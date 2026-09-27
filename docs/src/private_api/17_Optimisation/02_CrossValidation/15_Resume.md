@@ -10,7 +10,6 @@ PortfolioOptimisers.resume_fold_count
 PortfolioOptimisers.assert_resume_scheme
 PortfolioOptimisers.assert_resume_folds
 PortfolioOptimisers.assert_resume_full_fold
-PortfolioOptimisers.cv_resume_info
 PortfolioOptimisers.copy_states
 PortfolioOptimisers.copy_state
 PortfolioOptimisers.carrier_timestamps

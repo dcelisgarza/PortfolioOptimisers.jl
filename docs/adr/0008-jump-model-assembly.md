@@ -19,7 +19,7 @@ is repeated, in the same order, across five files:
 - [`RiskBudgeting`](../../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl) (`_optimise` ~688–713)
 - [`RelaxedRiskBudgeting`](../../src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl) (`_optimise` ~382)
 - [`FactorRiskContribution`](../../src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl) (`_optimise` ~299–341)
-- [`NearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl) (constrained `_optimise` ~1053–1105)
+- [`NearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl) (constrained `_optimise` ~1053–1105)
 
 The middle is the seam between builders, but it is not a module: it has no interface, so a
 change to constraint ordering or a new constraint type must be applied in five places, and
@@ -44,7 +44,7 @@ There are also two parallel representations of the processed inputs: MeanRisk/RB
 result-suffixed names (`lcsr`, `ctr`, `gcardr`, `plr`); constrained-NOC uses
 `processed_jump_optimiser` → a processed `JuMPOptimiser` in place, read with
 estimator-suffixed names (`lcse`, `cte`, `gcarde`, `ple`) and carrying the scalar settings on
-the same object, wrapped in a [`NearOptimalSetup`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl).
+the same object, wrapped in a [`NearOptimalSetup`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl).
 
 This builds on the Model State interface of [ADR 0004](0004-typed-jump-model-state.md): that
 ADR gave the data the builders share a named interface; this ADR gives the *ordering* of the
@@ -309,7 +309,7 @@ rather than refused.
 ### The census
 
 Every `JuMPOptimiser` setting was set one at a time on a default
-[`NearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl) with the three
+[`NearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl) with the three
 anchor portfolios supplied, and the assembled centring model was compared byte for byte
 against the same model without the setting. `lcse`, `card`, `l1`, `linf`, `lp`, `l2c`,
 `linfc`, `tn`, `tr` and `ss` all leave the model identical. They are carried and validated,
@@ -347,7 +347,7 @@ another, with nothing comparing the two.
 The review asks for a membership declaration that the head checks, so that a setting the
 formulation cannot honour raises instead of being ignored. That half is **not** done, and the
 exclusion is stated in the docstrings instead —
-[`UnconstrainedNearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl)
+[`UnconstrainedNearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl)
 now lists every setting the centring model reads and every setting it does not, and the `alg`
 field text names the choice as the thing that selects between them.
 
@@ -375,3 +375,37 @@ of fees": builds the head and the middle with the three anchors supplied, so no 
 asserts that the model's return expression and the `rt_opt` target both move with the fees, and
 that a fixed fee moves neither. Proved to discriminate — before the fix the two return
 expressions are byte-identical.
+
+## Amendment 4 (2026-09-24)
+
+Decision 5 put FRC's `set_sdp_frc_phylogeny_constraints!` in FRC's tail. The code called it in
+the head, before `assemble_jump_model!`. It reads two marks that the middle writes:
+`variance_flag`, which a variance marks when the objective's risk carries it, and
+`risk_minimised`, which `mark_risk_minimised!` writes after the return constraints. Neither mark
+was present when the head ran, so the factor phylogeny always added its `p · tr(frc_W)` penalty,
+while the asset phylogeny omits it for a variance that the objective minimises (#1305).
+
+The call now runs after `assemble_jump_model!` and before the objective, where decision 5 put
+it, and the two phylogenies follow one rule. The same change stopped passing `_optimise`'s
+keyword arguments to `phylogeny_constraints` as positional arguments, which threw a
+`MethodError` for a phylogeny estimator and any keyword that the head does not read, and widened
+`FactorRiskContributionResult`'s `frc_plr` to a vector of results, which `frc_ple` already
+accepts. Found by the sweep of `05_SDPConstraints.jl` (#1304). Verified in
+`test_19_factor_risk_contribution.jl`, "A semidefinite factor phylogeny reads the marks of the
+assembled model".
+
+## Amendment 5 (2026-09-24)
+
+Decision 5 now covers two builders in FRC's tail. `set_frc_iplg_constraints!` applies an
+`IntegerPhylogeny` of `frc_ple` to the factor weights `w1`, beside
+`set_sdp_frc_phylogeny_constraints!`. Before it, the field accepted an integer entry and dropped it
+without a message (#1311). The middle is unchanged: an asset `IntegerPhylogeny` in the optimiser's
+own phylogeny field still reaches `set_iplg_constraints!` there, and it gates on the asset bits that
+`set_mip_constraints!` registers in Model State.
+
+The factor builder declares its own held bits in a `FactorMIPSpace`, under the prefix `frc_`, and
+reads them in the same call. It registers no bundle, so the asset bits stay the ones that
+`mip_indicators` returns. A factor weight is free in sign and has no bound of its own, so the gate
+takes its bounds from the asset weight bounds through `w1 = Bᵀw`, and the builder refuses asset
+bounds that are not finite. Verified in `test_19_factor_risk_contribution.jl`, "An integer factor
+phylogeny gates the factor weights".

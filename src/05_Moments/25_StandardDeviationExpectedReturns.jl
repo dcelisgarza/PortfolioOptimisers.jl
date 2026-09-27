@@ -83,7 +83,7 @@ Compute expected returns as the standard deviation of each asset.
 
 This method returns the standard deviation vector of `X` as estimated by the covariance estimator `me.ce`. The result is in the units of the returns in `X`. It is the elementwise square root of what [`mean(me::VarianceExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) returns on the same data and the same `me.ce`.
 
-The method reads the diagonal of the matrix that `me.ce` returns, not a formula of its own. Every choice inside `me.ce` therefore reaches the result: the moment algorithm, the observation weights, and the matrix processing.
+The method reads the diagonal of the matrix that `me.ce` returns, not a formula of its own. Every choice inside `me.ce` therefore reaches the result: the moment algorithm, the observation weights, and the matrix processing. It calls `me.ce` through [`library_covariance_estimator`](@ref), which wraps an estimator the library does not own, such as `StatsBase.SimpleCovariance()`, in a [`GeneralCovariance`](@ref). `StatsBase` defines no `std` for such an estimator.
 
 # Mathematical definition
 
@@ -124,7 +124,7 @@ Where:
 function Statistics.mean(me::StandardDeviationExpectedReturns, X::MatNum; dims::Int = 1,
                          kwargs...)
     assert_dims(dims)
-    return Statistics.std(me.ce, X; dims = dims, kwargs...)
+    return Statistics.std(library_covariance_estimator(me.ce), X; dims = dims, kwargs...)
 end
 
 """
@@ -211,7 +211,7 @@ Compute expected returns as the variance of each asset.
 
 This method returns the variance vector of `X` as estimated by the covariance estimator `me.ce`. The result is in the squared units of the returns in `X`. It is the elementwise square of what [`mean(me::StandardDeviationExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) returns on the same data and the same `me.ce`.
 
-The method reads the diagonal of the matrix that `me.ce` returns, not a formula of its own. Every choice inside `me.ce` therefore reaches the result: the moment algorithm, the observation weights, and the matrix processing.
+The method reads the diagonal of the matrix that `me.ce` returns, not a formula of its own. Every choice inside `me.ce` therefore reaches the result: the moment algorithm, the observation weights, and the matrix processing. It calls `me.ce` through [`library_covariance_estimator`](@ref), which wraps an estimator the library does not own, such as `StatsBase.SimpleCovariance()`, in a [`GeneralCovariance`](@ref). `StatsBase` defines no `var` for such an estimator.
 
 # Mathematical definition
 
@@ -251,7 +251,7 @@ Where:
 """
 function Statistics.mean(me::VarianceExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
     assert_dims(dims)
-    return Statistics.var(me.ce, X; dims = dims, kwargs...)
+    return Statistics.var(library_covariance_estimator(me.ce), X; dims = dims, kwargs...)
 end
 
 export StandardDeviationExpectedReturns, VarianceExpectedReturns

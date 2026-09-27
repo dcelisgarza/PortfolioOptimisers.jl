@@ -2,7 +2,7 @@
 Description = "Median expected returns, public API of PortfolioOptimisers.jl: MedianExpectedReturns, mean."
 ```
 
-# Median expected returns
+# [Median expected returns](@id api-median-expected-returns)
 
 ```@docs
 MedianExpectedReturns

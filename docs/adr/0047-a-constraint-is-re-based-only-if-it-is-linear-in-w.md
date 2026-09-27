@@ -188,7 +188,7 @@ missed a case. Each is corrected here; the decision itself stands.
 `JuMPOptimiser` get factor exposure constraints without knowing they exist" is true of the
 projection — nothing downstream needs a factor concept — but it overstated what NOC does with a
 linear constraint.
-[`UnconstrainedNearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering.jl), which
+[`UnconstrainedNearOptimalCentering`](../../src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl), which
 is the **default**, builds its centering model with weight bounds, budget, risk and return only. It
 never calls `set_linear_weight_constraints!`, so `lcsr` is dropped from the model whose solution is
 returned. This is by design, is long-standing, and applies to an asset-space linear constraint
@@ -203,7 +203,7 @@ together.
 as unconditional. As written that throws a `KeyError` on the common case: every factor-prior run
 that declares no factor axis has an `rd.nf` and no `sets.dict[fkey]`, and the factor axis is
 *optional* by the decision two paragraphs above it.
-[`assert_universe_axis_order`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl) therefore skips an
+[`assert_universe_axis_order`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl) therefore skips an
 axis when **either** side is absent, and checks the pair only when both are declared. It also runs
 *before* the prior is fitted, so a misaligned universe is reported without paying for a regression
 first.

@@ -4,7 +4,7 @@ Description = "Net returns and drawdowns, public API of PortfolioOptimisers.jl: 
 
 # Net returns and drawdowns
 
-Net returns and drawdowns are two of the performance metrics of a portfolio. Here we define functions used to compute portfolio returns and related quantities.
+The functions below compute the returns of a portfolio net of fees, the returns of each asset position, the turnover, the cumulative returns and the drawdowns. The types below state how the weights move between two rebalances.
 
 ```@docs
 AbstractPreviousWeightsSource

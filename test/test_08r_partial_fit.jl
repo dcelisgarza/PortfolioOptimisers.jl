@@ -236,6 +236,15 @@ state its estimator no longer matches.
         @test isnothing(pe.obs_weights_view(cv, 1:10).cache)
         @test isnothing(pe.obs_weights_view(me, 1:10).cache)
         @test isnothing(pe.obs_weights_view(gc, 1:10).cache)
+        # `@wprop` alone opens the observation channel. A type with no `@wprop` field falls
+        # through to the identity, so every state it holds is carried, its children's too.
+        # A child viewed on its own still drops its state. #1344.
+        poc = fold(PortfolioOptimisersCovariance(), X)
+        epr = fold(EmpiricalPrior(), X)
+        @test !isnothing(poc.ce.cache) && !isnothing(epr.cache)
+        @test pe.obs_weights_view(poc, 1:10) === poc
+        @test pe.obs_weights_view(epr, 1:10) === epr
+        @test isnothing(pe.obs_weights_view(poc.ce, 1:10).cache)
 
         # The slice is exact: the viewed estimator reads what the same estimator reads when
         # it is fitted on the selected columns alone.

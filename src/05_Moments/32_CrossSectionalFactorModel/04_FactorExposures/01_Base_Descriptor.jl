@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Descriptor Estimator types.
 
-A Descriptor Estimator produces one Descriptor: a per-asset value at every observation, computed from one or more Panel Fields of an Asset Panel. A point-in-time ratio of two fundamentals, the logarithm of a market capitalisation and the growth of a field over a lag are each one Descriptor. The estimator is configuration, so it names the Panel Fields it reads and holds no data.
+A Descriptor Estimator produces one Descriptor, a per-asset value at every observation that the estimator computes from one or more Panel Fields of an Asset Panel. A point-in-time ratio of two fundamentals, the logarithm of a market capitalisation and the growth of a field over a lag are each one Descriptor. The estimator is configuration, so it names the Panel Fields it reads and holds no data.
 
 All concrete types producing a Descriptor should be subtypes of `AbstractDescriptorEstimator`.
 
@@ -48,7 +48,7 @@ abstract type AbstractDescriptorEstimator <: AbstractEstimator end
 
 Compute the Descriptor of a carrier.
 
-This is the verb every Descriptor Estimator answers. It reads the Panel Fields the estimator names off `rd.pnl`, which owns their values. Returns are not a Panel Field, so a member that reads them reads `rd.X`. Every member follows two conventions: the value at an observation uses information up to and including that observation, and every cell where the active mask of the Asset Panel is `false` is `NaN`.
+Every Descriptor Estimator implements this function. It reads the Panel Fields that the estimator names from `rd.pnl`. Returns are not a Panel Field, so a member that reads them reads `rd.X`. Every member follows two conventions. The value at an observation uses information up to and including that observation, and every cell where the active mask of the Asset Panel is `false` is `NaN`.
 
 # Arguments
 
@@ -75,13 +75,13 @@ function descriptor end
 
 Read one numeric Panel Field, or a linear combination of numeric Panel Fields, out of a carrier.
 
-This is the one route from a Panel Field's name to its values, and every Descriptor Estimator reads through it. A blank cell never reaches a carrier: [`asset_panel`](@ref) resolves each one to a fill value and records the resolution in the field's observed-mask column. The read undoes that resolution, so a cell the fill touched comes back as `NaN` and a Descriptor cannot mistake a fill value for data.
+Every Descriptor Estimator reads its Panel Fields through this function. A blank cell never reaches a carrier, because [`asset_panel`](@ref) resolves each one to a fill value and records the resolution in the observed-mask column of the field. This function writes `NaN` back into each cell that the fill set, so a Descriptor cannot mistake a fill value for data.
 
 # Algorithm
 
- 1. Look the Panel Field up by name through [`panel_field`](@ref), and copy its values into a matrix whose element type is the one a division of the field's values lands in, which is the type that carries a `NaN`: an integer field reads in `Float64`, a `Float32` field in `Float32`.
+ 1. Look the Panel Field up by name through [`panel_field`](@ref), and copy its values into a matrix whose element type is `float_if_integer` of the field's. An integer field reads in `Float64`, and a `Float32` field stays `Float32`.
  2. When the Panel Field carries an observed mask, write `NaN` into every cell whose mask entry is `false`.
- 3. For a vector of `name => coefficient` pairs, read each named field the same way, and return the sum of the fields, each multiplied by its coefficient. A `NaN` in any term is a `NaN` in the sum.
+ 3. For a vector of `name => coefficient` pairs, read each named field the same way and multiply it by its coefficient. Return the sum of those terms in the type that all of them promote to, so the order of the terms does not change the result. A `NaN` in any term is a `NaN` in the sum.
 
 # Arguments
 
@@ -137,7 +137,7 @@ function panel_field_values(rd::ReturnsResult, name::AbstractString)::Matrix{<:R
               ArgumentError("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be a NumericPanelField, got a $(nameof(typeof(f)))"))
     @argcheck(ndims(f.vals) == 2,
               DimensionMismatch("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be time-varying; this Asset Panel is static"))
-    Tf = typeof(one(eltype(f.vals)) / one(eltype(f.vals)))
+    Tf = float_if_integer(eltype(f.vals))
     V = Matrix{Tf}(f.vals)
     omsk = f.omsk
     if !isnothing(omsk)
@@ -153,9 +153,11 @@ function panel_field_values(rd::ReturnsResult,
                             terms::AbstractVector{<:Pair{<:AbstractString, <:Real}})::Matrix{<:Real}
     @argcheck(!isempty(terms),
               IsEmptyError("a Panel Field combination needs at least one `name => coefficient` term"))
-    V = panel_field_values(rd, terms[1][1]) .* terms[1][2]
-    for k in 2:length(terms)
-        V .+= panel_field_values(rd, terms[k][1]) .* terms[k][2]
+    Vs = [panel_field_values(rd, name) .* c for (name, c) in terms]
+    V = similar(Vs[1], mapreduce(eltype, promote_type, Vs))
+    V .= Vs[1]
+    for k in 2:length(Vs)
+        V .+= Vs[k]
     end
     return V
 end
@@ -164,7 +166,7 @@ end
 
 Read the Asset Panel a Descriptor needs out of a carrier.
 
-[`panel_field_values`](@ref) reaches the panel through the name of a Panel Field, and every Descriptor that reads one meets its refusal. A Descriptor over the returns reads no Panel Field, so it takes this route to the same refusal and to the active mask [`descriptor_active_fill!`](@ref) needs.
+[`panel_field_values`](@ref) refuses a carrier that holds no Asset Panel. A Descriptor over the returns reads no Panel Field, so it calls this function to get the same refusal and the active mask that [`descriptor_active_fill!`](@ref) reads.
 
 # Arguments
 
@@ -219,25 +221,63 @@ A Descriptor that compounds returns takes the logarithm of one plus each return.
 function assert_log_returns(X::AbstractMatrix{<:Real})::Nothing
     k = findfirst(x -> !isnan(x) && x <= -one(x), X)
     @argcheck(isnothing(k),
-              DomainError(isnothing(k) ? NaN : X[k],
-                          "a Descriptor over log returns takes the logarithm of one plus each return, so every return that is not missing must be greater than -1, and it is $(isnothing(k) ? NaN : X[k]) at observation $(isnothing(k) ? 0 : k[1]) for asset $(isnothing(k) ? 0 : k[2]). A return at or below -1 is a data error, so clean the input rather than pass it through."))
+              DomainError(X[k],
+                          "a Descriptor over log returns takes the logarithm of one plus each return, so every return that is not missing must be greater than -1, and it is $(X[k]) at observation $(k[1]) for asset $(k[2]). A return at or below -1 is a data error, so clean the input rather than pass it through."))
     return nothing
+end
+"""
+    nan_fill_value(A::AbstractArray{<:Number}) -> Number
+
+Return `NaN` in the element type of an array that a fill writes into in place, and refuse an element type that cannot hold it.
+
+A fill changes an array that its caller owns, so it cannot widen the element type the way a function that allocates its result does with `float_if_integer`. An `Integer`, a `Rational` or a `Complex{Int}` holds no `NaN`, and the conversion would raise an `InexactError` at the first inactive cell. This function converts once, before the fill writes anything. Every element type that holds `NaN` passes, a number type from another package included. Every other type raises an `ArgumentError` whose message names the repair.
+
+# Arguments
+
+  - `A`: The array the fill writes into.
+
+# Validation
+
+  - `eltype(A)` holds `NaN`. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nan::Number`: `NaN` converted to `eltype(A)`.
+
+# Related
+
+  - [`descriptor_active_fill!`](@ref)
+  - [`exposure_active_fill!`](@ref)
+  - [`one_hot_level_fill!`](@ref)
+  - [`one_hot_observed_fill!`](@ref)
+"""
+function nan_fill_value(A::AbstractArray{<:Number})::Number
+    T = eltype(A)
+    try
+        return convert(T, NaN)
+    catch err
+        if !(err isa InexactError)
+            rethrow()
+        end
+        throw(ArgumentError("a fill writes NaN into the cells that hold no value, in place, so the element type of the array must hold NaN, and $T does not. Convert the array to a floating point type before the call, for example with float_if_integer."))
+    end
 end
 """
     descriptor_active_fill!(D::AbstractMatrix{<:Number}, pnl::AssetPanel) -> nothing
 
 Write `NaN` into every cell of a Descriptor where the active mask of the Asset Panel is `false`, in place.
 
-Every Descriptor Estimator ends with this call, so the convention that an inactive cell is `NaN` is written once. An asset that is not listed at an observation has no Descriptor there, whatever its Panel Fields hold.
+Every Descriptor Estimator ends with this call, so the library states the convention that an inactive cell is `NaN` in one place. An asset that is not listed at an observation has no Descriptor there, whatever its Panel Fields hold.
 
 # Arguments
 
-  - `D`: The Descriptor, `observations × assets`, changed in place.
+  - `D`: The Descriptor, `observations × assets`, changed in place. Its element type must hold `NaN`.
   - `pnl`: The Asset Panel whose active mask is read.
 
 # Validation
 
   - `size(D) == size(pnl.amsk)`. Raises a `DimensionMismatch`.
+  - `eltype(D)` holds `NaN`, through [`nan_fill_value`](@ref). Raises an `ArgumentError`.
 
 # Returns
 
@@ -268,10 +308,10 @@ function descriptor_active_fill!(D::AbstractMatrix{<:Number}, pnl::AssetPanel)::
     amsk = pnl.amsk
     @argcheck(size(D) == size(amsk),
               DimensionMismatch("a Descriptor is observations × assets, so it must match the active mask of the Asset Panel, got size(D) = $(size(D)) and size(pnl.amsk) = $(size(amsk))"))
-    Tf = eltype(D)
+    nan = nan_fill_value(D)
     for k in CartesianIndices(D)
         if !amsk[k]
-            D[k] = Tf(NaN)
+            D[k] = nan
         end
     end
     return nothing
@@ -281,7 +321,20 @@ end
 
 Divide `a` by `b` where `b` is strictly positive, and return `NaN` otherwise.
 
-A ratio Descriptor is undefined where its denominator is zero, and it is meaningless where a quantity that is positive by construction, a market capitalisation or a total of assets, is negative. Both cases answer `NaN` rather than a number or an error, so one bad cell costs one cell of the Descriptor and not the whole fit. A `NaN` denominator compares `false` against zero, so it also answers `NaN`.
+A ratio Descriptor is undefined where its denominator is zero, and it is meaningless where a quantity that is positive by construction, a market capitalisation or a total of assets, is negative. Both cases give `NaN` rather than a number or an error, so one bad cell costs one cell of the Descriptor and not the whole fit. A `NaN` denominator compares `false` against zero, so it also gives `NaN`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+q &= \\begin{cases} a / b & b > 0\\,, \\\\ \\mathrm{NaN} & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``a``: The numerator.
+  - ``b``: The denominator.
 
 # Arguments
 
@@ -290,7 +343,7 @@ A ratio Descriptor is undefined where its denominator is zero, and it is meaning
 
 # Returns
 
-  - `q::Real`: `a / b` when `b > 0`, `NaN` otherwise, in the floating point type of the quotient.
+  - `q::Real`: The quotient, in the type of `a / b`. Where `b` is not positive, that type must hold `NaN`, so a `Rational` quotient raises an `InexactError` there.
 
 # Examples
 
@@ -320,15 +373,30 @@ end
 
 Build the market return of every observation from a carrier.
 
-This is the one market series every market-relative Descriptor reads, so the rule that defines it is stated once. The market return is the capitalisation-weighted mean of the returns over the estimation universe, and it is rebuilt from the Asset Panel by every member rather than supplied by the caller.
+Every market-relative Descriptor reads this series, so its definition is in one place. The market return is the capitalisation-weighted mean of the returns over the estimation universe, and every member rebuilds it from the Asset Panel rather than take it from the caller. A weight need not be positive. A negative capitalisation is a data error and not a missing value, so it enters the sum as it stands.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+r_{m,t} &= \\frac{\\sum_{i \\in \\mathcal{E}_{t}} c_{t,i}\\, x_{t,\\,i}}{\\sum_{i \\in \\mathcal{E}_{t}} c_{t,i}}\\,, \\\\
+\\mathcal{E}_{t} &= \\left\\{ i : e_{t,i} \\text{ is true, and } x_{t,\\,i} \\text{ and } c_{t,i} \\text{ are finite} \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:r_mt_ewb])
+  - $(math_dict[:x_ti_ret])
+  - ``c_{t,i}``: Capitalisation of asset ``i`` at observation ``t``, `NaN` where the Panel Field was not observed.
+  - ``e_{t,i}``: Entry of the estimation mask of the Asset Panel.
+  - ``\\mathcal{E}_{t}``: The assets that enter the mean at observation ``t``.
 
 # Algorithm
 
- 1. Read the capitalisation Panel Field through [`panel_field_values`](@ref), so a cell a fill touched comes back as `NaN`.
- 2. At each observation, take the pairs where the estimation mask is `true` and where both the return and the weight are finite.
- 3. Return the mean of those returns, weighted by the capitalisation.
-
-A weight is not required to be positive: a negative capitalisation is a data error rather than a missing value, so it enters the sum as it stands. The total weight of an observation must be strictly positive, because a total of zero or below divides no mean.
+ 1. Read the capitalisation ``c`` through [`panel_field_values`](@ref), so a cell that a fill touched is `NaN` and leaves ``\\mathcal{E}_{t}``.
+ 2. At each observation, add up the numerator and the denominator of ``r_{m,t}`` over ``\\mathcal{E}_{t}``.
+ 3. Refuse a denominator at or below zero, and store the quotient as ``r_{m,t}``.
 
 # Arguments
 
@@ -338,7 +406,7 @@ A weight is not required to be positive: a negative capitalisation is a data err
 # Validation
 
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
-  - The total weight of every observation is strictly positive. Raises an `ArgumentError` naming the observation.
+  - The total weight ``\\sum_{i \\in \\mathcal{E}_{t}} c_{t,i}`` of every observation is strictly positive, because a total of zero or below divides no mean. Raises an `ArgumentError` naming the observation.
 
 # Returns
 
@@ -396,34 +464,40 @@ end
 
 Run the exponentially weighted market beta recursion down each column of a return matrix.
 
-This is the recursion every market-relative Descriptor shares, so the two files that hold one call it rather than repeat it. Each asset carries its own state and its own count of valid observations, and the market carries one state for the whole panel.
+[`EWBeta`](@ref) and [`EWResidualVolatility`](@ref) both call this recursion rather than repeat it. Each asset has its own state and its own count of valid observations, and the market has one state for the whole panel.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-d_{t} &= r_{m,t} - \\mu_{t-1}\\,, \\quad d_{t,i} = r_{t,i} - \\mu_{t-1,i}\\,, \\\\
-V_{t} &= \\lambda V_{t-1} + (1 - \\lambda) d_{t}^2\\,, \\\\
-C_{t,i} &= \\lambda C_{t-1,i} + (1 - \\lambda) d_{t,i} d_{t}\\,, \\\\
-\\beta_{t,i} &= \\frac{C_{t,i}}{V_{t} + \\texttt{min\\_val}}\\,.
+\\beta_{t,i} &= \\frac{C_{t,i}}{V_{m,t} + \\texttt{min\\_val}}\\,, \\\\
+C_{t,i} &= \\lambda C_{t-1,i} + (1 - \\lambda)\\left(x_{t,\\,i} - \\mu_{t-1,i}\\right)\\left(r_{m,t} - \\mu_{m,t-1}\\right)\\,, \\\\
+V_{m,t} &= \\lambda V_{m,t-1} + (1 - \\lambda)\\left(r_{m,t} - \\mu_{m,t-1}\\right)^2\\,, \\\\
+\\mu_{t,i} &= \\lambda \\mu_{t-1,i} + (1 - \\lambda)\\, x_{t,\\,i}\\,, \\\\
+\\mu_{m,t} &= \\lambda \\mu_{m,t-1} + (1 - \\lambda)\\, r_{m,t}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``r_{m,t}``: The market return at observation ``t``.
-  - ``r_{t,i}``: The return of asset ``i`` at observation ``t``.
-  - ``\\mu_{t}``, ``\\mu_{t,i}``: Exponentially weighted means of the market and of asset ``i``.
-  - ``V_{t}``: Exponentially weighted variance of the market return.
   - ``C_{t,i}``: Exponentially weighted covariance of asset ``i`` with the market.
-  - ``\\lambda``: The decay factor.
+  - ``\\mu_{t,i}``, ``\\mu_{m,t}``: Exponentially weighted means of asset ``i`` and of the market.
+  - $(math_dict[:beta_ti_ewb])
+  - $(math_dict[:V_mt_ewb])
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:r_mt_ewb])
+  - $(math_dict[:lambda_ew])
+  - $(math_dict[:min_val_ewb])
+  - $(math_dict[:n_i_ew])
+
+Every state starts from zero, and each deviation uses the mean of the previous observation. This is the exponentially weighted form of Welford's recursion, and it has none of the downward bias of a deviation from the updated mean. The states of asset ``i`` advance only at an observation where its return is valid, and they hold their values at every other observation. ``n_i`` counts the observations where they advance. The market states advance at every observation.
 
 # Algorithm
 
- 1. Take each deviation from the mean of the **previous** step, and update the mean after it. This is the exponentially weighted form of Welford's recursion, and it carries none of the downward bias that a deviation from the updated mean carries.
- 2. Advance the market state at every observation, and an asset's state only where its return is valid.
- 3. Write a fresh beta where the observation count of the panel and the valid count of the asset have both reached `min_obs`. An asset whose return is not valid keeps the beta it last held, and an asset that has never been ready holds `NaN`.
- 4. Where `amsk` is given, [`ew_beta_reset!`](@ref) restarts the mean, the covariance and the count of an asset that turns inactive, and a valid return needs an active cell. Where `amsk` is `nothing`, no state ever restarts and a valid return is any finite return.
+ 1. Where `amsk` is given, call [`ew_beta_reset!`](@ref), which sets ``\\mu_{t-1,i}``, ``C_{t-1,i}`` and ``n_i`` to zero for an asset that turns inactive. A valid return then needs an active cell. Where `amsk` is `nothing`, no state restarts and a valid return is any finite return.
+ 2. Update ``\\mu_{m,t}`` and ``V_{m,t}`` from ``r_{m,t}``, and store ``V_{m,t}``.
+ 3. For each asset with a valid return, update ``\\mu_{t,i}`` and ``C_{t,i}``, and add one to ``n_i``.
+ 4. Where ``t`` and ``n_i`` have both reached `min_obs`, write a new ``\\beta_{t,i}``. Every other cell holds the last beta of its asset, and an asset that has never reached `min_obs` holds `NaN`. A restart does not clear the held beta, so it holds until ``n_i`` reaches `min_obs` again.
 
 # Arguments
 
@@ -432,12 +506,12 @@ Where:
   - $(arg_dict[:decay])
   - $(arg_dict[:min_obs])
   - $(arg_dict[:min_val])
-  - `amsk`: Optional active mask, `observations × assets`. It resets the state of an asset that turns inactive.
+  - `amsk`: Optional active mask, `observations × assets`. The recursion restarts the state of an asset where it turns inactive.
 
 # Returns
 
-  - `B::Matrix{<:Real}`: The betas, `observations × assets`, before any mask is applied.
-  - `Vm::Vector{<:Real}`: The market variance after each observation.
+  - `B::Matrix{<:Real}`: The betas ``\\beta_{t,i}``, `observations × assets`, before the caller applies a mask.
+  - `Vm::Vector{<:Real}`: The market variance ``V_{m,t}``, one entry per observation.
 
 # Examples
 
@@ -463,7 +537,7 @@ julia> B
 function ew_beta_series(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real}, decay::Real,
                         min_obs::Integer, min_val::Real,
                         amsk::Option{<:AbstractMatrix{Bool}} = nothing)
-    Tf = promote_type(eltype(X), eltype(rm))
+    Tf = float_if_integer(promote_type(eltype(X), eltype(rm)))
     T, N = size(X)
     B = fill(Tf(NaN), T, N)
     Vm = Vector{Tf}(undef, T)
@@ -504,12 +578,12 @@ end
                    n::AbstractVector{<:Integer}, act::AbstractVector{Bool},
                    t::Integer) -> nothing
     ew_beta_reset!(amsk::AbstractMatrix{Bool}, mu::AbstractVector{<:Number},
-                   cv::AbstractVector{<:Real}, n::AbstractVector{<:Integer},
+                   cv::AbstractVector{<:Number}, n::AbstractVector{<:Integer},
                    act::AbstractVector{Bool}, t::Integer) -> nothing
 
 Restart the state of every asset that turns inactive at one observation, in place.
 
-The optional active mask of [`ew_beta_series`](@ref) is read here by dispatch rather than by a branch inside the recursion. With no mask no state ever restarts, and `act` stays `true` everywhere, which is what makes any finite return a valid one. With a mask, `act` carries that observation's activity, so the recursion tests one vector rather than the mask and the mask's absence.
+This function reads the optional active mask of [`ew_beta_series`](@ref) by dispatch, so the recursion needs no branch on it. With no mask, no state restarts and `act` stays `true` everywhere, so any finite return is valid. With a mask, `act` holds the activity of the observation, so the recursion tests one vector and not both the mask and its absence.
 
 # Arguments
 

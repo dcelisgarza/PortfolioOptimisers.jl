@@ -2,7 +2,7 @@
 Description = "Ulcer Index, public API of PortfolioOptimisers.jl: UlcerIndex, RelativeUlcerIndex."
 ```
 
-# Ulcer Index
+# [Ulcer Index](@id api-ulcer-index)
 
 ```@docs
 UlcerIndex

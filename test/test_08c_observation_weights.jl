@@ -37,6 +37,15 @@ function PortfolioOptimisers.get_observation_weights(::VectorOnlyObsWeights,
     return aweights(fill(inv(length(X)), length(X)))
 end
 
+# Implements the matrix arity ONLY, as a type that reads the returns matrix does. A moment
+# measure that handed it to a nested variance estimator met the vector arity and raised.
+struct MatrixOnlyObsWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::MatrixOnlyObsWeights,
+                                                     X::PortfolioOptimisers.MatNum;
+                                                     dims::Int = 1, kwargs...)
+    return aweights(collect(range(1.0, 2.0; length = size(X, dims))))
+end
+
 const PO = PortfolioOptimisers
 
 @testset "Observation weight resolution" begin
@@ -230,15 +239,53 @@ const PO = PortfolioOptimisers
             @test_throws PO.ObservationWeightsError dyn_vw(w, X)
         end
 
-        # The rebuild replaces `w` and copies every other field, so a non-default setting
-        # survives it. The ten hand-written rebuilds named their fields one by one.
-        for r in (LowOrderMoment(; w = cw, settings = RiskMeasureSettings(; scale = 3)),
-                  Kurtosis(; w = cw, settings = RiskMeasureSettings(; scale = 3), N = 7),
-                  Skewness(; w = cw, settings = MaxRiskMeasureSettings(; scale = 3)))
-            rebuilt = PO.Accessors.@set r.w = PO.get_observation_weights(r.w, X)
-            @test isa(rebuilt.w, StatsBase.AbstractWeights)
-            @test all(f -> f === :w || getfield(rebuilt, f) === getfield(r, f),
+        # The rebuild replaces `w` and the nested estimator, and copies every other field,
+        # so a non-default setting survives it. An earlier set of hand-written rebuilds
+        # dropped fields: `Skewness` reset its `settings`.
+        for r in (LowOrderMoment(; w = cw, settings = RiskMeasureSettings(; scale = 3),
+                                 mu = 0.001, alg = SecondMoment()),
+                  HighOrderMoment(; w = cw, settings = RiskMeasureSettings(; scale = 3),
+                                  mu = 0.001, alg = PO.StandardisedHighOrderMoment()),
+                  Kurtosis(; w = cw, settings = RiskMeasureSettings(; scale = 3), mu = 0.001,
+                           N = 7, alg1 = PO.SemiMoment()),
+                  Skewness(; w = cw, settings = MaxRiskMeasureSettings(; scale = 3), mu = 0.001),
+                  PO.ThirdCentralMoment(; w = cw,
+                                        settings = PO.HierarchicalRiskMeasureSettings(; scale = 3),
+                                        mu = 0.001))
+            rebuilt = PO.resolve_observation_weights(r, X)
+            @test rebuilt.w == rw
+            @test all(f -> f in (:w, :alg, :ve) || getfield(rebuilt, f) === getfield(r, f),
                       fieldnames(typeof(r)))
+        end
+        # A measure that is not a moment measure returns unchanged.
+        mad = MedianAbsoluteDeviation(; w = cw)
+        @test PO.resolve_observation_weights(mad, X) === mad
+    end
+
+    @testset "resolved weights reach the nested variance estimator (#1319)" begin
+        # `factory` against a prior writes the weights into `w` and into the variance
+        # estimator `ve`. The functor used to resolve `w` alone. So without `factory` the
+        # standard deviation went unweighted, and after `factory` with dynamic weights `ve`
+        # met the vector arity and raised.
+        w = fill(inv(5), 5)
+        mw = MatrixOnlyObsWeights()
+        rw = PO.get_observation_weights(mw, X)
+        pr = prior(HighOrderPriorEstimator(), X)
+        mu = pr.mu
+        sha = PO.StandardisedHighOrderMoment
+        for f in (ow -> LowOrderMoment(; w = ow, mu = mu, alg = SecondMoment()),
+                  ow -> LowOrderMoment(; w = ow, mu = mu,
+                                       alg = SecondMoment(; alg1 = PO.SemiMoment())),
+                  ow -> HighOrderMoment(; w = ow, mu = mu, alg = sha()),
+                  ow -> HighOrderMoment(; w = ow, mu = mu, alg = sha(; alg = PO.FourthMoment())),
+                  ow -> Skewness(; w = ow, mu = mu))
+            dyn, sta = f(mw), f(rw)
+            val = factory(sta, pr)(w, X)
+            @test isapprox(sta(w, X), val; rtol = 1e-12)
+            @test isapprox(dyn(w, X), val; rtol = 1e-12)
+            @test isapprox(factory(dyn, pr)(w, X), val; rtol = 1e-12)
+            # The series functor resolves against the series, which this type refuses.
+            @test_throws PO.ObservationWeightsError dyn(X * w)
         end
     end
 end

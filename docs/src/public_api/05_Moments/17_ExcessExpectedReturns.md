@@ -2,7 +2,7 @@
 Description = "Excess expected returns, public API of PortfolioOptimisers.jl: ExcessExpectedReturns, factory, mean."
 ```
 
-# Excess expected returns
+# [Excess expected returns](@id api-excess-expected-returns)
 
 ```@docs
 ExcessExpectedReturns

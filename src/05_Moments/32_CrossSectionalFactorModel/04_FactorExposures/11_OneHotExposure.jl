@@ -151,7 +151,11 @@ An asset that belongs to no level of the classification has no exposure to any o
 
 # Arguments
 
-  - `B`: The one-hot block, `observations × assets × levels`, changed in place.
+  - `B`: The one-hot block, `observations × assets × levels`, changed in place. Its element type must hold `NaN`.
+
+# Validation
+
+  - `eltype(B)` holds `NaN`, through [`nan_fill_value`](@ref). Raises an `ArgumentError`.
 
 # Returns
 
@@ -164,7 +168,7 @@ An asset that belongs to no level of the classification has no exposure to any o
   - [`factor_exposure`](@ref)
 """
 function one_hot_level_fill!(B::AbstractArray{<:Real, 3})::Nothing
-    Tf = eltype(B)
+    nan = nan_fill_value(B)
     for t in axes(B, 1), i in axes(B, 2)
         set = false
         for l in axes(B, 3)
@@ -176,7 +180,7 @@ function one_hot_level_fill!(B::AbstractArray{<:Real, 3})::Nothing
         end
         if !set
             for l in axes(B, 3)
-                B[t, i, l] = Tf(NaN)
+                B[t, i, l] = nan
             end
         end
     end
@@ -193,8 +197,12 @@ A blank never reaches a carrier: the builder resolves it to a fill value and rec
 
 # Arguments
 
-  - `B`: The one-hot block, `observations × assets × levels`, changed in place.
+  - `B`: The one-hot block, `observations × assets × levels`, changed in place. Its element type must hold `NaN`.
   - `omsk`: The Panel Field's observed mask, `observations × assets`, or `nothing` when the Panel Field cannot blank.
+
+# Validation
+
+  - `eltype(B)` holds `NaN` when `omsk` is a mask, through [`nan_fill_value`](@ref). Raises an `ArgumentError`.
 
 # Returns
 
@@ -211,11 +219,11 @@ function one_hot_observed_fill!(::AbstractArray{<:Number, 3}, ::Nothing)::Nothin
 end
 function one_hot_observed_fill!(B::AbstractArray{<:Number, 3},
                                 omsk::AbstractMatrix{Bool})::Nothing
-    Tf = eltype(B)
+    nan = nan_fill_value(B)
     for t in axes(B, 1), i in axes(B, 2)
         if !omsk[t, i]
             for l in axes(B, 3)
-                B[t, i, l] = Tf(NaN)
+                B[t, i, l] = nan
             end
         end
     end
@@ -277,7 +285,7 @@ julia> factor_exposure(OneHotExposure(; field = \"sector\", family = \"sector\")
 function factor_exposure(xe::OneHotExposure, rd::ReturnsResult)::Array{<:Real, 3}
     f = one_hot_field(rd, xe.field)
     codes = f.codes
-    Tf = real(eltype(rd.X))
+    Tf = float_if_integer(real(eltype(rd.X)))
     B = zeros(Tf, size(codes, 1), size(codes, 2), length(f.levels))
     for i in CartesianIndices(codes)
         B[i, codes[i]] = one(Tf)

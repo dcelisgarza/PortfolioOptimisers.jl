@@ -19,7 +19,7 @@ Represents the Negative Skewness risk measure.
 
 # Mathematical definition
 
-Let ``\\boldsymbol{w}`` be the portfolio weight vector and ``\\mathbf{V}`` the negative semi-definite coskewness matrix (spectral decomposition of the negative part of the sample coskewness tensor). The Negative Skewness risk measure is:
+Let ``\\boldsymbol{w}`` be the portfolio weight vector and ``\\mathbf{V}`` the positive semi-definite matrix built from the negative spectral parts of the slices of the sample coskewness tensor. The Negative Skewness risk measure is:
 
 ```math
 \\begin{align}
@@ -34,7 +34,7 @@ Where:
 
   - ``\\mathrm{NSke}(\\boldsymbol{w})``: Negative Skewness risk measure.
   - $(math_dict[:w_port])
-  - ``\\mathbf{V}``: Negative semi-definite coskewness matrix (spectral decomposition of the negative part of the sample coskewness tensor).
+  - ``\\mathbf{V}``: Positive semi-definite matrix built from the negative spectral parts of the slices of the sample coskewness tensor, so that the square root is real.
 
 # Fields
 

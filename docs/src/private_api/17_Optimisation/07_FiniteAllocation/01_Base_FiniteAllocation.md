@@ -16,7 +16,6 @@ allocation_liquidation_fee
 allocation_side_fees
 permute_side_fees
 allocation_fee
-adjust_long_cash
 ```
 
 ## References

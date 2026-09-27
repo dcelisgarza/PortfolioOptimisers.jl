@@ -63,9 +63,8 @@ Where:
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRisk,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
-                               kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
     return set_conditional_risk_constraints!(model, i, r, opt, pr, series, T,
                                              (; var = :var_, z = :z_cvar_,
@@ -107,7 +106,7 @@ this function writes the exceedance constraint once.
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
-                                           opt::RiskJuMPOptimisationEstimator,
+                                           opt::RiskConstraintOwner,
                                            pr::AbstractPriorResult, series, T::Int,
                                            keys::NamedTuple; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
@@ -161,8 +160,8 @@ CVaR expressions.
   - [`set_range_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatRiskRange,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     return set_range_risk_constraints!(model, i, r, :cvar_range_risk_, opt, pr, args...;
                                        prefix = prefix, kwargs...)
 end
@@ -209,9 +208,8 @@ a nested prefix rather than allowed to collide with those of the loss tail.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalValueatRisk,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
-                               kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     w = get_w(model, prefix)
     series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
     # The gain tail carries its own ambiguity ball, and `:Xap1` is not indexed by measure,
@@ -275,7 +273,7 @@ gross asset returns for the returns twin, drawdowns-plus-one for the drawdown tw
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_dr_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
-                                              opt::RiskJuMPOptimisationEstimator,
+                                              opt::RiskConstraintOwner,
                                               pr::AbstractPriorResult, w, series, ambiguity,
                                               T::Int, keys::NamedTuple;
                                               prefix::Symbol = Symbol(""))
@@ -364,8 +362,8 @@ Wasserstein ambiguity ball.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalValueatRiskRange,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     return set_range_risk_constraints!(model, i, r, :drcvar_risk_range_, opt, pr, args...;
                                        prefix = prefix, kwargs...)
 end
@@ -404,8 +402,8 @@ differ. The scalar variable is the drawdown at risk rather than the value at ris
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdownatRisk,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)
     return set_conditional_risk_constraints!(model, i, r, opt, pr, series, T,
                                              (; var = :dar_, z = :z_cdar_,
@@ -449,8 +447,8 @@ programme over two different series.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::DistributionallyRobustConditionalDrawdownatRisk,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     w = get_w(model, prefix)
     series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)
     ambiguity = set_portfolio_drawdowns_plus_one!(model, pr.X; prefix = prefix)

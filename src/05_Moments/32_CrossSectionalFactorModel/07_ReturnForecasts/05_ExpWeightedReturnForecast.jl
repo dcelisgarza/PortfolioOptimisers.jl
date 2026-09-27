@@ -8,7 +8,7 @@ Return the regression weights of an [`ExpWeightedReturnForecast`](@ref), in its 
 
 The method that Julia selects is the algorithm.
 
- 1. [`IdiosyncraticReturnUnit`](@ref): the fit runs on the idiosyncratic return, whose noise scales with the idiosyncratic variance, so the estimation mask is divided by that variance and the fit is a generalised least squares.
+ 1. [`IdiosyncraticReturnUnit`](@ref): the fit runs on the idiosyncratic return, whose noise scales with the idiosyncratic variance. The method divides the estimation mask by that variance, so the fit is a generalised least squares.
  2. [`IdiosyncraticSharpeUnit`](@ref): the target already carries the division, so the estimation mask is the whole weight and the fit is an ordinary least squares.
 
 # Arguments
@@ -39,7 +39,7 @@ end
 
 Return the mask of the `(observation, asset)` pairs an [`ExpWeightedReturnForecast`](@ref) fits on.
 
-A pair enters the fit when it carries a positive cross-sectional weight, a finite forward target, a finite idiosyncratic variance and a finite score for every Descriptor. The four conditions are read once and the answer is a mask, so the per-observation gather never re-derives them.
+A pair enters the fit when it carries a positive cross-sectional weight, a finite forward target, a finite idiosyncratic variance and a finite score for every Descriptor. The function reads the four conditions once and returns a mask, so the gather of each observation does not derive them again.
 
 # Arguments
 
@@ -75,7 +75,7 @@ end
 
 Gather the design, the target and the weights of one observation of an [`ExpWeightedReturnForecast`](@ref).
 
-The three arrays are materialised at the common floating point type rather than viewed, because the score array carries an open element type and a view of it names no numeric matrix.
+The function copies the three arrays into their promoted element type, so the accumulation reads one number type.
 
 # Arguments
 
@@ -110,7 +110,7 @@ Advance the exponentially weighted normal equations of an [`ExpWeightedReturnFor
 
 # Algorithm
 
- 1. When `normalise` is set, divide the weights by their mean over the valid assets, so that an observation enters with the same aggregate weight whatever the level of its idiosyncratic variances. A mean that is not finite or not positive leaves the weights as they stand.
+ 1. When `normalise` is `true`, divide the weights by their mean over the valid assets, so that an observation enters with the same aggregate weight whatever the level of its idiosyncratic variances. A mean that is not finite or not positive leaves the weights as they stand.
  2. Scale the design and the target by the square root of the weights, which is the weighted least squares of the observation written as an ordinary one.
  3. Advance `A` to `λ A + (1 - λ) Sw' Sw` and `c` to `λ c + (1 - λ) Sw' yw`.
 
@@ -122,7 +122,7 @@ Advance the exponentially weighted normal equations of an [`ExpWeightedReturnFor
   - `yb`: The target of the observation, of length `valid assets`.
   - `wb`: The weights of the observation, of length `valid assets`.
   - `decay`: The decay factor.
-  - `normalise`: Whether the weights of an observation are divided by their mean.
+  - `normalise`: Whether the function divides the weights of the observation by their mean.
 
 # Returns
 
@@ -153,7 +153,7 @@ Solve the ridge stabilised normal equations of an [`ExpWeightedReturnForecast`](
 
 # Algorithm
 
- 1. When `ridge` is positive, add `ridge` times the mean absolute diagonal entry of `A` to that diagonal, with the floor `eps` on the mean, so an empty normal matrix still gives a finite penalty.
+ 1. When `ridge` is positive, add `ridge` times the mean absolute diagonal entry of `A` to that diagonal, with the floor `eps` on the mean, so an empty normal matrix still gets a positive penalty.
  2. Solve through [`cross_sectional_solve`](@ref) under [`PseudoInverseFallback`](@ref), which takes the plain solve on a full rank matrix and the minimum-norm solution on a rank deficient one.
 
 # Arguments
@@ -175,7 +175,7 @@ Solve the ridge stabilised normal equations of an [`ExpWeightedReturnForecast`](
   - [`PseudoInverseFallback`](@ref)
 """
 function ew_forecast_solve(A::MatNum, c::VecNum, ridge::Real, t::Integer)::VecNum
-    Tf = promote_type(real(eltype(A)), real(eltype(c)))
+    Tf = promote_type(real(eltype(A)), real(eltype(c)), typeof(ridge))
     K = size(A, 1)
     Ar = Matrix{Tf}(A)
     if ridge > zero(ridge)
@@ -229,31 +229,51 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A Return Forecast whose Descriptor weights are fitted by exponentially weighted least squares.
+A Return Forecast that fits its Descriptor weights by exponentially weighted least squares.
 
-The member turns its Descriptors into scores with the recipe in `scores`, and regresses the forward mean idiosyncratic return of every observation on them across the assets. The normal equations of the observations are combined under an exponential decay rather than solved one at a time, so the coefficients carry the whole history and move slowly. No intercept is fitted, so the forecast absorbs no cross-sectional mean and suits a long-short caller.
+The member turns its Descriptors into scores with the recipe in `scores`. It regresses the forward mean idiosyncratic return of every observation on those scores across the assets. It combines the normal equations of the observations under an exponential decay and does not solve them one at a time, so the coefficients carry the whole history and move slowly. The fit has no intercept, so the forecast absorbs no cross-sectional mean and suits a long-short caller.
 
-The Forecast Unit chooses the pair of target and weights. In the return unit the target is the forward return and the weights are the inverse idiosyncratic variance, which is a generalised least squares. In the Sharpe unit the target is the forward return divided by the idiosyncratic volatility and the weights are the estimation mask, which is the same estimator written as an ordinary least squares, and the forecast is multiplied by the idiosyncratic volatility at the end.
+The Forecast Unit chooses the pair of target and weights. In the return unit the target is the forward return and the weights are the inverse idiosyncratic variance, which is a generalised least squares. In the Sharpe unit the target is the forward return divided by the idiosyncratic volatility and the weights are the estimation mask. That is the same estimator written as an ordinary least squares, and the member multiplies the forecast by the idiosyncratic volatility at the end.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathbf{A}_{t} &= \\lambda \\mathbf{A}_{t-1} + (1 - \\lambda) \\mathbf{S}_{t}^{\\intercal} \\mathbf{W}_{t} \\mathbf{S}_{t}\\,, \\\\
-\\boldsymbol{c}_{t} &= \\lambda \\boldsymbol{c}_{t-1} + (1 - \\lambda) \\mathbf{S}_{t}^{\\intercal} \\mathbf{W}_{t} \\boldsymbol{y}_{t}\\,, \\\\
-\\boldsymbol{\\beta}_{t} &= \\left(\\mathbf{A}_{t} + \\rho_{t} \\mathbf{I}\\right)^{-1} \\boldsymbol{c}_{t}\\,, &
-\\rho_{t} &= \\varrho \\, \\overline{\\lvert \\operatorname{diag} \\mathbf{A}_{t} \\rvert}\\,.
+y_{ti} &= \\frac{\\bar{\\varepsilon}_{ti}}{g_{ti}}\\,, \\\\
+w_{ti} &= \\frac{u_{ti} \\, g_{ti}^{2}}{v_{ti}}\\,, \\\\
+\\omega_{ti} &= \\frac{w_{ti}}{\\frac{1}{\\lvert \\mathcal{A}_{t} \\rvert} \\sum_{j \\in \\mathcal{A}_{t}} w_{tj}}\\,, \\\\
+\\mathbf{A}_{k} &= \\lambda \\mathbf{A}_{k-1} + (1 - \\lambda) \\sum_{i \\in \\mathcal{A}_{t_{k}}} \\omega_{t_{k}i} \\, \\boldsymbol{s}_{t_{k}i} \\boldsymbol{s}_{t_{k}i}^{\\intercal}\\,, \\\\
+\\boldsymbol{c}_{k} &= \\lambda \\boldsymbol{c}_{k-1} + (1 - \\lambda) \\sum_{i \\in \\mathcal{A}_{t_{k}}} \\omega_{t_{k}i} \\, \\boldsymbol{s}_{t_{k}i} \\, y_{t_{k}i}\\,, \\\\
+\\rho_{k} &= \\varrho \\max\\left(\\frac{1}{K} \\sum_{j = 1}^{K} \\left\\lvert A_{k,jj} \\right\\rvert, \\epsilon\\right)\\,, \\\\
+\\boldsymbol{\\beta}_{k} &= \\left(\\mathbf{A}_{k} + \\rho_{k} \\mathbf{I}\\right)^{-1} \\boldsymbol{c}_{k}\\,, \\\\
+\\alpha_{ti} &= \\gamma \\, g_{ti} \\, \\boldsymbol{s}_{ti}^{\\intercal} \\boldsymbol{\\beta}_{m(t - d)}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathbf{S}_{t}``: Descriptor scores of the valid assets of observation ``t``.
-  - ``\\mathbf{W}_{t}``: diagonal of the regression weights of those assets.
-  - ``\\boldsymbol{y}_{t}``: forward target of those assets.
-  - ``\\lambda``: the decay factor.
-  - ``\\varrho``: the relative ridge penalty.
-  - ``\\boldsymbol{\\beta}_{t}``: Descriptor coefficients after observation ``t``.
+  - $(math_dict[:eps_ti_idio])
+  - ``\\bar{\\varepsilon}_{ti}``: Forward mean idiosyncratic return of asset ``i`` at observation ``t``, the mean of the finite ``\\varepsilon_{si}`` over ``s`` from ``t + \\ell`` to ``t + \\ell + h - 1``, with ``\\ell`` the lag and ``h`` the horizon.
+  - $(math_dict[:v_ti_idio])
+  - $(math_dict[:g_ti_unit])
+  - ``y_{ti}``: Target of the fit for asset ``i`` at observation ``t``.
+  - $(math_dict[:u_ti_cs])
+  - ``w_{ti}``: Regression weight of asset ``i`` at observation ``t``. It is ``u_{ti} / v_{ti}`` in the return unit and ``u_{ti}`` in the Sharpe unit.
+  - ``\\boldsymbol{s}_{ti}``: Descriptor scores of asset ``i`` at observation ``t``.
+  - ``\\mathcal{A}_{t}``: The valid assets of observation ``t``, those with ``u_{ti} > 0`` and a finite ``\\bar{\\varepsilon}_{ti}``, ``v_{ti}`` and ``\\boldsymbol{s}_{ti}``.
+  - ``\\omega_{ti}``: Normalised weight of asset ``i`` at observation ``t``. The weights of one observation have a mean of one. Under `normalise = false`, ``\\omega_{ti} = w_{ti}``.
+  - ``t_{1} < \\dots < t_{n}``: The observations that advance the state, those with ``t \\leq T - d`` and at least one asset in ``\\mathcal{A}_{t}``. An observation that does not advance the state leaves it as it is and does not decay it.
+  - ``\\mathbf{A}_{k}``, ``\\boldsymbol{c}_{k}``: The exponentially weighted normal matrix and cross product after ``k`` advances, with ``\\mathbf{A}_{0} = \\mathbf{0}`` and ``\\boldsymbol{c}_{0} = \\mathbf{0}``.
+  - $(math_dict[:lambda_ew])
+  - ``K``: Number of Descriptors.
+  - ``\\varrho``: `ridge`. Under `ridge = 0` the member adds no ridge.
+  - ``\\epsilon``: Machine epsilon of the number type, the floor that keeps the ridge of an empty normal matrix finite and positive.
+  - ``\\boldsymbol{\\beta}_{k}``: Descriptor coefficients after ``k`` advances. A singular ``\\mathbf{A}_{k} + \\rho_{k} \\mathbf{I}`` gives the minimum-norm solution.
+  - ``d``: ``\\ell + h - 1``, the number of observations a target takes to mature.
+  - ``m(t)``: The count of the observations ``t_{k} \\leq t``. The forecast at ``t`` is `NaN` when ``t \\leq d`` or when ``m(t - d)`` is below `min_obs`.
+  - $(math_dict[:gamma_rf_scale])
+  - $(math_dict[:alpha_ti_fc]) The member publishes the row of the latest observation ``T``.
+  - $(math_dict[:T])
 
 # Fields
 
@@ -268,11 +288,11 @@ $(DocStringExtensions.TYPEDFIELDS)
                               scale::Real = 1.0, normalise::Bool = true,
                               unit::AbstractForecastUnit = IdiosyncraticReturnUnit()) -> ExpWeightedReturnForecast
 
-Every keyword but `half_life` corresponds to a field. `half_life` is not a field: it fixes the defaults of `decay` and `min_obs`, and a value passed for either of those is used as it stands. `min_obs = 1` publishes a forecast from the first fitted observation.
+Every keyword but `half_life` corresponds to a field. `half_life` is not a field. It fixes the defaults of `decay` and `min_obs`, and the constructor keeps a value passed for either of those as it stands. `min_obs = 1` publishes a forecast from the first observation that advances the state.
 
 ## Validation
 
-  - `0 < decay < 1`.
+  - $(val_dict[:decay])
   - `min_obs >= 1`, `horizon >= 1` and `lag >= 1`.
   - `ridge >= 0` and is finite.
   - `scale > 0` and is finite.
@@ -335,7 +355,7 @@ ExpWeightedReturnForecast
     """
     min_obs
     """
-    Relative ridge penalty added to the diagonal of the exponentially weighted normal matrix before it is solved.
+    Relative ridge penalty. The member adds it, times the mean absolute diagonal entry, to the diagonal of the exponentially weighted normal matrix before it solves that matrix.
     """
     ridge
     """
@@ -351,7 +371,7 @@ ExpWeightedReturnForecast
     """
     scale
     """
-    Whether the regression weights of an observation are divided by their mean over its valid assets, so that a calm regime does not dominate the state through the size of its inverse variances.
+    Whether the member divides the regression weights of an observation by their mean over its valid assets. Under `true` a calm regime does not dominate the state through the size of its inverse variances.
     """
     normalise
     """
@@ -391,7 +411,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type produced by [`ExpWeightedReturnForecast`](@ref).
 
-Beside the two reads [`AbstractReturnForecastResult`](@ref) states, it carries the whole fitted state of the recursion: the latest coefficients, the two exponentially weighted accumulators and the count of the observations that advanced them. An update seam resumes the fit from those four fields alone, so nothing of the fit is lost by storing the Result rather than the estimator.
+Beside the two reads [`AbstractReturnForecastResult`](@ref) states, it carries the whole state of the recursion. That state is the latest coefficients, the two exponentially weighted accumulators and the count of the observations that advanced them. The next observation advances `A` and `c` and compares `n` with `min_obs`, and it reads nothing else of the past fit.
 
 # Fields
 
@@ -413,7 +433,7 @@ $(DocStringExtensions.TYPEDFIELDS)
     """
     hist
     """
-    Latest Descriptor coefficients, in the order the Descriptors are written in. They are `NaN` only when no observation advanced the recursion: `min_obs` gates the publication of a forecast, not the state the recursion carries.
+    Latest Descriptor coefficients, in the order of the Descriptors. They are `NaN` only when no observation advanced the recursion. `min_obs` gates the publication of a forecast, not the state the recursion carries.
     """
     coef
     """
@@ -462,19 +482,19 @@ Fit a Return Forecast by exponentially weighted least squares on the forward idi
 
 # Algorithm
 
- 1. Compute the Descriptor scores over the whole carrier through [`descriptor_scores`](@ref), cut them to the block's rows, and read the idiosyncratic returns and variances off the block. A row before the block carries no idiosyncratic variance, and the fit drops such a row, so the cut is the same answer with less work.
+ 1. Compute the Descriptor scores over the whole carrier through [`descriptor_scores`](@ref), cut them to the block's rows, and read the idiosyncratic returns and variances off the block. A row before the block carries no idiosyncratic variance, so the fit drops it. The cut gives the same answer with less work.
  2. Take the forward mean target through [`forward_mean_returns`](@ref), and convert it to the Forecast Unit through [`forecast_unit_target`](@ref).
  3. Read the regression weights through [`ew_forecast_weights`](@ref) and the eligibility mask through [`ew_forecast_valid`](@ref).
- 4. Over the observations whose target is known, which are all but the last `lag + horizon - 1`, advance the normal equations through [`ew_forecast_accumulate!`](@ref) and solve them through [`ew_forecast_solve`](@ref). An observation with no valid asset advances nothing and carries the previous coefficients forward.
- 5. Write the coefficients of an observation into the history only after `min_obs` observations have advanced the recursion.
- 6. Read the history through [`ew_forecast_history`](@ref), multiply by `scale`, and convert the whole history to return units through [`forecast_return_units`](@ref).
- 7. Read `mu` off the last observation of that history, which is the latest scores under the latest coefficients.
+ 4. Over the observations whose target is known, which are all but the last `lag + horizon - 1`, advance the normal equations through [`ew_forecast_accumulate!`](@ref) and solve them through [`ew_forecast_solve`](@ref). An observation with no valid asset advances nothing, does not decay `A` or `c`, and carries the previous coefficients forward.
+ 5. Write the coefficients of an observation into the coefficient history `coefs` only after `min_obs` observations have advanced the recursion. The count `n` holds the observations that advanced it, not the calendar observations.
+ 6. Read the forecast history through [`ew_forecast_history`](@ref), multiply by `scale`, and convert the whole history to return units through [`forecast_return_units`](@ref).
+ 7. Read `mu` off the last observation of that history, which is the latest scores under the latest published coefficients.
 
 # Arguments
 
   - `rfe`: Exponentially weighted Return Forecast Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
-  - `csfm`: The fitted factor-model block. It must carry the cross-sectional fit and the idiosyncratic variance history, its histories state the block's rows, and its exposure history is read under a Neutralisation.
+  - `csfm`: The fitted factor-model block. It must carry the cross-sectional fit and the idiosyncratic variance history, its histories state the block's rows, and the member reads its exposure history under a Neutralisation.
 
 # Validation
 
@@ -507,7 +527,10 @@ function return_forecast(rfe::ExpWeightedReturnForecast, rd::ReturnsResult,
     T = size(emsk, 1)
     K = size(Sb, 3)
     gap = rfe.lag + rfe.horizon - 1
-    Tf = promote_type(real(eltype(y)), real(eltype(W)))
+    # The state holds the decay and the ridge as well as the data, so a hyperparameter of a
+    # wider type widens the state and is not truncated into the type of the data.
+    Tf = promote_type(real(eltype(Sb)), real(eltype(y)), real(eltype(W)), typeof(rfe.decay),
+                      typeof(rfe.ridge))
     A = zeros(Tf, K, K)
     c = zeros(Tf, K)
     coefs = fill(Tf(NaN), max(T - gap, 0), K)

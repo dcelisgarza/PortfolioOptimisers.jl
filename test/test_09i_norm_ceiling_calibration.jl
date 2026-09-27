@@ -490,18 +490,25 @@ and ADR 0095 grants none.
           [joinpath("src", "17_Optimisation", "05_JuMP", "02_JuMPConstraints",
                     "12_RegularisationConstraints.jl")]
 
-    # -- Both entry points, and no third path. Each builder is called from one site, and
-    # each site wraps the term in its own route's verb, so no term reaches a builder
-    # unchecked. A definition line and a docstring signature both carry `::`, so the filter
-    # keeps the calls alone.
+    # -- Both entry points, and no third path. Each builder is called from two sites, the
+    # optimiser's and the programme Allocation Set's (ADR 0159), and each site wraps the
+    # term in its own route's verb, so no term reaches a builder unchecked. The optimiser
+    # wraps at the call. The set wraps in `resolve_allocation_set_rows`, which binds the
+    # wrapped term to the name its call passes; its `::Nothing` arm runs when no slot reads
+    # the head's rows, so the term it passes is already a value. A definition line and a
+    # docstring signature both carry `::`, so the filter keeps the calls alone.
     calls(tok) = [strip(l) for f in srcfiles
                   for l in eachline(f) if occursin(tok, l) && !occursin("::", l)]
     lp_calls = calls("set_lp_regularisation!(model")
     lpc_calls = calls("set_weight_norm_p_constraints!(model")
-    @test length(lp_calls) == 1
-    @test length(lpc_calls) == 1
-    @test occursin("factory(opt.lp,", only(lp_calls))
-    @test occursin("norm_ceiling_factory(opt.lpc,", only(lpc_calls))
+    @test length(lp_calls) == 2
+    @test length(lpc_calls) == 2
+    @test count(l -> occursin("factory(opt.lp,", l), lp_calls) == 1
+    @test count(l -> occursin("norm_ceiling_factory(opt.lpc,", l), lpc_calls) == 1
+    @test count(==("set_lp_regularisation!(model, lp)"), lp_calls) == 1
+    @test count(==("set_weight_norm_p_constraints!(model, lpc)"), lpc_calls) == 1
+    @test length(calls("lp = factory(set.lp,")) == 1
+    @test length(calls("lpc = norm_ceiling_factory(set.lpc,")) == 1
 
     # -- The `TimeDependent` case. The constructor calls the two guards with no wrapper
     # check, because a schedule is not a term and meets the permissive fallback. It is the

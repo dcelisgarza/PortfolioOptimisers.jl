@@ -48,7 +48,7 @@ what keeps the JuMP families cheap.
     hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = EmpiricalPrior()))
     w, t, p = 60, 20, 3
     batch_cv = IndexWalkForward(w, t; purged_size = p, expand_train = true)
-    online_cv = IndexWalkForward(w, t; purged_size = p, ff = OnlineStep())
+    online_cv = OnlineIndexWalkForward(w, t; purged_size = p)
     rows(d, i) = po.pipeline_data_view(d, i)
     weight_tol(pipe) = isa(pipe.steps[end], po.JuMPOptimisationEstimator) ? 1e-5 : 1e-10
     same_carrier(a, b) = isequal(a.nx, b.nx) &&
@@ -145,7 +145,8 @@ what keeps the JuMP families cheap.
         bres = fit_preprocessing(PriceGapFill(), pr)
         @test isequal(values(online.X), values(apply_preprocessing(bres, pr).X))
         @test fit_preprocessing(est).nx == bres.nx
-        @test fit_preprocessing(est).v == bres.v
+        # A delisted asset has a `missing` seed on both sides (#1330).
+        @test isequal(fit_preprocessing(est).v, bres.v)
         @test fit_preprocessing(est).te == bres.te == ts[end]
         # Issue #1068: the online form takes the batch rule. A first block that opens inside
         # an asset's suspension has no price before its leading gap, so the gap is not filled
@@ -353,7 +354,7 @@ what keeps the JuMP families cheap.
         @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-5)
                   for (pb, po_) in zip(b.pred, o.pred))
         bd = DateWalkForward(w, t; period = Day(1), purged_size = p, expand_train = true)
-        od = DateWalkForward(w, t; period = Day(1), purged_size = p, ff = OnlineStep())
+        od = OnlineDateWalkForward(w, t; period = Day(1), purged_size = p)
         b = cross_val_predict(pipes[2], pr, bd)
         o = cross_val_predict(pipes[2], pr, od)
         @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
@@ -393,7 +394,7 @@ what keeps the JuMP families cheap.
                         steps = (PriceGapFill(; fill = MeanValue()), PricesToReturns(),
                                  EmpiricalPrior(), hrp))
         rolling = IndexWalkForward(w + p, t; purged_size = p)
-        capped = IndexWalkForward(w + p, t; purged_size = p, ff = OnlineStep())
+        capped = OnlineIndexWalkForward(w + p, t; purged_size = p)
         b = cross_val_predict(pipe, pr, rolling)
         o = cross_val_predict(po.Online(pipe; max_history = w), pr, capped)
         @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
@@ -575,10 +576,49 @@ what keeps the JuMP families cheap.
         @test po.step_online_cap(MeanRisk(; opt = JuMPOptimiser(; pe = cpe, slv = slv))) ==
               w
         @test po.step_online_cap(PortfolioOptimisersCovariance()) === nothing
+        # The two walks read a wrapper at any depth, as the warm-up resolves it: a capped
+        # prior two levels under a hierarchical owner is refused behind a row-local step,
+        # and a wrapper there under `Online(pipe)` is refused by the refit route's message,
+        # not by the batch door's.
+        deep(pe) = HierarchicalRiskParity(;
+                                          opt = HierarchicalOptimiser(;
+                                                                      pe = HighOrderPriorEstimator(;
+                                                                                                   pe = pe)))
+        @test po.step_online_cap(deep(cpe)) == w
+        @test po.step_online_member(deep(cpe)) == "opt.pe.pe"
+        msg = refusal(() -> cross_val_predict(Pipeline(; steps = (prep..., deep(cpe))), pr,
+                                              online_cv))
+        @test occursin("PriceGapFill", msg) && occursin("max_history = $(w)", msg)
+        wrapped = po.Online(Pipeline(;
+                                     steps = (prep..., deep(po.Online(EmpiricalPrior())))))
+        msg = refusal(() -> cross_val_predict(wrapped, pr, online_cv))
+        @test occursin("opt.opt.pe.pe", msg) && occursin("Online(pipe)", msg)
+        @test po.pipeline_online_member(Pipeline(;
+                                                 steps = (Pipeline(;
+                                                                   steps = (po.Online(EmpiricalPrior()),
+                                                                            hrp)),))) ==
+              "opt.prior"
+        # A row-local step on returns input is refused before a capped owner too.
+        msg = refusal(() -> cross_val_predict(Pipeline(;
+                                                       steps = (MissingDataFilter(), cpe,
+                                                                hrp)), rd,
+                                              OnlineIndexWalkForward(w + p, t;
+                                                                     purged_size = p)))
+        @test occursin("MissingDataFilter", msg) && occursin("max_history = $(w)", msg)
+        # A hand-driven fold of a wrapper no warm-up resolved is refused, where it would
+        # drop the wrapper and fold the prior with no cap.
+        msg = refusal(() -> po.partial_fit!(Pipeline(; steps = (cpe, hrp)), rows(rd, 1:80)))
+        @test occursin("`prior` step", msg) && occursin("warm-up", msg)
+        # A cold pipeline holds no timestamps, whatever its owner.
+        @test isnothing(po.held_timestamps(Pipeline(;
+                                                    steps = (prep..., EmpiricalPrior(),
+                                                             hrp))))
+        @test isnothing(po.held_timestamps(Pipeline(; steps = (prep..., sched))))
+        @test isnothing(po.held_timestamps(Pipeline(; steps = (PricesToReturns(),))))
         # An Online(pipe) under a batch scheme, and an Online step at a fold-less fit.
         hpipe = Pipeline(; steps = (prep..., EmpiricalPrior(), hrp))
         msg = refusal(() -> cross_val_predict(po.Online(hpipe), pr, batch_cv))
-        @test occursin("no Fold Fit", msg)
+        @test occursin("not an Online Scheme", msg)
         msg = refusal(() -> fit(Pipeline(;
                                          steps = (prep..., po.Online(EmpiricalPrior()),
                                                   hrp)), pr))
@@ -639,5 +679,110 @@ what keeps the JuMP families cheap.
                                                                                      cv = online_cv,
                                                                                      r = r),
                                                            pr)
+    end
+
+    @testset "The online data steps: the universe, the first block and a caller's step" begin
+        function message(f)
+            err = try
+                f()
+                nothing
+            catch e
+                e
+            end
+            return isnothing(err) ? "" : sprint(showerror, err)
+        end
+        # A block of prices with other column names is refused by the field, for the
+        # assets and for the factors, and a factor column that one block lacks by presence.
+        other = price_ingestion(PriceIngestion(),
+                                TimeArray(ts[11:20], P[11:20, :], ["B$i" for i in 1:N]))
+        msg = message(() -> po.vcat_carrier_rows(rows(pr, 1:10), other))
+        @test occursin("the columns of `X`", msg) && occursin("\"B1\"", msg)
+        @test occursin("the columns of `X`",
+                       message(() -> po.partial_fit_transform(po.partial_fit!(PricesToReturns(),
+                                                                              rows(pr,
+                                                                                   1:10)),
+                                                              other)))
+        F1 = TimeArray(ts, P[:, 1:2], ["F1", "F2"])
+        F2 = TimeArray(ts, P[:, 1:2], ["F2", "F1"])
+        prf1 = price_ingestion(PriceIngestion(), TimeArray(ts, P, nx); F = F1)
+        prf2 = price_ingestion(PriceIngestion(), TimeArray(ts, P, nx); F = F2)
+        @test occursin("the columns of `F`",
+                       message(() -> po.vcat_carrier_rows(rows(prf1, 1:10),
+                                                          rows(prf2, 11:20))))
+        @test occursin("the `F` column",
+                       message(() -> po.vcat_carrier_rows(rows(prf1, 1:10), rows(pr, 11:20))))
+
+        # A first block of one price row has no return without padding, and the batch
+        # conversion of that row refuses it as empty rather than out of bounds. With
+        # padding the row converts, and the stream from one row equals the batch.
+        @test_throws po.IsEmptyError po.partial_fit_transform(PricesToReturns(),
+                                                              rows(pr, 1:1))
+        @test_throws po.IsEmptyError apply_preprocessing(PricesToReturns(), rows(pr, 1:1))
+        @test isnothing(po.assert_panel_masks((0, 2), po.AllTrueMask(0, 2),
+                                              po.AllTrueMask(0, 2)))
+        for ptr in (PricesToReturns(; padding = true),
+                    PricesToReturns(; padding = true, gap_return_alg = CatchUpGapReturn()))
+            e1, o1 = po.partial_fit_transform(ptr, rows(pr, 1:1))
+            e2, o2 = po.partial_fit_transform(e1, rows(pr, 2:160))
+            @test same_carrier(po.vcat_carrier_rows(o1, o2), apply_preprocessing(ptr, pr))
+        end
+
+        # A caller's Gap Return rule that reads the next price. The batch writes a zero at
+        # row 97 of A4, whose next price is observed; a block that ends at row 97 cannot
+        # see that price, so the verb refuses the rule by name.
+        struct NextPriceGapReturn <: po.AbstractGapReturnAlgorithm end
+        function po.gap_return(::NextPriceGapReturn, p::AbstractVector, r::AbstractVector,
+                               ::Symbol)
+            out = copy(r)
+            off = length(p) - length(r)
+            for j in eachindex(r)
+                if j + off < length(p) && !isnan(p[j + off + 1])
+                    out[j] = zero(eltype(r))
+                end
+            end
+            return out
+        end
+        nptr = PricesToReturns(; gap_return_alg = NextPriceGapReturn())
+        @test Matrix(apply_preprocessing(nptr, pr).X)[96, 4] == 0
+        msg = message(() -> po.partial_fit!(nptr, rows(pr, 1:97)))
+        @test occursin("NextPriceGapReturn", msg) && occursin("no online form", msg)
+
+        # A caller's own row-local step joins the host route with three methods and no
+        # `partial_fit!`: the stepped pipeline reads out as the batch fit.
+        struct PriceDoubler{C} <: po.AbstractPricesPreprocessingEstimator
+            cache::C
+        end
+        doubled(x) = PricesResult(;
+                                  X = TimeArray(timestamp(x.X), 2 .* values(x.X),
+                                                colnames(x.X)), F = x.F, B = x.B, iv = x.iv,
+                                  ivpa = x.ivpa, pnl = x.pnl, span = x.span)
+        po.fit_preprocessing(d::PriceDoubler, ::PricesResult) = d
+        po.apply_preprocessing(::PriceDoubler, x::PricesResult) = doubled(x)
+        po.partial_fit_transform(d::PriceDoubler, x::PricesResult) = (d, doubled(x))
+        po.fit_preprocessing(d::PriceDoubler) = d
+        po.supports_partial_fit(::PriceDoubler) = true
+        dpipe = Pipeline(;
+                         steps = (PriceGapFill(), PriceDoubler(nothing), PricesToReturns(),
+                                  EmpiricalPrior(), hrp))
+        @test isnothing(po.assert_online_entry(dpipe))
+        @test isapprox(fit(stepped(dpipe, pr, blocks)).w, fit(dpipe, rows(pr, 1:80)).w;
+                       atol = 1e-10)
+        @test_throws MethodError po.partial_fit!(PriceDoubler(nothing), rows(pr, 1:10))
+
+        # The anchor moves to the last observed price of a column, keeps its value where
+        # the block observes none, and is a new vector.
+        a0 = [1.0, 2.0, NaN]
+        a1 = po.advance_anchor(a0, [3.0 NaN NaN; NaN NaN 5.0])
+        @test isequal(a1, [3.0, 2.0, 5.0]) && isequal(a0, [1.0, 2.0, NaN])
+        # The series of a carrier lie side by side: the assets, the factors, the benchmark.
+        prfb = price_ingestion(PriceIngestion(), TimeArray(ts, P, nx); F = F1,
+                               B = TimeArray(ts, P[:, 1:1] .* 3, ["B"]))
+        S = po.series_values(rows(prfb, 1:3))
+        @test isequal(S, hcat(P[1:3, :], P[1:3, 1:2], P[1:3, 1:1] .* 3))
+        rfb = apply_preprocessing(PricesToReturns(), rows(prfb, 1:3))
+        R = po.series_values_returns(rfb)
+        @test isequal(R, hcat(Matrix(rfb.X), Matrix(rfb.F), collect(rfb.B)))
+        R[1, 1] = 99.0
+        @test Matrix(rfb.X)[1, 1] != 99.0
     end
 end

@@ -13,5 +13,6 @@ resolve_deferred_quantities(x::ValueatRisk, pr::AbstractPriorResult)
 resolve_deferred_quantities(x::ValueatRiskRange, pr::AbstractPriorResult)
 absolute_drawdown_vec
 relative_drawdown_vec(x::VecNum)
-drawdown_at_risk
+mip_var_bounds
+empirical_value_at_risk
 ```

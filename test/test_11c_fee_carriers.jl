@@ -366,7 +366,7 @@
                        atol = atol)
 
         # A carrier with no mask has nowhere to land, and saying so is the only honest
-        # answer: dropping it would understate the return and spreading it would bill an
+        # answer: dropping it would overstate the net return and spreading it would bill an
         # asset that did not leave.
         @test_throws ArgumentError calc_net_asset_returns(w3, X3, mkf(nothing))
         # A mask that does not span the matrix is refused by width, naming both.
@@ -635,7 +635,7 @@
         @test PortfolioOptimisers.investable_fees_view(red, imsk, X2) === red
         @test PortfolioOptimisers.investable_fees_view(red, nothing, X2) === red
         # Another mask is refused: the carriers hold no rate for an asset the other
-        # reduction kept, and charging nothing for it would understate the return.
+        # reduction kept, and charging nothing for it would overstate the net return.
         @test_throws ArgumentError PortfolioOptimisers.investable_fees_view(red,
                                                                             BitVector([1, 0,
                                                                                        1,
@@ -681,5 +681,148 @@
               (:tn, :l, :s, :fl, :fs, :lq, :flq, :fa, :kwargs)
         @test PortfolioOptimisers.show_fields(red) ==
               (:tn, :l, :s, :fl, :fs, :lq, :flq, :fa, :kwargs, :imsk)
+    end
+end
+@testset "The docstrings of 13_Fees.jl against numbers" begin
+    using PortfolioOptimisers, Test, LinearAlgebra, StableRNGs
+    PO = PortfolioOptimisers
+
+    # The closed form the `Fees` docstring states, written out by hand: a term per period
+    # F_r = F_Tn + F_p + F_lq, a one-off term F_o = F_f + F_flq, and the two clocks.
+    rng = StableRNG(1)
+    N = 6
+    w = randn(rng, N) / 3
+    w[3] = 0.0
+    w[5] = 1e-10
+    l = rand(rng, N) / 100
+    s = rand(rng, N) / 100
+    fl = rand(rng, N)
+    fs = rand(rng, N)
+    tw = randn(rng, N) / 3
+    ft = rand(rng, N) / 100
+    lqw = [0.3, -0.2, 0.0]
+    lqv = [0.01, 0.02, 0.03]
+    flqv = [4.0, 5.0, 6.0]
+    fees = Fees(; tn = Turnover(; w = tw, val = ft), l = l, s = s, fl = fl, fs = fs,
+                lq = Turnover(; w = lqw, val = lqv), flq = Turnover(; w = lqw, val = flqv))
+    fa = Fees(; tn = fees.tn, l = l, s = s, fl = fl, fs = fs, lq = fees.lq, flq = fees.flq,
+              fa = AmortisedFees())
+    pos = w .>= 0
+    neg = w .< 0
+    nz = .!isapprox.(w, 0; atol = 1e-8)
+    Fr = dot(pos .* w, l) - dot(neg .* w, s) + dot(abs.(w - tw), ft) + dot(abs.(lqw), lqv)
+    Fo = dot(pos .& nz, fl) +
+         dot(neg .& nz, fs) +
+         dot(.!isapprox.(lqw, 0; atol = 1e-8), flqv)
+    T = 21
+
+    @testset "The term per period and the one-off term" begin
+        @test PO.calc_periodic_fees(w, fees) ≈ Fr
+        @test PO.calc_one_off_fees(w, fees) ≈ Fo
+    end
+    @testset "The two clocks and their common total" begin
+        @test all(calc_fees(w, T, fees) .≈ (Fr, Fo))
+        am, ot = calc_fees(w, T, fa)
+        @test am ≈ Fr + Fo / T
+        @test iszero(ot)
+        @test calc_total_fees(w, T, fees) ≈ T * Fr + Fo
+        @test calc_total_fees(w, T, fa) ≈ T * am
+    end
+    @testset "The per asset fees sum to the portfolio fee, axis by axis" begin
+        (ai, al), (oi, ol) = calc_asset_fees(w, T, fees)
+        @test length(ai) == N
+        @test length(al) == length(lqw)
+        @test sum(ai) + sum(al) ≈ Fr
+        @test sum(oi) + sum(ol) ≈ Fo
+        ti, tl = calc_total_asset_fees(w, T, fees)
+        @test sum(ti) + sum(tl) ≈ T * Fr + Fo
+    end
+    @testset "Every carrier asks for the previous weights" begin
+        # The docstring once said that only `tn` reads them.
+        @test PO.needs_previous_weights(Fees(; lq = Turnover(; w = [0.1], val = 0.01)))
+        @test PO.needs_previous_weights(Fees(; flq = Turnover(; w = [0.1], val = 0.01)))
+        @test !PO.needs_previous_weights(Fees(;
+                                              lq = Turnover(; w = [0.1], val = 0.01,
+                                                            fixed = true)))
+        @test !PO.needs_previous_weights(Fees(; l = 0.01, fl = 1.0))
+    end
+    @testset "The fixed boundary and the scalar and vector rates of the turnover" begin
+        @test iszero(calc_fixed_fees([1e-9], 1.0, (; atol = 1e-8), .>=))
+        @test calc_fixed_fees([1e-7], 1.0, (; atol = 1e-8), .>=) == 1.0
+        w4 = [0.6, -0.4, 0.0, 0.25]
+        t4 = [0.1, 0.2, 0.3, 0.4]
+        a = calc_fees(w4, Turnover(; w = t4, val = 0.02))
+        b = calc_fees(w4, Turnover(; w = t4, val = fill(0.02, 4)))
+        @test a ≈ b
+        @test abs(a - b) < 1e-17
+        # `op` is a broadcast comparison, so the scalar `<` is refused.
+        @test_throws MethodError calc_fees([0.1], 0.01, <)
+    end
+    @testset "Element types come from the data" begin
+        w32 = Float32[0.3, -0.2, 0.5]
+        f32 = Fees(; tn = Turnover(; w = Float32[0.1, 0.1, 0.1], val = 0.01f0), l = 0.01f0,
+                   s = Float32[0.01, 0.02, 0.0], fl = 1.0f0, fs = Float32[1, 2, 3],
+                   lq = Turnover(; w = Float32[0.2], val = 0.01f0),
+                   flq = Turnover(; w = Float32[0.2], val = 2.0f0))
+        @test calc_fees(w32, T, f32) isa Tuple{Float32, Float32}
+        @test calc_total_fees(w32, T, f32) isa Float32
+        @test calc_asset_fees(w32, T, f32) isa
+              Tuple{Tuple{Vector{Float32}, Vector{Float32}},
+                    Tuple{Vector{Float32}, Vector{Float32}}}
+        @test calc_total_asset_fees(w32, T, nothing) isa
+              Tuple{Vector{Float32}, Vector{Float32}}
+        wr = Rational{Int}[1 // 2, -1 // 4, 3 // 4]
+        fr = Fees(; tn = Turnover(; w = Rational{Int}[0, 0, 1], val = 1 // 100),
+                  l = 1 // 100, s = Rational{Int}[1 // 100, 1 // 50, 0], fl = 1 // 1,
+                  fs = 2 // 1)
+        @test calc_fees(wr, T, fr) == (11 // 400, 4 // 1)
+        @test calc_total_fees(wr, T, fr) == 1831 // 400
+    end
+    @testset "The views, the mark and the lift" begin
+        full = Fees(;
+                    tn = Turnover(; w = [0.1, 0.2, 0.3, 0.4],
+                                  val = [0.01, 0.02, 0.03, 0.04]),
+                    l = [1.0, 2.0, 3.0, 4.0] / 100, s = 0.02, fl = [5.0, 6.0, 7.0, 8.0],
+                    fs = 3.0,
+                    lq = Turnover(; w = [0.1, -0.2, 0.3, 0.4],
+                                  val = [0.01, 0.02, 0.03, 0.04]),
+                    flq = Turnover(; w = [0.1, -0.2, 0.0, 0.4], val = [1.0, 2.0, 3.0, 4.0]))
+        imsk = BitVector([true, false, true, false])
+        red = PO.investable_fees_view(full, imsk, zeros(5, 4))
+        # The view slices with views, so the concrete type is not `typeof(fees)`.
+        v = PO.port_opt_view(full, [1, 3], zeros(5, 4))
+        @test v isa Fees
+        @test typeof(v) != typeof(full)
+        # The lift is the inverse of the door: it moves no number the reduced fee charged.
+        wr = [0.6, 0.4]
+        wf = PO.expand_investable_weights(imsk, wr)
+        lf = PO.lift_fees(red)
+        @test PO.calc_periodic_fees(wf, lf) ≈ PO.calc_periodic_fees(wr, red)
+        @test PO.calc_one_off_fees(wf, lf) ≈ PO.calc_one_off_fees(wr, red)
+        @test isnothing(lf.imsk)
+        @test PO.lift_fee_rate(0.5, imsk) == 0.5
+        @test isnothing(PO.lift_turnover(nothing, imsk))
+        @test PO.add_liquidation_terms(Float64[], [1.0]) == [1.0]
+        @test PO.add_liquidation_terms([1.0], Float64[]) == [1.0]
+        @test PO.add_liquidation_terms([1.0], [2.0]) == [3.0]
+        # The override keeps both carriers and the mark.
+        ov = PO.override_fee_amortisation(red, AmortisedFees())
+        @test ov.fa isa AmortisedFees
+        @test ov.lq === red.lq
+        @test ov.flq === red.flq
+        @test ov.imsk == red.imsk
+    end
+    @testset "The estimator resolves both carriers over the full universe" begin
+        sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+        fe = FeesEstimator(;
+                           lq = TurnoverEstimator(; w = [0.1, 0.2, 0.3],
+                                                  val = Dict("B" => 0.5), dval = 0.0),
+                           flq = TurnoverEstimator(; w = [0.1, 0.2, 0.3],
+                                                   val = Dict("C" => 2.0), dval = 1.0),
+                           l = Dict("A" => 0.1), dl = 0.2)
+        fc = fees_constraints(fe, sets)
+        @test fc.lq.val == [0.0, 0.5, 0.0]
+        @test fc.flq.val == [1.0, 1.0, 2.0]
+        @test fc.l == [0.1, 0.2, 0.2]
     end
 end

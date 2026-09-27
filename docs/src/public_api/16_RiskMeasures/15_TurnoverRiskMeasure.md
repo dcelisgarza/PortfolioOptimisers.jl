@@ -2,7 +2,7 @@
 Description = "Turnover risk measure, public API of PortfolioOptimisers.jl: TurnoverRiskMeasure, port_opt_view, factory, needs_previous_weights."
 ```
 
-# Turnover risk measure
+# [Turnover risk measure](@id api-turnover-risk-measure)
 
 ```@docs
 TurnoverRiskMeasure

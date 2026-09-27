@@ -10,7 +10,6 @@ Num_BgtCE
 BudgetEstimator
 BudgetCostEstimator
 Num_BgtRg
-set_budget_costs!
 set_budget_constraints!
 set_long_short_budget_constraints!
 set_cost_budget_constraints!

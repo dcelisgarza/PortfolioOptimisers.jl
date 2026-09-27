@@ -2,51 +2,67 @@
     set_weight_norm_2_constraints!(model::JuMP.Model, val::Number)
     set_weight_norm_2_constraints!(args...)
 
-Constrain the 2-norm of the weights.
+Bound the 2-norm of the weights above by `val`, a ceiling that spreads the portfolio over more assets as it falls.
 
-`val` is a direct upper bound on ``\\lVert \\boldsymbol{w} \\rVert_2``, expressed relative to the budget `k`: the constraint is ``\\lVert \\boldsymbol{w} \\rVert_2 \\leq \\mathrm{val} \\cdot k``. Smaller `val` forces the weights to spread more evenly across the assets.
-
-The builder takes a number. The caller-facing slot also takes an [`AbstractNormCeilingCalibrationAlgorithm`](@ref), which computes the ceiling from the universe the prior result carries, and [`assemble_jump_model!`](@ref) resolves it before it calls here.
+The row multiplies `val` by the homogenisation variable `k`, so the ceiling holds on the weights the result reports: on ``\\boldsymbol{w} / k`` under [`MaximumRatio`](@ref), on the renormalised weights under [`RiskBudgeting`](@ref), and on ``\\boldsymbol{w}`` itself under every other objective, where ``k = 1``. The budget does not scale the ceiling. The builder takes a number. The caller-facing slot also takes an [`AbstractNormCeilingCalibrationAlgorithm`](@ref), which computes the ceiling from the universe the prior result carries, and [`assemble_jump_model!`](@ref) resolves it before it calls here. Any other argument, `nothing` included, adds nothing to the model.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{l2c} &\\geq \\lVert \\boldsymbol{w} \\rVert_2\\,, \\\\
-\\mathrm{l2c} &\\leq \\mathrm{val} \\cdot k\\,.
+\\lVert \\boldsymbol{w} \\rVert_{2} &\\leq \\mathrm{val} \\cdot k\\,.
 \\end{align}
 ```
 
-Where:
-
-  - ``\\mathrm{l2c}``: Auxiliary variable upper-bounding ``\\lVert \\boldsymbol{w} \\rVert_2``.
-  - $(math_dict[:w_port])
-  - $(math_dict[:k_budget])
-  - ``\\mathrm{val}``: Upper bound on the 2-norm of the weights.
-
-# Diversification interpretation
-
-The 2-norm and the effective number of assets are reciprocally related: for a fully invested portfolio (``k = 1``), ``\\mathrm{ENA}(\\boldsymbol{w}) = 1 / \\lVert \\boldsymbol{w} \\rVert_2^2``. To require **at least `m` effective assets**, set `val = 1 / sqrt(m)`:
+For reported weights that sum to one, the ceiling is a floor on the effective number of assets, and `val = 1 / sqrt(m)` states the floor ``m``:
 
 ```math
 \\begin{align}
-\\lVert \\boldsymbol{w} \\rVert_2 \\leq \\frac{1}{\\sqrt{m}} \\iff \\mathrm{ENA}(\\boldsymbol{w}) = \\frac{1}{\\lVert \\boldsymbol{w} \\rVert_2^2} \\geq m\\,.
+\\lVert \\boldsymbol{w} \\rVert_{2} \\leq \\frac{1}{\\sqrt{m}} &\\iff \\mathrm{ENA}_{2}(\\boldsymbol{w}) \\geq m\\,.
 \\end{align}
 ```
+
+Weights that sum to one have ``\\lVert \\boldsymbol{w} \\rVert_{2} \\geq 1 / \\sqrt{N}``, with equality at equal weights. A ceiling below ``1 / \\sqrt{N}`` admits none of them, and the model is infeasible.
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``\\mathrm{val}``: Ceiling on the 2-norm of the weights.
+  - $(math_dict[:ENA_p])
+  - $(math_dict[:m_ena])
+  - $(math_dict[:N])
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: read. The portfolio weights.
+  - `k`: read. The homogenisation variable.
+  - `l2c`: created. The epigraph ``t`` of the 2-norm.
+
+## Constraints
+
+  - `cl2c_soc`: ``(s_c t, s_c \\boldsymbol{w}) \\in \\mathcal{K}_{2}``, that is ``t \\geq \\lVert \\boldsymbol{w} \\rVert_{2}``.
+  - `cl2c`: ``s_c (t - \\mathrm{val} \\cdot k) \\leq 0``.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:K_q_norm])
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `val::Number`: Upper bound on the 2-norm of the weights.
+  - `val::Number`: Ceiling on the 2-norm of the weights.
+
+# Validation
+
+  - `isfinite(val)` and `val > 0`, else a `DomainError` that names `l2c`.
 
 # Returns
 
   - `nothing`.
-
-# Details
-
-  - `val::Number`: Introduces the auxiliary variable `l2c`, bounds it below by ``\\lVert \\boldsymbol{w} \\rVert_2`` with a `SecondOrderCone` constraint, and adds the linear constraint `l2c <= val * k`.
-  - `args...`: No-op, used when no 2-norm weight constraint is configured.
 
 # Related
 
@@ -56,6 +72,10 @@ The 2-norm and the effective number of assets are reciprocally related: for a fu
   - [`EffectiveAssetFloor`](@ref)
   - [`number_effective_assets`](@ref)
   - [`JuMPOptimiser`](@ref)
+
+# References
+
+  - $(ref_dict[:jump2026cones])
 """
 function set_weight_norm_2_constraints!(args...)
     return nothing
@@ -76,56 +96,67 @@ end
     set_weight_norm_p_constraints!(model::JuMP.Model, lps::LpReg_VecLpReg)
     set_weight_norm_p_constraints!(args...)
 
-Constrain the p-norm of the weights.
+Bound the ``p``-norm of the weights above, once for each term of `lps`.
 
-Generalises [`set_weight_norm_2_constraints!`](@ref) to an arbitrary norm order ``p > 1``. Each term supplies its own norm order and bound, so several may be imposed at once.
-
-Each term is an [`LpRegularisation`](@ref), reused here as a constraint rather than a penalty: its `p` field is the norm order, and its `val` field is a direct upper bound on ``\\lVert \\boldsymbol{w} \\rVert_p``, expressed relative to the budget `k`. Smaller `val` forces a more evenly spread portfolio.
-
-That reuse is why `val` carries two readings and one bound. Here it is a ceiling, so [`norm_ceiling_factory`](@ref) refuses an [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref) in it, resolves an [`AbstractNormCeilingCalibrationAlgorithm`](@ref) against the prior result, and hands each term its own norm order first. Every `val` this builder sees is therefore a number.
+Each term is an [`LpRegularisation`](@ref) that serves as a ceiling: its `p` field is the norm order, and its `val` field is the ceiling. The row multiplies `val` by the homogenisation variable `k`, so the ceiling holds on the weights the result reports, as in [`set_weight_norm_2_constraints!`](@ref). [`norm_ceiling_factory`](@ref) refuses an [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref) in `val`, resolves an [`AbstractNormCeilingCalibrationAlgorithm`](@ref) against the prior result with the term's own norm order, and rebuilds the term. Every `val` this builder sees is therefore a number that the constructor of [`LpRegularisation`](@ref) checked. The entries carry names apart from those of [`set_lp_regularisation!`](@ref), so a model can carry an Lp penalty and a ``p``-norm ceiling at once. Any other argument, `nothing` included, adds nothing to the model.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{t}_{p,\\, i} &\\geq \\lVert \\boldsymbol{w} \\rVert_{p_i}\\,, \\\\
-\\mathrm{t}_{p,\\, i} &\\leq \\mathrm{val}_i \\cdot k\\,.
+\\lVert \\boldsymbol{w} \\rVert_{p_i} &\\leq \\mathrm{val}_i \\cdot k\\,, \\quad i = 1, \\ldots, n\\,.
 \\end{align}
 ```
 
-Where:
-
-  - ``\\mathrm{t}_{p,\\, i}``: Auxiliary variable upper-bounding ``\\lVert \\boldsymbol{w} \\rVert_{p_i}``.
-  - ``p_i``: Norm order of the ``i``-th term, its `p` field.
-  - ``\\mathrm{val}_i``: Upper bound on the ``p_i``-norm of the weights, its `val` field.
-  - $(math_dict[:w_port])
-  - $(math_dict[:k_budget])
-
-# Diversification interpretation
-
-For a fully invested portfolio (``k = 1``), the order-``p`` effective number of assets is ``\\mathrm{ENA}_p(\\boldsymbol{w}) = \\left(\\sum_i \\lvert w_i \\rvert^p\\right)^{1/(1 - p)}``. To require **at least `m` order-``p`` effective assets**, set `val = m^(1/p - 1)`:
+For reported weights that sum to one, each ceiling is a floor on the effective number of assets of order ``p_i``, and ``\\mathrm{val}_i = m^{1/p_i - 1}`` states the floor ``m``:
 
 ```math
 \\begin{align}
-\\lVert \\boldsymbol{w} \\rVert_p \\leq m^{1/p - 1} \\iff \\mathrm{ENA}_p(\\boldsymbol{w}) = \\left(\\sum_i \\lvert w_i \\rvert^p\\right)^{\\frac{1}{1 - p}} \\geq m\\,.
+\\lVert \\boldsymbol{w} \\rVert_{p} \\leq m^{1/p - 1} &\\iff \\mathrm{ENA}_{p}(\\boldsymbol{w}) \\geq m\\,.
 \\end{align}
 ```
 
-This is [`number_effective_assets`](@ref) taken to an arbitrary order. At ``p = 2`` the two are the same number, and at every order an equal-weight portfolio over ``m`` assets reports exactly ``m``. The exponent is also ``-1/q`` for the conjugate order ``q``, and it tends to ``-1`` as ``p`` grows, which is the ceiling [`set_weight_norm_inf_constraints!`](@ref) states.
+The exponent ``1/p - 1`` tends to ``-1`` as ``p`` grows, which gives the ceiling ``1 / m`` of [`set_weight_norm_inf_constraints!`](@ref). Weights that sum to one have ``\\lVert \\boldsymbol{w} \\rVert_{p} \\geq N^{1/p - 1}``, with equality at equal weights. A ceiling below ``N^{1/p - 1}`` admits none of them, and the model is infeasible.
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:k_budget])
+  - ``p_i > 1``: Norm order of the ``i``-th term, its `p` field.
+  - ``\\mathrm{val}_i``: Ceiling of the ``i``-th term, its `val` field.
+  - ``n``: Number of terms in `lps`.
+  - $(math_dict[:ENA_p])
+  - $(math_dict[:m_ena])
+  - $(math_dict[:N])
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: read. The portfolio weights.
+  - `k`: read. The homogenisation variable.
+  - `t_lpc_i`: created. The epigraph ``t_i`` of the ``p_i``-norm.
+  - `r_lpc_i`: created. The ``N`` auxiliaries ``r_{i,j}`` of the ``i``-th term, one for each asset.
+
+## Constraints
+
+  - `clpc_i`: ``(s_c r_{i,j}, s_c t_i, s_c w_j) \\in \\mathcal{P}_{1/p_i}`` for ``j = 1, \\ldots, N``, that is ``r_{i,j} \\geq \\lvert w_j \\rvert^{p_i} / t_i^{p_i - 1}``.
+  - `cslpc_i`: ``s_c \\left(\\sum_{j} r_{i,j} - t_i\\right) = 0``. With the rows of `clpc_i`, it gives ``t_i^{p_i} \\geq \\sum_{j} \\lvert w_j \\rvert^{p_i}``, that is ``t_i \\geq \\lVert \\boldsymbol{w} \\rVert_{p_i}``.
+  - `clpc_bnd_i`: ``s_c (t_i - \\mathrm{val}_i \\cdot k) \\leq 0``.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:P_alpha_power])
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `lps::LpReg_VecLpReg`: One or more p-norm weight constraints.
+  - `lps::LpReg_VecLpReg`: One or more ``p``-norm ceilings.
 
 # Returns
 
   - `nothing`.
-
-# Details
-
-  - `lps::LpReg_VecLpReg`: For each term, introduces the auxiliary variables `t_lpc_i` and `r_lpc_i`, bounds ``\\lVert \\boldsymbol{w} \\rVert_{p_i}`` above by `t_lpc_i` with a set of `MOI.PowerCone` constraints, and adds the linear constraint `t_lpc_i <= val * k`. Variables and constraints are suffixed by the term's index, so terms do not collide, and are named distinctly from those of [`set_lp_regularisation!`](@ref) so a model may carry both an Lp penalty and a p-norm constraint.
-  - `args...`: No-op, used when no p-norm weight constraint is configured.
 
 # Related
 
@@ -136,8 +167,12 @@ This is [`number_effective_assets`](@ref) taken to an arbitrary order. At ``p = 
   - [`norm_ceiling_factory`](@ref)
   - [`assert_norm_ceiling_role`](@ref)
   - [`Num_NormCeilCal`](@ref)
-  - [`set_lp_regularisation!`](@ref)
+  - [`set_lp_regularisation!`](@ref): the Lp penalty that the same estimator states in the `lp` field.
   - [`JuMPOptimiser`](@ref)
+
+# References
+
+  - $(ref_dict[:jump2026cones])
 """
 function set_weight_norm_p_constraints!(args...)
     return nothing
@@ -174,45 +209,68 @@ end
     set_weight_norm_inf_constraints!(model::JuMP.Model, val::Number)
     set_weight_norm_inf_constraints!(args...)
 
-Constrain the ∞-norm of the weights, capping the largest absolute weight.
+Bound the largest absolute weight above by `val`, the ∞-norm ceiling of the weights.
 
-The limiting case of [`set_weight_norm_p_constraints!`](@ref). `val` is a direct upper bound on the largest absolute weight, expressed relative to the budget `k`: the constraint is ``\\lVert \\boldsymbol{w} \\rVert_\\infty \\leq \\mathrm{val} \\cdot k``. So a fully invested portfolio (``k = 1``) constrained with `val = 0.2` holds no position larger than 20%. Smaller `val` forces a more evenly spread portfolio.
-
-The builder takes a number. The caller-facing slot also takes an [`AbstractNormCeilingCalibrationAlgorithm`](@ref), which computes the ceiling from the universe the prior result carries, and [`assemble_jump_model!`](@ref) resolves it before it calls here.
+The row multiplies `val` by the homogenisation variable `k`, so the ceiling holds on the weights the result reports, as in [`set_weight_norm_2_constraints!`](@ref). So `val = 0.2` keeps each reported weight within 20% of a portfolio that sums to one. The builder takes a number. The caller-facing slot also takes an [`AbstractNormCeilingCalibrationAlgorithm`](@ref), which computes the ceiling from the universe the prior result carries, and [`assemble_jump_model!`](@ref) resolves it before it calls here. Any other argument, `nothing` included, adds nothing to the model.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathrm{t}_\\infty &\\geq \\lVert \\boldsymbol{w} \\rVert_\\infty\\,, \\\\
-\\mathrm{t}_\\infty &\\leq \\mathrm{val} \\cdot k\\,.
+\\lVert \\boldsymbol{w} \\rVert_{\\infty} &\\leq \\mathrm{val} \\cdot k\\,.
 \\end{align}
 ```
 
+For reported weights that sum to one, `val = 1 / m` states the floor ``m`` on the effective number of assets of order ``\\infty``:
+
+```math
+\\begin{align}
+\\lVert \\boldsymbol{w} \\rVert_{\\infty} \\leq \\frac{1}{m} &\\iff \\mathrm{ENA}_{\\infty}(\\boldsymbol{w}) \\geq m\\,.
+\\end{align}
+```
+
+At least ``m`` of those weights are then non-zero, because ``n`` non-zero weights that sum to one have ``1 \\leq n \\lVert \\boldsymbol{w} \\rVert_{\\infty}``. Weights that sum to one have ``\\lVert \\boldsymbol{w} \\rVert_{\\infty} \\geq 1 / N``, with equality at equal weights. A ceiling below ``1 / N`` admits none of them, and the model is infeasible.
+
 Where:
 
-  - ``\\mathrm{t}_\\infty``: Auxiliary variable upper-bounding ``\\lVert \\boldsymbol{w} \\rVert_\\infty``.
-  - ``\\mathrm{val}``: Upper bound on the largest absolute weight.
   - $(math_dict[:w_port])
   - $(math_dict[:k_budget])
+  - ``\\mathrm{val}``: Ceiling on the largest absolute weight.
+  - $(math_dict[:ENA_p])
+  - $(math_dict[:m_ena])
+  - ``n``: Number of non-zero weights.
+  - $(math_dict[:N])
 
-# Diversification interpretation
+# JuMP formulation
 
-Capping the largest weight spreads the portfolio across a minimum number of assets. To spread across **at least `m` assets**, set `val = 1 / m`: no single position can then exceed a ``1 / m`` share of a fully invested portfolio.
+## Variables
+
+  - `w`: read. The portfolio weights.
+  - `k`: read. The homogenisation variable.
+  - `t_linfc`: created. The epigraph ``t`` of the ∞-norm.
+
+## Constraints
+
+  - `clinfc_nic`: ``(s_c t, s_c \\boldsymbol{w}) \\in \\mathcal{K}_{\\infty}``, that is ``t \\geq \\lVert \\boldsymbol{w} \\rVert_{\\infty}``.
+  - `clinfc`: ``s_c (t - \\mathrm{val} \\cdot k) \\leq 0``.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:K_q_norm])
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `val::Number`: Upper bound on the largest absolute weight.
+  - `val::Number`: Ceiling on the largest absolute weight.
+
+# Validation
+
+  - `isfinite(val)` and `val > 0`, else a `DomainError` that names `linfc`.
 
 # Returns
 
   - `nothing`.
-
-# Details
-
-  - `val::Number`: Introduces the auxiliary variable `t_linfc`, bounds it below by ``\\lVert \\boldsymbol{w} \\rVert_\\infty`` with a `MOI.NormInfinityCone` constraint, and adds the linear constraint `t_linfc <= val * k`.
-  - `args...`: No-op, used when no ∞-norm weight constraint is configured.
 
 # Related
 
@@ -220,7 +278,7 @@ Capping the largest weight spreads the portfolio across a minimum number of asse
   - [`set_weight_norm_p_constraints!`](@ref)
   - [`Num_NormCeilCal`](@ref)
   - [`EffectiveAssetFloor`](@ref)
-  - [`set_linf_regularisation!`](@ref)
+  - [`set_linf_regularisation!`](@ref): the ∞-norm penalty on the weights.
   - [`JuMPOptimiser`](@ref)
 """
 function set_weight_norm_inf_constraints!(args...)
@@ -241,42 +299,53 @@ end
 """
     norm_ball_dual_norm_epigraph!(model::JuMP.Model, prefix::Symbol, i, x, p::Number)
 
-Register an epigraph variable of the dual norm of `x`, raising the cone the dual order of `p` names.
+Register an epigraph variable of the dual norm of `x`, and bound it below by that norm.
 
-The cone follows the dual norm order `q = dual_norm_order(p)`, and the four routes are the ones
-[`set_weight_norm_2_constraints!`](@ref), [`set_weight_norm_inf_constraints!`](@ref),
-[`set_weight_norm_p_constraints!`](@ref) and the box return builder raise for the weights: a
-second-order cone at ``q = 2``, a norm-one cone at ``q = 1`` (``p = \\infty``), a norm-infinity
-cone at ``q = \\infty`` (``p = 1``), and one power cone per entry of `x` otherwise. Both norm-ball
-consumers call it, the mean builder on ``\\mathbf{L}^{\\intercal}\\boldsymbol{w}`` and the
-covariance builder on ``\\mathbf{L}^{\\intercal}\\operatorname{vec}(\\mathbf{W} + \\mathbf{E})``,
-so it takes `prefix` and `i` and registers every entry under both.
+The dual order ``q`` picks the cone. At ``q = 2`` it is the second-order cone, as in [`set_weight_norm_2_constraints!`](@ref). At ``q = 1`` (``p = \\infty``) it is the norm-one cone, as in [`set_l1_regularisation!`](@ref). At ``q = \\infty`` (``p = 1``) it is the norm-infinity cone, as in [`set_weight_norm_inf_constraints!`](@ref). At every other order it is one power cone for each entry of `x`, as in [`set_weight_norm_p_constraints!`](@ref). The two norm-ball consumers call it, the mean builder on ``\\mathbf{L}^{\\intercal}\\boldsymbol{w}`` and the covariance builder on ``\\mathbf{L}^{\\intercal}\\operatorname{vec}(\\mathbf{W} + \\mathbf{E})``, so it takes `prefix` and `i` and registers every entry under both. The variable equals the dual norm only where the caller's objective pulls it down.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+t &\\geq \\lVert \\boldsymbol{x} \\rVert_{q}\\,, \\\\
+q &= \\frac{p}{p - 1}\\,.
+\\end{align}
+```
+
+The dual order is ``q = 1`` at ``p = \\infty``, and ``q = \\infty`` at ``p = 1``.
+
+Where:
+
+  - ``t``: Epigraph of the dual norm.
+  - ``\\boldsymbol{x}``: The affine expression whose dual norm is bounded.
+  - ``p``: Norm order of the ball.
+  - ``q``: Dual norm order of ``p``.
 
 # JuMP formulation
 
 ## Variables
 
-  - `t_nbucs_i`: epigraph of the dual norm, ``t \\geq \\lVert \\boldsymbol{x} \\rVert_{q}``.
-  - `r_nbucs_i`: one auxiliary per entry of `x`, on the power-cone route only.
+  - `t_nbucs_i`: created, under `prefix`. The epigraph ``t``.
+  - `r_nbucs_i`: created, under `prefix`, on the power-cone route only. One auxiliary ``r_j`` for each entry of `x`.
 
 ## Constraints
 
-  - `nbucs_cone_i`: ``(s_c t, s_c \\boldsymbol{x}) \\in \\mathcal{K}_{q}``, with ``\\mathcal{K}_{2}`` the second-order cone, ``\\mathcal{K}_{1}`` the norm-one cone and ``\\mathcal{K}_{\\infty}`` the norm-infinity cone. On the power-cone route the entry holds one row per entry of `x`: ``(s_c r_j, s_c t, s_c x_j) \\in \\mathcal{P}_{1/q}``, that is ``r_j^{1/q} t^{1 - 1/q} \\geq \\lvert x_j \\rvert``.
-  - `nbucs_cone_sum_i`: ``s_c \\left(\\sum_j r_j - t\\right) = 0``, on the power-cone route only, which closes ``t^{q} \\geq \\sum_j \\lvert x_j \\rvert^{q}``.
+  - `nbucs_cone_i`: ``(s_c t, s_c \\boldsymbol{x}) \\in \\mathcal{K}_{q}`` for ``q \\in \\{1, 2, \\infty\\}``. On the power-cone route it holds one row for each entry of `x`, ``(s_c r_j, s_c t, s_c x_j) \\in \\mathcal{P}_{1/q}``, that is ``r_j \\geq \\lvert x_j \\rvert^{q} / t^{q - 1}``.
+  - `nbucs_cone_sum_i`: ``s_c \\left(\\sum_{j} r_j - t\\right) = 0``, on the power-cone route only. With the rows of `nbucs_cone_i`, it gives ``t^{q} \\geq \\sum_{j} \\lvert x_j \\rvert^{q}``.
 
 Where:
 
-  - ``\\boldsymbol{x}``: The affine expression whose dual norm is bounded.
-  - ``q``: Dual norm order of `p`.
   - $(math_dict[:sc_scale])
+  - $(math_dict[:K_q_norm])
+  - $(math_dict[:P_alpha_power])
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `prefix`: Model State prefix the entries are registered under.
-  - `i`: Index of the term, which suffixes every name the builder registers.
+  - `prefix`: Model State prefix that the entries are registered under.
+  - `i`: Index of the term, which suffixes every name that the builder registers.
   - `x`: Affine expression, a vector of at least one entry.
-  - `p::Number`: Norm order of the ball, `p >= 1` with `Inf` admitted.
+  - `p::Number`: Norm order of the ball, `p >= 1`, with `Inf` admitted.
 
 # Returns
 
@@ -288,6 +357,10 @@ Where:
   - [`dual_norm_order`](@ref)
   - [`set_ucs_return_constraints!`](@ref)
   - [`set_ucs_variance_risk!`](@ref)
+
+# References
+
+  - $(ref_dict[:jump2026cones])
 """
 function norm_ball_dual_norm_epigraph!(model::JuMP.Model, prefix::Symbol, i, x, p::Number)
     sc = get_constraint_scale(model)

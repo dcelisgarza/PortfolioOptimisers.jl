@@ -240,3 +240,80 @@ would restate them under second names. Moving three abstract declarations buys t
 - Three abstract types moved files, so `src/01_Base/02_TypeRoots.jl` and
   `src/20_Optimisation/01_Base_Optimisation.jl` both move in the sweep manifest and in the size and
   complexity baselines.
+
+## Amendment (2026-09-25)
+
+[#1334](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1334) reverses the section
+*The degrees of freedom are stated, because no block records them*. The block now records them.
+
+### Why the stated count was wrong
+
+`ρ = ν / χ²⁻¹_ν(q) − 1` bounds `d ≤ (1 + ρ) d̂` with probability `1 − q` only when `d̂` is the
+residual sum of squares divided by `ν`. The numerator must be the **divisor of the variance
+estimator**, and `compact_radius_dof` stated the count that the **fit** spent. No default fit of the
+library divides by that count:
+
+- `FactorPrior` writes `var(ve, err)`, and the default `SimpleVariance()` divides by `T − 1`, while
+  an OLS fit over `K` factors and an intercept leaves `T − K − 1`. The level fell to
+  `1 − F_ν((T − 1) χ²⁻¹_ν(q) / ν)`: `0.904` at `T = 30`, `K = 3`, `q = 0.05`, and `0.769` at
+  `K = 8`.
+- A Cross-Sectional Factor Prior writes an exponentially weighted variance by default. It has no
+  chi-squared law at `T (N − K) / N` degrees of freedom.
+- `StepwiseRegression` keeps a different number of factors for each asset, and the rule read
+  `K = size(rr.M, 2)` for every asset.
+
+### Decision
+
+The rule stops guessing at a fact the fit knows. Of the three options the issue named, this is
+the first: the block records the count.
+
+- `Regression` and `CrossSectionalFactorModel` carry two per-asset vectors beside `esigma`.
+  `edof` is the degrees of freedom of each residual series, and `ediv` is the divisor of each
+  idiosyncratic variance in the same effective count. Both are optional, both follow
+  `port_opt_view` and the Coverage Universe expansion, and the constructors check their length.
+- `StepwiseRegression` and `DimensionReductionRegression` write `edof` as the number of
+  observations less the parameters that each asset's fit spent. A stepwise fit is therefore priced
+  per asset. The count reads the factors that the search kept, not the search.
+- A new per-type verb, `variance_count(ve, X)`, states `(; n, m)`: the effective count of the
+  observations and the divisor. `SimpleVariance` answers `T` and `T − 1` unweighted, and Kish's count
+  with the divisor of `StatsBase` under weights. `ExpWeightedVariance` and
+  `RegimeAdjustedExpWeightedVariance` answer Kish's count of their weights for both, because the
+  weights sum to one after the cold-start correction. `WindowedVariance` asks its inner estimator
+  over the window. The method on `AbstractVarianceEstimator` answers `nothing`.
+- `factor_lift` restates `edof` in the count of its variance estimator, `n − (T − edof)`, and
+  writes `ediv = m`. The Cross-Sectional Factor Prior charges each asset the fraction
+  `Σₜ(nₜ − p) / Σₜ nₜ` of its effective count, where `p` is the parameters of one period.
+- `ResidualInflation` forms one inflation per asset, `ρᵢ = max(mᵢ / χ²⁻¹_{νᵢ}(q) − 1, 0)`, and
+  the radius `‖R^{1/2} D^{1/2} W^{1/2} P‖₂²`. It is still the tightest radius that satisfies the
+  set's own bound, and it reduces to the old formula when every asset shares one inflation.
+  `compact_radius_dof` and `compact_radius_sample_size` are removed.
+
+### A block with no count is refused, not defaulted
+
+The `nothing` of `variance_count` means *this estimator states no count*. A block built by hand,
+fitted by a regression estimator that records nothing, or measured by such a variance estimator
+carries no `edof`, and the rule refuses it with an `IsNothingError` that names `dof` and
+`VarianceFraction`. The `dof` field of the rule survives as that escape: a stated count serves every
+asset, and the divisor is still read off the block when the block records one, else it equals
+`dof`. The rejected alternative *A `dof` field with no derivation, mandatory like
+`ScenarioCount.n`* is now half true: the rule derives nothing, and the block, not the caller, is
+the source.
+
+### Rejected options
+
+**A `divisor` rule beside `dof`, defaulting to `T − 1` on a `Regression`.** Small, but it hard-codes
+the default of an estimator the rule cannot see, and a caller who changes `ve` gets the old defect
+back silently.
+
+**Document only.** The docstring already stated the defect. It left the default path below its
+stated level with no way out except a smaller `q` chosen by hand.
+
+### Consequences
+
+- On the default time-series path the level is `1 − q` for Gaussian residuals. On a weighted or
+  exponentially weighted variance it is Kish's approximation.
+- The radius of the default Cross-Sectional Factor Prior grows. Its effective count is about
+  `(1 + λ) / (1 − λ) ≈ 115` at the default half-life of 40 observations, not the row count of the
+  sample.
+- `Regression` gains two type parameters and `CrossSectionalFactorModel` two, so every printed
+  block shows two more fields.

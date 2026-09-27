@@ -3,15 +3,16 @@
 Description = "The optimiser families of PortfolioOptimisers.jl with one minimal call each: mean-risk, risk budgeting, hierarchical, near-optimal centering, naive and meta."
 ```
 
-# Optimisers
+# [Optimisers](@id user-guide-optimisers)
 
-This is the breadth tour of the optimiser families. Every optimiser shares the same call —
-`optimise(estimator)` (or `optimise(estimator, rd)` for the naive and meta ones) — and returns
-a result whose `w` field holds the asset weights. The point of this page is to show the *shape*
-of each family with one minimal call; for objectives, risk measures, variants, and trade-offs,
-follow the cross-links into the [optimiser examples](../examples/3_optimisers/01_MeanRisk_Objectives.md).
+This page makes one call from each family of optimisers. Every optimiser takes the same call,
+`optimise(estimator)`, or `optimise(estimator, rd)` for the naive optimisers and the
+meta-optimisers. The result holds the asset weights in its field `w`. For the objectives, the risk
+measures and the variants of each family, follow the links into the
+[optimiser examples](@ref example-meanrisk-objectives).
 
-We fix one empirical prior and reuse it everywhere so the families are comparable.
+We compute one empirical prior and give it to every JuMP, clustering and meta-optimiser. The naive
+optimisers take the returns directly.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -30,15 +31,16 @@ rd = prices_to_returns(X)
 pr = prior(EmpiricalPrior(), rd)
 
 #=
-Every JuMP optimiser below shares this one solver. Its `check_sol` field is splatted into JuMP's
-`assert_is_solved_and_feasible` after each solve, and decides which solver statuses count as a
-solved model. The default `(;)` is strict on purpose — it accepts only `OPTIMAL` or
-`LOCALLY_SOLVED` at a `FEASIBLE_POINT`, so a solution the solver itself flags as approximate is
-rejected rather than silently used. Passing `allow_almost = true` widens it to the `ALMOST_*`
-statuses, which is what we want here: a first-order conic solver that reaches its tolerance on a
-well-posed portfolio problem gives a usable answer, and rejecting it would only make the optimiser
-fall through to the next solver. Tighten it the other way with `allow_local = false` when nothing
-short of a certified global optimum will do.
+Every JuMP optimiser below uses this solver. After each solve, the optimiser passes the solver's
+`check_sol` field to JuMP's `assert_is_solved_and_feasible`, which decides which solver statuses
+count as a solution. The default, `(;)`, accepts `OPTIMAL` or `LOCALLY_SOLVED` at a
+`FEASIBLE_POINT`. If the solver marks its solution as approximate, the check fails, and the
+optimiser tries the next solver in its list.
+
+`allow_almost = true` also accepts the `ALMOST_*` statuses. We set it, because a conic solver that
+stops at its tolerance on a well-posed portfolio problem still returns usable weights.
+`allow_local = true` is JuMP's default, so it changes nothing here. To accept only `OPTIMAL`, set
+`allow_local = false`.
 =#
 
 slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
@@ -48,62 +50,66 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
 #=
 ## 1. Naive optimisers
 
-Naive optimisers use simple, solver-free rules that buy robustness through unsophistication.
-[`InverseVolatility`](@ref) weights by the reciprocal of each asset's volatility;
-[`EqualWeighted`](@ref) splits capital evenly; [`RandomWeighted`](@ref) samples a Dirichlet
-allocation. They take the [`ReturnsResult`](@ref) directly.
+A naive optimiser uses a fixed rule and no solver. [`InverseVolatility`](@ref) weights each asset
+by the reciprocal of its volatility. [`EqualWeighted`](@ref) gives each asset the same weight.
+[`RandomWeighted`](@ref) draws the weights from a Dirichlet distribution. They take the
+[`ReturnsResult`](@ref) directly. [`OnlinePortfolioSelection`](@ref) is also a naive optimiser. It
+moves its allocation after each period by a rule of its own, and it has its own page,
+[Online portfolio selection](@ref user-guide-online-portfolio-selection).
 =#
 
 res_iv = optimise(InverseVolatility(), rd)
 res_ew = optimise(EqualWeighted(), rd)
 
 #=
-## 2. JuMP optimisers — `MeanRisk`
+## 2. JuMP optimisers and `MeanRisk`
 
-JuMP optimisers solve a mathematical program and are the most flexible on constraints,
-objectives, and risk measures. They need a [`JuMPOptimiser`](@ref) carrying the prior and a
-[`Solver`](@ref) (we recommend [Clarabel](https://github.com/oxfordcontrol/Clarabel.jl) for
-non-MIP problems). The workhorse is [`MeanRisk`](@ref); its default objective is
-[`MinimumRisk`](@ref).
+A JuMP optimiser solves a mathematical program, and it accepts more constraints and objectives
+than the other families. It needs a [`JuMPOptimiser`](@ref) that holds the prior and a
+[`Solver`](@ref). [Clarabel](https://github.com/oxfordcontrol/Clarabel.jl) suits a problem with no
+integer variables. The most used JuMP optimiser is [`MeanRisk`](@ref), and its
+default objective is [`MinimumRisk`](@ref).
 =#
 
 res_mr = optimise(MeanRisk(; obj = MinimumRisk(),
                            opt = JuMPOptimiser(; pe = pr, slv = slv)))
 
 #=
-`MeanRisk` also offers [`MaximumUtility`](@ref), [`MaximumRatio`](@ref) and
-[`MaximumReturn`](@ref) objectives and efficient frontiers — see
-[MeanRisk Objectives](../examples/3_optimisers/01_MeanRisk_Objectives.md) and
-[Efficient Frontier](../examples/3_optimisers/02_Efficient_Frontier.md).
+`MeanRisk` also takes the objectives [`MaximumUtility`](@ref), [`MaximumRatio`](@ref) and
+[`MaximumReturn`](@ref), and it computes efficient frontiers. See
+[MeanRisk Objectives](@ref example-meanrisk-objectives) and
+[Efficient Frontier](@ref example-efficient-frontier).
 
-The **risk measure** is the `r` field (of `MeanRisk` and of the clustering optimisers below); the
-default is [`Variance`](@ref). Which one you pick encodes *what kind* of risk you penalise —
-overall dispersion ([`Variance`](@ref)), the left tail ([`ConditionalValueatRisk`](@ref)),
-peak-to-trough paths ([`MaximumDrawdown`](@ref)), or the whole ordered loss curve
-([`OrderedWeightsArray`](@ref)). The full menu — every measure with its alias, its meaning, and
-which optimisers accept it — is the [risk measures](03_Risk_Measures.md) page; you can also mix
-several in one objective ([Multiple Risk Measures](../examples/3_optimisers/04_Multiple_Risk_Measures.md)).
+The risk measure is the `r` field of `MeanRisk` and of the clustering optimisers below, and its
+default is [`Variance`](@ref). The measure sets the kind of risk that the optimiser penalises.
+[`Variance`](@ref) penalises the spread of the returns, [`ConditionalValueatRisk`](@ref) the left
+tail, [`MaximumDrawdown`](@ref) the largest fall from a peak, and [`OrderedWeightsArray`](@ref) a
+weighted sum of the sorted returns. [Risk measures](@ref user-guide-risk-measures) lists every measure with
+its alias, what it penalises and the optimisers that accept it. You can also put several measures
+in one objective. See
+[Multiple Risk Measures](@ref example-multiple-risk-measures).
 
-The **return** side is the `ret` field of [`JuMPOptimiser`](@ref), an
-[`ArithmeticReturn`](@ref) by default. Like `r`, it takes one term or a vector of them, summed
-with weights into the model's single return expression. Each term carries its own
-[`JuMPReturnsSettings`](@ref) — its weight in that sum, its own lower bound, and whether it
-enters the sum at all — so a term can bound the portfolio without being rewarded, which is how
-you price what a floor on one quantity costs in another
-([ℓ1 uncertainty sets](../examples/2_moments_priors/11_L1_Uncertainty_Quintile_Portfolios.md)).
+The return is the `ret` field of [`JuMPOptimiser`](@ref), an [`ArithmeticReturn`](@ref) by
+default. Like `r`, it takes one term or a vector of terms. The optimiser multiplies each term by
+its scale and adds the terms into one return expression. Each term has its own
+[`JuMPReturnsSettings`](@ref), which set its scale, its lower bound, and whether it enters the
+sum. So a term can bound the portfolio's return and add nothing to the objective. With this you
+can measure how much of one return you give up to keep another above a floor
+([ℓ1 uncertainty sets](@ref example-l1-uncertainty-sets-the-quintile-and-1-n-portfolios)).
 
-The drawdown notion is also useful purely as a *post-optimisation diagnostic* — via
-[`drawdowns`](@ref) on a realised book — when you want to measure rather than optimise it
-([Performance Attribution](../examples/6_post_processing/03_Performance_Attribution.md)).
+To measure the drawdowns of a portfolio without optimising them, call [`drawdowns`](@ref) on its
+returns after the optimisation. See
+[Performance Attribution](@ref example-performance-attribution-and-post-optimisation-diagnostics).
 
-The other JuMP families follow the same `opt = JuMPOptimiser(...)` pattern:
+The other JuMP optimisers take the same `opt = JuMPOptimiser(...)` keyword:
 
-  - [`RiskBudgeting`](@ref) / [`RelaxedRiskBudgeting`](@ref) — target a risk contribution per
-    asset or factor ([Risk Budgeting](../examples/3_optimisers/09_Risk_Budgeting.md)).
-  - [`NearOptimalCentering`](@ref) — a robust point near the efficient frontier
-    ([Near Optimal Centering](../examples/3_optimisers/15_Near_Optimal_Centering.md)).
+  - [`RiskBudgeting`](@ref) and [`RelaxedRiskBudgeting`](@ref) give each asset, or each factor, a
+    target share of the risk. See [Risk Budgeting](@ref example-risk-budgeting).
+  - [`NearOptimalCentering`](@ref) returns the centre of the set of portfolios whose return and
+    risk are close to those of the optimal portfolio. See
+    [Near Optimal Centering](@ref example-near-optimal-centering).
 
-Here is the minimal risk-budgeting call (equal risk contribution by default):
+We run risk budgeting with its default budget, which gives every asset the same share of the risk.
 =#
 
 res_rb = optimise(RiskBudgeting(; opt = JuMPOptimiser(; pe = pr, slv = slv)))
@@ -111,32 +117,30 @@ res_rb = optimise(RiskBudgeting(; opt = JuMPOptimiser(; pe = pr, slv = slv)))
 #=
 ### Which risk measures each optimiser family accepts
 
-Compatibility is a property of the optimiser *family*, not the individual optimiser: every
-JuMP optimiser accepts the same [`RiskMeasure`](@ref)s, and clustering optimisers additionally
-accept the hierarchical-only measures. You can ask programmatically with
-[`supports_risk_measure`](@ref) / [`supported_risk_measures`](@ref):
+The family of an optimiser sets the risk measures that it accepts. Every JuMP optimiser with an
+`r` field accepts the same [`RiskMeasure`](@ref)s. [`RelaxedRiskBudgeting`](@ref) has no `r`
+field. The clustering optimisers accept those measures and also the measures that only a
+clustering optimiser can use. You can ask with [`supports_risk_measure`](@ref) and
+[`supported_risk_measures`](@ref):
 
 ```julia
-supports_risk_measure(MeanRisk, ConditionalValueatRisk)   # true
-supported_risk_measures(HierarchicalRiskParity)           # OptimisationRiskMeasure
+supports_risk_measure(MeanRisk, ConditionalValueatRisk)
+supported_risk_measures(HierarchicalRiskParity)
 ```
 
-Meta-optimisers (`NestedClustered`, `Stacking`, `SubsetResampling`) are the exception: their
-acceptance is instance-specific because they *delegate*, accepting a measure only when every
-constituent optimiser does (the intersection of their children's categories).
-
-The [risk measures](03_Risk_Measures.md) page tabulates every measure against these classes —
-the tables there are generated from the same predicate, so they cannot drift from what the
-optimisers actually dispatch on.
+The first call returns `true`, and the second returns `OptimisationRiskMeasure`. For a
+meta-optimiser, `NestedClustered`, `Stacking` or `SubsetResampling`, the answer depends on
+the optimisers that it holds. The [risk measures](@ref user-guide-risk-measures) page shows every measure
+against these classes.
 
 ## 3. Clustering optimisers
 
-Clustering optimisers build the allocation from the asset correlation hierarchy instead of a
-single program. They take a [`HierarchicalOptimiser`](@ref) carrying the prior and a clustering
-estimate. [`HierarchicalRiskParity`](@ref) (HRP) is the canonical one;
+A clustering optimiser builds the weights from a hierarchy of the assets and not from one
+program. It takes a [`HierarchicalOptimiser`](@ref) that holds the prior and a clustering of the
+assets. [`HierarchicalRiskParity`](@ref) (HRP) is the best known.
 [`HierarchicalEqualRiskContribution`](@ref) and
-[`SchurComplementHierarchicalRiskParity`](@ref) are its siblings — see
-[Clustering Optimisers](../examples/3_optimisers/11_Clustering_Optimisers.md).
+[`SchurComplementHierarchicalRiskParity`](@ref) are in the same family. See
+[Clustering Optimisers](@ref example-clustering-optimisers).
 =#
 
 clr = clusterise(ClustersEstimator(), pr.X)
@@ -146,13 +150,16 @@ res_hrp = optimise(HierarchicalRiskParity(; opt = hopt, r = Variance()))
 #=
 ### 3.1 Clustering on something other than the returns
 
-`clusterise(ClustersEstimator(), pr.X)` derives its distance from the correlation, so the
-hierarchy can only ever see structure the price history contains. Swapping the estimator's
-distance slot for a [`FeatureDistance`](@ref) clusters an **assets × features** matrix instead —
-a sector or country classification, a factor loading profile, any per-asset quantity you can
-name. That matrix is derived from an [`AssetPanel`](@ref): [`panel_input`](@ref) turns a
-[`UniverseSets`](@ref) taxonomy key into one Panel Field, [`asset_panel`](@ref) builds the panel,
-and it travels beside the returns as data rather than on the estimator.
+`clusterise(ClustersEstimator(), pr.X)` computes its distance from the correlation of the returns,
+so the hierarchy shows only the structure that the returns contain. A [`FeatureDistance`](@ref) in
+the estimator's `de` field clusters the assets on a matrix of features instead. A feature can be a
+sector or a country, a profile of factor loadings, or any other quantity you have for each asset.
+That matrix comes from an [`AssetPanel`](@ref). [`panel_input`](@ref) turns keys of a
+[`UniverseSets`](@ref) into the fields of the panel, and [`asset_panel`](@ref) builds the panel.
+The panel goes on the returns, next to `X`, and not on the estimator.
+
+We label each asset with its sector and with where most of its revenue comes from, and we cluster
+the assets on those two labels.
 =#
 
 sector = Dict("AAPL" => "Tech", "AMD" => "Tech", "MSFT" => "Tech", "BAC" => "Financials",
@@ -182,29 +189,32 @@ res_hrp_z = optimise(HierarchicalRiskParity(;
                                             r = Variance()), rd_z)
 
 #=
-[`FeatureDistance`](@ref)'s `ape` slot says where the panel comes from. `nothing` reads the one
-you put on the [`ReturnsResult`](@ref), and a **producer** — [`RegressionPanel`](@ref) or
-[`PhylogenyPanel`](@ref) — builds one at the point of use from the prior result and the returns of
-the subproblem that runs it.
+The `ape` field of [`FeatureDistance`](@ref) sets where the panel comes from. With `nothing`, it
+reads the panel on the [`ReturnsResult`](@ref). With [`RegressionPanel`](@ref) or
+[`PhylogenyPanel`](@ref), it builds a panel when it runs, from the prior and the returns that it
+receives.
 
-The difference only shows once cross-validation is switched on, and it cannot be inferred from the
-API: **a carried panel slices, a producer refits.** Inside a fold or a meta-optimiser's subproblem
-a carried panel is *subselected*, while a producer is *recomputed on the subproblem's own returns*.
-For a fixed classification the two coincide; for a returns-derived producer they are two different
-questions, so the slot chooses between two semantics rather than two copies. A producer is also the
-only route for features that must vary with time *and* survive folds, because it refits on
-whatever rows the fold hands it.
+The two choices give different panels only when the optimiser runs on part of the data, inside a
+cross-validation fold or inside a subproblem of a meta-optimiser. There the optimiser takes the part
+of a stored panel that the fold uses. A panel estimator instead fits a new panel on the returns of
+the fold. For a fixed label, such as a sector, the two give the same panel. For a panel estimated
+from the returns, they give different panels. A panel estimator is also the only way to use a
+feature that changes with time on every fold, because it fits the feature on the rows of the fold.
 
-See [Feature Matrices as a Distance Source](../examples/3_optimisers/16_Feature_Distance_Clustering.md)
-for the producers, the time-varying shapes, and a walk-forward comparison.
+See
+[Feature Matrices as a Distance Source](@ref example-feature-matrices-as-a-distance-source)
+for the panel estimators, the features that change with time, and a comparison over a walk-forward.
 
 ## 4. Meta-optimisers
 
-Meta-optimisers compose other optimisers. [`NestedClustered`](@ref) (NCO) runs an **inner**
-optimiser within each cluster and an **outer** optimiser across the cluster representatives;
-[`Stacking`](@ref) and [`SubsetResampling`](@ref) blend several fits — see
-[Meta Optimisers](../examples/3_optimisers/13_Meta_Optimisers.md). The inner optimiser carries
-the prior; the outer one does not.
+A meta-optimiser combines other optimisers. [`NestedClustered`](@ref) (NCO) runs an inner
+optimiser inside each cluster, and an outer optimiser across the portfolios of the clusters.
+[`Stacking`](@ref) runs several inner optimisers and combines their weights with an outer
+optimiser. [`SubsetResampling`](@ref) runs one optimiser on random subsets of the assets and
+combines the weights. See [Meta Optimisers](@ref example-meta-optimisers).
+
+In the call below, the inner optimiser holds the computed prior `pr`, and the outer one must not.
+The outer problem has one asset for each cluster, so the outer optimiser computes its own prior.
 =#
 
 res_nco = optimise(NestedClustered(; pe = pr, cle = clr,
@@ -217,10 +227,10 @@ res_nco = optimise(NestedClustered(; pe = pr, cle = clr,
 #=
 ## 5. Comparing the families
 
-One prior, six optimisers, six allocations. The naive rules, risk budgeting, and the clustering
-hierarchy spread weight broadly (max weight in single digits to low teens); `MeanRisk(MinimumRisk)`
-and NCO concentrate into a few low-variance names (max weight ≈ a third). Same data, very
-different portfolios — which is the point of having a menu.
+We print the weights of the six optimisers in one table and plot them. The naive rules, risk
+budgeting and HRP give some weight to every asset. `MeanRisk` with `MinimumRisk` and NCO put most
+of the weight in a few assets with a low variance. The six optimisers use the same returns, so
+the differences come from the optimisers alone.
 =#
 
 results = [res_iv, res_ew, res_mr, res_rb, res_hrp, res_nco]

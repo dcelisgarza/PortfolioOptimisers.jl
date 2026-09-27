@@ -1,16 +1,19 @@
 ```@meta
-Description = "Returns result, public API of PortfolioOptimisers.jl: ReturnsResult, asset_panel, port_opt_view, returns_result_picker."
+Description = "Returns result, public API of PortfolioOptimisers.jl: AbstractReturnsResult, ReturnsResult, asset_panel, port_opt_view, returns_result_picker."
 ```
 
 # Returns result
 
 ## Prices to returns
 
-Other than [`FiniteAllocationOptimisationEstimator`](@ref), all optimisations work based off returns data rather than price data. These functions and types are involved in computing returns.
+Every optimiser works on returns, except a [`FiniteAllocationOptimisationEstimator`](@ref), which works on prices. The types and functions below hold returns and compute them from prices.
 
 ## Types
 
+A new returns result subtypes `AbstractReturnsResult`, carries the fields `nx`, `X`, `ts` and `pnl`, and adds a method of `port_opt_view`.
+
 ```@docs
+PortfolioOptimisers.AbstractReturnsResult
 ReturnsResult
 ```
 

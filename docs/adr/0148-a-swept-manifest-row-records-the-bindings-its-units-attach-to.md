@@ -87,3 +87,40 @@ names nothing, which is recorded as `<anonymous>` so that the list never loses a
 - **A separate `code_health/sweep_bindings.toml`.** ADR 0073 splits the code-health files on
   authorship, and this list is measured and pasted like `units`, so it belongs on the row beside
   the number it extends.
+
+## Amendment (2026-09-24)
+
+**A drift under a swept row no longer asks for a sub-issue.** The commit that adds a unit to a
+swept file, or replaces one in it, sweeps the new units itself. It records the new row, keeps
+`swept = true`, and does not reopen the child map. Issue #1310 is the cause.
+
+The Decision above says that a drift asks for what a count drift asks for: a sub-issue under the
+child map. The tooling did not agree. `code_health/sweep_check.jl` asked for the sub-issue, and
+`code_health/sweep_triage.jl --file`, the one tool that plans it, refuses a row that reads
+`swept = true`. #1308 met the conflict: it added one private unit to a file that #1173 had swept
+one commit before, and #1309 was filed by hand. That sub-issue recorded nothing that the commit
+did not, because the commit wrote the unit to the swept standard and #1309 closed on the same
+day.
+
+Two fixes were offered. The first let `--file` plan a swept row and name the added units. The
+second removed the demand. The maintainer chose the second, so the tracker records only the work
+that the commit leaves.
+
+What the commit owes is the swept standard, applied to the new units:
+
+- the three conditions of the manifest header: the documentation states the mathematics, the code
+  agrees with that statement, and the lines are covered or exempted;
+- the prose passes `/unslop`;
+- the four swept-only demands that `test/test_26_docs.jl` holds, with the `algorithm` floor raised
+  when a new unit carries the section.
+
+**A commit that cannot meet it sets `swept = false`.** It drops `algorithm` and `bindings` from
+the row, and the change then takes the four steps of an addition to an unswept file, which
+`sweep_triage.jl --file` plans. This relaxes the swept-only gates on that file until the re-sweep,
+which the Decision above rejected as the default. It is kept here as the exception, because it is
+the only path that leaves the tracker holding the work that no commit did.
+
+`code_health/sweep_check.jl` prints the new demand on both failures of a swept row and no longer
+asks for steps 3 and 4 there. `test/test_45_sweep_census.jl`, the manifest header, `CLAUDE.md`
+§ *Functionality you add* and the `sweep-conform` skill state the same rule. The census, the
+`bindings` list and the rest of the Decision are unchanged.

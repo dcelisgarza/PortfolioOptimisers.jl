@@ -17,9 +17,6 @@ domain vocabulary is normative — read `CONTEXT.md` before touching anything yo
   behaviour, so an ADR describing superseded behaviour is correct history, not a bug. An ADR whose
   decision has **not** reached `main` is still a draft — rewrite it in place, because no reader
   outside the branch ever saw the text you would be amending.
-- To find code, prefer kaimon's `search_code` (semantic) when you can only *describe* what you
-  want, and `grep_code` when you already hold an exact token. `/graphify` builds a queryable graph
-  for larger architectural questions.
 
 ## Parallel sessions
 
@@ -40,7 +37,8 @@ finished first, then adds its own change to the current text.
 Three files are shared by every sweep ticket, so this rule bites hardest there:
 
 - `code_health/sweep_manifest.toml` — one row per source file.
-- `src/01_Base/01_DocstringDictionaries.jl` — `arg_dict`, `math_dict` and their siblings.
+- `src/01_Base/01_DocstringDictionaries/` — `arg_dict`, `math_dict` and their siblings, one
+  subject to a file, so two sessions collide only when they add keys of one subject.
 - `test/test_26_docs.jl` — the library-wide ratchets, `DETAILS_TOTAL`, `NO_RELATED_TOTAL` and
   `MATH_COPY_TOTAL`.
 
@@ -57,8 +55,7 @@ before you merge so you lower the number that is current.
 - **Single-threaded**: `julia -t 1`, `BLAS.set_num_threads(1)`. Never kick off the full test suite
   or a docs build — those are the maintainer's to run.
 - Run **targeted** `test_*.jl` files for the area you changed. `test/runtests.jl` supplies a shared
-  `init_code` preamble (`Test`, `Logging`, `CSV`, `TimeSeries`, `DataFrames`, `StableRNGs`,
-  `StatsBase`, `LinearAlgebra`, `find_tol`); reproduce it if you include a test file directly.
+  `init_code` preamble; reproduce it if you include a test file directly.
 - On a Revise world-age warning, **restart the session and cold-load**. If a session wedges, shut it
   down and start a new one rather than fighting it.
 
@@ -76,10 +73,8 @@ before you merge so you lower the number that is current.
 - **JuliaFormatter runs over the whole repository, and every file it reaches is formatted in
   place.** It escapes a quote inside a jldoctest block as `\"`, which is normal output: inside a
   `"""` docstring `\"` renders as `"`, and the doctests pass. **Do not revert the escaping.**
-  The gate is `.github/workflows/FormatCheck.yml`, which runs `format(".")`, and the
-  `julia-formatter` pre-commit hook, which excludes only `.github/`.
-- Margin is 92 (`.JuliaFormatter.toml`, `yas` style). Long string literals and docstring prose are
-  exempt in practice; code lines are not.
+- Long string literals and docstring prose are exempt from the margin in practice; code lines are
+  not.
 
 ## Doctests
 
@@ -96,7 +91,10 @@ before you merge so you lower the number that is current.
 - **A numeric type is derived, never coerced.** Read it off the arguments with `eltype`, `typeof`,
   `real` and `promote_type`, or off the operation that widens it, and take an index with the
   in-function conversion `ceil(Int, x)` rather than `Int(ceil(x))`. Never wrap a derived type in
-  `float`. The library must stay open to number types it has never seen — an AD dual, a unit-carrying
+  `float`, and never read it off a division such as `typeof(one(T) / one(T))`: both clobber a
+  `Rational` and every type that needed no repair. When integer data must hold a fraction or a
+  `NaN`, pass the type of the data to `float_if_integer`, which floats an `Integer` and keeps every
+  other type. The library must stay open to number types it has never seen — an AD dual, a unit-carrying
   quantity, a `Rational`, a number type another package defines — and every forced type closes it to
   one of them. [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md)
   § *Numeric types come from the data* owns the rule, and
@@ -104,7 +102,7 @@ before you merge so you lower the number that is current.
 - **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field
   list, write the constructor name once per type, and use the ordinary keyword constructor.
 - Docstring field text is centralised in `field_dict` / `arg_dict` in
-  `src/01_Base/01_DocstringDictionaries.jl`, and an entry
+  `src/01_Base/01_DocstringDictionaries/`, and an entry
   that loses its last user is deleted. When a description must interpolate a key and when prose is
   permitted is stated by
   [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md),
@@ -137,10 +135,12 @@ build when a file carries no row, and when a file's unit count leaves its row.
 
 Wire your addition into the audit in the same change:
 
-1. Add or correct the file's row. The census prints the line to paste. Take `map` from the row of a
-   neighbouring file in the same directory, and set `swept = false`. A swept row also records the
-   name of the binding each unit attaches to, so a unit replaced one for one in a swept file owes
-   the same four steps as an addition, and the row keeps `swept = true` (ADR 0148).
+1. Add or correct the file's row. The census prints the line to paste. Take `map` from the check
+   below: it names the map when the directory uses one, and lists the candidates when the directory
+   uses several. Set `swept = false`. A swept row also records the name of the binding each unit
+   attaches to. A unit added to a swept file, or replaced one for one in it, keeps
+   `swept = true`: the commit sweeps the new units itself, and steps 3 and 4 do not apply. If the
+   commit cannot sweep them, it sets `swept = false` and takes all four steps (ADR 0148).
 2. Cover every line of a new file, or give it a Coverage Exemption. ADR 0082 owns that rule.
 3. Reopen the child map that owns the file, and reopen its umbrella, issue #404.
 4. Open one sub-issue of that child map for the addition, so it is swept as systematically as the
@@ -157,7 +157,9 @@ child map's *Not yet specified* section, and take steps 3 and 4 when the design 
 ## Repo etiquette
 
 - Never link to or post in repositories outside `dcelisgarza`'s — name external sources in prose.
-- Branch before committing if you are on the default branch, and only commit when asked.
+- Branch before committing if you are on the default branch.
+- **A session that works an issue commits without being asked.** It commits, rebases and pushes
+  `dev` as § *Parallel sessions* states. Any other session commits only when asked.
 - **Close an issue yourself after you commit the work that resolves it.** This holds for every kind
   of issue: a defect, a feature, a sweep sub-issue, a map. Name the issue in the commit message, for
   example `Fix #493: …`. A closing keyword does not close the issue: GitHub acts on the keyword only

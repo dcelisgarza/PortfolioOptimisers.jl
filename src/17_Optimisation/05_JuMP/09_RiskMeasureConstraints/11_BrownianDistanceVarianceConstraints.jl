@@ -135,8 +135,8 @@ the existing expression if already present.
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVariance,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     return state_build!(model, prefix, :bdvariance_risk) do
         X = pr.X
         net_X = set_net_portfolio_returns!(model, X; prefix = prefix)

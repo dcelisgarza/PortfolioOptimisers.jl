@@ -1,22 +1,23 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for base clustering optimisation estimators.
+Abstract supertype for the shared configuration that a hierarchical optimiser holds in its `opt` field.
 
-These are intermediate configuration types used in hierarchical/clustering optimisation pipelines.
+A subtype is not an optimiser, so [`optimise`](@ref) does not take one. [`HierarchicalOptimiser`](@ref) is the one subtype, and [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref) each hold one.
 
 # Related
 
   - [`BaseOptimisationEstimator`](@ref)
   - [`HierarchicalOptimiser`](@ref)
+  - [`ClusteringOptimisationEstimator`](@ref)
 """
 abstract type BaseClusteringOptimisationEstimator <: BaseOptimisationEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for clustering-based portfolio optimisation estimators.
+Abstract supertype for the optimisers that cluster the assets and allocate over the clusters.
 
-Clustering optimisation estimators use asset clustering to decompose the portfolio optimisation problem. Subtypes include HRP, HERC, and SCHRP.
+It has four subtypes. [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref) hold a [`HierarchicalOptimiser`](@ref) in the field `opt` and a fallback in the field `fb`. The methods of this file that dispatch on the family read those two fields, so a new subtype that holds them needs no method of its own for time-dependent constraints. [`NestedClustered`](@ref) holds neither field, and it overrides all four of those methods.
 
 # Related
 
@@ -24,12 +25,36 @@ Clustering optimisation estimators use asset clustering to decompose the portfol
   - [`HierarchicalRiskParity`](@ref)
   - [`HierarchicalEqualRiskContribution`](@ref)
   - [`SchurComplementHierarchicalRiskParity`](@ref)
+  - [`NestedClustered`](@ref)
+  - [`BaseClusteringOptimisationEstimator`](@ref)
 """
 abstract type ClusteringOptimisationEstimator <: NonFiniteAllocationOptimisationEstimator end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if the estimator's own problem-definition fields, the inner optimiser, or the fallback carry time-dependent constraints.
+Return `true` when a clustering optimiser, or an estimator it holds, carries a [`TimeDependent`](@ref) schedule.
+
+The optimiser is time-dependent when any one of three things holds:
+
+  - one of its own fields holds a schedule that [`time_dependent_fields`](@ref) returns;
+  - its inner optimiser `opt.opt` is time-dependent;
+  - its fallback `opt.fb` is time-dependent.
+
+[`NestedClustered`](@ref) overrides this with its own method.
+
+# Arguments
+
+  - `opt`: Clustering optimiser that holds the fields `opt` and `fb`.
+
+# Returns
+
+  - `flag::Bool`: `true` when a fold loop must resolve a schedule before the optimiser runs.
+
+# Related
+
+  - [`update_time_dependent_estimator`](@ref)
+  - [`reset_time_dependent_estimator`](@ref)
+  - [`time_dependent_fields`](@ref)
 """
 function is_time_dependent(opt::ClusteringOptimisationEstimator)
     return (!isempty(time_dependent_fields(opt)) ||
@@ -46,9 +71,32 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve time-dependent constraints for the fold described by `ctx`: the estimator's own scheduled fields (risk measures, scalarisers, fallback, …) are swapped for their per-fold values, then the inner optimiser and the (possibly just-swapped-in) fallback are recursed into with the same context.
+Replace every [`TimeDependent`](@ref) schedule of a clustering optimiser with its value at the fold that `ctx` describes.
 
-[`NestedClustered`](@ref) overrides this with its own method resolving its own fields and inner estimators.
+The fallback is resolved after the optimiser's own fields, so a fallback that a schedule selects for this fold is itself resolved. [`NestedClustered`](@ref) overrides this with its own method.
+
+# Algorithm
+
+ 1. Return `opt` unchanged when [`is_time_dependent`](@ref) is `false`.
+ 2. Replace each scheduled field of `opt` with its value at the fold, through [`update_time_dependent_fields`](@ref). This gives the new `opt`.
+ 3. Resolve the inner optimiser `opt.opt` and the fallback `opt.fb` of the new `opt` with the same `ctx` and `all_binds`.
+ 4. Rebuild `opt` with the two resolved estimators, through [`rebuild_estimator`](@ref).
+
+# Arguments
+
+  - `opt`: Clustering optimiser that holds the fields `opt` and `fb`.
+  - `ctx`: Fold context of the current fold.
+  - `all_binds`: Whether the fold loop resolves the schedules bound to `:nearest` as well as those bound to `:outermost`.
+
+# Returns
+
+  - `opt`: The optimiser with no schedule left for this fold loop, of the same type as the input.
+
+# Related
+
+  - [`is_time_dependent`](@ref)
+  - [`reset_time_dependent_estimator`](@ref)
+  - [`TimeDependentContext`](@ref)
 """
 function update_time_dependent_estimator(opt::ClusteringOptimisationEstimator,
                                          ctx::TimeDependentContext, all_binds::Bool = true)
@@ -65,9 +113,30 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Replace time-dependent constraints with their static defaults, both on the estimator's own fields and by recursing into the inner optimiser and fallback.
+Replace every [`TimeDependent`](@ref) schedule of a clustering optimiser with its static default.
 
-[`NestedClustered`](@ref) overrides this with its own method resetting its own fields and inner estimators.
+A fold-less [`optimise`](@ref) calls it first, so the optimiser runs with each scheduled field at its default. [`NestedClustered`](@ref) overrides this with its own method.
+
+# Algorithm
+
+ 1. Return `opt` unchanged when [`is_time_dependent`](@ref) is `false`.
+ 2. Replace each scheduled field of `opt` with its static default, through [`reset_time_dependent_fields`](@ref). This gives the new `opt`.
+ 3. Reset the inner optimiser `opt.opt` and the fallback `opt.fb` of the new `opt`.
+ 4. Rebuild `opt` with the two reset estimators, through [`rebuild_estimator`](@ref).
+
+# Arguments
+
+  - `opt`: Clustering optimiser that holds the fields `opt` and `fb`.
+
+# Returns
+
+  - `opt`: The optimiser with no schedule left, of the same type as the input.
+
+# Related
+
+  - [`is_time_dependent`](@ref)
+  - [`update_time_dependent_estimator`](@ref)
+  - [`hierarchical_optimiser_td_defaults`](@ref)
 """
 function reset_time_dependent_estimator(opt::ClusteringOptimisationEstimator)
     if !is_time_dependent(opt)
@@ -81,13 +150,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Shared field core for hierarchical (clustering-based) optimisation results.
+Holds the fields that the results of hierarchical risk parity and hierarchical equal risk contribution share.
 
-Holds the fields common to [`HierarchicalRiskParityResult`](@ref) and [`HierarchicalEqualRiskContributionResult`](@ref), and is embedded as the first field (`hr`) of each — analogous to how [`JuMPOptimisationResult`](@ref) is embedded as `jr` on the JuMP side. Each leaf keeps only the measures and scalarisers its own estimator carries, plus the trailing `fb`.
+[`HierarchicalRiskParityResult`](@ref) and [`HierarchicalEqualRiskContributionResult`](@ref) each hold it as their first field, `hr`, as a JuMP result holds a [`JuMPOptimisationResult`](@ref) as `jr`. Each of the two adds the risk measures and the scalarisers of its own estimator, and ends in the fallback field `fb`.
 
-## The core carries no `fb`
-
-`fb` is fixed as the **last** field of each concrete result and kept out of the core, because every optimisation result already ends in `fb`. Both leaves end in `fb`, so the one generic `factory(res, fb)` rebuilds them by the same convention and needs no change. The core sits off [`AbstractResult`](@ref)'s optimisation branch, so that generic never reaches it.
+The core holds no `fb`. The generic `factory(res, fb)` rebuilds a result from all of its fields but the last, and puts `fb` in the last field. Each of the two results ends in `fb`, so that method keeps the core unchanged. The core is not an [`OptimisationResult`](@ref), so `factory(res, fb)` does not take it.
 
 # Fields
 
@@ -107,7 +174,7 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-The keyword constructor is the one door a hierarchical `_optimise` exits through, so it is where the solved weights expand back onto the full asset universe, through [`expand_investable_weights`](@ref). The positional constructor never expands: every retcode rebuild goes through it, and a second pass would expand twice.
+The keyword constructor expands `w` from the investable assets to the full universe, through [`expand_investable_weights`](@ref), and then calls the positional constructor. [`HierarchicalRiskParity`](@ref) and [`HierarchicalEqualRiskContribution`](@ref) build their results through the keyword constructor, so the stored `w` has one entry per asset of the universe, and a non-investable asset holds zero. When `imsk` is `nothing`, `w` is stored as it is given. The positional constructor always stores `w` as it is given, so it is the constructor for weights that are already expanded.
 
 # Related
 
@@ -166,11 +233,11 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that a clustering covers exactly the universe the optimisation is about to allocate over.
+Assert that a clustering covers exactly the assets the optimisation allocates over.
 
-[`clusterise`](@ref) returns a fitted [`AbstractClusteringResult`](@ref) unchanged, so a caller who states one instead of an estimator states the leaf order as well. Nothing slices that order. Under an Investable Mask, or inside a subset or a nested view, the universe below the call is narrower than the one the caller clustered, and the leaf order would index the wrong columns. The weights would still come back, and they would be wrong, so the mismatch is refused where it is first visible.
+[`clusterise`](@ref) returns a fitted [`AbstractClusteringResult`](@ref) unchanged, so a caller who states one instead of an estimator also states the leaf order, and nothing slices that order. Under an Investable Mask, or inside a subset or a nested view, the optimisation runs on fewer assets than the caller clustered. The leaf order would then index the wrong columns, and the optimisation would return wrong weights without an error. This check raises before the leaf order is read.
 
-A fixed clustering under a changing universe is stated as a [`ClustersEstimator`](@ref), which refits per window and always matches.
+To keep one clustering method while the universe changes, state a [`ClustersEstimator`](@ref). It refits on each window, so its result always matches.
 
 # Algorithm
 
@@ -179,12 +246,12 @@ A fixed clustering under a changing universe is stated as a [`ClustersEstimator`
 
 # Arguments
 
-  - `clr`: Clustering result, fitted or just built.
+  - `clr`: Clustering result, fitted by [`clusterise`](@ref) or stated by the caller.
   - `N`: Number of assets the optimisation runs on, after the reduction.
 
 # Validation
 
-  - The clustering must carry one label per asset of the reduced universe.
+  - The clustering carries one label per asset of the reduced universe, else a `DimensionMismatch` is raised.
 
 # Returns
 
@@ -206,11 +273,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Result type for [`HierarchicalRiskParity`](@ref).
+Holds the weights and the fitted state of a hierarchical risk parity optimisation.
 
-Carries the shared core as `hr`, plus the one measure and the one scalariser its estimator holds, both stored **resolved**.
+[`HierarchicalRiskParity`](@ref) returns it. It holds the shared [`HierarchicalResult`](@ref) as `hr`, and the risk measure and the scalariser of its estimator, with the measure stored resolved.
 
-Every property of the core forwards through this type, so `res.w`, `res.pr`, `res.clr`, `res.wb`, `res.fees` and `res.retcode` read as if the fields were flat.
+Every property of `hr` reads through this type, so `res.w`, `res.pr`, `res.clr`, `res.wb`, `res.fees`, `res.retcode` and `res.imsk` read as if they were fields of `res`.
 
 # Fields
 
@@ -236,7 +303,7 @@ Keywords correspond to the struct's fields.
 """
 @concrete struct HierarchicalRiskParityResult <: HierarchicalOptimisationResult
     """
-    Shared hierarchical result core, see [`HierarchicalResult`](@ref).
+    $(field_dict[:hr_core])
     """
     hr
     """
@@ -271,13 +338,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Result type for [`HierarchicalEqualRiskContribution`](@ref).
+Holds the weights and the fitted state of a hierarchical equal risk contribution optimisation.
 
-Carries the shared core as `hr`, plus the **two** measures and **two** scalarisers its estimator holds — the intra-cluster pair and the inter-cluster pair — all stored **resolved**.
+[`HierarchicalEqualRiskContribution`](@ref) returns it. It holds the shared [`HierarchicalResult`](@ref) as `hr`, and the two risk measures and the two scalarisers of its estimator, one pair inside the clusters and one pair across them. Both measures are stored resolved.
 
-The differing arity against [`HierarchicalRiskParityResult`](@ref) is why the shared `HierarchicalResult` split into two leaves rather than growing `Option` slots or union-typed fields.
-
-Every property of the core forwards through this type, so `res.w`, `res.pr`, `res.clr`, `res.wb`, `res.fees` and `res.retcode` read as if the fields were flat.
+Every property of `hr` reads through this type, so `res.w`, `res.pr`, `res.clr`, `res.wb`, `res.fees`, `res.retcode` and `res.imsk` read as if they were fields of `res`.
 
 # Fields
 
@@ -305,7 +370,7 @@ Keywords correspond to the struct's fields.
 """
 @concrete struct HierarchicalEqualRiskContributionResult <: HierarchicalOptimisationResult
     """
-    Shared hierarchical result core, see [`HierarchicalResult`](@ref).
+    $(field_dict[:hr_core])
     """
     hr
     """
@@ -353,7 +418,7 @@ end
 
 Read the Investable Mask a hierarchical result reduced on.
 
-The core carries the mask as `imsk`, and the two leaves carry the core as `hr`. A leaf answers through the core rather than through its forwarded `res.imsk`, because the verb dispatches on the type and a forwarded property is invisible to it: without these methods the leaf falls back to `nothing`, the fold keeps the full weights, and a per-asset fee the result carries reduced is charged against them (#892).
+The core holds the mask in its field `imsk`, and each of the two leaves holds the core in its field `hr`. The generic method returns `nothing` for a result type that has no method of its own, and the property that a leaf forwards does not change the dispatch. So each leaf reads the mask through `hr`. Without these methods, a fold would keep the full weight vector and charge against it a per-asset fee that the result holds for the investable assets only.
 
 # Arguments
 
@@ -380,9 +445,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Base configuration for hierarchical clustering-based portfolio optimisers.
+Holds the prior, the clustering, the bounds and the fees that a hierarchical optimiser shares with its siblings.
 
-`HierarchicalOptimiser` combines a prior estimator, a clustering estimator, and weight bound/fee specifications to provide a reusable base configuration for hierarchical optimisers (HRP, HERC, SCHRP, etc.).
+[`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref) each hold one in their field `opt`. Each of them uses these fields to select the returns, fit the prior, cluster the assets, resolve the fees and the weight bounds, and finalise the weights.
 
 # Fields
 
@@ -404,19 +469,20 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> HierarchicalOptimiser
 
-Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, clustering estimator, weight finaliser and asset sets as much as the bounds and fees — may therefore vary over folds; execution control (`slv`, `brt`, `x_src`, `strict`) stays static.
+Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TD_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule, one value per fold, in place of a static value. A cross-validation fold loop resolves the schedule on each fold, and a fold-less `optimise` runs with the field at its static default. These fields are the problem definition: the prior estimator, the clustering estimator, the weight bounds, the fees, the asset sets and the weight finaliser. The fields `slv`, `brt`, `x_src` and `strict` control the execution, and they are always static.
 
 ## Validation
 
   - `x_src in (:prior, :data)`.
   - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
-  - If any field holds a [`TimeDependent`](@ref): every vector entry is test-substituted through this constructor so type compatibility errors surface immediately.
+  - If a field holds a [`TimeDependent`](@ref) schedule: the constructor runs again with each value of the schedule in that field, so a value that the constructor refuses raises here and not in a later fold.
 
 ## Propagated parameters
 
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `fees`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -426,6 +492,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
   - `wb`: Recursively viewed via [`port_opt_view`](@ref).
   - `fees`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -591,9 +658,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the static defaults of the [`HierarchicalOptimiser`](@ref) fields that may hold a [`TimeDependent`](@ref).
+Return the one copy of the static defaults of the schedulable fields of [`HierarchicalOptimiser`](@ref).
 
-Shared by the constructor's test-substitution pass and [`time_dependent_field_defaults`](@ref), so the fold-less value of a field is declared once. Fields whose static default is `nothing` are omitted.
+The constructor reads it to try each value of a schedule, and [`time_dependent_field_defaults`](@ref) returns it, so the two agree on the fold-less value of each field. It names `pe`, `cle`, `wb` and `wf`. The fields `fees` and `sets` default to `nothing`, so they have no entry.
+
+# Returns
+
+  - `defaults::NamedTuple`: The default value of each schedulable field whose default is not `nothing`.
 
 # Related
 
@@ -608,7 +679,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether the [`HierarchicalOptimiser`](@ref) requires previous portfolio weights (based on fee structure and time-dependent constraints).
+Return `true` when a [`HierarchicalOptimiser`](@ref) reads the weights of the previous fold.
+
+The optimiser reads them when its fees do, as a turnover fee does, or when one of its [`TimeDependent`](@ref) schedules does.
+
+# Arguments
+
+  - `opt`: The shared configuration of a hierarchical optimiser.
+
+# Returns
+
+  - `flag::Bool`: `true` when a fold loop must pass the previous weights through [`factory`](@ref).
 
 # Related
 
@@ -622,11 +703,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the static defaults of the [`HierarchicalOptimiser`](@ref) fields that may hold a [`TimeDependent`](@ref).
+Return the value that each schedulable field of a [`HierarchicalOptimiser`](@ref) takes when no fold resolves it.
+
+It returns [`hierarchical_optimiser_td_defaults`](@ref), which the constructor also reads.
+
+# Returns
+
+  - `defaults::NamedTuple`: The static default of `pe`, `cle`, `wb` and `wf`.
 
 # Related
 
   - [`HierarchicalOptimiser`](@ref)
+  - [`hierarchical_optimiser_td_defaults`](@ref)
   - [`TimeDependent`](@ref)
   - [`TimeDependentContext`](@ref)
 """
@@ -639,7 +727,31 @@ end
 
 Compute the expected risk of each asset held alone.
 
-The ``i``-th entry is the risk of the portfolio whose weight vector is one in position ``i`` and zero everywhere else, so the result has one entry per **asset**, not per cluster. For [`Variance`](@ref) the vector is the diagonal of the covariance matrix. The hierarchical optimisers invert this vector to build a naive risk parity allocation inside a cluster.
+The result has one entry per asset, not per cluster. [`HierarchicalRiskParity`](@ref) and [`HierarchicalEqualRiskContribution`](@ref) weight the assets of a cluster in proportion to the inverse of these risks, which is the naive risk parity allocation inside the cluster.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\rho(\\{i\\}) &= R(\\boldsymbol{e}_i)\\,, \\quad i = 1,\\, \\ldots,\\, N\\,.
+\\end{align}
+```
+
+For [`Variance`](@ref), ``\\rho(\\{i\\}) = \\Sigma_{ii}``, so the vector is the diagonal of the covariance matrix. A measure that reads the returns evaluates ``R`` on the returns of asset ``i`` net of the fees that `fees` charges on ``\\boldsymbol{e}_i``.
+
+Where:
+
+  - ``\\rho(\\{i\\})``: Risk of asset ``i`` held alone.
+  - $(math_dict[:R_w])
+  - ``\\boldsymbol{e}_i``: Weight vector that is one at asset ``i`` and zero at every other asset.
+  - ``\\Sigma_{ii}``: Variance of asset ``i``.
+  - $(math_dict[:N])
+
+# Algorithm
+
+ 1. Make the weight vector `wk`, all zero, of length `size(X, 2)`. Its entries take the type of the quotient of two returns, so an integer `X` gives fractional weights.
+ 2. For each asset `i`, set `wk[i]` to one, evaluate `expected_risk(r, wk, X, fees)` as the `i`-th risk, and set `wk[i]` back to zero.
+ 3. Collect the risks into `rk`, whose element type is the type that `expected_risk` returns.
 
 # Arguments
 
@@ -649,7 +761,7 @@ The ``i``-th entry is the risk of the portfolio whose weight vector is one in po
 
 # Returns
 
-  - `rk::Vector`: Expected risk of each asset held alone, of length `size(X, 2)`.
+  - `rk::Vector`: Expected risk of each asset held alone, of length `size(X, 2)`. Its element type is the type of the risk, not the element type of `X`.
 
 # Related
 
@@ -659,14 +771,16 @@ The ``i``-th entry is the risk of the portfolio whose weight vector is one in po
 """
 function unitary_expected_risks(r::OptimisationRiskMeasure, X::MatNum,
                                 fees::Option{<:Fees} = nothing)
-    wk = zeros(eltype(X), size(X, 2))
-    rk = Vector{eltype(X)}(undef, size(X, 2))
-    for i in eachindex(wk)
-        wk[i] = one(eltype(X))
-        rk[i] = expected_risk(r, wk, X, fees)
-        wk[i] = zero(eltype(X))
+    # A risk is not an entry of `X`: an integer returns matrix has a fractional variance.
+    # The weights take the type of the returns, widened to a float only when it is an
+    # integer, and `map` takes the type of the risks from the values `expected_risk` returns.
+    wk = zeros(float_if_integer(eltype(X)), size(X, 2))
+    return map(eachindex(wk)) do i
+        wk[i] = one(eltype(wk))
+        rki = expected_risk(r, wk, X, fees)
+        wk[i] = zero(eltype(wk))
+        return rki
     end
-    return rk
 end
 """
     unitary_expected_risks!(wk::VecNum, rk::VecNum, r::OptimisationRiskMeasure,
@@ -674,12 +788,17 @@ end
 
 Write the expected risk of each asset held alone into `rk`.
 
-The in-place form of [`unitary_expected_risks`](@ref), for a caller that reuses one buffer across several risk measures.
+This is the in-place form of [`unitary_expected_risks`](@ref), which states the mathematics. A caller that evaluates several risk measures uses it to reuse one pair of buffers.
+
+# Algorithm
+
+ 1. Set every entry of `rk` to zero.
+ 2. For each asset `i`, set `wk[i]` to one, evaluate `expected_risk(r, wk, X, fees)` into `rk[i]`, and set `wk[i]` back to zero.
 
 # Arguments
 
-  - `wk`: Scratch weight vector, of length `size(X, 2)`. It must arrive all zero, and it leaves all zero: each iteration raises one entry to one and lowers it again.
-  - `rk`: Output risk vector, of length `size(X, 2)`. It is overwritten in full.
+  - `wk`: Scratch weight vector, of length `size(X, 2)`. It must be all zero on entry, and it is all zero on exit, because each step sets one entry to one and then back to zero.
+  - `rk`: Output risk vector, of length `size(X, 2)`. It is overwritten in full. Its element type must hold a risk, so for an integer `X` it is a floating-point type.
   - `r`: Risk measure, already resolved by [`factory`](@ref).
   - `X`: Asset return matrix, observations by assets.
   - `fees`: Fees to charge against each unit portfolio, or `nothing`.
@@ -696,11 +815,11 @@ The in-place form of [`unitary_expected_risks`](@ref), for a caller that reuses 
 """
 function unitary_expected_risks!(wk::VecNum, rk::VecNum, r::OptimisationRiskMeasure,
                                  X::MatNum, fees::Option{<:Fees} = nothing)
-    fill!(rk, zero(eltype(X)))
+    fill!(rk, zero(eltype(rk)))
     for i in eachindex(wk)
-        wk[i] = one(eltype(X))
+        wk[i] = one(eltype(wk))
         rk[i] = expected_risk(r, wk, X, fees)
-        wk[i] = zero(eltype(X))
+        wk[i] = zero(eltype(wk))
     end
     return nothing
 end

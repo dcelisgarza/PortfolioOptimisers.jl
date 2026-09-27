@@ -2,7 +2,7 @@
 Description = "Plotting, public API of PortfolioOptimisers.jl: plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_composition, …"
 ```
 
-# Plotting
+# [Plotting](@id api-plotting)
 
 ```@docs
 plot_portfolio_cumulative_returns

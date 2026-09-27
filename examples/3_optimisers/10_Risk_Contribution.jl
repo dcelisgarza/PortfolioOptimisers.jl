@@ -1,28 +1,26 @@
 #=
 ```@meta
-Description = "Risk contribution in PortfolioOptimisers.jl: constrain where risk lands by asset or by factor, and compare the result across objectives."
+Description = "Risk contribution in PortfolioOptimisers.jl: bound each asset's or each factor's share of the risk, and compare the result across objectives."
 ```
 
 # Risk contribution
 
-This example focuses on *where* risk lands rather than only on how much risk a portfolio
-takes. It walks through two related workflows:
+This page is about how the risk of a portfolio divides between its assets or its factors,
+not about how much risk it takes. It covers two jobs:
 
-  - asset risk contribution under the variance measure, using the `rc` field to constrain
-    per-asset contributions while comparing multiple objective functions;
-  - factor risk contribution optimisation, where we constrain the contribution of specific
-    factors and solve across multiple objectives.
+  - asset risk contribution under the variance measure, where the `rc` field caps what each
+    asset contributes and three objective functions run against the same caps;
+  - factor risk contribution, where the same kind of cap names factors instead of assets.
 
 !!! tip "When to reach for this"
-    Reach for risk-contribution workflows when the allocation itself is not the point.
-    They are useful when you want to see concentration in the realised risk profile, impose
-    contribution limits directly in risk space, and compare how objective functions reshape
-    the final risk profile under the same `rc` constraints.
+    Reach for a risk contribution workflow when the weights are not what you want to control.
+    It shows you how concentrated the realised risk is, it lets you ask for a bound on what one
+    asset or one factor contributes, and it lets you hold those bounds fixed while you change
+    the objective.
 =#
 
 using PortfolioOptimisers, PrettyTables
 
-## Format for pretty tables.
 resfmt = (v, i, j) -> begin
     if j == 1
         return v
@@ -32,10 +30,10 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. Data
 
-We use one year of S&P 500 prices and the matching factor returns slice used in the test
-suite. The factor block is required for the factor-risk-contribution section.
+We use one year of S&P 500 prices and the factor returns over the same dates. Section 4
+needs the factor returns.
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel
@@ -47,8 +45,8 @@ rd = prices_to_returns(price_ingestion(PriceIngestion(), X; F = F))
 #=
 ## 2. Shared optimiser setup
 
-We pass a vector of solver configurations so the examples can fall back cleanly if the
-first Clarabel configuration stalls on this data slice.
+We pass a vector of solver settings. If the first Clarabel setting stalls on this data, the
+optimiser tries the next one.
 =#
 
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
@@ -69,12 +67,14 @@ opt_asset = JuMPOptimiser(; pe = pr, slv = slv, sets = sets_asset)
 #=
 ## 3. Asset risk contribution with `rc` constraints
 
-[`risk_contribution`](@ref) decomposes the total risk of a portfolio into per-asset
-contributions. Instead of using risk budgeting, we constrain contributions directly via
-[`Variance`](@ref) using its `rc` field.
+[`risk_contribution`](@ref) splits the total risk of a portfolio into one contribution per
+asset. Risk budgeting asks for a whole budget. The `rc` field of [`Variance`](@ref) instead
+bounds each contribution, and the cell below asks for every asset at or below 20% of the total
+risk. The optimiser states these bounds on a relaxation, which section 4 describes, so read the
+realised shares in the table.
 
-The same risk constraints are then solved under three different objectives to show how
-objective choice changes weights while still respecting the contribution limits.
+The loop then solves the same constraints under three objectives, so you can read how the
+objective moves the weights while the caps stay put.
 =#
 
 lcs_asset = LinearConstraintEstimator(; val = ["$a <= 0.2" for a in rd.nx])
@@ -99,26 +99,28 @@ end
 pretty_table(asset_df; formatters = [resfmt])
 
 #=
-Even when all solutions satisfy the same per-asset contribution caps, objective functions
-still produce different weights and risk-contribution shapes.
+Read the risk columns of the table against the 20% cap. The weights differ from one
+objective to the next. The plots below draw one risk profile per objective.
 =#
 
 using StatsPlots, GraphRecipes
 
 for (name, _) in obj_specs
     display(plot_risk_contribution(rf_asset, asset_res[name], rd;
-                                   title = "Asset RC - $(name)"))
+                                   title = "Asset risk contribution, $(name)"))
 end
 
 #=
 ## 4. Factor risk contribution optimisation
 
-[`FactorRiskContribution`](@ref) works one layer higher: instead of decomposing risk across
-assets only, it uses factor regression to impose or inspect contribution targets on named
-factors. The regression estimator needs the factor-return data at optimisation time, so we
-pass `rd` directly to [`optimise`](@ref).
+[`FactorRiskContribution`](@ref) caps a named factor rather than a named asset. It regresses
+the asset returns onto the factor returns and computes the contribution of each factor from that
+regression. The regression estimator needs the factor returns when the optimiser builds the
+problem, so we pass `rd` to [`optimise`](@ref).
 
-The factor side mirrors the same idea: `rc` constraints are fixed, while objectives vary.
+The loop below runs the same three objectives against one set of factor constraints. The
+constraints cap the share of `VLUE` in the portfolio variance at 74%, keep the share of `QUAL`
+at or above -7%, and fix the share of `MTUM` at 9%. A factor can contribute a negative share.
 =#
 
 sets = UniverseSets(; dict = Dict("nx" => rd.nf))
@@ -126,7 +128,7 @@ lcs = LinearConstraintEstimator(; val = ["VLUE <= 0.74", "QUAL >= -0.07", "MTUM=
 r_fac = Variance(; rc = lcs)
 
 rf_fac = factory(r_fac, pr)
-factor_df = DataFrame(; factor = [rd.nf; "Intercept"])
+factor_df = DataFrame(; factor = [rd.nf; "Off-factor"])
 factor_res = Dict{Symbol, Any}()
 
 for (name, obj) in obj_specs
@@ -140,22 +142,31 @@ end
 
 pretty_table(factor_df; formatters = [resfmt])
 
+#=
+The table prints each factor's share of the total, so every column sums to one. The `rc`
+constraints bound each factor's share of the portfolio variance. The optimiser states them on a
+semidefinite relaxation, in which a matrix variable takes the place of the product of the factor
+weights with themselves. When the relaxation is not tight, the shares of the portfolio it returns
+miss the targets. On this data only the maximum-ratio column meets all three constraints.
+=#
+
 for (name, _) in obj_specs
     display(plot_factor_risk_contribution(rf_fac, factor_res[name], rd;
-                                          title = "Factor RC - $(name)"))
+                                          title = "Factor risk contribution, $(name)"))
 end
 
 #=
 ## Summary
 
-Risk contribution workflows answer a different question from plain mean-risk optimisation:
+The `rc` field bounds each asset's or each factor's share of the variance, whatever the
+objective.
 
-  - [`Variance`](@ref) with `rc` constraints directly limits realised risk contribution,
-    either by asset or by factor.
-  - [`MeanRisk`](@ref) and [`FactorRiskContribution`](@ref) can be run with the same
-    constraints and different objective functions to compare allocations and concentration.
-  - [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) verify whether the
-    solved portfolio's realised profile matches your intended contribution policy.
+  - [`Variance`](@ref) with `rc` constraints states the bounds on a semidefinite relaxation, so
+    a solve can succeed and still return weights whose realised shares miss a bound.
+  - [`MeanRisk`](@ref) and [`FactorRiskContribution`](@ref) take the same constraints under
+    different objectives, so you can compare the weights and the concentration they give.
+  - [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) compute the realised
+    profile, which you read against the caps you set.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

@@ -2,7 +2,7 @@
 Description = "Windowed variance, public API of PortfolioOptimisers.jl: WindowedVariance, var, std."
 ```
 
-# Windowed variance
+# [Windowed variance](@id api-windowed-variance)
 
 ```@docs
 WindowedVariance

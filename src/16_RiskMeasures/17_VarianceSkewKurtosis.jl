@@ -114,7 +114,7 @@ $(DocStringExtensions.FIELDS)
         pe::Option{<:AbstractPriorEstimator} = nothing
     ) -> Skewness
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. A `w` that is not `nothing` is passed to `ve` with [`factory`](@ref), so the variance estimator reads the same weights as the measure.
 
 ## Validation
 
@@ -223,7 +223,7 @@ function Skewness(; settings::MaxRiskMeasureSettings = MaxRiskMeasureSettings(),
                   sk::Option{<:SkSlot} = nothing, w::Option{<:ObsWeights} = nothing,
                   mu::Option{<:MuSlot} = nothing,
                   pe::Option{<:AbstractPriorEstimator} = nothing)::Skewness
-    return Skewness(settings, ve, sk, w, mu, pe)
+    return Skewness(settings, factory(ve, w), sk, w, mu, pe)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -300,7 +300,8 @@ function factory(r::Skewness, pr::HighOrderPrior, args...; kwargs...)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     sk = nothing_scalar_array_selector(r.sk, pr.sk)
-    return Skewness(; ve = factory(r.ve, w), sk = sk, w = w, mu = mu, pe = nothing)
+    return Skewness(; settings = r.settings, ve = factory(r.ve, w), sk = sk, w = w, mu = mu,
+                    pe = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -318,7 +319,8 @@ function factory(r::Skewness, pr::LowOrderPrior, args...; kwargs...)::Skewness
     r = resolve_deferred_quantities(r, pr)
     w = nothing_scalar_array_selector(r.w, pr.w)
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
-    return Skewness(; ve = factory(r.ve, w), sk = r.sk, w = w, mu = mu, pe = nothing)
+    return Skewness(; settings = r.settings, ve = factory(r.ve, w), sk = r.sk, w = w,
+                    mu = mu, pe = nothing)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -518,6 +520,12 @@ The skewness term takes a **lower** bound, because a larger skewness is preferab
 !!! info
 
     A relaxation block stands in for an exact Kronecker product, so the model's value carries the relaxation gap. The functor reads the moments from the matrices directly and carries no gap. The two agree to the width of that gap.
+
+!!! warning
+
+    The `JuMP` model is an approximate formulation of ``\\mathcal{R}``. Its optimum matches the optimum of ``\\mathcal{R}`` only where the relaxation is tight, and the relaxation is tight over a range of skewness values only. A skewness scale ``s_{\\mathrm{sk}}`` that is large against ``s_{\\sigma^2}`` and ``s_{\\kappa}`` loosens it: the optimum moves to relaxation blocks far from any product of the weights, and the model's value stops tracking the functor's. A first-order solver can then stop at a point that breaks the weight bounds and the budget. The solution check accepts that point as solved when `check_sol = (; allow_almost = true)`.
+
+    Raise ``s_{\\mathrm{sk}}`` in small steps and check the returned weights against the bounds and the budget. The default `check_sol` rejects an approximate solution, so a solver that stops short fails instead of returning such a point.
 
 # Functor
 

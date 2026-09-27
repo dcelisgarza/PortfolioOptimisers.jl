@@ -4,4 +4,4 @@ Description = "Excess expected returns has no private API in PortfolioOptimisers
 
 # Excess expected returns: private API
 
-Excess expected returns has no private API in `PortfolioOptimisers.jl`; its names are in the public API.
+Every name of this topic is public. The [public page](@ref api-excess-expected-returns) documents them.

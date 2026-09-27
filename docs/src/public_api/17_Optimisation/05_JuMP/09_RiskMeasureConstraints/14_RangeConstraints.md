@@ -4,4 +4,4 @@ Description = "Range Constraints has no public API in PortfolioOptimisers.jl; it
 
 # Range Constraints
 
-Range Constraints has no public API in PortfolioOptimisers.jl; see [Range Constraints: private API](../../../../private_api/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/14_RangeConstraints.md) for its private API.
+Every name of this topic is private. The [private page](@ref private-api-range-constraints) documents them.

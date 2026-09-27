@@ -25,7 +25,7 @@ Where:
   - $(math_dict[:T])
   - ``\\mathrm{VaR}``: Value-at-Risk variable.
   - ``\\hat{r}_t``: Portfolio return at time ``t``.
-  - ``b``: Big-M constant.
+  - ``b``: Big-M constant, from [`mip_big_m`](@ref).
 
 Parametric VaR (Normal/t/Laplace):
 
@@ -66,11 +66,10 @@ where ``z_\\alpha`` is the distribution quantile at level ``\\alpha`` and ``\\ma
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
-                               kwargs...)
-    b = ifelse(!isnothing(r.alg.b), r.alg.b, 1e3)
-    s = ifelse(!isnothing(r.alg.s), r.alg.s, 1e-5)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
+    b, s = mip_var_bounds(r.alg.b, r.alg.s)
+    b = mip_big_m(model, b, s, NetReturnsRiskSeries(), pr; prefix = prefix)
     series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
     return set_mip_quantile_risk_constraints!(model, i, r, opt, pr, series, T, b, s,
                                               (; risk = :var_risk_, z = :z_var_,
@@ -95,7 +94,7 @@ function writes the indicator block once.
   - $(arg_dict[:pr_X])
   - `series`: The per-observation return series from [`risk_series`](@ref).
   - `T::Int`: The number of observations.
-  - `b::Number`: Big-M constant.
+  - `b::Number`: Big-M constant, from [`mip_big_m`](@ref).
   - `s::Number`: Cardinality slack.
   - `keys::NamedTuple`: Bare Model State entry names, one per entry this builder registers.
 
@@ -113,23 +112,17 @@ The block knows nothing of which tail it builds. [`risk_series`](@ref) negates t
 for the gain tail, and this same programme over that series is the gain tail's quantile, so
 the binaries and the cardinality constraint are written once.
 
-# Throws
-
-  - `DomainError`: if `b <= s`.
-
 # Related
 
   - [`risk_series`](@ref)
+  - [`mip_big_m`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_mip_quantile_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
-                                            opt::RiskJuMPOptimisationEstimator,
+                                            opt::RiskConstraintOwner,
                                             pr::AbstractPriorResult, series, T::Int,
                                             b::Number, s::Number, keys::NamedTuple;
                                             prefix::Symbol = Symbol(""))
-    @argcheck(b > s,
-              DomainError((b, s),
-                          "`b` is $b and `s` is $s. The big-M constant `b` relaxes a bound the slack `s` tightens, so `b > s` must hold."))
     sc = get_constraint_scale(model)
     risk, z = JuMP.@variables(model, begin
                                   ()
@@ -189,8 +182,8 @@ VaR expressions. Each tail brings its own binary indicator set and big-M block.
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                    <:MIPValueatRisk},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     return set_range_risk_constraints!(model, i, r, :var_range_risk_, opt, pr, args...;
                                        prefix = prefix, kwargs...)
 end
@@ -227,9 +220,8 @@ constraint to bound the portfolio standard deviation. The VaR expression is
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRisk{<:Any, <:Any, <:Any,
                                               <:DistributionValueatRisk},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
-                               kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     G = chol_sigma_selector(model, pr, r.alg)
@@ -283,8 +275,8 @@ between the lower-tail and upper-tail VaR expressions.
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any,
                                                    <:DistributionValueatRisk},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     alg = r.alg
     mu = nothing_scalar_array_selector(alg.mu, pr.mu)
     G = chol_sigma_selector(model, pr, r.alg)
@@ -340,13 +332,162 @@ the empirical drawdown quantile at confidence level `r.alpha`.
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::DrawdownatRisk,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
-    b = ifelse(!isnothing(r.b), r.b, 1e3)
-    s = ifelse(!isnothing(r.s), r.s, 1e-5)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
+    b, s = mip_var_bounds(r.b, r.s)
+    b = mip_big_m(model, b, s, DrawdownRiskSeries(), pr; prefix = prefix)
     series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)
     return set_mip_quantile_risk_constraints!(model, i, r, opt, pr, series, T, b, s,
                                               (; risk = :dar_risk_, z = :z_dar_,
                                                cardinality = :csdar_, exceedance = :cdar_);
                                               prefix = prefix)
+end
+"""
+    mip_series_spread(alg::AbstractRiskSeriesAlgorithm, X::MatNum) -> Number
+
+Return the largest spread of the losses of one asset over the observations, per unit of weight.
+
+For the net returns it is the range of a column of `X`. For the drawdowns it is the range of the cumulative sum of a column, over a path that starts at zero. Multiplied by a bound on the gross exposure of the weights, it bounds the spread of the losses of the portfolio, as [`mip_big_m`](@ref) states.
+
+# Arguments
+
+  - `alg::AbstractRiskSeriesAlgorithm`: [`NetReturnsRiskSeries`](@ref) or [`DrawdownRiskSeries`](@ref).
+  - `X::MatNum`: Asset returns matrix, observations by assets.
+
+# Returns
+
+  - `d::Number`: The largest spread over the assets.
+
+# Related
+
+  - [`mip_big_m`](@ref)
+"""
+function mip_series_spread(::NetReturnsRiskSeries, X::MatNum)
+    return maximum(x -> maximum(x) - minimum(x), eachcol(X))
+end
+function mip_series_spread(::DrawdownRiskSeries, X::MatNum)
+    return maximum(eachcol(X)) do x
+        c = cumsum(x)
+        return max(zero(eltype(c)), maximum(c)) - min(zero(eltype(c)), minimum(c))
+    end
+end
+"""
+    mip_fees_keep_spread(model::JuMP.Model, alg::AbstractRiskSeriesAlgorithm) -> Bool
+
+Return `true` when the fees of `model` do not change the spread of the losses that [`mip_series_spread`](@ref) bounds.
+
+A per period fee is the same at every observation, so it leaves the spread of the net returns unchanged. So does a one-time fee on an [`AmortisedFees`](@ref) clock. A one-time fee on the first observation changes the loss of that observation alone, which changes the spread. A drawdown adds up the fees of its periods, so any fee changes its spread.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `alg::AbstractRiskSeriesAlgorithm`: [`NetReturnsRiskSeries`](@ref) or [`DrawdownRiskSeries`](@ref).
+
+# Returns
+
+  - `flag::Bool`: `true` when the spread holds with the fees.
+
+# Related
+
+  - [`mip_big_m`](@ref)
+  - [`set_net_portfolio_returns!`](@ref)
+"""
+function mip_fees_keep_spread(model::JuMP.Model, ::NetReturnsRiskSeries)
+    return !shared_has(model, :one_time_fees) ||
+           isa(shared_get(model, :fee_fa), AmortisedFees)
+end
+function mip_fees_keep_spread(model::JuMP.Model, ::DrawdownRiskSeries)
+    return !shared_has(model, :fees) && !shared_has(model, :one_time_fees)
+end
+"""
+    mip_big_m(model::JuMP.Model, b::Option{<:Number}, s::Number,
+              alg::AbstractRiskSeriesAlgorithm, pr::AbstractPriorResult;
+              prefix::Symbol = Symbol("")) -> Number
+
+Return the big-M constant of the empirical quantile programme of [`MIPValueatRisk`](@ref).
+
+A stated `b` is returned as it is, after the check that `b > s`. A `nothing` takes the smallest constant that keeps the programme exact for every weight vector that the model admits. Each exceedance row then relaxes its bound by no more than it must, so the integrality tolerance ``\\varepsilon`` of the solver loosens a row by ``b \\varepsilon`` at most.
+
+# Mathematical definition
+
+The programme is exact when ``b`` is at least the largest loss minus the smallest loss, because the risk is never below the smallest loss. For the net returns,
+
+```math
+\\begin{align}
+\\ell_{t} - \\ell_{t'} &= \\left(\\boldsymbol{X}_{t'} - \\boldsymbol{X}_{t}\\right) \\boldsymbol{w} \\leq \\lVert \\boldsymbol{w} \\rVert_{1} \\max_{i} \\left(\\max_{t} X_{t,\\,i} - \\min_{t} X_{t,\\,i}\\right) \\leq g\\, d\\,.
+\\end{align}
+```
+
+For the drawdowns, ``0 \\leq \\ell_{t} = \\max_{0 \\leq s \\leq t} c_{s} - c_{t}``, and the same bound holds with the ranges of the cumulative sums ``C_{t,\\,i} = \\sum_{u=1}^{t} X_{u,\\,i}``, ``C_{0,\\,i} = 0``, in place of the ranges of the columns. So
+
+```math
+\\begin{align}
+b &= g\\, d\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\ell_{t}``: Loss of observation ``t``.
+  - ``\\boldsymbol{X}_{t}``: Row ``t`` of the asset returns matrix.
+  - $(math_dict[:w_port])
+  - $(math_dict[:ct])
+  - ``g``: Bound on the gross exposure, the model's `:w_gross_ub`, from [`gross_exposure_bound`](@ref).
+  - ``d``: The largest spread per unit of weight, from [`mip_series_spread`](@ref).
+  - ``b``: Big-M constant.
+
+The derivation needs the weights in units of the budget, so it holds only when all of these are true:
+
+  - The model's `k` is the number `1`. Under [`MaximumRatio`](@ref) and in [`RiskBudgeting`](@ref) the weights have a free scale.
+  - The series reads the head's weights, not weights that a tracking build shifts.
+  - The weight builder recorded a finite ``g``.
+  - The fees keep the spread, as [`mip_fees_keep_spread`](@ref) states.
+  - ``g\\, d`` is finite, which a `NaN` in `X` makes false.
+
+When one is false, the constant is `1000`, the value that Cajas recommends.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `b::Option{<:Number}`: The stated big-M constant, or `nothing`.
+  - `s::Number`: Cardinality slack.
+  - `alg::AbstractRiskSeriesAlgorithm`: The loss series, [`NetReturnsRiskSeries`](@ref) or [`DrawdownRiskSeries`](@ref).
+  - $(arg_dict[:pr_X])
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `b::Number`: The big-M constant.
+
+# Throws
+
+  - `DomainError`: if a stated `b` is not greater than `s`.
+
+# Related
+
+  - [`MIPValueatRisk`](@ref)
+  - [`DrawdownatRisk`](@ref)
+  - [`mip_var_bounds`](@ref)
+  - [`set_mip_quantile_risk_constraints!`](@ref)
+
+# References
+
+  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equation 7.51.
+"""
+function mip_big_m(::JuMP.Model, b::Number, s::Number, args...; kwargs...)
+    @argcheck(b > s,
+              DomainError((b, s),
+                          "`b` is $b and `s` is $s. The big-M constant `b` relaxes a bound the slack `s` tightens, so `b > s` must hold."))
+    return b
+end
+function mip_big_m(model::JuMP.Model, ::Nothing, ::Number, alg::AbstractRiskSeriesAlgorithm,
+                   pr::AbstractPriorResult; prefix::Symbol = Symbol(""))
+    # Every check reads the model without side effects, so all of them can run.
+    exact = all((isa(get_k(model), Number), weights_prefix(model, prefix) == Symbol(""),
+                 shared_has(model, :w_gross_ub), mip_fees_keep_spread(model, alg)))
+    b = exact ? shared_get(model, :w_gross_ub) * mip_series_spread(alg, pr.X) : Inf
+    return isfinite(b) ? b : 1e3
 end

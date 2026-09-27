@@ -65,7 +65,7 @@ The `SOCRiskExpr` overload passes the SOC variable directly to
 function set_negative_skewness_risk!(model::JuMP.Model,
                                      r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                          <:SOCRiskExpr},
-                                     opt::RiskJuMPOptimisationEstimator,
+                                     opt::RiskConstraintOwner,
                                      nskew_risk::JuMP.AbstractJuMPScalar, i, args...;
                                      prefix::Symbol = Symbol(""))
     set_risk_bounds_and_expression!(model, opt, nskew_risk, r.settings, :nskew_risk_, i;
@@ -75,7 +75,7 @@ end
 function set_negative_skewness_risk!(model::JuMP.Model,
                                      r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                          <:SquaredSOCRiskExpr},
-                                     opt::RiskJuMPOptimisationEstimator,
+                                     opt::RiskConstraintOwner,
                                      nskew_risk::JuMP.AbstractJuMPScalar, i, args...;
                                      prefix::Symbol = Symbol(""))
     qnskew_risk = state_set!(model, prefix, :sq_nskew_risk_, i,
@@ -88,7 +88,7 @@ end
 function set_negative_skewness_risk!(model::JuMP.Model,
                                      r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any,
                                                          <:QuadRiskExpr},
-                                     opt::RiskJuMPOptimisationEstimator,
+                                     opt::RiskConstraintOwner,
                                      nskew_risk::JuMP.AbstractJuMPScalar, i, V::MatNum;
                                      prefix::Symbol = Symbol(""))
     w = get_w(model, prefix)
@@ -149,8 +149,8 @@ where ``\\mathbf{V}`` is the co-skewness matrix projected onto the weight space.
   - [`assert_high_order_quantity`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     # `sk` and `V` are both-or-neither on either side, so the gate reads the pair through
     # `sk` and the kernel below can take `pr.V` whenever it takes `pr.sk`.
     assert_high_order_quantity(r.sk, pr, :NegativeSkewness, :sk, :CoskewnessEstimator)

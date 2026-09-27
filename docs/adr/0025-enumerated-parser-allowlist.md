@@ -8,7 +8,7 @@ status: accepted
 
 Constraint equations, Black-Litterman view strings, entropy-pooling view strings and asset-set
 names are untrusted input: a config file, spreadsheet, or UI feeds them into a caller, and they all
-funnel through the exported [`parse_equation`](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration.jl).
+funnel through the exported [`parse_equation`](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl).
 That parser calls `Meta.parse` on the caller string and then evaluates the numeric parts of the
 resulting expression in `eval_numeric_functions` — so `eval_numeric_functions` *is* the library's
 trust boundary for string input.

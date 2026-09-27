@@ -1,85 +1,103 @@
 #=
 ```@meta
-Description = "A fast tour of PortfolioOptimisers.jl: the one minimal call for each stage of the pipeline, from prices to a traded portfolio."
+Description = "A short tour of PortfolioOptimisers.jl that gives one minimal call for each stage of the pipeline, from prices to a portfolio you can trade."
 ```
 
 # Introduction to the user guide
 
-Welcome to the `PortfolioOptimisers.jl` **user guide** — a fast, skimmable tour of the package.
-Each page gives you the *one minimal blessed call* for a task so you can get a portfolio out
-the door without reading the source or the reference. It is deliberately shallow: when you want
-the full treatment of a topic — every variant, sweep, and trade-off — follow the cross-links
-into the [Examples](../examples/00_Examples.md), which are deep single-topic dives.
+The user guide is a short tour of `PortfolioOptimisers.jl`. Each page gives you one minimal call
+for a task, so you can build a portfolio without reading the source or the reference. A page
+covers the common path of its topic and stops there. For the variants of a topic and the choices
+between them, follow the links into the [Examples](@ref example-examples-introduction), where each page
+covers one topic in depth.
 
 ## The pipeline
 
-`PortfolioOptimisers.jl` is organised as a pipeline. Data flows through a sequence of stages,
-and each stage is a swappable estimator:
+`PortfolioOptimisers.jl` is organised as a pipeline. Data passes through a sequence of stages, and
+each stage is an estimator that you can replace with another:
 
 ```text
 data ─▶ moments / prior ─▶ optimiser ─▶ constraints & costs ─▶ validation ─▶ post-processing
 ```
 
-The guide mirrors that spine, one page per stage:
+The first pages of the guide follow the stages, and the later pages cover topics that span them:
 
-  - [Data and priors](01_Data_and_Priors.md) — turn prices into returns and returns into a
-    prior (expected returns, covariance). Deep dives: [moments & priors examples](../examples/2_moments_priors/01_Expected_Returns_Estimation.md).
-  - [Optimisers](02_Optimisers.md) — the breadth tour: naive, JuMP (MeanRisk, risk budgeting,
-    near-optimal centering), clustering, and meta-optimisers. Deep dives:
-    [optimiser examples](../examples/3_optimisers/01_MeanRisk_Objectives.md).
-  - [Risk measures](03_Risk_Measures.md) — the catalog of what you ask an optimiser to minimise:
-    every measure with its alias, its meaning, and which optimisers accept it.
-  - [Constraints and costs](04_Constraints_and_Costs.md) — budgets, weight bounds, turnover,
-    fees. Deep dives: [constraints & costs examples](../examples/4_constraints_costs/01_Budget_Constraints.md).
-  - [Validation and tuning](05_Validation_and_Tuning.md) — cross-validation and hyperparameter
-    search. Deep dives: [validation examples](../examples/5_validation_tuning/01_Cross_Validation.md).
-  - [Post-processing](06_Post_Processing.md) — discrete allocation and reporting. Deep dives:
-    [post-processing examples](../examples/6_post_processing/01_Finite_Allocation.md).
-  - [Choosing a strategy](07_Choosing_a_Strategy.md) — a decision framework for picking tools by
-    compute budget, rebalance frequency, risk appetite, and capital. Worked end-to-end profiles
-    live in [putting it together](../examples/7_putting_it_together/01_Profile_Retail_Daily.md).
-  - [The point-in-time universe](08_Point_in_Time_Universe.md) — a gapped price table taken
-    through the ingestion layer to a walk-forward: what the library does when an asset lists,
-    delists, or is suspended inside your sample, which layers handle a gap, and which refuse one
-    by name.
-  - [The online walk-forward](09_Online_Walk_Forward.md) — one estimator stepped fold by fold
-    instead of refitted: the one keyword that declares it, the identity with the batch run, the
-    wrapper for a member with no exact fold, the gain measured honestly, and the resume.
+  - [Data and priors](@ref user-guide-data-and-priors) turns prices into returns, and returns into a prior,
+    which holds the expected returns and the covariance. The
+    [moments and priors examples](@ref example-expected-returns-estimation)
+    show more estimators and the priors that take views.
+  - [Optimisers](@ref user-guide-optimisers) makes one call from each family of optimisers: naive, JuMP
+    (`MeanRisk`, risk budgeting, near-optimal centering), clustering, and the optimisers that
+    combine other optimisers. The
+    [optimiser examples](@ref example-meanrisk-objectives) show the objectives
+    and the variants of each family.
+  - [Risk measures](@ref user-guide-risk-measures) lists every risk measure that you can ask an optimiser to
+    minimise, with its alias, what it penalises, and the optimisers that accept it.
+  - [Constraints and costs](@ref user-guide-constraints-and-costs) adds weight bounds, group constraints,
+    factor exposures, turnover and fees. The
+    [constraints and costs examples](@ref example-budget-constraints)
+    also cover budgets, regularisation and constraints that you write yourself.
+  - [Validation and tuning](@ref user-guide-validation-and-tuning) runs cross-validation and a search over
+    parameters. The [validation examples](@ref example-cross-validation)
+    show the other splitters and searches.
+  - [Post-processing](@ref user-guide-post-processing) turns weights into whole shares and plots the result.
+    The [post-processing examples](@ref example-finite-allocation) also
+    cover the plots in detail and the attribution of the performance.
+  - [Choosing a strategy](@ref user-guide-choosing-a-strategy) asks four questions about your mandate:
+    compute, rebalance frequency, trust in your estimates, and capital. The
+    [investor profiles](@ref example-profile-retail-daily) apply the
+    answers from start to finish.
+  - [The point-in-time universe](@ref user-guide-the-point-in-time-universe) starts from a price table with
+    gaps and ends with a walk-forward. It shows what the library does when an asset lists, delists
+    or is suspended inside your sample. Some steps handle the gap, and the others throw an error
+    that names the asset.
+  - [The online walk-forward](@ref user-guide-the-online-walk-forward) warms one estimator up on the first
+    training window and then adds the rows of each later fold to it, where a batch walk-forward
+    refits. It shows the constructor that selects this, the weights of the two runs side by side,
+    the wrapper for an estimator with no exact update, where the online run is faster, and how to
+    resume a run.
+  - [Online portfolio selection](@ref user-guide-online-portfolio-selection) runs rules that move the
+    allocation after each period, from the ratio of each asset's price to its price one period
+    before. It runs the rules that follow the winner and the rules that follow the loser on a
+    market that reverts and on a market that trends. It compares every rule with three portfolios
+    chosen in hindsight, tunes a rate, and ends with the list of rules by group.
 
 ## Reading the API
 
-Two conventions run through the whole library. Knowing them up front makes the two-letter
-keyword names and the call sites read at a glance.
+Two conventions hold across the library. When you know them, you can read the short keyword names
+and the calls on every page.
 
-**Abbreviations follow a scheme.** Composed estimators take their sub-parts as short keyword
-arguments. The trailing letter tells you what *kind* of thing the slot holds: `-e` is an
-**estimator** (a configuration that still has to be run), `-r` is a **result** (an already-computed
-value passed downstream). So `pe` is a prior estimator, but a *computed* prior can be passed into
-the same slot; `cle` is a clustering estimator, `clr` a clustering result.
+### Keyword names
 
-| Abbrev. | Slot | Abbrev. | Slot |
+An estimator that holds other estimators takes each of them through a short keyword. A keyword
+that ends in `e` takes an estimator, a configuration that has not run yet. Many of these keywords
+also take the result that the estimator computes. So `pe` takes a prior estimator or a computed
+prior, and `cle` takes a clustering estimator or a computed clustering.
+
+| Keyword | Takes | Keyword | Takes |
 |:--|:--|:--|:--|
-| `pe` | prior estimator / result | `slv` | solver(s) |
-| `ce` | covariance estimator | `me` | expected-returns (mean) estimator |
+| `pe` | prior estimator or prior | `slv` | solver, or a vector of solvers |
+| `ce` | covariance estimator | `me` | expected returns estimator |
 | `ve` | variance estimator | `de` | distance estimator |
-| `mp` | matrix-processing estimator | `pdm` | posdef-matrix estimator |
-| `cle` / `clr` | clustering estimator / result | `re` | regression estimator |
-| `wb` | weight bounds | `opt` | optimiser configuration (`JuMPOptimiser` / `HierarchicalOptimiser`) |
+| `mp` | matrix processing estimator | `pdm` | positive definite matrix estimator |
+| `cle` | clustering estimator or clustering | `re` | regression estimator or regression |
+| `wb` | weight bounds | `opt` | optimiser configuration (`JuMPOptimiser` or `HierarchicalOptimiser`) |
 | `r` | risk measure | `obj` | objective function |
-| `rd` | returns data (`ReturnsResult`) | `fb` | fallback estimator |
+| `rd` | returns data (`ReturnsResult`) | `fb` | fallback optimiser |
 
-**Callable signal: functor vs verb.** Most stages are run with a **verb** applied to an
-estimator — `prior(EmpiricalPrior(), rd)`, `optimise(MeanRisk(…))`, `clusterise(…)`,
-`factory(…)`. **Risk measures are the exception**: a risk measure is itself a **callable
-functor** — you call the measure value directly to evaluate the risk of a portfolio, rather than
-passing it to a verb. Rule of thumb: a type that names a *stage* (prior, optimiser, clustering)
-is driven by a verb; a type that names a *risk quantity* is called directly.
+### Functions and risk measures
+
+A stage runs when you call a function on its estimator: `prior(EmpiricalPrior(), rd)`,
+`optimise(MeanRisk(…))`, `clusterise(…)`. A risk measure is different. You pass it to the `r`
+keyword of an optimiser. To get the risk of a portfolio outside an optimiser, you call
+[`expected_risk`](@ref) with the measure, the weights and the prior.
+[Risk measures](@ref user-guide-risk-measures) shows both uses.
 
 ## The data
 
-Every page in the guide uses the same bundled S&P 500 slice, so the pieces compose. Loading it
-and glancing at the prior is the natural first step — [`plot_prior`](@ref) shows the expected
-returns, per-asset volatility, and correlation of the data in one view.
+Every page of the guide uses the same data, the last 253 daily prices of 20 S&P 500 stocks, which
+end on 2022-12-28. A result on one page is therefore comparable with a result on another. We load
+the prices, compute the returns and plot the prior.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, StatsPlots, GraphRecipes

@@ -7,8 +7,15 @@ Dispatches on the type of `r.mu`: when `nothing`, uses the prior mean vector `mu
 `VecNum`, uses `r.mu`; when a `VecScalar`, combines the vector and scalar parts with `k`;
 when a scalar `Number`, scales it by `k`.
 
+A per-asset target (the first three) is a gross expected return, and the series it centres is
+net of the fee. So [`add_fees_to_ret!`](@ref) subtracts the mean fee per period from it, the
+same charge the net expected return carries, and the target is the net mean. A per period fee
+then cancels from every deviation, as [`moment_target_fees`](@ref) makes it cancel at the value
+level. A scalar target is a threshold on the net series, so it takes no fee.
+
 # Arguments
 
+  - $(arg_dict[:model])
   - `r::LoHiOrderMoment`: Risk measure carrying the target specification.
   - `w`: Portfolio weight vector.
   - `mu::VecNum`: Prior mean return vector.
@@ -21,20 +28,32 @@ when a scalar `Number`, scales it by `k`.
 # Related
 
   - [`set_risk_constraints!`](@ref)
+  - [`add_fees_to_ret!`](@ref)
+  - [`moment_target_fees`](@ref)
 """
-function calc_risk_constraint_target(::LoHiOrderMoment{<:Any, <:Any, Nothing, <:Any},
+function calc_risk_constraint_target(model::JuMP.Model,
+                                     ::LoHiOrderMoment{<:Any, <:Any, Nothing, <:Any},
                                      w::VecNum, mu::VecNum, args...)
-    return LinearAlgebra.dot(w, mu)
+    tgt = LinearAlgebra.dot(w, mu)
+    add_fees_to_ret!(model, tgt, true)
+    return tgt
 end
-function calc_risk_constraint_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecNum, <:Any},
+function calc_risk_constraint_target(model::JuMP.Model,
+                                     r::LoHiOrderMoment{<:Any, <:Any, <:VecNum, <:Any},
                                      w::VecNum, args...)
-    return LinearAlgebra.dot(w, r.mu)
+    tgt = LinearAlgebra.dot(w, r.mu)
+    add_fees_to_ret!(model, tgt, true)
+    return tgt
 end
-function calc_risk_constraint_target(r::LoHiOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
+function calc_risk_constraint_target(model::JuMP.Model,
+                                     r::LoHiOrderMoment{<:Any, <:Any, <:VecScalar, <:Any},
                                      w::VecNum, ::Any, k)
-    return LinearAlgebra.dot(w, r.mu.v) + r.mu.s * k
+    tgt = LinearAlgebra.dot(w, r.mu.v) + r.mu.s * k
+    add_fees_to_ret!(model, tgt, true)
+    return tgt
 end
-function calc_risk_constraint_target(r::LoHiOrderMoment{<:Any, <:Any, <:Number, <:Any},
+function calc_risk_constraint_target(::JuMP.Model,
+                                     r::LoHiOrderMoment{<:Any, <:Any, <:Number, <:Any},
                                      ::Any, ::Any, k)
     return r.mu * k
 end
@@ -56,7 +75,7 @@ First lower moment / semi-deviation:
 ```math
 \\begin{align}
 \\mathrm{FLM}(\\boldsymbol{w}) &= \\frac{1}{T}\\sum_{t=1}^T z_t\\,, \\\\
-z_t &\\geq \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\hat{r}_t,\\quad z_t \\geq 0\\,.
+z_t &\\geq \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\bar{F}(\\boldsymbol{w}) - \\hat{r}_t,\\quad z_t \\geq 0\\,.
 \\end{align}
 ```
 
@@ -66,6 +85,7 @@ Where:
   - $(math_dict[:T])
   - ``z_t \\geq 0``: Auxiliary variables capturing deviations below the mean.
   - ``\\boldsymbol{\\mu}``: Expected returns vector.
+  - ``\\bar{F}(\\boldsymbol{w})``: Mean fee per period, subtracted by [`calc_risk_constraint_target`](@ref) so that the target is the net mean. Zero without a fee.
   - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``: Portfolio return at time ``t``.
 
 Mean absolute deviation:
@@ -73,7 +93,7 @@ Mean absolute deviation:
 ```math
 \\begin{align}
 \\mathrm{MAD}(\\boldsymbol{w}) &= \\frac{1}{T}\\sum_{t=1}^T z_t\\,, \\\\
-z_t &\\geq |\\hat{r}_t - \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}|,\\quad z_t \\geq 0\\,.
+z_t &\\geq |\\hat{r}_t - \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} + \\bar{F}(\\boldsymbol{w})|,\\quad z_t \\geq 0\\,.
 \\end{align}
 ```
 
@@ -83,6 +103,7 @@ Where:
   - $(math_dict[:T])
   - ``z_t \\geq 0``: Auxiliary variables capturing absolute deviations.
   - ``\\boldsymbol{\\mu}``: Expected returns vector.
+  - ``\\bar{F}(\\boldsymbol{w})``: Mean fee per period, subtracted by [`calc_risk_constraint_target`](@ref) so that the target is the net mean. Zero without a fee.
   - ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}``: Portfolio return at time ``t``.
 
 where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net portfolio return at time ``t``.
@@ -107,12 +128,12 @@ where ``\\hat{r}_t = \\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` is the net p
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:FirstLowerMoment},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     k = get_k(model)
-    tgt = calc_risk_constraint_target(r, w, pr.mu, k)
+    tgt = calc_risk_constraint_target(model, r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     flm = state_set!(model, prefix, :flm_, i, JuMP.@variable(model, [1:T], lower_bound = 0))
@@ -161,12 +182,12 @@ expression and upper-bound constraint.
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any,
                                                  <:MeanAbsoluteDeviation},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     k = get_k(model)
-    tgt = calc_risk_constraint_target(r, w, pr.mu, k)
+    tgt = calc_risk_constraint_target(model, r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     mad = state_set!(model, prefix, :mad_, i, JuMP.@variable(model, [1:T], lower_bound = 0))
@@ -328,12 +349,12 @@ the risk expression and upper-bound constraint.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:SecondMoment},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     w = get_w(model, prefix)
     k = get_k(model)
     sc = get_constraint_scale(model)
-    tgt = calc_risk_constraint_target(r, w, pr.mu, k)
+    tgt = calc_risk_constraint_target(model, r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     sqrt_second_moment = state_set!(model, prefix, :sqrt_second_moment_, i,
@@ -430,12 +451,12 @@ Where:
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::LowOrderMoment{<:Any, <:Any, <:Any, <:EvenMoment},
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     w = get_w(model, prefix)
     k = effective_k(model)
     sc = get_constraint_scale(model)
-    tgt = calc_risk_constraint_target(r, w, pr.mu, k)
+    tgt = calc_risk_constraint_target(model, r, w, pr.mu, k)
     net_X = set_net_portfolio_returns!(model, pr.X; prefix = prefix)
     T = length(net_X)
     p = r.alg.p

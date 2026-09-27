@@ -1,7 +1,7 @@
 #=
 Unit tests for the `scalarise` reduction combinator and its slot-wise helpers.
 These are the shared reducers behind `hrp_scalarised_risk`,
-`herc_scalarised_risk_i!`/`_o!` and `near_optimal_centering_risks`; testing them
+`herc_intra_cluster_weights`, `herc_cluster_risk` and `near_optimal_centering_risks`; testing them
 directly means the four reduction rules (sum, max, min, log-sum-exp) are checked
 without needing an optimiser, prior, or solver.
 =#

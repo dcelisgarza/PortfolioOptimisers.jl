@@ -1,5 +1,5 @@
 ```@meta
-Description = "Plotting, private API of PortfolioOptimisers.jl: relevant_assets, finite_magnitudes, finite_symmetric_clim, finite_columns, investable_plot_view, …"
+Description = "Plotting, private API of PortfolioOptimisers.jl: relevant_assets, finite_magnitudes, finite_symmetric_clim, finite_columns, factor_plot_prior, …"
 ```
 
 # Plotting: private API
@@ -9,6 +9,7 @@ relevant_assets
 finite_magnitudes
 finite_symmetric_clim
 finite_columns
+factor_plot_prior
 investable_plot_view
 attribution_plot_axis
 ```

@@ -2,7 +2,7 @@
 Description = "Ratio Risk Measure, public API of PortfolioOptimisers.jl: RiskRatio, NonOptimisationRiskRatio, factory."
 ```
 
-# Ratio Risk Measure
+# [Ratio Risk Measure](@id api-ratio-risk-measure)
 
 ```@docs
 RiskRatio

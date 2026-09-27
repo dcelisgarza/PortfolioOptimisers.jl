@@ -915,3 +915,141 @@ end
                                                                 iv = zeros(0, Ng),
                                                                 ivpa = 1.2)
 end
+
+# Issue #979, the sweep of `src/03_InputData/07_PriceIngestion.jl`. Each check computes the
+# number the docstring states and compares it with the number the code returns.
+@testset "The sweep of the ingestion file: the docstrings agree with the code" begin
+    ts5 = Date(2020, 1, 1):Day(1):Date(2020, 1, 5)
+    P5 = [100 50; 101 51; 102 52; 103 53; 104 54]
+    X5 = TimeArray(ts5, Float64.(P5), ["A", "B"])
+
+    # A table whose element type admits `missing` but that holds no `missing` spells no
+    # absence, so a type that cannot hold one is not asked to. One `missing` is refused.
+    Pu = Matrix{Union{Missing, Rational{Int}}}(Rational{Int}.(P5))
+    pru = price_ingestion(PriceIngestion(), TimeArray(ts5, Pu, ["A", "B"]))
+    @test eltype(values(pru.X)) === Rational{Int}
+    @test values(pru.X) == Rational{Int}.(P5)
+    Pu[1, 2] = missing
+    @test_throws DomainError price_ingestion(PriceIngestion(),
+                                             TimeArray(ts5, Pu, ["A", "B"]))
+    Pf = Matrix{Union{Missing, Float64}}(Float64.(P5))
+    @test eltype(values(PortfolioOptimisers.unify_gaps(TimeArray(ts5, Pf, ["A", "B"])))) ===
+          Float64
+
+    # An infinity is refused before the untouched return, which is step 1 of `unify_gaps`.
+    Xinf = TimeArray(ts5, [1.0 2; 3 Inf; 4 5; 6 7; 8 9], ["A", "B"])
+    @test_throws DomainError PortfolioOptimisers.unify_gaps(Xinf)
+    @test_throws DomainError PortfolioOptimisers.unify_gaps(Xinf, Float64)
+
+    # A table that holds `missing` alone gives no value type to derive, and the refusal
+    # names the cause. Beside a priced table, it takes the priced table's type.
+    Xm = TimeArray(ts5, Matrix{Missing}(missing, 5, 2), ["A", "B"])
+    @test PortfolioOptimisers.series_value_type(Xm) === Union{}
+    err = try
+        price_ingestion(PriceIngestion(), Xm)
+    catch e
+        e
+    end
+    @test isa(err, DomainError)
+    @test occursin("`missing` alone", err.msg)
+    @test_throws DomainError PortfolioOptimisers.unify_gaps(Xm)
+    @test_throws DomainError PortfolioOptimisers.absence_type(Union{})
+    Bm = TimeArray(ts5, Vector{Missing}(missing, 5), ["bm"])
+    prm = price_ingestion(PriceIngestion(), X5; B = Bm)
+    @test eltype(values(prm.B)) === Float64
+    @test all(isnan, values(prm.B))
+
+    # `join_method` takes the three documented joins and nothing else.
+    @test [PriceIngestion(; join_method = m).join_method for m in (:left, :outer, :inner)] ==
+          [:left, :outer, :inner]
+    @test_throws ArgumentError PriceIngestion(; join_method = :right)
+    @test_throws ArgumentError PriceIngestion(; join_method = :lefft)
+
+    # The alignment asks for an absence before it knows whether it pads, as a join that can
+    # pad does: a `Rational` implied volatility on the full clock is refused by name.
+    ivr = TimeArray(ts5, fill(1 // 5, 5, 2), ["A", "B"])
+    @test_throws DomainError PortfolioOptimisers.align_series(ivr, collect(ts5))
+    # A one-column series held as a vector aligns to a one-column table.
+    ivv = TimeArray(collect(ts5)[2:4], [0.1, 0.2, 0.3], ["A"])
+    a = PortfolioOptimisers.align_series(ivv, collect(ts5))
+    @test isequal(values(a), reshape([NaN, 0.1, 0.2, 0.3, NaN], :, 1))
+    @test PortfolioOptimisers.padded_observations(ivv, collect(ts5)) == 2
+    @test PortfolioOptimisers.padded_observations(nothing, collect(ts5)) == 0
+    @test PortfolioOptimisers.padding_report_line("iv", ivv, collect(ts5)) ==
+          "`iv` at 2 of 5 observations, in every column (A)"
+
+    # `TimeSeries.merge` pads with the same bits `absent_value` writes.
+    X32 = TimeArray(ts5, Float32.(P5), ["A", "B"])
+    F32 = TimeArray(collect(ts5)[1:3], Float32.(reshape(1:3, :, 1)), ["f"])
+    M = TimeSeries.merge(X32, F32; method = :left)
+    @test reinterpret(UInt32, values(M)[5, 3]) ===
+          reinterpret(UInt32, PortfolioOptimisers.absent_value(Float32))
+
+    # A collapse projects a time-varying Panel Field at the last row of each period, whatever
+    # the timestamp function picks (#1329): a period's prices and Panel Field values come
+    # from one day under `last` and under `first` with a `last` value function alike.
+    T = 21
+    tsd = collect(Date(2020, 1, 6):Day(1):(Date(2020, 1, 6) + Day(T - 1)))
+    Xd = TimeArray(tsd, 100.0 .+ reshape(collect(1.0:(2T)), T, 2), ["A", "B"])
+    pnl = AssetPanel(;
+                     pf = [NumericPanelField(; name = "row",
+                                             vals = repeat(collect(1.0:T), 1, 2))],
+                     amsk = trues(T, 2), emsk = trues(T, 2))
+    prl = price_ingestion(PriceIngestion(; collapse_args = (Dates.week, last)), Xd;
+                          pnl = pnl)
+    prf = price_ingestion(PriceIngestion(; collapse_args = (Dates.week, first, last)), Xd;
+                          pnl = pnl)
+    @test values(prl.X)[:, 1] == values(prf.X)[:, 1] == [107.0, 114.0, 121.0]
+    @test PortfolioOptimisers.panel_field(prl.pnl, "row").vals[:, 1] == [7.0, 14.0, 21.0]
+    @test PortfolioOptimisers.panel_field(prf.pnl, "row").vals[:, 1] == [7.0, 14.0, 21.0]
+    # A timestamp function that makes timestamps `X` never had no longer refuses: the
+    # projection reads the rows of each period, not the emitted timestamps.
+    prn = price_ingestion(PriceIngestion(;
+                                         collapse_args = (Dates.week, t -> last(t) + Day(1),
+                                                          last)), Xd; pnl = pnl)
+    @test TimeSeries.timestamp(prn.X) == tsd[[7, 14, 21]] .+ Day(1)
+    @test PortfolioOptimisers.panel_field(prn.pnl, "row").vals[:, 1] == [7.0, 14.0, 21.0]
+    # An inner join that drops the last day of a week reduces that week over the rows it
+    # kept, and the Panel Field takes the last of those rows too.
+    Bd = TimeArray(tsd[1:(T - 1)], collect(1.0:(T - 1)), ["bm"])
+    pri = price_ingestion(PriceIngestion(; join_method = :inner,
+                                         collapse_args = (Dates.week, first, last)), Xd;
+                          B = Bd, pnl = pnl)
+    @test values(pri.X)[:, 1] == [107.0, 114.0, 120.0]
+    @test PortfolioOptimisers.panel_field(pri.pnl, "row").vals[:, 1] == [7.0, 14.0, 20.0]
+    # An outer join that adds a row the asset table never had cannot project a
+    # time-varying panel, and says so.
+    tv5 = AssetPanel(;
+                     pf = [NumericPanelField(; name = "mcap",
+                                             vals = reshape(collect(1.0:10.0), 5, 2))],
+                     amsk = trues(5, 2), emsk = trues(5, 2))
+    Bl = TimeArray(Date(2019, 12, 30):Day(1):Date(2020, 1, 5), collect(1.0:7.0), ["bm"])
+    @test_throws ArgumentError price_ingestion(PriceIngestion(; join_method = :outer), X5;
+                                               B = Bl, pnl = tv5)
+
+    # A contiguous window of a `ListingSpan` keeps two integers per asset and agrees with the
+    # boolean view cell for cell, over random spans, windows and asset subsets.
+    rng = StableRNG(979)
+    nls = 0
+    agree = true
+    for _ in 1:500
+        n = rand(rng, 1:12)
+        na = rand(rng, 1:4)
+        fst = rand(rng, 1:(n + 1), na)
+        lst = [rand(rng, (f - 1):n) for f in fst]
+        ls = PortfolioOptimisers.ListingSpan(fst, lst, n)
+        ts = collect(Date(2020, 1, 1):Day(1):(Date(2020, 1, 1) + Day(n - 1)))
+        lo = rand(rng, 1:n)
+        sel = if rand(rng) < 0.7
+            ts[lo:rand(rng, (lo - 1):n)]
+        else
+            sort(ts[unique(rand(rng, 1:n, rand(rng, 1:n)))])
+        end
+        j = rand(rng) < 0.5 ? Colon() : sort(unique(rand(rng, 1:na, rand(rng, 1:na))))
+        v = PortfolioOptimisers.span_carrier_view(ls, sel, ts, j)
+        nls += isa(v, PortfolioOptimisers.ListingSpan)
+        agree &= Matrix(v) == Matrix(ls)[indexin(sel, ts), j]
+    end
+    @test agree
+    @test nls > 0
+end

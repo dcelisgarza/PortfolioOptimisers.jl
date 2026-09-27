@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.13.0"
+julia_version = "1.13.1"
 manifest_format = "2.1"
-project_hash = "e087ca8ae815e571d570250dd0ab3047fbc3db25"
+project_hash = "bd75c57347e9dff59f83bd4aa51d7ce63fe25b4f"
 
 [[deps.ADTypes]]
 deps = ["PrecompileTools"]
@@ -1067,7 +1067,7 @@ version = "1.9.1+0"
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl", "OpenSSL_jll", "Zlib_jll"]
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
-version = "1.11.103+0"
+version = "1.11.104+0"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -1458,7 +1458,7 @@ version = "1.4.3"
 deps = ["Accessors", "ArgCheck", "AverageShiftedHistograms", "Clustering", "Combinatorics", "ConcreteStructs", "DataFrames", "DataStructures", "Dates", "Distances", "Distributions", "DocStringExtensions", "FLoops", "GLM", "Graphs", "InteractiveUtils", "JuMP", "LinearAlgebra", "LogExpFunctions", "MultivariateStats", "NearestCorrelationMatrix", "Optim", "Preferences", "Random", "Roots", "SimpleWeightedGraphs", "SparseArrays", "SpecialFunctions", "Statistics", "StatsAPI", "StatsBase", "StringDistances", "TimeSeries"]
 path = ".."
 uuid = "e0036ec9-05e5-505d-a6a9-07af41c94861"
-version = "0.31.0"
+version = "0.32.0"
 weakdeps = ["GraphRecipes", "StatsPlots"]
 
     [deps.PortfolioOptimisers.extensions]

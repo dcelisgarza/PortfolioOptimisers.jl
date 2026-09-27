@@ -45,7 +45,7 @@ call, so it won the dispatch. It was uncovered on CI, which is how it survived t
 [#513](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/513).
 
 Three optimiser slots take a `LinearConstraintEstimator` — `lcse`, `gcarde` and `sgcarde` in
-[`src/20_Optimisation/10_JuMPOptimiser.jl`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser.jl) — and
+[`src/20_Optimisation/10_JuMPOptimiser.jl`](../../src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl) — and
 each is bounded downstream by a constraint type rather than by a value. So
 `JuMPOptimiser(; gcarde = LinearConstraintEstimator(; val = UniformValues()))` raised inside
 `processed_jump_optimiser_attributes`, three frames from the slot the caller wrote, with a message
@@ -97,7 +97,7 @@ UniformValues())` raises at the constructor, naming the `val` keyword and the va
 - No documented route moves. Every documented user of `UniformValues` is a `WeightBoundsEstimator`
   slot, and every such slot keeps it.
 - The residue of #513 for
-  [`02_LinearConstraintGeneration.jl`](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration.jl)
+  [`02_LinearConstraintGeneration.jl`](../../src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl)
   falls to zero: the two uncovered lines were the deleted method's signature and its body.
 - `test/test_18k_constraints.jl` gates the split, the refusal and every value slot that keeps the
   algorithm.

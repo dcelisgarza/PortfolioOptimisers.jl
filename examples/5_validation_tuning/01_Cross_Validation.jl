@@ -1,18 +1,20 @@
 #=
 ```@meta
-Description = "Cross-validation in PortfolioOptimisers.jl: walk-forward, K-fold and combinatorial splitters, the metrics they compute and their plots."
+Description = "Cross-validation in PortfolioOptimisers.jl: walk-forward, K-fold and combinatorial schemes, the measures you compute on their predictions, and their plots."
 ```
 
-# Cross validation
+# [Cross validation](@id example-cross-validation)
 
-Cross validation is a powerful technique to evaluate the performance of a model on unseen data. In this example, we will showcase the different cross validation methods available in PortfolioOptimisers.jl and how to use them to evaluate the performance of our portfolio optimization models.
+Cross-validation scores a model on data that the fit did not see. This example shows the
+cross-validation schemes of PortfolioOptimisers.jl, how to run them on a portfolio
+optimisation, and the measures and plots you can compute from their results.
 
-Cross validation can be used as a standalone method to evaluate the performance of a model, or it can be used in conjunction with other techniques like hyperparameter tuning or model selection. They can also be used in [`NestedClustered`](@ref) and [`Stacking`](@ref) optimisation estimators to optimise the outer estimator on the out-of-sample performance of the inner estimators.
-
-This example will only focus on showcasing the different cross validation methods, with examples on how to use them and what metrics can be computed. We also demonstrate the plotting functions available for cross-validation results.
+You can use cross-validation on its own to score an estimator, or inside a hyperparameter
+search. [`NestedClustered`](@ref) and [`Stacking`](@ref) also take a scheme in their `cv`
+field, wrapped in an [`OptimisationCrossValidation`](@ref). They then fit the outer estimator
+on the out-of-sample returns of the inner estimators.
 =#
 using PortfolioOptimisers, PrettyTables
-## Format for pretty tables.
 tsfmt = (v, i, j) -> begin
     if j == 1
         return Date(v)
@@ -30,9 +32,13 @@ end;
 #=
 ## 1. Setting up
 
-For this example, we will use 5 years of daily data. This is so that we have enough data to perform cross validation on significant amounts of data for both training and testing.
+We use five years of daily data, so that all the schemes have enough rows for their
+training windows and their test windows.
 
-Cross validation cannot have precomputed values like we have done in previous examples. This is because the training and testing sets are generated on the fly, and the performance metrics are computed based on the results of the optimization on these sets.
+Cross-validation fits the estimator again on the training rows of every fold. Its fields must
+therefore be estimators, such as a prior estimator, and not results computed beforehand as in
+the earlier examples. `cross_val_predict` throws an error for a JuMP optimiser with a
+precomputed prior.
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel, Statistics
@@ -40,7 +46,6 @@ using CSV, TimeSeries, DataFrames, Clarabel, Statistics
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252 * 5):end]
 pretty_table(X[(end - 5):end]; formatters = [tsfmt])
 
-## Compute the returns
 rd = prices_to_returns(X)
 
 slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
@@ -66,7 +71,9 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
               check_sol = (; allow_local = true, allow_almost = true))];
 
 #=
-For this tutorial we will use the basic [`MeanRisk`](@ref) estimator, but the cross validation works for all optimisation estimators, even when computing pareto fronts.
+We use a [`MeanRisk`](@ref) estimator. Cross-validation works for every optimisation estimator
+except the finite allocations, [`DiscreteAllocation`](@ref) and [`GreedyAllocation`](@ref), and
+it also works for an estimator that computes a Pareto frontier.
 =#
 
 mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
@@ -75,15 +82,19 @@ mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
 ## 2. Cross validation
 ### 2.1 KFold
 
-The simplest form of cross validation is KFold. This method splits the data into K folds, and then iteratively trains on K-1 folds and tests on the remaining fold. This process is repeated K times, with each fold being used as the test set once.
+The simplest scheme is K-fold. It cuts the data into K consecutive folds, trains on K - 1 of
+them and tests on the fold that is left. It does this K times, and each fold is the test set
+once.
 
-The [`KFold`](@ref) indices can be generated independently of the optimisation. Let's say we want to perform 5-fold cross validation, this works out to be roughly one per year.
+You can make the [`KFold`](@ref) indices without an optimisation. With 5 folds, a fold is one
+year of 252 rows.
 =#
 
 kfold = KFold(; n = 5)
 
 #=
-For demonstration purposes we can generate the splits using the [`split`](@ref) method. This is not necessary as the cross validation will generate them internally.
+To show the splits, we make them with [`split`](@ref). `cross_val_predict` makes them itself,
+so you do not need this step.
 =#
 
 kfold_res = split(kfold, rd)
@@ -92,40 +103,59 @@ show(kfold_res.train_idx)
 show(kfold_res.test_idx)
 
 #=
-Let's perform the cross validation.
+We run the cross-validation.
 =#
 kfold_pred = cross_val_predict(mr, rd, kfold)
 
 #=
-We can visualise the out-of-sample performance and weight behaviour across folds.
+We load the plot packages and draw four plots of the K-fold prediction.
 =#
 
-# Portfolio cumulative returns across all KFold test periods.
 using StatsPlots, GraphRecipes
-# Per-asset weight distribution across folds.
+# The cumulative returns of the portfolio over all the KFold test windows.
 plot_portfolio_cumulative_returns(kfold_pred)
-# Portfolio turnover between consecutive folds.
+# The distribution of the weight of every asset over the folds.
 plot_weight_stability(kfold_pred)
-# Cross-validation scores (second moment / variance) per fold.
+# The turnover of the portfolio between consecutive folds.
 plot_turnover(kfold_pred)
+# The score of every fold, here the second moment, which is the variance.
 plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), kfold_pred)
 
 #=
-The result is a [`MultiPeriodPredictionResult`](@ref) object, which is a wrapper for a vector of [`PredictionResult`](@ref) objects, one for each fold. Each [`PredictionResult`](@ref) contains the optimisation result based on the training set, and a [`PredictionReturnsResult`](@ref) containing the predicted returns result of the optimised portfolio evaluated on its corresponding test set.
+The result is a [`MultiPeriodPredictionResult`](@ref). Its field `pred` is a vector of
+[`PredictionResult`](@ref) values, one per fold. Every [`PredictionResult`](@ref) keeps the
+optimisation result of its training fold in `res`, and a [`PredictionReturnsResult`](@ref) of
+the optimised portfolio on its test fold in `rd`.
 
-We can individually access the result of each fold by indexing into the `pred` field of the [`MultiPeriodPredictionResult`](@ref) object, but we can also directly access via the accessing the `mrd` and `mres` properties, which stand for multi-rd and multi-res. `mrd` concatenates the predicted returns into a single [`PredictionReturnsResult`](@ref). Since the embargo and purged sizes are zero, the timestamps of the predicted returns should be the same as the timestamps of the original returns result.
+You can index `pred` to get one fold. The property `mrd` joins the returns of all the folds
+into one [`PredictionReturnsResult`](@ref), and the property `res` gives the vector of the
+optimisation results of the folds. The test folds cover all the rows once. `KFold` can drop
+training rows next to a test fold: `purged_size` rows on each side of it, the purge, and
+`embargo_size` more rows after it, the embargo. Both are zero here, and neither drops a test row.
+We compare the timestamps of `mrd` with the timestamps of the returns.
 =#
 
 println("isequal(kfold_pred.mrd.ts, rd.ts) = $(isequal(kfold_pred.mrd.ts, rd.ts))")
 
 #=
-We can also compute performance metrics (risk measures) on the predicted returns. However, we can only use risk measures that use the returns series as an input. This means [`StandardDeviation`](@ref), [`NegativeSkewness`](@ref), [`TurnoverRiskMeasure`](@ref), [`TrackingRiskMeasure`](@ref) with [`WeightsTracking`](@ref), [`Variance`](@ref), [`UncertaintySetVariance`](@ref), [`EqualRisk`](@ref), [`ExpectedReturn`](@ref) and [`ExpectedReturnRiskRatio`](@ref), as well as any risk measure that uses any of these cannot be used. But there are ways around this, for example:
+You can also compute risk measures on the predicted returns. A prediction holds only the return
+series of the portfolio. A measure that needs the weights or data per asset cannot score it,
+and `expected_risk` throws an error for such a measure. These measures cannot score a
+prediction: [`StandardDeviation`](@ref), [`Variance`](@ref), [`UncertaintySetVariance`](@ref),
+[`NegativeSkewness`](@ref), [`TurnoverRiskMeasure`](@ref), [`TrackingRiskMeasure`](@ref) with
+[`WeightsTracking`](@ref), [`EqualRisk`](@ref), [`ExpectedReturn`](@ref) and
+[`ExpectedReturnRiskRatio`](@ref). Neither can `RiskTrackingRiskMeasure`,
+`VarianceSkewKurtosis`, a `ValueatRisk` with `DistributionValueatRisk`, a moment measure whose
+target `mu` is a vector per asset, or a ratio that uses one of these. Most of them have a
+replacement.
 
-- For the variance and standard deviation, we can use [`LowOrderMoment`](@ref) with the appropriate algorithms.
-- For [`NegativeSkewness`](@ref) we can use [`HighOrderMoment`](@ref), or [`Skewness`](@ref).
-- For [`ExpectedReturn`](@ref) and [`ExpectedReturnRiskRatio`](@ref) we can use [`MeanReturn`](@ref) and [`MeanReturnRiskRatio`](@ref) respectively.
+  - For the variance, use [`LowOrderMoment`](@ref) with `alg = SecondMoment()`. For the
+    standard deviation, use it with `alg = SecondMoment(; alg2 = SOCRiskExpr())`.
+  - For [`NegativeSkewness`](@ref), use [`HighOrderMoment`](@ref) or [`Skewness`](@ref).
+  - For [`ExpectedReturn`](@ref) and [`ExpectedReturnRiskRatio`](@ref), use
+    [`MeanReturn`](@ref) and [`MeanReturnRiskRatio`](@ref).
 
-Here we will compute the variance.
+We compute the variance.
 =#
 
 println("KFold(5) prediction variance = $(expected_risk(LowOrderMoment(; alg = SecondMoment()), kfold_pred))")
@@ -133,118 +163,144 @@ println("KFold(5) prediction variance = $(expected_risk(LowOrderMoment(; alg = S
 #=
 ### 2.2 Combinatorial
 
-The [`CombinatorialCrossValidation`](@ref) method generates all possible combinations of the data into training and testing sets. This method is computationally expensive, but provides a more comprehensive evaluation of the model's performance on unseen data.
+[`CombinatorialCrossValidation`](@ref) cuts the rows into `n_folds` consecutive folds. Every
+choice of `n_test_folds` of them is the test set of one split, and the other folds are its
+training set. A purge and an embargo remove the training rows next to the test folds. The test
+folds of the splits then join into paths, and a path covers all the rows once. The scheme needs
+one fit per split, many more than K-fold, and it gives many paths instead of one.
 
-There is also a way to compute the optimal number of folds and training folds given a user-defined desired training and test set lengths, as well as the relative weight between the training size and number of test paths.
+[`optimal_number_folds`](@ref) chooses `n_folds` and `n_test_folds` from the number of rows, a
+target size of the training set and a target number of paths. The keywords `train_size_w` and
+`n_test_paths_w` set the weight of each target.
 =#
 
 T = size(rd.X, 1)
 target_train_size = 200
-target_test_size = 70
-n_folds, n_test_folds = optimal_number_folds(T, target_train_size, target_test_size)
+target_n_test_paths = 70
+n_folds, n_test_folds = optimal_number_folds(T, target_train_size, target_n_test_paths)
 cfold = CombinatorialCrossValidation(; n_folds = n_folds, n_test_folds = n_test_folds)
 
 #=
-Let's see the indices this produces.
+We make the splits.
 =#
 
 cfold_res = split(cfold, rd)
 
 #=
-Here we have 78 splits, each testing path split into 11 folds. This means we have 78 * 11 = 858 total folds, which is a significant increase from the 5 folds we had in KFold. This is the trade-off for having a more comprehensive evaluation of the model's performance on unseen data.
+The scheme uses 13 folds with 11 test folds, so it has `binomial(13, 11) = 78` splits. A
+split trains on only 2 folds, about 194 rows, and tests on the other 11. The 78 splits give
+`78 × 11 = 858` test folds, which join into 66 paths.
 
-But it also means we need a way to find a good representative of the predictions in order to evaluate the out of sample performance. First let's perform the cross validation.
-
-There is some nuance with this approach in that the splits do not represent the same number of paths, in fact there are only 66 unique paths, which can be seen from `cfold_res.path_ids`.
+`cfold_res.path_ids` has one row per test fold of a split and one column per split. Every
+entry is the number of the path that the test fold belongs to.
 =#
 
 cfold_res.path_ids
 
 #=
-We can now perform the cross validation.
+We run the cross-validation. The result has one prediction per path.
 =#
 
 cfold_pred = cross_val_predict(mr, rd, cfold)
 
 #=
-We can see that there are indeed 66 predictions. Each is a valid representative of the out-of-sample performance of the model. However, for evaluating the performance, we can use a sample or the median of the predictions. The median is a good representative of the performance, as it is not affected by outliers, and it is a good measure of central tendency. We can do this with custom function, or a functor of a subtype of [`PredictionScorer`](@ref). We've implemented a simple one called [`NearestQuantilePrediction`](@ref) which takes the prediction with the nearest quantile to the desired quantile of the distribution of predictions, it defaults to the median.
+Every one of the 66 paths is an out-of-sample prediction. To score the model, you pick one path
+or summarise them. The median path is a common choice, because outliers do not move it. You
+can pick a path with your own function or with a subtype of [`PredictionScorer`](@ref).
+[`NearestQuantilePrediction`](@ref) computes a measure on all the paths, finds a quantile of the
+values, by default the median, and returns the first path whose value is nearest to it. It
+leaves out paths whose optimisation failed or whose measure is not finite.
 
-We will use the risk return ratio of the variance as our performance metric. The paths are sorted according to their expected risk, return based risk measures sort them based on descending order, while true risk measures sort them in ascending order.
+We use the mean return over the variance as the measure. This ratio divides by the variance,
+not by the standard deviation, so it is not a Sharpe ratio.
 =#
 
-sharpe_scorer = NearestQuantilePrediction(;
-                                          r = MeanReturnRiskRatio(;
-                                                                  rk = LowOrderMoment(;
-                                                                                      alg = SecondMoment())))
+ratio_scorer = NearestQuantilePrediction(;
+                                         r = MeanReturnRiskRatio(;
+                                                                 rk = LowOrderMoment(;
+                                                                                     alg = SecondMoment())))
 
 #=
-Scorer is a functor which takes a population as an input and outputs a tuple of the single prediction and the index in the population which matches the desired quantile of the distribution of predictions. In this case, we are using the mean return risk ratio with the variance as the risk measure, and we are looking for the prediction with the nearest quantile to 0.5, which is the median.
+A scorer is a callable object. It takes the population of paths and returns the path it picks.
+The field `id` of that path is its position in the population.
 =#
 
-median_pred_max_sharpe = sharpe_scorer(cfold_pred)
+median_pred = ratio_scorer(cfold_pred)
 
 #=
-The prediction `id` corresponds to the index/path id of the prediction in the population.
+`true` means that the path is the entry `id` of `cfold_pred.pred`.
 =#
-median_pred_max_sharpe === cfold_pred.pred[median_pred_max_sharpe.id]
+median_pred === cfold_pred.pred[median_pred.id]
 
 #=
-Similarty to the KFold, the timestamps of the predicted returns should be the same as the timestamps of the original returns result, since the embargo and purged sizes are zero.
+As for K-fold, a path covers all the rows. `true` means that the timestamps of the path are
+those of the returns.
 =#
-isequal(median_pred_max_sharpe.mrd.ts, rd.ts)
+isequal(median_pred.mrd.ts, rd.ts)
 
 #=
-We can further verify this by computing the risk return ratio of the variance for all predictions and seeing that the prediction with a risk value closest to the median is indeed the same as the one we found with the scorer. Note that the scorer also filters out predictions whose optimisations failed, so in order to be truly rigorous we'd need to skip NaN values in the array of risks, while keeping the indices aligned, but for demonstration purposes this is sufficient.
+We compute the ratio for all the paths and find the path nearest to the median by hand, to
+compare it with the pick of the scorer. This comparison leaves out no path. It matches the
+scorer only when no path failed.
 =#
 
-sharpe_ratios = expected_risk(MeanReturnRiskRatio(;
-                                                  rk = LowOrderMoment(;
-                                                                      alg = SecondMoment())),
-                              cfold_pred)
-argmin(abs.(sharpe_ratios .- median(sharpe_ratios))) == median_pred_max_sharpe.id
+mean_var_ratios = expected_risk(MeanReturnRiskRatio(;
+                                                    rk = LowOrderMoment(;
+                                                                        alg = SecondMoment())),
+                                cfold_pred)
+argmin(abs.(mean_var_ratios .- median(mean_var_ratios))) == median_pred.id
 
 #=
-Weight stability across all combinatorial CV paths shows how robust the model is to different
-training subsets.
+The next plot shows the distribution of the weight of each asset over the paths. A wide
+distribution means that the weights depend on which folds the model trains on.
 =#
 
 plot_weight_stability(cfold_pred)
 
 #=
-CV scores (Sharpe ratio) across all paths — the distribution shows the range of out-of-sample
-performance.
+`plot_cv_scores` draws the ratio of every path. A wide spread means that
+the ratio depends on which folds form the path.
 =#
 
 plot_cv_scores(MeanReturnRiskRatio(; rk = LowOrderMoment(; alg = SecondMoment())),
                cfold_pred)
 
 #=
-We can choose any compatible risk measure as outlined above, for demonstration purposes we will now rank them based on the variance.
+Any measure that scores a return series works in the scorer. We now pick the median path by
+variance.
 =#
 
 variance_scorer = NearestQuantilePrediction(; r = LowOrderMoment(; alg = SecondMoment()))
 median_pred_min_variance = variance_scorer(cfold_pred)
 
 #=
-Again the id matches the prediction with the nearest quantile to the median of the distribution of predictions.
+The `id` of this path also indexes it in `cfold_pred.pred`.
 =#
 median_pred_min_variance === cfold_pred.pred[median_pred_min_variance.id]
 
 #=
-As always, the timestamps match.
+`true` means that this path also covers all the rows.
 =#
 isequal(median_pred_min_variance.mrd.ts, rd.ts)
 
 #=
-### 2.3 WalkForward
+### 2.3 Walk-forward
 
-We offer two different walkforward estimators, [`IndexWalkForward`](@ref) and [`DateWalkForward`](@ref). The former splits the data based on the number of observations, while the latter splits the data based on the timestamps, and can be used with Julia's `Dates` module to adjust periods to specific times.
+There are two walk-forward schemes, [`IndexWalkForward`](@ref) and [`DateWalkForward`](@ref).
+The first sizes its windows in rows. The second sizes them in dates, and you can use Julia's
+`Dates` module to put the window boundaries on chosen dates.
 
-The walkforward method is a more realistic evaluation of the model's performance on unseen data, as it mimics the way the model would be used in practice. It can also dynamically use the previous optimisation weights in constraints and risk measures if so desired.
+A walk-forward trains on the past and tests on the rows that follow, which is how you use a
+model in practice. The folds run in time order, so a fold can use the weights of the fold
+before it. A non-fixed [`Turnover`](@ref), a `WeightsTracking` or a `TurnoverRiskMeasure` takes
+those previous weights as its reference.
 
 #### 2.3.1 IndexWalkForward
 
-The simpler estimator is [`IndexWalkForward`](@ref) so we will start with this one. We will use training sets of one full year and test sets of 3 months. Note that a year has roughly 252 trading days. We will again not use any purging, meaning that the test set will immediately follow the training set, and there will be no gap between them. This means that the timestamps of the predicted returns should be the same as the timestamps of the original returns result minus the first 252 entries.
+[`IndexWalkForward`](@ref) is the simpler of the two, so we start with it. We train on one
+year, 252 rows, and test on the next quarter, 63 rows. There is no purge, and a test window
+starts on the row after its training window. The first test window starts at row 253, and the
+test windows together cover the returns from there to the end.
 =#
 
 idx_walk_forward = IndexWalkForward(252, round(Int, 252 / 4))
@@ -253,36 +309,30 @@ show(idx_walk_forward_res.train_idx)
 show(idx_walk_forward_res.test_idx)
 
 #=
-We can generate the prediction now.
+We run the walk-forward.
 =#
 idx_walkforward_pred = cross_val_predict(mr, rd, idx_walk_forward)
 
 #=
-Let's check the timestamps.
+`true` means that the joined test windows start at row 253 and end at the last row.
 =#
 
 isequal(idx_walkforward_pred.mrd.ts, rd.ts[253:end])
 
-#=
-Cumulative returns across all walk-forward test windows, stacked together.
-=#
+# The cumulative return over all the test windows, joined in time order.
 
 plot_portfolio_cumulative_returns(idx_walkforward_pred)
 
-#=
-Portfolio composition evolution across walk-forward windows as a stacked bar.
-=#
+# The weights of every fold as a stacked bar.
 
 plot_composition(idx_walkforward_pred)
 
-#=
-Turnover at each rebalancing point.
-=#
+# The turnover at every rebalance, without a turnover constraint.
 
 plot_turnover(idx_walkforward_pred)
 
 #=
-Now let's see the evolution of the weights across the different splits.
+Every column of the table holds the weights of one fold.
 =#
 
 pretty_table(hcat(DataFrame(:tickers => rd.nx),
@@ -290,19 +340,24 @@ pretty_table(hcat(DataFrame(:tickers => rd.nx),
                             Symbol.(1:16))); formatters = [resfmt])
 
 #=
-As we can see, the weights can evolve in a fairly volatile manner. We can avoid this by adding a non-fixed turnover constraint, fee, risk measure, or weight based tracking. For demonstration purposes we will use a turnover constraint with a maximum turnover of 2% per period for all assets from an equal weight starting point, we will provide the [`Turnover`](@ref) directly, which is non-fixed by default, meaning it will be updated every period.
+Some assets change weight by more than 20 % between two consecutive folds. Four tools limit
+this when their reference weights are not fixed: a turnover constraint, a turnover fee, a
+turnover risk measure and a tracking of the previous weights. We use a turnover constraint
+that lets no asset's weight change by more than 2 % from one fold to the next. Equal weights
+are the reference of the first fold. A [`Turnover`](@ref) has `fixed = false` by default, and
+a fold then takes the weights of the fold before as its reference.
 =#
 N = size(rd.X, 2)
 tn = Turnover(; w = range(; start = 1 / N, stop = 1 / N, length = N), val = 0.02)
 
 #=
-We can generate the optimiser with the turnover constraint and then perform the walkforward cross validation again.
+We add the constraint to the optimiser and run the walk-forward again.
 =#
 mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv, tn = tn))
 idx_tn_walkforward_pred = cross_val_predict(mr, rd, idx_walk_forward)
 
 #=
-Now let's see the evolution of the weights across the different splits. We can see how the weights change at most 2% per period.
+The table gives the weights again, so you can compare every column with the one before it.
 =#
 
 pretty_table(hcat(DataFrame(:tickers => rd.nx),
@@ -310,19 +365,26 @@ pretty_table(hcat(DataFrame(:tickers => rd.nx),
                             Symbol.(1:16))); formatters = [resfmt])
 
 #=
-With the turnover constraint the turnover per rebalancing period is now capped at 2%.
+The constraint limits the change of each asset, not the total. The turnover of a rebalance is
+the sum of the absolute changes over the 20 assets, so it can be larger than 2 %.
 =#
 
+# The cumulative returns with the turnover constraint.
 plot_portfolio_cumulative_returns(idx_tn_walkforward_pred)
+# The turnover at every rebalance.
 plot_turnover(idx_tn_walkforward_pred)
+# The distribution of the weight of every asset over the folds.
 plot_weight_stability(idx_tn_walkforward_pred)
 
 #=
 #### 2.3.2 DateWalkForward
 
-The [`DateWalkForward`](@ref) estimator is similar to the [`IndexWalkForward`](@ref) estimator, but it allows us to specify the training and test periods in terms of dates. This can be useful if we want to align our training and test sets with specific calendar periods, such as fiscal years or quarters.
+[`DateWalkForward`](@ref) works like [`IndexWalkForward`](@ref), but you give the windows in
+dates. Use it to align the windows with calendar periods, such as fiscal years or quarters.
 
-The `Dates` module provides a large amount of functionality to manipulate dates, but we will keep it simple. For this we will define an adjuster function that takes a date range generates a new one made up only of the last day of the month.
+We use `lastdayofmonth` from `Dates` to define an adjuster. It moves the dates of a range to
+the last day of their month, and drops a month end that comes after the last date of the
+range.
 =#
 
 function ldm(x)
@@ -338,16 +400,23 @@ function ldm(x)
 end;
 
 #=
-This estimator can take a few options, the first argument can also be a date period or compound period, but if we leave it as an integer it will take on that many periods. The second argument is always an integer and is the value of that many periods. Combining both gives us a fully determined mixture of training and test set lengths as both can be set to an arbitrarily defined training and testing period.
+The first argument, the training size, is an integer count of steps of the date range, or a
+`Period` or `CompoundPeriod` from `Dates`. The second argument, the test size, is an integer
+count of steps. `period` sets the step of the date range, and `adjuster` changes the range.
+Here the step is one month and the adjuster moves the dates to month ends, so we train on 12
+months and test on 3.
 
-To keep it simple, we will keep the period unit the same for both. We will again train for a year and test for a quarter, but the dates will now align with the end of calendar months. The date boundaries are determined by searching for the last date in the timestamps less than a value in the date boundary. If the date of the timestamp is not found in the date range, the `previous` flag is used to determine whether to take the last date found (previous = true), or the next available date is used (previous = false). This means that in order to guarantee alignment of the first date of each test set with the last day of the month we need to set `previous` to true.
+The scheme maps each date of the range to a row. A date that is a timestamp maps to its own
+row. A date between two timestamps maps to the earlier one when `previous = true`, and to the
+later one when `previous = false`. A month end can fall on a weekend, so we set
+`previous = true`. A test window then starts on the last trading day of a month.
 =#
 
 date_walk_forward = DateWalkForward(12, 3; period = Month(1), adjuster = ldm,
                                     previous = true)
 
 #=
-We can see what the splits look like.
+We look at the splits of the new scheme.
 =#
 
 date_walk_forward_res = split(date_walk_forward, rd)
@@ -355,28 +424,32 @@ show(date_walk_forward_res.train_idx)
 show(date_walk_forward_res.test_idx)
 
 #=
-We will once more use the turnover constraint, but with this new cross validation method.
+We run the new scheme with the turnover constraint.
 =#
 
 date_tn_walkforward_pred = cross_val_predict(mr, rd, date_walk_forward)
 
 #=
-We can see the evolution of the weights across the different splits. We can see how the weights change at most 2% per period.
+The table has one column per fold.
 =#
 
 pretty_table(hcat(DataFrame(:tickers => rd.nx),
                   DataFrame(reduce(hcat, getproperty.(date_tn_walkforward_pred.res, :w)),
                             Symbol.(1:15))); formatters = [resfmt])
 
-#=
-Calendar-aligned walk-forward: cumulative returns and turnover across month-end rebalancing dates.
-=#
-
+# The cumulative returns over the month-end windows.
 plot_portfolio_cumulative_returns(date_tn_walkforward_pred)
+# The turnover at every month-end rebalance.
 plot_turnover(date_tn_walkforward_pred)
 
 #=
-The splits are different to the index walkforward method, so the weights are also different, but we can see there's not too much variation. That's because the training periods are roughly the same. However, the turnover constraint also helps in stabilising the weights.
+The date walk-forward sizes its windows in months and puts their bounds on month ends. The
+index walk-forward sizes them in rows. Because twelve months are about 252 trading days, the
+training windows of the two schemes cover almost the same dates. The same 2 % limit applies to
+both. To see how far the weights move, compare this table with the second table of section
+2.3.1. The date walk-forward has 15 folds and the index walk-forward has 16. Compare the weights
+of an asset over the folds, not column by column.
 
-There is another cross validation method called [`MultipleRandomised`](@ref) which uses a walk forward estimator, but also randomly samples the asset universe. Since it is more complex to analyse and understand, we will cover it in a future example.
+[`MultipleRandomised`](@ref) is one more scheme. It runs a walk-forward on random subsets of the
+assets, and section 5.2 of the pipelines example uses it.
 =#

@@ -278,7 +278,7 @@ number_or_dash(x) = x === nothing ? "—" : string(x)
     body_of(candidate, commit) -> String
 
 The sub-issue of ADR 0084. It mirrors the child map that owns it, one file wide: the fixed
-`ROUTING` block, a Destination naming the file and its measured row, the three conditions of #404
+`ROUTING` block, a Destination naming the file and its measured row, the five conditions of #404
 restated compactly, the sentence that the committed files are the authority, and Notes that point
 at #404 without copying a rule.
 
@@ -304,10 +304,13 @@ function body_of(c::Candidate, commit::AbstractString)
     println(io, "| --- | ---: | ---: | ---: |")
     println(io, "| `", c.path, "` | ", c.units, " | ", number_or_dash(c.misses), " | ",
             number_or_dash(c.lines), " |\n")
-    println(io, "Three conditions, from #", UMBRELLA, ":\n")
+    println(io, "Five conditions, from #", UMBRELLA, ":\n")
     println(io, "1. Its documentation states the mathematics.")
     println(io, "2. Its code agrees with that statement, checked with real numbers.")
-    println(io, "3. Its lines are covered, or exempted with a reason.\n")
+    println(io, "3. Its lines are covered, or exempted with a reason.")
+    println(io, "4. Its prose passes `/unslop`.")
+    println(io, "5. Its code carries no performance trap: `code_health/perf.jl scan ",
+            c.path, "` lists no Finding that a Dismissal does not cover.\n")
     println(io, "Take the numbers from `code_health/sweep_manifest.toml` and ",
             "`code_health/coverage_baseline.toml`, not from this table.\n")
     println(io, "## Notes\n")

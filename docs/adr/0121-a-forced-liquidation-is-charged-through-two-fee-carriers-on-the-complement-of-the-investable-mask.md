@@ -244,3 +244,13 @@ are zero for the exit, so nothing else is owed.
   `investable_fees_view` binding. The finite allocation input learns the mask.
 - Reporting a per-fold turnover that includes the liquidation, as the reference does, is not
   decided here: the library reports no per-fold turnover today, so there is no reader to be wrong.
+
+## Amendment (2026-09-23)
+
+The Schur optimiser gains its fees
+([#1296](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1296)).
+`SchurComplementHierarchicalRiskParity` resolves the fee through `fees_constraints` and
+`investable_fees_view` above the door, as the two `HierarchicalRiskParity` methods do, and its
+result carries the fee with the carriers. The fold therefore charges a forced exit on a Schur
+result as it does on a hierarchical one. The fit strips no carrier, because no sub-problem of the
+Schur allocation reads a fee.

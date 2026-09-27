@@ -11,6 +11,7 @@ Base.copy(x::PortfolioOptimisers.CoverageCounts)
 PortfolioOptimisers.coverage_counts_view
 PortfolioOptimisers.coverage_valid
 PortfolioOptimisers.coverage_valid_block
+PortfolioOptimisers.coverage_inactive_block!
 PortfolioOptimisers.coverage_step!
 PortfolioOptimisers.coverage_merge_stale
 PortfolioOptimisers.coverage_reset!

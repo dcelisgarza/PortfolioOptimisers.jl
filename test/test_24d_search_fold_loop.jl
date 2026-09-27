@@ -4,7 +4,7 @@ decision of #871 (ADR 0141).
 
 `search_cross_validation` builds candidate `i` through the grid's lenses and scores it through
 `fit_and_predict(opt_i, rd, gscv.cv; ex = SequentialEx())`, one row per fold, whatever the
-scheme's Fold Fit. The map's closing test's second half is the identity: a grid search over an
+scheme's fit. The map's closing test's second half is the identity: a grid search over an
 online walk-forward reads the matrix of the same search over the batch expanding walk-forward
 and picks the same column, through a JuMP optimiser and a hierarchical one, and the randomised
 search under the same seed inherits it. Around it sit what the route changed in batch (a
@@ -43,7 +43,7 @@ The fixture is the online fold loop's, because the identities are structural.
     w, t, p = 60, 20, 3
     rows(r, i) = po.port_opt_view(r, i, :)
     batch_cv = IndexWalkForward(w, t; purged_size = p, expand_train = true)
-    online_cv = IndexWalkForward(w, t; purged_size = p, ff = OnlineStep())
+    online_cv = OnlineIndexWalkForward(w, t; purged_size = p)
     r = ConditionalValueatRisk()
     # The identity's grids tune the weight bounds, which bind and so move the winner well
     # clear of the tolerance; the plain grids elsewhere tune the L1 penalty.
@@ -134,10 +134,10 @@ The fixture is the online fold loop's, because the identities are structural.
         end
         # And the online search reads the same threaded matrix.
         o = search_cross_validation(tn,
-                                    gs(IndexWalkForward(w, t; purged_size = p,
-                                                        ff = OnlineStep(),
-                                                        wd = SelfFinancingDrift(),
-                                                        pws = DriftedWeights()), jgrid), rd)
+                                    gs(OnlineIndexWalkForward(w, t; purged_size = p,
+                                                              wd = SelfFinancingDrift(),
+                                                              pws = DriftedWeights()),
+                                       jgrid), rd)
         @test isapprox(o.test_scores, res.test_scores; atol = 1e-5)
         @test o.idx == res.idx
     end
@@ -194,10 +194,10 @@ The fixture is the online fold loop's, because the identities are structural.
                 e
             end
             @test isa(err, ArgumentError) && occursin(path, err.msg)
-            @test occursin(if isnothing(po.fold_fit(cv))
-                               "search_cross_validation"
-                           else
+            @test occursin(if po.folds_are_stepped(cv)
                                "online arm"
+                           else
+                               "search_cross_validation"
                            end, err.msg)
         end
         @test_throws ArgumentError po.assert_search_entry(warm, batch_cv)
@@ -294,7 +294,7 @@ The fixture is the online fold loop's, because the identities are structural.
         pres = search_cross_validation(pipe, gs(mb, grid), rd)
         dres = search_cross_validation(mr, gs(mb, ["opt.l1" => grid[1][2]]), rd)
         @test isapprox(pres.test_scores, dres.test_scores; atol = 1e-8)
-        # The door takes a Fold Fit since #1022, and picks the batch candidate; test_24f pins
+        # The door takes an Online Scheme since #1022, and picks the batch candidate; test_24f pins
         # the Pipeline's identities.
         ores = search_cross_validation(pipe, gs(online_cv, grid), rd)
         @test isapprox(ores.test_scores, res.test_scores; atol = 1e-6)
@@ -315,13 +315,77 @@ The fixture is the online fold loop's, because the identities are structural.
         @test fres.idx == 2
     end
 
-    @testset "9. Executor: a search over `OnlineStep` with a threaded executor" begin
+    @testset "9. Executor: a search over an Online Scheme with a threaded executor" begin
         seq = search_cross_validation(mr, gs(online_cv, jgrid; ex = FLoops.SequentialEx()),
                                       rdg)
         thr = search_cross_validation(mr, gs(online_cv, jgrid; ex = FLoops.ThreadedEx()),
                                       rdg)
         @test thr.test_scores == seq.test_scores
         @test thr.idx == seq.idx
+    end
+
+    @testset "10. The grid, an empty value vector, and the combinatorial paths" begin
+        # The grid is the product of the value vectors, with the first key fastest, and a
+        # vector of sets concatenates the grids of its sets.
+        lg, vg = po.lens_val_grid(["opt.l1" => [1, 2, 3], "opt.l2" => [10, 20]])
+        @test vg == [(1, 10), (2, 10), (3, 10), (1, 20), (2, 20), (3, 20)]
+        @test length(lg) == 6 && all(==(lg[1]), lg)
+        sets = Union{Vector{Pair{String, Vector{Int}}}, Dict{String, Vector{Int}}}[["opt.l1" =>
+                                                                                        [1,
+                                                                                         2]],
+                                                                                   Dict("opt.l2" =>
+                                                                                            [10,
+                                                                                             20,
+                                                                                             30])]
+        @test po.lens_val_grid(sets)[2] == [(1,), (2,), (10,), (20,), (30,)]
+        # An empty value vector makes the product empty. The grid refuses it by name
+        # before any candidate is fitted; the search used to report that every candidate
+        # failed a fold.
+        for p in (["opt.l1" => Float64[], "opt.l2" => [0.1]], Dict("opt.l1" => Float64[]))
+            err = try
+                po.lens_val_grid(p)
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, IsEmptyError) && occursin("`opt.l1`", sprint(showerror, err))
+        end
+        err = try
+            search_cross_validation(mr, gs(KFold(; n = 3), ["opt.l1" => Float64[]]), rd)
+            nothing
+        catch e
+            e
+        end
+        @test isa(err, IsEmptyError)
+        # The combinatorial method scores each path by the risk of its pooled series, and
+        # scores each fold of a path over the fold's own training window, in path order.
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        cvr = split(ccv, rd)
+        res = search_cross_validation(mr,
+                                      gs(ccv, jgrid; train_score = true,
+                                         ex = FLoops.SequentialEx()), rd)
+        l1 = po.parse_lens("opt.l1")
+        for (i, val) in enumerate(jgrid[1][2])
+            pp = po.fit_and_predict(Accessors.set(mr, l1, val), rd, ccv)
+            @test res.test_scores[:, i] == [-expected_risk(r, path) for path in pp.pred]
+            for (q, path) in enumerate(pp.pred)
+                ks = [I[2] for I in findall(==(q), cvr.path_ids)]
+                @test all(k -> path.pred[k].res.pr.X == view(rd.X, cvr.train_idx[ks[k]], :),
+                          eachindex(path.pred))
+                @test res.train_scores[q][:, i] ==
+                      [-expected_risk(r, fp.res) for fp in path.pred]
+            end
+        end
+        # A candidate that fails a path never wins.
+        bad = WeightBounds(; lb = fill(0.5, N), ub = ones(N))
+        ok = WeightBounds(; lb = zeros(N), ub = ones(N))
+        base = MeanRisk(;
+                        opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
+                                            sets = UniverseSets(; dict = Dict("nx" => nx))))
+        fres = search_cross_validation(base, gs(ccv, ["opt.wb" => [bad, ok]]), rd)
+        @test all(isnan, fres.test_scores[:, 1])
+        @test all(isfinite, fres.test_scores[:, 2])
+        @test fres.idx == 2
     end
 
     @testset "A result's own prior scores its weights at the result's mask" begin

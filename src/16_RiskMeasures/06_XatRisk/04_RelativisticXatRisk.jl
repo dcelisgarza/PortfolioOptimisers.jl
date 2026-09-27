@@ -1,28 +1,97 @@
 """
-    RRM(x, slv, alpha = 0.05, kappa = 0.3, ...; kwargs...)
+    RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
+        w::Option{<:ObsWeights} = nothing) -> Number
 
-Compute the Relativistic Risk Measure (RRM) for a vector of portfolio returns.
+Compute the Relativistic Value-at-Risk of the returns `x` with a power-cone programme.
 
-Solves a convex optimisation problem to compute the RRM at confidence level `alpha` with relativistic parameter `kappa`, using the specified solver(s).
+[`RelativisticValueatRisk`](@ref) states the measure, its Kaniadakis ball and its primal programme. Every call builds a new `JuMP` model. The primal and the dual programmes have the same optimal value, but a solver can stall on one of them and solve the other, so the dual programme is the fallback of the primal one.
 
-The primal power-cone programme is tried first. If no solver in `slv` succeeds on it, the equivalent dual programme is tried, which is numerically better conditioned for some solvers. If neither succeeds, the result is `NaN`.
+# Algorithm
+
+ 1. Check that `slv` is not empty when it is a vector.
+ 2. When `w` is stated, divide it by its sum, giving `wi`.
+ 3. Compute `ln_k`, the Kaniadakis logarithm of ``1/(\\alpha T)``.
+ 4. Build the primal programme in a new model, and solve it with the solvers of `slv` in turn.
+ 5. When a solver solves the primal programme, return its objective value.
+ 6. Otherwise, build the dual programme in a new model, and solve it with the solvers of `slv` in turn.
+ 7. When a solver solves the dual programme, return its objective value. Otherwise, return `NaN`.
+
+# JuMP formulation
+
+## Variables
+
+The primal model creates these variables:
+
+  - `t`: free scalar ``t``.
+  - `z`: scalar ``z``, bounded below by zero.
+  - `omega`, `psi`, `theta`, `epsilon`: free ``T \\times 1`` vectors ``\\boldsymbol{\\omega}``, ``\\boldsymbol{\\psi}``, ``\\boldsymbol{\\theta}`` and ``\\boldsymbol{\\epsilon}``.
+
+The dual model creates these variables:
+
+  - `z`, `nu`, `tau`: free ``T \\times 1`` vectors ``\\boldsymbol{q}``, ``\\boldsymbol{\\nu}`` and ``\\boldsymbol{\\tau}``.
+
+## Expressions
+
+  - `risk`, in the primal model: ``t + \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + T \\sum_{i=1}^{T} p_i (\\psi_i + \\theta_i)``.
+  - `risk`, in the dual model: ``-\\boldsymbol{q}^\\intercal \\boldsymbol{x}``.
+
+## Constraints
+
+No row carries a name. The primal model registers these rows:
+
+  - ``\\left(\\tfrac{z(1+\\kappa)}{2\\kappa},\\, \\tfrac{\\psi_i(1+\\kappa)}{\\kappa},\\, \\epsilon_i\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right)``, one row for each ``i``.
+  - ``\\left(\\tfrac{\\omega_i}{1-\\kappa},\\, \\tfrac{\\theta_i}{\\kappa},\\, -\\tfrac{z}{2\\kappa}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa)``, one row for each ``i``.
+  - ``\\epsilon_i + \\omega_i - x_i - t \\leq 0``, one row for each ``i``.
+
+The dual model registers these rows:
+
+  - ``\\sum_{i=1}^{T} q_i - 1 = 0``.
+  - ``\\tfrac{1}{2\\kappa} \\sum_{i=1}^{T} (\\nu_i - \\tau_i) - \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) \\leq 0``.
+  - ``(\\nu_i,\\, T p_i,\\, q_i) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right)``, one row for each ``i``.
+  - ``(q_i,\\, T p_i,\\, \\tau_i) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa)``, one row for each ``i``.
+
+The two power-cone rows of the dual model give ``\\nu_i \\geq q_i^{1+\\kappa} (T p_i)^{-\\kappa}`` and ``\\tau_i \\leq q_i^{1-\\kappa} (T p_i)^{\\kappa}``. So the second row is the Kaniadakis ball of [`RelativisticValueatRisk`](@ref), ``\\sum_{i} q_i \\ln_{\\kappa}\\!\\left(\\tfrac{q_i}{p_i T}\\right) \\leq \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right)``.
+
+## Objective
+
+  - The primal model minimises `risk`, and the dual model maximises `risk`. The two optimal values are equal.
+
+Where:
+
+  - $(math_dict[:xret])
+  - $(math_dict[:T])
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:kappa_rm])
+  - $(math_dict[:ln_kappa])
+  - $(math_dict[:p_i_obs])
+  - $(math_dict[:rlvar_t])
+  - $(math_dict[:rlvar_z_ge])
+  - $(math_dict[:rlvar_aux])
+  - ``\\boldsymbol{q}``: ``T \\times 1`` probability vector of the dual programme, whose ``i``-th entry is ``q_i``.
+  - ``\\nu_i``, ``\\tau_i``: Auxiliary variables of observation ``i`` in the dual programme.
+  - $(math_dict[:K_pow])
 
 # Arguments
 
   - `x`: Vector of portfolio returns.
-  - `slv`: Solver or vector of solvers.
-  - `alpha`: Confidence level (default `0.05`).
-  - `kappa`: Relativistic parameter (default `0.3`).
-  - Additional parameters depending on the specific RRM formulation.
-  - `kwargs...`: Additional keyword arguments passed to the solver.
+  - $(arg_dict[:slv])
+  - `alpha`: Significance level, ``\\alpha \\in (0, 1)``.
+  - `kappa`: Kaniadakis deformation parameter, ``\\kappa \\in (0, 1)``.
+  - `w`: Observation weights, or `nothing` for equal weights.
+
+# Validation
+
+  - If `slv` is a `VecSlv`: `!isempty(slv)`, else `IsEmptyError`.
 
 # Returns
 
-  - RRM value (scalar), or `NaN` if neither the primal nor the dual programme is solved.
+  - The Relativistic Value-at-Risk of `x`, or `NaN` when no solver of `slv` solves either programme.
 
 # Related
 
   - [`RelativisticValueatRisk`](@ref)
+  - [`kappa_log`](@ref)
+  - [`optimise_JuMP_model!`](@ref)
   - [`Slv_VecSlv`](@ref)
 """
 function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
@@ -108,47 +177,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Relativistic Value-at-Risk (RLVaR) risk measure.
+Measures the Relativistic Value-at-Risk (RLVaR), the worst expected loss over a Kaniadakis entropy ball about the sample distribution.
 
-`RelativisticValueatRisk` is a coherent risk measure generalising EVaR via the Kaniadakis (``\\kappa``-deformed) entropy. It is parametrised by a deformation parameter ``\\kappa \\in (0, 1)`` and reduces to EVaR in the limit ``\\kappa \\to 0``. It is solved via a conic programme. It is the Kaniadakis counterpart of the Kullback-Leibler ambiguity ball that [`EntropicValueatRisk`](@ref) reads as a risk measure.
+The RLVaR is a coherent risk measure. [`EntropicValueatRisk`](@ref) measures its ball with the Kullback-Leibler divergence, and the RLVaR tends to it as the deformation parameter ``\\kappa`` tends to zero.
 
 # Mathematical definition
 
-The RLVaR is:
-
-```math
-\\begin{align}
-\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\underset{t,\\, z}{\\min} \\Bigl\\{ t + \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + \\sum_{i=1}^{T} (\\psi_i + \\theta_i) \\;:\\; z \\geq 0 \\Bigr\\}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relativistic Value-at-Risk.
-  - $(math_dict[:xret])
-  - $(math_dict[:alpha_rm])
-  - $(math_dict[:T])
-  - $(math_dict[:kappa_rm])
-  - $(math_dict[:ln_kappa])
-  - ``t``, ``z``, ``\\psi_i``, ``\\theta_i``, ``\\epsilon_i``, ``\\omega_i``: Conic optimisation variables.
-
-subject to the power-cone constraints:
-
-```math
-\\begin{align}
-& \\left(\\tfrac{z(1+\\kappa)}{2\\kappa},\\, \\tfrac{\\psi_i(1+\\kappa)}{\\kappa},\\, \\epsilon_i\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right) \\quad \\forall i\\,,\\\\
-& \\left(\\tfrac{\\omega_i}{1-\\kappa},\\, \\tfrac{\\theta_i}{\\kappa},\\, -\\tfrac{z}{2\\kappa}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa) \\quad \\forall i\\,,\\\\
-& \\epsilon_i + \\omega_i \\leq x_i + t \\quad \\forall i\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^p b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.
-
-For observation-weighted samples the weight vector is normalised to ``\\boldsymbol{w}`` with ``\\sum_{t=1}^{T} w_t = 1``. The Kaniadakis logarithm keeps the argument ``\\frac{1}{\\alpha T}``, and the sum ``\\sum_{i=1}^{T} (\\psi_i + \\theta_i)`` becomes ``T \\sum_{i=1}^{T} w_i (\\psi_i + \\theta_i)``. The Kaniadakis logarithm has no multiplication-to-addition property, so the normalisation ``\\alpha T`` cannot absorb the weights the way it does for [`EntropicValueatRisk`](@ref).
-
-The dual of that programme is the worst expected loss over a Kaniadakis ball about the sample distribution:
+The RLVaR is the worst expected loss over a Kaniadakis ball about the sample distribution:
 
 ```math
 \\begin{align}
@@ -159,13 +194,57 @@ The dual of that programme is the worst expected loss over a Kaniadakis ball abo
 
 Where:
 
+  - ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x})``: Relativistic Value-at-Risk.
   - ``\\mathcal{Q}_{\\kappa}(\\alpha)``: Kaniadakis ambiguity ball of radius ``\\ln_{\\kappa}\\!\\left(\\frac{1}{\\alpha T}\\right)``.
+  - $(math_dict[:xret])
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:kappa_rm])
+  - $(math_dict[:T])
+  - $(math_dict[:ln_kappa])
   - $(math_dict[:amb_Q])
   - $(math_dict[:amb_P])
   - $(math_dict[:amb_EQ_L])
   - $(math_dict[:amb_L_t])
 
-The left side takes the place the Kullback-Leibler divergence holds for [`EntropicValueatRisk`](@ref). With equal observation weights ``p_t = 1/T`` it is the negated Kaniadakis entropy of ``Q``. Because ``\\ln_{\\kappa}`` has no multiplication-to-addition property, the sample size ``T`` stays inside both sides, and neither side separates into a term in ``T`` and a term in ``\\alpha``. The Kullback-Leibler ball at radius ``-\\ln(\\alpha)`` is recovered in the limit ``\\kappa \\to 0``.
+The left side of the ball takes the place that the Kullback-Leibler divergence holds for [`EntropicValueatRisk`](@ref). With equal observation weights ``p_t = 1/T``, it is the negated Kaniadakis entropy of ``Q``. The Kaniadakis logarithm does not change a product into a sum, so the sample size ``T`` stays inside both sides, and neither side separates into a term in ``T`` and a term in ``\\alpha``.
+
+Conic duality gives the equivalent primal programme:
+
+```math
+\\begin{align}
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) = \\underset{t,\\, z,\\, \\boldsymbol{\\psi},\\, \\boldsymbol{\\theta},\\, \\boldsymbol{\\epsilon},\\, \\boldsymbol{\\omega}}{\\min} \\quad & t + \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + T \\sum_{i=1}^{T} p_i (\\psi_i + \\theta_i) \\\\
+\\mathrm{s.t.} \\quad & \\left(\\tfrac{z(1+\\kappa)}{2\\kappa},\\, \\tfrac{\\psi_i(1+\\kappa)}{\\kappa},\\, \\epsilon_i\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right) \\quad \\forall i\\,, \\\\
+& \\left(\\tfrac{\\omega_i}{1-\\kappa},\\, \\tfrac{\\theta_i}{\\kappa},\\, -\\tfrac{z}{2\\kappa}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa) \\quad \\forall i\\,, \\\\
+& \\epsilon_i + \\omega_i \\leq x_i + t \\quad \\forall i\\,, \\\\
+& z \\geq 0\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:p_i_obs])
+  - $(math_dict[:rlvar_t])
+  - $(math_dict[:rlvar_z_ge])
+  - $(math_dict[:rlvar_aux])
+  - $(math_dict[:K_pow])
+
+With equal observation weights, the sum in the objective is ``\\sum_{i=1}^{T} (\\psi_i + \\theta_i)``. The radius keeps the argument ``\\frac{1}{\\alpha T}`` when the weights are stated, because the Kaniadakis logarithm cannot absorb the weights into ``\\alpha T`` the way the natural logarithm does for [`EntropicValueatRisk`](@ref).
+
+The definition has these consequences:
+
+```math
+\\begin{align}
+\\lim_{\\kappa \\to 0} \\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x})\\,, \\\\
+\\lim_{\\kappa \\to 1} \\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) &= \\max_{t} L_t\\,, \\\\
+\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) \\leq \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) &\\leq \\mathrm{EVaR}_{\\alpha}(\\boldsymbol{x}) \\leq \\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) \\leq \\max_{t} L_t\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{VaR}_{\\alpha}``, ``\\mathrm{CVaR}_{\\alpha}``, ``\\mathrm{EVaR}_{\\alpha}``: Value-at-Risk, Conditional Value-at-Risk and Entropic Value-at-Risk at the same level ``\\alpha``.
+
+With equal observation weights and ``\\alpha T \\leq 1``, the radius is not negative, so the ball holds every distribution on the sample, and the RLVaR is the largest loss ``\\max_{t} L_t``.
 
 # Fields
 
@@ -194,7 +273,7 @@ Keywords correspond to the struct's fields.
 
     (r::RelativisticValueatRisk)(x::VecNum)
 
-Computes the RLVaR of a portfolio returns vector `x`.
+Computes the RLVaR of a portfolio returns vector `x` with [`RRM`](@ref), and returns `NaN` when no solver of `slv` solves the programme. The functor needs a solver: with `slv = nothing` the call raises a `MethodError`. [`factory`](@ref) fills `slv` from the solver of the optimiser.
 
 ## Arguments
 
@@ -222,11 +301,14 @@ RelativisticValueatRisk
   - [`EntropicValueatRisk`](@ref)
   - [`RelativisticValueatRiskRange`](@ref)
   - [`RelativisticDrawdownatRisk`](@ref)
+  - [`RRM`](@ref)
   - [`kappa_log`](@ref)
+  - [`factory`](@ref)
 
 # References
 
   - $(ref_dict[:rlvar])
+  - $(ref_dict[:cajas2025]) Section 7.2.2.7, Equations 7.65 to 7.69.
 """
 @propagatable @concrete struct RelativisticValueatRisk <: RiskMeasure
     """
@@ -276,11 +358,16 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the significance level `alpha` and the deformation parameter `kappa` of a [`RelativisticValueatRisk`](@ref) against prior result `pr`.
 
-`alpha` and `kappa` are a **travelling pair**: [`EntropyBudget`](@ref) reads the significance level of its sibling slot. So `alpha` resolves first, and the number it produced is stated in the [`CalibrationContext`](@ref) of the `kappa` slot before that slot is resolved. A stated number, a plain function and a rule that reads no sibling all ignore the field, so the order costs nothing where no rule reads a sibling.
+`alpha` and `kappa` are a Travelling Pair. A rule in the `kappa` slot, such as [`EntropyBudget`](@ref), can read the significance level of the `alpha` slot, so `alpha` resolves first. A stated number, a plain function and a rule that reads no sibling ignore the context, so the order changes nothing for them.
 
-The series this measure prices travels in the same context. It is the returns, which is the default [`calibration_series`](@ref) states, so this site names what the default context already holds. It is written all the same, for the reason every site writes it: the marker belongs to the measure, and no rule carries one of its own to be corrected.
+# Algorithm
 
-The solver is settled once, as `sel(x.slv, slv)`, and handed to both rules, so a rule may call [`RRM`](@ref) itself. The rebuild goes through [`rebuild_with_slots`](@ref), whose positional call runs the inner constructor and re-runs both range checks on the calibrated numbers.
+ 1. Select the observation weights `ws` with `sel(x.w, pr.w)`.
+ 2. Select the solver `sv` with `sel(x.slv, slv)`. Both rules receive it, so a rule can call [`RRM`](@ref).
+ 3. Read the series marker `s` with [`calibration_series`](@ref). The measure prices the returns, which is also the default of the context.
+ 4. Resolve the `alpha` slot, giving `alpha`.
+ 5. Resolve the `kappa` slot with a [`CalibrationContext`](@ref) that holds `alpha` and `s`, giving `kappa`.
+ 6. Rebuild the measure with [`rebuild_with_slots`](@ref). Its positional call runs the inner constructor, which checks the range of both calibrated numbers again.
 
 # Related
 
@@ -309,9 +396,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Relativistic Value-at-Risk Range (RLVaR Range) risk measure.
+Measures the spread of the returns as the sum of the Relativistic Value-at-Risk of the losses and that of the gains.
 
-`RelativisticValueatRiskRange` computes the sum of the lower-tail RLVaR (at level `alpha` with deformation `kappa_a`) and the upper-tail RLVaR (at level `beta` with deformation `kappa_b`).
+The loss tail has the level `alpha` and the deformation `kappa_a`. The gain tail has the level `beta` and the deformation `kappa_b`.
 
 # Mathematical definition
 
@@ -330,7 +417,7 @@ Where:
 
 $(math_dict[:negated_upper_tail])
 
-Each term is the worst expected loss over its own Kaniadakis ball about the sample distribution, one deformed by ``\\kappa_a`` at level ``\\alpha`` and one deformed by ``\\kappa_b`` at level ``\\beta``. [`RelativisticValueatRisk`](@ref) states the ball.
+Each term is the worst expected loss over its own Kaniadakis ball about the sample distribution. The first ball has the deformation ``\\kappa_a`` and the level ``\\alpha``, and the second ball has the deformation ``\\kappa_b`` and the level ``\\beta``. [`RelativisticValueatRisk`](@ref) states the ball.
 
 # Fields
 
@@ -361,7 +448,7 @@ Keywords correspond to the struct's fields.
 
     (r::RelativisticValueatRiskRange)(x::VecNum)
 
-Computes the RLVaR Range of a portfolio returns vector `x`.
+Computes the RLVaR Range of a portfolio returns vector `x` with two calls of [`RRM`](@ref). The functor needs a solver, as the functor of [`RelativisticValueatRisk`](@ref) does.
 
 ## Arguments
 
@@ -390,10 +477,12 @@ RelativisticValueatRiskRange
   - [`RiskMeasureSettings`](@ref)
   - [`RelativisticValueatRisk`](@ref)
   - [`EntropicValueatRiskRange`](@ref)
+  - [`range_tails`](@ref)
 
 # References
 
   - $(ref_dict[:rlvar])
+  - $(ref_dict[:cajas2025]) Section 7.2.3.5, Equation 7.84.
 """
 @propagatable @concrete struct RelativisticValueatRiskRange <: RiskMeasure
     """
@@ -455,11 +544,20 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the two significance levels and the two deformation parameters of a [`RelativisticValueatRiskRange`](@ref) against prior result `pr`.
 
-Each end carries a **travelling pair** of its own: `kappa_a` reads `alpha` and `kappa_b` reads `beta`. The gain-side pair defaults to the loss-side pair, `beta` to `alpha` and `kappa_b` to `kappa_a`, so a pair stated on the loss side alone reaches both ends. The resolution runs the pair of the loss side and then the pair of the gain side, and neither side reads the other's number. That is the pairing [`range_tails`](@ref) builds and the functor evaluates.
+Each end has its own Travelling Pair: `kappa_a` reads `alpha`, and `kappa_b` reads `beta`. The gain-side pair defaults to the loss-side pair, `beta` to `alpha` and `kappa_b` to `kappa_a`, so a pair stated on the loss side alone reaches both ends. Neither end reads the number of the other end. [`range_tails`](@ref) and the functor use the same pairing.
 
-The four slots carry four different bounds, so a rule of the wrong end or the wrong family is refused at construction. The solver is settled once and handed to all four rules.
+The four slots have four different bounds, so the constructor refuses a rule of the wrong end or of the wrong family. Both ends price the returns, so one series marker goes into the context of both `kappa` slots, while each end has its own significance level.
 
-Both ends price one series, which is the returns, so the same marker stands in the context of both `kappa` slots. The series is a property of the measure and not of an end, where the significance level is a property of the end.
+# Algorithm
+
+ 1. Select the observation weights `ws` with `sel(x.w, pr.w)`.
+ 2. Select the solver `sv` with `sel(x.slv, slv)`. All four rules receive it.
+ 3. Read the series marker `s` with [`calibration_series`](@ref).
+ 4. Resolve the `alpha` slot, giving `alpha`.
+ 5. Resolve the `kappa_a` slot with a [`CalibrationContext`](@ref) that holds `alpha` and `s`, giving `kappa_a`.
+ 6. Resolve the `beta` slot, giving `beta`.
+ 7. Resolve the `kappa_b` slot with a [`CalibrationContext`](@ref) that holds `beta` as its significance level and `s`, giving `kappa_b`.
+ 8. Rebuild the measure with [`rebuild_with_slots`](@ref), which checks the range of all four calibrated numbers again.
 
 # Related
 
@@ -505,9 +603,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Relativistic Drawdown-at-Risk (RLDaR) risk measure.
-
-`RelativisticDrawdownatRisk` applies the Relativistic Value-at-Risk framework to the absolute drawdown series of portfolio returns.
+Measures the Relativistic Drawdown-at-Risk (RLDaR), the Relativistic Value-at-Risk of the absolute drawdown series of the portfolio.
 
 # Mathematical definition
 
@@ -541,7 +637,18 @@ Where:
   - $(math_dict[:kappa_rm])
   - ``\\boldsymbol{d}(\\boldsymbol{x})``: Absolute drawdown series vector ``T \\times 1``.
 
-So the RLDaR is the worst expected drawdown over a Kaniadakis ball about the sample distribution of ``\\boldsymbol{d}(\\boldsymbol{x})``. [`RelativisticValueatRisk`](@ref) states the ball.
+So the RLDaR is the worst expected drawdown over a Kaniadakis ball about the sample distribution of ``\\boldsymbol{d}(\\boldsymbol{x})``. [`RelativisticValueatRisk`](@ref) states the ball. The order of that measure holds for the drawdowns too:
+
+```math
+\\begin{align}
+\\mathrm{DaR}_{\\alpha}(\\boldsymbol{x}) \\leq \\mathrm{CDaR}_{\\alpha}(\\boldsymbol{x}) \\leq \\mathrm{EDaR}_{\\alpha}(\\boldsymbol{x}) \\leq \\mathrm{RLDaR}_{\\alpha,\\kappa}(\\boldsymbol{x}) \\leq \\mathrm{MDD}(\\boldsymbol{x})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{DaR}_{\\alpha}``, ``\\mathrm{CDaR}_{\\alpha}``, ``\\mathrm{EDaR}_{\\alpha}``: Drawdown-at-Risk, Conditional Drawdown-at-Risk and Entropic Drawdown-at-Risk at the same level ``\\alpha``.
+  - ``\\mathrm{MDD}(\\boldsymbol{x}) = -\\min_{t} d_t``: Maximum drawdown.
 
 # Fields
 
@@ -570,7 +677,7 @@ Keywords correspond to the struct's fields.
 
     (r::RelativisticDrawdownatRisk)(x::VecNum)
 
-Computes the Relativistic Drawdown-at-Risk of a portfolio returns vector `x`.
+Computes the Relativistic Drawdown-at-Risk of a portfolio returns vector `x` with [`RRM`](@ref) on its drawdown series. The functor needs a solver, as the functor of [`RelativisticValueatRisk`](@ref) does.
 
 ## Arguments
 
@@ -598,11 +705,13 @@ RelativisticDrawdownatRisk
   - [`RelativisticValueatRisk`](@ref)
   - [`EntropicDrawdownatRisk`](@ref)
   - [`RelativeRelativisticDrawdownatRisk`](@ref)
+  - [`absolute_drawdown_vec`](@ref)
 
 # References
 
   - $(ref_dict[:cdar])
   - $(ref_dict[:rlvar])
+  - $(ref_dict[:cajas2025]) Section 7.2.4.6, Equations 7.99 and 7.100.
 """
 @propagatable @concrete struct RelativisticDrawdownatRisk <: RiskMeasure
     """
@@ -652,9 +761,18 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the significance level `alpha` and the deformation parameter `kappa` of a [`RelativisticDrawdownatRisk`](@ref) against prior result `pr`.
 
-It carries the reading of [`resolve_deferred_quantities`](@ref) on the value-at-risk twin unchanged: `alpha` resolves first and reaches the `kappa` slot in its [`CalibrationContext`](@ref). The drawdown series has one entry per row of the sample, so a rule reads the same sample size here as it does there.
+The order is the one that [`RelativisticValueatRisk`](@ref) uses: `alpha` resolves first, and it reaches the `kappa` slot in its [`CalibrationContext`](@ref). The drawdown series has one entry per row of the sample, so a rule reads the same sample size as it does for the value-at-risk measure.
 
-**The series does not carry over, and the context is what says so.** This measure prices the absolute drawdown series of the portfolio, so [`calibration_series`](@ref) states [`AbsoluteDrawdownSeries`](@ref) and the marker travels beside `alpha`. A rule that reads the shape of a series then reads the drawdown series of each column of the sample, in place of the columns themselves, and the `alpha` it reads is the level of that same drawdown series. The key `:kappa` names this slot and the twin's slot alike, so nothing else could have told the rule which quantity it stands in front of.
+The series differs from that of [`RelativisticValueatRisk`](@ref). This measure prices the absolute drawdown series of the portfolio, so [`calibration_series`](@ref) states [`AbsoluteDrawdownSeries`](@ref), and the context carries that marker beside `alpha`. A rule that reads the shape of a series then reads the drawdown series of each column of the sample, not the columns, and `alpha` is the level of that drawdown series. The key `:kappa` names this slot and the slot of [`RelativisticValueatRisk`](@ref) alike, so the marker is the only thing that tells the rule which series it reads.
+
+# Algorithm
+
+ 1. Select the observation weights `ws` with `sel(x.w, pr.w)`.
+ 2. Select the solver `sv` with `sel(x.slv, slv)`.
+ 3. Read the series marker `s`, which is [`AbsoluteDrawdownSeries`](@ref).
+ 4. Resolve the `alpha` slot, giving `alpha`.
+ 5. Resolve the `kappa` slot with a [`CalibrationContext`](@ref) that holds `alpha` and `s`, giving `kappa`.
+ 6. Rebuild the measure with [`rebuild_with_slots`](@ref), which checks the range of both calibrated numbers again.
 
 # Related
 
@@ -687,9 +805,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents the Relative Relativistic Drawdown-at-Risk (Relative RLDaR) risk measure for hierarchical optimisation.
-
-`RelativeRelativisticDrawdownatRisk` applies the Relativistic Value-at-Risk framework to the relative (compounded) drawdown series of portfolio returns.
+Measures the Relative Relativistic Drawdown-at-Risk, the Relativistic Value-at-Risk of the compounded drawdown series, for hierarchical optimisation.
 
 # Mathematical definition
 
@@ -752,7 +868,7 @@ Keywords correspond to the struct's fields.
 
     (r::RelativeRelativisticDrawdownatRisk)(x::VecNum)
 
-Computes the Relative Relativistic Drawdown-at-Risk of a portfolio returns vector `x`.
+Computes the Relative Relativistic Drawdown-at-Risk of a portfolio returns vector `x` with [`RRM`](@ref) on its relative drawdown series. The functor needs a solver, as the functor of [`RelativisticValueatRisk`](@ref) does.
 
 ## Arguments
 
@@ -834,9 +950,18 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the significance level `alpha` and the deformation parameter `kappa` of a [`RelativeRelativisticDrawdownatRisk`](@ref) against prior result `pr`.
 
-The measure is a hierarchical one, so it reaches no `JuMP` model and the [`factory`](@ref) route is its only resolution. The travelling pair is resolved in the order the absolute twin states.
+The measure is hierarchical, so it reaches no `JuMP` model, and [`factory`](@ref) is the only route that resolves it. The Travelling Pair resolves in the order that [`RelativisticDrawdownatRisk`](@ref) uses.
 
-The series is the twin's reading in its own units: this measure compounds the path, so [`calibration_series`](@ref) states [`RelativeDrawdownSeries`](@ref) and the context carries it. The two markers name two different series of the same column, and a rule that reads the shape of a series answers differently on each.
+This measure compounds the path, so [`calibration_series`](@ref) states [`RelativeDrawdownSeries`](@ref), and the context carries that marker. The two drawdown measures name two different series of the same column, and a rule that reads the shape of a series gives a different answer on each.
+
+# Algorithm
+
+ 1. Select the observation weights `ws` with `sel(x.w, pr.w)`.
+ 2. Select the solver `sv` with `sel(x.slv, slv)`.
+ 3. Read the series marker `s`, which is [`RelativeDrawdownSeries`](@ref).
+ 4. Resolve the `alpha` slot, giving `alpha`.
+ 5. Resolve the `kappa` slot with a [`CalibrationContext`](@ref) that holds `alpha` and `s`, giving `kappa`.
+ 6. Rebuild the measure with [`rebuild_with_slots`](@ref), which checks the range of both calibrated numbers again.
 
 # Related
 

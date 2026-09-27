@@ -4,7 +4,7 @@ Description = "Asset turnover, public API of PortfolioOptimisers.jl: TurnoverEst
 
 # Asset turnover
 
-The turnover is used to measure the absolute weight change between the current weights and benchmark weights. They can be used to compute fees, or as a constraint. It can also be used as a risk measure, but we will detail that use in [Risk Measures](./16_RiskMeasures/15_TurnoverRiskMeasure.md)
+The turnover measures the absolute change of each weight from a set of reference weights, such as the weights before a rebalance. You can use it to compute fees or as a constraint. It is also a risk measure, which the [turnover risk measure](@ref api-turnover-risk-measure) page describes.
 
 ```@docs
 TurnoverEstimator

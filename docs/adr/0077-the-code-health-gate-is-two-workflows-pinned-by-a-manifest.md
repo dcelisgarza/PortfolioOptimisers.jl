@@ -143,3 +143,20 @@ number in it is measured locally.
 
 `ReusableTest.yml`'s coverage job and `Sweep.yml` read the pin the same way the two gate workflows
 do, so the move reaches all five workflows through the one Manifest line, and no YAML changed.
+
+## Amendment (2026-09-27)
+
+The pin is **Julia 1.13.1**. The juliaup `release` channel moved from 1.13.0 to 1.13.1, so every
+gate run on it refused to check against provenance that named 1.13.0. `code_health/Manifest.toml` was re-resolved under 1.13.1 with `Pkg.resolve`, which kept every
+package version: only `julia_version`, the stdlib jll `LibSSH2_jll` and the path version of
+`PortfolioOptimisers` moved. JET stays at 0.12.1, and CodeComplexity and JuliaSyntax stay at their
+recorded versions.
+
+The size, complexity, expansion, performance and prose baselines were refreshed under 1.13.1 in the
+commit that moved the Manifest, and no binding number rose. Their other rows moved only because
+`dev` carried drift under the threshold. JET needed `--accept-rise` for five rows whose `reviewed`
+count rose under 1.13.1's inference: `01_PosdefMatrix.jl` and `06_CalibrationRules.jl` in the
+`main` run, and `20_Base_Regression.jl`, `03_GraphTraversal.jl` and `03_EntropicXatRisk.jl` in the
+`plots_ext` run. The same tree is JET-green under 1.13.0 with the old Manifest, so the rises are
+the analyser's, not the code's. The coverage baseline's provenance line was moved by hand, for the
+reason the first amendment gives.

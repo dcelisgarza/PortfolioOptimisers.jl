@@ -261,8 +261,13 @@ end
     # window, in silence. A leaf that overrides `getproperty` carries its core's mask as a
     # forwarded property, which `fieldnames` cannot see and the verb cannot dispatch on, so
     # such a leaf is held to the same rule (#892: the two hierarchical leaves fell back).
+    # `BudgetedHindsightPathResult` is a path, so its `w` and its `imsk` are `rows × assets`,
+    # one allocation and one mask per row. No fold reads it: its `predict` answers one
+    # `NaiveOptimisationResult` per row with that row's mask, and those leaves are held here.
+    per_row = (PO.BudgetedHindsightPathResult,)
     for U in all_concrete(PO.OptimisationResult)
         parentmodule(U) === PO || continue
+        U in per_row && continue
         forwards = which(Base.getproperty, Tuple{U, Symbol}) !== base_getproperty
         if :imsk in fieldnames(U) || forwards
             @test which(PO.result_investable_mask, Tuple{U}) !== fallback
@@ -309,8 +314,8 @@ end
                                   fb = nothing)
     @test PO.result_investable_mask(ncres) == imsk
     scres = SchurComplementHierarchicalRiskParityResult(; pr = prk, wb = nothing,
-                                                        clr = nothing, r = Variance(),
-                                                        gamma = 0.5,
+                                                        clr = nothing, fees = nothing,
+                                                        r = Variance(), gamma = 0.5,
                                                         retcode = OptimisationSuccess(),
                                                         w = w_keep, imsk = imsk,
                                                         fb = nothing)

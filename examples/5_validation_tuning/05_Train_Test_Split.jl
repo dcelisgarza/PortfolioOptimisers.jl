@@ -1,31 +1,31 @@
 #=
 ```@meta
-Description = "Train/test splitting in PortfolioOptimisers.jl: the holdout protocol everyone reaches for first, done honestly, before any cross-validation."
+Description = "Train/test splitting in PortfolioOptimisers.jl: hold out the most recent rows, fit the whole workflow on the rest, and score the portfolio on the held-out rows."
 ```
 
 # Train/test splitting
 
-The cheapest honest question you can ask of a portfolio is: *does it survive data it has
-never seen?* Cross-validation answers that many times over, on many folds, at many times the
-cost. Before any of that, there is the **holdout split** — train on the first 80 % of history,
-score on the last 20 %, once.
+A holdout split trains on the first part of the history and scores on the rest. Most cells of
+this page hold out the last 20 %.
+Cross-validation scores many folds instead, at the cost of one fit per fold.
 
-It is the protocol everyone reaches for first, and the one easiest to get quietly wrong. Not
-because the split itself is hard, but because *everything upstream of it* has to respect it.
-An imputation fill value computed from the whole price history has seen the test window. So
-has a missing-data filter that chose the asset universe by looking at all five years. The
-returns matrix you split was already contaminated before you split it.
+Every step before the optimiser must also respect the split. As the pipelines example shows, a
+fill value or an asset filter fitted on the whole history already uses the prices of the test
+rows. If you split a returns matrix built that way, the test rows have already entered the
+training data.
 
-[`TrainTestSplit`](@ref) (alias `TTS`) closes that hole by making the split a **step of the
-pipeline** — the *first* step, before any other step has touched the data. Everything fitted
-downstream sees the training window and nothing else, by construction rather than by
-discipline.
+[`TrainTestSplit`](@ref), with the alias `TTS`, makes the split a step of a pipeline. It is
+the first step and runs before any other step sees the data. Every fitted step after it sees
+the training window and nothing else.
 
-This example covers the free function and its sizing rules, the pipeline step and the leakage
-argument that pins it to first position, the payoff (`fit_predict` scoring on the held-out
-window), the embargo, and why a pipeline carrying a holdout is refused by cross-validation.
+This example covers these subjects.
 
-See `docs/adr/0031-holdout-split-as-a-pipeline-step.md` for the design rationale.
+  - The function `train_test_split`, its sizes and the embargo.
+  - The pipeline step, and why it must come first.
+  - Scoring on the held-out window with `fit_predict`.
+  - Why cross-validation throws an error for a pipeline with a split.
+
+`docs/adr/0031-holdout-split-as-a-pipeline-step.md` gives the reasons for the design.
 =#
 using PortfolioOptimisers, PrettyTables
 
@@ -40,9 +40,9 @@ end;
 #=
 ## 1. Setting up
 
-Four years of daily prices for ten S&P 500 names. As in the pipelines example we start from
-**prices**, not returns, because the whole point is that the split happens before the data is
-cleaned and converted.
+We use four years of daily prices for ten S&P 500 stocks. As in the pipelines example, we
+start from prices, not returns, because the split must happen before the pipeline cleans and
+converts the data.
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel, Statistics, Dates
@@ -60,12 +60,10 @@ size(values(X))
 #=
 ## 2. The free function
 
-[`train_test_split`](@ref) cuts price- or returns-level data into two windows: the training
-window is the **head** of the observations, the test window is the **tail**. Time-ordered, so
-the test window is always the most recent data — a random shuffle would let the model train on
-tomorrow to predict yesterday.
-
-The windows are views, so nothing is copied.
+[`train_test_split`](@ref) cuts price or returns data into two windows. The training window holds
+the first rows and the test window the last rows. The split keeps the time order, and the
+test window is always the most recent data. A random shuffle would let the model train on
+later rows and test on earlier ones.
 =#
 
 train, test = train_test_split(pr; test_size = 0.2)
@@ -76,14 +74,16 @@ DataFrame(; window = ["train", "test"],
           to = [last(timestamp(train.X)), last(timestamp(test.X))])
 
 #=
-### 2.1 Sizing: counts, fractions, and complements
+### 2.1 Sizes as counts or fractions
 
-A size is either an **`Integer` row count** or an **`AbstractFloat` fraction** of the
-observations in `(0, 1)`. `test_size = 250` means the last 250 rows; `test_size = 0.25` means
-the last quarter.
+A size is an `Integer` count of rows, or an `AbstractFloat` fraction of the rows, strictly
+between 0 and 1. `test_size = 250` means the last 250 rows, and `test_size = 0.25` means the
+last quarter. A fraction rounds down to a whole number of rows.
 
-Give **one** side and the other is its complement — the two windows partition the data. Give
-**neither** and the split is 75/25. The four spellings below all describe the same idea.
+If you give one size, the other window takes the remaining rows. If you give neither, the
+training window takes 75 % of the rows. The cell prints the window sizes of four calls. A fraction
+rounds down on the side you give, so `test_size = 0.2` and `train_size = 0.8` differ by one
+row.
 =#
 
 N = size(values(X), 1)
@@ -103,17 +103,19 @@ sizes
 #=
 ### 2.2 The embargo
 
-Give **both** sizes and they need not cover the data. The head supplies the training rows, the
-tail supplies the test rows, and anything in between is **embargoed** — it belongs to neither
-window.
+If you give both sizes, the two windows need not cover all the rows. The first rows go to the
+training window, the last rows go to the test window, and the rows between them belong to
+neither. Those rows are the embargo.
 
-That gap is not waste, it is insurance. Financial features are autocorrelated: a return
-computed over a 20-day window straddling the boundary leaks test information into the last
-training row. Dropping the rows around the seam severs that link. (This is the same idea as
-`KFold`'s `purged_size`/`embargo_size`, expressed for a single split.)
+The embargo keeps the last training rows away from the first test rows. Many inputs to a model
+are autocorrelated. A 20-day average return computed on a window that crosses the boundary
+puts test information into the last training rows, and an embargo of 20 rows removes it.
+[`KFold`](@ref) applies the same idea to many folds with its `purged_size` and `embargo_size`
+fields.
 
-Windows that would *overlap* are rejected outright, as is any split that would leave a window
-empty.
+`train_test_split` throws an error when the two windows overlap, and when a window is empty.
+The cell leaves an embargo between a training window of 60 % and a test window of 20 %. Then it
+asks for two windows that overlap and prints the error.
 =#
 
 tr_e, te_e = train_test_split(pr; train_size = 0.6, test_size = 0.2)
@@ -123,7 +125,6 @@ DataFrame(; window = ["train", "embargoed", "test"],
                   N - size(values(tr_e.X), 1) - size(values(te_e.X), 1),
                   size(values(te_e.X), 1)])
 
-## Overlapping windows are a mistake, not a preference:
 try
     train_test_split(pr; train_size = 0.9, test_size = 0.2)
 catch e
@@ -131,31 +132,32 @@ catch e
 end
 
 #=
-## 3. Why the manual composition is a trap
+## 3. The mistake that a manual split allows
 
 Nothing stops you from writing this:
 
 ```julia
-res  = fit(pipe, pr)          ## fitted on EVERYTHING
+#! This fits the pipeline on every row of pr, the test window included.
+res  = fit(pipe, pr)
 pred = predict(res, pr, test_window)
 ```
 
-It runs. It produces a number. And that number is **not out-of-sample** — the pipeline's
-missing-data filter chose its universe using the test rows, and its price fill computed its
-values from them. The call shape is identical to the honest one; only the data the fit saw
-differs. Nothing warns you.
+The code runs and gives a number, but the number is not out of sample. The missing-data filter
+of the pipeline used the test rows to choose its assets, and the price fill computed its values
+from them. The call looks the same as a correct one. Only the rows that the fit saw differ, and
+nothing warns you.
 
-The fix is to make the split part of the workflow, so the fit *cannot* see the test rows.
+To prevent this, make the split part of the workflow, so that the fit cannot see the test rows.
 =#
 
 #=
 ## 4. The split as the first pipeline step
 
-[`TrainTestSplit`](@ref) narrows whichever data slot the pipeline input filled — prices here —
-and hands the training window to every step downstream. It also stashes the held-out window in
-its fitted result, which is what makes the evaluation a one-liner later.
+[`TrainTestSplit`](@ref) cuts the data that you give the pipeline, here the prices, and passes
+the training window to every later step. Its fitted result also keeps the held-out window, which `fit_predict` uses in section 5.
 
-Note the auto-generated step name: `"split"`.
+The step takes the name `"split"` when you give it none. The filter and the gap fill both
+change the prices, so they take the names `"prices_1"` and `"prices_2"`.
 =#
 
 pipe = Pipeline(;
@@ -166,8 +168,7 @@ pipe = Pipeline(;
 pipe.names
 
 #=
-Fitting runs the steps left to right. Everything after the split saw 806 training prices, not
-the 1009 in the sample.
+We fit the pipeline and count the rows at each stage.
 =#
 
 res = fit(pipe, pr)
@@ -175,21 +176,22 @@ res = fit(pipe, pr)
 split_res = res["split"]
 
 DataFrame(;
-          quantity = ["prices in the sample", "prices the workflow was fitted on",
-                      "prices held out", "returns reaching the optimiser"],
+          quantity = ["prices in the sample", "prices in the training window",
+                      "prices held out", "returns the optimiser gets"],
           rows = [N, size(values(split_res.train.X), 1), size(values(split_res.test.X), 1),
                   size(res.ctx.returns.X, 1)])
 
 #=
-### 4.1 The position rule is enforced
+### 4.1 The split must be the first step
 
-A `TrainTestSplit` **must be the first step**. This is not tidiness — it is the entire safety
-argument. A [`MissingDataFilter`](@ref) fitted before the split would choose the asset universe
-using the held-out rows; a [`PriceGapFill`](@ref) fitted before it would compute its fill
-values from them. Their fitted state would carry test information into the training workflow, which is
-exactly the leak the split exists to prevent.
+A `TrainTestSplit` must be the first step, so that every other step is fitted on the training
+window alone. A
+[`MissingDataFilter`](@ref) fitted before the split would use the held-out rows to choose the
+assets. A [`PriceGapFill`](@ref) fitted before it would compute its fill values from them.
+Their fitted state would then depend on the test rows.
 
-So the constructor refuses, rather than letting you find out from a suspiciously good backtest.
+The `Pipeline` constructor therefore throws an error when a split is not the first step. It does the
+same for a split inside a nested pipeline, even when the nested pipeline is the first step.
 =#
 
 try
@@ -201,7 +203,6 @@ catch e
     println(e.msg)
 end
 
-## The same applies to a split hidden inside a nested pipeline:
 try
     inner = Pipeline(; steps = (TrainTestSplit(; test_size = 0.2), PricesToReturns()))
     Pipeline(; steps = (inner, EqualWeighted()))
@@ -210,72 +211,75 @@ catch e
 end
 
 #=
-## 5. The payoff: `fit_predict` scores on the held-out window
+## 5. `fit_predict` scores on the held-out window
 
-For a pipeline carrying a split, [`fit_predict`](@ref) fits on the training rows and predicts
-on the window the split reserved. That is the whole holdout protocol, in one call — and it is
-out-of-sample by construction, because the split is what defined "sample".
+For a pipeline with a split, [`fit_predict`](@ref) fits on the training rows and predicts on
+the rows that the split held out.
 
-For a pipeline *without* a split, `fit_predict` keeps its old meaning and stays in-sample. The
-same call means different things only because the workflows genuinely differ.
+For a pipeline without a split, `fit_predict` predicts on the same data that it fits, so the
+result is in sample. For comparison, we also predict on the training window, in sample.
 =#
 
 pred_test = fit_predict(pipe, pr)
 
-## The in-sample counterpart: replay the fitted workflow on its own training window.
 pred_train = predict(res, split_res.train)
 
 #=
-Both are scored on the *realised portfolio return series*, so the measures must be ones that can
-read a bare return series: `SCM()` is the scoreable spelling of standard deviation
-([`Variance`](@ref) and [`StandardDeviation`](@ref) consume portfolio weights instead — see the
-asset pre-selection example, which hits the same wall).
+We score both predictions on the return series of the portfolio. `expected_risk` on a
+prediction sees only that series. [`Variance`](@ref) and [`StandardDeviation`](@ref) need the
+weights, so they throw an error here, as the cross-validation example explains.
+`SCM()` is the second central moment of the return series, which is its variance.
 =#
 
 DataFrame(; window = ["train (in-sample)", "test (held out)"],
           observations = [length(pred_train.rd.X), length(pred_test.rd.X)],
-          std = [expected_risk(SCM(), pred_train), expected_risk(SCM(), pred_test)],
+          variance = [expected_risk(SCM(), pred_train), expected_risk(SCM(), pred_test)],
           cvar = [expected_risk(ConditionalValueatRisk(), pred_train),
                   expected_risk(ConditionalValueatRisk(), pred_test)])
 
 #=
-The gap between the two rows is the number the whole exercise exists to produce. In-sample risk
-is an estimate the optimiser *minimised*; held-out risk is an estimate it merely *inherited*.
-The first is optimistic by construction. Only the second is evidence.
+The difference between the two rows is what a holdout measures. The in-sample risk comes from
+the rows on which the optimiser minimised the variance. The held-out risk comes from rows that
+the fit never saw. Here both held-out values are lower than the in-sample values, so on this
+window the in-sample risk did not understate the held-out risk. A holdout gives you one such
+comparison, and a different window can give the opposite result.
+
+The next table gives the weights. They cover the assets of the training window, and the test
+prediction uses the same assets.
 =#
 
-## The weights are indexed by the training universe, and the test prediction is aligned to them.
 DataFrame(; asset = res.ctx.returns.nx, weight = res.w)
 
 #=
-## 6. Replaying a fitted split on new data is a pass-through
+## 6. A fitted split returns new data unchanged
 
-A fitted holdout's rows are a fact about the *fitting* window. Replaying them on some unseen
-window would be meaningless, so [`apply_preprocessing`](@ref) on a
-[`TrainTestSplitResult`](@ref) passes the data straight through.
+The rows of a fitted holdout belong to the window that it was fitted on. They mean nothing on
+another window, so [`apply_preprocessing`](@ref) on a [`TrainTestSplitResult`](@ref) returns
+the data unchanged.
 
-That is what keeps the ordinary workflow — fit on history, predict on genuinely new
-observations — working. Every *other* fitted step still replays properly: the training asset
-universe, the training fill values, the returns conversion. Only the split stands aside.
+You can therefore still fit on the history and predict on new rows. Every other fitted step still
+applies its state, such as the training assets, the training fill values and the conversion to
+returns. Only the split does nothing. We treat the last 41 prices as data that arrived after
+the fit.
 =#
 
-## Pretend the last 40 rows are data that arrived after the model was built.
 future = PricesResult(; X = X[(end - 40):end])
 pred_future = predict(res, future)
 
 DataFrame(; source = ["held-out window (fit_predict)", "fresh data (predict)"],
           observations = [length(pred_test.rd.X), length(pred_future.rd.X)],
-          std = [expected_risk(SCM(), pred_test), expected_risk(SCM(), pred_future)])
+          variance = [expected_risk(SCM(), pred_test), expected_risk(SCM(), pred_future)])
 
 #=
 ## 7. One evaluation protocol per call
 
-A holdout and a cross-validator are two answers to the same question, and they do not compose.
-Cross-validation already defines the train and test window of *every fold*; a split left in the
-pipeline would shave a second, redundant holdout off each fold's training data and stash a test
-window nobody ever reads.
+A holdout and cross-validation both choose the rows to test on, and you cannot use both at
+once. Cross-validation already defines the training window and the test window of every fold.
+A split left in the pipeline would cut a second holdout off the training data of every fold,
+and it would keep a test window that nothing uses.
 
-That is silent loss of training data, so the library refuses it rather than quietly doing it.
+The pipeline would lose training data with no warning. `search_cross_validation` therefore
+throws an error for a pipeline with a split.
 =#
 
 gscv = GridSearchCrossValidation(Dict("returns" =>
@@ -290,8 +294,8 @@ catch e
 end
 
 #=
-Drop the split and the same pipeline tunes happily — cross-validation supplies the discipline
-the split was providing.
+Without the split, the same pipeline tunes with no error, and cross-validation chooses the test
+rows.
 =#
 
 pipe_cv = Pipeline(;
@@ -306,27 +310,28 @@ scv_res.idx
 #=
 ## 8. Choosing between them
 
-|                | Holdout (`TrainTestSplit`)              | Cross-validation                          |
-|:---------------|:----------------------------------------|:------------------------------------------|
-| Fits           | one                                     | one per fold                              |
-| Answers        | *does this survive unseen data?*        | *how does this behave across regimes?*    |
-| Test rows      | the most recent tail, once              | every row, in turn                        |
-| Use it for     | a final, honest score on a locked model | selecting hyperparameters, estimating variance of the estimate |
+|                | Holdout, `TrainTestSplit`                  | Cross-validation                             |
+|:---------------|:-------------------------------------------|:---------------------------------------------|
+| Fits           | one                                        | one per fold                                 |
+| Answers        | *how does the model do on rows it never saw?* | *how does the model do over many windows?* |
+| Test rows      | the most recent rows, once                 | every row, in turn                           |
+| Use it for     | a last score of a model you no longer change | choosing parameters, and seeing how much the score varies |
 
-The holdout is a **verdict**, not a search tool. Tune with cross-validation, and keep the
-holdout untouched until the model is frozen — the moment you tune *against* the held-out score,
-it stops being held out, and you are back to reporting an in-sample number with extra steps.
+Tune with cross-validation, and do not look at the
+held-out score until the model is fixed. If you tune against the held-out score, the held-out
+rows become part of the fit, and the score is in sample again.
 
 ## Summary
 
-  - [`train_test_split`](@ref) cuts data into a head (train) and a tail (test); one size given
-    makes the other its complement, both given **embargoes** the rows between them.
-  - [`TrainTestSplit`](@ref) makes that the **first step** of a [`Pipeline`](@ref), so every
-    fitted step downstream — universe selection, imputation, prior, optimiser — sees the
-    training window alone. The position rule is enforced at construction.
-  - [`fit_predict`](@ref) on a split-bearing pipeline scores on the held-out window; the split's
-    fitted result carries both windows (`res["split"].train`, `res["split"].test`).
-  - Replaying a fitted split is a pass-through, so predicting on genuinely new data still works.
-  - A pipeline carrying a holdout cannot also be cross-validated: one evaluation protocol per
+  - [`train_test_split`](@ref) cuts data into its first rows for training and its last rows
+    for testing. If you give one size, the other window takes the rest. If you give both, the
+    rows between the two windows are an embargo.
+  - [`TrainTestSplit`](@ref) is the first step of a [`Pipeline`](@ref), so the asset filter,
+    the gap fill, the prior and the optimiser after it see only the training window. The
+    `Pipeline` constructor throws an error for a split in any other position.
+  - [`fit_predict`](@ref) on a pipeline with a split scores on the held-out window. The fitted
+    result of the split keeps both windows, `res["split"].train` and `res["split"].test`.
+  - A fitted split returns new data unchanged, and a prediction on new rows still works.
+  - Cross-validation throws an error for a pipeline with a split. Use one of the two per
     call.
 =#

@@ -63,7 +63,7 @@ The ticket named both, and both are defensible.
 Reading 2 explains why `me` is an estimator field rather than a `mean` keyword, so it is not a straw
 man. Three measurements decide between them.
 
-**The library's own weight channel already reads reading 1.** [`factory`](../../src/02_Tools.jl)
+**The library's own weight channel already reads reading 1.** [`factory`](../../src/02_Tools/04_Factory.jl)
 replaces a `@wprop`-tagged field at **every level of the tree at once**, so `factory(ve, w)` writes
 `w` into `ve.w` and into `ve.me.w` together. Every weighted call site inside the library reaches the
 estimator through `factory`, so every one of them already held a weighted centre. Only a hand-built

@@ -4,42 +4,51 @@ Description = "Price ingestion, public API of PortfolioOptimisers.jl: PriceInges
 
 # Price ingestion
 
-## The ingestion layer
+## From raw prices to a prices result
 
-[`PriceIngestion`](@ref) assembles raw price series into the carrier the conversion reads. It runs
-**once on the whole panel** and is deliberately not a [`Pipeline`](@ref) step: unification of the
-two absent-price conventions, the factor and benchmark join, and the frequency collapse each move
-or renumber the observations, folds are cut once on the carrier's clock, and a hyperparameter that
-changes the test set cannot be scored against one that does not. Running outside the `Pipeline` is
-also what lets the **Span Rule** read the whole panel, which a step — seeing only a window — cannot.
+[`PriceIngestion`](@ref) turns raw price series into the `PricesResult` that the conversion to
+returns reads. It runs once, on the whole history, and it is not a [`Pipeline`](@ref) step. It also
+spells every absent price, `missing` or a non-finite number, as `NaN`. Two of its steps change
+the observations themselves. It joins the factor and benchmark series to the prices, and it can
+collapse the data to a lower frequency. Cross-validation cuts its folds once, on the
+observations of the result, so a step that adds, removes or renumbers observations cannot run
+inside a fold. A hyperparameter that changed the test window would also give scores that you
+cannot compare. Because it sees the whole history, `PriceIngestion` also finds the listing span of
+each asset from all of its prices. A step inside a pipeline sees one window, which does not show
+whether an asset is listed before or after it.
 
-The carrier it emits holds the Listing Span in its `span` field. [`PricesToReturns`](@ref) projects
-that onto the returns clock and hands the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) stating
-the universe — **always**, a gapless panel included, so `pnl === nothing` on a returns carrier means
-one thing only: the carrier was not built by the layer. The gapless case costs nothing to say: both
-masks become a [`PortfolioOptimisers.AllTrueMask`](@ref), which stores no cell.
+The result holds the listing span of each asset in its `span` field. [`PricesToReturns`](@ref)
+moves the spans onto the dates of the returns and gives the [`ReturnsResult`](@ref) an
+[`AssetPanel`](@ref) that states the universe. It does so even when no price is missing, so a
+`ReturnsResult` with `pnl === nothing` did not come from `PriceIngestion`. When no price is
+missing, both universe masks are a [`PortfolioOptimisers.AllTrueMask`](@ref), which stores no
+cells.
 
-The layer spells an absent price `NaN`, which is the library's one spelling for absence, and the
-conversion carries it into the returns rather than deleting the observation or the asset that holds
-one. A carrier the layer did not build states no span, and then no universe: the conversion does not
-guess one from the window, because a delisting straddling the window end reads there as an asset
-that was never listed. See
-`docs/adr/0129-the-ingestion-layer-seams-at-the-listing-span-and-the-clock-draws-the-pipeline-boundary.md`
-and
-`docs/adr/0132-the-layer-emits-one-carrier-and-alignment-splits-into-a-fixed-axis-and-a-provenance-check.md`.
+`PriceIngestion` writes an absent price as `NaN`, the one value the library uses for a missing
+number. The conversion to returns keeps it as a `NaN` return, and deletes neither the observation
+nor the asset. A `PricesResult` that `PriceIngestion` did not build has no spans, so the conversion
+gives its returns no universe. The conversion does not guess a universe from one window.
 
-**The asset table states the clock.** Under the default `join_method = :left` the factor,
-benchmark and implied-volatility series are aligned to the asset clock and padded `NaN` where they
-are silent, so `timestamp(pr.X) == timestamp(X)` unless `collapse_args` is non-empty; `:outer` and
-`:inner` stay reachable. What the join padded is named — which table, how many observations, which
-columns — warning by default and refusing under `strict`. The value type the carrier holds is
-derived from the series rather than named: a `Float32` panel stays `Float32`, `Float32` beside
-`Float64` joins in `Float64`, an integer panel takes the floating-point type the return arithmetic
-gives it, and a type that cannot spell an absence is refused by name at the first gap it would have
-to spell. An absent implied volatility is carried like an absent price, and
-[`ImpliedVolatility`](@ref) narrows its Coverage Universe to the columns whose implied
-volatilities are complete. See
-`docs/adr/0135-the-asset-table-states-the-clock-and-the-layer-carries-every-absence-and-names-it.md`.
+The asset prices set the observation dates. With the default `join_method = :left`,
+`PriceIngestion` aligns the factor, benchmark and implied-volatility series to the dates of the
+asset prices, and writes `NaN` where a series has no value. The result then has the timestamps of
+the asset prices, `timestamp(pr.X) == timestamp(X)`, unless `collapse_args` is non-empty. The
+`:outer` join keeps the union of the dates, and the `:inner` join keeps their intersection.
+`PriceIngestion` reports every observation it padded, with the table, the number of observations
+and the columns. It warns by default, and throws an error when `strict` is set.
+
+A collapse puts the observations of one period into one row. A time-varying [`AssetPanel`](@ref)
+then takes the values of the last observation of each period, whatever timestamp function
+`collapse_args` names. With `collapse_args = (week, first, last)`, the prices and the panel values
+of a week both come from its last day.
+
+The element type of the result comes from the input series. A `Float32` panel stays `Float32`,
+`Float32` next to `Float64` gives `Float64`, and an integer panel takes the floating-point type of
+its returns. A type that has no value for an absent number throws an error that names the type.
+The error comes at a gap, before a join that can pad, and when `PriceIngestion` aligns the implied
+volatilities, even if the join or the alignment then pads nothing. An absent implied volatility
+is kept like an absent price, and [`ImpliedVolatility`](@ref) then fits only on the columns whose
+implied volatilities have no gaps.
 
 ## Types
 

@@ -1,18 +1,19 @@
 """
     CodeHealth
 
-Shared machinery for the four code-health entry scripts, `complexity.jl`, `expansion.jl`, `jet.jl`
-and `coverage.jl`. It reads and writes the generated TOML files, compares provenance, applies the
-ratchet, pairs renames, and renders a failure for a terminal and for GitHub Actions.
+Shared machinery for the code-health entry scripts, `complexity.jl`, `expansion.jl`, `jet.jl`,
+`coverage.jl`, `size.jl` and `perf.jl`. It reads and writes the generated TOML files, compares
+provenance, applies the ratchet, pairs renames, and renders a failure for a terminal and for GitHub
+Actions.
 
-The decisions this module implements are recorded in ADRs 0071 to 0077 and ADR 0082 under
-`docs/adr/`. The maintenance procedure that calls it is `docs/src/contribute/3-code-health.md`.
+The decisions this module implements are recorded in ADRs 0071 to 0077, ADR 0082 and ADR 0175
+under `docs/adr/`. The maintenance procedure that calls it is `docs/src/contribute/3-code-health.md`.
 """
 module CodeHealth
 
 using TOML
 
-export Definition, Reviewed, Rise, RefreshRefused, run_script
+export Definition, Reviewed, Finding, Rise, RefreshRefused, run_script
 
 # --- what one measurement says about one definition -------------------------
 #
@@ -52,6 +53,25 @@ struct Reviewed
     line::Int
 end
 
+"""
+    Finding
+
+One performance trap, as `code_health/perf.jl` measures it and the scheduled job reports it: the
+file and line, the rule, the definition that holds it, the code of the flagged expression as
+`string` prints it, and the replacement `perf.jl scan` offers.
+
+The Performance Fingerprint is `(file, rule, definition, code)`. It carries no line, so a Dismissal
+survives an edit above it, and `code` is the printed `Expr`, so it survives a reformat. ADR 0175.
+"""
+struct Finding
+    file::String
+    line::Int
+    rule::String
+    definition::String
+    code::String
+    hint::String
+end
+
 # --- paths and scope -------------------------------------------------------
 
 const DIR = @__DIR__
@@ -77,11 +97,14 @@ The measured roots of ADR 0072. A tracked `.jl` file outside them must be a name
 const MEASURED_ROOTS = ("src/", "ext/")
 
 """
-The four files that declare a Declaration Macro, per ADR 0072.
+The files that declare a Declaration Macro, per ADR 0072. `src/02_Tools.jl` and
+`src/17_Optimisation/01_Base_Optimisation.jl` became directories (ADR 0179), so each names the
+part that holds its macros.
 """
-const DECLARING_FILES = ("src/01_Base/03_PrettyShow.jl", "src/02_Tools.jl",
+const DECLARING_FILES = ("src/01_Base/03_PrettyShow.jl", "src/02_Tools/05_Propagatable.jl",
+                         "src/02_Tools/06_ForwardProperties.jl",
                          "src/05_Moments/01_Base_Moments.jl",
-                         "src/17_Optimisation/01_Base_Optimisation.jl")
+                         "src/17_Optimisation/01_Base_Optimisation/02_PipeRouting.jl")
 
 in_scope(path::AbstractString) = any(r -> startswith(path, r), MEASURED_ROOTS)
 
@@ -516,7 +539,8 @@ the Expansion Bound's key set needs.
 
 `declaring` is the set of files searched for a declaration. It is a parameter for the same reason
 `root` is: a fixture tree holds no `src/01_Base.jl`, so a hard-coded list admits only the live
-checkout. The default is ADR 0072's four files.
+checkout. The default is `DECLARING_FILES`: ADR 0072's four files, with the two that became
+directories named by the part that holds their macros.
 """
 function declaration_macros(files; root = REPO_ROOT, declaring = DECLARING_FILES)
     declared = Set{String}()
@@ -854,6 +878,7 @@ function check_rationale_citations(rulings)
     known = Set(keys(get(rulings, "rationale", Dict{String, Any}())))
     bad = String[]
     for (kind, entries) in (("dismissal", get(rulings, "dismissal", [])),
+                            ("perf_dismissal", get(rulings, "perf_dismissal", [])),
                             ("exemption", get(rulings, "exemption", [])),
                             ("coverage_exemption", get(rulings, "coverage_exemption", [])))
         for e in entries

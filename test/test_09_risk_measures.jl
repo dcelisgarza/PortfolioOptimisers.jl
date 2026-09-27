@@ -498,6 +498,22 @@
         # per-period constant, and the model carries no fee term either.
         @test r(w, rd.X, Fees(; l = 0.001)) == r(w, rd.X)
     end
+    @testset "`factory` keeps a `Skewness`'s settings (#1293)" begin
+        # `factory(::Skewness, ...)` rebuilt the measure without its `settings`, so after
+        # `factory` the skewness term of a `VarianceSkewKurtosis` had scale 1 and no floor.
+        # The model used the stated scale, so the result stored a measure the model did not
+        # use, and its functor reported the skewness term at the wrong scale.
+        st = MaxRiskMeasureSettings(; scale = 2.0, lb = 0.5)
+        @test factory(Skewness(; settings = st), pr).settings === st
+        @test factory(Skewness(; settings = st, sk = pr.sk), pr.pr).settings === st
+
+        # `VarianceSkewKurtosis` turns off each child's `rke`, and keeps its `scale` and `lb`.
+        r = factory(VarianceSkewKurtosis(; sk = Skewness(; settings = st)), pr)
+        @test r.sk.settings === MaxRiskMeasureSettings(; rke = false, scale = 2.0, lb = 0.5)
+        w2 = kron(w, w)
+        @test isapprox(r(w, rd.X),
+                       dot(w, pr.sigma, w) - 2 * dot(w, pr.sk, w2) + dot(w2, pr.kt, w2))
+    end
     @testset "The weighted even moment weights observations linearly (#351)" begin
         # `moment_risk` computed `norm(val .* r.w, 2p)`, which raises each observation
         # weight to the power `2p`. The `JuMP` model attains `(sum w_t d_t^(2p) / T_d)^(1/p)`,
@@ -741,5 +757,36 @@
               PO.rolling_window_measure(rws, w, rd.X, nothing, 20)
         @test PO.rolling_window_measure(rws, U, rd.X, nothing, 20; sca = MaxScalariser()) !=
               PO.rolling_window_measure(rws, U, rd.X, nothing, 20)
+    end
+    @testset "The power-norm measure is the largest loss under its condition (#1282)" begin
+        rng = StableRNG(1282)
+        r = PowerNormValueatRisk(; slv = slv)
+        # alpha * T^(1/p) = 0.05 * sqrt(252) < 1: the value is the largest loss. The
+        # docstring states the condition, and the measure does not warn.
+        x = randn(rng, 252)
+        v = @test_logs min_level = Logging.Warn r(x)
+        @test isapprox(v, maximum(-x); rtol = 1e-5)
+        # alpha * T^(1/p) = 0.05 * sqrt(401) > 1 with no tie: a smaller value.
+        x = randn(rng, 401)
+        @test r(x) < maximum(-x)
+        # A tie of two observations at the largest loss doubles its probability, and
+        # 0.05 * (800 / 2)^(1/2) = 1 is on the boundary.
+        x = randn(rng, 800)
+        x[1:2] .= minimum(x) - 1
+        @test isapprox(r(x), maximum(-x); rtol = 1e-5)
+        # A frequency weight of two on the largest loss acts as the same tie.
+        x = randn(rng, 500)
+        k = ones(Int, 500)
+        k[argmin(x)] = 2
+        rw = PowerNormValueatRisk(; slv = slv, w = fweights(k))
+        @test isapprox(rw(x), maximum(-x); rtol = 1e-5)
+        @test r(x) < maximum(-x)
+        # An observation of zero weight carries no probability, so the second largest loss
+        # sets the value.
+        x = randn(rng, 252)
+        q = ones(252)
+        q[argmin(x)] = 0
+        rw = PowerNormValueatRisk(; slv = slv, w = pweights(q))
+        @test isapprox(rw(x), sort(-x; rev = true)[2]; rtol = 1e-5)
     end
 end

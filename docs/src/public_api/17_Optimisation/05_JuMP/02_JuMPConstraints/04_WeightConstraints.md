@@ -4,4 +4,4 @@ Description = "Weight Constraints has no public API in PortfolioOptimisers.jl; i
 
 # Weight Constraints
 
-Weight Constraints has no public API in PortfolioOptimisers.jl; see [Weight Constraints: private API](../../../../private_api/17_Optimisation/05_JuMP/02_JuMPConstraints/04_WeightConstraints.md) for its private API.
+Every name of this topic is private. The [private page](@ref private-api-weight-constraints) documents them.

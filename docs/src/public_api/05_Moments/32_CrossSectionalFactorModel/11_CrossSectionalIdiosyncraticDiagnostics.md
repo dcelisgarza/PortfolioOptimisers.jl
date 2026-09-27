@@ -16,3 +16,10 @@ idio_vol_ic
 idio_vol_residual_dependence
 idio_calibration_summary
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

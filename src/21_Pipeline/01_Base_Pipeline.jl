@@ -7,8 +7,6 @@ A pipeline reifies an end-to-end workflow — price preprocessing, prices-to-ret
 
 All concrete pipeline estimators should subtype `AbstractPipelineEstimator`.
 
-See `docs/adr/0028-pipeline-workflow-estimator.md` for the design rationale.
-
 # Related
 
   - [`AbstractEstimator`](@ref)

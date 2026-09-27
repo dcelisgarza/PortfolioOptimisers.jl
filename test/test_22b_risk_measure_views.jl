@@ -81,12 +81,13 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
                                    opto = MeanRisk(; r = ValueatRisk(),
                                                    opt = JuMPOptimiser(; slv = mip_slv))),
                    rd)
+    # The derived big-M constant of #1323 moved these weights. The old ones held a VaR of
+    # 0.013824, and these hold 0.013200, because b = 1000 stopped the second cluster short.
     @test isapprox(res.w,
-                   [0.0, 0.0, 0.05185452300759591, 0.011033389567697087, 0.0, 0.0,
-                    0.07030782696268922, 0.21987054724580155, 0.056990122442879244,
-                    0.20922287906742792, 0.0, 0.19272555326079038, 0.00357686646553502,
-                    0.05051771647808476, 0.0, 0.0, 0.0, 0.0, 0.09783965575644371,
-                    0.036060919745055015], rtol = 1e-6)
+                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.32515447570275585, 0.0,
+                    0.3086086955000851, 0.04387217515833515, 0.1125361601310135, 0.0, 0.0,
+                    0.08740615267221835, 0.0, 0.0, 0.0, 0.12242234083559198, 0.0],
+                   rtol = 1e-6)
     res = optimise(NestedClustered(; cle = clr,
                                    opti = MeanRisk(; r = DrawdownatRisk(),
                                                    opt = JuMPOptimiser(; pe = pr,

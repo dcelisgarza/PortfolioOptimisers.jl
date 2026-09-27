@@ -1,5 +1,5 @@
 ```@meta
-Description = "Exponentially Weighted Expected Returns, private API of PortfolioOptimisers.jl: ExpWeightedExpectedReturnsState, process_observation!, exp_weighted_pass!, …"
+Description = "Exponentially Weighted Expected Returns, private API of PortfolioOptimisers.jl: ExpWeightedExpectedReturnsState, decay_half_life, process_observation!, …"
 ```
 
 # Exponentially Weighted Expected Returns: private API
@@ -13,6 +13,7 @@ ExpWeightedExpectedReturnsState
 ## Functions
 
 ```@docs
+decay_half_life
 process_observation!(cache::ExpWeightedExpectedReturnsState, me::ExpWeightedExpectedReturns, X::VecNum, active_mask::Option{<:AbstractVector{<:Bool}})
 exp_weighted_pass!(f, est::ExpWeightedExpectedReturns, X::MatNum, dims::Int, active_mask::Option{<:AbstractMatrix{<:Bool}}, state::Option{<:ExpWeightedExpectedReturnsState} = nothing)
 exp_weighted_pass!(est::ExpWeightedExpectedReturns, X::MatNum, dims::Int, active_mask::Option{<:AbstractMatrix{<:Bool}}, state::Option{<:ExpWeightedExpectedReturnsState} = nothing)

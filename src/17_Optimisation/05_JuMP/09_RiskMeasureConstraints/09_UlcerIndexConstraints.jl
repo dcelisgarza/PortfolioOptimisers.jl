@@ -41,8 +41,8 @@ where ``dd_t`` is the portfolio drawdown at time ``t``.
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::UlcerIndex,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     # The pre-migration guard tested `:uci` but returned `:uci_risk`; the two are always
     # registered together in this block, so keying the memo on the returned entry is
     # equivalent.

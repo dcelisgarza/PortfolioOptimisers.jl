@@ -533,6 +533,48 @@ end
                                       rdk))
 end
 
+@testset "Schur Complement HRP carries its fee, as Hierarchical Risk Parity does (#1296)" begin
+    fees = Fees(; l = fill(0.001, N), s = fill(0.002, N))
+    feesk = Fees(; l = fill(0.001, length(keep)), s = fill(0.002, length(keep)))
+    hopt = HierarchicalOptimiser(; pe = prn, fees = fees)
+    hrp = optimise(HierarchicalRiskParity(; opt = hopt), rd)
+    ps = [SchurComplementParams(; gamma = 0.5), SchurComplementParams(; gamma = 0.25)]
+    for sh in (SchurComplementHierarchicalRiskParity(; opt = hopt),
+               SchurComplementHierarchicalRiskParity(; params = ps, opt = hopt))
+        res = optimise(sh, rd)
+        # The fee sits on the reduced universe, marked with the mask, as the HRP fee does.
+        @test res.fees.imsk == res.imsk == hrp.fees.imsk
+        @test collect(res.fees.l) == collect(hrp.fees.l) == feesk.l
+        @test collect(res.fees.s) == feesk.s
+        # The net returns are net of the fee.
+        @test calc_net_returns(res, X) ≈ calc_net_returns(res.w[keep], X[:, keep], feesk)
+        # The allocation reads no fee: a variance is not moved by it.
+        ref = optimise(SchurComplementHierarchicalRiskParity(; params = sh.params,
+                                                             opt = HierarchicalOptimiser(;
+                                                                                         pe = prn)),
+                       rd)
+        @test res.w == ref.w
+        @test isnothing(ref.fees)
+    end
+    # A forced exit rides on the result, where the fold charges it, as it does for HRP.
+    lqf = Fees(; l = fill(0.001, N), lq = Turnover(; w = fill(0.2, N), val = 0.01))
+    lopt = HierarchicalOptimiser(; pe = prn, fees = lqf)
+    res = optimise(SchurComplementHierarchicalRiskParity(; opt = lopt), rd)
+    ref = optimise(HierarchicalRiskParity(; opt = lopt), rd)
+    @test !isnothing(res.fees.lq)
+    @test collect(res.fees.lq.w) == collect(ref.fees.lq.w)
+    # The all-investable path carries the fee too, and the net returns net it.
+    res = optimise(SchurComplementHierarchicalRiskParity(;
+                                                         opt = HierarchicalOptimiser(;
+                                                                                     pe = pr,
+                                                                                     fees = fees)),
+                   rd)
+    @test isnothing(res.imsk)
+    @test res.fees.l == fees.l
+    @test !(calc_net_returns(res, X) ≈ X * res.w)
+    @test calc_net_returns(res, X) ≈ calc_net_returns(res.w, X, fees)
+end
+
 @testset "Nested Clustered reduces once, and the cluster slice indexes the reduced axis" begin
     # The reduction happens before the clustering, so no cluster holds a non-investable
     # asset and every `port_opt_view(opti, cl, X)` below indexes the reduced universe.
@@ -625,6 +667,10 @@ end
     @test_throws ArgumentError UniverseSets(;
                                             dict = Dict("nx" => ["a", "b", "c"],
                                                         "ni" => ["c"]))
+    # The message counts the names on both axes.
+    @test_throws "2 name(s) are on both" UniverseSets(;
+                                                      dict = Dict("nx" => ["a", "b", "c"],
+                                                                  "ni" => ["b", "c", "d"]))
     # The seventh prefix joins the mutual-exclusion grammar.
     @test_throws ArgumentError UniverseSets(; xkey = "ni", nikey = "n",
                                             dict = Dict("ni" => ["a", "b"]))
@@ -1698,4 +1744,39 @@ end
         other = PO.investable_fees_view(fees, BitVector([0, 1, 1, 1, 1]), N)
         @test_throws ArgumentError PO.result_investable_view(res, nothing, other)
     end
+end
+
+@testset "A precomputed fallback result ends the chain as the answer" begin
+    # The `fb` field of an estimator admits a precomputed result. `optimise` called
+    # `_optimise` on it and raised a MethodError, because no method solves a result.
+    rd3 = ReturnsResult(; nx = ["A", "B", "C"], X = randn(StableRNG(3), 10, 3))
+    pre = optimise(EqualWeighted(), rd3)
+    slv0 = Solver(; name = :none, solver = nothing)
+    mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv0), fb = pre)
+    res = optimise(mr, rd3)
+    @test isa(res, NaiveOptimisationResult)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test res.w == pre.w
+    @test length(res.fb) == 1
+    @test res.fb[1][1] === mr
+    @test isa(res.fb[1][2].retcode, OptimisationFailure)
+    # A failed precomputed result is still the answer: nothing follows it.
+    failed = optimise(PreviousWeights(), rd3)
+    res = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv0), fb = failed), rd3)
+    @test isa(res.retcode, OptimisationFailure)
+    @test all(isnan, res.w)
+    @test length(res.fb) == 1
+    # Its own chain is replaced by the chain of this walk, and not walked.
+    chained = PortfolioOptimisers.factory(failed, [(EqualWeighted(), pre)])
+    res = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv0), fb = chained), rd3)
+    @test isa(res.retcode, OptimisationFailure)
+    @test length(res.fb) == 1
+    @test isa(res.fb[1][1], MeanRisk)
+    # The result may sit behind an estimator fallback.
+    res = optimise(PreviousWeights(; fb = pre), rd3)
+    @test isa(res.retcode, OptimisationSuccess)
+    @test res.w == pre.w
+    # A result has no estimator to refit, so both meta-optimiser checks pass it.
+    @test isnothing(PortfolioOptimisers.assert_internal_optimiser(pre))
+    @test isnothing(PortfolioOptimisers.assert_external_optimiser(pre))
 end

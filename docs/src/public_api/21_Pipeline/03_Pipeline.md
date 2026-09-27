@@ -4,7 +4,7 @@ Description = "PortfolioOptimisers pipeline, public API of PortfolioOptimisers.j
 
 # PortfolioOptimisers pipeline
 
-The `Pipeline` estimator reifies an end-to-end workflow — data preparation, prior estimation, phylogeny, uncertainty sets, constraint generation, and optimisation — as an ordered list of steps fitted as a single unit. Computed slots override the terminal optimiser's internal configuration; absent steps fall back to what the optimiser computes internally.
+The `Pipeline` estimator fits a list of steps as one estimator. The steps can be data preparation, prior estimation, phylogeny, uncertainty sets, constraint generation and optimisation. What a step computes replaces the matching setting of the optimiser at the end of the pipeline. For each step that the pipeline does not have, the optimiser computes the value itself, as it does outside a pipeline.
 
 ```@docs
 Pipeline
@@ -18,7 +18,7 @@ implicit_constraint_target
 
 ## Holdout splitting
 
-A [`TrainTestSplit`](@ref) step reserves a held-out test window before any other step runs. It is pinned to the **first** position — a stateful step fitted before it would have seen the held-out rows — and excludes cross-validation, which defines its own train/test windows. `fit_predict(pipe, data)` predicts on the window the split reserved.
+A [`TrainTestSplit`](@ref) step keeps a test window aside before any other step runs. It must be the first step, because a fitted step before it would see the rows of the test window. You cannot use it with cross-validation, which makes its own training and test windows. `fit_predict(pipe, data)` predicts on the test window that the split kept aside.
 
 ```@docs
 PortfolioOptimisers.assert_split_position

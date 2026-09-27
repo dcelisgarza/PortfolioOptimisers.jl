@@ -4,7 +4,7 @@ Description = "Cross-Sectional Factor Prior, public API of PortfolioOptimisers.j
 
 # Cross-Sectional Factor Prior
 
-A cross-sectional factor prior estimates a point-in-time factor model from an [`AssetPanel`](@ref) and lifts it onto the assets, returning a [`CrossSectionalFactorModel`](@ref) in the `rr` slot of its [`LowOrderPrior`](@ref).
+A cross-sectional factor prior fits a factor model at each observation from the exposures in an [`AssetPanel`](@ref), and turns the model into moments of the assets. It returns a [`LowOrderPrior`](@ref) whose `rr` field holds the fitted [`CrossSectionalFactorModel`](@ref).
 
 ```@docs
 CrossSectionalFactorPrior

@@ -1,36 +1,33 @@
-# Renders the Capability Catalogue page from `capability_catalogue.jl` (ADR 0040).
+# Writes the Capability Catalogue page, `docs/src/capability_catalogue.md`, from
+# `capability_catalogue.jl` (ADR 0040).
 #
-# The catalogue file curates only the *grouping*. Each `Cap`'s one-line
-# description is resolved here, at build time, from the first sentence of the
-# first paragraph of its leading name's docstring -- the paragraph that follows
-# `$(DocStringExtensions.TYPEDEF)`. That convention holds for every documented
-# type in the package and is what lets the page carry prose without keeping a
-# second copy of it; see `docs/src/contribute/` for the contributor-facing rule.
+# The catalogue file holds the grouping alone. For each `Cap`, this file takes the one-line
+# description at build time from the docstring of the first name. The description is the first
+# sentence of the paragraph after `$(DocStringExtensions.TYPEDEF)`. So the page has a
+# description for each type with no second copy of it. `docs/src/contribute/2-developer.md`
+# states the rule for a contributor, and `summary_paragraph` fails the build when a docstring
+# does not follow it.
 #
-# Resolving via `Base.Docs.doc` rather than by reading source text means the
-# `$(TYPEDEF)` / `$(FIELDS)` interpolations are already expanded, so the first
-# `Markdown.Paragraph` in the rendered docstring is the summary. Reading the raw
-# string would instead hand back the uninterpolated `$(...)` expressions.
+# This file reads the docstring with `Base.Docs.doc` and not from the source text. `Base.Docs.doc`
+# gives the docstring with the `$(TYPEDEF)` and `$(FIELDS)` interpolations expanded, so the first
+# `Markdown.Paragraph` is the summary. The source text gives the `$(...)` expressions unexpanded.
 #
-# Rendering notes (Documenter's HTML writer) -- see also
-# `generate_type_hierarchy.jl`, which shares this page's constraints:
-#   * A collapsible group is a raw-HTML `<details>`, NOT a `!!! details`
-#     admonition. Two reasons. The Markdown parser accepts a quoted title only
-#     (`!!! details "Title"`), and it renders that title as plain text, so the
-#     head would lose its `@ref` links. Writing the `<details>` / `<summary>`
-#     tags in `@raw html` blocks and leaving the head and the body as ordinary
-#     markdown between them keeps every link live. The page used the unquoted
-#     `- !!! details <head>` form before, which Documenter renders as literal
-#     prose rather than a disclosure.
-#   * A `@raw html` block is a fence, so it cannot sit inside a list item. Each
-#     group therefore breaks out of the enclosing list, and the list nesting is
-#     restored with `margin-left`. The value is `(indent + 2)em`, because the
-#     theme gives `.content ul` a 2em margin per nesting level and `indent`
-#     counts two spaces per level. The group's own children then restart at
-#     indent 0 inside the `<details>`, so the margins compose. See
+# Notes on Documenter's HTML writer. `generate_type_hierarchy.jl` has the same constraints.
+#   * A group that a reader can collapse is a raw HTML `<details>` block, not a `!!! details`
+#     admonition. The Markdown parser accepts only a quoted title, `!!! details "Title"`, and
+#     renders it as plain text, so the head of the group would lose its `@ref` links. The
+#     unquoted form `- !!! details <head>`, which the page used before, renders as literal text
+#     and not as a block that collapses. So the script writes the `<details>` and `<summary>`
+#     tags in `@raw html` blocks, and the head and the body stay ordinary markdown between them.
+#     Every link then resolves.
+#   * A `@raw html` block is a fence, and a fence cannot go inside a list item. Each group therefore
+#     ends the list around it, and a `margin-left` gives back the indent of the list. The value
+#     is `(indent + 2)em`, because the theme gives `.content ul` a margin of 2em per level of
+#     nesting, and `indent` counts two spaces per level. The children of the group start again
+#     at indent 0 inside the `<details>`, so the margins add up. See
 #     `docs/src/assets/generated-pages.css`.
-#   * `@ref` links must not sit inside a code fence, so everything else here is
-#     plain markdown.
+#   * The rest of the page is plain markdown, because an `@ref` link does not resolve inside
+#     a code fence.
 
 using PortfolioOptimisers, Markdown, InteractiveUtils
 
@@ -41,11 +38,10 @@ const _PAGE_TITLE = "Capability catalogue"
 """
     summary_sentence(name) -> String
 
-The first sentence of `name`'s docstring summary paragraph.
+The first sentence of the summary paragraph of the docstring of `name`.
 
-Errors rather than falling back to a placeholder: a capability with no usable
-summary is a docstring bug, and silently rendering an empty bullet would hide
-exactly the kind of gap this page exists to prevent.
+Throws an error when the docstring has no summary, and writes no placeholder. A capability with
+no summary is a defect of its docstring, and an empty bullet on the page would hide that defect.
 """
 function summary_sentence(name::Union{Symbol, String})
     para = summary_paragraph(name)
@@ -62,10 +58,10 @@ function summary_paragraph(name::Union{Symbol, String})
     if isnothing(para)
         error("""capability_catalogue: `$name` has no summary paragraph.
 
-               Every type docstring must open with `\$(DocStringExtensions.TYPEDEF)`
-               followed by a blank line and a one-line summary. Add one, or pass an
-               explicit `label` in `capability_catalogue.jl` if `$name` genuinely
-               cannot be summarised in a bullet.""")
+               Every type docstring must start with `\$(DocStringExtensions.TYPEDEF)`,
+               a blank line and a one-line summary. Add the summary, or give the `Cap`
+               of `$name` a `label` in `capability_catalogue.jl` if one bullet cannot
+               summarise `$name`.""")
     end
     return para
 end
@@ -73,16 +69,14 @@ end
 """
     first_paragraph(md) -> Union{String, Nothing}
 
-The summary paragraph: the first prose block of a docstring, skipping the code
-block that `\$(TYPEDEF)` expands to.
+The summary paragraph, which is the first paragraph of a docstring after the code block that
+`\$(TYPEDEF)` expands to.
 
-Stops at the first heading and returns `nothing` rather than searching past it.
-That matters more than it looks: a docstring whose summary has been deleted
-still contains paragraphs further down, under `# Constructors` or `# Related`,
-and happily returning one of those would put an unrelated sentence on the
-catalogue page and call it a description -- silent drift, which is the whole
-thing this page exists to prevent. Refusing here turns it into a build error
-naming the type.
+Stops at the first heading and returns `nothing`, and does not search past it. A docstring with
+no summary still has paragraphs under a later heading, such as `# Constructors` or `# Related`.
+If this function returned one of them, the page would show a sentence about something else as
+the description of the type. The `nothing` makes `summary_paragraph` throw an error that names
+the type, and the build fails.
 """
 function first_paragraph(md)
     if !(md isa Markdown.MD)
@@ -90,11 +84,11 @@ function first_paragraph(md)
     end
     for block in md.content
         if block isa Markdown.Header
-            # A heading before any prose means the summary is gone.
+            # A heading before any paragraph means that the docstring has no summary.
             return nothing
         elseif block isa Markdown.MD
             # A function with several documented methods nests one `MD` per
-            # method, so the summary lives one level down.
+            # method, so the summary is one level down.
             para = first_paragraph(block)
             isnothing(para) || return para
         elseif block isa Markdown.Paragraph
@@ -105,20 +99,18 @@ function first_paragraph(md)
     return nothing
 end
 
-# Abbreviations whose full stop does not end a sentence. Anything else followed
-# by whitespace does.
+# Abbreviations whose full stop does not end a sentence. Every other `.`, `!` or `?` before
+# whitespace ends one.
 const _ABBREV = r"(?:e\.g|i\.e|cf|et al|vs|approx|Fig|Eq|Ref|Sec|Dr|Mr|Ms|St)$"
 
 """
     first_sentence(text) -> String
 
-Trim a summary paragraph to its first sentence, keeping the terminator.
+Cut a summary paragraph to its first sentence, and keep the mark that ends it.
 
-Kept deliberately simple: the summaries are short declaratives, so the only real
-hazard is an abbreviation's full stop, which `_ABBREV` guards. Inline code and
-maths are left untouched because the sentence split never looks inside them --
-the scan is over the rendered text, and a `.` inside `x.y` is preceded by a
-word character with no following whitespace.
+The summaries are short statements. The one risk is the full stop of an abbreviation, which
+`_ABBREV` catches. A `.` inside inline code or maths, such as the one in `x.y`, has no
+whitespace after it, so the split does not cut there.
 """
 function first_sentence(text::AbstractString)
     text = replace(strip(text), r"\s*\n\s*" => " ")
@@ -135,8 +127,8 @@ end
 ref(name::Symbol) = string("[`", name, "`](@ref)")
 ref(name::String) = string("[`", name, "`](@ref)")
 
-# ", " between all but the last pair, " and " before the last -- the dominant
-# style in the hand-written section this page replaces.
+# Joins two links with " and ", and three or more with ", " and a last ", and ". This is
+# the style of the hand-written section that this page replaced.
 function join_refs(names)
     strs = ref.(names)
     n = length(strs)
@@ -154,11 +146,11 @@ end
 """
     cap_text(c::Cap) -> String
 
-The rendered body of one capability bullet: its description followed by the
-`@ref` links a reader follows to reach it.
+The text of one capability bullet, which is its description and then the `@ref` links to its
+docstrings.
 
-A label that already contains links is used as-is -- see `Cap`'s docstring for
-why some entries have to spell their own.
+A label that already contains links goes to the page unchanged. The docstring of `Cap` says why
+some entries write their own links.
 """
 function cap_text(c::Cap)
     if !isnothing(c.label) && occursin("](@ref)", c.label)
@@ -172,10 +164,10 @@ end
 head_text(h::Cap) = cap_text(h)
 head_text(h::String) = h
 
-# `depth` counts Section nesting; `indent` counts list nesting. They advance
-# independently. A Section resets the list. A Group also resets it, because a
-# `<details>` starts a fresh list inside the disclosure; the group carries the
-# level it broke out of in its own `margin-left`.
+# `depth` counts the nesting of Sections, and `indent` counts the nesting of lists. Each one
+# changes without the other. A Section starts the list again at indent 0. A Group does too,
+# because a `<details>` starts a new list inside it, and the `margin-left` of the group keeps
+# the level of the list that it ended.
 function render(io::IO, node::Section, depth::Int, indent::Int)
     println(io, "\n", "#"^depth, " ", node.title, "\n")
     for child in node.children
@@ -184,16 +176,15 @@ function render(io::IO, node::Section, depth::Int, indent::Int)
     return io
 end
 function render(io::IO, node::Prose, depth::Int, indent::Int)
-    # Blank on both sides: markdown needs a paragraph separated from an adjacent
-    # list in either direction, or the two run together into one block.
-    # `render_catalogue` collapses whatever doubling this causes.
+    # A blank line goes on each side, because markdown joins a paragraph and a list next to it
+    # into one block when no blank line separates them. `render_catalogue` removes the extra
+    # blank lines that this makes.
     #
-    # Inside a list the paragraph must also be indented to the enclosing item's
-    # content column, or it ends the list: the bullets that follow are then a
-    # fresh block indented four spaces, which markdown reads as a *code block*.
-    # Documenter does not resolve `@ref` inside code, so every link below such a
-    # paragraph silently survives as literal `(@ref)` text and reaches the site
-    # builder as a dead `./@ref` link.
+    # Inside a list, the paragraph must also start at the content column of the item around it.
+    # If it does not, it ends the list, and the bullets after it are a new block indented four
+    # spaces, which markdown reads as a code block. Documenter does not resolve an `@ref` inside
+    # code, so each link below such a paragraph stays as the literal text `(@ref)`, and the site
+    # builder reports a dead `./@ref` link.
     pad = " "^indent
     body = join((string(pad, line) for line in split(node.text, '\n')), "\n")
     println(io, "\n", body, "\n")
@@ -214,11 +205,11 @@ end
 """
     raw_html(io, html)
 
-Emit `html` verbatim through a `@raw html` block.
+Write `html` unchanged in a `@raw html` block.
 
-A blank line goes on each side. A fence that touches the paragraph above it is
-read as part of that paragraph. A fence that touches a list above it is read as
-a lazy continuation of the last item.
+A blank line goes on each side. Markdown reads a fence with no blank line after a paragraph as a
+part of that paragraph, and a fence with no blank line after a list as a lazy continuation of the
+last item.
 """
 function raw_html(io::IO, html::AbstractString)
     println(io, "\n```@raw html\n", html, "\n```\n")
@@ -226,14 +217,14 @@ function raw_html(io::IO, html::AbstractString)
 end
 
 function render(io::IO, node::Group, depth::Int, indent::Int)
-    # The head and the body stay markdown, between raw blocks, so their `@ref`
-    # links resolve. See the header note for the `margin-left` arithmetic.
+    # The head and the body stay markdown between the raw blocks, so their `@ref`
+    # links resolve. The header note explains the value of `margin-left`.
     raw_html(io,
              string("<details class=\"cap-group\" style=\"margin-left: ", indent + 2,
                     "em\">\n<summary>"))
     println(io, "\n", head_text(node.head), "\n")
     raw_html(io, "</summary>")
-    # A fresh list starts inside the disclosure, so the child indent restarts.
+    # A new list starts inside the `<details>`, so the indent of the children starts at 0.
     for child in node.children
         render(io, child, depth, 0)
     end
@@ -244,9 +235,9 @@ end
 """
     render_catalogue(io; base_level = 2)
 
-Render `CATALOGUE` as markdown. `base_level` is the heading level of a top-level
-`Section`; it exists so the output can be compared against the section this page
-was extracted from, which sat one level deeper inside `00_API.md`.
+Render `CATALOGUE` as markdown. `base_level` is the heading level of a top-level `Section`.
+It lets a caller compare the output with the section of `00_API.md` that this page came from,
+which was one level deeper.
 """
 function render_catalogue(io::IO = IOBuffer(); base_level::Int = 2)
     buf = IOBuffer()
@@ -260,13 +251,12 @@ end
 """
     collapse_blank_runs(md) -> String
 
-Collapse every run of blank lines in `md` to a single one.
+Replace every run of blank lines in `md` with one blank line.
 
-Blocks emit their own separators without knowing what precedes them, so a run is
-the normal outcome of concatenating two of them. It must be applied to whatever
-text is *finally written* — collapsing the rendered body alone leaves the seam
-where the preamble meets it, which is one such concatenation and produced a
-double blank line that `markdownlint` then stripped back out on every commit.
+Each block writes its own blank lines and does not know what comes before it. Two blocks in
+a row often leave a run. Apply this function to the text that the generator writes to the file.
+When it ran on the rendered body alone, the join of the preamble and the body kept a double
+blank line, and `markdownlint` removed it again on every commit.
 """
 function collapse_blank_runs(md::AbstractString)::String
     return replace(md, r"\n{3,}" => "\n\n")
@@ -274,43 +264,41 @@ end
 
 const _PREAMBLE = """
 ```@meta
-Description = "Every estimator, risk measure, constraint and optimiser PortfolioOptimisers.jl ships, grouped by the job it does and linked to its docstring."
+Description = "Every estimator, risk measure, constraint and optimiser in PortfolioOptimisers.jl, grouped by the job it does and linked to its docstring."
 ```
 
 # [$(_PAGE_TITLE)](@id capability-catalogue)
 
-Everything `PortfolioOptimisers.jl` can do, grouped by the job it does rather
-than by the file it lives in. Each entry links to its docstring. Every entry
-here is public API: `test_26_docs.jl`'s "every exported function is accounted
-for" testset makes that true by construction (ADR 0040), so the page needs no
-per-entry marker.
+This page lists what `PortfolioOptimisers.jl` can do, grouped by the job that each
+type or function does. Each entry links to its docstring, on a public API page, or
+on a private API page for a name outside the public API.
 
-This page is generated (see
-[docs/generate_capability_catalogue.jl](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/generate_capability_catalogue.jl)):
-the grouping is curated in `docs/capability_catalogue.jl`, and every description
-is the first sentence of the corresponding docstring, so the two can never
-disagree. A test asserts that every estimator and algorithm in the package
-appears here, so the page cannot fall behind the code.
+The documentation build writes this page with
+[docs/generate_capability_catalogue.jl](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/generate_capability_catalogue.jl).
+The grouping comes from `docs/capability_catalogue.jl`. The description of an entry
+is the first sentence of its docstring, unless the catalogue gives the entry its own
+label. The build fails when a type that you can choose, such as an estimator or an
+algorithm, has no entry here.
 
-For the same types arranged by subtyping rather than by capability, see the
-[type hierarchy](@ref type-hierarchy-AbstractEstimator).
+The [type hierarchy](@ref type-hierarchy-AbstractEstimator) lists the same types by
+their supertypes.
 """
 
 """
     declared_leaves(T, acc = Set{Type}()) -> Set{Type}
 
-Every concrete leaf under `T` that `PortfolioOptimisers` itself declares.
+Every leaf under `T` that `PortfolioOptimisers` declares.
 
-A leaf is a non-abstract type with no subtypes. Note `!isabstracttype` rather
-than `isconcretetype`: nearly every struct here is `@concrete`, so the bare name
-is a `UnionAll` and `isconcretetype` is false for every one of them.
+A leaf is a type that is not abstract and has no subtypes. The test is `!isabstracttype` and
+not `isconcretetype`. Almost every struct here is `@concrete`, so its bare name is a
+`UnionAll`, and `isconcretetype` is false for each one.
 
-The `parentmodule` filter matters in `test/test_26_docs.jl`, which shares this
-rule. The runner gives each test file its own module, but not its own process,
-so an estimator that another file declares stays in the worker and `subtypes`
-finds it here. The catalogue is about the shipped universe, so a leaf from
-another module is not one of its members. Which files share a worker changes
-from run to run, so without this filter the test is a scheduling flake.
+The `parentmodule` filter matters in `test/test_26_docs.jl`, which uses this rule too. The
+runner gives each test file its own module but not its own process, so an estimator that
+another test file declares stays in the worker, and `subtypes` finds it here. The catalogue
+lists the types of the package alone, so a leaf from another module is not a member. The set of
+files that share a worker changes from run to run. Without this filter, the test fails on
+some runs and passes on others.
 """
 function declared_leaves(T, acc = Set{Type}())
     subs = subtypes(T)
@@ -327,10 +315,11 @@ end
 """
     declared_descendants(T, acc = Set{Type}()) -> Set{Type}
 
-Every concrete type under `T`, at any depth, that `PortfolioOptimisers` declares.
+Every type under `T`, at any depth, that is not abstract and that `PortfolioOptimisers`
+declares.
 
-Unlike [`declared_leaves`](@ref) this keeps an inner concrete type as well, so a
-family is subtracted whole.
+Unlike [`declared_leaves`](@ref), this also keeps a type that is not abstract and has subtypes,
+so `choice_surface_names` removes a whole family.
 """
 function declared_descendants(T, acc = Set{Type}())
     if !isabstracttype(T) && parentmodule(T) === PortfolioOptimisers
@@ -343,12 +332,11 @@ end
 """
     exported_concrete_types() -> Set{Type}
 
-Every concrete type `PortfolioOptimisers` exports under its own name.
+Every type that is not abstract and that `PortfolioOptimisers` exports under its own name.
 
-An alias binding is skipped, because its `nameof` is the canonical type it
-points at: `HRP` and `HierarchicalRiskParity` are one capability, and the
-catalogue entry belongs to the long form. The alias table in the risk-measure
-guide is where a reader looks an acronym up.
+The function skips an alias, because the `nameof` of an alias is the name of the type that it
+points at. `HRP` and `HierarchicalRiskParity` are one capability, and the catalogue lists the
+long name. The docstring of `HRP` names the long name for a reader.
 """
 function exported_concrete_types()
     acc = Set{Type}()
@@ -375,26 +363,25 @@ end
 """
     choice_surface_names() -> Set{Symbol}
 
-The names the catalogue must reach, before `NOT_A_CHOICE` is subtracted.
+The names that the catalogue must list, before the removal of the names in `NOT_A_CHOICE`.
 
-This is the Choice Surface of `CONTEXT.md` § 1 in code, and it is the one
-statement of the coverage rule: `test/test_26_docs.jl` calls this function too.
-A concrete type that `PortfolioOptimisers` declares is on the surface when
-either rule holds:
+This function is the Choice Surface of `CONTEXT.md` § 1 in code, and the one statement of the
+coverage rule. `test/test_26_docs.jl` calls it too. A type that `PortfolioOptimisers` declares,
+and that is not abstract, is on the surface when one of these rules holds:
 
   - it is a leaf subtype of `AbstractEstimator`, of `AbstractAlgorithm` or of
-    `AbstractCovarianceEstimator`, exported or not; or
+    `AbstractCovarianceEstimator`, exported or not;
   - the package exports it under its own name.
 
-Two families are then subtracted, because a caller receives them and never
-chooses them: an `AbstractResult`, which includes an `OptimisationReturnCode`,
-and a `PortfolioOptimisersError`.
+The function then removes two families, because a caller receives them and never chooses
+them. They are the `AbstractResult` family, which includes `OptimisationReturnCode`, and the
+`PortfolioOptimisersError` family.
 
-The roots alone left a hole, which is issue #636: a family that takes none of
-them is required by nothing, so the catalogue held it by the author's attention
-alone. `AbstractCovarianceEstimator` is a root here for that reason. It descends
-from `StatsBase.CovarianceEstimator` rather than from `AbstractEstimator`, so
-the two original roots reached no member of it, exported or not.
+The roots alone left a gap, issue #636. No rule required an entry for a family outside every
+root, so the catalogue listed such a family only when an author remembered it.
+`AbstractCovarianceEstimator` is a root for that reason. It descends from
+`StatsBase.CovarianceEstimator` and not from `AbstractEstimator`, so the two roots before it
+reached none of its members, exported or not.
 """
 function choice_surface_names()
     required = union(declared_leaves(PortfolioOptimisers.AbstractEstimator),
@@ -409,15 +396,14 @@ end
 """
     assert_complete()
 
-Refuse to render a catalogue that is missing a choice.
+Throw an error, and write no page, when a choice has no entry in the catalogue.
 
-A type listed in `NOT_A_CHOICE` is exempt: the library constructs it for itself,
-so it is not a capability a reader can reach for.
+A type in `NOT_A_CHOICE` is exempt, because the library constructs it for itself and a reader
+never chooses it.
 
-`test/test_26_docs.jl` is the authoritative check and fires far sooner, on the
-PR that added the type. This one exists because the generator's failure mode is
-worse than a red test: a page that quietly omits a capability *looks* complete,
-which is precisely the defect this page was built to end.
+`test/test_26_docs.jl` makes the same check earlier, on the pull request that adds the type.
+This function checks again because a page with a missing capability shows no sign of the gap,
+and a reader takes it as complete.
 """
 function assert_complete()
     catalogued = Set{Symbol}()
@@ -438,10 +424,10 @@ function assert_complete()
     setdiff!(required, keys(NOT_A_CHOICE))
     missed = sort(collect(setdiff(required, catalogued)))
     if !isempty(missed)
-        error("""capability_catalogue: $(length(missed)) choice(s) are not catalogued, so the
-                 page would be rendered incomplete. Add each to
-                 `docs/capability_catalogue.jl`, or list it in `NOT_A_CHOICE` with a
-                 reason:\n  $(join(missed, "\n  "))""")
+        error("""capability_catalogue: $(length(missed)) choice(s) have no entry, so the page
+                 would be incomplete. Add a `Cap` for each to
+                 `docs/capability_catalogue.jl`, or give it an entry in `NOT_A_CHOICE`
+                 with a reason:\n  $(join(missed, "\n  "))""")
     end
     return nothing
 end
@@ -449,43 +435,41 @@ end
 """
     assert_refs_survive(md)
 
-Check that every `@ref` written into the page is still a *link* once the page is
-parsed as markdown.
+Check that every `@ref` that the generator writes is still a link after markdown parses the
+page.
 
-Writing `[`X`](@ref)` is not enough: the surrounding text decides whether it
-survives. Two ways it does not, both of which shipped before this check existed:
+The text around an `[`X`](@ref)` decides whether it stays a link. Two defects broke links on
+the page before this check existed:
 
-  - **A bare `_` in a description** pairs with the `_` inside a neighbouring
-    `snake_case` link and the two are read as emphasis, eating the
-    brackets. `(f_μ vector)` next to ``[`plot_factor_mu`](@ref)`` rendered as
-    `(fμ vector … [`plotfactor_`.
-  - **A paragraph at column 0 inside a list** ends the list, so the four-space
-    indented bullets that follow parse as an indented *code block*.
+  - A bare `_` in a description pairs with the `_` in a `snake_case` link next to it.
+    Markdown reads the two as emphasis and drops the brackets. `(f_μ vector)` next to
+    ``[`plot_factor_mu`](@ref)`` rendered as `(fμ vector … [`plotfactor_`.
+  - A paragraph at column 0 inside a list ends the list, so markdown parses the bullets after
+    it, indented four spaces, as a code block.
 
-Documenter resolves `@ref` only in real links, so in both cases the text passes
-through verbatim and reaches the site builder as a dead `./@ref` link -- one
-error, no matter how many links were lost, and no indication of which page
-region is at fault. Catching it here names them.
+Documenter resolves `@ref` only in a real link. In both cases the text reaches the site builder
+unchanged. The builder then reports one dead `./@ref` link for any number of lost links, and it
+does not say where on the page they are. This check names each lost link.
 
-Uses the `Markdown` stdlib rather than the CommonMark parser Documenter itself
-uses. The two differ in corner cases, so this is a net for the common failures,
-not a substitute for the docs build.
+The check uses the `Markdown` stdlib, and not the CommonMark parser that Documenter uses. The
+two parsers differ in rare cases. The check finds the common defects and does not replace
+the docs build.
 """
 function assert_refs_survive(md::AbstractString)
     written = [m.captures[1] for m in eachmatch(r"\[`([^`]+)`\]\(@ref\)", md)]
     survived = String[]
-    # Walk structurally rather than by node type: `Markdown` spells its children
-    # `content`, `items` or `text` depending on the node, and enumerating those
-    # types would silently skip any this version of the stdlib adds.
+    # Walk each field that holds children, and not a list of node types. `Markdown` names the
+    # children `content`, `items` or `text` by the node, and a list of node types would skip a
+    # type that a later version of the stdlib adds.
     function walk(node)
         if node isa AbstractVector
             foreach(walk, node)
             return nothing
         end
         if node isa Markdown.Link && node.url == "@ref"
-            # The link text of a catalogue entry is a single code span, so take
-            # its literal contents; rendering the node would give back the whole
-            # `[`X`](@ref)` and compare against nothing.
+            # The text of a catalogue link is one code span, so take its literal
+            # contents. A render of the node gives back the whole `[`X`](@ref)`,
+            # which matches no written name.
             buf = IOBuffer()
             for t in node.text
                 if t isa Markdown.Code
@@ -514,12 +498,14 @@ function assert_refs_survive(md::AbstractString)
         isnothing(i) || deleteat!(lost, i)
     end
     if !isempty(lost)
-        error("""capability_catalogue: $(length(lost)) `@ref` link(s) do not survive markdown
-                 parsing and would reach the site builder as dead `./@ref` links:
+        error("""capability_catalogue: $(length(lost)) `@ref` link(s) are not links after
+                 markdown parses the page, and the site builder would report them as dead
+                 `./@ref` links:
                  \n  $(join(unique(lost), "\n  "))\n
-                 Usual causes: a bare `_` in a description pairing with the one inside a
-                 neighbouring `snake_case` link (wrap it in backticks), or a `Prose` node
-                 that breaks out of a list and turns the bullets below it into a code block.""")
+                 One usual cause is a bare `_` in a description that pairs with the `_` of a
+                 `snake_case` link next to it. Put the bare `_` in backticks. The other is a
+                 `Prose` node that ends a list and turns the bullets below it into a code
+                 block.""")
     end
     return nothing
 end

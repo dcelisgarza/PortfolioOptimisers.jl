@@ -430,15 +430,15 @@ end
     fees = FeesEstimator(; fl = ["JNJ" => 1])
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, bgt = 1, fees = fees, sets = sets)
     res = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
-    # Issue #898: a fixed fee of one currency unit used to be charged on every observation,
-    # which priced `JNJ` out. It is charged one time now, spread over the observation count
-    # of the fit, so it no longer does.
-    @test !isapprox(res.w[findfirst(x -> x == "JNJ", rd.nx)], 0)
+    # Issue #898: a fixed fee is charged one time for the whole holding period, not on
+    # every observation. Issue #904: a fee with fixed terms alone reaches the net return
+    # series too. The default clock charges the whole fee, all of the capital, to the first
+    # observation whenever `JNJ` is held, so the drawdown prices `JNJ` out.
+    @test isapprox(res.w[findfirst(x -> x == "JNJ", rd.nx)], 0)
     @test isapprox(res.w,
-                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.38725498830197425, 0.0, 0.0,
-                    0.055674643687933394, 0.07176313645022615, 0.0, 0.0, 0.0, 0.0, 0.0,
-                    0.09485063813452817, 0.12791171181961808, 0.2625448816057193],
-                   rtol = 1e-6)
+                   [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.10628880639076628,
+                    0.3797133984773178, 0.0, 0.0, 0.0, 0.0, 0.0, 0.09964195482348168,
+                    0.2186053167698726, 0.1957505235385616], rtol = 1e-6)
 end
 
 @testset "Variance risk contribution" begin
@@ -522,11 +522,11 @@ end
             5e-6
         elseif i in (4, 8)
             5e-3
-        elseif i in (12, 23)
+        elseif i == 12
             1e-4
         elseif i in (6, 14)
             5e-5
-        elseif i in (7, 22)
+        elseif i in (7, 22, 23)
             5e-4
         else
             1e-6

@@ -2,15 +2,23 @@
     copy_states(est)
     copy_states(td::TimeDependent)
 
-Copies every partial-fit state an estimator tree carries, and returns the tree rebuilt around the copies.
+Copies every partial-fit state that an estimator tree carries, and returns the tree rebuilt around the copies.
 
-The walk of [`online_entry_state`](@ref) with a rebuild in place of a report: it copies `est`'s own `cache` when it holds a state, descends into every estimator-valued field ([`estimator_fields`](@ref)), and rebuilds each host whose fields moved through [`rebuild_estimator`](@ref). A host nothing under changed is returned as it is. A [`TimeDependent`](@ref) schedule is returned unchanged, because its entries are batch configuration resolved per fold and the loop threads no state through them, and so is anything that is not an estimator.
+The walk is the one [`online_entry_state`](@ref) takes, with a rebuild where that verb makes a report. A host whose subtree holds no state comes back as it is. A [`TimeDependent`](@ref) schedule comes back unchanged, because its entries are batch configuration that the fold loop resolves per fold and threads no state through. Any value that is not an estimator comes back unchanged too.
 
-Two callers take it. [`Resume`](@ref) calls it once at entry, so the Result it holds is never written: [`partial_fit!`](@ref) promises nothing about a kept estimator, a buffer appends into its backing array, and every state answers `Base.copy`. The generic method of [`partial_fit`](@ref) calls it before every fold, so the value form holds the same promise on a host that folds through the states of its members — a [`HighOrderPriorEstimator`](@ref), a hierarchical optimiser — as on a leaf that carries its own `cache`.
+Two callers use it. [`Resume`](@ref) calls it once at entry, so the Result it holds is never written. That copy is necessary because [`partial_fit!`](@ref) promises nothing about a kept estimator, and a buffer appends into its backing array. The generic method of [`partial_fit`](@ref) calls it before every fold. The value form therefore keeps its promise on a host that folds through the states of its members, such as a [`HighOrderPriorEstimator`](@ref) or a hierarchical optimiser, as well as on a leaf that carries its own `cache`. Every state type defines `Base.copy`, so one copy per state is enough.
+
+# Algorithm
+
+ 1. Read the `cache` field of `est`, or `nothing` when `est` has no such field, and copy it through [`copy_state`](@ref), giving `cache`.
+ 2. Call `copy_states` on every estimator-valued field of `est` ([`estimator_fields`](@ref)), giving `repl`.
+ 3. Set `moved` when an entry of `repl` is not the object (`!==`) that `est` holds in that field.
+ 4. Return `est` when `cache` is `nothing` and `moved` is false.
+ 5. Otherwise rebuild `est` through [`rebuild_estimator`](@ref) from `repl`, and from `cache` too when it is not `nothing`.
 
 # Arguments
 
-  - `est`: The estimator, or any value a field holds.
+  - `est`: The estimator, or any value that a field holds.
 
 # Returns
 
@@ -49,7 +57,9 @@ end
     copy_state(state::AbstractPartialFitState)
     copy_state(::Nothing)
 
-The `cache` arm of [`copy_states`](@ref): a state is copied, and no state stays none.
+Copies the partial-fit state in a `cache` field, and returns `nothing` when the field holds none.
+
+This is the `cache` arm of [`copy_states`](@ref).
 
 # Related
 
@@ -65,7 +75,9 @@ end
     carrier_timestamps(rd::ReturnsResult)
     carrier_timestamps(pr::PricesResult)
 
-The timestamps of a carrier, or `nothing` when it holds none.
+Returns the timestamps of a carrier, or `nothing` when it holds none.
+
+A prices carrier always holds them, because its `TimeArray` has a timestamp column.
 
 # Related
 
@@ -82,7 +94,7 @@ end
     context_timestamps(cache::ReturnsBufferState)
     context_timestamps(::Nothing)
 
-The timestamps a Fold Context holds; none before the first step.
+Returns the timestamps that a Fold Context holds, or `nothing` before the first step.
 
 # Related
 
@@ -97,9 +109,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Continues an online walk-forward from the folds its Result holds, over the history extended.
+Continues an online walk-forward from the folds that its Result holds, over a longer history.
 
-A transient declaration in the estimator slot, in the idiom of [`Online`](@ref) and [`TimeDependent`](@ref), decided by [#1018](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1018). An online run's [`MultiPeriodPredictionResult`](@ref) carries the estimator the loop threaded, folded through the last training end. `Resume(res)` hands that Result back to [`cross_val_predict`](@ref) over the **full history extended** — the old carrier with the new rows appended — and the same scheme. The scheme enumerates every fold as the one-shot run does; the loop skips the folds the Result holds — located by the state's last held timestamp, so a resumed Result, which holds the new folds only, resumes again — folds the ordinary delta from the last training end into a **copy** of `res.opt`, and continues from the fold after them, threading `res.pred[end]`'s weights as the previous fold's. No warm-up runs: the warm-up was fold 1's window, and fold 1 is skipped. The resumed Result carries the new folds only and `opt` again, so the chain continues, and `vcat` on the two Results stacks them for scoring.
+`Resume` is a transient declaration in the estimator slot, like [`Online`](@ref) and [`TimeDependent`](@ref). The [`MultiPeriodPredictionResult`](@ref) of an online run carries in `opt` the estimator that the fold loop threaded, folded through the last training end. `Resume(res)` hands that Result back to [`cross_val_predict`](@ref), with the same scheme and the **full history extended**, which is the old carrier with the new rows appended. The loop skips the folds that the Result holds, folds the new rows into a copy of `res.opt`, and runs the folds after them. No warm-up runs. The resumed Result holds the new folds only and carries `opt` again, so it can be resumed in turn, and `vcat` stacks the two Results for scoring.
 
 The oracle is the one-shot run. For an online scheme `cv`, a history `rd_T` and its extension `rd_{T+k}`,
 
@@ -109,13 +121,23 @@ res2 = cross_val_predict(Resume(res), rd_{T+k}, cv)
 vcat(res.pred, res2.pred) ≈ cross_val_predict(mr, rd_{T+k}, cv).pred   # fold for fold
 ```
 
-to the tolerance of the moment layer and of the solver for the weights, and exactly for the carrier the read-out rebuilds, a capped run included. `res` is never written — `Resume` copies every state at entry — so one Result resumes any number of times, and a terminal view never spoils a later continuation.
+The weights agree to the tolerance of the moment layer and of the solver. The carrier that the read-out rebuilds agrees exactly, under a cap too. `Resume` copies every state at entry, so `res` is never written. One Result can be resumed any number of times, and a terminal view does not change a later continuation.
 
-The re-entry checks four things, each an `ArgumentError` by name. The scheme is a walk-forward with a Fold Fit, and it adds at least one fold. **Timestamps are required**: the carrier and the state must both hold them, and every held timestamp must equal its row of the carrier — `state.ts == rd.ts[(r - h + 1):r]` for `r` the last training end and `h` the held count — which pins the prefix exactly over the held span, under a cap or not; an index-only caller attaches a synthetic calendar, `ts = Date(1) .+ Day.(0:(T - 1))`. And **a partial last fold is terminal**: with `reduce_test = true` the old run's last fold is the first part of a full window of the longer run, so it can be neither skipped nor completed. Resume the same Result terminally with `reduce_test = true` for the live view of the leftover rows, and again with `reduce_test = false` when the rows arrive.
+`cross_val_predict` refuses a resume in five cases, each with an `ArgumentError` that names the cause.
 
-Every state is an immutable struct of arrays, names, integers and a timestamp vector, so a Result of an online run round-trips through the stdlib `Serialization` as it stands, and a deserialised Result resumes to the same weights. That format is bound to the Julia version that wrote it, and no other format is provided.
+  - The scheme is not an Online Scheme.
+  - The carrier adds no fold.
+  - The carrier or the state holds no timestamps, or the timestamps that the state holds differ from their rows of the carrier. An index-only caller attaches a synthetic calendar, `ts = Date(1) .+ Day.(0:(T - 1))`.
+  - The last fold of the Result was partial. With `reduce_test = true` that fold predicted the rows left at the end of the old carrier, and in the longer history those rows are the first part of a full window. The fold can be neither skipped nor completed. Resume the same Result with `reduce_test = true` for the live view of the leftover rows, and resume it again with `reduce_test = false` when the rows arrive.
+  - The head is an [`OnlinePortfolioSelection`](@ref) whose fees carry a turnover term, and the scheme has no Previous-Weights Source. The one-shot online arm refuses the same head.
 
-A batch Result, a [`PopulationPredictionResult`](@ref) (a [`MultipleRandomised`](@ref) run), a scheme that is not a walk-forward, a scheme with no Fold Fit, and a search are refused by name. A [`Pipeline`](@ref) host resumes on the same terms, through the state its row owner keeps.
+The timestamp check reads the training ends of the scheme. It refuses a scheme with a different window, step or purge, because such a scheme moves the training ends. A change of the Weight Drift or of the Previous-Weights Source moves no training end, so the check does not see it. The new folds then run under the scheme handed, and the identity above does not hold. Under a cap the state holds its last rows only, and the check pins those rows and nothing before them.
+
+The previous weights come from the Result alone. When no fold of `res` passes its weights on, for example because every fold of a short resumed Result failed, the first new fold gets no previous weights. The one-shot run hands it the last threadable fold of the earlier run instead. Resume `vcat(old, res)` in that case, because the stacked Result holds the earlier folds too.
+
+Every state is an immutable struct of arrays, names, integers and a timestamp vector. The Result of an online run therefore round-trips through the stdlib `Serialization` as it stands, and the deserialised Result resumes to the same weights. That format is bound to the Julia version that wrote it, and the package gives no other format.
+
+The constructor refuses a batch Result and a [`PopulationPredictionResult`](@ref) from a [`MultipleRandomised`](@ref) run. `cross_val_predict` refuses a scheme that is not a walk-forward, a walk-forward that is not an Online Scheme, and a search. A [`Pipeline`](@ref) host resumes on the same terms, through the state that its row owner keeps.
 
 # Fields
 
@@ -134,7 +156,7 @@ $(DocStringExtensions.FIELDS)
 # Related
 
   - [`MultiPeriodPredictionResult`](@ref)
-  - [`OnlineStep`](@ref)
+  - [`OnlineIndexWalkForward`](@ref)
   - [`online_folds`](@ref)
   - [`cross_val_predict`](@ref)
   - [`Base.vcat(a::MultiPeriodPredictionResult, b::MultiPeriodPredictionResult)`](@ref)
@@ -148,7 +170,7 @@ struct Resume{T1}
     res::T1
     function Resume(res::MultiPeriodPredictionResult)
         @argcheck(!isnothing(res.opt),
-                  ArgumentError("`Resume` continues an online run, and this Result carries no estimator (`res.opt === nothing`), so it is a batch run and there is nothing to continue. Run the walk-forward with `ff = OnlineStep()`, and resume the Result it returns."))
+                  ArgumentError("`Resume` continues an online run, and this Result carries no estimator (`res.opt === nothing`), so it is a batch run and there is nothing to continue. Run the walk-forward as an Online Scheme (`OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit`), and resume the Result it returns."))
         return new{typeof(res)}(res)
     end
 end
@@ -163,7 +185,9 @@ end
     needs_previous_weights(r::Resume)
     assert_time_dependent_fold_count(r::Resume, n::Integer, all_binds::Bool = true)
 
-The fold loop reads its three traits off the root it is handed, and a [`Resume`](@ref) root answers for the estimator its Result carries: the loop resolves the declaration at entry, and the per-fold copy is made of that estimator.
+Answers the three traits of the fold loop for the estimator that the Result of a [`Resume`](@ref) carries.
+
+The fold loop reads the traits off the root that it is handed. The loop resolves a `Resume` at entry and makes the per-fold copy of the estimator that its Result carries, so that estimator answers.
 
 # Related
 
@@ -178,21 +202,29 @@ function assert_time_dependent_fold_count(r::Resume, n::Integer,
     return assert_time_dependent_fold_count(r.res.opt, n, all_binds)
 end
 """
+    assert_resume_scheme(::Online{<:WalkForwardEstimator})
     assert_resume_scheme(cv::WFCVER)
     assert_resume_scheme(cv::CVER)
 
-Refuses a scheme a [`Resume`](@ref) cannot re-enter, by name: one that is not a walk-forward, and a walk-forward with no Fold Fit.
+Refuses, by name, a scheme that a [`Resume`](@ref) cannot re-enter.
+
+Two kinds of scheme are refused: a scheme that is not a walk-forward, and a walk-forward that is not an Online Scheme. Each refusal is a method on the refused type, so dispatch decides it and the message names the cause.
+
+# Validation
+
+  - `cv` is an Online Scheme over a walk-forward. An `ArgumentError` is thrown otherwise.
 
 # Related
 
   - [`Resume`](@ref)
-  - [`fold_fit`](@ref)
-  - [`OnlineStep`](@ref)
+  - [`folds_are_stepped`](@ref)
+  - [`OnlineIndexWalkForward`](@ref)
 """
-function assert_resume_scheme(cv::WFCVER)::Nothing
-    @argcheck(!isnothing(fold_fit(cv)),
-              ArgumentError("`Resume` continues the online arm of the fold loop, and this walk-forward declares no Fold Fit, so every fold would refit from its training window and there is no state to continue. Set `ff = OnlineStep()` on the scheme, the same one the Result came from."))
+function assert_resume_scheme(::Online{<:WalkForwardEstimator})::Nothing
     return nothing
+end
+function assert_resume_scheme(cv::WFCVER)::Nothing
+    return throw(ArgumentError("`Resume` continues the online arm of the fold loop, and this walk-forward is not an Online Scheme, so every fold would refit from its training window and there is no state to continue. Build the scheme the Result came from with `OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit`."))
 end
 function assert_resume_scheme(cv::CVER)::Nothing
     return throw(ArgumentError("`Resume` continues an online walk-forward, and a `$(typeof(cv).name.name)` is not one: only a walk-forward threads one estimator from fold to fold, so only a walk-forward has a fold to continue from. A `MultipleRandomised` run is a population of paths, and its resume is not established."))
@@ -200,26 +232,38 @@ end
 """
     resume_fold_count(opt, rd, train_idx) -> Int
 
-Finds the fold a [`Resume`](@ref) continues from, by the timestamps, and refuses a carrier whose rows do not carry the state.
+Finds, by timestamp, the last fold that a [`Resume`](@ref) holds, and refuses a carrier whose rows do not carry the state.
 
-The state's last held timestamp names the row it folded through, and the fold whose training window ends at that row is the last fold the run holds: `n_old` is that fold's index in the scheme's enumeration over the extended carrier, and the loop continues from `n_old + 1`. The count is read off the state and not off `length(res.pred)`, because a resumed Result holds the new folds only, and the chain `Resume(res2)` must skip every fold before it. Both the carrier and the state must hold timestamps, and every timestamp the state holds must equal its row of the carrier: `held == carrier_timestamps(rd)[(r - h + 1):r]` for `r = last(train_idx[n_old])` and `h` the held count. That is exact over the held span at `O(h)`, and it is the one check that pins a prefix — a row dropped or inserted before `r` moves the carrier's row `r`, and a changed scheme moves every training end — under a cap, where the state holds no total, as much as without one.
+The last timestamp that the state holds names the last row it folded. The fold whose training window ends at that row is the last fold that the run holds, and the loop continues from the fold after it. The count comes from the state and not from `length(res.pred)`, because a resumed Result holds the new folds only, and the chain `Resume(res2)` must skip every fold before it.
+
+The check is exact over the held span, and it costs one comparison per held timestamp. Without a cap the state holds every row that it folded, so the check pins the whole prefix. A row dropped or inserted before `r` moves the row of the carrier at `r`, and a scheme with a different window, step or purge moves the training ends. Under a cap the state holds its last rows only, so the check pins those rows and nothing before them. A carrier that differs before the held span then resumes to the same weights, because no row before the span reaches the state.
+
+# Algorithm
+
+ 1. Read the timestamps of the carrier through [`carrier_timestamps`](@ref), giving `given`. Refuse `nothing`.
+ 2. Read the timestamps of the state through [`held_timestamps`](@ref), giving `held`. Refuse `nothing`.
+ 3. Take the last entry of `held`, giving `stop`.
+ 4. Find the first fold whose training window ends at a row with timestamp `stop`, giving `n_old`. Refuse when no fold ends there.
+ 5. Take the last row of that training window, giving `r`, and the length of `held`, giving `h`.
+ 6. Refuse unless `h <= r` and `held` equals `given[(r - h + 1):r]`.
+ 7. Return `n_old`.
 
 # Arguments
 
-  - `opt`: The stepped estimator the Result carries.
+  - `opt`: The stepped estimator that the Result carries.
   - `rd`: The carrier of the full history extended.
-  - `train_idx`: The training windows of every fold the scheme enumerates over `rd`.
+  - `train_idx`: The training windows of every fold that the scheme enumerates over `rd`.
 
 # Validation
 
   - The carrier holds timestamps. An `ArgumentError` is thrown otherwise.
   - The state holds timestamps. An `ArgumentError` is thrown otherwise.
-  - Some fold's training window ends at the state's last held timestamp. An `ArgumentError` is thrown otherwise.
-  - The held timestamps equal the carrier's over the held span. An `ArgumentError` is thrown otherwise.
+  - The training window of some fold ends at the last timestamp that the state holds. An `ArgumentError` is thrown otherwise.
+  - The held timestamps equal the timestamps of the carrier over the held span. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
-  - `n_old::Int`: The index of the last fold the run holds.
+  - `n_old::Int`: The index of the last fold that the run holds.
 
 # Related
 
@@ -247,7 +291,16 @@ end
 """
     assert_resume_folds(n_old::Integer, n::Integer)
 
-Refuses a carrier that adds no fold to the run a [`Resume`](@ref) continues.
+Refuses a carrier that adds no fold to the run that a [`Resume`](@ref) continues.
+
+# Arguments
+
+  - `n_old`: The index of the last fold that the Result holds.
+  - `n`: The number of folds that the scheme enumerates over the carrier.
+
+# Validation
+
+  - `n > n_old`. An `ArgumentError` is thrown otherwise.
 
 # Related
 
@@ -262,15 +315,21 @@ end
 """
     assert_resume_full_fold(test_idx::VecInt, pred::PredictionResult, ts)
 
-Refuses a [`Resume`](@ref) whose last held fold was partial: its test window under the longer history runs past the last row the fold predicted.
+Refuses a [`Resume`](@ref) whose last held fold was partial.
 
-With `reduce_test = true` the last fold of the old run predicted the rows left over at the end of the carrier, which under the longer history are the first part of a full window — the same training end, the same weights, too short a span. Skipping it loses rows and completing it needs a mid-window entry, so it is terminal. The check compares timestamps, not counts — the fold's last predicted timestamp against the carrier's at the window's last row — because a price-level window of `L` rows predicts `L - 1` returns, and the timestamp of the last one is the last price's either way. The message names the two-resume workaround.
+A fold was partial when its test window in the longer history runs past the last row that the fold predicted. With `reduce_test = true` the last fold of the old run predicted the rows left at the end of its carrier. In the longer history those rows are the first part of a full window, with the same training end and the same weights. The fold cannot be skipped without a loss of rows, and it cannot be completed without an entry in the middle of a window, so it is terminal.
+
+The check compares timestamps and not counts. A price-level window of `L` rows predicts `L - 1` returns, and the last return has the timestamp of the last price, so one comparison of timestamps holds at both levels. The message names the workaround with two resumes.
 
 # Arguments
 
   - `test_idx`: The test window of the last held fold, over the extended carrier.
-  - `pred`: The last held fold's prediction.
-  - `ts`: The extended carrier's timestamps.
+  - `pred`: The prediction of the last held fold.
+  - `ts`: The timestamps of the extended carrier.
+
+# Validation
+
+  - The last timestamp that `pred` predicted equals `ts[last(test_idx)]`. An `ArgumentError` is thrown otherwise.
 
 # Related
 
@@ -285,43 +344,38 @@ function assert_resume_full_fold(test_idx::VecInt, pred::PredictionResult, ts)::
     return nothing
 end
 """
-    cv_resume_info(n_old::Integer, n::Integer)
+    online_folds(fit_fold, r::Resume, n::Integer, ::Type{ElT}, path_id = nothing; rd, train_idx, test_idx, fold_view, pws)
 
-Build the informational message emitted when a cross-validation run resumes from a Result, the counterpart of [`cv_online_info`](@ref) for the resumed arm of [`online_folds`](@ref).
+Runs the resumed arm of [`fold_loop`](@ref), which continues an online walk-forward from the folds that its Result holds.
 
-# Returns
+The loop takes this arm when the estimator slot holds a [`Resume`](@ref). The arm resolves the declaration at entry, so no verb below the loop meets it. The new folds run through [`thread_online_folds!`](@ref), the body that the online arm runs, so a resume continues exactly the loop that started the run. The [`TimeDependentContext`](@ref) of a schedule carries the `i` and `n` of the enumeration over the extended history. Every step checks the context that the state pinned, such as the asset names, a static panel and the column presence, as the one-shot run checks it.
 
-  - `msg::String`: The message.
+# Algorithm
 
-# Related
-
-  - [`Resume`](@ref)
-  - [`cv_online_info`](@ref)
-"""
-function cv_resume_info(n_old::Integer, n::Integer)
-    return "Resuming cross-validation online from fold $(n_old + 1) of $(n): the scheme enumerates $(n) fold(s) over the extended history, the first $(n_old) end where the Result's estimator stopped and are skipped, and the estimator the Result carries is copied and folded from its last training end through the rest, in order. The Result returned holds the new folds only; `vcat` it onto the old one to score the whole run."
-end
-"""
-    online_folds(fit_fold, r::Resume, n::Integer, ::Type{ElT}; rd, train_idx, test_idx, fold_view, pws)
-
-The resumed arm of [`fold_loop`](@ref): continue an online walk-forward from the folds its Result holds.
-
-Taken when the estimator slot holds a [`Resume`](@ref). It resolves the declaration at entry — a copy of `res.opt` through [`copy_states`](@ref), the last threadable fold of `res.pred` as the previous prediction, advanced over the folds the Result holds by [`advance_previous_fold`](@ref) exactly as the one-shot loop advanced it, and the folds to skip, `n_old`, read off the state's last held timestamp by [`resume_fold_count`](@ref) — and the declaration is gone before any verb below the loop meets it. The count comes from the state and not from `length(res.pred)`, because a resumed Result holds the new folds only and the chain `Resume(res2)` skips every fold before it. The re-entry checks run in order: the held timestamps name a fold and equal their rows ([`resume_fold_count`](@ref)), the carrier adds a fold ([`assert_resume_folds`](@ref)), and the last held fold was not partial ([`assert_resume_full_fold`](@ref)). The folds `(n_old + 1):n` then run through [`thread_online_folds!`](@ref), the body the online arm runs, from the last training end `last(train_idx[n_old])`. No warm-up runs. The schedule's [`TimeDependentContext`](@ref) carries the combined enumeration's `i` and `n`, and the pinned context — names, static panel, column presence — runs on every delta step through the state's own step.
+ 1. Refuse, through [`assert_online_fee_source`](@ref), a head whose fee cannot be measured without a Previous-Weights Source, as the one-shot online arm refuses it.
+ 2. Find the index of the last fold that the Result holds through [`resume_fold_count`](@ref), giving `n_old`.
+ 3. Refuse a carrier that adds no fold, through [`assert_resume_folds`](@ref).
+ 4. Take the last row of the training window of fold `n_old`, giving `last_end`.
+ 5. Refuse a partial last held fold, through [`assert_resume_full_fold`](@ref).
+ 6. Advance over every fold of `res.pred` through [`advance_previous_fold`](@ref), as the one-shot loop advanced over them, giving `prev`, the last threadable fold.
+ 7. Copy every state of `res.opt` through [`copy_states`](@ref).
+ 8. Run the folds `(n_old + 1):n` on the copy from `last_end` through [`thread_online_folds!`](@ref), giving `predictions` and the threaded `est`.
 
 # Arguments
 
-  - `fit_fold`: The per-fold resolution and callback [`fold_loop`](@ref) builds.
+  - `fit_fold`: The per-fold resolution and callback that [`fold_loop`](@ref) builds.
   - `r`: The declaration, holding the Result to continue.
-  - `n`: The number of folds the scheme enumerates over the extended history.
+  - `n`: The number of folds that the scheme enumerates over the extended history.
+  - `path_id`: The path that the folds belong to, or `nothing`. Only the context of a fold reads it.
   - `rd`: The carrier of the full history extended.
   - `train_idx`: The training windows of every fold, in split order.
   - `test_idx`: The test windows of every fold, in split order.
-  - `fold_view`: Unread; a multiple-randomised path never reaches this arm.
-  - `pws`: The scheme's Previous-Weights Source, or `nothing`.
+  - `fold_view`: Not read, because a multiple-randomised path never reaches this arm.
+  - `pws`: The Previous-Weights Source of the scheme, or `nothing`.
 
 # Validation
 
-  - Everything [`resume_fold_count`](@ref), [`assert_resume_folds`](@ref) and [`assert_resume_full_fold`](@ref) refuse.
+  - Everything that [`assert_online_fee_source`](@ref), [`resume_fold_count`](@ref), [`assert_resume_folds`](@ref) and [`assert_resume_full_fold`](@ref) refuse.
 
 # Returns
 
@@ -335,13 +389,12 @@ Taken when the estimator slot holds a [`Resume`](@ref). It resolves the declarat
   - [`thread_online_folds!`](@ref)
   - [`resume_fold_count`](@ref)
   - [`copy_states`](@ref)
-  - [`cv_resume_info`](@ref)
 """
-function online_folds(fit_fold, r::Resume, n::Integer, ::Type{ElT}; rd, train_idx, test_idx,
-                      fold_view = nothing, pws = nothing) where {ElT}
+function online_folds(fit_fold, r::Resume, n::Integer, ::Type{ElT}, path_id = nothing; rd,
+                      train_idx, test_idx, fold_view = nothing, pws = nothing) where {ElT}
     res = r.res
+    assert_online_fee_source(res.opt, pws)
     n_old = resume_fold_count(res.opt, rd, train_idx)
-    @info(cv_resume_info(n_old, n))
     assert_resume_folds(n_old, n)
     last_end = last(train_idx[n_old])
     assert_resume_full_fold(test_idx[n_old], res.pred[end], carrier_timestamps(rd))
@@ -351,18 +404,21 @@ function online_folds(fit_fold, r::Resume, n::Integer, ::Type{ElT}; rd, train_id
     end
     predictions = Vector{ElT}(undef, n - n_old)
     est = thread_online_folds!(predictions, fit_fold, copy_states(res.opt), (n_old + 1):n,
-                               prev; rd = rd, train_idx = train_idx, last_end = last_end,
-                               pws = pws)
+                               prev; rd = rd, train_idx = train_idx, test_idx = test_idx,
+                               n = n, last_end = last_end, pws = pws, path_id = path_id)
     return predictions, est
 end
 """
-    OptimiserResume = Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any, <:NonFiniteAllocationOptimisationEstimator}}
+    const OptimiserResume = Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any, <:NonFiniteAllocationOptimisationEstimator}}
 
-Alias for a [`Resume`](@ref) whose Result carries an optimiser: the declaration the optimiser doors take.
+Groups the [`Resume`](@ref) declarations whose Result carries an optimiser, so that the optimiser doors can take them.
+
+The doors of [`cross_val_predict`](@ref) and [`fit_and_predict`](@ref) that take an optimiser dispatch on this alias. A `Resume` whose Result carries a [`Pipeline`](@ref) takes the pipeline door instead, through [`PipelineResume`](@ref).
 
 # Related
 
   - [`Resume`](@ref)
+  - [`PipelineResume`](@ref)
   - [`cross_val_predict`](@ref)
 """
 const OptimiserResume = Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any,
@@ -371,22 +427,32 @@ const OptimiserResume = Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any
     cross_val_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER; cols = :, ex = FLoops.ThreadedEx())
     fit_and_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER; cols = :, ex = FLoops.ThreadedEx(), id = nothing)
 
-Continue an online walk-forward from a Result, over the full history extended.
+Continues an online walk-forward from a Result, over the full history extended.
 
-The doors that take an optimiser in the estimator slot take a [`Resume`](@ref) too. The carrier is viewed by `cols` as the one-shot door views it, and the estimator is not: the Result's estimator was threaded over the old run's view already, so the pinned context refuses a different one at the first delta step. The scheme is checked at the door ([`assert_resume_scheme`](@ref)) and the fold loop takes its resumed arm. The Result returned holds the new folds only, its `opt` folded through the last training end, and `id`.
+The doors that take an optimiser in the estimator slot take a [`Resume`](@ref) too. `cross_val_predict` views the carrier by `cols` as the one-shot door views it, but it leaves the estimator of the Result as it is. That estimator was threaded over the view of the old run already, and its state refuses a different view at the first step. The Result that the doors return holds the new folds only.
+
+# Algorithm
+
+ 1. For `cross_val_predict` only, run [`assert_internal_optimiser`](@ref) and [`assert_external_optimiser`](@ref) on `r.res.opt`, and view `rd` by `cols` when `cols` is not `:`.
+ 2. Refuse a scheme that a `Resume` cannot re-enter, through [`assert_resume_scheme`](@ref).
+ 3. Split `rd` by `cv`, giving `train_idx` and `test_idx`, and refuse shuffled folds through [`assert_unshuffled_folds`](@ref).
+ 4. Read the evaluation settings of `cv` through [`fold_evaluation`](@ref), giving `wd`, `pws`, `fa`, `store_weight_path` and `strict`, and the drift of the held weights through [`held_weights_drift`](@ref), giving `hwd`.
+ 5. Run [`fold_loop`](@ref) on `r`, which takes the resumed arm of [`online_folds`](@ref). Each fold calls the one-fold `fit_and_predict` with its estimator, its test window, its previous weights and the settings of step 4, giving `predictions` and the threaded `est`.
+ 6. Return a [`MultiPeriodPredictionResult`](@ref) of `predictions`, with `id`, and with `est` as `opt`.
 
 # Arguments
 
   - `r`: The declaration, holding the Result to continue.
   - $(arg_dict[:rd])
-  - `cv`: The scheme the Result came from, a walk-forward with `ff = OnlineStep()`.
-  - `cols`: The asset view of the carrier.
-  - `ex`: Unread; the resumed arm runs in order.
-  - `id`: The identifier the Result carries.
+  - `cv`: The scheme that the Result came from, an Online Scheme.
+  - `cols`: The asset view. `cross_val_predict` views the carrier by it. `fit_and_predict` hands it to every fold, which views its estimator and its prediction by it.
+  - `ex`: Not read, because the resumed arm runs the folds in order.
+  - `id`: The identifier that the Result carries.
 
 # Validation
 
-  - Everything [`assert_resume_scheme`](@ref) and the resumed arm of [`online_folds`](@ref) refuse.
+  - Everything that [`assert_resume_scheme`](@ref) and the resumed arm of [`online_folds`](@ref) refuse.
+  - For `cross_val_predict`, everything that [`assert_internal_optimiser`](@ref) and [`assert_external_optimiser`](@ref) refuse on `r.res.opt`.
 
 # Returns
 
@@ -401,6 +467,8 @@ The doors that take an optimiser in the estimator slot take a [`Resume`](@ref) t
 """
 function cross_val_predict(r::OptimiserResume, rd::ReturnsResult, cv::CVER; cols = :,
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+    assert_internal_optimiser(r.res.opt)
+    assert_external_optimiser(r.res.opt)
     if !isa(cols, Colon)
         rd = port_opt_view(rd, cols)
     end
@@ -427,7 +495,13 @@ end
 """
     search_cross_validation(::Resume, ::AbstractSearchCrossValidationEstimator, ::Any)
 
-A search refuses a [`Resume`](@ref) by name: a search scores every candidate through the one fold loop, so a resumed search is per-candidate Results the search Result does not carry.
+Refuses a [`Resume`](@ref) in a search, by name.
+
+A search scores every candidate through one fold loop. A resumed search would need one Result per candidate, and the Result of a search does not carry them. The message names the resume of the walk-forward of the chosen candidate instead.
+
+# Validation
+
+  - A search never takes a `Resume`. An `ArgumentError` is always thrown.
 
 # Related
 
@@ -442,7 +516,13 @@ end
 
 Stacks the folds of a run and of its resume into one Result, for scoring.
 
-`pred` is concatenated and `mrd` re-stacked by the constructor; the Result carries `a`'s `id` and `b`'s `opt`, the estimator the later run threaded. The two must abut in time: the last row of `a` is before the first row of `b`, both read off the stacked carriers' timestamps, so two Results that overlap, or that come from carriers without timestamps, are refused by name.
+The stacked Result carries the `id` of `a` and the `opt` of `b`, which is the estimator that the later run threaded, so it can be resumed too. The two Results must abut in time. The check reads the timestamps of the stacked carriers, so a pair that overlaps and a pair from carriers without timestamps are refused by name.
+
+# Algorithm
+
+ 1. Read the timestamps of the stacked carriers, giving `ta = a.mrd.ts` and `tb = b.mrd.ts`. Refuse when either is `nothing`.
+ 2. Refuse unless the last entry of `ta` is before the first entry of `tb`.
+ 3. Build a [`MultiPeriodPredictionResult`](@ref) from `vcat(a.pred, b.pred)`, the `id` of `a` and the `opt` of `b`. Its constructor stacks `mrd` again from the folds.
 
 # Arguments
 
@@ -451,7 +531,7 @@ Stacks the folds of a run and of its resume into one Result, for scoring.
 
 # Validation
 
-  - Both carry timestamps and `a` ends before `b` starts. An `ArgumentError` is thrown otherwise.
+  - Both carry timestamps, and `a` ends before `b` starts. An `ArgumentError` is thrown otherwise.
 
 # Returns
 

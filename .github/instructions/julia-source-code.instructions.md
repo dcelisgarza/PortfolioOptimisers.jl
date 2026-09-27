@@ -126,22 +126,35 @@ change here. Every forced type closes the library to one of them.
 ```julia
 Tf = eltype(X)                                  # the element type of one argument
 Tf = promote_type(real(eltype(X)), typeof(p))   # the element type of several
-Tf = typeof(one(Ts) / one(Ts))                  # the type one operation lands in
+Tf = float_if_integer(eltype(X))                # the same, when an integer must be repaired
 ```
 
-**Do not wrap a derived type in `float`.** `float(Int)` is `Float64`, so one integer argument
-inside a `promote_type` widens the whole computation to `Float64` and a `Float32` caller silently
-loses its precision. The wrapper also decides for a number type the library has never seen: a
-`Rational` argument becomes inexact, and a number type another package defines is converted to
-whatever `float` says rather than to what the arithmetic says. `nextfloat` and `prevfloat` are
-different verbs. They step a value and coerce nothing, so this rule does not reach them.
+**Repair an integer type with `float_if_integer`, and with nothing else.** An integer element
+type cannot hold a mean, a variance, a weight or a `NaN`, so a site whose data can be an integer
+must widen that one type. Take the type of the data, and pass it to `float_if_integer` in
+[`src/02_Tools/03_TypeUtilities.jl`](../../src/02_Tools/03_TypeUtilities.jl). It returns the
+floating-point type of `T` when `T <: Integer`, and `T` itself for every other type. So an
+integer panel computes in `Float64`, a `Float32` panel stays in `Float32`, and a `Rational`
+panel stays exact. That function holds the one call of `float` in `src/` and `ext/`.
 
-**Derive from the operation when the operation widens.** A mean, a variance, a correlation and a
-regression coefficient all divide, and a division of two integers lands in a float. Take the type
-from the division rather than from the arguments, as `cross_sectional_regression` in
-[`src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl`](../../src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl)
-does. The result is wider than `float`, not narrower: an integer panel still regresses in
-`Float64`, a `Float32` panel stays in `Float32`, and an exact type stays exact.
+**Do not repair an integer type with `float`.** `float(Int)` is `Float64`, so one integer
+argument inside a `promote_type` widens the whole computation to `Float64` and a `Float32` caller
+silently loses its precision. The wrapper also decides for every type that needed no repair: a
+`Rational` argument becomes inexact, and a number type another package defines is converted to
+whatever `float` says. `nextfloat` and `prevfloat` are different verbs. They step a value and
+coerce nothing, so this rule does not reach them.
+
+**Do not repair an integer type with the type of a division.** `typeof(one(T) / one(T))`,
+`typeof(zero(T) / one(Int))` and `typeof(one(T) / 1)` are the same coercion in a different
+spelling. A number type is free to define its division in a different type, so the spelling
+decides for every type, and not for integers alone. Sessions wrote it to repair integer
+returns after the census refused `float(`, and each such repair was reverted.
+
+**Derive from the operation only when the operation leaves every type.** A square root of a
+`Rational` is not a `Rational`, so a site that stores a square root takes
+`typeof(sqrt(one(float_if_integer(T))))`. A site that answers `NaN` for the other branch of a
+real quotient `a / b` takes `oftype(one(a) / one(b), NaN)`, because that value is a quotient.
+Neither is a repair of an integer input.
 
 **A concrete type is admitted only when the code really needs that type**, and then only when no
 method converts internally. An index is the usual case.
@@ -170,7 +183,7 @@ This avoids duplicating method definitions. A union alias is a **dispatch alias*
 
 ## Docstrings
 
-[`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) is the Authority for every docstring rule. It states which sections each kind of unit carries, what each section holds, the dictionaries in `src/01_Base/01_DocstringDictionaries.jl` that a description interpolates from, the mathematical notation, and the `jldoctest` blocks. Read it before you write a docstring, and change a docstring rule there and nowhere else.
+[`julia-docstrings.instructions.md`](julia-docstrings.instructions.md) is the Authority for every docstring rule. It states which sections each kind of unit carries, what each section holds, the dictionaries in `src/01_Base/01_DocstringDictionaries/` that a description interpolates from, the mathematical notation, and the `jldoctest` blocks. Read it before you write a docstring, and change a docstring rule there and nowhere else.
 
 An **alias** is the case to check first. Its docstring carries a different set of sections from the unit it names, the set differs by kind of alias, and `test/test_26_docs.jl` reds the file over a section outside that set. See § *Section Structure for Aliases*.
 
@@ -246,6 +259,36 @@ already carries the shape and names the symbol the caller passed.
   function prior(pr::AbstractPriorResult, args...; kwargs...) = pr  # passthrough
   ```
 
+## A unit that offers nothing but indirection is inlined
+
+A unit is a dead-end when it has **one method**, a body that is **one depth-one forward**, and
+**at most one reference** in `src/` and `ext/` outside its own definition (ADR 0168). A depth-one
+forward is a bare argument, a literal, a field of an argument, or one call whose callee is a name
+and whose arguments are each of those, a global name, a splat or a keyword forward. Such a unit
+is a name between a caller and the expression it forwards to, and it is inlined at that caller. A
+unit with no reference at all is dead and is deleted. The shape is one method, one caller, and a
+body that only constructs the geometry token the caller could construct itself.
+
+Everything wider earns its keep, because it reduces its caller's complexity, keeps the caller's
+inferred type concrete, or names a rule the caller would otherwise restate:
+
+- **Two methods are dispatch.** A `Nothing`/value pair and a two-family pair save the caller an
+  `isa` branch. They are never candidates, whatever their bodies hold.
+- **A decision, an operator, an index, a nested call, a comprehension or a string template is
+  logic the unit owns.** A ternary that picks a formulation, a message template, an accessor
+  that slices, and a helper that names one rule all stay.
+- **A public forward is public API.** A user's call is a use the census cannot see, so it is
+  flagged and kept by an allow-list entry, and the list shows every public forward the library
+  carries.
+
+The type-level case is an abstract type with one concrete subtype that nothing codes against: no
+dispatch on it, no field bound, no union alias. It stays when it has a realistic future
+application, and the allow-list is where that application is named.
+
+`test/test_70_trivial_unit_census.jl` is the census and the allow-list. A flagged name outside
+the list fails the build, and an entry whose name is no longer flagged is stale and fails too, so
+the list can only shrink on its own.
+
 ## Return Type Annotations
 
 - See `.github/instructions/julia-return-types.instructions.md` for full guidelines.
@@ -253,7 +296,8 @@ already carries the shape and names the symbol the caller passed.
 
 ## Code Organization
 
-- **File naming**: Source files are prefixed numerically to indicate load order (e.g., `src/01_Base/01_DocstringDictionaries.jl`). A prefix is unique within its directory, and the `include` list of `src/PortfolioOptimisers.jl` is the listing of `src/` sorted by prefix, so the number on a file is the order it loads in. A new file takes the next free number of its directory, or renumbers the files that load after it. `docs/src/public_api/` and `docs/src/private_api/` are each numbered the same way, to read beside `src/`. `test/test_47_alias_and_module_census.jl` gates both claims (ADR 0147).
+- **File naming**: Source files are prefixed numerically to indicate load order (e.g., `src/01_Base/02_TypeRoots.jl`). A prefix is unique within its directory, and the `include` list of `src/PortfolioOptimisers.jl` is the listing of `src/` sorted by prefix, so the number on a file is the order it loads in. A new file takes the next free number of its directory, or renumbers the files that load after it. `docs/src/public_api/` and `docs/src/private_api/` are each numbered the same way, to read beside `src/`. `test/test_47_alias_and_module_census.jl` gates both claims (ADR 0147).
+- **Letter parts**: A file over the size threshold of ADR 0101 that holds one subject in a logical order is cut into letter parts, which add the suffixes `_a`, `_b`, and so on to its name: `src/05_Moments/05_Gerber/03_GerberIQCovariance_a.jl` and `src/05_Moments/05_Gerber/03_GerberIQCovariance_b.jl` are the two parts of one file. The parts keep the number of the file, load in letter order, and count as one entry of the directory, so a run starts at `_a` and leaves no letter out. A cut falls before a documented definition, and each part takes as many definitions as fit under the threshold with room for its own `export` line. A file that mixes subjects is not cut this way: it becomes a directory of files, one subject to a file (ADR 0179). `test/test_47_alias_and_module_census.jl` gates the run (ADR 0178).
 - **Directories**: A family of files under one subject is a directory, numbered as one entry of its parent, and its files are numbered inside it: `src/05_Moments/05_Gerber/` holds the three Gerber-family covariances, `src/17_Optimisation/05_JuMP/` everything that builds the JuMP model. A file whose subject already has a directory goes into it. A family of two or more files at the top of a directory that reads as one subject takes a directory of its own (ADR 0150). `docs/src/public_api/` and `docs/src/private_api/` each carry one page per source file at the same path, so a directory in `src/` is a directory of pages on each mirror (ADR 0128).
 - **Module structure**: Each submodule focuses on a specific domain (moments, risk, priors, etc.).
 - **Type hierarchy**: Subtype the appropriate abstract type (`AbstractEstimator`, `AbstractAlgorithm`, `AbstractResult`).

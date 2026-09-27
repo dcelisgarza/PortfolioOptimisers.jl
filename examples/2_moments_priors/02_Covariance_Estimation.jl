@@ -1,33 +1,34 @@
 #=
 ```@meta
-Description = "Covariance estimation in PortfolioOptimisers.jl: denoising, detoning, shrinkage and robust estimators for a short, noisy return sample."
+Description = "Covariance estimation in PortfolioOptimisers.jl: denoising and sparsification of the covariance of a short, noisy return sample."
 ```
 
-# Covariance estimation
+# [Covariance estimation](@id example-covariance-estimation)
 
-The covariance matrix is the second moment that almost every optimiser depends on, and on a
-short window it is badly estimated: with ``N`` assets and only a little more than ``N``
-observations, the sample covariance is noisy and ill-conditioned, and inverting it (as
-mean–variance implicitly does) amplifies that noise. Two families of fixes help:
+Almost every optimiser reads the covariance matrix, and a short window estimates it badly.
+With ``N`` assets and a little more than ``N`` observations, the sample covariance is noisy
+and ill-conditioned. Mean-variance optimisation inverts it in effect, and the inverse
+amplifies the noise. Two families of fixes help.
 
-  - **Denoising** — separate signal from noise in the eigenspectrum. [`Denoise`](@ref) offers
-    [`FixedDenoise`](@ref) (collapse the sub-threshold bulk), [`ShrunkDenoise`](@ref) (shrink
-    it) and [`SpectralDenoise`](@ref) (zero it) — the last does not always lower the condition
-    number, as we will see.
-  - **Sparsification** — impose a relationship structure on the inverse. [`LoGo`](@ref) keeps
-    only the entries justified by the network topology, using a similarity measure such as
-    [`MaximumDistanceSimilarity`](@ref) or [`ExponentialSimilarity`](@ref).
+  - Denoising separates the signal from the noise in the eigenvalues of the matrix.
+    [`Denoise`](@ref) takes one of three algorithms for the eigenvalues below the noise
+    threshold. [`FixedDenoise`](@ref) replaces them with their mean. [`ShrunkDenoise`](@ref)
+    keeps the diagonal of their part of the matrix and shrinks its other entries toward zero.
+    [`SpectralDenoise`](@ref) sets them to zero, which leaves a nearly singular matrix, as
+    section 2 shows.
+  - Sparsification imposes a structure on the inverse. [`LoGo`](@ref) keeps only the entries
+    that a network of the assets supports, and it builds the network from a similarity
+    measure such as [`MaximumDistanceSimilarity`](@ref) or [`ExponentialSimilarity`](@ref).
 
-Both are configured through the [`MatrixProcessing`](@ref) pipeline on a
-[`PortfolioOptimisersCovariance`](@ref), which is the `ce` field of a prior.
+You configure both through [`MatrixProcessing`](@ref), the `mp` field of
+[`PortfolioOptimisersCovariance`](@ref). A prior takes that estimator in its `ce` field.
 
 !!! tip "When to reach for this"
-    Reach for covariance denoising/sparsification whenever your estimation window is short
-    relative to the number of assets and you run anything that leans on the covariance —
-    mean–variance, risk budgeting, clustering. A lower condition number means a more stable
-    inverse and weights that move less when the data wobbles. Compare condition numbers before
-    committing to a technique: [`SpectralDenoise`](@ref) in particular can make conditioning
-    *worse* on some data.
+    Reach for denoising or sparsification when your window is short next to the number of
+    assets and you run anything that reads the covariance, such as mean-variance
+    optimisation, risk budgeting or clustering. A lower condition number gives a more stable
+    inverse, and weights that move less when the data changes a little. Compare condition
+    numbers before you settle on a technique.
 =#
 
 using PortfolioOptimisers, PrettyTables, LinearAlgebra
@@ -48,9 +49,10 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data
+## 1. The data
 
-We use the same S&P 500 slice as the other examples.
+We load the daily prices of 20 assets over the last 253 trading days, and convert them to
+returns.
 =#
 
 using CSV, TimeSeries, DataFrames
@@ -61,9 +63,9 @@ rd = prices_to_returns(X)
 #=
 ## 2. Covariance estimators
 
-We build one prior per covariance estimator, varying **only** the `ce` field (the expected
-returns are held at the plain sample mean). We compare the vanilla sample covariance against
-three denoisers and two LoGo sparsifications.
+We build one prior per covariance estimator and change only the `ce` field. The expected
+returns stay at the sample mean. We compare the sample covariance with three denoisers and two
+LoGo sparsifications.
 =#
 
 ces = ["Vanilla" => PortfolioOptimisersCovariance(),
@@ -90,9 +92,9 @@ ces = ["Vanilla" => PortfolioOptimisersCovariance(),
 prs = [k => prior(EmpiricalPrior(; ce = ce), rd) for (k, ce) in ces]
 
 #=
-The condition number is our headline diagnostic — lower is better-posed. FixedDenoise gives
-the biggest improvement here, while SpectralDenoise actually makes conditioning dramatically
-*worse* on this data, a reminder to always measure rather than assume.
+A lower condition number means a better-posed problem. On this data `FixedDenoise` lowers it
+the most, and `SpectralDenoise` raises it by many orders of magnitude. Measure it on your own
+data before you trust a technique.
 =#
 
 pretty_table(DataFrame(; :estimator => [k for (k, _) in prs],
@@ -102,28 +104,29 @@ pretty_table(DataFrame(; :estimator => [k for (k, _) in prs],
 #=
 ## 3. Visualising the eigenspectrum
 
-[`plot_eigenspectrum`](@ref) shows the Marchenko–Pastur ``\lambda_+`` threshold: bars above it
-carry signal, bars below are noise. Denoising acts on the sub-threshold bulk.
+[`plot_eigenspectrum`](@ref) draws the eigenvalues of a covariance matrix as bars, with the
+Marchenko-Pastur upper bound ``\lambda_+`` of that covariance. A bar above the line is larger
+than noise alone would give. The denoiser does not use this line. It fits its own threshold to
+the eigenvalues of the correlation matrix.
 =#
 
 using StatsPlots, GraphRecipes
-# Eigenspectrum: vanilla sample covariance.
+# The eigenvalues of the sample covariance.
 plot_eigenspectrum(prs[1].second, rd)
-# Eigenspectrum: fixed-denoised covariance.
+# The eigenvalues after `FixedDenoise`.
 plot_eigenspectrum(prs[2].second, rd)
-# Eigenspectrum: shrunk-denoised covariance.
+# The eigenvalues after `ShrunkDenoise`.
 plot_eigenspectrum(prs[3].second, rd)
-# Eigenspectrum: spectral-denoised covariance.
+# The eigenvalues after `SpectralDenoise`.
 plot_eigenspectrum(prs[4].second, rd)
-# Eigenspectrum: LoGo(MaxDist) sparsified covariance.
+# The eigenvalues after LoGo sparsification with the maximum distance similarity.
 plot_eigenspectrum(prs[5].second, rd)
 
 #=
-## 4. Why it matters: minimum-variance optimisation
+## 4. Minimum-variance portfolios
 
-Minimum-variance is the optimisation most exposed to covariance conditioning. We solve it with
-each prior and compare the weights — better-conditioned estimators produce more stable, less
-concentrated allocations.
+The minimum-variance portfolio reads only the covariance, so it isolates the estimator. We solve
+it with each prior and compare the weights.
 =#
 
 using Clarabel
@@ -140,7 +143,7 @@ pretty_table(DataFrame(["Assets" => rd.nx; [k => r.w for (k, r) in ress]]);
              title = "Minimum-variance weights by covariance estimator")
 
 #=
-The composition plot contrasts the minimum-variance portfolios across estimators.
+We stack the same weights into one bar per covariance estimator.
 =#
 
 plot_stacked_bar_composition([r for (_, r) in ress], rd;

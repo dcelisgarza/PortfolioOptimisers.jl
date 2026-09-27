@@ -10,7 +10,7 @@ first_duplicate
 
 ## Injection
 
-The pipeline resolves its computed slots into [routing targets](@ref PIPELINE_ROUTING_TARGETS) and hands each one to the optimiser, which owns the decision of where it lands. See [`pipe_route`](@ref) for the optimiser-owned half of the seam.
+The pipeline turns every slot it computed into [routing targets](@ref PIPELINE_ROUTING_TARGETS) and passes them to the optimiser. The optimiser chooses the field that receives the value, through [`pipe_route`](@ref).
 
 ```@docs
 inject_context
@@ -27,7 +27,7 @@ assert_constraint_targets
 
 ## Prediction
 
-Predicting with a fitted pipeline replays the fitted preprocessing steps — the training universe, the training imputation parameters, the returns conversion — on an unseen data window, then delegates to the existing weights-level prediction machinery. Cross-validation folds can be computed directly on price-level data ([`Prices_RR`](@ref)), so the whole workflow is fitted per fold with no test-window leakage into stateful preprocessing.
+To predict with a fitted pipeline, the pipeline applies its fitted preprocessing steps to the new data window. The steps keep what they learned on the training window: the universe, the imputation parameters and the conversion to returns. The pipeline then predicts with the same functions as an optimisation result. Cross-validation also accepts price data, through [`Prices_RR`](@ref). Each fold then fits the whole pipeline on its own training window, so no preprocessing step learns anything from the test window.
 
 ```@docs
 apply_fitted_step

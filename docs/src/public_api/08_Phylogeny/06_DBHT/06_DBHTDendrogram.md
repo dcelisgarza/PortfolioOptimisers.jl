@@ -4,4 +4,4 @@ Description = "DBHT Dendrogram has no public API in PortfolioOptimisers.jl; its 
 
 # DBHT Dendrogram
 
-DBHT Dendrogram has no public API in PortfolioOptimisers.jl; see [DBHT Dendrogram: private API](../../../private_api/08_Phylogeny/06_DBHT/06_DBHTDendrogram.md) for its private API.
+Every name of this topic is private. The [private page](@ref private-api-dbht-dendrogram) documents them.

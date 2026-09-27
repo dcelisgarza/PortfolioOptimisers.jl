@@ -58,7 +58,9 @@ Regression
        M ┼ 2×2 Matrix{Float64}
        L ┼ 2×2 Matrix{Float64}
        b ┼ nothing
-  esigma ┴ nothing
+  esigma ┼ nothing
+    edof ┼ nothing
+    ediv ┴ nothing
 ```
 
 # Related
@@ -1127,6 +1129,8 @@ Holds the loadings matrix, the intercept vector, the reduced-basis loadings and 
 
 `esigma` holds the idiosyncratic covariance the fit left over, and it carries the same name and the same shapes as the field [`CrossSectionalFactorModel`](@ref) declares, so one reader answers off either block. A regression estimator fits loadings alone and writes nothing here; the field is filled by the prior that lifts the factor moments, and only when that prior adds a residual block. [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) write the residual variances of [`factor_lift`](@ref) under `rsd = true`, and leave the field unset under `rsd = false`.
 
+`edof` and `ediv` record how each idiosyncratic variance was measured, so a consumer that prices the sampling error of `esigma` reads the count off the block instead of guessing it. [`StepwiseRegression`](@ref) and [`DimensionReductionRegression`](@ref) write `edof` as the number of observations less the parameters that the fit of each asset spent, the intercept included. The prior that writes `esigma` restates `edof` in the effective count of its variance estimator and writes `ediv`, the divisor of each variance in that count, with [`variance_count`](@ref). A block built by hand, or measured by a variance estimator that states no count, leaves both unset. [`ResidualInflation`](@ref) reads both fields.
+
 # Mathematical definition
 
 ```math
@@ -1155,7 +1159,9 @@ $(DocStringExtensions.FIELDS)
         M::MatNum,
         L::Option{<:MatNum} = nothing,
         b::Option{<:VecNum} = nothing,
-        esigma::Option{<:VecNum_MatNum} = nothing
+        esigma::Option{<:VecNum_MatNum} = nothing,
+        edof::Option{<:VecNum} = nothing,
+        ediv::Option{<:VecNum} = nothing
     ) -> Regression
 
 Keywords correspond to the struct's fields.
@@ -1166,6 +1172,7 @@ Keywords correspond to the struct's fields.
   - If provided, `!isempty(b)`, and `length(b) == size(M, 1)`.
   - If provided, `!isempty(L)`, and `size(L, 1) == size(M, 1)`.
   - If provided, `!isempty(esigma)`, and `esigma` carries `size(M, 1)` entries when it is a vector, or is square with `size(M, 1)` rows when it is a matrix.
+  - If provided, `edof` and `ediv` each carry `size(M, 1)` entries.
 
 # Examples
 
@@ -1175,7 +1182,9 @@ Regression
        M ┼ 2×3 Matrix{Int64}
        L ┼ 2×4 Matrix{Int64}
        b ┼ Vector{Int64}: [1, 2]
-  esigma ┴ Vector{Float64}: [0.1, 0.2]
+  esigma ┼ Vector{Float64}: [0.1, 0.2]
+    edof ┼ nothing
+    ediv ┴ nothing
 ```
 
 # Related
@@ -1206,8 +1215,17 @@ Regression
     $(arg_dict[:esigma])
     """
     esigma
+    """
+    $(arg_dict[:edof])
+    """
+    edof
+    """
+    $(arg_dict[:ediv])
+    """
+    ediv
     function Regression(M::MatNum, L::Option{<:MatNum}, b::Option{<:VecNum},
-                        esigma::Option{<:VecNum_MatNum})
+                        esigma::Option{<:VecNum_MatNum}, edof::Option{<:VecNum},
+                        ediv::Option{<:VecNum})
         @argcheck(!isempty(M), IsEmptyError)
         if isa(b, VecNum)
             @argcheck(!isempty(b), IsEmptyError)
@@ -1218,18 +1236,23 @@ Regression
             @argcheck(size(L, 1) == size(M, 1), DimensionMismatch)
         end
         assert_idiosyncratic_covariance(esigma, size(M, 1))
-        return new{typeof(M), typeof(L), typeof(b), typeof(esigma)}(M, L, b, esigma)
+        assert_idiosyncratic_count(edof, size(M, 1), :edof)
+        assert_idiosyncratic_count(ediv, size(M, 1), :ediv)
+        return new{typeof(M), typeof(L), typeof(b), typeof(esigma), typeof(edof),
+                   typeof(ediv)}(M, L, b, esigma, edof, ediv)
     end
 end
 function Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
                     b::Option{<:VecNum} = nothing,
-                    esigma::Option{<:VecNum_MatNum} = nothing)::Regression
-    return Regression(M, L, b, esigma)
+                    esigma::Option{<:VecNum_MatNum} = nothing,
+                    edof::Option{<:VecNum} = nothing,
+                    ediv::Option{<:VecNum} = nothing)::Regression
+    return Regression(M, L, b, esigma, edof, ediv)
 end
 # When `L` is unset (`Nothing` type parameter), `:L` falls back to the loadings matrix `M`;
 # when `L` is a stored matrix the default field access already returns it, so only the
 # `Nothing` specialisation needs a rule (see [`@forward_properties`](@ref)'s `swap`).
-@forward_properties Regression{<:Any, Nothing, <:Any, <:Any} begin
+@forward_properties Regression{<:Any, Nothing, <:Any, <:Any, <:Any, <:Any} begin
     swap(L, M)
 end
 """
@@ -1237,7 +1260,7 @@ end
 
 Return a view of a [`Regression`](@ref) result object, selecting only the rows indexed by `i`.
 
-This function constructs a new `Regression` result, where the coefficient matrix `M`, optional auxiliary matrix `L`, intercept vector `b` and idiosyncratic covariance `esigma` are restricted to the rows specified by the index vector `i`. This is useful for extracting or operating on a subset of regression results, such as for a subset of assets.
+This function constructs a new `Regression` result, where the coefficient matrix `M`, optional auxiliary matrix `L`, intercept vector `b`, idiosyncratic covariance `esigma` and the counts `edof` and `ediv` are restricted to the rows specified by the index vector `i`. This is useful for extracting or operating on a subset of regression results, such as for a subset of assets.
 
 # Algorithm
 
@@ -1246,7 +1269,8 @@ This function constructs a new `Regression` result, where the coefficient matrix
  3. Take a row view of `L` over `i` when step 1 found a matrix, and `nothing` otherwise.
  4. Take an element view of `b` over `i` when step 1 found a vector, and `nothing` otherwise.
  5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape: a vector of variances is indexed once, and a full covariance is indexed on both axes.
- 6. Build a new [`Regression`](@ref) from the four, which re-runs every guard of the constructor.
+ 6. View `edof` and `ediv` with [`nothing_scalar_array_view`](@ref), which indexes a vector once and passes `nothing` through.
+ 7. Build a new [`Regression`](@ref) from the six, which re-runs every guard of the constructor.
 
 # Arguments
 
@@ -1265,14 +1289,18 @@ Regression
        M ┼ 3×2 Matrix{Int64}
        L ┼ 3×2 Matrix{Int64}
        b ┼ Vector{Int64}: [7, 8, 9]
-  esigma ┴ nothing
+  esigma ┼ nothing
+    edof ┼ nothing
+    ediv ┴ nothing
 
 julia> PortfolioOptimisers.port_opt_view(re, [1, 3])
 Regression
        M ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
        L ┼ 2×2 SubArray{Int64, 2, Matrix{Int64}, Tuple{Vector{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
        b ┼ SubArray{Int64, 1, Vector{Int64}, Tuple{Vector{Int64}}, false}: [7, 9]
-  esigma ┴ nothing
+  esigma ┼ nothing
+    edof ┼ nothing
+    ediv ┴ nothing
 ```
 
 # Related
@@ -1288,14 +1316,17 @@ function port_opt_view(re::Regression, i, args...)::Regression
     b = getfield(re, :b)
     return Regression(; M = view(re.M, i, :), L = isnothing(L) ? nothing : view(L, i, :),
                       b = isnothing(b) ? nothing : view(b, i),
-                      esigma = idiosyncratic_covariance_view(re.esigma, i))
+                      esigma = idiosyncratic_covariance_view(re.esigma, i),
+                      edof = nothing_scalar_array_view(re.edof, i),
+                      ediv = nothing_scalar_array_view(re.ediv, i))
 end
 """
-    set_idiosyncratic_covariance(re::Regression, esigma::Option{<:VecNum_MatNum})
+    set_idiosyncratic_covariance(re::Regression, esigma::Option{<:VecNum_MatNum},
+                                 edof::Option{<:VecNum}, ediv::Option{<:VecNum})
 
-Return a [`Regression`](@ref) that carries `esigma`, with every other field unchanged.
+Return a [`Regression`](@ref) that carries `esigma`, `edof` and `ediv`, with every other field unchanged.
 
-A regression estimator fits loadings alone, so the block a fit returns carries no idiosyncratic covariance. The prior that lifts the factor moments measures the residual variances on the way, and it writes them here rather than making every consumer recompute them. [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) are the two callers, and each passes what [`factor_lift`](@ref) returned: the variances under `rsd = true`, and `nothing` under `rsd = false`.
+A regression estimator fits loadings alone, so the block a fit returns carries no idiosyncratic covariance. The prior that lifts the factor moments measures the residual variances on the way, and it writes them here rather than making every consumer recompute them. It writes the counts of those variances beside them. [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) are the two callers, and each passes what [`factor_lift`](@ref) returned: the variances and their counts under `rsd = true`, and `nothing` for the variances and the divisors under `rsd = false`.
 
 `Accessors.@set` cannot do this. It reads the fields through property access, and the `swap(L, M)` rule of [`Regression`](@ref) makes `re.L` return `re.M` when `L` is unset, so the rebuilt result would carry a copy of `M` under `L` and `isnothing(getfield(re, :L))` would stop being true. This method reads `L` and `b` with `getfield` for that reason, as [`port_opt_view`](@ref) does.
 
@@ -1303,10 +1334,12 @@ A regression estimator fits loadings alone, so the block a fit returns carries n
 
   - `re`: The regression result to rewrite.
   - `esigma`: The idiosyncratic covariance to write, or `nothing` to leave the field unset.
+  - `edof`: The degrees of freedom of each residual series, or `nothing` to leave the field unset.
+  - `ediv`: The divisor of each idiosyncratic variance, or `nothing` to leave the field unset.
 
 # Returns
 
-  - `re::Regression`: A new result carrying `esigma`, which re-runs every guard of the constructor.
+  - `re::Regression`: A new result carrying `esigma`, `edof` and `ediv`, which re-runs every guard of the constructor.
 
 # Related
 
@@ -1314,10 +1347,11 @@ A regression estimator fits loadings alone, so the block a fit returns carries n
   - [`factor_lift`](@ref)
   - [`port_opt_view`](@ref)
 """
-function set_idiosyncratic_covariance(re::Regression,
-                                      esigma::Option{<:VecNum_MatNum})::Regression
+function set_idiosyncratic_covariance(re::Regression, esigma::Option{<:VecNum_MatNum},
+                                      edof::Option{<:VecNum},
+                                      ediv::Option{<:VecNum})::Regression
     return Regression(; M = re.M, L = getfield(re, :L), b = getfield(re, :b),
-                      esigma = esigma)
+                      esigma = esigma, edof = edof, ediv = ediv)
 end
 """
     regression(re::Regression, args...)

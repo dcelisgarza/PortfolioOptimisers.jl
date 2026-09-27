@@ -309,3 +309,61 @@ const _path_w = [0.6, 0.4]
     @test_throws ArgumentError expected_risk(rw, U, _path_X)
     @test_throws ArgumentError expected_risk(rv, U, rd)
 end
+
+# The two kinds that read a return series refuse a `nothing` carrier by name (#1240). The
+# call that lands here is the documented `expected_risk(r, res)` on a result that carries no
+# carrier of its own, where the fallback to `res.pr` yields `nothing`. Before this the kind
+# singleton reached no method and the caller met a `MethodError` naming neither the measure
+# nor the missing argument. `WeightsInput` reads no series, so it still answers.
+@testset "a `nothing` carrier is refused by name, and only by the two series kinds (#1240)" begin
+    rn = ConditionalValueatRisk()
+    rw = MedianAbsoluteDeviation()
+    rv = Variance(; sigma = [1.0 0.0; 0.0 1.0])
+    U = PO.weight_path(nothing, _path_w, _path_X)
+    @test PO.risk_input_kind(rn) === PO.NetReturnsInput()
+    @test PO.risk_input_kind(rw) === PO.WeightsReturnsFeesInput()
+    @test PO.risk_input_kind(rv) === PO.WeightsInput()
+
+    # Both series kinds refuse a carrier-free single target, at either arity.
+    for r in (rn, rw)
+        @test_throws IsNothingError expected_risk(r, _path_w)
+        @test_throws IsNothingError expected_risk(r, _path_w, nothing)
+        @test_throws IsNothingError expected_risk(r, _path_w, nothing, nothing)
+    end
+
+    # A weight path reaches the new refusal for `NetReturnsInput` alone. The other two
+    # kinds refuse **any** path by name already (#773), and that refusal is the more
+    # fundamental one, so a carrier-free path keeps it rather than naming the carrier.
+    @test_throws IsNothingError expected_risk(rn, U)
+    @test_throws IsNothingError expected_risk(rn, U, nothing, nothing)
+    @test_throws ArgumentError expected_risk(rw, U)
+    @test_throws ArgumentError expected_risk(rv, U)
+    for r in (rw, rv)
+        msg = try
+            expected_risk(r, U)
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("weight path", msg)
+    end
+
+    # The message names the measure and states the ways out.
+    msg = try
+        expected_risk(rn, _path_w)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("ConditionalValueatRisk", msg)
+    @test occursin("expected_risk(r, res, X)", msg)
+    @test occursin("expected_risk(r, res, pr)", msg)
+
+    # A vector of measures is scalarised through the same door, so it refuses too.
+    @test_throws IsNothingError expected_risk([rn], _path_w, nothing, nothing)
+
+    # `WeightsInput` reads no series, so a carrier-free call answers as it always has.
+    @test expected_risk(rv, _path_w) == rv(_path_w)
+    @test expected_risk(rv, _path_w, nothing, nothing) == rv(_path_w)
+
+    # Handing a carrier in answers, which is the way out the message names.
+    @test expected_risk(rn, _path_w, _path_X) == rn(calc_net_returns(_path_w, _path_X))
+end

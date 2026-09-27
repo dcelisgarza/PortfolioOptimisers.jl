@@ -2,9 +2,9 @@
     set_l1_regularisation!(model::JuMP.Model, l1_val::Number)
     set_l1_regularisation!(args...)
 
-Add an L1 regularisation penalty to the objective function.
+Add an L1 penalty on the portfolio weights to the objective penalty.
 
-The penalty is applied as given, so `l1_val` must be commensurate with the scale of the objective it is added to.
+The objective takes the penalty in its own units, so `l1_val` is a price in those units. With no short positions and a budget of one, ``\\lVert \\boldsymbol{w} \\rVert_1 = 1`` at every feasible point, so the penalty is a constant and moves no weight. It acts on the gross exposure of a portfolio that can hold short positions. Under [`MaximumRatio`](@ref) the model's `w` is the homogenised vector ``k \\boldsymbol{w}``, so the penalty acts on ``k \\boldsymbol{w}``. The method on `args...` does nothing, and it runs when no L1 coefficient is set.
 
 # Mathematical definition
 
@@ -16,22 +16,43 @@ The penalty is applied as given, so `l1_val` must be commensurate with the scale
 
 Where:
 
-  - ``\\lambda_1``: L1 regularisation coefficient.
+  - ``\\lambda_1``: L1 penalty coefficient, `l1_val`.
+  - $(math_dict[:w_port])
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: read from the model.
+  - `t_l1`: created, the epigraph variable of the 1-norm.
+
+## Expressions
+
+  - `l1`: ``\\lambda_1 t_{1}``. [`add_to_objective_penalty!`](@ref) adds it to the objective penalty `op`.
+
+## Constraints
+
+  - `cl1_noc`: ``\\left(s_c t_{1},\\, s_c \\boldsymbol{w}\\right)`` lies in the 1-norm cone, which is ``t_{1} \\geq \\lVert \\boldsymbol{w} \\rVert_1``. The objective penalty always makes the objective worse, and ``\\lambda_1 > 0``, so at the optimum ``t_{1}`` equals the norm.
+
+Where:
+
+  - ``t_{1}``: The epigraph variable `t_l1`.
+  - ``\\lambda_1``: L1 penalty coefficient, `l1_val`.
+  - $(math_dict[:sc_scale])
   - $(math_dict[:w_port])
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `l1_val::Number`: L1 regularisation coefficient.
+  - `l1_val::Number`: L1 penalty coefficient.
+
+# Validation
+
+  - `l1_val > 0` and finite.
 
 # Returns
 
   - `nothing`.
-
-# Details
-
-  - `l1_val::Number`: Introduces the auxiliary variable `t_l1`, bounds it with `[t_l1; w] in MOI.NormOneCone`, and adds `l1_val * t_l1` to the objective penalty via [`add_to_objective_penalty!`](@ref).
-  - `args...`: No-op, used when no L1 regularisation is configured.
 
 # Related
 
@@ -47,42 +68,45 @@ end
     set_l2_regularisation!(model::JuMP.Model, l2s::L2Reg_VecL2Reg)
     set_l2_regularisation!(args...)
 
-Add one or more L2 regularisation penalties to the objective function.
+Add the penalty of each L2 term to the objective penalty.
 
-Each [`L2Regularisation`](@ref) carries its own coefficient and cone formulation, so several may be combined in a single model. The penalties are applied as given, so each coefficient must be commensurate with the scale of the objective it is added to, and with the formulation used to express it.
+Each [`L2Regularisation`](@ref) carries its own coefficient and formulation, and the penalties of several terms add. The objective takes each penalty in its own units, and the formulation sets the power of the norm, so one `val` gives a different penalty under each formulation. The method on `args...` does nothing, and it runs when no L2 term is set.
 
 # Mathematical definition
 
+Each term adds
+
 ```math
 \\begin{align}
-\\text{penalty} &= \\sum_{i} \\lambda_{2,\\, i} \\lVert \\boldsymbol{w} \\rVert_2\\,.
+\\text{penalty} &= \\lambda_2 \\lVert \\boldsymbol{w} \\rVert_2^{q}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\lambda_{2,\\, i}``: L2 regularisation coefficient of the ``i``-th term.
+  - $(math_dict[:lambda_2_reg])
+  - $(math_dict[:q_l2_power])
   - $(math_dict[:w_port])
+
+# Algorithm
+
+ 1. Read the weights `w` and the constraint scale `sc` from the model.
+ 2. For the term at position `i`, call [`_set_l2_regularisation!`](@ref), which registers the rows and the penalty of that term under names that end in `i`.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `l2s::L2Reg_VecL2Reg`: One or more L2 regularisation terms.
+  - `l2s::L2Reg_VecL2Reg`: One L2 term, or a vector of them.
 
 # Returns
 
   - `nothing`.
 
-# Details
-
-  - `l2s::L2Reg_VecL2Reg`: Dispatches each term to [`_set_l2_regularisation!`](@ref), which selects the cone formulation from the term's `alg` field. Variables and constraints are suffixed by the term's index, so terms do not collide.
-  - `args...`: No-op, used when no L2 regularisation is configured.
-
 # Related
 
   - [`L2Regularisation`](@ref)
   - [`L2Reg_VecL2Reg`](@ref)
-  - [`_set_l2_regularisation!`](@ref)
+  - [`_set_l2_regularisation!`](@ref): Registers the model entries of one term.
   - [`set_l1_regularisation!`](@ref)
   - [`add_to_objective_penalty!`](@ref)
 """
@@ -93,45 +117,73 @@ end
     set_lp_regularisation!(model::JuMP.Model, lps::LpReg_VecLpReg)
     set_lp_regularisation!(args...)
 
-Add one or more Lp regularisation penalties to the objective function.
+Add the penalty of each Lp term to the objective penalty.
 
-Each [`LpRegularisation`](@ref) carries its own norm order and coefficient, so several may be combined in a single model. The penalties are applied as given, so each coefficient must be commensurate with the scale of the objective it is added to.
+Each [`LpRegularisation`](@ref) carries its own norm order and coefficient, and the penalties of several terms add. The objective takes each penalty in its own units. Under [`MaximumRatio`](@ref) the model's `w` is the homogenised vector ``k \\boldsymbol{w}``, so the penalty acts on ``k \\boldsymbol{w}``. The method on `args...` does nothing, and it runs when no Lp term is set.
 
-The same estimator also specifies a p-norm *constraint* when it is placed in the `lpc` field of [`JuMPOptimiser`](@ref) instead of the `lp` field, in which case its `val` field is an upper bound on the p-norm rather than a coefficient. See [`set_weight_norm_p_constraints!`](@ref).
+The same estimator in the `lpc` field of [`JuMPOptimiser`](@ref) is a norm constraint, and [`set_weight_norm_p_constraints!`](@ref) reads its `val` as a ceiling on the norm.
 
 # Mathematical definition
 
+Each term adds
+
 ```math
 \\begin{align}
-\\text{penalty} &= \\sum_{i} \\lambda_{p,\\, i} \\lVert \\boldsymbol{w} \\rVert_{p_i}\\,.
+\\text{penalty} &= \\lambda_p \\lVert \\boldsymbol{w} \\rVert_p\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\lambda_{p,\\, i}``: Regularisation coefficient of the ``i``-th term, its `val` field.
-  - ``p_i``: Norm order of the ``i``-th term, its `p` field.
+  - $(math_dict[:lambda_p_reg])
+  - $(math_dict[:p_norm_order])
   - $(math_dict[:w_port])
+
+# JuMP formulation
+
+The entries below belong to the term at position ``i``. Each name ends in ``i``, so the entries of two terms do not collide.
+
+## Variables
+
+  - `w`: read from the model.
+  - `t_lp_i`: created, the epigraph variable of the p-norm.
+  - `r_lp_i`: created, one entry for each asset.
+
+## Expressions
+
+  - `lp_i`: ``\\lambda_p t_p``. [`add_to_objective_penalty!`](@ref) adds it to the objective penalty `op`.
+
+## Constraints
+
+  - `clp_i`: one row for each asset ``j``, ``\\left(s_c r_j,\\, s_c t_p,\\, s_c w_j\\right)`` lies in the power cone of exponent ``1/p``, which is ``r_j^{1/p} t_p^{1 - 1/p} \\geq \\lvert w_j \\rvert``.
+  - `cslp_i`: ``s_c \\left(\\sum_{j=1}^{N} r_j - t_p\\right) = 0``.
+
+The two rows together give ``t_p \\geq \\lVert \\boldsymbol{w} \\rVert_p``. The objective penalty always makes the objective worse, and ``\\lambda_p > 0``, so at the optimum ``t_p`` equals the norm.
+
+Where:
+
+  - ``t_p``: The epigraph variable `t_lp_i`.
+  - ``r_j``: Entry ``j`` of `r_lp_i`.
+  - $(math_dict[:lambda_p_reg])
+  - $(math_dict[:p_norm_order])
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:w_port])
+  - $(math_dict[:N])
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `lps::LpReg_VecLpReg`: One or more Lp regularisation terms.
+  - `lps::LpReg_VecLpReg`: One Lp term, or a vector of them.
 
 # Returns
 
   - `nothing`.
 
-# Details
-
-  - `lps::LpReg_VecLpReg`: For each term, introduces the auxiliary variables `t_lp_i` and `r_lp_i`, bounds ``\\lVert \\boldsymbol{w} \\rVert_{p_i}`` above by `t_lp_i` with a set of `MOI.PowerCone` constraints, and adds `val * t_lp_i` to the objective penalty via [`add_to_objective_penalty!`](@ref). Variables and constraints are suffixed by the term's index, so terms do not collide.
-  - `args...`: No-op, used when no Lp regularisation is configured.
-
 # Related
 
   - [`LpRegularisation`](@ref)
   - [`LpReg_VecLpReg`](@ref)
-  - [`set_weight_norm_p_constraints!`](@ref)
+  - [`set_weight_norm_p_constraints!`](@ref): Reads the same estimator as a norm ceiling.
   - [`set_l1_regularisation!`](@ref)
   - [`add_to_objective_penalty!`](@ref)
 """
@@ -142,9 +194,9 @@ end
     set_linf_regularisation!(model::JuMP.Model, linf::Number)
     set_linf_regularisation!(args...)
 
-Add an L∞ regularisation penalty to the objective function.
+Add an L∞ penalty on the portfolio weights to the objective penalty.
 
-The penalty is applied as given, so `linf` must be commensurate with the scale of the objective it is added to and with the range of values the weights can take.
+The penalty prices the largest absolute weight, so it moves weight away from the largest position. The objective takes the penalty in its own units, so `linf` is a price in those units. Under [`MaximumRatio`](@ref) the model's `w` is the homogenised vector ``k \\boldsymbol{w}``, so the penalty acts on ``k \\boldsymbol{w}``. The method on `args...` does nothing, and it runs when no L∞ coefficient is set.
 
 # Mathematical definition
 
@@ -156,22 +208,43 @@ The penalty is applied as given, so `linf` must be commensurate with the scale o
 
 Where:
 
-  - ``\\lambda_\\infty``: L∞ regularisation coefficient.
+  - ``\\lambda_\\infty``: L∞ penalty coefficient, `linf`.
+  - $(math_dict[:w_port])
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: read from the model.
+  - `t_linf`: created, the epigraph variable of the ∞-norm.
+
+## Expressions
+
+  - `linf`: ``\\lambda_\\infty t_\\infty``. [`add_to_objective_penalty!`](@ref) adds it to the objective penalty `op`.
+
+## Constraints
+
+  - `clinf_nic`: ``\\left(s_c t_\\infty,\\, s_c \\boldsymbol{w}\\right)`` lies in the ∞-norm cone, which is ``t_\\infty \\geq \\lVert \\boldsymbol{w} \\rVert_\\infty``. The objective penalty always makes the objective worse, and ``\\lambda_\\infty > 0``, so at the optimum ``t_\\infty`` equals the norm.
+
+Where:
+
+  - ``t_\\infty``: The epigraph variable `t_linf`.
+  - ``\\lambda_\\infty``: L∞ penalty coefficient, `linf`.
+  - $(math_dict[:sc_scale])
   - $(math_dict[:w_port])
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `linf::Number`: L∞ regularisation coefficient.
+  - `linf::Number`: L∞ penalty coefficient.
+
+# Validation
+
+  - `linf > 0` and finite.
 
 # Returns
 
   - `nothing`.
-
-# Details
-
-  - `linf::Number`: Introduces the auxiliary variable `t_linf`, bounds it with `[t_linf; w] in MOI.NormInfinityCone`, and adds `linf * t_linf` to the objective penalty via [`add_to_objective_penalty!`](@ref).
-  - `args...`: No-op, used when no L∞ regularisation is configured.
 
 # Related
 
@@ -220,7 +293,7 @@ abstract type AbstractRegularisationEstimator <: AbstractEstimator end
 
 Build the refusal message of [`assert_ambiguity_radius_formulation`](@ref), naming the formulation that was paired with a rule.
 
-The message is written once and every refusing method reads it, so the two formulations that refuse a radius today, and any that a later type adds, all say the same thing. The formulation and the rule family are named with `nameof`, not printed, for the reason [`assert_calibrated_slots`](@ref) states: a printed type carries a module prefix wherever the name is not visible from `Main`.
+Every refusing method reads this one message, so every formulation that refuses a radius gives the same text. The message names the formulation and the rule family with `nameof`, because a printed type carries a module prefix wherever the name is not visible from `Main`. [`assert_calibrated_slots`](@ref) names its types the same way.
 
 # Arguments
 
@@ -283,25 +356,23 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-L2-norm regularisation term added to the optimisation objective.
+L2-norm penalty term that a [`JuMPOptimiser`](@ref) adds to the objective.
 
-Penalises concentrated portfolios by shrinking the weights towards zero. The `alg` field selects the formulation used to express the penalty, which determines both the cones the solver sees and the power of the norm being penalised, so `val` must be interpreted in the light of the chosen formulation — see [`_set_l2_regularisation!`](@ref).
+The penalty shrinks the weights towards zero, and under a budget it spreads them over the assets. The `alg` field selects the formulation, which sets the cones the solver sees and the power of the norm, so one `val` gives a different penalty under each formulation. Under [`MaximumRatio`](@ref) the model's weights are the homogenised vector ``k \\boldsymbol{w}``, and ``k`` scales with the normalisation `ohf` of the ratio. Each formulation gives a penalty of degree one in ``k``: the squared formulations divide ``\\lVert k \\boldsymbol{w} \\rVert_2^2`` by ``k``, through [`squared_norm_over_k!`](@ref). When the ratio bounds the risk and maximises the return, the weights do not depend on `ohf`. When the ratio fixes the return and minimises the risk, they do not depend on `ohf` if the risk term also has degree one, as a standard deviation or a conditional value at risk has. A [`Variance`](@ref) in the SOC or quadratic formulation has degree two, so beside it the strength of every penalty changes with `ohf`.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\text{penalty} &= \\lambda_2 \\lVert \\boldsymbol{w} \\rVert_2\\,, \\\\
-\\text{penalty} &= \\lambda_2 \\lVert \\boldsymbol{w} \\rVert_2^2\\,.
+\\text{penalty} &= \\lambda_2 \\lVert \\boldsymbol{w} \\rVert_2^{q}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\lambda_2``: L2 regularisation coefficient, the `val` field.
+  - $(math_dict[:lambda_2_reg])
+  - $(math_dict[:q_l2_power])
   - $(math_dict[:w_port])
-
-The first form is used by [`SOCRiskExpr`](@ref); the second by [`SquaredSOCRiskExpr`](@ref), [`QuadRiskExpr`](@ref) and [`RSOCRiskExpr`](@ref).
 
 # Fields
 
@@ -361,11 +432,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the ambiguity radius in `val` against prior result `pr`, and return an [`L2Regularisation`](@ref) holding the number.
 
-This is the channel [`JuMPOptimiser`](@ref) uses: the estimator is not `@propagatable`, so the resolution takes the ordinary `factory` verb rather than the generated one, and [`assemble_jump_model!`](@ref) calls it with the optimisation's own prior result and solver. The rebuild goes through the keyword constructor, so the positivity check and [`assert_ambiguity_radius_formulation`](@ref) both re-run on the calibrated number.
+[`assemble_jump_model!`](@ref) calls it with the prior result and the solver of the optimisation. The estimator is not `@propagatable`, so this method is the ordinary `factory` verb and not the generated one. The rebuild goes through the keyword constructor, so the positivity check and [`assert_ambiguity_radius_formulation`](@ref) run again on the resolved number.
 
-The weights-only `factory(l2, w)` and [`port_opt_view`](@ref) carry the estimator through untouched, which is right: neither holds a prior result, so neither can resolve a rule, and a rule that survives a cluster slice is resolved against that cluster's own prior when the model is assembled.
+The weights-only `factory(l2, w)` and [`port_opt_view`](@ref) return the estimator unchanged. Neither holds a prior result, so neither can resolve a rule. A rule that stays after a cluster slice is resolved against the prior of that cluster when the model is assembled.
 
-The slot is named `val` and its key is `:l2reg_val`, because [`LpRegularisation`](@ref) names its own coefficient `val` too and the two carry two different ground metrics. A key that read `:val` could not tell the type-2 metric of this penalty from the type-``q`` metric of that one, so [`DualNormRadius`](@ref) would have no reading of either. The two keys are the two names [`field_dict`](@ref) already uses for the two slots.
+The slot resolves under the key `:l2reg_val` and not `:val`, because [`LpRegularisation`](@ref) also names its coefficient `val`, and the two coefficients belong to two different ground metrics. [`DualNormRadius`](@ref) reads the key to tell the type-2 metric of this penalty from the type-``q`` metric of the Lp penalty.
+
+# Algorithm
+
+ 1. Resolve the slot `x.val` under the key `:l2reg_val` against `pr`, its observation weights `pr.w` and `slv`, giving `val`.
+ 2. Pair the declaration of [`calibration_slots`](@ref) with this resolver through [`assert_declared_calibration_resolver`](@ref).
+ 3. `val` is the object that `x` already holds: return `x`. Otherwise rebuild the term through the keyword constructor with `val` and `x.alg`.
 
 # Arguments
 
@@ -430,53 +507,144 @@ Matches either a single [`L2Regularisation`](@ref) or a vector of them ([`VecL2R
 """
 const L2Reg_VecL2Reg = Union{<:L2Regularisation, <:VecL2Reg}
 """
-    _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                            l2::L2Regularisation{<:Any, <:SOCRiskExpr}, sc::Number)
-    _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                            l2::L2Regularisation{<:Any, <:SquaredSOCRiskExpr}, sc::Number)
-    _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                            l2::L2Regularisation{<:Any, <:QuadRiskExpr}, args...)
-    _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                            l2::L2Regularisation{<:Any, <:RSOCRiskExpr}, sc::Number)
+    squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k::Number, sc::Number)
+    squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k, sc::Number)
 
-Add the `i`-th L2 regularisation penalty to the objective, in the formulation given by `l2.alg`.
+Return a term equal to the squared 2-norm of `x` divided by the homogenisation variable `k`, for the squared L2 penalty at position `i`.
 
-The coefficient `l2.val` is applied as given, so it must be consistent with the formulation it multiplies: [`SOCRiskExpr`](@ref) penalises ``\\lVert \\boldsymbol{w} \\rVert_2``, whereas [`SquaredSOCRiskExpr`](@ref), [`QuadRiskExpr`](@ref) and [`RSOCRiskExpr`](@ref) penalise ``\\lVert \\boldsymbol{w} \\rVert_2^2``. The same `val` therefore does not produce the same penalty across formulations.
-
-[`QuadRiskExpr`](@ref) yields a quadratic objective term rather than a conic one; [`add_to_objective_penalty!`](@ref) promotes an affine penalty expression to a `JuMP.QuadExpr` to accommodate it.
+Under [`MaximumRatio`](@ref) the model's weights are the homogenised vector ``\\boldsymbol{y} = k \\boldsymbol{w}``, so for ``\\boldsymbol{x} = \\boldsymbol{y}`` the term is ``k \\lVert \\boldsymbol{w} \\rVert_2^2``. It has degree one in ``k``, as the other penalties have, so it does not change the balance of the ratio when the normalisation `ohf` changes. When `k` is a number, the term is the quadratic ``\\boldsymbol{x}^\\intercal \\boldsymbol{x} / k``, and every objective except [`MaximumRatio`](@ref) sets ``k = 1``. When `k` is a variable, the quotient is not quadratic, and the function states it as a rotated second-order cone.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\text{penalty} &= \\lambda_2 \\lVert \\boldsymbol{w} \\rVert_2\\,, \\\\
-\\text{penalty} &= \\lambda_2 \\lVert \\boldsymbol{w} \\rVert_2^2\\,.
+\\text{term} &= \\frac{\\lVert \\boldsymbol{x} \\rVert_2^2}{k}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\lambda_2``: L2 regularisation coefficient, the `val` field of `l2`.
+  - ``\\boldsymbol{x}``: The vector argument `x`. A scalar `x` is the vector of one entry.
+  - $(math_dict[:k_budget])
+
+# JuMP formulation
+
+The number method registers no entry. The variable method registers these entries, and each name ends in `i`.
+
+## Variables
+
+  - `t_l2_sq_i`: the epigraph variable ``s`` of the term.
+
+## Constraints
+
+  - `cl2_sq_rsoc_i`: ``\\left(s_c s,\\, s_c k / 2,\\, s_c \\boldsymbol{x}\\right)`` lies in the rotated second-order cone, which is ``s k \\geq \\lVert \\boldsymbol{x} \\rVert_2^2``. The penalty makes the objective worse as ``s`` rises, so at the optimum ``s`` equals its bound ``\\lVert \\boldsymbol{x} \\rVert_2^2 / k``.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `i::Integer`: Position of the term, which ends the name of each entry it registers.
+  - `x`: The vector, or the scalar, whose squared norm the term measures.
+  - `k`: The homogenisation variable from [`effective_k`](@ref), or the number that stands for it.
+  - `sc::Number`: Constraint scale. The number method registers no row and ignores it.
+
+# Returns
+
+  - The quadratic expression ``\\boldsymbol{x}^\\intercal \\boldsymbol{x} / k`` when `k` is a number, else the epigraph variable `t_l2_sq_i`.
+
+# Related
+
+  - [`_set_l2_regularisation!`](@ref)
+  - [`effective_k`](@ref)
+  - [`MaximumRatio`](@ref)
+"""
+function squared_norm_over_k!(::JuMP.Model, ::Integer, x, k::Number, ::Number)
+    return LinearAlgebra.dot(x, x) / k
+end
+function squared_norm_over_k!(model::JuMP.Model, i::Integer, x, k, sc::Number)
+    t_sq = state_set!(model, Symbol(""), :t_l2_sq_, i, JuMP.@variable(model))
+    state_set!(model, Symbol(""), :cl2_sq_rsoc_, i,
+               JuMP.@constraint(model,
+                                [sc * t_sq; sc * k / 2; sc * x] in
+                                JuMP.RotatedSecondOrderCone()))
+    return t_sq
+end
+"""
+    _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
+                            l2::L2Regularisation{<:Any, <:SOCRiskExpr}, sc::Number)
+    _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
+                            l2::L2Regularisation{<:Any, <:SquaredSOCRiskExpr}, sc::Number)
+    _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
+                            l2::L2Regularisation{<:Any, <:QuadRiskExpr}, sc::Number)
+    _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
+                            l2::L2Regularisation{<:Any, <:RSOCRiskExpr}, sc::Number)
+
+Add the penalty of the L2 term at position `i` to the objective penalty, in the formulation that `l2.alg` selects.
+
+[`SOCRiskExpr`](@ref) penalises ``\\lVert \\boldsymbol{w} \\rVert_2``, and [`SquaredSOCRiskExpr`](@ref), [`QuadRiskExpr`](@ref) and [`RSOCRiskExpr`](@ref) penalise ``\\lVert \\boldsymbol{w} \\rVert_2^2``, so one `val` gives a different penalty under each. Under [`MaximumRatio`](@ref) the model's `w` is the homogenised vector ``k \\boldsymbol{w}``, so the penalty acts on ``k \\boldsymbol{w}``. The three squared formulations divide the square by ``k``, so every penalty has degree one in ``k``. Under every other objective ``k = 1``: [`QuadRiskExpr`](@ref) and [`SquaredSOCRiskExpr`](@ref) then give a quadratic penalty, and [`add_to_objective_penalty!`](@ref) promotes an affine objective penalty to a `JuMP.QuadExpr` to hold it. Under [`MaximumRatio`](@ref) the quotient is not quadratic, so [`squared_norm_over_k!`](@ref) states it as a rotated second-order cone.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\text{penalty} &= \\lambda_2 \\lVert \\boldsymbol{w} \\rVert_2^{q}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:lambda_2_reg])
+  - $(math_dict[:q_l2_power])
+  - $(math_dict[:w_port])
+
+# JuMP formulation
+
+Each name ends in `i`, so the entries of two terms do not collide.
+
+## Variables
+
+  - `w`: read from the model, passed in as the argument `w`.
+  - `t_l2_i`: created by every formulation except [`QuadRiskExpr`](@ref), the epigraph variable of the norm or of its square.
+  - `t_l2_sq_i`: created by [`squared_norm_over_k!`](@ref) under [`SquaredSOCRiskExpr`](@ref) and [`QuadRiskExpr`](@ref) when ``k`` is a variable.
+
+## Expressions
+
+  - `l2_i`: the penalty. [`add_to_objective_penalty!`](@ref) adds it to the objective penalty `op`.
+      + [`SOCRiskExpr`](@ref): ``\\lambda_2 t_2``.
+      + [`SquaredSOCRiskExpr`](@ref): ``\\lambda_2 t_2^2 / k``.
+      + [`QuadRiskExpr`](@ref): ``\\lambda_2 \\boldsymbol{w}^\\intercal \\boldsymbol{w} / k``.
+      + [`RSOCRiskExpr`](@ref): ``\\lambda_2 t_2``.
+
+## Constraints
+
+  - `cl2_soc_i`, under [`SOCRiskExpr`](@ref) and [`SquaredSOCRiskExpr`](@ref): ``\\left(s_c t_2,\\, s_c \\boldsymbol{w}\\right)`` lies in the second-order cone, which is ``t_2 \\geq \\lVert \\boldsymbol{w} \\rVert_2``.
+  - `cl2_rsoc_i`, under [`RSOCRiskExpr`](@ref): ``\\left(s_c t_2,\\, s_c k / 2,\\, s_c \\boldsymbol{w}\\right)`` lies in the rotated second-order cone, which is ``t_2 \\geq \\lVert \\boldsymbol{w} \\rVert_2^2 / k``.
+  - `cl2_sq_rsoc_i`, under [`SquaredSOCRiskExpr`](@ref) and [`QuadRiskExpr`](@ref) when ``k`` is a variable: the row of [`squared_norm_over_k!`](@ref).
+
+[`QuadRiskExpr`](@ref) registers no row when ``k`` is a number. The objective penalty always makes the objective worse, ``\\lambda_2 > 0``, and ``t_2^2`` rises with ``t_2 \\geq 0``, so at the optimum ``t_2`` equals its bound.
+
+Where:
+
+  - ``t_2``: The epigraph variable `t_l2_i`.
+  - $(math_dict[:k_budget])
+  - $(math_dict[:lambda_2_reg])
+  - $(math_dict[:sc_scale])
   - $(math_dict[:w_port])
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `i::Integer`: Index of the term, used to suffix the variables and constraints it creates so that multiple terms do not collide.
-  - `w::VecNum`: Portfolio weights variable.
-  - `l2::L2Regularisation`: The L2 regularisation term.
-  - `sc::Number`: Constraint scale factor.
+  - `i::Integer`: Position of the term, which ends the name of each entry it registers.
+  - `w::VecNum`: The weights variable of the model.
+  - `l2::L2Regularisation`: The L2 term.
+  - `sc::Number`: Constraint scale. The [`QuadRiskExpr`](@ref) method uses it only when ``k`` is a variable.
 
 # Returns
 
   - `nothing`.
-
-# Details
-
-  - `l2::L2Regularisation{<:Any, <:SOCRiskExpr}`: Introduces `t_l2_i`, constrains `[t_l2_i; w] in SecondOrderCone` so that `t_l2_i >= norm(w, 2)`, and penalises `val * t_l2_i`.
-  - `l2::L2Regularisation{<:Any, <:SquaredSOCRiskExpr}`: Introduces `t_l2_i`, constrains `[t_l2_i; w] in SecondOrderCone` so that `t_l2_i >= norm(w, 2)`, and penalises `val * t_l2_i^2`.
-  - `l2::L2Regularisation{<:Any, <:QuadRiskExpr}`: Introduces no auxiliary variable, and penalises `val * dot(w, w)` directly.
-  - `l2::L2Regularisation{<:Any, <:RSOCRiskExpr}`: Introduces `t_l2_i`, constrains `[t_l2_i; 0.5; w] in RotatedSecondOrderCone` so that `t_l2_i >= norm(w, 2)^2`, and penalises `val * t_l2_i`.
 
 # Related
 
@@ -502,25 +670,27 @@ function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
     t_l2 = state_set!(model, Symbol(""), :t_l2_, i, JuMP.@variable(model))
     state_set!(model, Symbol(""), :cl2_soc_, i,
                JuMP.@constraint(model, [sc * t_l2; sc * w] in JuMP.SecondOrderCone()))
-    l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * t_l2^2))
+    t_l2_sq = squared_norm_over_k!(model, i, t_l2, effective_k(model), sc)
+    l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * t_l2_sq))
     add_to_objective_penalty!(model, l2)
     return nothing
 end
 function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
-                                 l2::L2Regularisation{<:Any, <:QuadRiskExpr}, args...)
+                                 l2::L2Regularisation{<:Any, <:QuadRiskExpr}, sc::Number)
     val = l2.val
-    l2 = state_set!(model, Symbol(""), :l2_, i,
-                    JuMP.@expression(model, val * LinearAlgebra.dot(w, w)))
+    w_sq = squared_norm_over_k!(model, i, w, effective_k(model), sc)
+    l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * w_sq))
     add_to_objective_penalty!(model, l2)
     return nothing
 end
 function _set_l2_regularisation!(model::JuMP.Model, i::Integer, w::VecNum,
                                  l2::L2Regularisation{<:Any, <:RSOCRiskExpr}, sc::Number)
     val = l2.val
+    k = effective_k(model)
     t_l2 = state_set!(model, Symbol(""), :t_l2_, i, JuMP.@variable(model))
     state_set!(model, Symbol(""), :cl2_rsoc_, i,
                JuMP.@constraint(model,
-                                [sc * t_l2; sc * 0.5; sc * w] in
+                                [sc * t_l2; sc * k / 2; sc * w] in
                                 JuMP.RotatedSecondOrderCone()))
     l2 = state_set!(model, Symbol(""), :l2_, i, JuMP.@expression(model, val * t_l2))
     add_to_objective_penalty!(model, l2)
@@ -536,24 +706,24 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Lp-norm regularisation term added to the optimisation objective.
+Lp-norm penalty term that a [`JuMPOptimiser`](@ref) adds to the objective, or a ceiling on the Lp norm of the weights.
 
-Penalises concentrated portfolios by encouraging weight smoothness for ``p > 1``.
+For ``p > 1`` and a budget of one, Hölder's inequality gives ``\\lVert \\boldsymbol{w} \\rVert_p \\geq N^{1/p - 1}``, with equality at equal weights alone. So the penalty moves weight away from concentrated positions. A larger ``p`` puts more of the price on the largest weights.
 
-The same estimator serves double duty. In the `lp` field of [`JuMPOptimiser`](@ref) it is a *penalty*, and `val` is the coefficient multiplying the norm. In the `lpc` field it is a *constraint*, and `val` is instead an upper bound on the p-norm of the weights. The norm order `p` means the same thing in both. See [`set_lp_regularisation!`](@ref) and [`set_weight_norm_p_constraints!`](@ref).
+In the `lp` field of [`JuMPOptimiser`](@ref) the term is a penalty, and `val` is the coefficient of the norm. In the `lpc` field it is a constraint, and `val` is a ceiling on the norm. The norm order `p` has one meaning in both fields. [`set_lp_regularisation!`](@ref) builds the penalty, and [`set_weight_norm_p_constraints!`](@ref) builds the constraint.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\text{penalty} &= \\mathrm{val} \\cdot \\lVert \\boldsymbol{w} \\rVert_p\\,.
+\\text{penalty} &= \\lambda_p \\lVert \\boldsymbol{w} \\rVert_p\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{val}``: Regularisation coefficient.
-  - ``p > 1``: Norm order.
+  - $(math_dict[:lambda_p_reg])
+  - $(math_dict[:p_norm_order])
   - $(math_dict[:w_port])
 
 # Fields
@@ -618,9 +788,9 @@ end
 
 Refuse a norm-ceiling rule that was placed in a slot which reads its number as a penalty coefficient.
 
-The `val` field of [`LpRegularisation`](@ref) is the one dual-use slot in the library. [`JuMPOptimiser`](@ref)'s `lp` field adds `val * norm(w, p)` to the objective, where `val` is an ambiguity radius, and its `lpc` field bounds `norm(w, p) <= val * k`, where `val` is a norm ceiling. One field cannot carry two bounds, so [`Num_AmbRadNormCeilCal`](@ref) admits both rule families and the slot's *owner* settles which reading is legal.
+The `val` field of [`LpRegularisation`](@ref) is the one dual-use slot in the library. [`JuMPOptimiser`](@ref)'s `lp` field adds `val * norm(w, p)` to the objective, where `val` is an ambiguity radius, and its `lpc` field bounds `norm(w, p) <= val * k`, where `val` is a norm ceiling. The type bound of the field is [`Num_AmbRadNormCeilCal`](@ref), which admits both rule families, and the field of [`JuMPOptimiser`](@ref) that holds the term decides which reading is legal.
 
-This is the penalty half. A rule of the norm-ceiling family states that the number **is** a ceiling, and a ceiling has no reading as a penalty coefficient: its reciprocal is a floor on the effective number of assets, which says nothing about how strongly the objective should shrink the weights. A plain number stays legal on both routes, because a number is whatever quantity the caller meant it to be.
+This method checks the penalty side. A rule of the norm-ceiling family states that the number is a ceiling, and a ceiling has no reading as a penalty coefficient. Its reciprocal is a floor on the effective number of assets, which says nothing about how strongly the objective shrinks the weights. A plain number is legal on both sides, because the caller states what it means.
 
 The check is a set of methods rather than a list of types in one body, on the same terms as [`assert_ambiguity_radius_formulation`](@ref). It runs in [`JuMPOptimiser`](@ref)'s constructor, where the caller wrote the field, and again in [`factory`](@ref) for a term that reached the objective by another route.
 
@@ -663,7 +833,7 @@ end
 
 Refuse an ambiguity-radius rule that was placed in a slot which reads its number as a norm ceiling.
 
-This is the norm-constraint half of the pair [`assert_penalty_coefficient_role`](@ref) opens, and it carries that method's reading unchanged. A rule of the ambiguity-radius family states that the number **is** a radius, the coefficient of a norm penalty in the objective. `JuMPOptimiser.lpc` bounds the norm instead, so the statement is false there.
+This method checks the norm-constraint side, and [`assert_penalty_coefficient_role`](@ref) checks the penalty side. A rule of the ambiguity-radius family states that the number is a radius, the coefficient of a norm penalty in the objective. `JuMPOptimiser.lpc` bounds the norm instead, so the statement is false there.
 
 # Algorithm
 
@@ -705,13 +875,18 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the ambiguity radius in `val` against prior result `pr`, and return an [`LpRegularisation`](@ref) holding the number.
 
-It carries the reading of [`factory`](@ref) on [`L2Regularisation`](@ref) unchanged. The estimator has one norm order and no formulation slot, so no pairing of a rule with a formulation can be wrong and [`assert_ambiguity_radius_formulation`](@ref) never runs here: `val` multiplies `norm(w, p)` and never its square. The role guard below is a different check.
+It reads the slot as [`factory`](@ref) on [`L2Regularisation`](@ref) does. The estimator has no formulation slot, and `val` multiplies `norm(w, p)` and never its square, so [`assert_ambiguity_radius_formulation`](@ref) has nothing to refuse here.
 
-The same estimator also serves as a norm *constraint* through the `lpc` field of [`JuMPOptimiser`](@ref), where `val` is an upper bound and not a coefficient. Both routes share one field and one bound, so the route settles the reading: this method refuses a norm-ceiling rule through [`assert_penalty_coefficient_role`](@ref), and [`norm_ceiling_factory`](@ref) refuses a radius rule on the other side.
+In the `lpc` field of [`JuMPOptimiser`](@ref) the same estimator is a norm constraint, and `val` is a ceiling. The field decides the reading. This method refuses a norm-ceiling rule through [`assert_penalty_coefficient_role`](@ref), and [`norm_ceiling_factory`](@ref) refuses a radius rule on the constraint side.
 
-The slot is named `val` and its key is `:lpreg_val`, because [`L2Regularisation`](@ref) names its own coefficient `val` too and the two carry two different ground metrics. The two keys are the two names [`field_dict`](@ref) already uses for the two slots.
+The slot resolves under the key `:lpreg_val`, which [`L2Regularisation`](@ref) does not use, because the two coefficients belong to two different ground metrics. The key names no norm order: `p` is a field of the term, and one rule can stand in several terms. So the method states the order of the term in the [`CalibrationContext`](@ref), and [`DualNormRadius`](@ref) reads it there.
 
-The key still names no norm order, because `p` lives on this estimator and one rule may stand in several terms. So this route states the term's own order in the [`CalibrationContext`](@ref) it resolves the slot against, on the same terms as [`norm_ceiling_factory`](@ref). [`DualNormRadius`](@ref) is the rule that reads it.
+# Algorithm
+
+ 1. Refuse a norm-ceiling rule in `x.val` through [`assert_penalty_coefficient_role`](@ref).
+ 2. Resolve the slot `x.val` under the key `:lpreg_val` against `pr`, its observation weights `pr.w`, `slv` and a [`CalibrationContext`](@ref) that holds `x.p`, giving `val`.
+ 3. Pair the declaration of [`calibration_slots`](@ref) with this resolver through [`assert_declared_calibration_resolver`](@ref).
+ 4. `val` is the object that `x` already holds: return `x`. Otherwise rebuild the term through the keyword constructor with `x.p` and `val`.
 
 # Arguments
 
@@ -752,7 +927,7 @@ It is the norm-constraint counterpart of [`factory`](@ref) on the same type, and
 
 The two verbs differ in the guard and in the key, and in nothing else. Each refuses the family that has no reading on its own route, this one through [`assert_norm_ceiling_role`](@ref). Each states the term's own norm order in the [`CalibrationContext`](@ref) it resolves the slot against, because one rule placed in `lp` or in `lpc` serves every term and each term carries its own `p`.
 
-The fallback carries its argument through unchanged, which is the route `nothing` takes. A term whose `val` is already a number is returned by identity instead, because the resolution gives back the number it holds.
+The fallback returns its argument unchanged, so an empty `lpc` field, `nothing`, passes through it. A term whose `val` is already a number comes back as the same object, because the resolution returns the number it holds.
 
 # Algorithm
 

@@ -9,7 +9,7 @@ status: accepted
 A risk measure that carries a prior-derived field took a **value** or `nothing`.
 [`Variance`](../../src/16_RiskMeasures/02_Variance.jl) took a covariance matrix,
 [`Kurtosis`](../../src/16_RiskMeasures/04_Kurtosis.jl) a cokurtosis tensor,
-[`ArithmeticReturn`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl)
+[`ArithmeticReturn`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/01_ReturnEstimators.jl)
 an expected-returns vector. `nothing` meant "take the optimisation's own prior"; a value meant
 "use this one".
 

@@ -36,36 +36,33 @@ function BubbleHierarchy(Pred::VecNum, Sb::VecNum)
     Root = findall(Pred .== 0)
     CliqCount = zeros(Int, Nc)
     CliqCount[Root] .= 1
-    Mb = Matrix{Int}(undef, Nc, 0)
+    # The cliques of each bubble, one entry per column of `Mb`.
+    bubbles = Vector{Vector{Int}}(undef, 0)
 
     if length(Root) > 1
-        TempVec = zeros(Int, Nc)
-        TempVec[Root] .= 1
-        Mb = hcat(Mb, TempVec)
+        push!(bubbles, Root)
     end
 
     while sum(CliqCount) < Nc
         NxtRoot = Int[]
         for n in eachindex(Root)
             DirectChild = findall(Pred .== Root[n])
-            TempVec = zeros(Int, Nc)
-            TempVec[[Root[n]; DirectChild]] .= 1
-            Mb = hcat(Mb, TempVec)
+            push!(bubbles, [Root[n]; DirectChild])
             CliqCount[DirectChild] .= 1
 
-            for m in eachindex(DirectChild)
-                if Sb[DirectChild[m]] != 0
-                    NxtRoot = [NxtRoot; DirectChild[m]]
-                end
-            end
+            append!(NxtRoot, Iterators.filter(c -> !iszero(Sb[c]), DirectChild))
         end
         Root = sort!(unique(NxtRoot))
+    end
+    Mb = zeros(Int, Nc, length(bubbles))
+    for (bi, b) in pairs(bubbles)
+        Mb[b, bi] .= 1
     end
     Nb = size(Mb, 2)
     H = SparseArrays.spzeros(Int, Nb, Nb)
 
     for n in axes(Mb, 2)
-        Indx = Mb[:, n] .== 1
+        Indx = @view(Mb[:, n]) .== 1
         JointSum = vec(sum(Mb[Indx, :]; dims = 1))
         Neigh = JointSum .>= 1
         H[n, Neigh] .= 1
@@ -80,9 +77,9 @@ end
              Mb::MatNum, Mv::MatNum,
              CliqList::MatNum)
 
-Compute the directed bubble hierarchy tree (DBHT) for a Maximal Planar Graph (MPG).
+Compute the directed bubble hierarchical tree (DBHT) for a Maximal Planar Graph (MPG).
 
-This function assigns directions to each separating 3-clique in the undirected bubble tree of a Planar Maximally Filtered Graph (PMFG), producing the directed bubble hierarchy tree (DBHT). The direction is determined by comparing the sum of edge weights on either side of each separating clique, enabling the identification of converging and diverging bubbles.
+This function assigns directions to each separating 3-clique in the undirected bubble tree of a Planar Maximally Filtered Graph (PMFG), producing the directed bubble hierarchical tree (DBHT). The direction is determined by comparing the sum of edge weights on either side of each separating clique, enabling the identification of converging and diverging bubbles.
 
 # Mathematical definition
 
@@ -135,11 +132,11 @@ function DirectHb(Rpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::MatNum, CliqList::Mat
     Hb = Hb .!= 0
     r, c, _ = SparseArrays.findnz(SparseArrays.sparse(LinearAlgebra.UpperTriangular(Hb) .!=
                                                       0))
-    CliqEdge = Matrix{Int}(undef, 0, 3)
+    CliqEdge = Matrix{Int}(undef, length(r), 3)
     for n in eachindex(r)
-        data = findall(Mb[:, r[n]] .!= 0 .&& Mb[:, c[n]] .!= 0)
-        data = hcat(r[n], c[n], data)
-        CliqEdge = vcat(CliqEdge, data)
+        CliqEdge[n, 1] = r[n]
+        CliqEdge[n, 2] = c[n]
+        CliqEdge[n, 3:3] = findall(Mb[:, r[n]] .!= 0 .&& Mb[:, c[n]] .!= 0)
     end
 
     kb = vec(sum(Hb; dims = 1))
@@ -147,8 +144,9 @@ function DirectHb(Rpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::MatNum, CliqList::Mat
     Hc = SparseArrays.spzeros(sMv, sMv)
 
     sCE = size(CliqEdge, 1)
+    Temp = copy(Hb)
     for n in axes(CliqEdge, 1)
-        Temp = copy(Hb)
+        copyto!(Temp, Hb)
         Temp[CliqEdge[n, 1], CliqEdge[n, 2]] = 0
         Temp[CliqEdge[n, 2], CliqEdge[n, 1]] = 0
         SparseArrays.dropzeros!(Temp)
@@ -185,7 +183,7 @@ end
 
 Obtain non-discrete and discrete clusterings from the bubble topology of the Planar Maximally Filtered Graph (PMFG).
 
-This function assigns each vertex to a cluster based on the directed bubble hierarchy tree (DBHT) structure. It computes both a non-discrete cluster membership matrix and a discrete cluster assignment vector, using the converging bubbles identified in the directed bubble tree.
+This function assigns each vertex to a cluster based on the directed bubble hierarchical tree (DBHT) structure. It computes both a non-discrete cluster membership matrix and a discrete cluster assignment vector, using the converging bubbles identified in the directed bubble tree.
 
 # Mathematical definition
 
@@ -238,7 +236,7 @@ function BubbleCluster8s(Rpm::MatNum, Dpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::M
                          CliqList::MatNum)
     Hc, Sep = DirectHb(Rpm, Hb, Mb, Mv, CliqList)   # Assign directions on the bubble tree
 
-    N = size(Rpm, 1)    # Number of vertices in the PMFG
+    N = size(Rpm, 1)::Int    # Number of vertices in the PMFG
     indx = findall(Sep .== 1)   # Look for the converging bubbles
     Adjv = SparseArrays.spzeros(Int, 0, 0)
 
@@ -275,8 +273,10 @@ function BubbleCluster8s(Rpm::MatNum, Dpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::M
         v, ci, _ = SparseArrays.findnz(Mdjv)
         Tc[v] .= ci
 
-        # Compute the distance between a vertex and the converging bubbles
-        Udjv = Dpm * Mdjv * LinearAlgebra.diagm(1 ⊘ vec(sum(Mdjv .!= 0; dims = 1)))
+        # Compute the distance between a vertex and the converging bubbles. Scale the sparse
+        # `Mdjv` first, as the reference does: both products then read only its stored
+        # entries, so an unreachable vertex keeps its `Inf` and never meets a zero (#1314).
+        Udjv = Dpm * (Mdjv * LinearAlgebra.Diagonal(1 ⊘ vec(sum(!iszero, Mdjv; dims = 1))))
         Udjv[Adjv .== 0] .= typemax(eltype(Dpm))
 
         imn = vec(getindex.(argmin(Udjv[vec(sum(Mdjv; dims = 2)) .== 0, :]; dims = 2), 2))  # Look for the closest converging bubble
@@ -344,7 +344,7 @@ function BubbleMember(Rpm::MatNum, Mv::MatNum, Mc::MatNum)
     for n in eachindex(vu)
         bub = findall(Mc[vu[n], :] .!= 0)
         vu_bub = vec(sum(Rpm[:, vu[n]] ⊙ Mv[:, bub]; dims = 1))
-        all_bub = LinearAlgebra.diag(transpose(Mv[:, bub]) * Rpm * Mv[:, bub]) / 2
+        all_bub = map(b -> LinearAlgebra.dot(view(Mv, :, b), Rpm, view(Mv, :, b)) / 2, bub)
         frac = vu_bub ⊘ all_bub
         imx = vec(argmax(frac; dims = 1))
         Mvv[vu[n], bub[imx]] .= 1

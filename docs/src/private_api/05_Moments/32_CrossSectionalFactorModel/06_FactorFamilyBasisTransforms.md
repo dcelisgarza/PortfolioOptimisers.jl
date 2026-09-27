@@ -2,7 +2,7 @@
 Description = "Factor Family Basis Transforms, private API of PortfolioOptimisers.jl: reduce_factor_names, reduce_exposures, reduce_loadings, reduce_factor_returns, …"
 ```
 
-# Factor Family Basis Transforms: private API
+# [Factor Family Basis Transforms: private API](@id private-api-factor-family-basis-transforms)
 
 ## Functions
 

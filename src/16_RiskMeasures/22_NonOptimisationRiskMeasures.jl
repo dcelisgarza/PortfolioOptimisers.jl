@@ -458,7 +458,7 @@ Compute the vector of deviations from the centering target for [`ThirdCentralMom
 function calc_deviations_vec(r::TCM_Sk, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
-    tgt = calc_moment_target(r, w, x)
+    tgt = calc_moment_target(r, w, x) - moment_target_fees(r.mu, w, fees, length(x))
     return x .- tgt
 end
 """

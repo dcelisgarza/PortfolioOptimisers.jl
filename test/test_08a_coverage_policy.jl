@@ -343,17 +343,22 @@ end
     X = [1.0 NaN; 2.0 4.0; NaN 6.0]
     amsk = trues(3, 2)
     amsk[3, 2] = false
-    Xo, msk, mu, active, stale = PortfolioOptimisers.coverage_valid_block(X, amsk; dims = 1)
+    Xo, msk, mu, active, stale = PortfolioOptimisers.coverage_valid_block(X, amsk,
+                                                                          DecayCoverage();
+                                                                          dims = 1)
     @test Xo === X
     @test msk == BitMatrix([true false; true true; false false])
     @test mu ≈ [1.5, 4.0]
     @test active == BitVector([true, false])
     @test stale == [1, 1]
     # No mask means every asset is active, so nothing is ever newly inactive.
-    _, msk2, _, active2, _ = PortfolioOptimisers.coverage_valid_block(X, nothing; dims = 1)
+    _, msk2, _, active2, _ = PortfolioOptimisers.coverage_valid_block(X, nothing,
+                                                                      DecayCoverage();
+                                                                      dims = 1)
     @test msk2 == isfinite.(X)
     @test all(active2)
-    @test_throws DimensionMismatch PortfolioOptimisers.coverage_valid_block(X, trues(3, 3);
+    @test_throws DimensionMismatch PortfolioOptimisers.coverage_valid_block(X, trues(3, 3),
+                                                                            DecayCoverage();
                                                                             dims = 1)
 end
 @testset "A user's own coverage algorithm dispatches" begin
@@ -519,4 +524,130 @@ end
           (:me, :mp, :alg, :w, :cvg, :cache)
     @test PortfolioOptimisers.show_fields(Cokurtosis(; cvg = CoveragePolicy())) ==
           (:me, :mp, :alg, :w, :cvg, :cache)
+end
+@testset "ResetCoverage reaches the two-pass arms" begin
+    T, N = 14, 3
+    X = Float64[sin(t * j) + 0.1 * t * j for t in 1:T, j in 1:N]
+    amsk = trues(T, N)
+    # Asset 2 delists at row 6 and lists again at row 9.
+    amsk[6:8, 2] .= false
+    X[6:8, 2] .= NaN
+    dec = CoveragePolicy(; alg = DecayCoverage())
+    res = CoveragePolicy(; alg = ResetCoverage())
+    # The oracle: the reset is DecayCoverage over a sample whose history before the delisting
+    # was never observed.
+    Xr = copy(X)
+    Xr[1:5, 2] .= NaN
+    semi = Covariance(; alg = SemiMoment(), cvg = res)
+    @test isequal(cov(semi, X; active_mask = amsk),
+                  cov(Covariance(; alg = SemiMoment(), cvg = dec), Xr; active_mask = amsk))
+    @test !isequal(cov(semi, X; active_mask = amsk),
+                   cov(Covariance(; alg = SemiMoment(), cvg = dec), X; active_mask = amsk))
+    @test isequal(first(coskewness(Coskewness(; cvg = res), X; active_mask = amsk)),
+                  first(coskewness(Coskewness(; cvg = dec), Xr; active_mask = amsk)))
+    @test !isequal(first(coskewness(Coskewness(; cvg = res), X; active_mask = amsk)),
+                   first(coskewness(Coskewness(; cvg = dec), X; active_mask = amsk)))
+    mp = MatrixProcessing(; pdm = nothing)
+    @test isequal(cokurtosis(Cokurtosis(; mp = mp, cvg = res), X; active_mask = amsk),
+                  cokurtosis(Cokurtosis(; mp = mp, cvg = dec), Xr; active_mask = amsk))
+    # The folding arm meets the same oracle, so the two arms read one universe.
+    @test cov(Covariance(; cvg = res), X; active_mask = amsk) ==
+          cov(Covariance(; cvg = dec), Xr; active_mask = amsk)
+    # The block and the fold agree on the bookkeeping, over two delistings of one asset and a
+    # delisting that never relists.
+    am2 = trues(T, N)
+    am2[3:4, 1] .= false
+    am2[9:10, 1] .= false
+    am2[12:14, 3] .= false
+    X2 = copy(X)
+    X2[.!am2] .= NaN
+    X2[7, 2] = NaN
+    fold = partial_fit!(SimpleVariance(; cvg = res), X2; active_mask = am2).cache
+    _, F, mu, active, stale = PortfolioOptimisers.coverage_valid_block(X2, am2,
+                                                                       ResetCoverage())
+    @test fold.cvg.nu == vec(sum(F; dims = 1)) == [4, 11, 0]
+    @test fold.cvg.stale == stale == [0, 0, 3]
+    @test fold.cvg.active == active
+    @test isapprox(fold.mu, mu; rtol = 1e-14)
+    # With no active mask no asset goes inactive, so the reset is DecayCoverage.
+    Xh = copy(X)
+    Xh[6:8, 2] .= NaN
+    @test isequal(cov(Covariance(; cvg = res), Xh), cov(Covariance(; cvg = dec), Xh))
+    @test isequal(cov(semi, Xh), cov(Covariance(; alg = SemiMoment(), cvg = dec), Xh))
+    # A caller's own algorithm keeps the history in a two-pass arm.
+    own = CoveragePolicy(; alg = AdmitEverything())
+    @test isequal(first(coskewness(Coskewness(; cvg = own), X; active_mask = amsk)),
+                  first(coskewness(Coskewness(; cvg = dec), X; active_mask = amsk)))
+end
+@testset "The share of a relisted asset and the hold of an expiring one" begin
+    # The reset keeps the number of observations folded, so a relisted asset's share is its
+    # count since the relisting over the whole window.
+    T = 12
+    X = Float64[t + 10j for t in 1:T, j in 1:2]
+    amsk = trues(T, 2)
+    amsk[4:6, 2] .= false
+    X[4:6, 2] .= NaN
+    strict_reset = CoveragePolicy(; min_coverage = 0.6, alg = ResetCoverage())
+    strict_decay = CoveragePolicy(; min_coverage = 0.6, alg = DecayCoverage())
+    @test isnan(vec(mean(SimpleExpectedReturns(; cvg = strict_reset), X;
+                         active_mask = amsk))[2])
+    @test vec(mean(SimpleExpectedReturns(; cvg = strict_decay), X; active_mask = amsk))[2] ≈
+          mean(X[[1:3; 7:12], 2])
+    # A holiday before a delisting raises the staleness, so it shortens the hold.
+    Xe = [1.0 1; 2 2; 3 3; 4 4; 5 NaN; 6 NaN; 7 NaN; 8 NaN]
+    ame = trues(8, 2)
+    ame[7:8, 2] .= false
+    exp3 = CoveragePolicy(; alg = ExpireCoverage(; after = 3))
+    @test isnan(vec(mean(SimpleExpectedReturns(; cvg = exp3), Xe; active_mask = ame))[2])
+    Xe[5:6, 2] .= [5.0, 6.0]
+    @test vec(mean(SimpleExpectedReturns(; cvg = exp3), Xe; active_mask = ame))[2] ≈ 3.5
+    # ExpireCoverage keeps the history as DecayCoverage does.
+    a = partial_fit!(SimpleVariance(; cvg = exp3), X; active_mask = amsk).cache
+    b = partial_fit!(SimpleVariance(; cvg = CoveragePolicy()), X; active_mask = amsk).cache
+    @test a.cvg.nu == b.cvg.nu == [12, 9]
+    @test a.mu == b.mu
+end
+@testset "The read-out helpers at their edges" begin
+    # A state that folded nothing gives every asset a share of zero.
+    c0 = PortfolioOptimisers.coverage_counts_seed(CoveragePolicy(), nothing, 3, Float64,
+                                                  false)
+    @test isnothing(PortfolioOptimisers.coverage_admission(CoveragePolicy(), c0, 0))
+    @test PortfolioOptimisers.coverage_admission(CoveragePolicy(; min_coverage = 0.1), c0,
+                                                 0) == falses(3)
+    # An exact element type cannot hold the sentinel.
+    @test_throws InexactError PortfolioOptimisers.coverage_divide([1//1 2//1], [2 0], false,
+                                                                  nothing)
+    @test_throws InexactError PortfolioOptimisers.coverage_frame([1 // 2, 2 // 3], [1, 0],
+                                                                 nothing)
+    @test PortfolioOptimisers.coverage_divide([1//1 2//1], [2 3], false, nothing) ==
+          [1//2 2//3]
+    @test eltype(PortfolioOptimisers.coverage_divide(Float32[1 2], [2 1], true, nothing)) ===
+          Float32
+    # The pair columns of a coskewness take the conjunction of the two asset flags.
+    cmsk = BitVector([1, 0, 1])
+    V = zeros(3, 9)
+    PortfolioOptimisers.coverage_refuse_comoment!(V, cmsk, Val(:sk))
+    for i in 1:3, j in 1:3
+        @test isnan(V[1, (i - 1) * 3 + j]) == !(cmsk[i] && cmsk[j])
+    end
+    @test all(isnan, V[2, :])
+end
+@testset "The default floor fills every column that has a variance" begin
+    X = randn(StableRNG(3), 20, 3) ./ 100
+    cvg = CoveragePolicy()
+    pe = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg),
+                        ce = Covariance(; cvg = cvg))
+    # One observation: a NaN variance, so the Investable Mask drops the asset and nothing is
+    # filled.
+    X1 = copy(X)
+    X1[1:19, 3] .= NaN
+    r1 = @test_logs prior(pe, X1)
+    @test PortfolioOptimisers.investable_mask(r1) == BitVector([1, 1, 0])
+    @test isnan(r1.sigma[3, 3])
+    # Two observations: a variance, so the prior fills the column in silence.
+    X2 = copy(X)
+    X2[1:18, 3] .= NaN
+    r2 = @test_logs prior(pe, X2)
+    @test isnothing(PortfolioOptimisers.investable_mask(r2))
+    @test isfinite(r2.sigma[3, 3])
 end

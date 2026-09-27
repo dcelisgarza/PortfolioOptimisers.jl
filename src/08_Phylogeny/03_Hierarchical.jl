@@ -619,7 +619,7 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
         W_list[i] = sum(D_list)
     end
     return if c1 > 2
-        gaps = W_list[1:(end - 2)] + W_list[3:end] - 2 * W_list[2:(end - 1)]
+        gaps = @views W_list[1:(end - 2)] .+ W_list[3:end] .- 2 .* W_list[2:(end - 1)]
         valid_k_clusters(res, gaps)
     else
         c1

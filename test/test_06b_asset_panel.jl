@@ -128,6 +128,56 @@ end
                                                                   vals = ones(2, 2))],
                                           amsk = [true false; true true],
                                           emsk = [true true; true true])
+
+    #=
+    Two Panel Fields with different names can derive one Feature Matrix column name (#1335). The
+    panel refuses it at construction, so no panel exists without a valid Feature Matrix, and the
+    message names the column and the Panel Fields that give it.
+    =#
+    derived_name_error(pf) =
+        try
+            AssetPanel(; pf = pf)
+            nothing
+        catch err
+            err
+        end
+    # A numeric Panel Field against a tensor label.
+    err = derived_name_error([NumericPanelField(; name = "beta=size", vals = [1.0, 2.0]),
+                              TensorPanelField(; name = "beta", axis = "f",
+                                               labels = ["size"],
+                                               vals = reshape([7.0, 8.0], 2, 1))])
+    @test isa(err, ArgumentError)
+    @test occursin("\"beta=size\" is derived twice, first by the Panel Field \"beta=size\" and then by \"beta\"",
+                   err.msg)
+    # A numeric Panel Field against another's observed-mask column.
+    err = derived_name_error([NumericPanelField(; name = "x", vals = [1.0, 2.0],
+                                                omsk = [true, false]),
+                              NumericPanelField(; name = "x::observed", vals = [1.0, 0.0])])
+    @test isa(err, ArgumentError)
+    @test occursin("\"x::observed\" is derived twice, first by the Panel Field \"x\" and then by \"x::observed\"",
+                   err.msg)
+    # A numeric Panel Field against a categorical level, in either order.
+    s = CategoricalPanelField(; name = "s", levels = ["a", "b"], codes = [1, 2])
+    sa = NumericPanelField(; name = "s=a", vals = [1.0, 2.0])
+    @test isa(derived_name_error([s, sa]), ArgumentError)
+    err = derived_name_error([sa, s])
+    @test occursin("\"s=a\" is derived twice, first by the Panel Field \"s=a\" and then by \"s\"",
+                   err.msg)
+    # One tensor Panel Field whose value column is another label's observed-mask column.
+    err = derived_name_error([TensorPanelField(; name = "t", axis = "f",
+                                               labels = ["a", "a::observed"],
+                                               vals = ones(2, 2), omsk = trues(2, 2))])
+    @test isa(err, ArgumentError)
+    @test occursin("\"t=a::observed\" is derived twice, first by the Panel Field \"t\" and then by \"t\"",
+                   err.msg)
+    # Names that only look alike stay legal, and the Feature Matrix names stay unique.
+    ok = AssetPanel(;
+                    pf = [NumericPanelField(; name = "x", vals = [1.0, 2.0],
+                                            omsk = [true, false]),
+                          NumericPanelField(; name = "x:observed", vals = [1.0, 0.0]), s,
+                          NumericPanelField(; name = "s=c", vals = [1.0, 2.0])])
+    @test panel_feature_matrix(ok)[1] ==
+          ["x", "x::observed", "x:observed", "s=a", "s=b", "s=c"]
 end
 @testset "The derived Feature Matrix, and its inverse" begin
     pnl = AssetPanel(;

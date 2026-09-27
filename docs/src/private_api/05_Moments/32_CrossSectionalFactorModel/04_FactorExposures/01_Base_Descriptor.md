@@ -13,6 +13,7 @@ assert_log_returns
 market_return_series
 ew_beta_series
 ew_beta_reset!
+nan_fill_value
 descriptor_active_fill!
 positive_divide
 ```

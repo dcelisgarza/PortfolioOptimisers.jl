@@ -4,9 +4,9 @@ Description = "Error types, public API of PortfolioOptimisers.jl: IsNothingError
 
 # Error types
 
-Many of the types defined in `PortfolioOptimisers.jl` make use of extensive data validation to ensure values meet various criteria. This simplifies the implementation of methods, and improves performance and by delegating as many checks as possible to variable instantiation. In cases where validation cannot be performed at variable instantiation, they are performed as soon as possible within functions.
+Most types of `PortfolioOptimisers.jl` check their values in the constructor. A method that receives such an object uses it without checking it again, which keeps the method short and fast. A check that needs data the constructor does not have runs at the start of the first function that has that data.
 
-`PortfolioOptimisers.jl` aims to catch potential data validation issues as soon as possible and in an informative manner, in order to do so it makes use of a few custom error types.
+When a check fails, the library throws one of the error types below. The type names the kind of failure, such as a value that is `nothing`, an empty array or a non-finite number.
 
 ```@docs
 IsNothingError

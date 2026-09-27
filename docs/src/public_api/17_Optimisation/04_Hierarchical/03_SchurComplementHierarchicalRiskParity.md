@@ -1,12 +1,17 @@
 ```@meta
-Description = "Schur Complement Hierarchical Risk Parity, public API of PortfolioOptimisers.jl: NonMonotonicSchurComplement, MonotonicSchurComplement, …"
+Description = "Schur Complement Hierarchical Risk Parity, public API of PortfolioOptimisers.jl: SchurComplementAlgorithm, NonMonotonicSchurComplement, …"
 ```
 
 # Schur Complement Hierarchical Risk Parity
 
+A new Schur complement algorithm subtypes `SchurComplementAlgorithm` and adds a method of `schur_complement_weights`.
+
 ```@docs
+PortfolioOptimisers.SchurComplementAlgorithm
 NonMonotonicSchurComplement
 MonotonicSchurComplement
+schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt, wb::WeightBounds, params::SchurComplementParams{<:Any, <:Any, <:Any, <:NonMonotonicSchurComplement, <:Any}, gamma::Option{<:Number} = nothing)
+schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt, wb::WeightBounds, params::SchurComplementParams{<:Any, <:Any, <:Any, <:MonotonicSchurComplement, <:Any})
 SchurComplementParams
 SchurComplementHierarchicalRiskParityResult
 SchurComplementHierarchicalRiskParity

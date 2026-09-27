@@ -248,12 +248,13 @@ An asset that is not listed at an observation has no Factor Exposure there, what
 
 # Arguments
 
-  - `L`: The Factor Exposure, `observations × assets` or `observations × assets × factors`, changed in place.
+  - `L`: The Factor Exposure, `observations × assets` or `observations × assets × factors`, changed in place. Its element type must hold `NaN`.
   - `pnl`: The Asset Panel whose active mask is read.
 
 # Validation
 
   - The first two axes of `L` match the active mask. Raises a `DimensionMismatch`.
+  - `eltype(L)` holds `NaN`, through [`nan_fill_value`](@ref). Raises an `ArgumentError`.
 
 # Returns
 
@@ -273,10 +274,10 @@ function exposure_active_fill!(L::AbstractArray{<:Number, 3}, pnl::AssetPanel)::
     amsk = pnl.amsk
     @argcheck(size(L)[1:2] == size(amsk),
               DimensionMismatch("a one-hot Factor Exposure is observations × assets × factors, so its first two axes must match the active mask of the Asset Panel, got size(L) = $(size(L)) and size(pnl.amsk) = $(size(amsk))"))
-    Tf = eltype(L)
+    nan = nan_fill_value(L)
     for k in CartesianIndices(L)
         if !amsk[k[1], k[2]]
-            L[k] = Tf(NaN)
+            L[k] = nan
         end
     end
     return nothing

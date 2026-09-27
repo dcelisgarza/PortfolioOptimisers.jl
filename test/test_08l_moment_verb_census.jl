@@ -151,6 +151,9 @@ Measured under #667, by building each estimator and taking a `port_opt_view` of 
     would still change no answer: no consumer reads the cache, which is the exemption ADR 0106
     grants and the reason ADR 0105 hides the field. `mean`, `var` and `cov` rebuild from the
     sample they are handed, measured equal to the same verb on an estimator carrying no cache.
+  - `RankOneCovariance` carries `shift::Real` alone, the number added to every entry of the rows
+    before the decomposition. A scalar is universe-independent, so a view of the estimator is
+    the estimator.
 
 A name added here must carry its own reason, and a leaf with a genuine per-asset field belongs in
 a `port_opt_view` method instead -- `CustomValueExpectedReturns{<:VecNum}` is the worked example.
@@ -159,7 +162,8 @@ const VIEW_IDENTITY_ALLOWED = Set([:MedianExpectedReturns, :DistanceCovariance,
                                    :CustomValueExpectedReturns, :ExpWeightedExpectedReturns,
                                    :ExpWeightedVariance, :ExpWeightedCovariance,
                                    :RegimeAdjustedExpWeightedVariance,
-                                   :RegimeAdjustedExpWeightedCovariance])
+                                   :RegimeAdjustedExpWeightedCovariance,
+                                   :RankOneCovariance])
 
 @testset "The asset-axis tripwire: a per-asset field is declared, never inferred" begin
     families = moment_families()

@@ -3,26 +3,26 @@
 Description = "Subset resampling under cross-validation in PortfolioOptimisers.jl: how stable a meta-optimiser's out-of-sample weights and frontier are."
 ```
 
-# Subset resampling and cross-validation
+# [Subset resampling and cross-validation](@id example-subset-resampling-and-cross-validation)
 
-This example deepens the basic meta-optimiser walkthrough by focusing on two practical
+The meta-optimiser page builds the three meta-optimisers. This page asks two further
 questions:
 
-  - how stable are the out-of-sample predictions produced by a plain optimiser versus a
-    meta-optimiser when we evaluate them with cross validation?
-  - what does the efficient frontier look like when the optimiser is a meta-optimiser that
-    resamples the universe before averaging the result?
+  - how far do the out-of-sample predictions of a plain optimiser and of a meta-optimiser move
+    from one fold to the next?
+  - what does the efficient frontier look like when the optimiser draws random subsets of the
+    universe and averages the weights?
 
-We use [`MeanRisk`](@ref) as the benchmark and [`SubsetResampling`](@ref) as the meta-
-optimiser. The example also reuses the same clustering/prior setup as the standard meta-
-optimiser page so the allocations can be compared directly.
+[`MeanRisk`](@ref) is the benchmark here and [`SubsetResampling`](@ref) is the meta-optimiser.
+The prior and the clustering are the ones the meta-optimiser page builds, so you can read the
+allocations of the two pages against each other.
 
 !!! tip "When to reach for this"
-    Reach for subset resampling, and meta-optimisers generally, when a single full-universe
-    fit feels brittle — when small changes in the estimation window swing the allocation, or
-    when you want a portfolio averaged over many resampled universes rather than committed to
-    one point estimate. Cross-validation here is the tool for *checking* that stability, not
-    for producing the final portfolio.
+    Reach for subset resampling, and for a meta-optimiser in general, when one fit over every
+    asset moves too far for you to act on. A small change to the estimation window can move
+    the whole allocation, and an average over many drawn universes moves less than one point
+    estimate. Cross-validation on this page measures that movement. It does not build the
+    portfolio you hold.
 =#
 
 using PortfolioOptimisers, PrettyTables, StableRNGs
@@ -36,10 +36,10 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. ReturnsResult data and shared ingredients
+## 1. Data and shared ingredients
 
-We use the same S&P 500 slice as the other optimiser examples. The shared prior and
-clustering are computed once and reused everywhere below.
+We use the data of the meta-optimiser page, one year of daily prices for twenty S&P 500 stocks.
+We compute the prior and the clustering once, and every cell below uses them.
 =#
 
 using CSV, TimeSeries, DataFrames, Clarabel, Statistics
@@ -65,9 +65,9 @@ jopto = JuMPOptimiser(; slv = slv)
 #=
 ## 2. Reference allocations
 
-We compute the plain minimum-variance portfolio and the three standard meta-optimisers.
-These are the same building blocks as the shorter overview example, but here we will reuse
-them for cross-validation and frontier comparisons.
+We solve the plain minimum-variance portfolio and the three meta-optimisers. The
+meta-optimiser page builds the same four. Sections 3 and 4 take the plain optimiser and subset
+resampling further. Section 3 cross-validates both, and section 4 traces a frontier for each.
 =#
 
 res_bench = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv)))
@@ -95,8 +95,9 @@ pretty_table(DataFrame(; :assets => rd.nx, :MinVar => res_bench.w, :NCO => res_n
              formatters = [resfmt])
 
 #=
-The meta-optimisers spread capital more than the plain fit, and SubsetResampling usually
-smooths it the most because it averages over many smaller universes.
+Read the three meta-optimiser columns against the plain fit, and read the largest weight in
+each. SubsetResampling averages over many smaller universes, so its largest weight is smaller
+than in the other three columns, and it holds more assets. The plot below stacks the four allocations.
 =#
 
 using StatsPlots, GraphRecipes
@@ -105,16 +106,16 @@ plot_stacked_bar_composition([res_bench, res_nco, res_stk, res_ssr], rd)
 #=
 ## 3. Cross-validation prediction
 
-We now evaluate the benchmark and the bagged optimiser with explicit cross-validation. The
-[`cross_val_predict`](@ref) helper works on estimators, so we can compare the out-of-sample
-prediction streams directly.
+We score the benchmark and the resampled optimiser under cross-validation.
+[`cross_val_predict`](@ref) takes an estimator and returns one out-of-sample prediction per
+fold, so the two sets of predictions are comparable.
 
-Note that the optimisers we hand it carry **no precomputed prior** — their `JuMPOptimiser` has
-only a solver, so the prior is an estimator (the default [`EmpiricalPrior`](@ref)) refit on each
-training fold. This is mandatory: a precomputed prior would have been fit on the whole sample,
-leaking the test fold into training, so cross-validation **disallows** the precomputed form and
-requires the estimator. (See the precomputed-vs-estimator note in the
-[`MeanRisk` objectives](01_MeanRisk_Objectives.md) example.)
+The two optimisers we pass it carry no computed prior. Their `JuMPOptimiser` holds a solver
+alone, so the prior is an estimator, the default [`EmpiricalPrior`](@ref), and it is fitted
+again on each training fold. Cross-validation needs it that way. A prior computed once was
+fitted on every observation, including the ones each test fold holds, so cross-validation
+refuses it and asks for the estimator. The
+[`MeanRisk` objectives](@ref example-meanrisk-objectives) page covers that distinction.
 =#
 
 kfold = KFold(; n = 5)
@@ -131,26 +132,37 @@ pp_ssr = PopulationPredictionResult(; pred = [cv_ssr])
 median_bench = scorer(pp_bench)
 median_ssr = scorer(pp_ssr)
 
-println("MeanRisk cross-val variance = $(expected_risk(LowOrderMoment(; alg = SecondMoment()), cv_bench))")
-println("SubsetResampling cross-val variance = $(expected_risk(LowOrderMoment(; alg = SecondMoment()), cv_ssr))")
+println("MeanRisk cross-validated variance = $(expected_risk(LowOrderMoment(; alg = SecondMoment()), cv_bench))")
+println("SubsetResampling cross-validated variance = $(expected_risk(LowOrderMoment(; alg = SecondMoment()), cv_ssr))")
 
+# Each bar of the first plot is the variance of one test fold of the benchmark.
 plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), cv_bench)
+# Each bar of the second plot is the variance of one test fold of the resampled optimiser.
 plot_cv_scores(LowOrderMoment(; alg = SecondMoment()), cv_ssr)
 
 #=
-The scorer returns the prediction closest to the median of the population. On both
-optimisers that gives us a representative fold without hand-picking one ourselves.
+The two printed lines give the variance of the out-of-sample returns of each optimiser, with
+the five test folds joined into one series. Each plot draws the variance of every fold on its
+own.
+
+The scorer returns the path closest to the median of the population, so you do not choose a
+path by hand. The cell below prints the `id` of the path it returned for each optimiser. A population
+numbers its paths by position, and each population here holds one
+[`cross_val_predict`](@ref) stream, so both print `1`. A population of many paths, such as
+the one [`CombinatorialCrossValidation`](@ref) returns, gives the `id` of the path the scorer
+selected.
 =#
 
-println("Median benchmark fold id = $(median_bench.id)")
-println("Median SSR fold id = $(median_ssr.id)")
+println("Median benchmark path id = $(median_bench.id)")
+println("Median SubsetResampling path id = $(median_ssr.id)")
 
 #=
 ## 4. Efficient frontier of a meta-optimiser
 
-The frontier example from the optimiser overview used a single `MeanRisk` problem. Here we
-apply the same frontier sweep to the bagged optimiser, which gives us a frontier of
-bagged portfolios rather than a frontier from a single full-universe fit.
+The frontier page runs one [`MeanRisk`](@ref) problem per point. We run the same sweep over
+the resampled optimiser, so each point of the frontier is an average over drawn universes
+rather than one fit over every asset. The table prints the largest weight at each point of
+both frontiers, and the plot draws the two frontiers together.
 =#
 
 frontier_ret = ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = Frontier(; N = 15)))
@@ -178,25 +190,27 @@ pretty_table(DataFrame(; :point => 1:length(res_mf.w),
 
 plot(xs_m, ys_m; seriestype = :scatter, marker = (:circle, 5), label = "MeanRisk",
      xlabel = "Variance", ylabel = "Arithmetic return",
-     title = "Frontier: plain optimiser vs bagged meta-optimiser")
+     title = "Efficient frontiers of MeanRisk and SubsetResampling")
 plot!(xs_s, ys_s; seriestype = :scatter, marker = (:diamond, 6), label = "SubsetResampling")
 
 #=
-## 5. A risk-measure slot that follows the refit
+## 5. A covariance fitted again on every subset and fold
 
-Section 3 made the point that cross-validation **disallows** a precomputed prior. It does not,
-and cannot, disallow a precomputed *matrix* pasted into a risk measure: `Variance(; sigma = S)`
-is a legitimate configuration, and nothing distinguishes a matrix the caller measured elsewhere
-from one fitted on the very sample the portfolio is about to be scored on.
+Section 3 said that cross-validation refuses a prior computed once. It cannot refuse a
+matrix pasted into a risk measure the same way. `Variance(; sigma = S)` is a valid setting, and
+a matrix you measured somewhere else looks the same as one fitted on the very sample the
+portfolio is about to be scored on.
 
-So a prior-derived slot takes a second form — the **estimator that computes the value**, rather
-than the value. That is a [`DeferredQuantity`](@ref), and it is resolved against whatever prior
-the optimisation actually runs on: per subset, per fold. The struct that reaches the solver still
-holds a plain matrix. What changed is *when* the matrix is computed.
+A field that a prior fills therefore takes a second form, the estimator that computes the value
+rather than the value. That is a [`DeferredQuantity`](@ref). The optimiser fits it on the prior
+of each subset and each fold. What reaches the solver is still a plain matrix, and only the
+moment the matrix is computed has moved.
 
-The difference only shows for an estimator whose answer depends on the universe or the window it
-sees. Denoising is one: it clips the eigenvalue bulk at a threshold derived from the aspect ratio
-`T / N`, so the 14-asset block of a 20-asset fit is not a 14-asset fit.
+The two forms give the same answer unless the estimator depends on the universe or the window.
+Denoising depends on both. [`FixedDenoise`](@ref) fits a Marchenko-Pastur distribution to the
+eigenvalues of the correlation matrix, with the ratio of observations to assets, `T / N`, as its
+shape. It replaces every eigenvalue at or below the fitted edge with the mean of those
+eigenvalues. So the 14-asset block of a 20-asset fit is not a 14-asset fit.
 =#
 
 ce_dn = PortfolioOptimisersCovariance(;
@@ -209,15 +223,19 @@ idx = 1:14
 sigma_refit = cov(ce_dn, view(pr.X, :, idx))
 sigma_slice = view(sigma_full, idx, idx)
 
-println("Largest entry of the full-universe covariance   = $(maximum(abs, sigma_full))")
-println("Refit vs sliced, on a 14-asset subset           = $(maximum(abs, sigma_refit .- sigma_slice))")
+println("Largest entry of the full-universe covariance     = $(maximum(abs, sigma_full))")
+println("Largest gap, 14-asset refit against the cut block = $(maximum(abs, sigma_refit .- sigma_slice))")
 
 #=
+The second number is the largest gap between the covariance fitted on the 14 assets and the
+block cut from the 20-asset fit. Read it against the first number, the largest entry of the
+full covariance.
+
 ### Inside a resample
 
-[`SubsetResampling`](@ref) takes a view of the problem *before* the prior is computed, so a stated
-matrix crosses that boundary sliced, while a Deferred Quantity crosses unresolved and fits on the
-subset it lands in.
+[`SubsetResampling`](@ref) cuts the inner optimiser down to the assets it drew before that
+optimiser computes its prior. A matrix you pass is cut to those assets. A deferred quantity is
+not yet a matrix, so it is fitted on the prior of the subset.
 =#
 
 ssr_rm = r -> SubsetResampling(; pe = pr,
@@ -233,11 +251,14 @@ pretty_table(DataFrame(; :assets => rd.nx, :pasted_matrix => res_pasted.w,
                        :deferred_estimator => res_deferred.w); formatters = [resfmt])
 
 #=
+The two columns differ only in how the covariance of each subset was made. The gap between
+them is the effect of fitting the denoised covariance on the subset instead of cutting it from
+the full fit.
+
 ### Inside a fold
 
-The same slot under cross-validation. Here the pasted matrix is not merely stale — it was fitted
-on all 252 observations, so every test fold sits inside it. The estimator refits on the training
-fold alone.
+We run the same two forms under cross-validation. The pasted matrix was fitted on all 252
+observations, so it contains every test fold. The estimator fits on the training fold alone.
 =#
 
 cv_pasted = cross_val_predict(MeanRisk(; obj = MinimumRisk(),
@@ -248,38 +269,46 @@ cv_deferred = cross_val_predict(MeanRisk(; obj = MinimumRisk(),
                                          opt = JuMPOptimiser(; slv = slv)), rd, kfold)
 
 sm = LowOrderMoment(; alg = SecondMoment())
-println("Pasted-matrix cross-val variance      = $(expected_risk(sm, cv_pasted))")
-println("Deferred-estimator cross-val variance = $(expected_risk(sm, cv_deferred))")
+println("Pasted-matrix cross-validated variance      = $(expected_risk(sm, cv_pasted))")
+println("Deferred-estimator cross-validated variance = $(expected_risk(sm, cv_deferred))")
 
 #=
-The pasted matrix scores **better**, and that is the warning rather than the result: it saw the
-test folds. The deferred estimator's larger number is the honest one.
+The two runs differ in two ways. The pasted matrix was fitted on the observations each test
+fold holds, so its score is one no portfolio could have earned at the time. The deferred
+estimator also fits each training fold at a smaller `T / N` than the 252 rows of the pasted fit
+give, and `T / N` is the shape of the denoising fit. Read the deferred estimator's number as
+the one a portfolio could have earned.
 
-Every prior-derived slot on a risk measure behaves this way — `mu`, `sigma`, `kt` and `sk`. A
-measure with two or more deferrable slots takes a prior estimator in `pe` instead, and one fit
-fills every slot the measure leaves unstated:
+The fields a prior fills, `mu`, `sigma`, `kt` and `sk`, all work this way. A measure with two or
+more such fields takes a prior estimator in `pe` instead, and one fit fills every field you left
+unstated. The fit fills `mu` and `kt` of a `Kurtosis`, so its `pe` must compute a cokurtosis,
+as a `HighOrderPriorEstimator` does. It fills `mu`, `sigma` and `chol` of a
+`DistributionValueatRisk`.
 
 ```julia
-Kurtosis(; pe = EmpiricalPrior())                  # mu and kt from one fit
-DistributionValueatRisk(; pe = EmpiricalPrior())   # mu, sigma and chol from one fit
+Kurtosis(; pe = HighOrderPriorEstimator())
+DistributionValueatRisk(; pe = EmpiricalPrior())
 ```
 
-Slots stated by hand are left alone, and nothing makes them agree with each other. Each measure's
-docstring carries that warning; ADR 0051 records why the design warns rather than refuses.
+A field you state by hand keeps the value you gave it. The constructor checks the shape of each
+field, not whether their values match, and the docstring of each such measure warns you of that.
+The library does not refuse the setting, because a matrix measured elsewhere is a valid thing to
+pass.
 =#
 
 #=
 ## Summary
 
-Meta-optimisers help when a single fit feels too brittle.
+A meta-optimiser helps when one fit over every asset moves too far from window to window.
 
-  - [`cross_val_predict`](@ref) shows how the benchmark and the bagged optimiser behave
-    under repeated out-of-sample evaluation.
-  - [`SubsetResampling`](@ref) smooths allocations by averaging many subset solves.
-  - Frontier sweeps still work on the meta-optimiser, so you can compare its trade-off
-    curve against the plain optimiser instead of choosing only one portfolio.
-  - A prior-derived slot can hold the **estimator** rather than the value, so it refits with
-    every subset and every fold instead of pinning one full-sample answer.
+  - [`cross_val_predict`](@ref) scores the benchmark and the resampled optimiser out of
+    sample, one prediction per fold.
+  - [`SubsetResampling`](@ref) averages many subset solves, and its weights sit closer
+    together than those of one fit.
+  - A frontier sweep runs over a meta-optimiser, so you can read its whole curve against the
+    curve of the plain optimiser rather than one portfolio against another.
+  - A field a prior fills takes the estimator rather than the value, so it fits again on every
+    subset and every fold instead of holding one answer from the whole sample.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)
@@ -289,13 +318,9 @@ Meta-optimisers help when a single fit feels too brittle.
 #src - Narrative holds: SubsetResampling spreads weight the most (JNJ 20.5% vs 37% for MinVar),
 #src   and at every frontier point the SSR max weight sits well below the plain MeanRisk max
 #src   (75% vs 100% at the most aggressive point) — the "bagging smooths the frontier" point lands.
-#src - FINDING (record-only → validation/meta rollup): section 3 prints
-#src   `Median benchmark fold id = nothing` and `Median SSR fold id = nothing`.
-#src   `NearestQuantilePrediction` runs without error, but the selected result's `.id` is
-#src   `nothing` when the `PopulationPredictionResult` wraps a single `cross_val_predict` stream,
-#src   so the "representative fold without hand-picking" narrative surfaces no usable id. Either
-#src   populate `.id` on this path or soften the prose — needs a look at how
-#src   `NearestQuantilePrediction` / `PopulationPredictionResult` carry fold identifiers.
+#src - RESOLVED (#1250): section 3 printed `nothing` for both ids, because a population built
+#src   by hand from `cross_val_predict` streams carried no `id`. `PopulationPredictionResult`
+#src   now gives a member without an `id` its position, so both cells print `1`.
 #src - No solver warnings or plotting deprecations observed.
 #src - Section 5 (Deferred Quantity, added for #286) checked in the test env with `julia -t 1`,
 #src   BLAS 1, one Clarabel solver: refit-vs-sliced covariance difference 9.87e-5 against a

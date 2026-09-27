@@ -315,4 +315,127 @@ using Statistics
         @test isapprox(cs_regression_t_stats(blk),
                        cs_regression_t_stats(Msn, csrn.f, csrn.eps); rtol = 1e-12)
     end
+
+    @testset "the verbs agree with a weighted least-squares fit written out" begin
+        rng7 = StableRNG(24681357)
+        Tw, Nw, Kw = 4, 12, 3
+        B = randn(rng7, Tw, Nw, Kw)
+        B[:, :, 1] .= 1.0
+        W = rand(rng7, Tw, Nw)
+        # Each mask branch: a zero weight, a NaN weight, a NaN exposure, a NaN residual.
+        W[1, 3] = 0.0
+        W[2, 5] = NaN
+        B[3, 4, 2] = NaN
+        fw = randn(rng7, Tw, Kw)
+        ew = 0.2 * randn(rng7, Tw, Nw)
+        ew[4, 6] = NaN
+        vif = exposure_vif(B, W)
+        kappa = exposure_condition_number(B, W)
+        ts = cs_regression_t_stats(B, fw, ew, W)
+        r2 = cs_regression_r2(B, fw, ew, W)
+        adj = cs_regression_adjusted_r2(B, fw, ew, W)
+        aic = cs_regression_aic(B, fw, ew, W)
+        bic = cs_regression_bic(B, fw, ew, W)
+        for t in 1:Tw
+            # The Gram diagnostics mask on the weight and the exposures.
+            ok = [W[t, i] > 0 && all(isfinite, B[t, i, :]) for i in 1:Nw]
+            X = B[t, ok, :]
+            G = transpose(X) * LinearAlgebra.Diagonal(W[t, ok]) * X
+            @test isapprox(vif[t, :], LinearAlgebra.diag(G) .* LinearAlgebra.diag(inv(G));
+                           rtol = 1e-12)
+            @test isapprox(kappa[t], LinearAlgebra.cond(G); rtol = 1e-12)
+            # The t-statistic also masks on the residual.
+            ok2 = ok .& isfinite.(ew[t, :])
+            X2 = B[t, ok2, :]
+            u2 = W[t, ok2]
+            G2 = transpose(X2) * LinearAlgebra.Diagonal(u2) * X2
+            s2 = sum(u2 .* ew[t, ok2] .^ 2) / (count(ok2) - Kw)
+            se = sqrt.(s2 .* LinearAlgebra.diag(inv(G2)))
+            @test isapprox(ts[t, :], fw[t, :] ./ se; rtol = 1e-12)
+            # The scores mask on the reconstructed return and normalise the weights.
+            r = [sum(B[t, i, :] .* fw[t, :]) + ew[t, i] for i in 1:Nw]
+            ok3 = (W[t, :] .> 0) .& isfinite.(r)
+            q = W[t, ok3] ./ sum(W[t, ok3])
+            n = count(ok3)
+            rss = sum(q .* ew[t, ok3] .^ 2)
+            m = sum(q .* r[ok3])
+            R2 = 1 - rss / sum(q .* (r[ok3] .- m) .^ 2)
+            @test isapprox(r2[t], R2; rtol = 1e-12)
+            @test isapprox(adj[t], 1 - (1 - R2) * (n - 1) / (n - Kw - 1); rtol = 1e-12)
+            @test isapprox(aic[t], n * log(rss) + 2 * Kw; rtol = 1e-12)
+            @test isapprox(bic[t], n * log(rss) + Kw * log(n); rtol = 1e-12)
+        end
+        # A perfect fit has a residual sum of squares of zero.
+        Bp = reshape([1.0, 1.0, 1.0, -1.0, 1.0, 0.0], 1, 3, 2)
+        @test cs_regression_aic(Bp, [1.0 0.0], zeros(1, 3); k = 1) == [-Inf]
+        @test cs_regression_bic(Bp, [1.0 0.0], zeros(1, 3); k = 1) == [-Inf]
+    end
+
+    @testset "a cross-section of equal returns has no coefficient of determination" begin
+        # The weighted mean of equal returns rounds away from their common value for most
+        # weights, so the total sum of squares must not be read off the rounded mean. Sizes
+        # of three to seven assets reach the rounding that four assets can miss.
+        rng8 = StableRNG(97531864)
+        for n in 3:7, _ in 1:200
+            B = randn(rng8, 1, n, 1)
+            e = fill(randn(rng8), 1, n)
+            @test isnan(cs_regression_r2(B, zeros(1, 1), e, rand(rng8, 1, n))[1])
+        end
+    end
+
+    @testset "a collinear design reads the pseudo-inverse" begin
+        # An intercept beside a one-hot block is exactly collinear. The answer is finite,
+        # the variance inflation factor falls below one, and the condition number shows the
+        # singular slice.
+        Nc = 9
+        Bc = zeros(1, Nc, 4)
+        Bc[1, :, 1] .= 1.0
+        for i in 1:Nc
+            Bc[1, i, 2 + mod(i, 3)] = 1.0
+        end
+        vif = exposure_vif(Bc, nothing)
+        @test all(isfinite, vif)
+        @test minimum(vif) < 1
+        @test exposure_condition_number(Bc, nothing)[1] > 1e12
+    end
+
+    @testset "the numeric types" begin
+        rng9 = StableRNG(13572468)
+        Tn, Nn, Kn = 3, 7, 2
+        Bi = rand(rng9, -3:3, Tn, Nn, Kn)
+        Bi[:, :, 1] .= 1
+        fi = rand(rng9, -3:3, Tn, Kn)
+        ei = rand(rng9, -3:3, Tn, Nn)
+        wi = rand(rng9, 1:3, Tn, Nn)
+        Bf, ff, ef, wf = float.(Bi), float.(fi), float.(ei), float.(wi)
+        # An integer history keeps an exact Gram history, and an integer weight scales it.
+        @test cs_gram(Bi, wi) isa Array{Int, 3}
+        @test cs_gram(Bi, wi) == cs_gram(Bf, wf)
+        # Every other verb answers in `Float64`, and agrees with the float history.
+        @test exposure_vif(Bi, wi) ≈ exposure_vif(Bf, wf)
+        @test exposure_condition_number(Bi, wi) ≈ exposure_condition_number(Bf, wf)
+        @test cs_regression_t_stats(Bi, fi, ei, wi) ≈ cs_regression_t_stats(Bf, ff, ef, wf)
+        for verb in (cs_regression_r2, cs_regression_adjusted_r2, cs_regression_aic,
+                     cs_regression_bic)
+            @test verb(Bi, fi, ei, wi) isa Vector{Float64}
+            @test verb(Bi, fi, ei, wi) ≈ verb(Bf, ff, ef, wf)
+        end
+        @test cs_regression_t_stat_exceedance_rate([3 1; 1 1]) == [0.5, 0.0]
+        # A `Rational` history keeps its Gram history and its scores exact. The
+        # decomposition and the logarithm answer in `Float64`.
+        Br, fr, er = Rational{Int}.(Bi), Rational{Int}.(fi), ei .// 7
+        @test cs_gram(Br) isa Array{Rational{Int}, 3}
+        @test cs_regression_r2(Br, fr, er) isa Vector{Rational{Int}}
+        @test cs_regression_r2(Br, fr, er) ≈ cs_regression_r2(Bf, ff, ei ./ 7)
+        @test exposure_vif(Br, nothing) ≈ exposure_vif(Bf, nothing)
+        @test cs_regression_aic(Br, fr, er) ≈ cs_regression_aic(Bf, ff, ei ./ 7)
+        @test cs_regression_t_stat_exceedance_rate([3//1 1; 1 1]) == [1//2, 0]
+        # A `Float32` history stays `Float32`.
+        B32, f32, e32, w32 = Float32.(Bf), Float32.(ff), Float32.(ef), Float32.(wf)
+        @test exposure_vif(B32, w32) isa Matrix{Float32}
+        @test exposure_condition_number(B32, w32) isa Vector{Float32}
+        @test cs_regression_t_stats(B32, f32, e32, w32) isa Matrix{Float32}
+        @test cs_regression_r2(B32, f32, e32, w32) isa Vector{Float32}
+        @test cs_regression_aic(B32, f32, e32, w32) isa Vector{Float32}
+    end
 end

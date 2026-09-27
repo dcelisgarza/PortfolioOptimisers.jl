@@ -198,6 +198,19 @@ function print_findings(io::IO, path, fs)
 end
 
 """
+    SWEPT_ADDITION
+
+What a unit added to, or replaced in, a file whose row reads `swept = true` owes, which is ADR 0148
+§ *Amendment (2026-09-24)* and issue #1310: the commit sweeps the new units itself, and it files no
+sub-issue. A sub-issue would record nothing that the commit does not, and
+`code_health/sweep_triage.jl` refuses to plan a swept row.
+"""
+const SWEPT_ADDITION = ["The row keeps `swept = true`, so the new units meet the swept standard in",
+                        "this commit, and no sub-issue is owed (ADR 0148). A commit that cannot",
+                        "meet it sets `swept = false`, drops `algorithm` and `bindings`, and takes",
+                        "steps 3 and 4 as an addition to an unswept file does."]
+
+"""
     check_file(path, rows, map_names, coverage, entry, tracker, exempted, survey) -> Vector{Finding}
 
 Every duty the sweep places on one file, in the order a person meets them.
@@ -251,8 +264,12 @@ function check_file(path, rows, map_names, coverage, entry, tracker, exempted, s
                       "the unit count moved: $(row["units"]) -> $measured. Record it:",
                       [row_line(path, row["map"], measured, row["swept"];
                                 algorithm = get(row, "algorithm", nothing),
-                                bindings = swept ? bindings : nothing),
-                       "A documented unit joined this file, so it joins the file's child map too."]))
+                                bindings = swept ? bindings : nothing);
+                       if swept
+                           SWEPT_ADDITION
+                       else
+                           ["A documented unit joined this file, so it joins the file's child map too."]
+                       end]))
     elseif swept && haskey(row, "bindings") && !(sort(String.(row["bindings"])) == bindings)
         # The count sees an addition and a deletion, and not a REPLACEMENT: issue #1065. The
         # names do, and `test/test_45_sweep_census.jl` compares them on a swept row.
@@ -261,9 +278,8 @@ function check_file(path, rows, map_names, coverage, entry, tracker, exempted, s
                       "the unit set moved under a swept row: $measured unit(s), and not the ones " *
                       "the row records. Record the new list:",
                       [row_line(path, row["map"], measured, true;
-                                algorithm = get(row, "algorithm", nothing), bindings),
-                       "The sweep passed a text this file no longer holds, so the rewritten units",
-                       "join the file's child map as an addition would: open a sub-issue for them."]))
+                                algorithm = get(row, "algorithm", nothing), bindings);
+                       SWEPT_ADDITION]))
     else
         push!(fs, Finding(:ok, "the row is current: $measured unit(s), map $(row["map"])."))
     end
@@ -350,8 +366,9 @@ end
 Steps 3 and 4 of `CLAUDE.md` § *Functionality you add*, which no Julia test can reach: reopen the
 child map and the umbrella, and open one sub-issue for the file.
 
-An unread tracker is reported once as a `:note` naming the flag that reads it. A row that already
-reads `swept = true` owes no sub-issue, so nothing is reported for it.
+An unread tracker is reported once as a `:note` naming the flag that reads it. A row that reads
+`swept = true` owes no sub-issue, so nothing is reported for it. That holds after an addition too:
+the commit that adds a unit to a swept file sweeps it in the same commit (ADR 0148).
 
 **A missing sub-issue is a failure for a file the branch touched, and a note under `--all`.** The
 rule of ADR 0084 is about a late addition: a file that joined the library after its child map was
@@ -542,6 +559,8 @@ function main(args)
     println("  2. Cover every line of a new file, or give it a Coverage Exemption (ADR 0082).")
     println("  3. Reopen the child map that owns the file, and reopen #", UMBRELLA, ".")
     println("  4. Open one sub-issue of that child map for the addition.")
+    println("\nA row that reads `swept = true` owes steps 1 and 2 only. Its new units meet the")
+    println("swept standard in the same commit (ADR 0148).")
     println("\nSteps 3 and 4:  julia --project=code_health code_health/sweep_triage.jl \\")
     println("                  --fetch --file <path>")
     println("                code_health/sweep_issues.sh apply")

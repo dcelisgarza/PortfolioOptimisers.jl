@@ -323,6 +323,120 @@ assets is what keeps the JuMP families cheap.
         @test !(:cache in po.show_fields(EqualWeighted()))
         @test :cache in fieldnames(EqualWeighted)
     end
+
+    @testset "ReturnsBufferState agrees with its docstrings" begin
+        RBS = po.ReturnsBufferState
+        rdn = ReturnsResult(; nx = nx, X = X, ts = ts)
+        fold_head(r, i; kw...) = partial_fit!(RBS(; kw...), rows(r, i); own_returns = true)
+
+        # A merge under a cap keeps the last `max_history` rows of every column, the vector
+        # columns included, so it equals one state stepped over both blocks.
+        w = 5
+        m = po.merge_states(fold_head(rdv, 1:4; max_history = w),
+                            fold_head(rdv, 5:8; max_history = w))
+        @test (m.X.n, length(m.ts), length(m.B)) == (w, w, w)
+        @test po.context_count(m) == w
+        @test same_fields(po.returns_result(m, m.X), rows(rdv, 4:8))
+        @test same_fields(po.returns_result(m, m.X),
+                          po.returns_result(fold_head(rdv, 1:8; max_history = w),
+                                            fold_head(rdv, 1:8; max_history = w).X))
+        # The inputs of a merge are left alone.
+        a = fold_head(rdv, 1:4)
+        b = fold_head(rdv, 5:8)
+        po.merge_states(a, b)
+        @test (length(a.ts), length(b.ts)) == (4, 4)
+        # Two caps, and two states that keep different columns, are refused by name.
+        @test_throws ArgumentError po.merge_states(fold_head(rdn, 1:2; max_history = 3),
+                                                   fold_head(rdn, 3:4))
+        c3 = partial_fit!(RBS(; max_history = 3), rows(rdn, 1:2); own_factors = false)
+        @test_throws ArgumentError po.merge_states(c3,
+                                                   partial_fit!(RBS(), rows(rdn, 3:4);
+                                                                own_factors = false))
+        r1 = ReturnsResult(; nx = nx, X = X[1:1, :])
+        err = try
+            po.merge_states(fold_head(rdn, 1:2), fold_head(r1, 1:1))
+            nothing
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError) && occursin("`ts`", err.msg)
+        @test_throws ArgumentError po.merge_states(fold_head(rdn, 1:2),
+                                                   partial_fit!(RBS(), rows(rdn, 3:4)))
+
+        # The first step fixes the presence of a column even when the state keeps none.
+        s = partial_fit!(RBS(), r1)
+        @test po.context_count(s) == 0
+        @test_throws ArgumentError partial_fit!(s, rows(rdn, 2:2))
+        @test_throws ArgumentError partial_fit!(partial_fit!(InverseVolatility(), r1),
+                                                rows(rdn, 2:2))
+        @test_throws ArgumentError partial_fit!(partial_fit!(InverseVolatility(), r1),
+                                                rows(rdv, 2:2))
+        # A mask that appears at a later step is refused by the buffer that holds the rows.
+        amsk = trues(T, N)
+        amsk[1:10, 2] .= false
+        Xg = copy(X)
+        Xg[.!amsk] .= NaN
+        rdg = ReturnsResult(; nx = nx, X = Xg, pnl = AssetPanel(; amsk = amsk, emsk = amsk))
+        @test_throws ArgumentError partial_fit!(partial_fit!(EqualWeighted(), r1),
+                                                rows(rdg, 2:2))
+
+        # A head with no prior keeps the active mask alone. The estimation mask, a Panel
+        # Field and the implied volatility are dropped, and the weights still equal batch.
+        emsk = copy(amsk)
+        emsk[:, 3] .= false
+        rde = ReturnsResult(; nx = nx, X = Xg, pnl = AssetPanel(; amsk = amsk, emsk = emsk))
+        o = step(EqualWeighted(), rde, 20)
+        rp = po.returns_result(o)
+        @test rp.pnl.amsk == amsk[1:20, :]
+        @test rp.pnl.emsk == amsk[1:20, :]
+        @test optimise(o).w == optimise(EqualWeighted(), rows(rde, 1:20)).w
+        tv = AssetPanel(; pf = [NumericPanelField(; name = "cap", vals = ones(T, N))],
+                        amsk = trues(T, N), emsk = trues(T, N))
+        o = partial_fit!(EqualWeighted(), ReturnsResult(; nx = nx, X = X, pnl = tv))
+        @test isempty(po.returns_result(o).pnl.pf)
+        o = partial_fit!(EqualWeighted(),
+                         ReturnsResult(; nx = nx, X = X, iv = fill(0.2, T, N), ivpa = 1.0))
+        @test isnothing(po.returns_result(o).iv) && isnothing(po.returns_result(o).ivpa)
+        # The rows and the context must count the same observations.
+        @test_throws DimensionMismatch po.returns_result(fold_head(rdn, 1:3),
+                                                         fold_head(rdn, 1:4).X)
+
+        # A copy shares the pinned panel and nothing a fold writes.
+        spnl = AssetPanel(; pf = [NumericPanelField(; name = "cap", vals = collect(1.0:N))])
+        sp = fold_head(ReturnsResult(; nx = nx, X = X, pnl = spnl, ts = ts), 1:5)
+        cp = copy(sp)
+        @test cp.pnl === sp.pnl
+        @test cp.nx !== sp.nx && cp.ts !== sp.ts && cp.X.X !== sp.X.X
+
+        # A slice copies the columns with no asset axis, so a fold on it leaves the parent
+        # alone, and a single integer is not an index vector.
+        sv = fold_head(rdv, 1:10)
+        v = po.port_opt_view(sv, [3, 1])
+        @test v.nx == ["A3", "A1"]
+        @test po.sample_buffer(v.X) == X[1:10, [3, 1]]
+        @test v.B == sv.B && v.B !== sv.B && v.ts !== sv.ts
+        partial_fit!(v,
+                     ReturnsResult(; nx = ["A3", "A1"], X = X[11:11, [3, 1]], nb = ["BM"],
+                                   B = Bv[11:11], ts = ts[11:11]); own_returns = true)
+        @test (sv.X.n, length(sv.B), length(sv.ts)) == (10, 10, 10)
+        @test_throws TypeError po.port_opt_view(sv, 2)
+
+        # A view of a panel agrees with the panel by content, and a narrower view does not.
+        @test po.pinned_agree(po.port_opt_view(spnl, 1:N), spnl)
+        @test !isequal(po.port_opt_view(spnl, 1:N), spnl)
+        @test !po.pinned_agree(po.port_opt_view(spnl, 1:2), spnl)
+        @test po.pinned_agree(nothing, nothing) && !po.pinned_agree(nothing, nx)
+        # The message renders names in full and anything else by its summary.
+        @test po.pinned_repr(view(nx, 1:2)) == "[\"A1\", \"A2\"]"
+        @test po.pinned_repr(nothing) == "nothing"
+        @test po.pinned_repr(spnl) == summary(spnl)
+
+        # The vector arm appends in place and keeps the last `max_history` entries.
+        buf = [1, 2, 3]
+        @test po.fold_column(buf, 4:6, 4) === buf
+        @test buf == [3, 4, 5, 6]
+        @test po.fold_column(nothing, 1:3, nothing) == [1, 2, 3]
+    end
     @testset "An uncertainty set on the seam: own `pe` refits from the buffer, `pe = nothing` reads the folded prior (#1015)" begin
         # ADR 0138. No set takes a step. A set with its own `pe` is refitted over the
         # reconstituted carrier at the read-out, bit-identical to batch because the carrier

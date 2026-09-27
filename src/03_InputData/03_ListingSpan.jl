@@ -1,11 +1,31 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Reads a per-asset listing interval as a matrix of booleans, storing two integers per asset.
+Stores the listing interval of each asset as two integers and reads it as a matrix of booleans.
 
-`ListingSpan` is the **Listing Span**: the interval of the price clock over which an asset is listed, from its first priced observation to its last. It answers `size` as `(observations, assets)` and `getindex(s, t, i)` as `first[i] <= t <= last[i]`, so it is an ordinary `AbstractMatrix{Bool}` to every reader, and it costs two integers per asset rather than one boolean per cell. The compression is **exact** rather than approximate: under the **Span Rule** an interior gap leaves an asset listed, so an asset's active set *is* that interval. A column that is a gap throughout is the empty interval, `first[i] > last[i]`.
+`ListingSpan` holds the **Listing Span** of each asset, the interval of the price clock from the first priced observation of the asset to its last. `size` answers `(observations, assets)`, and `getindex(s, t, i)` answers `first[i] <= t <= last[i]`, so every reader sees an ordinary `AbstractMatrix{Bool}`. The type holds two integers per asset in place of one boolean per cell. The compression is exact, because the **Span Rule** keeps an interior gap inside the listing, so the active set of an asset is one interval. A column that is a gap throughout takes the empty interval, `first[i] > last[i]`.
 
-It is unexported and Base-only: it owns `size`, `getindex` and `show`, and nothing else in the library dispatches on it. The public bound is `AbstractMatrix{Bool}`, which is what a caller writes against and what a caller's own declaration — a listing calendar, or a constituency that leaves and rejoins — enters as.
+The type is unexported. It owns `size`, `getindex`, `IndexStyle` and `show`. [`PortfolioOptimisers.project_span`](@ref) and [`PortfolioOptimisers.span_carrier_view`](@ref) carry a library-internal fast path for it, which keeps the two integers per asset through a projection and through a window. A caller writes against the public bound, `AbstractMatrix{Bool}`, and a caller's own declaration, such as a listing calendar or a constituency that leaves and joins again, enters under that bound.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+a_{t,\\,i} &= \\begin{cases}
+1 & f_{i} \\leq t \\leq l_{i} \\\\
+0 & \\text{otherwise}
+\\end{cases}\\,, \\quad t = 1, \\ldots, n\\,.
+\\end{align}
+```
+
+An empty interval, ``f_{i} > l_{i}``, gives ``a_{t,\\,i} = 0`` at every observation.
+
+Where:
+
+  - $(math_dict[:a_ti_span])
+  - $(math_dict[:f_i_span])
+  - $(math_dict[:l_i_span])
+  - $(math_dict[:n_span])
 
 # Fields
 
@@ -32,18 +52,19 @@ ListingSpan(3 × 2)
   - [`listing_span`](@ref)
   - [`universe_masks`](@ref)
   - [`PortfolioOptimisers.project_span`](@ref)
+  - [`PortfolioOptimisers.span_carrier_view`](@ref): cuts a span to a window of its clock and keeps the two integers per asset.
 """
 struct ListingSpan <: AbstractMatrix{Bool}
     """
-    Index of each asset's first priced observation, on the clock the span is stated on.
+    Index of the first priced observation of each asset, on the clock of the span. A window of a longer clock puts this bound at zero or below for an asset that is listed before the window opens.
     """
     first::Vector{Int}
     """
-    Index of each asset's last priced observation, on the clock the span is stated on. An asset that is a gap throughout carries `last[i] < first[i]`, the empty interval.
+    Index of the last priced observation of each asset, on the clock of the span. An asset that is a gap throughout carries `last[i] < first[i]`, the empty interval. A window of a longer clock puts this bound above `n` for an asset that is still listed when the window closes.
     """
     last::Vector{Int}
     """
-    Length of the clock the span is stated on.
+    Length of the clock of the span, in observations.
     """
     n::Int
     function ListingSpan(first::VecInt, last::VecInt, n::Integer)
@@ -76,9 +97,28 @@ end
 
 Derive the Listing Span of every asset column of a price panel by the Span Rule.
 
-The rule reads a gap's *position* in a price column, which is what lets a caller holding only prices state a universe: a **leading** run of gaps is an asset not yet listed, a **trailing** run is a delisting, and an **interior** gap — priced on both sides — is a suspension or a holiday on an asset that is still listed and still held. The first two fall outside the span and the third inside it, so the span is exactly the interval from the first priced observation to the last. A cell counts as priced when it is neither `missing` nor non-finite, which unifies the two conventions a source spells an absent price with.
+The Span Rule reads the position of a gap in a price column, so a caller who holds only prices can state a universe. A leading run of gaps is an asset that is not listed yet, and a trailing run is a delisting. An interior gap, with prices on both sides, is a suspension or a holiday on an asset that is still listed and still held. The first two fall outside the span and the third falls inside it. A cell counts as priced when it is neither `missing` nor non-finite, so the two spellings of an absent price read alike.
 
-The derivation runs once over the whole panel rather than per window. A listing calendar is a fact about the instruments, not an estimate from returns, which is what licenses that; a window-local derivation instead reads a delisting straddling the window end as dead rather than held.
+The derivation runs once over the whole panel, not once per window. A listing calendar is a fact about the instruments and not an estimate from returns, so one derivation serves every window. A derivation over one window reads a gap that runs past the end of the window as a delisting, although the asset resumes after the window and is still held.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{P}_{i} &= \\left\\{t \\in \\{1, \\ldots, n\\} : \\text{asset } i \\text{ is priced at observation } t\\right\\}\\,, \\\\
+f_{i} &= \\min \\mathcal{P}_{i}\\,, \\\\
+l_{i} &= \\max \\mathcal{P}_{i}\\,.
+\\end{align}
+```
+
+An asset with an empty ``\\mathcal{P}_{i}`` takes an empty interval, ``f_{i} > l_{i}``. Every observation from ``f_{i}`` to ``l_{i}`` is listed, so an interior gap stays inside the listing.
+
+Where:
+
+  - ``\\mathcal{P}_{i}``: Priced observations of asset ``i``, those at which its price is neither `missing` nor non-finite.
+  - $(math_dict[:f_i_span])
+  - $(math_dict[:l_i_span])
+  - $(math_dict[:n_span])
 
 # Algorithm
 
@@ -88,7 +128,7 @@ The derivation runs once over the whole panel rather than per window. A listing 
 
 # Arguments
 
-  - `X`: The price panel, `observations × assets`. An absent price is spelled `missing` or non-finite.
+  - `X`: The price panel, `observations × assets`. A source spells an absent price as `missing` or as a non-finite value.
 
 # Validation
 
@@ -142,16 +182,39 @@ end
 
 Project a price-clock listing statement onto a returns clock of `m` observations.
 
-A return is the change between two **consecutive** observations, so a return is active exactly when *both* prices of its pair lie inside the asset's listing. That reading fixes the projection, and it is the same one under either padding convention: with padding the clocks align row for row and the pair of observation `t` is `(t - 1, t)`, so the leading row is active for nobody; without padding the returns clock is one observation shorter and the pair of observation `s` is `(s, s + 1)`. Under it the active mask bounds exactly the run of a column's finite returns at both ends, and no asset's inception emits a **Held Gap**.
+A return is the change between two consecutive prices, so a return is active when both prices of its pair lie inside the listing of the asset. The projection follows from that rule under either padding convention. With padding, the two clocks align row for row and return `t` reads prices `t - 1` and `t`, so the first row is active for no asset. Without padding, the returns clock is one observation shorter and return `t` reads prices `t` and `t + 1`. The active mask thus starts at the first return whose two prices lie inside the listing, and it stops at the last one. The first return of an asset is therefore never a **Held Gap**. An interior gap next to either end of the listing does make one, because the asset is still listed there.
 
-On a [`PortfolioOptimisers.ListingSpan`](@ref) the projection is `[first + 1, last]` under padding and `[first, last - 1]` without it, so the two integers per asset survive the crossing rather than being expanded and discarded at it. An asset with a single priced observation gives the empty interval, which is correct: one price yields no return. On any other `AbstractMatrix{Bool}`, which is how a caller's own declaration enters, the same rule is applied cell by cell, so a constituency that leaves and rejoins books no return across its absence.
+On a [`PortfolioOptimisers.ListingSpan`](@ref) the projection moves the two bounds, so the two integers per asset stay two integers. A bound lies outside the clock when the span is a window of a longer clock, and the projection clamps the opening bound to the clock before it moves it. The projection of a window thus equals the projection of the matrix of booleans that the window holds. An asset with one priced observation gets the empty interval, because one price gives no return. On any other `AbstractMatrix{Bool}`, which is how a caller's own declaration enters, the rule applies cell by cell, so a constituency that leaves and joins again books no return across its absence.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{a}_{t,\\,i} &= a_{t+o-1,\\,i} \\wedge a_{t+o,\\,i}\\,, \\quad t = 1, \\ldots, m\\,, \\\\
+\\tilde{f}_{i} &= \\max(f_{i}, 1) + 1 - o\\,, \\\\
+\\tilde{l}_{i} &= l_{i} - o\\,.
+\\end{align}
+```
+
+The first line is the rule for a matrix of booleans, with ``a_{0,\\,i} = 0``. The second and the third lines are the same rule on an interval: ``\\tilde{a}_{t,\\,i} = 1`` exactly when ``\\tilde{f}_{i} \\leq t \\leq \\tilde{l}_{i}``. Under padding, ``\\tilde{a}_{1,\\,i} = 0`` for every asset, because the first return reads a price before the clock.
+
+Where:
+
+  - $(math_dict[:a_tilde_ti_act])
+  - $(math_dict[:a_ti_span])
+  - ``\\tilde{f}_{i}``, ``\\tilde{l}_{i}``: First and last active observation of asset ``i``, on the returns clock.
+  - $(math_dict[:f_i_span])
+  - $(math_dict[:l_i_span])
+  - $(math_dict[:o_span])
+  - $(math_dict[:n_span])
+  - $(math_dict[:m_span])
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. [`PortfolioOptimisers.ListingSpan`](@ref): shift the opening bound up by one when the clocks align row for row, and the closing bound down by one when they do not.
- 2. Any other `AbstractMatrix{Bool}`: write `span[a, i] && span[a + 1, i]` into row `a + 1 - o` of the result, where `o` is the row count the returns clock lost.
+ 1. [`PortfolioOptimisers.ListingSpan`](@ref): read the clock offset `o` off the two row counts. Clamp each opening bound to the clock and move it up by `1 - o`, and move each closing bound down by `o`. Return the moved bounds as a `ListingSpan` of length `m`.
+ 2. Any other `AbstractMatrix{Bool}`: read the clock offset `o` off the two row counts, and write `span[a, i] && span[a + 1, i]` into row `a + 1 - o` of `amsk`.
 
 # Arguments
 
@@ -169,11 +232,8 @@ The method that Julia selects is the algorithm.
   - [`PortfolioOptimisers.ListingSpan`](@ref)
 """
 function project_span(span::ListingSpan, m::Integer)
-    return if size(span, 1) == m
-        ListingSpan(span.first .+ 1, span.last, m)
-    else
-        ListingSpan(span.first, span.last .- 1, m)
-    end
+    o = size(span, 1) - Int(m)
+    return ListingSpan(max.(span.first, 1) .+ (1 - o), span.last .- o, m)
 end
 function project_span(span::AbstractMatrix{Bool}, m::Integer)
     n, N = size(span)
@@ -190,24 +250,44 @@ end
         R::AbstractMatrix{<:Union{Missing, <:Real}}
     ) -> Tuple{AbstractMatrix{Bool}, BitMatrix}
 
-Project a listing statement onto the returns clock and intersect it with finiteness, giving an Asset Panel's two universe masks.
+Project a listing statement onto the returns clock and intersect it with finiteness to make the two universe masks of an Asset Panel.
 
-The **active mask** says which assets are in the universe at each observation, and it is `span` projected by [`PortfolioOptimisers.project_span`](@ref). A caller who passes their own `AbstractMatrix{Bool}` rather than a derived [`PortfolioOptimisers.ListingSpan`](@ref) therefore replaces the Span Rule's answer **outright**, and is never second-guessed. The **estimation mask** is the active mask intersected with the finiteness of the returns: an asset inside a **Held Gap** is active — still listed, still held — but has no return at that observation, so it cannot enter that observation's cross-section. It is **never the caller's to state** and is always re-derived, which is what makes `emsk ⊆ amsk` hold by construction rather than by refusal, and what keeps the library from quietly disagreeing with the numbers it emitted.
+The **active mask** states which assets are in the universe at each observation. It is `span` projected by [`PortfolioOptimisers.project_span`](@ref). A caller who passes their own `AbstractMatrix{Bool}` in place of a derived [`PortfolioOptimisers.ListingSpan`](@ref) replaces the answer of the Span Rule, and the function does not change that answer. The **estimation mask** is the active mask intersected with the finiteness of the returns. An asset inside a **Held Gap** is active, because it is still listed and still held, but it has no return at that observation, so it cannot enter the cross-section of that observation. A caller cannot state the estimation mask. The function always derives it, so `emsk ⊆ amsk` holds by construction, and the mask always agrees with the returns that the conversion made.
 
-The estimation mask is a **snapshot** of what the conversion produced, not a view over whatever `R` later holds, so a value-level step that rewrites a return does not move the estimation universe under a fold already scored against it.
+The estimation mask is a copy of the finiteness of `R` when the function runs, not a view of `R`. A later step that rewrites a return thus does not change the estimation universe of a fold that already has a score.
 
-Which padding convention the conversion used is read off the two row counts, and this is the one place that knows: `size(span, 1) == size(R, 1)` is the padded case, in which the first observation survives with a non-finite return, and `size(span, 1) == size(R, 1) + 1` is the unpadded case.
+The function reads the padding convention off the two row counts, and no other function does. `size(span, 1) == size(R, 1)` is the padded case, where the first observation stays with a non-finite return. `size(span, 1) == size(R, 1) + 1` is the unpadded case.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+e_{t,\\,i} &= \\tilde{a}_{t,\\,i} \\wedge \\mathbb{1}\\left[x_{t,\\,i} \\text{ is present and finite}\\right]\\,, \\quad t = 1, \\ldots, m\\,, \\\\
+o &\\in \\{0, 1\\}\\,.
+\\end{align}
+```
+
+It follows that ``e_{t,\\,i} \\leq \\tilde{a}_{t,\\,i}`` at every observation.
+
+Where:
+
+  - ``e_{t,\\,i}``: Estimation mask entry of asset ``i`` at observation ``t`` of the returns clock.
+  - $(math_dict[:a_tilde_ti_act])
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:o_span])
+  - $(math_dict[:n_span])
+  - $(math_dict[:m_span])
 
 # Algorithm
 
  1. Read the padding convention off the row counts of `span` and `R`.
- 2. Project `span` onto the returns clock with [`PortfolioOptimisers.project_span`](@ref), giving the active mask.
- 3. Intersect the active mask with the finiteness of `R`, giving the estimation mask.
+ 2. Project `span` onto the returns clock with [`PortfolioOptimisers.project_span`](@ref), giving the active mask `amsk`.
+ 3. Intersect `amsk` with the finiteness of `R`, giving the estimation mask `emsk`.
 
 # Arguments
 
   - `span`: The listing statement, `price observations × assets`. A [`PortfolioOptimisers.ListingSpan`](@ref) from [`listing_span`](@ref), or a caller's own declaration.
-  - `R`: The returns panel the conversion produced, `observations × assets`. An absent return is spelled `missing` or non-finite.
+  - `R`: The returns panel the conversion produced, `observations × assets`. An absent return is `missing` or a non-finite value.
 
 # Validation
 

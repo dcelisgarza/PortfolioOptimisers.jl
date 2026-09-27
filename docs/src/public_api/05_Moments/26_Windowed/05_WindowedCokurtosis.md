@@ -2,7 +2,7 @@
 Description = "Windowed Cokurtosis, public API of PortfolioOptimisers.jl: WindowedCokurtosis, cokurtosis."
 ```
 
-# Windowed Cokurtosis
+# [Windowed Cokurtosis](@id api-windowed-cokurtosis)
 
 ```@docs
 WindowedCokurtosis

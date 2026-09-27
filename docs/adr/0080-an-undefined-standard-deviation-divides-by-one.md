@@ -6,7 +6,7 @@ status: accepted
 
 ## Context
 
-[`StandardisedValue`](../../src/02_Tools.jl) reduces a vector to its mean divided by its standard
+[`StandardisedValue`](../../src/02_Tools/07_VectorToScalarMeasures.jl) reduces a vector to its mean divided by its standard
 deviation. The denominator carried one guard: an **exact** zero became `sqrt(eps)`. An
 **undefined** denominator carried none.
 

@@ -4,11 +4,11 @@ Description = "The Coverage Universe, public API of PortfolioOptimisers.jl: cov,
 
 # [The Coverage Universe](@id api-coverage-universe)
 
-An asset is in the **Coverage Universe** of one fit when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window. A prior reduces its returns matrix to that universe, fits every plain estimator on the clean block, and expands every block of its result onto the full asset universe with a `NaN` frame outside it.
+An asset is in the coverage universe of one fit when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window. A prior keeps only those assets of its returns matrix and fits each estimator on the smaller matrix. It then puts every result back on the full set of assets, with `NaN` for each asset outside the coverage universe.
 
-The Asset Panel travels as the third positional argument of every moment verb, and the root method of each verb is that reduce-and-expand. A mask-aware estimator overrides its root and takes the whole window.
+Each of the seven moment functions takes the asset panel as its third positional argument. The default method of each function removes the assets outside the coverage universe and puts them back as `NaN`. An estimator that reads the masks itself has its own method, and receives the whole window.
 
-## The roots of the seven verbs
+## The default methods of the seven moment functions
 
 ```@docs
 cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
@@ -20,9 +20,9 @@ coskewness(ske::CoskewnessEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims:
 cokurtosis(kte::CokurtosisEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 ```
 
-## The available-case seam
+## Estimators that fit each asset on its own observations
 
-An estimator that carries a [`CoveragePolicy`](@ref) is a mask-aware estimator, so its panel method hands it the whole window and the panel's active mask instead of reducing to the Coverage Universe.
+An estimator that carries a [`CoveragePolicy`](@ref) reads the masks itself. Its method with a panel passes it the whole window and the active mask of the panel, and does not remove the assets outside the coverage universe.
 
 ```@docs
 mean(me::SimpleExpectedReturns, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)

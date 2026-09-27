@@ -150,3 +150,11 @@ scale ask for it.
     fully invested book under a convex homogeneous measure. It needs a value-level evaluation of
     the model's aggregate risk expression, which the seam that registers the floor does not hold,
     and it is not a bound at all once the risk measure's homogeneity degree is not one.
+
+## Amendment (2026-09-23)
+
+The floor is inert where the ratio is well posed **and the solver stops at `OPTIMAL`**: across the
+47 `LogarithmicReturn` ratio cases of `test/test18_setup.jl`'s `mr_block1`, every `OPTIMAL` stop
+agrees with a `1e-14` floor to `6.7e-5` or better. An `ALMOST_OPTIMAL` stop is not inert, because
+any change of `1e-8` or more to the right-hand side of `k >= kmin` moves where Clarabel stops, and
+the size of the change does not predict the move, so the derived floor moves it too (#1280).

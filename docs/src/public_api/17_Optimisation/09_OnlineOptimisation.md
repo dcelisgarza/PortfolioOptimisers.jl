@@ -4,7 +4,7 @@ Description = "The optimiser on the partial-fit seam, public API of PortfolioOpt
 
 # The optimiser on the partial-fit seam
 
-An optimiser takes the online step in two verbs and one forward. `partial_fit!(opt, rd)` folds the observations of a carrier into the **prior alone** and records the rest of the carrier in a [`PortfolioOptimisers.ReturnsBufferState`](@ref); `optimise(opt)` with no returns rebuilds the carrier from the state, swaps the folded prior for its read-out and runs the ordinary batch path, so everything above the prior — the clustering estimator, the constraint estimators, every uncertainty set, a meta-optimiser's inner optimisers — is fitted exactly as batch fits it. The read-out is pure, so the fallback chain walks unchanged. ADR 0137 records the decision.
+An optimiser updates with two calls. `partial_fit!(opt, rd)` adds the observations of a `ReturnsResult` to the prior only, and stores the rest of the `ReturnsResult` in a [`PortfolioOptimisers.ReturnsBufferState`](@ref). `optimise(opt)` with no returns rebuilds the `ReturnsResult` from the state, replaces the prior with its current result, and runs the ordinary batch optimisation. Every part that uses the prior is then fitted as in a batch run, such as the clustering estimator, the constraint estimators, each uncertainty set and the inner optimisers of a meta-optimiser. Reading the prior does not change its state, so a fallback optimiser, which runs when the first one fails, reads the same prior.
 
 ```@docs
 PortfolioOptimisers.partial_fit!(opt::PortfolioOptimisers.JuMPOptimisationEstimator, rd::ReturnsResult)

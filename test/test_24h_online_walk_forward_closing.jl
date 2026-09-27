@@ -56,7 +56,7 @@ const ONL_PE = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = ONL_CVG),
                                                                                  cvg = ONL_CVG)))
 const ONL_W, ONL_T, ONL_P = 100, 40, 3
 const ONL_BATCH = IndexWalkForward(ONL_W, ONL_T; purged_size = ONL_P, expand_train = true)
-const ONL_ONLINE = IndexWalkForward(ONL_W, ONL_T; purged_size = ONL_P, ff = OnlineStep())
+const ONL_ONLINE = OnlineIndexWalkForward(ONL_W, ONL_T; purged_size = ONL_P)
 const ONL_TRAIN = [1:97, 1:137, 1:177, 1:217, 1:257]
 
 onl_jump(pe) = JuMPOptimiser(; pe = pe, slv = ONL_SLV)
@@ -223,7 +223,7 @@ end
     # A rolling scheme of window `w + p` with purge `p` trains over `w` rows; the online
     # scheme with the prior capped at `w` reads out over exactly those rows.
     rolling = IndexWalkForward(ONL_W + ONL_P, ONL_T; purged_size = ONL_P)
-    stepped = IndexWalkForward(ONL_W + ONL_P, ONL_T; purged_size = ONL_P, ff = OnlineStep())
+    stepped = OnlineIndexWalkForward(ONL_W + ONL_P, ONL_T; purged_size = ONL_P)
     @test all(length.(split(rolling, ONL_RD).train_idx) .== ONL_W)
     cap(pe) = PortfolioOptimisers.Online(pe; max_history = ONL_W)
     for (batch, online) in ((MeanRisk(; opt = onl_jump(EmpiricalPrior())),

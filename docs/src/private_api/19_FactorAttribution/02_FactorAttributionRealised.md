@@ -2,7 +2,7 @@
 Description = "Realised factor attribution, private API of PortfolioOptimisers.jl: ATTRIBUTION_CURRENCY_FAMILY, attribution_slice, attribution_weights, attribution_cov, …"
 ```
 
-# Realised factor attribution: private API
+# [Realised factor attribution: private API](@id private-api-realised-factor-attribution)
 
 ```@docs
 ATTRIBUTION_CURRENCY_FAMILY

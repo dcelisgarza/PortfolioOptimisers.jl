@@ -20,4 +20,5 @@ exp_weighted_moment(cache::ExpWeightedVarianceState, est::ExpWeightedVariance)
 variance_series(ce::ExpWeightedVariance, X::MatNum; dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 variance_series(ce::ExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 Base.copy(x::PortfolioOptimisers.ExpWeightedVarianceState)
+exp_weighted_variance_count
 ```

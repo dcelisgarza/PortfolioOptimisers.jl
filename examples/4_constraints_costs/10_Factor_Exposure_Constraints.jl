@@ -1,35 +1,38 @@
 #=
 ```@meta
-Description = "Factor exposure constraints in PortfolioOptimisers.jl: bound the portfolio's factor weights through a loadings matrix instead of its tickers."
+Description = "Factor exposure constraints in PortfolioOptimisers.jl: bound the portfolio's factor exposures through a loadings matrix instead of its tickers."
 ```
 
-# Factor exposure constraints
+# [Factor exposure constraints](@id example-factor-exposure-constraints)
 
-A mandate is rarely written in tickers. It is written in *factors*: "at most 10% momentum",
-"market-neutral to value", "no more than 60% in the defensive factors combined". Those are
-constraints on the portfolio's **factor weights**
+An investment mandate often limits factors instead of assets, for example "at most 10%
+momentum", "no net exposure to value" or "no more than 60% in the defensive factors together".
+Those are constraints on the factor exposures of the portfolio,
 
 ```math
 \boldsymbol{w}_f = \mathbf{M}^\intercal \boldsymbol{w}
 ```
 
-where `M` is the loadings matrix a factor model already computes. Writing one by hand means
-fitting the regression yourself, multiplying it out, and pasting twenty coefficients into an
-equation string — and the moment the loadings are refit, that string describes an exposure the
+where `M` is the loadings matrix that a factor model computes. To write such a constraint
+by hand, you fit the regression yourself, multiply it out, and paste twenty coefficients into an
+equation string. When the model fits the loadings again, that string uses loadings that the
 model no longer has.
 
-[`ExposureConstraintEstimator`](@ref) closes that gap. It **decorates** whatever the `lcse`
-keyword already accepts and declares the [`AbstractConstraintSpace`](@ref) the rows are written
-in; [`FactorSpace`](@ref) is the space that resolves names against the factor axis and re-bases
-through the prior's loadings. The projection happens while the constraint is being *generated*, so
-what reaches the optimiser is an ordinary asset-space [`LinearConstraint`](@ref) — every optimiser
-sharing [`JuMPOptimiser`](@ref) supports one without knowing factors exist. See ADR 0047.
+[`ExposureConstraintEstimator`](@ref) writes that equation for you. It wraps what the `lcse`
+keyword accepts. Its `space` field, an [`AbstractConstraintSpace`](@ref), states which names the
+rows use and how the library maps them onto the asset weights. The factor axis is the ordered list
+of factor names in the returns data, and section 2 declares it. With [`FactorSpace`](@ref), the
+library looks up the names of each row on the factor axis and maps the row through the loadings of
+the prior. We call that mapping the projection. It happens
+when the library generates the constraint, and the optimiser gets an ordinary
+[`LinearConstraint`](@ref) on the asset weights. Every optimiser built on [`JuMPOptimiser`](@ref)
+accepts it and needs no knowledge of factors.
 
 !!! tip "When to reach for this"
-    Reach for it whenever the mandate names a factor rather than an asset, and *especially* under
-    cross-validation or a walk-forward backtest, where the loadings are refit per fold. This is
-    the one constraint that cannot be precomputed by hand without going stale — §7 measures how
-    far off a hand-written row drifts on this very dataset.
+    Use it when the mandate names a factor rather than an asset. It matters most
+    under cross-validation or a walk-forward backtest, where each fold fits the loadings again.
+    A row that you compute once by hand goes out of date. Section 7 measures how far a
+    hand-written row drifts on this dataset.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -46,10 +49,11 @@ end;
 #=
 ## 1. Returns and factor data
 
-A factor exposure constraint needs *two* things a plain mandate does not: factor returns, so the
-prior can fit a regression, and factor names, so the constraint can be written down. Both come
-from the same place — [`prices_to_returns`](@ref) takes an optional second `TimeArray` of factor
-prices and records the factor names on the [`ReturnsResult`](@ref)'s `nf` field.
+A factor exposure constraint needs two inputs that an asset mandate does not. It needs factor
+returns, so that the prior can fit a regression. It needs factor names, so that you can write the
+constraint. We pass the factor prices next to the asset prices, and
+[`prices_to_returns`](@ref) stores the factor names in the `nf` field of the
+[`ReturnsResult`](@ref). The last line prints them.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -65,43 +69,45 @@ rd.nf
 #=
 ## 2. Declaring the factor axis
 
-[`UniverseSets`](@ref) declares **every axis it carries**, each under its own key: `xkey` for
-assets (default `"nx"`) and `tfkey` for time-series factors (default `"nf"`). A cross-sectional
-factor model names its own axis under `cfkey`, and `factor_axis_key` picks the key off the loadings
-so a caller never states it. The asset axis is required; both factor axes are optional, and a
-constraint that needs one and does not find it fails at the point of need rather than at
-construction.
+[`UniverseSets`](@ref) declares each axis under its own key. `xkey` names the asset axis, with the
+default `"nx"`. `tfkey` names the axis of the time-series factors, with the default `"nf"`. A
+cross-sectional factor model names its own axis under `cfkey`, and the library picks the key from
+the loadings, so you never state it. The asset axis is required. Both factor axes are optional,
+and a constraint that needs a missing axis fails when it looks for the axis, not when you build
+the sets.
 
-A universe is an **ordered** declaration. Position is the only link between a name and a column of
-the data, so a universe listing the right names in the wrong order attaches every constraint to
-the wrong column and still solves. Both axes are therefore checked against the returns data —
-name for name, in order — before the prior is even fitted.
+A universe is an ordered list. The position of a name is the only link between the name and a
+column of the data. A universe with the right names in the wrong order attaches every constraint
+to the wrong column, and the problem still solves. So before it fits the prior, the library checks
+the asset axis against `rd.nx` and the time-series factor axis against `rd.nf`, name for name and
+in order. We declare both axes from the returns data.
 =#
 
 sets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
 
 #=
-## 3. What the prior carries
+## 3. The loadings on the prior
 
-A factor exposure constraint is re-based through a *regression*, so it needs a prior that fits
-one. [`FactorPrior`](@ref) does; [`EmpiricalPrior`](@ref) does not. The loadings live on the prior
-result's `rr` field.
+A factor exposure constraint needs a prior that fits a regression, because the projection uses
+the loadings of that regression. [`FactorPrior`](@ref) fits one, and [`EmpiricalPrior`](@ref)
+does not. The loadings are in the `rr` field of the prior result.
 
-Note the loadings used here are `rr.M`, **not** `rr.L`. Under a
-[`DimensionReductionRegression`](@ref) the two are the two sides of one projection and each is
-recoverable from the other, so which one a consumer reads is decided by what it is *doing*: a risk
-decomposition ([`FactorRiskContribution`](@ref), [`FactorRiskBudgeting`](@ref)) reads `L`, the
-orthogonal reduced basis its covariance was estimated in, while a constraint reads `M`, because a
-constraint is *written down* and only `M`'s columns carry names a user can put in an equation —
-`L`'s are principal components.
+The constraint uses the loadings `rr.M`, not `rr.L`. A risk decomposition, such as
+[`FactorRiskContribution`](@ref) or [`FactorRiskBudgeting`](@ref), uses `L`. Under a
+[`DimensionReductionRegression`](@ref), `L` holds the loadings on the retained principal
+components, and one linear map relates `L` to `M`. The default regression of
+[`FactorPrior`](@ref), which this page uses, is a [`StepwiseRegression`](@ref). It does not set `L`,
+and `rr.L` then returns `M`. A constraint always uses `M`, because you write a constraint in names,
+and only the columns of `M` have factor names. We fit the prior and print the size of `M`, one row
+per asset and one column per factor.
 =#
 
 pr = prior(FactorPrior(), rd)
 size(pr.rr.M)
 
 #=
-Solving without any constraint gives the baseline exposures, `Mᵀw`. These are what a mandate is
-about to move.
+We solve the minimum-risk portfolio with no constraint and print its factor exposures, `Mᵀw`. They
+are the baseline that each mandate below changes.
 =#
 
 opt_base = JuMPOptimiser(; pe = FactorPrior(), slv = slv, sets = sets)
@@ -113,19 +119,19 @@ pretty_table(DataFrame("Factor" => rd.nf, "Baseline" => exposures(res_base));
              formatters = [resfmt], title = "Baseline factor exposures")
 
 #=
-The portfolio is strongly long low-volatility (`USMV`) and short size (`SIZE`) — unsurprising for
-a minimum-risk allocation — and carries a slightly *negative* momentum exposure.
+The portfolio has a large long exposure to low volatility, `USMV`, and a large short exposure to
+size, `SIZE`. Both are usual for a minimum-risk portfolio. Its momentum exposure is slightly
+negative.
 
-## 4. The one-liner
+## 4. A momentum floor
 
 To require at least 20% momentum, wrap an ordinary [`LinearConstraintEstimator`](@ref) and declare
-the space. Everything else — the `"name op value"` grammar, group expansion, `strict` handling —
-is inherited from the estimator being wrapped, because `ExposureConstraintEstimator` wraps rather
-than reimplements.
+the space. The wrapped estimator supplies the `"name op value"` grammar, the expansion of groups
+and the `strict` keyword.
 
-We pass the prior **estimator** (`pe = FactorPrior()`) rather than a precomputed prior, and hand
-`rd` to [`optimise`](@ref). That is what lets the projection be recomputed against whatever
-loadings the prior actually fits — the point of §7.
+We pass the prior estimator, `pe = FactorPrior()`, and not a prior result, and we give `rd` to
+[`optimise`](@ref). The library then projects the constraint through the loadings that the prior
+fits on the data it gets. Section 7 shows why that matters.
 =#
 
 ece = ExposureConstraintEstimator(; lce = LinearConstraintEstimator(; val = "MTUM >= 0.2"),
@@ -140,22 +146,24 @@ pretty_table(DataFrame("Factor" => rd.nf, "Baseline" => exposures(res_base),
              title = "Momentum floor")
 
 #=
-`MTUM` lands exactly on `0.2` — the constraint binds. Nothing downstream of constraint generation
-knows a re-basis happened: what the optimiser received is a single asset-space row, and it is
-sitting in the ordinary `lcsr` slot on the result.
+Compare the momentum exposure with its floor of 20%. The optimiser receives one row on the asset
+weights, and the result stores it in `pa.lcsr`, as it stores any linear constraint. We print the
+coefficients of the row.
 =#
 
 res_mtum.pa.lcsr.ineq.A
 
 #=
-## 5. Factor groups need no machinery
+## 5. Factor groups need no extra code
 
-A [`UniverseSets`](@ref) group is expanded by name and is **axis-blind** — `replace_group_by_assets`
-does not care which axis a name came from. So a factor group is just another key in the same dict,
-and a constraint over it works with no extra code.
+A group of [`UniverseSets`](@ref) expands by name, and nothing checks which axis the names belong
+to. So a factor group is one more key in the same dictionary.
 
-The same blindness has a corollary worth knowing: a factor constraint that names an *asset* group
-degrades to unknown-name warnings rather than to an error. It is detectable, not prevented.
+A factor constraint that names a group of assets does not raise an error by default. Each asset
+name is unknown on the factor axis, and the library drops the row with a warning. It throws an
+error only under `strict = true`.
+
+We add a group `"defensive"` of `QUAL` and `USMV`, and cap its exposure at 60%.
 =#
 
 sets_grp = UniverseSets(;
@@ -177,16 +185,17 @@ pretty_table(DataFrame("Factor" => rd.nf, "Baseline" => exposures(res_base),
              title = "A factor group")
 
 #=
-The group sums to exactly the cap:
+We add the exposures of `QUAL` and `USMV`, the second and fourth factors, to compare the sum with
+the cap.
 =#
 
 sum(w_grp[[2, 4]])
 
 #=
-## 6. Market-neutral to a factor
+## 6. No net exposure to a factor
 
-An equality is written the same way. `"VLUE == 0"` asks for a portfolio with no net value
-exposure — the "market-neutral to value" mandate, in one string.
+You write an equality the same way. `"VLUE == 0"` is the mandate "no net exposure to value" from
+the introduction, in one string.
 =#
 
 res_neutral = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -203,14 +212,13 @@ pretty_table(DataFrame("Factor" => rd.nf, "Baseline" => exposures(res_base),
              title = "Value-neutral")
 
 #=
-## 7. Why you cannot precompute this by hand
+## 7. Why a hand-written row goes out of date
 
-This is the argument for the whole feature, and it is worth measuring rather than asserting.
-
-Split the sample in half. Fit the loadings on the first half, write the momentum cap out by hand
-as a twenty-term asset-space equation against **those** loadings, and then solve on the second
-half — where the prior refits, and the loadings are no longer the ones the equation was written
-against.
+We split the sample in half, fit the loadings on the first half, and write the momentum cap by
+hand with them, as an equation of twenty terms on the asset weights. On the second half the prior
+fits new loadings. We solve on the second half with the hand-written row and with the projected
+cap, and print the momentum exposure of each portfolio, measured with the loadings of the second
+half.
 =#
 
 rd_a = ReturnsResult(; nx = rd.nx, X = rd.X[1:126, :], nf = rd.nf, F = rd.F[1:126, :])
@@ -219,7 +227,6 @@ rd_b = ReturnsResult(; nx = rd.nx, X = rd.X[127:end, :], nf = rd.nf, F = rd.F[12
 pr_a = prior(FactorPrior(), rd_a)
 pr_b = prior(FactorPrior(), rd_b)
 
-## The hand-written row: the first half's momentum loadings, spelled out as an equation.
 stale_eqn = join(string.(pr_a.rr.M[:, 1]) .* " * " .* rd.nx, " + ") * " <= 0.1"
 stale = LinearConstraintEstimator(; val = [stale_eqn])
 
@@ -241,25 +248,28 @@ pretty_table(DataFrame("Row written against" =>
              title = "A 10% momentum cap on the second half")
 
 #=
-The re-based constraint lands on the cap. The hand-written one does not bind at all — the
-portfolio it produces carries roughly **four times** the momentum exposure the mandate asked for,
-and nothing warned about it, because as far as the optimiser was concerned the row was satisfied.
+Compare the momentum exposure under the projected cap with the cap. Under the hand-written row,
+the portfolio has about four times the momentum exposure that the mandate allows. No warning
+appears,
+because the weights satisfy the row that the optimiser got.
 
-This is not a contrived split. It is exactly what every fold of a [`KFold`](@ref),
-[`IndexWalkForward`](@ref) or [`DateWalkForward`](@ref) scheme does, which is why the *estimator*
-route is the default advice: the projection is recomputed inside each fold, with the prior
-actually in use.
+Every fold of a [`KFold`](@ref), [`IndexWalkForward`](@ref) or [`DateWalkForward`](@ref) scheme
+fits the prior on different rows, as this section did. Pass the estimator, and the library
+projects the constraint inside each fold, with the prior of that fold.
 
-### Where the loadings come from: `FactorSpace(; re = ...)`
+### The source of the loadings, `FactorSpace(; re = ...)`
 
-Everything above reads the basis off the prior, which is what `FactorSpace()` means. The space also
-takes an `re` field naming the source outright, with the precedence every other factor consumer
-already uses: a precomputed [`Regression`](@ref) wins, then the prior's own loadings, then a refit
-from the returns.
+Everything above takes the loadings from the prior, which is what `FactorSpace()` means. The space
+also has an `re` field that names the source of the loadings. It looks for loadings in the same
+order as [`FactorRiskContribution`](@ref), [`FactorRiskBudgeting`](@ref) and
+[`factor_risk_contribution`](@ref). A precomputed [`Regression`](@ref) comes first, then the
+loadings of the prior, then a new fit from the returns.
 
-The third arm is the interesting one. It makes a factor mandate legal on a prior that carries **no
-factor block at all** — an [`EmpiricalPrior`](@ref), say — because the space fits the loadings
-itself, per fold and per subproblem, from the factor returns already in `rd`.
+The third source lets you use a factor mandate on a prior with no loadings, such as an
+[`EmpiricalPrior`](@ref). The space then fits the loadings itself from the factor returns in `rd`,
+in each fold and in each inner problem of a meta optimiser. We solve the momentum cap on the second half with an
+`EmpiricalPrior` and `FactorSpace(; re = StepwiseRegression())`, and check that the prior result
+has no regression.
 =#
 
 re_fit = ExposureConstraintEstimator(;
@@ -270,49 +280,50 @@ res_fit = optimise(MeanRisk(; obj = MinimumRisk(),
                             opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
                                                 sets = sets, lcse = re_fit)), rd_b)
 
-## The prior carries no regression: the basis is the space's own refit.
 isnothing(res_fit.pa.pr.rr)
 
 #=
-Measured against the loadings the space fitted, the mandate binds exactly as it does on the
-factor-prior route.
+We fit the same regression on the second half, and print the momentum exposure of each portfolio
+against its own loadings, next to the portfolio of the factor prior.
 =#
 
 rr_fit = regression(StepwiseRegression(), rd_b)
 
-pretty_table(DataFrame("Basis source" => ["`FactorPrior`'s own loadings",
-                                          "`FactorSpace(; re = StepwiseRegression())`"],
+pretty_table(DataFrame("Source of the loadings" => ["FactorPrior's own loadings",
+                                                    "FactorSpace(; re = StepwiseRegression())"],
                        "Realised MTUM exposure" => [dot(pr_b.rr.M[:, 1], res_live.w),
                                                     dot(rr_fit.M[:, 1], res_fit.w)],
                        "Cap" => [0.1, 0.1]); formatters = [resfmt],
-             title = "Reading the basis versus fitting it")
+             title = "Momentum cap with loadings from the prior and from the space")
 
 #=
 !!! warning
 
-    A **precomputed** `re` does not refit, and that is the trap §7 just measured, in a supported
-    spelling. `FactorSpace(; re = pr_a.rr)` pins the basis to the first half's loadings exactly as
-    the hand-written equation did — the row is the right *shape* for the universe, so nothing can
-    detect that it is stale. Use it when the basis genuinely is fixed, and reach for
-    `re = <an estimator>` or a [`TimeDependent`](@ref) schedule on `lcse` when it is not.
+    A precomputed `re` keeps its loadings fixed, and it goes out of date as the hand-written row
+    of section 7 did. The library accepts it without a warning. `FactorSpace(; re = pr_a.rr)` fixes the loadings
+    to those of the first half, as the hand-written equation did. The row has the right shape for
+    the universe, and no check can find that the loadings are out of date. Use a precomputed `re`
+    when the loadings do not change. When they change, use `re = <an estimator>` or a
+    [`TimeDependent`](@ref) schedule on `lcse`.
 
-    A pinned basis is refused outright at a [`NestedClustered`](@ref) outer solve, where the asset
-    universe is *replaced* by cluster names rather than sliced, so no view of the loadings can
-    follow it. An estimator is accepted everywhere, because it refits against whatever universe it
-    is handed.
+    The outer solve of a [`NestedClustered`](@ref) rejects a precomputed `re` with an error. The
+    outer problem replaces the assets with cluster names, so no subset of the fixed loadings can
+    match it. An estimator works here, because it fits the loadings on the universe it gets.
 
 ## 8. Mixing factor-space and asset-space constraints
 
-The `lcse` keyword takes a vector, and that vector may mix a re-based constraint with a plain
-one — the asset frame is simply the *absence* of a re-basis, spelled by a bare
-[`LinearConstraintEstimator`](@ref). There is deliberately no `AssetSpace`: it would be a no-op
-decorator computing bit-for-bit what it wraps.
+The `lcse` keyword accepts a vector, and the vector can mix a projected constraint with a plain
+one. A plain [`LinearConstraintEstimator`](@ref) is a constraint on the asset weights and needs
+no wrapper. The library has no `AssetSpace` type.
 
-!!! warning "A heterogeneous vector needs its element type"
-    `[ece, lce]` promotes to `Vector{AbstractConstraintEstimator}`, which is wider than the `lcse`
-    bound and will not be accepted. Write the element type out:
-    `PortfolioOptimisers.EcE_LcE_Lc[ece, lce]`. The same applies to a mixed vector of plain
-    estimators and precomputed constraints.
+!!! warning "A mixed vector needs its element type"
+    `[ece, lce]` promotes to `Vector{AbstractConstraintEstimator}`. That type is wider than the
+    type that `lcse` accepts, so `JuMPOptimiser` rejects the vector. Write the element type:
+    `PortfolioOptimisers.EcE_LcE_Lc[ece, lce]`. The same applies to a vector that mixes estimators
+    and precomputed constraints.
+
+We cap `JNJ` at 10% next to the momentum floor, and print the momentum exposure and the weight of
+`JNJ`.
 =#
 
 mixed = PortfolioOptimisers.EcE_LcE_Lc[ece, LinearConstraintEstimator(; val = "JNJ <= 0.1")]
@@ -325,19 +336,21 @@ pretty_table(DataFrame("Constraint" =>
                            ["MTUM ≥ 20% (factor space)", "JNJ ≤ 10% (asset space)"],
                        "Realised" => [exposures(res_mixed)[1],
                                       res_mixed.w[findfirst(==("JNJ"), rd.nx)]]);
-             formatters = [resfmt], title = "Both hold at once")
+             formatters = [resfmt], title = "Factor and asset constraints together")
 
 #=
-## 9. A precomputed constraint can be re-based too
+## 9. Projecting a precomputed constraint
 
-`ExposureConstraintEstimator` wraps exactly what `lcse` accepts, which includes an already
-assembled [`LinearConstraint`](@ref). This is the one place where a precomputed constraint is not
-passed through untouched: it was written in the wrapped basis, so its coefficient matrix is
-projected wholesale, `A * transpose(M)`. The right-hand side is left alone — a change of basis
-acts on the row, not on the bound.
+`ExposureConstraintEstimator` wraps anything that `lcse` accepts, and that includes an assembled
+[`LinearConstraint`](@ref). This is the one case where the library changes a precomputed
+constraint. You wrote its rows in factors, and the library projects the whole coefficient matrix,
+`A * transpose(M)`. The right-hand side stays the same, because a change of basis acts on the row
+and not on the bound.
 
-Its columns must be *factors*, not assets, and that is checked rather than assumed, because a
-precomputed constraint carries no names and nothing else would catch the mistake.
+The columns of `A` must be factors, not assets. A precomputed constraint has no names, and the
+library checks that `A` has one column per factor. We cap the first
+factor, `MTUM`, at 10% with a one-row constraint, solve on the second half, and print the momentum
+exposure.
 =#
 
 plc = LinearConstraint(;
@@ -359,20 +372,20 @@ dot(pr_b.rr.M[:, 1], res_pre.w)
 #=
 ## 10. Failure modes
 
-Three of the four checks below happen when the constraint is generated; the fourth happens before
-the prior is fitted. They are worth reading once, because the diagnoses are close together and the
-remedies are not.
+The library makes three of the four checks below when it generates the constraint, and the fourth
+before it fits the prior.
 
 ### No regression on the prior
 
-A missing regression **always throws, ignoring `strict`**. `strict` governs unknown *names*: a
-per-row, recoverable condition where the offending row is dropped and the rest of the problem is
-still the problem you described. A missing regression is not that — it makes *every* row
-unbuildable, and dropping them silently yields a feasible, plausible-looking portfolio carrying
-none of the requested exposure.
+A missing regression always throws an error, whatever the value of `strict`. `strict` controls
+unknown names. An unknown name affects one row, and the library can drop that row and still solve
+the problem you described. A missing regression makes every row impossible to build. If the
+library dropped every row with no error, you would get a feasible portfolio with none of the
+exposure you asked for.
 
-"Missing" means *no* carrier holds any, so the remedy is either a prior that computes loadings or a
-space that supplies them — `FactorSpace(; re = ...)`, above. The message names both.
+The regression is missing when neither the space nor the prior has one. The fix is a prior that
+computes loadings, or a space that gives them through `FactorSpace(; re = ...)`, as above. The
+message names both fixes. We solve with an `EmpiricalPrior` and a `FactorSpace()` with no `re`.
 =#
 
 try
@@ -386,9 +399,10 @@ end
 #=
 ### An unknown factor name
 
-This one *is* governed by `strict`: the term is dropped with a warning by default, and throws
-under `strict = true`. The message names the axis it searched, so a factor name misspelt as an
-asset name is distinguishable from the reverse.
+By default the library drops the row with a warning, and under `strict = true` it throws an
+error. The error names the axis that the library searched. With it, you can tell a factor name
+written on the asset axis from an asset name written on the factor axis. We ask for a factor `F3` that a
+small universe of three assets and two factors does not have.
 =#
 
 sets_small = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"]))
@@ -405,15 +419,14 @@ catch err
 end
 
 #=
-### A row the loadings annihilate
+### A row that the loadings turn into zeros
 
-A re-basis creates a diagnosis the asset frame does not have: every name resolved, and the
-projection still produced an all-zero row, because no asset loads on the factors named (or a
-long/short combination's loadings cancelled). An all-zero row is indistinguishable from "no name
-matched" by inspection, so assembly tracks whether anything matched and reports the two
-differently — here the remedy is to inspect the loadings, not the spelling.
+Every name can resolve, and the projection can still give a row of zeros. That happens when no asset loads on the named factors,
+or when the loadings of a long-short combination cancel. A row of zeros looks the same as a row
+where no name matched, so the library reports the two cases with different messages. Here the fix
+is to check the loadings, not the spelling.
 
-`F2` above is a factor no asset loads on:
+`F2` in the small universe above is a factor that no asset loads on.
 =#
 
 try
@@ -427,11 +440,12 @@ catch err
 end
 
 #=
-### A universe that disagrees with the data
+### A universe that does not match the data
 
-The axis-order check from §2, on the factor side. It runs before the prior is fitted, and only
-where *both* sides exist — `rd.nf` is optional on a [`ReturnsResult`](@ref) and the factor axis is
-optional on a [`UniverseSets`](@ref), so a plain asset mandate is unaffected.
+This is the order check of section 2, applied to the factor axis. It runs before the
+library fits the prior, and only when both sides exist. `rd.nf` is optional on a
+[`ReturnsResult`](@ref), and the factor axis is optional on a [`UniverseSets`](@ref), so the library
+skips the check for a plain asset mandate. We reverse the factor names in the universe.
 =#
 
 try
@@ -447,60 +461,57 @@ catch err
 end
 
 #=
-## 11. What has no factor-space form, and why
+## 11. Constraints with no factor form, and why
 
-`ExposureConstraintEstimator` decorates `lcse` and nothing else. It cannot be handed to `gcarde`
-or `sgcarde`, and that is enforced by the *type* — those keywords admit only the unmarked
-[`LinearConstraintEstimator`](@ref), so an illegal space cannot be written down in the first
-place. `lt`/`st` and `wb` never took a linear constraint estimator to begin with.
+`ExposureConstraintEstimator` wraps `lcse` and nothing else. You cannot pass it to `gcarde` or
+`sgcarde`, because the types of those keywords accept a [`LinearConstraintEstimator`](@ref) or a
+[`LinearConstraint`](@ref) and nothing that declares a space. `lt`, `st` and `wb` do not accept a
+linear constraint estimator.
 
-The reason is not a missing feature. **A constraint can be re-based if and only if it is a linear
-form in the weights.** Under a change of basis `w_b = Pᵀw` a row `a` becomes `Pa` and nothing else
-about the problem changes. The boundary is therefore a property of the *mechanism*: a re-basis
-rewrites a row and leaves the model alone, so a constraint that reaches the model through its own
-variables is out of reach even where the factor quantity is perfectly well defined.
+The projection handles only a constraint that is a set of rows linear in the weights. Under the
+map `w_f = Mᵀw`, a factor row `a` becomes the asset row `M a`, and nothing else in the problem
+changes. The projection cannot change a constraint that adds its own variables to the model, even
+when the factor quantity has a clear definition.
 
-  - **Cardinality** ([`IntegerPhylogeny`](@ref), `gcarde`, `sgcarde`) and **threshold**
-    ([`ThresholdEstimator`](@ref)) rows index the binary *held indicators*, not `w`. A projected
-    row is neither integral nor an index into them. "At most 5 factors held" is a different
-    feature — it needs its own binaries — not this one with a flag flipped.
-  - **Weight bounds** ([`WeightBoundsEstimator`](@ref)) are a per-asset *box*. A factor box,
-    `lb ≤ Mᵀw ≤ ub`, is a linear constraint and already has a home: write it as two rows through
-    `lcse`.
-  - **Turnover** ([`Turnover`](@ref)) and **tracking error** ([`TrackingError`](@ref)) are *norm*
-    forms. Each declares its own auxiliary variables and cones, so it is not a row to rewrite. The
-    factor turnover `‖Mᵀ(w - w₀)‖` is a real quantity and is not equal to any asset-space
-    turnover — it is re-basable in mathematics, and not by this mechanism.
-  - **Fees** ([`Fees`](@ref)) are priced per *traded position*: the proportional rates index the
-    long/short weight split, the fixed charges index the MIP indicator bits, and the total is
-    subtracted from the return. A factor is not traded, so there is nothing for `M` to carry.
+  - A cardinality constraint, such as [`IntegerPhylogenyEstimator`](@ref), `gcarde` or `sgcarde`, and a
+    threshold constraint, [`ThresholdEstimator`](@ref), act on the binary variables that show
+    whether you hold an asset, not on `w`. A projected row is neither integer nor an index into
+    those variables. "At most 5 factors held" is a different feature, with binary variables of its
+    own.
+  - Weight bounds, [`WeightBoundsEstimator`](@ref), are a box on each asset. A box on the factors,
+    `lb ≤ Mᵀw ≤ ub`, is a linear constraint. Write it as two rows through `lcse`.
+  - Turnover, [`Turnover`](@ref), and tracking error, [`TrackingError`](@ref), are norms. Each
+    adds its own variables and cones, so it is not a row to rewrite. The factor turnover
+    `‖Mᵀ(w - w₀)‖` is a real quantity, and it is not equal to any turnover of the asset weights.
+  - Fees, [`Fees`](@ref), apply to each traded position. The proportional rates act on the long
+    and short parts of the weights, and the fixed charges act on the binary variables of the
+    mixed-integer model. The library subtracts the total from the return. You do not trade a
+    factor, so `M` has nothing to map.
 
-The list illustrates the rule rather than exhausting it. The question to ask of a new constraint is
-not which bullet it matches, but whether the constraint *is* a row in `w` — because that is the
-only thing `ExposureConstraintEstimator` rewrites.
+To judge a new constraint, ask whether it is a row in `w`, the only thing that
+`ExposureConstraintEstimator` rewrites.
 
 ### Tracking a factor already works
 
-One case looks like a gap and is not. [`ReturnsTracking`](@ref) takes a benchmark **return
-series** rather than a benchmark weight vector, and a factor's return series is a column of `F`.
-So tracking a factor needs no re-basis at all — pass the column:
+[`ReturnsTracking`](@ref) takes a series of benchmark
+returns, not a vector of benchmark weights, and the return series of a factor is a column of `F`.
+To track a factor, pass the column, which is already in the units of the factor.
 
 ```julia
 TrackingError(; tr = ReturnsTracking(; w = view(rd.F, :, 1)), err = 0.05)
 ```
 
-The projection is unnecessary here rather than unavailable: the benchmark is already in the
-factor's own units.
+## 12. Near-optimal centering and pipelines
 
-## 12. Two things to watch
+### Near-optimal centering
 
-### Near Optimal Centering
-
-[`NearOptimalCentering`](@ref)'s default algorithm,
-[`UnconstrainedNearOptimalCentering`](@ref), builds its centering model from weight bounds,
-budget, risk and return only — it **drops linear constraints**, for asset-space mandates just as
-much as for factor ones. A factor mandate written under the default will not hold in the reported
-weights. Use [`ConstrainedNearOptimalCentering`](@ref) when the mandate must bind.
+The default algorithm of [`NearOptimalCentering`](@ref),
+[`UnconstrainedNearOptimalCentering`](@ref), builds its centering model from the weight bounds,
+the budgets, the risk and the return. It drops the linear constraints, for asset mandates and for
+factor mandates. The portfolios that set the target of the centering still use them, but the
+reported weights under the default need not satisfy a factor mandate. Use
+[`ConstrainedNearOptimalCentering`](@ref) when the mandate must bind. We solve with it under the
+momentum floor and print the momentum exposure.
 =#
 
 res_noc = optimise(NearOptimalCentering(; obj = MinimumRisk(),
@@ -511,23 +522,24 @@ res_noc = optimise(NearOptimalCentering(; obj = MinimumRisk(),
 exposures(res_noc)[1]
 
 #=
-### The pipeline route pins its projection
+### A pipeline step fixes its projection
 
-An `ExposureConstraintEstimator` is also a valid bare [`Pipeline`](@ref) step: it reads the
-`prior` slot for its basis and writes an ordinary asset-space [`LinearConstraint`](@ref) into
-`constraints`. The factor names resolve against the axis the pipeline builds from `rd.nf`, so the
-axis and the loadings agree by construction and the missing-axis error of §10 cannot occur.
+An `ExposureConstraintEstimator` can also be a [`Pipeline`](@ref) step on its own. It takes the
+loadings from the `prior` slot, and it writes an ordinary [`LinearConstraint`](@ref) on the asset
+weights into `constraints`. The pipeline builds the factor axis from `rd.nf`. The axis therefore
+always exists and matches the order of the loadings.
 
-But the rows it produces are **pinned to the pipeline's prior**. The projection happens once, when
-the step runs; a downstream optimiser that refits its own prior receives rows computed against the
-loadings the *step* saw. That is right only if the optimiser shares that prior. Passing the
-estimator to the optimiser's `lcse` field instead — everything above — re-projects it with the
-prior actually in use, which is why that is the default advice for a factor mandate. It is the
-same trade-off a phylogeny constraint step already makes.
+The step fixes the rows to the prior of the pipeline. The projection happens once, when the step
+runs. A later optimiser that fits its own prior gets rows computed with the loadings that the step
+saw. Those rows are correct only if the optimiser uses the same prior. If you pass the estimator to
+the `lcse` field of the optimiser instead, as everywhere above, the library projects it with the
+prior in use. For a factor mandate, pass the estimator to `lcse`. A phylogeny constraint step
+makes a similar trade-off, because it fits its network once, on the returns of the pipeline.
 
 ## 13. Comparing the mandates
 
-Same data, same objective — only the factor mandate changes.
+The data and the objective stay the same, and only the factor mandate changes. We print the factor
+exposures of the four portfolios and plot their weights.
 =#
 
 results = [res_base, res_mtum, res_grp, res_neutral]

@@ -4,9 +4,9 @@ Description = "Type roots, private API of PortfolioOptimisers.jl: AbstractEstima
 
 # Type roots: private API
 
-`PortfolioOptimisers.jl` is designed in a deliberately structured and hierarchical way. Enabling us to create self-contained, independent, composable processes. These abstract types form the basis of this hierarchy.
+Most types of `PortfolioOptimisers.jl` are subtypes of the abstract types below. An estimator holds the settings of a computation, an algorithm selects a variant of it, and a result holds its output. So a function can accept any estimator, or any result, with one method.
 
-Custom types are the bread and butter of `PortfolioOptimisers.jl`, the following types and utilities are non-specific and used throughout the library.
+[`CrossValidationEstimator`](@ref) is the supertype of the cross-validation schemes.
 
 ```@docs
 AbstractEstimator

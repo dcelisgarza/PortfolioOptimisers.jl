@@ -3,31 +3,33 @@
 Description = "Performance attribution in PortfolioOptimisers.jl: cumulative returns, drawdowns, risk contributions and fees as diagnostics after optimise."
 ```
 
-# Performance attribution and post-optimisation diagnostics
+# [Performance attribution and post-optimisation diagnostics](@id example-performance-attribution-and-post-optimisation-diagnostics)
 
-An optimiser hands you weights; it does not tell you whether the resulting book is any good.
-Before trusting an allocation you analyse its *realised* behaviour: how wealth would have grown,
-how deep and how long the drawdowns were, where the risk actually sits, and how much trading
-costs eat into the result. None of these are objectives — they are **diagnostics you run after
-`optimise`**, and they work on *any* weight vector, not just optimiser output (a benchmark, a
-live book, an equal-weight sleeve).
+An optimiser gives you weights. It does not tell you how the portfolio behaves. Before you trust an
+allocation, you measure what it would have done: how wealth would have grown, how deep and how long
+the drawdowns were, which assets the risk comes from, and how much the fees take from the return.
+None of these is what the portfolios below optimise. You compute them after `optimise`, and they
+take any weights: the output of an optimiser, a benchmark, a portfolio you already hold, or equal
+weights.
 
-Where the [plotting and reporting](02_Plotting_and_Reporting.md) page is a visual tour, this one
-is the *quantitative* companion: the raw functions that return the numbers and series behind the
-plots, so you can tabulate, compare, and attribute.
+The [plotting and reporting](@ref example-plotting-and-reporting) page draws plots. This page uses the
+functions that return the numbers and the series behind those plots, so you can put them in a
+table and compare them.
 
-  - [`cumulative_returns`](@ref) — the equity curve, simple (sum) or compounded (product).
-  - [`drawdowns`](@ref) — the peak-to-trough path, from which max drawdown, average drawdown,
-    and the Ulcer index follow.
-  - [`calc_net_returns`](@ref) and [`calc_fees`](@ref) — realised returns and cost drag after
-    fees, so you can attribute how much performance the trading costs consumed.
-  - [`risk_contribution`](@ref) — where the portfolio's risk comes from, by asset.
+  - [`cumulative_returns`](@ref) returns the equity curve, simple (a sum) or compounded (a
+    product).
+  - [`drawdowns`](@ref) returns the loss from the running peak, from which the maximum drawdown,
+    the average drawdown and the Ulcer index follow.
+  - [`calc_net_returns`](@ref) and [`calc_fees`](@ref) return the returns net of fees and the
+    fees themselves, so you can see how much of the performance the fees take.
+  - [`risk_contribution`](@ref) returns the share of the risk of the portfolio that each asset
+    contributes.
 
 !!! tip "When to reach for this"
-    Reach for these after you have chosen a portfolio, to understand and compare candidates on
-    realised path behaviour, risk concentration, and cost drag — rather than re-optimising.
-    Because they take a plain weight vector, they are equally the tools for reporting on a
-    benchmark or an externally-supplied book.
+    Reach for these functions after you choose a portfolio, to compare candidates on the returns
+    they would have made, on the concentration of their risk and on their fees, without a new
+    optimisation. They take plain weights, so they also report on a benchmark or on a portfolio
+    from outside the library.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames, Statistics
@@ -41,11 +43,12 @@ resfmt = (v, i, j) -> begin
 end;
 
 #=
-## 1. Candidate books
+## 1. Candidate portfolios
 
-We build three portfolios to compare: a minimum-variance and a maximum-ratio book from
-[`MeanRisk`](@ref), plus a naive equal-weight sleeve. The equal-weight book is just a vector —
-it shows that every diagnostic below works on any weights, not only optimiser results.
+We compare three portfolios: a minimum-variance and a maximum-ratio portfolio from
+[`MeanRisk`](@ref), and an equal-weight portfolio. The equal-weight portfolio is a plain vector,
+and every function below takes it as it takes the output of an optimiser. The sections below
+score each portfolio on the returns the optimiser fitted, so their numbers are in sample.
 =#
 
 using CSV, TimeSeries, Clarabel
@@ -65,22 +68,20 @@ w_ratio = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 w_ew = fill(inv(length(rd.nx)), length(rd.nx))
 
 books = ["Min variance" => w_min, "Max ratio" => w_ratio, "Equal weight" => w_ew]
-## Realised in-sample portfolio return series for each book.
 port_ret = [name => rd.X * w for (name, w) in books]
 
 #=
 ## 2. Cumulative returns: the equity curve
 
-[`cumulative_returns`](@ref) turns a return series into a wealth path. Its `compound` flag picks
-the convention:
+[`cumulative_returns`](@ref) turns a series of returns into a path of wealth. Its second argument,
+`compound`, chooses how:
 
-  - `compound = false` (the default) sums the returns: `cumsum(X)` — the *absolute* cumulative
-    return, additive and easy to reason about for short horizons.
-  - `compound = true` multiplies them: `cumprod(1 .+ X)` — the *relative* (geometric) wealth
-    multiple, which is what an investor actually realises through reinvestment.
+  - `false`, the default, sums the returns, `cumsum(X)`. This is the absolute
+    cumulative return. It adds up period by period and is easy to read over a short horizon.
+  - `true` multiplies them, `cumprod(1 .+ X)`. This is the relative, or geometric,
+    multiple of wealth, which is what an investor who reinvests gets.
 
-The dedicated [`absolute_cumulative_returns`](@ref) and [`relative_cumulative_returns`](@ref)
-expose the two conventions directly. We report each book's final compounded wealth multiple.
+The table prints the last compounded multiple of wealth of each portfolio.
 =#
 
 final_wealth = [name => cumulative_returns(r, true)[end] for (name, r) in port_ret]
@@ -90,29 +91,30 @@ pretty_table(DataFrame(; book = first.(final_wealth),
              title = "Final compounded wealth multiple over the sample")
 
 #=
-## 3. Drawdown analytics
+## 3. Drawdowns
 
-[`drawdowns`](@ref) returns the full peak-to-trough series (each point is the loss from the
-running high). From it we derive the three headline drawdown statistics: the **maximum
-drawdown** (worst single decline), the **average drawdown** (time-average depth), and the
-**Ulcer index** (root-mean-square depth, which punishes long drawdowns more than shallow
-spikes). We compute compounded drawdowns to match the geometric equity curve.
+[`drawdowns`](@ref) returns the drawdown at each point, the loss from the highest value reached
+before it. From that series we compute three statistics: the maximum drawdown, which is the worst
+loss; the average drawdown, which is the mean depth over time; and the Ulcer index, the root mean
+square of the depth, which weighs a deep drawdown more than a shallow one. We use compounded
+drawdowns, to match the compounded equity curve. A drawdown is zero or negative, so we negate the
+minimum and the mean.
 =#
 
 dd_stats = map(port_ret) do (name, r)
-    dd = drawdowns(r, true)          # compounded drawdown series, ≤ 0
+    dd = drawdowns(r, true)
     return (name = name, max_dd = -minimum(dd), avg_dd = -mean(dd),
             ulcer = sqrt(mean(dd .^ 2)))
 end
-pretty_table(DataFrame(dd_stats); formatters = [resfmt], title = "Drawdown analytics")
+pretty_table(DataFrame(dd_stats); formatters = [resfmt], title = "Drawdown statistics")
 
 #=
-## 4. A realised-performance scorecard
+## 4. A scorecard of performance
 
-Putting the path statistics together gives the kind of scorecard you would report for a book:
-annualised return and volatility, the annualised Sharpe ratio (net of the risk-free rate), the
-maximum drawdown, and the Calmar ratio (annualised return over maximum drawdown). All are derived
-from the realised return series — no re-optimisation.
+We compute the statistics you would report for a portfolio: the annualised return and volatility,
+the annualised Sharpe ratio net of the risk-free rate, the maximum drawdown, and the Calmar ratio,
+which is the annualised return divided by the maximum drawdown. All of them come from the return
+series of each portfolio, with no new optimisation.
 =#
 
 scorecard = map(port_ret) do (name, r)
@@ -133,22 +135,21 @@ pretty_table(DataFrame(scorecard);
                                          end)], title = "Realised-performance scorecard")
 
 #=
-## 5. Cost attribution: gross vs net returns
+## 5. Fees: gross and net returns
 
-A book that looks good gross can be mediocre net of trading costs. [`calc_net_returns`](@ref)
-applies a [`Fees`](@ref) schedule to the realised returns; [`calc_fees`](@ref) reports that cost
-as a **pair**, the charge every observation carries beside the one-off charge the first observation
-carries alone, and [`calc_total_fees`](@ref) contracts the pair to the cost of a whole holding
-period.
+A portfolio with a good gross return can have a poor one after fees. [`calc_net_returns`](@ref)
+deducts a [`Fees`](@ref) schedule from the returns. [`calc_fees`](@ref) returns the fees as a
+pair: the charge on every observation, and the one-off charge on the first observation alone.
+[`calc_total_fees`](@ref) adds the pair up over a whole holding period.
 
-The important subtlety is the time base. `l`, `s` and `tn` are rates per period, so
-`calc_net_returns(w, X, fees)` deducts them on **every row** of `X`: it models paying the
-rebalancing cost *each period*. With 252 daily observations a per-period fee of `l` therefore
-accumulates to roughly `252 · l` over the year before compounding. `fl` and `fs` are different:
-they are currency amounts charged one time for the whole holding period, and `fees.fa` decides
-where on the series that one charge lands. We use a modest per-rebalance fee of 5 bps
-(`l = 0.0005`), which is about a 12–13% annualised cost, and compare gross and net compounded
-wealth.
+The fees have two time bases. `l`, `s` and `tn` are rates per period, so
+`calc_net_returns(w, X, fees)` deducts them on every row of `X`. `l` is proportional to the long
+positions and `s` to the short ones, and `tn` to the turnover. Over 252 daily observations, a rate
+`l` per period adds up to about `252 * l` over the year, before compounding. `fl` and `fs` are
+charged once for the whole holding period on each position that is not zero, and on a return series
+they are a fraction of capital. `fees.fa` decides where on the series that charge falls. We charge
+`l = 0.0005`, five basis points per period on the long positions, and compare the compounded wealth
+gross and net of it. The table also prints the fee of one period and the total over 252 periods.
 =#
 
 fees = Fees(; l = 0.0005)
@@ -160,21 +161,20 @@ pretty_table(DataFrame(;
                        quantity = ["Gross compounded wealth (×)",
                                    "Net compounded wealth (×)",
                                    "Single-period fee (fraction)",
-                                   "Approx annualised fee (252 periods)"],
+                                   "Total fee over 252 periods"],
                        value = [round(cumulative_returns(gross_ret, true)[end]; digits = 4),
                                 round(cumulative_returns(net_ret, true)[end]; digits = 4),
                                 round(single_period_fee; digits = 5),
                                 round(calc_total_fees(w_ratio, 252, fees); digits = 4)]);
-             title = "Fee drag on the maximum-ratio book (5 bps per rebalance)")
+             title = "Wealth and fees of the maximum-ratio portfolio, 5 basis points per period on the long positions")
 
 #=
 ## 6. Risk attribution
 
-A book can look diversified by *weight* yet be concentrated in *risk*. [`risk_contribution`](@ref)
-decomposes the total risk into per-asset shares. As with the plotting layer, a quadratic risk
-measure must be configured for the data — pass `factory(Variance(), pr)`, not a bare `Variance()`.
-We normalise the contributions so they sum to one and report the largest for the minimum-variance
-book.
+[`risk_contribution`](@ref) splits the total risk into the share of each asset. As with the plots,
+a quadratic risk measure needs the covariance of the data, so pass `factory(Variance(), pr)`, not
+a bare `Variance()`. We scale the contributions to sum to one, and the table prints the eight
+largest of the minimum-variance portfolio beside their weights.
 =#
 
 rc = risk_contribution(factory(Variance(), pr), w_min, rd.X)
@@ -182,17 +182,31 @@ rc ./= sum(rc)
 rc_df = sort(DataFrame(; asset = rd.nx, weight = w_min, risk_share = rc), :risk_share;
              rev = true)
 pretty_table(first(rc_df, 8); formatters = [resfmt],
-             title = "Top risk contributors — minimum-variance book")
+             title = "The eight largest risk shares in the minimum-variance portfolio")
 
 #=
-The weight and risk shares are not the same: a low-weight, high-volatility or
-highly-correlated name can carry a disproportionate share of the risk. That gap is exactly what
-risk attribution surfaces.
+On the minimum-variance portfolio the two columns match. At the minimum of the variance, a small
+move of weight between two assets in the portfolio does not change the variance, so each of its
+assets adds the same variance per unit of weight. The share of the risk of each asset is then its
+weight. We compute the same shares for the maximum-ratio portfolio, and the table prints the assets
+with a weight above 0.01 %.
+=#
+
+rc_ratio = risk_contribution(factory(Variance(), pr), w_ratio, rd.X)
+rc_ratio ./= sum(rc_ratio)
+rc_ratio_df = sort(DataFrame(; asset = rd.nx, weight = w_ratio, risk_share = rc_ratio),
+                   :risk_share; rev = true)
+pretty_table(filter(:weight => >(1e-4), rc_ratio_df); formatters = [resfmt],
+             title = "Weight and risk share of each asset of the maximum-ratio portfolio with a weight above 0.01 %")
+
+#=
+Here the two columns differ, and XOM takes a larger share of the risk than of the weight. An asset
+with a high volatility, or a high correlation with the other assets, can contribute more risk than
+its weight, and the weights alone do not show it.
 
 ## 7. The equity curves
 
-Finally, the compounded wealth paths of the three books side by side — the visual summary of
-everything the scorecard quantified.
+The last plot draws the compounded wealth of the three portfolios over the sample.
 =#
 
 using StatsPlots, GraphRecipes
@@ -207,17 +221,15 @@ current()
 #=
 ## Summary
 
-After the optimiser runs, the post-processing toolkit answers "how did this book actually
-behave?" without any re-optimisation:
+On this sample the three portfolios differ as follows:
 
-  - [`cumulative_returns`](@ref) (simple/compounded) is the equity curve;
-    [`drawdowns`](@ref) gives the loss path and the max-drawdown / Ulcer statistics.
-  - [`calc_net_returns`](@ref) and [`calc_fees`](@ref) attribute the cost drag, separating gross
-    from net performance.
-  - [`risk_contribution`](@ref) shows where the risk lives, which weight alone hides.
-
-Every one of these takes a plain weight vector, so the same diagnostics report on optimiser
-output, a benchmark, or any externally-supplied portfolio.
+  - The maximum-ratio portfolio ends with the largest compounded wealth of the three, and the
+    equal-weight portfolio has the largest value of all three drawdown statistics.
+  - A fee of five basis points per period on the long positions lowers the compounded wealth of
+    the maximum-ratio portfolio, and [`calc_total_fees`](@ref) gives the fee over the whole
+    sample.
+  - On the minimum-variance portfolio the share of the risk of each asset equals its weight. On
+    the maximum-ratio portfolio the two differ.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

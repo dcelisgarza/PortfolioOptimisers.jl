@@ -39,6 +39,18 @@
     its value type, and the free weight bounds take the `datatype` every caller already
     passed. A constant filled in a derived type is spelled `fill(convert(T, NaN), n)`.
 
+    2026-09-26. Sessions repaired an integer input over and over, first with `float(` and
+    then, once this census refused that spelling, with a type derived from a division:
+    `typeof(one(T) / one(T))`, `typeof(zero(T) / one(Int))`. Both decide for a type that
+    needed no repair. `float` turns a `Rational` into a `Float64`, and a division lands in
+    whatever type a number type defines for it. The maintainer ruled that a site takes the
+    type of its data and repairs an integer only, through ONE guard:
+    `float_if_integer` in `src/02_Tools/03_TypeUtilities.jl`. `GUARD` is the one line
+    that may call `float`, and `DIVISION_TYPE` reads the division spelling. A type derived
+    from an operation that leaves every type, such as `typeof(sqrt(one(Tf)))` or a division
+    by a square root, is not a repair, so the pattern reads a division of a bare `one`,
+    `zero` or `oneunit` by another of them or by a literal only.
+
     What the census does not read is what carries no `(`: `zeros(Float64, n)` and its
     siblings name a concrete type for an allocation, and `convert(Float64, x)` names one
     for a conversion. Neither spelling stands in `src/` or `ext/` today. Add the pattern
@@ -74,6 +86,13 @@
     NAMED_FLOAT_BROADCAST = r"(?<![\w.{])(?:Float16|Float32|Float64|BigFloat|ComplexF16|ComplexF32|ComplexF64)\.\(\s*[A-Za-z_]"
     # A float literal filled into an array, whose element type is then the literal's.
     FILL_LITERAL = r"\bfill\(\s*-?(?:NaN|Inf)\b"
+    # A working type read off a division of constants, which repairs an integer input by
+    # deciding the type of every input.
+    DIVISION_TYPE = r"\btypeof\(\s*(?:one|zero|oneunit)\(.*?\)\s*/\s*(?:(?:one|zero|oneunit)\(|\d)"
+    # The one line that may call `float`: the guard that repairs an integer type and keeps
+    # every other type.
+    GUARD = ("src/02_Tools/03_TypeUtilities.jl",
+             "float_if_integer(::Type{T}) where {T <: Integer} = float(T)")
 
     #=
     A site the rule owns and another ticket ships. Each entry maps a file to the fragment
@@ -90,13 +109,22 @@
     named = String[]
     broadcast = String[]
     filled = String[]
+    divided = String[]
     forgiven = String[]
+    guarded = String[]
     for f in files
         rel = relpath(f, ROOT)
         exempt = get(EXEMPT, replace(rel, '\\' => '/'), nothing)
         for (i, line) in enumerate(eachline(f))
             if occursin(COERCE, line)
-                push!(coerced, "$rel:$i: $(strip(line))")
+                if replace(rel, '\\' => '/') == GUARD[1] && strip(line) == GUARD[2]
+                    push!(guarded, "$rel:$i: $(strip(line))")
+                else
+                    push!(coerced, "$rel:$i: $(strip(line))")
+                end
+            end
+            if occursin(DIVISION_TYPE, line)
+                push!(divided, "$rel:$i: $(strip(line))")
             end
             if occursin(ROUND_THEN_CONVERT, line)
                 push!(rounded, "$rel:$i: $(strip(line))")
@@ -142,6 +170,15 @@
         @info "Sites that fill an array with a float literal:\n" * join(filled, "\n")
     end
     @test isempty(filled)
+
+    if !isempty(divided)
+        @info "Sites that read a working type off a division; take the type of the data and pass it to `float_if_integer`:\n" *
+              join(divided, "\n")
+    end
+    @test isempty(divided)
+
+    # The guard is still where the census looks for it, so its one allowance is not stale.
+    @test length(guarded) == 1
 
     # Every exemption is still a site. One that is not has been shipped, and the entry that
     # forgives it must go with it.

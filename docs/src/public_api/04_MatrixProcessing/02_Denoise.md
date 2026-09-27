@@ -4,9 +4,9 @@ Description = "Denoise, public API of PortfolioOptimisers.jl: AbstractDenoiseEst
 
 # Denoise
 
-Real world data in general is often noisy. Financial data, is subject to myriad sources of noise, from latency, to arbitrage, to price uncertainty, to inherent randomness.
+A covariance matrix estimated from returns mixes the relations between the assets with sampling noise. For a given number of observations and assets, random matrix theory gives the range of eigenvalues that pure noise produces.
 
-Denoising is about reducing or removing noise from signal. This can be done by modifying the small eigenvalues associated with noise to reduce their impact on the result [mlp1,mpdist](@cite). Denoising also reduces the condition number, thus improving the numerical behaviour of the final matrix.
+Denoising changes the small eigenvalues inside that range, so they have less effect on the result [mlp1,mpdist](@cite). It also lowers the condition number of the matrix, so a solver that uses the matrix is more stable.
 
 ```@docs
 AbstractDenoiseEstimator

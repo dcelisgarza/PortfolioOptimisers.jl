@@ -2,7 +2,7 @@
 Description = "Network Graph, private API of PortfolioOptimisers.jl: graph_weight_matrix, calc_weighted_adjacency_graph, calc_weighted_adjacency, calc_adjacency, …"
 ```
 
-# Network Graph: private API
+# [Network Graph: private API](@id private-api-network-graph)
 
 ```@docs
 graph_weight_matrix

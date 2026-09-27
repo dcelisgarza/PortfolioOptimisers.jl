@@ -1,33 +1,35 @@
 #=
 ```@meta
-Description = "Custom objectives and constraints in PortfolioOptimisers.jl: write straight against the JuMP model with CustomJuMPObjective and CustomJuMPConstraint."
+Description = "Custom objectives and constraints in PortfolioOptimisers.jl: write your own terms into the JuMP model with CustomJuMPObjective and CustomJuMPConstraint."
 ```
 
-# Custom objectives and constraints
+# [Custom objectives and constraints](@id example-custom-objectives-and-constraints)
 
-Every keyword on a [`JuMPOptimiser`](@ref) — bounds, budgets, turnover, fees, cardinality —
-is a *pre-built* way to shape the problem. When a mandate needs something none of them covers,
-`PortfolioOptimisers.jl` gives you two extension points that write **straight against the JuMP
-model**:
+Each keyword of the [`JuMPOptimiser`](@ref), such as the bounds, the budgets, turnover, fees and
+cardinality, adds a ready-made part to the problem. When a mandate needs something that no
+keyword covers, you can write a term into the JuMP model yourself, in one of two ways.
 
-  - [`CustomJuMPObjective`](@ref) (the `cobj` keyword) — implement
-    [`add_custom_objective_term!`](@ref) to *price* a preference, softly.
-  - [`CustomJuMPConstraint`](@ref) (the `ccnt` keyword) — implement
-    [`add_custom_constraint!`](@ref) to *mandate* one, hard.
+  - Subtype [`CustomJuMPObjective`](@ref), pass it to the `cobj` keyword, and write a method of
+    [`add_custom_objective_term!`](@ref). The term puts a price on a preference in the
+    objective.
+  - Subtype [`CustomJuMPConstraint`](@ref), pass it to the `ccnt` keyword, and write a method of
+    [`add_custom_constraint!`](@ref). The constraint must hold in the solution.
 
-Each keyword takes a single estimator *or a vector of them*, and each hook **dispatches on the
-estimator's type**, so a term is just a struct carrying its data plus one method. Subtyping one
-without implementing its method is an error, not a silent no-op. This page builds both from
-scratch, works through the model idioms that keep them correct (the constraint scale and the
-homogenisation variable `k`), and composes several into one problem. It is the deep dive behind the one-call summary in the
-[constraints & costs guide](../../user_guide/04_Constraints_and_Costs.md).
+Each keyword takes one estimator or a vector of them. The library calls the function with your
+estimator as an argument, so Julia picks your method by the type of the estimator. A custom term
+is a struct that holds its data, and one method. If you subtype one of the two types
+and write no method, the optimisation throws an error that names the missing method. This page
+builds both kinds of term, shows the two rules that keep a constraint correct, and combines
+several terms in one problem. The [constraints and costs
+guide](@ref user-guide-constraints-and-costs) gives a short summary of the same features.
 
 !!! tip "When to reach for this"
-    Reach for a custom term when your preference is a **continuous per-asset number** that no
-    group string can express — a factor score, a carbon intensity, a liquidity penalty — or a
-    relationship between weights that isn't a plain linear bound. If it *can* be written as a
-    linear/group constraint (`lcse`) or an existing keyword, prefer that: the built-ins are
-    tested and composable. Custom hooks are the escape hatch, not the first tool.
+    Reach for a custom term when your preference is a number per asset that no group string can
+    express, such as a factor score, a carbon intensity or a liquidity penalty. Reach for it
+    also for a relation between weights that is not a plain linear bound. If a linear or group
+    constraint (`lcse`) or another keyword can express it, use that instead, because the library
+    tests those and they work with every other keyword. Write a custom term only when no keyword
+    fits.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, StatsPlots,
@@ -45,10 +47,10 @@ end;
 #=
 ## 1. Data and a momentum score
 
-We fix one empirical prior, a solver, and a minimum-risk baseline, so every custom term's
-effect is visible against the same allocation. The preference we will encode is a **momentum
-score**: each asset's trailing-63-day return, standardised across the universe. It is a
-continuous per-asset number — exactly the case the extension points exist for.
+We fit one empirical prior, set up one solver, and optimise a minimum risk baseline, so you can
+compare every custom term with the same portfolio. The preference is a momentum score, the sum
+of each asset's daily returns over the last 63 days, standardised across the assets. It is a
+number per asset, which is the case that custom terms are for.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -68,53 +70,53 @@ res_base = optimise(MeanRisk(; obj = MinimumRisk(),
                              opt = JuMPOptimiser(; pe = pr, slv = slv)))
 
 #=
-The portfolio's **momentum exposure** is `score' * w` — the score-weighted allocation. The
-minimum-risk baseline does not care about momentum, so it lands wherever the risk trade-off
-puts it; we will push that exposure up, first softly (an objective), then hard (a constraint).
+The momentum exposure of a portfolio is `score' * w`. The minimum risk baseline takes no account
+of momentum. We print its exposure. Then we raise the exposure, first with a term in the
+objective and then with a constraint.
 =#
 
 base_exposure = score' * res_base.w
 
 #=
-## 2. A custom objective — a soft tilt
+## 2. A custom objective: a tilt toward momentum
 
-A custom objective is a struct subtyping [`CustomJuMPObjective`](@ref), carrying whatever data
-the term needs, plus one method of [`add_custom_objective_term!`](@ref). The method is handed
-the model *mid-assembly* and contributes a term to the **objective penalty**. Its signature is
+The library calls your method of `add_custom_objective_term!` while it builds the model. The
+method adds a term to the objective penalty, a sum of terms that the library adds to the
+objective. Its signature is
 
 ```julia
 add_custom_objective_term!(model, obj, cobj, optimiser, attrs)
 ```
 
-  - `model` — the [`JuMP`](https://jump.dev/) model under construction.
-  - `obj` — the [`ObjectiveFunction`](@ref) being built (`MinimumRisk`, `MaximumUtility`, …).
-    Dispatch on this if your term should *differ* by objective; you do **not** need it to get
-    the sign right.
-  - `cobj` — your estimator; the argument you dispatch your method on.
-  - `optimiser` — the outer optimiser estimator (e.g. the [`MeanRisk`](@ref) itself). Its `opt`
-    field is the [`JuMPOptimiser`](@ref).
-  - `attrs` — the [`ProcessedJuMPOptimiserAttributes`](@ref) bundle: `attrs.pr` (prior),
-    `attrs.ret` (returns estimator), `attrs.wb` (bounds) and the rest of the processed problem
-    data, if your term is data-driven rather than carrying its own numbers.
+  - `model` is the [`JuMP`](https://jump.dev/) model that the library builds.
+  - `obj` is the [`ObjectiveFunction`](@ref) of the problem, such as `MinimumRisk` or
+    `MaximumUtility`. Dispatch on it if your term must change with the objective. You do not
+    need it to get the sign right.
+  - `cobj` is your estimator, and your method dispatches on its type.
+  - `optimiser` is the optimisation estimator, for example the [`MeanRisk`](@ref) itself. Its
+    `opt` field is the [`JuMPOptimiser`](@ref).
+  - `attrs` is a [`ProcessedJuMPOptimiserAttributes`](@ref), the data of the problem after
+    processing. It holds the prior in `attrs.pr`, the returns estimator in `attrs.ret`, the
+    weight bounds in `attrs.wb`, and more. Read it if your term computes its numbers from the
+    data.
 
-Read the weight variables with the [`get_w`](@ref) accessor rather than reaching into
-`model[:w]` — it asserts the variables have been registered and fails with a clear message if a
-hook runs out of order.
+Get the weight variables with [`get_w`](@ref), not with `model[:w]`. If the model has no weight
+variables yet, `get_w` throws an error that says so.
 
-Contribute the term with [`add_to_objective_penalty!`](@ref) rather than touching the objective
-expression yourself. That single call is what makes the term correct everywhere:
+Add the term with [`add_to_objective_penalty!`](@ref), not by a change to the objective
+expression. Then the term is correct under every objective.
 
-!!! tip "The library orients your term; you just say what you mean"
-    Some objectives are minimised and some maximised, and [`MaximumRatio`](@ref) is *either*
-    depending on the risk measure — so a term written against the raw objective expression needs
-    a sign that no single rule can supply. The penalty accumulator sidesteps this: it is folded
-    into the objective with the factor matching whichever sense is being built, so **a
-    contribution always worsens the objective, and a reward is a negative contribution**. Write
-    `-λ * something_good` once and it rewards under every objective.
+!!! tip "The library gives your term the right sign"
+    Some objectives are minimised and some are maximised, and [`MaximumRatio`](@ref) can be
+    either, depending on the risk measure. A term that you add to the objective expression
+    yourself therefore has no sign that is right in every case. The library adds the objective
+    penalty to the objective with a factor of 1 when it minimises and -1 when it maximises. With
+    this factor, a positive term always makes the objective worse, and a reward is a negative
+    term. Write `-λ * something_good` once, and it is a reward under every objective.
 
-    It also promotes an affine accumulator to a quadratic one as needed, so a quadratic term
-    (an L2 tilt, a tracking penalty) is safe against any objective — including the affine ones,
-    where mutating the expression directly would be a `MethodError`.
+    The objective penalty also becomes quadratic when you add a quadratic term, such as an L2
+    tilt or a tracking penalty. A quadratic term therefore works with every objective, including
+    the linear ones, where a direct change to the objective expression throws a `MethodError`.
 =#
 
 struct MomentumTilt{T1, T2} <: PortfolioOptimisers.CustomJuMPObjective
@@ -126,15 +128,16 @@ function PortfolioOptimisers.add_custom_objective_term!(model::JuMP.Model, obj,
                                                         cobj::MomentumTilt, optimiser,
                                                         attrs)
     w = PortfolioOptimisers.get_w(model)
-    ## Negative penalty == reward. No sign dispatch, no objective-type special cases.
     PortfolioOptimisers.add_to_objective_penalty!(model, -cobj.lambda * (cobj.score' * w))
     return nothing
 end
 
 #=
-`lambda` is the price we put on momentum relative to risk. Sweeping it traces the *soft*
-trade-off: a small `lambda` barely moves the book, a large one lets momentum dominate — until
-the term saturates and the portfolio piles into the single highest-momentum name.
+`lambda` is the price of momentum against risk. We solve for four values of `lambda`, and print
+the momentum exposure and the largest weight of each result. The smallest price above zero,
+`1e-4`, already moves the weights far from the baseline. Each larger price raises the exposure
+by less than the one before, because the weights move toward the one asset with the highest
+score.
 =#
 
 lambdas = [0.0, 1e-4, 5e-4, 2e-3]
@@ -147,18 +150,20 @@ pretty_table(DataFrame("λ (momentum price)" => lambdas,
                        "Momentum exposure" => [score' * r.w for r in tilt_res],
                        "Max weight" => [maximum(r.w) for r in tilt_res]);
              formatters = [resfmt],
-             title = "A larger λ buys more momentum exposure, until it saturates")
+             title = "Momentum exposure and largest weight at each λ")
 
 #=
-Note the term is **homogeneous of degree one in `w`** (it scales with the weights, just like the
-return and risk expressions). That is what lets it stay consistent under a ratio objective's
-internal rescaling — the constraint side, next, is where that rescaling needs explicit care.
+The term is homogeneous of degree one in `w`. If you multiply the weights by a number, the term
+is multiplied by the same number, as the expected return is. The term stays correct
+when a ratio objective rescales the weights. A constraint needs more care with that rescaling,
+which section 5 shows.
 
-## 3. The same term under a different sense
+## 3. The same term in a maximisation
 
-`MaximumUtility` is a *maximisation*, the exact opposite of the minimisation above — and the
-tilt needs no change at all. The identical `MomentumTilt` lifts its momentum exposure too,
-because the penalty accumulator is folded in with the factor for whichever sense is being built.
+`MaximumUtility` is a maximisation, where the problem above is a minimisation. We use the same
+`MomentumTilt` with no change, and print the momentum exposure without it and with it. The
+library adds the objective penalty with the factor of a maximisation, so the tilt is a reward
+here too.
 =#
 
 util_base = optimise(MeanRisk(; obj = MaximumUtility(),
@@ -171,35 +176,32 @@ util_exposures = (base = score' * util_base.w, tilted = score' * util_tilt.w)
 
 #=
 !!! note "[`MaximumRatio`](@ref) needs no special case"
-    The maximum-ratio problem is solved through a homogenising transform that, depending on the
-    risk measure, lands the objective in **either** a maximisation **or** a risk-minimisation
-    form — so a term written against the raw objective expression has no single correct sign.
-    Because the contribution goes through the penalty accumulator, both forms fold it in with
-    their own factor and the tilt rewards momentum either way. Note this fixes the *sign*, not
-    the *scaling*: §5's `k` idiom still applies to any term that is not homogeneous of degree
-    one in `w`.
+    The library solves the maximum-ratio problem with a change of variables. Depending on the
+    risk measure, the result is a maximisation, or a minimisation of the risk. Each form adds
+    the objective penalty with its own factor, so the tilt is a reward in both. This fixes the
+    sign, not the scale. A term that is not homogeneous of degree one in `w` still needs the
+    variable `k` of section 5.
 
-## 4. A custom constraint — a hard floor
+## 4. A custom constraint: a floor on momentum
 
-A custom constraint is the same shape: a struct subtyping [`CustomJuMPConstraint`](@ref) plus
-one method of [`add_custom_constraint!`](@ref), whose signature is
+The library calls your method of `add_custom_constraint!` in the same way. Its signature is
 
 ```julia
 add_custom_constraint!(model, ccnt, optimiser, attrs)
 ```
 
-  - `model`, `optimiser`, `attrs` — exactly as on the objective side (`ccnt` is what you
-    dispatch on). The two hooks take the same arguments; the objective one adds `obj` ahead of
-    the dispatch argument, and that is the only difference between them.
+The arguments are those of `add_custom_objective_term!` without `obj`. `ccnt` is your estimator,
+and your method dispatches on its type.
 
-Two model idioms keep a hand-written constraint correct (see ADR 0008, *JuMP model assembly*):
+Follow two rules when you write a constraint.
 
- 1. **Scale the constraint** by [`get_constraint_scale`](@ref) (`model[:sc]`), so it sits on the
-    same numerical footing as every built-in constraint.
- 2. **Multiply any constant bound by [`get_k`](@ref)** (`model[:k]`), the homogenisation
-    variable. For most objectives `k == 1` and this is a no-op; under a ratio objective the
-    weights are solved in a rescaled space (`w_real = w / k`), and a bare constant would be
-    compared against the *rescaled* weights — the wrong thing. §5 shows exactly what breaks.
+ 1. Multiply the constraint by [`get_constraint_scale`](@ref), which returns `model[:sc]`. The
+    library scales every constraint it makes by this number, so yours then has the same scale.
+ 2. Multiply each constant bound by [`get_k`](@ref), which returns `model[:k]`. For most
+    objectives `k` is the constant 1, and the product changes nothing. Under a ratio objective
+    `k` is a variable at or above zero, and the solver works with rescaled weights, `w_real = w
+    / k`. A constant with no `k` is then compared with the rescaled weights, which is the wrong
+    comparison. Section 5 shows the result.
 =#
 
 struct MomentumFloor{T1, T2} <: PortfolioOptimisers.CustomJuMPConstraint
@@ -217,9 +219,10 @@ function PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model, ccnt::Mom
 end
 
 #=
-Unlike the soft tilt, a floor binds *exactly*: the optimiser buys just enough momentum to meet
-it and no more, spending the rest of its freedom on risk. Sweeping the floor shows it clamping
-the exposure to the requested level (a floor below the baseline `0.204` simply never binds).
+A floor acts differently from the tilt. When the floor binds, the exposure equals the floor, and
+the weights minimise the risk under that condition. A floor below the exposure of the baseline
+does not bind. We solve for four floors, and print the exposure of each result next to its
+floor. The `Binds?` column is `yes` when the exposure is at most `1e-6` above the floor.
 =#
 
 floors = [0.0, 0.5, 1.0, 1.35]
@@ -232,13 +235,14 @@ pretty_table(DataFrame("Momentum floor" => floors,
                        "Momentum exposure" => [score' * r.w for r in floor_res],
                        "Binds?" => [score' * r.w > f + 1e-6 ? "no" : "yes"
                                     for (f, r) in zip(floors, floor_res)]);
-             formatters = [resfmt], title = "A hard floor clamps the exposure to its bound")
+             formatters = [resfmt],
+             title = "Momentum floors and the exposure of the minimum-risk portfolio")
 
 #=
-## 5. Why the `k` idiom matters
+## 5. Why a constant bound needs `k`
 
-To see idiom (2) pay off, here is the *same* floor written **without** the `* k` — the mistake
-most people make first, because it is invisible under `MinimumRisk` (where `k == 1`).
+We write the same floor without the `* k`. Under `MinimumRisk`, `k` is 1, so the mistake has no
+effect there and is easy to miss.
 =#
 
 struct MomentumFloorNoK{T1, T2} <: PortfolioOptimisers.CustomJuMPConstraint
@@ -249,15 +253,17 @@ function PortfolioOptimisers.add_custom_constraint!(model::JuMP.Model,
                                                     ccnt::MomentumFloorNoK, opt, attrs)
     w = PortfolioOptimisers.get_w(model)
     sc = PortfolioOptimisers.get_constraint_scale(model)
-    JuMP.@constraint(model, sc * (ccnt.score' * w - ccnt.floor) >= 0)  # forgot `* k`
+    #! This bound leaves out `* k` on purpose, to show the mistake.
+    JuMP.@constraint(model, sc * (ccnt.score' * w - ccnt.floor) >= 0)
     return nothing
 end
 
 #=
-Under [`MaximumRatio`](@ref) the homogenisation variable `k` is a genuine free variable, so the
-two versions diverge. The correct floor binds the *recovered* exposure exactly at the bound; the
-`k`-less one binds it at some fixed level of the rescaled weights — which, at `floor = 1.38`,
-lands **below** the requested floor, silently breaking the mandate.
+Under [`MaximumRatio`](@ref), `k` is a variable of the problem, so the two floors give different
+results. The floor with `k` holds the exposure of the final weights at the bound. The floor
+without `k` holds the exposure of the rescaled weights at the bound, which is a different
+number. We compare the two over three floors. At `floor = 1.38`, the version without `k` gives
+an exposure below the floor, and no error tells you.
 =#
 
 k_floors = [1.30, 1.35, 1.38]
@@ -274,17 +280,17 @@ pretty_table(DataFrame("Requested floor" => first.(k_compare),
                        "With * k (correct)" => getindex.(k_compare, 2),
                        "Without * k (wrong)" => getindex.(k_compare, 3));
              formatters = [resfmt],
-             title = "Under a ratio objective, only the k-scaled floor binds where asked")
+             title = "MaximumRatio momentum exposure, floor with and without * k")
 
 #=
 ## 6. Composing several custom pieces
 
-Both keywords accept a **vector** of estimators, applied in order — the hooks iterate and
-dispatch each element. That is how you stack custom terms without folding them into one struct.
+Both keywords take a vector of estimators, and the library applies them in order, with one
+method call for each. You can combine custom terms without one struct for all of them.
 
-**A band from two constraints.** Pair the floor with its mirror image — a cap, the same idiom
-with the inequality flipped — and the two together bound the exposure into a corridor. Define
-the cap first (as always, every custom type before the optimiser that uses it):
+First, a band from two constraints. A cap is the floor with the inequality reversed, and a floor
+and a cap together keep the exposure inside a band. We define the cap, then give both
+constraints to one optimiser.
 =#
 
 struct MomentumCap{T1, T2} <: PortfolioOptimisers.CustomJuMPConstraint
@@ -306,9 +312,8 @@ band = optimise(MeanRisk(; obj = MinimumRisk(),
                                                      MomentumCap(score, 0.8)])))
 
 #=
-**Additive objectives.** A `cobj` vector contributes each term to the same penalty accumulator,
-so two `1e-4` tilts compose into one of strength `2e-4` — a quick sanity check that vectors
-accumulate rather than replace:
+Second, two objective terms. Each term of a `cobj` vector adds to the same objective penalty, so
+two tilts of `1e-4` act as one tilt of `2e-4`. We solve both, and print the three exposures.
 =#
 
 two_tilts = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -323,11 +328,11 @@ composition = (band = score' * band.w, two_1e4_tilts = score' * two_tilts.w,
                one_2e4_tilt = score' * one_double.w)
 
 #=
-The band sits inside `[0.5, 0.8]`, and the two stacked tilts land on exactly the same exposure
-as the single double-strength tilt — vectors compose.
+Compare the exposure of the band portfolio with `[0.5, 0.8]`. Then compare the exposure of the
+two tilts of `1e-4` with that of the one tilt of `2e-4`.
 
-**Objective and constraint together.** Nothing stops you mixing them: a soft tilt *and* a hard
-floor in the same problem, each through its own keyword.
+Last, an objective term and a constraint together. We give a tilt to `cobj` and a floor to
+`ccnt` of one optimiser.
 =#
 
 res_both = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -338,9 +343,9 @@ res_both = optimise(MeanRisk(; obj = MinimumRisk(),
 #=
 ## 7. Comparing the effect
 
-Same prior, same minimum-risk objective — only the custom term changes the allocation. The soft
-tilt leans toward momentum as far as the risk trade-off allows; the hard floor and the band pin
-the exposure to a level; combining them does both.
+We print and plot five portfolios. Only the custom terms differ between them. The tilt raises
+the momentum exposure as far as its price against risk allows. The floor and the band hold the
+exposure at a bound. The last portfolio has both a tilt and a floor.
 =#
 
 results = [res_base, tilt_res[2], floor_res[3], band, res_both]

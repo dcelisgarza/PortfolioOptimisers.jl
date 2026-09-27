@@ -3,23 +3,17 @@ agent: agent
 description: Check API docs completeness.
 ---
 
-Check API documentation completeness for PortfolioOptimisers.jl:
+Check API documentation completeness for PortfolioOptimisers.jl.
 
- 1. For every public and private symbol with no exception (types, functions, macros, aliases) exported or defined in the codebase:
+Two checks are already gated. Run them, and report what they fail on:
 
-      + Verify that a Julia docstring is present for the symbol in the source code.
-      + Verify that the docsstring is complete, accurate, and up to date.
-      + Also verify the corresponding markdown file in `./docs/src/public_api/` or `./docs/src/private_api/` (whichever side the symbol classifies onto) references the symbol.
+- `test/test_26_docs.jl` — every public and private name carries a docstring.
+- `test/test_65_docs_public_private_placement_census.jl` — every `@docs` entry sits on the side of the mirrored API tree that its classification puts it on.
 
- 2. For each symbol with a docstring:
+No gate reads the rest. For each symbol, types, functions, macros and aliases, public and private:
 
-      + Check that the symbol is documented in the corresponding markdown file in `./docs/src/public_api/` or `./docs/src/private_api/` (e.g., `./src/SomeFeature.jl` has corresponding `./docs/src/public_api/SomeFeature.md` and `./docs/src/private_api/SomeFeature.md`, `./src/SomeFolder/AnotherFeature.jl` has corresponding `./docs/src/public_api/SomeFolder/AnotherFeature.md` and `./docs/src/private_api/SomeFolder/AnotherFeature.md`).
-      + Confirm that the docstring content (or a summary of it) is included in the markdown file.
- 3. Report:
+1. Check that the docstring is complete, accurate, and current against the code it documents.
+2. Check that the mirror page lists the symbol in an `@docs` block. `./src/SomeFeature.jl` maps to `./docs/src/public_api/SomeFeature.md` and `./docs/src/private_api/SomeFeature.md`, and `./src/SomeFolder/AnotherFeature.jl` maps to `./docs/src/public_api/SomeFolder/AnotherFeature.md` and `./docs/src/private_api/SomeFolder/AnotherFeature.md`. The page holds the entry, not a copy of the docstring.
+3. Check that every `@docs` entry names a symbol the codebase still defines.
 
-      + Any symbols missing a docstring.
-      + Any symbols with incomplete, inaccurate, or outdated docstrings.
-      + Any symbols with a docstring that are not referenced in the corresponding markdown file.
-      + Any markdown files that reference symbols not present in the codebase.
-
-Use the established conventions and file structure of PortfolioOptimisers.jl. List results by file and symbol, with links to the relevant source and documentation locations.
+List results by file and symbol, with links to the relevant source and documentation locations.

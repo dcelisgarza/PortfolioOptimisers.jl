@@ -57,9 +57,8 @@ Where:
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
-                               kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
     return set_entropic_risk_constraints!(model, i, r, opt, pr, series, T,
                                           (; t = :t_evar_, z = :z_evar_, u = :u_evar_,
@@ -100,9 +99,9 @@ series and this function writes the cone once.
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_entropic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
-                                        opt::RiskJuMPOptimisationEstimator,
-                                        pr::AbstractPriorResult, series, T::Int,
-                                        keys::NamedTuple; prefix::Symbol = Symbol(""))
+                                        opt::RiskConstraintOwner, pr::AbstractPriorResult,
+                                        series, T::Int, keys::NamedTuple;
+                                        prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     t, z, u = JuMP.@variables(model, begin
                                   ()
@@ -160,8 +159,8 @@ EVaR expressions. Each tail brings its own exponential cone block.
   - [`set_range_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRiskRange,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     return set_range_risk_constraints!(model, i, r, :evar_risk_range_, opt, pr, args...;
                                        prefix = prefix, kwargs...)
 end
@@ -192,8 +191,8 @@ drawdown-at-risk at confidence level `r.alpha`.
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicDrawdownatRisk,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)
     return set_entropic_risk_constraints!(model, i, r, opt, pr, series, T,
                                           (; t = :t_edar_, z = :z_edar_, u = :u_edar_,

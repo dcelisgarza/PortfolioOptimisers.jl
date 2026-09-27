@@ -48,7 +48,7 @@ synthetic data and from a caller who centres the data themselves.
 [#498](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/498), opened on a raise from
 the documentation ticket [#456](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/456),
 found the same edge in
-[`GerberIQCovariance`](../../src/05_Moments/05_Gerber/03_GerberIQCovariance.jl):
+[`GerberIQCovariance`](../../src/05_Moments/05_Gerber/03_GerberIQCovariance_a.jl):
 
 ```julia
 X = [1.0 2.0; 0.0 0.0; -1.0 3.0; 2.0 -1.0; 0.0 1.0; -2.0 -2.0]

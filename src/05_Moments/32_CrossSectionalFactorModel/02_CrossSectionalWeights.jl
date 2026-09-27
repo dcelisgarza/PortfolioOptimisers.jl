@@ -515,9 +515,12 @@ function cross_sectional_winsorise!(IV::Matrix{<:Number}, W0::MatNum,
     @argcheck(size(IV) == size(W0),
               DimensionMismatch("IV ($(size(IV, 1))×$(size(IV, 2))) must match W0 ($(size(W0, 1))×$(size(W0, 2)))"))
     Tf = eltype(IV)
+    u = Tf[]
     for t in axes(IV, 1)
         row = view(IV, t, :)
-        u = [x for (x, w) in zip(row, view(W0, t, :)) if w > zero(eltype(W0)) && !isnan(x)]
+        w0 = view(W0, t, :)
+        append!(empty!(u),
+                (x for (x, w) in zip(row, w0) if w > zero(eltype(W0)) && !isnan(x)))
         if any(isfinite, u)
             row .= clamp.(row, Statistics.quantile(u, wins[1]),
                           Statistics.quantile(u, wins[2]))
@@ -571,14 +574,16 @@ julia> IV
 """
 function cross_sectional_median_cap!(IV::Matrix{<:Number}, ratio::Real)::BitVector
     ready = falses(size(IV, 1))
+    u = eltype(IV)[]
     for t in axes(IV, 1)
         row = view(IV, t, :)
         ready[t] = any(isfinite, row)
         if !ready[t]
             continue
         end
-        row .= min.(row, Statistics.median([x for x in row if !isnan(x)]) * ratio)
-        row ./= sum([x for x in row if !isnan(x)])
+        append!(empty!(u), Iterators.filter(!isnan, row))
+        row .= min.(row, Statistics.median!(u) * ratio)
+        row ./= sum(append!(empty!(u), Iterators.filter(!isnan, row)))
     end
     return ready
 end

@@ -4,7 +4,7 @@ Description = "Base Pipeline, public API of PortfolioOptimisers.jl: PipelineStep
 
 # Base Pipeline
 
-A pipeline reifies an end-to-end workflow — price preprocessing, prices-to-returns conversion, returns preprocessing, prior estimation, phylogeny, uncertainty sets, constraint generation, and optimisation — as an ordered list of steps executed left-to-right over an accumulating context. Pipelines widen the cross-validation and hyperparameter-tuning boundary to the entire workflow, data preparation included. See `docs/adr/0028-pipeline-workflow-estimator.md` for the design rationale.
+A pipeline holds a whole workflow as a list of steps that run from left to right. The steps can be price preprocessing, the conversion of prices to returns, returns preprocessing, prior estimation, phylogeny, uncertainty sets, constraint generation and optimisation. Each step can read what the steps before it computed. Cross-validation and hyperparameter tuning then cover the whole workflow, data preparation included, not the optimiser alone.
 
 ```@docs
 PipelineStep

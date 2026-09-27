@@ -59,9 +59,8 @@ Where:
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRisk,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; loss::Bool = true, prefix::Symbol = Symbol(""),
-                               kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               loss::Bool = true, prefix::Symbol = Symbol(""), kwargs...)
     series, T = risk_series(model, NetReturnsRiskSeries(), pr; loss = loss, prefix = prefix)
     return set_power_norm_risk_constraints!(model, i, r, opt, pr, series, T,
                                             (; eta = :pvar_eta_, t = :pvar_t_,
@@ -105,9 +104,9 @@ and this function writes the cone once.
   - [`set_risk_bounds_and_expression!`](@ref)
 """
 function set_power_norm_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
-                                          opt::RiskJuMPOptimisationEstimator,
-                                          pr::AbstractPriorResult, series, T::Int,
-                                          keys::NamedTuple; prefix::Symbol = Symbol(""))
+                                          opt::RiskConstraintOwner, pr::AbstractPriorResult,
+                                          series, T::Int, keys::NamedTuple;
+                                          prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     ip = inv(r.p)
     eta, t, slack, v = JuMP.@variables(model, begin
@@ -174,8 +173,8 @@ by *its own* norm order.
   - [`set_range_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormValueatRiskRange,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     return set_range_risk_constraints!(model, i, r, :pvar_range_risk_, opt, pr, args...;
                                        prefix = prefix, kwargs...)
 end
@@ -205,8 +204,8 @@ computed over the drawdown path of portfolio returns.
   - [`set_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::PowerNormDrawdownatRisk,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     series, T = risk_series(model, DrawdownRiskSeries(), pr; prefix = prefix)
     return set_power_norm_risk_constraints!(model, i, r, opt, pr, series, T,
                                             (; eta = :pdar_eta_, t = :pdar_t_,

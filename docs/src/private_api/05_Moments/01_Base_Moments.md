@@ -6,9 +6,7 @@ Description = "Base moments, private API of PortfolioOptimisers.jl: AbstractExpe
 
 ## Abstract moment types and fallbacks
 
-Some optimisations and constraints make use of summary statistics. These types and functions form the base for moment estimation in `PortfolioOptimisers.jl`.
-
-They also provide generic fallbacks for the various functionality in the library.
+The abstract types below are the roots of the moment estimators. The functions are the steps that many moment estimators share, such as the calls to a `StatsBase` covariance estimator, the choice of the observation window and its weights, and the centring of the returns.
 
 ```@docs
 AbstractExpectedReturnsAlgorithm
@@ -27,9 +25,9 @@ demean_returns
 
 ## Windowed estimator generation
 
-The five windowed estimators — [`WindowedExpectedReturns`](@ref), [`WindowedVariance`](@ref), [`WindowedCovariance`](@ref), [`WindowedCoskewness`](@ref) and [`WindowedCokurtosis`](@ref) — share one shape: wrap an inner estimator, restrict it to a trailing window, and forward every moment call to it. Each is generated from a single declaration by [`@windowed_estimator`](@ref), so the struct, its constructor, its `factory`/`port_opt_view` methods, its forwarding methods and all of their docstrings cannot drift apart.
+The five windowed estimators have one shape: [`WindowedExpectedReturns`](@ref), [`WindowedVariance`](@ref), [`WindowedCovariance`](@ref), [`WindowedCoskewness`](@ref) and [`WindowedCokurtosis`](@ref). Each wraps an inner estimator, keeps only the last observations of the sample, and passes every moment call to the inner estimator. The macro [`@windowed_estimator`](@ref) writes each of them from one declaration. It writes the struct, its constructor, its `factory` and `port_opt_view` methods, the methods that pass each moment call on, and their docstrings.
 
-The entries below are the macro and its expansion-time machinery. They are internal: callers use the five estimators, not these.
+The entries below are the macro and the functions it calls when it expands. You use the five estimators, and never call these directly.
 
 ```@docs
 WINDOWED_ESTIMATOR_KEYS
@@ -46,9 +44,9 @@ windowed_method_doc
 windowed_method_def
 ```
 
-## FullMoment and semi moments
+## Available-case co-moments
 
-Moments other than the expected return can be estimated using the entire spectrum of deviations (full), or only the deviations below a target (semi/downside). These types allow us to provide such functionality.
+An available-case fit estimates each asset from the rows where its return is finite and the asset is active. The two functions below build the block that the available-case coskewness and cokurtosis read. A co-moment reads every deviation from the mean with [`FullMoment`](@ref), or only the negative deviations with [`SemiMoment`](@ref), and [`coverage_comoment_deviations`](@ref) is the one step where the two differ.
 
 ```@docs
 coverage_comoment_deviations

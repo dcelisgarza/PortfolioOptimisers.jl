@@ -385,11 +385,11 @@ $(DocStringExtensions.FIELDS)
 
     RegimeAdjustedExpWeightedVariance(;
         decay::Number             = exp2(-inv(40.0)),
-        min_obs::Integer          = round(Int, max(1, inv(log2(inv(decay))))),
+        min_obs::Integer          = round(Int, max(1, decay_half_life(decay))),
         hac_lags::Option{<:Integer} = nothing,
         regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
-        regime_decay::Number      = exp2(-2 / inv(log2(inv(decay)))),
-        regime_min_obs::Integer   = round(Int, max(1, inv(log2(inv(decay))) / 2)),
+        regime_decay::Number      = exp2(-2 / decay_half_life(decay)),
+        regime_min_obs::Integer   = round(Int, max(1, decay_half_life(decay) / 2)),
         regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = nothing,
         min_val::Number           = sqrt(eps()),
         centred::Bool             = false,
@@ -479,7 +479,7 @@ julia> ce.min_obs
                                                                                 <:Number}},
                                                min_val::Number, centred::Bool,
                                                cache::Option{<:AbstractPartialFitState})
-        assert_nonempty_gt0_finite_val(decay, :decay)
+        assert_unit_interval(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         assert_nonempty_gt0_finite_val(regime_min_obs, :regime_min_obs)
         if !isnothing(regime_lohi_mult)
@@ -503,14 +503,14 @@ end
 function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                            min_obs::Integer = round(Int,
                                                                     max(1,
-                                                                        inv(log2(inv(decay))))),
+                                                                        decay_half_life(decay))),
                                            hac_lags::Option{<:Integer} = nothing,
                                            regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
                                            regime_decay::Number = exp2(-2 /
-                                                                       inv(log2(inv(decay)))),
+                                                                       decay_half_life(decay)),
                                            regime_min_obs::Integer = round(Int,
                                                                            max(1,
-                                                                               inv(log2(inv(decay))) /
+                                                                               decay_half_life(decay) /
                                                                                2)),
                                            regime_lohi_mult::Option{<:Tuple{<:Number,
                                                                             <:Number}} = nothing,
@@ -628,7 +628,7 @@ squared innovations.
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
 function get_regime_state(method::FirstMomentRegimeAdjusted, z2_valid::VecNum, ::Any)
-    return Statistics.mean(sqrt.(max.(z2_valid, zero(eltype(z2_valid))))) / method.x
+    return Statistics.mean(z -> sqrt(max(z, zero(eltype(z2_valid)))), z2_valid) / method.x
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -781,7 +781,7 @@ function process_observation!(cache::RegimeAdjustedVarianceState,
     cache.obs_count[valid] .+= 1
 
     if !isnothing(cache.ret_buffer)
-        X_new = copy(Xi)
+        X_new = copyto!(similar(cache.X2), Xi)
         X_new[.!valid] .= NaN
         push!(cache.ret_buffer, X_new)
     end
@@ -877,19 +877,20 @@ function regime_adjusted_variance_pass!(f, ce::RegimeAdjustedExpWeightedVariance
     end
     N = size(X, setdiff((1, 2), (dims,))[1])
 
+    # The state holds a variance and a `NaN`, so an integer panel computes in its floating
+    # point type, and every other type is kept: a `Float32` panel keeps a `Float32` state.
+    Tf = float_if_integer(eltype(X))
     # An uncentred estimator seeds its location from the first observation it sees, so the
-    # location starts as `NaN`, in the type of `X` so that a `Float32` panel keeps a
-    # `Float32` state.
-    location = ce.centred ? zeros(eltype(X), N) : fill(convert(eltype(X), NaN), N)
+    # location starts as `NaN`.
+    location = ce.centred ? zeros(Tf, N) : fill(convert(Tf, NaN), N)
     cache = if isnothing(state)
         RegimeAdjustedVarianceState(if isnothing(ce.hac_lags)
                                         nothing
                                     else
-                                        DataStructures.CircularBuffer{Vector{eltype(X)}}(ce.hac_lags)
-                                    end, zeros(eltype(X), N), zeros(eltype(X), N),
-                                    zeros(eltype(X), N), fill(convert(eltype(X), NaN), N),
-                                    location, zeros(Int, N), zeros(Int, N), trues(N),
-                                    nothing, zero(eltype(X)))
+                                        DataStructures.CircularBuffer{Vector{Tf}}(ce.hac_lags)
+                                    end, zeros(Tf, N), zeros(Tf, N), zeros(Tf, N),
+                                    fill(convert(Tf, NaN), N), location, zeros(Int, N),
+                                    zeros(Int, N), trues(N), nothing, zero(Tf))
     else
         @argcheck(length(state.variance) == N,
                   DimensionMismatch("the state holds $(length(state.variance)) assets, and `X` holds $N"))
@@ -1054,7 +1055,7 @@ function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::
                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask)
-    if !ce.centred && any(.!cache.active)
+    if !ce.centred && any(!, cache.active)
         cache.location[.!cache.active] .= NaN
     end
 
@@ -1109,7 +1110,8 @@ function variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims:
                          estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     assert_dims(dims)
-    val = Matrix{eltype(X)}(undef, size(X, dims), size(X, setdiff((1, 2), (dims,))[1]))
+    val = Matrix{float_if_integer(eltype(X))}(undef, size(X, dims),
+                                              size(X, setdiff((1, 2), (dims,))[1]))
     regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask) do i, cache
         val[i, :] = regime_adjusted_variance(cache, ce)
         return nothing
@@ -1646,19 +1648,19 @@ The panel travels as the third positional argument, and this method unpacks it o
 """
 function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    amsk, emsk = panel_moment_masks(pnl)
+    amsk, emsk = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.var(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
                           kwargs...)
 end
 function Statistics.std(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    amsk, emsk = panel_moment_masks(pnl)
+    amsk, emsk = dims_oriented(dims, panel_moment_masks(pnl)...)
     return Statistics.std(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
                           kwargs...)
 end
 function variance_series(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
                          pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    amsk, emsk = panel_moment_masks(pnl)
+    amsk, emsk = dims_oriented(dims, panel_moment_masks(pnl)...)
     return variance_series(ce, X; dims = dims, estimation_mask = emsk, active_mask = amsk,
                            kwargs...)
 end
@@ -1666,6 +1668,9 @@ end
 # Folds in every configuration; only its merge refuses (see [`supports_partial_fit`](@ref)).
 function supports_partial_fit(::RegimeAdjustedExpWeightedVariance)
     return true
+end
+function variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum)
+    return exp_weighted_variance_count(ve.decay, X)
 end
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance

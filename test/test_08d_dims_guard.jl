@@ -87,8 +87,70 @@ end
     # The census is closed, so this number moves when an estimator is added. It is here to
     # show that the loop above ran over a real universe rather than an empty one. Issue #854
     # added `ExpWeightedExpectedReturns`, `ExpWeightedVariance` and `ExpWeightedCovariance`,
-    # which carry one, two and two verbs, so the number rose by five.
-    @test checked == 50
+    # which carry one, two and two verbs, so the number rose by five. The online portfolio
+    # selection family added `PriceLevelExpectedReturns` and `PriorExpectedReturns` (one verb
+    # each) and `RankOneCovariance` (two), so it rose by four. `GeodesicShrinkageCovariance`
+    # carries two verbs, so it rose by two.
+    @test checked == 56
+end
+
+@testset "a panel arm answers the same at both orientations" begin
+    #=
+    An Asset Panel carries its masks as `observations × assets` whatever `dims` says, and
+    every mask-aware root reads a mask shaped as its sample is: it orients the two together
+    with `dims_oriented`. So the panel arm of a verb must turn the mask where the caller
+    turns the sample. An arm that hands the panel's mask through unturned compares a
+    `T × N` mask with an `N × T` sample, and it throws a `DimensionMismatch` at
+    `dims = 2` alone, while the reduce-and-expand root of the same verb answers. One verb
+    then answered a transposed sample for a plain estimator and refused it for a mask-aware
+    one (issue #1249).
+
+    The rule belongs to the family rather than to the leaf, so this census drives the same
+    pairings the `dims = 3` census drives, and it names no leaf either. The two orientations
+    must agree, in the answer and in the refusal alike: a leaf this one fixture cannot drive
+    refuses at both, and a leaf it can drive answers the same statistic at both.
+    =#
+    T, N = 30, 5
+    R = 0.02 .* reshape(sinpi.(collect(1:(T * N)) ./ 7), T, N)
+    amsk = trues(T, N)
+    amsk[1:8, N] .= false                # the last asset lists at observation 9
+    R[.!amsk] .= NaN
+    pnl = AssetPanel(; amsk = amsk, emsk = copy(amsk))
+    Rt = permutedims(R)
+
+    leaves = moment_families()
+    families = [(filter(S -> answers_family(f, S), getproperty(leaves, f)),
+                 family_verbs(f)) for f in (:er, :ve, :ce)]
+    for (types, verbs) in families
+        @test !isempty(types)
+        for S in types, verb in verbs
+            est = S()
+            # `ImpliedVolatility` reads its own series, which is oriented as the sample is.
+            kw1 = isa(est, PO.ImpliedVolatility) ? (; iv = R) : (;)
+            kw2 = isa(est, PO.ImpliedVolatility) ? (; iv = Rt) : (;)
+            a1 = try
+                verb(est, R, pnl; dims = 1, kw1...)
+            catch err
+                err
+            end
+            a2 = try
+                verb(est, Rt, pnl; dims = 2, kw2...)
+            catch err
+                err
+            end
+            if isa(a1, Exception)
+                @test isa(a2, typeof(a1))
+            else
+                @test !isa(a2, Exception)
+                # The reduce-and-expand root sums a transposed block in another order, so
+                # the two answers agree to the last few bits rather than bit for bit. The
+                # mask-aware arms answer bit for bit, and a mask that arrives unturned is
+                # a `DimensionMismatch` rather than a small difference, so the tolerance
+                # costs the census nothing.
+                @test isapprox(vec(a1), vec(a2); nans = true)
+            end
+        end
+    end
 end
 
 @testset "no leaf spells the dims guard or the orientation by hand" begin

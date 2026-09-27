@@ -160,3 +160,18 @@ reads it again.
   returns `nothing` already is the drop, and a new tag would be a second way to say one thing.
 - **Slice on the observation axis too.** Refused. No numerically stable inverse of a Welford update
   exists, which is the same reason the seam refuses a windowed estimator.
+
+## Amendment (2026-09-26)
+
+The table says that `@fprop` routes `cache` through `obs_weights_view` on every propagatable
+estimator of the seam. That holds only where the observation channel is open, and `@wprop` alone
+opens it (`PROP_TAG_CHANNELS`). A type with no `@wprop` field emits no `obs_weights_view` method.
+It falls through to the identity `obs_weights_view(x, ::Any) = x`, so its `cache` is carried, not
+dropped. `PortfolioOptimisersCovariance` and `EmpiricalPrior` are two such types, and their
+docstrings claimed the drop (#1344).
+
+The docstrings were corrected, and the code was not changed. No caller takes an observation view of
+such a type: the one call site, `realised_vol`, takes an `AbstractVarianceEstimator`. A drop added
+to these two types alone would also be half a view. The identity does not reach their composed
+children, so it neither indexes a child's weights nor drops a child's state. If a caller of that kind appears, the fix is to open the
+observation channel on `@fprop` for every type at once, not a `cache` rule per type.

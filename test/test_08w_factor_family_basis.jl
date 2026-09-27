@@ -252,6 +252,163 @@ end
         @test_throws DimensionMismatch PO.project_factor_coordinates(fcb, randn(rng, K + 1))
         @test_throws DimensionMismatch PO.reduce_factor_names(fcb, ["a"])
         @test_throws DimensionMismatch PO.dropped_factor_names(fcb, ["a"])
+        # The vector method of the expansion names its own argument in the refusal.
+        msg = try
+            PO.expand_factor_returns(fcb, randn(rng, Kr + 1))
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("g carries a factor axis", msg)
+    end
+end
+
+@testset "FactorFamilyBasis transforms agree with their closed forms in exact arithmetic" begin
+    #=
+    Every transform against the closed form its docstring states, over Rational numbers so
+    each identity holds exactly. Two families and two factors outside every family: family
+    one is raw factors 1 and 3 and drops factor 1, family two is raw factors 4, 5 and 6 and
+    drops factor 6, and factors 2 and 7 sit outside. The ratios are the benchmark-weighted
+    exposures of the panel over that of the dropped member, as the definition of the basis
+    states them, and the change of basis `R` is written out by hand from that layout.
+    =#
+    PO = PortfolioOptimisers
+    rng = StableRNG(822_001)
+    T, N, K = 4, 6, 7
+    fi = [[1, 3], [4, 5, 6]]
+    B = Rational{Int}.(rand(rng, 1:5, T, N, K))
+    bw = Rational{Int}.(rand(rng, 1:4, T, N))
+    w = bw ./ sum(bw; dims = 2)
+    c = [sum(w[t, i] * B[t, i, k] for i in 1:N) for t in 1:T, k in 1:K]
+    ratios = [c[t, 3] / c[t, 1] for t in 1:T]
+    ratios = hcat(ratios, [c[t, 4] / c[t, 6] for t in 1:T],
+                  [c[t, 5] / c[t, 6] for t in 1:T])
+    fcb = FactorFamilyBasis(; fnm = ["one", "two"], fi = fi, di = [1, 3], ratios = ratios,
+                            K = K)
+    @test PO.dropped_factor_indices(fcb) == [1, 6]
+    @test PO.retained_factor_indices(fcb) == [2, 3, 4, 5, 7]
+    Kr = PO.reduced_factor_count(fcb)
+    @test Kr == 5
+
+    # The change of basis of the docstrings: a one per retained factor, and minus the ratio
+    # of each retained member in the row of the factor its family drops.
+    function R(t)
+        M = zeros(Rational{Int}, K, Kr)
+        for (col, row) in enumerate([2, 3, 4, 5, 7])
+            M[row, col] = 1
+        end
+        M[1, 2] = -ratios[t, 1]
+        M[6, 3] = -ratios[t, 2]
+        M[6, 4] = -ratios[t, 3]
+        return M
+    end
+    S = zeros(Rational{Int}, K, Kr)
+    for (col, row) in enumerate([2, 3, 4, 5, 7])
+        S[row, col] = 1
+    end
+    D = zeros(Rational{Int}, K, 2)
+    D[1, 1] = 1
+    D[6, 2] = 1
+
+    @testset "The retention matrix is a left inverse of the change of basis" begin
+        for t in 1:T
+            @test transpose(S) * R(t) == Matrix{Rational{Int}}(LinearAlgebra.I, Kr, Kr)
+        end
+    end
+
+    @testset "Exposures and loadings map through R" begin
+        Z = PO.reduce_exposures(fcb, B)
+        @test eltype(Z) == Rational{Int}
+        g = Rational{Int}.(rand(rng, -3:3, T, Kr))
+        f = PO.expand_factor_returns(fcb, g)
+        for t in 1:T
+            @test Z[t, :, :] == B[t, :, :] * R(t)
+            @test PO.reduce_loadings(fcb, B[t, :, :], t) == B[t, :, :] * R(t)
+            # The two bases give the same fitted values.
+            @test Z[t, :, :] * g[t, :] == B[t, :, :] * f[t, :]
+        end
+    end
+
+    @testset "Factor returns expand through R and satisfy the zero-sum condition" begin
+        g = Rational{Int}.(rand(rng, -3:3, T, Kr))
+        f = PO.expand_factor_returns(fcb, g)
+        @test eltype(f) == Rational{Int}
+        for t in 1:T
+            @test f[t, :] == R(t) * g[t, :]
+            for fam in fi
+                @test sum(c[t, k] * f[t, k] for k in fam) == 0
+            end
+            @test f[t, 1] == -ratios[t, 1] * f[t, 3]
+            @test f[t, 6] == -ratios[t, 2] * f[t, 4] - ratios[t, 3] * f[t, 5]
+        end
+        @test PO.reduce_factor_returns(fcb, f) == g
+        @test PO.reduce_factor_returns(fcb, f[2, :]) == transpose(S) * f[2, :]
+        @test PO.expand_factor_returns(fcb, g[1, :]) == R(T) * g[1, :]
+        # The converse fails for raw returns off the image of R.
+        h = Rational{Int}.(rand(rng, 1:3, T, K))
+        @test PO.expand_factor_returns(fcb, PO.reduce_factor_returns(fcb, h)) != h
+    end
+
+    @testset "The factor mean expands through R" begin
+        m = Rational{Int}.(rand(rng, -3:3, Kr))
+        for t in 1:T
+            @test PO.expand_factor_mu(fcb, m, t) == R(t) * m
+            @test PO.reduce_factor_mu(fcb, PO.expand_factor_mu(fcb, m, t)) == m
+        end
+        raw = Rational{Int}.(rand(rng, 1:3, K))
+        @test PO.reduce_factor_mu(fcb, raw) == transpose(S) * raw
+    end
+
+    @testset "The factor covariance expands through R, block by block" begin
+        A = Rational{Int}.(rand(rng, -3:3, Kr, Kr))
+        Sr = A * transpose(A) + 3 * Matrix{Rational{Int}}(LinearAlgebra.I, Kr, Kr)
+        for t in 1:T
+            W = PO.dropped_factor_weights(fcb, t)
+            @test W == transpose(D) * R(t)
+            raw = PO.expand_factor_covariance(fcb, Sr, t)
+            @test eltype(raw) == Rational{Int}
+            @test raw == R(t) * Sr * transpose(R(t))
+            @test transpose(S) * raw * S == Sr
+            @test transpose(D) * raw * S == W * Sr
+            @test transpose(D) * raw * D == W * Sr * transpose(W)
+            @test LinearAlgebra.rank(Float64.(raw)) == Kr
+            @test PO.reduce_factor_covariance(fcb, raw) == Sr
+        end
+    end
+
+    @testset "Coordinates project through the transpose of R" begin
+        x = Rational{Int}.(rand(rng, -3:3, T, K))
+        y = PO.project_factor_coordinates(fcb, x)
+        for t in 1:T
+            @test y[t, :] == transpose(R(t)) * x[t, :]
+        end
+        @test PO.project_factor_coordinates(fcb, x[1, :]) == transpose(R(T)) * x[1, :]
+        # A portfolio's factor exposure projects onto its exposure to the reduced factors.
+        Z = PO.reduce_exposures(fcb, B)
+        wp = Rational{Int}.(rand(rng, 0:3, N))
+        for t in 1:T
+            gt = transpose(B[t, :, :]) * wp
+            @test transpose(R(t)) * gt == transpose(Z[t, :, :]) * wp
+        end
+        @test PO.project_factor_coordinates(fcb, transpose(B[T, :, :]) * wp) ==
+              transpose(Z[T, :, :]) * wp
+    end
+
+    @testset "A Float32 basis and Float32 data keep Float32" begin
+        f32 = FactorFamilyBasis(; fnm = fcb.fnm, fi = fcb.fi, di = fcb.di,
+                                ratios = Float32.(ratios), K = K)
+        B32 = Float32.(B)
+        @test eltype(PO.reduce_exposures(f32, B32)) == Float32
+        @test eltype(PO.reduce_loadings(f32, B32[1, :, :])) == Float32
+        @test eltype(PO.expand_factor_returns(f32, ones(Float32, T, Kr))) == Float32
+        @test eltype(PO.expand_factor_returns(f32, ones(Float32, Kr))) == Float32
+        @test eltype(PO.expand_factor_mu(f32, ones(Float32, Kr))) == Float32
+        @test eltype(PO.expand_factor_covariance(f32,
+                                                 Matrix{Float32}(LinearAlgebra.I, Kr, Kr))) ==
+              Float32
+        @test eltype(PO.dropped_factor_weights(f32, 1)) == Float32
+        @test eltype(PO.project_factor_coordinates(f32, ones(Float32, T, K))) == Float32
+        @test eltype(PO.project_factor_coordinates(f32, ones(Float32, K))) == Float32
     end
 end
 
@@ -361,6 +518,73 @@ end
         @test_throws PortfolioOptimisers.IsNonFiniteError factor_family_basis(["ind" => "ind=c"],
                                                                               empty_lvl, bw,
                                                                               nf, fam)
+    end
+
+    @testset "The ratios are the closed form, written out" begin
+        # The definition, one line at a time: the normalised weights, the benchmark-weighted
+        # exposures, the automatic drop and the ratios. A NaN weight and a NaN exposure are
+        # read as zero.
+        holed_M = copy(Ms)
+        holed_M[2, 5, 4] = NaN
+        holed_w = copy(bw)
+        holed_w[3, 2] = NaN
+        B = replace(holed_M, NaN => 0.0)
+        u = replace(holed_w, NaN => 0.0)
+        wbar = u ./ sum(u; dims = 2)
+        cf = [sum(wbar[t, i] * B[t, i, k] for i in 1:N) for t in 1:T, k in 1:K]
+        F = [3, 4, 5]
+        d = argmax([sum(abs, cf[:, k]) for k in F])
+        kept = [k for (p, k) in enumerate(F) if p != d]
+        fcb = factor_family_basis(["ind" => nothing], holed_M, holed_w, nf, fam)
+        @test fcb.di == [d]
+        @test fcb.ratios ≈ cf[:, kept] ./ cf[:, F[d]] rtol = 1e-14
+        # The zero-sum condition holds on every observation, with the dropped factor return
+        # reconstructed from the ratios.
+        g = randn(rng, T, length(kept))
+        fd = -sum(fcb.ratios .* g; dims = 2)
+        for t in 1:T
+            @test abs(sum(cf[t, kept] .* g[t, :]) + cf[t, F[d]] * fd[t]) < 1e-13
+        end
+    end
+
+    @testset "The builder derives its number type from the data" begin
+        # One-hot integer exposures and integer weights. Integer data float, a Rational
+        # history stays exact, and a Float32 history stays Float32.
+        sel = [1, 3, 4, 5]
+        Mi = round.(Int, Ms[:, :, sel])
+        wi = rand(StableRNG(724_005), 1:5, T, N)
+        nfi, fami = nf[sel], fam[sel]
+        exact(M, w) = factor_family_basis(["ind" => nothing], M, w, nfi, fami)
+        fi64 = exact(Float64.(Mi), Float64.(wi))
+        fint = exact(Mi, wi)
+        @test eltype(fint.ratios) == Float64
+        @test fint.ratios ≈ fi64.ratios rtol = 1e-14
+        @test fint.di == fi64.di
+        frat = exact(Rational{Int}.(Mi), Rational{Int}.(wi))
+        @test eltype(frat.ratios) == Rational{Int}
+        @test Float64.(frat.ratios) ≈ fi64.ratios rtol = 1e-14
+        # The Rational answer is the closed form in exact arithmetic.
+        cr = [sum(wi[t, i] * Mi[t, i, k] for i in 1:N) // sum(wi[t, :])
+              for t in 1:T, k in 1:4]
+        F = [2, 3, 4]
+        dr = F[frat.di[1]]
+        @test frat.ratios == cr[:, filter(!=(dr), F)] ./ cr[:, dr]
+        f32 = exact(Float32.(Mi), Float32.(wi))
+        @test eltype(f32.ratios) == Float32
+        @test f32.ratios ≈ fi64.ratios rtol = 1e-5
+        # A dropped member that no asset takes is refused as a non-finite ratio in every type,
+        # also where a retained member is zero at the same observation.
+        Mz = zeros(Rational{Int}, T, N, 4)
+        Mz[:, :, 1] .= 1
+        Mz[:, :, 2] .= 1
+        @test_throws PortfolioOptimisers.IsNonFiniteError factor_family_basis(["ind" => "ind=c"],
+                                                                              Mz,
+                                                                              Rational{Int}.(wi),
+                                                                              nfi, fami)
+        @test_throws PortfolioOptimisers.IsNonFiniteError factor_family_basis(["ind" => "ind=c"],
+                                                                              Float64.(Mz),
+                                                                              Float64.(wi),
+                                                                              nfi, fami)
     end
 end
 
@@ -476,6 +700,160 @@ end
                         for t in 1:Tb, s in 2:3, i in 4:5)
         @test after < 0.15
         @test after < before
+    end
+end
+
+@testset "The Neutralisation agrees with its closed form" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(820)
+    nt, na = 3, 7
+    nf = ["mkt", "size", "value", "ind=a", "ind=b"]
+    fam = ["market", "style", "style", "industry", "industry"]
+    Ms = randn(rng, nt, na, 5)
+    Ms[:, :, 1] .= 1.0
+    Ms[:, :, 4] = [1.0 0.0 1.0 1.0 0.0 0.0 1.0; 0.0 0.0 1.0 1.0 0.0 1.0 1.0;
+                   1.0 1.0 0.0 0.0 1.0 0.0 1.0]
+    Ms[:, :, 5] = 1.0 .- Ms[:, :, 4]
+    # A missing key exposure, a missing target exposure, a zero weight and an infinite weight.
+    Ms[2, 3, 2] = NaN
+    Ms[3, 5, 3] = NaN
+    bw = rand(rng, nt, na)
+    bw[1, 6] = 0.0
+    bw[2, 1] = Inf
+
+    # The regression weights, written out.
+    omega(M, b, k, tg) = ifelse.((0 .< b .< Inf) .& isfinite.(M[:, :, k]) .&
+                                 dropdims(all(isfinite, M[:, :, tg]; dims = 3); dims = 3),
+                                 b, zero(eltype(b)))
+    # The fit, the residual of every asset and the standardiser, written out: the centre is
+    # weighted by the regression weights, and the scale is equal-weighted over the assets of
+    # positive weight.
+    function closed_form(M, b, k, tg, intercept)
+        W = omega(M, b, k, tg)
+        R = fill(convert(eltype(M), NaN), size(M, 1), size(M, 2))
+        for t in axes(M, 1)
+            B = M[t, :, tg]
+            A = intercept ? [ones(eltype(M), size(M, 2)) B] : B
+            fit = W[t, :] .> 0
+            s = sqrt.(W[t, fit])
+            e = M[t, :, k] - A * ((A[fit, :] .* s) \ (M[t, fit, k] .* s))
+            mu = sum(W[t, fit] .* e[fit]) / sum(W[t, fit])
+            R[t, :] = (e .- mu) ./ Statistics.std(e[fit]; mean = mu)
+        end
+        return R
+    end
+    function agrees(S, R; rtol = 1e-12)
+        f = .!isnan.(R)
+        return isequal(isnan.(S), isnan.(R)) && isapprox(S[f], R[f]; rtol = rtol)
+    end
+
+    @testset "A factor key agrees with and without an intercept" begin
+        for intercept in (false, true)
+            Y = copy(Ms)
+            PO.neutralise_exposures!(Y, ["size" => ["value", "industry"]],
+                                     CrossSectionalLinearRegression(;
+                                                                    intercept = intercept),
+                                     bw, nf, fam)
+            R = closed_form(Ms, bw, 2, [3, 4, 5], intercept)
+            @test agrees(Y[:, :, 2], R)
+            # The two missing exposures leave a hole, and the zero and the infinite weights
+            # leave a residual.
+            @test isnan(R[2, 3]) && isnan(R[3, 5])
+            @test isfinite(R[1, 6]) && isfinite(R[2, 1])
+            @test isequal(Y[:, :, [1, 3, 4, 5]], Ms[:, :, [1, 3, 4, 5]])
+        end
+    end
+
+    @testset "A family key neutralises each member against the same targets" begin
+        Y = copy(Ms)
+        PO.neutralise_exposures!(Y, ["style" => "industry"],
+                                 CrossSectionalLinearRegression(), bw, nf, fam)
+        @test agrees(Y[:, :, 2], closed_form(Ms, bw, 2, [4, 5], false))
+        @test agrees(Y[:, :, 3], closed_form(Ms, bw, 3, [4, 5], false))
+    end
+
+    @testset "The consequences of the normal equations hold" begin
+        wcov(W, a, b) = sum(W .* (a .- sum(W .* a) / sum(W)) .* (b .- sum(W .* b) / sum(W)))
+        # With an intercept, the score is uncorrelated with every target under the weights.
+        Y = copy(Ms)
+        PO.neutralise_exposures!(Y, ["size" => ["value"]],
+                                 CrossSectionalLinearRegression(; intercept = true), bw, nf,
+                                 fam)
+        W = omega(Ms, bw, 2, [3])
+        for t in 1:nt
+            f = W[t, :] .> 0
+            @test abs(wcov(W[t, f], Y[t, f, 2], Ms[t, f, 3])) < 1e-12
+        end
+        # Targets that span the constant keep the score orthogonal without an intercept.
+        Y = copy(Ms)
+        PO.neutralise_exposures!(Y, ["size" => ["industry"]],
+                                 CrossSectionalLinearRegression(), bw, nf, fam)
+        W = omega(Ms, bw, 2, [4, 5])
+        for t in 1:nt, j in 4:5
+            f = W[t, :] .> 0
+            @test abs(sum(W[t, f] .* Y[t, f, 2] .* Ms[t, f, j])) < 1e-12
+        end
+        # A single style target without an intercept leaves the score correlated with it.
+        Y = copy(Ms)
+        PO.neutralise_exposures!(Y, ["size" => ["value"]], CrossSectionalLinearRegression(),
+                                 bw, nf, fam)
+        W = omega(Ms, bw, 2, [3])
+        @test maximum(abs(wcov(W[t, W[t, :] .> 0], Y[t, W[t, :] .> 0, 2],
+                               Ms[t, W[t, :] .> 0, 3])) for t in 1:nt) > 1e-3
+    end
+
+    @testset "The number type of the exposures is kept" begin
+        Mb = BigFloat.(Ms)
+        Y = copy(Mb)
+        PO.neutralise_exposures!(Y, ["size" => ["value"]], CrossSectionalLinearRegression(),
+                                 bw, nf, fam)
+        @test eltype(Y) === BigFloat
+        @test agrees(Y[:, :, 2], closed_form(Mb, BigFloat.(bw), 2, [3], false);
+                     rtol = 1e-60)
+        Y32 = Float32.(Ms)
+        PO.neutralise_exposures!(Y32, ["size" => ["value"]],
+                                 CrossSectionalLinearRegression(), bw, nf, fam)
+        @test eltype(Y32) === Float32
+        @test agrees(Y32[:, :, 2], Float32.(closed_form(Ms, bw, 2, [3], false));
+                     rtol = 1e-5)
+    end
+
+    @testset "A Symbol names what a String names" begin
+        cre = CrossSectionalLinearRegression()
+        Y = copy(Ms)
+        Z = copy(Ms)
+        PO.neutralise_exposures!(Y, [:style => [Symbol("ind=a"), Symbol("ind=b")]], cre, bw,
+                                 nf, fam)
+        PO.neutralise_exposures!(Z, ["style" => ["ind=a", "ind=b"]], cre, bw, nf, fam)
+        @test isequal(Y, Z)
+        Y = copy(Ms)
+        Z = copy(Ms)
+        PO.neutralise_exposures!(Y, ["size" => :value], cre, bw, nf, fam)
+        PO.neutralise_exposures!(Z, ["size" => "value"], cre, bw, nf, fam)
+        @test isequal(Y, Z)
+    end
+
+    @testset "A type without a residual and an infinite exposure are refused" begin
+        cre = CrossSectionalLinearRegression()
+        Mi = round.(Int, 3 .* replace(Ms, NaN => 0.0))
+        @test_throws ArgumentError PO.neutralise_exposures!(copy(Mi), ["size" => "value"],
+                                                            cre, bw, nf, fam)
+        # No entry writes a residual, so an integer history passes unchanged.
+        Y = copy(Mi)
+        @test PO.neutralise_exposures!(Y, Pair{String, String}[], cre, bw, nf, fam) ===
+              nothing
+        @test Y == Mi
+        for (k, s) in ((2, 1.0), (3, -1.0))
+            Minf = copy(Ms)
+            Minf[1, 2, k] = s * Inf
+            @test_throws DomainError PO.neutralise_exposures!(Minf, ["size" => "value"],
+                                                              cre, bw, nf, fam)
+        end
+        # An infinity in a factor that no entry names is not read.
+        Minf = copy(Ms)
+        Minf[1, 2, 1] = Inf
+        PO.neutralise_exposures!(Minf, ["size" => "value"], cre, bw, nf, fam)
+        @test agrees(Minf[:, :, 2], closed_form(Ms, bw, 2, [3], false))
     end
 end
 

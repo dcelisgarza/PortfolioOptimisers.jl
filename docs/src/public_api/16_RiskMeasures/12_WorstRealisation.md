@@ -2,7 +2,7 @@
 Description = "Worst Realisation, public API of PortfolioOptimisers.jl: WorstRealisation."
 ```
 
-# Worst Realisation
+# [Worst Realisation](@id api-worst-realisation)
 
 ```@docs
 WorstRealisation

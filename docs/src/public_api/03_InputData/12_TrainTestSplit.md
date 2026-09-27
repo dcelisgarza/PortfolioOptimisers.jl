@@ -6,11 +6,11 @@ Description = "Train/test split, public API of PortfolioOptimisers.jl: TrainTest
 
 ## Train/test splitting
 
-A **holdout split** reserves the tail of the time-ordered observations as a test window and trains on the head. It comes in two forms: the free function [`train_test_split`](@ref), which cuts data into a train/test pair, and the estimator [`TrainTestSplit`](@ref) (alias `TTS`), which carries the protocol *inside* a [`Pipeline`](@ref) as its first step — so every fitted step downstream sees the training window alone, and `fit_predict(pipe, data)` evaluates on the held-out window in one line.
+A holdout split keeps the last observations as a test window and trains on the observations before them. It has two forms. [`train_test_split`](@ref) cuts data into a training part and a test part. [`TrainTestSplit`](@ref), alias `TTS`, is an estimator that does the same as the first step of a [`Pipeline`](@ref). Every fitted step after it then sees the training window only, and `fit_predict(pipe, data)` scores the pipeline on the test window.
 
-Sizes are row counts (`Integer`) or fractions of the observations (`AbstractFloat` in `(0, 1)`). Giving one side makes the other its complement; giving both **embargoes** the rows between the two windows. See `docs/adr/0031-holdout-split-as-a-pipeline-step.md`.
+A size is a number of rows, an `Integer`, or a fraction of the observations, any other `Real` in `(0, 1)`. If you give one size, the other window takes the remaining rows. If you give both, the rows between the two windows go to neither, which is an embargo.
 
-The keyword form returns a bare `(train, test)` tuple; the estimator form, `train_test_split(tts, data)`, returns the same [`TrainTestSplitResult`](@ref) a pipeline's split step produces, so one configured holdout can be reused inside and outside a pipeline.
+Called with keywords, `train_test_split` returns a `(train, test)` tuple. Called with a `TrainTestSplit`, as `train_test_split(tts, data)`, it returns the [`TrainTestSplitResult`](@ref) that the split step of a pipeline makes. You can use one `TrainTestSplit` both inside and outside a pipeline.
 
 ## Types
 

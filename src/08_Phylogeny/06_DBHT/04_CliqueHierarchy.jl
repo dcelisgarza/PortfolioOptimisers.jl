@@ -12,8 +12,8 @@ This function identifies all 3-cliques (triangles) in the adjacency matrix `A` o
  3. Keep the upper triangle of the entries where `A2` and `A` are both non-zero, giving `P`. A stored entry of `P` is an edge whose two ends share at least one neighbour.
  4. Read the row and the column index of every stored entry of `P` into the two columns of `E`, one row per candidate edge.
  5. For each candidate edge, intersect the neighbourhoods of its two ends, giving `K3[n]`, the third vertices that close a triangle on it.
- 6. Sort each triple `(E[n, 1], E[n, 2], K3[n][m])` and append it to `clique` when `clique` does not already hold it, so a triangle found from each of its three edges is stored once.
- 7. Sort the rows of `clique` on its three columns, and drop the placeholder first row.
+ 6. Sort each triple `(E[n, 1], E[n, 2], K3[n][m])` and keep it when it is new, so a triangle found from each of its three edges is stored once.
+ 7. Sort the triples, and write them as the rows of `clique`.
 
 # Arguments
 
@@ -52,28 +52,19 @@ function clique3(A::MatNum)
         N3[n] = length(idx)
     end
 
-    clique = zeros(Int, 1, 3)
+    triples = Set{NTuple{3, Int}}()
     for n in eachindex(r)
-        temp = K3[n]
-        for m in eachindex(temp)
-            candidate = transpose(E[n, :])
-            candidate = hcat(candidate, temp[m])
-            sort!(candidate; dims = 2)
-            a = clique[:, 1] .== candidate[1]
-            b = clique[:, 2] .== candidate[2]
-            c = clique[:, 3] .== candidate[3]
-            check = a ⊙ b ⊙ c
-            check = sum(check)
-
-            if iszero(check)
-                clique = vcat(clique, candidate)
-            end
+        for k in K3[n]
+            # The triple in ascending order, so each triangle has one key.
+            lo, hi = minmax(E[n, 1], E[n, 2])
+            lo, mid = minmax(lo, k)
+            mid, hi = minmax(mid, hi)
+            push!(triples, (lo, mid, hi))
         end
     end
 
-    isort = sortperm(collect(zip(clique[:, 1], clique[:, 2], clique[:, 3])))
-    clique = clique[isort, :]
-    clique = clique[2:size(clique, 1), :]
+    rows = sort!(collect(triples))
+    clique = [t[col] for t in rows, col in 1:3]
 
     return K3, E, clique
 end
@@ -168,7 +159,7 @@ function BuildHierarchy(M::MatNum)
     Pred = zeros(Int, N)
     SparseArrays.dropzeros!(M)
     for n in axes(M, 2)
-        Children = SparseArrays.findnz(M[:, n] .== 1)[1]
+        Children = findall(==(1), view(M, :, n))
         ChildrenSum = vec(sum(M[Children, :]; dims = 1))
         Parents = findall(ChildrenSum .== length(Children))
         Parents = Parents[Parents .!= n]
@@ -223,11 +214,12 @@ function AdjCliq(A::MatNum, CliqList::MatNum, CliqRoot::VecNum)
     N = size(A, 1)
     Adj = SparseArrays.spzeros(Int, Nc, Nc)
     Indicator = zeros(Int, N)
+    RootList = CliqList[CliqRoot, 1:3]
+    Indi = similar(Indicator, length(CliqRoot), 3)
     for n in eachindex(CliqRoot)
         Indicator .= 0
         Indicator[CliqList[CliqRoot[n], :]] .= 1
-        Indi = hcat(Indicator[CliqList[CliqRoot, 1]], Indicator[CliqList[CliqRoot, 2]],
-                    Indicator[CliqList[CliqRoot, 3]])
+        Indi .= view(Indicator, RootList)
 
         adjacent = CliqRoot[vec(sum(Indi; dims = 2)) .== 2]
         Adj[adjacent, CliqRoot[n]] .= 1
@@ -384,7 +376,7 @@ This function builds the hierarchical structure of 3-cliques (triangles) and bub
   - $(ref_dict[:NHPG])
 """
 function CliqHierarchyTree2s(Apm::MatNum, root::DBHTRootMethod = UniqueRoot())
-    N = size(Apm, 1)
+    N = size(Apm, 1)::Int
     A = Apm .!= 0
     K3, E, clique = clique3(A)
 
@@ -392,6 +384,7 @@ function CliqHierarchyTree2s(Apm::MatNum, root::DBHTRootMethod = UniqueRoot())
     M = SparseArrays.spzeros(Int, N, Nc)
     CliqList = copy(clique)
     Sb = zeros(Int, Nc)
+    indx_s = Int[]
 
     for n in axes(clique, 1)
         cliq_vec = CliqList[n, :]
@@ -400,7 +393,7 @@ function CliqHierarchyTree2s(Apm::MatNum, root::DBHTRootMethod = UniqueRoot())
         indx1 = findall(T .== 1)
         indx2 = findall(T .== 2)
 
-        indx_s = length(indx1) > length(indx2) ? vcat(indx2, indx0) : vcat(indx1, indx0)
+        append!(empty!(indx_s), length(indx1) > length(indx2) ? indx2 : indx1, indx0)
 
         Sb[n] = !isempty(indx_s) ? length(indx_s) - 3 : 0
 

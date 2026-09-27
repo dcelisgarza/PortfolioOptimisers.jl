@@ -4,7 +4,7 @@ Description = "Type roots, public API of PortfolioOptimisers.jl: AbstractPartial
 
 # Type roots
 
-Estimators, algorithms, and results behave as length-1 iterables and containers to simplify dispatch and slicing in hierarchical workflows.
+Every estimator, algorithm and result iterates as a collection of one element, and `x[1]` returns `x`. This lets a function that loops over a vector of estimators accept a single estimator as well.
 
 ```@docs
 AbstractPartialFitState

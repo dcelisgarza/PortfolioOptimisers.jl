@@ -20,3 +20,10 @@ descriptor(de::EWMacroSensitivity, rd::ReturnsResult)
 descriptor(de::EWDownsideBeta, rd::ReturnsResult)
 EWMarketBeta
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

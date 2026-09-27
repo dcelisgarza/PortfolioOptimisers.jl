@@ -216,7 +216,7 @@ Where:
 """
 function Statistics.mean(me::EquilibriumExpectedReturns, X::MatNum; dims::Int = 1,
                          kwargs...)
-    sigma = Statistics.cov(me.ce, X; dims = dims, kwargs...)
+    sigma = Statistics.cov(library_covariance_estimator(me.ce), X; dims = dims, kwargs...)
     return equilibrium_mu(me.l, sigma, me.w)
 end
 

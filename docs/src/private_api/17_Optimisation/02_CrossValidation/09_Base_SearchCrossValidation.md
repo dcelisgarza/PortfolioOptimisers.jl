@@ -10,8 +10,12 @@ CrossValSearchScorer
 AbstractSearchCrossValidationAlgorithm
 finite_candidate_index
 assert_search_entry
+search_candidate
+assert_search_candidates
 pin_draw
 score_rows
+fold_train_returns
+candidate_train_score
 write_candidate_scores!
 parse_lens
 assert_search_grid_cap

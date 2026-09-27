@@ -14,7 +14,7 @@ running total:
 2. the value-level `scalarise` closures in Near Optimal Centering, Hierarchical Risk Parity
    and Hierarchical Equal Risk Contribution,
 3. the model's `:ret_vec`, through
-   [`set_return_expression!`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions.jl),
+   [`set_return_expression!`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/03_ReturnConstraints.jl),
 4. Schur Complement Hierarchical Risk Parity's blend over its parameter bundles.
 
 `scale` had no ADR and no `CONTEXT.md` entry. ADR 0024 owns the `scalarise` **seam** and never

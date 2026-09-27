@@ -288,3 +288,64 @@ function variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int =
     end
     return isone(dims) ? val : permutedims(val)
 end
+"""
+    variance_count(ve::AbstractVarianceEstimator, X::MatNum)
+    variance_count(ve::SimpleVariance, X::MatNum)
+    variance_count(ve::ExpWeightedVariance, X::MatNum)
+    variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum)
+    variance_count(ve::WindowedVariance, X::MatNum)
+
+Effective count and divisor of the variance that `ve` measures on each column of `X`.
+
+A consumer that prices the sampling error of a variance needs two facts that only the estimator knows: how many observations the estimate is worth, and what the estimator divides the sum of squares by. This function states both. A prior that writes the idiosyncratic variances of a loadings block calls it on the residuals, and writes the answer beside the variances, so that [`ResidualInflation`](@ref) reads it off the block.
+
+The method over [`AbstractVarianceEstimator`](@ref) returns `nothing`, which means that the estimator states no count. It is not a default count. A consumer that needs one refuses a block that carries none, and names the way out.
+
+# Mathematical definition
+
+Let the estimate of asset ``i`` be a weighted sum of squares, ``\\hat{d}_{i} = \\sum_{t} a_{t} e_{t,i}^{2}``, of residuals with variance ``d_{i}``. Its law is approximated by a scaled chi-squared law with the same mean and variance:
+
+```math
+\\begin{align}
+\\dfrac{m_{i} \\hat{d}_{i}}{d_{i}} &\\sim \\chi^{2}_{n_{i}}\\,, \\\\
+n_{i} &= \\dfrac{\\left(\\sum_{t} a_{t}\\right)^{2}}{\\sum_{t} a_{t}^{2}}\\,, \\\\
+m_{i} &= \\dfrac{n_{i}}{\\sum_{t} a_{t}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``n_{i}``: Effective count of the observations of asset ``i``, Kish's count of the weights ``a_{t}``.
+  - ``m_{i}``: Divisor of the variance of asset ``i`` in that count. It is the sum of squares of ``n_{i}`` equally weighted observations that ``\\hat{d}_{i}`` divides by ``m_{i}``.
+  - ``a_{t}``: Weight of observation ``t`` in the estimate.
+  - ``e_{t,i}``: Residual of asset ``i`` at observation ``t``.
+  - ``d_{i}``: True variance of asset ``i``.
+
+On an unweighted sample of ``T`` observations, ``n_{i} = T`` and ``m_{i}`` is `T - 1` or `T`, as the estimator corrects the bias or not. The relation is then exact for Gaussian residuals, and approximate for any other weights.
+
+# Algorithm
+
+ 1. On [`AbstractVarianceEstimator`](@ref), return `nothing`.
+ 2. On [`SimpleVariance`](@ref), take the finite rows of each column, and read the count off the observation weights with [`simple_variance_count`](@ref).
+ 3. On [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref), take Kish's count of the exponential weights over the finite rows of each column with [`exp_weighted_variance_count`](@ref). The weights sum to one after the correction of the cold start, so the divisor equals the count. The regime multiplier and the lags of a Heteroskedasticity and Autocorrelation Consistent (HAC) adjustment are not counted.
+ 4. On [`WindowedVariance`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref), and ask the inner estimator.
+
+# Arguments
+
+  - $(arg_dict[:ve])
+  - `X`: Data matrix `observations × assets`.
+
+# Returns
+
+  - `cnt::Option{<:NamedTuple}`: `(; n, m)`, two vectors with one entry per column of `X`: the effective count `n` and the divisor `m`. `nothing` when the estimator states no count.
+
+# Related
+
+  - [`AbstractVarianceEstimator`](@ref)
+  - [`factor_lift`](@ref)
+  - [`ResidualInflation`](@ref)
+  - [`Regression`](@ref)
+"""
+function variance_count(::AbstractVarianceEstimator, ::MatNum)::Nothing
+    return nothing
+end

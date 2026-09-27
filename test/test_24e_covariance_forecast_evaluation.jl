@@ -3,7 +3,7 @@ The covariance forecast evaluation, issue #1023, against the decision of #873 (A
 
 One verb through the one fold loop: `covariance_forecast_evaluation(est, rd, cv)` scores a
 covariance estimator's, or a prior's, forecast on the test rows of every fold, in batch when
-the walk-forward refits and online when it declares `ff = OnlineStep()`. Around the verb sit
+the walk-forward refits and online when it is an Online Scheme. Around the verb sit
 the per-step kernel and its parity with the reference implementation's, the two realised
 targets, the location the test rows are centred on, the online and rolling identities over a
 panel with a listing and a delisting, the date form, the summary against the reference's
@@ -37,7 +37,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
                         pnl = AssetPanel(; amsk = amsk, emsk = copy(amsk)))
     w, h, p = 60, 5, 2
     batch_cv = IndexWalkForward(w, h; purged_size = p, expand_train = true)
-    online_cv = IndexWalkForward(w, h; purged_size = p, ff = OnlineStep())
+    online_cv = OnlineIndexWalkForward(w, h; purged_size = p)
     finite_max(a, b) = maximum(abs, filter(!isnan, a .- b))
     columns = (:mahalanobis_ratio, :diagonal_ratio, :qlike, :frobenius,
                :standardised_return, :portfolio_qlike)
@@ -148,7 +148,8 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test isapprox(raw.mahalanobis_ratio - cen.mahalanobis_ratio, term; rtol = 1e-10)
         @test raw.mahalanobis_ratio > cen.mahalanobis_ratio
         # The location is the estimator's: a covariance estimator centres on its own
-        # mean, a centred exponentially weighted one on zero, a prior on its `mu`.
+        # mean, a centred exponentially weighted one on zero, a prior on the centre of its
+        # `sigma`, which the default empirical prior publishes as its `mu`.
         @test po.forecast_location(Covariance(), Xm[1:60, :]) ≈ c
         @test po.forecast_location(GeneralCovariance(), Xm[1:60, :]) ≈ c
         ow = StatsBase.pweights(collect(1.0:60))
@@ -171,10 +172,81 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test cb == co
         @test cb[3] ≈ mean(Xg[31:60, 3])
         @test cb[1] ≈ mean(Xg[1:60, 1])
+        # The panel arm of the location turns the mask where the caller turns the sample.
+        # A mask-aware estimator reads a mask shaped as its sample is, so an arm that
+        # handed the panel's mask through unturned threw at `dims = 2` alone (issue #1249).
+        # The panel spans the whole sample, so the window here is the whole sample too.
+        Xgt = permutedims(Xg)
+        for ce in (Covariance(; cvg = CoveragePolicy()),
+                   ExpWeightedCovariance(; decay = 0.94, min_obs = 4),
+                   RegimeAdjustedExpWeightedCovariance(; decay = 0.94, min_obs = 4,
+                                                       regime_min_obs = 2))
+            @test isequal(vec(po.forecast_location(ce, Xgt, rdg.pnl; dims = 2)),
+                          vec(po.forecast_location(ce, Xg, rdg.pnl)))
+        end
         # The fallback for an estimator with no location of its own is the finite column
         # mean of the window.
         @test po.forecast_location(NoLocationCovariance(), Xg[1:60, :])[3] ≈
               mean(Xg[31:60, 3])
+    end
+
+    @testset "A prior centres on the centre of its sigma, not on the mu it publishes" begin
+        # Issue #1327. A shrunk mean moves the `mu` of an empirical prior and leaves its
+        # `sigma`, which `ce` forms about the sample mean. The location follows `sigma`.
+        sh = ShrunkExpectedReturns()
+        rdv = po.port_opt_view(rd, 1:60, :)
+        pe = EmpiricalPrior(; me = sh)
+        c = po.forecast_location(pe, rdv)
+        @test c ≈ vec(mean(X[1:60, :]; dims = 1))
+        @test maximum(abs, c - prior(pe, rdv).mu) > 1e-5
+        @test last(po.forecast_moments(pe, rd, 1:60)) == c
+        @test po.forecast_location(EmpiricalPrior(), rdv) == prior(EmpiricalPrior(), rdv).mu
+        ps = EmpiricalPrior(; ce = StatsBase.SimpleCovariance(), me = sh)
+        @test po.forecast_location(ps, rdv) ≈ c
+        @test po.forecast_location(HighOrderPriorEstimator(; pe = pe), rdv) ≈ c
+        # The horizon arm maps the log location as `mu` maps the log mean.
+        Xl = log1p.(X[1:60, :])
+        ch = expm1.(5 * vec(mean(Xl; dims = 1)) + 5 * diag(cov(Xl)) / 2)
+        @test po.forecast_location(EmpiricalPrior(; me = sh, horizon = 5), rdv) ≈ ch
+        @test po.forecast_location(EmpiricalPrior(; horizon = 5), rdv) ≈
+              prior(EmpiricalPrior(; horizon = 5), rdv).mu
+        # A factor prior lifts the location of its factor prior.
+        Fm = randn(StableRNG(1327), T, 2) ./ 100 .+ 0.0002
+        rdf = ReturnsResult(; nx = nx, X = X, nf = ["F1", "F2"], F = Fm, ts = ts)
+        rdfv = po.port_opt_view(rdf, 1:60, :)
+        fp = FactorPrior(; pe = pe)
+        fpr = prior(fp, rdfv)
+        cf = fpr.rr.M * vec(mean(Fm[1:60, :]; dims = 1)) + fpr.rr.b
+        @test po.forecast_location(fp, rdfv) ≈ cf
+        @test maximum(abs, cf - fpr.mu) > 1e-7
+        @test po.forecast_location(HighOrderFactorPriorEstimator(; pe = fp), rdfv) ≈ cf
+        @test po.forecast_location(FactorPrior(), rdfv) == prior(FactorPrior(), rdfv).mu
+        # A posterior forms its `sigma` about its `mu`.
+        bl = BlackLittermanPrior(; pe = pe,
+                                 views = LinearConstraintEstimator(; val = ["A1 == 0.001"]),
+                                 sets = UniverseSets(; dict = Dict("nx" => nx)))
+        @test po.forecast_location(bl, rdv) == prior(bl, rdv).mu
+        # The data-less form reads the fold: a folded `ce`, a `ce` refitted over the
+        # carried rows, the horizon arm, and a host whose wrapped posterior answers `mu`.
+        @test po.forecast_location(po.partial_fit!(pe, X[1:60, :])) ≈ c
+        @test po.forecast_location(po.partial_fit!(ps, X[1:60, :])) ≈ c
+        @test po.forecast_location(po.partial_fit!(EmpiricalPrior(; me = sh, horizon = 5),
+                                                   X[1:60, :])) ≈ ch
+        hb = po.partial_fit!(HighOrderPriorEstimator(; pe = bl), X[1:60, :])
+        @test po.forecast_location(hb) == prior(hb).mu
+        # So the mean estimator no longer moves the evaluation of a `sigma` it never read.
+        for cv in (batch_cv, online_cv)
+            a = cfe(pe, rd, cv)
+            b = cfe(EmpiricalPrior(), rd, cv)
+            for f in columns
+                @test finite_max(getfield(a, f), getfield(b, f)) == 0
+            end
+        end
+        a = cfe(fp, rdf, batch_cv)
+        b = cfe(FactorPrior(), rdf, batch_cv)
+        for f in columns
+            @test finite_max(getfield(a, f), getfield(b, f)) <= 1e-12
+        end
     end
 
     @testset "The online identity over a panel with a listing and a delisting" begin
@@ -225,12 +297,16 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
 
     @testset "The rolling identity through Online(est; max_history = w)" begin
         rolling = IndexWalkForward(w + p, h; purged_size = p)
-        stepped = IndexWalkForward(w + p, h; purged_size = p, ff = OnlineStep())
+        stepped = OnlineIndexWalkForward(w + p, h; purged_size = p)
         @test all(length.(split(rolling, rd).train_idx) .== w)
         for (est, r) in
             ((Covariance(), rd), (GeneralCovariance(), rd), (EmpiricalPrior(), rd),
              (Covariance(; cvg = CoveragePolicy()), rdg), (EmpiricalPrior(), rdg),
-             (ExpWeightedCovariance(), rdg))
+             (ExpWeightedCovariance(), rdg),
+             (EmpiricalPrior(; me = ShrunkExpectedReturns(), horizon = 2), rd),
+             (FactorPrior(; pe = EmpiricalPrior(; me = ShrunkExpectedReturns())),
+              ReturnsResult(; nx = nx, X = X, nf = ["F1", "F2"],
+                            F = randn(StableRNG(1327), T, 2) ./ 100, ts = ts)))
             b = cfe(est, r, rolling)
             o = cfe(po.Online(est; max_history = w), r, stepped)
             @test b.n_valid == o.n_valid
@@ -244,7 +320,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
 
     @testset "The date form" begin
         bd = DateWalkForward(w, h; period = Day(1), purged_size = p, expand_train = true)
-        od = DateWalkForward(w, h; period = Day(1), purged_size = p, ff = OnlineStep())
+        od = OnlineDateWalkForward(w, h; period = Day(1), purged_size = p)
         bi = cfe(Covariance(), rdg, batch_cv)
         b = cfe(Covariance(), rdg, bd)
         o = cfe(Covariance(), rdg, od)
@@ -409,6 +485,93 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         # Without the forecasts there is nothing to re-project.
         @test isnothing(rerun.sigma)
         @test isnothing(rerun.location)
+        # An online state updates its location in place, so each step stores its own copy
+        # and the re-projection of an online run reproduces its columns too (#1028).
+        o = cfe(Covariance(), rdg, online_cv; store_forecasts = true)
+        @test o.location[1] !== o.location[2]
+        @test o.location[1] != o.location[end]
+        op = covariance_forecast_portfolio(o, rdg, nothing)
+        @test op.standardised_return == o.standardised_return
+        @test op.portfolio_qlike == o.portfolio_qlike
+        # The stored forecasts of an online run are the batch run's, fold for fold, for
+        # every family state that the fold writes in place.
+        for est in (Covariance(), GeneralCovariance(), ExpWeightedCovariance(),
+                    Covariance(; cvg = CoveragePolicy()))
+            o = cfe(est, rd, online_cv; store_forecasts = true)
+            b = cfe(est, rd, batch_cv; store_forecasts = true)
+            @test length(unique(o.location)) == length(o.dates)
+            @test maximum(maximum(abs, x - y) for (x, y) in zip(o.location, b.location)) <=
+                  1e-12
+            @test maximum(maximum(abs, x - y) for (x, y) in zip(o.sigma, b.sigma)) <= 1e-12
+            pjo = covariance_forecast_portfolio(o, rd, wt)
+            ro = cfe(est, rd, online_cv; w = wt)
+            @test finite_max(pjo.standardised_return, ro.standardised_return) <= 1e-12
+        end
+    end
+
+    @testset "The summary and the comparison at their edges (#1028)" begin
+        # One step: the Mahalanobis columns are that step's ratio, and the bias statistic,
+        # a sample standard deviation over the steps, is NaN with its percentiles.
+        one = cfe(Covariance(), rd, IndexWalkForward(T - h, h))
+        @test length(one.dates) == 1
+        s1 = covariance_forecast_summary(one)
+        @test s1.mahalanobis_mean == one.mahalanobis_ratio
+        @test s1.mahalanobis_p5 == one.mahalanobis_ratio
+        @test all(isnan,
+                  (s1.bias_statistic[1], s1.bias_p5[1], s1.bias_p25[1], s1.bias_p75[1],
+                   s1.bias_p95[1]))
+        @test isfinite(s1.portfolio_qlike_mean[1])
+        @test isnan(po.summary_quantile([1.0, NaN, 3.0], 0.5))
+        # The `NaN` is read off the column, so it keeps the element type of the data.
+        @test po.summary_quantile(Float32[1, NaN, 3], 0.5) isa Float32
+        @test po.summary_quantile([1.0, 2.0, 3.0], 0.25) == quantile([1.0, 2.0, 3.0], 0.25)
+        # A listing and a delisting change the active count under an index walk-forward,
+        # so the Mahalanobis mean weights each step by N_t h and is not the plain mean. The
+        # diagonal mean weights each step by h alone, so it is the plain mean.
+        g = cfe(Covariance(), rdg, batch_cv)
+        @test length(unique(g.n_valid)) > 1
+        sg = covariance_forecast_summary(g)
+        nu = g.n_valid .* g.horizon
+        @test sg.mahalanobis_mean[1] ≈ dot(nu, g.mahalanobis_ratio) / sum(nu)
+        @test !isapprox(sg.mahalanobis_mean[1], mean(g.mahalanobis_ratio); rtol = 1e-4)
+        dbar = [mean(filter(isfinite, r)) for r in eachrow(g.diagonal_ratio)]
+        @test sg.diagonal_mean[1] ≈ mean(dbar)
+        # The default lags are the largest horizon less one, capped at M - 1.
+        two = cfe(Covariance(), rd, IndexWalkForward(T - 2h, h))
+        two_b = cfe(ExpWeightedCovariance(; decay = 0.8), rd, IndexWalkForward(T - 2h, h))
+        @test length(two.dates) == 2
+        c2 = covariance_forecast_compare(two, two_b)
+        @test c2.lags == 1
+        @test c2.variance ≈ covariance_forecast_compare(two, two_b; lags = 1).variance
+        # The Bartlett weights keep the long-run variance non-negative, even on an
+        # alternating series whose autocovariances are all of the largest size.
+        alt = [(-1.0)^t for t in 1:9]
+        @test all(l -> po.newey_west_variance(alt, l) >= 0, 0:8)
+    end
+
+    @testset "A wrapper centres where the estimator it holds centres" begin
+        # The panel arm of the wrapper's `cov` hands the panel to the estimator it holds, so a
+        # mask-aware estimator inside it admits the young asset; the location follows.
+        for inner in (Covariance(; cvg = CoveragePolicy()),
+                      ExpWeightedCovariance(; decay = 0.94, min_obs = 4))
+            poc = PortfolioOptimisersCovariance(; ce = inner)
+            pw = po.port_opt_view(rdg, 1:60, :).pnl
+            @test isequal(po.forecast_location(poc, Xg[1:60, :], pw),
+                          po.forecast_location(inner, Xg[1:60, :], pw))
+            @test cfe(poc, rdg, batch_cv).n_valid == cfe(inner, rdg, batch_cv).n_valid
+        end
+        # A StatsBase estimator inside a wrapper is read as the library reads it in `cov`.
+        for ce in (PortfolioOptimisersCovariance(; ce = StatsBase.SimpleCovariance()),
+                   po.CorrelationCovariance(; ce = StatsBase.SimpleCovariance()))
+            @test po.forecast_location(ce, X[1:60, :]) ≈ vec(mean(X[1:60, :]; dims = 1))
+            @test length(cfe(ce, rd, batch_cv).dates) ==
+                  length(split(batch_cv, rd).test_idx)
+        end
+        @test isequal(po.forecast_location(PortfolioOptimisersCovariance(;
+                                                                         ce = StatsBase.SimpleCovariance()),
+                                           Xg[1:60, :], po.port_opt_view(rdg, 1:60, :).pnl),
+                      po.forecast_location(GeneralCovariance(), Xg[1:60, :],
+                                           po.port_opt_view(rdg, 1:60, :).pnl))
     end
 
     @testset "Every refusal by name" begin
@@ -438,10 +601,14 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         cn[2] = NaN
         @test covariance_forecast_step(sig, Z, cn, nothing, RealisedCovariance()).n_valid ==
               N - 1
+        # A singular forecast has no Cholesky factor.
+        v1 = randn(StableRNG(3), N)
+        @test_throws PosDefException covariance_forecast_step(v1 * v1', Z, c, nothing,
+                                                              RealisedCovariance())
         # The verb.
         @test_throws po.IsNothingError cfe(Covariance(), ReturnsResult(; nx = nx), batch_cv)
         e = @test_throws ArgumentError cfe(po.Online(Covariance()), rd, batch_cv)
-        @test occursin("declares no Fold Fit", e.value.msg)
+        @test occursin("not an Online Scheme", e.value.msg)
         # The loop starts cold: a state at entry is refused by name.
         e = @test_throws ArgumentError cfe(po.partial_fit!(Covariance(), X[1:10, :]), rd,
                                            online_cv)

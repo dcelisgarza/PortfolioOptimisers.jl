@@ -448,5 +448,15 @@ end
         @test mean_cross_sectional_r2(csr32, Array{Float32}(Zi), Float32.(Xi),
                                       Float32.(Wi)) isa Float32
         @test eltype(cross_sectional_r2(csr, Zi, Xi, Wi)) == Float64
+        # A `Rational` panel keeps its type in `f`, but both members solve in floating
+        # point, so the fit lands near the exact slope 13//14 rather than on it, #1352. The
+        # float reference carries the tolerance, because `≈` of two `Rational`s has none.
+        Zr = reshape(Rational{Int}[1, 2, 3], 1, 3, 1)
+        for cre in (CrossSectionalLinearRegression(), CrossSectionalTargetRegression())
+            csrr = cross_sectional_regression(cre, Zr, Rational{Int}[1 3 2],
+                                              ones(Rational{Int}, 1, 3))
+            @test eltype(csrr.f) == Rational{Int}
+            @test csrr.f[1] ≈ 13 / 14
+        end
     end
 end

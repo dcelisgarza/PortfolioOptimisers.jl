@@ -4,17 +4,17 @@ Description = "Asset selection, public API of PortfolioOptimisers.jl: ScoreSelec
 
 # Asset selection
 
-Asset selectors narrow the universe from the data: drop constant columns, keep the best or worst assets by a risk measure, prune redundant ones. They are ordinary returns-preprocessing estimators — they know nothing about pipelines, and a [`Pipeline`](@ref) drives them through [`fit_preprocessing`](@ref) and [`apply_preprocessing`](@ref) like any other step.
+An asset selector removes assets from the returns data. It can drop constant columns, keep the best or worst assets by a risk measure, or remove redundant assets. A selector is an ordinary preprocessing estimator of returns, and it does not depend on a pipeline. A [`Pipeline`](@ref) calls [`fit_preprocessing`](@ref) and [`apply_preprocessing`](@ref) on it, as on any other step.
 
-The universe a selector chooses on the training window is its **fitted state**. Applying the fitted result to an unseen window replays that universe rather than re-deciding it, which is what makes a selector safe inside cross-validation.
+A selector chooses its assets on the training window, and that choice is its fitted result. Applied to a later window, the fitted result keeps the same assets and does not choose again. The test window never changes the choice, so you can use a selector inside cross-validation.
 
-See `docs/adr/0029-asset-selection-is-returns-preprocessing.md` for the design rationale, and [`PortfolioOptimisers.AbstractAssetSelector`](@ref) for the seam every selector shares.
+Every selector subtypes [`PortfolioOptimisers.AbstractAssetSelector`](@ref).
 
 ## Scoring assets with a risk measure
 
-A [`ScoreSelector`](@ref) scores each asset by evaluating a risk measure on that asset's own return series, then hands the scores to a rule. Any risk measure whose [`supports_precomputed_returns`](@ref) is `true` may be used, which covers the quantile and drawdown families, the moment measures, and [`MeanReturn`](@ref). [`bigger_is_better`](@ref) tells the ordinal rules which end of the ordering is "best".
+A [`ScoreSelector`](@ref) computes a risk measure on the returns of each asset alone, and passes the scores to a rule. It accepts any risk measure whose [`supports_precomputed_returns`](@ref) is `true`, which includes the quantile and drawdown measures, the moment measures and [`MeanReturn`](@ref). [`bigger_is_better`](@ref) tells the ordinal rules which end of the order is the best.
 
-Two measures are notable exceptions. [`Variance`](@ref) and [`StandardDeviation`](@ref) are [`WeightsInput`](@ref) measures: their functors consume portfolio weights, not a return series, so they cannot score a single asset and are rejected at construction. Use `SCM()`, which computes the same quantity from a return series — [`ZeroVarianceFilter`](@ref) spells this for you.
+[`Variance`](@ref) and [`StandardDeviation`](@ref) do not work here. They are [`WeightsInput`](@ref) measures, which take portfolio weights and not a series of returns, so they cannot score one asset, and the constructor throws an error for them. Use `SCM()`, which computes the same quantity from a series of returns. [`ZeroVarianceFilter`](@ref) builds that selector for you.
 
 ```@docs
 ScoreSelector
@@ -23,9 +23,9 @@ CompleteAssetSelector
 
 ## Selection rules
 
-A rule turns per-asset scores into a keep-mask. [`ThresholdRule`](@ref) is *literal* — it compares raw scores against absolute bounds and ignores orientation, because a zero-variance filter must drop the *low*-variance assets. [`RankRule`](@ref) and [`QuantileRule`](@ref) are *ordinal* — they consult [`bigger_is_better`](@ref) and take counts (or fractions) from each tail.
+A rule turns the scores into a mask of the assets to keep. [`ThresholdRule`](@ref) compares the raw scores with fixed bounds, and ignores which end is better, because a zero-variance filter must drop the assets with low variance. [`RankRule`](@ref) and [`QuantileRule`](@ref) read [`bigger_is_better`](@ref), and take a count or a fraction of the assets from each end.
 
-Ties at a rank cut are excluded entirely, so an ordinal rule may return fewer assets than asked. If the 20th and 21st assets score equally, `RankRule(; best = 20)` keeps 19: the tied block is dropped rather than split arbitrarily. This is the library's "if we cannot tell them apart, trust neither" tie policy.
+An ordinal rule drops every asset of a tie at its cut, so it can keep fewer assets than you ask for. If the 20th and 21st assets have the same score, `RankRule(; best = 20)` keeps 19. The rule drops both tied assets, because it has no reason to keep one of them and not the other.
 
 ```@docs
 PortfolioOptimisers.AbstractSelectionRule
@@ -36,13 +36,13 @@ QuantileRule
 
 ## Discarding redundant assets
 
-A [`RedundancySelector`](@ref) discards assets that duplicate information already carried by others. Its `alg` decides what "redundant" means, and its `score` decides which member of a redundancy group survives.
+A [`RedundancySelector`](@ref) removes assets whose returns carry the same information as the returns of other assets. Its `alg` field decides what counts as redundant, and its `score` field decides which asset of a redundant group stays.
 
-[`PairwiseCorrelation`](@ref) is greedy: it drops one asset at a time until no surviving pair exceeds the threshold, and never chains. [`CorrelationComponents`](@ref) reads the same correlations transitively, treating a chain `A ~ B ~ C` as one blob and keeping a single representative — a stronger reduction, and a different answer on the same input. [`ClusterGroups`](@ref) partitions with [`clusterise`](@ref) and keeps one representative per cluster.
+[`PairwiseCorrelation`](@ref) removes one asset at a time until no remaining pair has a correlation above the threshold, and it does not follow chains. [`CorrelationComponents`](@ref) follows chains of the same correlations. If `A` is close to `B` and `B` is close to `C`, it puts `A`, `B` and `C` in one group and keeps one of them. It removes more assets than `PairwiseCorrelation`, and on the same data it can keep a different set. [`ClusterGroups`](@ref) groups the assets with [`clusterise`](@ref) and keeps one asset per cluster.
 
-Leaving `score` as `nothing` falls back to the correlation algorithms' own survivor rule: the asset with the lowest summary correlation to the rest of the universe. [`ClusterGroups`](@ref) has no such fallback and requires a `score`.
+If you leave `score` as `nothing`, the two correlation algorithms keep the asset with the lowest summary correlation to the rest of the universe. [`ClusterGroups`](@ref) has no such default, and it needs a `score`.
 
-[`ClusterGroups`](@ref) is also the only redundancy algorithm that reaches a distance estimator — the other two carry a `StatsBase.CovarianceEstimator` — so it is the only one that can be driven by a feature matrix rather than by the returns. Give its `cle` a [`FeatureDistance`](@ref) and the redundancy groups come from exogenous structure: a sector taxonomy, carried as a categorical Panel Field through [`panel_input`](@ref), reduces the universe to one representative per classification, not per correlated blob. The panel is read straight off the [`ReturnsResult`](@ref), because preselection runs before any prior exists — a producer that reads a prior raises here, and [`PhylogenyPanel`](@ref) is the one that does not.
+[`ClusterGroups`](@ref) is also the only redundancy algorithm that takes a distance estimator, and so the only one that can group assets by a feature matrix in place of their returns. The other two take a `StatsBase.CovarianceEstimator`. Give its `cle` field a [`FeatureDistance`](@ref), and the groups come from data outside the returns. For example, a sector classification, held as a categorical field of the asset panel through [`panel_input`](@ref), leaves one asset per sector, not one per group of correlated assets. The selector reads the panel directly from the [`ReturnsResult`](@ref), because asset selection runs before a prior exists. An asset panel estimator that reads a prior throws an error here, and [`PhylogenyPanel`](@ref), which reads none, works.
 
 ```@docs
 PortfolioOptimisers.AbstractRedundancyAlgorithm

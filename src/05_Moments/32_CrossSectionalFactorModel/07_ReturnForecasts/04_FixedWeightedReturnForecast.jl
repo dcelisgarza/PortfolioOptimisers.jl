@@ -4,7 +4,7 @@
 
 Check the signed Descriptor weights of a [`FixedWeightedReturnForecast`](@ref).
 
-The weights of a Return Forecast are signed, because a Descriptor may forecast a return that falls, so they are not the convex weights of a [`CompositeExposure`](@ref). They are normalised by their absolute sum when the forecast is computed, and that sum is what must be positive: a set of weights that cancels states no forecast.
+The weights of a Return Forecast are signed, because a Descriptor can forecast a falling return. They are therefore not the convex weights of a [`CompositeExposure`](@ref). [`signed_composite_weights`](@ref) divides them by their absolute sum, so that sum must be positive. Only weights that are all zero fail, and they give no forecast.
 
 # Arguments
 
@@ -14,7 +14,7 @@ The weights of a Return Forecast are signed, because a Descriptor may forecast a
 # Validation
 
   - `length(weights) == n`. Raises a `DimensionMismatch`.
-  - Every entry of `weights` is finite. Raises a `DomainError`.
+  - Every entry of `weights` is finite. Raises an [`IsNonFiniteError`](@ref).
   - `sum(abs, weights) > 0`. Raises a `DomainError`.
 
 # Returns
@@ -44,9 +44,9 @@ end
     signed_composite_weights(weights::Nothing, n::Integer) -> VecNum
     signed_composite_weights(weights::VecNum, n::Integer) -> VecNum
 
-Return the signed Descriptor weights a [`FixedWeightedReturnForecast`](@ref) combines its scores under, normalised by their absolute sum.
+Return the signed Descriptor weights of a [`FixedWeightedReturnForecast`](@ref), divided by their absolute sum.
 
-`nothing` is the equal-weight forecast, which is the one weighting a caller need not write out. The normalisation puts the composite on one scale whatever the caller wrote, so the forecast scale means the same thing across estimators.
+`nothing` gives the equal weights ``1 / n``, so a caller need not write them out. The division puts the composite on one scale whatever weights the caller writes, so one value of `scale` gives a forecast of the same strength under any weights.
 
 # Arguments
 
@@ -84,9 +84,9 @@ end
 
 Accumulate the signed weighted Descriptor scores and the surviving absolute weight of a composite, in place.
 
-It is [`composite_accumulate!`](@ref) with two changes, and it reads the whole score array rather than one slice of it: the weights are signed, so the denominator takes the **absolute** weight while the numerator takes the signed product; and the Descriptor axis is the third axis of one array, so no slice of it is formed.
+It is [`composite_accumulate!`](@ref) with two changes. The weights are signed, so the numerator takes the signed product and the denominator takes the absolute weight. It also reads the Descriptors as the third axis of one score array, so it forms no slice of that array.
 
-The accumulation is finite-aware. A Descriptor that is not finite on a cell contributes to neither sum there, which is what renormalises the composite of that cell over the Descriptors that remain.
+A Descriptor whose score is not finite on a cell adds to neither sum there. The composite of that cell thus renormalises over the Descriptors that remain.
 
 # Arguments
 
@@ -127,28 +127,85 @@ $(DocStringExtensions.TYPEDEF)
 
 A Return Forecast that is a fixed signed combination of Descriptor scores.
 
-The member turns its Descriptors into scores with the recipe in `scores`, combines them under fixed signed weights, and multiplies the composite by a fixed scale. Neither the weights nor the scale is estimated from realised returns: both are the caller's, which is what separates this member from the fitted ones.
+The member turns its Descriptors into scores with the recipe in `scores`, combines them under fixed signed weights, and multiplies the composite by a fixed scale. The caller sets the weights and the scale, and the member estimates neither from realised returns. That separates it from the fitted members.
 
-The combination is finite-aware, as [`CompositeExposure`](@ref)'s is: an asset whose score is unavailable takes its composite from the Descriptors that remain, and the weights renormalise over their absolute values. `min_coverage` is the smallest share of the absolute weight a cell may be built from.
+The combination is finite-aware, as the one of [`CompositeExposure`](@ref) is. An asset that lacks a score takes its composite from the Descriptors that remain, and the weights renormalise over their absolute values.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-z_{t,j} &= \\frac{\\sum_{k \\in \\mathcal{V}_{t,j}} w_{k} \\, s_{k,t,j}}{\\sum_{k \\in \\mathcal{V}_{t,j}} \\lvert w_{k} \\rvert}\\,, &
-\\mathcal{V}_{t,j} &= \\left\\{k : s_{k,t,j} \\text{ is finite}\\right\\}\\,.
+w_{k} &= \\frac{\\omega_{k}}{\\sum_{l = 1}^{K} \\lvert \\omega_{l} \\rvert}\\,, \\\\
+W_{ti} &= \\sum_{k \\in \\mathcal{V}_{ti}} \\lvert w_{k} \\rvert\\,, \\\\
+z_{ti} &= \\frac{1}{W_{ti}} \\sum_{k \\in \\mathcal{V}_{ti}} w_{k} \\, s_{tik}\\,, \\\\
+\\tilde{\\boldsymbol{z}}_{t} &= \\begin{cases} \\phi\\left(\\boldsymbol{z}_{t}\\right) & K > 1\\,, \\\\ \\boldsymbol{z}_{t} & K = 1\\,, \\end{cases} \\\\
+\\alpha_{ti} &= \\gamma \\, g_{ti} \\, \\tilde{z}_{ti}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``s_{k,t,j}``: score of Descriptor ``k`` for asset ``j`` at observation ``t``.
-  - ``w_{k}``: signed weight of Descriptor ``k``, normalised so that ``\\sum_{k} \\lvert w_{k} \\rvert = 1``.
-  - ``\\mathcal{V}_{t,j}``: Descriptors whose score is finite for that asset and observation.
+  - ``\\omega_{k}``: Signed weight of Descriptor ``k`` in `weights`, or ``1`` for every Descriptor under `weights = nothing`.
+  - ``K``: Number of Descriptors.
+  - ``w_{k}``: Normalised signed weight of Descriptor ``k``. The absolute values of the normalised weights sum to one.
+  - ``s_{tik}``: Score of Descriptor ``k`` for asset ``i`` at observation ``t``, after the outlier and the scoring transforms of the recipe.
+  - ``\\mathcal{V}_{ti}``: The Descriptors whose score ``s_{tik}`` is finite.
+  - ``W_{ti}``: Surviving absolute weight of asset ``i`` at observation ``t``, the share of the absolute weight that reaches the cell. It lies in ``[0, 1]``.
+  - ``z_{ti}``: Composite score of asset ``i`` at observation ``t``. It is `NaN` where ``W_{ti} = 0`` and where ``W_{ti}`` is below `min_coverage`. The threshold is on weight and not on count. Under the weights `[0.8, -0.2]`, a cell with only the first Descriptor keeps ``W_{ti} = 0.8``, so `min_coverage = 0.5` admits it.
+  - ``\\boldsymbol{z}_{t}``: The composite scores of observation ``t``, one per asset.
+  - ``\\phi``: The cross-sectional transform in the scoring slot of the recipe, or the identity when that slot is `nothing`. It puts the composites of assets that use different Descriptors on one scale.
+  - ``\\tilde{z}_{ti}``: Rescored composite of asset ``i`` at observation ``t``.
+  - $(math_dict[:g_ti_unit])
+  - $(math_dict[:v_ti_idio])
+  - $(math_dict[:gamma_rf_scale])
+  - $(math_dict[:alpha_ti_fc]) The member publishes the row of the latest observation ``T``.
+  - $(math_dict[:T])
 
 # Fields
 
 $(DocStringExtensions.TYPEDFIELDS)
+
+# Constructors
+
+    FixedWeightedReturnForecast(; scores::DescriptorScores, scale::Real,
+                                weights::Option{<:VecNum} = nothing,
+                                min_coverage::Real = 0.0,
+                                unit::AbstractForecastUnit = IdiosyncraticReturnUnit()) -> FixedWeightedReturnForecast
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `scale > 0` and is finite.
+  - The rules of [`assert_signed_composite_weights`](@ref), with one weight for each Descriptor of `scores`.
+  - `isfinite(min_coverage)` and `0 <= min_coverage <= 1`.
+
+# Examples
+
+```jldoctest
+julia> ds = DescriptorScores(; descriptors = [Passthrough(; field = \"a\")]);
+
+julia> FixedWeightedReturnForecast(; scores = ds, scale = 0.02)
+FixedWeightedReturnForecast
+        scores ┼ DescriptorScores
+               │   descriptors ┼ 1-element Vector{Passthrough}
+               │               │ Passthrough ⋯
+               │    neutralise ┼ nothing
+               │           cre ┼ CrossSectionalLinearRegression
+               │               │         alg ┼ PseudoInverseFallback()
+               │               │   intercept ┴ Bool: false
+               │       outlier ┼ CrossSectionalWinsoriser
+               │               │    low ┼ Float64: 0.01
+               │               │   high ┴ Float64: 0.99
+               │       scoring ┼ CrossSectionalStandardiser
+               │               │   min_group_size ┼ Int64: 8
+               │               │             atol ┴ Float64: 1.0e-12
+               │         group ┴ nothing
+         scale ┼ Float64: 0.02
+       weights ┼ nothing
+  min_coverage ┼ Float64: 0.0
+          unit ┴ IdiosyncraticReturnUnit()
+```
 
 # Related
 
@@ -165,11 +222,11 @@ $(DocStringExtensions.TYPEDFIELDS)
     """
     scores
     """
-    Multiplicative scale of the composite score, in the Forecast Unit `unit`. It is the forecast one unit of composite score is worth.
+    Multiplicative scale of the composite score, in the Forecast Unit `unit`. It is the forecast that one unit of composite score is worth.
     """
     scale
     """
-    Signed Descriptor weights, in the order the Descriptors are written in, or `nothing` for equal weights. They are normalised by their absolute sum.
+    Signed Descriptor weights, in the order of the Descriptors in `scores`, or `nothing` for equal weights. The member divides them by their absolute sum.
     """
     weights
     """
@@ -203,7 +260,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result type produced by [`FixedWeightedReturnForecast`](@ref).
 
-Beside the two reads [`AbstractReturnForecastResult`](@ref) states, it carries the normalised signed weights the composite was built under, so a reader sees the weighting the forecast came from without renormalising the estimator's own.
+It carries the two fields that [`AbstractReturnForecastResult`](@ref) requires, and also the normalised signed weights of the composite. A reader thus sees the weights of the forecast and need not normalise the weights of the estimator again.
 
 # Fields
 
@@ -225,7 +282,7 @@ $(DocStringExtensions.TYPEDFIELDS)
     """
     hist
     """
-    Normalised signed Descriptor weights the composite was built under, whose absolute values sum to one.
+    Normalised signed Descriptor weights of the composite. Their absolute values sum to one.
     """
     weights
     function FixedWeightedReturnForecastResult(mu::VecNum, hist::MatNum, weights::VecNum)
@@ -261,7 +318,7 @@ Compute the Return Forecast of a fixed signed combination of Descriptor scores.
 
   - `rfe`: Fixed weighted Return Forecast Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
-  - `csfm`: The fitted factor-model block. Its histories state the block's rows, its exposure history is read only under a Neutralisation, and its idiosyncratic variance history only under [`IdiosyncraticSharpeUnit`](@ref).
+  - `csfm`: The fitted factor-model block. Its histories set the rows of the block. The member reads its exposure history only under a Neutralisation, and its idiosyncratic variance history only under [`IdiosyncraticSharpeUnit`](@ref).
 
 # Validation
 
@@ -334,7 +391,7 @@ end
 
 Return a view of a [`FixedWeightedReturnForecastResult`](@ref), selecting only the assets indexed by `i`.
 
-`mu` is cut on its one axis and `hist` on its **second** axis, which is the asset axis of a per-asset history. The Descriptor weights are indexed by Descriptor, so they pass through unchanged.
+The view cuts `mu` on its one axis and `hist` on its second axis, the asset axis. The Descriptor weights have one entry per Descriptor and not per asset, so the view keeps them unchanged.
 
 # Arguments
 

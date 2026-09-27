@@ -79,17 +79,74 @@ end
     @test_throws DomainError performance_summary(ret; alpha = 0.0)
     @test_throws DomainError performance_summary(ret; alpha = 1.0)
     @test_throws DomainError performance_summary(ret; periods_per_year = 0)
-    # A constant series has no drawdown and no losing period, so the ratios that divide by
-    # them are `NaN`. The Sharpe ratio is not among them: `std` of a constant vector returns
-    # `1.8e-18` rather than an exact zero, so the `ann_volatility > 0` guard does not fire and
-    # the ratio comes back as a huge finite number. That is the arithmetic of `std`, not a
-    # rule of this function, and a caller reads `ann_volatility` to tell the two apart.
+    # A constant series has no drawdown, no losing period and no volatility, so every ratio
+    # that divides by one of them is `NaN`.
     flat = performance_summary(fill(0.01, 10))
     @test isnan(flat.sortino)
     @test isnan(flat.calmar)
     @test iszero(flat.max_drawdown)
-    @test flat.ann_volatility < 1e-15
-    @test isfinite(flat.sharpe)
+    @test iszero(flat.ann_volatility)
+    @test isnan(flat.sharpe)
+    @test isnan(flat.sharpe_stderr)
+end
+
+@testset "#1333: a constant series and a constant excess series give NaN ratios" begin
+    # The mean of equal values can round off them: `mean(fill(0.1, 3))` is
+    # `0.10000000000000002`. `std` about that mean was a tiny positive number, so the guards
+    # did not fire and the Sharpe ratio read about `2e16`. The mean is now clamped to the least
+    # and greatest entry, which makes it the common value. A length of 3 rounds; a length of
+    # 2, 4 or 8 divides exactly and passes by luck.
+    @test mean(fill(0.1, 3)) != 0.1
+    ps = performance_summary(fill(0.1, 3); periods_per_year = 12, benchmark = fill(0.05, 3))
+    @test ps.ann_return == 0.1 * 12
+    @test iszero(ps.ann_volatility)
+    @test isnan(ps.sharpe)
+    @test isnan(ps.sharpe_stderr)
+    @test isapprox(ps.excess_ret, 0.05 * 12)
+    @test iszero(ps.tracking_error)
+    @test isnan(ps.information_ratio)
+    # Every constant series of the issue's sweep, of both signs, and a constant excess series
+    # over a benchmark that is not constant.
+    for T in 2:9, v in (0.1, 0.3, 0.7, 1 / 3, -0.2, 2.2, 0.123456789)
+        c = performance_summary(fill(v, T))
+        @test iszero(c.ann_volatility)
+        @test isnan(c.sharpe) && isnan(c.sharpe_stderr)
+        b = collect(range(0.0, 0.01; length = T))
+        e = performance_summary(b .+ v; benchmark = b)
+        @test iszero(e.tracking_error) || !allequal((b .+ v) .- b)
+        @test isnan(e.information_ratio) || !allequal((b .+ v) .- b)
+    end
+end
+
+@testset "performance_summary: a guarded statistic keeps the number type of the series" begin
+    # #1193. A guard's `NaN` must take the number type its finite branch lands in. A bare
+    # `NaN` literal is `Float64`, so a `Float32` series came back with a `Float64` Sortino,
+    # Calmar and standard error when their guards fired and a `Float32` one when they did
+    # not; and the excess statistics wrote a `Float32` `NaN` where the finite tracking error
+    # and information ratio are `Float64`, because `sqrt(252)` is. `0.25f0` is exact in
+    # binary, so the standard deviation of the constant series is an exact zero and every
+    # guard fires.
+    flat = performance_summary(fill(0.25f0, 10))
+    @test iszero(flat.ann_volatility)
+    @test isnan(flat.sharpe) &&
+          isnan(flat.sharpe_stderr) &&
+          isnan(flat.sortino) &&
+          isnan(flat.calmar)
+    live = performance_summary(Float32[0.02, -0.01, 0.03, -0.02];
+                               benchmark = Float32[0.01, 0, 0.01, 0])
+    @test all(isfinite,
+              (live.sharpe, live.sharpe_stderr, live.sortino, live.calmar, live.excess_ret,
+               live.tracking_error, live.information_ratio))
+    @test live.sortino isa Float32
+    for f in (:sharpe, :sharpe_stderr, :sortino, :calmar, :excess_ret, :tracking_error,
+              :information_ratio)
+        @test typeof(getproperty(flat, f)) == typeof(getproperty(live, f))
+    end
+    # A zero tracking error is the guard of the information ratio.
+    tied = performance_summary(Float32[0.02, -0.01, 0.03, -0.02];
+                               benchmark = Float32[0.02, -0.01, 0.03, -0.02])
+    @test isnan(tied.information_ratio)
+    @test typeof(tied.information_ratio) == typeof(live.information_ratio)
 end
 
 #=

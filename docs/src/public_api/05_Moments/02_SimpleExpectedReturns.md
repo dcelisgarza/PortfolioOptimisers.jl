@@ -4,7 +4,7 @@ Description = "Simple expected returns, public API of PortfolioOptimisers.jl: Si
 
 # Simple expected returns
 
-The most basic moment is the simple expected return. These types and functions implement it.
+The simplest estimate of the expected returns is the mean return of each asset. The types and functions below compute it, with or without observation weights.
 
 ```@docs
 SimpleExpectedReturns
@@ -13,7 +13,7 @@ mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)
 
 ## Incremental fit
 
-The sample mean folds one observation at a time, so a long history need not be held or re-read. [`partial_fit!`](@ref) returns a new estimator whose `cache` field carries the state, and `mean` reads the fit off the estimator alone.
+The sample mean updates with each new block of observations, and does not read the earlier observations again. [`partial_fit!`](@ref) returns a new estimator whose `cache` field holds the running state, and `mean(me)` returns the estimate from the estimator alone.
 
 ```@docs
 partial_fit!(state::SimpleExpectedReturnsState, x::VecNum)
@@ -26,7 +26,7 @@ merge_states(a::SimpleExpectedReturnsState, b::SimpleExpectedReturnsState)
 
 ## Available-case fit
 
-With a [`CoveragePolicy`](@ref) in its `cvg` field the estimator fits each asset on that asset's own finite and active observations, and [`PortfolioOptimisers.coverage_mean`](@ref) routes between that arm and the Coverage Universe one.
+With a [`CoveragePolicy`](@ref) in its `cvg` field, the estimator fits each asset on the observations where that asset is finite and active. Without a policy, it fits on the coverage universe, the assets that are finite and active at every observation. [`PortfolioOptimisers.coverage_mean`](@ref) chooses between the two fits.
 
 ```@docs
 partial_fit!(state::SimpleExpectedReturnsState, x::VecNum, ::Nothing, ::Option{<:AbstractVector{<:Bool}})

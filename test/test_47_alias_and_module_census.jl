@@ -483,12 +483,23 @@ end
         end
         sort_key(path) = Tuple(prefix_key.(splitpath(path)))
 
+        # A file cut near the size threshold keeps its number, and its parts carry the letter
+        # suffixes `_a`, `_b`, … in load order (ADR 0178). The parts are one entry of the
+        # directory, so the census reads the name without the suffix. A run must start at
+        # `_a`, leave no letter out, and stand beside no unsuffixed file of the same name.
+        letter_part(entry) = match(r"^(.+)_([a-z])\.(jl|md)$", entry)
+        function entry_name(entry)
+            m = letter_part(entry)
+            return m === nothing ? entry : string(m.captures[1], ".", m.captures[3])
+        end
+
         # One row per number claimed twice in one directory, over every tree in `tops`.
         function prefix_collisions(tops, base)
             collisions = String[]
             for top in tops
                 for (root, dirs, files) in walkdir(top)
                     by_number = Dict{Int, Vector{String}}()
+                    runs = Dict{String, Vector{Char}}()
                     # A coverage run leaves `<file>.jl.<pid>.cov` beside every source file,
                     # and each carries the source file's prefix. Only the sources and the
                     # pages are numbered, so the census reads those two extensions and
@@ -496,7 +507,22 @@ end
                     for entry in vcat(dirs, filter(f -> endswith(f, r"\.(jl|md)$"), files))
                         m = match(r"^(\d+)_", entry)
                         m === nothing && continue
-                        push!(get!(by_number, parse(Int, m.captures[1]), String[]), entry)
+                        name = entry_name(entry)
+                        p = letter_part(entry)
+                        if p !== nothing
+                            push!(get!(runs, name, Char[]), only(p.captures[2]))
+                        end
+                        entries = get!(by_number, parse(Int, m.captures[1]), String[])
+                        name in entries || push!(entries, name)
+                    end
+                    for (name, letters) in runs
+                        sort!(letters)
+                        if letters != collect('a':letters[end]) || name in files
+                            push!(collisions,
+                                  string(relpath(root, base), ": ", name,
+                                         " has the letter parts ", join(letters, ", "),
+                                         name in files ? " and an unsuffixed file" : ""))
+                        end
                     end
                     for (number, entries) in by_number
                         length(entries) > 1 || continue
@@ -520,6 +546,18 @@ end
             touch(joinpath(d, "src", "01_B.jl"))
             @test prefix_collisions((joinpath(d, "src"),), d) ==
                   ["src: 01_ on 01_A.jl, 01_B.jl"]
+        end
+        # Letter parts of one file share its number. A gap in the run, or an unsuffixed
+        # file beside the parts, is refused.
+        mktempdir() do d
+            mkpath(joinpath(d, "src"))
+            touch(joinpath(d, "src", "01_A_a.jl"))
+            touch(joinpath(d, "src", "01_A_b.jl"))
+            touch(joinpath(d, "src", "02_B.jl"))
+            @test isempty(prefix_collisions((joinpath(d, "src"),), d))
+            touch(joinpath(d, "src", "02_B_b.jl"))
+            @test prefix_collisions((joinpath(d, "src"),), d) ==
+                  ["src: 02_B.jl has the letter parts b and an unsuffixed file"]
         end
 
         collisions = prefix_collisions((SRC, joinpath(ROOT, "ext"),

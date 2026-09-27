@@ -1,30 +1,30 @@
 #=
 ```@meta
-Description = "Drawdown risk measures in PortfolioOptimisers.jl: average, maximum and conditional drawdown at risk on the path of cumulative wealth."
+Description = "Drawdown risk measures in PortfolioOptimisers.jl: average, maximum and conditional drawdown at risk on the path of cumulative returns."
 ```
 
-# Drawdown risk measures
+# [Drawdown risk measures](@id example-drawdown-risk-measures)
 
-Drawdown-based risk measures describe how far the portfolio has fallen from its previous
-high at each point in time. Where variance and CVaR look at the cross-sectional distribution
-of single-period returns, drawdown measures look at the *path* of cumulative wealth — the
-maximum loss you would have experienced by holding the portfolio from any peak to any
-subsequent trough.
+A drawdown is how far the running sum of the portfolio returns is below its previous high at each
+point in time. The variance and the conditional value at risk (CVaR) use the distribution of the
+returns of single periods, and the order of those returns does not count. A drawdown measure uses
+the *path* of the cumulative returns, which gives the sum of the returns from any peak to any
+later trough.
 
-Four related measures are available:
+This page uses four of the library's drawdown measures.
 
 | Measure | What it penalises |
 | ------- | ----------------- |
-| `MaximumDrawdown` | The single worst peak-to-trough decline over the whole period |
-| `AverageDrawdown` | The time-average depth of the drawdown curve |
-| `UlcerIndex` | The root-mean-square of the drawdown curve (penalises long shallow drawdowns more than `AverageDrawdown`) |
-| `ConditionalDrawdownatRisk` | The expected drawdown conditional on being in the worst-α fraction (CDaR, the drawdown analogue of CVaR) |
+| `MaximumDrawdown` | The worst decline from a peak to a trough over the whole period |
+| `AverageDrawdown` | The mean depth of the drawdown curve over time |
+| `UlcerIndex` | The root mean square of the drawdown curve, which penalises deep drawdowns more than `AverageDrawdown` does |
+| `ConditionalDrawdownatRisk` | The conditional drawdown at risk (CDaR), the drawdown form of CVaR. It is the mean drawdown over the worst fraction `α` of days |
 
 !!! tip "When to reach for this"
-    Reach for drawdown measures when the *recovery path* matters — trend-following strategies,
-    strategies sold to retail investors who may redeem at the worst moment, or any portfolio
-    where drawdown duration and depth are reported to stakeholders. Variance minimisation
-    ignores paths entirely; these measures do not.
+    Reach for a drawdown measure when the *path to recovery* matters. Examples are a
+    trend-following strategy, a strategy for retail investors who can sell at the worst
+    moment, and any portfolio whose report states the depth and the length of its drawdowns.
+    Minimising the variance ignores the order of the returns, and these measures depend on it.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames
@@ -62,9 +62,10 @@ opt = JuMPOptimiser(; pe = pr, slv = slv)
 #=
 ## 2. Minimising each drawdown measure
 
-These measures drop into [`MeanRisk`](@ref) with no extra configuration. Their
-constructors only take an optional `settings::RiskMeasureSettings`; `ConditionalDrawdownatRisk`
-additionally accepts `alpha` (the tail probability, default 0.05).
+[`MeanRisk`](@ref) accepts these measures with their defaults. Each constructor takes an optional
+`settings::RiskMeasureSettings`. `AverageDrawdown` and `ConditionalDrawdownatRisk` also take
+observation weights `w`, and `ConditionalDrawdownatRisk` takes `alpha`, the tail probability, which
+is 0.05 by default. We minimise each measure and print the weights.
 =#
 
 r_mdd = MaximumDrawdown()
@@ -81,30 +82,32 @@ pretty_table(DataFrame(hcat(rd.nx, [r.w for r in results]...),
                        [:assets; Symbol.(labels)...]); formatters = [resfmt])
 
 #=
-The allocations diverge noticeably.  `MaximumDrawdown` minimises the single worst event so
-it concentrates into whatever reduces that peak loss.  `AverageDrawdown` and `UlcerIndex`
-care about the whole recovery path and therefore spread weight more broadly.  `CDaR` is the
-closest to CVaR in spirit and allocations.
+`MaximumDrawdown` depends only on the worst decline, so it puts its weight in the assets that
+reduce that one loss. `AverageDrawdown` and `UlcerIndex` use the whole drawdown curve, and `CDaR`
+uses the worst 5 % of it.
 =#
 
-using StatsPlots, GraphRecipes, StatsBase
+using StatsPlots, GraphRecipes
 plot_stacked_bar_composition(results, rd)
 
 #=
-To avoid an unreadable spaghetti chart, we compare drawdown paths with a heatmap instead
-of many overlaid lines. Darker cells indicate deeper drawdowns for that optimiser at that
-date.
+Four drawdown curves on one line chart are hard to tell apart, so we compare them with a
+heatmap. Each row is one portfolio and each column one day. The colour of a cell shows the
+depth of the drawdown, and the colour bar gives the scale.
 =#
 
 drawdown_grid = hcat([(-drawdowns(rd.X * res.w)) for res in results]...)
-heatmap(eachindex(rd.ts), labels, drawdown_grid'; xlabel = "Day", ylabel = "Optimiser",
-        colorbar_title = "Drawdown", title = "Drawdown depth by optimiser")
+heatmap(eachindex(rd.ts), labels, drawdown_grid'; xlabel = "Day",
+        ylabel = "Minimised measure", colorbar_title = "Drawdown",
+        title = "Daily drawdown depth of each portfolio")
 
 #=
-## 3. Tail level sensitivity for CDaR — sweeping alpha
+## 3. The tail level `alpha` of CDaR
 
-`ConditionalDrawdownatRisk` accepts `alpha`. As `alpha → 0` it focuses on catastrophic
-tail drawdowns; larger `alpha` broadens the tail set and moves toward average-tail behaviour.
+`alpha` sets the fraction of the worst days that `ConditionalDrawdownatRisk` averages. As
+`alpha → 0` it uses only the deepest drawdowns. With a larger `alpha` the measure averages more
+days, and it moves toward the average drawdown. We minimise CDaR for four values of `alpha` and
+print the weights.
 =#
 
 alphas = [0.01, 0.05, 0.1, 0.25]
@@ -116,17 +119,14 @@ pretty_table(DataFrame(hcat(rd.nx, [r.w for r in cdar_results]...),
              formatters = [resfmt])
 
 #=
-Lower alpha focuses more on preventing catastrophic drawdowns; higher alpha cares about
-average drawdown depth across more of the distribution.
-=#
+As `alpha` rises, the weight of JNJ falls and the weights of MRK and UNH grow. All three move
+toward their weights in the `ADD` column of section 2.
 
-#=
-## 4. Constraining drawdown rather than minimising it
+## 4. Bounding the drawdown instead of minimising it
 
-Instead of using a drawdown measure as the primary objective, you can impose an **upper
-bound** on it while optimising return. Here we find the portfolio that maximises
-risk-adjusted return subject to a CDaR ceiling, using [`RiskMeasureSettings`](@ref) to
-set the `ub`.
+A drawdown measure need not be the objective. You can set an upper bound on it and optimise
+the return instead. We maximise the risk-adjusted return with CDaR at most 0.08, and set that
+bound as the `ub` of [`RiskMeasureSettings`](@ref).
 =#
 
 rf = 4.2 / 100 / 252
@@ -136,68 +136,64 @@ res_cdar_max_ratio = optimise(MeanRisk(; r = r_cdar_ub, obj = MaximumRatio(; rf 
 println("CDaR-constrained max-ratio retcode: $(res_cdar_max_ratio.retcode)")
 
 #=
-## 5. Drawdown analytics — post-optimisation diagnostics
+## 5. Drawdown statistics after the optimisation
 
-After choosing a portfolio, `drawdowns()` and `cumulative_returns()` give a full picture of
-how the portfolio would have behaved over the in-sample period.  These are analytics, not
-objectives — use them to *understand* a portfolio after the optimiser has run.
+When you have a portfolio, `drawdowns()` and `cumulative_returns()` return its drawdown series
+and its cumulative return series over the sample. By default both add the returns up without
+compounding. They are not objectives, so use them to study a portfolio after the optimiser has
+run. `expected_risk` with the measures of section 2 gives the statistics. We compare the
+minimum-variance portfolio with the minimum-CDaR portfolio of section 2.
 =#
 
-## Pick two portfolios to compare side by side.
 w_var = optimise(MeanRisk(; r = Variance(), opt = opt)).w
-w_cdar = results[4].w   ## CDaR minimising portfolio
+w_cdar = results[4].w
 
-## Portfolio return time series for each weight vector.
 ret_var = rd.X * w_var
 ret_cdar = rd.X * w_cdar
 
-## Cumulative returns (simple).
 cr_var = cumulative_returns(ret_var)
 cr_cdar = cumulative_returns(ret_cdar)
 
-## Drawdown series.
 dd_var = drawdowns(ret_var)
 dd_cdar = drawdowns(ret_cdar)
 
-## Summary statistics.
+rs_dd = [r_mdd, r_add, r_uci, r_cdar]
 pretty_table(DataFrame(;
-                       :Metric =>
-                           ["Max drawdown", "Avg drawdown", "Ulcer index", "CDaR 5%"],
-                       :MinVariance =>
-                           [-minimum(dd_var), -mean(dd_var), sqrt(mean(dd_var .^ 2)),
-                            -quantile(-dd_var, 0.95)],
-                       :MinCDaR =>
-                           [-minimum(dd_cdar), -mean(dd_cdar), sqrt(mean(dd_cdar .^ 2)),
-                            -quantile(-dd_cdar, 0.95)]); formatters = [resfmt])
+                       :Metric => ["Maximum drawdown", "Average drawdown", "Ulcer index",
+                                   "CDaR 5%"],
+                       :MinVariance => [expected_risk(r, w_var, rd.X) for r in rs_dd],
+                       :MinCDaR => [expected_risk(r, w_cdar, rd.X) for r in rs_dd]);
+             formatters = [resfmt])
 
 #=
-The CDaR-minimising portfolio has a materially lower CDaR than the variance-minimising
-portfolio. The variance portfolio may still have a lower standard deviation, but when you
-look at the path, its drawdown profile is worse in the tail.
+Compare the two columns row by row. The minimum-variance portfolio has the lower variance, but
+the variance ignores the order of the returns, and the four rows compare the depth of the
+drawdowns of the two portfolios. We plot the cumulative returns of both portfolios.
 =#
 
-plot(cr_var; label = "Min Variance", xlabel = "Day", ylabel = "Cumulative return",
+plot(cr_var; label = "Minimum variance", xlabel = "Day", ylabel = "Cumulative return",
      title = "Cumulative return paths")
-plot!(cr_cdar; label = "Min CDaR")
+plot!(cr_cdar; label = "Minimum CDaR")
 
-plot(dd_var; label = "Min Variance", xlabel = "Day", ylabel = "Drawdown",
+# We plot the drawdowns of the same two portfolios.
+
+plot(dd_var; label = "Minimum variance", xlabel = "Day", ylabel = "Drawdown",
      title = "Drawdown paths")
-plot!(dd_cdar; label = "Min CDaR")
+plot!(dd_cdar; label = "Minimum CDaR")
 
 #=
 ## Summary
 
-Drawdown measures target the *path* of cumulative wealth:
+Drawdown measures use the *path* of the cumulative returns.
 
-  - [`MaximumDrawdown`](@ref) guards against the worst single episode but can produce
-    concentrated portfolios.
-  - [`AverageDrawdown`](@ref) and [`UlcerIndex`](@ref) penalise the entire recovery curve.
-  - [`ConditionalDrawdownatRisk`](@ref) is the natural drawdown analogue of CVaR and
-    responds to `alpha` the same way.
-    - Heatmaps of `drawdowns()` are often clearer than overlaid line plots when comparing many
-        drawdown-optimised portfolios.
-  - After optimisation, `drawdowns()` and `cumulative_returns()` give the full diagnostic
-    picture for any weight vector without re-running the optimiser.
+  - [`MaximumDrawdown`](@ref) depends on the worst decline alone, and its portfolio can put most
+    of its weight in a few assets.
+  - [`AverageDrawdown`](@ref) and [`UlcerIndex`](@ref) penalise the whole drawdown curve.
+  - [`ConditionalDrawdownatRisk`](@ref) is the drawdown form of CVaR, and `alpha` sets its
+    tail as it does for CVaR.
+  - `drawdowns()` and `cumulative_returns()` return the drawdown series and the cumulative
+    return series of any portfolio, `rd.X * w`, and `expected_risk` computes the statistics,
+    without a new optimisation.
 =#
 
 #src ## Findings (authoring dogfooding — stripped from rendered docs)

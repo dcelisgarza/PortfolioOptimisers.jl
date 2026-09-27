@@ -88,7 +88,7 @@ Public functions use a **manually written signature** in the docstring header (n
 
 ## Documentation Dictionaries
 
-Five dictionaries in `src/01_Base/01_DocstringDictionaries.jl` provide standardised, consistent descriptions. **Always interpolate from them** instead of writing ad-hoc text.
+Five dictionaries in `src/01_Base/01_DocstringDictionaries/` provide standardised, consistent descriptions. **Always interpolate from them** instead of writing ad-hoc text.
 
 - `arg_dict` — argument descriptions. Use as `$(arg_dict[:key])` in `# Arguments` sections.
 - `field_dict` — field descriptions (derived from `arg_dict`). Use as `"$(field_dict[:key])"` in inline field docstrings inside structs.
@@ -96,7 +96,7 @@ Five dictionaries in `src/01_Base/01_DocstringDictionaries.jl` provide standardi
 - `ret_dict` — return value descriptions. Use as `$(ret_dict[:key])` in `# Returns` sections.
 - `math_dict` — LaTeX mathematical notation. Use as `$(math_dict[:key])` in the `Where:` list of a `# Mathematical definition` or `# JuMP formulation` section.
 
-If a needed key is missing, add it to the appropriate dictionary in `src/01_Base/01_DocstringDictionaries.jl` before writing the docstring.
+If a needed key is missing, add it to the appropriate dictionary, in the file of `src/01_Base/01_DocstringDictionaries/` that holds its subject, before writing the docstring.
 
 ### Inline field docstrings
 
@@ -177,6 +177,40 @@ A mis-filed step goes to `# Algorithm`, an argument contract to `# Arguments`, t
 The Capability Catalogue extracts the **first sentence only** of the summary paragraph, so a later sentence of that paragraph is a safe home for a trap that applies to the whole unit.
 
 `test/test_26_docs.jl` gates the abolition twice. A file marked `swept = true` in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) carries **zero** `# Details` sections, and the library-wide count of the section **may not rise**. The second check retires when that count reaches zero. [ADR 0085](../../docs/adr/0085-the-docstring-standard-is-rules-and-pointers.md) records the decision.
+
+---
+
+## A docstring cites no process
+
+A docstring documents the released unit, not the discussion that produced it. **It never names a GitHub issue, a pull request, an ADR, or an unpublished numerical experiment**, in any section, including an admonition (`!!! note`, `!!! warning`) — an admonition renders on the API page exactly like the paragraph beside it, so it is not an exception.
+
+The rule's Scope is every page a library user reaches without opening `docs/adr/`, not `src/**/*.jl`, `ext/**/*.jl` and `docs/**/*.md` alone: the same clause governs the `Prose` text in [`docs/capability_catalogue.jl`](../../docs/capability_catalogue.jl), and the rendered prose and admonitions of the Literate sources that build the example and user-guide pages, `examples/**/*.jl` and `user_guide/*.jl`. It also governs error text: the message of a `throw`, an `error`, an error constructor such as `ArgumentError(…)`, an `@argcheck` or an `@assert` under `src/` and `ext/`, and a `const` remedy string whose name ends in `_remedy` or `_message`. An error message reaches the user through the REPL, so it is as user-facing as a page. ADRs are written for a contributor deciding what to build next, not for someone calling the finished function — an ADR number means nothing to that reader and sends them looking for a file that is not part of the package.
+
+- **State the fact, not its provenance.** Write the rule, the bound, or the defect the way a reader with no repository access needs it — what holds, what fails, and why — instead of pointing at the ticket that established it. `The clamp is a necessary and sufficient condition on the template.` stands on its own; `This closes #494 and #500.` sends the reader to a page the docstring does not need.
+- **A decision belongs in `docs/adr/`.** Link an ADR from another ADR, from `STANDARDS.md`, or from `CONTEXT.md` — never from a docstring, an example, a user-guide page or the Capability Catalogue.
+- **`# References` cites only a published external source**, through `ref_dict`. A GitHub issue or pull request is neither published nor external in that sense, and gets no bullet there either.
+- **The contributor guide is the exception.** `docs/src/contribute/` and `docs/adr/` are written for a contributor, not a library user, and may cite an ADR, an issue or a PR freely.
+
+---
+
+## The prose passes `/unslop`
+
+The prose of a docstring reads as a person wrote it for a reader. The `unslop` skill states the patterns that mark generated text, and every rule of the skill holds on the prose in this section's Scope. **The skill is the Authority for the patterns.** This section cites it by name, copies none of its rules, and names a rule of the skill by the number the skill gives it.
+
+**Scope.** The docstrings of `src/**/*.jl` and `ext/**/*.jl`, and the dictionary values of [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/) that they interpolate. Every text a user reads as a page is outside this section: the hand-written Markdown pages under `docs/src/`, `README.md`, the `Prose` text of the Capability Catalogue, and the Literate sources of the examples and the user guide. [`.github/instructions/julia-prose.instructions.md`](julia-prose.instructions.md) owns them all.
+
+**What the pass reads.** The prose alone: the summary paragraph, the sentences of every section, the text of every bullet and of every admonition. It does not read a code span, a `jldoctest` block, a LaTeX expression, a heading a template of this file fixes, or a `# References` bullet, which `ref_dict` writes.
+
+**Where this file and the skill meet.**
+
+- A template of this file fixes the shape of a section, and the skill's rules apply to the sentences inside it. A `# Fields` bullet, a `Where:` bullet and a `# Related` entry are list entries by template. Rule 33 asks each to carry its articles and its verb, and it does not ask it to become a paragraph.
+- A dictionary value is one text with many users. It is rewritten once, in its dictionary, and every docstring that interpolates it changes with it.
+- Rules 20 and 22 describe a chat reply. They never arise in a docstring.
+- Every other rule applies as written.
+
+**How to apply it.** Invoke `/unslop` on the file. When the skill cannot be invoked, read its rules and apply them by hand. Rewrite the prose, keep the meaning, and end with the skill's self-audit, "What makes this obviously AI generated?". A pass changes prose alone: a line of code, a `jldoctest` block and its output, a LaTeX expression and an interpolated key stay as they are.
+
+**The Gate.** None. The rules that matter most, such as rules 27, 28 and 32, are judgements that no parser reads, so the rule holds by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md). A file whose sweep-manifest row reads `swept = true` owes the pass, and the file's sweep ticket carries it.
 
 ---
 
@@ -526,7 +560,7 @@ Check 2 reads the `swept` flag because it demands a section, and a presence dema
 
 A docstring that rests on a published source names it. The section is **last**, after `# Related`, and it holds one bullet per work.
 
-- **Never paste the reference prose.** Every bullet is one interpolation of `ref_dict` (`src/01_Base/01_DocstringDictionaries.jl`), which holds a single copy of each reference text:
+- **Never paste the reference prose.** Every bullet is one interpolation of `ref_dict` (`src/01_Base/01_DocstringDictionaries/13_References.jl`), which holds a single copy of each reference text:
 
   ```julia
   # References
@@ -683,7 +717,7 @@ Key rules:
 - One comprehensive `Where:` after the last block is acceptable when multiple blocks appear in the same docstring.
 - Every symbol that appears in any block must be defined.
 - Interpolate `$(math_dict[:key])` for standardised variables (``T``, ``\boldsymbol{x}_t``, ``\alpha``, etc.).
-- If a key is missing from `math_dict`, add it to `src/01_Base/01_DocstringDictionaries.jl` first.
+- If a key is missing from `math_dict`, add it to the `*_Math*.jl` file of `src/01_Base/01_DocstringDictionaries/` that holds its subject first.
 
 ---
 
@@ -691,7 +725,7 @@ Key rules:
 
 The rules above fix the glyphs. The two below fix the content, so that two docstrings that state one quantity state it once and state it alike.
 
-**A shared symbol becomes a `math_dict` key.** A symbol that appears in the docstrings of two or more Units gets a key in [`src/01_Base/01_DocstringDictionaries.jl`](../../src/01_Base/01_DocstringDictionaries.jl), and every site interpolates it. A symbol that exactly one Unit uses may stay inline, on the reasoning of [When a field description may be prose](#when-a-field-description-may-be-prose): one copy cannot drift. When a second Unit needs it, move it into `math_dict` and replace both copies with the interpolation.
+**A shared symbol becomes a `math_dict` key.** A symbol that appears in the docstrings of two or more Units gets a key in [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/), and every site interpolates it. A symbol that exactly one Unit uses may stay inline, on the reasoning of [When a field description may be prose](#when-a-field-description-may-be-prose): one copy cannot drift. When a second Unit needs it, move it into `math_dict` and replace both copies with the interpolation.
 
 A new description is a **new** key. Editing a value already in `math_dict` moves every docstring that interpolates it, which is the reason [ADR 0081](../../docs/adr/0081-the-docstring-standard-states-the-model-it-builds.md) gives for `arg_dict`.
 
@@ -817,7 +851,7 @@ Where:
 """
 ````
 
-**Example that registers no row.** The following is the formulation of `set_model_scales!` in `src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation.jl`. It registers two expressions and nothing else, so it carries one subsection:
+**Example that registers no row.** The following is the formulation of `set_model_scales!` in `src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl`. It registers two expressions and nothing else, so it carries one subsection:
 
 ````julia
 """
@@ -849,5 +883,5 @@ Read a real docstring, not a copy of one. Each row names a Unit whose file is ma
 | Public function | `denoise!` | [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) |
 | Private function | `_denoise!` | [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) |
 | Dispatch alias | `RhoDistanceAlgorithm` | [`src/06_Distance/02_Distance.jl`](../../src/06_Distance/02_Distance.jl) |
-
-The table above carries no row for `# JuMP formulation`. Every file that calls a `JuMP` macro is unswept, so no Gate holds a pointer into one. The row is added when the first such file is swept.
+| `# JuMP formulation` | `set_distance_cone!` | [`src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl`](../../src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl) |
+| `# JuMP formulation` with a `## Relaxation` | `ep_tail_dual_block!` | [`src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl`](../../src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl) |

@@ -28,7 +28,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add a single turnover constraint for a [`Turnover`](@ref) object to the JuMP optimisation model.
 
-Introduces auxiliary variable `t_tn_i`, expression `tn_i = w - wb * k`, and enforces `‖w - wb‖₁ ≤ val * k` via NormOneCone constraints.
+Introduces auxiliary variable `t_tn_i`, expression `tn_i = w - wb * k`, and enforces `|w[i] - wb[i] * k| ≤ v[i] * k` for each asset `i`, one NormOneCone constraint per asset, where `v` is `val` broadcast to the assets. The bound is on the change of each asset, not on the sum of the changes.
 
 # Mathematical definition
 

@@ -4,27 +4,33 @@ Description = "The Listing Span, public API of PortfolioOptimisers.jl: listing_s
 
 # The Listing Span
 
-## The Listing Span
+## The listing span
 
-A **Listing Span** is the interval of the price clock over which an asset is listed, one per asset
-column. The **Span Rule** derives it from the position of a gap: a *leading* run of gaps is an asset
-not yet listed, a *trailing* run is a delisting, and an *interior* gap is a suspension or a holiday
-on an asset that is still listed and still held. So a caller holding only prices can state a
-universe, because the position already carries the distinction a listing calendar would supply.
+The listing span of an asset is the range of observations over which the asset is listed.
+[`listing_span`](@ref) finds one span per asset column from the position of each gap in the
+prices. A run of gaps at the start of a column means that the asset is not listed yet. A run of
+gaps at the end means that the asset was delisted. A gap with prices on both sides is a suspension
+or a holiday, and the asset is still listed and still held. With this rule, you can derive the
+universe from the prices alone, without a listing calendar.
 
-[`listing_span`](@ref) derives the span, and [`universe_masks`](@ref) projects it onto the returns
-clock and intersects it with finiteness, giving the two universe masks an [`AssetPanel`](@ref)
-carries. A return consumes the *earlier* price of its pair, so the projection is `[first + 1, last]`
-under padding and `[first, last - 1]` without it — the active mask bounds exactly the run of a
-column's finite returns, and an inception emits no **Held Gap**. The two masks then differ only
-inside an interior gap, which is what the fold reports and zeroes.
+[`universe_masks`](@ref) moves the spans onto the dates of the returns and makes the two universe
+masks that an [`AssetPanel`](@ref) carries. The active mask marks the assets that are listed at
+each observation. The estimation mask is the active mask where the return is also finite. A return
+needs the earlier price of its pair. A span from `first` to `last` on the prices therefore becomes
+`[first + 1, last]` on padded returns, and `[first, last - 1]` on returns without padding. The active
+mask then starts at the first return whose two prices are both in the listing, so the first price
+of an asset never shows as a missing return. The two masks differ only at a return that reads a
+gap with prices on both sides. This is also true when the gap is next to the first or the last
+price of the listing. There the asset is listed but has no return, and a cross-validation fold that holds the asset reports
+the observation and counts its return as zero.
 
-Both verbs work on bare arrays and carry no estimator. The type bound is `AbstractMatrix{Bool}`, so
-a caller's own declaration — a listing calendar, or a constituency that leaves and rejoins — enters
-at the same point and replaces the derived active mask outright. The estimation mask is never the
-caller's to state and is always re-derived, which is what makes `emsk ⊆ amsk` hold by construction.
-See `docs/adr/0129-the-ingestion-layer-seams-at-the-listing-span-and-the-clock-draws-the-pipeline-boundary.md`
-and `docs/adr/0131-a-return-needs-two-consecutive-prices-and-a-gap-return-writes-only-the-cells-that-lack-them.md`.
+Both functions take plain arrays, and neither needs an estimator. `universe_masks` also accepts
+your own `AbstractMatrix{Bool}` in place of the spans, such as a listing calendar or the
+membership of an index that an asset leaves and joins again. Your matrix takes the place of the
+derived spans, and `universe_masks` moves it onto the dates of the returns in the same way. You
+cannot give the estimation mask. `universe_masks` always derives it from
+the active mask and the returns, so the estimation mask never marks a cell that the active mask
+leaves out.
 
 ```@docs
 listing_span

@@ -2,7 +2,7 @@
 Description = "Distances of Distances, public API of PortfolioOptimisers.jl: DistanceDistance, distance, cor_and_dist."
 ```
 
-# Distances of Distances
+# [Distances of Distances](@id api-distances-of-distances)
 
 ```@docs
 DistanceDistance

@@ -4,9 +4,9 @@ Description = "JuMP model optimisation, public API of PortfolioOptimisers.jl: So
 
 # JuMP model optimisation
 
-`PortfolioOptimisers.jl` is based on [`JuMP`](https://github.com/jump-dev/JuMP.jl), as such it tries to be as flexible as possible.
+`PortfolioOptimisers.jl` builds its optimisation models with [`JuMP`](https://github.com/jump-dev/JuMP.jl), so a solver that JuMP supports can solve them.
 
-These types and functions let us define solver and solution interfaces.
+A `Solver` names one solver, its settings and the solution statuses it must reach. An optimiser takes one `Solver` or a vector of them, and tries them in order until one returns an accepted solution. A `JuMPResult` records which solvers failed, at which stage, and whether any of them succeeded.
 
 ```@docs
 Solver

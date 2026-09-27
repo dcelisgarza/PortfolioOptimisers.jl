@@ -207,3 +207,22 @@ on the map, and neither is built.
   prior. The walk is type-decided and folds to `nothing` on a wrapper-free tree, so a batch fit
   pays nothing it can measure.
 - `CONTEXT.md` gains **Fold Fit**.
+
+## Amendment (2026-09-21)
+
+[ADR 0167](0167-a-scheme-takes-the-online-step-by-wrapping-in-online-and-its-function-constructor-is-the-only-door.md)
+withdraws the sixth switch. `ff`, `AbstractFoldFit`, `OnlineStep`, `fold_fit` and the derived
+`expand_train` keyword are removed in a clean break, and `expand_train` is a plain `Bool = false`
+again. A scheme takes the online step by being wrapped in `Online`, the existing struct, and the
+wrapped value is built by one of three exported function constructors alone —
+`OnlineIndexWalkForward`, `OnlineDateWalkForward`, `OnlineHindsightSplit` — each taking its
+scheme's keywords minus the window knob and setting that knob `true`, so the mismatch this ADR
+refused on a value cannot be written. Option 5 above is taken, with the second meaning it feared
+given a definition instead: the `Online` wrapper declares that the object it wraps takes the
+online step, and on a scheme it is not transient. Option 2's forwarding cost is paid on the reused
+struct, and the eight walk-forward bounds widen with a Union alias. `HindsightSplit` with
+`prefix = true` joins as a nested-prefix scheme, under the rule that every nested-prefix scheme
+steps. The two identities remain the contract, with `OnlineIndexWalkForward(w, t; purged_size = p)`
+on the online side. The reasons given above for choosing the switch — the five existing switches,
+the `@concrete` inference argument, the window being the estimator's, the schedule rule and the
+cold start — all stand; only the home of the declaration moves.

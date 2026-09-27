@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all Direct Bubble Hierarchy Tree (DBHT) root selection methods.
+Abstract supertype for all Direct Bubble Hierarchical Tree (DBHT) root selection methods.
 
 The root is chosen inside [`CliqHierarchyTree2s`](@ref), which builds the clique hierarchy of the planar graph. A hierarchy needs one node with no parent, and the planar clique tree can present several candidates, so the choice of which of them becomes the root is a member of this family.
 

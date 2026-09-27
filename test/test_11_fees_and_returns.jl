@@ -566,6 +566,25 @@ using JuMP: JuMP
         @test trf.fees.tn.w == wbt
         @test isa(trf.fees.fa, AmortisedFees)
     end
+    @testset "the JuMP fee bounds the definition from above until the decomposition is pinned" begin
+        # The `Fees` docstring: without `xbgt`, `lw` and `sw` only bound the parts of `w`, and
+        # the budget fills both sides, so the model charges more than `calc_fees` does. A
+        # long-only model has no short side, and the two agree.
+        fe = Fees(; l = 0.002, s = 0.003)
+        ls = optimise(MeanRisk(;
+                               opt = JuMPOptimiser(; wb = WeightBounds(; lb = -1, ub = 1),
+                                                   sbgt = 0.5, bgt = 1, fees = fe, pe = pr,
+                                                   slv = slv)))
+        m = ls.jr.model
+        @test JuMP.value(m[:fees]) / JuMP.value(m[:k]) >
+              PortfolioOptimisers.calc_periodic_fees(ls.w, fe) + 1e-4
+        lo = optimise(MeanRisk(;
+                               opt = JuMPOptimiser(; wb = WeightBounds(; lb = 0, ub = 1),
+                                                   bgt = 1, fees = fe, pe = pr, slv = slv)))
+        m = lo.jr.model
+        @test isapprox(JuMP.value(m[:fees]) / JuMP.value(m[:k]),
+                       PortfolioOptimisers.calc_periodic_fees(lo.w, fe); rtol = 1e-6)
+    end
 end
 
 # The net-returns pair of `src/14_NetReturnsDrawdowns.jl`, swept under issue #547.

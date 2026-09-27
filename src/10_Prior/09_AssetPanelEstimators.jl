@@ -3,13 +3,30 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all phylogeny feature algorithms.
 
-A phylogeny feature algorithm is the rule turning the structure a [`PhylogenyPanel`](@ref) source describes into an `assets × assets` proximity matrix, `Z[i, k] = f(separation(i, k))`. The family is open: a user needing a different rule defines a member and a [`phylogeny_features`](@ref) method for it.
+A phylogeny feature algorithm is the rule that turns the structure of a [`PhylogenyPanel`](@ref) source into an `assets × assets` proximity matrix. The one member, [`Proximity`](@ref), scores each pair of assets by a decay of their separation.
 
-Two neighbouring choices need neither. A different *fall-off* is an [`AbstractSeparationDecayAlgorithm`](@ref), which [`Proximity`](@ref) carries as a field; a different *notion of far* is an [`AbstractSeparationAlgorithm`](@ref), which the source [`NetworkEstimator`](@ref) carries as `sep`. Between them those two knobs span every neighbourhood rule the family has needed so far, which is why exactly one member ships.
+Two other choices need no new member. A different fall-off is an [`AbstractSeparationDecayAlgorithm`](@ref), which [`Proximity`](@ref) holds in its `decay` field. A different measure of separation is an [`AbstractSeparationAlgorithm`](@ref), which the source [`NetworkEstimator`](@ref) holds in its `sep` field. A new member is for a rule that is not a decay of a separation, for example a matrix of role similarity.
 
-**One member is an extension point, not a taxonomy.** The type exists so that a rule which is *not* a decayed separation — a role-similarity matrix, say, or a rule reading structure the separation kernels do not expose — has a place to dispatch from. It is not a partition of anything, and nothing infers a second member's existence from the first.
+Every member puts each asset at the top of its own scale, so the diagonal of the matrix holds the largest entries. [`PhylogenyPanel`](@ref) states why the diagonal matters.
 
-Every member includes **self**, so `f(0)` is the top of its scale — see [`PhylogenyPanel`](@ref) for why the diagonal is load-bearing rather than cosmetic.
+# Interfaces
+
+To add a rule, subtype `AbstractPhylogenyFeatureAlgorithm` and implement the method below. A clustering source needs no new method, because the co-membership method of [`phylogeny_features`](@ref) accepts every member.
+
+## `phylogeny_features`
+
+  - `phylogeny_features(alg::MyPhylogenyFeatureAlgorithm, pl::AbstractNetworkEstimator, X::MatNum; kwargs...) -> Matrix`: Build the feature matrix of the graph that `pl` fits on `X`.
+
+### Arguments
+
+  - `alg`: The new phylogeny feature algorithm.
+  - `pl`: Network estimator that fits the graph.
+  - `X`: Asset returns matrix, `observations × assets`.
+  - `kwargs...`: Keyword arguments for the phylogeny routines.
+
+### Returns
+
+  - `Z::Matrix`: Square `assets × assets` feature matrix, with the largest entry of each row on the diagonal.
 
 # Related
 
@@ -23,31 +40,47 @@ abstract type AbstractPhylogenyFeatureAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Phylogeny feature algorithm scoring each pair by how far apart it sits.
+Phylogeny feature algorithm that scores each pair of assets by a decay of their separation.
 
-`Z[i, k] = decay(separation(i, k))` inside the budget and `0` beyond, so the score falls off with distance instead of flattening to an indicator. The separation and its budget come from the source [`NetworkEstimator`](@ref)'s `sep` — hops under [`HopCount`](@ref), a summed shortest path under [`PathLength`](@ref) — and the fall-off from `decay`.
+The `sep` field of the source [`NetworkEstimator`](@ref) sets the separation and its budget. [`HopCount`](@ref) counts the edges of a shortest path, and [`PathLength`](@ref) sums their weights. The `decay` field sets the fall-off. A pair inside the budget scores the decay of its separation, and every other pair scores zero.
 
-The score is a function of the separation rather than of the un-clamped walk count `sum(A^i)`. A walk count is degree-biased — a hub accumulates walks combinatorially — so two assets' scores would encode how busy their neighbourhoods are as much as how close they are. It is for the same reason strictly richer than [`phylogeny_matrix`](@ref)'s output, which accumulates that walk count and then `clamp!(P, 0, 1)` **destroys the step count**: this is the information this algorithm keeps.
+The score reads the separation, not the walk count `sum(A^i)` of the adjacency matrix `A`. A hub gathers walks faster than other assets, so a walk count mixes the number of neighbours of two assets into their closeness. [`phylogeny_matrix`](@ref) sums that walk count and then clamps it to `[0, 1]`, which removes the number of steps. `Proximity` keeps it.
 
-# The two knobs
+# Mathematical definition
 
-`decay` shapes the fall-off; `sep` on the source [`NetworkEstimator`](@ref) truncates it. They are deliberately separate — an exponential never reaches zero, so a budget cannot be expressed as a fall-off — and the budget is the only place truncation happens. Under the default [`LinearDecay`](@ref) and [`HopCount`](@ref) the two coincide in appearance: a direct neighbour scores `n`, a two-hop neighbour `n - 1`, the asset itself `n + 1`, and the score would hit `0` exactly one hop past the budget that already cut it. Under [`ExponentialDecay`](@ref) or [`ReciprocalDecay`](@ref) the diagonal is `1` and the fall-off is set by the member's own parameter, independently of how far the budget looks.
+```math
+\\begin{align}
+Z_{i,\\,k} &= \\begin{cases}
+f\\left(D_{i,\\,k}\\right) & D_{i,\\,k} \\leq d_{\\mathrm{max}}\\,, \\\\
+0 & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
 
-[`NoDecay`](@ref) is the flat end of that dial and is worth stating on its own, because it is what a binary neighbourhood indicator now *is*: the budget still cuts, so `Proximity(; decay = NoDecay())` gives `1` inside it and `0` outside — an indicator, not a matrix of ones.
+Where:
 
-A zero entry means **functionally unreachable**: either the pair is disconnected or outside the budget, or the decay has fallen to nothing — the same claim about the pair, since [`AbstractSeparationDecayAlgorithm`](@ref) forbids anything below zero inside the budget. No shipped decay other than the flat one emits zero there, so for what ships a zero is unreachable-or-out-of-budget and nothing else.
+  - $(math_dict[:Z_prox])
+  - $(math_dict[:D_sep])
+  - $(math_dict[:dmax_sep])
+  - $(math_dict[:f_sep_decay])
 
-# Two separations, and what may be compared across them
+The diagonal is ``f(0)``, the largest entry of ``\\mathbf{Z}``, because a decay is largest at a separation of zero. An unreachable pair has ``D_{i,\\,k} = +\\infty``, which exceeds every budget, so it scores zero. A decay is non-negative inside the budget, so a zero entry means that the pair is unreachable, outside the budget, or scored zero by the decay. No shipped decay scores zero inside the budget.
 
-A `Z` graded over hops and a `Z` graded over path lengths are **interchangeable as inputs** — both satisfy the same contract, so every consumer takes either — and are **not comparable as values**. The budgets are in different units, the supports differ, and under [`LinearDecay`](@ref) so do the scales.
+# The fall-off and the budget
 
-On any real universe they will nevertheless *look* interchangeable: measured over twenty assets, `rho = 0.99` on a minimum spanning tree and `0.95` to `0.98` on a PMFG. That is empirical rather than guaranteed — both structures are selected by distance, so their two readings of it rarely disagree — and it is not a licence to compare one run's numbers against another's.
+`decay` sets the fall-off, and `sep` on the source sets the budget. The budget is the only truncation. The two are separate because an exponential never reaches zero, so a fall-off cannot state a budget. Under the default [`LinearDecay`](@ref) and a [`HopCount`](@ref) budget of `n`, the asset itself scores `n + 1`, a direct neighbour scores `n`, and a pair `n` hops apart scores `1`. Under [`ExponentialDecay`](@ref) or [`ReciprocalDecay`](@ref) the diagonal is `1`, and the parameter of the decay sets the fall-off whatever the budget.
 
-Under [`PathLength`](@ref)'s default `dmax = nothing` the budget is the **observed** diameter, so `f(0)` is data-dependent for [`LinearDecay`](@ref) and a diameter that moves between cross-validation folds *shifts* every entry of `Z` rather than rescaling it. A fixed `dmax` buys back the fold-stability, and the decays that pin `f(0) = 1` never had the exposure.
+[`NoDecay`](@ref) scores `1` at every separation, so `Proximity(; decay = NoDecay())` gives `1` inside the budget and `0` outside it. The result is the indicator of the neighbourhood that the budget selects, not a matrix of ones.
+
+# Hop counts and path lengths
+
+A `Z` graded over hop counts and a `Z` graded over path lengths are both valid inputs to every consumer, but their values do not compare. The budgets have different units, the supports differ, and under [`LinearDecay`](@ref) the scales differ too. On real data the two separations order the pairs almost alike, and [`PathLength`](@ref) states the measurement. That agreement does not make the numbers of one run comparable with the numbers of another.
+
+Under the default `dmax = nothing` of [`PathLength`](@ref), the budget is the observed diameter of the graph. Under [`LinearDecay`](@ref) the diagonal ``d_{\\mathrm{max}} + 1`` then depends on the data, and a diameter that changes between cross-validation folds shifts every entry of `Z`. A fixed `dmax` keeps the scale fixed across folds. A decay with `f(0) = 1` does not have this problem.
 
 # Unreachable pairs
 
-An unreachable pair carries [`separation_matrix`](@ref)'s sentinel — `typemax`, which is `typemax(Int)` for a hop count and `Inf` for a path length over `Float64` weights — so the budget comparison both selects the `0` and **guards the decay call**: `separation_decay` is never evaluated at the sentinel. The guard is load-bearing rather than tidy — `ReciprocalDecay` overflows `1 + d` there, and for a fractional `power` that is a `DomainError` rather than a discarded number.
+[`separation_matrix`](@ref) writes a sentinel for an unreachable pair. The sentinel is `typemax(Int)` for a hop count, and `Inf` for a path length over `Float64` weights. The budget test fails at the sentinel, so the kernel never evaluates the decay there. [`ReciprocalDecay`](@ref) needs that guard, because it overflows `1 + d` at `typemax(Int)`, and a fractional `power` then raises a `DomainError`.
 
 # Fields
 
@@ -100,25 +133,38 @@ end
     phylogeny_features(alg::AbstractPhylogenyFeatureAlgorithm,
                        pl::AbstractClustersEstimator, X::MatNum; kwargs...)
 
-Turn a graph source into a square `assets × assets` feature matrix.
+Turn a graph source or a partition source into a square `assets × assets` feature matrix.
 
-The kernel behind [`PhylogenyPanel`](@ref). Every method returns a matrix in `eltype(X)`, the type of the returns it graded — not the `Int` or `BitMatrix` the phylogeny routines produce — so that [`AngularDist`](@ref) keeps its BLAS `gemm` path and a `Float32` history grades in `Float32`.
+This is the kernel of [`PhylogenyPanel`](@ref). Every method returns a matrix of element type `float_if_integer(eltype(X))`, which is the element type of the returns, or `Float64` for integer returns. It is never the `Int` or `BitMatrix` that the phylogeny routines give, so [`AngularDist`](@ref) keeps its BLAS `gemm` path, a `Float32` history gives a `Float32` matrix, and a fractional score fits into the matrix of an integer history.
 
-# The source is always refit
+`pl` is an estimator, a [`NetworkEstimator`](@ref) or a [`ClustersEstimator`](@ref). It is never a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref), because an Estimator does not hold a Result, as `CONTEXT.md` §1 states. So each call builds the structure from `X`, and the structure follows a cross-validation fold or the subproblem of a meta-optimiser.
 
-`pl` is an estimator — a [`NetworkEstimator`](@ref) or a [`ClustersEstimator`](@ref) — never a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref), because an Estimator does not hold a Result (see `CONTEXT.md` §1). The structure is therefore rebuilt from `X` on every call, so it tracks a cross-validation fold or a meta-optimiser's subproblem instead of describing a universe it no longer sees.
+A graph has separations, and `alg` decays them. A partition has none, because two assets are in one cluster or they are not. So every algorithm gives the same co-membership matrix of a partition, and `alg` has no effect there. `FeatureDistance` treats its collapse `alg` the same way on a static feature matrix. `sep` is a field of [`NetworkEstimator`](@ref) alone, so no other field loses its effect on a partition.
 
-# `alg` applies to a graph, and is inert for a partition
+# Mathematical definition
 
-A **graph** source has separation structure, so `alg` decays it — over the separations its `sep` measures.
+```math
+\\begin{align}
+Z_{i,\\,k} &= \\begin{cases}
+f\\left(D_{i,\\,k}\\right) & D_{i,\\,k} \\leq d_{\\mathrm{max}}\\,, \\\\
+0 & \\text{otherwise}\\,,
+\\end{cases} \\quad \\text{for a graph}\\,, \\\\
+Z_{i,\\,k} &= \\begin{cases}
+1 & c_{i} = c_{k}\\,, \\\\
+0 & \\text{otherwise}\\,,
+\\end{cases} \\quad \\text{for a partition}\\,.
+\\end{align}
+```
 
-A **partition** has none: two assets are in the same cluster or they are not, and there is nothing between them to decay. Every algorithm therefore gives the same co-membership matrix, and `alg` is inert rather than an error — the same treatment `FeatureDistance`'s collapse `alg` gets on a static feature matrix.
+Where:
 
-The inert surface is `alg` alone. `sep` lives on [`NetworkEstimator`](@ref), which a clustering source does not have, so there is no second field going quiet here.
+  - $(math_dict[:Z_prox])
+  - $(math_dict[:D_sep])
+  - $(math_dict[:dmax_sep])
+  - $(math_dict[:f_sep_decay])
+  - ``c_{i}``: Cluster of asset ``i`` in the partition that `pl` fits.
 
-# The diagonal
-
-`Z[i, i]` is the top of the scale, never zero: `1` for any clustering source, and `separation_decay(decay, 0, dmax)` for [`Proximity`](@ref) over a graph — `n + 1` under the default [`LinearDecay`](@ref) and [`HopCount`](@ref), the observed diameter plus one under [`PathLength`](@ref)'s default budget, `1` for the members that pin `f(0) = 1`. That the diagonal is maximal is a contract on [`AbstractSeparationDecayAlgorithm`](@ref), checked before the loop by [`assert_separation_decay`](@ref).
+The diagonal holds the largest entry of each row. It is ``f(0)`` for a graph, and ``1`` for a partition. [`Proximity`](@ref) states ``f(0)`` for each decay. [`assert_separation_decay`](@ref) checks that ``f(0)`` is the largest score of a decay before the kernel scores a pair.
 
 # Algorithm
 
@@ -127,23 +173,23 @@ Over a graph source, under [`Proximity`](@ref):
  1. Build the structure from `X` through [`separation_graph`](@ref), giving `g`.
  2. Resolve the separation algorithm against the structure through [`resolve_separation`](@ref), giving `sep`.
  3. Measure the separations through [`separation_matrix`](@ref), giving `d`.
- 4. Read the budget through [`separation_budget`](@ref), and score `d` through [`_proximity_features`](@ref).
+ 4. Read the budget through [`separation_budget`](@ref), and score `d` in the element type `float_if_integer(eltype(X))` through [`_proximity_features`](@ref), giving `Z`.
 
 Over a partition source, under any algorithm:
 
- 1. Build the co-membership matrix from `X` through [`phylogeny_matrix`](@ref), and convert it to `eltype(X)`.
- 2. Add the identity, restoring the diagonal that [`phylogeny_matrix`](@ref) subtracts.
+ 1. Build the co-membership matrix from `X` through [`phylogeny_matrix`](@ref), and convert it to the element type `float_if_integer(eltype(X))`.
+ 2. Add the identity, which restores the diagonal that [`phylogeny_matrix`](@ref) subtracts, giving `Z`.
 
 # Arguments
 
   - `alg`: Phylogeny feature algorithm.
-  - `pl`: Structure source — a network estimator (a graph) or a clustering estimator (a partition).
-  - `X`: Asset returns matrix `observations × assets`.
-  - `kwargs...`: Additional keyword arguments passed to the underlying phylogeny routines.
+  - `pl`: Structure source, a network estimator for a graph or a clustering estimator for a partition.
+  - `X`: Asset returns matrix, `observations × assets`.
+  - `kwargs...`: Keyword arguments for the phylogeny routines.
 
 # Returns
 
-  - `Z::Matrix{Float64}`: Square `assets × assets` feature matrix.
+  - `Z::Matrix`: Square `assets × assets` feature matrix of element type `float_if_integer(eltype(X))`.
 
 # Related
 
@@ -161,7 +207,7 @@ function phylogeny_features end
 # the docstring's caveat -- the resulting distance carries the partition and nothing more.
 function phylogeny_features(::AbstractPhylogenyFeatureAlgorithm,
                             pl::AbstractClustersEstimator, X::MatNum; kwargs...)::Matrix
-    return Matrix{eltype(X)}(phylogeny_matrix(pl, X; dims = 1, kwargs...).X) +
+    return Matrix{float_if_integer(eltype(X))}(phylogeny_matrix(pl, X; dims = 1, kwargs...).X) +
            LinearAlgebra.I
 end
 """
@@ -169,30 +215,22 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Score a separation matrix under a decay, inside a budget.
 
-The loop behind [`phylogeny_features`](@ref)'s [`Proximity`](@ref) method, split out because it is a
-function of the **separations** alone: the structure, the estimator and the data are all spent by the
-time it runs. Handing it a matrix is how the unreachable branch is tested — every structure a shipped
-estimator builds is connected, so a disconnected one arrives as an argument rather than through a
-test double that answers [`calc_adjacency`](@ref).
+This is the loop of the [`Proximity`](@ref) method of [`phylogeny_features`](@ref). It is a function of its own because it reads the separations alone, and the structure, the estimator and the data play no part in it. A test hands it a disconnected separation matrix to reach the unreachable branch, because every structure that a shipped estimator builds is connected.
 
 # Algorithm
 
  1. Probe the decay over `0:dmax` through [`assert_separation_decay`](@ref), before the pair loop.
  2. Allocate `Z`, of the element type `et` and the size of `d`, filled with zeros.
- 3. For each pair, read its separation `duv` and ask [`is_related`](@ref) whether it is inside the
-    budget, giving `rel`. This is the sentinel test as well as the budget rule, so it is the guard
-    on the next step.
- 4. Where `rel` holds, write `separation_decay(dk, duv, dmax)` into `Z[u, v]`. Where it does not,
-    leave the zero of step 2.
+ 3. For each pair, read its separation `duv`, and ask [`is_related`](@ref) whether it is inside the budget, giving `rel`. This test also rejects the sentinel of an unreachable pair, so it guards the next step.
+ 4. Where `rel` holds, write `separation_decay(dk, duv, dmax)` into `Z[u, v]`, which is the form that [`Proximity`](@ref) states. Where it does not hold, keep the zero of step 2.
 
 # Arguments
 
-  - `alg`: Proximity algorithm carrying the decay.
-  - `sep`: Separation algorithm the matrix was measured under, forwarded to [`is_related`](@ref).
+  - `alg`: Proximity algorithm that holds the decay.
+  - `sep`: Separation algorithm that measured `d`, forwarded to [`is_related`](@ref).
   - `d`: Separation matrix from [`separation_matrix`](@ref).
   - `dmax`: Separation budget from [`separation_budget`](@ref).
-  - `et`: Element type of the result. [`phylogeny_features`](@ref) passes `eltype(X)`, so that
-    [`AngularDist`](@ref) keeps its BLAS `gemm` path.
+  - `et`: Element type of the result. [`phylogeny_features`](@ref) passes `float_if_integer(eltype(X))`, so that [`AngularDist`](@ref) keeps its BLAS `gemm` path.
 
 # Returns
 
@@ -235,33 +273,34 @@ function phylogeny_features(alg::Proximity, pl::AbstractNetworkEstimator, X::Mat
     g = separation_graph(pl.sep, pl, X; dims = 1, kwargs...)
     sep = resolve_separation(pl.sep, pl, X, g; dims = 1, kwargs...)
     d = separation_matrix(sep, g)
-    return _proximity_features(alg, sep, d, separation_budget(sep, pl, d), eltype(X))
+    return _proximity_features(alg, sep, d, separation_budget(sep, pl, d),
+                               float_if_integer(eltype(X)))
 end
 """
     panel_axis_labels(names::Nothing, n::Integer) -> Vector{String}
     panel_axis_labels(names::VecStr, n::Integer) -> Vector{String}
 
-Name the trailing axis of a produced [`TensorPanelField`](@ref), from the carrier or positionally.
+Name the trailing axis of a [`TensorPanelField`](@ref) that a producer builds, from the carrier or by position.
 
-A producer's field has a labelled trailing axis, and neither a loadings matrix nor a proximity matrix names that axis as data. So the **data carrier** is the one place a name exists: `rd.nx` names a proximity field's assets, and `rd.nf` names a loadings field's factors. Where the carrier gives no name, or gives the wrong number of them, the labels are positional, `"1"` to `"n"`.
+The field of a producer has a labelled trailing axis, and neither a loadings matrix nor a proximity matrix holds names for that axis. The data carrier is the one place that holds them. `rd.nx` names the assets of a proximity field, and `rd.nf` names the factors of a loadings field. When the carrier gives no names, or a wrong number of them, the labels are the positions `"1"` to `"n"`.
 
-The count is checked rather than assumed. A reduced or re-based `L` has fewer columns than the carrier has factors, and a positional label is then the only honest one.
+The function checks the count. A reduced or re-based `L` has fewer columns than the carrier has factors, and the carrier's names then belong to other columns.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. `names` is `nothing`: return the positional labels.
- 2. `names` is a vector: return it as `String`s when it holds `n` of them, and the positional labels otherwise.
+ 2. `names` is a vector: return it as `String`s when it holds `n` names, and the positional labels otherwise.
 
 # Arguments
 
-  - `names`: The carrier's names for the axis, or `nothing`.
+  - `names`: The names that the carrier gives the axis, or `nothing`.
   - `n`: Length of the axis to label.
 
 # Returns
 
-  - `labels::Vector{String}`: One label per trailing-axis entry.
+  - `labels::Vector{String}`: One label per entry of the trailing axis.
 
 # Related
 
@@ -280,9 +319,9 @@ end
     carrier_asset_names(rd::Nothing) -> nothing
     carrier_asset_names(rd::AbstractReturnsResult) -> Option{<:VecStr}
 
-Read the asset names a producer labels its trailing axis with, or `nothing`.
+Read the asset names that label the trailing axis of a producer's field, or `nothing`.
 
-A producer is handed the two carriers the kernel received. Only the data carrier names the assets, so this is the one read, and it answers `nothing` when there is no data carrier.
+The kernel hands a producer the two carriers that it received. Only the data carrier names the assets, so this function reads the data carrier, and returns `nothing` when there is none.
 
 # Algorithm
 
@@ -314,20 +353,20 @@ end
     regression_factor_names(rr::CrossSectionalFactorModel, rd) -> Option{<:VecStr}
     regression_factor_names(rr, rd) -> nothing
 
-Read the factor names a [`RegressionPanel`](@ref) labels its loadings axis with, or `nothing`.
+Read the factor names that label the loadings axis of a [`RegressionPanel`](@ref), or `nothing`.
 
-A name is read wherever one exists for the axis `pr.rr.L` spans, and the axis is labelled positionally by [`panel_axis_labels`](@ref) otherwise.
+The function reads a name wherever one exists for the axis that `pr.rr.L` spans. Otherwise [`panel_axis_labels`](@ref) labels the axis by position.
 
-  - A time-series [`Regression`](@ref) names no factor as data, so the names are the carrier's `nf`, read **only** where the loadings axis is the carrier's factor axis: a `Regression` whose `L` is unset, whose loadings are therefore the raw `M`, one column per factor the carrier holds. A reduced or re-based `L` has its own axis, which no data names.
-  - A [`CrossSectionalFactorModel`](@ref) names its own factors: the prior derives the raw axis from its Exposure Estimators and stores it as `nf` on the block, and [`cs_diagnostic_factor_names`](@ref) maps that list onto the reduced axis when the block carries a family re-basis, which is the axis `L` spans. So the names come off the block, and the data carrier is not read.
+  - A time-series [`Regression`](@ref) holds no factor names, so the names are the `nf` of the carrier. The function reads them only when the loadings axis is the factor axis of the carrier. That is a `Regression` whose `L` is unset, so that its loadings are the raw `M`, with one column for each factor of the carrier. A reduced or re-based `L` has an axis of its own, and no data names it.
+  - A [`CrossSectionalFactorModel`](@ref) names its own factors. The prior derives the raw axis from its Exposure Estimators and stores it as `nf` on the block. When the block holds a family re-basis, [`cs_diagnostic_factor_names`](@ref) maps that list onto the reduced axis, which is the axis that `L` spans. So the names come from the block, and the function does not read the data carrier.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. The `Nothing` type parameter of `L` is the raw-`M` case, which is the same parameter the `swap(L, M)` rule of [`Regression`](@ref) fires on.
+The method that Julia selects is the algorithm. The `Nothing` type parameter of `L` selects the raw `M`. The `swap(L, M)` rule of [`Regression`](@ref) reads the same parameter.
 
 # Arguments
 
-  - `rr`: The regression result the loadings came from.
+  - `rr`: The regression result that holds the loadings.
   - `rd`: The data carrier, or `nothing`.
 
 # Returns
@@ -356,20 +395,20 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Builds an Asset Panel holding the factor loadings the wrapped prior fitted.
+Builds an Asset Panel that holds the factor loadings of the wrapped prior.
 
-`RegressionPanel` treats `pr.rr.L` — the coordinate system a factor model places each asset in — as the values of one tensor Panel Field, `"loadings"` on the axis `"factor"`. It is the cheapest real feature source in the library: a factor prior already computes the loadings, and already refits them per fold, so the features track the fold with no extra plumbing.
+`RegressionPanel` takes `pr.rr.L`, the coordinates that a factor model gives each asset, as the values of one tensor Panel Field, `"loadings"` on the axis `"factor"`. It needs no estimation of its own. A factor prior computes the loadings already, and refits them in each fold, so the features follow the fold.
 
 # The matrix is `L`, not `M`
 
-`L` is `assets × reduced_dimensions`, set by [`DimensionReductionRegression`](@ref): the low-dimensional coordinate system the asset actually lives in. `M` is the *reconstructed* full-factor loadings. `pr.rr.L` always resolves — [`Regression`](@ref) swaps in `M` when `L` is unset — so this producer needs no branch and works behind every regression estimator, the time-series one and the cross-sectional one alike.
+`L` is `assets × reduced_dimensions`, and [`DimensionReductionRegression`](@ref) sets it. It holds the coordinates of each asset in the reduced space. `M` holds the loadings on every factor, rebuilt from `L`. `pr.rr.L` always has a value, because [`Regression`](@ref) returns `M` when `L` is unset. So this producer needs no branch, and it works behind the time-series and the cross-sectional regression estimators alike.
 
-Both are assets-major, so the panel's asset axis is the carrier's with no transpose. The trailing axis is the reduced dimensions, which are not assets, so a produced loadings panel is never square in the sense [`features_are_assets`](@ref) means.
+Both matrices have one row per asset, so the asset axis of the panel is the asset axis of the carrier, with no transpose. The trailing axis holds factors or reduced dimensions, not assets, so a loadings panel is never square in the sense of [`features_are_assets`](@ref).
 
 # Validation
 
-  - The call supplies a prior result. Raises an [`IsNothingError`](@ref) naming the site.
-  - The wrapped prior carries a regression (see [`assert_prior_regression`](@ref)). Nesting order does not matter: every wrapping estimator forwards `rr` and the factor block `fpr`. What throws is a prior that never computed a regression at all, such as [`EmpiricalPrior`](@ref).
+  - The call supplies a prior result. Raises an [`IsNothingError`](@ref) that names the call site.
+  - The wrapped prior holds a regression, see [`assert_prior_regression`](@ref). The order of nesting has no effect, because every wrapping estimator forwards `rr` and the factor block `fpr`. A prior that computes no regression, such as [`EmpiricalPrior`](@ref), raises the error.
 
 # Examples
 
@@ -392,11 +431,11 @@ struct RegressionPanel <: AbstractAssetPanelEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Builds an Asset Panel holding a square proximity matrix graded from a graph or a partition.
+Builds an Asset Panel that holds a square proximity matrix, graded from a graph or a partition.
 
-An `assets × assets` proximity matrix *is* a feature block whose feature `k` reads "is close to asset `k`", so a metric over its rows measures **neighbourhood overlap** — a standard notion of topological similarity — and needs almost no new estimation code. `PhylogenyPanel` returns it as one tensor Panel Field, `"proximity"` on the axis `"asset"`.
+In an `assets × assets` proximity matrix, feature `k` of a row reads "is close to asset `k`". So a metric over the rows measures the overlap of two neighbourhoods, which is a standard measure of topological similarity, and it needs almost no new estimation code. `PhylogenyPanel` returns the matrix as one tensor Panel Field, `"proximity"` on the axis `"asset"`.
 
-It is the one producer whose trailing axis *is* the asset axis. That needs no flag anywhere: it refits, so a subproblem gets its own square matrix over its own universe rather than a slice of a larger one, and [`features_are_assets`](@ref) compares the field's labels against the carrier's asset names where a hand-supplied panel meets a view.
+It is the one producer whose trailing axis is the asset axis, and it needs no flag for that. It refits, so a subproblem gets its own square matrix over its own assets, not a slice of a larger matrix. Where a panel supplied by hand meets a view, [`features_are_assets`](@ref) compares the labels of the field with the asset names of the carrier.
 
 # Fields
 
@@ -425,32 +464,32 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
 # Why the diagonal includes self
 
-The diagonal is not a convention, it selects between two different algorithms. Measured on a three-node path `1 - 2 - 3` under the default [`AngularDist`](@ref), with the decay held flat at [`NoDecay`](@ref) so that the diagonal is the only thing that changes between the two columns:
+The diagonal selects between two different algorithms. The table measures a three-node path `1 - 2 - 3` under the default [`AngularDist`](@ref) and the default one-hop budget. The decay is [`NoDecay`](@ref), so the diagonal is the only difference between the two columns.
 
 | pair            | zero diagonal | self included |
 |:--------------- | -------------:| -------------:|
-| `1`-`3`, 2 hops | **0.0**       | 0.333         |
+| `1`-`3`, 2 hops | 0.0           | 0.333         |
 | `1`-`2`, 1 hop  | 0.5           | 0.196         |
 
-The default [`LinearDecay`](@ref) grades the same graph rather than flattening it, so its numbers differ — `0.436` and `0.239` over a two-hop budget — while the ordering is the one the right-hand column shows.
+The default [`LinearDecay`](@ref) grades the path over the same budget, so its distances are `0.436` for `1`-`3` and `0.239` for `1`-`2`. The order of the two pairs is the order of the right-hand column.
 
-With a zero diagonal the two **non-adjacent** endpoints come out identical and the adjacent pairs maximally far: rows are compared on who their neighbours are, never on whether they are each other's. That is *structural equivalence* — similarity of role — which is a real notion but the opposite of the proximity the name promises.
+With a zero diagonal, the two endpoints, which are not adjacent, have a distance of zero, and each adjacent pair has the largest distance. The metric then compares two rows by their shared neighbours, and ignores whether the two assets are neighbours of each other. That is structural equivalence, a similarity of role, and it is the opposite of proximity.
 
-Including self also keeps subproblems well defined. An asset view of a spanning tree routinely isolates a vertex, and a zero-diagonal row for an isolated asset is a **zero row**: [`AngularDist`](@ref)'s zero-vector convention then puts every isolated asset at distance `0` from every other isolated asset, clustering them together for no reason. With self included they sit at maximal distance from everything, including each other.
+The diagonal also keeps a subproblem well defined. A view of a spanning tree on a subset of the assets can isolate a vertex. With a zero diagonal, the row of an isolated asset is a zero row, and the zero-vector convention of [`AngularDist`](@ref) puts every isolated asset at distance `0` from every other isolated asset. With self included, each isolated asset is at distance `0.5` from every other asset, the largest distance between two non-negative rows.
 
-# A clustering source is admitted, with a caveat worth reading
+# A clustering source
 
-`pl` is bound by [`NwE_ClE`](@ref): a graph ([`NetworkEstimator`](@ref)) or a partition ([`ClustersEstimator`](@ref)). Both are *estimators*, so both refit.
+[`NwE_ClE`](@ref) bounds `pl`, so it is a graph ([`NetworkEstimator`](@ref)) or a partition ([`ClustersEstimator`](@ref)). Both are estimators, so both refit.
 
-A partition carries much less than a graph, and the shortfall is measurable rather than stylistic. Its matrix is `P * transpose(P)` with the diagonal restored, so row `i` is the co-membership indicator of asset `i` and two rows are either identical or disjoint. On a seven-asset universe clustered `[1, 1, 1, 2, 2, 3, 3]` the whole distance matrix takes **two** distinct values under the default [`AngularDist`](@ref): `0.0` within a cluster and `0.5` across one, whatever the cluster sizes. The raw `phylogeny_matrix` output, whose `- I` this producer undoes, takes three — `0.0`, `0.333` and `0.5` — because that `- I` makes each row of a *pair* a lone `1` pointing at the other member, so the two rows are orthogonal and a size-two cluster's **within**-cluster distance equals its **across**-cluster distance. Restoring the diagonal repairs exactly that case; the coarseness remains.
+A partition holds less information than a graph. Its matrix is the co-membership indicator `P * transpose(P)`, where `P` is the `assets × clusters` membership matrix. Row `i` marks the assets in the cluster of asset `i`, so two rows are equal or disjoint. On seven assets in the clusters `[1, 1, 1, 2, 2, 3, 3]`, the distance matrix under the default [`AngularDist`](@ref) takes two values, `0.0` inside a cluster and `0.5` across clusters, whatever the sizes of the clusters. The raw output of [`phylogeny_matrix`](@ref) is `P * transpose(P) - I`, and it takes three values, `0.0`, `0.333` and `0.5`. In a cluster of two assets, the `- I` leaves each row with a single `1` at the other member, so the two rows are orthogonal, and the distance inside that cluster equals the distance across clusters. This producer adds `I` back, which repairs that case, but the matrix stays coarse.
 
-Clustering a re-encoded clustering largely returns the clustering. Prefer a graph source unless the partition is what you actually want to measure.
+A clustering of a feature matrix built from a clustering gives back much the same clustering. Use a graph source unless the partition is the thing to measure.
 
 # Provenance
 
-The source is a [`NetworkEstimator`](@ref) and never a precomputed [`PhylogenyResult`](@ref), because an Estimator does not hold a Result (see `CONTEXT.md` §1). This producer is therefore **endogenous**: the graph is filtered from the returns correlation, so it measures topology the correlation implies rather than structure outside it, and it refits on every fold and every subproblem.
+The source is a [`NetworkEstimator`](@ref) and never a precomputed [`PhylogenyResult`](@ref), because an Estimator does not hold a Result, as `CONTEXT.md` §1 states. The producer is therefore endogenous. It filters the graph from the correlation of the returns, so it measures the topology that the correlation implies and no structure outside it. It refits on every fold and on every subproblem.
 
-It reads no prior result, so it is the one producer that runs at a pre-prior site such as preselection.
+It reads no prior result, so it is the one producer that runs where no prior exists yet, for example in preselection.
 
 # Examples
 
@@ -518,29 +557,29 @@ end
     asset_panel(ape::RegressionPanel, pr, rd, X) -> AssetPanel
     asset_panel(ape::PhylogenyPanel, pr, rd, X) -> AssetPanel
 
-Build the static [`AssetPanel`](@ref) a producer returns, at the point of use.
+Build the static [`AssetPanel`](@ref) of a producer, at the point of use.
 
-Each method returns a panel holding **one** [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled third axis. The trailing axis is labelled off the data carrier or the regression block where a name exists there, and positionally otherwise; [`panel_axis_labels`](@ref) and [`regression_factor_names`](@ref) state the rule.
+Each method returns a panel that holds one [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled third axis. The labels of the trailing axis come from the data carrier or from the regression block where a name exists, and are positions otherwise. [`panel_axis_labels`](@ref) and [`regression_factor_names`](@ref) state the rule.
 
-A producer runs on the subproblem's own prior and returns, so nothing views what it built and a fold refits it. Standalone on a prior fitted on a point-in-time Asset Panel, a [`RegressionPanel`](@ref) reads the loadings on the prior's Investable Mask and answers the full universe, with a zero row and a false observed mask outside it, so the panel it builds can be handed back to an optimiser; [`expand_investable_loadings`](@ref) states the rule.
+A producer runs on the prior and the returns of its own subproblem, so no view reads the panel that it builds, and a fold refits it. Called on its own, on a prior fitted on a point-in-time Asset Panel, a [`RegressionPanel`](@ref) reads the loadings on the Investable Mask of the prior and answers for the full universe. Outside the mask each asset gets a zero row and a false observed mask, so an optimiser can take the panel back. [`expand_investable_loadings`](@ref) states the rule.
 
 # Algorithm
 
-A [`RegressionPanel`](@ref) takes four steps:
+A [`RegressionPanel`](@ref) takes seven steps:
 
  1. Check that a prior result reached the call, with [`assert_producer_prior`](@ref).
- 2. Check that the prior carries a regression, with [`assert_prior_regression`](@ref).
- 3. Reduce the prior to its Investable Mask through [`investable_mask`](@ref) and [`port_opt_view`](@ref), and read the loadings there. A prior fitted on a point-in-time Asset Panel writes `NaN` on the loadings of every asset outside its mask, and a Panel Field admits no `NaN`. Inside an optimiser the prior arrives reduced and the view is the whole universe.
- 4. Check that every loading on the mask is finite, and refuse otherwise: an asset the check counts has a finite moment and a loadings row that is not, which is a defect of the regression.
+ 2. Check that the prior holds a regression, with [`assert_prior_regression`](@ref).
+ 3. Reduce the prior to its Investable Mask through [`investable_mask`](@ref) and [`port_opt_view`](@ref), giving `prr`, and read its loadings `L`. A prior fitted on a point-in-time Asset Panel writes `NaN` into the loadings of every asset outside its mask, and a Panel Field admits no `NaN`. Inside an optimiser the prior arrives reduced, and the view covers the whole universe.
+ 4. Count the assets on the mask whose loadings are not all finite, giving `nnf`, and refuse a count above zero. Such an asset has a finite moment and a loadings row that is not finite, which is a defect of the regression.
  5. Label the loadings axis with [`panel_axis_labels`](@ref), from [`regression_factor_names`](@ref).
- 6. Expand the loadings back onto the full universe with [`expand_investable_loadings`](@ref): a zero row and a false observed mask outside the mask, the same rule every uncertainty set fitted standalone on such a prior follows.
- 7. Return the panel holding them as the field `"loadings"` on the axis `"factor"`.
+ 6. Expand the loadings back onto the full universe with [`expand_investable_loadings`](@ref), giving `vals` and `omsk`.
+ 7. Return the panel that holds them as the field `"loadings"` on the axis `"factor"`.
 
 A [`PhylogenyPanel`](@ref) takes three steps:
 
- 1. Grade the structure into an `assets × assets` matrix with [`phylogeny_features`](@ref).
+ 1. Grade the structure into an `assets × assets` matrix with [`phylogeny_features`](@ref), giving `Zp`.
  2. Label the trailing axis with [`panel_axis_labels`](@ref), from [`carrier_asset_names`](@ref).
- 3. Return the panel holding that matrix as the field `"proximity"` on the axis `"asset"`.
+ 3. Return the panel that holds `Zp` as the field `"proximity"` on the axis `"asset"`.
 
 # Arguments
 
@@ -551,12 +590,12 @@ A [`PhylogenyPanel`](@ref) takes three steps:
 
 # Validation
 
-  - A [`RegressionPanel`](@ref) needs a prior result carrying a regression. Raises an [`IsNothingError`](@ref).
-  - A [`RegressionPanel`](@ref) needs every loading inside the prior's Investable Mask to be finite. Raises an [`IsNonFiniteError`](@ref) counting the assets whose loadings are not.
+  - A [`RegressionPanel`](@ref) needs a prior result that holds a regression. Raises an [`IsNothingError`](@ref).
+  - A [`RegressionPanel`](@ref) needs every loading inside the Investable Mask of the prior to be finite. Raises an [`IsNonFiniteError`](@ref) that counts the assets whose loadings are not finite.
 
 # Returns
 
-  - `pnl::AssetPanel`: A static Asset Panel holding one tensor Panel Field.
+  - `pnl::AssetPanel`: A static Asset Panel that holds one tensor Panel Field.
 
 # Related
 
@@ -588,21 +627,44 @@ end
     expand_investable_loadings(L::MatNum, imsk::Nothing) -> (L, nothing)
     expand_investable_loadings(L::MatNum, imsk::BitVector) -> (vals, omsk)
 
-Write the loadings a [`RegressionPanel`](@ref) read on the Investable Mask back onto the full asset universe.
+Write the loadings that a [`RegressionPanel`](@ref) read on the Investable Mask back onto the full asset universe.
 
-A prior fitted on a point-in-time Asset Panel writes `NaN` on the loadings of every asset outside its Investable Mask, and a Panel Field admits no `NaN`. The producer therefore reads the loadings on the mask and expands them here: an asset outside the mask takes a **zero row** and a **false observed mask**, the same rule every uncertainty set fitted standalone on such a prior follows, and the shape a Panel Field already has for a cell a fill policy wrote. A zero row is a zero feature vector, which [`AngularDist`](@ref) places at distance `1` from every asset that has loadings and `0` from every other asset that has none, and `"loadings" => :observed` selects the mask as a column. A view of the expanded field at the mask recovers the reduced loadings, so a panel built standalone can be handed to an optimiser on the full universe.
+A prior fitted on a point-in-time Asset Panel writes `NaN` into the loadings of every asset outside its Investable Mask, and a Panel Field admits no `NaN`. So the producer reads the loadings on the mask, and this function expands them. Each asset outside the mask gets a zero row and a false observed mask. Every uncertainty set that a caller fits on its own on such a prior follows the same rule, and a Panel Field already has that shape for a cell that a fill policy wrote.
+
+A zero row is a zero feature vector. [`AngularDist`](@ref) puts it at distance `1` from every asset that has loadings, and at distance `0` from every other asset that has none. The selector `"loadings" => :observed` reads the mask as a column.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{V}_{\\mathcal{M},\\,\\cdot} &= \\mathbf{L}\\,, \\\\
+\\mathbf{V}_{i,\\,\\cdot} &= \\boldsymbol{0}\\,, \\quad i \\notin \\mathcal{M}\\,, \\\\
+O_{i,\\,j} &= \\mathbb{1}\\left[i \\in \\mathcal{M}\\right]\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{V}``: Loadings over every asset, of size ``N \\times K``.
+  - ``\\mathbf{L}``: Loadings on the Investable Mask, of size ``\\lvert \\mathcal{M} \\rvert \\times K``, with rows in the order of the assets.
+  - ``\\mathcal{M}``: Assets inside the Investable Mask.
+  - ``O_{i,\\,j}``: Entry ``(i, j)`` of the observed mask, of the size of ``\\mathbf{V}``.
+  - $(math_dict[:N])
+  - ``K``: Number of columns of the loadings.
+
+The rows of ``\\mathbf{V}`` on the mask are ``\\mathbf{L}``, so a view of the expanded field at the mask gives back the reduced loadings. An optimiser on the full universe can therefore take a panel that was built on its own.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `imsk` is `nothing`, or every asset is investable: the loadings are the full universe's, and the field carries no mask.
- 2. Otherwise allocate a zero frame in `eltype(L)` over every asset, write `L` on the mask's rows, and build the observed mask as `true` on those rows and `false` elsewhere.
+ 1. `imsk` is `nothing`, or every asset is investable: the loadings are those of the full universe, and the field holds no mask.
+ 2. Otherwise allocate a zero frame `vals` in `eltype(L)` over every asset, write `L` into the rows of the mask, and build the observed mask `omsk`, `true` on those rows and `false` elsewhere.
 
 # Arguments
 
   - `L`: The loadings on the Investable Mask, `investable assets × factors`.
-  - `imsk`: The prior's Investable Mask over every asset, or `nothing`.
+  - `imsk`: The Investable Mask of the prior over every asset, or `nothing`.
 
 # Returns
 
@@ -641,18 +703,18 @@ end
     assert_producer_prior(ape::AbstractAssetPanelEstimator, pr::AbstractPriorResult) -> nothing
     assert_producer_prior(ape::AbstractAssetPanelEstimator, pr) -> Union{}
 
-Assert that a producer that reads a prior result was handed one, and name the site when it was not.
+Check that a producer that reads a prior result received one, and name the call site when it did not.
 
-A producer runs wherever the estimator holding it runs, and one of those sites has no prior by construction: preselection is fitted from the returns data alone, before any prior exists. So does the shortest public call, `clusterise(cle, rd)`, which puts a data carrier in the `pr` slot. This turns both into a diagnostic that names the site rather than a `nothing` field access or a `MethodError`.
+A producer runs wherever the estimator that holds it runs, and one of those sites has no prior. Preselection fits from the returns alone, before a prior exists. The shortest public call, `clusterise(cle, rd)`, also has none, because it puts a data carrier in the `pr` slot. This function turns both into an error that names the site, in place of a field access on `nothing` or a `MethodError`.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. A prior result returns; anything else, `nothing` and a data carrier alike, raises.
+The method that Julia selects is the algorithm. A prior result returns. Anything else, `nothing` and a data carrier alike, raises.
 
 # Arguments
 
   - `ape`: The producer, named in the message.
-  - `pr`: The prior result, or whatever reached the slot.
+  - `pr`: The prior result, or the value in the prior slot.
 
 # Validation
 
@@ -678,3 +740,4 @@ function assert_producer_prior(ape::AbstractAssetPanelEstimator, ::Any)::Nothing
 end
 
 export Proximity, phylogeny_features, RegressionPanel, PhylogenyPanel
+public AbstractPhylogenyFeatureAlgorithm

@@ -3,27 +3,28 @@
 Description = "An end-to-end profile in PortfolioOptimisers.jl: a professional desk rebalancing monthly on a view and the full risk-return trade-off."
 ```
 
-# Profile: desk, monthly
+# [Profile: desk, monthly](@id example-profile-desk-monthly)
 
-The second profile is a **professional desk rebalancing monthly**. The trade-offs invert the
-[retail profile](01_Profile_Retail_Daily.md): rebalancing infrequently means each decision can
-afford real compute and real analysis, and turnover matters far less. The edge here comes from a
-*view* and from exploring the whole risk/return trade-off rather than from cost control.
+The second profile rebalances the book of a professional desk once a month. Every limit that
+binds in the [retail profile](@ref example-profile-retail-daily) loosens here. A monthly decision can pay
+for a long computation, and a month of return covers more trading cost than a day of it does. What
+this desk has instead is a house view, and the time to look at the whole risk-return trade-off
+before it picks a book.
 
-The reasoning, following the [strategy decision framework](../../user_guide/07_Choosing_a_Strategy.md):
+Three of the limits in the
+[strategy decision framework](@ref user-guide-choosing-a-strategy) change for this desk.
 
-  - **Compute is abundant, decisions are rare** — a monthly cadence justifies a richer prior and a
-    full frontier sweep.
-  - **The desk has a view** — it encodes a house thesis with an [`EntropyPoolingPrior`](@ref)
-    rather than taking the sample moments at face value.
-  - **Explore, then choose** — instead of one objective, it traces the efficient frontier and
-    selects the risk-adjusted (tangency) book.
-  - **Budget is substantial** — an exact [`DiscreteAllocation`](@ref) is affordable.
+  - A monthly rebalance leaves time for a slower computation, so we trace the whole efficient
+    frontier with fifteen solves and then take its tangency point.
+  - The desk has a view, so we state it as a constraint on the mean and fit an
+    [`EntropyPoolingPrior`](@ref) rather than take the sample mean as given.
+  - A monthly decision can wait for a mixed-integer solve, so we buy whole shares with
+    [`DiscreteAllocation`](@ref).
 
 !!! tip "When to reach for this"
-    This is the template for a research-driven, lower-frequency book: invest the compute in a
-    better prior and a frontier sweep, pick a point deliberately, and allocate exactly. Turnover
-    and fee control matter less when you trade rarely.
+    Reach for this profile when you trade rarely and can spend the time on the model instead. Put
+    that time into the prior and the frontier, choose a point on it, and allocate with a
+    mixed-integer solve. Turnover and fee control matter less when you trade once a month.
 =#
 
 using PortfolioOptimisers, CSV, TimeSeries, DataFrames, PrettyTables, Clarabel, HiGHS,
@@ -40,9 +41,11 @@ end;
 #=
 ## 1. Data and the house view
 
-The desk's thesis: healthcare will outperform energy. It encodes that as an entropy-pooling view,
-reweighting the empirical scenarios so the prior reflects the conviction (see
-[Entropy Pooling](../2_moments_priors/07_Entropy_Pooling.md)).
+The desk expects healthcare to outperform energy. We state that as a view on the mean, and
+[`EntropyPoolingPrior`](@ref) turns it into a new probability for each historical scenario. A
+scenario that supports the view gets more probability, and the rest get less.
+[Entropy Pooling](@ref example-entropy-pooling) covers the method that finds those
+probabilities.
 =#
 
 X = TimeArray(CSV.File(joinpath(@__DIR__, "..", "SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -65,8 +68,9 @@ rf = 4.2 / 100 / 252
 #=
 ## 2. The efficient frontier
 
-With compute to spare, the desk traces the whole frontier on the view-tilted prior — minimum-risk
-books across a sweep of return targets — rather than committing to a single objective up front.
+We solve for minimum risk fifteen times, once at each of fifteen lower bounds on the return. The
+fifteen books trace the efficient frontier of the prior that carries the view. The plot shows what
+each step up in return costs in risk.
 =#
 
 frontier = optimise(MeanRisk(; obj = MinimumRisk(),
@@ -81,8 +85,9 @@ plot_efficient_frontier(frontier.w, pr; rt = frontier.ret)
 #=
 ## 3. Choosing the book
 
-From the frontier, the desk takes the risk-adjusted optimum — the [`MaximumRatio`](@ref)
-(tangency) portfolio on the same view-tilted prior.
+The frontier shows the trade-off, and the desk still has to pick one point on it. We solve once
+more with [`MaximumRatio`](@ref), which maximises the ratio of return above the risk-free rate to
+risk. That book is the tangency point of the frontier.
 =#
 
 desk = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
@@ -90,13 +95,16 @@ desk = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
 
 pretty_table(DataFrame("Asset" => rd.nx, "Tangency weight" => desk.w);
              formatters = [resfmt],
-             title = "Desk monthly — risk-adjusted optimum on the view prior")
+             title = "Desk monthly tangency weights on the prior with the view")
 
 #=
 ## 4. Exact finite allocation
 
-On a \$500,000 book the rounding is small but the desk wants the provably-best whole-share book, so
-it uses [`DiscreteAllocation`](@ref) with a MIP solver ([HiGHS](https://github.com/jump-dev/HiGHS.jl)).
+The desk has \$500,000 to invest, so rounding to whole shares moves each weight by very little.
+[`DiscreteAllocation`](@ref) solves a mixed-integer problem with
+[HiGHS](https://github.com/jump-dev/HiGHS.jl). It minimises the money by which each position
+misses its target, plus the cash left over. The table title gives the amount invested and the cash
+left.
 =#
 
 mip_slv = Solver(; name = :highs, solver = HiGHS.Optimizer,
@@ -108,7 +116,7 @@ invested = sum(alloc.shares .* prices)
 pretty_table(DataFrame("Asset" => rd.nx, "Target" => desk.w,
                        "Shares" => round.(Int, alloc.shares), "Realised" => alloc.w);
              formatters = [resfmt],
-             title = "\$500,000 allocated — invested \$$(round(Int, invested)), cash left \$$(round(alloc.cash, digits = 2))")
+             title = "\$500,000 to invest, \$$(round(Int, invested)) invested, \$$(round(alloc.cash, digits = 2)) left in cash")
 
 #=
 ## 5. The book

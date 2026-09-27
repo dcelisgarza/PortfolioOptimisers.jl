@@ -39,10 +39,15 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
 5. THE STATISTICS ARE ORACLED BY RUNNING THE REFERENCE, NOT BY READING IT. `IC_ALPHA` and
    its gapped variant were put through the reference's own diagnostic and its correlation
    summary, and the literals below are what it answered. The one place the port diverges is
-   the hit rate: the library reads it against every date, so a date with no coefficient is a
-   miss, where the reference reads it against the dates that carried one. That is
-   `exposure_ic_factor_summary`'s convention, which both summaries now share, and it is
-   asserted as a divergence rather than papered over.
+   the hit rate: the library reads it against the dates that carried a coefficient, where
+   the reference's exposure summary counts a date with no coefficient as a miss. That is
+   `exposure_ic_factor_summary`'s convention, which both summaries share, and it is
+   asserted as a divergence rather than papered over. The second divergence is the
+   t-statistic: the reference scales the ratio by the root of the date count wherever it
+   is read, and the port's standard error reads the overlap of the forward windows through
+   `forecast_ic_lags`, so the two agree only where the windows are disjoint. The
+   holding-period table at a stride of one is where they part, and the reference's number
+   is asserted there as the plain ratio beside the corrected column.
 
 6. THE TWO ALPHA PORTFOLIOS ARE PINNED BY THEIR INVARIANTS, NOT BY A STORED NUMBER. Both
    are centred and scaled to 200 % gross, so every date holds one unit long and one unit
@@ -56,9 +61,7 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
    `max_drawdown` and `calmar` read a path that joins the date before a gap to the date
    after it. The probes assert the compressed answer and, beside it, what the uncompressed
    series would have answered, which is what makes the caveat legible. The hit rate beside
-   that summary therefore counts against the FINITE dates, which is the opposite of
-   convention 5's denominator: the two summaries are computed on different series, and each
-   docstring states which.
+   that summary counts against the FINITE dates, which is convention 5's denominator.
 
 8. THE FACTOR CORRELATION IS PINNED BY A DESIGN, NOT BY A LITERAL. It is contemporaneous,
    so there is nothing forward-looking to oracle: the probes build a cross-section whose
@@ -102,10 +105,9 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
     which is what a summary that computes nothing of its own owes: a literal that matches
     proves the number, and the identity proves the number came from the verb rather than
     from a second copy of it. The gapped fixture is what separates `mean_coverage` from
-    `min_coverage`, because a full panel reads 1 for both. The two hit-rate denominators
-    of conventions 5 and 7 meet here for the first time, and they are asserted APART
-    rather than reconciled: a silenced date is a miss for a coefficient and no trade for
-    a book, and the Result names the two columns apart and states each denominator.
+    `min_coverage`, because a full panel reads 1 for both. The hit rates of conventions 5
+    and 7 meet here with one denominator: a date with no coefficient and a date with no
+    trade are both unmeasured, and the coverage columns count them.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 
@@ -285,6 +287,35 @@ end
         @test_throws DomainError forecast_evaluation(alpha, y; step = 0)
         @test_throws DomainError forecast_evaluation(alpha, y; min_count = 0)
         @test_throws DomainError forecast_evaluation(alpha, y; ppy = 0)
+        @test_throws PO.ConflictingArgumentError forecast_evaluation(alpha, y;
+                                                                     ties = :dense)
+        @test forecast_evaluation(alpha, y).ties === :average
+        @test forecast_evaluation(alpha, y; ties = :ordinal).ties === :ordinal
+    end
+
+    @testset "The pair is scored in its own element type, which must hold a fraction and NaN" begin
+        # The evaluation neither converts nor refuses a pair by its type, so an integer pair
+        # fails where a statistic first writes a fraction or a NaN, and a caller converts it.
+        ai = rand(StableRNG(1), -5:5, 30, 8)
+        yi = rand(StableRNG(2), -5:5, 30, 8)
+        umsk = rand(StableRNG(3), Bool, 30, 8)
+        fe = forecast_evaluation(ai, yi)
+        @test eltype(fe.alpha) == Int
+        @test_throws InexactError forecast_ic(fe)
+        @test_throws InexactError forecast_portfolio(fe)
+        @test_throws InexactError forecast_calibration(fe)
+        @test_throws InexactError forecast_quantile_spread(fe)
+        @test_throws InexactError forecast_evaluation(ai, yi; umsk = umsk)
+        @test eltype(forecast_ic(forecast_evaluation(float.(ai), float.(yi)))) == Float64
+
+        fe32 = forecast_evaluation(Float32.(ai), Float32.(yi); umsk = umsk)
+        @test eltype(fe32.alpha) == Float32
+        @test eltype(forecast_ic(fe32)) == Float32
+        @test eltype(forecast_portfolio(fe32).w) == Float32
+
+        fer = forecast_evaluation(Rational.(ai), Rational.(yi))
+        @test eltype(forecast_ic(fer)) == Rational{Int}
+        @test_throws InexactError forecast_portfolio(fer)
     end
 end
 
@@ -691,6 +722,181 @@ end
         @test_throws PO.IsEmptyError forecast_ic_summary(Matrix{Float64}(undef, 0, 0))
         @test_throws DimensionMismatch forecast_ic_summary(ones(3, 1))
         @test_throws DimensionMismatch forecast_ic_summary(ones(3, 3))
+        @test_throws DomainError forecast_ic_summary(ic; lags = -1)
+    end
+end
+
+@testset "The t-statistic reads the overlap of the forward windows" begin
+    PO = PortfolioOptimisers
+    # Hand computation of the kernel's long-run standard error: the variance plus twice the
+    # first `L` autocovariances, every one over `n - 1`, pairs read at their positions.
+    function hand_t(v, L)
+        f = isfinite.(v)
+        n = count(f)
+        m = sum(v[f]) / n
+        g = zeros(L + 1)
+        for j in 0:L, t in 1:(length(v) - j)
+            if f[t] && f[t + j]
+                g[j + 1] += (v[t] - m) * (v[t + j] - m)
+            end
+        end
+        lrv = (g[1] + 2 * sum(g[2:end])) / (n - 1)
+        return lrv > 0 ? m / sqrt(lrv) * sqrt(n) : NaN
+    end
+
+    @testset "The lag is one less than the number of strides a window spans" begin
+        @test PO.forecast_ic_lags(1, 1) == 0
+        @test PO.forecast_ic_lags(5, 5) == 0
+        @test PO.forecast_ic_lags(5, 1) == 4
+        @test PO.forecast_ic_lags(5, 2) == 2
+        @test PO.forecast_ic_lags(4, 2) == 1
+        @test PO.forecast_ic_lags(2, 5) == 0
+        @test_throws DomainError PO.forecast_ic_lags(0, 1)
+        @test_throws DomainError PO.forecast_ic_lags(1, 0)
+        # The Result method reads the evaluation's own window and stride.
+        y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
+        @test PO.forecast_ic_lags(forecast_evaluation(IC_ALPHA, y)) == 0
+        @test PO.forecast_ic_lags(forecast_evaluation(IC_ALPHA, y; horizon = 3, step = 1)) ==
+              2
+        @test PO.forecast_ic_lags(forecast_evaluation(IC_ALPHA, y; horizon = 3, step = 2)) ==
+              1
+    end
+
+    @testset "At no lag the statistic is the one the reference states, bit for bit" begin
+        y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
+        ic = forecast_ic(forecast_evaluation(IC_ALPHA, y))
+        for k in 1:2
+            a = PO.exposure_ic_factor_summary(ic, k)
+            b = PO.exposure_ic_factor_summary(ic, k; lags = 0)
+            @test a == b
+            @test a.t_stat == a.ic_ir * sqrt(count(isfinite, ic[:, k]))
+        end
+    end
+
+    @testset "A positive lag adds the autocovariances to the standard error" begin
+        # A smooth series, so every autocovariance up to the third lag is positive and the
+        # long-run variance is positive at every lag probed.
+        v = [0.10, 0.18, 0.26, 0.30, 0.24, 0.16, 0.08, 0.04, 0.12, 0.22, 0.28, 0.20]
+        ic = hcat(v, -v)
+        for L in 0:3
+            s = PO.exposure_ic_factor_summary(ic, 1; lags = L)
+            @test s.t_stat ≈ hand_t(v, L)
+            # The mean, the deviation, the ratio and the hit rate do not read the lag.
+            s0 = PO.exposure_ic_factor_summary(ic, 1)
+            @test (s.mean_ic, s.std_ic, s.ic_ir, s.hit_rate) ==
+                  (s0.mean_ic, s0.std_ic, s0.ic_ir, s0.hit_rate)
+            # The forecast summary hands the same lag to both of its series.
+            fs = forecast_ic_summary(ic; lags = L)
+            @test isequal(fs.spearman, s)
+            @test isequal(fs.pearson, PO.exposure_ic_factor_summary(ic, 2; lags = L))
+            @test fs.pearson.t_stat ≈ -s.t_stat
+        end
+        # A positively autocorrelated series has a smaller statistic at a positive lag.
+        w = [0.1, 0.2, 0.3, 0.4, 0.5, 0.4, 0.3, 0.2, 0.1, 0.0]
+        t0 = PO.exposure_ic_factor_summary(hcat(w), 1).t_stat
+        t1 = PO.exposure_ic_factor_summary(hcat(w), 1; lags = 1).t_stat
+        @test 0 < t1 < t0
+        @test_throws DomainError PO.exposure_ic_factor_summary(ic, 1; lags = -1)
+        @test_throws DomainError PO.exposure_ic_summary(ic; lags = -1)
+    end
+
+    @testset "A NaN row is in no pair, and the lag is a distance in the series" begin
+        v = [0.3, NaN, 0.4, 0.2, NaN, 0.5, 0.1, 0.0, 0.3, -0.1]
+        for L in 1:2
+            @test PO.exposure_ic_factor_summary(hcat(v), 1; lags = L).t_stat ≈ hand_t(v, L)
+        end
+        # Dropping the gaps first would pair rows that are two apart as neighbours, and
+        # that is not what the kernel does.
+        u = filter(isfinite, v)
+        @test !(PO.exposure_ic_factor_summary(hcat(v), 1; lags = 1).t_stat ≈ hand_t(u, 1))
+    end
+
+    @testset "A non-positive long-run variance has no statistic" begin
+        # An alternating series has a lag-one autocovariance more negative than half its
+        # variance, so the sum is negative and the statistic is NaN rather than clamped.
+        v = [0.5, -0.4, 0.5, -0.4, 0.5, -0.4, 0.5, -0.4]
+        s = PO.exposure_ic_factor_summary(hcat(v), 1; lags = 1)
+        @test isnan(s.t_stat)
+        @test isfinite(s.ic_ir)
+        @test isfinite(PO.exposure_ic_factor_summary(hcat(v), 1).t_stat)
+    end
+
+    @testset "The evaluation summaries derive the lag from the window and the stride" begin
+        rng = StableRNG(7)
+        alpha = randn(rng, 40, 6)
+        X = randn(rng, 40, 6)
+        y = PO.forward_mean_returns(X, 3, 1)
+        # A stride of one under a window of three: two neighbours on either side overlap.
+        fe = forecast_evaluation(alpha, y; horizon = 3, step = 1)
+        ic = forecast_ic(fe)
+        s = forecast_evaluation_summary([fe])
+        @test s.spearman_t_stat[1] ≈ forecast_ic_summary(ic; lags = 2).spearman.t_stat
+        @test s.pearson_t_stat[1] ≈ forecast_ic_summary(ic; lags = 2).pearson.t_stat
+        @test !(s.spearman_t_stat[1] ≈ forecast_ic_summary(ic).spearman.t_stat)
+        # A stride of the window: no overlap, the plain statistic.
+        fe3 = forecast_evaluation(alpha, y; horizon = 3)
+        s3 = forecast_evaluation_summary([fe3])
+        @test s3.spearman_t_stat[1] ≈ forecast_ic_summary(forecast_ic(fe3)).spearman.t_stat
+        # The holding-period table's row `p` spans `p` strides at the default stride, so it
+        # reads `p - 1` lags; the decay table's windows stay one stride long.
+        fe1 = forecast_evaluation(alpha, PO.forward_mean_returns(X, 1, 1))
+        h = forecast_holding_period(fe1, X; n = 4)
+        d = forecast_decay(fe1, X; n = 4)
+        for p in 1:4
+            fp = PO.ForecastEvaluationResult(alpha,
+                                             PO.forward_mean_returns(X, h.horizon[p],
+                                                                     h.lag[p]), fe1.umsk,
+                                             h.dates, fe1.target, h.horizon[p], h.lag[p],
+                                             fe1.step, fe1.min_count, fe1.ties, fe1.ppy)
+            @test PO.forecast_ic_lags(fp) == p - 1
+            @test isequal(h.spearman_t_stat[p],
+                          forecast_ic_summary(forecast_ic(fp); lags = p - 1).spearman.t_stat)
+            fq = PO.ForecastEvaluationResult(alpha,
+                                             PO.forward_mean_returns(X, d.horizon[p],
+                                                                     d.lag[p]), fe1.umsk,
+                                             d.dates, fe1.target, d.horizon[p], d.lag[p],
+                                             fe1.step, fe1.min_count, fe1.ties, fe1.ppy)
+            @test PO.forecast_ic_lags(fq) == 0
+            @test d.spearman_t_stat[p] ≈
+                  forecast_ic_summary(forecast_ic(fq)).spearman.t_stat
+        end
+    end
+
+    @testset "A forecast with no skill is not made significant by a longer window" begin
+        # A persistent forecast against an independent target has no skill by construction.
+        # Its coefficient at a window of `p` observations, scored every observation, is a
+        # moving average of order `p - 1`, and the plain statistic's dispersion across
+        # samples grows with `p` where the corrected one's does not.
+        S = 120
+        T = 160
+        N = 12
+        n = 5
+        plain = zeros(S, n)
+        fixed = zeros(S, n)
+        for s in 1:S
+            rng = StableRNG(1000 + s)
+            alpha = Matrix{Float64}(undef, T, N)
+            alpha[1, :] = randn(rng, N)
+            for t in 2:T
+                alpha[t, :] = 0.99 .* alpha[t - 1, :] .+ sqrt(1 - 0.99^2) .* randn(rng, N)
+            end
+            X = randn(rng, T, N)
+            fe = forecast_evaluation(alpha, PO.forward_mean_returns(X, 1, 1))
+            h = forecast_holding_period(fe, X; n = n)
+            m = length(h.dates)
+            fixed[s, :] = h.spearman_t_stat
+            plain[s, :] = h.spearman_ic_ir .* sqrt(m)
+        end
+        sd(x) = sqrt(sum(abs2, x .- sum(x) / length(x)) / (length(x) - 1))
+        # Under the null the corrected statistic is dispersed like a unit normal at every
+        # depth; the plain one is at the first row only and by the last is far wider.
+        for p in 1:n
+            @test 0.75 < sd(fixed[:, p]) < 1.3
+        end
+        @test 0.75 < sd(plain[:, 1]) < 1.3
+        @test sd(plain[:, n]) > 1.6
+        @test sd(plain[:, n]) > 1.5 * sd(fixed[:, n])
+        @test plain[:, 1] == fixed[:, 1]
     end
 end
 
@@ -960,6 +1166,24 @@ end
                         view(forecast_portfolio(fe; kind = :zscore).w, 1, :))
     end
 
+    @testset "Equal forecasts take equal `:rank` weights under the default tie rule" begin
+        at = [1.0 1.0 2.0 3.0; 2.0 1.0 1.0 3.0; 1.0 2.0 3.0 4.0]
+        yt = [1.0 2.0 3.0 4.0; 4.0 3.0 2.0 1.0; 1.0 3.0 2.0 4.0]
+        wa = forecast_portfolio(forecast_evaluation(at, yt)).w
+        wo = forecast_portfolio(forecast_evaluation(at, yt; ties = :ordinal)).w
+        @test wa[1, 1] == wa[1, 2]
+        @test wa[2, 2] == wa[2, 3]
+        @test wo[1, 1] < wo[1, 2]
+        @test wo[2, 2] < wo[2, 3]
+        # A row with no tie is the same under both rules, and both books stay dollar
+        # neutral at 200 % gross.
+        @test wa[3, :] == wo[3, :]
+        @test all(k -> isapprox(sum(wa[k, :]), 0; atol = 1e-12), 1:3)
+        @test all(k -> sum(abs, wa[k, :]) ≈ 2, 1:3)
+        @test wa == PO.forecast_portfolio_weights(at, yt, 1:3, :rank, :average)
+        @test wo == PO.forecast_portfolio_weights(at, yt, 1:3, :rank, :ordinal)
+    end
+
     @testset "The portfolio return is the contraction of the weights with the target" begin
         p = forecast_portfolio(fe; kind = :rank)
         ref = map(enumerate(fe.dates)) do (k, t)
@@ -998,7 +1222,8 @@ end
         @test_throws PO.ConflictingArgumentError PO.forecast_portfolio_weights(fe.alpha,
                                                                                fe.y,
                                                                                fe.dates,
-                                                                               :inverse_vol)
+                                                                               :inverse_vol,
+                                                                               :average)
     end
 end
 
@@ -1158,7 +1383,7 @@ end
         @test p.summary.max_drawdown < 0
     end
 
-    @testset "The turnover into and out of the gap is dropped with it" begin
+    @testset "The turnover into the gap is dropped with it, and the one out of it is kept" begin
         @test isnan(p.turnover[1])
         @test isnan(p.turnover[2])
         @test isfinite(p.turnover[3])
@@ -1271,6 +1496,29 @@ end
         @test all(isfinite, forecast_factor_correlation(fg, FC_B; min_count = 2)[2, :])
     end
 
+    @testset "A weight removes an asset, and a constant cross-section is NaN in the weighted form only" begin
+        # Issue #951. Every asset carries a finite pair, so each NaN below comes from the
+        # weight or from the constant exposure, and not from a missing value.
+        w0 = ones(size(FC_ALPHA))
+        w0[1, 2] = 0.0
+        w0[2, 3] = NaN
+        cz = forecast_factor_correlation(fe, FC_B, w0; min_count = 4)
+        @test all(isnan, cz[1:2, :])
+        @test all(isfinite, cz[3:T, :])
+        # A constant exposure has no weighted correlation. Under the default tie rule its
+        # ranks are equal, so it has no rank correlation either. Under `:ordinal`, equal
+        # values take their position on the asset axis, so the rank form answers the rank
+        # correlation of the forecast with that order.
+        bc = cat(FC_TIED, fill(1.0, size(FC_ALPHA)); dims = 3)
+        @test all(isnan, forecast_factor_correlation(fe, bc)[:, 2])
+        @test all(isnan, forecast_factor_correlation(fe, bc; rank = true)[:, 2])
+        fo = forecast_evaluation(FC_ALPHA, PO.forward_mean_returns(FC_ALPHA, 1, 1);
+                                 ties = :ordinal)
+        crc = forecast_factor_correlation(fo, bc; rank = true)
+        @test crc[:, 2] == crc[:, 1]
+        @test crc[:, 2] ≈ ones(T)
+    end
+
     @testset "The evaluation grid is opt-in, and any row set is read the same way" begin
         # `dates = fe.dates` is the row subset of the whole-axis answer, entry for entry,
         # so a caller who wants the correlations beside the coefficients of the same dates
@@ -1282,6 +1530,28 @@ end
         @test isequal(forecast_factor_correlation(fe, FC_B, FC_W; dates = fe.dates,
                                                   rank = true),
                       forecast_factor_correlation(fe, FC_B; rank = true)[fe.dates, :])
+    end
+
+    @testset "The rank form ranks a tie by `fe.ties`, and `:average` reads no asset order" begin
+        # Every row of `FC_G` is one-hot, two blocks of two, so every asset is in a tie. A
+        # reversal of the asset axis moves the `:ordinal` answer and not the default one.
+        yt = PO.forward_mean_returns(FC_ALPHA, 1, 1)
+        rv = size(FC_ALPHA, 2):-1:1
+        fo = forecast_evaluation(FC_ALPHA, yt; ties = :ordinal)
+        far = forecast_evaluation(FC_ALPHA[:, rv], yt[:, rv])
+        fro = forecast_evaluation(FC_ALPHA[:, rv], yt[:, rv]; ties = :ordinal)
+        ca = forecast_factor_correlation(fe, FC_BG; rank = true)
+        co = forecast_factor_correlation(fo, FC_BG; rank = true)
+        @test ca ≈ forecast_factor_correlation(far, FC_BG[:, rv, :]; rank = true)
+        @test !isapprox(co, forecast_factor_correlation(fro, FC_BG[:, rv, :]; rank = true))
+        # Row 1: the ranks of `[1, 2, 3, 4]` against the midranks of `[1, 0, 1, 0]`.
+        @test ca[1, 1] ≈ -2 / sqrt(20)
+        @test co[1, 1] ≈ 0.0 atol = 1e-12
+        for k in 1:2, t in 1:T
+            @test co[t, k] ==
+                  PO.cs_spearman_correlation(view(fe.alpha, t, :), view(FC_BG, t, :, k);
+                                             min_count = fe.min_count, ties = :ordinal)
+        end
     end
 
     @testset "An empty row set and a row off the axis are refused" begin
@@ -1680,9 +1950,20 @@ end
 @testset "The two tables reproduce the reference implementation" begin
     PO = PortfolioOptimisers
     alpha = WINDOW_ALPHA
-    fe = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1)
+    # The forward means of a longer window tie on this fixture, and the reference breaks a
+    # tie by the asset order here, so `ties = :ordinal` reproduces its numbers.
+    fe = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1,
+                             ties = :ordinal)
     h = forecast_holding_period(fe, alpha; n = 3)
     d = forecast_decay(fe, alpha; n = 3)
+
+    @testset "Under the default tie rule, the rows whose targets tie move and the first does not" begin
+        fa = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1)
+        ha = forecast_holding_period(fa, alpha; n = 3)
+        @test ha.spearman_mean_ic[1] ≈ h.spearman_mean_ic[1]
+        @test ha.pearson_mean_ic ≈ h.pearson_mean_ic
+        @test !isapprox(ha.spearman_mean_ic[2:3], h.spearman_mean_ic[2:3])
+    end
 
     @testset "Both tables carry fifteen columns and three rows" begin
         @test keys(h) ==
@@ -1702,10 +1983,35 @@ end
     @testset "The holding-period table is what the reference answered" begin
         @test isapprox(h.spearman_mean_ic, [0.4, 0.12, 0.28])
         @test isapprox(h.spearman_ic_ir, [1.414214, 0.395628, 0.639010]; rtol = 1e-6)
-        @test isapprox(h.spearman_t_stat, [3.162278, 0.884652, 1.428869]; rtol = 1e-6)
         @test isapprox(h.pearson_mean_ic, [0.4, 0.180180, 0.400988]; rtol = 1e-5)
         @test isapprox(h.pearson_ic_ir, [1.414214, 0.371014, 0.605921]; rtol = 1e-6)
-        @test isapprox(h.pearson_t_stat, [3.162278, 0.829613, 1.354880]; rtol = 1e-6)
+        # The reference's t-statistic is the ratio times the root of the five dates at every
+        # row. The port answers that at the first row alone: at a stride of one, row `p`'s
+        # windows overlap their `p - 1` neighbours, and the port's standard error reads the
+        # overlap where the reference's does not. That is a deliberate divergence, asserted
+        # here beside the reference's number rather than papered over.
+        @test isapprox(h.spearman_ic_ir .* sqrt(5), [3.162278, 0.884652, 1.428869];
+                       rtol = 1e-6)
+        @test isapprox(h.pearson_ic_ir .* sqrt(5), [3.162278, 0.829613, 1.354880];
+                       rtol = 1e-6)
+        @test h.spearman_t_stat[1] ≈ 3.162278 rtol = 1e-6
+        @test h.pearson_t_stat[1] ≈ 3.162278 rtol = 1e-6
+        for p in 2:3
+            fp = PO.ForecastEvaluationResult(alpha,
+                                             PO.forward_mean_returns(alpha, h.horizon[p],
+                                                                     h.lag[p]), fe.umsk,
+                                             h.dates, fe.target, h.horizon[p], h.lag[p],
+                                             fe.step, fe.min_count, fe.ties, fe.ppy)
+            s = forecast_ic_summary(forecast_ic(fp); lags = p - 1)
+            @test isequal(h.spearman_t_stat[p], s.spearman.t_stat)
+            @test isequal(h.pearson_t_stat[p], s.pearson.t_stat)
+        end
+        @test h.spearman_t_stat[2] ≈ 0.8624393618641034
+        @test h.pearson_t_stat[2] ≈ 0.7453765425294355
+        # Five dates at two lags sum the Spearman series' long-run variance to a
+        # non-positive number, and the statistic is NaN there rather than clamped.
+        @test isnan(h.spearman_t_stat[3])
+        @test h.pearson_t_stat[3] ≈ 1.9491738847880407
         @test isapprox(h.rank_ann_return, [1.0, 0.55, 0.733333]; rtol = 1e-6)
         @test isapprox(h.rank_sharpe, [1.414214, 0.792825, 0.964764]; rtol = 1e-6)
         @test isapprox(h.zscore_ann_return, h.rank_ann_return)
@@ -1736,7 +2042,7 @@ end
     h = forecast_holding_period(fe, alpha; n = 3)
     d = forecast_decay(fe, alpha; n = 3)
     fb = PO.ForecastEvaluationResult(alpha, y, fe.umsk, h.dates, fe.target, fe.horizon,
-                                     fe.lag, fe.step, fe.min_count, fe.ppy)
+                                     fe.lag, fe.step, fe.min_count, fe.ties, fe.ppy)
     ic = forecast_ic_summary(forecast_ic(fb))
     rk = forecast_portfolio(fb; kind = :rank)
     zs = forecast_portfolio(fb; kind = :zscore)
@@ -1982,8 +2288,8 @@ end
 
     @testset "The edges are the quantiles, and they are answered once each" begin
         # The cut writes out the linear interpolation `Statistics.quantile` applies by
-        # default, so it must answer exactly what that verb answers -- which is what keeps
-        # the curve at parity with the reference implementation.
+        # default, so it answers what that verb answers to rounding. That keeps the curve at
+        # parity with the reference implementation.
         for x in ([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], [1.0, 1.0, 2.0, 40.0],
                   collect(range(-3.0, 5.0, 17)))
             for bins in (1, 2, 3, 10)
@@ -2134,6 +2440,108 @@ end
         @test forecast_ic(scaled)[:, 1] ≈ forecast_ic(fe)[:, 1]
         @test forecast_portfolio(scaled).ret ≈ forecast_portfolio(fe).ret
         @test forecast_calibration(scaled).slope ≈ forecast_calibration(fe).slope / 100
+    end
+end
+
+@testset "The docstrings of 13_ForecastCalibration.jl against numbers" begin
+    PO = PortfolioOptimisers
+
+    @testset "The pairs follow the order of `dates`, and a weight that is not finite is zero" begin
+        A = [1.0 NaN 3.0; 4.0 5.0 6.0; 7.0 8.0 NaN]
+        Y = [1.0 2.0 3.0; NaN 5.0 6.0; 7.0 8.0 9.0]
+        U = [1.0 1.0 NaN; 2.0 3.0 4.0; 5.0 Inf 6.0]
+        a, b, q = PO.forecast_calibration_pairs(A, Y, U, [3, 1])
+        @test a == [7.0, 8.0, 1.0, 3.0]
+        @test b == [7.0, 8.0, 1.0, 3.0]
+        @test q == [5.0, 0.0, 1.0, 0.0]
+    end
+
+    @testset "The slope is the weighted least-squares fit through the origin" begin
+        rng = StableRNG(953)
+        for _ in 1:50
+            n = rand(rng, 1:40)
+            a = randn(rng, n)
+            b = randn(rng, n)
+            q = rand(rng, n)
+            @test PO.forecast_calibration_slope(a, b, q) ≈ (sqrt.(q) .* a) \ (sqrt.(q) .* b) rtol = 1e-10
+        end
+        # A weight of zero at every pair leaves no positive weighted square.
+        @test isnan(PO.forecast_calibration_slope([1.0, 2.0], [1.0, 2.0], [0.0, 0.0]))
+    end
+
+    @testset "An edge that falls on an order statistic equals it exactly" begin
+        # At `n = 43` and `B = 14`, edge 9 sits at the order statistic `0.28`. A floating
+        # `h = (n - 1) i / B + 1` lands one ulp above 28, and the edge came out above
+        # `0.28`, so the pair at `0.28` fell into the bin below.
+        x = collect(1:43) ./ 100
+        e = PO.forecast_calibration_edges(x, 14)
+        @test e[10] == 0.28
+        @test all(i -> x[div(42 * i, 14) + 1] == e[i + 1], 0:14)
+        @test PO.forecast_calibration_curve(x, x, 14).count == [fill(3, 13); 4]
+        # Elsewhere the edges agree with `Statistics.quantile` to rounding.
+        rng = StableRNG(9532)
+        for _ in 1:200
+            n = rand(rng, 1:60)
+            y = round.(randn(rng, n); digits = 2)
+            B = rand(rng, 1:12)
+            @test PO.forecast_calibration_edges(y, B) ≈
+                  unique([quantile(y, p) for p in range(0, 1, B + 1)]) atol = 1e-12
+        end
+    end
+
+    @testset "Each bin holds the pairs between its edges, and the means rise" begin
+        rng = StableRNG(9533)
+        for _ in 1:100
+            n = rand(rng, 1:50)
+            a = round.(randn(rng, n); digits = 1)
+            b = randn(rng, n)
+            B = rand(rng, 1:10)
+            c = PO.forecast_calibration_curve(a, b, B)
+            e = PO.forecast_calibration_edges(a, B)
+            m = length(e)
+            @test sum(c.count) == n
+            @test all(>(0), diff(c.mean_alpha))
+            for (j, bj) in enumerate(c.bin)
+                lo = m == 1 ? -Inf : e[bj]
+                hi = (m == 1 || bj == m - 1) ? Inf : e[bj + 1]
+                k = findall(v -> lo <= v < hi, a)
+                @test length(k) == c.count[j]
+                @test c.mean_alpha[j] ≈ sum(a[k]) / length(k)
+                @test c.mean_y[j] ≈ sum(b[k]) / length(k)
+            end
+        end
+        # A bin with no pair between its edges is dropped, so `bin` skips its index.
+        @test PO.forecast_calibration_curve([0.0, 10.0], [1.0, 2.0], 4).bin == [1, 4]
+    end
+
+    @testset "The pooled moments are the mean and the corrected deviation" begin
+        v = [1.0, 2.0, 4.0, -3.0]
+        m = PO.forecast_pooled_moments(v)
+        @test m.mean == sum(v) / 4
+        @test m.std ≈ sqrt(sum(abs2, v .- sum(v) / 4) / 3)
+        @test isnan(PO.forecast_pooled_moments([1.0]).std)
+    end
+
+    @testset "Only a positive rescaling leaves the coefficients and the books unmoved" begin
+        rng = StableRNG(1)
+        A = randn(rng, 12, 8)
+        Y = PO.forward_mean_returns(A .+ 0.3 .* randn(rng, 12, 8), 1, 1)
+        fe = forecast_evaluation(A, Y)
+        fn = forecast_evaluation(-2 .* A, Y)
+        @test forecast_ic(forecast_evaluation(2 .* A, Y)) ≈ forecast_ic(fe)
+        @test forecast_ic(fn) ≈ -forecast_ic(fe)
+        @test filter(isfinite, forecast_portfolio(fn).ret) ≈
+              -filter(isfinite, forecast_portfolio(fe).ret)
+        @test forecast_calibration(fn).slope ≈ -forecast_calibration(fe).slope / 2
+    end
+
+    @testset "A Float32 evaluation stays Float32" begin
+        A = Float32[1 2 3 4; 2 4 6 8; 4 3 2 1]
+        c = forecast_calibration(forecast_evaluation(A, PO.forward_mean_returns(A, 1, 1)))
+        @test c.slope isa Float32
+        @test c.std_y isa Float32
+        @test eltype(c.curve.mean_alpha) == Float32
+        @test eltype(PO.forecast_calibration_edges(Float32[3, 1, 2, 5], 3)) == Float32
     end
 end
 
@@ -2438,7 +2846,7 @@ end
         @test a.y === early.y
         @test a.umsk === early.umsk
         @test b.alpha === late.alpha
-        for f in (:target, :horizon, :lag, :step, :min_count, :ppy)
+        for f in (:target, :horizon, :lag, :step, :min_count, :ties, :ppy)
             @test getfield(a, f) === getfield(early, f)
             @test getfield(b, f) === getfield(late, f)
         end
@@ -2493,6 +2901,7 @@ end
     @testset "A set that does not answer one question is refused before it is aligned" begin
         for (nm, other) in (("horizon", forecast_evaluation(late_alpha, y; horizon = 2)),
                             ("step", forecast_evaluation(late_alpha, y; step = 2)),
+                            ("ties", forecast_evaluation(late_alpha, y; ties = :ordinal)),
                             ("ppy", forecast_evaluation(late_alpha, y; ppy = 252)))
             err = try
                 forecast_evaluation_align([early, other])
@@ -2717,5 +3126,725 @@ end
               forecast_evaluation_summary(fes[2], px.csfm).spearman_mean_ic[1]
         @test fa.spearman_mean_ic[2] ==
               forecast_evaluation_summary(al[2], px.csfm).spearman_mean_ic[1]
+    end
+end
+
+#=
+The docstrings of `14_ForecastSummary.jl` against numbers. Each probe computes, by hand, the
+number a `# Mathematical definition` or a sentence of the file states, and compares it with
+the number the code returns. The fixture holds a date with no forecast, a date under the
+threshold and two late listers, so the hit rates, the shares and the counts each read a
+sample that differs from the evaluation dates.
+=#
+function summary_docstring_fixture()
+    T, N = 40, 12
+    rng = StableRNG(962)
+    alpha = randn(rng, T, N)
+    X = randn(rng, T, N)
+    y = PortfolioOptimisers.forward_mean_returns(X, 1, 1)
+    alpha[5, :] .= NaN
+    alpha[9, 1:10] .= NaN
+    umsk = trues(T, N)
+    umsk[1:6, 11:12] .= false
+    fe = forecast_evaluation(alpha, y; umsk = umsk, min_count = 3)
+    return (; T = T, N = N, y = y, umsk = umsk, fe = fe)
+end
+
+@testset "The docstrings of 14_ForecastSummary.jl against numbers" begin
+    PO = PortfolioOptimisers
+    sx = summary_docstring_fixture()
+    fe = sx.fe
+
+    @testset "The scored count is the universe assets that carry a finite pair" begin
+        u = PO.forecast_ic_weights(fe.alpha, nothing)
+        n = PO.forecast_summary_scored(fe, u)
+        nh = [count(i -> fe.umsk[t, i] &&
+                         u[t, i] > 0 &&
+                         isfinite(fe.alpha[t, i]) &&
+                         isfinite(fe.y[t, i]), 1:(sx.N)) for t in fe.dates]
+        @test n == nh
+        # It is the numerator of the coverage, over the universe of the date.
+        U = [count(i -> fe.umsk[t, i] && u[t, i] > 0, 1:(sx.N)) for t in fe.dates]
+        @test isequal(forecast_coverage(fe), n ./ U)
+        @test n[findfirst(==(5), fe.dates)] == 0
+    end
+
+    @testset "The four coverage figures are the means and the minima of the definition" begin
+        u = PO.forecast_ic_weights(fe.alpha, nothing)
+        c = forecast_coverage(fe)
+        n = PO.forecast_summary_scored(fe, u)
+        Jc = findall(isfinite, c)
+        cv = PO.forecast_summary_coverage(fe, nothing)
+        @test cv.mean_coverage ≈ sum(c[Jc]) / length(Jc)
+        @test cv.min_coverage == minimum(c[Jc])
+        @test cv.mean_n_scored ≈ sum(n) / length(n)
+        @test cv.min_n_scored == minimum(n) == 0
+        # A date whose universe is empty enters no share figure and counts zero assets.
+        w = ones(sx.T, sx.N)
+        w[3, :] .= 0
+        cw = forecast_coverage(fe, w)
+        nw = PO.forecast_summary_scored(fe, w)
+        j3 = findfirst(==(3), fe.dates)
+        @test isnan(cw[j3]) && nw[j3] == 0
+        cvw = PO.forecast_summary_coverage(fe, w)
+        @test cvw.mean_coverage ≈ sum(filter(isfinite, cw)) / count(isfinite, cw)
+        @test cvw.mean_n_scored ≈ sum(nw) / length(nw)
+        # Every universe empty: the two shares are NaN, and the two counts are zero.
+        cvz = PO.forecast_summary_coverage(fe, zeros(sx.T, sx.N))
+        @test isnan(cvz.mean_coverage) && isnan(cvz.min_coverage)
+        @test cvz.mean_n_scored == 0 && cvz.min_n_scored == 0
+    end
+
+    @testset "Every hit rate counts the scored dates and not every date" begin
+        fs = forecast_evaluation_summary(fe)
+        ic = forecast_ic(fe)
+        rk = forecast_portfolio(fe; kind = :rank)
+        zs = forecast_portfolio(fe; kind = :zscore)
+        scored(x) = count(>(0), filter(isfinite, x)) / count(isfinite, x)
+        every(x) = count(>(0), filter(isfinite, x)) / length(x)
+        @test fs.spearman_hit_rate[1] == scored(ic[:, 1]) != every(ic[:, 1])
+        @test fs.pearson_hit_rate[1] == scored(ic[:, 2]) != every(ic[:, 2])
+        @test fs.rank_hit_rate[1] == scored(rk.ret) != every(rk.ret)
+        @test fs.zscore_hit_rate[1] == scored(zs.ret) != every(zs.ret)
+    end
+
+    @testset "Each book reports three figures that read no order of the returns" begin
+        fs = forecast_evaluation_summary(fe)
+        rk = forecast_portfolio(fe; kind = :rank)
+        @test fs.rank_ann_return[1] == rk.summary.ann_return
+        @test fs.rank_ann_volatility[1] == rk.summary.ann_volatility
+        @test fs.rank_sharpe[1] == rk.summary.sharpe
+        r = filter(isfinite, rk.ret)
+        p = r[randperm(StableRNG(3), length(r))]
+        a = performance_summary(r)
+        b = performance_summary(p)
+        @test a.ann_return ≈ b.ann_return &&
+              a.ann_volatility ≈ b.ann_volatility &&
+              a.sharpe ≈ b.sharpe
+        @test a.sortino ≈ b.sortino && a.cvar ≈ b.cvar && a.sharpe_stderr ≈ b.sharpe_stderr
+        @test !(a.max_drawdown ≈ b.max_drawdown)
+        @test length(PO.forecast_summary_row(fe, nothing, 10)) == 30
+        @test collect(keys(PO.forecast_summary_row(fe, nothing, 10))) ==
+              collect(fieldnames(ForecastSummaryResult)[2:31])
+    end
+
+    @testset "The aligned grid is the set the definition states, on the later phase" begin
+        f1 = forecast_evaluation(fe.alpha, sx.y; umsk = sx.umsk, step = 2, min_count = 3)
+        late = copy(fe.alpha)
+        late[1:9, :] .= NaN
+        f2 = forecast_evaluation(late, sx.y; umsk = sx.umsk, step = 2, min_count = 3)
+        @test isodd(first(f1.dates)) && iseven(first(f2.dates))
+        lo = max(first(f1.dates), first(f2.dates))
+        hi = min(last(f1.dates), last(f2.dates))
+        D = [lo + 2 * q for q in 0:hi if lo + 2 * q <= hi]
+        al = forecast_evaluation_align([f1, f2])
+        @test al[1].dates == al[2].dates == D
+        @test al[1].alpha === f1.alpha && al[1].y === f1.y && al[1].umsk === f1.umsk
+        # Two grids that share no date are refused.
+        g1 = PO.ForecastEvaluationResult(fe.alpha, fe.y, fe.umsk, [1, 2, 3], fe.target,
+                                         fe.horizon, fe.lag, fe.step, fe.min_count, fe.ties,
+                                         fe.ppy)
+        g2 = PO.ForecastEvaluationResult(fe.alpha, fe.y, fe.umsk, [10, 11], fe.target,
+                                         fe.horizon, fe.lag, fe.step, fe.min_count, fe.ties,
+                                         fe.ppy)
+        @test_throws PO.IsEmptyError forecast_evaluation_align([g1, g2])
+    end
+
+    @testset "A single tail fraction is read as a vector of one" begin
+        a = forecast_evaluation_summary(fe; quantiles = 0.2)
+        b = forecast_evaluation_summary(fe; quantiles = [0.2])
+        @test a.quantiles == [0.2]
+        @test a.spread_sharpe == b.spread_sharpe && size(a.spread_sharpe) == (1, 1)
+    end
+
+    @testset "Two Panel Field targets are one target only when they name one field" begin
+        @test PO.forecast_summary_same_target(PanelFieldTarget(; name = "a"),
+                                              PanelFieldTarget(; name = "a"))
+        @test !PO.forecast_summary_same_target(PanelFieldTarget(; name = "a"),
+                                               PanelFieldTarget(; name = "b"))
+        @test !PO.forecast_summary_same_target(IdiosyncraticTarget(), AssetReturnTarget())
+    end
+end
+
+@testset "The docstrings of 12_ForecastForwardWindows.jl against numbers" begin
+    PO = PortfolioOptimisers
+    alpha = WINDOW_ALPHA
+    fe = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1)
+
+    @testset "Each grid pair is the half-open window of the definition" begin
+        Xw = randn(StableRNG(952), 30, 3)
+        kinds = (:cumulative, :disjoint)
+        for (h, l, n) in ((1, 0, 4), (2, 1, 3), (3, 2, 3))
+            for kind in kinds
+                g = PO.forecast_window_grid(h, l, n, kind)
+                for p in 1:n
+                    lo = kind === :cumulative ? l : l + (p - 1) * h
+                    hi = l + p * h
+                    Yw = PO.forward_mean_returns(Xw, g[p]...)
+                    @test all(Yw[t, i] ≈ mean(Xw[(t + lo):(t + hi - 1), i])
+                              for t in 1:(30 - hi + 1), i in 1:3)
+                end
+            end
+        end
+    end
+
+    @testset "The common dates are the set of the definition" begin
+        rng = StableRNG(9520)
+        for _ in 1:100
+            nt, na = rand(rng, 5:12), rand(rng, 2:6)
+            a = randn(rng, nt, na)
+            a[rand(rng, nt, na) .< 0.25] .= NaN
+            xr = randn(rng, nt, na)
+            xr[rand(rng, nt, na) .< 0.2] .= NaN
+            g = PO.forecast_window_grid(rand(rng, 1:2), rand(rng, 0:2), rand(rng, 1:3),
+                                        rand(rng, (:cumulative, :disjoint)))
+            ys = [PO.forward_mean_returns(xr, h, l) for (h, l) in g]
+            mc = rand(rng, 1:na)
+            set = [t
+                   for t in 1:nt
+                   if all(count(i -> isfinite(a[t, i]) && isfinite(y[t, i]), 1:na) >= mc
+                          for y in ys)]
+            @test PO.forecast_common_dates(a, ys, 1:nt, mc) == set
+        end
+    end
+
+    @testset "A zero weight leaves the Pearson coefficient NaN on a kept date" begin
+        wz = ones(8, 4)
+        wz[2, 1:2] .= 0.0
+        t = forecast_holding_period(fe, alpha, wz; n = 2)
+        @test 2 ∈ t.dates
+        f1 = PO.ForecastEvaluationResult(fe.alpha, PO.forward_mean_returns(alpha, 1, 1),
+                                         fe.umsk, t.dates, fe.target, 1, 1, 1, 3, fe.ties,
+                                         fe.ppy)
+        ic = forecast_ic(f1, wz)
+        j = findfirst(==(2), t.dates)
+        @test isnan(ic[j, 2])
+        @test isfinite(ic[j, 1])
+        @test all(isfinite, forecast_portfolio(f1; kind = :rank).ret)
+    end
+
+    @testset "Every figure of a row takes the element type of the pairing" begin
+        a32 = Float32.(alpha)
+        f32 = forecast_evaluation(a32, PO.forward_mean_returns(a32, 1, 1); step = 1)
+        for n in (2, 8)
+            t = forecast_holding_period(f32, a32, ones(Float64, 8, 4); n = n)
+            @test all(eltype(t[k]) === Float32 for k in keys(t)[5:end])
+        end
+    end
+
+    @testset "A wrong weight history raises at every depth" begin
+        @test_throws DimensionMismatch forecast_holding_period(fe, alpha, ones(3, 3); n = 2)
+        @test_throws DimensionMismatch forecast_holding_period(fe, alpha, ones(3, 3); n = 8)
+        @test_throws DimensionMismatch forecast_decay(fe, alpha, ones(3, 3); n = 8)
+        @test_throws DomainError forecast_holding_period(fe, alpha, -ones(8, 4); n = 8)
+    end
+
+    @testset "The plain t-ratio spreads with the depth only for a persistent forecast" begin
+        rng = StableRNG(9522)
+        nr, nt, na, depth = 100, 240, 20, 5
+        for (rho, grows) in ((1.0, true), (0.0, false))
+            plain = zeros(nr, depth)
+            corrected = zeros(nr, depth)
+            for m in 1:nr
+                xm = randn(rng, nt, na)
+                am = zeros(nt, na)
+                am[1, :] = randn(rng, na)
+                for t in 2:nt
+                    am[t, :] = rho .* am[t - 1, :] .+ sqrt(1 - rho^2) .* randn(rng, na)
+                end
+                fm = forecast_evaluation(am, PO.forward_mean_returns(xm, 1, 1))
+                tb = forecast_holding_period(fm, xm; n = depth)
+                plain[m, :] = tb.spearman_ic_ir .* sqrt(length(tb.dates))
+                corrected[m, :] = tb.spearman_t_stat
+            end
+            sp = vec(std(plain; dims = 1))
+            sc = vec(std(corrected; dims = 1))
+            @test (sp[depth] / sp[1] > 1.6) == grows
+            @test sc[depth] / sc[1] < 1.3
+        end
+    end
+end
+
+@testset "The docstrings of 09_ForecastInformationCoefficient.jl against numbers" begin
+    PO = PortfolioOptimisers
+    # The definitions, written out by hand. Every assignment is local, so no helper writes
+    # a variable of the testset.
+    function ic_hand_wcor(a, b, u, mc)
+        local k = [i
+                   for i in eachindex(a)
+                   if isfinite(a[i]) && isfinite(b[i]) && isfinite(u[i]) && u[i] > 0]
+        length(k) < mc && return NaN
+        local wk, xk, yk = u[k], a[k], b[k]
+        local mx, my = sum(wk .* xk) / sum(wk), sum(wk .* yk) / sum(wk)
+        local num = sum(wk .* (xk .- mx) .* (yk .- my))
+        local den = sqrt(sum(wk .* (xk .- mx) .^ 2) * sum(wk .* (yk .- my) .^ 2))
+        return den > 1e-12 ? num / den : NaN
+    end
+    function ic_hand_ranks(x)
+        local r = similar(x)
+        r[sortperm(x)] = 1:length(x)
+        return r
+    end
+    function ic_hand_spearman(a, b, mc)
+        local k = [i for i in eachindex(a) if isfinite(a[i]) && isfinite(b[i])]
+        length(k) < mc && return NaN
+        return ic_hand_wcor(ic_hand_ranks(a[k]), ic_hand_ranks(b[k]), ones(length(k)), mc)
+    end
+
+    @testset "Each column is its correlation over the assets the definition admits" begin
+        rng = StableRNG(948)
+        for _ in 1:150
+            nt, na = rand(rng, 5:10), rand(rng, 3:8)
+            a = randn(rng, nt, na)
+            a[rand(rng, nt, na) .< 0.1] .= NaN
+            wr = rand(rng, nt, na)
+            wr[rand(rng, nt, na) .< 0.15] .= rand(rng, [0.0, NaN, Inf])
+            mc = rand(rng, 1:4)
+            fr = forecast_evaluation(a, PO.forward_mean_returns(randn(rng, nt, na), 2, 1);
+                                     horizon = 2, step = rand(rng, 1:2), min_count = mc)
+            ic = forecast_ic(fr, wr)
+            for (j, t) in enumerate(fr.dates)
+                s = ic_hand_spearman(fr.alpha[t, :], fr.y[t, :], mc)
+                p = ic_hand_wcor(fr.alpha[t, :], fr.y[t, :], wr[t, :], mc)
+                @test isequal(s, ic[j, 1]) || isapprox(s, ic[j, 1]; atol = 1e-12)
+                @test isequal(p, ic[j, 2]) || isapprox(p, ic[j, 2]; atol = 1e-12)
+            end
+        end
+    end
+
+    @testset "Equal forecasts share a rank under `:average` and take the asset order under `:ordinal`" begin
+        flat = [1.0 1.0 1.0 1.0 1.0; 0.0 0.0 0.0 0.0 0.0]
+        up = [1.0 2.0 3.0 4.0 5.0; 0.0 0.0 0.0 0.0 0.0]
+        # Under the default, a constant forecast has constant ranks, so the Spearman column
+        # is `NaN`, as the Pearson column is.
+        for yc in (up, reverse(up; dims = 2))
+            icc = forecast_ic(forecast_evaluation(flat, yc))
+            @test isnan(icc[1, 1])
+            @test isnan(icc[1, 2])
+        end
+        # Under `:ordinal`, the order of the assets sets the Spearman column.
+        icu = forecast_ic(forecast_evaluation(flat, up; ties = :ordinal))
+        icd = forecast_ic(forecast_evaluation(flat, reverse(up; dims = 2); ties = :ordinal))
+        @test icu[1, 1] == 1.0
+        @test icd[1, 1] == -1.0
+        @test isnan(icu[1, 2])
+        @test isnan(icd[1, 2])
+        # Two targets that differ only inside the ties of the forecast get one coefficient
+        # under the default, and two under `:ordinal`.
+        a2 = [1.0 1.0 2.0 2.0; 0.0 0.0 0.0 0.0]
+        y1 = [1.0 2.0 3.0 4.0; 0.0 0.0 0.0 0.0]
+        y2 = [2.0 1.0 4.0 3.0; 0.0 0.0 0.0 0.0]
+        @test forecast_ic(forecast_evaluation(a2, y1))[1, 1] ≈ 4 / sqrt(20)
+        @test forecast_ic(forecast_evaluation(a2, y2))[1, 1] ≈ 4 / sqrt(20)
+        @test forecast_ic(forecast_evaluation(a2, y1; ties = :ordinal))[1, 1] ≈ 1.0
+        @test forecast_ic(forecast_evaluation(a2, y2; ties = :ordinal))[1, 1] ≈ 0.6
+    end
+
+    @testset "A weight that is not finite is outside the universe of every verb" begin
+        # A zero idiosyncratic variance gives an infinite weight under the inverse-variance
+        # metric, which reads 1 ./ vs. Asset 1 carries it at the first date, and no forecast
+        # there, so the coverage read it as a missed asset and reported 3/4.
+        vs = [0.0 1.0 1.0 1.0; 1.0 1.0 1.0 1.0]
+        wi = 1 ./ vs
+        a = [NaN 2.0 3.0 4.0; 2.0 1.0 4.0 3.0]
+        yi = [1.0 2.0 3.0 4.0; 0.0 0.0 0.0 0.0]
+        fi = forecast_evaluation(a, yi; min_count = 2)
+        @test isinf(wi[1, 1])
+        @test fi.dates == [1, 2]
+        @test forecast_coverage(fi, wi)[1] == 1.0
+        # With a finite forecast, asset 1 was counted as scored, 4 against the 3 the
+        # Pearson column reads.
+        a2 = [1.0 2.0 3.0 4.0; 2.0 1.0 4.0 3.0]
+        f2 = forecast_evaluation(a2, yi; min_count = 2)
+        @test PO.forecast_summary_scored(f2, PO.forecast_ic_weights(f2.alpha, wi)) ==
+              [3.0, 4.0]
+        @test forecast_coverage(f2, wi) == [1.0, 1.0]
+        @test forecast_ic(f2, wi)[1, 2] ≈ ic_hand_wcor(a2[1, 2:4], yi[1, 2:4], ones(3), 2)
+        wn = copy(wi)
+        wn[1, 1] = NaN
+        @test isequal(forecast_coverage(f2, wn), forecast_coverage(f2, wi))
+        @test isequal(forecast_ic(f2, wn), forecast_ic(f2, wi))
+    end
+
+    @testset "The lag counts the later dates whose windows overlap a given one" begin
+        for h in 1:12, s in 1:12
+            @test PO.forecast_ic_lags(h, s) == count(j -> j * s < h, 1:12)
+        end
+    end
+
+    @testset "The t-statistic is the mean over the long-run standard error" begin
+        rng = StableRNG(9480)
+        for _ in 1:100
+            nr = rand(rng, 4:30)
+            ic = randn(rng, nr, 2)
+            ic[rand(rng, nr, 2) .< 0.1] .= NaN
+            nl = rand(rng, 0:4)
+            sm = forecast_ic_summary(ic; lags = nl)
+            for (k, v) in ((1, sm.spearman), (2, sm.pearson))
+                c = ic[:, k]
+                f = filter(isfinite, c)
+                n = length(f)
+                n < 2 && continue
+                m = sum(f) / n
+                g = sum(abs2, f .- m)
+                for l in 1:nl, t in 1:(nr - l)
+                    if isfinite(c[t]) && isfinite(c[t + l])
+                        g += 2 * (c[t] - m) * (c[t + l] - m)
+                    end
+                end
+                tt = g > 0 ? m / sqrt(g / (n - 1)) * sqrt(n) : NaN
+                @test isequal(tt, v.t_stat) || isapprox(tt, v.t_stat; rtol = 1e-12)
+                @test v.mean_ic ≈ m
+                @test v.std_ic ≈ sqrt(sum(abs2, f .- m) / (n - 1))
+                @test v.hit_rate == count(>(0), f) / n
+            end
+        end
+    end
+
+    @testset "The plain ratio overstates a persistent forecast and not a fresh one" begin
+        rng = StableRNG(9481)
+        nr, nt, na, h = 100, 200, 16, 4
+        for (rho, overstated) in ((0.99, true), (0.0, false))
+            plain = zeros(nr)
+            corrected = zeros(nr)
+            for m in 1:nr
+                am = zeros(nt, na)
+                am[1, :] = randn(rng, na)
+                for t in 2:nt
+                    am[t, :] = rho .* am[t - 1, :] .+ sqrt(1 - rho^2) .* randn(rng, na)
+                end
+                xm = randn(rng, nt, na)
+                fm = forecast_evaluation(am, PO.forward_mean_returns(xm, h, 1); horizon = h,
+                                         step = 1)
+                icm = forecast_ic(fm)
+                plain[m] = forecast_ic_summary(icm).spearman.ic_ir *
+                           sqrt(count(isfinite, icm[:, 1]))
+                corrected[m] = forecast_ic_summary(icm; lags = PO.forecast_ic_lags(fm)).spearman.t_stat
+            end
+            @test (std(plain) > 1.5) == overstated
+            @test 0.75 < std(corrected) < 1.3
+        end
+    end
+
+    @testset "The columns and the coverage take the promotion of the pair and the weights" begin
+        a32 = Float32.(IC_ALPHA)
+        f32 = forecast_evaluation(a32, PO.forward_mean_returns(a32, 1, 1))
+        @test eltype(forecast_ic(f32)) === Float32
+        @test eltype(forecast_coverage(f32)) === Float32
+        @test eltype(forecast_ic(f32, ones(Float64, 4, 4))) === Float64
+        @test eltype(forecast_coverage(f32, ones(Float64, 4, 4))) === Float64
+    end
+end
+
+@testset "The docstrings of 10_ForecastPortfolios.jl against numbers" begin
+    PO = PortfolioOptimisers
+
+    @testset "A flat cross-section holds no book under either kind" begin
+        # The mean of equal values rounds off them at 3, 5, 6 and 7 assets, so a centring
+        # that trusts it writes a short book of 200 % gross instead of a zero row. Under the
+        # default tie rule, the ranks of a flat cross-section are equal too. Under
+        # `:ordinal`, they follow the asset axis, so the rank kind holds a book.
+        for na in 1:7, v in (0.1, 0.3, 0.7, 1 / 3, 0.123456789, -0.2, 2.2),
+            kind in (:rank, :zscore), tr in (:average, :ordinal)
+
+            a = fill(v, 1, na)
+            wf = PO.forecast_portfolio_weights(a, a, [1], kind, tr)
+            @test if kind === :rank && tr === :ordinal && na > 1
+                isapprox(sum(abs, wf), 2)
+            else
+                all(iszero, wf)
+            end
+        end
+        @test all(iszero,
+                  PO.forecast_portfolio_weights(fill(0.1, 1, 3), fill(0.0, 1, 3), [1],
+                                                :zscore, :average))
+    end
+
+    @testset "A constant series has a zero volatility and no ratio" begin
+        for ns in 2:9, v in (0.1, 0.3, 0.7, 1 / 3, 0.123456789, -0.2, 2.2)
+            sm = PO.forecast_series_summary(fill(v, ns), 12)
+            @test sm.ann_mean == 12 * v
+            @test iszero(sm.ann_vol)
+            @test isnan(sm.ann_ir)
+        end
+        @test all(isnan, values(PO.forecast_series_summary(Float64[], 12)))
+        sm = PO.forecast_series_summary([NaN, 0.2], 12)
+        @test sm.ann_mean ≈ 2.4
+        @test isnan(sm.ann_vol) && isnan(sm.ann_ir)
+        @test PO.forecast_hit_rate([1.0, -1.0, NaN, 0.0, Inf]) == 1 / 3
+        @test isnan(PO.forecast_hit_rate([NaN]))
+    end
+
+    # Date 2 carries two assets under `min_count = 3`. Its book is built, and its return
+    # is not scored.
+    alpha = [1.0 2.0 3.0 4.0
+             1.0 2.0 NaN NaN
+             1.0 2.0 3.0 4.0]
+    gap_y(g) = [0.0 0.0 0.0 -0.1
+                -g g 0.0 0.0
+                0.0 0.0 0.0 -0.1]
+
+    @testset "A date below the threshold keeps its book, and the next turnover reads it" begin
+        fe = forecast_evaluation(alpha, gap_y(0.1); min_count = 3, ppy = 1, step = 1)
+        p = forecast_portfolio(fe; kind = :rank)
+        @test p.w[2, :] == [-1.0, 1.0, 0.0, 0.0]
+        @test isnan(p.ret[2])
+        @test isnan(p.turnover[2])
+        @test p.turnover[3] ≈ sum(abs, p.w[3, :] - p.w[2, :])
+        @test p.turnover[3] ≈ 2.5
+    end
+
+    @testset "A gap hides its own return, so the compressed drawdown moves either way" begin
+        for (g, deeper) in ((0.1, true), (-0.1, false))
+            fe = forecast_evaluation(alpha, gap_y(g); min_count = 3, ppy = 1, step = 1)
+            p = forecast_portfolio(fe; kind = :rank)
+            held = copy(p.ret)
+            held[2] = sum(p.w[2, i] * gap_y(g)[2, i] for i in 1:4)
+            full = performance_summary(held; periods_per_year = 1)
+            @test p.summary.max_drawdown ≈ -0.15
+            @test (p.summary.max_drawdown < full.max_drawdown) == deeper
+        end
+    end
+
+    @testset "The quantile spread reports the four figures of the series summary" begin
+        fe = forecast_evaluation(alpha[[1, 3], :], gap_y(0.1)[[1, 3], :]; min_count = 3,
+                                 ppy = 4, step = 1)
+        q = forecast_quantile_spread(fe; quantiles = [0.25, 0.5])
+        @test keys(q) == (:spread, :ann_mean, :ann_vol, :ann_ir, :hit_rate)
+        for j in 1:2
+            sm = PO.forecast_series_summary(q.spread[:, j], 4)
+            @test isequal((q.ann_mean[j], q.ann_vol[j], q.ann_ir[j], q.hit_rate[j]),
+                          values(sm))
+        end
+        @test isequal(forecast_quantile_spread(fe; quantiles = 0.25).spread,
+                      q.spread[:, 1:1])
+    end
+
+    @testset "Both tails are inclusive, so a small cross-section puts one asset in both" begin
+        @test PO.forecast_tail_spread([1.0], [2.0], 0.1) == 0
+        # At q = 0.5 the median asset is in both tails.
+        @test PO.forecast_tail_spread([1.0, 2.0, 3.0], [10.0, 20.0, 30.0], 0.5) ≈
+              (20 + 30) / 2 - (10 + 20) / 2
+    end
+end
+
+# A member that counts its fits and forwards each one to a shipped member. It carries no
+# method of `forecast_history`, so it also proves that a new member needs none.
+struct HistoryFitCounter{R} <: PortfolioOptimisers.AbstractReturnForecastEstimator
+    inner::R
+    n::Base.RefValue{Int}
+end
+function PortfolioOptimisers.return_forecast(c::HistoryFitCounter,
+                                             rd::PortfolioOptimisers.ReturnsResult,
+                                             csfm::CrossSectionalFactorModel)
+    c.n[] += 1
+    return PortfolioOptimisers.return_forecast(c.inner, rd, csfm)
+end
+
+@testset "The docstrings of 08_ForecastHistory.jl against numbers" begin
+    PO = PortfolioOptimisers
+    fx = evaluation_fixture()
+    rd, csfm, scores, rows = fx.rd, fx.csfm, fx.scores, fx.rows
+    Tb, N = fx.Tb, fx.N
+    fw = FixedWeightedReturnForecast(; scores = scores, scale = 1.0, weights = [0.4, 0.6])
+    ew = ExpWeightedReturnForecast(; scores = scores, horizon = 2, lag = 1, scale = 1.0,
+                                   min_obs = 3)
+    tgt = TargetReturnForecast(; scores = scores, horizon = 2, lag = 1, calibrate = false)
+    tgtc = TargetReturnForecast(; scores = scores, horizon = 2, lag = 1, calibrate = true)
+    members = (fw, ew, tgt, tgtc)
+
+    @testset "No member reads b, esigma, L, fcb, rf, or the values of M" begin
+        K = size(csfm.Ms, 3)
+        fcb = PO.FactorFamilyBasis(; fnm = ["industry"], fi = [collect(2:K)], di = [K - 1],
+                                   ratios = ones(Tb, K - 2), K = K)
+        full = CrossSectionalFactorModel(; M = 3 .* csfm.M .+ 1,
+                                         L = randn(StableRNG(3), N, K - 1),
+                                         b = randn(StableRNG(4), N), csr = csfm.csr,
+                                         Ms = csfm.Ms, vs = csfm.vs, esigma = fill(0.3, N),
+                                         nf = csfm.nf, fam = csfm.fam, fcb = fcb,
+                                         rf = return_forecast(fw, rd, csfm))
+        for m in members
+            mu = return_forecast(m, rd, full).mu
+            @test isequal(mu, return_forecast(m, rd, csfm).mu)
+            # The fit on the cut at the last row is the fit on the whole sample.
+            @test isequal(mu,
+                          return_forecast(m, PO.port_opt_view(rd, 1:rows[Tb], :),
+                                          PO.forecast_history_block(full, Tb)).mu)
+            @test isequal(forecast_history(m, rd, full; step = 3),
+                          forecast_history(m, rd, csfm; step = 3))
+        end
+        cut = PO.forecast_history_block(full, 10)
+        @test isequal(cut.M, full.Ms[10, :, :])
+        @test cut.b == full.b
+        @test cut.esigma == full.esigma
+        @test isnothing(getfield(cut, :L))
+        @test cut.L === cut.M
+        @test isnothing(cut.fcb)
+        @test isnothing(cut.rf)
+    end
+
+    @testset "A grid row is the fit at that row, and the last row is mu only on the grid" begin
+        mu = return_forecast(tgtc, rd, csfm).mu
+        for s in (1, 3, 5, 7)
+            h = forecast_history(tgtc, rd, csfm; step = s)
+            grid = 1:s:Tb
+            for tb in grid
+                tb == Tb && continue
+                @test isequal(h[tb, :],
+                              return_forecast(tgtc, PO.port_opt_view(rd, 1:rows[tb], :),
+                                              PO.forecast_history_block(csfm, tb)).mu)
+            end
+            @test all(t -> all(isnan, view(h, t, :)), setdiff(1:Tb, grid))
+            if Tb in grid
+                @test isequal(h[Tb, :], mu)
+            else
+                @test all(isnan, view(h, Tb, :))
+            end
+        end
+    end
+
+    @testset "Every evaluation date is a fitted row of the grid" begin
+        for s in 1:7, hz in (1, 2, 4)
+            fe = forecast_evaluation(tgt, rd, csfm; horizon = hz, lag = 1, step = s)
+            grid = 1:s:Tb
+            fin = [t
+                   for t in grid
+                   if any(i -> isfinite(fe.alpha[t, i]) && isfinite(fe.y[t, i]), 1:N)]
+            @test issubset(fe.dates, grid)
+            @test first(fe.dates) == first(fin)
+            @test last(fe.dates) == last(fin)
+        end
+    end
+
+    @testset "A member with a history is fitted once, and one without is refitted per row" begin
+        for (m, s) in ((fw, 1), (fw, 5), (ew, 3), (tgt, 1), (tgt, 3), (tgt, 5))
+            c = HistoryFitCounter(m, Ref(0))
+            h = forecast_history(c, rd, csfm; step = s)
+            grid = 1:s:Tb
+            @test c.n[] ==
+                  (m isa TargetReturnForecast ? 1 + length(grid) - (Tb in grid) : 1)
+            @test size(h) == (length(PO.return_forecast_rows(rd, csfm)), N)
+        end
+    end
+
+    @testset "A whole-history member reads nothing after the row it forecasts" begin
+        tw = TargetReturnForecast(; scores = scores, horizon = 2, lag = 1, calibrate = true,
+                                  whole_history = true)
+        h = forecast_history(tw, rd, csfm; step = 3)
+        for tb in 1:3:(Tb - 1)
+            @test isequal(h[tb, :],
+                          return_forecast(tw, PO.port_opt_view(rd, 1:rows[tb], :),
+                                          PO.forecast_history_block(csfm, tb)).mu)
+        end
+        @test isequal(h[Tb, :], return_forecast(tw, rd, csfm).mu)
+        tb = 31
+        rng = StableRNG(7)
+        rdp = deepcopy(rd)
+        csfmp = deepcopy(csfm)
+        ra = (rows[tb] + 1):(fx.T)
+        rdp.X[ra, :] .= 10 .* randn(rng, length(ra), N)
+        csfmp.csr.eps[(tb + 1):Tb, :] .= 5 .* randn(rng, Tb - tb, N)
+        csfmp.vs[(tb + 1):Tb, :] .= 9.0
+        hp = forecast_history(tw, rdp, csfmp; step = 3)
+        @test isequal(view(hp, 1:tb, :), view(h, 1:tb, :))
+        @test !isequal(view(hp, tb + 3, :), view(h, tb + 3, :))
+    end
+
+    @testset "A stated forecast is refused whatever the step" begin
+        cv = CustomValueReturnForecast(; mu = fill(0.01, N))
+        for s in (0, -1, 1, 3)
+            @test_throws PO.ConflictingArgumentError forecast_history(cv, rd, csfm;
+                                                                      step = s)
+        end
+    end
+
+    @testset "The refit history takes the element type of mu" begin
+        mu = Float32.(return_forecast(tgt, rd, csfm).mu)
+        h = PO.forecast_history_refit(tgt, rd, csfm, mu, 5)
+        @test eltype(h) === Float32
+        @test isequal(h[1, :], Float32.(forecast_history(tgt, rd, csfm; step = 5)[1, :]))
+    end
+end
+
+@testset "The docstrings of 07_ForecastEvaluation.jl against numbers" begin
+    PO = PortfolioOptimisers
+    fx = evaluation_fixture()
+    ew = ExpWeightedReturnForecast(; scores = fx.scores, half_life = 10.0, min_obs = 1,
+                                   horizon = 2, lag = 1)
+    rf = return_forecast(ew, fx.rd, fx.csfm)
+
+    @testset "Every method refuses a parameter outside its domain before it reads a history" begin
+        # The carrier methods read the history at `t + lag` to build the target, so a
+        # negative lag must be refused before that read, not by an index out of bounds.
+        for (k, v) in
+            ((:horizon, 0), (:lag, -1), (:lag, -3), (:step, 0), (:min_count, 0), (:ppy, 0))
+            kw = (k => v,)
+            @test_throws DomainError forecast_evaluation(rf, fx.rd, fx.csfm; kw...)
+            @test_throws DomainError forecast_evaluation(ew, fx.rd, fx.csfm; kw...)
+            @test_throws DomainError forecast_evaluation(rf.hist, rf.hist; kw...)
+            @test_throws DomainError PO.forecast_evaluation_pairing(rf.hist, fx.rd, fx.csfm;
+                                                                    kw...)
+        end
+        for fn in (() -> forecast_evaluation(rf, fx.rd, fx.csfm; ties = :dense),
+                   () -> forecast_evaluation(ew, fx.rd, fx.csfm; ties = :dense),
+                   () -> forecast_evaluation(rf.hist, rf.hist; ties = :dense))
+            @test_throws PO.ConflictingArgumentError fn()
+        end
+        @test isnothing(PO.forecast_evaluation_assert_parameters(; horizon = 1, lag = 0,
+                                                                 step = 1, min_count = 1,
+                                                                 ties = :ordinal, ppy = 1))
+    end
+
+    @testset "The dates are the stride from the first scorable observation" begin
+        for trial in 1:500
+            rng = StableRNG(trial)
+            nt, na = rand(rng, 1:9), rand(rng, 1:5)
+            ad = [rand(rng) < 0.3 ? rand(rng, (NaN, Inf, -Inf)) : randn(rng)
+                  for _ in 1:nt, _ in 1:na]
+            yd = [rand(rng) < 0.3 ? rand(rng, (NaN, Inf)) : randn(rng)
+                  for _ in 1:nt, _ in 1:na]
+            sd = rand(rng, 1:4)
+            sc = [t
+                  for t in 1:nt if any(i -> isfinite(ad[t, i]) && isfinite(yd[t, i]), 1:na)]
+            if isempty(sc)
+                @test_throws PO.IsEmptyError PO.forecast_evaluation_dates(ad, yd, sd)
+            else
+                dd = PO.forecast_evaluation_dates(ad, yd, sd)
+                @test dd == [first(sc) + (j - 1) * sd
+                             for j in 1:(fld(last(sc) - first(sc), sd) + 1)]
+            end
+        end
+        # The last date can come before the last scorable observation.
+        @test PO.forecast_evaluation_dates(ones(4, 1), ones(4, 1), 2) == [1, 3]
+    end
+
+    @testset "The mask writes NaN off the universe, and no more" begin
+        for trial in 1:200
+            rng = StableRNG(10_000 + trial)
+            am = randn(rng, rand(rng, 1:6), rand(rng, 1:5))
+            mm = rand(rng, Bool, size(am)...)
+            ac = copy(am)
+            wm = PO.forecast_evaluation_mask(am, mm)
+            @test all(k -> mm[k] ? wm[k] == am[k] : isnan(wm[k]), eachindex(mm))
+            @test (wm === am) == all(mm)
+            @test am == ac
+        end
+        @test eltype(PO.forecast_evaluation_mask(Float32[1 2; 3 4],
+                                                 [true false; true true])) === Float32
+    end
+
+    @testset "A perfect idiosyncratic ranking scores less than one on the asset return" begin
+        fi = forecast_evaluation(rf, fx.rd, fx.csfm; horizon = 2, lag = 1, step = 1)
+        fa = forecast_evaluation(rf, fx.rd, fx.csfm; target = AssetReturnTarget(),
+                                 horizon = 2, lag = 1, step = 1)
+        rho_i = [PO.cs_spearman_correlation(view(fi.y, t, :), view(fi.y, t, :))
+                 for t in axes(fi.y, 1)]
+        rho_a = [PO.cs_spearman_correlation(view(fi.y, t, :), view(fa.y, t, :))
+                 for t in axes(fi.y, 1)]
+        both = [t for t in axes(fi.y, 1) if isfinite(rho_i[t]) && isfinite(rho_a[t])]
+        @test !isempty(both)
+        @test all(t -> rho_i[t] ≈ 1, both)
+        @test all(t -> rho_a[t] <= 1 + 1e-12, both)
+        @test count(t -> rho_a[t] < 1 - 1e-12, both) > 0
     end
 end

@@ -2,7 +2,7 @@
 Description = "Maximum Drawdown, public API of PortfolioOptimisers.jl: MaximumDrawdown, RelativeMaximumDrawdown."
 ```
 
-# Maximum Drawdown
+# [Maximum Drawdown](@id api-maximum-drawdown)
 
 ```@docs
 MaximumDrawdown

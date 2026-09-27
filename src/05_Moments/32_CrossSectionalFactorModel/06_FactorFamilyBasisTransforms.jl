@@ -44,20 +44,27 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Map an exposure history onto the reduced factor axis.
 
+The function applies the ratios of each observation to the exposures of that observation.
+
 # Mathematical definition
 
-For a family that drops member ``k``, each retained member ``j`` becomes
-
 ```math
-z_{t,j} = x_{t,j} - \\frac{c_t(j)}{c_t(k)} \\, x_{t,k},
+\\begin{align}
+\\mathbf{B}^{\\mathrm{red}}_{t} &= \\mathbf{B}_{t} \\mathbf{R}_{t}\\,, \\\\
+\\mathbf{B}^{\\mathrm{red}}_{t} \\boldsymbol{f}^{\\mathrm{red}}_{t} &= \\mathbf{B}_{t} \\boldsymbol{f}^{\\mathrm{raw}}_{t} \\quad \\text{when} \\quad \\boldsymbol{f}^{\\mathrm{raw}}_{t} = \\mathbf{R}_{t} \\boldsymbol{f}^{\\mathrm{red}}_{t}\\,.
+\\end{align}
 ```
 
-and a factor outside every constrained family is copied unchanged.
+The column of a retained member ``j`` of a family that drops ``k`` is the column of ``j`` less ``r_{t}(j)`` times the column of ``k``, and a factor outside every constrained family keeps its column. The second line follows from the first, so the two bases give the same fitted values.
 
 Where:
 
-  - ``x_{t,j}``: raw exposure of the assets to factor ``j`` at observation ``t``.
-  - ``c_t(j) / c_t(k)``: the entry of `fcb.ratios` for member ``j``.
+  - $(math_dict[:B_t_att])
+  - ``\\mathbf{B}^{\\mathrm{red}}_{t}``: Exposure slice of observation ``t`` on the reduced axis, ``N \\times K_{r}``.
+  - $(math_dict[:R_t_fcb])
+  - $(math_dict[:r_tj_fcb])
+  - $(math_dict[:K_r_fcb])
+  - $(math_dict[:f_t_fcb])
 
 # Arguments
 
@@ -102,13 +109,29 @@ end
 
 Map a point-in-time loading matrix onto the reduced factor axis.
 
-This is [`reduce_exposures`](@ref) at one observation, so it applies the ratios of observation `t` to a matrix of assets by raw factors.
+This is [`reduce_exposures`](@ref) at one observation. It applies the ratios of observation `t` to a matrix of assets by raw factors.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{L} &= \\mathbf{M} \\mathbf{R}_{t}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{M}``: Loading matrix on the raw axis, ``N \\times K``.
+  - ``\\mathbf{L}``: Loading matrix on the reduced axis, ``N \\times K_{r}``.
+  - $(math_dict[:R_t_fcb])
+  - $(math_dict[:r_tj_fcb])
+  - $(math_dict[:K_r_fcb])
 
 # Arguments
 
   - `fcb`: A Factor Family Basis.
   - `M::MatNum`: Loading matrix on the raw axis, `assets × factors`.
-  - `t::Integer`: Observation whose ratios are applied. It defaults to the last observation of the basis.
+  - `t::Integer`: Observation whose ratios the function applies. It defaults to the last observation of the basis.
 
 # Validation
 
@@ -177,7 +200,27 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Drop the redundant factor returns, giving the reduced-axis factor returns.
 
-Factor returns are coordinates in factor-return space, so the reduction keeps the retained columns and applies no ratio. It is the inverse of [`expand_factor_returns`](@ref).
+The reduction keeps the retained columns and applies no ratio. It undoes [`expand_factor_returns`](@ref), and the converse holds only for raw returns that satisfy the zero-sum condition of every constrained Factor Family.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{f}^{\\mathrm{red}}_{t} &= \\mathbf{S}^{\\intercal} \\boldsymbol{f}^{\\mathrm{raw}}_{t}\\,, \\\\
+\\mathbf{S}^{\\intercal} \\mathbf{R}_{t} &= \\mathbf{I}\\,.
+\\end{align}
+```
+
+The second line follows from the definitions of ``\\mathbf{S}`` and ``\\mathbf{R}_{t}``.
+
+Where:
+
+  - $(math_dict[:f_t_fcb])
+  - $(math_dict[:S_fcb])
+  - $(math_dict[:R_t_fcb])
+  - $(math_dict[:r_tj_fcb])
+  - $(math_dict[:K_r_fcb])
+  - $(math_dict[:I_identity])
 
 # Arguments
 
@@ -210,7 +253,27 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Drop the redundant entries of a factor mean, giving the reduced-axis mean.
 
-It is the inverse of [`expand_factor_mu`](@ref), and it applies no ratio.
+The reduction applies no ratio. It undoes [`expand_factor_mu`](@ref), and the converse holds only for a raw mean that satisfies the zero-sum condition of every constrained Factor Family.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{\\mu}^{\\mathrm{red}} &= \\mathbf{S}^{\\intercal} \\boldsymbol{\\mu}^{\\mathrm{raw}}\\,, \\\\
+\\mathbf{S}^{\\intercal} \\mathbf{R}_{t} &= \\mathbf{I}\\,.
+\\end{align}
+```
+
+The second line follows from the definitions of ``\\mathbf{S}`` and ``\\mathbf{R}_{t}``.
+
+Where:
+
+  - $(math_dict[:mu_fcb])
+  - $(math_dict[:S_fcb])
+  - $(math_dict[:R_t_fcb])
+  - $(math_dict[:r_tj_fcb])
+  - $(math_dict[:K_r_fcb])
+  - $(math_dict[:I_identity])
 
 # Arguments
 
@@ -239,7 +302,27 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Take the full-rank block of a factor covariance, giving the reduced-axis covariance.
 
-The reduced factor returns are the retained raw ones, so the reduced covariance is the submatrix of the retained indices and no ratio is applied. It is the inverse of [`expand_factor_covariance`](@ref).
+The reduced factor returns are the retained raw ones, so the reduced covariance is the block of the retained factors and the reduction applies no ratio. It undoes [`expand_factor_covariance`](@ref), and the converse holds only for a raw covariance of the form ``\\mathbf{R}_{t} \\mathbf{\\Sigma}^{\\mathrm{red}} \\mathbf{R}_{t}^{\\intercal}``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{\\Sigma}^{\\mathrm{red}} &= \\mathbf{S}^{\\intercal} \\mathbf{\\Sigma}^{\\mathrm{raw}} \\mathbf{S}\\,, \\\\
+\\mathbf{S}^{\\intercal} \\mathbf{R}_{t} &= \\mathbf{I}\\,.
+\\end{align}
+```
+
+The second line follows from the definitions of ``\\mathbf{S}`` and ``\\mathbf{R}_{t}``.
+
+Where:
+
+  - $(math_dict[:Sigma_fcb])
+  - $(math_dict[:S_fcb])
+  - $(math_dict[:R_t_fcb])
+  - $(math_dict[:r_tj_fcb])
+  - $(math_dict[:K_r_fcb])
+  - $(math_dict[:I_identity])
 
 # Arguments
 
@@ -270,12 +353,30 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the reduced-axis weights that reconstruct the dropped factors at one observation.
 
-Row `j` holds the coefficients of the zero-sum condition of family `j`, so the dropped factor of that family is the row applied to a reduced-axis quantity. The dense change of basis is never formed.
+Row `j` holds the coefficients of the zero-sum condition of family `j`, so the row applied to a reduced-axis vector gives the entry of the factor that family drops. The function builds these rows from the ratios and never forms the change of basis.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{W}_{t} &= \\mathbf{D}^{\\intercal} \\mathbf{R}_{t}\\,.
+\\end{align}
+```
+
+The row of a family that drops ``k`` holds ``-r_{t}(j)`` in the column of each retained member ``j``, and zero in every other column.
+
+Where:
+
+  - $(math_dict[:W_t_fcb])
+  - $(math_dict[:D_fcb])
+  - $(math_dict[:R_t_fcb])
+  - $(math_dict[:r_tj_fcb])
+  - $(math_dict[:K_r_fcb])
 
 # Arguments
 
   - `fcb`: A Factor Family Basis.
-  - `t::Integer`: Observation whose ratios are read.
+  - `t::Integer`: Observation whose ratios the function reads.
 
 # Validation
 
@@ -307,23 +408,31 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reconstruct the raw-axis factor returns from the reduced-axis ones.
 
+The retained returns pass through, and the zero-sum condition of each family gives the return of the factor it drops.
+
 # Mathematical definition
 
-The retained returns pass through, and the dropped return of each family follows from the zero-sum condition:
-
 ```math
-f_k(t) = -\\sum_{j \\ne k} \\frac{c_t(j)}{c_t(k)} \\, g_j(t).
+\\begin{align}
+\\boldsymbol{f}^{\\mathrm{raw}}_{t} &= \\mathbf{R}_{t} \\boldsymbol{f}^{\\mathrm{red}}_{t}\\,, \\\\
+f^{\\mathrm{raw}}_{t,k} &= -\\sum_{j \\in \\mathcal{F} \\setminus \\{k\\}} r_{t}(j) \\, f^{\\mathrm{raw}}_{t,j}\\,.
+\\end{align}
 ```
+
+The second line follows from the first for every constrained Factor Family ``\\mathcal{F}`` that drops ``k``.
 
 Where:
 
-  - ``g_j(t)``: reduced-axis factor return of retained member ``j`` at observation ``t``.
-  - ``f_k(t)``: raw-axis factor return of the dropped member ``k``.
+  - $(math_dict[:f_t_fcb])
+  - $(math_dict[:R_t_fcb])
+  - $(math_dict[:r_tj_fcb])
+  - $(math_dict[:F_fam_att])
+  - $(math_dict[:K_r_fcb])
 
 # Arguments
 
   - `fcb`: A Factor Family Basis.
-  - `g::VecNum_MatNum`: Factor returns on the reduced axis. A matrix carries one observation per row and expands each row with that row's ratios. A vector expands with the ratios of the last observation.
+  - `g::VecNum_MatNum`: Factor returns on the reduced axis, either one observation per row or one observation alone. The function expands each row of a matrix with the ratios of that row, and a vector with the ratios of the last observation.
 
 # Validation
 
@@ -362,6 +471,7 @@ function expand_factor_returns(fcb::FactorFamilyBasis, g::MatNum)
     return f
 end
 function expand_factor_returns(fcb::FactorFamilyBasis, g::VecNum)
+    assert_factor_axis_length(length(g), reduced_factor_count(fcb), :g)
     return expand_factor_mu(fcb, g, size(fcb.ratios, 1))
 end
 """
@@ -369,13 +479,28 @@ end
 
 Reconstruct the raw-axis factor mean from the reduced-axis one.
 
-The retained entries pass through, and the dropped entry of each family is the zero-sum reconstruction at observation `t`. It is the inverse of [`reduce_factor_mu`](@ref).
+The retained entries pass through, and the zero-sum condition of each family at observation `t` gives the entry of the factor it drops. [`reduce_factor_mu`](@ref) undoes it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{\\mu}^{\\mathrm{raw}} &= \\mathbf{R}_{t} \\boldsymbol{\\mu}^{\\mathrm{red}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:mu_fcb])
+  - $(math_dict[:R_t_fcb])
+  - $(math_dict[:r_tj_fcb])
+  - $(math_dict[:K_r_fcb])
 
 # Arguments
 
   - `fcb`: A Factor Family Basis.
   - `mu::VecNum`: Factor mean on the reduced axis.
-  - `t::Integer`: Observation whose ratios are applied. It defaults to the last observation of the basis.
+  - `t::Integer`: Observation whose ratios the function applies. It defaults to the last observation of the basis.
 
 # Validation
 
@@ -417,23 +542,46 @@ end
 
 Reconstruct the raw-axis factor covariance from the reduced-axis one.
 
+The answer is singular by construction, because the raw axis is a linear image of a smaller one. [`reduce_factor_covariance`](@ref) undoes it.
+
 # Mathematical definition
 
 ```math
-\\Sigma = R_t \\, \\Sigma^{\\mathrm{red}} \\, R_t^{\\top}.
+\\begin{align}
+\\mathbf{\\Sigma}^{\\mathrm{raw}} &= \\mathbf{R}_{t} \\mathbf{\\Sigma}^{\\mathrm{red}} \\mathbf{R}_{t}^{\\intercal}\\,, \\\\
+\\mathbf{S}^{\\intercal} \\mathbf{\\Sigma}^{\\mathrm{raw}} \\mathbf{S} &= \\mathbf{\\Sigma}^{\\mathrm{red}}\\,, \\\\
+\\mathbf{D}^{\\intercal} \\mathbf{\\Sigma}^{\\mathrm{raw}} \\mathbf{S} &= \\mathbf{W}_{t} \\mathbf{\\Sigma}^{\\mathrm{red}}\\,, \\\\
+\\mathbf{D}^{\\intercal} \\mathbf{\\Sigma}^{\\mathrm{raw}} \\mathbf{D} &= \\mathbf{W}_{t} \\mathbf{\\Sigma}^{\\mathrm{red}} \\mathbf{W}_{t}^{\\intercal}\\,, \\\\
+\\operatorname{rank} \\mathbf{\\Sigma}^{\\mathrm{raw}} &\\le K_{r} < K\\,.
+\\end{align}
 ```
+
+The last four lines follow from the first. The second, third and fourth give the retained block, the block of the dropped rows against the retained columns, and the dropped block.
 
 Where:
 
-  - ``R_t``: the change of basis at observation ``t``, which is never formed. The retained block is copied, and the dropped rows and columns come from the reconstruction weights of [`dropped_factor_weights`](@ref).
+  - $(math_dict[:Sigma_fcb])
+  - $(math_dict[:R_t_fcb])
+  - $(math_dict[:r_tj_fcb])
+  - $(math_dict[:S_fcb])
+  - $(math_dict[:D_fcb])
+  - $(math_dict[:W_t_fcb])
+  - $(math_dict[:K_r_fcb])
+  - $(math_dict[:K])
 
-The answer is singular by construction, because the raw axis is a linear image of a smaller one.
+# Algorithm
+
+ 1. Check that `sigma` is ``K_{r} \\times K_{r}``.
+ 2. Build the reconstruction weights `W` of observation `t` with [`dropped_factor_weights`](@ref).
+ 3. Multiply `W` by `sigma`, giving `DR`, the block of the dropped rows against the retained columns.
+ 4. Multiply `DR` by the transpose of `W`, giving `DD`, the dropped block.
+ 5. Write `sigma`, `DR`, the transpose of `DR` and `DD` into their blocks of the ``K \\times K`` answer `raw`.
 
 # Arguments
 
   - `fcb`: A Factor Family Basis.
   - `sigma::MatNum`: Factor covariance on the reduced axis, `reduced factors × reduced factors`.
-  - `t::Integer`: Observation whose ratios are applied. It defaults to the last observation of the basis.
+  - `t::Integer`: Observation whose ratios the function applies. It defaults to the last observation of the basis.
 
 # Validation
 
@@ -460,41 +608,52 @@ function expand_factor_covariance(fcb::FactorFamilyBasis, sigma::MatNum,
     drp = dropped_factor_indices(fcb)
     DR = W * sigma
     DD = DR * transpose(W)
-    S = zeros(Tf, fcb.K, fcb.K)
+    raw = zeros(Tf, fcb.K, fcb.K)
     for b in eachindex(ret), a in eachindex(ret)
-        S[ret[a], ret[b]] = Tf(sigma[a, b])
+        raw[ret[a], ret[b]] = Tf(sigma[a, b])
     end
     for b in eachindex(ret), a in eachindex(drp)
-        S[drp[a], ret[b]] = Tf(DR[a, b])
-        S[ret[b], drp[a]] = Tf(DR[a, b])
+        raw[drp[a], ret[b]] = Tf(DR[a, b])
+        raw[ret[b], drp[a]] = Tf(DR[a, b])
     end
     for b in eachindex(drp), a in eachindex(drp)
-        S[drp[a], drp[b]] = Tf(DD[a, b])
+        raw[drp[a], drp[b]] = Tf(DD[a, b])
     end
-    return S
+    return raw
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Project raw factor-space coordinates into the reduced basis.
 
-This applies the transpose of the change of basis, so it is not a column selection: the coordinate of a dropped factor contributes to the retained coordinates of its family. A portfolio's factor exposure is such a coordinate.
+The map applies the transpose of the change of basis, so it is not a column selection. The coordinate of a dropped factor contributes to the retained coordinates of its family. The factor exposure of a portfolio is such a coordinate.
 
 # Mathematical definition
 
 ```math
-y_j = x_j - \\frac{c_t(j)}{c_t(k)} \\, x_k, \\qquad j \\ne k.
+\\begin{align}
+\\boldsymbol{y} &= \\mathbf{R}_{t}^{\\intercal} \\boldsymbol{x}\\,, \\\\
+\\mathbf{R}_{t}^{\\intercal} \\boldsymbol{g}_{t} &= (\\mathbf{B}_{t} \\mathbf{R}_{t})^{\\intercal} \\boldsymbol{w}_{t}\\,.
+\\end{align}
 ```
+
+The entry of a retained member ``j`` of a family that drops ``k`` is ``x_{j} - r_{t}(j) \\, x_{k}``, and the entry of a factor outside every constrained family is ``x_{j}``. The second line follows from the first, because ``\\boldsymbol{g}_{t} = \\mathbf{B}_{t}^{\\intercal} \\boldsymbol{w}_{t}``. The projected factor exposure of a portfolio is its exposure to the reduced factors of [`reduce_exposures`](@ref).
 
 Where:
 
-  - ``x_j``: raw coordinate of retained member ``j``.
-  - ``x_k``: raw coordinate of the dropped member ``k``.
+  - ``\\boldsymbol{x}``: Coordinates on the raw axis, ``K \\times 1``, with entry ``x_{j}`` for factor ``j``.
+  - ``\\boldsymbol{y}``: Coordinates on the reduced axis, ``K_{r} \\times 1``.
+  - $(math_dict[:R_t_fcb])
+  - $(math_dict[:r_tj_fcb])
+  - $(math_dict[:K_r_fcb])
+  - $(math_dict[:g_t_att])
+  - $(math_dict[:B_t_att])
+  - $(math_dict[:w_t_att])
 
 # Arguments
 
   - `fcb`: A Factor Family Basis.
-  - `x::VecNum_MatNum`: Coordinates on the raw axis. A matrix carries one observation per row and projects each row with that row's ratios. A vector projects with the ratios of the last observation.
+  - `x::VecNum_MatNum`: Coordinates on the raw axis, either one observation per row or one observation alone. The function projects each row of a matrix with the ratios of that row, and a vector with the ratios of the last observation.
 
 # Validation
 

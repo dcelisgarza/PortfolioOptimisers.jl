@@ -4,4 +4,4 @@ Description = "Factor Family Basis Transforms has no public API in PortfolioOpti
 
 # [Factor Family Basis Transforms](@id api-factor-family-basis-transforms)
 
-Factor Family Basis Transforms has no public API in `PortfolioOptimisers.jl`; its names are in the private API.
+Every name of this topic is private. The [private page](@ref private-api-factor-family-basis-transforms) documents them.

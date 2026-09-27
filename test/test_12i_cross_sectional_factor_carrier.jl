@@ -200,22 +200,26 @@ end
 
         # 3. `set_factor_risk_contribution_constraints!`, at
         #    `17_Optimisation/05_JuMP/05_FactorRiskContribution.jl`.
-        b1_c, rr_c = PO.set_factor_risk_contribution_constraints!(PO.JuMP.Model(),
-                                                                  StepwiseRegression(), rd,
-                                                                  pr_csfm_reb, true,
-                                                                  nothing)
-        b1_r, rr_r = PO.set_factor_risk_contribution_constraints!(PO.JuMP.Model(),
-                                                                  StepwiseRegression(), rd,
-                                                                  pr_reg_reb, true, nothing)
+        b1_c, _, rr_c = PO.set_factor_risk_contribution_constraints!(PO.JuMP.Model(),
+                                                                     StepwiseRegression(),
+                                                                     rd, pr_csfm_reb, true,
+                                                                     nothing)
+        b1_r, _, rr_r = PO.set_factor_risk_contribution_constraints!(PO.JuMP.Model(),
+                                                                     StepwiseRegression(),
+                                                                     rd, pr_reg_reb, true,
+                                                                     nothing)
         @test b1_c == b1_r
         @test rr_c === csfm_reb
         @test rr_r === reg_reb
 
-        # 4. The expression `set_relaxed_risk_budgeting_constraints!` forms from that `rr`,
-        #    at `17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl`. It is built here on the `rr`
-        #    step 3 returned, so it is the same read on the same object.
+        # 4. The expressions `set_relaxed_risk_budgeting_constraints!` forms from that `rr`,
+        #    at `17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl`: the factor covariance
+        #    under `flag = false`, and the factor marginal risks under `flag = true`. They are
+        #    built here on the `rr` step 3 returned, so they are the same reads on the same
+        #    object.
         @test Matrix(LinearAlgebra.Symmetric(rr_c.L \ pr_csfm_reb.sigma * b1_c)) ==
               Matrix(LinearAlgebra.Symmetric(rr_r.L \ pr_reg_reb.sigma * b1_r))
+        @test transpose(b1_c) * pr_csfm_reb.sigma == transpose(b1_r) * pr_reg_reb.sigma
 
         # 5. The factor budget axis, at `17_Optimisation/05_JuMP/07_RiskBudgeting.jl`. The caller
         #    passes `size(rr.L, 2)`, so the reduced basis is what the names must match.
@@ -268,9 +272,31 @@ end
                                            "nf" => ["mkt", "size", "value"]))
         @test PO.constraint_space_basis(FactorSpace(), ts_only, reg_reb)[2] == "nf"
         @test_throws KeyError PO.constraint_space_basis(FactorSpace(), ts_only, csfm_reb)
+        # A name the cross-sectional axis does not carry is reported against the factor
+        # universe it was searched in, under `ncf`, and not against the asset universe.
+        # A row stated at `ncf` without loadings that resolves and cancels names the same
+        # axis. Under a re-basis that row reads `empty_projected_row_msg` instead. #1273.
+        msg = try
+            linear_constraints(ExposureConstraintEstimator(;
+                                                           lce = LinearConstraintEstimator(;
+                                                                                           val = "valu <= 0.3"),
+                                                           space = FactorSpace()), sets;
+                               rr = csfm_reb, strict = true)
+        catch e
+            @test e isa ArgumentError
+            sprint(showerror, e)
+        end
+        @test occursin("not in factor universe (3 factors under key `ncf`)", msg)
+        @test occursin("did you mean `value`?", msg)
+        msg = try
+            linear_constraints("size - size <= 0.3", sets, sets.cfkey; strict = true)
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("the universe (3 factors under key `ncf`)", msg)
 
         # 2. `constraint_row_term`, at
-        #    `09_ConstraintGeneration/02_LinearConstraintGeneration.jl`.
+        #    `09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl`.
         Ai = [true, false, true]
         @test PO.constraint_row_term(csfm_reb, Ai, 2.0) ==
               PO.constraint_row_term(reg_reb, Ai, 2.0) ==

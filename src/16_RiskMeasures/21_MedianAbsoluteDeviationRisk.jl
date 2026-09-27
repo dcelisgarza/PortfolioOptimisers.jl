@@ -43,7 +43,7 @@ Accepts a numeric scalar/vector target, an estimator that computes one (a **Defe
 
 The field has **two resolution points**, and both are forced. A centring strategy resolves in [`calc_moment_target`](@ref), at the point of use, because it centres the *portfolio* series and so needs the asset weights. A Deferred Quantity resolves in [`factory`](@ref), because it needs the returns matrix, which `calc_moment_target` never sees. There is no `Nothing` state: the default is `MedianCentering()`.
 
-The two are different quantities, not two spellings of one. The median is not linear, so `median(w'X) ≠ w' * median(X)` — `MedianCentering()` and `mu = MedianExpectedReturns()` do not agree. Nor does `MeanCentering()` agree with a mean estimator when fees are set: it centres net of fees, a resolved vector is gross.
+The two are different quantities, not two spellings of one. The median is not linear, so `median(w'X) ≠ w' * median(X)` — `MedianCentering()` and `mu = MedianExpectedReturns()` do not agree. A resolved vector is a gross expected return, and the series is net of the fee, so [`moment_target_fees`](@ref) subtracts the mean fee per period from the target. The target is then the net mean, and `MeanCentering()` agrees with a vector that is the mean of the same returns, with or without a fee.
 
 # Related
 
@@ -296,7 +296,7 @@ Compute the vector of deviations from the centering target for [`MedianAbsoluteD
 function calc_deviations_vec(r::MedianAbsoluteDeviation, w::VecNum, X::MatNum,
                              fees::Option{<:Fees} = nothing)
     x = calc_net_returns(w, X, fees)
-    tgt = calc_moment_target(r, w, x)
+    tgt = calc_moment_target(r, w, x) - moment_target_fees(r.mu, w, fees, length(x))
     return x .- tgt
 end
 """

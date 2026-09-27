@@ -3,7 +3,25 @@
 
 Return one standardised idiosyncratic return.
 
-The idiosyncratic return is divided by the standard deviation the fit predicted for it, and the answer is `NaN` wherever that division has no meaning: a variance that is not positive, a variance that is not finite, and a return that is not finite each read `NaN`. A negative variance is clamped to zero before the square root, so the verb answers rather than raises on a variance estimate that undershot.
+The verb divides the idiosyncratic return by the standard deviation the fit predicted for it. The answer is `NaN` where the division has no meaning. A variance that is not positive, a variance that is not finite, and a return that is not finite each give `NaN`. A negative variance counts as zero, so a variance estimate that undershot gives `NaN` and does not raise.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+z_{ti} &= \\begin{cases}
+\\dfrac{\\varepsilon_{ti}}{\\hat{\\sigma}_{ti}} & \\text{if } \\hat{\\sigma}_{ti} > 0 \\text{ and the ratio is finite}\\,, \\\\
+\\mathrm{NaN} & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:z_ti_idio])
+  - $(math_dict[:eps_ti_idio])
+  - $(math_dict[:sigma_ti_idio])
+  - $(math_dict[:v_ti_idio])
 
 # Arguments
 
@@ -29,18 +47,24 @@ end
 
 Return the standardised idiosyncratic returns of a cross-sectional fit.
 
-It is the level-0 kernel of the idiosyncratic group. Every calibration series of this file reads it: the fit predicted a variance for each asset at each observation, and the standardised return states how large the realised return was against that prediction. A well calibrated fit leaves a cross-section of standardised returns whose standard deviation is `1`.
+Every calibration series of the idiosyncratic group reads it. The fit predicted a variance for each asset at each observation, and the standardised return states how large the realised return was against that prediction. A fit that is well calibrated leaves cross-sections of standardised returns whose standard deviation is `1`.
 
 # Mathematical definition
 
 ```math
-z_{ti} = \\frac{\\varepsilon_{ti}}{\\sqrt{\\max(v_{ti}, 0)}}
+\\begin{align}
+z_{ti} &= \\frac{\\varepsilon_{ti}}{\\hat{\\sigma}_{ti}}\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``\\varepsilon_{ti}``: Idiosyncratic return of asset ``i`` at observation ``t``.
-  - ``v_{ti}``: Idiosyncratic variance predicted for asset ``i`` at observation ``t``.
+  - $(math_dict[:z_ti_idio])
+  - $(math_dict[:eps_ti_idio])
+  - $(math_dict[:sigma_ti_idio])
+  - $(math_dict[:v_ti_idio])
+
+An entry is `NaN` where the predicted volatility is not positive or the ratio is not finite, as [`standardised_idio_value`](@ref) states.
 
 # Arguments
 
@@ -54,7 +78,7 @@ Where:
 
 # Returns
 
-  - `z::Matrix{<:Real}`: Standardised idiosyncratic returns `observations × assets`. An entry whose predicted volatility is zero, or whose return is not finite, is `NaN`.
+  - `z::Matrix{<:Real}`: Standardised idiosyncratic returns `observations × assets`, of a floating-point type. An entry whose predicted volatility is zero, or whose return is not finite, is `NaN`.
 
 # Examples
 
@@ -77,7 +101,7 @@ function standardised_idio_returns(eps::MatNum, vs::MatNum)
     @argcheck(!isempty(eps), IsEmptyError("eps cannot be empty"))
     @argcheck(size(vs, 1) == size(eps, 1) && size(vs, 2) == size(eps, 2),
               DimensionMismatch("vs ($(size(vs, 1))×$(size(vs, 2))) must match eps ($(size(eps, 1))×$(size(eps, 2)))"))
-    Tf = promote_type(real(eltype(eps)), real(eltype(vs)))
+    Tf = typeof(one(real(eltype(eps))) / sqrt(one(real(eltype(vs)))))
     T, N = size(eps)
     z = Matrix{Tf}(undef, T, N)
     for i in 1:N, t in 1:T
@@ -90,7 +114,20 @@ end
 
 Return the idiosyncratic volatility history the fit predicted.
 
-A negative variance is clamped to zero before the square root, so a variance estimate that undershot answers `0` rather than raising. The two dependence series read it as the quantity whose ranking they score.
+A negative variance counts as zero, so a variance estimate that undershot gives `0` and does not raise. The two dependence series rank the assets by this quantity.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\hat{\\sigma}_{ti} &= \\sqrt{\\max(v_{ti}, 0)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:sigma_ti_idio])
+  - $(math_dict[:v_ti_idio])
 
 # Arguments
 
@@ -98,7 +135,7 @@ A negative variance is clamped to zero before the square root, so a variance est
 
 # Returns
 
-  - `s::Matrix{<:Real}`: Predicted volatility `observations × assets`.
+  - `s::Matrix{<:Real}`: Predicted volatility `observations × assets`, of a floating-point type. A variance that is not finite gives `NaN`.
 
 # Related
 
@@ -107,7 +144,7 @@ A negative variance is clamped to zero before the square root, so a variance est
   - [`standardised_idio_value`](@ref)
 """
 function idio_predicted_volatility(vs::MatNum)
-    Tf = real(eltype(vs))
+    Tf = typeof(sqrt(one(real(eltype(vs)))))
     T, N = size(vs)
     s = Matrix{Tf}(undef, T, N)
     for i in 1:N, t in 1:T
@@ -120,18 +157,33 @@ end
 
 Return the count and the three central moments of one cross-section of standardised idiosyncratic returns.
 
-The calibration, the excess kurtosis and the skewness are each a function of these four numbers alone, so the two passes over the cross-section are made once and read three times. An entry that is not finite enters neither the count nor a moment.
+The calibration, the excess kurtosis and the skewness are each a function of these four numbers alone. So the verb makes its two passes over the cross-section once, and three series read the answer. An entry that is not finite enters neither the count nor a moment.
 
 # Mathematical definition
 
 ```math
-m_{p} = \\frac{1}{n} \\sum_{i \\in \\mathcal{F}} \\left( z_{i} - \\bar{z} \\right)^{p}, \\qquad \\bar{z} = \\frac{1}{n} \\sum_{i \\in \\mathcal{F}} z_{i}
+\\begin{align}
+\\bar{z}_{t} &= \\frac{1}{n_{t}} \\sum_{i \\in \\mathcal{F}_{t}} z_{ti}\\,, \\\\
+m_{pt} &= \\frac{1}{n_{t}} \\sum_{i \\in \\mathcal{F}_{t}} \\left( z_{ti} - \\bar{z}_{t} \\right)^{p}\\,, \\quad p \\in \\{2, 3, 4\\}\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``\\mathcal{F}``: The assets at which the standardised return is finite.
-  - ``n``: Size of ``\\mathcal{F}``.
+  - ``\\bar{z}_{t}``: Mean of the finite standardised returns of observation ``t``.
+  - $(math_dict[:m_pt_idio])
+  - $(math_dict[:z_ti_idio])
+  - $(math_dict[:F_t_idio])
+  - $(math_dict[:n_t_idio])
+
+A cross-section whose finite entries are all equal has ``m_{pt} = 0`` for every ``p``.
+
+# Algorithm
+
+ 1. Pass over row `t` of `z` once. Over the finite entries, find the count `n`, the sum `s`, the least entry `lo` and the greatest entry `hi`.
+ 2. When `n` is zero, return `NaN` for the three moments.
+ 3. Divide `s` by `n` and clamp the answer to `[lo, hi]`, giving the mean `m`. A mean of equal values can carry round-off, so without the clamp a constant cross-section would give a tiny positive `m2` in place of zero. With the clamp, `m` equals the common value exactly, and every deviation is zero.
+ 4. Pass over row `t` again. Sum the second, third and fourth powers of the deviations from `m`, and divide each sum by `n`, giving `m2`, `m3` and `m4`.
 
 # Arguments
 
@@ -152,21 +204,26 @@ Where:
   - [`idio_skewness`](@ref)
 """
 function idio_row_moments(z::MatNum, t::Integer)
-    Tf = real(eltype(z))
+    Tf = float_if_integer(real(eltype(z)))
     N = size(z, 2)
     n = 0
     s = zero(Tf)
+    lo = typemax(Tf)
+    hi = typemin(Tf)
     for i in 1:N
         v = z[t, i]
         if isfinite(v)
+            x = Tf(v)
             n += 1
-            s += Tf(v)
+            s += x
+            lo = min(lo, x)
+            hi = max(hi, x)
         end
     end
     if n == 0
         return (; n = n, m2 = Tf(NaN), m3 = Tf(NaN), m4 = Tf(NaN))
     end
-    m = s / n
+    m = clamp(s / n, lo, hi)
     m2 = zero(Tf)
     m3 = zero(Tf)
     m4 = zero(Tf)
@@ -189,20 +246,25 @@ end
 
 Return the cross-sectional standard deviation of the standardised idiosyncratic returns, one entry per observation.
 
-It is the headline calibration series of a cross-sectional fit. The fit predicted a variance for each asset, and dividing the realised idiosyncratic return by the predicted volatility leaves a cross-section whose standard deviation is `1` when the prediction was right. A series that sits above `1` is a fit whose specific risk is too small, and one that sits below `1` is a fit whose specific risk is too large.
-
-The deviation is the sample one, so it divides by ``n - 1``. An observation at which fewer than two assets carry a finite standardised return reads `NaN`.
+It is the headline calibration series of a cross-sectional fit. The fit predicted a variance for each asset. When the prediction is right, the realised idiosyncratic returns divided by the predicted volatilities have a standard deviation of `1`. A series above `1` shows that the fit's specific risk is too small, and a series below `1` shows that it is too large.
 
 # Mathematical definition
 
 ```math
-c_{t} = \\sqrt{\\frac{n_{t}}{n_{t} - 1} m_{2t}}
+\\begin{align}
+\\varsigma_{t} &= \\sqrt{\\frac{n_{t}}{n_{t} - 1} m_{2t}}\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``m_{2t}``: Second central moment of the cross-section of observation ``t``.
-  - ``n_{t}``: Number of assets at which the standardised return is finite.
+  - ``\\varsigma_{t}``: Sample standard deviation of the finite standardised returns of observation ``t``.
+  - $(math_dict[:m_pt_idio])
+  - $(math_dict[:n_t_idio])
+  - $(math_dict[:F_t_idio])
+  - $(math_dict[:z_ti_idio])
+
+The deviation is the sample one, so it divides by ``n_{t} - 1``. It is not defined for ``n_{t} < 2``. A constant cross-section gives ``\\varsigma_{t} = 0``.
 
 # Arguments
 
@@ -214,8 +276,8 @@ Where:
 # Validation
 
   - `!isempty(eps)` and `size(vs) == size(eps)`, on the two-argument form.
-  - `csfm.csr` is not `nothing`, else an `IsNothingError` naming `csr` is raised.
-  - `csfm.vs` is not `nothing`, else an `IsNothingError` naming `vs` is raised.
+  - `csfm.csr` is not `nothing`, else the verb raises an `IsNothingError` that names `csr`.
+  - `csfm.vs` is not `nothing`, else the verb raises an `IsNothingError` that names `vs`.
 
 # Returns
 
@@ -230,7 +292,7 @@ Where:
   - [`CrossSectionalFactorModel`](@ref)
 """
 function idio_calibration(z::MatNum)
-    Tf = real(eltype(z))
+    Tf = typeof(sqrt(one(float_if_integer(real(eltype(z))))))
     T = size(z, 1)
     c = Vector{Tf}(undef, T)
     for t in 1:T
@@ -254,21 +316,26 @@ end
 
 Return the share of assets whose standardised idiosyncratic return exceeds a threshold, one entry per observation.
 
-The Gaussian reference of a threshold of three is ``2 \\Phi(-3) \\approx 0.0027``, so a series that sits above it is a fit whose standardised returns carry heavier tails than the normal law implies. A rate of one to three percent is ordinary for an equity factor model, and it is not by itself a defect of the fit.
-
-An asset enters the denominator when its standardised return is finite, and the numerator when the absolute value of that return exceeds the threshold. An observation at which no asset carries a finite standardised return reads `NaN`.
+Under the normal law the expected rate is ``2 \\Phi(-c)``, which is about `0.0027` for a threshold of three. A series above it shows standardised returns with heavier tails than the normal law gives. The standardised returns of an equity factor model are often fat-tailed, so a rate above the Gaussian reference is common and is not by itself a defect of the fit.
 
 # Mathematical definition
 
 ```math
-r_{t} = \\frac{1}{n_{t}} \\sum_{i \\in \\mathcal{F}_{t}} \\mathbb{1} \\left\\{ \\left| z_{ti} \\right| > c \\right\\}
+\\begin{align}
+r_{t} &= \\frac{1}{n_{t}} \\sum_{i \\in \\mathcal{F}_{t}} \\mathbb{1} \\left\\{ \\left| z_{ti} \\right| > c \\right\\}\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``\\mathcal{F}_{t}``: The assets at which the standardised return is finite.
-  - ``n_{t}``: Size of ``\\mathcal{F}_{t}``.
+  - ``r_{t}``: Tail rate of observation ``t``.
   - ``c``: The threshold.
+  - ``\\Phi``: Cumulative distribution function of the standard normal law.
+  - $(math_dict[:z_ti_idio])
+  - $(math_dict[:F_t_idio])
+  - $(math_dict[:n_t_idio])
+
+The rate is not defined for ``n_{t} = 0``. An entry that is not finite enters neither the count nor the sum.
 
 # Arguments
 
@@ -281,8 +348,8 @@ Where:
 # Validation
 
   - `!isempty(eps)` and `size(vs) == size(eps)`, on the two-argument form.
-  - `csfm.csr` is not `nothing`, else an `IsNothingError` naming `csr` is raised.
-  - `csfm.vs` is not `nothing`, else an `IsNothingError` naming `vs` is raised.
+  - `csfm.csr` is not `nothing`, else the verb raises an `IsNothingError` that names `csr`.
+  - `csfm.vs` is not `nothing`, else the verb raises an `IsNothingError` that names `vs`.
 
 # Returns
 
@@ -297,7 +364,7 @@ Where:
   - [`CrossSectionalFactorModel`](@ref)
 """
 function idio_tail_rate(z::MatNum; threshold::Real = 3)
-    Tf = real(eltype(z))
+    Tf = float_if_integer(real(eltype(z)))
     T, N = size(z)
     r = Vector{Tf}(undef, T)
     for t in 1:T
@@ -305,8 +372,9 @@ function idio_tail_rate(z::MatNum; threshold::Real = 3)
         ne = 0
         for i in 1:N
             v = z[t, i]
-            nv += isfinite(v)
-            ne += abs(v) > threshold
+            f = isfinite(v)
+            nv += f
+            ne += f && abs(v) > threshold
         end
         r[t] = nv > 0 ? Tf(ne) / Tf(nv) : Tf(NaN)
     end
@@ -326,20 +394,25 @@ end
 
 Return the cross-sectional excess kurtosis of the standardised idiosyncratic returns, one entry per observation.
 
-The Gaussian reference is `0`, and a positive value is a cross-section whose tails are heavier than the normal law implies. Read it beside [`idio_tail_rate`](@ref): the rate counts the assets beyond a threshold, and the kurtosis weighs how far beyond it they went.
-
-The estimate is bias corrected, so it matches the ordinary sample estimator of the excess kurtosis. An observation at which fewer than four assets carry a finite standardised return reads `NaN`, and so does one whose cross-section is constant.
+The Gaussian reference is `0`, and a positive value shows a cross-section with heavier tails than the normal law gives. Read it beside [`idio_tail_rate`](@ref). The rate counts the assets beyond a threshold, and the kurtosis measures how far beyond it they went.
 
 # Mathematical definition
 
 ```math
-k_{t} = \\frac{n_{t} - 1}{(n_{t} - 2)(n_{t} - 3)} \\left[ (n_{t} + 1) \\left( \\frac{m_{4t}}{m_{2t}^{2}} - 3 \\right) + 6 \\right]
+\\begin{align}
+k_{t} &= \\frac{n_{t} - 1}{(n_{t} - 2)(n_{t} - 3)} \\left[ (n_{t} + 1) \\left( \\frac{m_{4t}}{m_{2t}^{2}} - 3 \\right) + 6 \\right]\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``m_{2t}``, ``m_{4t}``: Second and fourth central moments of the cross-section of observation ``t``.
-  - ``n_{t}``: Number of assets at which the standardised return is finite.
+  - ``k_{t}``: Excess kurtosis of the finite standardised returns of observation ``t``.
+  - $(math_dict[:m_pt_idio])
+  - $(math_dict[:n_t_idio])
+  - $(math_dict[:F_t_idio])
+  - $(math_dict[:z_ti_idio])
+
+It is the bias-corrected sample excess kurtosis, the estimator ``G_{2}`` of Joanes and Gill. It is not defined for ``n_{t} < 4``, or for a constant cross-section, where ``m_{2t} = 0``.
 
 # Arguments
 
@@ -351,12 +424,12 @@ Where:
 # Validation
 
   - `!isempty(eps)` and `size(vs) == size(eps)`, on the two-argument form.
-  - `csfm.csr` is not `nothing`, else an `IsNothingError` naming `csr` is raised.
-  - `csfm.vs` is not `nothing`, else an `IsNothingError` naming `vs` is raised.
+  - `csfm.csr` is not `nothing`, else the verb raises an `IsNothingError` that names `csr`.
+  - `csfm.vs` is not `nothing`, else the verb raises an `IsNothingError` that names `vs`.
 
 # Returns
 
-  - `k::Vector{<:Real}`: The series, one entry per observation. An observation with fewer than four finite assets is `NaN`.
+  - `k::Vector{<:Real}`: The series, one entry per observation. An observation with fewer than four finite assets, or with a constant cross-section, is `NaN`.
 
 # Related
 
@@ -365,9 +438,13 @@ Where:
   - [`idio_skewness`](@ref)
   - [`plot_idio_kurtosis`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
+
+# References
+
+  - $(ref_dict[:joanesgill1998])
 """
 function idio_kurtosis(z::MatNum)
-    Tf = real(eltype(z))
+    Tf = float_if_integer(real(eltype(z)))
     T = size(z, 1)
     k = Vector{Tf}(undef, T)
     for t in 1:T
@@ -397,20 +474,25 @@ end
 
 Return the cross-sectional skewness of the standardised idiosyncratic returns, one entry per observation.
 
-The Gaussian reference is `0`. A cross-section that is persistently skewed is a fit whose residual carries a direction the factors did not take, which a sector or a style the exposures do not name can produce.
-
-The estimate is bias corrected, so it matches the ordinary sample estimator of the skewness. An observation at which fewer than three assets carry a finite standardised return reads `NaN`, and so does one whose cross-section is constant.
+The Gaussian reference is `0`. A cross-section that stays skewed shows a residual with a direction the factors did not take. A sector or a style that the exposures do not name can cause it.
 
 # Mathematical definition
 
 ```math
-s_{t} = \\frac{m_{3t}}{m_{2t}^{3/2}} \\frac{\\sqrt{n_{t}(n_{t} - 1)}}{n_{t} - 2}
+\\begin{align}
+s_{t} &= \\frac{m_{3t}}{m_{2t}^{3/2}} \\frac{\\sqrt{n_{t}(n_{t} - 1)}}{n_{t} - 2}\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``m_{2t}``, ``m_{3t}``: Second and third central moments of the cross-section of observation ``t``.
-  - ``n_{t}``: Number of assets at which the standardised return is finite.
+  - ``s_{t}``: Skewness of the finite standardised returns of observation ``t``.
+  - $(math_dict[:m_pt_idio])
+  - $(math_dict[:n_t_idio])
+  - $(math_dict[:F_t_idio])
+  - $(math_dict[:z_ti_idio])
+
+It is the bias-corrected sample skewness, the estimator ``G_{1}`` of Joanes and Gill. It is not defined for ``n_{t} < 3``, or for a constant cross-section, where ``m_{2t} = 0``.
 
 # Arguments
 
@@ -422,12 +504,12 @@ Where:
 # Validation
 
   - `!isempty(eps)` and `size(vs) == size(eps)`, on the two-argument form.
-  - `csfm.csr` is not `nothing`, else an `IsNothingError` naming `csr` is raised.
-  - `csfm.vs` is not `nothing`, else an `IsNothingError` naming `vs` is raised.
+  - `csfm.csr` is not `nothing`, else the verb raises an `IsNothingError` that names `csr`.
+  - `csfm.vs` is not `nothing`, else the verb raises an `IsNothingError` that names `vs`.
 
 # Returns
 
-  - `s::Vector{<:Real}`: The series, one entry per observation. An observation with fewer than three finite assets is `NaN`.
+  - `s::Vector{<:Real}`: The series, one entry per observation. An observation with fewer than three finite assets, or with a constant cross-section, is `NaN`.
 
 # Related
 
@@ -436,9 +518,13 @@ Where:
   - [`idio_kurtosis`](@ref)
   - [`plot_idio_skewness`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
+
+# References
+
+  - $(ref_dict[:joanesgill1998])
 """
 function idio_skewness(z::MatNum)
-    Tf = real(eltype(z))
+    Tf = typeof(sqrt(one(float_if_integer(real(eltype(z))))))
     T = size(z, 1)
     s = Vector{Tf}(undef, T)
     for t in 1:T
@@ -461,29 +547,36 @@ function idio_skewness(csfm::CrossSectionalFactorModel)
     return idio_skewness(ep, vh)
 end
 """
-    idio_vol_dependence(eps::MatNum, vs::MatNum, standardise::Bool)
+    idio_vol_dependence(eps::MatNum, vs::MatNum, standardise::Bool, ties::Symbol)
 
 Return the rank correlation of the predicted idiosyncratic volatility against the next observation's absolute idiosyncratic return, standardised or not.
 
-It is the worker of [`idio_vol_ic`](@ref) and of [`idio_vol_residual_dependence`](@ref), which read the same two cross-sections and differ only in whether the target is divided by the predicted volatility. Both score the volatility the fit predicted at observation ``t`` against what the asset realised at observation ``t + 1``, so the series is one entry shorter than the history.
+It does the work of [`idio_vol_ic`](@ref) and of [`idio_vol_residual_dependence`](@ref). The two read the same two cross-sections, and differ only in whether they divide the target by the predicted volatility. Both score the volatility the fit predicted at observation ``t`` against what the asset realised at observation ``t + 1``, so the series has one entry fewer than the history. Those two docstrings state the mathematics.
 
-The correlation is taken over the assets at which both cross-sections are finite, and an observation that shares fewer than five such assets reads `NaN`.
+# Algorithm
+
+ 1. Check that `eps` is not empty, that `vs` has its size, and that it has more than one observation.
+ 2. Compute the predicted volatility `sig` with [`idio_predicted_volatility`](@ref).
+ 3. For each observation `t` but the last, fill `a` with row `t` of `sig`. Fill `b` with the absolute idiosyncratic returns of observation `t + 1`. When `standardise` is `true`, divide each entry of `b` by the volatility predicted at observation `t`, through [`standardised_idio_value`](@ref).
+ 4. Correlate `a` and `b` with [`cs_spearman_correlation`](@ref) under `min_count = 5` and `ties`, giving entry `t` of `c`.
 
 # Arguments
 
   - `eps`: Idiosyncratic return history `observations × assets`.
   - `vs`: Idiosyncratic variance history `observations × assets`.
   - `standardise`: Divide the absolute return of observation ``t + 1`` by the volatility predicted at observation ``t``.
+  - $(arg_dict[:cs_ties])
 
 # Validation
 
   - `!isempty(eps)`.
   - `size(vs) == size(eps)`.
   - `size(eps, 1) > 1`.
+  - The rules of [`cs_ranks`](@ref).
 
 # Returns
 
-  - `c::Vector{<:Real}`: The series, `observations - 1` entries. Entry `t` reads observations `t` and `t + 1`.
+  - `c::Vector{<:Real}`: The series, `observations - 1` entries. Entry `t` reads observations `t` and `t + 1`. An observation that shares fewer than five finite assets is `NaN`.
 
 # Related
 
@@ -492,14 +585,14 @@ The correlation is taken over the assets at which both cross-sections are finite
   - [`cs_spearman_correlation`](@ref)
   - [`idio_predicted_volatility`](@ref)
 """
-function idio_vol_dependence(eps::MatNum, vs::MatNum, standardise::Bool)
+function idio_vol_dependence(eps::MatNum, vs::MatNum, standardise::Bool, ties::Symbol)
     @argcheck(!isempty(eps), IsEmptyError("eps cannot be empty"))
     @argcheck(size(vs, 1) == size(eps, 1) && size(vs, 2) == size(eps, 2),
               DimensionMismatch("vs ($(size(vs, 1))×$(size(vs, 2))) must match eps ($(size(eps, 1))×$(size(eps, 2)))"))
     T, N = size(eps)
     @argcheck(T > 1,
               DimensionMismatch("eps ($T observations) must carry more than one observation"))
-    Tf = promote_type(real(eltype(eps)), real(eltype(vs)))
+    Tf = typeof(one(real(eltype(eps))) / sqrt(one(real(eltype(vs)))))
     sig = idio_predicted_volatility(vs)
     c = Vector{Tf}(undef, T - 1)
     a = Vector{Tf}(undef, N)
@@ -510,46 +603,56 @@ function idio_vol_dependence(eps::MatNum, vs::MatNum, standardise::Bool)
             m = abs(Tf(eps[t + 1, i]))
             b[i] = standardise ? standardised_idio_value(m, Tf(vs[t, i])) : m
         end
-        c[t] = cs_spearman_correlation(a, b; min_count = 5)
+        c[t] = cs_spearman_correlation(a, b; min_count = 5, ties = ties)
     end
     return c
 end
 """
-    idio_vol_ic(eps::MatNum, vs::MatNum) -> Vector{<:Real}
-    idio_vol_ic(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
+    idio_vol_ic(eps::MatNum, vs::MatNum; ties::Symbol = :average) -> Vector{<:Real}
+    idio_vol_ic(csfm::CrossSectionalFactorModel; ties::Symbol = :average) -> Vector{<:Real}
 
 Return the information coefficient of the predicted idiosyncratic volatility, one entry per pair of observations.
 
-The fit predicted a volatility for each asset at observation ``t``, and the assets it called the most volatile should be the assets that moved the most at observation ``t + 1``. This series scores that ranking with the rank correlation of the predicted volatility against the absolute idiosyncratic return of the next observation.
+The fit predicted a volatility for each asset at observation ``t``. The assets it called the most volatile should be the assets that moved the most at observation ``t + 1``. This series scores that ranking.
 
-A high value is a fit that ranks specific risk across the assets well. The series also picks up a broad cross-sectional effect such as size or liquidity, so read it beside [`idio_vol_residual_dependence`](@ref), which states whether the level of the prediction still leaks into what the fit standardised.
+A high value shows a fit that ranks specific risk across the assets well. The series also responds to a broad cross-sectional effect such as size or liquidity. So read it beside [`idio_vol_residual_dependence`](@ref), which shows whether the level of the prediction still leaks into the standardised returns.
 
 # Mathematical definition
 
 ```math
-\\mathrm{IC}_{t} = \\rho_{S} \\left( \\hat{\\sigma}_{t \\cdot}, \\left| \\boldsymbol{\\varepsilon}_{t + 1, \\cdot} \\right| \\right)
+\\begin{align}
+\\mathrm{IC}_{t} &= \\rho_{S} \\left( \\hat{\\sigma}_{t \\cdot}, \\left| \\varepsilon_{t + 1, \\cdot} \\right| \\right)\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``\\hat{\\sigma}_{ti} = \\sqrt{\\max(v_{ti}, 0)}``: Predicted idiosyncratic volatility.
-  - ``\\rho_{S}``: The cross-sectional rank correlation, over the assets at which both cross-sections are finite.
+  - ``\\mathrm{IC}_{t}``: Information coefficient of observation ``t``, read against observation ``t + 1``.
+  - ``\\hat{\\sigma}_{t \\cdot}``, ``\\varepsilon_{t + 1, \\cdot}``: The cross-sections of observations ``t`` and ``t + 1``, one entry per asset.
+  - $(math_dict[:rho_S_cs])
+  - $(math_dict[:sigma_ti_idio])
+  - $(math_dict[:v_ti_idio])
+  - $(math_dict[:eps_ti_idio])
+
+The correlation is not defined over fewer than five common finite assets.
 
 # Arguments
 
   - `eps`: Idiosyncratic return history `observations × assets`.
   - `vs`: Idiosyncratic variance history `observations × assets`.
   - `csfm`: A cross-sectional factor model block.
+  - $(arg_dict[:cs_ties])
 
 # Validation
 
   - `!isempty(eps)`, `size(vs) == size(eps)` and `size(eps, 1) > 1`.
-  - `csfm.csr` is not `nothing`, else an `IsNothingError` naming `csr` is raised.
-  - `csfm.vs` is not `nothing`, else an `IsNothingError` naming `vs` is raised.
+  - `csfm.csr` is not `nothing`, else the verb raises an `IsNothingError` that names `csr`.
+  - `csfm.vs` is not `nothing`, else the verb raises an `IsNothingError` that names `vs`.
+  - The rules of [`cs_ranks`](@ref).
 
 # Returns
 
-  - `c::Vector{<:Real}`: The series, `observations - 1` entries. An observation sharing fewer than five finite assets is `NaN`.
+  - `c::Vector{<:Real}`: The series, `observations - 1` entries. An observation that shares fewer than five finite assets is `NaN`.
 
 # Related
 
@@ -558,51 +661,63 @@ Where:
   - [`plot_idio_vol_ic`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
-function idio_vol_ic(eps::MatNum, vs::MatNum)
-    return idio_vol_dependence(eps, vs, false)
+function idio_vol_ic(eps::MatNum, vs::MatNum; ties::Symbol = :average)
+    return idio_vol_dependence(eps, vs, false, ties)
 end
-function idio_vol_ic(csfm::CrossSectionalFactorModel)
+function idio_vol_ic(csfm::CrossSectionalFactorModel; ties::Symbol = :average)
     ep, vh = idio_diagnostic_data(csfm)
-    return idio_vol_ic(ep, vh)
+    return idio_vol_ic(ep, vh; ties = ties)
 end
 """
-    idio_vol_residual_dependence(eps::MatNum, vs::MatNum) -> Vector{<:Real}
-    idio_vol_residual_dependence(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
+    idio_vol_residual_dependence(eps::MatNum, vs::MatNum;
+                                 ties::Symbol = :average) -> Vector{<:Real}
+    idio_vol_residual_dependence(csfm::CrossSectionalFactorModel;
+                                 ties::Symbol = :average) -> Vector{<:Real}
 
 Return the rank correlation of the predicted idiosyncratic volatility against the next observation's standardised absolute idiosyncratic return, one entry per pair of observations.
 
-Dividing the realised move by the volatility the fit predicted should remove the level of that prediction. So a well calibrated fit leaves a series near `0`: how large an asset's standardised move was should not depend on how volatile the fit said the asset would be. A series that stays positive is a fit that under-predicts the volatile assets, and one that stays negative is a fit that over-predicts them.
+Division of the realised move by the predicted volatility should remove the level of the prediction. So a fit that is well calibrated leaves a series near `0`, because the size of an asset's standardised move does not depend on how volatile the fit said the asset would be. A series that stays positive shows a fit that under-predicts the volatile assets, and a series that stays negative shows a fit that over-predicts them.
 
-The target divides the absolute return of observation ``t + 1`` by the volatility predicted at observation ``t``, and not by the volatility predicted at observation ``t + 1``. Both quantities are written ``z_{t+1}`` in the literature, and they differ wherever the prediction moved between the two observations.
+The target divides the absolute return of observation ``t + 1`` by the volatility predicted at observation ``t``, not at observation ``t + 1``. The notation ``|z_{t+1}|`` can name either quantity, and the two differ wherever the prediction moved between the two observations.
 
-Read it beside [`idio_vol_ic`](@ref). A fit that ranks well and leaves no residual dependence carries a high information coefficient and a dependence near `0`.
+Read it beside [`idio_vol_ic`](@ref). A fit that ranks well and leaves no residual dependence has a high information coefficient and a dependence near `0`.
 
 # Mathematical definition
 
 ```math
-d_{t} = \\rho_{S} \\left( \\hat{\\sigma}_{t \\cdot}, \\frac{\\left| \\boldsymbol{\\varepsilon}_{t + 1, \\cdot} \\right|}{\\hat{\\sigma}_{t \\cdot}} \\right)
+\\begin{align}
+d_{t} &= \\rho_{S} \\left( \\hat{\\sigma}_{t \\cdot}, \\frac{\\left| \\varepsilon_{t + 1, \\cdot} \\right|}{\\hat{\\sigma}_{t \\cdot}} \\right)\\,.
+\\end{align}
 ```
 
 Where:
 
-  - ``\\hat{\\sigma}_{ti} = \\sqrt{\\max(v_{ti}, 0)}``: Predicted idiosyncratic volatility.
-  - ``\\rho_{S}``: The cross-sectional rank correlation, over the assets at which both cross-sections are finite.
+  - ``d_{t}``: Residual dependence of observation ``t``, read against observation ``t + 1``.
+  - ``\\hat{\\sigma}_{t \\cdot}``, ``\\varepsilon_{t + 1, \\cdot}``: The cross-sections of observations ``t`` and ``t + 1``, one entry per asset. The division is per asset, and it is `NaN` where ``\\hat{\\sigma}_{ti}`` is zero.
+  - $(math_dict[:rho_S_cs])
+  - $(math_dict[:sigma_ti_idio])
+  - $(math_dict[:v_ti_idio])
+  - $(math_dict[:eps_ti_idio])
+
+The correlation is not defined over fewer than five common finite assets.
 
 # Arguments
 
   - `eps`: Idiosyncratic return history `observations × assets`.
   - `vs`: Idiosyncratic variance history `observations × assets`.
   - `csfm`: A cross-sectional factor model block.
+  - $(arg_dict[:cs_ties])
 
 # Validation
 
   - `!isempty(eps)`, `size(vs) == size(eps)` and `size(eps, 1) > 1`.
-  - `csfm.csr` is not `nothing`, else an `IsNothingError` naming `csr` is raised.
-  - `csfm.vs` is not `nothing`, else an `IsNothingError` naming `vs` is raised.
+  - `csfm.csr` is not `nothing`, else the verb raises an `IsNothingError` that names `csr`.
+  - `csfm.vs` is not `nothing`, else the verb raises an `IsNothingError` that names `vs`.
+  - The rules of [`cs_ranks`](@ref).
 
 # Returns
 
-  - `d::Vector{<:Real}`: The series, `observations - 1` entries. An observation sharing fewer than five finite assets is `NaN`.
+  - `d::Vector{<:Real}`: The series, `observations - 1` entries. An observation that shares fewer than five finite assets is `NaN`.
 
 # Related
 
@@ -611,19 +726,36 @@ Where:
   - [`plot_idio_vol_residual_dependence`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
-function idio_vol_residual_dependence(eps::MatNum, vs::MatNum)
-    return idio_vol_dependence(eps, vs, true)
+function idio_vol_residual_dependence(eps::MatNum, vs::MatNum; ties::Symbol = :average)
+    return idio_vol_dependence(eps, vs, true, ties)
 end
-function idio_vol_residual_dependence(csfm::CrossSectionalFactorModel)
+function idio_vol_residual_dependence(csfm::CrossSectionalFactorModel;
+                                      ties::Symbol = :average)
     ep, vh = idio_diagnostic_data(csfm)
-    return idio_vol_residual_dependence(ep, vh)
+    return idio_vol_residual_dependence(ep, vh; ties = ties)
 end
 """
     idio_nan_mean(v::VecNum)
 
 Return the mean of the finite entries of a series.
 
-A diagnostic series carries `NaN` at an observation that had too few assets, and the summary reads the observations that answered. This verb states that rule once for the four means the summary takes.
+A diagnostic series is `NaN` at an observation that had too few assets, and the summary reads the observations that answered. This verb states that rule once for the four means the summary takes.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{a} &= \\frac{1}{|\\mathcal{A}|} \\sum_{t \\in \\mathcal{A}} a_{t}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\bar{a}``: Mean of the finite entries.
+  - $(math_dict[:a_t_series])
+  - $(math_dict[:A_series_fin])
+
+The mean is not defined for an empty ``\\mathcal{A}``.
 
 # Arguments
 
@@ -631,7 +763,7 @@ A diagnostic series carries `NaN` at an observation that had too few assets, and
 
 # Returns
 
-  - `m::Real`: The mean of the finite entries, or `NaN` when the series carries none.
+  - `m::Real`: The mean of the finite entries, or `NaN` when the series has none.
 
 # Related
 
@@ -639,7 +771,7 @@ A diagnostic series carries `NaN` at an observation that had too few assets, and
   - [`idio_nan_median`](@ref)
 """
 function idio_nan_mean(v::VecNum)
-    Tf = real(eltype(v))
+    Tf = float_if_integer(real(eltype(v)))
     s = zero(Tf)
     n = 0
     for x in v
@@ -655,7 +787,23 @@ end
 
 Return the median of the finite entries of a series.
 
-The summary reads the median of the calibration series beside its mean, because one observation whose cross-section was nearly constant moves the mean and not the median.
+The summary reads the median of the calibration series beside its mean. One observation with a cross-section that is almost constant moves the mean, but not the median.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{a} &= \\operatorname{median} \\left\\{ a_{t} : t \\in \\mathcal{A} \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{a}``: Median of the finite entries. For an even count it is the mean of the two middle entries.
+  - $(math_dict[:a_t_series])
+  - $(math_dict[:A_series_fin])
+
+The median is not defined for an empty ``\\mathcal{A}``.
 
 # Arguments
 
@@ -663,7 +811,7 @@ The summary reads the median of the calibration series beside its mean, because 
 
 # Returns
 
-  - `m::Real`: The median of the finite entries, or `NaN` when the series carries none.
+  - `m::Real`: The median of the finite entries, or `NaN` when the series has none.
 
 # Related
 
@@ -671,7 +819,7 @@ The summary reads the median of the calibration series beside its mean, because 
   - [`idio_nan_mean`](@ref)
 """
 function idio_nan_median(v::VecNum)
-    Tf = real(eltype(v))
+    Tf = float_if_integer(real(eltype(v)))
     f = Vector{Tf}(undef, 0)
     sizehint!(f, length(v))
     for x in v
@@ -687,9 +835,16 @@ end
 
 Return the five time-aggregated numbers of the calibration of a cross-sectional fit.
 
-The four calibration series each answer per observation, and a caller who judges a whole fit reads their time aggregate instead. The five numbers are the mean and the median of [`idio_calibration`](@ref), and the means of [`idio_kurtosis`](@ref), of [`idio_skewness`](@ref) and of [`idio_tail_rate`](@ref). Every aggregate skips the observations that had too few assets to answer.
+The four calibration series each answer per observation. To judge a whole fit, read their time aggregates. The five numbers are the mean and the median of [`idio_calibration`](@ref), and the means of [`idio_kurtosis`](@ref), [`idio_skewness`](@ref) and [`idio_tail_rate`](@ref). Each aggregate skips the observations that had too few assets to answer.
 
-Under the normal law the expected values are `1`, `1`, `0`, `0` and ``2 \\Phi(-c)``. A fit of an equity universe ordinarily carries a positive excess kurtosis and a tail rate above the Gaussian reference, so read the first two numbers for the scale of the specific risk and the last three for the shape of its tails.
+Under the normal law the expected values are `1`, `1`, `0`, `0` and ``2 \\Phi(-c)``, where ``\\Phi`` is the cumulative distribution function of the standard normal law and ``c`` is the threshold. A fit of an equity universe usually has a positive excess kurtosis and a tail rate above the Gaussian reference. Read the first two numbers for the scale of the specific risk, and the last three for the shape of its tails.
+
+# Algorithm
+
+ 1. Compute the standardised returns `z` once with [`standardised_idio_returns`](@ref).
+ 2. Compute the calibration series `cs` from `z` with [`idio_calibration`](@ref).
+ 3. Take the mean of `cs` with [`idio_nan_mean`](@ref) and its median with [`idio_nan_median`](@ref), giving `mean_cs_std` and `median_cs_std`.
+ 4. Compute the kurtosis, skewness and tail rate series from `z`, and take the mean of each with [`idio_nan_mean`](@ref), giving `mean_kurtosis`, `mean_skewness` and `mean_tail_rate`.
 
 # Arguments
 
@@ -701,8 +856,8 @@ Under the normal law the expected values are `1`, `1`, `0`, `0` and ``2 \\Phi(-c
 # Validation
 
   - `!isempty(eps)` and `size(vs) == size(eps)`, on the two-argument form.
-  - `csfm.csr` is not `nothing`, else an `IsNothingError` naming `csr` is raised.
-  - `csfm.vs` is not `nothing`, else an `IsNothingError` naming `vs` is raised.
+  - `csfm.csr` is not `nothing`, else the verb raises an `IsNothingError` that names `csr`.
+  - `csfm.vs` is not `nothing`, else the verb raises an `IsNothingError` that names `vs`.
 
 # Returns
 
@@ -738,9 +893,9 @@ end
     idio_diagnostic_data(csr::CrossSectionalRegression, vs::Nothing)
     idio_diagnostic_data(csr::CrossSectionalRegression, vs::MatNum)
 
-Return the idiosyncratic return history and the idiosyncratic variance history an idiosyncratic diagnostic reads off a factor model block.
+Return the idiosyncratic return history and the idiosyncratic variance history that an idiosyncratic diagnostic reads off a factor model block.
 
-The group reads the residual of the fit against the variance the fit predicted for it. Neither history carries a factor axis, so the group takes no lag and no family re-basis, and the two histories are read as the block wrote them. The absent case is the dispatch rather than a branch, and its message names the field the caller must populate.
+The group reads the residual of the fit against the variance the fit predicted for it. Neither history has a factor axis, so the group takes no lag and no family re-basis, and it reads the two histories as the block wrote them. Dispatch, not a branch, selects the absent case, and its message names the field the caller must populate.
 
 # Arguments
 
@@ -750,8 +905,8 @@ The group reads the residual of the fit against the variance the fit predicted f
 
 # Validation
 
-  - `csfm.csr` is not `nothing`, else an `IsNothingError` naming `csr` is raised.
-  - `csfm.vs` is not `nothing`, else an `IsNothingError` naming `vs` is raised.
+  - `csfm.csr` is not `nothing`, else the verb raises an `IsNothingError` that names `csr`.
+  - `csfm.vs` is not `nothing`, else the verb raises an `IsNothingError` that names `vs`.
 
 # Returns
 

@@ -79,7 +79,7 @@ The trade-off: this is a **discipline seam, not a compiler-enforced one**.
 
 ### 3. Home: `08_Base_JuMPOptimisation.jl`
 
-The interface lives in [08_Base_JuMPOptimisation.jl](../../src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation.jl),
+The interface lives in [08_Base_JuMPOptimisation.jl](../../src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/),
 which already holds the embryonic setters (`set_w!`, `set_model_scales!`,
 `set_portfolio_returns!`) and is included before both constraint directories, so
 include-order — the only hard constraint in a flat module — is satisfied.

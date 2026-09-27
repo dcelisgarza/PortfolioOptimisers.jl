@@ -413,8 +413,8 @@ lines, and each one is driven here on purpose.
     # block at all and blanks the whole matrix.
     @test all(isnan, cov(sep(), fill(NaN, 6, 3)))
 
-    # An asset that delists mid-sample has its variance, its correlation state and its pair
-    # counts reset, which is the branch the single-recursion path does not carry.
+    # An asset that delists mid-sample has its variance and its correlation state reset, which
+    # is the branch the single-recursion path does not carry.
     X = randn(rng, 30, 3) .* 0.02
     active = trues(size(X))
     active[20:end, 3] .= false
@@ -477,4 +477,71 @@ end
         @test isequal(PO.regime_adjusted_covariance(with_f, ce),
                       PO.regime_adjusted_covariance(without_f, ce))
     end
+end
+
+@testset "a holiday holds the correlation on the path with one decay" begin
+    # Issue #1343 and ADR 0181. Two equal assets and five holidays of the second: the variance
+    # of asset 1 decays, and its covariance with asset 2 decays by the square root, so the
+    # correlation stays one. A rule that updates only the pairs whose two assets are valid gives
+    # a correlation above one and a negative eigenvalue.
+    r = [0.02, -0.01, 0.015, -0.02, 0.01, 0.03, -0.025, 0.02]
+    Xh = vcat(hcat(r, r), [zeros(5) fill(NaN, 5)])
+    sh = cov(RegimeAdjustedExpWeightedCovariance(; decay = 0.7, min_obs = 1,
+                                                 centred = true), Xh)
+    @test isapprox(sh[1, 2] / sqrt(sh[1, 1] * sh[2, 2]), 1; rtol = 1e-12)
+    @test minimum(eigvals(Symmetric(sh))) > -1e-14 * maximum(abs, sh)
+
+    # The state stays positive semidefinite for every pattern of holidays.
+    rng = StableRNG(1343)
+    worst = Inf
+    for _ in 1:100
+        T, N = rand(rng, 10:40), rand(rng, 2:5)
+        X = randn(rng, T, N) / 100
+        X[rand(rng, T, N) .< 0.3] .= NaN
+        ce = partial_fit!(RegimeAdjustedExpWeightedCovariance(; decay = 0.9, min_obs = 1),
+                          X)
+        S = ce.cache.covariance
+        m = maximum(abs, S)
+        iszero(m) || (worst = min(worst, minimum(eigvals(Symmetric(S))) / m))
+    end
+    @test worst > -1e-14
+end
+
+@testset "a holiday holds the correlation on the separate path" begin
+    # Issue #1346 and ADR 0181. The separate `cor_decay` path takes the same step on its
+    # correlation state. Two equal assets and five holidays of the second, at which the first
+    # has a zero deviation: the correlation of the state stays one. A rule that updates only
+    # the pairs whose two assets are valid gives the ratio `0.9^(-5/2)`, which the clamp of the
+    # read-out hides for two assets, so the test reads the state.
+    r = [0.02, -0.01, 0.015, -0.02, 0.01, 0.03, -0.025, 0.02]
+    Xh = vcat(hcat(r, r), [zeros(5) fill(NaN, 5)])
+    ce = RegimeAdjustedExpWeightedCovariance(; decay = 0.7, cor_decay = 0.9, min_obs = 1,
+                                             centred = true)
+    @test PO.has_separate_cor_decay(ce)
+    Q = partial_fit!(ce, Xh).cache.cor_state
+    @test isapprox(Q[1, 2] / sqrt(Q[1, 1] * Q[2, 2]), 1; rtol = 1e-12)
+    @test isapprox(cor(ce, Xh)[1, 2], 1; rtol = 1e-12)
+
+    # The state and the read-out stay positive semidefinite for every pattern of holidays.
+    # Before the fix, these panels gave a smallest eigenvalue of -0.1075 times the largest
+    # entry.
+    rng = StableRNG(7)
+    worst_state = Inf
+    worst_cov = Inf
+    for _ in 1:200
+        T, N = rand(rng, 20:60), rand(rng, 3:5)
+        X = randn(rng, T, N) / 100
+        X[rand(rng, T, N) .< 0.3] .= NaN
+        ce = RegimeAdjustedExpWeightedCovariance(; decay = 0.9, cor_decay = 0.97,
+                                                 min_obs = 1)
+        Q = partial_fit!(ce, X).cache.cor_state
+        m = maximum(abs, Q)
+        iszero(m) || (worst_state = min(worst_state, minimum(eigvals(Symmetric(Q))) / m))
+        s = cov(ce, X)
+        if all(isfinite, s)
+            worst_cov = min(worst_cov, minimum(eigvals(Symmetric(s))) / maximum(abs, s))
+        end
+    end
+    @test worst_state > -1e-14
+    @test worst_cov > -1e-14
 end

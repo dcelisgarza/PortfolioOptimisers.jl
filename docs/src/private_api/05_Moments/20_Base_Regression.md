@@ -23,7 +23,7 @@ MinValStepwiseRegressionCriterion
 MaxValStepwiseRegressionCriterion
 MinMaxValStepwiseRegressionCriterion
 RegE_Reg
-set_idiosyncratic_covariance(re::Regression, esigma::Option{<:VecNum_MatNum})
+set_idiosyncratic_covariance(re::Regression, esigma::Option{<:VecNum_MatNum}, edof::Option{<:VecNum}, ediv::Option{<:VecNum})
 has_family_rebasis(rr::AbstractLoadingsRegressionResult)
 default_regression_criterion_variant
 regression_criterion_func

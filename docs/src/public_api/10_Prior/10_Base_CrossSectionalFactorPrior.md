@@ -4,4 +4,4 @@ Description = "Cross-Sectional Factor Prior internals has no public API in Portf
 
 # Cross-Sectional Factor Prior internals
 
-Cross-Sectional Factor Prior internals has no public API in PortfolioOptimisers.jl; see [Cross-Sectional Factor Prior internals: private API](../../private_api/10_Prior/10_Base_CrossSectionalFactorPrior.md) for its private API.
+Every name of this topic is private. The [private page](@ref private-api-cross-sectional-factor-prior-internals) documents them.

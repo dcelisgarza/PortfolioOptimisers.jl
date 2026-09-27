@@ -3,11 +3,11 @@
 
 Check that the sign of a rolling log-return Descriptor is `1` or `-1`.
 
-The Descriptor sums log returns over a window, and the optional exponentiation inverts that sum with `expm1`. A multiplier other than `1` or `-1` scales the sum, and the exponentiation of a scaled sum is no longer a return, so the field takes the two values that keep the reading meaningful: `1` reads the window as momentum, and `-1` reads it as reversal.
+The Descriptor sums log returns over a window, and the optional exponentiation turns that sum back into a simple return with `expm1`. A multiplier other than `1` or `-1` scales the sum, and the exponential of a scaled sum is not a return. So the field takes only two values. A sign of `1` reads the window as momentum, and a sign of `-1` reads it as reversal.
 
 # Arguments
 
-  - `sign`: The multiplier applied to the window sum.
+  - $(arg_dict[:sign_roll])
 
 # Validation
 
@@ -34,7 +34,9 @@ end
 
 Read the returns and the Asset Panel a rolling Descriptor works on.
 
-Returns are not a Panel Field, so a Descriptor that reads them reads `rd.X` rather than the feature matrix. This is the one route to that pair, and every rolling Descriptor reads through it. The returns come back as a floating point matrix of their own, so a missing return is a `NaN` the Descriptor tests directly.
+Returns are not a Panel Field, so a Descriptor that reads them reads `rd.X` and not the feature matrix. Every rolling Descriptor reads the pair through this function. The returns come back as a new matrix in `float_if_integer(eltype(rd.X))`. An integer panel is floated, so its Descriptor can hold the `NaN` of the warm-up. A `Rational` panel is kept, and it cannot hold that `NaN`.
+
+A return that is missing is a `NaN`, and a Descriptor tests for it. A return that is infinite is refused, because a sum over a window is one difference of two cumulative sums. One infinite return makes every later cumulative sum infinite, and the difference of two of them is `NaN`, also in a window that does not hold the infinite return.
 
 # Arguments
 
@@ -44,13 +46,14 @@ Returns are not a Panel Field, so a Descriptor that reads them reads `rd.X` rath
 
   - `!isnothing(rd.X)`. Raises an [`IsNothingError`](@ref).
   - `!isnothing(rd.pnl)`. Raises an [`IsNothingError`](@ref).
+  - Every entry of `rd.X` that is not `NaN` is finite. Raises a `DomainError`.
 
-The two shapes need no check of their own: [`ReturnsResult`](@ref) binds the observation axis and the asset axis of the feature matrix to those of the returns, so an Asset Panel that reaches a carrier always matches the returns beside it.
+The two shapes need no check of their own. [`ReturnsResult`](@ref) binds the observation axis and the asset axis of the feature matrix to those of the returns, so an Asset Panel that reaches a carrier always matches the returns beside it.
 
 # Returns
 
-  - `X::Matrix{<:Real}`: The returns, `observations × assets`.
-  - `pnl::AssetPanel`: The Asset Panel the carrier holds.
+  - `X::Matrix{<:Real}`: The returns, `observations × assets`, in `float_if_integer(eltype(rd.X))`.
+  - `pnl::AssetPanel`: The Asset Panel of the carrier.
 
 # Related
 
@@ -67,7 +70,12 @@ function descriptor_returns(rd::ReturnsResult)
               IsNothingError("a rolling Descriptor reads returns, and rd.X is nothing. Build the carrier with the returns matrix the Asset Panel was drawn on."))
     @argcheck(!isnothing(pnl),
               IsNothingError("a rolling Descriptor reads the active mask of an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
-    return Matrix(X), pnl
+    Xf = Matrix{float_if_integer(eltype(X))}(X)
+    k = findfirst(isinf, Xf)
+    @argcheck(isnothing(k),
+              DomainError(Xf[k],
+                          "a rolling Descriptor reads every return that is not missing as a finite number, and it is $(Xf[k]) at observation $(k[1]) for asset $(k[2]). An infinite return is a data error, so clean the input rather than pass it through."))
+    return Xf, pnl
 end
 """
     rolling_window_max(X::AbstractMatrix{<:Real}, amsk::AbstractMatrix{Bool},
@@ -75,13 +83,28 @@ end
 
 Take the largest return of one asset over one window of observations.
 
-This is the window scan of [`RollingMax`](@ref), written once so the verb reads as one loop over the observations. The scan stops at the first observation the active mask refuses, because the window is then `NaN` whatever the rest of it holds.
+This is the scan of one window for [`RollingMax`](@ref). The scan stops at the first inactive observation, because the value of the window is then `NaN` whatever the rest of the window holds.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+m &= \\begin{cases} \\max \\{ x_{k,\\,i} : k \\in K \\text{, } x_{k,\\,i} \\text{ observed} \\} & \\text{if } a_{ki} = 1 \\text{ for every } k \\in K \\text{, and one } x_{k,\\,i} \\text{ is observed} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``m``: Value of the window.
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:a_ti_pnl])
+  - ``K``: `rows`, the observations of the window.
 
 # Arguments
 
-  - `X`: The returns, `observations × assets`.
+  - `X`: The returns, `observations × assets`, in a type that holds `NaN`.
   - `amsk`: The active mask of the Asset Panel, `observations × assets`.
-  - `i`: The asset's column.
+  - `i`: The column of the asset.
   - `rows`: The observations of the window.
 
 # Returns
@@ -113,30 +136,34 @@ $(DocStringExtensions.TYPEDEF)
 
 Sum of log returns over a fixed window that ends a fixed number of observations back, at every observation.
 
-This is the archetype of every rolling log-return Descriptor: medium-term momentum, which skips the most recent month, and short-term reversal, which negates the sum of the last month. The window holds `window` observations and ends `skip` observations before the current one, so the two readings differ only in their window, their skip and their sign.
+This is the archetype of every rolling log-return Descriptor. Medium-term momentum skips the most recent month, and short-term reversal negates the sum of the last month. The window holds `window` observations and ends `skip` observations before the current one, so momentum and reversal differ only in their window, their skip and their sign.
 
-The Descriptor is `NaN` unless every observation of the window is active, which is one rule for three cases: the warm-up at the start of the sample, an asset that lists late, and a gap in the middle of a listing. An active observation whose return is missing contributes zero to the sum, because a holiday is not a loss.
+The Descriptor is `NaN` unless every observation of the window is active. This one rule covers three cases: the warm-up at the start of the sample, an asset that lists late, and a gap in the middle of a listing. A window with a skip excludes the current observation, and the Descriptor is also `NaN` where the current observation is inactive. An active observation whose return is missing adds zero to the sum, because a holiday is not a loss.
 
-The output is a log return by default. A log cumulative return is more symmetric than a simple one, which suits the cross-sectional standardisation that reads it, and the logarithm is monotone, so the two orderings agree. Set `exponentiate` to read the simple return instead.
+The output is a log return by default. A log cumulative return is more symmetric than a simple one, and the cross-sectional standardisation that reads it works better on a symmetric value. The logarithm is increasing, so the two orders of the assets agree. Set `exponentiate` to get the simple return.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-x_{t,i} &= \\begin{cases} \\log(1 + r_{t,i}) & \\text{if } r_{t,i} \\text{ is observed} \\\\ 0 & \\text{otherwise} \\end{cases}\\,,\\\\
-S_{t,i} &= \\sum_{k = t - s - w + 1}^{t - s} x_{k,i}\\,,\\\\
-d_{t,i} &= \\begin{cases} \\sigma S_{t,i} & \\text{if } t \\ge s + w \\text{, every } a_{k,i} \\text{ of the window holds, and not } \\texttt{exponentiate} \\\\ \\exp(\\sigma S_{t,i}) - 1 & \\text{same, and } \\texttt{exponentiate} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
+y_{t,i} &= \\begin{cases} \\log(1 + x_{t,\\,i}) & \\text{if } x_{t,\\,i} \\text{ is observed} \\\\ 0 & \\text{otherwise} \\end{cases}\\,,\\\\
+S_{t,i} &= \\sum_{k = t - s - w + 1}^{t - s} y_{k,i}\\,,\\\\
+d_{t,i} &= \\begin{cases} \\sigma S_{t,i} & \\text{if } t \\ge s + w \\text{, } a_{ti} = 1 \\text{, } a_{ki} = 1 \\text{ for every } k \\text{ of the window, and not } \\texttt{exponentiate} \\\\ \\exp(\\sigma S_{t,i}) - 1 & \\text{if the same conditions hold, and } \\texttt{exponentiate} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
+
+Every return that is observed is finite and greater than ``-1``, so every ``y_{t,i}`` is finite.
 
 Where:
 
   - ``d_{t,i}``: Descriptor of asset ``i`` at observation ``t``.
-  - ``r_{t,i}``: Return of asset ``i`` at observation ``t``.
-  - ``a_{t,i}``: Active mask of the Asset Panel.
-  - ``w``: The window, in observations.
-  - ``s``: The skip, in observations.
-  - ``\\sigma``: The sign.
+  - $(math_dict[:x_ti_ret])
+  - ``y_{t,i}``: Log return of asset ``i`` at observation ``t``, zero where the return is missing.
+  - ``S_{t,i}``: Sum of the log returns of the window of asset ``i`` at observation ``t``.
+  - $(math_dict[:a_ti_pnl])
+  - $(math_dict[:w_roll])
+  - ``s``: `skip`, the number of the most recent observations that the window excludes.
+  - ``\\sigma``: `sign`, the multiplier of the window sum.
 
 # Fields
 
@@ -147,13 +174,13 @@ $(DocStringExtensions.FIELDS)
     RollingLogReturn(; window::Integer, skip::Integer = 0, sign::Real = 1,
                      exponentiate::Bool = false) -> RollingLogReturn
 
-Keywords correspond to the struct's fields. `window` takes no default, because it depends on the data frequency: `252` is one year of daily observations. The named Descriptors fix all four.
+Keywords correspond to the struct's fields. `window` takes no default, because it depends on the data frequency. For example, `252` is one year of daily observations. The named Descriptors [`RollingMomentum`](@ref) and [`Reversal`](@ref) give a default to all four.
 
 ## Validation
 
   - `window > 0`.
   - `skip >= 0`.
-  - `sign == 1 || sign == -1`.
+  - `sign == 1 || sign == -1`, through [`assert_rolling_sign`](@ref).
 
 # Examples
 
@@ -176,19 +203,19 @@ RollingLogReturn
 """
 @concrete struct RollingLogReturn <: AbstractDescriptorEstimator
     """
-    Number of observations in the window.
+    $(field_dict[:window_roll])
     """
     window
     """
-    Number of most recent observations the window excludes. The window ends at observation `t - skip`.
+    $(field_dict[:skip_roll])
     """
     skip
     """
-    Multiplier of the window sum. `1` reads the window as momentum, `-1` reads it as reversal.
+    $(field_dict[:sign_roll])
     """
     sign
     """
-    Whether the output is the simple return over the window rather than the log return.
+    $(field_dict[:exponentiate_roll])
     """
     exponentiate
     function RollingLogReturn(window::Integer, skip::Integer, sign::Real,
@@ -211,24 +238,26 @@ $(DocStringExtensions.TYPEDEF)
 
 Maximum return over a fixed trailing window, at every observation.
 
-This is the lottery demand Descriptor. An asset whose recent path holds one very large positive return attracts speculative demand, and the cross-section of that reading prices it.
+This is the lottery demand Descriptor. An asset whose recent returns hold one very large positive return attracts speculative demand, and the cross-section of this Descriptor prices that demand.
 
-The Descriptor is `NaN` unless every observation of the window is active, which covers the warm-up at the start of the sample, an asset that lists late, and a gap in the middle of a listing. A missing return inside an active window is ignored rather than counted as zero, so the maximum reads the returns that exist. A window whose returns are all missing is `NaN`, because a maximum of nothing is not a number.
+The Descriptor is `NaN` unless every observation of the window is active. This rule covers the warm-up at the start of the sample, an asset that lists late, and a gap in the middle of a listing. The window ends at the current observation, so an inactive current observation makes the Descriptor `NaN` too. The maximum ignores a missing return inside an active window, and does not count it as zero. A window whose returns are all missing is `NaN`, because a maximum of no value is not a number.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-d_{t,i} &= \\begin{cases} \\max \\{ r_{k,i} : k \\in [t - w + 1,\\, t] \\text{, } r_{k,i} \\text{ observed} \\} & \\text{if } t \\ge w \\text{, every } a_{k,i} \\text{ of the window holds, and one } r_{k,i} \\text{ is observed} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
+d_{t,i} &= \\begin{cases} \\max \\{ x_{k,\\,i} : k \\in [t - w + 1,\\, t] \\text{, } x_{k,\\,i} \\text{ observed} \\} & \\text{if } t \\ge w \\text{, } a_{ki} = 1 \\text{ for every } k \\text{ of the window, and one } x_{k,\\,i} \\text{ is observed} \\\\ \\mathrm{NaN} & \\text{otherwise} \\end{cases}\\,.
 \\end{align}
 ```
+
+Every return that is observed is finite.
 
 Where:
 
   - ``d_{t,i}``: Descriptor of asset ``i`` at observation ``t``.
-  - ``r_{t,i}``: Return of asset ``i`` at observation ``t``.
-  - ``a_{t,i}``: Active mask of the Asset Panel.
-  - ``w``: The window, in observations.
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:a_ti_pnl])
+  - $(math_dict[:w_roll])
 
 # Fields
 
@@ -238,7 +267,7 @@ $(DocStringExtensions.FIELDS)
 
     RollingMax(; window::Integer) -> RollingMax
 
-Keywords correspond to the struct's fields. `window` takes no default, because it depends on the data frequency: `21` is one month of daily observations. [`MaxReturn`](@ref) fixes it there.
+Keywords correspond to the struct's fields. `window` takes no default, because it depends on the data frequency. For example, `21` is one month of daily observations, and [`MaxReturn`](@ref) gives that default.
 
 ## Validation
 
@@ -262,7 +291,7 @@ RollingMax
 """
 @concrete struct RollingMax <: AbstractDescriptorEstimator
     """
-    Number of observations in the trailing window.
+    $(field_dict[:window_roll])
     """
     window
     function RollingMax(window::Integer)
@@ -279,13 +308,13 @@ end
 
 Compute a rolling Descriptor of the return path.
 
-Both members read the returns of `rd.X` and the active mask of the Asset Panel, and no Panel Field. Both answer `NaN` on every observation whose window is not wholly active, and on every inactive cell.
+Both methods read the returns of `rd.X` and the active mask of the Asset Panel, and no Panel Field. Both write `NaN` at every observation whose window is not wholly active, and in every inactive cell.
 
 # Algorithm
 
- 1. Read the returns and the Asset Panel through [`descriptor_returns`](@ref).
- 2. For [`RollingLogReturn`](@ref), refuse a return at or below `-1` through [`assert_log_returns`](@ref), then take the cumulative sums of `log1p` of the returns and of the active mask along the observations. A missing return contributes zero. The window of observation `t` runs from `t - skip - window + 1` to `t - skip`, and its sum is one difference of the cumulative sums. Write that sum, multiplied by the sign, where the active count of the window equals the window, and `expm1` of it when `exponentiate` is set.
- 3. For [`RollingMax`](@ref), scan the trailing window of each observation through [`rolling_window_max`](@ref), which writes the largest return that is not missing where every observation of the window is active and one return exists.
+ 1. Read the returns and the Asset Panel through [`descriptor_returns`](@ref), which floats integer returns and refuses an infinite return.
+ 2. For [`RollingLogReturn`](@ref), refuse a return at or below `-1` through [`assert_log_returns`](@ref). Then take the cumulative sums of `log1p` of the returns and of the active mask along the observations. A missing return adds zero. The window of observation `t` runs from `t - skip - window + 1` to `t - skip`, and its sum is one difference of the cumulative sums. Where the active count of the window equals `window`, write that sum multiplied by `sign`, or `expm1` of that product when `exponentiate` is set.
+ 3. For [`RollingMax`](@ref), scan the window of each observation through [`rolling_window_max`](@ref). It gives the largest return that is not missing where every observation of the window is active and one return exists.
  4. Write `NaN` into every inactive cell through [`descriptor_active_fill!`](@ref).
 
 # Arguments
@@ -387,14 +416,18 @@ end
 
 Sum of log returns over one year, ending one month back.
 
-This is the classic twelve-minus-one momentum reading. The skip separates the medium-term momentum the window measures from the short-term reversal of the most recent month, which [`Reversal`](@ref) reads on its own.
+This is the classic twelve-minus-one momentum. The skip separates the medium-term momentum that the window measures from the short-term reversal of the most recent month. [`Reversal`](@ref) measures that reversal on its own.
 
 # Arguments
 
-  - `window`: Number of observations in the window. `252` is one year of daily observations.
-  - `skip`: Number of most recent observations the window excludes. `21` is one month of daily observations.
-  - `sign`: Multiplier of the window sum.
-  - `exponentiate`: Whether the output is the simple return over the window rather than the log return.
+  - $(arg_dict[:window_roll]) `252` is one year of daily observations.
+  - $(arg_dict[:skip_roll]) `21` is one month of daily observations.
+  - $(arg_dict[:sign_roll])
+  - $(arg_dict[:exponentiate_roll])
+
+# Validation
+
+  - The validation of [`RollingLogReturn`](@ref).
 
 # Returns
 
@@ -429,14 +462,18 @@ end
 
 Negated sum of log returns over one month, ending at the current observation.
 
-This is the short-term reversal reading. A high value says that the asset lost ground recently, which temporary price pressure, the provision of liquidity and the microstructure of the market tend to reverse. It is the counterpart of [`RollingMomentum`](@ref), whose skip excludes the window this Descriptor reads.
+This is the short-term reversal. A high value shows that the asset lost value recently. Temporary price pressure, the provision of liquidity and the microstructure of the market tend to reverse such a loss. It is the counterpart of [`RollingMomentum`](@ref), whose skip excludes the window of this Descriptor.
 
 # Arguments
 
-  - `window`: Number of observations in the window. `21` is one month of daily observations, `5` is one week, and `1` is one day.
-  - `skip`: Number of most recent observations the window excludes.
-  - `sign`: Multiplier of the window sum.
-  - `exponentiate`: Whether the output is the simple return over the window rather than the log return.
+  - $(arg_dict[:window_roll]) `21` is one month of daily observations, `5` is one week, and `1` is one day.
+  - $(arg_dict[:skip_roll])
+  - $(arg_dict[:sign_roll])
+  - $(arg_dict[:exponentiate_roll])
+
+# Validation
+
+  - The validation of [`RollingLogReturn`](@ref).
 
 # Returns
 
@@ -470,11 +507,15 @@ end
 
 Maximum return over one month.
 
-This is the lottery demand reading at the horizon its source uses. An asset whose last month holds one very large positive return earns a lower return afterwards, which the cross-section reads as the price of a lottery-like payoff.
+This is the lottery demand Descriptor at the horizon of its source. An asset whose last month holds one very large positive return earns a lower return after that month. The cross-section prices this as the cost of a payoff that resembles a lottery ticket.
 
 # Arguments
 
-  - `window`: Number of observations in the trailing window. `21` is one month of daily observations, and `5` is one week.
+  - $(arg_dict[:window_roll]) `21` is one month of daily observations, and `5` is one week.
+
+# Validation
+
+  - The validation of [`RollingMax`](@ref).
 
 # Returns
 

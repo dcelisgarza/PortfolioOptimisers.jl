@@ -4,7 +4,7 @@ Description = "Simple covariance, public API of PortfolioOptimisers.jl: GeneralC
 
 # [Simple covariance](@id api-covariance)
 
-The covariance is an important measure of risk used in portfolio selection and performance analysis. The classic Markowitz [markowitz1952](@cite) portfolio uses the portfolio variance as its risk measure, which is computed from the covariance matrix and portfolio weights. Here we define the most basic covariance/correlation estimator.
+The covariance matrix measures how the returns of the assets vary together. The mean-variance portfolio of Markowitz [markowitz1952](@cite) takes the portfolio variance as its risk, which is `w' Σ w` for the weights `w` and the covariance matrix `Σ`. This page has the sample covariance and correlation estimators.
 
 ## General covariance
 
@@ -26,7 +26,7 @@ cor(ce::Covariance{<:Any, <:Any, <:SemiMoment}, X::MatNum; dims::Int = 1, mean =
 
 ## Incremental fit
 
-The full-moment sample covariance folds one observation at a time, so a long history need not be held or re-read. One state serves both estimators, because they run the same recursion over the same three quantities. [`partial_fit!`](@ref) returns a new estimator whose `cache` field carries the state, and `cov` reads the fit off the estimator alone.
+Like the sample mean, the sample covariance with `FullMoment` updates with each new block of observations. `GeneralCovariance` and `Covariance` use the same state, `CovarianceState`, and update it in the same way. [`partial_fit!`](@ref) stores the state in the `cache` field of the estimator it returns, and `cov(ce)` computes the estimate from that state, with no data.
 
 ```@docs
 partial_fit!(state::CovarianceState, x::VecNum)
@@ -43,7 +43,7 @@ merge_states(a::CovarianceState, b::CovarianceState)
 
 ## Available-case fit
 
-With a [`CoveragePolicy`](@ref) in its `cvg` field the estimator fits each pair on the observations that pair shares, and [`PortfolioOptimisers.coverage_covariance`](@ref) routes between that arm and the Coverage Universe one.
+With a [`CoveragePolicy`](@ref) in its `cvg` field, the estimator fits each pair of assets on the observations where both assets are finite and active. Without a policy, it fits on the coverage universe, the assets that are finite and active at every observation. [`PortfolioOptimisers.coverage_covariance`](@ref) chooses between the two fits.
 
 ```@docs
 partial_fit!(state::CovarianceState, x::VecNum, ::Nothing, ::Option{<:AbstractVector{<:Bool}})

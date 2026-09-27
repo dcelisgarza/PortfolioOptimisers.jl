@@ -1223,13 +1223,14 @@ function cross_sectional_transform(ct::CrossSectionalWinsoriser, X::MatNum;
     fin = isfinite.(A)
     est = cross_sectional_estimation_mask(fin, w)
     Y = similar(A)
+    buf = similar(A, size(A, 2))
     for t in axes(A, 1)
         idx = cross_sectional_indices(est, t)
         if isempty(idx)
             cross_sectional_blank_row!(Y, t)
             continue
         end
-        v = sort!([A[t, i] for i in idx])
+        v = sort!(copyto!(view(buf, 1:length(idx)), view(A, t, idx)))
         qlo = Statistics.quantile(v, ct.low; sorted = true)
         qhi = Statistics.quantile(v, ct.high; sorted = true)
         for i in axes(A, 2)
@@ -1250,14 +1251,17 @@ function cross_sectional_transform(ct::CrossSectionalTanhShrinker, X::MatNum;
     fin = isfinite.(A)
     est = cross_sectional_estimation_mask(fin, w)
     Y = similar(A)
+    buf = similar(A, size(A, 2))
     for t in axes(A, 1)
         idx = cross_sectional_indices(est, t)
         if isempty(idx)
             cross_sectional_blank_row!(Y, t)
             continue
         end
-        m = Statistics.median([A[t, i] for i in idx])
-        s = CS_MAD_CONSISTENCY * Statistics.median([abs(A[t, i] - m) for i in idx])
+        v = view(buf, 1:length(idx))
+        m = Statistics.median!(copyto!(v, view(A, t, idx)))
+        s = CS_MAD_CONSISTENCY *
+            Statistics.median!(map!(x -> abs(x - m), v, view(A, t, idx)))
         h = ct.knee * s
         for i in axes(A, 2)
             Y[t, i] = s > ct.atol ? m + h * tanh((A[t, i] - m) / h) : A[t, i]

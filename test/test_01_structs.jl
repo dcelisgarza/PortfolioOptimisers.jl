@@ -129,6 +129,111 @@
         @test isnothing(rr.iv)
         @test isnothing(rr.ivpa)
     end
+    @testset "ReturnsResult agrees with its docstrings" begin
+        PO = PortfolioOptimisers
+        X = [0.1 0.2 0.3; 0.4 0.5 0.6; 0.7 0.8 0.9; 1.0 1.1 1.2]
+        nx = ["A", "B", "C"]
+        F = [1.0 2.0; 3.0 4.0; 5.0 6.0; 7.0 8.0]
+        nf = ["F1", "F2"]
+        Bm = X ./ 10
+        Bv = [0.01, 0.02, 0.03, 0.04]
+        ts = Date(2020, 1, 1) .+ Day.(0:3)
+        iv = fill(0.2, 4, 3)
+        ivpa = [1.0, 2.0, 3.0]
+
+        # Implied volatilities need the asset returns they describe. Before the check the
+        # call reached size(nothing) and threw a MethodError.
+        @test_throws IsNothingError ReturnsResult(; iv = iv)
+        # A benchmark name needs the benchmark returns it names, as nx needs X.
+        @test_throws IsNothingError ReturnsResult(; nb = ["BM"])
+        @test_throws IsNothingError ReturnsResult(; nx = nx, X = X, nb = ["BM"])
+        # A vector benchmark needs no name, and takes at most one.
+        @test isnothing(ReturnsResult(; nx = nx, X = X, B = Bv).nb)
+        @test_throws DimensionMismatch ReturnsResult(; nx = nx, X = X, nb = ["a", "b"],
+                                                     B = Bv)
+        @test_throws IsNothingError ReturnsResult(; nx = nx, X = X, B = Bm)
+        @test_throws ArgumentError ReturnsResult(; nx = ["A", "A", "C"], X = X)
+        # The timestamps need X or F, and agree with the rows of B.
+        @test_throws IsNothingError ReturnsResult(; ts = ts, B = Bv)
+        @test ReturnsResult(; ts = ts, nf = nf, F = F).ts === ts
+        @test_throws DimensionMismatch ReturnsResult(; ts = ts[1:3], nf = nf, F = F[1:3, :],
+                                                     B = Bv)
+        err = try
+            ReturnsResult(; ts = [ts[1], ts[2], ts[2], ts[1]], nx = nx, X = X)
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError)
+        @test occursin("2 duplicate(s), the first being 2020-01-02", err.msg)
+        # ivpa is checked only beside iv, and NaN marks an absent implied volatility.
+        @test isnothing(ReturnsResult(; nx = nx, X = X, iv = iv).ivpa)
+        @test ReturnsResult(; nx = nx, X = X, ivpa = -1.0).ivpa == -1.0
+        @test isnan(ReturnsResult(; nx = nx, X = X, iv = [NaN 0.3 0.4; iv[2:end, :]]).iv[1])
+
+        # The two-argument view indexes assets, and a matrix benchmark follows them.
+        rd = ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nx, B = Bm, ts = ts,
+                           iv = iv, ivpa = ivpa)
+        v = PO.port_opt_view(rd, [3, 1])
+        @test v.nx == ["C", "A"]
+        @test v.X == X[:, [3, 1]]
+        @test v.nb == ["C", "A"]
+        @test v.B == Bm[:, [3, 1]]
+        @test v.iv == iv[:, [3, 1]]
+        @test v.ivpa == [3.0, 1.0]
+        @test v.F === F && v.nf === nf && v.ts === ts
+        # A vector benchmark and a scalar ivpa pass through an asset view.
+        rdv = ReturnsResult(; nx = nx, X = X, nb = ["BM"], B = Bv, iv = iv, ivpa = 2.0)
+        v = PO.port_opt_view(rdv, 2:3)
+        @test v.B === Bv && v.nb === rdv.nb && v.ivpa == 2.0
+        # The four-argument view indexes observations, then assets, then factors.
+        v = PO.port_opt_view(rd, 2:3, [3, 1], [2])
+        @test v.nx == ["C", "A"]
+        @test v.X == X[2:3, [3, 1]]
+        @test v.nf == ["F2"]
+        @test v.F == F[2:3, [2]]
+        @test v.B == Bm[2:3, [3, 1]]
+        @test v.ts == ts[2:3]
+        @test v.iv == iv[2:3, [3, 1]]
+        @test v.ivpa == [3.0, 1.0]
+        v = PO.port_opt_view(rdv, 1:2, [1])
+        @test v.B == Bv[1:2] && v.nb === rdv.nb
+        # A call of the wrong shape and a subtype with no method each throw an ArgumentError.
+        @test_throws ArgumentError PO.port_opt_view(rd)
+        @test_throws ArgumentError PO.port_opt_view(rd, 1; factors = 1)
+        @test_throws ArgumentError PO.port_opt_view(rd, 1, 2, 3, 4)
+        @test_throws ArgumentError PO.port_opt_view(PredictionReturnsResult(; nx = nx,
+                                                                            X = Bv), 1)
+
+        # returns_result_picker subtracts the benchmark once, and keeps every other field.
+        r1 = returns_result_picker(rdv, true)
+        @test r1.X == X .- Bv
+        @test isnothing(r1.nb) && isnothing(r1.B)
+        @test r1.iv === iv && r1.ivpa == 2.0
+        @test returns_result_picker(r1, true) === r1
+        r2 = returns_result_picker(rd, true)
+        @test r2.X == X - Bm
+        @test r2.ts === ts && r2.F === F && r2.nx === nx
+        @test returns_result_picker(rd, false) === rd
+        rn = ReturnsResult(; nx = nx, X = X)
+        @test returns_result_picker(rn, :any) === rn
+        @test_throws MethodError returns_result_picker(rd, 1)
+        @test_throws MethodError returns_result_picker(ReturnsResult(; nb = ["BM"], B = Bv),
+                                                       true)
+
+        # asset_panel reads rd first, then a ReturnsResult in the pr slot, else it throws.
+        pv = [1.0 2.0 3.0; 4.0 5.0 6.0; 7.0 8.0 9.0; 1.0 2.0 3.0]
+        pnl = asset_panel([NumericPanelInput(; name = "a", vals = pv)])
+        pnl2 = asset_panel([NumericPanelInput(; name = "b", vals = pv)])
+        rp = ReturnsResult(; nx = nx, X = X, pnl = pnl)
+        rp2 = ReturnsResult(; nx = nx, X = X, pnl = pnl2)
+        @test PO.asset_panel(nothing, rp2, rp, X) === pnl
+        @test PO.asset_panel(nothing, rp2, nothing, X) === pnl2
+        @test_throws IsNothingError PO.asset_panel(nothing, 1, nothing, X)
+        @test_throws IsNothingError PO.asset_panel(nothing, nothing, rd, X)
+        @test PO.panel_field(PO.port_opt_view(rp, [3, 1]).pnl, "a").vals == pv[:, [3, 1]]
+        @test PO.panel_field(PO.port_opt_view(rp, 2:3, [3, 1]).pnl, "a").vals ==
+              pv[2:3, [3, 1]]
+    end
     @testset "Denoise" begin
         @test_throws DomainError ShrunkDenoise(; alpha = -eps())
         @test_throws DomainError ShrunkDenoise(; alpha = 1.0 + eps())
@@ -2213,22 +2318,44 @@
     end
     @testset "Documentation dictionaries" begin
         # A `Dict` literal is last-wins, so a repeated key used to drop the earlier entry
-        # with no warning. `unique_key_dict` builds the four documentation dictionaries and
+        # with no warning. `unique_key_dict!` fills the documentation dictionaries and
         # refuses a repeat at load time, naming both descriptions.
-        @test_throws ArgumentError PortfolioOptimisers.unique_key_dict(:demo, :a => "one",
-                                                                       :b => "two",
-                                                                       :a => "three")
+        @test_throws ArgumentError PortfolioOptimisers.unique_key_dict!(Dict{Symbol,
+                                                                             String}(),
+                                                                        :demo, :a => "one",
+                                                                        :b => "two",
+                                                                        :a => "three")
         msg = try
-            PortfolioOptimisers.unique_key_dict(:demo, :a => "one", :a => "three")
+            PortfolioOptimisers.unique_key_dict!(Dict{Symbol, String}(), :demo, :a => "one",
+                                                 :a => "three")
         catch err
             sprint(showerror, err)
         end
         @test occursin("`demo` has a repeated key, `:a`", msg)
         @test occursin("first: one", msg)
         @test occursin("later: three", msg)
-        good = PortfolioOptimisers.unique_key_dict(:demo, :a => "one", :b => "two")
+        good = PortfolioOptimisers.unique_key_dict!(Dict{Symbol, String}(), :demo,
+                                                    :a => "one", :b => "two")
         @test good == Dict(:a => "one", :b => "two")
         @test isa(good, Dict{Symbol, String})
+        # A table is filled by several files, so the guard also holds across two calls. A
+        # key that returns with the description it holds is a second evaluation of the same
+        # file, as Revise makes, and changes nothing.
+        @test PortfolioOptimisers.unique_key_dict!(good, :demo, :a => "one",
+                                                   :c => "three") === good
+        @test good == Dict(:a => "one", :b => "two", :c => "three")
+        @test_throws ArgumentError PortfolioOptimisers.unique_key_dict!(good, :demo,
+                                                                        :b => "other")
+        @test good[:b] == "two"
+        # Every documentation table has an entry, and `field_dict` holds one entry for
+        # each key of `arg_dict`.
+        for d in (PortfolioOptimisers.arg_dict, PortfolioOptimisers.field_dict,
+                  PortfolioOptimisers.val_dict, PortfolioOptimisers.ret_dict,
+                  PortfolioOptimisers.math_dict, PortfolioOptimisers.err_name_dict,
+                  PortfolioOptimisers.ref_dict)
+            @test !isempty(d)
+        end
+        @test keys(PortfolioOptimisers.field_dict) == keys(PortfolioOptimisers.arg_dict)
         # The `:ple` collision this guard was written for: the surviving JuMP entry is now
         # named like its neighbours, and the shadowed phylogeny entry had no reader.
         @test !haskey(PortfolioOptimisers.arg_dict, :ple)

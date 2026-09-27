@@ -337,7 +337,7 @@ end
     end
 end
 @testset "Weight finalisation" begin
-    using PortfolioOptimisers, JuMP, Test, Clarabel, LinearAlgebra
+    using PortfolioOptimisers, JuMP, Test, Clarabel, LinearAlgebra, Dates, StableRNGs
     slv = Solver(; name = :Clarabel, solver = Clarabel.Optimizer,
                  settings = Dict("verbose" => false))
     w0 = [0.5, 0.3, 0.15, 0.05]
@@ -367,7 +367,8 @@ end
         end
     end
     @testset "A repaired vector keeps its budget and lands in the bounds" begin
-        for wf in (IterativeWeightFinaliser(), JuMPWeightFinaliser(; slv = slv))
+        for wf in (IterativeWeightFinaliser(), EuclideanWeightFinaliser(),
+                   EntropicWeightFinaliser(), JuMPWeightFinaliser(; slv = slv))
             w = PortfolioOptimisers.opt_weight_bounds(wf, wb, copy(w0))
             @test isapprox(sum(w), sum(w0))
             @test all(wb.lb .- 1e-8 .<= w .<= wb.ub .+ 1e-8)
@@ -377,15 +378,190 @@ end
         @test PortfolioOptimisers.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv), wb,
                                                     copy(wok)) == wok
     end
-    @testset "An unsatisfiable bound set still reports success" begin
-        # `finalise_weight_bounds` tests finiteness alone, so an exhausted iterative loop
-        # returns a bound-violating vector under a success code.
+    @testset "An unsatisfiable bound set reports failure" begin
+        # `Σ lb = 1.2` cannot hold a budget of one, so no finaliser can meet the bounds.
         wbi = WeightBounds(; lb = fill(0.3, 4), ub = fill(0.9, 4))
+        for wf in (IterativeWeightFinaliser(), EuclideanWeightFinaliser(),
+                   EntropicWeightFinaliser())
+            retcode, w = PortfolioOptimisers.finalise_weight_bounds(wf, wbi, copy(w0))
+            @test isa(retcode, OptimisationFailure)
+            @test w ≈ wbi.lb
+        end
         retcode, w = PortfolioOptimisers.finalise_weight_bounds(IterativeWeightFinaliser(),
-                                                                wbi, copy(w0))
+                                                                wb, copy(w0))
         @test isa(retcode, OptimisationSuccess)
-        @test !all(wbi.lb .<= w)
-        @test isapprox(sum(w), sum(w0))
+        @test !PortfolioOptimisers.weights_meet_bounds(wb, [NaN, 0.5, 0.25, 0.25], 1.0)
+    end
+    @testset "The iterative loop falls back to the projection when it cannot converge" begin
+        opt = PortfolioOptimisers.opt_weight_bounds
+        proj = PortfolioOptimisers.euclidean_weight_projection
+        # A stall: after the clip no weight lies strictly inside its bounds, so the clipped
+        # mass has nowhere to go, and the loop sat at `[0.5, 0.5, 0.0]` for any `iter`.
+        # A long-short divergence: the loop spread mass over a sum of mixed signs. The third
+        # case is the worst of a random census, where the loop reached `[277, -515, 933,
+        # -694]`.
+        cases = ((WeightBounds(; lb = 0.0, ub = 0.4), [0.6, 0.4, 0.0], [0.4, 0.4, 0.2]),
+                 (WeightBounds(; lb = -0.3, ub = 0.5), [0.9, 0.6, -0.5], [0.5, 0.5, 0.0]),
+                 (WeightBounds(; lb = [-0.026, -0.103, -0.1837, -0.1388],
+                               ub = [0.0554, 0.44, 0.1866, 0.4171]),
+                  [0.703, -0.5214, 1.3316, -0.5132], [0.0554, 0.3749, 0.1866, 0.3831]))
+        for (wbc, wc, wp) in cases,
+            wf in (IterativeWeightFinaliser(), IterativeWeightFinaliser(; iter = 10_000),
+                   EuclideanWeightFinaliser(), EntropicWeightFinaliser())
+
+            w = opt(wf, wbc, copy(wc))
+            @test isapprox(w, wp; atol = 1e-4)
+            @test w == proj(wc, wbc)
+            @test isa(first(PortfolioOptimisers.finalise_weight_bounds(wf, wbc, copy(wc))),
+                      OptimisationSuccess)
+        end
+        # A loop that reaches the bounds keeps its own answer, which keeps the ratio of the
+        # free weights and so differs from the projection.
+        wbr = WeightBounds(; lb = 0.0, ub = 0.5)
+        @test opt(IterativeWeightFinaliser(), wbr, [0.9, 0.09, 0.01]) ≈ [0.5, 0.45, 0.05]
+        @test opt(EuclideanWeightFinaliser(), wbr, [0.9, 0.09, 0.01]) ≈ [0.5, 0.29, 0.21]
+    end
+    @testset "A scalar bound is tested against every weight" begin
+        # `map` over a scalar bound and a vector stopped after the first weight, so a first
+        # weight inside its bounds returned the vector untouched.
+        wbs = WeightBounds(; lb = 0.0, ub = 0.4)
+        for wf in (IterativeWeightFinaliser(), EuclideanWeightFinaliser(),
+                   EntropicWeightFinaliser(), JuMPWeightFinaliser(; slv = slv))
+            w = PortfolioOptimisers.opt_weight_bounds(wf, wbs, [0.1, 0.8, 0.1])
+            @test isapprox(sum(w), 1.0)
+            @test all(-1e-8 .<= w .<= 0.4 + 1e-8)
+        end
+    end
+    @testset "The Euclidean projection holds any budget and an absent bound" begin
+        proj = PortfolioOptimisers.euclidean_weight_projection
+        for s in (1.0, 0.5, 0.0, -0.3, 2.0)
+            wbl = WeightBounds(; lb = [-0.5, -0.4, -0.3, -0.6], ub = [0.9, 0.6, 0.7, 0.8])
+            wc = [1.5, -1.0, 0.4, -0.9] .+ (s - 0.0) / 4
+            w = PortfolioOptimisers.opt_weight_bounds(EuclideanWeightFinaliser(), wbl, wc)
+            @test isapprox(sum(w), s; atol = 1e-12)
+            @test PortfolioOptimisers.weights_meet_bounds(wbl, w, s)
+        end
+        # The projection is the programme of the squared absolute error, in closed form.
+        wbj = WeightBounds(; lb = fill(0.1, 4), ub = fill(0.3, 4))
+        wj = [0.6, 0.25, 0.1, 0.05]
+        wq = PortfolioOptimisers.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv,
+                                                                       alg = SquaredAbsoluteErrorWeightFinaliser()),
+                                                   wbj, copy(wj))
+        @test proj(wj, wbj) ≈ [0.3, 0.3, 0.225, 0.175]
+        # Clarabel solves the cone to about `5e-6`.
+        @test isapprox(proj(wj, wbj), wq; atol = 1e-4)
+        # An absent bound is no constraint on its side.
+        @test proj([0.7, 0.4, -0.1], WeightBounds(; lb = nothing, ub = 0.5)) ≈
+              [0.5, 0.5, 0.0]
+        @test proj([0.7, 0.4, -0.1], WeightBounds(; lb = 0.0, ub = nothing)) ≈
+              [0.65, 0.35, 0.0]
+        wu = [0.25, 0.25, 0.5]
+        @test PortfolioOptimisers.opt_weight_bounds(EuclideanWeightFinaliser(),
+                                                    WeightBounds(; lb = 0.0, ub = 0.5),
+                                                    wu) === wu
+    end
+    @testset "The entropic projection keeps the ratios of the free weights" begin
+        opt = PortfolioOptimisers.opt_weight_bounds
+        ent = PortfolioOptimisers.entropic_weight_projection
+        euc = PortfolioOptimisers.euclidean_weight_projection
+        # Where the loop reaches the bounds, the entropic projection is its exact limit.
+        wbr = WeightBounds(; lb = 0.0, ub = 0.5)
+        @test opt(EntropicWeightFinaliser(), wbr, [0.9, 0.09, 0.01]) ≈ [0.5, 0.45, 0.05]
+        @test opt(EntropicWeightFinaliser(), wb, copy(w0)) ≈
+              opt(IterativeWeightFinaliser(), wb, copy(w0))
+        wq = [0.35, 0.3, 0.2, 0.1, 0.05]
+        wbq = WeightBounds(; lb = fill(0.08, 5), ub = fill(0.28, 5))
+        w = opt(EntropicWeightFinaliser(), wbq, wq)
+        free = findall(wbq.lb .< w .< wbq.ub)
+        @test length(free) >= 2
+        @test all(isapprox.(w[free] ./ wq[free], w[free[1]] / wq[free[1]]))
+        @test sum(w) ≈ 1
+        # An absent bound is no constraint on its side.
+        @test ent([0.7, 0.3], WeightBounds(; lb = nothing, ub = 0.5)) ≈ [0.5, 0.5]
+        @test ent([0.9, 0.1], WeightBounds(; lb = 0.2, ub = nothing)) ≈ [0.8, 0.2]
+        # Outside its domain it is the Euclidean projection: a zero weight that must take
+        # mass (the stall of the loop), a negative weight, a negative lower bound, a budget
+        # that is not positive, and a budget equal to `Σ lb`.
+        for (wbc, wc) in ((WeightBounds(; lb = 0.0, ub = 0.4), [0.6, 0.4, 0.0]),
+                          (WeightBounds(; lb = -0.3, ub = 0.5), [0.9, 0.6, -0.5]),
+                          (WeightBounds(; lb = -0.3, ub = 0.5), [0.9, 0.1, 0.0]),
+                          (WeightBounds(; lb = -0.5, ub = 0.5), [0.7, -0.2, -0.5]),
+                          (WeightBounds(; lb = [0.5, 0.3, 0.2], ub = 0.8), [0.7, 0.2, 0.1]))
+            @test ent(wc, wbc) == euc(wc, wbc)
+            @test PortfolioOptimisers.weights_meet_bounds(wbc, ent(wc, wbc), sum(wc))
+        end
+        @test ent([0.6, 0.4, 0.0], WeightBounds(; lb = 0.0, ub = 0.4)) ≈ [0.4, 0.4, 0.2]
+        # Under zero lower bounds the loop converges to the entropic point. Under two-sided
+        # bounds it can stop elsewhere, farther from the input in relative entropy.
+        kl(w, w0) = sum(w .* log.(w ./ w0))
+        w3 = [0.5, 0.4, 0.1]
+        wb3 = WeightBounds(; lb = 0.0, ub = 0.45)
+        @test opt(IterativeWeightFinaliser(), wb3, copy(w3)) ≈ [0.45, 0.44, 0.11]
+        @test opt(EntropicWeightFinaliser(), wb3, copy(w3)) ≈ [0.45, 0.44, 0.11]
+        wb3 = WeightBounds(; lb = 0.3, ub = 0.45)
+        wi = opt(IterativeWeightFinaliser(; iter = 10_000), wb3, copy(w3))
+        we = opt(EntropicWeightFinaliser(), wb3, copy(w3))
+        @test wi ≈ [0.4, 0.3, 0.3]
+        @test we ≈ [3.5, 2.8, 2.7] ./ 9
+        @test kl(we, w3) < kl(wi, w3)
+    end
+    @testset "An integer weight vector projects as its float copy does" begin
+        # An absent bound was `typemin(Int)`, which is finite, so `w .- typemin` overflowed
+        # and `[0, -5]` under `ub = 0` projected to `-9.2e18`. The iterative loop wrote a
+        # float into an integer vector, and `weights_meet_bounds` had no `eps(Int)`.
+        opt = PortfolioOptimisers.opt_weight_bounds
+        euc = PortfolioOptimisers.euclidean_weight_projection
+        ent = PortfolioOptimisers.entropic_weight_projection
+        @test euc([0, -5], WeightBounds(; lb = nothing, ub = 0)) == [0.0, -5.0]
+        @test ent([4, 1], WeightBounds(; lb = -3, ub = nothing)) == [4.0, 1.0]
+        for (wbi, wbf) in
+            ((WeightBounds(; lb = nothing, ub = 1), WeightBounds(; lb = nothing, ub = 1.0)),
+             (WeightBounds(; lb = -1, ub = 1), WeightBounds(; lb = -1.0, ub = 1.0)),
+             (WeightBounds(; lb = 0, ub = nothing), WeightBounds(; lb = 0.0, ub = nothing))),
+            wf in (IterativeWeightFinaliser(), EuclideanWeightFinaliser(),
+                   EntropicWeightFinaliser()), wi in ([3, -2, 0], [2, 1, 0], [-1, 1, 1])
+
+            rf, wf_ = PortfolioOptimisers.finalise_weight_bounds(wf, wbf, Float64.(wi))
+            ri, wi_ = PortfolioOptimisers.finalise_weight_bounds(wf, wbi, copy(wi))
+            @test typeof(ri) == typeof(rf)
+            @test isequal(wi_, wf_)
+        end
+    end
+    @testset "A Rational weight vector meets its bounds exactly (#1349)" begin
+        # `weights_meet_bounds` took `sqrt(eps(T))`, and `Rational` has no `eps`, so every
+        # finaliser threw on `Rational` weights, also with no bounds at all.
+        tolf = PortfolioOptimisers.weights_bound_tolerance
+        meet = PortfolioOptimisers.weights_meet_bounds
+        @test tolf(Float64) == sqrt(eps(Float64))
+        @test tolf(Float32) === sqrt(eps(Float32))
+        @test tolf(Rational{Int}) === 0 // 1
+        w = fill(1 // 3, 3)
+        wb = WeightBounds(; lb = 0 // 1, ub = 1 // 2)
+        @test meet(wb, w, 1 // 1)
+        @test meet(WeightBounds(; lb = nothing, ub = nothing), w, 1 // 1)
+        # Exact arithmetic has no round-off, so the smallest miss fails.
+        @test !meet(WeightBounds(; lb = 0 // 1, ub = 1 // 3 - 1 // 10^12), w, 1 // 1)
+        @test !meet(wb, w, 1 // 1 + 1 // 10^12)
+        # A finaliser that moves the weights lands on the bounds and the budget exactly.
+        wr = [1 // 2, 3 // 10, 3 // 20, 1 // 20]
+        wbr = WeightBounds(; lb = 1 // 10, ub = 2 // 5)
+        for (wf, we) in ((IterativeWeightFinaliser(), [2 // 5, 1 // 3, 1 // 6, 1 // 10]),
+                         (EuclideanWeightFinaliser(), [2 // 5, 13 // 40, 7 // 40, 1 // 10]),
+                         (EntropicWeightFinaliser(), [2 // 5, 1 // 3, 1 // 6, 1 // 10]))
+            retcode, wf_ = PortfolioOptimisers.finalise_weight_bounds(wf, wbr, copy(wr))
+            @test isa(retcode, OptimisationSuccess)
+            @test wf_ == we
+            @test eltype(wf_) == Rational{Int}
+        end
+        X = Rational.(rand(StableRNG(1349), -20:20, 50, 3)) .// 1000
+        rd = ReturnsResult(; nx = ["a", "b", "c"], X = X,
+                           ts = Date(2024, 1, 1) .+ Day.(0:49))
+        for opt in (EqualWeighted(), EqualWeighted(; wb = nothing))
+            res = optimise(opt, rd)
+            @test isa(res.retcode, OptimisationSuccess)
+            @test res.w == fill(1 // 3, 3)
+            @test eltype(res.w) == Rational{Int}
+        end
     end
     @testset "The relative formulations write eps into a zero weight" begin
         wz = [0.6, 0.4, 0.0, 0.0]
@@ -485,4 +661,47 @@ end
     failed_mr = PO.factory(mr_res.fb[1][2], mr_res.fb)
     @test failed_mr.fb === mr_res.fb
     @test PO.set_retcode(failed_mr, OptimisationSuccess()).fb === mr_res.fb
+end
+@testset "A PreviousWeights fallback holds its slice under an asset-subset view (#1339)" begin
+    using PortfolioOptimisers, Test, StableRNGs
+    PO = PortfolioOptimisers
+    slv = Solver(; name = :none, solver = nothing)
+    X4 = randn(StableRNG(2), 10, 4)
+    # The view slices `w`, and recurses into the fallback of the fallback.
+    pw = PreviousWeights(; w = [0.4, 0.3, 0.2, 0.1],
+                         fb = PreviousWeights(; w = fill(0.25, 4)))
+    pwv = PO.port_opt_view(pw, [1, 3], X4)
+    @test pwv.w == [0.4, 0.2]
+    @test pwv.fb.w == [0.25, 0.25]
+    @test isnothing(PO.port_opt_view(PreviousWeights(), [1, 3], X4).w)
+    # Every holder views its fallback: a JuMP head, a hierarchical head and a naive head.
+    fb = PreviousWeights(; w = fill(0.25, 4))
+    mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv), fb = fb)
+    @test PO.port_opt_view(mr, [1, 2], X4).fb.w == [0.25, 0.25]
+    hrp = HierarchicalRiskParity(; fb = fb)
+    @test PO.port_opt_view(hrp, [2, 4], X4).fb.w == [0.25, 0.25]
+    ew = EqualWeighted(; fb = fb)
+    @test PO.port_opt_view(ew, [1, 2, 3], X4).fb.w == fill(0.25, 3)
+    # A precomputed fallback answers on the universe it was solved on, so a view keeps
+    # it. A schedule that holds one still refuses a subset view.
+    rd4 = ReturnsResult(; nx = string.('a':'d'), X = X4)
+    res = optimise(EqualWeighted(), rd4)
+    @test PO.port_opt_view(MeanRisk(; opt = JuMPOptimiser(; slv = slv), fb = res), [1, 2],
+                           X4).fb === res
+    @test PO.port_opt_view(EqualWeighted(; fb = res), [1, 2], X4).fb === res
+    @test_throws ArgumentError PO.port_opt_view(MeanRisk(; opt = JuMPOptimiser(; slv = slv),
+                                                         fb = TimeDependent([EqualWeighted(),
+                                                                             res])), [1, 2],
+                                                X4)
+    # The reproduction of #1339: a cluster whose solve fails falls back to the held
+    # book, sliced to the cluster, where it used to throw a `DimensionMismatch`.
+    X8 = randn(StableRNG(2), 200, 8) ./ 100 .+ 0.001
+    rd8 = ReturnsResult(; nx = string.('a':'h'), X = X8)
+    w8 = collect(1.0:8.0) ./ 36
+    inner = MeanRisk(; opt = JuMPOptimiser(; slv = slv), fb = PreviousWeights(; w = w8))
+    nres = optimise(NestedClustered(; opti = inner, opto = EqualWeighted()), rd8)
+    @test length(nres.w) == 8
+    cls = [findall(==(k), PO.assignments(nres.clr)) for k in 1:(nres.clr.k)]
+    @test all(nres.resi[k].w == w8[cls[k]] for k in eachindex(cls))
+    @test all(isa(r.retcode, OptimisationSuccess) for r in nres.resi)
 end

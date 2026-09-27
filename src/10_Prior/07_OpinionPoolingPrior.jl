@@ -574,7 +574,7 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     # Opinion pooling reweights observations without touching either axis of `Z`, so the
     # pooled prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole rather than stamped with the
-    # pooled weights — see the note at the same seam in `03_EntropyPoolingPrior.jl`.
+    # pooled weights — see the note at the same seam in `03_EntropyPoolingPrior_c.jl`.
     (; X, o_X, mu, sigma, chol, rr, fpr) = prior(pe2, X, F, pnl; strict = strict, kwargs...)
     ens = exp(StatsBase.entropy(w))
     kld = [StatsBase.kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]

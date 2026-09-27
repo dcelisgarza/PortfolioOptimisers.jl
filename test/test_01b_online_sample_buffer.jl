@@ -256,6 +256,28 @@ end
         @test po.time_dependent_candidate_fields(SchedProbe(;
                                                             inner = Online(BufferProbe()))) ==
               ()
+        # A schedule is an estimator, so its field is a candidate of the two walks, and the
+        # `TimeDependent` methods of the walks answer `nothing` for it.
+        sp = SchedProbe(; inner = BufferProbe(), sched = TimeDependent([1, 2]))
+        @test po.estimator_fields(sp) == (:inner, :sched)
+        @test isnothing(po.online_entry_state(sp))
+        @test isnothing(po.online_wrapper_path(sp))
+        # The two walks answer the dotted path from the root, and `nothing` for a value that
+        # is not an estimator.
+        warm = partial_fit!(po.update_online_estimator(Online(BufferProbe())), X)
+        @test po.online_entry_state(warm) == "cache"
+        @test po.online_entry_state(HostProbe(; inner = HostProbe(; inner = warm))) ==
+              "inner.inner.cache"
+        @test isnothing(po.online_entry_state(HostProbe(; inner = BufferProbe())))
+        @test isnothing(po.online_entry_state(1))
+        @test po.online_wrapper_path(Online(BufferProbe())) == ""
+        @test po.online_wrapper_path(HostProbe(; inner = Online(BufferProbe()))) == "inner"
+        @test po.online_wrapper_path(HostProbe(;
+                                               inner = HostProbe(;
+                                                                 inner = Online(BufferProbe())))) ==
+              "inner.inner"
+        @test isnothing(po.online_wrapper_path(HostProbe(; inner = BufferProbe())))
+        @test isnothing(po.online_wrapper_path(1))
         # A *callable* schedule cannot be checked at construction, because its value does not
         # exist until the fold does. A wrapper it returns therefore reaches the fold
         # unresolved, and meets a message naming the warm-up rather than the generic one.
@@ -298,6 +320,60 @@ end
         @test_throws DomainError po.SampleBufferState(; X = zeros(2, 2), max_history = 0)
         @test_throws DomainError po.SampleBufferState(; n = -1, X = zeros(2, 2))
         @test_throws DomainError po.SampleBufferState(; off = -1, X = zeros(2, 2))
+    end
+    @testset "A buffer that holds no observations" begin
+        # Issue #971. An empty buffer records nothing, so it merges as the identity on either
+        # side, and the result shares no array with the buffer it copies.
+        full = partial_fit!(po.SampleBufferState(), view(X, 1:5, :))
+        for m in (po.merge_states(po.SampleBufferState(), full),
+                  po.merge_states(full, po.SampleBufferState()))
+            @test isequal(buf(m), X[1:5, :])
+            @test m.X !== full.X
+        end
+        @test po.merge_states(po.SampleBufferState(), po.SampleBufferState()).n == 0
+        # The cap is still checked first, so an empty buffer of another cap is refused.
+        @test_throws ArgumentError po.merge_states(po.SampleBufferState(; max_history = 2),
+                                                   full)
+        # Its view is the empty seed with the same cap, and the view folds like a seed.
+        v = po.port_opt_view(po.SampleBufferState(; max_history = 4), [1, 3])
+        @test v.n == 0
+        @test v.max_history == 4
+        @test isequal(buf(partial_fit!(v, view(X, 1:6, [1, 3]))), X[3:6, [1, 3]])
+        # The next fold seeds it again from its block, whatever width the backing had.
+        e = po.SampleBufferState(; X = zeros(0, 7))
+        @test isequal(buf(partial_fit!(e, X)), X)
+        # The seed takes the element type of the block, not the element type of the backing.
+        @test eltype(partial_fit!(po.SampleBufferState(; X = zeros(Float32, 0, 0)), X).X) ===
+              Float64
+    end
+    @testset "Growth copies fewer rows than the last capacity" begin
+        # A block longer than twice the capacity fits the matrix to the rows, and the next
+        # append doubles it.
+        s = partial_fit!(po.SampleBufferState(), view(X, 1:2, :))
+        s = partial_fit!(s, view(X, 3:12, :))
+        @test (s.n, size(s.X, 1)) == (12, 12)
+        s = partial_fit!(s, view(X, 13, :))
+        @test (s.n, size(s.X, 1)) == (13, 24)
+        # Over random block sizes, the rows that all the growths copy stay below the last
+        # capacity.
+        Y = repeat(X, 20)
+        for seed in 1:20
+            g = StableRNG(seed)
+            b = po.SampleBufferState()
+            copied = 0
+            i = 0
+            while i < size(Y, 1) - 12
+                rows = (i + 1):(i + rand(g, 1:12))
+                i = last(rows)
+                cap, n = size(b.X, 1), b.n
+                b = partial_fit!(b, view(Y, rows, :))
+                if size(b.X, 1) != cap && cap > 0
+                    copied += n
+                end
+            end
+            @test copied < size(b.X, 1)
+            @test isequal(buf(b), Y[1:i, :])
+        end
     end
     @testset "Online over every family that folds exactly" begin
         # Issue #997. A family that folds exactly narrows the `cache` type parameter of its

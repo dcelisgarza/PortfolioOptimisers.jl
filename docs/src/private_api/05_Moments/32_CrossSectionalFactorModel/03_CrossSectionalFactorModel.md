@@ -9,6 +9,7 @@ Description = "Cross-Sectional Factor Model, private API of PortfolioOptimisers.
 ```@docs
 assert_idiosyncratic_covariance
 idiosyncratic_covariance_view
+assert_idiosyncratic_count
 idiosyncratic_variances(rr::AbstractLoadingsRegressionResult)
 cs_history_assets
 assert_cs_history_obs

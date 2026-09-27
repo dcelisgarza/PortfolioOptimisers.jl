@@ -4,7 +4,7 @@ Description = "Partial fit, public API of PortfolioOptimisers.jl: partial_fit!, 
 
 # Partial fit
 
-An incremental fit folds one observation into an estimate without reading the sample again. [`partial_fit!`](@ref) is the verb each family writes, [`partial_fit`](@ref) is the value form that folds a copy of the state, its running quantities live in a [`AbstractPartialFitState`](@ref), and [`merge_states`](@ref) combines the states of two disjoint blocks of observations into the state of the concatenated block.
+An incremental fit adds new observations to an estimate without reading the earlier observations again. [`partial_fit!`](@ref) adds a block of observations to an estimator and returns the updated estimator. [`partial_fit`](@ref) does the same to a copy of the state, so the estimator you pass in keeps its old state. The running quantities of the fit are stored in an [`AbstractPartialFitState`](@ref). [`merge_states`](@ref) combines the states of two separate blocks of observations into the state of the two blocks placed end to end.
 
 ```@docs
 partial_fit!

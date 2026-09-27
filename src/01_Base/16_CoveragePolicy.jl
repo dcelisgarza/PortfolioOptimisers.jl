@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype of the rules that decide what an available-case fit does with a delisted asset.
 
-All concrete subtypes should subtype `AbstractCoverageAlgorithm`. The family is the `alg` field of a [`CoveragePolicy`](@ref), and it exists because a delisting has no single right answer: one caller keeps the history until the asset leaves the frame, another throws it away so that a relisting starts cold, and a third holds the asset in the frame for a stated number of observations after it goes.
+All concrete subtypes should subtype `AbstractCoverageAlgorithm`. A member of the family goes in the `alg` field of a [`CoveragePolicy`](@ref). The family exists because a delisting has more than one correct treatment. One caller keeps the history of the asset and drops the asset at once. Another caller throws the history away, so that a relisting starts cold. A third holds the asset in the frame for a stated number of observations after it goes.
 
 # Interfaces
 
@@ -11,7 +11,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## fold_inactive!
 
-  - `fold_inactive!(alg::AbstractCoverageAlgorithm, state::AbstractPartialFitState, ni::AbstractVector{<:Bool}) -> AbstractPartialFitState`: The fold-time hook, called once per observation with the assets that have just become inactive.
+  - `fold_inactive!(alg::AbstractCoverageAlgorithm, state::AbstractPartialFitState, ni::AbstractVector{<:Bool}) -> AbstractPartialFitState`: The fold-time hook, called once per observation with the assets that have just become inactive. Only the arms that fold call it. The two-pass arms, which are the semi-covariance, the coskewness and the cokurtosis, read the window whole and never call it, so a new subtype keeps the history in those arms.
 
 ### Arguments
 
@@ -65,7 +65,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Keeps a delisted asset's history, and drops the asset from the frame the moment it goes inactive.
 
-This is the default rule, and the cheapest of the three, because it does nothing at fold time. It is also the one whose relisting resumes: an asset that lists, delists and lists again folds into the counts and accumulators it left behind rather than starting from zero.
+This is the default rule. It does nothing at fold time, and it does not read the staleness at read-out. A relisting resumes the history. An asset that lists, delists and lists again folds into the counts and accumulators that it left behind, and does not start from zero. [`ExpireCoverage`](@ref) keeps the history in the same way, and it differs only in how long a delisted asset stays in the frame.
 
 # Related
 
@@ -80,7 +80,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Throws a delisted asset's history away, so that a relisting starts the asset cold.
 
-The reset zeroes the asset's counts and the row and column of every accumulator that touches it, which is what [`ExpWeightedCovariance`](@ref) already does for the exponentially weighted family. Use it when a relisted ticker is a different company, or when a corporate action makes the old series incomparable with the new one.
+The reset zeroes the counts of the asset, and the row and the column of every accumulator that touches it. [`ExpWeightedCovariance`](@ref) resets an inactive asset in the same way. Use it when a relisted ticker is a different company, or when a corporate action makes the old series incomparable with the new one.
+
+Every arm applies the reset. A folding arm applies it through [`fold_inactive!`](@ref) at the observation where the asset goes inactive, and a two-pass arm applies it to the whole window through [`coverage_inactive_block!`](@ref). The reset needs an active mask. With no mask no asset goes inactive, a gap reads as a holiday, and the answer is the answer of [`DecayCoverage`](@ref). The reset does not zero the number of observations folded, so the coverage share of a relisted asset is its count since the relisting over every observation folded.
 
 # Related
 
@@ -89,6 +91,7 @@ The reset zeroes the asset's counts and the row and column of every accumulator 
   - [`ExpireCoverage`](@ref)
   - [`CoveragePolicy`](@ref)
   - [`fold_inactive!`](@ref)
+  - [`coverage_inactive_block!`](@ref)
 """
 struct ResetCoverage <: AbstractCoverageAlgorithm end
 """
@@ -96,7 +99,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds a delisted asset in the frame for a stated number of observations, then drops it.
 
-The count is staleness, the number of observations folded since the asset was last finite and active, so a holiday spends it as freely as a delisting does and an asset that quotes again resets it to zero. `after = 0` admits exactly what [`DecayCoverage`](@ref) admits: an asset that is inactive at an observation has its staleness raised by that observation, so no state a fold produces carries an inactive asset at staleness zero.
+The count is the staleness of the asset, the number of observations folded since the asset was last finite and active. A holiday raises the staleness as a delisting does, so a holiday just before a delisting shortens the hold. A finite return at an active observation sets the staleness back to zero. `after = 0` admits exactly what [`DecayCoverage`](@ref) admits. An observation at which an asset is inactive raises its staleness, so no fold leaves an inactive asset at a staleness of zero.
 
 # Fields
 
@@ -146,9 +149,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits each cell of a moment on the observations that cell has, instead of on the Coverage Universe.
 
-The opt-in that replaces all-or-nothing coverage by available-case estimation. It is the `cvg` field of a moment estimator, it is `nothing` there by default, and the `nothing` arm is today's reduce-and-expand path read by dispatch, so a caller who asks for nothing pays nothing. With a policy set, every cell of the answer is fitted on the observations at which every asset of that cell is finite and active, each cell carries its own denominator, and an asset reaches the answer only where [`admits`](@ref) says so.
+A policy replaces the all-or-nothing Coverage Universe with available-case estimation. It goes in the `cvg` field of a moment estimator, where the default is `nothing`. With `nothing` the estimator takes the reduce-and-expand path by dispatch, and the policy costs nothing. With a policy set, the estimator fits every cell of the answer on the observations at which every asset of that cell is finite and active, and each cell carries its own denominator. An asset reaches the answer only where [`admits`](@ref) lets it in.
 
-**`min_coverage` is also the share a [`scenario_fill`](@ref) passes in silence.** [`admits`](@ref) reads an asset's coverage share as its own observation count over the number of observations folded, and the fill counts that column's non-finite entries over the same denominator, so the two are complements and the admission test **is** the fill test. [`resolve_fill_limit`](@ref) derives `1 - min_coverage` wherever a prior's `fill_limit` is `nothing`, which never fires: an admitted column satisfies it by construction. So turning a policy on does not turn a warning on, and an available-case walk-forward names nothing while it does what it was configured to do. The default `min_coverage = 0` therefore admits a one-observation column and **fills it in silence**, which is what `0` asks for; a caller who wants to admit broadly and be told anyway states the prior's `fill_limit` explicitly, tighter than `1 - min_coverage`.
+**`min_coverage` is also the share that a [`scenario_fill`](@ref) passes in silence.** [`admits`](@ref) reads the coverage share of an asset as its own observation count over the number of observations folded. The fill counts the non-finite entries of the column over the same denominator. So a column that [`DecayCoverage`](@ref), [`ResetCoverage`](@ref) or [`ExpireCoverage`](@ref) admits is at most a `1 - min_coverage` share non-finite. Where the `fill_limit` of a prior is `nothing`, [`resolve_fill_limit`](@ref) derives `1 - min_coverage`, and no admitted column goes past it. A policy therefore turns on no warning, and an available-case walk-forward gives no warning for the gaps that it was set up to fill.
+
+The default `min_coverage = 0` admits every column, and a prior fills in silence every column that has a variance. Under the default Bessel correction that is a column with two or more observations. A column with one observation has a `NaN` variance, so the Investable Mask drops the asset and nothing is filled. To admit broadly and still get the warning, set the `fill_limit` of the prior explicitly, tighter than `1 - min_coverage`.
 
 # Fields
 
@@ -187,7 +192,7 @@ CoveragePolicy
 """
 @concrete struct CoveragePolicy <: AbstractEstimator
     """
-    `min_coverage`: Coverage floor, a share in `[0, 1]`. An asset whose own observation count over the number of observations folded falls below it is `NaN` in the answer. It is also the share a [`scenario_fill`](@ref) fills in silence, so the default of `0` fills a one-observation column and says nothing.
+    `min_coverage`: Coverage floor, a share in `[0, 1]`. An asset whose own observation count over the number of observations folded falls below it is `NaN` in the answer. It is also the share that a [`scenario_fill`](@ref) fills in silence, so under the default of `0` a prior fills every column that has a variance and says nothing.
     """
     min_coverage
     """
@@ -210,7 +215,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the per-cell denominators and the per-asset bookkeeping of an available-case fold.
 
-The component a partial-fit state holds in its `cvg` field, which is `nothing` on the plain path so that the plain state costs nothing. `nu` has the shape of the accumulator it serves, because the observation count of a covariance cell is a count per pair and not a count per asset, and `centre` has that shape wherever a cell's own centre differs from the state's per-asset mean.
+A partial-fit state holds it in its `cvg` field. On the plain path that field is `nothing`, so the plain state costs nothing. `nu` has the shape of the accumulator it serves, because the observation count of a covariance cell is a count per pair and not a count per asset. `centre` has that shape too wherever the centre of a cell differs from the per-asset mean of the state.
 
 This type is an implementation detail and is not intended for direct use. [`partial_fit!`](@ref) writes it, the read-out verbs divide by it, and [`merge_states`](@ref) folds two of them.
 
@@ -253,7 +258,7 @@ end
 
 Returns the [`CoverageCounts`](@ref) an available-case fold writes into, seeding one of zeros when the state carries none.
 
-The seed is written here rather than inside [`partial_fit!`](@ref), so that the branch that reads the `cvg` field of a state has one home and the fold reads as one line. The policy is the first argument because it is what selects the arm: `nothing` is the plain path and gives `nothing`, whatever the state carries.
+[`partial_fit!`](@ref) calls it, so one function holds the branch on the `cvg` field of a state. The policy is the first argument because it selects the arm. `nothing` is the plain path and gives `nothing`, whatever the state carries.
 
 # Arguments
 
@@ -349,7 +354,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the assets that are valid at one observation, and the assets that have just gone inactive.
 
-An asset is **valid** when its return is finite and the active mask admits it, which is the condition the exponentially weighted family already reads. With no mask every asset is active, so a non-finite return reads as a holiday rather than as a delisting and no asset is ever newly inactive.
+An asset is **valid** when its return is finite and the active mask admits it. The exponentially weighted family reads the same condition. With no mask every asset is active, so a non-finite return reads as a holiday and not as a delisting, and no asset ever goes inactive.
 
 # Arguments
 
@@ -390,7 +395,7 @@ Moves the per-asset bookkeeping of a [`CoverageCounts`](@ref) on by one observat
 # Algorithm
 
  1. Set the staleness of every valid asset to zero, and add one to the staleness of every other.
- 2. Rebind `active` to the mask of this observation, which is every asset when the caller gave none.
+ 2. Overwrite `active` in place with the mask of this observation, or with `true` for every asset when the caller gave no mask.
 
 # Arguments
 
@@ -424,7 +429,24 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds the staleness counters of two [`CoverageCounts`](@ref) fitted on consecutive blocks.
 
-An asset that was valid somewhere in the second block carries that block's own count, and an asset that was valid nowhere in it has spent the whole block stale, so its staleness is the two counts added. The test for "valid nowhere in `b`" is that `b`'s counter has reached `b`'s observation count, which is what the counter does when nothing resets it.
+An asset that was valid somewhere in the second block takes the count of that block. An asset that was valid nowhere in it was stale for the whole block, so its staleness is the sum of the two counts. The counter of `b` reaches the observation count of `b` exactly when the asset was valid nowhere in `b`, because only a valid observation sets the counter back to zero.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tau_{i} &= \\begin{cases}
+\\tau_{i}^{a} + \\tau_{i}^{b} & \\text{if } \\tau_{i}^{b} = n_{b}\\,, \\\\
+\\tau_{i}^{b} & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:tau_i_cvg])
+  - ``\\tau_{i}^{a}``, ``\\tau_{i}^{b}``: Staleness of asset ``i`` in `a` and in `b`.
+  - ``n_{b}``: Number of observations folded into `b`.
 
 # Arguments
 
@@ -454,19 +476,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads everything a two-pass available-case fit needs out of a block of observations.
 
-The block counterpart of [`coverage_valid`](@ref) and [`coverage_step!`](@ref), for the arms that have no incremental recursion and must see the whole window at once. It returns the oriented block beside the four quantities the fold would otherwise have carried, so that a two-pass arm and a folding arm read the same universe and the same bookkeeping.
+It is the block counterpart of [`coverage_valid`](@ref), [`fold_inactive!`](@ref) and [`coverage_step!`](@ref), for the arms that have no incremental recursion and must see the whole window at once. It returns the oriented block beside the four quantities that a fold carries, so that a two-pass arm and a folding arm read the same universe and the same bookkeeping.
 
 # Algorithm
 
  1. Orient `X`, and the mask when there is one, to `observations × assets`.
  2. Take the valid entries, finite and active, giving `F`.
- 3. Take each asset's available-case mean over its own valid entries, giving `mu`, which is zero for an asset with none.
- 4. Take the active mask of the last observation, and each asset's staleness at it.
+ 3. Take the active mask of the last observation, giving `active`, and the number of observations after the last valid entry of each asset, giving `stale`. An asset with no valid entry has a staleness of `T`, the number of observations.
+ 4. Apply the fold-time rule of `alg` to `F` with [`coverage_inactive_block!`](@ref).
+ 5. Take the available-case mean of each asset over its own entries of `F`, giving `mu`. It is zero for an asset with none.
 
 # Arguments
 
   - `X`: The block of observations.
   - `active_mask`: The active mask of the Asset Panel over the block, or `nothing`.
+  - `alg`: The coverage algorithm of the policy.
   - `dims`: Whether the observations lie on the rows, `1`, or on the columns, `2`.
 
 # Validation
@@ -475,54 +499,99 @@ The block counterpart of [`coverage_valid`](@ref) and [`coverage_step!`](@ref), 
 
 # Returns
 
-  - `(Xo, F, mu, active, stale)::Tuple`: The oriented block, its valid entries, each asset's available-case mean, the active mask of the last observation, and each asset's staleness at it.
+  - `(Xo, F, mu, active, stale)::Tuple`: The oriented block, its valid entries after the fold-time rule, each asset's available-case mean, the active mask of the last observation, and each asset's staleness at it.
 
 # Related
 
   - [`coverage_valid`](@ref)
   - [`coverage_step!`](@ref)
+  - [`coverage_inactive_block!`](@ref)
   - [`CoverageCounts`](@ref)
 """
-function coverage_valid_block(X::MatNum, active_mask::Option{<:AbstractMatrix{<:Bool}};
-                              dims::Int = 1)
+function coverage_valid_block(X::MatNum, active_mask::Option{<:AbstractMatrix{<:Bool}},
+                              alg::AbstractCoverageAlgorithm; dims::Int = 1)
     Xo = dims_oriented(dims, X)
     F = isfinite.(Xo)
-    if !isnothing(active_mask)
-        amsk = dims_oriented(dims, active_mask)
+    amsk = isnothing(active_mask) ? nothing : dims_oriented(dims, active_mask)
+    if !isnothing(amsk)
         @argcheck(size(amsk) == size(Xo),
                   DimensionMismatch("size(X) ($(size(Xo))) must match size(active_mask) ($(size(amsk)))"))
         F .&= amsk
     end
     T, N = size(Xo)
-    Tf = typeof(zero(eltype(Xo)) / one(Int))
+    stale = [T - something(findlast(view(F, :, j)), 0) for j in axes(F, 2)]
+    coverage_inactive_block!(alg, F, amsk)
+    Tf = float_if_integer(eltype(Xo))
     mu = zeros(Tf, N)
-    stale = zeros(Int, N)
     for j in axes(Xo, 2)
-        s = zero(Tf)
-        c = 0
-        for t in axes(Xo, 1)
-            if F[t, j]
-                s += Xo[t, j]
-                c += 1
-            end
-        end
+        c = count(view(F, :, j))
+        s = sum(Xo[t, j] for t in axes(Xo, 1) if F[t, j]; init = zero(Tf))
         mu[j] = iszero(c) ? zero(Tf) : s / c
-        k = findlast(view(F, :, j))
-        stale[j] = isnothing(k) ? T : T - k
     end
-    active = if isnothing(active_mask)
-        trues(N)
-    else
-        BitVector(view(dims_oriented(dims, active_mask), T, :))
-    end
+    active = isnothing(amsk) ? trues(N) : BitVector(view(amsk, T, :))
     return Xo, F, mu, active, stale
+end
+"""
+    coverage_inactive_block!(alg::AbstractCoverageAlgorithm, F::AbstractMatrix{Bool},
+                             amsk::Option{<:AbstractMatrix{<:Bool}}) -> Nothing
+    coverage_inactive_block!(alg::ResetCoverage, F::AbstractMatrix{Bool},
+                             amsk::AbstractMatrix{<:Bool}) -> Nothing
+
+Applies the fold-time rule of a coverage algorithm to the valid entries of a whole block.
+
+It is the block form of [`fold_inactive!`](@ref), for the two-pass arms that never fold. A fold applies the rule at each observation where an asset goes inactive. A block applies the same rule to the valid entries of the window at once, so that the two arms admit the same observations.
+
+The first method passes the block through. It serves [`DecayCoverage`](@ref) and [`ExpireCoverage`](@ref), which keep the history, and [`ResetCoverage`](@ref) with no active mask, where no asset ever goes inactive. It also serves a coverage algorithm of the caller's own, whose [`fold_inactive!`](@ref) method the two-pass arms cannot call, so such an algorithm keeps the history in those arms.
+
+# Algorithm
+
+The [`ResetCoverage`](@ref) method runs these steps for each asset `j`:
+
+ 1. Find the last observation `t0` at which the asset goes inactive, where the asset is inactive at `t0` and active at the observation before it. The observation before the first one counts as active, as it does for the seed of a fold.
+ 2. Clear the valid entries of the asset at every observation up to `t0`. An asset that never goes inactive has `t0 = 0`, and keeps every entry.
+
+# Arguments
+
+  - `alg`: The coverage algorithm.
+  - `F`: The valid entries of the block, `observations × assets`, mutated in place.
+  - `amsk`: The active mask of the block in the orientation of `F`, or `nothing`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`fold_inactive!`](@ref)
+  - [`ResetCoverage`](@ref)
+  - [`coverage_valid_block`](@ref)
+"""
+function coverage_inactive_block!(::AbstractCoverageAlgorithm, ::AbstractMatrix{Bool},
+                                  ::Option{<:AbstractMatrix{<:Bool}})::Nothing
+    return nothing
+end
+function coverage_inactive_block!(::ResetCoverage, F::AbstractMatrix{Bool},
+                                  amsk::AbstractMatrix{<:Bool})::Nothing
+    for j in axes(F, 2)
+        t0 = 0
+        prev = true
+        for t in axes(amsk, 1)
+            cur = amsk[t, j]
+            if prev && !cur
+                t0 = t
+            end
+            prev = cur
+        end
+        F[1:t0, j] .= false
+    end
+    return nothing
 end
 """
     fold_inactive!(alg, state, ni)
 
 Applies a coverage algorithm's fold-time rule to the assets that have just become inactive.
 
-The first of the two verbs of the [`AbstractCoverageAlgorithm`](@ref) interface. It runs once per observation, before the observation is folded, so a rule that throws history away runs while the state still holds the history to throw.
+It is the first of the two verbs of the [`AbstractCoverageAlgorithm`](@ref) interface. It runs once per observation, before the fold of that observation, so a rule that throws the history away runs while the state still holds that history. Only the folding arms call it. A two-pass arm applies the rule of a built-in algorithm to the whole window through [`coverage_inactive_block!`](@ref).
 
 # Arguments
 
@@ -540,12 +609,13 @@ The first of the two verbs of the [`AbstractCoverageAlgorithm`](@ref) interface.
   - [`ResetCoverage`](@ref)
   - [`admits`](@ref)
   - [`partial_fit!`](@ref)
+  - [`coverage_inactive_block!`](@ref)
 """
 function fold_inactive! end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`DecayCoverage`](@ref) and [`ExpireCoverage`](@ref) method of [`fold_inactive!`](@ref). Both keep the history of a delisted asset, so neither has anything to do at fold time and the state passes through.
+[`DecayCoverage`](@ref) and [`ExpireCoverage`](@ref) method of [`fold_inactive!`](@ref). Both keep the history of a delisted asset, so neither does anything at fold time, and the state passes through.
 
 # Related
 
@@ -564,7 +634,7 @@ end
 
 Zeroes the entries of an accumulator that touch a set of assets.
 
-The primitive the [`ResetCoverage`](@ref) methods of [`fold_inactive!`](@ref) share, so that the reset of a per-asset accumulator and the reset of a per-pair accumulator are written once.
+The [`ResetCoverage`](@ref) methods of [`fold_inactive!`](@ref) share it, so the reset of a per-asset accumulator and the reset of a per-pair accumulator are each written once.
 
 # Arguments
 
@@ -597,7 +667,7 @@ end
 
 Decides whether an asset reaches the answer of an available-case fit.
 
-The second of the two verbs of the [`AbstractCoverageAlgorithm`](@ref) interface. It runs once per asset at read-out, and the assets it refuses are the `NaN` frame the read-out writes.
+It is the second of the two verbs of the [`AbstractCoverageAlgorithm`](@ref) interface. It runs once per asset at read-out, and the read-out writes `NaN` across every asset that it refuses.
 
 # Arguments
 
@@ -622,7 +692,22 @@ function admits end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`DecayCoverage`](@ref) and [`ResetCoverage`](@ref) method of [`admits`](@ref). An asset is admitted while it is active and its coverage share reaches the floor, so the exit is immediate under both and the history is what the two algorithms differ over.
+[`DecayCoverage`](@ref) and [`ResetCoverage`](@ref) method of [`admits`](@ref). An asset is admitted while it is active and its coverage share reaches the floor. So both algorithms drop a delisted asset at once, and they differ only in the history they keep.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+i \\in \\mathcal{A} &\\iff a_{i} = 1 \\land s_{i} \\geq c\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:A_adm_cvg])
+  - $(math_dict[:a_i_cvg])
+  - $(math_dict[:s_i_cvg])
+  - $(math_dict[:c_cvg])
 
 # Related
 
@@ -637,7 +722,24 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`ExpireCoverage`](@ref) method of [`admits`](@ref). An inactive asset stays in the frame while its staleness is at most `after`, and its coverage share must reach the floor either way.
+[`ExpireCoverage`](@ref) method of [`admits`](@ref). An inactive asset stays in the frame while its staleness is at most `after`, and its coverage share must reach the floor in both cases.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+i \\in \\mathcal{A} &\\iff s_{i} \\geq c \\land \\left(a_{i} = 1 \\lor \\tau_{i} \\leq h\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:A_adm_cvg])
+  - $(math_dict[:s_i_cvg])
+  - $(math_dict[:c_cvg])
+  - $(math_dict[:a_i_cvg])
+  - $(math_dict[:tau_i_cvg])
+  - ``h``: The `after` field of the algorithm.
 
 # Related
 
@@ -653,14 +755,28 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the universe of an available-case fit out of its per-cell counts.
 
-The read-out's own mask, and the one place [`admits`](@ref) is called. It collapses onto the `nothing` sentinel exactly as [`coverage_sentinel`](@ref) does, so an answer that admits every asset allocates no mask. Unlike [`coverage_sentinel`](@ref) it refuses no sample: an available-case fit whose window admits nothing answers all `NaN` rather than raising, because the fit is opt-in and its caller asked for the gaps.
+It makes the mask of the read-out, and it is the one place that calls [`admits`](@ref). It collapses onto the `nothing` sentinel exactly as [`coverage_sentinel`](@ref) does, so an answer that admits every asset allocates no mask. Unlike [`coverage_sentinel`](@ref) it refuses no sample. An available-case fit whose window admits nothing answers all `NaN` and does not raise, because the fit is opt-in and its caller asked for the gaps.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+s_{i} &= \\frac{\\nu_{i}}{\\max(n, 1)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:s_i_cvg])
+  - ``\\nu_{i}``: Observation count of asset ``i``, the diagonal entry ``\\nu_{ii}`` when the counts are per pair.
+  - ``n``: Number of observations folded. A state that folded none gives every asset a share of zero.
 
 # Algorithm
 
- 1. Take the per-asset observation count, which is the diagonal when the counts are per pair.
- 2. Divide it by `n`, the number of observations folded, giving each asset's coverage share.
- 3. Call [`admits`](@ref) once per asset.
- 4. Return `nothing` when every asset is admitted, and the mask otherwise.
+ 1. Take the per-asset observation count `nu`, which is the diagonal when the counts are per pair.
+ 2. Take the coverage share of each asset.
+ 3. Call [`admits`](@ref) once per asset, giving the mask `cmsk`.
+ 4. Return `nothing` when every asset is admitted, and `cmsk` otherwise.
 
 # Arguments
 
@@ -694,14 +810,33 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Divides an available-case accumulator by its per-cell denominator, and frames the assets the policy refuses.
 
-The tail every available-case read-out shares. A cell whose denominator has not reached one is `NaN`, which is the per-cell half of the rule, and an asset [`coverage_admission`](@ref) refuses is `NaN` across its whole row and column, which is the per-asset half.
+Every available-case read-out ends with it. A cell whose denominator has not reached one is `NaN`, which is the per-cell half of the rule. An asset that [`coverage_admission`](@ref) refuses is `NaN` across its whole row and column, which is the per-asset half.
 
-The answer's element type is the type of the division itself, so a `Float32` accumulator reads out as `Float32` and is never widened by the sentinel. An element type that cannot hold `NaN` cannot hold the answer either: an exact accumulator, a `Rational` among them, raises an `InexactError` at the first cell the policy refuses rather than silently reading out as `Float64`. A window with no refused cell is unaffected.
+The element type of the answer is the type of the division itself, so a `Float32` accumulator reads out as `Float32`, and the sentinel does not widen it. An element type that cannot hold `NaN` cannot hold the answer either. An exact accumulator, a `Rational` among them, raises an `InexactError` at the first cell that the policy refuses, and does not read out as `Float64`. A window with no refused cell is unaffected.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+v_{k} &= \\begin{cases}
+\\dfrac{M_{k}}{\\nu_{k} - \\delta} & \\text{if } \\nu_{k} - \\delta \\geq 1 \\text{ and cell } k \\text{ is admitted}\\,, \\\\
+\\mathrm{NaN} & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:v_k_cvg])
+  - ``M_{k}``: Entry ``k`` of the accumulator.
+  - $(math_dict[:nu_k_cvg])
+  - ``\\delta``: The Bessel correction, ``1`` when `corrected` is `true` and ``0`` otherwise.
+  - $(math_dict[:A_adm_cvg])
 
 # Algorithm
 
- 1. Divide each entry of `M` by its entry of `nu` less `corrected`, writing `NaN` where that denominator is below one.
- 2. Write `NaN` into every entry that touches an asset outside `cmsk`.
+ 1. Divide each entry of `M` by its corrected denominator, giving `val`, with `NaN` where the corrected denominator is below one.
+ 2. Write `NaN` into every entry of `val` that touches an asset outside `cmsk`, with [`coverage_refuse!`](@ref).
 
 # Arguments
 
@@ -722,7 +857,7 @@ The answer's element type is the type of the division itself, so a `Float32` acc
 """
 function coverage_divide(M::AbstractArray, nu::AbstractArray, corrected::Bool,
                          cmsk::Option{BitVector})
-    Tf = typeof(zero(eltype(M)) / one(eltype(nu)))
+    Tf = float_if_integer(promote_type(eltype(M), eltype(nu)))
     val = Array{Tf}(undef, size(M))
     for k in eachindex(val, M, nu)
         d = nu[k] - corrected
@@ -736,9 +871,27 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Frames an available-case estimate that needs no division, and frames the assets the policy refuses.
 
-The read-out of a quantity that is already a ratio, which is what a running per-asset mean is: the value is copied where its cell has an observation and is `NaN` where it has none, and [`coverage_refuse!`](@ref) then writes the frame. It exists beside [`coverage_divide`](@ref) so that a Welford mean is never multiplied by its count and divided by it again, which would move the last bits of an answer the fold computed exactly.
+It reads out a quantity that is already a ratio, such as a running per-asset mean. It copies the value where its cell has an observation and writes `NaN` where the cell has none, and [`coverage_refuse!`](@ref) then writes the frame. It is separate from [`coverage_divide`](@ref) so that a Welford mean is never multiplied by its count and divided by it again, which would change the last bits of the mean that the fold computed.
 
-The answer carries the element type of `A`, which the fold already derived from its own division. As in [`coverage_divide`](@ref), an exact element type cannot hold the `NaN` sentinel and raises an `InexactError` at the first cell that has no observation.
+The answer carries the element type of `A`, which the fold derived from its own division. As in [`coverage_divide`](@ref), an exact element type cannot hold the `NaN` sentinel, and it raises an `InexactError` at the first cell that has no observation.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+v_{k} &= \\begin{cases}
+A_{k} & \\text{if } \\nu_{k} \\geq 1 \\text{ and cell } k \\text{ is admitted}\\,, \\\\
+\\mathrm{NaN} & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:v_k_cvg])
+  - ``A_{k}``: Entry ``k`` of the estimate.
+  - $(math_dict[:nu_k_cvg])
+  - $(math_dict[:A_adm_cvg])
 
 # Arguments
 
@@ -771,7 +924,7 @@ end
 
 Writes `NaN` into every entry of an answer that touches an asset the policy refuses.
 
-The per-asset half of the read-out rule, shared by [`coverage_divide`](@ref) and [`coverage_frame`](@ref). A `nothing` mask is the sentinel of [`coverage_admission`](@ref) and means that every asset is admitted, so nothing is written.
+It is the per-asset half of the read-out rule, and [`coverage_divide`](@ref) and [`coverage_frame`](@ref) share it. A `nothing` mask is the sentinel of [`coverage_admission`](@ref). It means that every asset is admitted, so the method writes nothing.
 
 # Arguments
 
@@ -808,9 +961,9 @@ end
 
 Writes `NaN` into every entry of a higher-order co-moment answer that touches an asset the policy refuses.
 
-The co-moment form of [`coverage_refuse!`](@ref), for an answer whose axes are not all the asset axis. A coskewness tensor is `assets × assets²`, so its rows take the asset mask and its columns the pair mask; a cokurtosis matrix is `assets² × assets²`, so both of its axes take the pair mask. The `Val` marker names the shape, exactly as it does for [`expand_moment`](@ref), and the mask stays one argument so the arm is a plain dispatch rather than a product of two `Option`s.
+It is the co-moment form of [`coverage_refuse!`](@ref), for an answer whose axes are not all the asset axis. A coskewness tensor is `assets × assets²`, so its rows take the asset mask and its columns take the pair mask. A cokurtosis matrix is `assets² × assets²`, so both of its axes take the pair mask. The `Val` marker names the shape, as it does for [`expand_moment`](@ref). The mask stays one argument, so the arm is a plain dispatch and not a product of two `Option`s.
 
-A pair is admitted when both of its assets are, and a co-moment tensor indexes the pair `(i, j)` at the column `(i - 1) * N + j`, which is the layout [`coverage_pair_index`](@ref) states. `kron(cmsk, cmsk)` is that conjunction in that order, entry for entry.
+A pair is admitted when both of its assets are. A co-moment tensor indexes the pair `(i, j)` at the column `(i - 1) * N + j`, which is the layout that [`coverage_pair_index`](@ref) states. `kron(cmsk, cmsk)` is that conjunction in that order, entry for entry.
 
 # Arguments
 

@@ -131,6 +131,7 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
         JuMP.@constraint(model, w_ub, sc * (w ⊖ k * ub) <= 0)
     end
     set_budget_constraints!(model, bgt, w)
+    set_gross_exposure_bound!(model, gross_exposure_bound(wb, bgt, sbgt, gbgt, N))
     if flag
         lw, sw = if !shared_has(model, :sw)
             JuMP.@variables(model, begin
@@ -153,6 +154,123 @@ function set_weight_constraints!(model::JuMP.Model, wb::WeightBounds,
         JuMP.@expression(model, lw, w)
     end
     return nothing
+end
+"""
+    budget_upper_bound(bgt) -> Number
+
+Return the upper bound that a budget puts on a sum of weights, or `Inf` when it puts none.
+
+A number pins the sum, so it is its own bound. A [`BudgetRange`](@ref) bounds the sum by its `ub`. `nothing`, a range without `ub`, and a budget that also pays costs give `Inf`.
+
+# Arguments
+
+  - `bgt`: The budget, as [`set_weight_constraints!`](@ref) receives it.
+
+# Returns
+
+  - `ub::Number`: The upper bound of the sum, in units of ``k``.
+
+# Related
+
+  - [`gross_exposure_bound`](@ref)
+"""
+function budget_upper_bound(bgt::Number)
+    return bgt
+end
+function budget_upper_bound(bgt::BudgetRange)
+    return isnothing(bgt.ub) ? Inf : bgt.ub
+end
+function budget_upper_bound(args...)
+    return Inf
+end
+"""
+    gross_exposure_bound(wb::WeightBounds, bgt, sbgt, gbgt, N::Integer) -> Number
+
+Return an upper bound on the gross exposure of every weight vector that the weight bounds and the budgets admit, or `Inf` when they admit no bound.
+
+The bound is the smallest of the bounds below that apply.
+
+```math
+\\begin{align}
+\\lVert \\boldsymbol{w} \\rVert_{1} &\\leq \\sum_{i=1}^{N} \\max\\left(\\lvert \\ell_{i} \\rvert,\\, \\lvert u_{i} \\rvert\\right)\\,, \\\\
+\\lVert \\boldsymbol{w} \\rVert_{1} &\\leq \\overline{B}\\,, \\quad \\text{if } \\boldsymbol{\\ell} \\geq \\boldsymbol{0}\\,, \\\\
+\\lVert \\boldsymbol{w} \\rVert_{1} &\\leq \\min\\left(\\overline{G},\\, \\overline{B} + 2 \\overline{S}\\right)\\,, \\quad \\text{if a bound is negative}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - ``\\boldsymbol{\\ell}``, ``\\boldsymbol{u}``: Lower and upper bound vectors from `wb`.
+  - ``\\overline{B}``, ``\\overline{S}``, ``\\overline{G}``: Upper bounds of the budget, the short budget and the gross budget, from [`budget_upper_bound`](@ref).
+  - ``w^{+}_{i}``, ``w^{-}_{i}``: Long and short parts of weight ``i``, the model's `lw` and `sw`.
+  - $(math_dict[:k_budget])
+  - $(math_dict[:N])
+
+The first bound holds for all weights. The second holds because non-negative weights have a gross exposure equal to their sum. The third holds because ``\\lvert w_{i} \\rvert \\leq w^{+}_{i} + w^{-}_{i}``, the long budget bounds the sum of the long parts by ``\\overline{B} + \\overline{S}``, and the short budget bounds the sum of the short parts by ``\\overline{S}``. Each bound is in units of ``k``, as the constraints of [`set_weight_constraints!`](@ref) are.
+
+# Arguments
+
+  - $(arg_dict[:wb_arg])
+  - `bgt`: The budget.
+  - `sbgt`: The short budget.
+  - `gbgt`: The gross budget.
+  - `N::Integer`: The number of assets.
+
+# Returns
+
+  - `g::Number`: The bound, or `Inf`.
+
+# Related
+
+  - [`set_weight_constraints!`](@ref)
+  - [`set_gross_exposure_bound!`](@ref)
+  - [`mip_big_m`](@ref)
+"""
+function gross_exposure_bound(wb::WeightBounds, bgt, sbgt, gbgt, N::Integer)
+    lb = wb.lb
+    ub = wb.ub
+    g = if isnothing(lb) || isnothing(ub)
+        Inf
+    else
+        m = max.(abs.(lb), abs.(ub))
+        isa(m, Number) ? N * m : sum(m)
+    end
+    return if w_neg_flag(lb) || w_neg_flag(ub)
+        min(g, budget_upper_bound(gbgt),
+            budget_upper_bound(bgt) + 2 * budget_upper_bound(sbgt))
+    elseif !isnothing(lb)
+        min(g, budget_upper_bound(bgt))
+    else
+        g
+    end
+end
+"""
+    set_gross_exposure_bound!(model::JuMP.Model, g::Number)
+
+Record `g` as the shared Model State entry `:w_gross_ub`, the bound on the gross exposure of the head's weights.
+
+A second call keeps the smaller bound, because the constraints of both calls hold for the same weights. [`mip_big_m`](@ref) reads the entry.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `g::Number`: The bound, from [`gross_exposure_bound`](@ref).
+
+# Returns
+
+  - `g::Number`: The bound that the model records.
+
+# Related
+
+  - [`gross_exposure_bound`](@ref)
+  - [`mip_big_m`](@ref)
+"""
+function set_gross_exposure_bound!(model::JuMP.Model, g::Number)
+    if shared_has(model, :w_gross_ub)
+        g = min(g, shared_get(model, :w_gross_ub))
+    end
+    return shared_set!(model, :w_gross_ub, g)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

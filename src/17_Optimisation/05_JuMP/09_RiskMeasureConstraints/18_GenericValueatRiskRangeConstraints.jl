@@ -27,8 +27,8 @@ Calls [`set_range_risk_constraints!`](@ref), which reads the two tails from
   - [`set_range_risk_constraints!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::GenericValueatRiskRange,
-                               opt::RiskJuMPOptimisationEstimator, pr::AbstractPriorResult,
-                               args...; prefix::Symbol = Symbol(""), kwargs...)
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
     return set_range_risk_constraints!(model, i, r, :genvar_range_, opt, pr, args...;
                                        prefix = prefix, kwargs...)
 end

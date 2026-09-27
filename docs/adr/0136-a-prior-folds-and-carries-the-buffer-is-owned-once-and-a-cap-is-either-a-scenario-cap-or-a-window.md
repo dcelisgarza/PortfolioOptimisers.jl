@@ -77,7 +77,8 @@ result, so the carry buffer holds the linear rows and the fold transforms on the
 Only `EmpiricalPrior` puts the caller's own matrix into `X`. `BlackLittermanPrior` returns
 `forward_prior(prior_model; …)` and `HighOrderPriorEstimator` builds `HighOrderPrior(; pr = pr, …)`,
 both reusing the inner prior's result, so both fold by forwarding to their inner `pe` and own **no**
-buffer, reading `pr.X` when they need the sample. This is the argument #975 used to make
+buffer, reading the rows of the prior they embed when they need the sample (amended below: not
+`pr.X`). This is the argument #975 used to make
 `fill_limit` an `EmpiricalPrior` field: the cost is paid once, at the bottom, and rides up through
 the result.
 
@@ -88,7 +89,8 @@ from, so a refusal would protect nothing, and no type bound and no runtime check
 
 A host that carries the observations folds every member that folds and runs the batch verb over its
 own rows for every member that does not. `HighOrderPriorEstimator` with a `SemiMoment` `ske` folds
-`pe` and `kte` and refits `ske` alone, from `pr.X`.
+`pe` and `kte` and refits `ske` alone, from the rows that `pe` folded (amended below: not from
+`pr.X`).
 
 The caller writes the estimator they would write in batch. They need no wrapper and no knowledge of
 the ledger, and no member carries a second copy of `X`. A member is foldable **as a whole**, not per
@@ -227,3 +229,35 @@ member carries its own copy of `X`.
   built the factor rows as a second state type, a pair of buffers; the section above replaces
   that on the ruling of [#1009](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1009),
   and its build folds the pair into the one buffer.
+
+## Amendment (2026-09-25): a forwarding host refits over the folded rows, not `pr.X`
+
+[#1328](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1328), found by the sweep of
+`src/10_Prior/12_PriorPartialFit.jl` in
+[#1006](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1006), asked which rows a
+`HighOrderPriorEstimator` refits a co-moment that does not fold over at the read-out. The first
+text of this ADR said `pr.X`. The batch method fits both co-moments over the caller's matrix, and
+`pr.X` is not that matrix in two cases:
+
+- A Scenario Cap on the embedded prior keeps only the last `w` rows in `pr.X`. With 80 rows and
+  `w = 25`, a `SemiMoment` coskewness over `pr.X` missed the batch coskewness by 24 %.
+- The Scenario Fill writes zeros into the rows of `pr.X` before a late asset lists. With a
+  `CoveragePolicy` on the co-moments, a refit over the filled zeros missed the batch coskewness by
+  28 % and the batch cokurtosis by 27 %.
+
+**Decision.** A forwarding host refits a member that does not fold over the rows that its embedded
+prior folded. `prior_returns_buffer` reads them: it walks `HighOrderPriorEstimator` and
+`BlackLittermanPrior` down to the prior that owns the rows, and `returns_buffer` reads the rows out
+of a `PriorCarryState` or a `SampleBufferState`. The two helpers moved from
+`src/17_Optimisation/09_OnlineOptimisation.jl` to `src/10_Prior/12_PriorPartialFit.jl`, because a
+read-out of the prior layer now calls them. The read-out of an optimiser calls them as before.
+
+The read-out then equals the batch fit in both cases, to rounding, and the batch-parity identity
+holds for a co-moment that does not fold under a cap. Under `Online(…; max_history = m)` the buffer
+holds the last `m` rows, which is the window that the batch equal of that route fits over. The host
+still keeps no copy of the rows. The docstring of `prior(pe::HighOrderPriorEstimator)` states the
+rule in its prose and in step 2 of its `# Algorithm`.
+
+**Rejected: keep `pr.X` and document the difference.** The previous docstring did this. It made
+the read-out differ from the batch method, which reads the caller's matrix, and from itself: the
+co-moments that fold read every row, and the co-moments that do not fold read a subset of the rows.

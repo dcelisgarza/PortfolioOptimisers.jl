@@ -304,6 +304,14 @@ end
     @testset "An inactive cell is NaN across every level" begin
         @test all(isnan, factor_exposure(xe, rd)[2, 2, :])
     end
+    @testset "Integer returns take a float exposure, which holds the inactive NaN" begin
+        # The levels used to take the element type of the returns, so integer returns threw
+        # `InexactError: Int64(NaN)` at the first inactive cell.
+        rdi = ReturnsResult(; nx = rd.nx, X = zeros(Int, 2, 2), pnl = rd.pnl)
+        @test isequal(factor_exposure(xe, rdi), factor_exposure(xe, rd))
+        rdf = ReturnsResult(; nx = rd.nx, X = zeros(Float32, 2, 2), pnl = rd.pnl)
+        @test eltype(factor_exposure(xe, rdf)) == Float32
+    end
     @testset "An asset cannot set no level" begin
         # A categorical Panel Field stores one code per cell, so the level-less cell the
         # one-hot layout could express is now unrepresentable: the code is refused rather
@@ -339,6 +347,14 @@ end
     @testset "The ones column, NaN where the asset is not listed" begin
         L = factor_exposure(ConstantExposure(), rd)
         @test isequal(L, [1.0 1.0; 1.0 NaN])
+    end
+    @testset "Integer returns take a float exposure, which holds the inactive NaN" begin
+        # The ones used to take the element type of the returns, so integer returns threw
+        # `InexactError: Int64(NaN)` at the first inactive cell.
+        rdi = ReturnsResult(; nx = rd.nx, X = zeros(Int, 2, 2), pnl = rd.pnl)
+        @test isequal(factor_exposure(ConstantExposure(), rdi), [1.0 1.0; 1.0 NaN])
+        rdf = ReturnsResult(; nx = rd.nx, X = zeros(Float32, 2, 2), pnl = rd.pnl)
+        @test eltype(factor_exposure(ConstantExposure(), rdf)) == Float32
     end
     @testset "A carrier with no Asset Panel is refused" begin
         rdn = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2))
