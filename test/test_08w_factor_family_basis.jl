@@ -252,6 +252,163 @@ end
         @test_throws DimensionMismatch PO.project_factor_coordinates(fcb, randn(rng, K + 1))
         @test_throws DimensionMismatch PO.reduce_factor_names(fcb, ["a"])
         @test_throws DimensionMismatch PO.dropped_factor_names(fcb, ["a"])
+        # The vector method of the expansion names its own argument in the refusal.
+        msg = try
+            PO.expand_factor_returns(fcb, randn(rng, Kr + 1))
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("g carries a factor axis", msg)
+    end
+end
+
+@testset "FactorFamilyBasis transforms agree with their closed forms in exact arithmetic" begin
+    #=
+    Every transform against the closed form its docstring states, over Rational numbers so
+    each identity holds exactly. Two families and two factors outside every family: family
+    one is raw factors 1 and 3 and drops factor 1, family two is raw factors 4, 5 and 6 and
+    drops factor 6, and factors 2 and 7 sit outside. The ratios are the benchmark-weighted
+    exposures of the panel over that of the dropped member, as the definition of the basis
+    states them, and the change of basis `R` is written out by hand from that layout.
+    =#
+    PO = PortfolioOptimisers
+    rng = StableRNG(822_001)
+    T, N, K = 4, 6, 7
+    fi = [[1, 3], [4, 5, 6]]
+    B = Rational{Int}.(rand(rng, 1:5, T, N, K))
+    bw = Rational{Int}.(rand(rng, 1:4, T, N))
+    w = bw ./ sum(bw; dims = 2)
+    c = [sum(w[t, i] * B[t, i, k] for i in 1:N) for t in 1:T, k in 1:K]
+    ratios = [c[t, 3] / c[t, 1] for t in 1:T]
+    ratios = hcat(ratios, [c[t, 4] / c[t, 6] for t in 1:T],
+                  [c[t, 5] / c[t, 6] for t in 1:T])
+    fcb = FactorFamilyBasis(; fnm = ["one", "two"], fi = fi, di = [1, 3], ratios = ratios,
+                            K = K)
+    @test PO.dropped_factor_indices(fcb) == [1, 6]
+    @test PO.retained_factor_indices(fcb) == [2, 3, 4, 5, 7]
+    Kr = PO.reduced_factor_count(fcb)
+    @test Kr == 5
+
+    # The change of basis of the docstrings: a one per retained factor, and minus the ratio
+    # of each retained member in the row of the factor its family drops.
+    function R(t)
+        M = zeros(Rational{Int}, K, Kr)
+        for (col, row) in enumerate([2, 3, 4, 5, 7])
+            M[row, col] = 1
+        end
+        M[1, 2] = -ratios[t, 1]
+        M[6, 3] = -ratios[t, 2]
+        M[6, 4] = -ratios[t, 3]
+        return M
+    end
+    S = zeros(Rational{Int}, K, Kr)
+    for (col, row) in enumerate([2, 3, 4, 5, 7])
+        S[row, col] = 1
+    end
+    D = zeros(Rational{Int}, K, 2)
+    D[1, 1] = 1
+    D[6, 2] = 1
+
+    @testset "The retention matrix is a left inverse of the change of basis" begin
+        for t in 1:T
+            @test transpose(S) * R(t) == Matrix{Rational{Int}}(LinearAlgebra.I, Kr, Kr)
+        end
+    end
+
+    @testset "Exposures and loadings map through R" begin
+        Z = PO.reduce_exposures(fcb, B)
+        @test eltype(Z) == Rational{Int}
+        g = Rational{Int}.(rand(rng, -3:3, T, Kr))
+        f = PO.expand_factor_returns(fcb, g)
+        for t in 1:T
+            @test Z[t, :, :] == B[t, :, :] * R(t)
+            @test PO.reduce_loadings(fcb, B[t, :, :], t) == B[t, :, :] * R(t)
+            # The two bases give the same fitted values.
+            @test Z[t, :, :] * g[t, :] == B[t, :, :] * f[t, :]
+        end
+    end
+
+    @testset "Factor returns expand through R and satisfy the zero-sum condition" begin
+        g = Rational{Int}.(rand(rng, -3:3, T, Kr))
+        f = PO.expand_factor_returns(fcb, g)
+        @test eltype(f) == Rational{Int}
+        for t in 1:T
+            @test f[t, :] == R(t) * g[t, :]
+            for fam in fi
+                @test sum(c[t, k] * f[t, k] for k in fam) == 0
+            end
+            @test f[t, 1] == -ratios[t, 1] * f[t, 3]
+            @test f[t, 6] == -ratios[t, 2] * f[t, 4] - ratios[t, 3] * f[t, 5]
+        end
+        @test PO.reduce_factor_returns(fcb, f) == g
+        @test PO.reduce_factor_returns(fcb, f[2, :]) == transpose(S) * f[2, :]
+        @test PO.expand_factor_returns(fcb, g[1, :]) == R(T) * g[1, :]
+        # The converse fails for raw returns off the image of R.
+        h = Rational{Int}.(rand(rng, 1:3, T, K))
+        @test PO.expand_factor_returns(fcb, PO.reduce_factor_returns(fcb, h)) != h
+    end
+
+    @testset "The factor mean expands through R" begin
+        m = Rational{Int}.(rand(rng, -3:3, Kr))
+        for t in 1:T
+            @test PO.expand_factor_mu(fcb, m, t) == R(t) * m
+            @test PO.reduce_factor_mu(fcb, PO.expand_factor_mu(fcb, m, t)) == m
+        end
+        raw = Rational{Int}.(rand(rng, 1:3, K))
+        @test PO.reduce_factor_mu(fcb, raw) == transpose(S) * raw
+    end
+
+    @testset "The factor covariance expands through R, block by block" begin
+        A = Rational{Int}.(rand(rng, -3:3, Kr, Kr))
+        Sr = A * transpose(A) + 3 * Matrix{Rational{Int}}(LinearAlgebra.I, Kr, Kr)
+        for t in 1:T
+            W = PO.dropped_factor_weights(fcb, t)
+            @test W == transpose(D) * R(t)
+            raw = PO.expand_factor_covariance(fcb, Sr, t)
+            @test eltype(raw) == Rational{Int}
+            @test raw == R(t) * Sr * transpose(R(t))
+            @test transpose(S) * raw * S == Sr
+            @test transpose(D) * raw * S == W * Sr
+            @test transpose(D) * raw * D == W * Sr * transpose(W)
+            @test LinearAlgebra.rank(Float64.(raw)) == Kr
+            @test PO.reduce_factor_covariance(fcb, raw) == Sr
+        end
+    end
+
+    @testset "Coordinates project through the transpose of R" begin
+        x = Rational{Int}.(rand(rng, -3:3, T, K))
+        y = PO.project_factor_coordinates(fcb, x)
+        for t in 1:T
+            @test y[t, :] == transpose(R(t)) * x[t, :]
+        end
+        @test PO.project_factor_coordinates(fcb, x[1, :]) == transpose(R(T)) * x[1, :]
+        # A portfolio's factor exposure projects onto its exposure to the reduced factors.
+        Z = PO.reduce_exposures(fcb, B)
+        wp = Rational{Int}.(rand(rng, 0:3, N))
+        for t in 1:T
+            gt = transpose(B[t, :, :]) * wp
+            @test transpose(R(t)) * gt == transpose(Z[t, :, :]) * wp
+        end
+        @test PO.project_factor_coordinates(fcb, transpose(B[T, :, :]) * wp) ==
+              transpose(Z[T, :, :]) * wp
+    end
+
+    @testset "A Float32 basis and Float32 data keep Float32" begin
+        f32 = FactorFamilyBasis(; fnm = fcb.fnm, fi = fcb.fi, di = fcb.di,
+                                ratios = Float32.(ratios), K = K)
+        B32 = Float32.(B)
+        @test eltype(PO.reduce_exposures(f32, B32)) == Float32
+        @test eltype(PO.reduce_loadings(f32, B32[1, :, :])) == Float32
+        @test eltype(PO.expand_factor_returns(f32, ones(Float32, T, Kr))) == Float32
+        @test eltype(PO.expand_factor_returns(f32, ones(Float32, Kr))) == Float32
+        @test eltype(PO.expand_factor_mu(f32, ones(Float32, Kr))) == Float32
+        @test eltype(PO.expand_factor_covariance(f32,
+                                                 Matrix{Float32}(LinearAlgebra.I, Kr, Kr))) ==
+              Float32
+        @test eltype(PO.dropped_factor_weights(f32, 1)) == Float32
+        @test eltype(PO.project_factor_coordinates(f32, ones(Float32, T, K))) == Float32
+        @test eltype(PO.project_factor_coordinates(f32, ones(Float32, K))) == Float32
     end
 end
 

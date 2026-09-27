@@ -152,6 +152,17 @@ unique_key_dict!(math_dict, :math_dict,
                  :pi_k_summary => "``\\pi_{k}``: Reduced position of raw factor ``k``, its position on the reduced factor axis, and ``0`` when the family re-basis dropped it.",#
                  :s2_tk_summary => "``s^{2}_{tk}``: Uncorrected cross-sectional variance of the exposure to factor ``k`` at observation ``t``, over the assets at which that exposure is not `NaN`.",#
                  :c_k_summary => "``c_{k}``: Constant-exposure flag of factor ``k``, true when the largest ``s^{2}_{tk}`` over the observations is under ``10^{-12}``.",#
+                 # The Factor Family Basis of `32_CrossSectionalFactorModel/`. Each symbol
+                 # is stated by two or more Units of `06_FactorFamilyBasisTransforms.jl`.
+                 :r_tj_fcb => "``r_{t}(j) = c_{t}(j) / c_{t}(k)``: Ratio of the benchmark-weighted exposure of member ``j`` of a constrained Factor Family to that of the member ``k`` the family drops, at observation ``t``.",#
+                 :K_r_fcb => "``K_{r}``: Reduced factor count, ``K`` less one factor for each constrained Factor Family.",#
+                 :R_t_fcb => "``\\mathbf{R}_{t}``: Change of basis of observation ``t`` from the reduced factor axis to the raw one, ``K \\times K_{r}``. The column of a retained factor ``j`` holds ``1`` in row ``j``, and ``-r_{t}(j)`` in row ``k`` when ``j`` belongs to a constrained Factor Family that drops ``k``. Every other entry is zero.",#
+                 :S_fcb => "``\\mathbf{S}``: Retention matrix, ``K \\times K_{r}``, the columns of the identity matrix at the retained factors, in raw order.",#
+                 :D_fcb => "``\\mathbf{D}``: Drop matrix, the columns of the ``K \\times K`` identity matrix at the dropped factors, one column for each constrained Factor Family.",#
+                 :W_t_fcb => "``\\mathbf{W}_{t} = \\mathbf{D}^{\\intercal} \\mathbf{R}_{t}``: Reconstruction weights of observation ``t``, one row for each constrained Factor Family and ``K_{r}`` columns. A row applied to a reduced-axis vector gives the entry of the factor that its family drops.",#
+                 :f_t_fcb => "``\\boldsymbol{f}^{\\mathrm{raw}}_{t}``, ``\\boldsymbol{f}^{\\mathrm{red}}_{t}``: Raw and reduced factor returns of observation ``t``, ``K \\times 1`` and ``K_{r} \\times 1``. The entry of factor ``j`` is ``f^{\\mathrm{raw}}_{t,j}``.",#
+                 :mu_fcb => "``\\boldsymbol{\\mu}^{\\mathrm{raw}}``, ``\\boldsymbol{\\mu}^{\\mathrm{red}}``: Raw and reduced factor mean, ``K \\times 1`` and ``K_{r} \\times 1``.",#
+                 :Sigma_fcb => "``\\mathbf{\\Sigma}^{\\mathrm{raw}}``, ``\\mathbf{\\Sigma}^{\\mathrm{red}}``: Raw and reduced factor covariance, ``K \\times K`` and ``K_{r} \\times K_{r}``.",#
                  # The coverage policy of `01_Base/16_CoveragePolicy.jl`. Each symbol is
                  # stated by two or more Units of that file.
                  :s_i_cvg => "``s_{i}``: Coverage share of asset ``i``, its own observation count over the number of observations folded.",#
