@@ -137,7 +137,7 @@ commit = "0ecb3ce47c"
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/10_DerivedExposure.jl" = { code = 50, doc = 98, comment = 0, blank = 31, total = 179 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/11_OneHotExposure.jl" = { code = 75, doc = 145, comment = 0, blank = 71, total = 291 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/12_ConstantExposure.jl" = { code = 19, doc = 62, comment = 0, blank = 33, total = 114 }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/13_ExposureNeutralisation.jl" = { code = 83, doc = 95, comment = 0, blank = 48, total = 226 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/13_ExposureNeutralisation.jl" = { code = 91, doc = 125, comment = 0, blank = 55, total = 271 }
 "src/05_Moments/32_CrossSectionalFactorModel/05_FactorFamilyBasis.jl" = { code = 206, doc = 324, comment = 0, blank = 146, total = 676 }
 "src/05_Moments/32_CrossSectionalFactorModel/06_FactorFamilyBasisTransforms.jl" = { code = 190, doc = 345, comment = 0, blank = 172, total = 707 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/01_Base_ReturnForecast.jl" = { code = 118, doc = 318, comment = 2, blank = 158, total = 596 }

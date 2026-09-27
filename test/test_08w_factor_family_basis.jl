@@ -703,6 +703,160 @@ end
     end
 end
 
+@testset "The Neutralisation agrees with its closed form" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(820)
+    nt, na = 3, 7
+    nf = ["mkt", "size", "value", "ind=a", "ind=b"]
+    fam = ["market", "style", "style", "industry", "industry"]
+    Ms = randn(rng, nt, na, 5)
+    Ms[:, :, 1] .= 1.0
+    Ms[:, :, 4] = [1.0 0.0 1.0 1.0 0.0 0.0 1.0; 0.0 0.0 1.0 1.0 0.0 1.0 1.0;
+                   1.0 1.0 0.0 0.0 1.0 0.0 1.0]
+    Ms[:, :, 5] = 1.0 .- Ms[:, :, 4]
+    # A missing key exposure, a missing target exposure, a zero weight and an infinite weight.
+    Ms[2, 3, 2] = NaN
+    Ms[3, 5, 3] = NaN
+    bw = rand(rng, nt, na)
+    bw[1, 6] = 0.0
+    bw[2, 1] = Inf
+
+    # The regression weights, written out.
+    omega(M, b, k, tg) = ifelse.((0 .< b .< Inf) .& isfinite.(M[:, :, k]) .&
+                                 dropdims(all(isfinite, M[:, :, tg]; dims = 3); dims = 3),
+                                 b, zero(eltype(b)))
+    # The fit, the residual of every asset and the standardiser, written out: the centre is
+    # weighted by the regression weights, and the scale is equal-weighted over the assets of
+    # positive weight.
+    function closed_form(M, b, k, tg, intercept)
+        W = omega(M, b, k, tg)
+        R = fill(convert(eltype(M), NaN), size(M, 1), size(M, 2))
+        for t in axes(M, 1)
+            B = M[t, :, tg]
+            A = intercept ? [ones(eltype(M), size(M, 2)) B] : B
+            fit = W[t, :] .> 0
+            s = sqrt.(W[t, fit])
+            e = M[t, :, k] - A * ((A[fit, :] .* s) \ (M[t, fit, k] .* s))
+            mu = sum(W[t, fit] .* e[fit]) / sum(W[t, fit])
+            R[t, :] = (e .- mu) ./ Statistics.std(e[fit]; mean = mu)
+        end
+        return R
+    end
+    function agrees(S, R; rtol = 1e-12)
+        f = .!isnan.(R)
+        return isequal(isnan.(S), isnan.(R)) && isapprox(S[f], R[f]; rtol = rtol)
+    end
+
+    @testset "A factor key agrees with and without an intercept" begin
+        for intercept in (false, true)
+            Y = copy(Ms)
+            PO.neutralise_exposures!(Y, ["size" => ["value", "industry"]],
+                                     CrossSectionalLinearRegression(;
+                                                                    intercept = intercept),
+                                     bw, nf, fam)
+            R = closed_form(Ms, bw, 2, [3, 4, 5], intercept)
+            @test agrees(Y[:, :, 2], R)
+            # The two missing exposures leave a hole, and the zero and the infinite weights
+            # leave a residual.
+            @test isnan(R[2, 3]) && isnan(R[3, 5])
+            @test isfinite(R[1, 6]) && isfinite(R[2, 1])
+            @test isequal(Y[:, :, [1, 3, 4, 5]], Ms[:, :, [1, 3, 4, 5]])
+        end
+    end
+
+    @testset "A family key neutralises each member against the same targets" begin
+        Y = copy(Ms)
+        PO.neutralise_exposures!(Y, ["style" => "industry"],
+                                 CrossSectionalLinearRegression(), bw, nf, fam)
+        @test agrees(Y[:, :, 2], closed_form(Ms, bw, 2, [4, 5], false))
+        @test agrees(Y[:, :, 3], closed_form(Ms, bw, 3, [4, 5], false))
+    end
+
+    @testset "The consequences of the normal equations hold" begin
+        wcov(W, a, b) = sum(W .* (a .- sum(W .* a) / sum(W)) .* (b .- sum(W .* b) / sum(W)))
+        # With an intercept, the score is uncorrelated with every target under the weights.
+        Y = copy(Ms)
+        PO.neutralise_exposures!(Y, ["size" => ["value"]],
+                                 CrossSectionalLinearRegression(; intercept = true), bw, nf,
+                                 fam)
+        W = omega(Ms, bw, 2, [3])
+        for t in 1:nt
+            f = W[t, :] .> 0
+            @test abs(wcov(W[t, f], Y[t, f, 2], Ms[t, f, 3])) < 1e-12
+        end
+        # Targets that span the constant keep the score orthogonal without an intercept.
+        Y = copy(Ms)
+        PO.neutralise_exposures!(Y, ["size" => ["industry"]],
+                                 CrossSectionalLinearRegression(), bw, nf, fam)
+        W = omega(Ms, bw, 2, [4, 5])
+        for t in 1:nt, j in 4:5
+            f = W[t, :] .> 0
+            @test abs(sum(W[t, f] .* Y[t, f, 2] .* Ms[t, f, j])) < 1e-12
+        end
+        # A single style target without an intercept leaves the score correlated with it.
+        Y = copy(Ms)
+        PO.neutralise_exposures!(Y, ["size" => ["value"]], CrossSectionalLinearRegression(),
+                                 bw, nf, fam)
+        W = omega(Ms, bw, 2, [3])
+        @test maximum(abs(wcov(W[t, W[t, :] .> 0], Y[t, W[t, :] .> 0, 2],
+                               Ms[t, W[t, :] .> 0, 3])) for t in 1:nt) > 1e-3
+    end
+
+    @testset "The number type of the exposures is kept" begin
+        Mb = BigFloat.(Ms)
+        Y = copy(Mb)
+        PO.neutralise_exposures!(Y, ["size" => ["value"]], CrossSectionalLinearRegression(),
+                                 bw, nf, fam)
+        @test eltype(Y) === BigFloat
+        @test agrees(Y[:, :, 2], closed_form(Mb, BigFloat.(bw), 2, [3], false);
+                     rtol = 1e-60)
+        Y32 = Float32.(Ms)
+        PO.neutralise_exposures!(Y32, ["size" => ["value"]],
+                                 CrossSectionalLinearRegression(), bw, nf, fam)
+        @test eltype(Y32) === Float32
+        @test agrees(Y32[:, :, 2], Float32.(closed_form(Ms, bw, 2, [3], false));
+                     rtol = 1e-5)
+    end
+
+    @testset "A Symbol names what a String names" begin
+        cre = CrossSectionalLinearRegression()
+        Y = copy(Ms)
+        Z = copy(Ms)
+        PO.neutralise_exposures!(Y, [:style => [Symbol("ind=a"), Symbol("ind=b")]], cre, bw,
+                                 nf, fam)
+        PO.neutralise_exposures!(Z, ["style" => ["ind=a", "ind=b"]], cre, bw, nf, fam)
+        @test isequal(Y, Z)
+        Y = copy(Ms)
+        Z = copy(Ms)
+        PO.neutralise_exposures!(Y, ["size" => :value], cre, bw, nf, fam)
+        PO.neutralise_exposures!(Z, ["size" => "value"], cre, bw, nf, fam)
+        @test isequal(Y, Z)
+    end
+
+    @testset "A type without a residual and an infinite exposure are refused" begin
+        cre = CrossSectionalLinearRegression()
+        Mi = round.(Int, 3 .* replace(Ms, NaN => 0.0))
+        @test_throws ArgumentError PO.neutralise_exposures!(copy(Mi), ["size" => "value"],
+                                                            cre, bw, nf, fam)
+        # No entry writes a residual, so an integer history passes unchanged.
+        Y = copy(Mi)
+        @test PO.neutralise_exposures!(Y, Pair{String, String}[], cre, bw, nf, fam) ===
+              nothing
+        @test Y == Mi
+        for (k, s) in ((2, 1.0), (3, -1.0))
+            Minf = copy(Ms)
+            Minf[1, 2, k] = s * Inf
+            @test_throws DomainError PO.neutralise_exposures!(Minf, ["size" => "value"],
+                                                              cre, bw, nf, fam)
+        end
+        # An infinity in a factor that no entry names is not read.
+        Minf = copy(Ms)
+        Minf[1, 2, 1] = Inf
+        PO.neutralise_exposures!(Minf, ["size" => "value"], cre, bw, nf, fam)
+        @test agrees(Minf[:, :, 2], closed_form(Ms, bw, 2, [3], false))
+    end
+end
+
 @testset "Parity with the reference implementation" begin
     PO = PortfolioOptimisers
     #=
