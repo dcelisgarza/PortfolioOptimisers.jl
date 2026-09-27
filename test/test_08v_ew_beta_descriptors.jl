@@ -913,3 +913,83 @@ end
         @test eltype(V) == Float64
     end
 end
+
+# The beta series from its closed form in BigFloat: each mean, variance and covariance is a sum
+# over the valid observations of its asset since the last restart, so it shares no loop with
+# the recursion it checks. A restart happens where an asset turns inactive, and a cell that
+# writes no new beta holds the last one.
+function ewb_closed_beta(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
+                         amsk::AbstractMatrix{Bool}, decay::Real, min_obs::Integer,
+                         min_val::Real)
+    lam = BigFloat(decay)
+    T, N = size(X)
+    r = BigFloat.(rm)
+    # `mum[s]` is the market mean after `s - 1` observations, the mean a deviation at `s` uses.
+    mum = [(1 - lam) * sum((lam^(s - 1 - u) * r[u] for u in 1:(s - 1)); init = zero(lam))
+           for s in 1:T]
+    Vm = [(1 - lam) * sum(lam^(t - s) * (r[s] - mum[s])^2 for s in 1:t) for t in 1:T]
+    B = fill(BigFloat(NaN), T, N)
+    for i in 1:N
+        start = 1
+        b = BigFloat(NaN)
+        for t in 1:T
+            if t > 1 && amsk[t - 1, i] && !amsk[t, i]
+                start = t
+            end
+            v = [s for s in start:t if amsk[s, i] && isfinite(X[s, i])]
+            k = length(v)
+            if k > 0 && last(v) == t && t >= min_obs && k >= min_obs
+                x = BigFloat.(X[v, i])
+                mu = [(1 - lam) *
+                      sum((lam^(j - 1 - l) * x[l] for l in 1:(j - 1)); init = zero(lam))
+                      for j in 1:k]
+                C = (1 - lam) *
+                    sum(lam^(k - j) * (x[j] - mu[j]) * (r[v[j]] - mum[v[j]]) for j in 1:k)
+                b = C / (Vm[t] + min_val)
+            end
+            B[t, i] = b
+        end
+    end
+    return B, Vm
+end
+
+@testset "The beta series is the closed form of its recursion (#726)" begin
+    # Asset 1 has a gap at observation 3, and asset 2 turns inactive at observation 4. The
+    # warm-up of two observations delays the first beta and the first beta after the restart.
+    X = [0.10 0.20
+         -0.10 0.00
+         NaN 0.05
+         0.02 -0.03
+         -0.04 0.06
+         0.03 0.01]
+    rm = [0.15, -0.05, 0.035, -0.005, 0.01, 0.02]
+    amsk = [true true; true true; true true; true false; true true; true true]
+    decay, min_obs, min_val = 0.6, 2, 1e-4
+    B, Vm = PortfolioOptimisers.ew_beta_series(X, rm, decay, min_obs, min_val, amsk)
+    Bc, Vc = ewb_closed_beta(X, rm, amsk, decay, min_obs, min_val)
+    @test ewb_same(B, Float64.(Bc); rtol = 1e-12)
+    @test Vm ≈ Float64.(Vc) rtol = 1e-12
+    @test all(isnan, B[1, :])
+    # A gap holds the beta, and a restart does not clear it: the first valid return after the
+    # restart counts one observation, below the warm-up, so the old beta holds one more step.
+    @test B[3, 1] == B[2, 1]
+    @test B[5, 2] == B[3, 2]
+    @test B[6, 2] != B[5, 2]
+    # With no mask, no state restarts: the inactive cell is an ordinary finite return.
+    B0, _ = PortfolioOptimisers.ew_beta_series(X, rm, decay, min_obs, min_val)
+    Bc0, _ = ewb_closed_beta(X, rm, trues(size(X)), decay, min_obs, min_val)
+    @test ewb_same(B0, Float64.(Bc0); rtol = 1e-12)
+end
+
+@testset "A negative capitalisation enters the market return as it stands (#726)" begin
+    X = [0.10 0.20 -0.05; 0.02 -0.03 0.04]
+    W = [1.0 -0.5 2.0; 1.0 1.0 1.0]
+    rd = ewb_hand_panel(X, W)
+    rm = PortfolioOptimisers.market_return_series(rd, "market_cap")
+    @test rm[1] ≈ (1.0 * 0.10 - 0.5 * 0.20 + 2.0 * -0.05) / 2.5
+    # A total weight of zero divides no mean, even where every pair is finite.
+    Wz = [1.0 -1.0 0.0; 1.0 1.0 1.0]
+    @test_throws ArgumentError PortfolioOptimisers.market_return_series(ewb_hand_panel(X,
+                                                                                       Wz),
+                                                                        "market_cap")
+end

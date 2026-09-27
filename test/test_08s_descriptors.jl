@@ -649,3 +649,33 @@ Base.convert(::Type{NaNProbe726}, x::Float64) = throw(DomainError(x, "NaNProbe72
 
     @test_throws DomainError PortfolioOptimisers.nan_fill_value(fill(NaNProbe726(1.0), 1))
 end
+
+@testset "A combination of Panel Fields does not depend on the order of its terms (#726)" begin
+    # The first term used to fix the element type, so a Float32 first term truncated a
+    # Float64 second term. The sum now takes the type that every term promotes to.
+    pnl = asset_panel([NumericPanelInput(; name = "f32", vals = Float32[1 2; 3 4]),
+                       NumericPanelInput(; name = "f64", vals = [1e-9 0.0; 0.0 2.5])];
+                      amsk = trues(2, 2), emsk = trues(2, 2))
+    rd = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = pnl)
+    V1 = PortfolioOptimisers.panel_field_values(rd, ["f32" => 1, "f64" => 1])
+    V2 = PortfolioOptimisers.panel_field_values(rd, ["f64" => 1, "f32" => 1])
+    @test eltype(V1) === Float64 && eltype(V2) === Float64
+    @test V1 == V2
+    @test V1[1, 1] == 1.0 + 1e-9
+    # One Float32 term with an integer coefficient stays Float32.
+    V3 = PortfolioOptimisers.panel_field_values(rd, ["f32" => 2])
+    @test eltype(V3) === Float32
+    @test V3 == Float32[2 4; 6 8]
+end
+
+@testset "The log-return check names the first return at or below -1 (#726)" begin
+    @test isnothing(PortfolioOptimisers.assert_log_returns([0.1 NaN; -0.5 Inf]))
+    err = try
+        PortfolioOptimisers.assert_log_returns([0.1 0.2; -1.0 -2.0])
+    catch e
+        e
+    end
+    @test err isa DomainError
+    @test err.val == -1.0
+    @test occursin("observation 2 for asset 1", err.msg)
+end
