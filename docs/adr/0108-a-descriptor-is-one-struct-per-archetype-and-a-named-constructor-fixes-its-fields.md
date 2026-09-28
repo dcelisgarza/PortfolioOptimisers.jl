@@ -163,3 +163,15 @@ possible: a concrete type has no subtypes. A `BookToPrice` wrapper that forwards
     one that does not, so a typo in a guard cannot pass in silence.
 - Every Descriptor pays one read of its observed-mask column per field. A field that cannot
     blank carries no such column and pays nothing.
+
+## Amendment (2026-09-28)
+
+`EWMacroSensitivity` gains the field `series` after `mcap`
+([#1365](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1365)). It names the column
+of the Exogenous Series that holds the reference return, so the descriptor reads its series from
+the returns data inside `CrossSectionalFactorPrior` and inside a cross-validation fold, where no
+keyword reaches `descriptor`. The default `series = nothing` keeps the keyword `ref` of a direct
+call, and a call that gives both is refused. ADR 0184 states the Exogenous Series. The field list
+of the table above is now `mcap`, `series`, `decay`, `min_obs`, `agg_obs`, `min_val`. The
+decision of this ADR does not change: `EWMacroSensitivity` stays one struct with no named
+constructor.

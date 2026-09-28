@@ -980,7 +980,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Exponentially weighted sensitivity of the returns to a reference series, after the market is removed.
 
-The exposure of an asset to an exchange rate, a rate of interest, inflation or a basket of commodities is the part of its move that the market does not explain. The partial beta is the coefficient of the reference series in the regression of the returns on the market and the reference series together, so it contains no exposure that the market explains. The reference series is not a Panel Field, so the Asset Panel does not carry it. [`descriptor`](@ref) takes it as the keyword `ref`, because a Result carries no input of this kind.
+The exposure of an asset to an exchange rate, a rate of interest, inflation or a basket of commodities is the part of its move that the market does not explain. The partial beta is the coefficient of the reference series in the regression of the returns on the market and the reference series together, so it contains no exposure that the market explains. The reference series belongs to no asset, so it is not a Panel Field. The field `series` names its column in the Exogenous Series `rd.E` of the returns data, and [`descriptor`](@ref) reads that column. A [`CrossSectionalFactorPrior`](@ref) and a cross-validation fold pass the returns data alone, so inside them the field is the only path. A direct call can pass the series as the keyword `ref` instead.
 
 # Mathematical definition
 
@@ -1005,7 +1005,7 @@ Where:
   - $(math_dict[:r_mt_ewb])
   - $(math_dict[:min_val_ewb])
 
-Each moment follows the recursion that [`EWBeta`](@ref) states, with the decay `decay`, and every moment holds its value at an observation whose reference return is not finite.
+Each moment follows the recursion that [`EWBeta`](@ref) states, with the decay `decay`, and every moment holds its value at an observation whose reference return is not finite. A series that `series` names is refused where it is not finite after the warm-up, as [`ew_macro_reference`](@ref) states.
 
 # Fields
 
@@ -1013,15 +1013,17 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    EWMacroSensitivity(; mcap::AbstractString = "market_cap", half_life::Real = 60.0,
+    EWMacroSensitivity(; mcap::AbstractString = "market_cap",
+                       series::Option{<:AbstractString} = nothing, half_life::Real = 60.0,
                        decay::Real = half_life_decay(half_life),
                        min_obs::Integer = half_life_min_obs(half_life),
                        agg_obs::Integer = 1, min_val::Real = 1e-12) -> EWMacroSensitivity
 
-Keywords correspond to the struct's fields, except `half_life`, which is not a field. It sets the defaults of `decay` and `min_obs`, and a value passed for either of those is used as it is. With daily observations, the default half-life of `60` is about one quarter of a year.
+Keywords correspond to the struct's fields, except `half_life`, which is not a field. It sets the defaults of `decay` and `min_obs`, and a value passed for either of those is used as it is. With daily observations, the default half-life of `60` is about one quarter of a year. The default `series = nothing` names no column, so a call to [`descriptor`](@ref) must then pass the keyword `ref`.
 
 ## Validation
 
+  - If `series` is not `nothing`, `!isempty(series)`.
   - $(val_dict[:decay])
   - $(val_dict[:min_obs])
   - `agg_obs >= 1`.
@@ -1030,9 +1032,10 @@ Keywords correspond to the struct's fields, except `half_life`, which is not a f
 # Examples
 
 ```jldoctest
-julia> EWMacroSensitivity(; half_life = 2)
+julia> EWMacroSensitivity(; series = \"EURUSD\", half_life = 2)
 EWMacroSensitivity
      mcap ┼ String: "market_cap"
+   series ┼ String: "EURUSD"
     decay ┼ Float64: 0.7071067811865476
   min_obs ┼ Int64: 2
   agg_obs ┼ Int64: 1
@@ -1045,6 +1048,7 @@ EWMacroSensitivity
   - [`descriptor`](@ref)
   - [`EWBeta`](@ref)
   - [`ew_macro_sensitivity_series`](@ref)
+  - [`ew_macro_reference`](@ref)
   - [`market_return_series`](@ref)
 """
 @concrete struct EWMacroSensitivity <: AbstractDescriptorEstimator
@@ -1052,6 +1056,10 @@ EWMacroSensitivity
     $(field_dict[:mcap])
     """
     mcap
+    """
+    Name of the column of the Exogenous Series `rd.E` that holds the reference return, or `nothing` when a call to [`descriptor`](@ref) passes the series as the keyword `ref`.
+    """
+    series
     """
     $(field_dict[:decay])
     """
@@ -1068,22 +1076,106 @@ EWMacroSensitivity
     $(field_dict[:min_val])
     """
     min_val
-    function EWMacroSensitivity(mcap::AbstractString, decay::Real, min_obs::Integer,
-                                agg_obs::Integer, min_val::Real)
+    function EWMacroSensitivity(mcap::AbstractString, series::Option{<:AbstractString},
+                                decay::Real, min_obs::Integer, agg_obs::Integer,
+                                min_val::Real)
         assert_panel_terms(mcap, :mcap)
+        @argcheck(isnothing(series) || !isempty(series),
+                  IsEmptyError("series names a column of the Exogenous Series, so it cannot be the empty string"))
         assert_ew_decay(decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         assert_ew_agg_obs(agg_obs)
         assert_nonempty_gt0_finite_val(min_val, :min_val)
-        return new{typeof(mcap), typeof(decay), typeof(min_obs), typeof(agg_obs),
-                   typeof(min_val)}(mcap, decay, min_obs, agg_obs, min_val)
+        return new{typeof(mcap), typeof(series), typeof(decay), typeof(min_obs),
+                   typeof(agg_obs), typeof(min_val)}(mcap, series, decay, min_obs, agg_obs,
+                                                     min_val)
     end
 end
-function EWMacroSensitivity(; mcap::AbstractString = "market_cap", half_life::Real = 60.0,
+function EWMacroSensitivity(; mcap::AbstractString = "market_cap",
+                            series::Option{<:AbstractString} = nothing,
+                            half_life::Real = 60.0,
                             decay::Real = half_life_decay(half_life),
                             min_obs::Integer = half_life_min_obs(half_life),
                             agg_obs::Integer = 1, min_val::Real = 1e-12)::EWMacroSensitivity
-    return EWMacroSensitivity(mcap, decay, min_obs, agg_obs, min_val)
+    return EWMacroSensitivity(mcap, series, decay, min_obs, agg_obs, min_val)
+end
+"""
+    ew_macro_reference(series::Nothing, de::EWMacroSensitivity, rd::ReturnsResult,
+                       ref::Option{<:AbstractVector{<:Real}}) -> AbstractVector{<:Real}
+    ew_macro_reference(series::AbstractString, de::EWMacroSensitivity, rd::ReturnsResult,
+                       ref::Option{<:AbstractVector{<:Real}}) -> AbstractVector{<:Real}
+
+Select the reference return of an [`EWMacroSensitivity`](@ref), from the keyword `ref` or from the column of the Exogenous Series that the field `series` names.
+
+The field and the keyword are two sources for one series, so a call that gives both is refused. The ingestion pads the Exogenous Series with `NaN` where the series is silent, for example before the first value of a series that starts late. The recursion of [`ew_macro_sensitivity_series`](@ref) skips an observation whose reference return is not finite, and in the warm-up that is correct. After the warm-up, a skipped observation freezes the partial beta of every asset, so this function refuses a named series that is not finite there. The keyword `ref` keeps the rule of the recursion at every observation.
+
+# Algorithm
+
+ 1. With `series = nothing`, refuse a `ref` that is `nothing` or whose length is not the number of observations, and return `ref`.
+ 2. Otherwise, refuse a `ref` that is not `nothing`, an `rd.E` that is `nothing`, and a `series` that `rd.ne` does not hold. Take the column `rf` of `rd.E` that `series` names.
+ 3. Walk the complete windows of `agg_obs` observations. Count in `c` each window that holds a finite value, until `c` reaches `min_obs`. This is the warm-up of the recursion.
+ 4. In each later window, refuse the first value of `rf` that is not finite. Return `rf`.
+
+# Arguments
+
+  - `series`: The field `series` of `de`.
+  - `de`: Descriptor Estimator.
+  - $(arg_dict[:rd])
+  - `ref`: The keyword `ref` of [`descriptor`](@ref).
+
+# Validation
+
+  - With `series = nothing`, `ref` is not `nothing`. Raises an [`IsNothingError`](@ref).
+  - With `series = nothing`, `length(ref) == size(rd.X, 1)`. Raises a `DimensionMismatch`.
+  - With a `series`, `ref` is `nothing`. Raises an `ArgumentError`.
+  - With a `series`, `rd.E` is not `nothing`. Raises an [`IsNothingError`](@ref).
+  - With a `series`, `rd.ne` holds `series`. Raises an `ArgumentError` that names the series.
+  - With a `series`, every value of `rf` after the warm-up is finite. Raises an [`IsNonFiniteError`](@ref) that names the series and the observation.
+
+# Returns
+
+  - `rf::AbstractVector{<:Real}`: The reference return, one entry per observation.
+
+# Related
+
+  - [`EWMacroSensitivity`](@ref)
+  - [`descriptor`](@ref)
+  - [`ew_macro_sensitivity_series`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
+function ew_macro_reference(::Nothing, ::EWMacroSensitivity, rd::ReturnsResult,
+                            ref::Option{<:AbstractVector{<:Real}})::AbstractVector{<:Real}
+    @argcheck(!isnothing(ref),
+              IsNothingError("a macro sensitivity is measured against a reference return series, and the estimator names no column of the Exogenous Series in `series`, and the call passes no keyword `ref`. Set `series` to the name of a column of rd.E, or pass the series as `ref`, one entry per observation."))
+    @argcheck(length(ref) == size(rd.X, 1),
+              DimensionMismatch("the reference return series carries one entry per observation, got length(ref) = $(length(ref)) and size(rd.X, 1) = $(size(rd.X, 1))"))
+    return ref
+end
+function ew_macro_reference(series::AbstractString, de::EWMacroSensitivity,
+                            rd::ReturnsResult,
+                            ref::Option{<:AbstractVector{<:Real}})::AbstractVector{<:Real}
+    @argcheck(isnothing(ref),
+              ArgumentError("the estimator reads its reference return from the column \"$series\" of the Exogenous Series, and the call also passes the keyword `ref`. Give the series in one place: set `series = nothing` to pass `ref`, or do not pass `ref`."))
+    @argcheck(!isnothing(rd.E),
+              IsNothingError("the estimator reads its reference return from the column \"$series\" of the Exogenous Series of the returns data, and rd.E is nothing. Give the PricesResult or the ReturnsResult an E with a column named \"$series\"."))
+    j = findfirst(==(series), rd.ne)
+    @argcheck(!isnothing(j),
+              ArgumentError("the estimator reads its reference return from the column \"$series\" of the Exogenous Series, and rd.ne has no column of that name. Got rd.ne => $(rd.ne)"))
+    rf = view(rd.E, :, j)
+    a = de.agg_obs
+    c = 0
+    for k in 1:div(length(rf), a)
+        w = ((k - 1) * a + 1):(k * a)
+        if c < de.min_obs
+            c += any(isfinite, view(rf, w))
+            continue
+        end
+        t = findfirst(!isfinite, view(rf, w))
+        if !isnothing(t)
+            throw(IsNonFiniteError("the reference return \"$series\" must be finite on every observation the estimator reads after its warm-up, and it is not at observation $(w[t]) of the returns data. A gap in the warm-up is accepted, because the recursion skips it before it writes a sensitivity."))
+        end
+    end
+    return rf
 end
 """
     descriptor(de::EWMacroSensitivity, rd::ReturnsResult;
@@ -1091,26 +1183,28 @@ end
 
 Compute an exponentially weighted macro sensitivity Descriptor from a [`ReturnsResult`](@ref) and a reference series.
 
+The reference series is the column of the Exogenous Series `rd.E` that the field `series` of `de` names. A direct call can pass the series as the keyword `ref` instead, when `series` is `nothing`.
+
 # Algorithm
 
- 1. Mask the returns into `X` through [`ew_active_returns`](@ref).
- 2. Build the market return `rm` through [`market_return_series`](@ref).
- 3. Where `agg_obs` is greater than one, aggregate `X`, `rm` and `ref` into `Xa`, `rma` and `rfa` through [`ew_agg_series`](@ref) and [`ew_agg_vector`](@ref).
- 4. Run the recursion through [`ew_macro_sensitivity_series`](@ref), for the partial betas `Ba` of every window.
- 5. Spread `Ba` over the observations into the Descriptor `D` through [`ew_beta_expand`](@ref).
- 6. Write `NaN` into the inactive cells of `D` through [`descriptor_active_fill!`](@ref).
+ 1. Select the reference return `rf` through [`ew_macro_reference`](@ref).
+ 2. Mask the returns into `X` through [`ew_active_returns`](@ref).
+ 3. Build the market return `rm` through [`market_return_series`](@ref).
+ 4. Where `agg_obs` is greater than one, aggregate `X`, `rm` and `rf` into `Xa`, `rma` and `rfa` through [`ew_agg_series`](@ref) and [`ew_agg_vector`](@ref).
+ 5. Run the recursion through [`ew_macro_sensitivity_series`](@ref), for the partial betas `Ba` of every window.
+ 6. Spread `Ba` over the observations into the Descriptor `D` through [`ew_beta_expand`](@ref).
+ 7. Write `NaN` into the inactive cells of `D` through [`descriptor_active_fill!`](@ref).
 
 # Arguments
 
   - `de`: Descriptor Estimator.
-  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
-  - `ref`: The reference return, one entry per observation. It is required.
+  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`, and the Exogenous Series in `rd.ne` and `rd.E` when `de.series` names a column.
+  - `ref`: The reference return, one entry per observation. It is required when `de.series` is `nothing`, and refused otherwise.
 
 # Validation
 
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
-  - `ref` is not `nothing`. Raises an [`IsNothingError`](@ref).
-  - `length(ref) == size(rd.X, 1)`. Raises a `DimensionMismatch`.
+  - The rules of [`ew_macro_reference`](@ref).
   - The rules of [`market_return_series`](@ref).
 
 # Returns
@@ -1124,18 +1218,23 @@ julia> pnl = asset_panel([NumericPanelInput(; name = \"market_cap\",
                                             vals = [1.0 2.0; 3.0 4.0; 5.0 6.0])];
                          amsk = trues(3, 2), emsk = trues(3, 2));
 
-julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], pnl = pnl);
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; -0.1 0.0; 0.05 0.05], ne = [\"EURUSD\"],
+                          E = reshape([0.02, -0.01, 0.03], :, 1), pnl = pnl);
 
-julia> descriptor(EWMacroSensitivity(; half_life = 1), rd; ref = [0.02, -0.01, 0.03])
+julia> D = descriptor(EWMacroSensitivity(; series = \"EURUSD\", half_life = 1), rd)
 3×2 Matrix{Float64}:
   0.070978    0.141956
  15.2941    -10.5882
   1.96733    -1.21431
+
+julia> D == descriptor(EWMacroSensitivity(; half_life = 1), rd; ref = [0.02, -0.01, 0.03])
+true
 ```
 
 # Related
 
   - [`EWMacroSensitivity`](@ref)
+  - [`ew_macro_reference`](@ref)
   - [`ew_macro_sensitivity_series`](@ref)
   - [`market_return_series`](@ref)
   - [`descriptor_active_fill!`](@ref)
@@ -1143,16 +1242,13 @@ julia> descriptor(EWMacroSensitivity(; half_life = 1), rd; ref = [0.02, -0.01, 0
 function descriptor(de::EWMacroSensitivity, rd::ReturnsResult;
                     ref::Option{<:AbstractVector{<:Real}} = nothing)::Matrix{<:Real}
     pnl = descriptor_asset_panel(rd)
-    @argcheck(!isnothing(ref),
-              IsNothingError("a macro sensitivity is measured against a reference return series that the Asset Panel does not carry, so `descriptor` takes it as the keyword `ref`, and it is nothing. Pass the series, one entry per observation."))
+    rf = ew_macro_reference(de.series, de, rd, ref)
     X = ew_active_returns(rd.X, pnl)
-    @argcheck(length(ref) == size(X, 1),
-              DimensionMismatch("the reference return series carries one entry per observation, got length(ref) = $(length(ref)) and size(rd.X, 1) = $(size(X, 1))"))
     rm = market_return_series(rd, de.mcap)
     agg_obs = de.agg_obs
     Xa = isone(agg_obs) ? X : ew_agg_series(X, agg_obs)
     rma = isone(agg_obs) ? rm : ew_agg_vector(rm, agg_obs)
-    rfa = isone(agg_obs) ? ref : ew_agg_vector(ref, agg_obs)
+    rfa = isone(agg_obs) ? rf : ew_agg_vector(rf, agg_obs)
     Ba = ew_macro_sensitivity_series(Xa, rma, rfa, de.decay, de.min_obs, de.min_val)
     D = ew_beta_expand(Ba, size(X, 1), agg_obs)
     descriptor_active_fill!(D, pnl)

@@ -128,6 +128,11 @@ currency can hold it. With log returns the split has no cross term.
   Result answers on, so a cross-sectional prior runs inside `NestedClustered` (#1369).
 - `CrossSectionalFactorPrior` has no online path now. A future online path must buffer `E` as
   it buffers `F`.
-- `EWMacroSensitivity` can name a column of the Exogenous Series in place of its keyword `ref`,
-  so that it works inside the prior, and an `ObservedExposure` can pair it with the observed
-  series. #1365 tracks that work.
+- `EWMacroSensitivity` gains the field `series`, which names a column of the Exogenous Series,
+  so that it works inside the prior and inside a fold, and an `ObservedExposure` can pair it with
+  the observed series (#1365). The keyword `ref` stays for a direct call, because its removal
+  breaks released code. A call that gives both is refused, because no rule can say which of the
+  two the caller meant. The descriptor refuses a named series where it is not finite after the
+  warm-up of its recursion, as point 3 states. The keyword names no series, so it keeps its
+  released rule: the state of the recursion holds its value at a reference return that is not
+  finite.

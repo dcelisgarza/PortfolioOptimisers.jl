@@ -122,7 +122,8 @@ ObservedExposure
                               family::AbstractString)
         @argcheck(!isa(xe, Union{<:AbstractObservedExposureEstimator, <:DerivedExposure}),
                   ArgumentError("an ObservedExposure wraps an estimated Exposure Estimator that reads the Asset Panel, and got a $(nameof(typeof(xe))). An observed member is observed already, and a DerivedExposure reads the exposure of another factor of the list."))
-        assert_panel_terms(series, :series)
+        @argcheck(!isempty(series),
+                  IsEmptyError("series names a column of the Exogenous Series, so it cannot be the empty string"))
         assert_exposure_family(family)
         return new{typeof(xe), typeof(series), typeof(family)}(xe, series, family)
     end

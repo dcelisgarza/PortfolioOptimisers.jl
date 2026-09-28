@@ -345,10 +345,10 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
 
 # Algorithm
 
- 1. Orient `X`, `F` and `E` by `dims`, rebuild the returns data that the Descriptors read, from `X`, `F`, `ne`, `E`, `pnl`, `iv` and `ivpa`, and take the two universe masks off `pnl` with [`cross_sectional_panel_masks`](@ref). Split the factor list into estimated and observed members with [`cross_sectional_factor_partition`](@ref). Read the observed factors with [`cross_sectional_observed`](@ref), and the returns the regression reads, `Xl`, with [`cross_sectional_local_returns`](@ref). The warm-up reads `X`, or the named net returns under `lx`, so a gap in an observed series does not move it.
- 2. Build the benchmark weights `BW` with [`cross_sectional_cap_weights`](@ref), over the assets of the estimation universe whose return and market capitalisation are finite, and write them onto a copy of the Asset Panel with [`cross_sectional_benchmark_returns`](@ref). A benchmark power of zero reads no market capitalisation.
- 3. Build every Factor Exposure with [`cross_sectional_exposure_history`](@ref), in dependency order, giving `Ms`, `nf` and `fam`.
- 4. Drop the leading observations the Descriptors warm up over, with [`cross_sectional_warmup`](@ref), giving the rows `rw`.
+ 1. Orient `X`, `F` and `E` by `dims`, rebuild the returns data that the Descriptors read, from `X`, `F`, `ne`, `E`, `pnl`, `iv` and `ivpa`, and take the two universe masks off `pnl` with [`cross_sectional_panel_masks`](@ref). Split the factor list into estimated and observed members with [`cross_sectional_factor_partition`](@ref).
+ 2. Build the benchmark weights `BW` with [`cross_sectional_cap_weights`](@ref), over the assets of the estimation universe whose return and market capitalisation are finite, and write them onto a copy of the Asset Panel with [`cross_sectional_benchmark_returns`](@ref). The universe and the warm-up read `X`, or the named net returns under `lx`, so a gap in an observed series does not move them. A benchmark power of zero reads no market capitalisation.
+ 3. Read the observed factors from the copy with [`cross_sectional_observed`](@ref), so an observed member that wraps a [`CompositeExposure`](@ref) reads the benchmark weights. Take the returns the regression reads, `Xl`, with [`cross_sectional_local_returns`](@ref). Build every Factor Exposure with [`cross_sectional_exposure_history`](@ref), in dependency order, giving `Ms`, `nf` and `fam`.
+ 4. Drop the leading observations the Descriptors warm up over, with [`cross_sectional_warmup`](@ref) on the estimated and the observed exposures together, giving the rows `rw`.
  5. Neutralise the exposures with [`cross_sectional_neutralise!`](@ref), under the benchmark weights and the prior's own regression estimator.
  6. Build the Factor Family Basis `fb` with [`cross_sectional_family_basis`](@ref), and reduce the exposures through it.
  7. Lag the reduced exposures and the market capitalisation by `pe.lag`, giving `Zl` and `mcl`. Trim the observed factors to the fitted observations with [`cross_sectional_observed_block`](@ref), which refuses a non-finite observed return among them. Take the eligibility mask `msk` of the fit with [`cross_sectional_eligible`](@ref) on `Xl`, and drop from it every pair whose lagged market capitalisation is not finite.
@@ -428,12 +428,12 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
                        E = E, iv = iv, ivpa = ivpa, pnl = pnl)
     amsk, emsk = cross_sectional_panel_masks(pnl)
     (; est, obs) = cross_sectional_factor_partition(pe.factors)
-    cc = cross_sectional_observed(obs, rd)
-    Xl = cross_sectional_local_returns(pe.lx, cc, X, rd, pe.lag)
     # The warm-up and the benchmark universe read the returns the caller stated: `X`, or the
     # named net returns. The derived net returns hold the observed returns, so a gap in an
-    # observed series over the warm-up would otherwise move it.
-    Xu = isnothing(pe.lx) ? X : Xl
+    # observed series over the warm-up would otherwise move it. Neither reads the observed
+    # factors, so the benchmark weights are written before any member reads the panel: an
+    # observed member that wraps a composite reads them too.
+    Xu = isnothing(pe.lx) ? X : panel_field_values(rd, pe.lx)
     mcap = if cross_sectional_needs_market_cap(pe.bp, pe.wa)
         panel_field_values(rd, pe.mcap)
     else
@@ -442,11 +442,14 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     bmsk = isfinite.(Xu) .& emsk
     cross_sectional_cap_finite!(bmsk, mcap)
     BW = cross_sectional_cap_weights(pe.bp, mcap, bmsk)
-    (; Ms, nf, fam) = cross_sectional_exposure_history(est,
-                                                       cross_sectional_benchmark_returns(rd,
-                                                                                         pe.bw,
-                                                                                         BW))
-    rw = (cross_sectional_warmup(Xu, Ms, emsk) + 1):size(X, 1)
+    rdb = cross_sectional_benchmark_returns(rd, pe.bw, BW)
+    cc = cross_sectional_observed(obs, rdb)
+    Xl = cross_sectional_local_returns(pe.lx, cc, X, rdb, pe.lag)
+    (; Ms, nf, fam) = cross_sectional_exposure_history(est, rdb)
+    # An observed member warms up too: one that wraps a Descriptor gives no exposure over the
+    # warm-up of the Descriptor, and its derived net return is then not finite.
+    Mo = isnothing(cc) ? Ms : cat(Ms, cc.Z; dims = 3)
+    rw = (cross_sectional_warmup(Xu, Mo, emsk) + 1):size(X, 1)
     Msw = Ms[rw, :, :]
     Xw = X[rw, :]
     Xlw = Xl[rw, :]

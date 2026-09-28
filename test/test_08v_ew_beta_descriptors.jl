@@ -521,6 +521,145 @@ end
     end
 end
 
+# Returns driven by the market and by one macro series, with the macro series in the Exogenous
+# Series of the returns data under the name "FX" (#1365, ADR 0184).
+function ewb_macro_fixture(; T::Integer = 120, N::Integer = 10, fx = nothing)
+    rng = StableRNGs.StableRNG(1365)
+    m = 0.01 .* randn(rng, T)
+    f = isnothing(fx) ? 0.005 .* randn(rng, T) : fx
+    bm = collect(range(0.6, 1.4; length = N))
+    bf = collect(range(-1.0, 1.0; length = N))
+    X = m .* transpose(bm) .+ ifelse.(isfinite.(f), f, 0.0) .* transpose(bf) .+
+        0.002 .* randn(rng, T, N)
+    W = 1.0 .+ rand(rng, T, N)
+    pnl = asset_panel([NumericPanelInput(; name = "market_cap", vals = W)];
+                      amsk = trues(T, N), emsk = trues(T, N))
+    return ReturnsResult(; nx = ["A" * string(i) for i in 1:N], X = X, ne = ["SPX", "FX"],
+                         E = hcat(m, f), pnl = pnl)
+end
+
+@testset "EW beta descriptors: EWMacroSensitivity reads the Exogenous Series (#1365)" begin
+    PO = PortfolioOptimisers
+    rd = ewb_macro_fixture()
+    ref = rd.E[:, 2]
+    @testset "The named column gives the partial beta of the keyword" begin
+        for agg_obs in (1, 3)
+            de = EWMacroSensitivity(; series = "FX", half_life = 5, agg_obs = agg_obs)
+            dr = EWMacroSensitivity(; half_life = 5, agg_obs = agg_obs)
+            @test isequal(descriptor(de, rd), descriptor(dr, rd; ref = ref))
+        end
+        # The column is found by its name, not by its place.
+        rds = ReturnsResult(; nx = rd.nx, X = rd.X, ne = ["FX", "SPX"], E = rd.E[:, [2, 1]],
+                            pnl = rd.pnl)
+        @test isequal(descriptor(EWMacroSensitivity(; series = "FX", half_life = 5), rds),
+                      descriptor(EWMacroSensitivity(; series = "FX", half_life = 5), rd))
+    end
+    @testset "A gap in the warm-up is accepted, and the recursion skips it" begin
+        # The warm-up of a half-life of 5 is more than four observations, and three of its
+        # values are missing.
+        de = EWMacroSensitivity(; series = "FX", half_life = 5)
+        f = copy(ref)
+        f[[1, 2, 4]] .= NaN
+        rdg = ewb_macro_fixture(; fx = f)
+        @test isequal(descriptor(de, rdg),
+                      descriptor(EWMacroSensitivity(; half_life = 5), rdg; ref = f))
+        # With agg_obs = 3, a window of the warm-up averages its finite values.
+        da = EWMacroSensitivity(; series = "FX", half_life = 5, agg_obs = 3)
+        @test isequal(descriptor(da, rdg),
+                      descriptor(EWMacroSensitivity(; half_life = 5, agg_obs = 3), rdg;
+                                 ref = f))
+        # With agg_obs = 7, the 17 complete windows end at observation 119, so the recursion
+        # does not read observation 120, and a gap there is accepted.
+        f = copy(ref)
+        f[120] = NaN
+        rdt = ewb_macro_fixture(; fx = f)
+        dt = EWMacroSensitivity(; series = "FX", half_life = 5, agg_obs = 7)
+        @test isequal(descriptor(dt, rdt),
+                      descriptor(EWMacroSensitivity(; half_life = 5, agg_obs = 7), rdt;
+                                 ref = f))
+    end
+    @testset "The refusals" begin
+        de = EWMacroSensitivity(; series = "FX", half_life = 5)
+        # Both sources of the series.
+        @test_throws ArgumentError descriptor(de, rd; ref = ref)
+        # Neither source.
+        @test_throws PO.IsNothingError descriptor(EWMacroSensitivity(; half_life = 5), rd)
+        # No Exogenous Series.
+        rd0 = ReturnsResult(; nx = rd.nx, X = rd.X, pnl = rd.pnl)
+        @test_throws PO.IsNothingError descriptor(de, rd0)
+        # A name the Exogenous Series does not hold is named in the message.
+        err = try
+            descriptor(EWMacroSensitivity(; series = "JPY", half_life = 5), rd)
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("\"JPY\"", err.msg)
+        # A value that is not finite after the warm-up, at observation 50.
+        f = copy(ref)
+        f[50] = NaN
+        rdn = ewb_macro_fixture(; fx = f)
+        err = try
+            descriptor(de, rdn)
+        catch e
+            e
+        end
+        @test err isa PO.IsNonFiniteError
+        @test occursin("\"FX\"", err.msg)
+        @test occursin("observation 50", err.msg)
+        @test_throws PO.IsNonFiniteError descriptor(EWMacroSensitivity(; series = "FX",
+                                                                       half_life = 5,
+                                                                       agg_obs = 3), rdn)
+        # The keyword keeps the rule of the recursion: the state holds its value there.
+        D = descriptor(EWMacroSensitivity(; half_life = 5), rdn; ref = f)
+        @test isequal(D[50, :], D[49, :])
+        # An empty name is refused by the constructor.
+        err = try
+            EWMacroSensitivity(; series = "")
+        catch e
+            e
+        end
+        @test err isa PO.IsEmptyError
+        @test occursin("Exogenous Series", err.msg)
+    end
+    @testset "An observation view reads the rows of E that it keeps" begin
+        de = EWMacroSensitivity(; series = "FX", half_life = 5)
+        rows, cols = 21:100, [1, 3, 4, 8]
+        rdv = PO.port_opt_view(rd, rows, cols)
+        @test isequal(descriptor(de, rdv),
+                      descriptor(EWMacroSensitivity(; half_life = 5), rdv; ref = ref[rows]))
+    end
+    @testset "Inside CrossSectionalFactorPrior" begin
+        de = EWMacroSensitivity(; series = "FX", half_life = 5)
+        xe = CompositeExposure(; descriptors = [de], outlier = nothing, scoring = nothing,
+                               family = "macro")
+        # The exposure is the Descriptor of a direct call with the same series. A direct call
+        # of the member reads the benchmark weights from the panel, where the prior writes them.
+        pnl = rd.pnl
+        rdb = ReturnsResult(; nx = rd.nx, X = rd.X, ne = rd.ne, E = rd.E,
+                            pnl = AssetPanel(;
+                                             pf = [pnl.pf...,
+                                                   NumericPanelField(;
+                                                                     name = "benchmark_weights",
+                                                                     vals = ones(size(rd.X)))],
+                                             amsk = pnl.amsk, emsk = pnl.emsk))
+        L = factor_exposure(xe, rdb)
+        @test isequal(L, descriptor(EWMacroSensitivity(; half_life = 5), rd; ref = ref))
+        for f in (xe, ObservedExposure(; xe = xe, series = "FX"))
+            pe = CrossSectionalFactorPrior(;
+                                           factors = ["market" => ConstantExposure(),
+                                                      "fx" => f], minra = 3, bp = 0,
+                                           wa = MarketCapWeights(; p = 0))
+            pr = prior(pe, rd)
+            k = findfirst(==("fx"), pr.rr.nf)
+            @test !isnothing(k)
+            @test all(isfinite, pr.mu)
+            @test all(isfinite, pr.sigma)
+            @test pr.rr.M[:, k] ≈ L[end, :]
+        end
+    end
+end
+
 @testset "EW beta descriptors: EWDownsideBeta" begin
     X = [0.10 0.20 -0.05
          -0.10 -0.02 0.03

@@ -5,7 +5,7 @@
 [provenance]
 julia = "1.13.1"
 rules = 2
-commit = "ebcacfda95"
+commit = "a0c500c7d0"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
@@ -137,6 +137,7 @@ commit = "ebcacfda95"
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/11_OneHotExposure.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/12_ConstantExposure.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/13_ExposureNeutralisation.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/14_ObservedExposure.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/05_FactorFamilyBasis.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/06_FactorFamilyBasisTransforms.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/01_Base_ReturnForecast.jl" = { slice_copy = 0, reduce_temporary = 0, unfused_broadcast = 0, search_temporary = 0, linalg_temporary = 0, repeated_call = 0, loop_allocation = 0, raw = 0 }

@@ -18,6 +18,7 @@ ew_beta_shrink
 ew_masked_mean
 ew_masked_weighted_mean
 ew_macro_sensitivity_series
+ew_macro_reference
 ew_downside_beta_series
 assert_ew_agg_obs
 assert_ew_shrinkage_bounds

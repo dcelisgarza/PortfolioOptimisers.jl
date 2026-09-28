@@ -217,6 +217,14 @@ end
                                                                                      "market")],
                                                              lx = "local")
         @test_throws ArgumentError ObservedExposure(; xe = CurrencyExposure(), series = "x")
+        # An empty name is refused with a message about the Exogenous Series (#1365).
+        err = try
+            ObservedExposure(; xe = ConstantExposure(), series = "")
+        catch e
+            e
+        end
+        @test err isa PO.IsEmptyError
+        @test occursin("Exogenous Series", err.msg)
         @test_throws ArgumentError ObservedExposure(;
                                                     xe = DerivedExposure(; source = "beta",
                                                                          f = abs,
