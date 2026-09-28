@@ -24,7 +24,7 @@ function PortfolioOptimisers.plot_portfolio_dashboard(res::OptimisationResult, r
     p1 = PortfolioOptimisers.plot_composition(w, nx; N = N)
     p2 = PortfolioOptimisers.plot_portfolio_cumulative_returns(w, rd.X, fees; ts = ts,
                                                                compound = compound)
-    # The carrier is handed whole where it is a prior, so a measure with an unstated slot,
+    # `rd` is handed whole where it is a prior, so a measure with an unstated slot,
     # the default `Variance()` among them, resolves it there; a returns result carries no
     # moment to resolve against and is unwrapped to its matrix.
     p3 = PortfolioOptimisers.plot_risk_contribution(r, w,

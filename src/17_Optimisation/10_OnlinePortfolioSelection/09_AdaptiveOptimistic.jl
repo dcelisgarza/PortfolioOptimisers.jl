@@ -998,7 +998,7 @@ function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::Abstrac
     res = [st.res[1] + r, st.res[1]]
     s = statistic_after_step(md.eta, st.s, w, x)
     # The played iterate is formed at the rate of the next period, which the schedule
-    # answers from the carrier after the row: the paper's `f_{t+1}` at `η_{t+1}`.
+    # answers from the state `nst` after the row: the paper's `f_{t+1}` at `η_{t+1}`.
     nst = OptimisticStepState(t, v, v, st.w0, s, res, m, ps)
     u = half_step(md, set, v, learning_rate(md.eta, t + 1, nst) .* m, wh)
     played = played_allocation(u, alpha)

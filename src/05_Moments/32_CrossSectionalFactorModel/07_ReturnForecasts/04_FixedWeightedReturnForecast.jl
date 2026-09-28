@@ -306,7 +306,7 @@ Compute the Return Forecast of a fixed signed combination of Descriptor scores.
 
 # Algorithm
 
- 1. Compute the Descriptor scores over the whole carrier through [`descriptor_scores`](@ref), and cut them to the block's rows.
+ 1. Compute the Descriptor scores over all the returns data through [`descriptor_scores`](@ref), and cut them to the block's rows.
  2. Normalise the signed weights by their absolute sum.
  3. Accumulate the finite-aware signed weighted sum and the surviving absolute weight of every cell over the Descriptor axis.
  4. Divide, and write `NaN` where the surviving absolute weight is zero or below `min_coverage`.

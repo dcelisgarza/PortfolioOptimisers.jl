@@ -17,7 +17,7 @@ pipe_reads(o::Online) = pipe_reads(o.est)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses an [`Online`](@ref) step that reaches a fit with no folds, by name.
+Refuses an [`Online`](@ref) step that reaches a fit with no folds, with an error that names it.
 
 The warm-up of the online arm resolves a wrapper, and `fit(pipe, data)` runs no warm-up. A wrapper that reaches it has no buffer to seed and no step to fold. A fit of the wrapped estimator as a plain one would return a batch answer under an online declaration, so the method refuses the step instead.
 
@@ -37,11 +37,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Holds every block of observations that `Online(pipe)` folds, concatenated, so the read-out is a batch fit over them.
+Holds every block of observations that `Online(pipe)` folds, concatenated, so `fit(pipe)` with no data is a batch fit over them.
 
-This state is the declared refit of a [`Pipeline`](@ref), and no step folds under it. The buffer holds the input of the pipeline as the caller gave it, at the price level or at the returns level, and `fit(pipe)` runs `fit(pipe, data)` over the buffer. So the read-out is exact for every configuration, at the cost of a batch fit. With a cap the buffer keeps the last `max_history` rows, and the run equals the rolling batch walk-forward.
+This state is the declared refit of a [`Pipeline`](@ref), and no step folds under it. The buffer holds the input of the pipeline as the caller gave it, at the price level or at the returns level, and `fit(pipe)` runs `fit(pipe, data)` over the buffer. So `fit(pipe)` with no data is exact for every configuration, at the cost of a batch fit. With a cap the buffer keeps the last `max_history` rows, and the run equals the rolling batch walk-forward.
 
-The type of the state in `pipe.cache` selects the route. A [`ReturnsBufferState`](@ref) is the Fold Context of the host route, and a `PipelineBufferState` is the refit route.
+The type of the state in `pipe.cache` selects the route. A [`ReturnsBufferState`](@ref) is the Fold Context of the fold route, and a `PipelineBufferState` is the refit route.
 
 # Fields
 
@@ -64,7 +64,7 @@ $(DocStringExtensions.FIELDS)
 """
 @concrete struct PipelineBufferState <: AbstractPartialFitState
     """
-    The observations folded so far, as one carrier of the pipeline's input level, or `nothing` before the first block.
+    The observations folded so far, as one `PricesResult` or `ReturnsResult` at the pipeline's input level, or `nothing` before the first block.
     """
     data
     """
@@ -90,7 +90,7 @@ The state is immutable, so the method returns a new state and leaves `state` as 
 
 # Algorithm
 
- 1. Concatenate the held carrier and `data` by rows through [`vcat_carrier_rows`](@ref), giving `held`. When the state holds no carrier yet, `held` is `data`.
+ 1. Concatenate the held data and `data` by rows through [`vcat_carrier_rows`](@ref), giving `held`. When the state holds no data yet, `held` is `data`.
  2. Count the rows of `held`, giving `n`.
  3. When `max_history` is set and `n > max_history`, view the last `max_history` rows of `held`.
  4. Return a new state that holds `held` and carries the same cap.
@@ -192,7 +192,7 @@ is_data_step(step) = pipe_writes(step) in PIPELINE_DATA_SLOTS
 
 Answers whether a data step is universe-only.
 
-A universe-only step folds nothing. At the read-out its batch verb runs over the rows of the row owner, and the read-out applies its universe as a view. The asset selectors are universe-only, and every other step answers `false`.
+A universe-only step folds nothing. In `fit(pipe)` with no data its batch verb runs over the rows of the row owner, and the call applies its universe as a view. The asset selectors are universe-only, and every other step answers `false`.
 
 # Related
 
@@ -220,7 +220,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Finds the index of the row owner of a [`Pipeline`](@ref), or answers `0` when the pipeline has none.
 
-A prior step owns the rows when one exists, because [`inject_context`](@ref) replaces the `pe` of the optimiser with it, and the prior of the optimiser is never fitted. Without a prior step, the optimisation step owns the rows. It is then a host itself, and it keeps its own Fold Context. A pipeline with neither has nothing to fold the rows into.
+A prior step owns the rows when one exists, because [`inject_context`](@ref) replaces the `pe` of the optimiser with it, and the prior of the optimiser is never fitted. Without a prior step, the optimisation step owns the rows. It then takes the online step itself, and it keeps its own Fold Context. A pipeline with neither has nothing to fold the rows into.
 
 # Algorithm
 
@@ -269,7 +269,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Names the first [`Online`](@ref) declaration under the steps of a [`Pipeline`](@ref), prefixed with the name of the step, or answers `nothing`.
 
-Two refusals read this walk. Under `Online(pipe)` no member folds, so a wrapper below the root has no fold to seed and its cap would have no effect, and [`assert_online_entry`](@ref) refuses it by name. On the host route the warm-up resolves every wrapper, so the fold refuses a wrapper that it still meets.
+Two refusals read this walk. Under `Online(pipe)` no member folds, so a wrapper below the root has no fold to seed and its cap would have no effect, and [`assert_online_entry`](@ref) refuses it with an error that names it. On the fold route the warm-up resolves every wrapper, so the fold refuses a wrapper that it still meets.
 
 # Related
 
@@ -290,7 +290,7 @@ end
 
 Names the first [`Online`](@ref) declaration that one [`Pipeline`](@ref) step carries, relative to the step.
 
-The answer is `""` when the step is itself a wrapper, and the dotted path of the wrapper when the estimator of the step holds one at any depth ([`online_wrapper_path`](@ref)). Otherwise it is `nothing`. A [`PipelineStep`](@ref) answers for its estimator, and a nested `Pipeline` answers through [`pipeline_online_member`](@ref). The walk goes to every depth because the warm-up does too. [`update_online_estimator`](@ref) resolves a wrapper under the prior of an optimiser, and under the prior of a prior host.
+The answer is `""` when the step is itself a wrapper, and the dotted path of the wrapper when the estimator of the step holds one at any depth ([`online_wrapper_path`](@ref)). Otherwise it is `nothing`. A [`PipelineStep`](@ref) answers for its estimator, and a nested `Pipeline` answers through [`pipeline_online_member`](@ref). The walk goes to every depth because the warm-up does too. [`update_online_estimator`](@ref) resolves a wrapper under the prior of an optimiser, and under the inner prior of a prior that holds one.
 
 # Related
 
@@ -305,7 +305,7 @@ step_online_member(p::Pipeline) = pipeline_online_member(p)
 
 Reads the first `max_history` that an [`Online`](@ref) declaration of one [`Pipeline`](@ref) step carries, or answers `nothing` when no wrapper of the step carries a cap.
 
-The refusal of a capped owner on the host route reads this cap. A cap on the owner is a window counted in the rows of the owner, and a row-local step before the owner folds a state across the front edge of that window. The walk goes to every depth, as [`step_online_member`](@ref) does, so a cap on the prior of a prior host under an optimiser counts.
+The refusal of a capped owner on the fold route reads this cap. A cap on the owner is a window counted in the rows of the owner, and a row-local step before the owner folds a state across the front edge of that window. The walk goes to every depth, as [`step_online_member`](@ref) does, so a cap on the inner prior of a prior under an optimiser counts.
 
 # Algorithm
 
@@ -335,15 +335,15 @@ end
     assert_online_entry(p::Pipeline)
     assert_online_entry(o::Online{<:Pipeline})
 
-Refuses a [`Pipeline`](@ref) that cannot take the online step, by name.
+Refuses a [`Pipeline`](@ref) that cannot take the online step, with an error that names the step.
 
-The fold loop calls it at the entry of its online arm, before any fit. The checks depend on the route. The host route folds the rows through the steps into a row owner, and it has the most checks. The refit route, `Online(pipe)`, folds no member, so it has two.
+The fold loop calls it at the entry of its online arm, before any fit. The checks depend on the route. The fold route folds the rows through the steps into a row owner, and it has the most checks. The refit route, `Online(pipe)`, folds no member, so it has two.
 
-The rolling window through a Pipeline is `Online(pipe; max_history = w)`. A capped owner stays on the host route only when every data step before it is universe-only, because the read-out refits a universe-only step over the capped rows of the owner.
+The rolling window through a Pipeline is `Online(pipe; max_history = w)`. A capped owner stays on the fold route only when every data step before it is universe-only, because `fit(pipe)` with no data refits a universe-only step over the capped rows of the owner.
 
 # Validation
 
-On the host route, in this order:
+On the fold route, in this order:
 
   - The pipeline carries no state, in its own `cache` or under a step ([`online_entry_state`](@ref)), because the loop starts cold.
   - The pipeline has a row owner ([`pipeline_row_owner`](@ref)), a prior step or an optimisation step.
@@ -353,7 +353,7 @@ On the host route, in this order:
 
 On the refit route:
 
-  - The pipeline carries no state, as on the host route.
+  - The pipeline carries no state, as on the fold route.
   - No step carries an [`Online`](@ref) declaration of its own ([`pipeline_online_member`](@ref)), because no member folds under a refit and its cap would have no effect.
 
 Each refusal throws an `ArgumentError` that names the step.
@@ -390,7 +390,7 @@ function assert_online_entry(p::Pipeline)
         @argcheck(supports_partial_fit(est) || is_universe_step(est),
                   ArgumentError("the `$(p.names[i])` step, a `$(typeof(est).name.name)`, has no online form in this configuration: refitting it over one more observation changes what it wrote at earlier ones, so no state folded at one step can be corrected at the next. Give it a `partial_fit_transform` and a data-less `fit_preprocessing` where an exact form exists, or declare a refit with `Online(pipe)`, whose buffer refits every step from the observations seen so far."))
         @argcheck(isnothing(cap) || is_universe_step(est),
-                  ArgumentError("the `$(p.names[i])` step, a `$(typeof(est).name.name)`, folds a state that reaches across the front edge of the window the `$(p.names[k])` step declares with `max_history = $(cap)`: the owner's window is counted in its own rows, and the step's carry — the last price row, the carried price, the missing counts — reads observations the window has dropped, so the run equals no batch scheme. Cap the pipeline's window with `Online(pipe; max_history = $(cap))`, which refits every step over the window and equals the rolling batch walk-forward, or drop the cap, under which the host route equals the expanding one."))
+                  ArgumentError("the `$(p.names[i])` step, a `$(typeof(est).name.name)`, folds a state that reaches across the front edge of the window the `$(p.names[k])` step declares with `max_history = $(cap)`: the owner's window is counted in its own rows, and the step's carry — the last price row, the carried price, the missing counts — reads observations the window has dropped, so the run equals no batch scheme. Cap the pipeline's window with `Online(pipe; max_history = $(cap))`, which refits every step over the window and equals the rolling batch walk-forward, or drop the cap, under which the fold route equals the expanding one."))
     end
     return nothing
 end
@@ -400,17 +400,17 @@ function assert_online_entry(o::Online{<:Pipeline})
               ArgumentError("`Online(pipe)` enters the online arm of the fold loop with the pipeline carrying a partial-fit state at `$(path)`, and the loop starts cold. Hand the loop the pipeline with every `cache` at `nothing`."))
     member = pipeline_online_member(o.est)
     @argcheck(isnothing(member),
-              ArgumentError("`Online(pipe)` declares a refit of the whole pipeline from its input-carrier buffer, under which no member folds, and the `$(member)` step declares an `Online` of its own: it would have no fold to seed, and its `max_history` would be silently ignored. Cap the pipeline's window with `Online(pipe; max_history = …)`, or drop the outer wrapper and let the member's own buffer fold on the host route."))
+              ArgumentError("`Online(pipe)` declares a refit of the whole pipeline from a buffer of its input data, under which no member folds, and the `$(member)` step declares an `Online` of its own: it would have no fold to seed, and its `max_history` would be silently ignored. Cap the pipeline's window with `Online(pipe; max_history = …)`, or drop the outer wrapper and let the member's own buffer take the fold route."))
     return nothing
 end
 """
     assert_online_owner(owner, name::AbstractString)
 
-Refuses a row owner that cannot fold, by name.
+Refuses a row owner that cannot fold, with an error that names the step.
 
 A prior passes. An optimisation step passes when it passes the checks of [`assert_online_entry`](@ref) for an optimiser. A precomputed result never reaches this check. A result is not a step, so it enters a pipeline only as an entry of a schedule, and the check refuses the schedule first.
 
-The check refuses an [`OnlinePortfolioSelection`](@ref) head because of its read-out, not because of its fold. The read-out of the head is its own recursion, so it rebuilds no carrier ([`online_readout`](@ref)). The read-out of the Pipeline rebuilds a carrier from the row owner, and then refits the universe steps over it. Two things are missing, and a carrier would supply only the first. A rule whose tree reads no rows holds no rows, so nothing exists to rebuild the carrier from. And the read-out expresses a selection as a view of the state of the owner. For a recursion that view is not the run over those columns, because the allocation is a path, the projection couples the columns, and the wealth factor reads every column.
+The check refuses an [`OnlinePortfolioSelection`](@ref) head because of its call with no data, not because of its fold. `optimise(opt)` with no data on the head answers a Recursion Result, so it rebuilds no [`ReturnsResult`](@ref) ([`online_readout`](@ref)). `fit(pipe)` with no data rebuilds a `ReturnsResult` from the row owner, and then refits the universe steps over it. Two things are missing, and a `ReturnsResult` would supply only the first. A rule whose tree reads no rows holds no rows, so nothing exists to rebuild the `ReturnsResult` from. And `fit(pipe)` with no data expresses a selection as a view of the state of the owner. For a recursion that view is not the run over those columns, because the allocation is a path, the projection couples the columns, and the wealth factor reads every column.
 
 # Validation
 
@@ -430,7 +430,7 @@ function assert_online_owner(::AbstractPriorEstimator, ::AbstractString)
     return nothing
 end
 function assert_online_owner(::OnlinePortfolioSelection, name::AbstractString)
-    return throw(ArgumentError("the `$(name)` step is an `OnlinePortfolioSelection` head and owns the rows of the online step, because no prior step precedes it: the head's read-out is its own recursion, so it holds no carrier for `fit(pipe)` to reconstitute the universe steps over, and a rule whose tree reads no rows holds none at all. Nor would a carrier be enough: a universe step's selection is read out as a view of the owner's state, and a view of a recursion is not the recursion over those columns. Put a prior step before the head, whose rows the read-out reads, or declare a refit with `Online(pipe)`, which fits every step over the observations folded so far."))
+    return throw(ArgumentError("the `$(name)` step is an `OnlinePortfolioSelection` head and owns the rows of the online step, because no prior step precedes it: the head's call with no data answers its own recursion, so it holds no `ReturnsResult` for `fit(pipe)` to reconstitute the universe steps over, and a rule whose tree reads no rows holds none at all. Nor would a `ReturnsResult` be enough: a universe step's selection is read out as a view of the owner's state, and a view of a recursion is not the recursion over those columns. Put a prior step before the head, whose rows `fit(pipe)` reads, or declare a refit with `Online(pipe)`, which fits every step over the observations folded so far."))
 end
 function assert_online_owner(::TimeDependent, name::AbstractString)
     return throw(ArgumentError("the `$(name)` step is a `TimeDependent` schedule of optimisers and owns the rows of the online step, because no prior step precedes it: a schedule swaps the estimator that carries the state every fold, so the optimiser a fold is handed never saw the rows folded before it. Put a prior step before it, whose state the loop threads while the schedule swaps a stateless step, or schedule a field that carries no state, or refit every fold with `ff = nothing`."))
@@ -441,7 +441,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Runs the entry checks of the cross-validation doors of a Pipeline.
+Runs the entry checks of the `cross_val_predict` methods of a Pipeline.
 
 # Validation
 
@@ -464,16 +464,16 @@ end
 function assert_pipeline_door(o::Online{<:Pipeline}, cv)
     assert_no_holdout(o.est)
     @argcheck(folds_are_stepped(cv),
-              ArgumentError("`Online(pipe)` declares a refit from a buffer the online arm of the fold loop seeds at its warm-up, and this scheme is not an Online Scheme, so every fold refits from its training window already. Build the scheme with `OnlineIndexWalkForward` or `OnlineDateWalkForward`, or hand the door the plain pipeline."))
+              ArgumentError("`Online(pipe)` declares a refit from a buffer the online arm of the fold loop seeds at its warm-up, and this scheme is not an Online Scheme, so every fold refits from its training window already. Build the scheme with `OnlineIndexWalkForward` or `OnlineDateWalkForward`, or hand `cross_val_predict` the plain pipeline."))
     return nothing
 end
 """
     cross_val_predict(o::Online{<:Pipeline}, data::Prices_RR, cv::CVER; ex = FLoops.ThreadedEx(), id = nothing)
     cross_val_predict(o::Online{<:Pipeline}, data::Prices_RR, cv::MultipleRandomised; ex = FLoops.ThreadedEx(), kwargs...)
 
-Runs a walk-forward over `Online(pipe)`, the declared refit of a [`Pipeline`](@ref) from a buffer of its input carrier.
+Runs a walk-forward over `Online(pipe)`, the declared refit of a [`Pipeline`](@ref) from a buffer of its input data.
 
-These are the doors of the pipeline, and the fold loop threads the wrapper through them. The online arm resolves the wrapper at its warm-up into a pipeline that carries a [`PipelineBufferState`](@ref). Every fold appends its new rows to the buffer, and the read-out is `fit(pipe, buffer)`. So the run is exact for every configuration, at the cost of a batch fit per fold. This includes the window-valued steps that the host route refuses.
+These are `cross_val_predict` methods of the pipeline, and the fold loop threads the wrapper through them. The online arm resolves the wrapper at its warm-up into a pipeline that carries a [`PipelineBufferState`](@ref). Every fold appends its new rows to the buffer, and `fit(pipe)` with no data is `fit(pipe, buffer)`. So the run is exact for every configuration, at the cost of a batch fit per fold. This includes the window-valued steps that the fold route refuses.
 
 With `max_history = w` the buffer keeps the last `w` input rows, and the run equals the rolling batch walk-forward whose purged training window holds `w` rows. Build both schemes with the training size `w + purged_size` and the same `purged_size`, such as `IndexWalkForward(w + p, t; purged_size = p)` and `OnlineIndexWalkForward(w + p, t; purged_size = p)`.
 
@@ -548,7 +548,7 @@ end
 
 Resolves the [`Online`](@ref) declarations in the steps of a [`Pipeline`](@ref), at warm-up.
 
-On the host route [`update_online_step`](@ref) resolves every step. So an `Online(EmpiricalPrior(); max_history = w)` step becomes the prior with its buffer, and an optimisation step resolves the wrappers under its own prior. On the refit route the pipeline carries a [`PipelineBufferState`](@ref), which `Online(pipe)` seeded, and the method returns the pipeline unchanged. No member folds under a refit, and [`assert_online_entry`](@ref) already refused any wrapper below the root by name.
+On the fold route [`update_online_step`](@ref) resolves every step. So an `Online(EmpiricalPrior(); max_history = w)` step becomes the prior with its buffer, and an optimisation step resolves the wrappers under its own prior. On the refit route the pipeline carries a [`PipelineBufferState`](@ref), which `Online(pipe)` seeded, and the method returns the pipeline unchanged. No member folds under a refit, and [`assert_online_entry`](@ref) already refused any wrapper below the root with an error that names it.
 
 # Related
 
@@ -607,12 +607,12 @@ Returns the timestamps that a stepped [`Pipeline`](@ref) holds, through the stat
 
 The state that the pipeline carries selects the answer.
 
-  - Under `Online(pipe)` the [`PipelineBufferState`](@ref) holds the input carrier, and the timestamps of that carrier are the answer.
+  - Under `Online(pipe)` the [`PipelineBufferState`](@ref) holds the input data, and the timestamps of that data are the answer.
   - A prior owner leaves the Pipeline its own [`ReturnsBufferState`](@ref), which holds them.
   - An optimisation owner keeps its own Fold Context, and the pipeline holds none, so the owner answers ([`held_timestamps`](@ref)).
   - A pipeline whose owner carries no state, or that has no owner, has taken no step, and answers `nothing`.
 
-At the price level the answer of the host route starts one row after the answer of the refit route. A `PricesToReturns` step drops the first price row, so the returns carry the timestamps of the prices from the second row on. Both answers are a run of the timestamps of the price carrier that ends at the last row folded, which is what the alignment check of [`Resume`](@ref) reads.
+At the price level the answer of the fold route starts one row after the answer of the refit route. A `PricesToReturns` step drops the first price row, so the returns carry the timestamps of the prices from the second row on. Both answers are a run of the timestamps of the price data that ends at the last row folded, which is what the alignment check of [`Resume`](@ref) reads.
 
 # Related
 
@@ -630,7 +630,7 @@ end
 
 The three arms of [`held_timestamps(p::Pipeline)`](@ref), selected by dispatch on the state that the pipeline carries.
 
-A buffer of the input carrier answers with the timestamps of that carrier, and a Fold Context answers with its own. With no state, the row owner ([`pipeline_row_owner`](@ref)) answers when it carries a state ([`online_entry_state`](@ref)), and the method answers `nothing` otherwise.
+A buffer of the input data answers with the timestamps of that data, and a Fold Context answers with its own. With no state, the row owner ([`pipeline_row_owner`](@ref)) answers when it carries a state ([`online_entry_state`](@ref)), and the method answers `nothing` otherwise.
 
 # Related
 
@@ -653,7 +653,7 @@ end
 
 Alias for a [`Resume`](@ref) whose Result carries a [`Pipeline`](@ref).
 
-The pipeline doors dispatch on it, so a resumed pipeline takes the pipeline's own entry checks and fold loop, and not those of an optimiser.
+The `cross_val_predict` methods of the pipeline dispatch on it, so a resumed pipeline takes the pipeline's own entry checks and fold loop, and not those of an optimiser.
 
 # Related
 
@@ -667,7 +667,7 @@ const PipelineResume = Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any,
 
 Continues an online walk-forward over a [`Pipeline`](@ref) from its Result, over the full history extended.
 
-This is the pipeline door of [`Resume`](@ref). The door checks the scheme through [`assert_resume_scheme`](@ref), and it refuses a holdout as the one-shot door does. The fold loop then takes its resumed arm through [`pipeline_cross_val_predict`](@ref). The host route and the refit route of `Online(pipe)` resume alike, because the entry reads the state off the pipeline through walks that take any estimator.
+This is the `cross_val_predict` method of the pipeline for [`Resume`](@ref). It checks the scheme through [`assert_resume_scheme`](@ref), and it refuses a holdout as the method for a plain pipeline does. The fold loop then takes its resumed arm through [`pipeline_cross_val_predict`](@ref). The fold route and the refit route of `Online(pipe)` resume alike, because the entry reads the state off the pipeline through walks that take any estimator.
 
 # Validation
 
@@ -695,18 +695,18 @@ end
 
 Folds a block of observations into a [`Pipeline`](@ref), without a fit.
 
-This is the online step of the Pipeline, and the pipeline is a host. The verb hands each step before the **row owner** the block that the step before it emitted, and folds the rows into the owner, which is the prior step, else the optimisation step ([`pipeline_row_owner`](@ref)). The verb leaves every step after the owner untouched, and the read-out fits it as batch fits it. Under `Online(pipe)` the pipeline carries a [`PipelineBufferState`](@ref) instead. The verb then appends the block to the buffer, no step folds, and the read-out is a batch fit over the buffer.
+This is the online step of the Pipeline, and the pipeline takes it for its steps. The verb hands each step before the **row owner** the block that the step before it emitted, and folds the rows into the owner, which is the prior step, else the optimisation step ([`pipeline_row_owner`](@ref)). The verb leaves every step after the owner untouched, and `fit(pipe)` with no data fits it as batch fits it. Under `Online(pipe)` the pipeline carries a [`PipelineBufferState`](@ref) instead. The verb then appends the block to the buffer, no step folds, and `fit(pipe)` with no data is a batch fit over the buffer.
 
-The arity mirrors the batch verb. `fit(pipe, data)` takes a carrier at the input level of the pipeline, so the online step takes one too, with one observation or a block of them.
+The arity mirrors the batch verb. `fit(pipe, data)` takes a `PricesResult` or a `ReturnsResult` at the input level of the pipeline, so the online step takes one too, with one observation or a block of them.
 
 # Algorithm
 
-On the host route:
+On the fold route:
 
  1. Find the row owner, giving `k`.
- 2. Walk the steps before `k` in order. Skip each step that writes no data slot ([`is_data_step`](@ref)) and each universe-only step ([`is_universe_step`](@ref)). A universe-only step passes the rows through untouched, and the read-out applies its universe.
+ 2. Walk the steps before `k` in order. Skip each step that writes no data slot ([`is_data_step`](@ref)) and each universe-only step ([`is_universe_step`](@ref)). A universe-only step passes the rows through untouched, and `fit(pipe)` with no data applies its universe.
  3. Fold each remaining step through [`partial_fit_transform`](@ref), giving the folded step and the next `block`.
- 4. Fold `block` into the owner through [`fold_pipeline_owner`](@ref), giving the folded owner and `cache`. A prior owner folds through [`fold_prior`](@ref), and `cache` is a [`ReturnsBufferState`](@ref) of the Pipeline that records the rest of the carrier, so that `fit(pipe)` can rebuild the carrier that the batch path reads. An optimisation owner folds through its own [`partial_fit!`](@ref) and keeps its own Fold Context, so `cache` is `nothing`.
+ 4. Fold `block` into the owner through [`fold_pipeline_owner`](@ref), giving the folded owner and `cache`. A prior owner folds through [`fold_prior`](@ref), and `cache` is a [`ReturnsBufferState`](@ref) of the Pipeline that records the rest of the `ReturnsResult`, so that `fit(pipe)` can rebuild the `ReturnsResult` that the batch path reads. An optimisation owner folds through its own [`partial_fit!`](@ref) and keeps its own Fold Context, so `cache` is `nothing`.
  5. Return the pipeline rebuilt from the folded steps and `cache`.
 
 On the refit route, append `data` to the buffer through [`partial_fit!`](@ref), and return the pipeline with the new state.
@@ -718,7 +718,7 @@ On the refit route, append `data` to the buffer through [`partial_fit!`](@ref), 
 
 # Validation
 
-On the host route:
+On the fold route:
 
   - The pipeline has a row owner. An `ArgumentError` is thrown otherwise.
   - No step holds an [`Online`](@ref) declaration ([`pipeline_online_member`](@ref)), because the warm-up resolves each one. A wrapper that no warm-up resolved would fold the estimator that it wraps with no buffer, and its cap would have no effect. An `ArgumentError` that names the step is thrown otherwise.
@@ -750,7 +750,7 @@ end
 
 The two routes of [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref), selected by dispatch on the state that the Pipeline carries.
 
-A buffer of the input carrier appends the block. A Fold Context, or no state, walks the steps. The steps and the refusals are those of the verb.
+A buffer of the input data appends the block. A Fold Context, or no state, walks the steps. The steps and the refusals are those of the verb.
 
 # Related
 
@@ -796,7 +796,7 @@ end
 
 Folds a block into the row owner of a [`Pipeline`](@ref), and records the own context of the Pipeline where the owner keeps none.
 
-An optimisation owner is a host itself. It folds through its own [`partial_fit!`](@ref), and the Pipeline records nothing beside it. The method refuses an [`OnlinePortfolioSelection`](@ref) head. This is the door of a hand-driven run, as [`assert_online_owner`](@ref) is the door of the fold loop, and that docstring states the reason.
+An optimisation owner takes the online step itself. It folds through its own [`partial_fit!`](@ref), and the Pipeline records nothing beside it. The method refuses an [`OnlinePortfolioSelection`](@ref) head. This is the check of a hand-driven run, as [`assert_online_owner`](@ref) is the check of the fold loop, and that docstring states the reason.
 
 # Algorithm
 
@@ -804,7 +804,7 @@ For a prior owner:
 
  1. Fold `rd` into the prior through [`fold_prior`](@ref), giving `pe`. This goes first, because the context takes its cap from the buffer that the prior seeds, as the context of an optimiser does ([`fold_returns`](@ref)).
  2. Read the buffer of the prior through [`prior_returns_buffer`](@ref), giving `rows`.
- 3. Set `own_factors` when [`needs_factor_returns`](@ref) answers `false` for `pe`. The context keeps the factor columns only then, so the carrier holds each factor column once.
+ 3. Set `own_factors` when [`needs_factor_returns`](@ref) answers `false` for `pe`. The context keeps the factor columns only then, so the rebuilt `ReturnsResult` holds each factor column once.
  4. Fold `rd` into the context of the Pipeline through [`fold_context`](@ref) under the cap `rows.max_history`, giving `cache`.
  5. Return `pe` and `cache`.
 
@@ -830,18 +830,18 @@ function fold_pipeline_owner(opt::OptimisationEstimator, ::Nothing, rd::ReturnsR
     return partial_fit!(opt, rd), nothing
 end
 function fold_pipeline_owner(::OnlinePortfolioSelection, ::Nothing, ::ReturnsResult)
-    return throw(ArgumentError("an `OnlinePortfolioSelection` head owns the rows of this `Pipeline`, because no prior step precedes it, and a head cannot own them: its read-out is its own recursion, so `fit(pipe)` is left with no carrier to reconstitute the universe steps over, and a view of a recursion is not the recursion over the columns a universe step keeps. Put a prior step before the head, whose rows the read-out reads, or declare a refit with `Online(pipe)`, which fits every step over the observations folded so far. The fold loop names the same two routes at its own door."))
+    return throw(ArgumentError("an `OnlinePortfolioSelection` head owns the rows of this `Pipeline`, because no prior step precedes it, and a head cannot own them: its call with no data answers its own recursion, so `fit(pipe)` is left with no `ReturnsResult` to reconstitute the universe steps over, and a view of a recursion is not the recursion over the columns a universe step keeps. Put a prior step before the head, whose rows `fit(pipe)` reads, or declare a refit with `Online(pipe)`, which fits every step over the observations folded so far. The fold loop names the same two routes in its own entry check."))
 end
 """
     fit(pipe::Pipeline)
 
 Reads a folded [`Pipeline`](@ref) out, with the result that the batch fit over the observations folded so far gives.
 
-This is the read-out verb of the online step of the Pipeline, as `optimise(opt)` is for an optimiser. It returns an ordinary [`PipelineResult`](@ref), so [`predict`](@ref), [`assert_universe_aligned`](@ref) and the search take it unchanged.
+This is the call with no data of the online step of the Pipeline, as `optimise(opt)` with no data is for an optimiser. It returns an ordinary [`PipelineResult`](@ref), so [`predict`](@ref), [`assert_universe_aligned`](@ref) and the search take it unchanged.
 
 # Algorithm
 
- 1. Rebuild the carrier of the observations folded so far from the row owner through [`pipeline_returns_result`](@ref), giving `rd₀`. A prior owner gives its rows through [`prior_returns_buffer`](@ref), and the Pipeline adds the rest from its own [`ReturnsBufferState`](@ref). An optimisation owner gives its carrier through [`returns_result`](@ref). The carrier spans the input universe of the pipeline at warm-up width.
+ 1. Rebuild the `ReturnsResult` of the observations folded so far from the row owner through [`pipeline_returns_result`](@ref), giving `rd₀`. A prior owner gives its rows through [`prior_returns_buffer`](@ref), and the Pipeline adds the rest from its own [`ReturnsBufferState`](@ref). An optimisation owner gives its `ReturnsResult` through [`returns_result`](@ref). The `ReturnsResult` spans the input universe of the pipeline at warm-up width.
  2. Walk the data steps before the owner in order, through [`readout_data_step`](@ref). A row-local step reads its fitted Result out of its state, restricted to the assets that survive so far. A universe-only step runs its batch verb over `rd₀` viewed to the surviving assets, and narrows the surviving set. The index `idx` of the surviving assets into `rd₀` is the column map, and `rd = port_opt_view(rd₀, :, idx)` is the context's returns.
  3. Run every other step before the owner over that context, as batch runs it. Such a step is a phylogeny step, an uncertainty-set step or a constraint step.
  4. Read the owner out over the surviving assets through [`readout_owner`](@ref). A prior owner reads out through `prior(port_opt_view(pe, idx))`, which views its state by asset and never slices its rows again. An optimisation owner reads out through `optimise(opt)` on the viewed estimator, with the context injected.
@@ -849,7 +849,7 @@ This is the read-out verb of the online step of the Pipeline, as `optimise(opt)`
 
 So a selection that moves between two steps is a view of a state fitted over the whole universe, which is the batch fit over those columns. The selector ranks the assets again at every step, as the batch loop refits it at every fold.
 
-Under `Online(pipe)` the read-out is `fit(pipe, buffer)`, the batch fit over the observations that the [`PipelineBufferState`](@ref) holds.
+Under `Online(pipe)`, `fit(pipe)` with no data is `fit(pipe, buffer)`, the batch fit over the observations that the [`PipelineBufferState`](@ref) holds.
 
 # Validation
 
@@ -877,7 +877,7 @@ end
 
 The two routes of [`fit(pipe::Pipeline)`](@ref), selected by dispatch on the state that the Pipeline carries.
 
-A buffer of the input carrier takes a batch fit. A Fold Context, or no state, takes the walk of the read-out. The steps and the refusals are those of the verb.
+A buffer of the input data takes a batch fit. A Fold Context, or no state, takes the walk of the steps. The steps and the refusals are those of the verb.
 
 # Related
 
@@ -958,7 +958,7 @@ end
 
 Reads one data step of a folded [`Pipeline`](@ref) out, and narrows the surviving assets where the universe of the step does.
 
-Dispatch on the estimator of the step selects the read-out.
+Dispatch on the estimator of the step selects the method.
 
   - A [`PriceGapFill`](@ref) reads the [`PriceGapFillResult`](@ref) of the whole history out of its state, restricted to the assets that survive so far, because the batch fit ran over the columns that an earlier filter left.
   - A [`MissingDataFilter`](@ref) reads its [`MissingDataFilterResult`](@ref) out the same way, and narrows the surviving assets to the ones that it keeps, in the order that they hold.
@@ -968,7 +968,7 @@ Dispatch on the estimator of the step selects the read-out.
 # Arguments
 
   - `est`: The step's estimator, carrying its state.
-  - `rd0`: The carrier of every observation folded, over the pipeline's input universe.
+  - `rd0`: The `ReturnsResult` of every observation folded, over the pipeline's input universe.
   - `idx`: The indices into `rd0` of the assets surviving the steps before this one.
 
 # Returns
@@ -1014,7 +1014,7 @@ end
 
 Reads the row owner of a folded [`Pipeline`](@ref) out over the surviving assets, and writes its slot.
 
-The method views the state of the owner to the surviving assets through [`view_owner`](@ref) before the read-out. The view is a slice by asset. A state fitted over the full universe, viewed to a set of columns and read out, is the batch fit over that set. A prior owner reads out through `prior(pe)`. The method injects the context into an optimisation owner and reads it out through `optimise(opt)`, so the clustering, the constraints and every uncertainty set come from the rebuilt carrier, as batch fits them.
+The method views the state of the owner to the surviving assets through [`view_owner`](@ref) before it reads the owner out. The view is a slice by asset. A state fitted over the full universe, viewed to a set of columns and read out, is the batch fit over that set. A prior owner reads out through `prior(pe)`. The method injects the context into an optimisation owner and reads it out through `optimise(opt)`, so the clustering, the constraints and every uncertainty set come from the rebuilt `ReturnsResult`, as batch fits them.
 
 # Validation
 

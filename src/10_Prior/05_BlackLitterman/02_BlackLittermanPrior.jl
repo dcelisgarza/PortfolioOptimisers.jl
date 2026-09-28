@@ -283,7 +283,7 @@ The returned `omega` already carries ``\\tau``, so a caller passes it to [`vanil
   - $(arg_dict[:datatype])
   - $(arg_dict[:strict])
   - $(arg_dict[:bl_axis])
-  - `ledger`: The door's ledger of departure casualties, or `nothing` when nobody is collecting. It is threaded into [`black_litterman_views`](@ref), and it is what tells a view set emptied by a departure from one emptied any other way — a distinction the *announcement* makes, not the answer.
+  - `ledger`: The Departure Ledger of the caller that derived the Investable Mask, or `nothing` when nobody is collecting. It is threaded into [`black_litterman_views`](@ref), and it is what tells a view set emptied by a departure from one emptied any other way — a distinction the *announcement* makes, not the answer.
 
 # Returns
 
@@ -351,7 +351,7 @@ end
 
 Report, once per Black-Litterman fit, who left the investable universe and what their leaving cost the view set.
 
-This is the family's call of [`announce_non_investable`](@ref), written once so the four `prior` methods each spend one line on it and none of them can word it differently. It names the process a Black-Litterman fit, because the message is otherwise the optimisation door's and would tell a standalone `prior(pe, X)` call that it is inside an optimisation it is not.
+This is the family's call of [`announce_non_investable`](@ref), written once so the four `prior` methods each spend one line on it and none of them can word it differently. It names the process a Black-Litterman fit, because the default message names an optimisation and would tell a standalone `prior(pe, X)` call that it is inside an optimisation it is not.
 
 The sentence is one sentence for all four members, and it is exactly true of each. Two of them write their views on the **factor** axis, where no asset name ever appears, so the view clause simply does not bite for them; what does bite for every member is the first clause, because all four estimate their posterior over the assets that remain.
 
@@ -479,7 +479,7 @@ Refuse the one configuration in which an asset-side Black-Litterman view cannot 
 
 The reduction works by resolving the caller's view *names* against the universe that survives, which is what lets a row naming a departed asset be dropped whole and every other row be rebuilt over the investable columns. A [`BlackLittermanViews`](@ref) passed in ready-made resolves no name — [`black_litterman_views`](@ref) hands it straight back, and its docstring says why: it was assembled against whatever universe the caller held, and nothing downstream can re-check it. So its `P` cannot be reduced, and there is nothing to reduce it *by*: an estimator whose views are precomputed is permitted to carry no `sets` at all.
 
-Left alone, this is the defect the whole ticket is about, unfixed for one configuration and **silent**: `calc_omega` forms `P * sigma * transpose(P)` over the full universe, `0 * NaN` is `NaN`, and the posterior comes back all `NaN`. Under the default `mp` that surfaces one layer later as `ArgumentError: matrix contains Infs or NaNs` from `posdef!`, which names the wrong cause; under a matrix processing estimator that does nothing, the fit *succeeds* and hands the caller an empty universe. This is the map's rule applied where it has to be: handle it, or refuse by name.
+Left alone, this is the defect the whole ticket is about, unfixed for one configuration and **silent**: `calc_omega` forms `P * sigma * transpose(P)` over the full universe, `0 * NaN` is `NaN`, and the posterior comes back all `NaN`. Under the default `mp` that surfaces one layer later as `ArgumentError: matrix contains Infs or NaNs` from `posdef!`, which names the wrong cause; under a matrix processing estimator that does nothing, the fit *succeeds* and hands the caller an empty universe. This is the map's rule applied where it has to be: handle it, or throw an error that names it.
 
 The split is dispatch on the type of `sets`, which is a field of a `@concrete` estimator and so a type fact. The `UniverseSets` method is the whole of the ordinary path and costs a dispatch; only the sets-less path derives the mask, and only to refuse.
 
@@ -934,7 +934,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Blends the views of a [`BlackLittermanPrior`](@ref) into the result its embedded prior answered.
 
-Everything the estimator does after the embedded prior has answered, written once. The batch method reaches it with the result of a fit over the caller's matrix, and the read-out of a folded estimator reaches it with the result of the embedded prior's own fold. Nothing here reads a returns matrix that the result does not already carry — `T`, the axis and the matrix the processing runs over all come off `prior_model` — which is why the two routes are one body and cannot drift.
+Everything the estimator does after the embedded prior has answered, written once. The batch method reaches it with the result of a fit over the caller's matrix, and `prior(pe)` with no data reaches it with the result of the embedded prior's own fold. Nothing here reads a returns matrix that the result does not already carry — `T`, the axis and the matrix the processing runs over all come off `prior_model` — which is why the two routes are one body and cannot drift.
 
 # Algorithm
 
@@ -998,10 +998,10 @@ function bl_posterior(pe::BlackLittermanPrior, prior_model::AbstractPriorResult,
     # Everything the wrapped prior carried is forwarded (see [`forward_prior`](@ref)); `chol`
     # is the only drop, because `posterior_sigma` supersedes the covariance it factorises.
     # `prior_model` is forwarded, not `vpr`: the reduction is this estimator's own working
-    # universe and nothing outside it may see a narrowed carrier. Black-Litterman leaves the
-    # observation axis untouched — the reduction takes columns, never rows — so the wrapped
-    # `w` still describes exactly the rows of the returned `X`, and its `ens`/`kld`/`ow`
-    # still describe that `w`.
+    # universe and nothing outside it may see a narrowed prior result. Black-Litterman
+    # leaves the observation axis untouched — the reduction takes columns, never rows — so
+    # the wrapped `w` still describes exactly the rows of the returned `X`, and its
+    # `ens`/`kld`/`ow` still describe that `w`.
     # `rr` is structural — the regression of `X` on `F`, over data Black-Litterman does not
     # modify — and the factor block `fpr` travels with it.
     return forward_prior(prior_model; mu = posterior_mu, sigma = posterior_sigma,

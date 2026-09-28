@@ -475,7 +475,7 @@ model is built.
 
 `T` names the optimiser that calls the function, for the error message. The function skips a
 [`TimeDependent`](@ref) schedule, and [`assert_time_dependent_substitution`](@ref) reaches it
-instead, because it runs the host's own constructor again on each resolved entry.
+instead, because it runs the optimiser's own constructor again on each resolved entry.
 
 # Validation
 

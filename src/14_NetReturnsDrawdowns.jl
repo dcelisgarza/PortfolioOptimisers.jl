@@ -9,7 +9,7 @@ The fee is two scalars on two clocks. [`calc_fees`](@ref) contracts the whole we
 
 The per asset returns sum to this series. `vec(sum(calc_net_asset_returns(w, X, fees); dims = 2))` reproduces `calc_net_returns(w, X, fees)`, because [`calc_asset_fees`](@ref) splits over the assets what [`calc_fees`](@ref) contracts into a scalar. The two sides add in a different order, so the identity holds to rounding and not to `==`.
 
-**This verb is the plain product, and a non-finite entry poisons its whole observation.** `0 * NaN` is `NaN`, so a zero weight does not save the row: one `NaN` in `X[t, i]` makes `val[t]` non-finite whatever `w[i]` holds. The verb takes no finiteness check, because it is the funnel of the library and a scan here is paid at each of its call sites on every evaluation. A gapped panel is scored through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref), which reduces the window to the Investable Mask and filters the Held Gaps once with [`filter_held_gaps`](@ref) before it reaches this verb.
+**This verb is the plain product, and a non-finite entry poisons its whole observation.** `0 * NaN` is `NaN`, so a zero weight does not save the row: one `NaN` in `X[t, i]` makes `val[t]` non-finite whatever `w[i]` holds. The verb takes no finiteness check, because the library calls it at many sites, and a scan here is paid at each of them on every evaluation. A gapped panel is scored through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref), which reduces the window to the Investable Mask and filters the Held Gaps once with [`filter_held_gaps`](@ref) before it reaches this verb.
 
 # Mathematical definition
 
@@ -125,7 +125,7 @@ end
 
 Report whether a fee term charges nothing at all.
 
-The verb that prices an unset liquidation carrier returns an **empty** vector rather than a vector of zeros, because it holds no length to build one from: the axis is the complement of the Investable Mask, and a [`Fees`](@ref) does not carry the mask. A `nothing` reaches the same sites from the caller that has already taken a step. Both mean one thing, so the sites that ask reach one predicate rather than repeating the pair.
+The verb that prices an unset liquidation charge returns an **empty** vector rather than a vector of zeros, because it holds no length to build one from: the axis is the complement of the Investable Mask, and a [`Fees`](@ref) does not carry the mask. A `nothing` reaches the same sites from the caller that has already taken a step. Both mean one thing, so the sites that ask reach one predicate rather than repeating the pair.
 
 # Arguments
 
@@ -151,12 +151,12 @@ Subtract a per asset fee from a per asset return matrix, on the clock the fee st
 
 The per asset twin of [`charge_fees`](@ref). Its row sums are the series that verb returns, up to the order of summation.
 
-A reduced [`Fees`](@ref) lives on **two** axes: the five per asset fields were sliced to the Investable Mask at the door, and the two liquidation carriers to its complement. `R` and `w` span the caller's own universe, so `imsk` is what reunites them, and each axis is charged in the columns it owns through [`charge_fee_axis!`](@ref). A liquidated asset earns no return, so its column of `R` is zero and holds its charge alone: the charge is neither smeared over the assets that stayed nor carried in a matrix of its own.
+A reduced [`Fees`](@ref) lives on **two** axes: the five per asset fields were sliced to the Investable Mask by [`investable_fees_view`](@ref), and the two liquidation charges, `lq` and `flq`, to its complement. `R` and `w` span the caller's own universe, so `imsk` is what reunites them, and each axis is charged in the columns it owns through [`charge_fee_axis!`](@ref). A liquidated asset earns no return, so its column of `R` is zero and holds its charge alone: the charge is neither smeared over the assets that stayed nor carried in a matrix of its own.
 
 # Algorithm
 
  1. A `nothing` `fees` returns `R` unchanged. It charges no fee rather than a zero fee.
- 2. Read the pair of pairs `((am_i, am_l), (ot_i, ot_l))` of [`calc_asset_fees`](@ref), over the row count of `R`. The weights it is handed are the investable ones, because that is the axis the five per asset fields were sliced to; the carriers read `w` for its element type alone.
+ 2. Read the pair of pairs `((am_i, am_l), (ot_i, ot_l))` of [`calc_asset_fees`](@ref), over the row count of `R`. The weights it is handed are the investable ones, because that is the axis the five per asset fields were sliced to; `lq` and `flq` read `w` for its element type alone.
  3. On a `nothing` `imsk`, charge the investable axis over the whole matrix, and refuse a `fees` that carries a liquidation: no mask says where the exits are, so the charge has nowhere to land, and dropping it would overstate the net return.
  4. On a `BitVector` `imsk`, charge the investable axis in the `imsk` columns and the liquidation axis in the complement's, each by the same two steps: the per period vector on every observation, and the one-off vector on the first alone. Under an [`AmortisedFees`](@ref) the one-off vector is zero, because step 2 spread that cost into the per period one.
 
@@ -171,7 +171,7 @@ A reduced [`Fees`](@ref) lives on **two** axes: the five per asset fields were s
 
   - `imsk` spans the columns of `R`, else a `DimensionMismatch` naming both widths.
   - Each charge spans the axis it is charged on, through [`assert_fee_axis_width`](@ref).
-  - A `nothing` `imsk` meets no liquidation carrier, else an `ArgumentError` naming the mask.
+  - A `nothing` `imsk` meets no liquidation charge, else an `ArgumentError` naming the mask.
 
 # Returns
 
@@ -203,9 +203,10 @@ end
 function charge_asset_fees(R::MatNum, w::VecNum, fees::Fees, imsk::BitVector)
     @argcheck(size(R, 2) == length(imsk),
               DimensionMismatch("the investable mask spans $(length(imsk)) assets, but the return matrix holds $(size(R, 2)) columns; the mask and the matrix must state the same universe"))
-    # The five per asset fields were sliced to the mask at the door, so the weights they are
-    # priced against are the investable ones. The two carriers read `w` for its element type
-    # alone and hold their own previous weights, so this slice reaches them harmlessly.
+    # `investable_fees_view` sliced the five per asset fields to the mask, so the weights
+    # they are priced against are the investable ones. `lq` and `flq` read `w` for its
+    # element type alone and hold their own previous weights, so this slice reaches them
+    # harmlessly.
     (am_i, am_l), (ot_i, ot_l) = calc_asset_fees(view(w, imsk), size(R, 1), fees)
     assert_fee_axis_width(am_i, ot_i, count(imsk), "investable")
     lmsk = .!imsk
@@ -213,8 +214,8 @@ function charge_asset_fees(R::MatNum, w::VecNum, fees::Fees, imsk::BitVector)
     val = copy(R)
     # Each axis is charged in its own columns, by the **same two steps**: the per period
     # charge on every observation, and the one-off charge at the observation the clock names.
-    # The investable fields were sliced to `imsk` at the door and the two carriers to its
-    # complement, so the mask is what puts each charge back where it was priced.
+    # `investable_fees_view` sliced the investable fields to `imsk` and `lq` and `flq` to
+    # its complement, so the mask is what puts each charge back where it was priced.
     charge_fee_axis!(view(val, :, imsk), am_i, ot_i)
     # A liquidated asset earns no return, so its column is zero and holds the charge alone.
     # Its one-off amount lands at the index `fl` and `fs` land on, which is what puts both
@@ -257,7 +258,7 @@ end
 
 Charge one axis of a per asset return matrix on the two clocks a fee states, in place.
 
-The step [`charge_asset_fees`](@ref) takes once per axis: the per period vector `am` is subtracted from every row, and the one-off vector `ot` from the first row alone. `A` is a view of the columns the axis owns, so the verb never learns which axis it is charging, and the investable fields and the two liquidation carriers take the same two steps.
+The step [`charge_asset_fees`](@ref) takes once per axis: the per period vector `am` is subtracted from every row, and the one-off vector `ot` from the first row alone. `A` is a view of the columns the axis owns, so the verb never learns which axis it is charging, and the investable fields and the two liquidation charges take the same two steps.
 
 The one-off charge is one vector written into one row, never an array the size of the matrix: a charge made once is stored once, and under an [`AmortisedFees`](@ref) it is zero and no row is written at all.
 
@@ -302,15 +303,15 @@ An optimiser reduces once at its entry, so no optimiser meets a gap. A caller wh
 
 Every block of the prior is reduced together by the [`port_opt_view`](@ref) method the prior's owner already writes, so a new block cannot be forgotten, and the reduced `pr.X` carries no dead column. The fees travel with the weights, because a [`Fees`](@ref) whose rates are one number per asset is indexed by the same axis and would otherwise meet a shorter weight vector.
 
-The fee takes the same door the fit sites take, [`investable_fees_view`](@ref), under every carrier. A caller states the two liquidation carriers of a [`Fees`](@ref) over the full universe, so on a prior with no mask nothing left and the carriers are dropped; a result's fee is marked with the mask it was reduced on, so it passes the door untouched and the exit it carries is charged. Without the door, an all-investable prior charged a caller's full-universe carrier as a forced exit of the whole book on every period.
+The fee goes through the same verb as at the fit sites, [`investable_fees_view`](@ref), for every type of `pr`. A caller states the two liquidation charges of a [`Fees`](@ref), `lq` and `flq`, over the full universe, so on a prior with no mask nothing left and `lq` and `flq` are dropped; a result's fee is marked with the mask it was reduced on, so it passes `investable_fees_view` untouched and the exit it carries is charged. Without `investable_fees_view`, an all-investable prior charged a liquidation charge that the caller states over the full universe as a forced exit of the whole book on every period.
 
 A held non-investable asset is a holding the prior cannot value. It takes the library's strictness policy through [`strict_diagnostic`](@ref): a warning names the assets and their weights are dropped, or an `ArgumentError` names them under `strict`.
 
-A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask exists to derive and they pass through, the fee alone taking its door under a `nothing` mask. That is what lets one door state the reduction once and dispatch decide whether it happens.
+A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask exists to derive and they pass through. The fee alone goes through `investable_fees_view` under a `nothing` mask. That is what lets one verb state the reduction once and dispatch decide whether it happens.
 
 # Algorithm
 
- 1. Return `nothing`, the carrier and the weights unchanged, and the fee through [`investable_fees_view`](@ref) under a `nothing` mask, when the carrier is a matrix or a returns result.
+ 1. Return `nothing`, `pr` and the weights unchanged, and the fee through [`investable_fees_view`](@ref) under a `nothing` mask, when `pr` is a matrix or a returns result.
  2. Derive the Investable Mask once with [`investable_mask`](@ref).
  3. Return the same when every asset is investable.
  4. Otherwise report the held non-investable assets through [`strict_diagnostic`](@ref).
@@ -329,7 +330,7 @@ A bare returns matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask
 
 # Returns
 
-  - `(imsk, pr, w, fees)`: The Investable Mask and the three reduced to it, or `nothing`, the carrier and the weights unchanged, and the fee on the axes a `nothing` mask leaves.
+  - `(imsk, pr, w, fees)`: The Investable Mask and the three reduced to it, or `nothing`, `pr` and the weights unchanged, and the fee on the axes a `nothing` mask leaves.
 
 # Related
 
@@ -369,7 +370,7 @@ function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
                           strict)
     end
     # The fee is viewed at `pr.X`, the prior's **unreduced** returns matrix, because its two
-    # liquidation carriers live on the complement of the mask and the view derives that
+    # liquidation charges live on the complement of the mask and the view derives that
     # complement from the full width. Every other argument here takes the index alone.
     return imsk, port_opt_view(pr, findall(imsk)), investable_weights_view(imsk, w),
            investable_fees_view(fees, imsk, pr.X)
@@ -450,7 +451,7 @@ A point-in-time panel carries a `NaN` at every `(observation, asset)` pair where
 
 A **Held Gap** takes the library's strictness policy through [`strict_diagnostic`](@ref): a warning names the pairs and the pair contributes zero, or an `ArgumentError` names them under `strict`. A zero weight at a gap is silent. Nothing is renormalised, so the missing weight sits in cash on that observation, which is the one reading that invents no trade the weights never stated.
 
-The funnel [`calc_net_returns`](@ref) stays the plain product. A scan there is paid at each of its call sites on every evaluation; a scan here is paid once, on a window the fold already multiplies once.
+[`calc_net_returns`](@ref) stays the plain product. A scan there is paid at each of its call sites on every evaluation; a scan here is paid once, on a window the fold already multiplies once.
 
 # Algorithm
 
@@ -629,7 +630,7 @@ Where:
 
  1. Scale each column of `X` by its weight, giving `X ⊙ transpose(w)`, the `T × N` matrix of gross per asset contributions.
  2. On the `args...` method, return that matrix unchanged. The method reads none of its trailing arguments, so a `nothing` `fees` reaches it and charges nothing rather than charging a zero fee.
- 3. On the `fees::Fees` method, hand the matrix to [`charge_asset_fees`](@ref), which subtracts the per asset per period charge from every row, and the one-off charge on the clock `fees.fa` names. `imsk` says which columns the five per asset fields were priced on and which the two liquidation carriers were, so each charge lands in the columns it was priced on; a `nothing` `imsk` charges the investable axis alone and refuses a fee that carries a liquidation.
+ 3. On the `fees::Fees` method, hand the matrix to [`charge_asset_fees`](@ref), which subtracts the per asset per period charge from every row, and the one-off charge on the clock `fees.fa` names. `imsk` says which columns the five per asset fields were priced on and which the two liquidation charges were, so each charge lands in the columns it was priced on; a `nothing` `imsk` charges the investable axis alone and refuses a fee that carries a liquidation.
 
 # Arguments
 

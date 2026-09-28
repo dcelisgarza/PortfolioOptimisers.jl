@@ -5,7 +5,7 @@ Abstract supertype for all returns result types.
 
 Every concrete type that holds the result of a returns calculation subtypes `AbstractReturnsResult`. [`ReturnsResult`](@ref) is the member the library builds.
 
-[`select_assets`](@ref), [`fit_preprocessing`](@ref) and the fold generation of cross-validation dispatch on this supertype. [`ClusterGroups`](@ref) reads the Feature Matrix from the [`AssetPanel`](@ref) of the carrier, because preselection runs before any prior exists and the carrier is the only source it can read. The `Pr_RR` alias names the concrete [`ReturnsResult`](@ref), and many methods dispatch on that alias, so these readers take this supertype instead. No check enforces the interface below.
+[`select_assets`](@ref), [`fit_preprocessing`](@ref) and the fold generation of cross-validation dispatch on this supertype. [`ClusterGroups`](@ref) reads the Feature Matrix from the [`AssetPanel`](@ref) of the returns data, because preselection runs before any prior exists and the returns data is the only source it can read. The `Pr_RR` alias names the concrete [`ReturnsResult`](@ref), and many methods dispatch on that alias, so these readers take this supertype instead. No check enforces the interface below.
 
 [`PredictionReturnsResult`](@ref) subtypes this supertype, but its `X` is a vector of portfolio returns with no asset axis. It does not meet the interface, and every entry point that needs an asset axis throws an error for it.
 
@@ -541,7 +541,7 @@ The function reads the benchmark field `B` of `rd` and the flag `brt`, which ask
 
 # Algorithm
 
-The method that Julia selects on the type of the field `B` is the first step, so a carrier with no benchmark runs no branch.
+The method that Julia selects on the type of the field `B` is the first step, so an `rd` that holds no benchmark runs no branch.
 
  1. `rd` carries no benchmark, because its `B` field is `Nothing`. Return `rd`.
  2. `brt` is `false`. Return `rd`.
@@ -551,7 +551,7 @@ The method that Julia selects on the type of the field `B` is the first step, so
 # Arguments
 
   - `rd`: A `ReturnsResult` that holds the asset returns, and optionally the factor and benchmark returns. When it carries a benchmark, it also holds `X`.
-  - `brt`: `true` to subtract the benchmark `B` from the asset returns, `false` to keep them. A carrier with no benchmark accepts any value.
+  - `brt`: `true` to subtract the benchmark `B` from the asset returns, `false` to keep them. When `rd` holds no benchmark, any value is valid.
 
 # Validation
 
@@ -640,7 +640,7 @@ end
 
 Resolve the [`AssetPanel`](@ref) a [`FeatureDistance`](@ref) with no producer measures.
 
-`nothing` in the `ape` slot tells the kernel to read the panel that the data carrier holds. The carriers reach the kernel as the two keywords `pr` and `rd`, and this function selects the source by dispatch. A [`ReturnsResult`](@ref) in either slot gives its `pnl`. When both slots hold one, `rd` wins, because `rd` is the data carrier. `Pr_RR` admits a [`ReturnsResult`](@ref) in the `pr` slot, and `clusterise(cle, rd)` and every [`Pipeline`](@ref) step pass it there. So the second method serves the shortest public call.
+`nothing` in the `ape` slot tells the kernel to read the panel that the [`ReturnsResult`](@ref) holds. The data reaches the kernel as the two keywords `pr` and `rd`, and this function selects the source by dispatch. A [`ReturnsResult`](@ref) in either slot gives its `pnl`. When both slots hold one, `rd` wins, because `rd` is the returns data. `Pr_RR` admits a [`ReturnsResult`](@ref) in the `pr` slot, and `clusterise(cle, rd)` and every [`Pipeline`](@ref) step pass it there. So the second method serves the shortest public call.
 
 A prior result alone carries no panel, so the call raises an [`IsNothingError`](@ref) that names the two ways to supply one.
 
@@ -650,24 +650,24 @@ The method that Julia selects is the algorithm.
 
  1. `rd` is a [`ReturnsResult`](@ref): answer `rd.pnl`.
  2. `pr` is a [`ReturnsResult`](@ref) and there is no `rd`: answer `pr.pnl`.
- 3. Neither slot holds a data carrier: raise.
+ 3. Neither slot holds a `ReturnsResult`: raise.
 
-Each of the first two checks that the carrier it read holds a panel, with [`assert_asset_panel_supplied`](@ref).
+Each of the first two checks that the `ReturnsResult` it read holds a panel, with [`assert_asset_panel_supplied`](@ref).
 
 # Arguments
 
-  - `ape`: `nothing`, which reads the carrier's panel.
+  - `ape`: `nothing`, which reads the panel of the `ReturnsResult`.
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd])
   - `X`: Returns matrix of the subproblem. Unread here; a producer reads it.
 
 # Validation
 
-  - A data carrier is present, and it holds an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
+  - A `ReturnsResult` is present, and it holds an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
 
 # Returns
 
-  - `pnl::AssetPanel`: The Asset Panel the data carrier holds.
+  - `pnl::AssetPanel`: The Asset Panel that the `ReturnsResult` holds.
 
 # Related
 
@@ -686,15 +686,15 @@ function asset_panel(::Nothing, pr::ReturnsResult, ::Nothing, ::Any)
     return assert_asset_panel_supplied(pr.pnl)
 end
 function asset_panel(::Nothing, ::Any, ::Nothing, ::Any)
-    return throw(IsNothingError("`FeatureDistance` with no producer reads the Asset Panel off the data carrier, and this call supplied none: only a prior result reached it, and a prior result carries no panel. Two ways forward:\n  1. Pass the `ReturnsResult` that holds the panel, which every forwarder takes as `rd`.\n  2. Set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`, which builds a panel from the prior it is handed."))
+    return throw(IsNothingError("`FeatureDistance` with no producer reads the Asset Panel off the ReturnsResult, and this call supplied none: only a prior result reached it, and a prior result carries no panel. Two ways forward:\n  1. Pass the `ReturnsResult` that holds the panel, which every forwarder takes as `rd`.\n  2. Set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`, which builds a panel from the prior it is handed."))
 end
 """
     assert_asset_panel_supplied(pnl::AssetPanel) -> AssetPanel
     assert_asset_panel_supplied(pnl::Nothing) -> Union{}
 
-Assert that the data carrier a [`FeatureDistance`](@ref) read holds an [`AssetPanel`](@ref), and return it.
+Assert that the [`ReturnsResult`](@ref) that a [`FeatureDistance`](@ref) read holds an [`AssetPanel`](@ref), and return it.
 
-The `pnl` of a carrier is optional, so a carrier built without one gives `nothing`. This function turns that `nothing` into an error message. It returns the panel, so the caller makes one call for the check and the access.
+The `pnl` of a `ReturnsResult` is optional, so a `ReturnsResult` built without one gives `nothing`. This function turns that `nothing` into an error message. It returns the panel, so the caller makes one call for the check and the access.
 
 # Algorithm
 
@@ -702,7 +702,7 @@ The method that Julia selects is the algorithm. A panel returns itself, and `not
 
 # Arguments
 
-  - `pnl`: The carrier's Asset Panel, or `nothing`.
+  - `pnl`: The Asset Panel of the `ReturnsResult`, or `nothing`.
 
 # Validation
 
@@ -724,7 +724,7 @@ function assert_asset_panel_supplied(pnl::AssetPanel)
     return pnl
 end
 function assert_asset_panel_supplied(::Nothing)
-    return throw(IsNothingError("`FeatureDistance` with no producer reads the Asset Panel off the data carrier, and the carrier holds none. Build one with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`."))
+    return throw(IsNothingError("`FeatureDistance` with no producer reads the Asset Panel off the ReturnsResult, and the ReturnsResult holds none. Build one with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`."))
 end
 
 export ReturnsResult, returns_result_picker

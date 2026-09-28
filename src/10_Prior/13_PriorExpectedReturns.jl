@@ -5,7 +5,7 @@ Reads the mean of a Prior as an expected-returns vector, so that any `me` slot c
 
 The adapter lets the posterior mean of a [`BlackLittermanPrior`](@ref) drive a [`ForecastReversion`](@ref) step, an [`ExpectedReturn`](@ref) risk measure or the `me` field of an [`EmpiricalPrior`](@ref). The adapter fits the prior on the returns it receives and keeps `mu` alone. It discards the covariance and the scenarios of the fit. No `me` slot in the library passes factor returns, so the constructor refuses a prior that requires them. A prior whose factor argument is optional is admitted, and the adapter fits it with no factor returns.
 
-[`supports_partial_fit`](@ref) gives for the adapter the answer it gives for the prior. [`partial_fit!`](@ref) forwards the rows to the prior, and `mean(me)` reads the `mu` of the folded prior. An [`EmpiricalPrior`](@ref) keeps its rows, so `supports_partial_fit` is `false` for it, and a host refits it from the rows the host holds. For the online portfolio selection head, those rows are the head's own buffer. [`rows_needed`](@ref) is `nothing` for an adapter that does not fold, so the head keeps every row, and each step costs one prior fit over all the rows so far. To bound the rows, wrap the adapter in a [`WindowedExpectedReturns`](@ref).
+[`supports_partial_fit`](@ref) gives for the adapter the answer it gives for the prior. [`partial_fit!`](@ref) forwards the rows to the prior, and `mean(me)` reads the `mu` of the folded prior. An [`EmpiricalPrior`](@ref) keeps its rows, so `supports_partial_fit` is `false` for it, and the estimator that holds the adapter refits it from the rows that estimator holds. For the online portfolio selection head, those rows are the head's own buffer. [`rows_needed`](@ref) is `nothing` for an adapter that does not fold, so the head keeps every row, and each step costs one prior fit over all the rows so far. To bound the rows, wrap the adapter in a [`WindowedExpectedReturns`](@ref).
 
 The adapter fits the whole prior, so a covariance that the prior cannot form makes the mean throw, although `mu` alone is defined. Under the default [`EmpiricalPrior`](@ref), a column of constant returns, such as a suspended asset in the head's buffer, makes the positive-definite repair of the covariance throw an `ArgumentError`. To fit such rows, give the prior a covariance without that repair, `PortfolioOptimisersCovariance(; mp = MatrixProcessing(; pdm = nothing))`.
 
@@ -120,7 +120,7 @@ The panel form passes the Asset Panel to the prior. The no-data form fits nothin
  3. Read `mu`, the mean vector of the Result.
  4. Reshape `mu` to `(1, N)` when `dims == 1`, and to `(N, 1)` when `dims == 2`.
 
-The no-data form reads the Result of `prior(me.pe)`, the read-out of the folded prior, in place of steps 1 and 2, and always reshapes `mu` to `(1, N)`.
+The no-data form reads the Result of `prior(me.pe)`, which makes the estimate from the Partial Fit State of the prior, in place of steps 1 and 2, and always reshapes `mu` to `(1, N)`.
 
 # Arguments
 
@@ -133,7 +133,7 @@ The no-data form reads the Result of `prior(me.pe)`, the read-out of the folded 
 # Validation
 
   - $(val_dict[:dims])
-  - The no-data form: the prior holds a partial-fit state. The prior's read-out throws an `ArgumentError` otherwise.
+  - The no-data form: the prior holds a partial-fit state. `prior(me.pe)` throws an `ArgumentError` otherwise.
   - Everything the prior's fit refuses.
 
 # Returns

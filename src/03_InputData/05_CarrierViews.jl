@@ -4,7 +4,7 @@
 
 Recover the positional row indices of a time-varying [`AssetPanel`](@ref) from a timestamp window.
 
-A Panel Field holds a plain array, so its observation axis follows the carrier's clock by position and not by timestamp. A routine that selects rows of `X` by timestamp calls this function to match the surviving timestamps back into the original clock, and the panel keeps the rows it finds. A surviving timestamp that is absent from that clock throws. Such a timestamp comes from an outer join that adds a row `X` never had. A positional slice past such a timestamp pairs each asset with the values of another period.
+A Panel Field holds a plain array, so its observation axis follows the clock of the input data by position and not by timestamp. A routine that selects rows of `X` by timestamp calls this function to match the surviving timestamps back into the original clock, and the panel keeps the rows it finds. A surviving timestamp that is absent from that clock throws. Such a timestamp comes from an outer join that adds a row `X` never had. A positional slice past such a timestamp pairs each asset with the values of another period.
 
 Two kinds of caller use it. At the price level, the clock is `TimeSeries.timestamp(X)` and the selection is a timestamp window. Where cross-validation assembles its folds, the clock is `ReturnsResult.ts` and the selection is a fold. There [`fold_row_indices`](@ref) recovers the rows of each fold from the timestamps that the fold's view of the returns holds. This is why `ts` must be unique. It is the key of the observation axis, and a repeated timestamp matches only its first position.
 
@@ -54,7 +54,7 @@ end
 
 Match the surviving timestamps back into the original clock, and return the rows they hold.
 
-[`feature_row_indices`](@ref) calls it for a time-varying [`AssetPanel`](@ref), and [`span_carrier_view`](@ref) calls it for a Listing Span. Both hold their observation axis parallel to the carrier's clock by position, so both recover their rows the same way.
+[`feature_row_indices`](@ref) calls it for a time-varying [`AssetPanel`](@ref), and [`span_carrier_view`](@ref) calls it for a Listing Span. Both hold their observation axis parallel to the clock of the input data by position, so both recover their rows the same way.
 
 # Algorithm
 
@@ -141,7 +141,7 @@ end
     panel_carrier_view(pnl::Nothing, i, j, nx) -> nothing
     panel_carrier_view(pnl::AssetPanel, i, j, nx) -> AssetPanel
 
-View a carrier's [`AssetPanel`](@ref), or return `nothing` when the carrier holds none.
+View the [`AssetPanel`](@ref) of a `PricesResult` or a `ReturnsResult`, or return `nothing` when the input data holds none.
 
 [`port_opt_view`](@ref) of a [`PricesResult`](@ref) or of a [`ReturnsResult`](@ref) calls it, and [`MissingDataFilter`](@ref) reaches it through that view. So the `nothing` case has one method, and no call site needs a branch for it.
 

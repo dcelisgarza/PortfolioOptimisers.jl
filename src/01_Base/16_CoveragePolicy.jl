@@ -25,7 +25,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## admits
 
-  - `admits(alg::AbstractCoverageAlgorithm, share::Real, active::Bool, stale::Integer, min_coverage::Real) -> Bool`: The read-out predicate, called once per asset.
+  - `admits(alg::AbstractCoverageAlgorithm, share::Real, active::Bool, stale::Integer, min_coverage::Real) -> Bool`: The predicate that the estimate from the state calls once per asset.
 
 ### Arguments
 
@@ -65,7 +65,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Keeps a delisted asset's history, and drops the asset from the frame the moment it goes inactive.
 
-This is the default rule. It does nothing at fold time, and it does not read the staleness at read-out. A relisting resumes the history. An asset that lists, delists and lists again folds into the counts and accumulators that it left behind, and does not start from zero. [`ExpireCoverage`](@ref) keeps the history in the same way, and it differs only in how long a delisted asset stays in the frame.
+This is the default rule. It does nothing at fold time, and it does not read the staleness when the estimate is made from the state. A relisting resumes the history. An asset that lists, delists and lists again folds into the counts and accumulators that it left behind, and does not start from zero. [`ExpireCoverage`](@ref) keeps the history in the same way, and it differs only in how long a delisted asset stays in the frame.
 
 # Related
 
@@ -217,7 +217,7 @@ Carries the per-cell denominators and the per-asset bookkeeping of an available-
 
 A partial-fit state holds it in its `cvg` field. On the plain path that field is `nothing`, so the plain state costs nothing. `nu` has the shape of the accumulator it serves, because the observation count of a covariance cell is a count per pair and not a count per asset. `centre` has that shape too wherever the centre of a cell differs from the per-asset mean of the state.
 
-This type is an implementation detail and is not intended for direct use. [`partial_fit!`](@ref) writes it, the read-out verbs divide by it, and [`merge_states`](@ref) folds two of them.
+This type is an implementation detail and is not intended for direct use. [`partial_fit!`](@ref) writes it, the batch verbs called with no data divide by it, and [`merge_states`](@ref) folds two of them.
 
 # Fields
 
@@ -667,7 +667,7 @@ end
 
 Decides whether an asset reaches the answer of an available-case fit.
 
-It is the second of the two verbs of the [`AbstractCoverageAlgorithm`](@ref) interface. It runs once per asset at read-out, and the read-out writes `NaN` across every asset that it refuses.
+It is the second of the two verbs of the [`AbstractCoverageAlgorithm`](@ref) interface. It runs once per asset when the estimate is made from the state, and the estimate holds `NaN` across every asset that `admits` refuses.
 
 # Arguments
 
@@ -755,7 +755,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the universe of an available-case fit out of its per-cell counts.
 
-It makes the mask of the read-out, and it is the one place that calls [`admits`](@ref). It collapses onto the `nothing` sentinel exactly as [`coverage_sentinel`](@ref) does, so an answer that admits every asset allocates no mask. Unlike [`coverage_sentinel`](@ref) it refuses no sample. An available-case fit whose window admits nothing answers all `NaN` and does not raise, because the fit is opt-in and its caller asked for the gaps.
+It makes the mask of the estimate from the state, and it is the one place that calls [`admits`](@ref). It collapses onto the `nothing` sentinel exactly as [`coverage_sentinel`](@ref) does, so an answer that admits every asset allocates no mask. Unlike [`coverage_sentinel`](@ref) it refuses no sample. An available-case fit whose window admits nothing answers all `NaN` and does not raise, because the fit is opt-in and its caller asked for the gaps.
 
 # Mathematical definition
 
@@ -810,7 +810,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Divides an available-case accumulator by its per-cell denominator, and frames the assets the policy refuses.
 
-Every available-case read-out ends with it. A cell whose denominator has not reached one is `NaN`, which is the per-cell half of the rule. An asset that [`coverage_admission`](@ref) refuses is `NaN` across its whole row and column, which is the per-asset half.
+Every available-case estimate from a state ends with it. A cell whose denominator has not reached one is `NaN`, which is the per-cell half of the rule. An asset that [`coverage_admission`](@ref) refuses is `NaN` across its whole row and column, which is the per-asset half.
 
 The element type of the answer is the type of the division itself, so a `Float32` accumulator reads out as `Float32`, and the sentinel does not widen it. An element type that cannot hold `NaN` cannot hold the answer either. An exact accumulator, a `Rational` among them, raises an `InexactError` at the first cell that the policy refuses, and does not read out as `Float64`. A window with no refused cell is unaffected.
 
@@ -924,7 +924,7 @@ end
 
 Writes `NaN` into every entry of an answer that touches an asset the policy refuses.
 
-It is the per-asset half of the read-out rule, and [`coverage_divide`](@ref) and [`coverage_frame`](@ref) share it. A `nothing` mask is the sentinel of [`coverage_admission`](@ref). It means that every asset is admitted, so the method writes nothing.
+It is the per-asset half of the rule that an available-case estimate applies, and [`coverage_divide`](@ref) and [`coverage_frame`](@ref) share it. A `nothing` mask is the sentinel of [`coverage_admission`](@ref). It means that every asset is admitted, so the method writes nothing.
 
 # Arguments
 

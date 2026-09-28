@@ -32,10 +32,10 @@ Keywords correspond to the struct's fields.
 
 ## Composition: what this estimator forwards
 
-This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its carrier directly rather than forwarding one along its own axis; each field still follows the pattern of a posterior field replacing its prior counterpart while a structural field forwards whole. It is the member of the Black-Litterman family whose factor block is *modified* rather than passed through — the views land on the factor distribution, and the assets are its projection.
+This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its prior result directly rather than forwarding one along its own axis; each field still follows the pattern of a posterior field replacing its prior counterpart while a structural field forwards whole. It is the member of the Black-Litterman family whose factor block is *modified* rather than passed through — the views land on the factor distribution, and the assets are its projection.
 
   - The factor block `fpr` is the **posterior** factor distribution, processed by `f_mp`, with `chol` dropped because the posterior covariance supersedes the one it factorises. Its `w` and that weighting's diagnostics forward untouched.
-  - `mu` and `sigma` are that block projected through the loadings, so the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction, whatever `rf` is, because the rate is inside `fpr.mu` where it is present at all. `sigma` optionally gains a residual correction when `rsd` is `true`.
+  - `mu` and `sigma` are that block projected through the loadings, so the returned prior result is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction, whatever `rf` is, because the rate is inside `fpr.mu` where it is present at all. `sigma` optionally gains a residual correction when `rsd` is `true`.
   - `w` is the factor prior's, and is over the right axis: this estimator wraps only a factor prior, and `posterior_X` has exactly `F`'s rows, so it is the only weighting in existence.
 
 Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the identity exactly, while [`BlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) do not — see their warnings.
@@ -364,7 +364,7 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
 12. Forward the factor block with [`forward_prior`](@ref), replacing `mu` and `sigma` by the posterior factor pair and dropping `chol`. It is not expanded: the reduction never touched the factor axis.
 13. Announce the departures once with [`announce_bl_departures`](@ref), naming them with [`investable_universe_names`](@ref).
 14. Write every asset-axis block back onto the full universe: the moment pair with [`expand_moment`](@ref), the reconstruction with [`expand_columns`](@ref) and the regression with [`expand_regression`](@ref). `chol` is dropped instead of expanded, because a `NaN` frame has no factorisation.
-15. Build the carrier directly, taking `w` and its diagnostics from `f_prior` and carrying no `Z`.
+15. Build the prior result directly, taking `w` and its diagnostics from `f_prior` and carrying no `Z`.
 
 # Arguments
 

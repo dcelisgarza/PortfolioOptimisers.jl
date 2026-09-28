@@ -304,7 +304,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a covariance matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `Statistics.cov`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+The method of `Statistics.cov` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 
@@ -330,7 +330,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a correlation matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `Statistics.cor`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+The method of `Statistics.cor` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 
@@ -356,7 +356,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a variance out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `Statistics.var`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+The method of `Statistics.var` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 
@@ -382,7 +382,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a standard deviation out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `Statistics.std`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+The method of `Statistics.std` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 
@@ -495,7 +495,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads an expected returns vector out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `Statistics.mean`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+The method of `Statistics.mean` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 
@@ -553,7 +553,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `return_forecast`
 
-  - [`return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult, csfm::CrossSectionalFactorModel)`](@ref): Computes the Return Forecast of a carrier and a factor-model block.
+  - [`return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult, csfm::CrossSectionalFactorModel)`](@ref): Computes the Return Forecast of `rd` and a factor-model block.
 
 ### Arguments
 
@@ -1836,7 +1836,7 @@ Build the type docstring of a generated windowed estimator as an interpolation A
  3. Push the `# Constructors` section, the keyword signature built from `name`, `field`, `ftype` and `default`, and the `## Validation` subsection carrying the live `val_dict[:oow]` lookup and the window rule.
  4. Push the three propagation subsections, `## Propagated parameters`, `## View parameters` and `## Observation weight parameters`, each naming `field` and `w` as the tags on the generated struct declare them.
  5. Push the `# Examples` section, fencing `doctest` as a `jldoctest` block.
- 6. Push the `# Related` heading, the supertype, `inner_ref`, every entry of `methods`, and the four seam functions the type answers.
+ 6. Push the `# Related` heading, the supertype, `inner_ref`, every entry of `methods`, and the four shared functions the type answers: `factory`, `port_opt_view`, `obs_weights_view` and `windowed_preamble`.
  7. Return `parts` wrapped in `Expr(:string, ...)`, so every lookup stays live.
 
 # Arguments
@@ -1908,7 +1908,7 @@ in sync.
     generated prose.
   - `forward`: one mini-signature per generic to forward, paired with the
     [`ret_dict`](@ref) key(s) documenting its return values. Naming `mean` in the
-    mini-signature emits it as a named keyword instead of letting it ride in `kwargs...`,
+    mini-signature emits it as a named keyword instead of letting it pass in `kwargs...`,
     where it would leak into [`windowed_preamble`](@ref).
   - `doctest`: the body of the `jldoctest` block for the `# Examples` section, without its
     fences.

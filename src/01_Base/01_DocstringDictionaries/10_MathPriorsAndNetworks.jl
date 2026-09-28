@@ -60,10 +60,11 @@ unique_key_dict!(math_dict, :math_dict,
                  :K_keep_set => "``\\mathcal{K}``: Set of the assets a selector keeps.",#
                  :k_tail_count => "``k``: Number of assets taken from one end of the score ordering.",#
                  :t_corr_threshold => "``t``: Correlation at or above which two assets are redundant.",#
-                 # The online step of the prior family. `12_PriorPartialFit.jl` states each
-                 # read-out as the batch prior of the rows it folded.
+                 # The online step of the prior family. `12_PriorPartialFit.jl` states the
+                 # result of `prior(pe)` with no data as the batch prior of the rows that
+                 # `pe` folded.
                  :P_batch_prior => "``\\mathcal{P}(\\cdot)``: Batch prior, the result that the estimator's batch verb gives on the matrices in the parentheses.",#
-                 :P_fold_prior => "``\\mathcal{P}_T``: Folded prior, the result that the estimator's read-out gives after it folds the observations ``\\boldsymbol{x}_1, \\ldots, \\boldsymbol{x}_T`` in order, one at a time or in blocks of any size.",#
+                 :P_fold_prior => "``\\mathcal{P}_T``: Folded prior, the result that the estimator's batch verb gives with no data after the estimator folds the observations ``\\boldsymbol{x}_1, \\ldots, \\boldsymbol{x}_T`` in order, one at a time or in blocks of any size.",#
                  # The cross-sectional factor prior. Each symbol below is stated by two or
                  # more Units of `10_Prior/10_Base_CrossSectionalFactorPrior.jl`.
                  :a_ti_pnl => "``a_{ti}``: Panel activity of asset ``i`` at observation ``t``, ``1`` when the active mask of the Asset Panel activates the asset and ``0`` when it does not.",#

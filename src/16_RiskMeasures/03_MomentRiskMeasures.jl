@@ -1317,7 +1317,7 @@ deviations `val` (net portfolio returns minus the measure's target, from
 [`calc_deviations_vec`](@ref)), compute the measure's scalar value. Dispatch selects the
 per-algorithm reduction (lower/full, the power, the standardisation, the formulation).
 
-Both functor arities funnel through this kernel: `r(w, X, fees)` calls
+Both functor arities call this kernel: `r(w, X, fees)` calls
 `moment_risk(r, calc_deviations_vec(r, w, X, fees))`, and the single-argument
 precomputed-returns form `r(x::VecNum)` calls `moment_risk(r, calc_deviations_vec(r, x))`,
 so the two share one definition of the math.

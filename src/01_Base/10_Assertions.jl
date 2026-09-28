@@ -458,9 +458,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that a matrix-source selector names one of the two carriers.
+Assert that a matrix-source selector names one of the two sources, the prior result or the returns data.
 
-Source selectors pick which of the two carriers a matrix is read from: `:prior` reads the prior result, `:data` reads the raw returns result. `x_src` selects the returns matrix `X`.
+Source selectors pick the source that a matrix is read from: `:prior` reads the prior result, `:data` reads the raw returns result. `x_src` selects the returns matrix `X`.
 
 # Arguments
 

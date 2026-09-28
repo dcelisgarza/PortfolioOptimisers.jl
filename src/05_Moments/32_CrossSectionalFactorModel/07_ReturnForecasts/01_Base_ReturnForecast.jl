@@ -2,7 +2,7 @@
     return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
                     csfm::CrossSectionalFactorModel) -> AbstractReturnForecastResult
 
-Compute the Return Forecast of a carrier and a fitted factor-model block.
+Compute the Return Forecast of the returns data `rd` and a fitted factor-model block.
 
 This is the verb every Return Forecast Estimator answers. The block carries the exposure history, the idiosyncratic variance history and the factor axis the members read, so a caller fits a forecast on a stored prior result without refitting the prior.
 
@@ -179,8 +179,8 @@ function return_forecast_weights(rd::ReturnsResult)::MatNum
     emsk = pnl.emsk
     @argcheck(!isnothing(emsk),
               IsNothingError("a Return Forecast scores its Descriptors over the estimation universe of each observation, and this Asset Panel is static, so it carries no estimation mask"))
-    # The mask is read in the number type of the returns it weighs, so a `Float32` carrier
-    # is not widened by its own weights.
+    # The mask is read in the number type of the returns it weighs, so `Float32` returns
+    # data is not widened by its own weights.
     T = real(eltype(rd.X))
     return T.(emsk)
 end
@@ -242,11 +242,11 @@ end
 """
     return_forecast_rows(rd::ReturnsResult, csfm::CrossSectionalFactorModel) -> AbstractUnitRange
 
-Return the rows of the carrier the histories of a factor-model block live on.
+Return the rows of the returns data the histories of a factor-model block live on.
 
-A [`CrossSectionalFactorPrior`](@ref) drops the leading observations that its Descriptors warm up over, and fits on the observations that remain. So the block is always a suffix of the carrier. The function finds the suffix by size, not by a stored offset. A stored offset must survive every view of the block, and the size arithmetic holds on every view.
+A [`CrossSectionalFactorPrior`](@ref) drops the leading observations that its Descriptors warm up over, and fits on the observations that remain. So the block is always a suffix of the returns data. The function finds the suffix by size, not by a stored offset. A stored offset must survive every view of the block, and the size arithmetic holds on every view.
 
-A Return Forecast Estimator scores its own Descriptors over the whole carrier, so they warm up on every observation of the panel. Each member then cuts the scores to these rows. A carrier of the same length as the block gives the whole range. A caller who hands the carrier that is already narrowed gets this answer.
+A Return Forecast Estimator scores its own Descriptors over all the returns data, so they warm up on every observation of the panel. Each member then cuts the scores to these rows. Returns data of the same length as the block gives the whole range. A caller who hands in returns data that is already narrowed gets this answer.
 
 # Mathematical definition
 
@@ -258,8 +258,8 @@ A Return Forecast Estimator scores its own Descriptors over the whole carrier, s
 
 Where:
 
-  - ``\\mathcal{R}``: The rows of the carrier that the block lives on.
-  - ``T_{c}``: Number of observations of the carrier.
+  - ``\\mathcal{R}``: The rows of the returns data that the block lives on.
+  - ``T_{c}``: Number of observations of the returns data.
   - ``T_{b}``: Number of observations of the block. A block that carries no history states no window, and then ``T_{b} = T_{c}``.
 
 # Arguments
@@ -270,11 +270,11 @@ Where:
 # Validation
 
   - The rules of [`descriptor_asset_panel`](@ref).
-  - The carrier is at least as long as the block. Raises a `DimensionMismatch`.
+  - The returns data is at least as long as the block. Raises a `DimensionMismatch`.
 
 # Returns
 
-  - `rows::AbstractUnitRange`: The rows of the carrier the block lives on.
+  - `rows::AbstractUnitRange`: The rows of the returns data the block lives on.
 
 # Related
 
@@ -291,7 +291,7 @@ function return_forecast_rows(rd::ReturnsResult,
         return 1:Tc
     end
     @argcheck(Tb <= Tc,
-              DimensionMismatch("the factor model block is fitted on a suffix of the carrier, so the carrier ($Tc observations) cannot be shorter than the block ($Tb observations). Hand the carrier the prior was fitted on."))
+              DimensionMismatch("the factor model block is fitted on a suffix of the returns data, so the returns data ($Tc observations) cannot be shorter than the block ($Tb observations). Hand in the returns data that the prior was fitted on."))
     return (Tc - Tb + 1):Tc
 end
 """
@@ -299,14 +299,14 @@ end
     return_forecast_cut(A::MatNum, rows::AbstractUnitRange) -> MatNum
     return_forecast_cut(A::Arr3Num, rows::AbstractUnitRange) -> Arr3Num
 
-Cut a history that lives on the carrier's observation axis down to the block's rows.
+Cut a history that lives on the observation axis of the returns data down to the block's rows.
 
-The Return Forecast family computes its Descriptor scores over the whole carrier and answers on the block's rows. So this verb cuts each whole-axis history that the family carries beside the scores, once. The cut is a copy and not a view, because a view of an array whose element type is open names no numeric array.
+The Return Forecast family computes its Descriptor scores over all the returns data and answers on the block's rows. So this verb cuts each whole-axis history that the family carries beside the scores, once. The cut is a copy and not a view, because a view of an array whose element type is open names no numeric array.
 
 # Arguments
 
-  - `A`: A history on the carrier's observation axis, or `nothing`.
-  - `rows`: The rows of the carrier the block lives on.
+  - `A`: A history on the observation axis of the returns data, or `nothing`.
+  - `rows`: The rows of the returns data the block lives on.
 
 # Returns
 
@@ -331,15 +331,15 @@ end
     return_forecast_pad(A::Nothing, rows::AbstractUnitRange, T::Integer) -> Nothing
     return_forecast_pad(A::MatNum, rows::AbstractUnitRange, T::Integer) -> MatNum
 
-Place a history of a factor-model block into the rows of the carrier it was fitted on.
+Place a history of a factor-model block into the rows of the returns data it was fitted on.
 
-The rows before the block carry no information of the factor model, so they are `NaN`. A member that fits over the whole carrier reads them as it reads any missing cell. Where the history that a pair needs is not finite, the pair drops out of the fit.
+The rows before the block carry no information of the factor model, so they are `NaN`. A member that fits over all the returns data reads them as it reads any missing cell. Where the history that a pair needs is not finite, the pair drops out of the fit.
 
 # Arguments
 
   - `A`: A history on the block's observation axis, or `nothing`.
-  - `rows`: The rows of the carrier the block lives on.
-  - `T`: Number of observations the carrier has.
+  - `rows`: The rows of the returns data the block lives on.
+  - `T`: Number of observations of the returns data.
 
 # Validation
 
@@ -347,7 +347,7 @@ The rows before the block carry no information of the factor model, so they are 
 
 # Returns
 
-  - `A`: The same history on the carrier's axis, `NaN` before the block, or `nothing`. Its element type is [`float_if_integer`](@ref) of the element type of `A`, so an integer history becomes a floating-point history.
+  - `A`: The same history on the axis of the returns data, `NaN` before the block, or `nothing`. Its element type is [`float_if_integer`](@ref) of the element type of `A`, so an integer history becomes a floating-point history.
 
 # Related
 

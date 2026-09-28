@@ -267,22 +267,22 @@ end
     append_carrier_block!(P::DataFrames.DataFrame, A::Nothing, ts, sym::Symbol) -> Vector{String}
     append_carrier_block!(P::DataFrames.DataFrame, A::TimeSeries.TimeArray, ts, sym::Symbol) -> Vector{String}
 
-Write one price block of the carrier beside the asset block, on the asset clock.
+Write one price block of the `PricesResult` beside the asset block, on the asset clock.
 
-The carrier states one clock. So this function reads a factor or benchmark series at the asset timestamps, and does not join it onto them. A join adds or drops observations, and [`price_ingestion`](@ref) owns every change of the clock. The function writes the columns one at a time, so the blocks do not need the one value type that `TimeSeries.merge` needs. A `Float32` factor table beside a `Float64` asset table converts, and the conversion promotes the two types.
+The `PricesResult` states one clock. So this function reads a factor or benchmark series at the asset timestamps, and does not join it onto them. A join adds or drops observations, and [`price_ingestion`](@ref) owns every change of the clock. The function writes the columns one at a time, so the blocks do not need the one value type that `TimeSeries.merge` needs. A `Float32` factor table beside a `Float64` asset table converts, and the conversion promotes the two types.
 
 # Algorithm
 
  1. A block that is `nothing` adds no column and no name.
  2. Otherwise, check that the block states the asset clock. Throw an error that names the block if it does not.
- 3. Write every absent price as `NaN` with [`unify_gaps`](@ref), which [`price_ingestion`](@ref) also runs. It changes nothing on a carrier that the ingestion layer built. On a carrier built by hand, it makes a `missing` convert as a `NaN` does.
+ 3. Write every absent price as `NaN` with [`unify_gaps`](@ref), which [`price_ingestion`](@ref) also runs. It changes nothing on a `PricesResult` that the ingestion layer built. On a `PricesResult` built by hand, it makes a `missing` convert as a `NaN` does.
  4. Write each column of the block into `P` under its own name, and return the names in order.
 
 # Arguments
 
   - `P`: The table the conversion is assembling, already carrying the clock and the asset columns.
   - `A`: The factor or benchmark price series, or `nothing`.
-  - `ts`: The asset timestamps, which are the carrier's clock.
+  - `ts`: The asset timestamps, which are the clock of the `PricesResult`.
   - `sym`: The block's name in the refusal, `:F` or `:B`.
 
 # Validation
@@ -326,11 +326,11 @@ end
         kwargs...
     ) -> ReturnsResult
 
-Compute returns from the price carrier.
+Compute returns from the price data.
 
-A keyword belongs to this function only when it changes the arithmetic of a return, and three keywords do. Every datum that the conversion reads is a field of the [`PricesResult`](@ref). These are the asset prices, the factors, the benchmark, the implied volatilities, the **Listing Span** and the [`AssetPanel`](@ref). A keyword for one of them would state again what the carrier states.
+A keyword belongs to this function only when it changes the arithmetic of a return, and three keywords do. Every datum that the conversion reads is a field of the [`PricesResult`](@ref). These are the asset prices, the factors, the benchmark, the implied volatilities, the **Listing Span** and the [`AssetPanel`](@ref). A keyword for one of them would state again what the `PricesResult` states.
 
-The second method takes a bare price table. It runs [`price_ingestion`](@ref) with a default [`PriceIngestion`](@ref), and converts the carrier that it returns. For a different join, a collapse, a declared span, or factor, benchmark and implied-volatility series, call the two steps.
+The second method takes a bare price table. It runs [`price_ingestion`](@ref) with a default [`PriceIngestion`](@ref), and converts the `PricesResult` that it returns. For a different join, a collapse, a declared span, or factor, benchmark and implied-volatility series, call the two steps.
 
 An absent price is a `NaN`. The conversion carries it into the returns, and it does not delete the observation or the asset. [`PriceGapFill`](@ref) fills a gap and [`MissingDataFilter`](@ref) deletes one. Both are fitted steps.
 
@@ -359,14 +359,14 @@ The conversion applies the same rule to a benchmark ``B``, and carries the bench
 # Algorithm
 
  1. Check with [`assert_distinct_series_names`](@ref) that the asset, factor and benchmark series have distinct names. Read the asset names and the asset timestamps from `pr.X`. Check `pr.pnl` against them with [`check_asset_panel`](@ref), and `pr.span` with [`assert_span_shape`](@ref).
- 2. Write the three price blocks side by side on the clock of the carrier with [`append_carrier_block!`](@ref), which writes every absent price as `NaN` with [`unify_gaps`](@ref). The carrier states one clock. So the function reads a factor or benchmark series at the asset timestamps, and does not join it onto them. It refuses a series on a different clock and names the series, because a join adds or drops observations and [`price_ingestion`](@ref) owns every change of the clock. A benchmark is one shared column, or one column per asset.
+ 2. Write the three price blocks side by side on the clock of the `PricesResult` with [`append_carrier_block!`](@ref), which writes every absent price as `NaN` with [`unify_gaps`](@ref). The `PricesResult` states one clock. So the function reads a factor or benchmark series at the asset timestamps, and does not join it onto them. It refuses a series on a different clock and names the series, because a join adds or drops observations and [`price_ingestion`](@ref) owns every change of the clock. A benchmark is one shared column, or one column per asset.
  3. Convert the prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This step applies the formula above. It computes both branches through logarithms. The log return is ``\\ln p_{t,\\,i} - \\ln p_{t-1,\\,i}``, and the simple return is `expm1` of it. So the two agree with the closed forms above to floating point, and not always to the last bit. When `padding` is `true`, the step keeps the first observation with a `NaN` return, so the returns keep the length of the price clock.
  4. **A gap carried here does not spread.** The formula reads two prices, so a run of `k` gapped prices makes non-finite only the returns that read one of them. That is `k + 1` returns for a run inside the series, and `k` for a run at either end, because no return reads a price before the first row or after the last. Every later return of that column reads two observed prices. A gap also stays in its own column, because the return of an asset reads no price of another asset.
  5. Resolve the returns that a gap left non-finite with [`apply_gap_return`](@ref), under `gap_return_alg`. The method for `nothing` is the default rule. It returns the table unchanged, so the returns of step 3 stay bit for bit the same. An algorithm writes only a return that reads a gapped price, inside the Listing Span of its column, after the first observed price. So every return computed from two observed prices keeps its value. The function logs an `@info` when it finds no writable return.
  6. Name the three blocks. Step 1 refused a name that two tables share and the name `timestamp`. So the asset names `nx`, the factor names `nf` and the benchmark names `nb` are the column names of the three tables, and `ts` is the `timestamp` column of the converted table.
- 7. Write each absent implied volatility as `NaN` with [`unify_gaps`](@ref), and index `pr.iv` by `ts`. Then check the implied volatilities and `pr.ivpa` against the asset count. The returns clock is the price clock, less the first observation when `padding` is `false`. So the implied volatilities of a carrier that the ingestion layer built cover it. The conversion carries an absent implied volatility as `NaN`, and the estimator that reads it excludes it.
+ 7. Write each absent implied volatility as `NaN` with [`unify_gaps`](@ref), and index `pr.iv` by `ts`. Then check the implied volatilities and `pr.ivpa` against the asset count. The returns clock is the price clock, less the first observation when `padding` is `false`. So the implied volatilities of a `PricesResult` that the ingestion layer built cover it. The conversion carries an absent implied volatility as `NaN`, and the estimator that reads it excludes it.
  8. View the [`AssetPanel`](@ref) on the returns clock. Find the panel rows of the returns timestamps with [`feature_row_indices`](@ref), and view the panel with [`port_opt_view`](@ref). Give it the asset names, so that it also cuts a square tensor Panel Field on its label axis. The conversion removes no column, so the view keeps every asset. A time-varying panel loses only the observations that the returns clock does not hold.
- 9. State the universe. Cut `pr.span` to the asset axis with [`span_carrier_view`](@ref). Give it and the asset returns to [`returns_universe_masks`](@ref), which projects the span onto the returns clock and intersects it with finiteness. [`attach_universe_masks`](@ref) puts the two masks on the Asset Panel and keeps its Panel Fields. When the carrier holds no panel, it makes a panel with no Panel Field. A carrier with no span states no universe, so the function attaches no masks, and the panel is the one of step 8, or `nothing`.
+ 9. State the universe. Cut `pr.span` to the asset axis with [`span_carrier_view`](@ref). Give it and the asset returns to [`returns_universe_masks`](@ref), which projects the span onto the returns clock and intersects it with finiteness. [`attach_universe_masks`](@ref) puts the two masks on the Asset Panel and keeps its Panel Fields. When the `PricesResult` holds no panel, it makes a panel with no Panel Field. A `PricesResult` with no span states no universe, so the function attaches no masks, and the panel is the one of step 8, or `nothing`.
 10. Build the factor and benchmark matrices from the columns of each block. A block with no column gives `nothing`, and a benchmark block with one column gives a vector. The asset matrix is always present, because the conversion removes no column.
 11. Return the [`ReturnsResult`](@ref).
 
@@ -374,7 +374,7 @@ The conversion applies the same rule to a benchmark ``B``, and carries the bench
 
 # Arguments
 
-  - `pr`: The price carrier, as [`price_ingestion`](@ref) returns it or a caller builds it.
+  - `pr`: The price data, as [`price_ingestion`](@ref) returns it or a caller builds it.
   - `X`: Asset price data (observations × assets), converted through a default [`PriceIngestion`](@ref).
   - `ret_method`: The return formula, `:simple` or `:log`.
   - `padding`: When `true`, keep the first observation with a `NaN` return, so the returns keep the length of the price clock. When `false`, drop it.
@@ -465,7 +465,7 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
     X = DataFrames.DataFrame(X)
     X = apply_gap_return(gap_return_alg, X, P, ret_method)
     #! The three name lists are pairwise disjoint, and none of them is `timestamp`, because
-    #! `assert_distinct_series_names` refused every collision at the door. So each block is
+    #! `assert_distinct_series_names` refused every collision on entry. So each block is
     #! named outright rather than recovered by intersection, and the clock is read as the
     #! one column that carries it. Recovering the clock as "whatever column no block
     #! claims" is what built a `Vector{Any}` of interleaved dates and prices out of a
@@ -526,11 +526,11 @@ Preprocessing estimator that converts price-level data into returns-level data.
 
 Its first three fields are the three keywords of [`prices_to_returns`](@ref), which are the keywords that change the arithmetic of a return. A join and a collapse change the observation clock, and [`PriceIngestion`](@ref) owns them. [`PriceGapFill`](@ref) fills a gap and [`MissingDataFilter`](@ref) deletes one, and both are fitted steps. Every datum that the conversion reads is a field of the [`PricesResult`](@ref).
 
-The step needs no state to fix an asset universe, because the carrier states one. A [`PricesResult`](@ref) that [`price_ingestion`](@ref) built carries a **Listing Span**. This step projects the span onto the returns clock, and gives the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) with two masks. At each observation, the masks state which assets are in the universe, and which of them are estimable. The asset axis is fixed before the split, so every window of every fold carries every asset, and no window loses a column.
+The step needs no state to fix an asset universe, because the `PricesResult` states one. A [`PricesResult`](@ref) that [`price_ingestion`](@ref) built carries a **Listing Span**. This step projects the span onto the returns clock, and gives the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) with two masks. At each observation, the masks state which assets are in the universe, and which of them are estimable. The asset axis is fixed before the split, so every window of every fold carries every asset, and no window loses a column.
 
 !!! warning
 
-    A carrier that the ingestion layer did not build states no universe, and the conversion does not infer one from the window. A span computed from the window alone reads a delisting that crosses the end of the window as an asset that was never listed. The conversion still carries the gaps of such a carrier. With no panel, the Coverage Universe reads finiteness alone, and the fold infers the universe that a span would state. Build the carrier with [`price_ingestion`](@ref), or give a listing calendar as its `span`.
+    A `PricesResult` that the ingestion layer did not build states no universe, and the conversion does not infer one from the window. A span computed from the window alone reads a delisting that crosses the end of the window as an asset that was never listed. The conversion still carries the gaps of such a `PricesResult`. With no panel, the Coverage Universe reads finiteness alone, and the fold infers the universe that a span would state. Build the `PricesResult` with [`price_ingestion`](@ref), or give a listing calendar as its `span`.
 
 # Algorithm
 

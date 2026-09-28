@@ -3044,7 +3044,7 @@ end
 
 Return the low order factor prior whose `mu` and `sigma` a factor figure draws.
 
-A prior result that carries a factor block keeps its low order factor moments in `fpr`. A [`HighOrderPrior`](@ref) is the exception. Its own `fpr` field holds the factor co-moments, and that field is `nothing` when the estimator formed none, although the prior it wraps still carries the low order factor block. The method for it falls back to the wrapped prior, so a factor figure draws the same block on both carriers.
+A prior result that carries a factor block keeps its low order factor moments in `fpr`. A [`HighOrderPrior`](@ref) is the exception. Its own `fpr` field holds the factor co-moments, and that field is `nothing` when the estimator formed none, although the prior it wraps still carries the low order factor block. The method for it falls back to the wrapped prior, so a factor figure draws the same block on both prior results.
 
 # Arguments
 
@@ -3087,7 +3087,7 @@ Reduce a prior result, the axis names and the weights a computed figure draws to
 
 A **drawn** plot keeps the frame. A heatmap or a bar chart of a Prior Result shows the full universe, and the backend leaves a blank cell and a missing bar where the asset is not investable. A **computed** plot has no such option. `eigvals(Symmetric(sigma))` refuses a `NaN`, and a phylogeny or a centrality score is fitted by a plain moment estimator, which refuses one too. Such a figure reduces here instead, and it draws the investable universe alone.
 
-The reduction is the one [`port_opt_view`](@ref) the prior's owner already writes, so a new block cannot be forgotten and the reduced `pr.X` carries no dead column. The names and the weights ride the asset axis, so they take the mask directly.
+The reduction is the one [`port_opt_view`](@ref) the prior's owner already writes, so a new block cannot be forgotten and the reduced `pr.X` carries no dead column. The names and the weights are on the asset axis, so they take the mask directly.
 
 A [`ReturnsResult`](@ref) carries no moments, so no mask exists to derive and it passes through. So one function states the reduction once, and dispatch decides whether it happens.
 
@@ -3095,7 +3095,7 @@ No diagnostic is emitted. A figure is a drawing rather than a number a caller ac
 
 # Algorithm
 
- 1. Return the three arguments unchanged when the carrier is a returns result.
+ 1. Return the three arguments unchanged when `pr` is a returns result.
  2. Derive the Investable Mask once with [`investable_mask`](@ref).
  3. Return the three unchanged when every asset is investable.
  4. Otherwise return a [`port_opt_view`](@ref) of the prior at `findall(imsk)`, and the views of the names and the weights at the mask.
@@ -3669,7 +3669,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
 
   - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
   - `X`: Target history `observations × assets`, on the axis of the forecast, from [`forecast_target_history`](@ref).
-  - `rd`: The carrier the target history is built from. It carries an Asset Panel in `rd.pnl`.
+  - `rd`: The returns data the target history is built from. It carries an Asset Panel in `rd.pnl`.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
@@ -3726,7 +3726,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
 
   - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
   - `X`: Target history `observations × assets`, on the axis of the forecast, from [`forecast_target_history`](@ref).
-  - `rd`: The carrier the target history is built from. It carries an Asset Panel in `rd.pnl`.
+  - `rd`: The returns data the target history is built from. It carries an Asset Panel in `rd.pnl`.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
@@ -3781,7 +3781,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
 
   - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
   - `X`: Target history `observations × assets`, on the axis of the forecast, from [`forecast_target_history`](@ref).
-  - `rd`: The carrier the target history is built from. It carries an Asset Panel in `rd.pnl`.
+  - `rd`: The returns data the target history is built from. It carries an Asset Panel in `rd.pnl`.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
@@ -3838,7 +3838,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
 
   - `fe`: The evaluation to draw, from [`forecast_evaluation`](@ref).
   - `X`: Target history `observations × assets`, on the axis of the forecast, from [`forecast_target_history`](@ref).
-  - `rd`: The carrier the target history is built from. It carries an Asset Panel in `rd.pnl`.
+  - `rd`: The returns data the target history is built from. It carries an Asset Panel in `rd.pnl`.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose weight history `weighting` names.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.

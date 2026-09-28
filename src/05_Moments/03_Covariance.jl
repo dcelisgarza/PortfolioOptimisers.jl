@@ -1100,7 +1100,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the [`CovarianceState`](@ref) an incremental covariance fit folds into, seeding one of zeros when the estimator carries none.
 
-Both covariance estimators of the seam seed the same state from the same observation, so the seed is written once here rather than at each [`partial_fit!`](@ref) method.
+Both covariance estimators, [`GeneralCovariance`](@ref) and [`Covariance`](@ref), seed the same state from the same observation, so the seed is written once here rather than at each [`partial_fit!`](@ref) method.
 
 # Arguments
 
@@ -1508,7 +1508,7 @@ end
 
 Reads the [`CoveragePolicy`](@ref) a covariance estimator carries, out of an estimator that may have no such field.
 
-[`GeneralCovariance`](@ref) and [`Covariance`](@ref) share one state and one read-out, and only the second has a `cvg` field. The read-out therefore asks for the policy through this verb rather than for the field, so that the arm is still chosen by dispatch and the estimator without the field answers `nothing`.
+[`GeneralCovariance`](@ref) and [`Covariance`](@ref) share one state and one method that makes the estimate from it, `cov(ce)` with no data, and only the second has a `cvg` field. That method therefore asks for the policy through this verb rather than for the field, so that the arm is still chosen by dispatch and the estimator without the field answers `nothing`.
 
 # Arguments
 
@@ -1534,7 +1534,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the read-out arm of [`coverage_covariance`](@ref). Every pair shares one count, so the whole answer is `NaN` until the count passes the Bessel correction.
+`Nothing` method of [`coverage_covariance`](@ref) for a state, which `cov(ce)` with no data calls. Every pair shares one count, so the whole answer is `NaN` until the count passes the Bessel correction.
 
 [`GeneralCovariance`](@ref) carries no `cvg` field and reads the same state, so it always reaches this arm.
 
@@ -1552,7 +1552,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of the read-out arm of [`coverage_covariance`](@ref). Each pair's accumulator is divided by that pair's own count less the Bessel correction, and an asset the policy refuses is `NaN` across its whole row and column.
+[`CoveragePolicy`](@ref) method of [`coverage_covariance`](@ref) for a state, which `cov(ce)` with no data calls. Each pair's accumulator is divided by that pair's own count less the Bessel correction, and an asset the policy refuses is `NaN` across its whole row and column.
 
 A pair whose two assets are each admitted but which share no observation is `NaN` on its own, because a covariance of no observations is not a number. That is available-case estimation's own cost, and it is what a consumer of the matrix must be ready for.
 
@@ -1579,7 +1579,7 @@ end
 
 Reads a correlation matrix out of a folded covariance estimator.
 
-The correlation twin of the state read-out of `Statistics.cov`, and the same two steps the batch method takes: the folded covariance first, then [`coverage_correlation`](@ref), which is the one place the conversion lives. So a folded estimator answers `cor` for the same configurations it answers `cov`, and the composite [`PortfolioOptimisersCovariance`](@ref) can offer both.
+The correlation twin of `cov(ce)` with no data, and the same two steps the batch method takes: the folded covariance first, then [`coverage_correlation`](@ref), which is the one place the conversion lives. So a folded estimator answers `cor` for the same configurations it answers `cov`, and the composite [`PortfolioOptimisersCovariance`](@ref) can offer both.
 
 # Arguments
 

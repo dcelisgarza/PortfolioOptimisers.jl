@@ -70,7 +70,7 @@ end
 
 Alias for a walk-forward scheme, plain or an Online Scheme.
 
-An Online Scheme is an [`Online`](@ref) around a walk-forward, built by the scheme's function constructor — [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref), [`OnlineHindsightSplit`](@ref). It is not a [`WalkForwardEstimator`](@ref) by supertype, because a struct has one, so every bound that admits a walk-forward is written on this alias and the wrapped form reaches the same doors as the plain one. `split`, `n_splits` and [`fold_evaluation`](@ref) forward to the wrapped scheme; [`folds_are_stepped`](@ref) is where the two differ.
+An Online Scheme is an [`Online`](@ref) around a walk-forward, built by the scheme's function constructor — [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref), [`OnlineHindsightSplit`](@ref). It is not a [`WalkForwardEstimator`](@ref) by supertype, because a struct has one, so every bound that admits a walk-forward is written on this alias and the wrapped form reaches the same methods as the plain one. `split`, `n_splits` and [`fold_evaluation`](@ref) forward to the wrapped scheme; [`folds_are_stepped`](@ref) is where the two differ.
 
 # Related
 
@@ -264,11 +264,11 @@ end
 
 Build the Online Scheme of an [`IndexWalkForward`](@ref): the scheme wrapped in [`Online`](@ref), under which the fold loop fits each fold by the online step instead of a refit.
 
-The keywords are the scheme's, minus `expand_train`, which is set `true`: a fold cannot un-fold an observation, so an online run is expanding by construction, and the mismatch a rolling window would be cannot be written. A rolling window computed online is the estimator's to declare, through `Online(pe; max_history = train_size - purged_size)` on the prior. This constructor is the only way to build the wrapped scheme; `Online(cv)` by hand is refused by name.
+The keywords are the scheme's, minus `expand_train`, which is set `true`: a fold cannot un-fold an observation, so an online run is expanding by construction, and the mismatch a rolling window would be cannot be written. A rolling window computed online is the estimator's to declare, through `Online(pe; max_history = train_size - purged_size)` on the prior. This constructor is the only way to build the wrapped scheme; `Online(cv)` by hand is refused with an error that names it.
 
 Under the Online Scheme the loop takes its online arm, [`online_folds`](@ref). It resolves every [`Online`](@ref) wrapper in the estimator through [`update_online_estimator`](@ref), folds the first training window in with [`partial_fit!`](@ref), and then, per fold, folds only the rows the training window has gained since the last fold and reads the estimator out through `optimise(opt)`. The estimator is threaded from fold to fold, so fold `i` never re-reads the rows fold `i - 1` read, and the run reaches the weights of the batch expanding-window scheme, `IndexWalkForward(train_size, test_size; purged_size, expand_train = true)`, fold for fold.
 
-The loop starts cold: an estimator carrying a partial-fit state at entry is refused by name, and a [`TimeDependent`](@ref) schedule on a field that carries a state — the prior, or the optimiser itself — is refused at warm-up, because a schedule replaces the value a state is threaded through. A schedule on any other field composes with no rule.
+The loop starts cold: an estimator carrying a partial-fit state at entry is refused with an error that names it, and a [`TimeDependent`](@ref) schedule on a field that carries a state — the prior, or the optimiser itself — is refused at warm-up, because a schedule replaces the value a state is threaded through. A schedule on any other field composes with no rule.
 
 # Examples
 
@@ -672,7 +672,7 @@ end
 
 Build the Online Scheme of a [`DateWalkForward`](@ref): the scheme wrapped in [`Online`](@ref), under which the fold loop fits each fold by the online step instead of a refit.
 
-The keywords are the scheme's, minus `expand_train`, which is set `true`: a fold cannot un-fold an observation, so an online run is expanding by construction, and the mismatch a rolling window would be cannot be written. A rolling window computed online is the estimator's to declare, through `Online(pe; max_history = …)` on the prior, with the cap the window's rows count to. This constructor is the only way to build the wrapped scheme; `Online(cv)` by hand is refused by name. What the loop does under it is what [`OnlineIndexWalkForward`](@ref) describes, over the folds the date scheme cuts.
+The keywords are the scheme's, minus `expand_train`, which is set `true`: a fold cannot un-fold an observation, so an online run is expanding by construction, and the mismatch a rolling window would be cannot be written. A rolling window computed online is the estimator's to declare, through `Online(pe; max_history = …)` on the prior, with the cap the window's rows count to. This constructor is the only way to build the wrapped scheme; `Online(cv)` by hand is refused with an error that names it. What the loop does under it is what [`OnlineIndexWalkForward`](@ref) describes, over the folds the date scheme cuts.
 
 # Examples
 
@@ -1150,7 +1150,7 @@ end
 
 Build the Online Scheme of a [`HindsightSplit`](@ref): the prefix split wrapped in [`Online`](@ref), under which the fold loop fits each fold by the online step instead of a refit.
 
-The keywords are the scheme's, minus `prefix`, which is set `true`: fold `t` then trains on rows `1:t` and tests on row `t`, and those training windows are nested prefixes, so the loop warms up on `1:start`, folds row `t`, reads out, and scores row `t`, exactly as it does under [`OnlineIndexWalkForward`](@ref). The row-alone split, `prefix = false`, is a window of one row that a fold cannot un-fold, so it has no online form and cannot be written here. The read-out after rows `1:t` equals the batch fit over `1:t`, so the comparators this scheme yields are the batch ones fold for fold; the step is faster than the refit only where the estimator's batch fit is itself a row recursion, and a comparator whose step is a solve, or a fixed point over every row it holds, runs no faster.
+The keywords are the scheme's, minus `prefix`, which is set `true`: fold `t` then trains on rows `1:t` and tests on row `t`, and those training windows are nested prefixes, so the loop warms up on `1:start`, folds row `t`, makes the call with no data, and scores row `t`, exactly as it does under [`OnlineIndexWalkForward`](@ref). The row-alone split, `prefix = false`, is a window of one row that a fold cannot un-fold, so it has no online form and cannot be written here. The call with no data after rows `1:t` equals the batch fit over `1:t`, so the comparators this scheme yields are the batch ones fold for fold; the step is faster than the refit only where the estimator's batch fit is itself a row recursion, and a comparator whose step is a solve, or a fixed point over every row it holds, runs no faster.
 
 # Examples
 

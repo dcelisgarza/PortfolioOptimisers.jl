@@ -37,9 +37,9 @@ Compute net returns for a [`OptimisationResult`](@ref).
 
 `fees` takes precedence over `res.fees` if both are provided. Delegates to [`calc_net_returns(w, X, fees, wd, obs)`](@ref).
 
-When `pr::Pr_RR` is passed, the carrier is paired whole and its `X` is read after.
+When `pr::Pr_RR` is passed, `pr` is paired whole and its `X` is read after.
 
-The weights, the matrix and the fee meet on the investable universe of `res`, through [`result_investable_view`](@ref): `res.w` is on the caller's universe and `res.fees` on the one the fit solved, so the weights and a caller's `X` are viewed at the result's Investable Mask, and a caller's `fees` takes the door a fee takes at the fit.
+The weights, the matrix and the fee meet on the investable universe of `res`, through [`result_investable_view`](@ref): `res.w` is on the caller's universe and `res.fees` on the one the fit solved, so the weights and a caller's `X` are viewed at the result's Investable Mask, and a caller's `fees` goes through [`investable_fees_view`](@ref), as a fee does at the fit.
 
 `wd` is the Weight Drift the window is read under. `nothing` reads the window at the constant weights `res.w`, which is the library's original behaviour. A [`SelfFinancingDrift`](@ref) reads it as the wealth ratio of the drifted holdings, and `obs` then names the observations of the message a non-positive wealth raises.
 
@@ -61,7 +61,7 @@ end
 function calc_net_returns(res::OptimisationResult, pr::Pr_RR,
                           fees::Option{<:Fees} = nothing,
                           wd::Option{<:AbstractWeightDrift} = nothing, obs = nothing)
-    # The carrier is paired whole, so the result's own prior handed back is known by
+    # `pr` is paired whole, so the result's own prior handed back is known by
     # identity; its matrix alone would be viewed a second time.
     _, w, pr, fees = result_investable_view(res, pr, fees)
     return calc_net_returns(w, pr.X, fees, wd, obs)
@@ -229,7 +229,7 @@ The method that Julia selects is the algorithm. Each kind contracts its own valu
 
   - `f`: The Panel Field.
   - `W`: Normalised inner weights, assets × synthetic assets.
-  - `nx`: The carrier's asset names, or `nothing`. Read for the square case alone.
+  - `nx`: The asset names of the returns data, or `nothing`. Read for the square case alone.
   - `syn`: The synthetic asset names.
 
 # Returns
@@ -318,7 +318,7 @@ A synthetic asset whose weights are entirely zero has `sⱼ = 0`; [`synthetic_as
 
 # Algorithm
 
- 1. Return `nothing` when the carrier holds no panel.
+ 1. Return `nothing` when `pnl` is `nothing`.
  2. Normalise the inner weights with [`synthetic_asset_weights`](@ref).
  3. Collapse every Panel Field with [`collapse_panel_field`](@ref).
  4. Collapse both universe masks with [`collapse_panel_mask`](@ref), which keeps them `nothing` for a static panel.
@@ -327,7 +327,7 @@ A synthetic asset whose weights are entirely zero has `sⱼ = 0`; [`synthetic_as
 
   - `pnl`: The Asset Panel, or `nothing`.
   - `wi`: Inner weights, assets × synthetic assets.
-  - `nx`: The carrier's asset names, or `nothing`. Read for the square case alone.
+  - `nx`: The asset names of the returns data, or `nothing`. Read for the square case alone.
 
 # Returns
 

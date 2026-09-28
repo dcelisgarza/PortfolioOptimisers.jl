@@ -7,7 +7,7 @@ Every concrete type that holds price-level data subtypes `AbstractPricesResult`.
 
 # Interfaces
 
-To implement a new price-level carrier that a pipeline and a cross-validation fold can read, subtype `AbstractPricesResult` with these fields:
+To implement a new price-level data type that a pipeline and a cross-validation fold can read, subtype `AbstractPricesResult` with these fields:
 
   - `X`: The asset prices, a `TimeSeries.TimeArray` of `observations × assets`. Fold generation reads its timestamps and its row count, and asset subset sampling reads its column count.
   - `pnl`: An [`AssetPanel`](@ref) over the assets of `X`, or `nothing`. Fold generation reads it together with `X` to find the assets that hold data.
@@ -16,19 +16,19 @@ Then implement the following method:
 
 ## `port_opt_view`
 
-  - `port_opt_view(pr::MyPricesResult, i, j = :) -> MyPricesResult`: Return the carrier on the observations at `i` and the assets at `j`.
+  - `port_opt_view(pr::MyPricesResult, i, j = :) -> MyPricesResult`: Return `pr` on the observations at `i` and the assets at `j`.
 
 A subtype that carries a panel subselects it together with `X`. A subtype that implements no method gets the fallback, which throws an `ArgumentError`.
 
 ### Arguments
 
-  - `pr`: The concrete price-level carrier.
+  - `pr`: The price-level data of the new type.
   - `i`: Indices or timestamps of the observations to keep.
   - `j`: Indices of the assets to keep.
 
 ### Returns
 
-  - `pr::MyPricesResult`: A carrier of the same type that holds only the selected observations and assets.
+  - `pr::MyPricesResult`: A value of the same type that holds only the selected observations and assets.
 
 # Related
 
@@ -43,7 +43,7 @@ abstract type AbstractPricesResult <: AbstractResult end
 
 Refuse a negative or an infinite value, and let an absence through.
 
-The ingestion layer carries an absent implied volatility as `NaN`, as it carries an absent price, and the carriers accept it. [`ImpliedVolatility`](@ref) reads the series from a carrier, and narrows its Coverage Universe to the assets whose values are complete. So an absent value removes the asset from the fit, and the fit does not fail. The carrier refuses a present value that is not a volatility, which is a negative value or an infinite one. An infinite value is neither a volatility nor the marker of an absence. [`assert_cross_sectional_matrix`](@ref) applies the same rule to a returns matrix. A carrier built by hand can also hold `missing`, and this check accepts it as an absence too. [`prices_to_returns`](@ref) changes each `missing` to `NaN` before an estimator reads the series.
+The ingestion layer carries an absent implied volatility as `NaN`, as it carries an absent price, and the [`PricesResult`](@ref) and the [`ReturnsResult`](@ref) accept it. [`ImpliedVolatility`](@ref) reads the series from a `PricesResult` or a `ReturnsResult`, and narrows its Coverage Universe to the assets whose values are complete. So an absent value removes the asset from the fit, and the fit does not fail. The `PricesResult` or the `ReturnsResult` refuses a present value that is not a volatility, which is a negative value or an infinite one. An infinite value is neither a volatility nor the marker of an absence. [`assert_cross_sectional_matrix`](@ref) applies the same rule to a returns matrix. A `PricesResult` or a `ReturnsResult` built by hand can also hold `missing`, and this check accepts it as an absence too. [`prices_to_returns`](@ref) changes each `missing` to `NaN` before an estimator reads the series.
 
 # Arguments
 
@@ -108,7 +108,7 @@ Keywords correspond to the struct's fields.
   - `!isempty(X)`.
   - If `F` is not `nothing`: `!isempty(F)`.
   - If `B` is not `nothing`: `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
-  - If `iv` is not `nothing`: `!isempty(iv)`, `size(values(iv), 2) == size(values(X), 2)`, and every present value is finite and non-negative. An absent value is `NaN`, or `missing` on a carrier built by hand. See [`assert_nonneg_where_present`](@ref).
+  - If `iv` is not `nothing`: `!isempty(iv)`, `size(values(iv), 2) == size(values(X), 2)`, and every present value is finite and non-negative. An absent value is `NaN`, or `missing` on a `PricesResult` built by hand. See [`assert_nonneg_where_present`](@ref).
   - If `ivpa` is not `nothing`: `!isempty(ivpa)`, `all(isfinite, ivpa)` and `all(x -> x > 0, ivpa)`. If `ivpa` is a vector: `length(ivpa) == size(values(X), 2)`.
   - If `pnl` is not `nothing`: its asset axis has the length `size(values(X), 2)`, and the observation axis of a time-varying panel has the length `size(values(X), 1)`. See [`check_asset_panel`](@ref).
   - If `span` is not `nothing`: `size(span) == size(values(X))`.
@@ -165,7 +165,7 @@ julia> size(values(pr.X))
     """
     pnl
     """
-    Optional Listing Span, `observations × assets`, that states which assets are listed at each observation of the price clock. Its axes run parallel to `X` by position. It is a [`PortfolioOptimisers.ListingSpan`](@ref) when [`PriceIngestion`](@ref) derives it by the Span Rule, and any other `AbstractMatrix{Bool}` when a caller states their own listing calendar. It is `nothing` when the ingestion layer did not build the carrier.
+    Optional Listing Span, `observations × assets`, that states which assets are listed at each observation of the price clock. Its axes run parallel to `X` by position. It is a [`PortfolioOptimisers.ListingSpan`](@ref) when [`PriceIngestion`](@ref) derives it by the Span Rule, and any other `AbstractMatrix{Bool}` when a caller states their own listing calendar. It is `nothing` when the ingestion layer did not build the `PricesResult`.
     """
     span
     function PricesResult(X::TimeSeries.TimeArray, F::Option{<:TimeSeries.TimeArray},
@@ -218,7 +218,7 @@ Indexing a `TimeArray` copies its rows, so `X`, `F`, `B` and `iv` of the result 
 
 The asset price series is the master clock. `i` selects rows of `X`, and the factor, benchmark and implied volatility series keep their rows at the timestamps that `X` keeps. The rows come back in clock order whatever the order of `i`, and a timestamp of `i` that `X` does not hold selects no row. `j` selects asset columns in the order it gives them, and its default is `:`. So a call that gives only `i` is an observation window over the whole universe.
 
-The first index selects observations here. The two-argument method of [`ReturnsResult`](@ref) selects assets, so `i` names a different axis on the two carriers.
+The first index selects observations here. The two-argument method of [`ReturnsResult`](@ref) selects assets, so `i` names a different axis on the two types.
 
 # Algorithm
 
@@ -255,7 +255,7 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
 
 # Returns
 
-  - `new_pr::PricesResult`: The carrier on the selected observations and assets. It is `pr` itself when `i` and `j` are both `Colon`s.
+  - `new_pr::PricesResult`: The price data on the selected observations and assets. It is `pr` itself when `i` and `j` are both `Colon`s.
 
 # Examples
 
@@ -327,7 +327,7 @@ end
 function port_opt_view(pr::AbstractPricesResult, args...; kwargs...)
     kws = keys(kwargs)
     kwmsg = isempty(kws) ? "" : " and the keyword argument(s) " * join(kws, ", ")
-    return throw(ArgumentError("port_opt_view has no method for a $(nameof(typeof(pr))) with the index argument type(s) ($(join(typeof.(args), ", ")))$(kwmsg). A price-level carrier takes port_opt_view(pr, observations) or port_opt_view(pr, observations, assets), with no keyword argument. The observations are integer indices, a range, a Colon or a vector of timestamps, and the assets are integer indices, a range or a Colon. A subtype of AbstractPricesResult implements these two shapes."))
+    return throw(ArgumentError("port_opt_view has no method for a $(nameof(typeof(pr))) with the index argument type(s) ($(join(typeof.(args), ", ")))$(kwmsg). A PricesResult takes port_opt_view(pr, observations) or port_opt_view(pr, observations, assets), with no keyword argument. The observations are integer indices, a range, a Colon or a vector of timestamps, and the assets are integer indices, a range or a Colon. A subtype of AbstractPricesResult implements these two shapes."))
 end
 export PricesResult
 public AbstractPricesResult

@@ -48,12 +48,12 @@ A return that is missing is a `NaN`, and a Descriptor tests for it. A return tha
   - `!isnothing(rd.pnl)`. Raises an [`IsNothingError`](@ref).
   - Every entry of `rd.X` that is not `NaN` is finite. Raises a `DomainError`.
 
-The two shapes need no check of their own. [`ReturnsResult`](@ref) binds the observation axis and the asset axis of the feature matrix to those of the returns, so an Asset Panel that reaches a carrier always matches the returns beside it.
+The two shapes need no check of their own. [`ReturnsResult`](@ref) binds the observation axis and the asset axis of the feature matrix to those of the returns, so an Asset Panel that reaches a `ReturnsResult` always matches the returns beside it.
 
 # Returns
 
   - `X::Matrix{<:Real}`: The returns, `observations × assets`, in `float_if_integer(eltype(rd.X))`.
-  - `pnl::AssetPanel`: The Asset Panel of the carrier.
+  - `pnl::AssetPanel`: The Asset Panel of the `ReturnsResult`.
 
 # Related
 
@@ -67,9 +67,9 @@ function descriptor_returns(rd::ReturnsResult)
     X = rd.X
     pnl = rd.pnl
     @argcheck(!isnothing(X),
-              IsNothingError("a rolling Descriptor reads returns, and rd.X is nothing. Build the carrier with the returns matrix the Asset Panel was drawn on."))
+              IsNothingError("a rolling Descriptor reads returns, and rd.X is nothing. Build the ReturnsResult with the returns matrix the Asset Panel was drawn on."))
     @argcheck(!isnothing(pnl),
-              IsNothingError("a rolling Descriptor reads the active mask of an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
+              IsNothingError("a rolling Descriptor reads the active mask of an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
     Xf = Matrix{float_if_integer(eltype(X))}(X)
     k = findfirst(isinf, Xf)
     @argcheck(isnothing(k),

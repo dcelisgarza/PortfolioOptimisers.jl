@@ -62,7 +62,7 @@ end
 """
     factor_exposure(xe::ConstantExposure, rd::ReturnsResult) -> Matrix{<:Real}
 
-Compute the constant Factor Exposure of a carrier.
+Compute the constant Factor Exposure of a [`ReturnsResult`](@ref).
 
 # Algorithm
 
@@ -105,7 +105,7 @@ julia> factor_exposure(ConstantExposure(), rd)
 function factor_exposure(::ConstantExposure, rd::ReturnsResult)::Matrix{<:Real}
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
-              IsNothingError("a constant Factor Exposure takes its shape from the active mask of an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
+              IsNothingError("a constant Factor Exposure takes its shape from the active mask of an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
     L = ones(float_if_integer(eltype(rd.X)), size(pnl.amsk))
     exposure_active_fill!(L, pnl)
     return L

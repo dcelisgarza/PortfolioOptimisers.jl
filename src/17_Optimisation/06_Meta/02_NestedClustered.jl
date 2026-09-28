@@ -27,7 +27,7 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-The keyword constructor is the one door `_optimise` exits through, so it is where the aggregated weights expand back onto the full asset universe, through [`expand_investable_weights`](@ref). The positional constructor never expands: [`set_retcode`](@ref) rebuilds through it, and a second pass would expand twice. `pr`, `clr`, `wb`, `fees` and every member of `resi` are the objects of the reduced universe, because that is what the algorithm ran on.
+`_optimise` always returns through the keyword constructor, so it is where the aggregated weights expand back onto the full asset universe, through [`expand_investable_weights`](@ref). The positional constructor never expands: [`set_retcode`](@ref) rebuilds through it, and a second pass would expand twice. `pr`, `clr`, `wb`, `fees` and every member of `resi` are the objects of the reduced universe, because that is what the algorithm ran on.
 
 # Related
 
@@ -723,7 +723,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Replace this meta-optimiser's own time-dependent fields with their static defaults.
 
-Deliberately does **not** recurse into the wrapped optimisers: a standalone meta solve consumes inner per-fold schedules through its inner cross-validation leg, and its fold-less full-window inner solves reset themselves at their own `_optimise` seam. Only the meta's own fields (applied to the combined weights, resolved by an outer fold loop when one exists) are inert here. A `bind = :nearest` schedule in a field the meta hands across its own inner fold loop (see [`inner_fold_fields`](@ref)) is likewise left in place — resetting it here would replace it with its `default` before the inner cross-validation ever saw it.
+Deliberately does **not** recurse into the wrapped optimisers: a standalone meta solve consumes inner per-fold schedules through its inner cross-validation leg, and its fold-less full-window inner solves reset themselves in their own `_optimise`. Only the meta's own fields (applied to the combined weights, resolved by an outer fold loop when one exists) are inert here. A `bind = :nearest` schedule in a field the meta hands across its own inner fold loop (see [`inner_fold_fields`](@ref)) is likewise left in place — resetting it here would replace it with its `default` before the inner cross-validation ever saw it.
 """
 function reset_time_dependent_estimator(opt::NestedClustered)
     return reset_time_dependent_fields(opt)
@@ -799,24 +799,24 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     nco = reset_time_dependent_estimator(nco)
     rd = returns_result_picker(rd, nco.brt)
     pr = prior(nco.pe, rd)
-    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
-    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
-    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
+    # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
     imsk = investable_mask(pr)
     fees = investable_fees_view(fees_constraints(nco.fees, nco.sets;
                                                  datatype = eltype(pr.X),
                                                  strict = nco.strict), imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
-    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # rebuilds, so only the result charges it. No sub-problem below holds that vector —
     # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
     cfees = strip_liquidation_carriers(fees, nothing)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here, so
     # that no cluster holds a non-investable asset and every cluster slice below indexes
     # the reduced axis. The weights are expanded back in `NestedClusteredResult`.
-    # The reduced carrier takes a name of its own. `rd` is assigned twice above, and a
+    # The reduced `rd` takes a name of its own. `rd` is assigned twice above, and a
     # variable that is reassigned and then captured by the fold's closure is boxed, which
     # FLoops reports as a correctness and performance problem on every call.
     _, pr, nco, rdr = investable_reduction(imsk, pr, nco, rd)

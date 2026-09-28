@@ -301,7 +301,7 @@ Return the idiosyncratic covariance a factor attribution adds to the systematic 
 
 It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. The root refuses, so the verb names a loadings result that carries no idiosyncratic block rather than attributing zero to it.
 
-A [`Regression`](@ref) answers its own `esigma`, which [`FactorPrior`](@ref) fills under `rsd = true`. Under `rsd = false` the field is `nothing` and the read answers a vector of zeros rather than refusing, because the carrier's covariance carries no residual block either. The predicted idiosyncratic component is then zero, the systematic component reaches the total on its own, and the remainder stays at rounding level. A realised attribution is unaffected, because it measures the idiosyncratic series from the returns rather than from this field.
+A [`Regression`](@ref) answers its own `esigma`, which [`FactorPrior`](@ref) fills under `rsd = true`. Under `rsd = false` the field is `nothing` and the read answers a vector of zeros rather than refusing, because the covariance of the prior result carries no residual block either. The predicted idiosyncratic component is then zero, the systematic component reaches the total on its own, and the remainder stays at rounding level. A realised attribution is unaffected, because it measures the idiosyncratic series from the returns rather than from this field.
 
 # Arguments
 
@@ -349,7 +349,7 @@ Return the idiosyncratic return series a realised factor attribution weights by 
 
 It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. The root refuses, so the verb names a loadings result that keeps no residual history rather than attributing zero to it.
 
-The read takes the carrier beside the block, because a block that stores no series recovers it from the prior result that carries it. A [`CrossSectionalFactorModel`](@ref) keeps its own residuals and ignores the carrier. A [`Regression`](@ref) keeps none, so the series is `original_returns(pr) - pr.X`, the difference between the returns the prior was fitted on and the reconstruction `F * M' .+ b'` that the carrier holds. A wrapping prior that replaces `X` moves this series, and the difference lands in the unattributed remainder.
+The read takes the prior result `pr` beside the block, because a block that stores no series recovers it from the prior result that carries it. A [`CrossSectionalFactorModel`](@ref) keeps its own residuals and ignores `pr`. A [`Regression`](@ref) keeps none, so the series is `original_returns(pr) - pr.X`, the difference between the returns the prior was fitted on and the reconstruction `F * M' .+ b'` that `pr` holds. A wrapping prior that replaces `X` moves this series, and the difference lands in the unattributed remainder.
 
 # Arguments
 
@@ -360,7 +360,7 @@ The read takes the carrier beside the block, because a block that stores no seri
 
   - The root method always raises an `ArgumentError` naming the type.
   - A [`CrossSectionalFactorModel`](@ref) whose `csr` is `nothing` raises an `IsNothingError`.
-  - A [`Regression`](@ref) on a carrier whose `o_X` is `nothing` raises an `IsNothingError`, because such a carrier reconstructed nothing and the difference is zero at every observation.
+  - A [`Regression`](@ref) on a prior result whose `o_X` is `nothing` raises an `IsNothingError`, because such a prior result reconstructed nothing and the difference is zero at every observation.
 
 # Returns
 
@@ -395,7 +395,7 @@ Return the factor return series a realised factor attribution multiplies by the 
 
 It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. The series is on the raw factor axis, which is the axis the loadings name, so a family re-basis does not move it.
 
-The read takes the carrier beside the block, as [`attribution_idiosyncratic_returns`](@ref) does and for the same reason. A [`CrossSectionalFactorModel`](@ref) fits the factor returns itself, and reads them off its own fit when no family is constrained. A constrained Factor Family makes the fit solve in a reduced basis, one column short per constrained family, so a re-based block reads `pr.fpr.X` instead, which holds the same coefficients already expanded onto the raw axis. A [`Regression`](@ref) regresses on factors the caller supplied, so the series is `pr.fpr.X`, the scenarios of the nested factor-axis prior. That field needs no refusal of its own, because [`LowOrderPrior`](@ref) admits `rr` and `fpr` only together, so a carrier that answers a loadings result answers a factor-axis prior beside it.
+The read takes the prior result `pr` beside the block, as [`attribution_idiosyncratic_returns`](@ref) does and for the same reason. A [`CrossSectionalFactorModel`](@ref) fits the factor returns itself, and reads them off its own fit when no family is constrained. A constrained Factor Family makes the fit solve in a reduced basis, one column short per constrained family, so a re-based block reads `pr.fpr.X` instead, which holds the same coefficients already expanded onto the raw axis. A [`Regression`](@ref) regresses on factors the caller supplied, so the series is `pr.fpr.X`, the scenarios of the nested factor-axis prior. That field needs no refusal of its own, because [`LowOrderPrior`](@ref) admits `rr` and `fpr` only together, so a prior result that answers a loadings result answers a factor-axis prior beside it.
 
 # Arguments
 
@@ -668,7 +668,7 @@ end
 
 Return an optional field of the prior result that carries a factor model block, or raise naming it.
 
-It is the sibling of [`assert_attribution_field`](@ref), and it names the carrier rather than the block. A [`Regression`](@ref) stores no return series of its own and reads the two series off the carrier, so a `nothing` there is a missing input of the attribution and not a missing field of the block.
+It is the sibling of [`assert_attribution_field`](@ref), and it names the prior result rather than the block. A [`Regression`](@ref) stores no return series of its own and reads the two series off the prior result, so a `nothing` there is a missing input of the attribution and not a missing field of the block.
 
 # Arguments
 
@@ -902,7 +902,7 @@ end
 
 Return the factor model block and the factor distribution a factor attribution decomposes.
 
-A prior result carries the loadings in `rr` and the factor distribution in `fpr`, and its constructor keeps the two together, so one check establishes the whole block. Every wrapping prior forwards both unchanged while it replaces `mu` and `sigma`, which is why the totals come from the carrier and the gaps land in the unattributed remainder.
+A prior result carries the loadings in `rr` and the factor distribution in `fpr`, and its constructor keeps the two together, so one check establishes the whole block. Every wrapping prior forwards both unchanged while it replaces `mu` and `sigma`, which is why the totals come from the prior result and the gaps land in the unattributed remainder.
 
 # Arguments
 

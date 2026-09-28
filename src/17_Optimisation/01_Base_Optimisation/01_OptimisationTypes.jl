@@ -19,7 +19,7 @@ Abstract supertype for base portfolio optimisation estimators.
 
 # Interfaces
 
-A subtype gains the time-dependent host methods from this supertype: [`is_time_dependent`](@ref), [`update_time_dependent_estimator`](@ref), [`reset_time_dependent_estimator`](@ref) and [`assert_time_dependent_fold_count`](@ref) all scan its fields generically, through [`time_dependent_fields`](@ref). One method is worth implementing:
+A subtype gains from this supertype the methods that resolve the schedules its fields hold: [`is_time_dependent`](@ref), [`update_time_dependent_estimator`](@ref), [`reset_time_dependent_estimator`](@ref) and [`assert_time_dependent_fold_count`](@ref) all scan its fields generically, through [`time_dependent_fields`](@ref). One method is worth implementing:
 
 ## `time_dependent_field_defaults`
 

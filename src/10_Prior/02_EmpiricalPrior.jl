@@ -165,7 +165,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of an [`EmpiricalPrior`](@ref) except `cache`, and `max_scenarios` only where it is set.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. `max_scenarios` is a cap most callers never set, and a `nothing` row for it would move every rendering of every host that carries a prior; it appears exactly where a caller chose one. Set `set_show_nothing_fields!(:EmpiricalPrior, true)` to render both.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. `max_scenarios` is a cap most callers never set, and a `nothing` row for it would move every rendering of every estimator that holds a prior; it appears exactly where a caller chose one. Set `set_show_nothing_fields!(:EmpiricalPrior, true)` to render both.
 
 # Arguments
 
@@ -218,7 +218,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Scales a pair of log-return moments to an investment horizon and converts them to arithmetic returns, in place.
 
-The horizon algebra of [`EmpiricalPrior`](@ref), written once. The batch method reaches it after fitting `pe.me` and `pe.ce` on `log1p.(X)`, and the read-out of a folded prior reaches it after reading the same two moments off their states, so the two answer identically by construction rather than by a test over two copies of the arithmetic.
+The horizon algebra of [`EmpiricalPrior`](@ref), written once. The batch method reaches it after fitting `pe.me` and `pe.ce` on `log1p.(X)`, and `prior(pe)` with no data reaches it after reading the same two moments off their states, so the two answer identically by construction rather than by a test over two copies of the arithmetic.
 
 # Mathematical definition
 

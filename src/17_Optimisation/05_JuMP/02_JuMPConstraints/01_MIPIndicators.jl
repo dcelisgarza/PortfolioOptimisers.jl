@@ -293,7 +293,7 @@ portfolio. This is what cardinality counts and what integer phylogeny gates on.
 
 [`SignIndicators`](@ref) deliberately has no method: it carries no held bit, and the
 declaration step only chooses it when nothing in the model consumes one. A caller that would
-need a held indicator therefore fails at the seam with a `MethodError`, rather than reading a
+need a held indicator therefore fails at the call of `held` with a `MethodError`, rather than reading a
 sign bit and silently miscounting.
 
 # Related
@@ -319,7 +319,7 @@ the budget is free and the gate relaxes — the same reason [`long_bin`](@ref) e
 [`long_gate`](@ref).
 
 [`SignIndicators`](@ref) deliberately has no method, for the same reason [`held`](@ref) does
-not: it carries no held bit, so a caller that would count one fails at the seam with a
+not: it carries no held bit, so a caller that would count one fails at the call of `held_bin` with a
 `MethodError` rather than miscounting a sign bit.
 
 # Related
@@ -347,7 +347,7 @@ value. With the bundle in Model State, the per-builder raw keys (`:ib`, `:ilb`/`
 private to the bundle: nothing outside a builder reaches an indicator by key.
 
 Only the asset space registers a bundle. Sub-group builders consume theirs immediately, in the
-same call, and never cross the late seam.
+same call, and never pass them to a late emitter.
 
 # Related
 

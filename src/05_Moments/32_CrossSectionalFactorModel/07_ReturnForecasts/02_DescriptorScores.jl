@@ -216,19 +216,19 @@ The method that Julia selects is the algorithm. The method for a recipe that nam
 
 # Arguments
 
-  - `S`: The Descriptor scores, `observations × assets × descriptors`, on the observation axis of the carrier. The function changes it in place.
+  - `S`: The Descriptor scores, `observations × assets × descriptors`, on the observation axis of the returns data. The function changes it in place.
   - `neutralise`: The Neutralisation names, or `nothing`.
   - `cre`: Cross-Sectional Regression Estimator that fits the residualisation.
   - `csfm`: The fitted factor-model block.
   - `w`: Cross-sectional weights, `observations × assets`.
   - `scoring`: The scoring transform, or `nothing`.
   - `groups`: Group label matrix `observations × assets`, or `nothing`.
-  - `rows`: The rows of the carrier that the block covers.
+  - `rows`: The rows of the returns data that the block covers.
 
 # Validation
 
   - The rules of [`descriptor_scores_axis`](@ref) and of [`neutralisation_targets`](@ref).
-  - When the block starts after the first row of the carrier, the element type of `S` holds `NaN`. An `Integer` or a `Rational` element type raises an `ArgumentError`.
+  - When the block starts after the first row of the returns data, the element type of `S` holds `NaN`. An `Integer` or a `Rational` element type raises an `ArgumentError`.
 
 # Returns
 
@@ -264,7 +264,7 @@ function neutralise_scores!(S::AbstractArray{<:Real, 3},
     gb = return_forecast_cut(groups, rows)
     Tf = eltype(S)
     @argcheck(first(rows) == 1 || !(Tf <: Union{Integer, Rational}),
-              ArgumentError("a neutralised score is NaN on the $(first(rows) - 1) observations before the factor model block, and the element type $Tf of the scores cannot hold NaN. Convert the Panel Fields to a floating-point type, or hand the carrier the block was fitted on."))
+              ArgumentError("a neutralised score is NaN on the $(first(rows) - 1) observations before the factor model block, and the element type $Tf of the scores cannot hold NaN. Convert the Panel Fields to a floating-point type, or hand in the returns data that the block was fitted on."))
     for k in axes(S, 3)
         y = S[rows, :, k]
         W = neutralisation_weights(y, X, wb)
@@ -280,12 +280,12 @@ end
 
 Compute the cross-sectional scores of the Descriptors of a [`DescriptorScores`](@ref).
 
-The function computes the Descriptors over the whole carrier. A Descriptor with a warm-up therefore warms up on every observation of the panel, and not a second time inside the window of the block. The function also returns the rows of the block, and each member cuts the scores to those rows once.
+The function computes the Descriptors over all the returns data. A Descriptor with a warm-up therefore warms up on every observation of the panel, and not a second time inside the window of the block. The function also returns the rows of the block, and each member cuts the scores to those rows once.
 
 # Algorithm
 
  1. Read the cross-sectional weights off the estimation mask of the Asset Panel, the group labels off the named categorical Panel Field, and the block's rows with [`return_forecast_rows`](@ref).
- 2. Compute each Descriptor over the whole carrier, and apply the outlier slot and then the scoring slot to it.
+ 2. Compute each Descriptor over all the returns data, and apply the outlier slot and then the scoring slot to it.
  3. Stack the scores on a third axis of `S`, in the order of the Descriptors. The number type of `S` is the promotion of the number types of the scores and, when the recipe names Neutralisation targets, of the exposure history.
  4. When the recipe names Neutralisation targets, residualise every score of the block's rows against those Factor Exposures, score it once more, and write `NaN` on the rows before the block.
 
@@ -302,8 +302,8 @@ The function computes the Descriptors over the whole carrier. A Descriptor with 
 
 # Returns
 
-  - `S::Array{<:Real, 3}`: The Descriptor scores, `observations × assets × descriptors`, on the carrier's observation axis.
-  - `rows::AbstractUnitRange`: The rows of the carrier that the block covers.
+  - `S::Array{<:Real, 3}`: The Descriptor scores, `observations × assets × descriptors`, on the observation axis of the returns data.
+  - `rows::AbstractUnitRange`: The rows of the returns data that the block covers.
 
 # Examples
 

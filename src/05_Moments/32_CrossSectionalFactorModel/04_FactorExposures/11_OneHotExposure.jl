@@ -60,7 +60,7 @@ end
 """
     one_hot_field(rd::ReturnsResult, name::AbstractString) -> PanelField
 
-Look the categorical Panel Field a [`OneHotExposure`](@ref) expands up on a carrier's Asset Panel.
+Look the categorical Panel Field a [`OneHotExposure`](@ref) expands up on the Asset Panel of a [`ReturnsResult`](@ref).
 
 The lookup and its two refusals are written once, because the verb and the factor names both need the field.
 
@@ -88,7 +88,7 @@ The lookup and its two refusals are written once, because the verb and the facto
 function one_hot_field(rd::ReturnsResult, name::AbstractString)::CategoricalPanelField
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
-              IsNothingError("a one-hot Factor Exposure reads its Panel Field off an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
+              IsNothingError("a one-hot Factor Exposure reads its Panel Field off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
     f = panel_field(pnl, name)
     @argcheck(isa(f, CategoricalPanelField),
               ArgumentError("a one-hot Factor Exposure expands one level per factor, so the Panel Field \"$name\" must be a CategoricalPanelField, got a $(nameof(typeof(f)))"))
@@ -101,7 +101,7 @@ end
 
 Return the factor names of a one-hot Factor Exposure, one per level, in column order.
 
-The names are the column labels the Panel Field contributes to the feature axis, `\"<field>=<level>\"`, so the factor axis of the fit and the feature axis of the carrier spell one level the same way.
+The names are the column labels the Panel Field contributes to the feature axis, `\"<field>=<level>\"`, so the factor axis of the fit and the feature axis of the `ReturnsResult` spell one level the same way.
 
 # Arguments
 
@@ -193,7 +193,7 @@ end
 
 Write `NaN` across every level of a one-hot Factor Exposure where the Panel Field was not observed, in place.
 
-A blank never reaches a carrier: the builder resolves it to a fill value and records the resolution in an observed-mask column. The read undoes that resolution, so a level the fill wrote does not become a classification the asset never carried.
+A blank never reaches a `ReturnsResult`: the builder resolves it to a fill value and records the resolution in an observed-mask column. The read undoes that resolution, so a level the fill wrote does not become a classification the asset never carried.
 
 # Arguments
 

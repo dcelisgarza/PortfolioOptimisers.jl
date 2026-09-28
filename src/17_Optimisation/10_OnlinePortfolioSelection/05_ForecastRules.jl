@@ -704,7 +704,7 @@ Builds the Gaussian weighting reversion, GWR.
 
 It is the rule of [caiye2019](@citet). It is a [`ForecastReversion`](@ref) whose forecast is the [`GaussianWeightedDoubleEstimate`](@ref) over the last price. The defaults `tau = 2.8`, `cutoff = 0.005` and `eps = 50` are the values of [caiye2019](@cite). [caiye2019](@citet) name the target ``\\delta`` and the cutoff ``\\epsilon``.
 
-The adaptive variant of [caiye2019](@cite), GWR-A, chooses `tau` online with a bandit over the reward. The library does not build it, because the family has no seam for a parameter that the reward chooses online.
+The adaptive variant of [caiye2019](@cite), GWR-A, chooses `tau` online with a bandit over the reward. The library does not build it, because the family has no interface for a parameter that the reward chooses online.
 
 # Examples
 

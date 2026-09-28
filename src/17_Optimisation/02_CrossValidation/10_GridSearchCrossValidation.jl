@@ -198,7 +198,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
         nothing
     end
     # One view per fold, built once for the whole search rather than per candidate. It is
-    # read only for a result that carries no carrier of its own; see
+    # read only for a result that holds no prior result of its own; see
     # [`candidate_train_score`](@ref).
     train_X = if gscv.train_score
         [fold_train_returns(cv, rd, k) for k in eachindex(cv.train_idx)]
@@ -332,7 +332,7 @@ function search_cross_validation(opt::NonFiniteAllocationOptimisationEstimator,
     # row per test block of a fold, so a path's entries are Cartesian and the fold is the
     # **column**. The folds of a path arrive in that order, measured against `res.pr.X` of
     # each prediction. The views are lazy, so they are built whether or not a train score is
-    # asked for, and read only for a result that carries no carrier of its own; see
+    # asked for, and read only for a result that holds no prior result of its own; see
     # [`candidate_train_score`](@ref).
     path_X = [[fold_train_returns(cv, rd, I[2]) for I in findall(==(p), cv.path_ids)]
               for p in 1:M]

@@ -9,11 +9,11 @@ A statistic that reads each asset's levels alone is homogeneous of degree one in
 
 A statistic is **windowed** when it reads a fixed number of levels. [`MovingAverage`](@ref), [`SpatialMedian`](@ref), [`WindowPeak`](@ref) and [`LaggedPrice`](@ref) are windowed. A statistic is **folding** when it is an exact recursion over the price relatives, as [`ExponentialMovingAverage`](@ref) and [`ReweightedPriceRelative`](@ref) are. A folding statistic carries one vector on a Partial Fit State and reads no rows. Its batch form over a matrix of returns runs the same recursion from the first level, so a fold and a batch over the same rows agree exactly.
 
-A folding statistic can also carry a memory on the same state, the last [`memory_rows`](@ref) relatives, as [`KernelTrendPattern`](@ref) does. Its recursion reads the carried vector and the memory together, so a host holds no rows for it. Its batch form fills the memory as it runs from the first row.
+A folding statistic can also carry a memory on the same state, the last [`memory_rows`](@ref) relatives, as [`KernelTrendPattern`](@ref) does. Its recursion reads the carried vector and the memory together, so the estimator that holds it keeps no rows for it. Its batch form fills the memory as it runs from the first row.
 
 Over the first rows a windowed statistic reads the levels it has. With `window = 5` and two returns folded, it reads three levels. This truncation is the library's choice. Over their first `window` rows, the code that accompanies [lihoi2012](@cite), [huang2016](@cite) and [lai2018ppt](@cite) forecasts the last price relative instead. A folding statistic starts from its seed at the first row, and a composite statistic truncates every window it holds.
 
-A folding statistic reads the active mask. [`partial_fit!`](@ref) folds the active assets of the row alone, and it resets an inactive asset to [`cold_statistic`](@ref), so a relisted asset starts cold. The read-out is `NaN` at an asset that has folded no level since its last reset. The caller reduces the assets, so a statistic that couples them reads the active assets alone and needs no mask of its own.
+A folding statistic reads the active mask. [`partial_fit!`](@ref) folds the active assets of the row alone, and it resets an inactive asset to [`cold_statistic`](@ref), so a relisted asset starts cold. `mean(me)` with no data answers `NaN` at an asset that has folded no level since its last reset. The caller reduces the assets, so a statistic that couples them reads the active assets alone and needs no mask of its own.
 
 # Interfaces
 
@@ -555,7 +555,7 @@ $(DocStringExtensions.FIELDS)
     """
     n
     """
-    The number of levels each asset has folded since its last reset, `assets × 1`. An asset at zero carries the cold seed, and the read-out answers `NaN` for it.
+    The number of levels each asset has folded since its last reset, `assets × 1`. An asset at zero carries the cold seed, and `mean(me)` with no data answers `NaN` for it.
     """
     nu
     """
@@ -585,7 +585,7 @@ Forecasts the next return of each asset as the move from the last price level to
 
 The forecast is the Price Relative Forecast of the online portfolio selection family, as an expected-returns estimator that any `me` field can hold. It is a forecast of the next period's return under the reversion or trend hypothesis of the statistic, not an average of past returns. The estimator reads every statistic on the reconstructed path, so the forecast is a function of the returns alone. [`AbstractPriceLevelStatistic`](@ref) states where this path changes the published statistic.
 
-A windowed statistic reads its last `window - 1` returns, and over the first rows it reads the levels it has. A folding statistic, such as [`ExponentialMovingAverage`](@ref) or [`ReweightedPriceRelative`](@ref), is an exact recursion over the price relatives. [`partial_fit!`](@ref) folds one row into the state that the `cache` field carries, and `mean(me)` reads it, so an online host carries one vector for it and no rows. Its batch form over a matrix runs the same recursion from the first level, and the two agree exactly over the same rows.
+A windowed statistic reads its last `window - 1` returns, and over the first rows it reads the levels it has. A folding statistic, such as [`ExponentialMovingAverage`](@ref) or [`ReweightedPriceRelative`](@ref), is an exact recursion over the price relatives. [`partial_fit!`](@ref) folds one row into the state that the `cache` field carries, and `mean(me)` reads it, so an online estimator that holds it carries one vector for it and no rows. Its batch form over a matrix runs the same recursion from the first level, and the two agree exactly over the same rows.
 
 # Mathematical definition
 
@@ -1317,7 +1317,7 @@ function Statistics.mean(me::PriceLevelExpectedReturns, X::MatNum; dims::Int = 1
                                          dims = 1, active_mask = amsk)))
     else
         @argcheck(isnothing(amsk),
-                  ArgumentError("`$(typeof(me.alg).name.name)` is a windowed statistic with no recursion to reset, so it reads no active mask: the Asset Panel seam reduces it to the Coverage Universe of its window."))
+                  ArgumentError("`$(typeof(me.alg).name.name)` is a windowed statistic with no recursion to reset, so it reads no active mask: `mean(me, X, pnl)` reduces it to the Coverage Universe of its window."))
         need = window_rows(me.alg)
         k = isnothing(need) ? size(X, 1) : min(size(X, 1), need)
         P = price_levels(view(X, (size(X, 1) - k + 1):size(X, 1), :))
@@ -1372,7 +1372,7 @@ end
 
 Reads the expected return from the state that a folding statistic carries, as the folded statistic minus one.
 
-An asset that has folded no level since its last reset carries its cold seed, not a forecast. So the read-out is `NaN` for it, as [`ExpWeightedExpectedReturns`](@ref) is below its `min_obs`. One folded level is enough for a forecast, so a `NaN` marks an asset that the mask turned off, or one that has no return yet.
+An asset that has folded no level since its last reset carries its cold seed, not a forecast. So `mean(me)` with no data answers `NaN` for it, as [`ExpWeightedExpectedReturns`](@ref) is below its `min_obs`. One folded level is enough for a forecast, so a `NaN` marks an asset that the mask turned off, or one that has no return yet.
 
 # Validation
 
@@ -1410,7 +1410,7 @@ Refuses a fold of a statistic that has no exact recursion, by name.
 """
 function assert_folding_statistic(alg::AbstractPriceLevelStatistic)::Nothing
     @argcheck(folds(alg),
-              ArgumentError("`$(typeof(alg).name.name)` is a windowed statistic with no exact recursion over price relatives, so `partial_fit!` cannot fold it: a host that carries the rows refits it with `mean(me, X)`, and the online portfolio selection head holds `window - 1` rows for it."))
+              ArgumentError("`$(typeof(alg).name.name)` is a windowed statistic with no exact recursion over price relatives, so `partial_fit!` cannot fold it: an estimator that holds it and carries the rows refits it with `mean(me, X)`, and the online portfolio selection head holds `window - 1` rows for it."))
     return nothing
 end
 """

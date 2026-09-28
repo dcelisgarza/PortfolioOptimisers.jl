@@ -3,7 +3,7 @@
 
 The names of the Model State entries that a nested risk build shares with its enclosing build, under the bare key.
 
-It is the complement of Per-Build Risk State. A name belongs here if and only if its entry is not a function of the weights under optimisation and is not a presence flag of one build. The inner and the outer build then want the same object, and a prefix would break the sharing that it exists to protect. [`shared_get`](@ref), [`shared_has`](@ref) and [`shared_set!`](@ref) check each name against this set, so the classification holds at run time, in addition to the seam-lock test.
+It is the complement of Per-Build Risk State. A name belongs here if and only if its entry is not a function of the weights under optimisation and is not a presence flag of one build. The inner and the outer build then want the same object, and a prefix would break the sharing that it exists to protect. [`shared_get`](@ref), [`shared_has`](@ref) and [`shared_set!`](@ref) check each name against this set, so the classification holds at run time, in addition to the test in `test/test_28_seam_lock.jl`.
 
 The comments in the source group the names and give the reason for each group. A new name here states that a nested build can safely read the copy of the enclosing build. Check that statement before you add a name.
 
@@ -44,7 +44,7 @@ const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical 
                                   # ratio constraint is hoisted and registers exactly one.
                                   :ohf, :op, :cost_bgt_expr, :sr_risk,
                                   # Risk and return accumulation and frontier bookkeeping:
-                                  # collected by the terminal scalarise seams (ADR 0024),
+                                  # collected by the terminal scalarise steps (ADR 0024),
                                   # which run once at the outer level. A nested build
                                   # returns its expression to its caller instead of pushing
                                   # here.
@@ -149,7 +149,7 @@ It is the one place that spells the two conventions of the namespace. A key sepa
   - `prefix` separates one build from another, so a nested risk build cannot collide with the build that encloses it.
   - `i` separates one measure from another inside one build, so two `ConditionalValueatRisk` measures in one vector get their own scratch entries.
 
-The seam-lock test checks that no builder composes a key by hand. A builder reaches Model State through [`state_get`](@ref), [`state_has`](@ref), [`state_set!`](@ref) and [`state_build!`](@ref).
+The test in `test/test_28_seam_lock.jl` checks that no builder composes a key by hand. A builder reaches Model State through [`state_get`](@ref), [`state_has`](@ref), [`state_set!`](@ref) and [`state_build!`](@ref).
 
 The key is the concatenation of the parts, with no delimiter, so two different sets of parts can give one key: `(:tr_dr_, 11)` and `(:tr_dr_1, 1)` both give `:tr_dr_11`. A delimiter would change every key that a caller reads at the top level, so the spelling stays, and [`assert_state_key_free`](@ref) refuses the collision when an entry is registered.
 

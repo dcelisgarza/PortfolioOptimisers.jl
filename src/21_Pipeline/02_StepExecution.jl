@@ -144,7 +144,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Read the slot an uncertainty-set step fits from, as the arguments its verb takes.
 
-An estimator that reads a prior result — [`reads_prior_result`](@ref) answers `true` — is fitted from the `prior` slot, and never touches the returns; every other estimator is fitted from the `returns` slot, whose `X` and `F` its verb takes. The required slot is checked here, so a missing one is refused by name before any fit. The predicate reads the type, so the branch folds.
+An estimator that reads a prior result — [`reads_prior_result`](@ref) answers `true` — is fitted from the `prior` slot, and never touches the returns; every other estimator is fitted from the `returns` slot, whose `X` and `F` its verb takes. The required slot is checked here, so a missing one is refused with an error that names it before any fit. The predicate reads the type, so the branch folds.
 
 # Arguments
 

@@ -328,7 +328,7 @@ Compute the Factor Exposure of a fixed weighted combination of Descriptors.
 
 # Algorithm
 
- 1. Read the benchmark weights and the group labels off the carrier.
+ 1. Read the benchmark weights and the group labels off the `ReturnsResult`.
  2. Compute each Descriptor, and apply the outlier slot and then the scoring slot to it.
  3. Accumulate the finite-aware weighted sum and the surviving weight of every cell.
  4. Divide, and write `NaN` where the surviving weight is zero or below `min_coverage`.

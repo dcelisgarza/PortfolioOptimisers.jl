@@ -287,7 +287,7 @@ function SelfConfidentRate(; eta_max::Real = 1)::SelfConfidentRate
     return SelfConfidentRate(eta_max)
 end
 function schedule_state_seed(::SelfConfidentRate, w::AbstractVector)
-    # The statistic is the pair `[C₁, log N]`, so the rate reads the carrier's `s` alone.
+    # The statistic is the pair `[C₁, log N]`, so the rate reads the `s` of the state alone.
     s = zeros(eltype(w), 2)
     s[2] = log(length(w))
     return s
@@ -1223,7 +1223,7 @@ Each geometry gives a published rule.
 
   - Under [`EntropicProjection`](@ref) the step is the multiplicative update of [helmbold1998](@citet), the exponentiated gradient. Its regret is ``O(\\sqrt{T \\log N})`` at ``\\eta = 2 r \\sqrt{2 \\log N / T}``, when every price relative is at least ``r`` times the largest one of its period.
   - Under [`EuclideanProjection`](@ref) the step is additive, and the projection onto the simplex follows it. This is the online gradient descent of [zinkevich2003](@citet), with regret ``O(\\sqrt{T N})``. It is also the gradient projection of [helmbold1997](@citet), except that [helmbold1997](@citet) assume the projection and do not enforce it.
-  - Under [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref) the step is the barrier step of [abernethy2015](@citet), of [zimmertseldin2021](@citet) and of §7 of [orseau2017](@cite). On the default set each projection is a scalar root.
+  - Under [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref) the step is the barrier step of [abernethy2015](@citet), of [zimmertseldin2021](@citet) and of Section 7 of [orseau2017](@cite). On the default set each projection is a scalar root.
 
 The Euclidean map admits every Allocation Set the head admits. The other three maps are defined on the positive orthant, so they refuse a set with a negative lower bound. The tuned rates of the theorems need the horizon, which an online rule does not know, so the library states them as formulas only. The anytime rates are [`InverseSquareRootRate`](@ref), [`SelfConfidentRate`](@ref) and [`DoublingTrickRate`](@ref), on `eta`.
 
@@ -1487,7 +1487,7 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
                                   gradient_state_seed(alg.grad, st.w0)), copy(u0)
     end
     # A schedule that chooses the rate from the period's row writes its statistic here, and
-    # every other one after the step; the carrier the rate is read from carries the answer.
+    # every other one after the step; the state that `learning_rate` reads holds the answer.
     st = MirrorDescentState(st.n, st.u, st.w0, statistic_before_rate(alg.eta, st.s, w, x),
                             st.gs)
     eta = learning_rate(alg.eta, t, st)
@@ -1542,7 +1542,7 @@ end
 
 Builds the exponentiated gradient, a [`MirrorDescent`](@ref) rule under [`EntropicProjection`](@ref) (EG). It is the rule of [helmbold1998](@citet).
 
-The rule moves weight towards the assets that just did well. Its regret is ``O(\\sqrt{T \\log N})`` at a rate tuned to the horizon, and under the uniform mix `alpha` with the doubling trick it is universal. The default rate is the rate ``0.05`` of [helmbold1998](@cite). In §5.2 of [helmbold1998](@cite), rates from ``0.01`` to ``0.15`` all do well, and a rate above one loses money on the two-stock example. As the weighting of an [`ExpertMixture`](@ref), the rule takes the online gradient step over the vector of expert returns.
+The rule moves weight towards the assets that just did well. Its regret is ``O(\\sqrt{T \\log N})`` at a rate tuned to the horizon, and under the uniform mix `alpha` with the doubling trick it is universal. The default rate is the rate ``0.05`` of [helmbold1998](@cite). In Section 5.2 of [helmbold1998](@cite), rates from ``0.01`` to ``0.15`` all do well, and a rate above one loses money on the two-stock example. As the weighting of an [`ExpertMixture`](@ref), the rule takes the online gradient step over the vector of expert returns.
 
 # Mathematical definition
 

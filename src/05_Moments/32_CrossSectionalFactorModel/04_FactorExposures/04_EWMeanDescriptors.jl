@@ -241,7 +241,7 @@ end
                     x::AbstractVector{<:Pair{<:AbstractString, <:Real}}) -> Matrix{<:Real}
     ew_ratio_values(rd::ReturnsResult, x::AbstractVector{<:AbstractString}) -> Matrix{<:Real}
 
-Read one side of an exponentially weighted ratio out of a carrier.
+Read one side of an exponentially weighted ratio out of a [`ReturnsResult`](@ref).
 
 A side takes four forms. Julia selects the method from the form, and each method reads the side as follows.
 
@@ -605,7 +605,7 @@ end
     descriptor(de::EWVolumeRatio, rd::ReturnsResult) -> Matrix{<:Real}
     descriptor(de::DaysToCover, rd::ReturnsResult) -> Matrix{<:Real}
 
-Compute an exponentially weighted mean Descriptor from a carrier.
+Compute an exponentially weighted mean Descriptor from a [`ReturnsResult`](@ref).
 
 Each of the three archetypes builds one `observations × assets` matrix and runs it through [`ew_mean_series`](@ref). [`descriptor_active_fill!`](@ref) then writes `NaN` into the inactive cells. An asset that is listed but has no value at an observation holds its state there, so a gap in the data neither restarts the recursion nor enters it as a zero.
 

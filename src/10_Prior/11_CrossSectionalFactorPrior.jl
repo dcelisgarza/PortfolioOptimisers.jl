@@ -263,7 +263,7 @@ end
 
 Fit a cross-sectional factor model on an Asset Panel, and return the asset prior it lifts.
 
-This is the returns-matrix method that every prior estimator implements, and the fit runs in it. The panel is the third positional argument, so a wrapping prior composes this estimator when it forwards the panel it received. The carrier method below passes the fields of a [`ReturnsResult`](@ref) to it.
+This is the returns-matrix method that every prior estimator implements, and the fit runs in it. The panel is the third positional argument, so a wrapping prior composes this estimator when it forwards the panel it received. The method below that takes a [`ReturnsResult`](@ref) passes its fields to it.
 
 # Mathematical definition
 
@@ -304,7 +304,7 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
 
 # Algorithm
 
- 1. Orient `X` and `F` by `dims`, rebuild the carrier the Descriptors read from `X`, `F`, `pnl`, `iv` and `ivpa`, and take the two universe masks off `pnl` with [`cross_sectional_panel_masks`](@ref).
+ 1. Orient `X` and `F` by `dims`, rebuild the returns data that the Descriptors read, from `X`, `F`, `pnl`, `iv` and `ivpa`, and take the two universe masks off `pnl` with [`cross_sectional_panel_masks`](@ref).
  2. Build the benchmark weights `BW` with [`cross_sectional_cap_weights`](@ref), over the assets of the estimation universe whose return and market capitalisation are finite, and write them onto a copy of the Asset Panel with [`cross_sectional_benchmark_carrier`](@ref). A benchmark power of zero reads no market capitalisation.
  3. Build every Factor Exposure with [`cross_sectional_exposure_history`](@ref), in dependency order, giving `Ms`, `nf` and `fam`.
  4. Drop the leading observations the Descriptors warm up over, with [`cross_sectional_warmup`](@ref), giving the rows `rw`.
@@ -315,7 +315,7 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
  9. Take the idiosyncratic variance history `vs` with [`variance_series`](@ref), standardise the idiosyncratic returns by it with [`cross_sectional_standardised_residuals`](@ref), giving `S`, and take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref). Record the degrees of freedom and the divisor of each variance with [`variance_count`](@ref) and [`cross_sectional_variance_counts`](@ref).
 10. Fit `pe.pe` on the reduced factor returns, giving `f_pr`, refuse a non-finite factor moment with [`assert_cross_sectional_factor_moments`](@ref), and process the factor covariance in place under `pe.f_mp`, which is the matrix processing estimator of the factor axis and not the asset one. The method passes `strict` to `pe.pe`, as [`FactorPrior`](@ref) does, because the slot admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
 11. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, and a zero `b`.
-12. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the whole carrier, so that a Descriptor of the forecast warms up over every observation the panel has, giving the block `rr` with the orthogonal part in `b` and the Result in `rf`. Blend the spanned part into the factor mean with [`cross_sectional_forecast_mu`](@ref), giving `f_mu`.
+12. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the full returns data, so that a Descriptor of the forecast warms up over every observation the panel has, giving the block `rr` with the orthogonal part in `b` and the Result in `rf`. Blend the spanned part into the factor mean with [`cross_sectional_forecast_mu`](@ref), giving `f_mu`.
 13. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named.
 14. Take the investable assets `idx` with [`cross_sectional_investable`](@ref).
 15. Rebuild the asset return scenarios `Xs` with [`cross_sectional_scenarios`](@ref).
@@ -326,11 +326,11 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
 
   - `pe`: Cross-Sectional Factor Prior estimator.
   - $(arg_dict[:X])
-  - $(arg_dict[:F]) The fit does not read it, because this estimator builds its own factors from the panel. The method writes it onto the rebuilt carrier only so that the carrier states what the caller held.
+  - $(arg_dict[:F]) The fit does not read it, because this estimator builds its own factors from the panel. The method writes it onto the rebuilt returns data only so that the returns data states what the caller held.
   - $(arg_dict[:pnl_prior]) This estimator reads it, and refuses without it.
   - `dims`: Dimension along which the observations lie.
-  - `iv`: Implied volatilities, written onto the rebuilt carrier.
-  - `ivpa`: Implied-volatility risk-premium adjustment, written onto the rebuilt carrier.
+  - `iv`: Implied volatilities, written onto the rebuilt returns data.
+  - `ivpa`: Implied-volatility risk-premium adjustment, written onto the rebuilt returns data.
   - $(arg_dict[:strict]) It is forwarded to the nested factor prior `pe.pe`.
   - `kwargs...`: Additional keyword arguments passed to the verbs of the algorithm.
 
@@ -367,11 +367,12 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     X, F = dims_oriented(dims, X, F)
     @argcheck(!isnothing(pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and the panel is nothing. Call prior(pe, rd) with a ReturnsResult whose `pnl` is the one asset_panel returns, or hand the panel to this method as its third positional argument."))
-    # Every Descriptor of the fit reads its Panel Fields off a carrier, so the carrier is
-    # rebuilt here rather than demanded from the caller: the panel is the one field of it a
-    # wrapping prior can forward, and no verb of the fit reads `nx`, `ts`, `nb` or `B`.
+    # Every Descriptor of the fit reads its Panel Fields off the returns data, so the
+    # returns data is rebuilt here rather than demanded from the caller: the panel is the
+    # one field of it a wrapping prior can forward, and no verb of the fit reads `nx`,
+    # `ts`, `nb` or `B`.
     #
-    # A carrier that holds returns holds names for them, and neither a matrix nor a panel
+    # A `ReturnsResult` holds names for its returns, and neither a matrix nor a panel
     # states any, so the names are the column numbers. They are read nowhere. Their length
     # is: it is the asset axis `check_asset_panel` binds the panel to, which is the check
     # this rebuild is worth making.
@@ -471,9 +472,9 @@ end
 """
     prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...) -> LowOrderPrior
 
-Fit a Cross-Sectional Factor Prior from a carrier.
+Fit a Cross-Sectional Factor Prior from a [`ReturnsResult`](@ref).
 
-The method passes the fields of the carrier to the returns-matrix method above, which runs the fit. The file defines this method instead of using [`prior(pe::AbstractPriorEstimator, rd::ReturnsResult)`](@ref), so that the refusal of a carrier with no Asset Panel names `rd.pnl`, the field of the carrier that the caller built.
+The method passes the fields of `rd` to the returns-matrix method above, which runs the fit. The file defines this method instead of using [`prior(pe::AbstractPriorEstimator, rd::ReturnsResult)`](@ref), so that the refusal of an `rd` with no Asset Panel names `rd.pnl`, the field of `rd` that the caller built.
 
 # Algorithm
 
@@ -506,7 +507,7 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X),
               IsNothingError("a Cross-Sectional Factor Prior regresses asset returns on their Factor Exposures, and rd.X is nothing"))
     @argcheck(!isnothing(rd.pnl),
-              IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
+              IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
     return prior(pe, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)
 end
 """

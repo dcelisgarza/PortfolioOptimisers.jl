@@ -7,21 +7,21 @@ The head is a naive optimiser. It fits no moment and solves no programme of its 
 
 **The batch verb is the Causal Pass.** `optimise(opt, rd)` starts from the Start Allocation `w0`, applies the Online Update to every row of `rd` in order, and returns the **Next-Period Allocation**. After rows `1:T` that is the portfolio for period `T + 1`, so the pass takes one more update than a backtest driver that stops at the last row it holds. The pass rebalances at every row and pays no fee. `predict(res, rd)` on its Result charges the head's `fees`, with no drift.
 
-**The online verbs run the same recursion.** `partial_fit!(opt, rd)` folds each row into the state as the Block Step. A fold of `k` rows is `k` single-row updates, so a walk-forward with `test_size = k` holds the Next-Period Allocation of the end of the block for `k` periods. `optimise(opt)` with no data is the **Recursion Read-out**. It wraps the allocation of the state in a Result and runs no batch path. So `optimise(opt)` after a fold of rows `1:t` equals `optimise(opt, rd[1:t])` exactly, at every `test_size`. The held path of a walk-forward differs from the batch pass in two ways. The target set at the start of a block drifts over the block, and the Block Step sets the cadence of the trades.
+**The online verbs run the same recursion.** `partial_fit!(opt, rd)` folds each row into the state as the Block Step. A fold of `k` rows is `k` single-row updates, so a walk-forward with `test_size = k` holds the Next-Period Allocation of the end of the block for `k` periods. `optimise(opt)` with no data is the **Recursion Result**. It wraps the allocation of the state in a Result and runs no batch path. So `optimise(opt)` after a fold of rows `1:t` equals `optimise(opt, rd[1:t])` exactly, at every `test_size`. The held path of a walk-forward differs from the batch pass in two ways. The target set at the start of a block drifts over the block, and the Block Step sets the cadence of the trades.
 
-**The Start Allocation** is `w0`, `nothing` by default. When it is absent, the recursion starts at `1/N` over the whole pinned universe, and the unlisted names are included. If `k` of `N` assets are unlisted at the first row, the recursion puts `k/N` of its weight on legs that see `x = 1`, as cash does, until the rule moves that weight. The read-out renormalises over the listed legs, so the fund holds the listed legs alone. But the fund is not always the recursion that starts over the listed names alone, because the parked legs enter the gross return `⟨w, x⟩` that a rule reads. Buy-and-hold scales each leg by its own price relative, so its fund is the same. The exponentiated-gradient step divides by the gross return, so its fund is different. A caller who wants the recursion to be the fund from row one gives `w0` over the listed assets, with zeros elsewhere. The rule's step then decides what a zero does. The exponentiated-gradient step keeps a zero at zero, so that asset never gets weight. A Euclidean step that moves no weight onto the asset keeps the zero exact too, because [`project_simplex`](@ref) only renormalises a raw step that is on the simplex up to rounding. Buy-and-hold is such a step. A Euclidean step that moves weight onto the asset, as the passive-aggressive step does, gives it weight, and a gap at that asset is then a Held Gap.
+**The Start Allocation** is `w0`, `nothing` by default. When it is absent, the recursion starts at `1/N` over the whole pinned universe, and the unlisted names are included. If `k` of `N` assets are unlisted at the first row, the recursion puts `k/N` of its weight on legs that see `x = 1`, as cash does, until the rule moves that weight. `optimise(opt)` with no data renormalises over the listed legs, so the fund holds the listed legs alone. But the fund is not always the recursion that starts over the listed names alone, because the parked legs enter the gross return `⟨w, x⟩` that a rule reads. Buy-and-hold scales each leg by its own price relative, so its fund is the same. The exponentiated-gradient step divides by the gross return, so its fund is different. A caller who wants the recursion to be the fund from row one gives `w0` over the listed assets, with zeros elsewhere. The rule's step then decides what a zero does. The exponentiated-gradient step keeps a zero at zero, so that asset never gets weight. A Euclidean step that moves no weight onto the asset keeps the zero exact too, because [`project_simplex`](@ref) only renormalises a raw step that is on the simplex up to rounding. Buy-and-hold is such a step. A Euclidean step that moves weight onto the asset, as the passive-aggressive step does, gives it weight, and a gap at that asset is then a Held Gap.
 
 A given `w0` is over the pinned names, and the head pins and views it with them. The first step projects it once onto the Allocation Set in the rule's geometry, as it projects the uniform start, so a start outside the set becomes feasible and is never refused. A set that reads the head's rows has no constraints before the first row, so it holds the start as given until the first update. The start reaches the first Online Update as `w`. A rule that steps from `w` continues from it. A rule whose next allocation is not a step from `w` replaces it at that update. The constant rebalanced portfolio returns its own `w`, an expert mixture returns the mix of its experts, and the Newton step solves its Gram. Such a rule can still carry `w0` forward. The gradient of the Newton step reads `w`, and an expert that steps from `w` starts at `w0`. Under every rule, the fund holds `w0` for exactly one period.
 
-**The Online Update reads the recursion's own allocation, and no flag changes that.** The previous weights of the loop reach the head through [`factory`](@ref) alone. They go into `fees` and `fb`, and never into the recursion. The fund's held book is the one base against which a turnover fee on this family measures a trade. So the online arm of the fold loop refuses a head whose `fees` carry a `tn` term when the Previous-Weights Source of the walk-forward is `nothing`. It refuses by name and before any fold, and `pws = DriftedWeights()` is the whole configuration. A head with no `tn` fee is not checked.
+**The Online Update reads the recursion's own allocation, and no flag changes that.** The previous weights of the loop reach the head through [`factory`](@ref) alone. They go into `fees` and `fb`, and never into the recursion. The fund's held book is the one base against which a turnover fee on this family measures a trade. So the online arm of the fold loop refuses a head whose `fees` carry a `tn` term when the Previous-Weights Source of the walk-forward is `nothing`. It throws an `ArgumentError` before any fold, and `pws = DriftedWeights()` is the whole configuration. A head with no `tn` fee is not checked.
 
 **A non-finite return is kept, and read in two ways.** The rule's step reads `x = 1` there, as if the leg held cash. At an asset that the panel marks inactive, or at one to which the recursion gives no weight, this is silent. At an active asset with a non-zero weight it is a Held Gap, which warns by default and refuses under `strict`. The rows buffer keeps the cell as `NaN`, with the row's active mask beside it. Every statistic over the rows reads them as the batch verb reads a Returns Result, and reduces to its own Coverage Universe. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. A plain estimator drops an asset with a gap anywhere in its window. A mask-aware estimator answers the asset from the rows it has. A kernel over price relatives reads the gap as one.
 
-The head never forces a zero into the recursion's allocation, and a relisted asset comes back at the recursion's own weight. A programme set that fits on the rows writes a zero at a leg that its prior cannot price, as a batch head does. It admits the leg again when the prior can price it. Under a time-varying panel, the Investable Mask of the read-out is the active mask of the last folded row. The read-out slices the full allocation to that mask and renormalises it, and the Result expands it back with a zero at every non-investable asset.
+The head never forces a zero into the recursion's allocation, and a relisted asset comes back at the recursion's own weight. A programme set that fits on the rows writes a zero at a leg that its prior cannot price, as a batch head does. It admits the leg again when the prior can price it. Under a time-varying panel, the Investable Mask of the Recursion Result is the active mask of the last folded row. `optimise(opt)` with no data slices the full allocation to that mask and renormalises it, and the Result expands it back with a zero at every non-investable asset.
 
-**The Allocation Set on `set` is the one the Constrained Update projects onto.** [`project`](@ref) projects the raw step of every rule onto it, in the rule's own Projection Geometry. The default [`BoundedAllocationSet`](@ref) is the simplex, and every projection onto it is closed form, so the default configuration solves nothing. A [`ProgrammeAllocationSet`](@ref) admits the full constraint vocabulary, and its projection is a programme. When a programme fails, the step is a **Held Step**. The projection returns the Price-Adjusted Allocation it was given, so the fund trades nothing that period, and the state of the rule still absorbs the row. The head warns once, with the row's timestamp. The retcode of the Recursion Read-out is an [`OptimisationSuccess`](@ref) that carries the [`HeldStep`](@ref) record of the last folded row, so a fallback chain never runs on a hold. The constructor refuses a negative lower bound under an entropic, Tsallis or log-barrier rule.
+**The Allocation Set on `set` is the one the Constrained Update projects onto.** [`project`](@ref) projects the raw step of every rule onto it, in the rule's own Projection Geometry. The default [`BoundedAllocationSet`](@ref) is the simplex, and every projection onto it is closed form, so the default configuration solves nothing. A [`ProgrammeAllocationSet`](@ref) admits the full constraint vocabulary, and its projection is a programme. When a programme fails, the step is a **Held Step**. The projection returns the Price-Adjusted Allocation it was given, so the fund trades nothing that period, and the state of the rule still absorbs the row. The head warns once, with the row's timestamp. The retcode of the Recursion Result is an [`OptimisationSuccess`](@ref) that carries the [`HeldStep`](@ref) record of the last folded row, so a fallback chain never runs on a hold. The constructor refuses a negative lower bound under an entropic, Tsallis or log-barrier rule.
 
-`merge_states` on the state and `Online(head)` are refused by name. An update depends on the order of the rows, and the family never refits from a buffer.
+`merge_states` on the state and `Online(head)` each throw an `ArgumentError`. An update depends on the order of the rows, and the family never refits from a buffer.
 
 # Mathematical definition
 
@@ -133,7 +133,7 @@ OnlinePortfolioSelection
     """
     alg
     """
-    The Allocation Set every allocation of the recursion lies in, or a [`TimeDependent`](@ref) schedule of one set per fold. Entry `i` is the complete set of fold `i`. The fold loop puts it in place before it folds the rows of fold `i`, so those rows step inside entry `i`, and the read-out reports it.
+    The Allocation Set every allocation of the recursion lies in, or a [`TimeDependent`](@ref) schedule of one set per fold. Entry `i` is the complete set of fold `i`. The fold loop puts it in place before it folds the rows of fold `i`, so those rows step inside entry `i`, and the Recursion Result reports it.
     """
     set
     """
@@ -149,7 +149,7 @@ OnlinePortfolioSelection
     """
     fb
     """
-    $(field_dict[:strict_opt]) The flag reaches every constraint of the set, the fee and the read-out, and the constraints that a programme set resolves on the rows at each step. It also governs a Held Gap, which warns when it is `false` and raises an error when it is `true`.
+    $(field_dict[:strict_opt]) The flag reaches every constraint of the set, the fee and `optimise(opt)` with no data, and the constraints that a programme set resolves on the rows at each step. It also governs a Held Gap, which warns when it is `false` and raises an error when it is `true`.
     """
     strict
     """
@@ -451,7 +451,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the state that a block folds into.
 
-On the first block the method seeds the state through [`online_selection_seed`](@ref). On every later block it returns the state that the head carries, after the pin-and-check that every host runs. The check compares the names and the static panel with those of the first step, and the width with that of the state. The timestamps must be present at every block or at none.
+On the first block the method seeds the state through [`online_selection_seed`](@ref). On every later block it returns the state that the head carries, after the pin-and-check that every estimator runs at its online step. The check compares the names and the static panel with those of the first step, and the width with that of the state. The timestamps must be present at every block or at none.
 
 # Validation
 
@@ -546,7 +546,7 @@ Reads the rows buffer out as the Returns Result that the Online Update gets.
 
 The result is a [`ReturnsResult`](@ref) of the buffer's rows verbatim, under the pinned names. When the buffer records active masks, [`buffer_panel`](@ref) makes them a time-varying Asset Panel on that Returns Result. The method returns `nothing` when the tree keeps no rows.
 
-Every statistic over the rows reads this Returns Result, and the batch verbs read the same type. So `prior(pe, rd)`, `mean(me, rd.X, rd.pnl)` and `optimise(opt, rd)` reduce to the Coverage Universe of the window exactly as they do on a Returns Result that the ingestion layer built. The method takes no copy, because the Returns Result views the valid region of the buffer. A buffer with no pinned names is refused by name. A Returns Result that carries rows carries their names by its own contract, so the head never meets that pair.
+Every statistic over the rows reads this Returns Result, and the batch verbs read the same type. So `prior(pe, rd)`, `mean(me, rd.X, rd.pnl)` and `optimise(opt, rd)` reduce to the Coverage Universe of the window exactly as they do on a Returns Result that the ingestion layer built. The method takes no copy, because the Returns Result views the valid region of the buffer. The method throws an `ArgumentError` for a buffer with no pinned names. A Returns Result that carries rows carries their names by its own contract, so the head never meets that pair.
 
 # Validation
 
@@ -676,7 +676,7 @@ end
 
 Folds the rows of a Returns Result into the head's recursion as the Block Step, and reads nothing out.
 
-Each row of `rd` is one Online Update, in order, and the state never learns the cadence of the loop. A fold of `k` rows is `k` updates and no read-out. After a fold of rows `1:t`, `optimise(opt)` equals `optimise(opt, rd[1:t])` exactly, because both take the same `t` single-row updates.
+Each row of `rd` is one Online Update, in order, and the state never learns the cadence of the loop. A fold of `k` rows is `k` updates and builds no Recursion Result. After a fold of rows `1:t`, `optimise(opt)` equals `optimise(opt, rd[1:t])` exactly, because both take the same `t` single-row updates.
 
 # Arguments
 
@@ -708,7 +708,7 @@ end
 
 Folds the fold's rows into the head inside the fold's own Allocation Set.
 
-The head is the one family whose online step is the optimisation. The Constrained Update projects the raw step of every row onto `set`, so the step reads a schedule on `set`, and not only the read-out. So the method resolves the entry here, in the same fold and before the read-out resolves the other schedules. The head that the loop threads on keeps the schedule, so fold `i + 1` resolves from the schedule and not from entry `i`. The step writes no field but the state, so the method returns the head with its `cache` rebound.
+The head is the one family whose online step is the optimisation. The Constrained Update projects the raw step of every row onto `set`, so the step reads a schedule on `set`, and not only `optimise(opt)` with no data. So the method resolves the entry here, in the same fold and before `optimise(opt)` with no data resolves the other schedules. The head that the loop threads on keeps the schedule, so fold `i + 1` resolves from the schedule and not from entry `i`. The step writes no field but the state, so the method returns the head with its `cache` rebound.
 
 # Arguments
 
@@ -739,9 +739,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Returns the Recursion Read-out, the allocation of the state as a [`NaiveOptimisationResult`](@ref) over the assets active at the last folded row.
+Returns the Recursion Result, the allocation of the state as a [`NaiveOptimisationResult`](@ref) over the assets active at the last folded row.
 
-The read-out reads the state and writes nothing, so every call on one state returns the same Result. Its retcode is an [`OptimisationSuccess`](@ref). Its `res` is the [`HeldStep`](@ref) record of the last folded row when that row was held, and `nothing` otherwise. A reduced allocation with no mass is the one failure from which a rule cannot recover. It happens when every held asset is inactive at the last row. The read-out then returns an [`OptimisationFailure`](@ref) with `NaN` weights, so that a fallback chain continues.
+This function reads the state and writes nothing, so every call on one state returns the same Result. Its retcode is an [`OptimisationSuccess`](@ref). Its `res` is the [`HeldStep`](@ref) record of the last folded row when that row was held, and `nothing` otherwise. A reduced allocation with no mass is the one failure from which a rule cannot recover. It happens when every held asset is inactive at the last row. This function then returns an [`OptimisationFailure`](@ref) with `NaN` weights, so that a fallback chain continues.
 
 # Mathematical definition
 
@@ -755,7 +755,7 @@ Where:
 
   - ``\\bar{w}_i``: Weight of asset ``i`` in the Result.
   - ``w_{T+1,i}``: Weight of asset ``i`` in the allocation of the state, the Next-Period Allocation after ``T`` rows.
-  - ``\\mathcal{I}``: Investable Mask of the read-out, the assets active at the last folded row, or every asset under a static panel.
+  - ``\\mathcal{I}``: Investable Mask of the Result, the assets active at the last folded row, or every asset under a static panel.
   - $(math_dict[:T])
 
 The Result expands ``\\bar{\\boldsymbol{w}}`` back over the pinned universe with a zero at every asset outside ``\\mathcal{I}``. The weights are defined when the denominator is positive and every ``w_{T+1,i}`` is finite.
@@ -870,9 +870,9 @@ end
 """
     optimise(opt::OnlinePortfolioSelection; kwargs...) -> OptimisationResult
 
-Returns the Recursion Read-out, the allocation of the state as a Result, and runs no batch path.
+Returns the Recursion Result, the allocation of the state as a Result, and runs no batch path.
 
-The method refuses by name a head that has taken no step. The read-out fails in one way, when the allocation has no mass on the assets active at the last row. The fallback chain then runs as the batch verb runs it, and each fallback reads out through its own `optimise(fb)`. A fallback that needs rows has folded none and refuses. So the fallback that serves here is a head that needs no rows, such as [`PreviousWeights`](@ref).
+The method refuses a head that has taken no step with an `ArgumentError`. The Recursion Result fails in one way, when the allocation has no mass on the assets active at the last row. The fallback chain then runs as the batch verb runs it, and each fallback reads out through its own `optimise(fb)`. A fallback that needs rows has folded none and refuses. So the fallback that serves here is a head that needs no rows, such as [`PreviousWeights`](@ref).
 
 # Algorithm
 
@@ -893,7 +893,7 @@ The method refuses by name a head that has taken no step. The read-out fails in 
 
 # Returns
 
-  - `res::OptimisationResult`: The Next-Period Allocation, or the Result of the fallback chain when the read-out fails.
+  - `res::OptimisationResult`: The Next-Period Allocation, or the Result of the fallback chain when the Recursion Result fails.
 
 # Related
 
@@ -916,9 +916,9 @@ end
 """
     online_readout(opt::OnlinePortfolioSelection)
 
-Refuses by name, because the head has no batch estimator to return.
+Refuses the head with an `ArgumentError`, because the head has no batch estimator to return.
 
-A Recursion Read-out rebuilds no returns data and runs no batch path. `optimise(opt)` reads the state directly.
+The head gives a Recursion Result. `optimise(opt)` rebuilds no returns data, runs no batch path and reads the state directly.
 
 # Related
 
@@ -926,7 +926,7 @@ A Recursion Read-out rebuilds no returns data and runs no batch path. `optimise(
   - [`optimise`](@ref)
 """
 function online_readout(::OnlinePortfolioSelection)
-    return throw(ArgumentError("an `OnlinePortfolioSelection` head has a Recursion Read-out, not a reconstitution: its state holds the next allocation and no returns data to rebuild, so there is no batch estimator to hand back. Read it out with `optimise(opt)`."))
+    return throw(ArgumentError("an `OnlinePortfolioSelection` head has a Recursion Result, not a reconstitution: its state holds the next allocation and no returns data to rebuild, so there is no batch estimator to hand back. Read it out with `optimise(opt)`."))
 end
 """
     held_timestamps(opt::OnlinePortfolioSelection)

@@ -2,9 +2,9 @@
     vcat_carrier_rows(a::PricesResult, b::PricesResult) -> PricesResult
     vcat_carrier_rows(a::ReturnsResult, b::ReturnsResult) -> ReturnsResult
 
-Concatenates the observations of two carriers of one universe, `a` first.
+Concatenates the observations of two `PricesResult` values or two `ReturnsResult` values of one universe, `a` first.
 
-Each online form of a data step reads this concatenation. [`PricesToReturns`](@ref) puts the last price row it kept in front of a new block, so that the conversion reads consecutive prices. The input-carrier buffer of `Online(pipe)` appends each block that it receives. The carrier `a` pins the universe: the names of the assets, the factors and the benchmark, the implied-volatility adjustment, and a static [`AssetPanel`](@ref). The function refuses a block `b` with a different universe, and the message names the field, as the step of [`ReturnsBufferState`](@ref) does. It also refuses a column that one carrier holds and the other does not, because a factor series that some blocks hold and others do not is not one series.
+Each online form of a data step reads this concatenation. [`PricesToReturns`](@ref) puts the last price row it kept in front of a new block, so that the conversion reads consecutive prices. The input-data buffer of `Online(pipe)` appends each block that it receives. `a` pins the universe: the names of the assets, the factors and the benchmark, the implied-volatility adjustment, and a static [`AssetPanel`](@ref). The function refuses a block `b` with a different universe, and the message names the field, as the step of [`ReturnsBufferState`](@ref) does. It also refuses a column that one of `a` and `b` holds and the other does not, because a factor series that some blocks hold and others do not is not one series.
 
 The function concatenates a time-varying panel mask by mask, and refuses its Panel Fields, as [`step_active_mask`](@ref) does. The rows of a time-varying field are sample data, and this function concatenates masks only.
 
@@ -23,12 +23,12 @@ The method that Julia selects is the algorithm.
 # Validation
 
   - The names, the implied-volatility adjustment and a static panel of `b` equal the ones of `a`. An `ArgumentError` is thrown otherwise.
-  - Each optional column is held by both carriers or by neither. An `ArgumentError` is thrown otherwise.
+  - Each optional column is held by both `a` and `b` or by neither. An `ArgumentError` is thrown otherwise.
   - A time-varying panel holds no Panel Field. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
-  - `c`: A carrier of the type of `a`, with the observations of `a` followed by the observations of `b`.
+  - `c`: A value of the type of `a`, with the observations of `a` followed by the observations of `b`.
 
 # Related
 
@@ -83,7 +83,7 @@ Refuses a block whose pinned value differs from the value that the first block p
 """
 function assert_pinned_carrier(pinned, given, name::Symbol)::Nothing
     @argcheck(isequal(pinned, given),
-              ArgumentError("the `$name` of a block of observations must equal the one the first block pinned, because a carrier that silently took a new one would put the next observation on the wrong column. Got $(pinned_repr(given)) against the pinned $(pinned_repr(pinned))."))
+              ArgumentError("the `$name` of a block of observations must equal the one the first block pinned, because a concatenation that silently took a new one would put the next observation on the wrong column. Got $(pinned_repr(given)) against the pinned $(pinned_repr(pinned))."))
     return nothing
 end
 """
@@ -91,7 +91,7 @@ end
     vcat_optional(a::TimeSeries.TimeArray, b::TimeSeries.TimeArray, name::Symbol) -> TimeSeries.TimeArray
     vcat_optional(a, b, name::Symbol)
 
-Concatenates one optional column of two carriers along the observation axis.
+Concatenates one optional column of two blocks of observations along the observation axis.
 
 # Algorithm
 
@@ -127,7 +127,7 @@ function vcat_optional(a::TimeSeries.TimeArray, b::TimeSeries.TimeArray, name::S
     na = string.(TimeSeries.colnames(a))
     nb = string.(TimeSeries.colnames(b))
     @argcheck(isequal(na, nb),
-              ArgumentError("the columns of `$name` in a block of observations must be the ones the first block pinned, in the same order, because a carrier that silently took new ones would put the next observation on the wrong column. Got $(pinned_repr(nb)) against the pinned $(pinned_repr(na))."))
+              ArgumentError("the columns of `$name` in a block of observations must be the ones the first block pinned, in the same order, because a concatenation that silently took new ones would put the next observation on the wrong column. Got $(pinned_repr(nb)) against the pinned $(pinned_repr(na))."))
     return vcat(a, b)
 end
 function vcat_optional(a, b, name::Symbol)
@@ -190,7 +190,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Counts the observations of a carrier.
+Counts the observations of a `PricesResult` or a `ReturnsResult`.
 
 # Returns
 
@@ -209,7 +209,7 @@ Folds a block of observations into a data step, and returns the block that the t
 
 This verb is the online form of a preprocessing step that changes the rows it receives. A [`Pipeline`](@ref) gives each step the block that the step before it returned, and takes back the block that the step returns. So the fold and the transform of a step are one call. The transform of the new rows reads the state that the earlier rows left, and the fold moves the state past the new rows. The two halves cannot be separated, because the first return of a new block reads the last price row that the step kept. So the verb returns both.
 
-For [`PricesToReturns`](@ref), [`PriceGapFill`](@ref) and [`MissingDataFilter`](@ref), [`partial_fit!`](@ref) returns the first element of this verb. The read-out of a step is [`fit_preprocessing`](@ref) with no data. A caller's own preprocessing estimator joins the online route of a `Pipeline` with three methods: this verb, the read-out, and a [`supports_partial_fit`](@ref) method that returns `true`. It needs no `partial_fit!` method.
+For [`PricesToReturns`](@ref), [`PriceGapFill`](@ref) and [`MissingDataFilter`](@ref), [`partial_fit!`](@ref) returns the first element of this verb. A step makes its estimate from the state with [`fit_preprocessing`](@ref) and no data. A caller's own preprocessing estimator joins the online route of a `Pipeline` with three methods: this verb, a `fit_preprocessing` method that takes no data, and a [`supports_partial_fit`](@ref) method that returns `true`. It needs no `partial_fit!` method.
 
 # Arguments
 
@@ -234,7 +234,7 @@ For [`PricesToReturns`](@ref), [`PriceGapFill`](@ref) and [`MissingDataFilter`](
   - [`MissingDataFilter`](@ref)
 """
 function partial_fit_transform(est::AbstractPreprocessingEstimator, ::Prices_RR)
-    return throw(ArgumentError("a `$(typeof(est).name.name)` has no online form: no `partial_fit_transform` method folds a block of observations into it. Give the step a `partial_fit_transform` and a data-less `fit_preprocessing` read-out, or declare a refit with `Online(pipe)`."))
+    return throw(ArgumentError("a `$(typeof(est).name.name)` has no online form: no `partial_fit_transform` method folds a block of observations into it. Give the step a `partial_fit_transform` and a `fit_preprocessing` method that takes no data, or declare a refit with `Online(pipe)`."))
 end
 function partial_fit!(est::Union{<:PricesToReturns, <:PriceGapFill, <:MissingDataFilter},
                       data::Prices_RR)
@@ -298,15 +298,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Puts the series columns of a price carrier side by side: the assets, then the factors, then the benchmark.
+Puts the series columns of the price data `pr` side by side: the assets, then the factors, then the benchmark.
 
-[`series_values_returns`](@ref) lays the columns of a returns carrier out in the same order, so a column index of one matrix names the same series in the other.
+[`series_values_returns`](@ref) lays the columns of a `ReturnsResult` out in the same order, so a column index of one matrix names the same series in the other.
 
 # Algorithm
 
  1. Read the asset prices `X` with each gap written as `NaN`, giving the first block of `cols`.
- 2. When the carrier holds factor prices `F`, append them to `cols` in the same way.
- 3. When the carrier holds benchmark prices `B`, append them to `cols` in the same way.
+ 2. When `pr` holds factor prices `F`, append them to `cols` in the same way.
+ 3. When `pr` holds benchmark prices `B`, append them to `cols` in the same way.
  4. Concatenate `cols` horizontally.
 
 # Returns
@@ -508,13 +508,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Puts the series columns of a returns carrier side by side, in the order of [`series_values`](@ref): the assets, then the factors, then the benchmark.
+Puts the series columns of the returns data `rd` side by side, in the order of [`series_values`](@ref): the assets, then the factors, then the benchmark.
 
 # Algorithm
 
  1. Copy the asset returns `X` into the first block of `cols`.
- 2. When the carrier holds factor returns `F`, append a copy to `cols`.
- 3. When the carrier holds benchmark returns `B`, append a copy to `cols`, as one column when `B` is a vector.
+ 2. When `rd` holds factor returns `F`, append a copy to `cols`.
+ 3. When `rd` holds benchmark returns `B`, append a copy to `cols`, as one column when `B` is a vector.
  4. Concatenate `cols` horizontally.
 
 # Returns
@@ -539,7 +539,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Rebuilds a returns carrier from the series matrix that [`series_values_returns`](@ref) lays out.
+Rebuilds a `ReturnsResult` from the series matrix that [`series_values_returns`](@ref) lays out.
 
 A Gap Return writes a finite return where the default conversion left none. So the function derives the estimation mask again, as the conversion does.
 
@@ -547,11 +547,11 @@ A Gap Return writes a finite return where the default conversion left none. So t
 
  1. Split `R` into the asset returns `X`, the factor returns `F` and the benchmark returns `B`, in the layout of [`series_values_returns`](@ref). `B` is one column when the benchmark of `rd` is a vector.
  2. When `rd` holds a time-varying panel, keep its active mask `amsk`, and derive the estimation mask `emsk` as the cells of `amsk` where `X` is finite. When `emsk` is true everywhere, [`compress_all_true`](@ref) replaces the two masks with one all-true mask.
- 3. Build the returns carrier from `X`, `F`, `B`, the panel, and the other fields of `rd`.
+ 3. Build the `ReturnsResult` from `X`, `F`, `B`, the panel, and the other fields of `rd`.
 
 # Returns
 
-  - `rd′::ReturnsResult`: The returns carrier of `R`.
+  - `rd′::ReturnsResult`: The returns data of `R`.
 
 # Related
 
@@ -616,7 +616,7 @@ Keeps the carried price of each asset and the end of the last block for an onlin
 
 [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref) keeps this state in `cache`. The carried price is the price that the gaps of the next block take, and the seed that the fitted result replays. The fitted result records the end of the last block as the end of its training window.
 
-An absence from the listing after the last observed price retires the carried price, because the next block cannot see that absence. The state keeps the price and clears its flag in `held`. The read-out then gives the asset a `missing` seed, as the batch fit over the same rows does.
+An absence from the listing after the last observed price retires the carried price, because the next block cannot see that absence. The state keeps the price and clears its flag in `held`. `fit_preprocessing` with no data then gives the asset a `missing` seed, as the batch fit over the same rows does.
 
 # Fields
 
@@ -687,8 +687,8 @@ A column that no earlier block priced has no carried price. A gap that opens suc
  4. Find `t0`, the first row of the block after the end `te` of the state. With no state, `t0` is one row past the end of the block.
  5. For each column `j`, find the last observed row `t`.
  6. Fill the gaps of column `j` of `vals` with [`gap_fill_column!`](@ref). A column with a carried price and a set flag takes the price as the seed from row `t0`. Any other column gets a `missing` seed, so its gaps fill from the earlier prices of the block only.
- 7. When `t` exists, the new carried price `vnew[j]` is `vals[t, j]`, and the new flag tells with [`gap_fill_open`](@ref) whether the Listing Span of the carrier holds from `t` to the end of the block. Otherwise the new flag is the old flag, cleared when the span breaks inside the block.
- 8. Build the filled price carrier from `vals`, and the new state from `names`, `vnew`, the new flags and the last timestamp of the block.
+ 7. When `t` exists, the new carried price `vnew[j]` is `vals[t, j]`, and the new flag tells with [`gap_fill_open`](@ref) whether the Listing Span of `pr` holds from `t` to the end of the block. Otherwise the new flag is the old flag, cleared when the span breaks inside the block.
+ 8. Build the filled `PricesResult` from `vals`, and the new state from `names`, `vnew`, the new flags and the last timestamp of the block.
 
 # Arguments
 
@@ -699,7 +699,7 @@ A column that no earlier block priced has no carried price. A gap that opens suc
 
   - The convention is a [`CarriedPrice`](@ref). A fill by a statistic of the window changes each earlier gap when the window grows, so it has no online form. [`supports_partial_fit`](@ref) answers `false` for it, and a `Pipeline` refuses it at warm-up. An `ArgumentError` is thrown otherwise.
   - A later block has the asset names of the first block. An `ArgumentError` is thrown otherwise.
-  - Under `strict`, a block with a gap comes from a carrier with a Listing Span. [`gap_fill_span`](@ref) throws an `ArgumentError` otherwise.
+  - Under `strict`, a block with a gap comes from a `PricesResult` with a Listing Span. [`gap_fill_span`](@ref) throws an `ArgumentError` otherwise.
 
 # Returns
 
@@ -794,7 +794,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Keeps the number of observations and the missing count of each asset for an online missing-data filter.
 
-[`MissingDataFilter`](@ref) keeps this state in `cache`, and its read-out computes the column filter from the counts.
+[`MissingDataFilter`](@ref) keeps this state in `cache`, and `fit_preprocessing` with no data computes the column filter from the counts.
 
 # Fields
 
@@ -848,7 +848,7 @@ end
 
 Counts the gaps of a block of prices, and returns the block unchanged.
 
-The column filter changes only which assets survive, and a longer window can change that set. So the verb leaves the column filter to the read-out. There, [`fit_preprocessing`](@ref) with no data gives the [`MissingDataFilterResult`](@ref) of the whole history, and a `Pipeline` applies it as a view. At `row_thr = 1` the row filter drops no row, so every row passes.
+The column filter changes only which assets survive, and a longer window can change that set. So the verb leaves the column filter to the call with no data. There, [`fit_preprocessing`](@ref) with no data gives the [`MissingDataFilterResult`](@ref) of the whole history, and a `Pipeline` applies it as a view. At `row_thr = 1` the row filter drops no row, so every row passes.
 
 # Algorithm
 

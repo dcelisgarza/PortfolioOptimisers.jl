@@ -76,7 +76,7 @@ const PATTERNS = Dict("emdash" => r"—", "endash" => r"–", "curly" => r"[“�
                           r"\b(?:utilis(?:e|es|ed|ing)|utiliz(?:e|es|ed|ing)|facilitat(?:e|es|ed|ing)|numerous|in the event that)\b"i,
                       "bold_label" => r"\*\*[^*\n]{1,80}:\*\*|\*\*[^*\n]{1,80}\*\*\s*:",
                       "mechanism" =>
-                          r"\bseams?\b|\bcarriers?\b|\bread-?outs?\b|\bhosts?\b|\brefused? by name\b|§"i,
+                          r"\bseams?\b|\bcarriers?\b|\bread-?outs?\b|\bhosts?\b|\bdoors?\b|\brefused? by name\b|§"i,
                       # "the identity matrix" is the matrix, not the verdict, and a page that
                       # shrinks a covariance towards it says so in those words.
                       "verdict" =>

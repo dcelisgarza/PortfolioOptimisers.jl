@@ -1206,8 +1206,9 @@ function expert_start_allocation(alg::ConstantRebalancedPortfolio, w::AbstractVe
     if isnothing(alg.w)
         return fill(one(eltype(w)) / length(w), length(w))
     end
-    # The carrier's numeric type is the head's, so a target given as integers, as the
-    # one-hot experts of a switching portfolio are, holds the projected allocation.
+    # The copy promotes to the numeric type of `w`, the head's, so a target given as
+    # integers, as the one-hot experts of a switching portfolio are, holds the projected
+    # allocation.
     return promote_type(eltype(w), eltype(alg.w)).(alg.w)
 end
 function online_update!(alg::ExpertMixture, st::ExpertMixtureState, w::AbstractVector,

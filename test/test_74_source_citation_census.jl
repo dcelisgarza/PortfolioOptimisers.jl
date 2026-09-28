@@ -41,6 +41,16 @@ span and an inline LaTeX expression. A citation `[key](@cite)` and a link lose t
 An author list with no year, and a private name for a value, hold by review. A match is a
 defect, and the fix is the rule's own: cite the work, and repeat the citation where the text
 said "the paper". There is no allow-list.
+
+------------------------------------------------------------------ the words for the mechanism
+
+The same rule says that a docstring defines each word it uses. Issue #1361 found about 1300
+lines under `src/` and `ext/` that named a value by a private word: "the carrier" for a
+`ReturnsResult`, "the seam", "the host", "the read-out" and "the door". The pages already
+fail on those words, through the `mechanism` pattern of `code_health/prose.jl`. The last testset
+reads that one pattern over every string literal of `src/` and `ext/`: the docstrings, the
+dictionary values, and the text of each error, warning and info message. A code span loses its
+text first, so a function named `rows_carrier` or an argument named `host` is not a match.
 =#
 module SourceCitationCensus
 module CH
@@ -186,5 +196,39 @@ end
             end
         end
         @test report(offenders) == String[]
+    end
+
+    MECHANISM = P.PATTERNS["mechanism"]
+    # A docstring opens on its signatures, indented four spaces, and a signature names an
+    # argument such as `host` or `door`: it is code, so it loses its text as a code span does.
+    function mechanism(text)
+        s = replace(text, r"\A(?: {4}[^\n]*\n)+" => "")
+        return [m.match for m in eachmatch(MECHANISM, readable(s))]
+    end
+
+    @testset "the mechanism pattern reads prose, not code" begin
+        @test length(mechanism("Build the carrier with the `pnl` the seam returns.")) == 2
+        @test length(mechanism("The fee takes the same door. The host folds it.")) == 2
+        @test isempty(mechanism("Call `rows_carrier(rd)`, then pass `host` to [`f`](@ref)."))
+        @test isempty(mechanism("the `vcat_carrier_rows` of `rd`"))
+        @test isempty(mechanism("    f(host::Symbol)\n    g(door)\n\nRefuses the field."))
+        @test length(mechanism("    f(x)\n\nThe host refuses the field.")) == 1
+    end
+
+    @testset "src and ext strings name no mechanism of the code" begin
+        offenders = String[]
+        # `dictionary_values` reads every string literal of a file, so it reads a docstring, a
+        # field docstring and the text of a message as it reads a dictionary value.
+        for dir in ("src", "ext"), f in files_under(joinpath(ROOT, dir))
+            for (l, t) in dictionary_values(f)
+                m = mechanism(t)
+                isempty(m) ||
+                    push!(offenders, "$(relpath(f, ROOT)):$(l): $(join(m, " | "))")
+            end
+        end
+        isempty(offenders) ||
+            @warn """$(length(offenders)) string(s) name a value by a word for the mechanism of the
+                     code. Name the argument, the type or the function instead:\n  $(join(offenders, "\n  "))"""
+        @test offenders == String[]
     end
 end

@@ -178,7 +178,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that a custom expected returns value is a per-asset vector of the expected length.
 
-Both the vector field of [`CustomValueExpectedReturns`](@ref) and the value returned by a callable `val` must be a vector of numbers with one element per asset. The callable is checked at the point of call, which is the only seam that can see what the callable returned.
+Both the vector field of [`CustomValueExpectedReturns`](@ref) and the value returned by a callable `val` must be a vector of numbers with one element per asset. The callable is checked at the point of call, which is the only step that can see what the callable returned.
 
 # Arguments
 

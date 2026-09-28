@@ -579,8 +579,8 @@ A taxonomy reaches the Asset Panel through [`panel_input`](@ref), which reads on
 
 `nikey` declares the Non-Investable Axis, the names that the Investable Mask left out. A forced liquidation is priced on this axis. It differs from the other six keys in three ways.
 
-  - A door writes it after it reduces an optimiser to the Investable Mask, and the door overwrites an entry that the caller wrote. Outside a door, an entry that the caller writes is the way to resolve a liquidation rate.
-  - Every view drops it. A sets that carries it was reduced by one door for one problem, so a cluster of a nested optimisation cannot inherit the departures of its parent and charge them again.
+  - The entry of a fit writes it after it reduces an optimiser to the Investable Mask, and it overwrites a value that the caller wrote. Outside a fit, a value that the caller writes is the way to resolve a liquidation rate.
+  - Every view drops it. A sets that carries it was reduced by one entry of a fit for one problem, so a cluster of a nested optimisation cannot inherit the departures of its parent and charge them again.
   - It has no prefixed partition and no unique-entry group, because its entries are unique by construction and a plain group already reaches it.
 
 A key that matches none of the seven prefixes is a plain group. It expands by name on any axis, so a factor group and a group on the Non-Investable Axis need no code of their own.
@@ -624,7 +624,7 @@ Keywords correspond to the struct's fields.
   - The method reads the asset index alone. It ignores every further positional argument, because it slices no axis but the asset axis.
   - The view slices every `xkey`-prefixed entry of `dict` to the selected assets, and rebuilds every `uxkey`-prefixed entry from the sliced partition that it names.
   - The view keeps the `tfkey`-, `utfkey`-, `cfkey`- and `ucfkey`-prefixed entries and every plain group unchanged. [`port_opt_view`](@ref) states why each axis is exempt.
-  - The view drops the `nikey` entry, because only a door writes one. It matches the key exactly and not by prefix, so it keeps a plain group whose name starts with `nikey`.
+  - The view drops the `nikey` entry, because only the entry of a fit writes one. It matches the key exactly and not by prefix, so it keeps a plain group whose name starts with `nikey`.
   - The view keeps the seven key prefixes, so the viewed value declares the same axes as the original.
 
 # Examples
@@ -759,7 +759,7 @@ The view slices the asset axis and no other. An asset index has no meaning on a 
  1. Read `xkey` and `uxkey` from `sets`, and open an empty dictionary `dict` of the type `sets.dict` has.
  2. For an entry of `sets.dict` whose key starts with `xkey`, take `view(v, i)`, the group restricted to the selected assets.
  3. For an entry whose key starts with `uxkey`, take the unique entries of the `xkey`-prefixed partition it names, restricted to `i`. The unique-entry group is therefore derived from the sliced partition and never from the original one.
- 4. Skip the entry whose key equals `nikey`. Only a door writes the Non-Investable Axis, so a view never carries one. Otherwise a cluster of a nested optimisation inherits the departures of its parent and charges each of them again, once per cluster. The match is exact and not by prefix, so the view keeps a plain group such as `"nikkei225"`, whose name starts with the default `"ni"`.
+ 4. Skip the entry whose key equals `nikey`. Only the entry of a fit writes the Non-Investable Axis, so a view never carries one. Otherwise a cluster of a nested optimisation inherits the departures of its parent and charges each of them again, once per cluster. The match is exact and not by prefix, so the view keeps a plain group such as `"nikkei225"`, whose name starts with the default `"ni"`.
  5. Copy every other entry unchanged into the same `dict`. The `tfkey`-, `utfkey`-, `cfkey`- and `ucfkey`-prefixed entries and every plain group come back bit-identical.
  6. Return the [`UniverseSets`](@ref) built from `dict` and the seven unchanged key prefixes, which revalidates the prefix grammar over the viewed universe.
 
@@ -803,11 +803,11 @@ end
 
 Write the Non-Investable Axis on `sets`, which declares `ni`, the names that the Investable Mask left out, under `sets.nikey`.
 
-A door calls this function after it reduces an optimiser to the Investable Mask, so a [`UniverseSets`](@ref) that carries the axis was reduced by one door for one problem. [`port_opt_view`](@ref) drops the axis, so no sub-problem inherits it.
+The entry of a fit calls this function after it reduces an optimiser to the Investable Mask, so a [`UniverseSets`](@ref) that carries the axis was reduced by one entry of a fit for one problem. [`port_opt_view`](@ref) drops the axis, so no sub-problem inherits it.
 
-A caller can also declare the axis by hand. Outside a door, that is the only way to resolve a forced-liquidation rate, for example in a direct call of [`fees_constraints`](@ref) with no optimisation around it. Inside a door the mask comes from the data, so this function overwrites an entry that the caller wrote and does not merge the two.
+A caller can also declare the axis by hand. Outside a fit, that is the only way to resolve a forced-liquidation rate, for example in a direct call of [`fees_constraints`](@ref) with no optimisation around it. Inside a fit the mask comes from the data, so this function overwrites an entry that the caller wrote and does not merge the two.
 
-An empty `ni` returns `sets` unchanged. No asset left the universe, and an empty axis makes [`fees_constraints`](@ref) resolve a carrier that prices no position.
+An empty `ni` returns `sets` unchanged. No asset left the universe, and an empty axis makes [`fees_constraints`](@ref) resolve a liquidation charge that prices no position.
 
 # Algorithm
 
@@ -850,7 +850,7 @@ end
 
 Read the names the Investable Mask leaves out, in the order the complement of the mask visits them.
 
-The order matters. A forced-liquidation carrier is sliced by index to the complement of the mask, and the rate that prices it resolves against these names by position, so both must walk the complement in one order. This function indexes `nx` with `.!imsk`, which is ascending, and [`port_opt_view`](@ref)`(::Fees, i, X)` takes the complement of `i` over the width of `X`, which is also ascending.
+The order matters. A liquidation charge is sliced by index to the complement of the mask, and the rate that prices it resolves against these names by position, so both must walk the complement in one order. This function indexes `nx` with `.!imsk`, which is ascending, and [`port_opt_view`](@ref)`(::Fees, i, X)` takes the complement of `i` over the width of `X`, which is also ascending.
 
 Returns data with no names gives an empty vector and does not throw. The axis is a list of names, so a problem with no names has no Non-Investable Axis and no name-keyed constraint to resolve against it.
 
@@ -881,17 +881,17 @@ end
     record_non_investable_drop!(ledger::Nothing, what::AbstractString) -> Nothing
     record_non_investable_drop!(ledger::AbstractVector, what::AbstractString) -> Nothing
 
-Record one thing that a departure cost, for the door to report.
+Record one thing that a departure cost, for the entry of the fit to report.
 
-Each site drops a departed name where it finds it, for example a view row or a group member. The site is far from the door, and only the door knows that a departure happened. A report at the site repeats once per row and once per window of a walk-forward. No report at all leaves a caller who wrote three views and got one fitted with no way to learn it. So the site writes what it dropped into a ledger, and the door reads the ledger once and reports the departures and the drops together, through [`announce_non_investable`](@ref).
+Each site drops a departed name where it finds it, for example a view row or a group member. The site is far from the entry of the fit, and only the entry of the fit knows that a departure happened. A report at the site repeats once per row and once per window of a walk-forward. No report at all leaves a caller who wrote three views and got one fitted with no way to learn it. So the site writes what it dropped into a ledger, and the entry of the fit reads the ledger once and reports the departures and the drops together, through [`announce_non_investable`](@ref).
 
-A `nothing` ledger collects nothing, and it is the default everywhere. A caller who assembles constraints outside a door has no door to report to, and pays nothing for a ledger that it does not keep. Dispatch on the type of the ledger selects the branch.
+A `nothing` ledger collects nothing, and it is the default everywhere. A caller who assembles constraints outside a fit has no entry of a fit to report to, and pays nothing for a ledger that it does not keep. Dispatch on the type of the ledger selects the branch.
 
-`what` is a noun phrase that names the dropped item, not a sentence. The door joins the phrases into one message and gives the verb.
+`what` is a noun phrase that names the dropped item, not a sentence. The entry of the fit joins the phrases into one message and gives the verb.
 
 # Arguments
 
-  - `ledger`: The door's ledger, or `nothing` when nobody is collecting.
+  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting.
   - `what`: A noun phrase naming what was dropped, for example ``"the view row `a + c == 0.05`"``.
 
 # Returns
@@ -916,17 +916,17 @@ end
     record_group_shed!(ledger::Option{<:AbstractVector}, group::AbstractString,
                        shed::Integer, kept::Integer, eqn::AbstractString) -> Nothing
 
-Record what a group shed to a departure, for the door to report through [`announce_non_investable`](@ref).
+Record what a group shed to a departure, for the entry of the fit to report through [`announce_non_investable`](@ref).
 
 A group that loses some of its members still describes the rest, so its row stays, with the coefficient spread over the survivors. A group that loses all of its members describes nothing, and its row goes. The two cases tell the caller different things, so the function writes a different phrase for each, and no other function writes either phrase. [`shed_departed_members`](@ref) is the only caller, and [`replace_group_by_assets`](@ref) reaches it from each of its four expansion branches.
 
-The phrases give counts and not names. The door names the departed assets once, and a list per group makes the message longer than the facts that it reports.
+The phrases give counts and not names. The entry of the fit names the departed assets once, and a list per group makes the message longer than the facts that it reports.
 
 A shed of nothing records nothing, so the all-investable path costs one comparison.
 
 # Arguments
 
-  - `ledger`: The door's ledger, or `nothing` when nobody is collecting.
+  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting.
   - `group`: The group name as the caller wrote it, or the pair `"(a, b)"` for a correlation view.
   - `shed`: How many members the group lost.
   - `kept`: How many members survived.
@@ -961,22 +961,22 @@ end
                             consequence::AbstractString = "…";
                             warn::Bool = false) -> Nothing
 
-Announce, once per door, the assets that left the investable universe and what their leaving cost.
+Announce, once per entry of a fit, the assets that left the investable universe and what their leaving cost.
 
-Only the door knows that a departure happened. After the door, a departed asset is absent. A bound stated for it resolves on the Non-Investable Axis and is skipped, and a view row that names it is dropped whole. A report at each of those sites repeats once per row and once per window of a walk-forward, so each site writes its drop into a ledger with [`record_non_investable_drop!`](@ref), and the door reports everything once, here.
+Only the entry of the fit knows that a departure happened. After the entry of the fit, a departed asset is absent. A bound stated for it resolves on the Non-Investable Axis and is skipped, and a view row that names it is dropped whole. A report at each of those sites repeats once per row and once per window of a walk-forward, so each site writes its drop into a ledger with [`record_non_investable_drop!`](@ref), and the entry of the fit reports everything once, here.
 
-`process` names the work that excludes the departed assets, because more than one kind of door writes the axis. An optimisation reduces at its entry, and a wrapping prior reduces at its own entry before it builds a view. `consequence` states what a departure means to this door. Only an optimisation prices a forced-liquidation carrier, so the defaults of the two arguments give the message of the optimisation door.
+`process` names the work that excludes the departed assets, because more than one kind of entry of a fit writes the axis. An optimisation reduces at its entry, and a wrapping prior reduces at its own entry before it builds a view. `consequence` states what a departure means to this entry of a fit. Only an optimisation prices a liquidation charge, so the defaults of the two arguments give the message of the entry of an optimisation.
 
 The message is an `@info` by default, not a warning and not a [`strict_diagnostic`](@ref). Nothing is wrong. The data changed, and the work runs correctly over the assets that are left. A raise under `strict` refuses the departure, and the reduction to the Investable Mask exists to remove that refusal. `warn = true` gives a `@warn` for the one case that is not routine, a departure that removed the last of something the caller asked for, such as the last view of a view set. The result is then the unconditioned answer, and the caller has no other way to learn it.
 
-An empty `ni` logs nothing. This is the path when every asset is investable and when the data has no names. An empty `drops` gives a message that names the departed assets and no drops, which is what a door logs before it resolves anything over them.
+An empty `ni` logs nothing. This is the path when every asset is investable and when the data has no names. An empty `drops` gives a message that names the departed assets and no drops, which is what the entry of a fit logs before it resolves anything over them.
 
 # Arguments
 
   - `ni`: The names the Investable Mask left out.
   - `drops`: The ledger of casualties, as [`record_non_investable_drop!`](@ref) filled it.
   - `process`: Noun phrase naming the work, for example `"optimisation"` or `"entropy pooling fit"`.
-  - `consequence`: Sentence stating what a departure means to this door.
+  - `consequence`: Sentence stating what a departure means to this entry of a fit.
   - `warn`: Raise the message to `@warn`, for a departure that changed the model rather than trimming it.
 
 # Returns
@@ -992,7 +992,7 @@ An empty `ni` logs nothing. This is the path when every asset is investable and 
 """
 function announce_non_investable(ni::VecStr, drops::VecStr = String[],
                                  process::AbstractString = "optimisation",
-                                 consequence::AbstractString = "A constraint, bound or rate stated for one of them is dropped, and a forced-liquidation carrier is priced over them.";
+                                 consequence::AbstractString = "A constraint, bound or rate stated for one of them is dropped, and a liquidation charge is priced over them.";
                                  warn::Bool = false)::Nothing
     if isempty(ni)
         return nothing
@@ -1099,7 +1099,7 @@ end
 
 Return the asset axis that `nxkey` is the counterpart of, or an empty vector when it has none.
 
-[`UniverseSets`](@ref) declares two axes over assets. The investable universe is under `xkey`, and the Non-Investable Axis is under `nikey`, which a door writes from the complement of the Investable Mask. A name-keyed estimator resolves against one of them. A name that it does not find there can still be a correct name on the other axis, for example a bound for an asset that left, or a forced-liquidation rate for an asset that stayed. [`name_to_val!`](@ref) reads this list to tell such a name from a typo.
+[`UniverseSets`](@ref) declares two axes over assets. The investable universe is under `xkey`, and the Non-Investable Axis is under `nikey`, which the entry of a fit writes from the complement of the Investable Mask. A name-keyed estimator resolves against one of them. A name that it does not find there can still be a correct name on the other axis, for example a bound for an asset that left, or a forced-liquidation rate for an asset that stayed. [`name_to_val!`](@ref) reads this list to tell such a name from a typo.
 
 The relation is symmetric and covers only these two axes. A factor axis names factors, so it has no counterpart and the answer is empty. A `key` that names any other list also gives an empty answer.
 
@@ -1139,7 +1139,7 @@ end
                           other::VecStr, ledger::Option{<:AbstractVector},
                           group::AbstractString, eqn::AbstractString) -> Tuple
 
-Remove from the member list of a group the names that are on the counterpart axis, and record the removal in the ledger of the door.
+Remove from the member list of a group the names that are on the counterpart axis, and record the removal in the Departure Ledger of the entry of the fit.
 
 The data resolves a group, and the caller does not choose its members. `"tech"` means the technology assets of this problem, and when one of them delists, the group still names the rest. [`replace_group_by_assets`](@ref) therefore sheds the departed members before it spreads the coefficient of the group. A Black-Litterman mean then divides by the surviving count, an entropy pooling sum runs over the survivors, and the row still computes what its right-hand side states. A removal after the spread leaves `k - 1` terms of `c/k` against an unchanged target. A name that the caller writes out is different, because a departed name drops its whole row.
 
@@ -1155,7 +1155,7 @@ The record is written here and not at the four call sites, so each branch of [`r
 
   - `members` / `members1`, `members2`: The group's member names, as `sets.dict` holds them.
   - `other`: The counterpart axis, read with [`counterpart_axis_names`](@ref). Usually the Non-Investable Axis.
-  - `ledger`: The door's ledger, or `nothing` when nobody is collecting.
+  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting.
   - `group`: The group name as the caller wrote it, for the ledger.
   - `eqn`: The row the group appears in, for the ledger.
 
@@ -1205,7 +1205,7 @@ Set values in a vector for the asset or the group of assets that `key` names.
 
 `name_to_val!` resolves `key` through [`resolve_axis_name`](@ref), maps the members to indices in the asset universe `nx`, and sets those entries of `arr` to `val`. An asset name resolves to itself, and a group name expands to its members. If `key` names neither, the function throws or warns, as `strict` selects. Each diagnostic message names the size of the universe and never the universe itself or the value dictionary, because a shared message builder writes each message.
 
-`other` is the counterpart axis, the asset names that the same [`UniverseSets`](@ref) declares on the axis that this call does not resolve against. The function skips a name that it finds there in silence, whatever `strict` is, and this is the only exception to `strict`. `strict` catches a typo of the caller, and a name on the counterpart axis is not a typo. It was a correct name over the universe that the caller had, and the data moved it. A caller cannot know in advance which asset a prior will fail to estimate, so a refusal, or a warning once per constraint and once per window of a walk-forward, reports a thing that no one can act on. The door that derived the mask reports the departure once.
+`other` is the counterpart axis, the asset names that the same [`UniverseSets`](@ref) declares on the axis that this call does not resolve against. The function skips a name that it finds there in silence, whatever `strict` is, and this is the only exception to `strict`. `strict` catches a typo of the caller, and a name on the counterpart axis is not a typo. It was a correct name over the universe that the caller had, and the data moved it. A caller cannot know in advance which asset a prior will fail to estimate, so a refusal, or a warning once per constraint and once per window of a walk-forward, reports a thing that no one can act on. The entry of the fit that derived the mask reports the departure once.
 
 The two asset axes are counterparts of each other, and the relation is symmetric. When the call resolves on the asset universe, `other` is the Non-Investable Axis, so the function drops a bound for an asset that left. When the call resolves on the Non-Investable Axis, which is how a forced-liquidation rate is priced, `other` is the asset universe, so the same rule drops a liquidation rate for an asset that stayed. A factor axis has no counterpart, and `other` is then empty.
 
@@ -1254,7 +1254,8 @@ function name_to_val!(nx::VecStr, sdict::AbstractDict, key::Any, val::Number, ar
     if isnothing(members)
         # A name on the counterpart axis is known-good, not a typo: it was correct over the
         # universe the caller was given, and the data moved it to the other axis. Silent
-        # under `strict` too — the door that derived the mask announces the departure once.
+        # under `strict` too, because the entry of the fit that derived the mask announces
+        # the departure once.
         if any(isequal(key), other)
             return nothing
         end

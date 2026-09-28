@@ -3,15 +3,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the observations an estimator keeps when its estimate has no exact incremental fold.
 
-This is the buffer of the [`partial_fit!`](@ref) seam. It is a state like any other. It lives in the `cache` field of the estimator, it copies, it slices by asset, and [`obs_weights_view`](@ref) drops it. It holds the observations verbatim, `NaN` included. So a read-out over the buffer gives the answer of a batch fit over the same rows, and the two have the same Coverage Universe by construction.
+This is the buffer of the [`partial_fit!`](@ref) interface. It is a state like any other. It lives in the `cache` field of the estimator, it copies, it slices by asset, and [`obs_weights_view`](@ref) drops it. It holds the observations verbatim, `NaN` included. So the call with no data over the buffer gives the answer of a batch fit over the same rows, and the two have the same Coverage Universe by construction.
 
 The buffer also holds the per-observation masks verbatim. A [`CoveragePolicy`](@ref) reads two facts from an active mask that the rows alone do not carry. A cell that is finite but inactive is excluded, and an asset that is active at one observation and inactive at the next is a delisting, not a holiday. A buffer that kept the rows and dropped the mask would give a different answer from the batch fit, with no warning. `A` is the active mask, and `E` is the estimation mask that the two regime-adjusted families read. Each is a backing matrix of the shape of `X`, or `nothing`. So a wrapped estimator folded under a policy gives the batch fit over the same window, as it does without a policy.
 
 The buffer holds the factor observations on the same terms. A prior whose batch verb is `prior(pe, X, F)` regresses the asset returns on the factor returns, so its refit reads two matrices whose `t`-th rows are contemporaneous. `F` is the second matrix, a backing matrix of `capacity × factors`, or `nothing`. The same `off` and `n` index `F` and `X`, so the rows stay contemporaneous by construction. [`needs_factor_returns`](@ref) answers whether a fit reads `F`. That is a fact of the estimator tree, and the buffer records what the fold gives it. There is one buffer type, and a cap drops the factor rows with the other rows.
 
-The first append fixes whether the buffer records a mask and whether it records factor rows, as it fixes the width and the element type. A later fold that disagrees is refused by name, in both directions. A buffer that holds no observations records nothing about them, so the next fold seeds it again from its block.
+The first append fixes whether the buffer records a mask and whether it records factor rows, as it fixes the width and the element type. A later fold that disagrees is refused with an error that names the disagreement, in both directions. A buffer that holds no observations records nothing about them, so the next fold seeds it again from its block.
 
-An estimator whose `cache` holds this buffer is a refit. It has no recursion of its own, and its read-out runs the batch verb over the rows of the buffer. [`Online`](@ref) seeds the buffer, and a wrapped estimator takes this route also when its statistic has an exact update. A fold-and-carry prior keeps its observations in one of these buffers too, inside a [`PriorCarryState`](@ref). That prior folds its moments exactly. It keeps the rows because [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, and its buffer has no cap. `max_history` is the window of a refit. A capped buffer holds the last `max_history` observations, and the read-out is the batch fit over them.
+An estimator whose `cache` holds this buffer is a refit. It has no recursion of its own, and its call with no data runs the batch verb over the rows of the buffer. [`Online`](@ref) seeds the buffer, and a wrapped estimator takes this route also when its statistic has an exact update. A fold-and-carry prior keeps its observations in one of these buffers too, inside a [`PriorCarryState`](@ref). That prior folds its moments exactly. It keeps the rows because [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, and its buffer has no cap. `max_history` is the window of a refit. A capped buffer holds the last `max_history` observations, and the call with no data gives the batch fit over them.
 
 The backing matrix has spare capacity, so an append costs amortised `O(1)`. `off` is the number of rows before the valid region, and `n` is the length of the region. [`reserve_sample_buffer`](@ref) moves the region to the front of the backing matrix only when an append would go past its end. [`sample_buffer`](@ref) reads the valid region.
 
@@ -289,7 +289,7 @@ end
 
 Reads the observations a sample buffer holds, `observations × assets`.
 
-This is the read-out of [`SampleBufferState`](@ref). It is a view of the valid region of the backing matrix, in the order of the folds, so a refit reads it with no copy. The estimator form reads the state from the `cache` field, and it refuses an estimator that carries no buffer.
+This function reads the rows out of a [`SampleBufferState`](@ref). It is a view of the valid region of the backing matrix, in the order of the folds, so a refit reads it with no copy. The estimator form reads the state from the `cache` field, and it refuses an estimator that carries no buffer.
 
 # Arguments
 
@@ -321,7 +321,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the per-observation masks a sample buffer holds, as the keywords a batch verb takes.
 
-[`sample_buffer`](@ref) gives the rows, and this function gives the masks of those rows. A read-out arm calls the batch verb on the rows and splats these keywords into the call, so the wrapped answer is the unwrapped answer over the same window. A buffer that records no mask gives an empty set of keywords, and the arm then makes the same call as with no policy. The branch reads fields of concrete type, so the compiler resolves it.
+[`sample_buffer`](@ref) gives the rows, and this function gives the masks of those rows. The call with no data runs the batch verb on the rows and splats these keywords into the call, so the wrapped answer is the unwrapped answer over the same window. A buffer that records no mask gives an empty set of keywords, and the arm then makes the same call as with no policy. The branch reads fields of concrete type, so the compiler resolves it.
 
 # Algorithm
 
@@ -360,7 +360,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the factor observations a sample buffer holds, `observations × factors`, or `nothing` when it holds none.
 
-This is the third part of the read-out of the buffer, with [`sample_buffer`](@ref) and [`sample_buffer_kwargs`](@ref). A refit whose batch verb reads a factor matrix takes it from here, as the second positional argument of that verb. Its `t`-th row is contemporaneous with the `t`-th row of [`sample_buffer`](@ref), because the same `off` and `n` index the two backings. A buffer that records no factor rows gives `nothing`, which is the value that the batch verb of a prior with no factors receives. The branch reads a field of concrete type, so the compiler resolves it.
+This is the third function that reads the buffer out, with [`sample_buffer`](@ref) and [`sample_buffer_kwargs`](@ref). A refit whose batch verb reads a factor matrix takes it from here, as the second positional argument of that verb. Its `t`-th row is contemporaneous with the `t`-th row of [`sample_buffer`](@ref), because the same `off` and `n` index the two backings. A buffer that records no factor rows gives `nothing`, which is the value that the batch verb of a prior with no factors receives. The branch reads a field of concrete type, so the compiler resolves it.
 
 # Arguments
 
@@ -1151,7 +1151,7 @@ This is the buffering arm of [`partial_fit!`](@ref). Each estimator that carries
 
 The method covers both arms of the interface. The families that refuse the step also declare one method over both arms, and two narrower methods here would be ambiguous against each of them. So the body selects the arm by the type of `X`, and the compiler resolves that branch at each call site.
 
-A buffer carries the per-observation masks beside the observations. So a [`CoveragePolicy`](@ref) mask goes through the wrapper as it goes through the accumulator of an estimator, and the read-out gives it back to the batch verb. A wrapped estimator folded under a policy gives the answer of a batch fit over the same window under the same policy.
+A buffer carries the per-observation masks beside the observations. So a [`CoveragePolicy`](@ref) mask goes through the wrapper as it goes through the accumulator of an estimator, and the call with no data gives it back to the batch verb. A wrapped estimator folded under a policy gives the answer of a batch fit over the same window under the same policy.
 
 # Algorithm
 
@@ -1197,8 +1197,9 @@ function partial_fit!(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEsti
         partial_fit!(state, X; active_mask = active_mask, estimation_mask = estimation_mask)
     end
     # `rebuild_estimator`, not `Accessors.@reset`: `@reset` rebuilds a struct by reading
-    # every *property*, and a host that declares forwarded properties has more properties
-    # than fields, so `@reset` refuses it outright. Every prior that buffers is such a host.
+    # every *property*, and an estimator that declares forwarded properties has more
+    # properties than fields, so `@reset` refuses it outright. Every prior that buffers is
+    # such an estimator.
     return rebuild_estimator(est, (; cache = state))
 end
 """
@@ -1206,13 +1207,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Declares that an estimator takes the online step from a buffer of the observations it has seen.
 
-An `Online` goes directly in the estimator field that it wraps, for example `HighOrderPriorEstimator(; pe = Online(EmpiricalPrior()))`, or the `pe` of an optimiser, `JuMPOptimiser(; pe = Online(EmpiricalPrior()), slv = …)`. It is transient, as [`TimeDependent`](@ref) is. [`update_online_estimator`](@ref) walks the fields that hold a wrapper, seeds the `cache` of each wrapped estimator with a [`SampleBufferState`](@ref), and rebuilds the host through its keyword constructor. The result is an ordinary estimator that carries a state. No `Online` exists after that, so each verb downstream receives a plain estimator.
+An `Online` goes directly in the estimator field that it wraps, for example `HighOrderPriorEstimator(; pe = Online(EmpiricalPrior()))`, or the `pe` of an optimiser, `JuMPOptimiser(; pe = Online(EmpiricalPrior()), slv = …)`. It is transient, as [`TimeDependent`](@ref) is. [`update_online_estimator`](@ref) walks the fields that hold a wrapper, seeds the `cache` of each wrapped estimator with a [`SampleBufferState`](@ref), and rebuilds the outer estimator through its keyword constructor. The result is an ordinary estimator that carries a state. No `Online` exists after that, so each verb downstream receives a plain estimator.
 
 Only a field whose bound is `Onl` admits a wrapper. These are the `pe` field of a wrapping prior and of an optimiser. A moment field inside a prior, such as `ce`, `me`, `ske` or `kte`, admits none, so the bound of the field refuses `EmpiricalPrior(; ce = Online(…))` before any warm-up. The prior owns the rows. It holds its observations once, at the bottom of its chain, and it refits from those rows each member that does not fold. A buffer under one of its moments would hold the same rows a second time, so wrap the prior. Wrap a moment estimator alone only when it is the estimator under study, as in `update_online_estimator(Online(Coskewness()))`.
 
 It differs from [`TimeDependent`](@ref) in when it resolves. A schedule resolves again at each fold, because its value changes at each fold. An `Online` resolves once, at warm-up. After warm-up, the step passes the state from fold to fold, and a second resolution would discard the buffer.
 
-A wrapper replaces an exact fold, and it does not add to one. Each family that folds exactly narrows the `cache` type parameter of its own [`partial_fit!`](@ref) methods to the state of that fold, so a wrapped estimator never reaches them. It buffers its observations, and it answers each read-out verb with the batch verb over the rows of the buffer. The type of the state selects the route, and the caller selects the type when it wraps the estimator or not.
+A wrapper replaces an exact fold, and it does not add to one. Each family that folds exactly narrows the `cache` type parameter of its own [`partial_fit!`](@ref) methods to the state of that fold, so a wrapped estimator never reaches them. It buffers its observations, and it answers each call with no data with the batch verb over the rows of the buffer. The type of the state selects the route, and the caller selects the type when it wraps the estimator or not.
 
 Wrap an estimator in one of these cases:
 
@@ -1222,9 +1223,9 @@ Wrap an estimator in one of these cases:
 
 An estimator that folds exactly and carries nothing needs no wrapper. Unwrapped, it answers [`partial_fit!`](@ref) and seeds its own state at the first call, and it uses the memory of one state, not the memory of a buffer.
 
-A wrapper and a [`TimeDependent`](@ref) schedule do not wrap each other, because they resolve at different times. Neither `Online(TimeDependent(…))` nor a schedule whose entry or `default` is an `Online` is admissible. A wrapper inside a schedule entry would resolve at no fold, or it would seed again at each fold and discard the buffer that the step passes on. They compose the other way, in two ordinary forms. An estimator that an `Online` wraps can hold schedules of its own, which the seed does not change and which resolve at each fold after it. One host can hold a wrapper in one field and a schedule in another, and each resolves at its own time. The two field scans are disjoint by construction, because a field that holds one kind is not a candidate of the other scan. So neither resolution reaches the wrapper of the other.
+A wrapper and a [`TimeDependent`](@ref) schedule do not wrap each other, because they resolve at different times. Neither `Online(TimeDependent(…))` nor a schedule whose entry or `default` is an `Online` is admissible. A wrapper inside a schedule entry would resolve at no fold, or it would seed again at each fold and discard the buffer that the step passes on. They compose the other way, in two ordinary forms. An estimator that an `Online` wraps can hold schedules of its own, which the seed does not change and which resolve at each fold after it. One outer estimator can hold a wrapper in one field and a schedule in another, and each resolves at its own time. The two field scans are disjoint by construction, because a field that holds one kind is not a candidate of the other scan. So neither resolution reaches the wrapper of the other.
 
-On a scheme, the same word declares an Online Scheme. `Online{<:WalkForwardEstimator}` wraps a walk-forward whose folds the loop fits by the online step, not by a refit. The loop warms one estimator up on the first training window, folds the new observations of each fold into it, and reads it out where a refit would run. Only the function constructor of the scheme builds one, [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref) or [`OnlineHindsightSplit`](@ref). Each takes the keywords of its scheme except the window knob, and it sets that knob `true`, because a fold cannot remove an observation. `Online(cv)` written by hand is refused by name. On a scheme the wrapper is not transient. Nothing resolves it, the loop reads it at each fold, and each door decides on its type. It carries no `max_history`, because the estimator declares a window through the wrapper on the prior.
+On a scheme, the same word declares an Online Scheme. `Online{<:WalkForwardEstimator}` wraps a walk-forward whose folds the loop fits by the online step, not by a refit. The loop warms one estimator up on the first training window, folds the new observations of each fold into it, and reads it out where a refit would run. Only the function constructor of the scheme builds one, [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref) or [`OnlineHindsightSplit`](@ref). Each takes the keywords of its scheme except the window knob, and it sets that knob `true`, because a fold cannot remove an observation. `Online(cv)` written by hand is refused with an error that names it. On a scheme the wrapper is not transient. Nothing resolves it, the loop reads it at each fold, and each function that takes the scheme decides on its type. It carries no `max_history`, because the estimator declares a window through the wrapper on the prior.
 
 `max_history` caps the buffer, and the cap is the window. An uncapped buffer gives the batch fit over every observation folded so far. A capped buffer gives the batch fit over the last `max_history` observations. This holds for the estimate and for each consumer that reads the observations, such as the scenario risk measures CVaR, EVaR and CDaR. The rule has no special case. A buffer always means the batch verb over its rows. An unwrapped estimator is not affected. It folds exactly, and it stays fitted over every observation.
 
@@ -1361,7 +1362,7 @@ const Online_Option{X} = Union{Nothing, <:Online, X}
 
 Alias for a required field that accepts a static estimator of type `X` or an [`Online`](@ref) declaration.
 
-This is the form of [`Online_Option`](@ref) for a required field, as [`TD`](@ref) is for [`TD_Option`](@ref). A field that a host needs takes this alias. A caller can declare the online step there, and the signature refuses `nothing`.
+This is the form of [`Online_Option`](@ref) for a required field, as [`TD`](@ref) is for [`TD_Option`](@ref). A field that the outer estimator requires takes this alias. A caller can declare the online step there, and the signature refuses `nothing`.
 
 # Related
 
@@ -1375,7 +1376,7 @@ const Onl{X} = Union{<:Online, X}
 
 Alias for a cross-validation scheme, plain or an Online Scheme.
 
-An Online Scheme is an [`Online`](@ref) around a walk-forward, built by the function constructor of the scheme, [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref) or [`OnlineHindsightSplit`](@ref). Its supertype is `AbstractEstimator` and not `CrossValidationEstimator`, because a struct has one supertype. Each door that takes a scheme dispatches on this alias, or on an alias built from it, so the wrapped form reaches the same doors as the plain form. The fold loop then reads [`folds_are_stepped`](@ref) from its type.
+An Online Scheme is an [`Online`](@ref) around a walk-forward, built by the function constructor of the scheme, [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref) or [`OnlineHindsightSplit`](@ref). Its supertype is `AbstractEstimator` and not `CrossValidationEstimator`, because a struct has one supertype. Each function that takes a scheme dispatches on this alias, or on an alias built from it, so the wrapped form reaches the same functions as the plain form. The fold loop then reads [`folds_are_stepped`](@ref) from its type.
 
 # Related
 
@@ -1390,7 +1391,7 @@ const CVE_Onl = Union{<:CrossValidationEstimator, <:Online{<:CrossValidationEsti
 
 Field names of `x` whose type admits an [`Online`](@ref), the candidate set that [`online_fields`](@ref) narrows by value.
 
-`fieldtype` alone decides whether a field can hold a wrapper, because a `@concrete` host records the type of the value in the type parameter of the field. The type of a field that holds a static estimator does not intersect [`Online`](@ref). So a generated function computes the tuple once for each host type, and for a host with no wrapper the tuple is empty at compile time. The warm-up then walks no field.
+`fieldtype` alone decides whether a field can hold a wrapper, because a `@concrete` estimator records the type of the value in the type parameter of the field. The type of a field that holds a static estimator does not intersect [`Online`](@ref). So a generated function computes the tuple once for each estimator type, and for an estimator with no wrapper the tuple is empty at compile time. The warm-up then walks no field.
 
 # Related
 
@@ -1408,7 +1409,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the tuple of field names of `est` whose values are [`Online`](@ref).
 
-The scan reads the fields of the host, so the constructor signatures that admit a wrapper, through [`Online_Option`](@ref) and [`Onl`](@ref), decide which estimators can take the step from a buffer. No list is kept by hand. The scan visits only the candidates of [`online_candidate_fields`](@ref), and the compiler removes the other fields.
+The scan reads the fields of the outer estimator, so the constructor signatures that admit a wrapper, through [`Online_Option`](@ref) and [`Onl`](@ref), decide which estimators can take the step from a buffer. No list is kept by hand. The scan visits only the candidates of [`online_candidate_fields`](@ref), and the compiler removes the other fields.
 
 # Arguments
 
@@ -1433,9 +1434,9 @@ end
 
 Resolves the [`Online`](@ref) declarations of an estimator, seeding the sample buffer each one asks for.
 
-The warm-up calls it once, before the first fold. It replaces each wrapper with the estimator that the wrapper holds, rebuilt through its keyword constructor with the state of [`online_state_seed`](@ref) in `cache`. That state is an empty [`SampleBufferState`](@ref) with the cap of the wrapper, unless the family has a seed of its own. The function then rebuilds the host through the keyword constructor of the host, so each construction check runs again. The result holds no `Online`, and each estimator that was wrapped carries the state that its refit or its carry reads.
+The warm-up calls it once, before the first fold. It replaces each wrapper with the estimator that the wrapper holds, rebuilt through its keyword constructor with the state of [`online_state_seed`](@ref) in `cache`. That state is an empty [`SampleBufferState`](@ref) with the cap of the wrapper, unless the family has a seed of its own. The function then rebuilds the outer estimator through its keyword constructor, so each construction check runs again. The result holds no `Online`, and each estimator that was wrapped carries the state that its refit or its carry reads.
 
-The function finds a wrapper in the fields of the estimator that it receives, and in the fields of an estimator inside a wrapper. A host that passes estimators across a boundary of its own, such as a meta-optimiser or a pipeline, has a method of its own that recurses, as it has for [`update_time_dependent_estimator`](@ref).
+The function finds a wrapper in the fields of the estimator that it receives, and in the fields of an estimator inside a wrapper. An outer estimator that passes estimators across a boundary of its own, such as a meta-optimiser or a pipeline, has a method of its own that recurses, as it has for [`update_time_dependent_estimator`](@ref).
 
 The function takes no fold context, unlike [`update_time_dependent_estimator`](@ref). The seed reads nothing from a fold, because the wrapper resolves once and not at each fold.
 
@@ -1478,7 +1479,7 @@ end
 
 Field names of `x` whose type admits an estimator, the candidate set that [`online_entry_state`](@ref) and [`online_wrapper_path`](@ref) walk.
 
-`fieldtype` alone decides whether a field can hold an estimator, because a `@concrete` host records the type of the value in the type parameter of the field. So a generated function computes the tuple once for each host type, as for [`online_candidate_fields`](@ref). A field that holds a vector of estimators or a result is not a candidate. A vector is a batch configuration that the step never folds into, and a result carries no state field. A field that holds a [`TimeDependent`](@ref) schedule is a candidate, because a schedule is an estimator. The `TimeDependent` methods of the two walks answer `nothing` for it, because the entries of a schedule resolve at each fold.
+`fieldtype` alone decides whether a field can hold an estimator, because a `@concrete` estimator records the type of the value in the type parameter of the field. So a generated function computes the tuple once for each estimator type, as for [`online_candidate_fields`](@ref). A field that holds a vector of estimators or a result is not a candidate. A vector is a batch configuration that the step never folds into, and a result carries no state field. A field that holds a [`TimeDependent`](@ref) schedule is a candidate, because a schedule is an estimator. The `TimeDependent` methods of the two walks answer `nothing` for it, because the entries of a schedule resolve at each fold.
 
 # Related
 
@@ -1593,19 +1594,19 @@ end
 """
     assert_batch_entry(est, door::AbstractString)
 
-Refuses, by name, an estimator that holds an [`Online`](@ref) at the door of a batch fit.
+Refuses an estimator that holds an [`Online`](@ref) at the entry of a batch fit, with an error that names the path of the wrapper.
 
-A wrapper is a declaration that the online arm of the fold loop resolves at its warm-up. A batch fit runs no warm-up. A batch fit is a plain [`optimise`](@ref), or a fold of a scheme that is not an Online Scheme. So the wrapper would reach `prior(pe, X)` unresolved and get a `MethodError` that names the whole type. The refusal names the dotted path that [`online_wrapper_path`](@ref) finds, and the two exits. One exit is an Online Scheme, such as [`OnlineIndexWalkForward`](@ref). The other exit is the estimator without the wrapper. Each caller passes an optimiser, which is never a wrapper, so the path at this door is never the empty path.
+A wrapper is a declaration that the online arm of the fold loop resolves at its warm-up. A batch fit runs no warm-up. A batch fit is a plain [`optimise`](@ref), or a fold of a scheme that is not an Online Scheme. So the wrapper would reach `prior(pe, X)` unresolved and get a `MethodError` that names the whole type. The refusal names the dotted path that [`online_wrapper_path`](@ref) finds, and the two exits. One exit is an Online Scheme, such as [`OnlineIndexWalkForward`](@ref). The other exit is the estimator without the wrapper. Each caller passes an optimiser, which is never a wrapper, so the path at this entry is never the empty path.
 
 # Algorithm
 
  1. Find the path of the first wrapper in `est` with [`online_wrapper_path`](@ref).
- 2. Refuse `est` when the path is not `nothing`, and name the path and the door.
+ 2. Refuse `est` when the path is not `nothing`, and name the path and the entry function.
 
 # Arguments
 
-  - `est`: The estimator handed to the door.
-  - `door`: The door's name, as the message reads it.
+  - `est`: The estimator handed to the entry function.
+  - `door`: The name of the entry function, as the message reads it.
 
 # Validation
 
@@ -1633,7 +1634,7 @@ end
 
 Answers whether [`partial_fit!`](@ref) folds this estimator.
 
-A host that carries the observations asks each of its members. This is the mixed-host rule. A host folds each member that folds, and it runs the batch verb over its own rows for each member that does not. So a caller writes the same estimator as in batch, with no wrapper at the call site, and no member carries a second copy of the sample.
+An outer estimator that carries the observations asks each of its members. This is the rule for an estimator with mixed members. The outer estimator folds each member that folds, and it runs the batch verb over its own rows for each member that does not. So a caller writes the same estimator as in batch, with no wrapper at the call site, and no member carries a second copy of the sample.
 
 The default is the buffering route. An estimator folds when it carries a [`SampleBufferState`](@ref), which [`Online`](@ref) seeds. A family with an exact fold of its own adds a method that returns `true`, beside that fold, under the same type bound without the `cache` parameter. An estimator of that family folds exactly when its bound matches, and by buffering when a wrapper seeded a buffer. A configuration that a family refuses adds no method, and it takes the default. The `SemiMoment` arms are such a configuration, because their clip moves when the mean moves. For them, the default is `true` only when a wrapper gave the estimator a buffer.
 
@@ -1659,8 +1660,8 @@ function supports_partial_fit(est::Union{<:AbstractEstimator,
     return hasfield(typeof(est), :cache) && isa(getfield(est, :cache), SampleBufferState)
 end
 function supports_partial_fit(::Nothing)
-    # A member a host does not hold folds vacuously: there is nothing to fold and nothing to
-    # refit, so the host's read-out skips it either way.
+    # A member that the outer estimator does not hold folds vacuously: there is nothing to
+    # fold and nothing to refit, so the call with no data skips it either way.
     return true
 end
 """
@@ -1668,7 +1669,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Builds the empty state an [`Online`](@ref) seeds into the estimator it wraps.
 
-One sample buffer works for each estimator that refits, so the seed needs no knowledge of the type. A prior whose batch verb reads a factor matrix beside the returns records the factor rows in the same buffer, and [`needs_factor_returns`](@ref) decides whether its fold receives them. A host whose state is not a sample buffer has a method of its own that returns the state that its read-out reads. A prior-less optimiser head is such a host, because its state is a fold context. Nothing else about the wrapper changes.
+One sample buffer works for each estimator that refits, so the seed needs no knowledge of the type. A prior whose batch verb reads a factor matrix beside the returns records the factor rows in the same buffer, and [`needs_factor_returns`](@ref) decides whether its fold receives them. An estimator whose state is not a sample buffer has a method of its own that returns the state that its call with no data reads. A prior-less optimiser head is such an estimator, because its state is a fold context. Nothing else about the wrapper changes.
 
 The function takes the estimator and not its type, so a family that sizes its seed from a field can read that field.
 
@@ -1696,7 +1697,7 @@ function update_online_estimator(o::Online)
     return update_online_estimator(est)
 end
 function update_online_estimator(::Online{<:CrossValidationEstimator})
-    return throw(ArgumentError("`Online` on a scheme is an Online Scheme, and it reached the warm-up in an estimator slot: a scheme seeds no sample buffer, because it is the `cv` argument of the cross-validation door, not a field of the estimator that runs through it."))
+    return throw(ArgumentError("`Online` on a scheme is an Online Scheme, and it reached the warm-up in an estimator slot: a scheme seeds no sample buffer, because it is the `cv` argument of `cross_val_predict`, not a field of the estimator that runs through it."))
 end
 
 """

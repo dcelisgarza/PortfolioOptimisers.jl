@@ -5,7 +5,7 @@ Supertype of the policies that resolve a blank cell of a raw Panel Field.
 
 All concrete types stating what a Panel Field's blank cell becomes should subtype `AbstractPanelFillAlgorithm`.
 
-A blank never reaches a carrier. [`asset_panel`](@ref) resolves every one of them, so every Panel Field comes out finite. The policy says what the resolved value is; the observed mask the Panel Field also carries says which cells the resolution touched.
+A blank never reaches a `PricesResult` or a `ReturnsResult`. [`asset_panel`](@ref) resolves every one of them, so every Panel Field comes out finite. The policy says what the resolved value is; the observed mask the Panel Field also carries says which cells the resolution touched.
 
 # Interfaces
 
@@ -350,7 +350,7 @@ The method that Julia selects is the algorithm, and the four differ in where the
 function panel_fill(::NoPanelFill, v::AbstractVector, name::AbstractString)
     i = findfirst(is_panel_blank, v)
     @argcheck(isnothing(i),
-              ArgumentError("the Panel Field \"$name\" carries a blank cell at position $i, and its fill policy is NoPanelFill, which refuses one. A blank never reaches a carrier, so give the field a fill policy — ForwardPanelFill is the one that is safe across a cross-validation fold — or remove the blank from the raw input."))
+              ArgumentError("the Panel Field \"$name\" carries a blank cell at position $i, and its fill policy is NoPanelFill, which refuses one. A blank never reaches a PricesResult or a ReturnsResult, so give the field a fill policy — ForwardPanelFill is the one that is safe across a cross-validation fold — or remove the blank from the raw input."))
     return collect(v)
 end
 function panel_fill(alg::ConstantPanelFill, v::AbstractVector, ::AbstractString)
@@ -418,7 +418,7 @@ Supertype of the raw, blank-carrying forms one Panel Field enters [`asset_panel`
 
 All concrete types holding one Panel Field's raw values, its metadata and its fill policy should subtype `AbstractPanelFieldInput`.
 
-An input is **not** a carrier and never becomes one. It holds the blanks, and [`asset_panel`](@ref) resolves them on the way into the Panel Field it builds; nothing downstream ever sees an unresolved panel. This is why the blank-carrying form is a plain argument to the builder rather than a preprocessing estimator: an estimator fitted inside a fold would need a carrier for the unfilled panel, and the finiteness rule on every Panel Field gives it none.
+An input is **not** a `PricesResult` or a `ReturnsResult`, and it never becomes one. It holds the blanks, and [`asset_panel`](@ref) resolves them on the way into the Panel Field it builds; nothing downstream ever sees an unresolved panel. This is why the blank-carrying form is a plain argument to the builder rather than a preprocessing estimator: an estimator fitted inside a fold would need a `PricesResult` or a `ReturnsResult` that holds the unfilled panel, and the finiteness rule on every Panel Field gives it none.
 
 # Interfaces
 
@@ -987,7 +987,7 @@ The method that Julia selects is the algorithm.
  2. [`CategoricalPanelInput`](@ref): a [`CategoricalPanelField`](@ref) over `inp.levels`, or, when that is `nothing`, over the distinct resolved labels in sorted order. The resolved labels are read rather than the raw ones, so a level that only a fill policy introduces still gets a code. Each label is then encoded to its level's position.
  3. [`TensorPanelInput`](@ref): a [`TensorPanelField`](@ref) over the input's own axis, labels and groups.
 
-The observed mask rides only when the fill policy is not [`NoPanelFill`](@ref): a Panel Field that refuses a blank observed every cell, so a mask of it carries no information.
+The Panel Field holds the observed mask only when the fill policy is not [`NoPanelFill`](@ref): a Panel Field that refuses a blank observed every cell, so a mask of it carries no information.
 
 # Arguments
 
@@ -1092,11 +1092,11 @@ end
         emsk::Option{<:AbstractMatrix{Bool}} = nothing
     ) -> AssetPanel
 
-Build the [`AssetPanel`](@ref) a carrier holds, from the raw, blank-carrying form of each Panel Field.
+Build the [`AssetPanel`](@ref) that a `PricesResult` or a `ReturnsResult` holds, from the raw, blank-carrying form of each Panel Field.
 
-This is the **build seam**. It takes each Panel Field's raw values with its fill policy, and it returns the panel alone: the panel owns the values, so there is nothing else for a carrier to be handed. The blanks stop here, and every Panel Field comes out finite.
+This function is **where the panel is built**. It takes each Panel Field's raw values with its fill policy, and it returns the panel alone: the panel owns the values, so there is nothing else to give to the `PricesResult` or the `ReturnsResult`. The blanks stop here, and every Panel Field comes out finite.
 
-The result goes straight into the keyword the carriers have, `ReturnsResult(; nx = nx, X = X, pnl = asset_panel(inputs))`, and the same keyword reaches [`prices_to_returns`](@ref).
+The result goes straight into the `pnl` keyword that `PricesResult` and `ReturnsResult` both have, `ReturnsResult(; nx = nx, X = X, pnl = asset_panel(inputs))`, and the same keyword reaches [`prices_to_returns`](@ref).
 
 The **static entry** is the rank of the raw values. An input whose values carry no observation axis is a static input: a fundamentals table or a sector classification with no history is that shape. There [`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref) are refused, because there is no observation axis to carry a value along.
 
@@ -1184,7 +1184,7 @@ A producer is **configuration**, not data: [`FeatureDistance`](@ref) holds one i
 
 The family is open: a producer that reads a source no shipped member reads defines a member and an `asset_panel` method for it.
 
-`nothing` in the slot is not a member. It reads the panel the data carrier already holds, which is what the same verb answers for it.
+`nothing` in the slot is not a member. It reads the panel that the [`ReturnsResult`](@ref) already holds, which is what the same verb answers for it.
 
 # Related
 

@@ -61,9 +61,9 @@ Return the keep-mask over the asset columns of `rd`.
 
 A concrete [`AbstractAssetSelector`](@ref) must implement this method, and no other. [`fit_preprocessing`](@ref) calls it on the Coverage Universe of the training window, and [`apply_preprocessing`](@ref) replays the result on every later window.
 
-`rd` is the reduced carrier, so every column of it is finite and active at every row. A selector needs no finiteness guard. A score that is not finite on a live column is a defect of the score, and [`asset_scores`](@ref) refuses it.
+`rd` is the returns data reduced to its Coverage Universe, so every column of it is finite and active at every row. A selector needs no finiteness guard. A score that is not finite on a live column is a defect of the score, and [`asset_scores`](@ref) refuses it.
 
-A selector reads `rd.nx` and the `observations × assets` matrix `rd.X`. The reduction reads `rd.pnl`, and [`ClusterGroups`](@ref) gives the whole carrier to [`clusterise`](@ref), so the family reads the fields `nx`, `X` and `pnl` of [`AbstractReturnsResult`](@ref). A selector never sees a prior result.
+A selector reads `rd.nx` and the `observations × assets` matrix `rd.X`. The reduction reads `rd.pnl`, and [`ClusterGroups`](@ref) gives the whole of `rd` to [`clusterise`](@ref), so the family reads the fields `nx`, `X` and `pnl` of [`AbstractReturnsResult`](@ref). A selector never sees a prior result.
 
 # Arguments
 
@@ -109,7 +109,7 @@ This one method fits every asset selector, and it applies the Coverage Universe.
 
 # Validation
 
-  - The carrier must hold an `observations × assets` returns matrix. A carrier that collapsed the asset axis, such as [`PredictionReturnsResult`](@ref), matches no method of the reduction and throws a `MethodError`.
+  - `rd` must hold an `observations × assets` returns matrix. A returns result that collapsed the asset axis, such as [`PredictionReturnsResult`](@ref), matches no method of the reduction and throws a `MethodError`.
   - At least one asset must be in the Coverage Universe of the training window, else `IsEmptyError`.
   - [`select_assets`](@ref) must return one entry per asset column of the reduced window, else `DimensionMismatch`.
   - The mask must keep at least one asset, else `IsEmptyError`, so no later step receives a problem with no asset.

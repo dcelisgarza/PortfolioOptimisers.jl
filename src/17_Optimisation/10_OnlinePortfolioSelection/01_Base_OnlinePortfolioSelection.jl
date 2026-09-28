@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the Online Selection Rules that an [`OnlinePortfolioSelection`](@ref) head holds in its `alg` field.
 
-The rule is the only part of the online portfolio selection family that changes from one rule to the next. It is a struct of the parameters of the rule, a state that holds what the update accumulates, and one update method. The head owns the parts that every rule shares: the Allocation Set, the Causal Pass, the Block Step, the Recursion Read-out and the checks that refuse a bad input. A rule projects its raw step onto the head's Allocation Set in its own Projection Geometry, which it holds in its `proj` field. The type bound of that field names the geometries that the rule's theorem covers.
+The rule is the only part of the online portfolio selection family that changes from one rule to the next. It is a struct of the parameters of the rule, a state that holds what the update accumulates, and one update method. The head owns the parts that every rule shares: the Allocation Set, the Causal Pass, the Block Step, the Recursion Result and the checks that refuse a bad input. A rule projects its raw step onto the head's Allocation Set in its own Projection Geometry, which it holds in its `proj` field. The type bound of that field names the geometries that the rule's theorem covers.
 
 # Interfaces
 
@@ -1021,7 +1021,7 @@ The seven-argument form names the **Gradient Point**. An [`ExpertMixture`](@ref)
 Where:
 
   - ``U``: Unconstrained step of the rule.
-  - ``s_t``: Carrier of the rule before the update of period ``t``.
+  - ``s_t``: State of the rule before the update of period ``t``.
   - $(math_dict[:w_t_iter])
   - $(math_dict[:x_t_rel])
   - $(math_dict[:q_raw])
@@ -1243,7 +1243,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Records a Held Step, a projection of one row that did not give an allocation on the budget, so the step traded nothing.
 
-A projection onto a [`ProgrammeAllocationSet`](@ref), or in a [`GramProjection`](@ref), is a programme, and a programme can fail. It is infeasible on a day when a turnover ceiling and a cap cannot both hold. It can also time out, stop a MIP at its limit, or meet a covariance cone with no finite data on its first rows. A closed-form root can also miss the budget in floating point, as [`budget_or_held_step`](@ref) states. The step then returns the Price-Adjusted Allocation that it got, the book that the fund already holds, so the fund trades nothing. The state of the rule still takes in the row. The head warns once with the timestamp of the row. Its Recursion Read-out carries the record of the last folded row inside an [`OptimisationSuccess`](@ref), so a fallback chain never runs on a hold. A step never throws on a failed solve, and never falls back to a weaker set, because a constraint that the step drops on the day it binds does not constrain.
+A projection onto a [`ProgrammeAllocationSet`](@ref), or in a [`GramProjection`](@ref), is a programme, and a programme can fail. It is infeasible on a day when a turnover ceiling and a cap cannot both hold. It can also time out, stop a MIP at its limit, or meet a covariance cone with no finite data on its first rows. A closed-form root can also miss the budget in floating point, as [`budget_or_held_step`](@ref) states. The step then returns the Price-Adjusted Allocation that it got, the book that the fund already holds, so the fund trades nothing. The state of the rule still takes in the row. The head warns once with the timestamp of the row. Its Recursion Result carries the record of the last folded row inside an [`OptimisationSuccess`](@ref), so a fallback chain never runs on a hold. A step never throws on a failed solve, and never falls back to a weaker set, because a constraint that the step drops on the day it binds does not constrain.
 
 # Fields
 
@@ -1408,7 +1408,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the Partial Fit State of an online portfolio selection head: the Rule State, the rows, the Fold Context and every folded timestamp.
 
-The pair `(st, w)` is the Rule State, the unit over which the family recurses. The state holds once the rows that any rule of the tree reads, as a [`SampleBufferState`](@ref) of returns. The buffer keeps the rows of the Returns Result as they arrived, with `NaN` where there was no return, and under a time-varying panel it keeps the active mask of each row beside it. [`rows_needed`](@ref) of the rule tree caps the buffer, and the buffer is `nothing` for a tree that reads no rows. At every row the head reads the buffer out as a [`ReturnsResult`](@ref) through [`rows_carrier`](@ref), so a statistic over the rows reduces to its Coverage Universe as a batch fit over the same window does. No cap applies to the timestamps, so [`Resume`](@ref) works for a rule with no state. The active mask of the last folded row is the Investable Mask on which the read-out reduces, and it is `nothing` under a static panel. The recursion keeps the full `w` and never carries a forced zero.
+The pair `(st, w)` is the Rule State, the unit over which the family recurses. The state holds once the rows that any rule of the tree reads, as a [`SampleBufferState`](@ref) of returns. The buffer keeps the rows of the Returns Result as they arrived, with `NaN` where there was no return, and under a time-varying panel it keeps the active mask of each row beside it. [`rows_needed`](@ref) of the rule tree caps the buffer, and the buffer is `nothing` for a tree that reads no rows. At every row the head reads the buffer out as a [`ReturnsResult`](@ref) through [`rows_carrier`](@ref), so a statistic over the rows reduces to its Coverage Universe as a batch fit over the same window does. No cap applies to the timestamps, so [`Resume`](@ref) works for a rule with no state. The active mask of the last folded row is the Investable Mask on which `optimise(opt)` with no data reduces the allocation, and it is `nothing` under a static panel. The recursion keeps the full `w` and never carries a forced zero.
 
 # Fields
 
@@ -1480,7 +1480,7 @@ Keywords correspond to the struct's fields.
     """
     pnl
     """
-    The active mask of the last folded row under a time-varying panel, which is the Investable Mask of the read-out, or `nothing` under a static panel.
+    The active mask of the last folded row under a time-varying panel, which is the Investable Mask of the Recursion Result, or `nothing` under a static panel.
     """
     amsk
     """
@@ -1488,7 +1488,7 @@ Keywords correspond to the struct's fields.
     """
     ts
     """
-    The [`HeldStep`](@ref) record of the last folded row when the step held a projection of that row, or `nothing` when every projection of it met the budget. The return code of the Recursion Read-out carries it.
+    The [`HeldStep`](@ref) record of the last folded row when the step held a projection of that row, or `nothing` when every projection of it met the budget. The return code of the Recursion Result carries it.
     """
     hold
 end
@@ -1510,7 +1510,7 @@ function OnlinePortfolioSelectionState(; n::Integer = 0, w::AbstractVector, st =
     end
     if !isnothing(pnl)
         @argcheck(panel_is_static(pnl),
-                  ArgumentError("an OnlinePortfolioSelectionState pins a static Asset Panel and never a time-varying one: the masks of a time-varying panel are per-observation, so the last row's rides on `amsk` and the rest with the rows."))
+                  ArgumentError("an OnlinePortfolioSelectionState pins a static Asset Panel and never a time-varying one: the masks of a time-varying panel are per-observation, so the state keeps the mask of the last row in `amsk` and the rest beside the rows."))
     end
     return OnlinePortfolioSelectionState(n, w, st, X, nx, pnl, amsk, ts, hold)
 end
@@ -1556,7 +1556,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Slices an [`OnlinePortfolioSelectionState`](@ref) to the selected assets, giving the state of the same observations over those assets.
 
-The method slices `w` and renormalises it. It sends the state of the rule to its own view through [`rule_state_view`](@ref), and the rows buffer to the view of [`SampleBufferState`](@ref). It slices the names, the panel and the mask, and it keeps the count, the timestamps and the hold record. The view is a copy for the read-out, and the recursion keeps the full `w`.
+The method slices `w` and renormalises it. It sends the state of the rule to its own view through [`rule_state_view`](@ref), and the rows buffer to the view of [`SampleBufferState`](@ref). It slices the names, the panel and the mask, and it keeps the count, the timestamps and the hold record. The view is a copy for `optimise(opt)` with no data, and the recursion keeps the full `w`.
 
 # Arguments
 
@@ -1595,7 +1595,7 @@ end
 
 Slices an allocation to the selected assets and renormalises it to sum to one, as a copy. A `nothing` allocation stays `nothing`.
 
-The function spreads the mass that the selection leaves out over the kept assets in proportion. Every per-asset view of an allocation in the family reads it this way, the read-out under a time-varying panel and the view of a rule's own allocation among them. A selection that keeps none of the mass, such as a view of a one-hot allocation to the other assets, has no proportion. It returns the uniform allocation over the kept assets, the Start Allocation of the family.
+The function spreads the mass that the selection leaves out over the kept assets in proportion. Every per-asset view of an allocation in the family reads it this way, the Recursion Result under a time-varying panel and the view of a rule's own allocation among them. A selection that keeps none of the mass, such as a view of a one-hot allocation to the other assets, has no proportion. It returns the uniform allocation over the kept assets, the Start Allocation of the family.
 
 # Mathematical definition
 

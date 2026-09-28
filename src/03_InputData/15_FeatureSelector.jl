@@ -375,7 +375,7 @@ The order of `sel` is the column order, so a caller decides it. A `nothing` sele
 """
 function select_fields(pnl::AssetPanel, sel, strict::Bool)
     @argcheck(!isempty(pnl.pf),
-              IsEmptyError("a Feature Matrix stacks the Panel Fields of an Asset Panel, and this panel carries none: it states a universe and carries no feature data, which is what a carrier built from prices alone holds. Build the panel the Feature Matrix is to stack with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`, which builds one from the prior it is handed."))
+              IsEmptyError("a Feature Matrix stacks the Panel Fields of an Asset Panel, and this panel carries none: it states a universe and carries no feature data, which is what a ReturnsResult built from prices alone holds. Build the panel the Feature Matrix is to stack with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`, which builds one from the prior it is handed."))
     assert_feature_selector(sel)
     cols = Tuple{Int, Int, Symbol}[]
     if isnothing(sel)

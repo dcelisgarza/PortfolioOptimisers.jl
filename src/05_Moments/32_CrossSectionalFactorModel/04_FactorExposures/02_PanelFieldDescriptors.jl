@@ -425,7 +425,7 @@ end
     descriptor(de::PanelFieldLog, rd::ReturnsResult) -> Matrix{<:Real}
     descriptor(de::Passthrough, rd::ReturnsResult) -> Matrix{<:Real}
 
-Compute a point-in-time Descriptor from the Panel Fields of a carrier.
+Compute a point-in-time Descriptor from the Panel Fields of a [`ReturnsResult`](@ref).
 
 The three archetypes read the same way, through [`panel_field_values`](@ref), and end the same way, through [`descriptor_active_fill!`](@ref). They part on the arithmetic between the two.
 

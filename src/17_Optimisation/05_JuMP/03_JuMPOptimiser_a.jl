@@ -244,10 +244,11 @@ function investable_view(optimiser::JuMPOptimisationEstimator, rd::ReturnsResult
                          pr::AbstractPriorResult, imsk::BitVector)
     X = isnothing(rd.X) ? pr.X : rd.X
     idx = findall(imsk)
-    # The head takes the same view of itself that the bundle's door took of the optimiser,
-    # so it declares the Non-Investable Axis on whatever sets it carries — a risk budget
-    # keyed by name is resolved from here, after this view. It stays quiet: the door has
-    # already announced the departure, and one event is reported once.
+    # The head takes the same view of itself that `investable_reduction` took of the
+    # optimiser for the bundle, so it declares the Non-Investable Axis on whatever sets it
+    # carries — a risk budget keyed by name is resolved from here, after this view. It stays
+    # quiet: `investable_reduction` has already announced the departure, and one event is
+    # reported once.
     return non_investable_universe(port_opt_view(optimiser, idx, X),
                                    non_investable_names(rd.nx, imsk)),
            port_opt_view(rd, idx)
@@ -320,8 +321,8 @@ function JuMPOptimisationResult(; pa::ProcessedJuMPOptimiserAttributes,
                                 retcode::OptRetCode_VecOptRetCode,
                                 sol::JuMPOptSol_VecJuMPOptSol,
                                 model::Option{<:JuMP.Model})::JuMPOptimisationResult
-    # The one door every JuMP family's result comes through, and so the one place the weight
-    # expansion belongs: `MeanRisk`, `RiskBudgeting`, `RelaxedRiskBudgeting`,
+    # The one constructor every JuMP family's result comes through, and so the one place
+    # the weight expansion belongs: `MeanRisk`, `RiskBudgeting`, `RelaxedRiskBudgeting`,
     # `FactorRiskContribution` and `NearOptimalCentering` all build their result here. `sol`
     # arrives holding the reduced vector the solver returned, and the result carries that
     # vector on the caller's own universe; the reduced problem survives in `model` when the
@@ -345,7 +346,7 @@ end
 
 Rebuild a [`JuMPOptimisationResult`](@ref) with a different return code.
 
-The rebuild reaches the inner constructor rather than the keyword one, because the keyword constructor expands the solver's reduced weight vector onto the caller's universe. `sol` is already expanded here, so a second pass through that door would expand it twice.
+The rebuild reaches the inner constructor rather than the keyword one, because the keyword constructor expands the solver's reduced weight vector onto the caller's universe. `sol` is already expanded here, so a second pass through the keyword constructor would expand it twice.
 
 # Arguments
 
@@ -1079,7 +1080,7 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
     lcse = port_opt_view(opt.lcse, i)
     sets = port_opt_view(opt.sets, i)
     # A fee spans two axes: the five per-asset fields on the investable assets, and the two
-    # liquidation carriers on the complement. Its view derives that complement from the
+    # liquidation charges on the complement. Its view derives that complement from the
     # width of the unreduced `X`, so this is the one constraint that must be handed the
     # matrix rather than the index alone.
     fees = port_opt_view(opt.fees, i, X)

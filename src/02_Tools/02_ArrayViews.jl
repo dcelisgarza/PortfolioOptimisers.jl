@@ -215,7 +215,7 @@ end
 
 Per-field view helper called by [`@propagatable`](@ref)-generated [`port_opt_view`](@ref) methods, and by the hand-written view of every optimiser that holds a fallback `fb`.
 
-It is the view twin of [`factory_child`](@ref). A child is viewed at the asset index, with one exception: a precomputed optimisation result is kept as it is. A result sits in a field as a fallback `fb`, and the fallback loop of [`optimise`](@ref) answers it without a solve, on the universe it was solved on. A door such as [`investable_reduction`](@ref) views an optimiser whose own fallback it never reads, so a refusal there would reject a fallback that nothing reaches.
+It is the view twin of [`factory_child`](@ref). A child is viewed at the asset index, with one exception: a precomputed optimisation result is kept as it is. A result sits in a field as a fallback `fb`, and the fallback loop of [`optimise`](@ref) answers it without a solve, on the universe it was solved on. A function such as [`investable_reduction`](@ref) views an optimiser whose own fallback it never reads, so a refusal there would reject a fallback that nothing reaches.
 
 A [`TimeDependent`](@ref) schedule is not a result, so it reaches [`port_opt_view`](@ref), and a schedule that holds a result still refuses a subset view.
 

@@ -42,7 +42,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the carrier the Exposure Estimators of a Cross-Sectional Factor Prior are fitted on.
+Return the returns data that the Exposure Estimators of a Cross-Sectional Factor Prior are fitted on.
 
 An Exposure Estimator weights its cross-sectional transforms by a benchmark-weight Panel Field that it names. The prior computes those weights from the market capitalisation, and writes them onto a copy of the Asset Panel before it builds any Factor Exposure. The copy replaces a field of that name, so every member reads the weights of the prior.
 
@@ -59,7 +59,7 @@ An Exposure Estimator weights its cross-sectional transforms by a benchmark-weig
 
 # Returns
 
-  - `rd::ReturnsResult`: The carrier, with the benchmark weights on its Asset Panel.
+  - `rd::ReturnsResult`: The returns data, with the benchmark weights on its Asset Panel.
 
 # Related
 
@@ -71,7 +71,7 @@ function cross_sectional_benchmark_carrier(rd::ReturnsResult, name::AbstractStri
                                            W::MatNum)::ReturnsResult
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
-              IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
+              IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
     pf = Any[f for f in pnl.pf if f.name != name]
     push!(pf, NumericPanelField(; name = name, vals = W))
     return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = rd.B,
@@ -1443,14 +1443,14 @@ Where:
 
 # Algorithm
 
- 1. Fit `rfe` on the coverage universe through [`return_forecast`](@ref), giving `rf`. The carrier is the whole one, so the Descriptors of the forecast warm up over every observation of the panel. [`return_forecast_rows`](@ref) finds the block as a suffix of that carrier by its size.
+ 1. Fit `rfe` on the coverage universe through [`return_forecast`](@ref), giving `rf`. `rd` holds every observation, so the Descriptors of the forecast warm up over every observation of the panel. [`return_forecast_rows`](@ref) finds the block as a suffix of `rd` by its size.
  2. Split `rf.mu` against the latest exposures with [`cross_sectional_alpha_split`](@ref), giving `g` and `ap`.
  3. Rebuild the block with `b = c * ap` and with `rf` in its field `rf`. Read `L` with `getfield`. The property `L` of [`CrossSectionalFactorModel`](@ref) gives `M` when `L` is unset, and the rebuilt block would then hold `M` as a set `L`.
 
 # Arguments
 
   - `rfe`: Return Forecast Estimator, or `nothing`.
-  - $(arg_dict[:rd]) It is the whole carrier the prior was fitted on, and the block is a suffix of it.
+  - $(arg_dict[:rd]) It is the full returns data the prior was fitted on, and the block is a suffix of it.
   - `csfm`: The factor-model block, built with a zero `b` and no Return Forecast.
   - `cre`: Cross-Sectional Regression Estimator of the split.
   - `c`: Confidence in the orthogonal part of the forecast.

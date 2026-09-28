@@ -107,7 +107,7 @@ Keywords correspond to the struct's fields.
 
 ## Composition: what this estimator forwards
 
-This estimator **merges two** priors rather than forwarding one along its own axis, so it builds its carrier directly; the same posterior-versus-structural pattern still governs which source each field takes. It solves one augmented Black-Litterman system over `[assets; factors]` and reports both halves:
+This estimator **merges two** priors rather than forwarding one along its own axis, so it builds its prior result directly; the same posterior-versus-structural pattern still governs which source each field takes. It solves one augmented Black-Litterman system over `[assets; factors]` and reports both halves:
 
   - `mu` and `sigma` are the asset half of the augmented posterior; the factor block `fpr` is the **factor half**, so both are posterior. `chol` is dropped on both sides, because the posterior covariances supersede the ones they factorise.
   - `w`, `ens`, `kld` and `ow` come from the **asset** prior, and `fpr`'s own come from the **factor** prior. Two priors disagreeing about observation weights is a legitimate configuration, and the nested block is what keeps the two weightings distinguishable rather than forcing a choice.
@@ -462,7 +462,7 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
 14. Truncate the asset half from `1:N`. Nothing is added to it: the intercept and the rate went into the prior mean at step 11, and the update is affine in that mean.
 15. Truncate the factor half from `N+1:N+K`, and forward the factor block with [`forward_prior`](@ref), dropping `chol`. The half takes no intercept, because the intercept is the regression's and hence asset-only, no rate, because the stack reached the update carrying the one it needed, and no second processing pass, because a principal submatrix of a processed matrix is already processed. It is not expanded: the reduction never touched the factor axis.
 16. Announce the departures once with [`announce_bl_departures`](@ref).
-17. Build the carrier directly, taking `w`, its diagnostics and `Z` from `a_prior`, and writing every asset-axis block back onto the full universe on the way: the moment pair with [`expand_moment`](@ref), the reconstruction with [`expand_columns`](@ref) and the regression with [`expand_regression`](@ref).
+17. Build the prior result directly, taking `w`, its diagnostics and `Z` from `a_prior`, and writing every asset-axis block back onto the full universe on the way: the moment pair with [`expand_moment`](@ref), the reconstruction with [`expand_columns`](@ref) and the regression with [`expand_regression`](@ref).
 
 # Related
 
@@ -619,8 +619,8 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     # configuration, and there are two slots to hold them. The diagnostics follow their
     # weights (ADR 0046), so `ens`/`kld`/`ow` come from `a_prior` too. `chol` is dropped:
     # `posterior_sigma` supersedes the covariance `a_prior.chol` factorises. This site merges
-    # two priors rather than forwarding one along its own axis, so it builds the carrier
-    # directly instead of going through [`forward_prior`](@ref).
+    # two priors rather than forwarding one along its own axis, so it builds the prior
+    # result directly instead of going through [`forward_prior`](@ref).
     announce_bl_departures(ni, ledger, viewless)
     # The expansion, onto the caller's own universe. The moment pair goes back through
     # [`expand_moment`](@ref), the reconstruction through [`expand_columns`](@ref) and the
@@ -628,7 +628,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     # FULL asset axis with a `NaN` in `mu` and on the diagonal of `sigma` for an asset that
     # is not investable, and the next layer derives the same mask this one did. `o_X` is the
     # caller's own `X` and was never reduced. There is no `chol` here to drop: the augmented
-    # system produces the asset moments whole and this carrier never held one.
+    # system produces the asset moments whole and this prior result never held one.
     return LowOrderPrior(; X = expand_columns(posterior_X, imsk), o_X = X,
                          mu = expand_moment(posterior_mu, imsk, 1),
                          sigma = expand_moment(posterior_sigma, imsk), w = a_prior.w,

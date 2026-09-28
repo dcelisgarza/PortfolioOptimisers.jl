@@ -70,10 +70,10 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     rd = returns_result_picker(rd, opt.brt)
     assert_universe_axis_order(opt.sets, rd)
     pr = prior(opt.pe, rd)
-    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
-    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
-    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
+    # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
     imsk = investable_mask(pr)
     fees = investable_fees_view(fees_constraints(opt.fees, opt.sets;
@@ -97,9 +97,9 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                  x_src = opt.x_src, strict = opt.strict, kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
     sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
-    # A name-keyed estimator follows the door: a name that left resolves on the
-    # Non-Investable Axis. A precomputed constraint cannot, because its `A` is bound to its
-    # columns by position. Say so here rather than let the model meet two numbers.
+    # A name-keyed estimator follows `investable_reduction`: a name that left resolves on
+    # the Non-Investable Axis. A precomputed constraint cannot, because its `A` is bound to
+    # its columns by position. Say so here rather than let the model meet two numbers.
     # `sgcardr` is not checked: its columns are the rows of `sgmtx`, one for each sub-group,
     # and a departed asset removes a column of `sgmtx`, never a sub-group.
     if !isnothing(imsk)

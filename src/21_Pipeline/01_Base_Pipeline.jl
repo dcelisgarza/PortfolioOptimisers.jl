@@ -464,7 +464,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 The [routing targets](@ref PIPELINE_ROUTING_TARGETS) a constraint family's step can write.
 
-This is the one declaration of the estimator → target half of the seam, and it has three readers, which is why it exists as a table rather than as scattered knowledge:
+This is the one declaration of the estimator → target half of the routing of a [`Pipeline`](@ref) slot into an optimiser, and it has three readers, which is why it exists as a table rather than as scattered knowledge:
 
   - [`run_constraint_step`](@ref) resolves the target and pairs it with the computed value.
   - [`pipe_required_targets`](@ref) hands it to [`assert_routable`](@ref), so a step whose target the terminal optimiser cannot receive is refused when the [`Pipeline`](@ref) is built rather than after the first fold has run.

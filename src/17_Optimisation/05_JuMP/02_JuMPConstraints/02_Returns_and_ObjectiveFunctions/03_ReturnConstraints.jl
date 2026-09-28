@@ -275,7 +275,8 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
                                            mus::AbstractVector, forces_risk::AbstractVector,
                                            pr::AbstractPriorResult)
     # The empty-numerator refusal is not here: it is one of the three objective refusals
-    # `assert_no_return_objective_compatibility` makes at the top of this seam.
+    # that `assert_no_return_objective_compatibility` makes at the top of
+    # `set_return_constraints!`.
     mu = aggregate_return_characteristic(rets, mus)
     set_maximum_ratio_normalisation!(model, obj, mu, pr)
     sc = get_constraint_scale(model)

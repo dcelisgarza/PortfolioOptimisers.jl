@@ -535,7 +535,7 @@ With `store_forecasts = true` the Result holds the forecast of every step and th
 # Arguments
 
   - `cfer`: The evaluation, run with `store_forecasts = true`.
-  - $(arg_dict[:rd]) It must be the carrier that the evaluation ran on, because each step reads its rows through `cfer.test_idx`.
+  - $(arg_dict[:rd]) It must be the returns data that the evaluation ran on, because each step reads its rows through `cfer.test_idx`.
   - `w`: The test portfolios on the full universe, as [`covariance_forecast_evaluation`](@ref) takes them.
 
 # Validation

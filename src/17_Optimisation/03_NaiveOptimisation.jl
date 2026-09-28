@@ -515,9 +515,9 @@ function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult(); k
     # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
     # a float type for them, and every other sample keeps its own type.
     Tf = float_if_integer(eltype(pr.X))
-    # Resolve the fee on the caller's own universe, before the door below narrows `sets`,
-    # for the reason the hierarchical heads do; `investable_fees_view` then places it on
-    # the axes the mask leaves.
+    # Resolve the fee on the caller's own universe, before `investable_reduction` below
+    # narrows `sets`, for the reason the hierarchical heads do; `investable_fees_view` then
+    # places it on the axes the mask leaves.
     fees = investable_fees_view(fees_constraints(iv.fees, iv.sets; strict = iv.strict,
                                                  datatype = Tf), investable_mask(pr),
                                 size(pr.X, 2))
@@ -737,8 +737,8 @@ Run the equal-weighted portfolio optimisation.
 function _optimise(ew::EqualWeighted, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     ew = reset_time_dependent_estimator(ew)
-    # The fee is resolved on the caller's own universe before the door below narrows
-    # `sets`, and placed on the axes the mask leaves after it.
+    # The fee is resolved on the caller's own universe before `coverage_reduction` below
+    # narrows `sets`, and placed on the axes the mask leaves after it.
     Nf = size(rd.X, 2)
     # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
     # a float type for them, and every other sample keeps its own type.
@@ -1004,8 +1004,8 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; kwargs...)
         @argcheck(length(rw.alpha) == Nf,
                   DimensionMismatch("rw.alpha ($(length(rw.alpha))) must match N ($Nf)"))
     end
-    # The fee is resolved on the caller's own universe before the door below narrows
-    # `sets`, and placed on the axes the mask leaves after it.
+    # The fee is resolved on the caller's own universe before `coverage_reduction` below
+    # narrows `sets`, and placed on the axes the mask leaves after it.
     # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
     # a float type for them, and every other sample keeps its own type.
     Tf = float_if_integer(eltype(rd.X))
@@ -1347,8 +1347,8 @@ Run the best constant rebalanced portfolio optimisation.
 function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     bcrp = reset_time_dependent_estimator(bcrp)
-    # The fee is resolved on the caller's own universe before the door below narrows
-    # `sets`, and placed on the axes the mask leaves after it.
+    # The fee is resolved on the caller's own universe before `coverage_reduction` below
+    # narrows `sets`, and placed on the axes the mask leaves after it.
     Nf = size(rd.X, 2)
     # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
     # a float type for them, and every other sample keeps its own type.

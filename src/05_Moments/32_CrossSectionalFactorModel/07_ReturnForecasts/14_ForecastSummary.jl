@@ -798,7 +798,7 @@ function forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationRes
     nm = forecast_summary_names(names, length(afes))
     # The element is asserted rather than taken from the iterator: `afes` is an
     # `AbstractVector` of an abstract element type, so without the assertion every read
-    # inside the row is analysed against an unknown carrier.
+    # inside the row is analysed against an unknown type.
     rows = [forecast_summary_row(afes[i]::ForecastEvaluationResult, w, bins)
             for i in eachindex(afes)]
     q, sm, sv, si, sh = forecast_summary_spreads(afes, quantiles)

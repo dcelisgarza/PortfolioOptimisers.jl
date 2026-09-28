@@ -14,7 +14,7 @@ Compute the expected portfolio return using the specified return estimator.
 
 ## The prior route reduces to the Investable Mask
 
-A prior result lives on the **full** asset universe, and an asset it could not estimate carries `NaN` in `mu` and down its column of `pr.X`. So `dot(w, mu)` and `X * w` are `NaN` at **any** weight, the optimiser's own zero included. Each method therefore reduces the prior, the weights and the fees once at its entry, through [`investable_reduction`](@ref) — the rule for an optimiser, taken at the value-level door. A held non-investable asset warns and its weight is dropped, or raises under `strict`. [`NoReturn`](@ref) answers zero at every weight, so it reads nothing and reduces nothing.
+A prior result lives on the **full** asset universe, and an asset it could not estimate carries `NaN` in `mu` and down its column of `pr.X`. So `dot(w, mu)` and `X * w` are `NaN` at **any** weight, the optimiser's own zero included. Each method therefore reduces the prior, the weights and the fees once at its entry, through [`investable_reduction`](@ref) — the rule for an optimiser, applied at the entry of each value-level verb. A held non-investable asset warns and its weight is dropped, or raises under `strict`. [`NoReturn`](@ref) answers zero at every weight, so it reads nothing and reduces nothing.
 
 The reduction is a **no-op on a prior that is already reduced**, because a reduced prior's moments are finite everywhere and [`investable_mask`](@ref) then answers `nothing`. That is what keeps a vector of terms, a population, and a composite such as [`expected_ratio`](@ref) to exactly one diagnostic.
 
@@ -78,9 +78,10 @@ Where:
 """
 function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
-    # The value-level door. A non-investable asset carries `NaN` in `mu`, so `dot(w, mu)` is
-    # `NaN` at any weight, the optimiser's own zero included. The reduction is a no-op on a
-    # prior that is already reduced, which is what keeps a composite to one diagnostic.
+    # Reduce to the Investable Mask. A non-investable asset carries `NaN` in `mu`, so
+    # `dot(w, mu)` is `NaN` at any weight, the optimiser's own zero included. The reduction
+    # is a no-op on a prior that is already reduced, which is what keeps a composite to one
+    # diagnostic.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     # The scalar twin of the `ret` expression `set_return_constraints!` builds, so it uses
     # the same ladder. The prior is in hand, so a Deferred Quantity resolves here too.
@@ -90,7 +91,7 @@ function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult
 end
 function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
-    # The value-level door — see the note on the arithmetic twin above.
+    # Reduce to the Investable Mask — see the note on the arithmetic twin above.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     rw = ret.w
     X = pr.X
@@ -290,7 +291,7 @@ function expected_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                         pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                         rf::Number = 0, sca::Scalariser = SumScalariser(),
                         strict::Bool = false, kwargs...)
-    # The value-level door reduces here, at the outermost entry the caller reached, so a
+    # Reduce to the Investable Mask here, at the outermost entry the caller reached, so a
     # held non-investable asset is named once. Both children reduce again on the reduced
     # prior, where every moment is finite and the mask is `nothing`, so neither repeats it.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
@@ -383,7 +384,7 @@ function expected_risk_ret_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum
                                  pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                                  rf::Number = 0, sca::Scalariser = SumScalariser(),
                                  strict::Bool = false, kwargs...)
-    # The value-level door reduces once here — see the note in `expected_ratio`.
+    # Reduce to the Investable Mask once here — see the note in `expected_ratio`.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     # The prior, not `pr.X` — see the note in `expected_ratio`.
     rk = expected_risk(r, w, pr, fees; sca = sca, kwargs...)
@@ -493,8 +494,8 @@ function expected_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                        pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                        rf::Number = 0, sca::Scalariser = SumScalariser(),
                        strict::Bool = false, kwargs...)
-    # The value-level door reduces once here, so the penalty's asset count is the count of
-    # assets the prior could estimate — see the note in `expected_ratio`.
+    # Reduce to the Investable Mask once here, so the penalty's asset count is the count
+    # of assets the prior could estimate — see the note in `expected_ratio`.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     sr = expected_ratio(r, ret, w, pr, fees; rf = rf, sca = sca, kwargs...)
     return sr - sric_penalty(sr, pr)
@@ -560,7 +561,7 @@ function expected_risk_ret_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                                 pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                                 rf::Number = 0, sca::Scalariser = SumScalariser(),
                                 strict::Bool = false, kwargs...)
-    # The value-level door reduces once here — see the note in `expected_sric`.
+    # Reduce to the Investable Mask once here — see the note in `expected_sric`.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     rk, rt, sr = expected_risk_ret_ratio(r, ret, w, pr, fees; rf = rf, sca = sca, kwargs...)
     return rk, rt, sr - sric_penalty(sr, pr)
@@ -1334,7 +1335,7 @@ The weight-and-returns methods net the returns through [`calc_net_returns`](@ref
 
 Every method takes a `benchmark`, a second return series over the same periods, and answers the three excess statistics against it. Without one the three are `NaN`. The prediction-result method also answers the **turnover** of the held path, the mean trade at a rebalance of a multi-period result; at `test_size = 1` a rebalance is a period. A bare series, a single fold and a one-fold result record no rebalance, so their turnover is `NaN`.
 
-**The Precomputed-returns contract: the series `ret` must be finite.** No method takes a finiteness check, because every internal caller hands one a finite series: the prediction methods read the fold's own funnel output, and a scan on a long series would be paid by all of them. One non-finite entry makes the mean, the volatility and every ratio non-finite, and the tail figure answers a **finite wrong number** rather than a `NaN`, because `partialsort` orders a `NaN` after every real. A caller who holds a gapped series drops the gaps first with `x[isfinite.(x)]`, and a caller who holds a gapped panel scores it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead, which filters the Held Gaps once.
+**The Precomputed-returns contract: the series `ret` must be finite.** No method takes a finiteness check, because every internal caller hands one a finite series: the prediction methods read the fold's own output of [`calc_net_returns`](@ref), and a scan on a long series would be paid by all of them. One non-finite entry makes the mean, the volatility and every ratio non-finite, and the tail figure answers a **finite wrong number** rather than a `NaN`, because `partialsort` orders a `NaN` after every real. A caller who holds a gapped series drops the gaps first with `x[isfinite.(x)]`, and a caller who holds a gapped panel scores it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead, which filters the Held Gaps once.
 
 The standard error of the Sharpe ratio reads every observation as independent, so it understates the true standard error on a series scored under a Weight Drift, as the `# Mathematical definition` states. The rigorous alternative is a long-run variance estimator, which needs a bandwidth the library would have to defend on every sample. The library does not build one, and it applies no guard and no threshold: the figure is reported as it stands.
 

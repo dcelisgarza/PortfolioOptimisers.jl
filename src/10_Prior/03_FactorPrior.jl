@@ -39,10 +39,10 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
 ## Composition: what this estimator forwards
 
-This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its carrier directly rather than forwarding one along its own axis; the forwarding rule still governs each field. It is the plain projection of the family — nothing here modifies the factor distribution, so [`FactorBlackLittermanPrior`](@ref) is this estimator with views landing on the factor block on the way through.
+This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its prior result directly rather than forwarding one along its own axis; the forwarding rule still governs each field. It is the plain projection of the family — nothing here modifies the factor distribution, so [`FactorBlackLittermanPrior`](@ref) is this estimator with views landing on the factor block on the way through.
 
   - The factor block `fpr` **is** the wrapped factor prior, forwarded whole and untouched: it needs no reconstruction, because the asset moments are its projection rather than an update of it.
-  - `mu` and `sigma` are that block projected through the loadings, so the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction. `sigma` optionally gains a residual correction when `rsd` is `true`.
+  - `mu` and `sigma` are that block projected through the loadings, so the returned prior result is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction. `sigma` optionally gains a residual correction when `rsd` is `true`.
   - `chol` is not forwarded but **rebuilt on the asset axis**, as `M * cholesky(fpr.sigma).L` widened by the residual block when `rsd` is `true`, so it stays in sync with the `sigma` it factorises.
   - `w` is the factor prior's, and is over the right axis: this estimator wraps only a factor prior, and `posterior_X` has exactly `F`'s rows, so it is the only weighting in existence. Its `ens`, `kld` and `ow` travel with it.
 
@@ -527,7 +527,7 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
     # sampling error.
     rr = set_idiosyncratic_covariance(rr, esigma, edof, ediv)
     # No panel travels on a prior result at all: a Feature Matrix is derived from the Asset
-    # Panel on the data carrier, or built by a producer on the distance that reads the
+    # Panel on the returns data, or built by a producer on the distance that reads the
     # loadings back off this result.
     #
     # The factor block *is* the prior that was fit on the factors: it needs no reconstruction,

@@ -13,7 +13,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `factor_exposure`
 
-  - [`factor_exposure(xe::AbstractExposureEstimator, rd::ReturnsResult)`](@ref): Computes the Factor Exposure of a carrier.
+  - [`factor_exposure(xe::AbstractExposureEstimator, rd::ReturnsResult)`](@ref): Computes the Factor Exposure of a [`ReturnsResult`](@ref).
 
 ### Arguments
 
@@ -39,7 +39,7 @@ abstract type AbstractExposureEstimator <: AbstractEstimator end
 """
     factor_exposure(xe::AbstractExposureEstimator, rd::ReturnsResult) -> Array{<:Real}
 
-Compute the Factor Exposure of a carrier.
+Compute the Factor Exposure of a [`ReturnsResult`](@ref).
 
 This is the verb every Exposure Estimator answers. A member that produces one factor returns an `observations × assets` matrix, and a member that expands one Panel Field into many returns an `observations × assets × factors` array. Every member follows two conventions: the value at an observation uses information up to and including that observation, and every cell where the active mask of the Asset Panel is `false` is `NaN`.
 

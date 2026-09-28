@@ -72,7 +72,7 @@ A `NaN` is the marker for a missing cell, so it is admitted and preserved. An in
 # Algorithm
 
  1. Refuse an empty matrix.
- 2. Find the first cell that is neither finite nor `NaN`, and refuse it by name.
+ 2. Find the first cell that is neither finite nor `NaN`, and throw an error that names it.
 
 # Arguments
 
@@ -1438,7 +1438,7 @@ Derive the group labels of a cross-sectional transform from a one-hot block, or 
 
 Both forms return the `observations × assets` label matrix [`cross_sectional_transform`](@ref) takes, where a label is the position of a level in the level order and [`CS_MISSING_GROUP`](@ref) marks an asset with no level.
 
-In the one-hot form, an asset carries a one in the column of the level it belongs to, and an asset whose row sets no level has no group. In the panel form, the codes of a [`CategoricalPanelField`](@ref) are the labels, and a cell its fill policy wrote (`omsk` is `false`) has no group: the fill resolved a blank so that the carrier holds no blank, and a fill value is not a membership, so the read undoes it, as [`OneHotExposure`](@ref) and [`panel_field_values`](@ref) do for the same cell.
+In the one-hot form, an asset carries a one in the column of the level it belongs to, and an asset whose row sets no level has no group. In the panel form, the codes of a [`CategoricalPanelField`](@ref) are the labels, and a cell its fill policy wrote (`omsk` is `false`) has no group: the fill resolved a blank so that the Panel Field holds no blank, and a fill value is not a membership, so the read undoes it, as [`OneHotExposure`](@ref) and [`panel_field_values`](@ref) do for the same cell.
 
 # Algorithm
 

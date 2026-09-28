@@ -425,7 +425,7 @@ The method that Julia selects is the algorithm. Each step is one method, and eac
  1. `Val{:pdm}`: apply [`posdef!`](@ref) to `sigma`, under `mp.pdm`. `X` is not read.
  2. `Val{:dn}`: read `T, N = size(X)`, then apply [`denoise!`](@ref) to `sigma`, under `mp.dn` and the effective sample ratio `T / N`. This is the one step that reads `X`, and it reads only its shape.
  3. `Val{:dt}`: apply [`detone!`](@ref) to `sigma`, under `mp.dt`. `X` is not read.
- 4. `Val{:alg}`: apply [`matrix_processing_algorithm!`](@ref) to `sigma`, under `mp.alg`, forwarding `X` and `kwargs`. This is the seam a caller extends.
+ 4. `Val{:alg}`: apply [`matrix_processing_algorithm!`](@ref) to `sigma`, under `mp.alg`, forwarding `X` and `kwargs`. This is the step that a caller extends.
 
 No method is defined for any other symbol, so an unrecognised step raises a `MethodError`. The constructor of [`MatrixProcessing`](@ref) rejects such a symbol first, so the `MethodError` is reachable only through a hand-built `Val`.
 
@@ -478,9 +478,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses a matrix processing estimator whose steps cannot be run from the shape of the sample alone.
 
-Three of the four steps of [`MatrixProcessing`](@ref) never read the sample: `pdm` and `dt` read `sigma` alone, and `dn` reads `size(X)` and nothing else. The fourth, `alg`, is a seam a caller extends, and it is handed `X` whole, so nothing here can say what it reads. An incremental fit keeps a moment and a count rather than the observations, so it can answer the first three and cannot answer the fourth.
+Three of the four steps of [`MatrixProcessing`](@ref) never read the sample: `pdm` and `dt` read `sigma` alone, and `dn` reads `size(X)` and nothing else. The fourth, `alg`, is a step that a caller extends, and it is handed `X` whole, so nothing here can say what it reads. An incremental fit keeps a moment and a count rather than the observations, so it can answer the first three and cannot answer the fourth.
 
-The refusal is by name, and it names the two routes that do carry the observations: [`Online`](@ref), which buffers them for the estimator itself, and a prior that carries them for a member of its own.
+The refusal is an `ArgumentError` that names the type of `alg`, and it names the two routes that do carry the observations: [`Online`](@ref), which buffers them for the estimator itself, and a prior that carries them for a member of its own.
 
 # Arguments
 
@@ -503,7 +503,7 @@ The refusal is by name, and it names the two routes that do carry the observatio
 """
 function assert_shape_only_matrix_processing(mp::MatrixProcessing)
     @argcheck(isnothing(mp.alg),
-              ArgumentError("`$(typeof(mp.alg))` is a matrix processing algorithm of your own, and it is handed the whole sample, so an incremental fit that keeps a moment and a count cannot run it. Wrap the estimator in `Online`, which buffers the observations the algorithm reads, or host it in a prior that carries them."))
+              ArgumentError("`$(typeof(mp.alg))` is a matrix processing algorithm of your own, and it is handed the whole sample, so an incremental fit that keeps a moment and a count cannot run it. Wrap the estimator in `Online`, which buffers the observations the algorithm reads, or put it in a prior that carries them."))
     return nothing
 end
 """
@@ -512,9 +512,9 @@ end
 
 Applies matrix processing to `sigma` in-place, from the **shape** of the sample rather than from the sample.
 
-The read-out arm of the pipeline, and the arm an incremental fit reaches: a fold keeps a moment and a count, so the observations the matrix arm reads no longer exist, while the one number that arm takes off them — the effective sample ratio `T / N` of the denoising step — is exactly the count the state carries. The substitution is therefore not an approximation, and [`observation_count`](@ref) is where `T` comes from.
+The arm of the pipeline that an incremental fit reaches when the estimate is made from the state: a fold keeps a moment and a count, so the observations the matrix arm reads no longer exist, while the one number that arm takes off them — the effective sample ratio `T / N` of the denoising step — is exactly the count the state carries. The substitution is therefore not an approximation, and [`observation_count`](@ref) is where `T` comes from.
 
-`alg` is the one step with no shape substitute, and [`assert_shape_only_matrix_processing`](@ref) refuses it by name before any step runs.
+`alg` is the one step with no shape substitute, and [`assert_shape_only_matrix_processing`](@ref) refuses it with an `ArgumentError` that names its type before any step runs.
 
 # Algorithm
 
@@ -600,9 +600,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Applies matrix processing to the finite block of `sigma`, from the shape of the sample rather than from the sample.
 
-The shape twin of [`matrix_processing_block!`](@ref), and the arm a read-out of an incremental fit takes. It is the matrix method's body with one substitution: where that one cuts the columns of `X` to the block, this one cuts the **count** of them, because the only thing the steps read off those columns is how many there are.
+The shape twin of [`matrix_processing_block!`](@ref), and the arm an incremental fit takes when the estimate is made from the state. It is the matrix method's body with one substitution: where that one cuts the columns of `X` to the block, this one cuts the **count** of them, because the only thing the steps read off those columns is how many there are.
 
-A read-out reaches this arm rather than the plain one for the reason the [`AssetPanel`](@ref) methods do: an estimator fitted over a changing universe answers `NaN` for an asset outside the Coverage Universe, and a positive-definite repair over a frame carrying one meets a LAPACK refusal rather than a named error. A complete matrix has no frame, and the body then runs the plain arm over the whole of it, so nothing is paid where nothing is missing.
+An estimate made from the state reaches this arm rather than the plain one for the reason the [`AssetPanel`](@ref) methods do: an estimator fitted over a changing universe answers `NaN` for an asset outside the Coverage Universe, and a positive-definite repair over a frame carrying one meets a LAPACK refusal rather than a named error. A complete matrix has no frame, and the body then runs the plain arm over the whole of it, so nothing is paid where nothing is missing.
 
 # Algorithm
 

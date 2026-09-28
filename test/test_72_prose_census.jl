@@ -382,6 +382,7 @@ end
         @test count_of("The seam hands its carrier to the host at read-out.",
                        "mechanism") == 4
         @test count_of("See § 3 for the fold.", "mechanism") == 1
+        @test count_of("The fee takes the door the fit takes.", "mechanism") == 1
         @test count_of("The two runs agree to the bit, by construction.", "verdict") == 3
         # The identity matrix is a matrix, and a page that shrinks towards it says so.
         @test count_of("We shrink the covariance towards the identity matrix.",

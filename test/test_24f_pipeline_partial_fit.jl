@@ -387,8 +387,8 @@ what keeps the JuMP families cheap.
         end
     end
 
-    @testset "Online(pipe; max_history = w) is the rolling batch walk-forward; Online(pipe) is the host route" begin
-        # A statistic fill is window-valued, which the host route refuses and the refit
+    @testset "Online(pipe; max_history = w) is the rolling batch walk-forward; Online(pipe) is the fold route" begin
+        # A statistic fill is window-valued, which the fold route refuses and the refit
         # route admits: every fold is a batch fit over the buffer.
         pipe = Pipeline(;
                         steps = (PriceGapFill(; fill = MeanValue()), PricesToReturns(),
@@ -403,7 +403,7 @@ what keeps the JuMP families cheap.
         o = cross_val_predict(po.Online(pipe), pr, online_cv)
         @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
                   for (pb, po_) in zip(b.pred, o.pred))
-        # The refit route equals the host route where both run.
+        # The refit route equals the fold route where both run.
         hpipe = Pipeline(;
                          steps = (PriceGapFill(), PricesToReturns(), EmpiricalPrior(), hrp))
         h = cross_val_predict(hpipe, pr, online_cv)
@@ -417,7 +417,7 @@ what keeps the JuMP families cheap.
         @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
                   for (pb, po_) in zip(b.pred, o.pred))
         # A capped owner on returns input, behind a universe-only step alone, stays on the
-        # host route and equals the rolling batch walk-forward: the read-out refits the
+        # fold route and equals the rolling batch walk-forward: the read-out refits the
         # selector over the owner's capped rows (#1076).
         sel = ScoreSelector(; score = MeanReturn(), rule = RankRule(; best = 4))
         b = cross_val_predict(Pipeline(; steps = (sel, EmpiricalPrior(), hrp)), rd, rolling)
@@ -430,7 +430,7 @@ what keeps the JuMP families cheap.
                   for (pb, po_) in zip(b.pred, o.pred))
         # #1076's fixture: asset 2 gapped over rows 5:40, so fold 2's window starts inside
         # the gap. The rolling batch fit seeds no price the window did not see and the column
-        # filter drops asset 2; the refit route drops it too. A capped owner on the host route
+        # filter drops asset 2; the refit route drops it too. A capped owner on the fold route
         # would have kept it, filled from row 4 at fold 1, and is refused below.
         P2 = copy(P)
         P2[5:40, 2] .= NaN
@@ -545,7 +545,7 @@ what keeps the JuMP families cheap.
         @test occursin("opt.opt.pe", msg)
         # A capped owner behind a row-local step (#1076): each of the three steps by name, on
         # a prior owner and on an optimisation owner's prior; the cap is read through
-        # `step_online_cap`, and an uncapped owner stays on the host route.
+        # `step_online_cap`, and an uncapped owner stays on the fold route.
         cpe = po.Online(EmpiricalPrior(); max_history = w)
         for (steps, name) in ((PricesToReturns(),) => "PricesToReturns",
                               (PriceGapFill(), PricesToReturns()) => "PriceGapFill",
@@ -747,7 +747,7 @@ what keeps the JuMP families cheap.
         msg = message(() -> po.partial_fit!(nptr, rows(pr, 1:97)))
         @test occursin("NextPriceGapReturn", msg) && occursin("no online form", msg)
 
-        # A caller's own row-local step joins the host route with three methods and no
+        # A caller's own row-local step joins the fold route with three methods and no
         # `partial_fit!`: the stepped pipeline reads out as the batch fit.
         struct PriceDoubler{C} <: po.AbstractPricesPreprocessingEstimator
             cache::C

@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the observations that a fold-and-carry prior keeps, and the assets whose scenario fill it has already named.
 
-A prior that carries this state folds its moments exactly, member by member, and keeps the rows for one reason. [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, so the read-out copies the rows into the result and computes nothing from them. A [`SampleBufferState`](@ref) is different. An estimator that carries one has no recursion of its own, and its read-out runs the batch verb over the rows that the buffer kept.
+A prior that carries this state folds its moments exactly, member by member, and keeps the rows for one reason. [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, so `prior(pe)` with no data copies the rows into the result and computes nothing from them. A [`SampleBufferState`](@ref) is different. An estimator that carries one has no recursion of its own, and its call with no data runs the batch verb over the rows that the buffer kept.
 
 An [`Online`](@ref) wrapper seeds a [`SampleBufferState`](@ref), so a wrapped prior takes the refit route and not this one. This is why the `max_history` of an `Online` windows the whole fit.
 
@@ -42,7 +42,7 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
     """
     buf
     """
-    Indices of the assets whose scenario fill a read-out has already named. [`strict_diagnostic`](@ref) keeps no record, so without this set a walk-forward that reads out at every step names the same asset at every step. A read-out adds to the set in place, because it returns a Prior Result and not the estimator, and no other return value takes the set to the next step. [`Base.copy`](@ref) copies the set, and [`merge_states`](@ref) takes the union of two.
+    Indices of the assets whose scenario fill a call of `prior(pe)` with no data has already named. [`strict_diagnostic`](@ref) keeps no record, so without this set a walk-forward that reads out at every step names the same asset at every step. That call adds to the set in place, because it returns a Prior Result and not the estimator, and no other return value takes the set to the next step. [`Base.copy`](@ref) copies the set, and [`merge_states`](@ref) takes the union of two.
     """
     named
 end
@@ -78,7 +78,7 @@ end
 
 Reads the buffer of asset returns out of the state that a prior carries.
 
-Two states hold rows at the prior layer, each in a different place. A [`SampleBufferState`](@ref) is the rows, and a [`PriorCarryState`](@ref) keeps them in `buf`. The read-out of an optimiser and the read-out of a forwarding host read the returns through this function and never through the fields of a state, so a new state that holds rows adds one method here. Where the tree of the prior reads factor returns, the buffer holds the factor rows too, and the read-out of an optimiser takes them with [`factor_buffer`](@ref) when the fold context keeps no factor column. This function refuses, by name, a state that holds no rows, such as the exact-fold state of a moment estimator.
+Two states hold rows at the prior layer, each in a different place. A [`SampleBufferState`](@ref) is the rows, and a [`PriorCarryState`](@ref) keeps them in `buf`. `optimise(opt)` with no data, and `prior(pe)` with no data on a prior that forwards its fold to an embedded prior, read the returns through this function. Neither reads the fields of a state, so a new state that holds rows adds one method here. Where the tree of the prior reads factor returns, the buffer holds the factor rows too, and `optimise(opt)` with no data takes them with [`factor_buffer`](@ref) when the fold context keeps no factor column. This function throws an `ArgumentError` that names the type of a state that holds no rows, such as the exact-fold state of a moment estimator.
 
 # Arguments
 
@@ -106,7 +106,7 @@ function returns_buffer(state::PriorCarryState)
     return state.buf
 end
 function returns_buffer(state::AbstractPartialFitState)
-    return throw(ArgumentError("a `$(typeof(state))` carries no rows, so no read-out can rebuild the returns it folded from it. The read-out reads the observations from the prior's own buffer, which a `SampleBufferState` or a `PriorCarryState` holds."))
+    return throw(ArgumentError("a `$(typeof(state))` carries no rows, so a call with no data cannot rebuild the returns that it folded. That call reads the observations from the prior's own buffer, which a `SampleBufferState` or a `PriorCarryState` holds."))
 end
 """
     prior_returns_buffer(pe::AbstractPriorEstimator)
@@ -114,7 +114,7 @@ end
 
 Reads the buffer of asset returns out of the prior that owns the folded rows.
 
-One prior in the chain owns the rows. [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) build their result around the prior they embed and own no rows, so this function reads the buffer of the embedded prior, at any depth. Every other prior keeps its rows in its own `cache`. Two read-outs call it. The read-out of an optimiser rebuilds the returns it forwarded, and the read-out of a [`HighOrderPriorEstimator`](@ref) refits a co-moment that does not fold over the rows.
+One prior in the chain owns the rows. [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) build their result around the prior they embed and own no rows, so this function reads the buffer of the embedded prior, at any depth. Every other prior keeps its rows in its own `cache`. Two calls with no data use it. `optimise(opt)` with no data rebuilds the returns it forwarded, and `prior(pe)` with no data on a [`HighOrderPriorEstimator`](@ref) refits a co-moment that does not fold over the rows.
 
 # Arguments
 
@@ -148,7 +148,7 @@ end
 
 Folds observations into the buffer that a [`PriorCarryState`](@ref) carries.
 
-The method forwards to the fold of the buffer, with its keyword arguments. So a [`CoveragePolicy`](@ref) mask goes into the buffer beside the rows it describes, as it does for a [`SampleBufferState`](@ref) that an [`Online`](@ref) seeded. No factor observation reaches the buffer, because [`EmpiricalPrior`](@ref), the one carrying prior, never reads one and drops it before the carry. The fold leaves the named-asset set as it is, because only a read-out finds an asset to name.
+The method forwards to the fold of the buffer, with its keyword arguments. So a [`CoveragePolicy`](@ref) mask goes into the buffer beside the rows it describes, as it does for a [`SampleBufferState`](@ref) that an [`Online`](@ref) seeded. No factor observation reaches the buffer, because [`EmpiricalPrior`](@ref), the one carrying prior, never reads one and drops it before the carry. The fold leaves the named-asset set as it is, because only `prior(pe)` with no data finds an asset to name.
 
 # Arguments
 
@@ -180,7 +180,7 @@ end
 
 Folds observations into a [`PriorCarryState`](@ref), and seeds an empty state where the prior carries none.
 
-It is [`fold_buffer`](@ref) with the named-asset set kept. The seed has no cap. The cap on the carried rows is the `max_scenarios` of an `EmpiricalPrior`, which the read-out applies. A cap on the fit is the `max_history` of an [`Online`](@ref), which puts the prior on the refit route instead.
+It is [`fold_buffer`](@ref) with the named-asset set kept. The seed has no cap. The cap on the carried rows is the `max_scenarios` of an `EmpiricalPrior`, which `prior(pe)` with no data applies. A cap on the fit is the `max_history` of an [`Online`](@ref), which puts the prior on the refit route instead.
 
 # Arguments
 
@@ -236,7 +236,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies a [`PriorCarryState`](@ref), so that the copy shares no array and no set with the original.
 
-The method copies the named-asset set for the reason it copies the backing matrix. A read-out writes into the set, so a copy that shared it would record its notices in the set of the original.
+The method copies the named-asset set for the reason it copies the backing matrix. `prior(pe)` with no data writes into the set, so a copy that shared it would record its notices in the set of the original.
 
 # Arguments
 
@@ -292,10 +292,10 @@ end
 
 Reads a prior out of the state that its estimator carries, with no data matrix.
 
-This is the read-out method of [`prior`](@ref), and the entry point of every prior that folds. It reads the state and dispatches on its type:
+This is the method of [`prior`](@ref) with no data, and the entry point of every prior that folds. It reads the state and dispatches on its type:
 
-  - A [`SampleBufferState`](@ref) means refit. The estimator has no recursion of its own, so the read-out runs the batch verb over the rows that the buffer kept. These are all the rows folded so far when the buffer has no cap, and the last `max_history` rows when an [`Online`](@ref) set one. The batch verb receives the factor rows that the buffer recorded, through [`factor_buffer`](@ref), or `nothing` where the buffer recorded none. The fold fixed that choice from the estimator tree.
-  - A [`PriorCarryState`](@ref) means fold and carry. Each family that takes it has a read-out method of its own.
+  - A [`SampleBufferState`](@ref) means refit. The estimator has no recursion of its own, so the method runs the batch verb over the rows that the buffer kept. These are all the rows folded so far when the buffer has no cap, and the last `max_history` rows when an [`Online`](@ref) set one. The batch verb receives the factor rows that the buffer recorded, through [`factor_buffer`](@ref), or `nothing` where the buffer recorded none. The fold fixed that choice from the estimator tree.
+  - A [`PriorCarryState`](@ref) means fold and carry. Each family that takes it has its own method of `prior` with no data.
 
 # Mathematical definition
 
@@ -365,15 +365,15 @@ end
 
 Answers whether the fit of a prior reads a factor matrix, from its estimator tree.
 
-The answer depends on the tree that an estimator embeds, not on the type of the host. A prior whose factor argument is optional never reads the argument, and passes it to the prior it embeds. Only a member that requires the argument reads it. So the answer has three values, and the abstract type of the member gives each one:
+The answer depends on the tree that an estimator embeds, not on the type of the outer estimator. A prior whose factor argument is optional never reads the argument, and passes it to the prior it embeds. Only a member that requires the argument reads it. So the answer has three values, and the abstract type of the member gives each one:
 
   - `true` for a member that requires factor returns, [`AbstractHiLoOrderPriorEstimator_F`](@ref). Its batch verb declares `F::MatNum` with no default, and refuses a fit without one.
   - `false` for a member that never reads them, [`AbstractLowOrderPriorEstimator_A`](@ref). Its batch verb declares the argument and ignores it, so a fold drops it as the batch verb does.
   - `nothing` for a member whose factor argument is optional, [`AbstractLowOrderPriorEstimator_AF`](@ref). The type does not say, so the fold takes what it receives, as the batch verb does.
 
-Each optional-argument host of the library recurses into the prior it embeds and answers the value of the leaf. So `EntropyPoolingPrior(; pe = FactorPrior())` answers `true`, and `EntropyPoolingPrior()` answers `false`. [`OpinionPoolingPrior`](@ref) holds several priors and combines their answers with [`combine_factor_answers`](@ref). An [`Online`](@ref) answers for the estimator it wraps. A caller's own optional-argument subtype that embeds a prior must define the recursion. A subtype that reads `F` itself can keep the default, which takes what it receives.
+Each outer estimator of the library whose factor argument is optional recurses into the prior it embeds and answers the value of the leaf. So `EntropyPoolingPrior(; pe = FactorPrior())` answers `true`, and `EntropyPoolingPrior()` answers `false`. [`OpinionPoolingPrior`](@ref) holds several priors and combines their answers with [`combine_factor_answers`](@ref). An [`Online`](@ref) answers for the estimator it wraps. A caller's own optional-argument subtype that embeds a prior must define the recursion. A subtype that reads `F` itself can keep the default, which takes what it receives.
 
-The doors that check for a missing factor matrix read this predicate. These are the [`ReturnsResult`](@ref) method of the prior, the step of the online optimiser, and the three uncertainty-set doors. The predicate finds a factor leaf under an optional-argument host, which an `isa` test on the host cannot find. It also decides what the refit route of [`partial_fit!`](@ref) does with the factor observation it receives.
+The checks at entry that look for a missing factor matrix read this predicate. These are the [`ReturnsResult`](@ref) method of the prior, the step of the online optimiser, and the `ReturnsResult` methods of [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref). The predicate finds a factor leaf under an outer estimator whose factor argument is optional, which an `isa` test on the outer estimator cannot find. It also decides what the refit route of [`partial_fit!`](@ref) does with the factor observation it receives.
 
 # Arguments
 
@@ -438,7 +438,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Combines the answers of several embedded priors into one, for a host that holds more than one.
+Combines the answers of several embedded priors into one, for an outer estimator that holds more than one.
 
 The rule is the strong three-valued disjunction of Kleene, with `nothing` as the unknown value. A fit that reaches a member which requires factor returns is refused without them, so one `true` decides the answer. A fit whose members all drop factor returns drops them too. In every other case at least one member takes what it receives and no member requires it, so the answer is `nothing`.
 
@@ -487,16 +487,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses a missing factor matrix at a door whose prior tree requires one.
+Refuses a missing factor matrix at a check at entry whose prior tree requires one.
 
-Five doors share this refusal: the [`ReturnsResult`](@ref) method of the prior, the step of the online optimiser, and the three uncertainty-set doors. The refit route of [`partial_fit!`](@ref) reaches it too, through [`fold_factor_argument`](@ref). One method holds the message and the test, so the two cannot differ between callers. The test is [`needs_factor_returns`](@ref) answering `true`. That predicate walks the estimator tree, so this method refuses a factor leaf under an optional-argument host by name, before the leaf meets a `MethodError` one call later.
+Five checks at entry share this refusal: the [`ReturnsResult`](@ref) method of the prior, the step of the online optimiser, and the `ReturnsResult` methods of [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref). The refit route of [`partial_fit!`](@ref) reaches it too, through [`fold_factor_argument`](@ref). One method holds the message and the test, so the two cannot differ between callers. The test is [`needs_factor_returns`](@ref) answering `true`. That predicate walks the estimator tree. So this method refuses a factor leaf under an outer estimator whose factor argument is optional with an `IsNothingError` that names `F`, before the leaf meets a `MethodError` one call later.
 
-A `pe` of `nothing` is an uncertainty set with no prior of its own. It reads no factor matrix, so the method checks nothing. The returns-data method refuses such a set later, by name, through [`ucs_prior`](@ref).
+A `pe` of `nothing` is an uncertainty set with no prior of its own. It reads no factor matrix, so the method checks nothing. The returns-data method refuses such a set later, with an error that names it, through [`ucs_prior`](@ref).
 
 # Arguments
 
-  - `pe`: The prior estimator that the door passes the matrix to, or `nothing`.
-  - `F`: The factor matrix that the carrier holds, the factor observation that a fold receives, or `nothing`.
+  - `pe`: The prior estimator that the check at entry passes the matrix to, or `nothing`.
+  - `F`: The factor matrix that the `ReturnsResult` holds, the factor observation that a fold receives, or `nothing`.
 
 # Validation
 
@@ -531,11 +531,11 @@ Folds observations, and the factor observations beside them, into the sample buf
 
 This is the refit route of the prior family. Every prior that carries a [`SampleBufferState`](@ref) reaches this method, which has the arity of the prior's own batch verb, `prior(pe, X, F)`. The estimator tree decides what the fold does with `F`, through [`needs_factor_returns`](@ref), and the fold does what the batch verb does with the same argument:
 
-  - `true`. The tree holds a factor leaf. The fold refuses a call without `F` by name, with the refusal of the doors, before it appends a row. A call with `F` records it.
+  - `true`. The tree holds a factor leaf. The fold refuses a call without `F` with the `IsNothingError` of [`assert_factor_returns`](@ref), which names `F`, before it appends a row. A call with `F` records it.
   - `false`. The tree never reads `F`, so the fold drops it, as `prior(EmpiricalPrior(), X, F)` drops it, and the buffer records the rows alone.
   - `nothing`. The tree does not say, so the buffer records `F` when the call gives it and not otherwise, as the batch verb of an optional-argument prior does.
 
-The buffer fixes what it records at its first append and refuses a mixture. So a run that gives `F` at one step and not at the next is refused at that step, by name.
+The buffer fixes what it records at its first append and refuses a mixture. So a run that gives `F` at one step and not at the next is refused at that step with an error.
 
 # Algorithm
 
@@ -594,7 +594,7 @@ end
 
 Applies the answer of the estimator tree to the factor argument of a fold.
 
-The method reads the three answers of [`needs_factor_returns`](@ref) as the refit route needs them. `true` refuses a missing `F` by name and passes a present one through. `false` drops `F`. `nothing` passes `F` through as it is. The method dispatches on the answer, so a tree whose answer follows from its type, which is true of every tree in the library, costs the fold no branch at run time.
+The method reads the three answers of [`needs_factor_returns`](@ref) as the refit route needs them. `true` refuses a missing `F` with an `IsNothingError` that names it, and passes a present one through. `false` drops `F`. `nothing` passes `F` through as it is. The method dispatches on the answer, so a tree whose answer follows from its type, which is true of every tree in the library, costs the fold no branch at run time.
 
 # Arguments
 
@@ -631,11 +631,11 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Folds an observation into a member of a carrying host, where that member folds.
+Folds an observation into a member of an outer estimator that carries the observations, where that member folds.
 
-This is the fold half of the rule for a mixed host. A host that carries the observations folds every member that folds, and leaves the other members as they are, because it can run their batch verb over its own rows at the read-out. [`supports_partial_fit`](@ref) answers the question from the type of the member and its `cache` field. So for a host of concrete members the compiler resolves the branch, and the host folds no member that must not fold.
+This is the fold half of the rule for an outer estimator with mixed members. An outer estimator that carries the observations folds every member that folds, and leaves the other members as they are, because it can run their batch verb over its own rows in the call with no data. [`supports_partial_fit`](@ref) answers the question from the type of the member and its `cache` field. So for an outer estimator of concrete members the compiler resolves the branch, and the outer estimator folds no member that must not fold.
 
-A member that the host does not hold is `nothing`, and a fold of it returns `nothing`.
+A member that the outer estimator does not hold is `nothing`, and a fold of it returns `nothing`.
 
 # Arguments
 
@@ -663,9 +663,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reads the estimate of a member out of its fold, or refits the member over the rows of the host.
+Reads the estimate of a member out of its fold, or refits the member over the rows of the outer estimator.
 
-This is the read-out half of the rule for a mixed host, and [`fold_member`](@ref) is the fold half. A member that the host folded answers from its state. A member that the host did not fold answers from the matrix that the host passes. `f` is the batch verb of the member, for example `Statistics.mean`, `Statistics.cov`, [`coskewness`](@ref) or [`cokurtosis`](@ref). The one-argument method of the same verb is its read-out, and every family that folds follows this convention.
+This half of the rule for an outer estimator with mixed members reads the estimate, and [`fold_member`](@ref) is the fold half. A member that the outer estimator folded answers from its state. A member that the outer estimator did not fold answers from the matrix that the outer estimator passes. `f` is the batch verb of the member, for example `Statistics.mean`, `Statistics.cov`, [`coskewness`](@ref) or [`cokurtosis`](@ref). The one-argument method of the same verb reads the estimate from the state, and every family that folds follows this convention.
 
 No [`AssetPanel`](@ref) reaches this verb. A panel describes the fold and is not a sample, and a buffer holds no activity mask, so the verb refits a member over the rows alone.
 
@@ -673,7 +673,7 @@ No [`AssetPanel`](@ref) reaches this verb. A panel describes the fold and is not
 
   - `f`: The batch verb of the member.
   - `est`: The member, or `nothing`.
-  - `X`: The rows that the host carries, which are the rows the member was folded on.
+  - `X`: The rows that the outer estimator carries, which are the rows the member was folded on.
   - `kwargs...`: Additional keyword arguments, forwarded to the batch verb alone. A folded member is read with no keyword argument, because its state is already the estimate.
 
 # Returns
@@ -697,13 +697,13 @@ end
 
 Folds observations into an [`EmpiricalPrior`](@ref), which folds its moments and carries its rows.
 
-`pe.me` and `pe.ce` fold exactly, so a step of the prior is their two steps and an append to the carried rows. The cost of a step grows with the square of the number of assets, and does not grow with the number of observations already folded. The cost of a refit from a buffer grows with that number too. This difference is the reason the carry route exists. A read-out written as `prior(pe, sample_buffer(pe))` passes every parity test and discards both exact folds, so a review must refuse that form.
+`pe.me` and `pe.ce` fold exactly, so a step of the prior is their two steps and an append to the carried rows. The cost of a step grows with the square of the number of assets, and does not grow with the number of observations already folded. The cost of a refit from a buffer grows with that number too. This difference is the reason the carry route exists. A call with no data that is written as `prior(pe, sample_buffer(pe))` passes every parity test and discards both exact folds, so a review must refuse that form.
 
 The two methods differ in one line. The method with no horizon folds the observation as it is. The horizon method folds `log1p` of the observation, because the batch horizon method fits its moments on log returns. It carries the observation itself, because the [`LowOrderPrior`](@ref) it returns carries the arithmetic returns that the caller passed. A buffer of log rows would change the matrix that every scenario risk measure reads.
 
-A member that does not fold, such as a `SemiMoment` covariance or a composite whose `mp.alg` reads the sample, stays as it is under [`fold_member`](@ref), and the read-out refits it over the carried rows. So a caller writes the estimator that they would write in batch, and no member keeps a second copy of the sample.
+A member that does not fold, such as a `SemiMoment` covariance or a composite whose `mp.alg` reads the sample, stays as it is under [`fold_member`](@ref), and `prior(pe)` with no data refits it over the carried rows. So a caller writes the estimator that they would write in batch, and no member keeps a second copy of the sample.
 
-The fold takes a factor observation and drops it, because `prior(EmpiricalPrior(), X, F)` declares `F` and never reads it. The fold has the arity of the batch verb, so a host that passes `F` down its tree meets no `MethodError` here. [`needs_factor_returns`](@ref) answers `false` for this estimator, so no estimator above it keeps a factor row for it.
+The fold takes a factor observation and drops it, because `prior(EmpiricalPrior(), X, F)` declares `F` and never reads it. The fold has the arity of the batch verb, so an outer estimator that passes `F` down its tree meets no `MethodError` here. [`needs_factor_returns`](@ref) answers `false` for this estimator, so no estimator above it keeps a factor row for it.
 
 # Algorithm
 
@@ -723,7 +723,7 @@ The fold takes a factor observation and drops it, because `prior(EmpiricalPrior(
 # Validation
 
   - $(val_dict[:dims])
-  - Every condition that the fold of `pe.me` or `pe.ce` checks. A member that holds observation weights refuses the fold by name, because a weight vector reweights every past observation when a new one arrives.
+  - Every condition that the fold of `pe.me` or `pe.ce` checks. A member that holds observation weights refuses the fold with an `ArgumentError` that names the member, because a weight vector reweights every past observation when a new one arrives.
 
 # Returns
 
@@ -777,11 +777,11 @@ end
 
 Reads an [`EmpiricalPrior`](@ref) out of its fold, with no data matrix.
 
-`mu` comes from `pe.me`, `sigma` comes from `pe.ce`, and `X` is the matrix that the carry state already holds. The read-out copies the rows, and does not refit a member that folded. The horizon method then applies the algebra of the batch method through [`horizon_moments!`](@ref), which holds that algebra once.
+`mu` comes from `pe.me`, `sigma` comes from `pe.ce`, and `X` is the matrix that the carry state already holds. The method copies the rows, and does not refit a member that folded. The horizon method then applies the algebra of the batch method through [`horizon_moments!`](@ref), which holds that algebra once.
 
 `pe.max_scenarios` cuts the rows that the result carries, as it does in batch, and the fill runs over the rows that remain. When the cap cuts, `ens` holds the number of observations folded, through [`scenario_ens`](@ref), so a consumer that prices a sample size reads ``T`` and not the number of rows carried. The named-asset set of the carry state limits the notice of the fill, so a walk-forward names an asset at the first step whose fill reaches it, and at no later step.
 
-No [`AssetPanel`](@ref) is read. A panel describes the fold and is not a sample. The Coverage Universe of this read-out equals the Coverage Universe of a batch fit, because [`coverage_mask`](@ref) is a function of the rows alone, and the carry state holds the rows that a batch fit reads.
+No [`AssetPanel`](@ref) is read. A panel describes the fold and is not a sample. The Coverage Universe of this method equals the Coverage Universe of a batch fit, because [`coverage_mask`](@ref) is a function of the rows alone, and the carry state holds the rows that a batch fit reads.
 
 # Mathematical definition
 
@@ -873,9 +873,9 @@ end
 
 Folds observations into a [`HighOrderPriorEstimator`](@ref) by forwarding them to its members.
 
-The host keeps no buffer. It builds `HighOrderPrior(; pr = pr, ...)` around the result of its embedded prior, so the rows it needs at the read-out are the rows that prior carries. A buffer here would be a second copy of the sample.
+The estimator keeps no buffer. It builds `HighOrderPrior(; pr = pr, ...)` around the result of its embedded prior, so the rows it needs in `prior(pe)` with no data are the rows that prior carries. A buffer here would be a second copy of the sample.
 
-The host forwards the fold to `pe.pe` in every case, because that member carries the rows. An embedded prior that cannot fold refuses here, and names the wrapper that gives it a buffer. The refusal is correct, because the host has no rows of its own to give it. The factor observations go with the rows, as the batch verb passes `F` to the embedded prior, and the tree of the embedded prior decides what happens to them. `pe.kte` and `pe.ske` go through [`fold_member`](@ref) instead, because the host has rows for them at the read-out, and the read-out refits a co-moment that cannot fold. So `HighOrderPriorEstimator(; ske = Coskewness(; alg = SemiMoment()))` needs no wrapper and keeps one copy of the sample.
+The estimator forwards the fold to `pe.pe` in every case, because that member carries the rows. An embedded prior that cannot fold refuses here, and names the wrapper that gives it a buffer. The refusal is correct, because the estimator has no rows of its own to give it. The factor observations go with the rows, as the batch verb passes `F` to the embedded prior, and the tree of the embedded prior decides what happens to them. `pe.kte` and `pe.ske` go through [`fold_member`](@ref) instead, because the estimator has rows for them in `prior(pe)` with no data, and that call refits a co-moment that cannot fold. So `HighOrderPriorEstimator(; ske = Coskewness(; alg = SemiMoment()))` needs no wrapper and keeps one copy of the sample.
 
 # Algorithm
 
@@ -892,7 +892,7 @@ The host forwards the fold to `pe.pe` in every case, because that member carries
 
 # Validation
 
-  - `pe.pe` folds. The embedded prior refuses the fold by name otherwise.
+  - `pe.pe` folds. The embedded prior refuses the fold otherwise, with an error that names the wrapper that gives it a buffer.
 
 # Returns
 
@@ -907,9 +907,9 @@ The host forwards the fold to `pe.pe` in every case, because that member carries
 """
 function partial_fit!(pe::HighOrderPriorEstimator, X::VecNum_MatNum,
                       F::Option{<:VecNum_MatNum} = nothing; kwargs...)
-    # `rebuild_estimator`, not `Accessors.@reset`: this host declares forwarded properties,
-    # and `@reset` rebuilds a struct by reading every *property*, which on such a type is not
-    # the field list at all.
+    # `rebuild_estimator`, not `Accessors.@reset`: this estimator declares forwarded
+    # properties, and `@reset` rebuilds a struct by reading every *property*, which on such
+    # a type is not the field list at all.
     return rebuild_estimator(pe,
                              (; pe = partial_fit!(pe.pe, X, F; kwargs...),
                               kte = fold_member(pe.kte, X; kwargs...),
@@ -920,9 +920,9 @@ end
 
 Reads a [`HighOrderPriorEstimator`](@ref) out of its fold, with no data matrix.
 
-The embedded prior answers first. A co-moment that folded answers from its state. The read-out refits a co-moment that did not fold over the rows that the embedded prior folded, which [`prior_returns_buffer`](@ref) reads. [`assemble_high_order_prior`](@ref) then builds the result as the batch method does.
+The embedded prior answers first. A co-moment that folded answers from its state. The method refits a co-moment that did not fold over the rows that the embedded prior folded, which [`prior_returns_buffer`](@ref) reads. [`assemble_high_order_prior`](@ref) then builds the result as the batch method does.
 
-The refit reads the folded rows and not `pr.X`, because `pr.X` holds the scenarios of the embedded prior's result, and these are not always the folded rows. A Scenario Cap on the embedded prior keeps only the last rows, and the scenario fill writes zeros into the early rows of an asset that lists late. The batch method fits both co-moments over every row that the caller passes, `NaN` entries included, so a refit over `pr.X` differs from it in both cases. Under an [`Online`](@ref) window the buffer holds the last `max_history` rows, which is the window that the batch equal of that route fits over. The host keeps no copy of the rows, because the embedded prior already holds them.
+The refit reads the folded rows and not `pr.X`, because `pr.X` holds the scenarios of the embedded prior's result, and these are not always the folded rows. A Scenario Cap on the embedded prior keeps only the last rows, and the scenario fill writes zeros into the early rows of an asset that lists late. The batch method fits both co-moments over every row that the caller passes, `NaN` entries included, so a refit over `pr.X` differs from it in both cases. Under an [`Online`](@ref) window the buffer holds the last `max_history` rows, which is the window that the batch equal of that route fits over. The estimator keeps no copy of the rows, because the embedded prior already holds them.
 
 # Mathematical definition
 
@@ -938,7 +938,7 @@ Where:
   - $(math_dict[:P_batch_prior])
   - $(math_dict[:X_returns])
 
-The equality holds for the embedded result and for every co-moment, the ones that fold and the ones that the read-out refits. In floating point, each co-moment differs from the batch co-moment by rounding.
+The equality holds for the embedded result and for every co-moment, the ones that fold and the ones that the method refits. In floating point, each co-moment differs from the batch co-moment by rounding.
 
 # Algorithm
 
@@ -955,7 +955,7 @@ The equality holds for the embedded result and for every co-moment, the ones tha
 
 # Validation
 
-  - Every condition that the read-out of `pe.pe` checks.
+  - Every condition that `prior(pe.pe)` with no data checks.
   - Everything [`prior_returns_buffer`](@ref) refuses.
 
 # Returns
@@ -982,7 +982,7 @@ end
 
 Folds observations into a [`BlackLittermanPrior`](@ref) by forwarding them to its embedded prior.
 
-The host keeps no buffer, for the reason that [`HighOrderPriorEstimator`](@ref) keeps none. It returns [`forward_prior`](@ref) of the result of its embedded prior, so the rows it needs are one level down. The factor observations go down with the rows, as the batch verb passes `F` down. The views are configuration, and they fold nothing.
+The estimator keeps no buffer, for the reason that [`HighOrderPriorEstimator`](@ref) keeps none. It returns [`forward_prior`](@ref) of the result of its embedded prior, so the rows it needs are one level down. The factor observations go down with the rows, as the batch verb passes `F` down. The views are configuration, and they fold nothing.
 
 # Arguments
 
@@ -993,7 +993,7 @@ The host keeps no buffer, for the reason that [`HighOrderPriorEstimator`](@ref) 
 
 # Validation
 
-  - `pe.pe` folds. The embedded prior refuses the fold by name otherwise.
+  - `pe.pe` folds. The embedded prior refuses the fold otherwise, with an error that names the wrapper that gives it a buffer.
 
 # Returns
 
@@ -1044,7 +1044,7 @@ Where:
 
 # Validation
 
-  - Every condition that the read-out of `pe.pe` checks.
+  - Every condition that `prior(pe.pe)` with no data checks.
   - The views of a [`LinearConstraintEstimator`](@ref) name one entry per asset of `prior_model.X`. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
@@ -1068,7 +1068,7 @@ end
 
 Resolves the [`Online`](@ref) declarations under the prior that a wrapping prior embeds, at warm-up.
 
-The generic method scans the fields of the host alone, and a wrapping prior holds its embedded prior in its own `pe` field, so the wrapping prior defines the recursion itself. `HighOrderPriorEstimator(; pe = BlackLittermanPrior(; pe = Online(EmpiricalPrior()), ...))` resolves through this method. The generic scan of the host's own fields finds no wrapper there, because `pe` holds a plain prior, so the generic method would leave the wrapper two levels down unseeded. A wrapper in the host's own `pe`, as in `HighOrderPriorEstimator(; pe = Online(EmpiricalPrior()))`, is seeded the same way, because the recursion meets it at the first level. The generic method still scans the co-moments of a [`HighOrderPriorEstimator`](@ref).
+The generic method scans the fields of the wrapping prior alone, and a wrapping prior holds its embedded prior in its own `pe` field, so the wrapping prior defines the recursion itself. `HighOrderPriorEstimator(; pe = BlackLittermanPrior(; pe = Online(EmpiricalPrior()), ...))` resolves through this method. The generic scan of the own fields of the wrapping prior finds no wrapper there, because `pe` holds a plain prior, so the generic method would leave the wrapper two levels down unseeded. A wrapper in the own `pe` of the wrapping prior, as in `HighOrderPriorEstimator(; pe = Online(EmpiricalPrior()))`, is seeded the same way, because the recursion meets it at the first level. The generic method still scans the co-moments of a [`HighOrderPriorEstimator`](@ref).
 
 # Algorithm
 

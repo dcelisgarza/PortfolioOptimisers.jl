@@ -13,7 +13,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `descriptor`
 
-  - [`descriptor(de::AbstractDescriptorEstimator, rd::ReturnsResult)`](@ref): Computes the Descriptor of a carrier.
+  - [`descriptor(de::AbstractDescriptorEstimator, rd::ReturnsResult)`](@ref): Computes the Descriptor of a [`ReturnsResult`](@ref).
 
 ### Arguments
 
@@ -46,7 +46,7 @@ abstract type AbstractDescriptorEstimator <: AbstractEstimator end
 """
     descriptor(de::AbstractDescriptorEstimator, rd::ReturnsResult) -> Matrix{<:Real}
 
-Compute the Descriptor of a carrier.
+Compute the Descriptor of a [`ReturnsResult`](@ref).
 
 Every Descriptor Estimator implements this function. It reads the Panel Fields that the estimator names from `rd.pnl`. Returns are not a Panel Field, so a member that reads them reads `rd.X`. Every member follows two conventions. The value at an observation uses information up to and including that observation, and every cell where the active mask of the Asset Panel is `false` is `NaN`.
 
@@ -73,9 +73,9 @@ function descriptor end
     panel_field_values(rd::ReturnsResult,
                        terms::AbstractVector{<:Pair{<:AbstractString, <:Real}}) -> Matrix{<:Real}
 
-Read one numeric Panel Field, or a linear combination of numeric Panel Fields, out of a carrier.
+Read one numeric Panel Field, or a linear combination of numeric Panel Fields, out of a [`ReturnsResult`](@ref).
 
-Every Descriptor Estimator reads its Panel Fields through this function. A blank cell never reaches a carrier, because [`asset_panel`](@ref) resolves each one to a fill value and records the resolution in the observed-mask column of the field. This function writes `NaN` back into each cell that the fill set, so a Descriptor cannot mistake a fill value for data.
+Every Descriptor Estimator reads its Panel Fields through this function. A blank cell never reaches a `ReturnsResult`, because [`asset_panel`](@ref) resolves each one to a fill value and records the resolution in the observed-mask column of the field. This function writes `NaN` back into each cell that the fill set, so a Descriptor cannot mistake a fill value for data.
 
 # Algorithm
 
@@ -131,7 +131,7 @@ julia> PortfolioOptimisers.panel_field_values(rd, [\"mcap\" => 1, \"debt\" => 1]
 function panel_field_values(rd::ReturnsResult, name::AbstractString)::Matrix{<:Real}
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
-              IsNothingError("a Descriptor reads its Panel Fields off an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
+              IsNothingError("a Descriptor reads its Panel Fields off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
     f = panel_field(pnl, name)
     @argcheck(isa(f, NumericPanelField),
               ArgumentError("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be a NumericPanelField, got a $(nameof(typeof(f)))"))
@@ -164,9 +164,9 @@ end
 """
     descriptor_asset_panel(rd::ReturnsResult) -> AssetPanel
 
-Read the Asset Panel a Descriptor needs out of a carrier.
+Read the Asset Panel a Descriptor needs out of a [`ReturnsResult`](@ref).
 
-[`panel_field_values`](@ref) refuses a carrier that holds no Asset Panel. A Descriptor over the returns reads no Panel Field, so it calls this function to get the same refusal and the active mask that [`descriptor_active_fill!`](@ref) reads.
+[`panel_field_values`](@ref) refuses a `ReturnsResult` that holds no Asset Panel. A Descriptor over the returns reads no Panel Field, so it calls this function to get the same refusal and the active mask that [`descriptor_active_fill!`](@ref) reads.
 
 # Arguments
 
@@ -178,7 +178,7 @@ Read the Asset Panel a Descriptor needs out of a carrier.
 
 # Returns
 
-  - `pnl::AssetPanel`: The Asset Panel the carrier holds.
+  - `pnl::AssetPanel`: The Asset Panel the `ReturnsResult` holds.
 
 # Related
 
@@ -190,7 +190,7 @@ Read the Asset Panel a Descriptor needs out of a carrier.
 function descriptor_asset_panel(rd::ReturnsResult)::AssetPanel
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
-              IsNothingError("a Descriptor is `NaN` wherever the active mask of an Asset Panel is `false`, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
+              IsNothingError("a Descriptor is `NaN` wherever the active mask of an Asset Panel is `false`, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
     return pnl
 end
 """
@@ -371,7 +371,7 @@ end
 """
     market_return_series(rd::ReturnsResult, mcap::AbstractString) -> Vector{<:Real}
 
-Build the market return of every observation from a carrier.
+Build the market return of every observation from a [`ReturnsResult`](@ref).
 
 Every market-relative Descriptor reads this series, so its definition is in one place. The market return is the capitalisation-weighted mean of the returns over the estimation universe, and every member rebuilds it from the Asset Panel rather than take it from the caller. A weight need not be positive. A negative capitalisation is a data error and not a missing value, so it enters the sum as it stands.
 

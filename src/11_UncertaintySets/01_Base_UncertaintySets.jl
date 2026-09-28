@@ -710,9 +710,9 @@ end
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     ucs_prior(::Nothing, X::MatNum, F::Option{<:MatNum} = nothing; kwargs...)
 
-Fits the prior an uncertainty set calibrates itself on, or refuses by name when the set holds none.
+Fits the prior an uncertainty set calibrates itself on, or throws an error that names `pe` when the set holds none.
 
-The one door through which every returns-data verb of the four families — [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) — fits its `pe`, so the refusal is written once rather than once per verb per family. A set whose `pe` is `nothing` is calibrated on a prior result it is handed, and `nothing` says that one thing: it does not resolve to an empirical prior over `X` at the fit, because that would calibrate the same estimator on two different priors depending on the call site. The returns-data form therefore raises and points at the prior-result form, `ucs(ue, pr)`, and at `pe`.
+The one function through which every returns-data verb of the four families — [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) — fits its `pe`, so the refusal is written once rather than once per verb per family. A set whose `pe` is `nothing` is calibrated on a prior result it is handed, and `nothing` says that one thing: it does not resolve to an empirical prior over `X` at the fit, because that would calibrate the same estimator on two different priors depending on the call site. The returns-data form therefore raises and points at the prior-result form, `ucs(ue, pr)`, and at `pe`.
 
 # Arguments
 

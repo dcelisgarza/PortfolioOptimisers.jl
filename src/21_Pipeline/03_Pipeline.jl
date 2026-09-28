@@ -245,7 +245,7 @@ Steps are given in execution order. Each element is either a step estimator or a
 
 # Online form
 
-A Pipeline is a host of the online step: [`partial_fit!`](@ref) walks the steps in order, folding each block of observations through them into the **row owner** — the prior step, else the optimiser step — and `fit(pipe)` with no data reads the fitted [`PipelineResult`](@ref) out. Every step before the owner belongs to one of three classes. A **row-local** step ([`PricesToReturns`](@ref), [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref), [`MissingDataFilter`](@ref) at `row_thr = 1`) folds and emits the transformed rows. A **universe-only** step (an [`AbstractAssetSelector`](@ref), and the column filter of a `MissingDataFilter`) folds nothing and is refitted at the read-out over the owner's rows, its universe applied as a view. A **window-valued** step, and any other step that writes a data slot, is refused at warm-up by name, and `Online(pipe)` is the declared refit that admits it. A cap on the row owner alone, `Online(pe; max_history = w)`, is a window counted in the owner's rows, and a row-local step before it folds a state across that window's front edge, so the pair is refused at warm-up by name too: the rolling window through a Pipeline is `Online(pipe; max_history = w)`, which refits every step over the window. `cache` is the Fold Context the Pipeline keeps when a prior step owns the rows, or the input-carrier buffer `Online(pipe)` seeds; it is `nothing` until a step writes one. See [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref) and [`fit(pipe::Pipeline)`](@ref).
+A Pipeline takes the online step for its steps: [`partial_fit!`](@ref) walks the steps in order, folding each block of observations through them into the **row owner** — the prior step, else the optimiser step — and `fit(pipe)` with no data reads the fitted [`PipelineResult`](@ref) out. Every step before the owner belongs to one of three classes. A **row-local** step ([`PricesToReturns`](@ref), [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref), [`MissingDataFilter`](@ref) at `row_thr = 1`) folds and emits the transformed rows. A **universe-only** step (an [`AbstractAssetSelector`](@ref), and the column filter of a `MissingDataFilter`) folds nothing and is refitted by `fit(pipe)` with no data over the owner's rows, its universe applied as a view. A **window-valued** step, and any other step that writes a data slot, is refused at warm-up with an error that names it, and `Online(pipe)` is the declared refit that admits it. A cap on the row owner alone, `Online(pe; max_history = w)`, is a window counted in the owner's rows, and a row-local step before it folds a state across that window's front edge, so the pair is refused at warm-up with an error that names it too: the rolling window through a Pipeline is `Online(pipe; max_history = w)`, which refits every step over the window. `cache` is the Fold Context the Pipeline keeps when a prior step owns the rows, or the buffer of the input data that `Online(pipe)` seeds; it is `nothing` until a step writes one. See [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref) and [`fit(pipe::Pipeline)`](@ref).
 
 # Examples
 
@@ -544,7 +544,7 @@ Combine the several values that reached one [accumulating](@ref PIPELINE_ACCUMUL
 
 The default packs them into a vector in write order, which is the shape every field holding one result per estimator expects.
 
-`:cte` is the exception, and it is what this seam exists for. Its field takes a vector of [`CentralityConstraint`](@ref) *estimators*, and [`centrality_constraints`](@ref) appends every row of every estimator into **one** [`LinearConstraint`](@ref). Separate steps therefore merge rather than pack, so *n* centrality steps in a [`Pipeline`](@ref) reach the optimiser with the value one `cte` field holding *n* estimators would have produced.
+`:cte` is the exception, and it is what this function exists for. Its field takes a vector of [`CentralityConstraint`](@ref) *estimators*, and [`centrality_constraints`](@ref) appends every row of every estimator into **one** [`LinearConstraint`](@ref). Separate steps therefore merge rather than pack, so *n* centrality steps in a [`Pipeline`](@ref) reach the optimiser with the value one `cte` field holding *n* estimators would have produced.
 
 Only ever called with more than one value; a single value is unwrapped by [`constraint_targets`](@ref) before it gets here.
 
@@ -619,7 +619,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Override an optimisation step's internal configuration with the computed slots of the pipeline context, immediately before the step runs.
 
-This is the pipeline-owned half of the injection seam. It resolves everything that depends on the *slots* — which halves of the uncertainty pair are populated, which result types the `constraints` slot holds, how many of each — into a flat sequence of [routing targets](@ref PIPELINE_ROUTING_TARGETS), then hands each one to [`pipe_route`](@ref) without knowing where it lands. Which optimiser field receives a target is the optimiser's business, so a field rename is a local edit rather than a break here.
+This is the pipeline half of the routing of a slot into an optimiser. It resolves everything that depends on the *slots* — which halves of the uncertainty pair are populated, which result types the `constraints` slot holds, how many of each — into a flat sequence of [routing targets](@ref PIPELINE_ROUTING_TARGETS), then hands each one to [`pipe_route`](@ref) without knowing where it lands. Which optimiser field receives a target is the optimiser's business, so a field rename is a local edit rather than a break here.
 
 Targets an optimiser has no home for are handled by [`unroutable_target`](@ref): `:pe` and `:cle` pass by, everything else throws rather than being silently dropped. This is why a naive or meta-optimiser accepts a computed prior it can use while still rejecting an uncertainty set it cannot.
 
@@ -780,13 +780,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that a test window came from the same ingestion as the training window.
 
-This is a **provenance** check. The terminal weights are indexed by the *training* universe, so a test window carrying a different asset set — or the same set described by a different universe statement — would silently misalign weights and returns, and it is reported here by name rather than surfacing as a dimension mismatch inside the risk calculation.
+This is a **provenance** check. The terminal weights are indexed by the *training* universe, so a test window carrying a different asset set — or the same set described by a different universe statement — would silently misalign weights and returns, and it is reported here with an error that names both universes rather than surfacing as a dimension mismatch inside the risk calculation.
 
-It reads two things. `nx` equality answers the asset axis, and [`check_asset_panel`](@ref) binds an [`AssetPanel`](@ref)'s asset axis to its carrier's at construction, so `nx` equality compares the panel's axis transitively and no separate assertion is owed. Panel-presence parity answers where the universe was stated: a window with a panel and a fitted context without one, or the reverse, did not come from one ingestion.
+It reads two things. `nx` equality answers the asset axis, and [`check_asset_panel`](@ref) binds an [`AssetPanel`](@ref)'s asset axis to the `nx` of the result that holds it at construction, so `nx` equality compares the panel's axis transitively and no separate assertion is owed. Panel-presence parity answers where the universe was stated: a window with a panel and a fitted context without one, or the reverse, did not come from one ingestion.
 
 The alignment guarantee it once carried alone has since split, and both halves are now held elsewhere. **The axis half is structural.** The ingestion layer fixes the asset axis before the split and [`port_opt_view`](@ref) slices it, so every window of every fold carries every asset, reduce-and-expand always expands onto a fixed axis, and no policy of the layer's own drops a row or a column. **The semantic half was never this check's**: an asset present in both windows and non-investable in one is a **Held Gap**, which `filter_held_gaps` reads off the weights and the returns under the strictness policy.
 
-What is left is the population that can still break the invariant, and its message names both: a carrier built outside the layer, and a third-party step that changes the asset set. On the layer's path neither can arise, so no remedy is prescribed here.
+What is left is the population that can still break the invariant, and its message names both: returns data built outside the layer, and a third-party step that changes the asset set. On the layer's path neither can arise, so no remedy is prescribed here.
 
 # Arguments
 
@@ -815,9 +815,9 @@ function assert_universe_aligned(res::PipelineResult, rd::AbstractReturnsResult)
         return nothing
     end
     @argcheck(rd.nx == train.nx,
-              ArgumentError("the pipeline's fitted steps produced a test-window universe $(rd.nx) that differs from the training universe $(train.nx), so the weights and the test returns would not be aligned. The ingestion layer fixes the asset axis before the split, so this reaches two situations only: a returns carrier built outside it, and a step of your own that changes the asset set. Build the carrier with price_ingestion(PriceIngestion(), X)."))
+              ArgumentError("the pipeline's fitted steps produced a test-window universe $(rd.nx) that differs from the training universe $(train.nx), so the weights and the test returns would not be aligned. The ingestion layer fixes the asset axis before the split, so this reaches two situations only: returns data built outside it, and a step of your own that changes the asset set. Build the returns data with price_ingestion(PriceIngestion(), X)."))
     @argcheck(isnothing(rd.pnl) == isnothing(train.pnl),
-              ArgumentError("the pipeline's fitted steps produced a test window that $(isnothing(rd.pnl) ? "states no universe" : "states a universe") while the training window $(isnothing(train.pnl) ? "states none" : "states one"), so the two did not come from one ingestion. A returns carrier the ingestion layer built always carries an Asset Panel, so pnl === nothing on one of them says that one was built outside it."))
+              ArgumentError("the pipeline's fitted steps produced a test window that $(isnothing(rd.pnl) ? "states no universe" : "states a universe") while the training window $(isnothing(train.pnl) ? "states none" : "states one"), so the two did not come from one ingestion. A ReturnsResult the ingestion layer built always carries an Asset Panel, so pnl === nothing on one of them says that one was built outside it."))
     return nothing
 end
 """

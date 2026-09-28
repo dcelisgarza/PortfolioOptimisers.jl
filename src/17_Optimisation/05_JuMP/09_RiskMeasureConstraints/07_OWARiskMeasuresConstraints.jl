@@ -282,8 +282,8 @@ Where:
 # Keyword arguments
 
   - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns;
-    if `false`, to their negation. This is the seam [`set_range_risk_constraints!`](@ref)
-    builds the gain tail of [`OrderedWeightsArrayRange`](@ref) through.
+    if `false`, to their negation. [`set_range_risk_constraints!`](@ref) sets it to `false`
+    to build the gain tail of [`OrderedWeightsArrayRange`](@ref).
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns

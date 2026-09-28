@@ -225,7 +225,7 @@ The fit reads the Coverage Universe of the rows, as every prior does. An asset w
 11. Compute `mu` as the weighted forecasts less one.
 12. For each pair of assets, find the smallest sum `m` of their two shifted errors over the subsystems. The covariance weight of subsystem `l` for the pair is the kernel of its sum less `m`. The two shifts cancel in the ratio, and the largest weight of each pair is one, so no denominator underflows to zero.
 13. Accumulate the weighted subsystem covariances in `num` and the weights in `den`, and divide, giving `sigma`.
-14. Symmetrise `sigma`, because a matrix product need not be symmetric to the bit.
+14. Symmetrise `sigma`, because a matrix product need not be exactly symmetric.
 15. Repair `sigma` with [`posdef`](@ref) under `pdm`, and expand `mu` and `sigma` to the full universe with [`expand_moment`](@ref).
 
 # Arguments
@@ -305,7 +305,7 @@ function prior(pe::LowDimensionEnsemblePrior, X::MatNum, ::Option{<:MatNum} = no
         den .+= u
     end
     sigma = num ./ den
-    # Symmetrised to the bit, so a consumer's Hermitian check holds; a matrix product need
+    # Symmetrised exactly, so a consumer's Hermitian check holds; a matrix product need
     # not be.
     sigma = (sigma .+ transpose(sigma)) ./ 2
     return LowOrderPrior(; X = Xf, mu = expand_moment(mu, cmsk, 1),

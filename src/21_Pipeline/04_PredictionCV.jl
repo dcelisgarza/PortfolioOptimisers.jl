@@ -1,7 +1,7 @@
 """
     const Pipeline_OnlPipe = Union{<:Pipeline, <:Online{<:Pipeline}, <:Resume{<:MultiPeriodPredictionResult{<:Any, <:Any, <:Any, <:Pipeline}}}
 
-Alias for what a Pipeline's cross-validation door threads through the fold loop: the [`Pipeline`](@ref) itself, taking the host route, `Online(pipe)`, the declared refit from an input-carrier buffer, or `Resume(res)`, the continuation of an online run whose Result carries a pipeline.
+Alias for what the `cross_val_predict` methods of a Pipeline thread through the fold loop: the [`Pipeline`](@ref) itself, taking the fold route, `Online(pipe)`, the declared refit from a buffer of the input data, or `Resume(res)`, the continuation of an online run whose Result carries a pipeline.
 
 # Related
 
@@ -19,7 +19,7 @@ const Pipeline_OnlPipe = Union{<:Pipeline, <:Online{<:Pipeline},
 
 Return `true` if a [`Pipeline`](@ref) step carries time-dependent constraints.
 
-Steps that participate in the time-dependent machinery — optimisation estimators and results, [`TimeDependent`](@ref) schedules, nested [`Pipeline`](@ref)s, and [`PipelineStep`](@ref) wrappers around any of them — delegate to [`is_time_dependent`](@ref); every other step (preprocessing, prior, phylogeny, uncertainty, constraint estimators, and custom callables) contributes `false`, because no non-optimiser family hosts schedules (they are spelled as fields of the optimisation step instead).
+Steps that participate in the time-dependent machinery — optimisation estimators and results, [`TimeDependent`](@ref) schedules, nested [`Pipeline`](@ref)s, and [`PipelineStep`](@ref) wrappers around any of them — delegate to [`is_time_dependent`](@ref); every other step (preprocessing, prior, phylogeny, uncertainty, constraint estimators, and custom callables) contributes `false`, because no non-optimiser family holds schedules (they are spelled as fields of the optimisation step instead).
 
 # Related
 
@@ -309,7 +309,7 @@ end
     pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::MultipleRandomised; ex = FLoops.ThreadedEx())
     pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::CVER; ex = FLoops.ThreadedEx(), id = nothing)
 
-The body of a Pipeline's cross-validation door, shared by the [`Pipeline`](@ref) and by `Online(pipe)`: the door checks its entry through [`assert_pipeline_door`](@ref), splits the data, and runs the folds through [`fold_loop`](@ref), whose online arm resolves the wrapper at warm-up and threads the pipeline from fold to fold.
+The body of the `cross_val_predict` methods of a Pipeline, shared by the [`Pipeline`](@ref) and by `Online(pipe)`: it checks its entry through [`assert_pipeline_door`](@ref), splits the data, and runs the folds through [`fold_loop`](@ref), whose online arm resolves the wrapper at warm-up and threads the pipeline from fold to fold.
 
 # Related
 
@@ -361,7 +361,7 @@ The input is split at its own level — price-level data by the prices-aware `sp
 
 This is the fold loop that consumes [`TimeDependent`](@ref) schedules in a pipeline: when the pipeline is time-dependent, fold `i` builds a [`TimeDependentContext`](@ref) — with `rd` the *raw, pre-preprocessing* input `data`, so pipeline-level callables see the fold's data before any step has transformed it — and swaps every schedule for its fold-`i` value via [`update_time_dependent_estimator`](@ref) **before** `fit` runs. A schedule step may resolve to an estimator (the fold optimises) or a precomputed result (the fold predicts only); injection never sees a schedule. The loop is [`fold_loop`](@ref), shared with the optimiser-level schemes. The scheme states whether its folds are a timeline through [`folds_are_time_ordered`](@ref). A walk-forward answers `true`, so a pipeline that [`needs_previous_weights`](@ref) runs sequentially and threads the previous fold's weights into the context's `w_prev` and, post-swap, into the optimisation steps via [`factory`](@ref). A [`KFold`](@ref) answers `false`, because its folds are independent of each other. Its folds run in parallel, `w_prev` is `nothing`, and no [`factory`](@ref) pass runs — the same behaviour the optimiser-level `KFold` path already has.
 
-A walk-forward that declares a Fold Fit sends the loop down its online arm: the pipeline is warmed up once on the first training window, each fold's new rows are folded through its steps into the row owner by [`partial_fit!`](@ref), and the fold reads the pipeline out through `fit(pipe)` where a refit would have run, through [`pipeline_fold_fit`](@ref). The run reaches the weights of the batch expanding walk-forward fold for fold, and `Online(pipe)` takes the same door as the declared refit from an input-carrier buffer.
+A walk-forward that declares a Fold Fit sends the loop down its online arm: the pipeline is warmed up once on the first training window, each fold's new rows are folded through its steps into the row owner by [`partial_fit!`](@ref), and the fold reads the pipeline out through `fit(pipe)` where a refit would have run, through [`pipeline_fold_fit`](@ref). The run reaches the weights of the batch expanding walk-forward fold for fold, and `Online(pipe)` goes through the same `cross_val_predict` as the declared refit from a buffer of the input data.
 
 # Arguments
 

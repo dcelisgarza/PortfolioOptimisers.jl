@@ -1061,7 +1061,7 @@ Return a view of one Panel Field over the observations `i` and the assets `j`.
 
 A static Panel Field has no observation axis, so its caller passes a `Colon` for `i`.
 
-**The square case is derived here, by name.** A tensor Panel Field whose labels are the carrier's asset names ([`features_are_assets`](@ref)) is sliced on its label axis by the same asset index, together with its labels and its groups: a group belongs to one label, so the labels that survive keep theirs. Every other field's trailing axis addresses features, and an asset view does not reach it.
+**The square case is derived here, by name.** A tensor Panel Field whose labels are the asset names of the input data ([`features_are_assets`](@ref)) is sliced on its label axis by the same asset index, together with its labels and its groups: a group belongs to one label, so the labels that survive keep theirs. Every other field's trailing axis addresses features, and an asset view does not reach it.
 
 # Algorithm
 
@@ -1072,7 +1072,7 @@ The method that Julia selects is the algorithm, and each kind views its own valu
   - `f`: The Panel Field.
   - `i`: Observation index.
   - `j`: Asset index.
-  - `nx`: The carrier's asset names, or `nothing`. Read for the square case alone.
+  - `nx`: The asset names of the input data, or `nothing`. Read for the square case alone.
 
 # Returns
 
@@ -1139,7 +1139,7 @@ end
 
 Report whether one Panel Field's trailing axis *is* the asset axis, so a view must slice both.
 
-True when a tensor Panel Field's labels equal the asset names, which is what a square phylogeny or adjacency matrix put on a carrier produces: an `assets × assets` block whose labels are "adjacent to asset ``k``". Subselecting assets without also subselecting that axis would leave the columns pointing at the full universe while the rows point at the subset — a silently wrong distance rather than an error.
+True when a tensor Panel Field's labels equal the asset names, which is what a square phylogeny or adjacency matrix put on a `PricesResult` or a `ReturnsResult` produces: an `assets × assets` block whose labels are "adjacent to asset ``k``". Subselecting assets without also subselecting that axis would leave the columns pointing at the full universe while the rows point at the subset — a silently wrong distance rather than an error.
 
 The fact is **derived**, never recorded. Comparing the names rather than the axis lengths is what makes it derivable: a rectangular-by-accident coincidence of counts is not a claim that the two axes mean the same thing, and the comparison stays correct under repeated views, since both name vectors are sliced by the same indices. A numeric or categorical Panel Field has no trailing axis, so it is never square.
 
@@ -1148,13 +1148,13 @@ The fact is **derived**, never recorded. Comparing the names rather than the axi
 The method that Julia selects is the algorithm.
 
  1. The field is not a tensor: return `false`.
- 2. `nx` is `nothing`: return `false`. A carrier that does not name its assets makes no claim.
+ 2. `nx` is `nothing`: return `false`. Input data that does not name its assets makes no claim.
  3. Return `f.labels == nx`.
 
 # Arguments
 
   - `f`: The Panel Field.
-  - `nx`: The carrier's asset names, or `nothing`.
+  - `nx`: The asset names of the input data, or `nothing`.
 
 # Returns
 
@@ -1178,7 +1178,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The Asset Panel: the Panel Fields of one universe, and the two point-in-time universe masks.
 
-The two universe masks are the panel's **defining content**, and the Panel Fields are optional payload. A panel with fields owns their values, so nothing else on a carrier holds a feature matrix, and the Feature Matrix a distance measures is derived from the panel by [`panel_feature_matrix`](@ref) and stored nowhere. A panel with **no** field is the ingestion layer's common case: a caller holding only prices has no market capitalisation and no sector, and the panel states a universe and nothing else. A panel with neither a field nor a mask carries nothing at all and is refused.
+The two universe masks are the panel's **defining content**, and the Panel Fields are optional payload. A panel with fields owns their values, so nothing else on a `PricesResult` or a `ReturnsResult` holds a feature matrix, and the Feature Matrix a distance measures is derived from the panel by [`panel_feature_matrix`](@ref) and stored nowhere. A panel with **no** field is the ingestion layer's common case: a caller holding only prices has no market capitalisation and no sector, and the panel states a universe and nothing else. A panel with neither a field nor a mask carries nothing at all and is refused.
 
 One panel takes one of two shapes, and its type parameters say which.
 
@@ -1464,7 +1464,7 @@ end
 
 Derive the Feature Matrix an [`AssetPanel`](@ref)'s Panel Fields stack into, and name its columns.
 
-A carrier that holds no panel derives nothing, so the `nothing` method answers with two of them and no consumer needs a branch of its own.
+Input data that holds no panel derives nothing, so the `nothing` method answers with two of them and no consumer needs a branch of its own.
 
 Nothing stores the result. A Feature Matrix is what a distance measures, so it is built where it is measured and thrown away after: the panel is the data, and the matrix is one view of it.
 
@@ -1555,7 +1555,7 @@ Return a view of the [`AssetPanel`](@ref) over the observations `i` and the asse
 
 Every Panel Field owns its values, so an asset view reaches them all: the one-argument arity keeps every observation and selects assets, and the three-argument arity selects both. A static panel has no observation axis and ignores the observation index, which is the same asymmetry the two [`port_opt_view`](@ref) arities have for `ivpa`.
 
-`nx` is the carrier's asset names, and it is what makes the **square case** derivable: a tensor Panel Field whose labels are those names is sliced on its label axis by the same asset index. Nothing records the fact, and no carrier carries a flag for it; [`features_are_assets`](@ref) states the comparison.
+`nx` holds the asset names of the input data, and it is what makes the **square case** derivable: a tensor Panel Field whose labels are those names is sliced on its label axis by the same asset index. Nothing records the fact, and no `PricesResult` or `ReturnsResult` holds a flag for it; [`features_are_assets`](@ref) states the comparison.
 
 # Algorithm
 
@@ -1567,7 +1567,7 @@ Every Panel Field owns its values, so an asset view reaches them all: the one-ar
   - `pnl`: The Asset Panel.
   - `i`: Observation index.
   - `j`: Asset index.
-  - `nx`: The carrier's asset names, or `nothing`.
+  - `nx`: The asset names of the input data, or `nothing`.
 
 # Returns
 
@@ -1597,22 +1597,22 @@ end
     check_asset_panel(pnl::Nothing, na, nobs, na_sym) -> nothing
     check_asset_panel(pnl::AssetPanel, na, nobs, na_sym) -> nothing
 
-Check an [`AssetPanel`](@ref) against the asset and observation axes of the carrier that holds it.
+Check an [`AssetPanel`](@ref) against the asset and observation axes of the `PricesResult` or the `ReturnsResult` that holds it.
 
-The panel owns its own values, so this is the only check a carrier owes it: that the universe it describes is the carrier's universe.
+The panel owns its own values, so this is the only check that the input data owes it: that the universe it describes is the universe of the input data.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `pnl` is `nothing`: the carrier has no panel, so there is nothing to check.
+ 1. `pnl` is `nothing`: the input data has no panel, so there is nothing to check.
  2. `pnl` is an [`AssetPanel`](@ref): read its shape from [`panel_axes`](@ref), check the asset axis against `na`, and check the observation axis against `nobs` when the panel is time-varying.
 
 # Arguments
 
   - `pnl`: The Asset Panel, or `nothing`.
-  - `na`: Asset count of the carrier.
-  - `nobs`: Observation count of the carrier.
+  - `na`: Asset count of the input data.
+  - `nobs`: Observation count of the input data.
   - `na_sym`: Symbolic name of the asset axis, displayed in the error messages.
 
 # Validation
@@ -1644,12 +1644,12 @@ function check_asset_panel(pnl::AssetPanel, na::Option{<:Integer}, nobs::Option{
     @argcheck(!isnothing(na),
               IsNothingError("an Asset Panel (pnl) describes a universe, so it needs an asset axis to bind to, but $na_sym is nothing"))
     @argcheck(ax[end] == na,
-              DimensionMismatch("the Panel Fields of an Asset Panel are indexed by asset, so their asset axis must be the carrier's, got $(ax[end]) and $na_sym = $na"))
+              DimensionMismatch("the Panel Fields of an Asset Panel are indexed by asset, so their asset axis must be the asset axis of the input data, got $(ax[end]) and $na_sym = $na"))
     if length(ax) == 2
         @argcheck(!isnothing(nobs),
                   IsNothingError("a time-varying Asset Panel (pnl) has an observation axis to bind to; provide the asset data its observations are parallel to, or pass a static Asset Panel instead"))
         @argcheck(ax[1] == nobs,
-                  DimensionMismatch("a time-varying Asset Panel is observations × assets, so its leading axis must be the carrier's observations, got $(ax[1]) and $nobs observations"))
+                  DimensionMismatch("a time-varying Asset Panel is observations × assets, so its leading axis must be the observation axis of the input data, got $(ax[1]) and $nobs observations"))
     end
     return nothing
 end

@@ -231,7 +231,7 @@ Where:
     ``\\rho_{ij}`` holds and ``Q`` stays positive semidefinite.
   - ``\\rho_{ij,t}``: Correlation, normalised from ``Q``.
 
-A zero seed damps the state, so the read-out removes the damping before it reports:
+A zero seed damps the state, so [`bias_corrected_covariance`](@ref) removes the damping before it reports:
 
 ```math
 \\begin{align}
@@ -1043,14 +1043,14 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Removes the damping a zero seed leaves in the running state, and returns the covariance that
-read-out reports.
+[`regime_adjusted_covariance`](@ref) reports.
 
 The recursion is seeded at zero, and it damps the state by ``1 - \\lambda^{n}`` after `n`
 observations. The correction is a congruence transform, so it restores the scale without moving a
 correlation, and it keeps a positive semidefinite state positive semidefinite. Where `cor_decay`
 opens the separate path, the variance is corrected at `decay`. The correction of the correlation
 state at `cor_decay` is a congruence transform too, so it cancels in the normalisation to a unit
-diagonal, and the read-out normalises the state directly.
+diagonal, and this function normalises the state directly.
 
 # Arguments
 
@@ -1115,7 +1115,7 @@ statistic.
 This block calibrates the smoother and is never reported, so it applies the per-asset variance
 correction alone. Where the separate path runs, the correlation already sits inside
 `cache.covariance` normalised, and its correction for the zero seed cancels in that
-normalisation. [`bias_corrected_covariance`](@ref) is the exact read-out.
+normalisation. [`bias_corrected_covariance`](@ref) makes the exact estimate from the state.
 
 # Arguments
 

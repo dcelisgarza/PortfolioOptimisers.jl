@@ -29,9 +29,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :malg => "`alg`: Moment algorithm.",
                  :pf_n => "`n`: Number of observations folded into the state.",
                  :pf_mu => "`mu`: Running mean of the observations folded into the state, `assets × 1`.",
-                 :pf_M2 => "`M2`: Running second central co-moment accumulator, `assets × assets`. It is the sum over the observations and not the covariance, so a read-out divides it by `n`.",
-                 :pf_M3 => "`M3`: Running third central co-moment accumulator, `assets × assets²`. It is the sum over the observations and not the coskewness, so a read-out divides it by `n`.",
-                 :pfcache => "`cache`: Optional partial-fit state. It is `nothing` until [`partial_fit!`](@ref) writes one, and the estimator's read-out verb reads it when the caller gives no data matrix. Each propagation channel does one thing with it: [`factory`](@ref) carries it unchanged, because a factory call resolves configuration rather than the sample; [`port_opt_view`](@ref) slices it to the selected assets by index copy, so the viewed estimator answers over those assets alone; and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. That channel is open only on a type with an observation-weights field, and a type with none falls through to the identity, so its state is carried. A family whose state has no exact asset slice drops it on both axes and names the reason.",
+                 :pf_M2 => "`M2`: Running second central co-moment accumulator, `assets × assets`. It is the sum over the observations and not the covariance, so the call with no data divides it by `n`.",
+                 :pf_M3 => "`M3`: Running third central co-moment accumulator, `assets × assets²`. It is the sum over the observations and not the coskewness, so the call with no data divides it by `n`.",
+                 :pfcache => "`cache`: Optional partial-fit state. It is `nothing` until [`partial_fit!`](@ref) writes one, and the estimator's batch verb reads it when the caller gives no data matrix. Each propagation channel does one thing with it: [`factory`](@ref) carries it unchanged, because a factory call resolves configuration rather than the sample; [`port_opt_view`](@ref) slices it to the selected assets by index copy, so the viewed estimator answers over those assets alone; and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. That channel is open only on a type with an observation-weights field, and a type with none falls through to the identity, so its state is carried. A family whose state has no exact asset slice drops it on both axes and names the reason.",
                  :cvg => "`cvg`: Optional [`CoveragePolicy`](@ref). `nothing` is the reduce-and-expand path of the Coverage Universe, in which an asset that is non-finite or inactive at any observation of the window is `NaN` throughout the answer. A policy replaces it by available-case estimation: every cell is fitted on the observations at which the assets of that cell are all finite and active, each cell carries its own denominator, and an asset reaches the answer where [`admits`](@ref) says so.",
                  :pf_cvg => "`cvg`: Optional [`CoverageCounts`](@ref), the per-cell denominators and per-asset bookkeeping of an available-case fold. It is `nothing` when the estimator carries no [`CoveragePolicy`](@ref), so the plain state costs nothing.",
                  :corrected => "`corrected`: Whether to apply Bessel's correction.",#
@@ -58,7 +58,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :rf_horizon => "`horizon`: Number of forward observations the target of the fit averages over.",#
                  :rf_lag => "`lag`: Number of observations between the scored observation and the first return of its target window.",#
                  :cs_ties => "`ties`: Rule that ranks the equal values of a cross-section. `:average` gives each value of a tie the mean of the positions the tie takes, so a rank correlation does not read the order of the assets, and a constant cross-section has no rank correlation. `:ordinal` gives the values of a tie consecutive positions, in the order of the asset axis. The two rules give the same ranks to a cross-section with no tie.",#
-                 :rf_whole_history => "`whole_history`: Whether the fit reads the whole carrier, with the block's histories placed into the rows they were fitted on, rather than the block's rows alone.",#
+                 :rf_whole_history => "`whole_history`: Whether the fit reads every observation of the returns data, with the block's histories placed into the rows they were fitted on, rather than the block's rows alone.",#
                  :crit => "`crit`: Factor selection criterion. A [`PValue`](@ref), or a `Val` of one symbol of [`STEPWISE_REGRESSION_CRITERIA`](@ref).",#
                  :r2variant => "`variant`: Name of the pseudo-``R^2`` variant a maximisation criterion reads, or `nothing` to take the default of the criterion.",#
                  :realg => "`alg`: Regression algorithm.",#
@@ -93,7 +93,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :fcalg => "`alg`: Feature collapse algorithm, used to reduce a window of time-varying features to a single distance matrix. Inert for a 2-D feature matrix.",#
                  :calg => "`alg`: Collapse algorithm, the aggregator applied along the observation axis.",#
                  :fdsim => "`sim`: Similarity matrix algorithm used to derive the similarity counterpart of the feature distance matrix.",#
-                 :fdape => "`ape`: Asset Panel producer, or `nothing` to read the panel the data carrier holds. A producer is configuration: it builds a static panel at the point of use, from the prior result and the returns of the subproblem that runs it, so a view passes it through and a fold refits it.",#
+                 :fdape => "`ape`: Asset Panel producer, or `nothing` to read the panel that the returns data holds. A producer is configuration: it builds a static panel at the point of use, from the prior result and the returns of the subproblem that runs it, so a view passes it through and a fold refits it.",#
                  :fdsel => "`sel`: Feature Selector naming the Panel Fields the Feature Matrix stacks, or `nothing` to stack every field's values. An entry is a field name, a field paired with the levels or labels it keeps, a field paired with one level or label, or a field paired with `:observed`. The vector order is the column order.",#
                  :fdstrict => "`strict`: Whether a `sel` entry naming a field, a level or a label the Asset Panel does not hold throws instead of warning and being dropped.",#
                  :fdrows => "`rows`: The observation rows a time-varying Asset Panel stacks, as positions or as a `Bool` mask, and `Colon()` for every row. A static panel has no observation axis and refuses any other value.",#
@@ -107,7 +107,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :sk => "`sk`: Coskewness matrix `assets × assets^2`.",#
                  :V => "`V`: Sum of the negative spectral slices of the coskewness matrix `assets × assets`.",
                  :X => "`X`: Data matrix `observations × assets` if the `dims` keyword does not exist or `dims = 1`, `assets × observations` when `dims = 2`.",#
-                 :o_X => "`o_X`: The returns matrix the caller supplied, kept only when the carrier's own `X` is not it, and `nothing` otherwise. The three estimators that lift a factor-axis prior onto the asset axis overwrite `X` with the reconstruction `F * transpose(M) .+ transpose(b)`; `o_X` is the asset returns they were handed, over the same observations and the same assets. Read it as `original_X`, which is always a matrix, rather than as this field.",#
+                 :o_X => "`o_X`: The returns matrix the caller supplied, kept only when the prior result's own `X` is not it, and `nothing` otherwise. The three estimators that lift a factor-axis prior onto the asset axis overwrite `X` with the reconstruction `F * transpose(M) .+ transpose(b)`; `o_X` is the asset returns they were handed, over the same observations and the same assets. Read it as `original_X`, which is always a matrix, rather than as this field.",#
                  :F => "`F`: Data matrix `observations × factors` if the `dims` keyword does not exist or `dims = 1`, `factors × observations` when `dims = 2`.",#
                  :Xv => "`X`: Data vector `observations × 1`.",#
                  :X_sub => "`X`: Returns matrix of the subproblem, `observations × assets`.",#
@@ -125,7 +125,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :beta => "`beta`: Quantile level for the upper tail. The bound is [`Num_SigCal`](@ref), so the slot takes the level itself, an [`AbstractSignificanceCalibrationAlgorithm`](@ref) that computes it from the prior result, or a plain function of the same five arguments.",#
                  # Risk-free rate.
                  :rf => "`rf`: Risk-free rate.",#
-                 # Data carrier fields.
+                 # Fields of the returns data and the price data.
                  :ivpa_iv => "`ivpa`: Implied volatility risk premium adjustment, a positive number that every asset shares, or a vector of positive numbers with one entry per asset.",#
                  # Cross-sectional transforms.
                  :min_group_size => "`min_group_size`: Smallest estimation set a group may carry and still be estimated from. A group below it, and every asset that carries no group, takes the whole observation's statistics instead.",#
@@ -186,12 +186,12 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :schalg => "`alg`: Algorithm that chooses the value of `gamma` that the allocation runs at.",#
                  # Partial fit states.
                  :pf_M => "`M`: Running second-moment accumulator of the observations folded into the state, about `mu`.",
-                 :pf_max_history => "`max_history`: Optional cap on the number of observations the buffer keeps. `nothing` keeps every observation folded so far. A capped buffer drops its oldest observations as new ones arrive and holds the last `max_history` of them. A read-out over the buffer reads those rows only. The cap is the window of the fit. An estimator wrapped in [`Online`](@ref) returns the batch fit over the last `max_history` observations, also when its statistic has an exact update.",#
+                 :pf_max_history => "`max_history`: Optional cap on the number of observations the buffer keeps. `nothing` keeps every observation folded so far. A capped buffer drops its oldest observations as new ones arrive and holds the last `max_history` of them. The call with no data reads those rows only. The cap is the window of the fit. An estimator wrapped in [`Online`](@ref) returns the batch fit over the last `max_history` observations, also when its statistic has an exact update.",#
                  :pf_nx_pinned => "`nx`: The names of the asset columns, which the first block pins.",#
                  # The masks of a returns buffer.
-                 :pf_buffer_A => "`A`: Backing matrix of the active mask, of the shape of `X`, or `nothing` when the buffer records no activity. Rows `off + 1` to `off + n` are the mask of the observations, cell for cell with them. It is fixed by the first append, and it is what lets a read-out tell a delisting from a holiday.",#
+                 :pf_buffer_A => "`A`: Backing matrix of the active mask, of the shape of `X`, or `nothing` when the buffer records no activity. Rows `off + 1` to `off + n` are the mask of the observations, cell for cell with them. It is fixed by the first append, and it is what lets the call with no data tell a delisting from a holiday.",#
                  :pf_buffer_E => "`E`: Backing matrix of the estimation mask, of the shape of `X`, or `nothing` when the buffer records none. It is the second per-observation mask the batch verbs take, it is carried on the same terms as `A`, and only the two regime-adjusted families read it.",#
                  :pf_active_mask => "`active_mask`: The active mask of the block, of the shape of `X`, or `nothing`. A buffer records it for every observation it holds or for none of them.",#
                  :pf_estimation_mask => "`estimation_mask`: The estimation mask of the block, of the shape of `X`, or `nothing`. It is carried on the same terms as `active_mask`.",#
                  # The price gap fill.
-                 :strict_span => "`strict`: If `true`, a window with a gap from a price carrier that states no Listing Span raises an `ArgumentError`. If `false`, it issues a warning.")
+                 :strict_span => "`strict`: If `true`, a window with a gap from a `PricesResult` that states no Listing Span raises an `ArgumentError`. If `false`, it issues a warning.")

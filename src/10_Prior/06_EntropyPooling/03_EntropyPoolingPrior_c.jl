@@ -574,7 +574,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole, on the same reasoning as the
-    # note at the same seam in `MeucciEntropyPoolingPrior`'s `ep_prior`.
+    # note at the same step in `MeucciEntropyPoolingPrior`'s `ep_prior`.
     (; X, o_X, mu, sigma, chol, rr, fpr) = pr
     ens = exp(StatsBase.entropy(w1))
     kld = StatsBase.kldivergence(w1, w0)
@@ -622,7 +622,7 @@ Compute entropy pooling prior moments with tail views, enforcing every view in o
 function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
                   F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing;
                   strict::Bool = false, kwargs...)
-    # See the note at the same seam in the staged method: the nested prior is fitted
+    # See the note at the same step in the staged method: the nested prior is fitted
     # first, and the prior probabilities are read on the rows it answered. ADR 0116.
     pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     w0 = ep_prior_probabilities(pe.w, pr, size(X, 1))
@@ -634,7 +634,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
         pe = factory(pe, w0)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
-    # See the note at the same seam in the staged method: every row is built on the
+    # See the note at the same step in the staged method: every row is built on the
     # investable columns, because `0 * NaN` is `NaN`. ADR 0115 and ADR 0125.
     imsk, vsets, ni = investable_views(pr, pe.sets)
     led = String[]
@@ -680,7 +680,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole, on the same reasoning as the
-    # note at the same seam in `MeucciEntropyPoolingPrior`'s `ep_prior`.
+    # note at the same step in `MeucciEntropyPoolingPrior`'s `ep_prior`.
     (; X, o_X, mu, sigma, chol, rr, fpr) = pr
     ens = exp(StatsBase.entropy(w1))
     kld = StatsBase.kldivergence(w1, w0)

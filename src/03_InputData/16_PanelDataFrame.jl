@@ -92,7 +92,7 @@ end
 
 Convert the asset labels that a [`panel_dataframe`](@ref) call names into positions on the asset axis of the panel.
 
-The panel holds no asset names. Its Panel Fields share an asset axis, and the carrier that holds the panel names that axis. So the caller gives the names in `nx`, and this function finds the position of each label in `nx`. The functions that write the table slice every slab at these positions.
+The panel holds no asset names. Its Panel Fields share an asset axis, and the `PricesResult` or the `ReturnsResult` that holds the panel names that axis. So the caller gives the names in `nx`, and this function finds the position of each label in `nx`. The functions that write the table slice every slab at these positions.
 
 # Algorithm
 
@@ -435,7 +435,7 @@ Convert an [`AssetPanel`](@ref) to a `DataFrames.DataFrame`.
 
 The library has no file format for a panel. To save, plot or share a panel, convert it to a table with this function, and write the table with a package that reads a `DataFrame`, for example CSV.jl or Arrow.jl.
 
-The panel holds no asset names and no observation labels, because the carrier that holds the panel names them. So the caller gives them in `nx` and `ts`. When one of them is `nothing`, the table names each entry by its position on the axis.
+The panel holds no asset names and no observation labels, because the `PricesResult` or the `ReturnsResult` that holds the panel names them. So the caller gives them in `nx` and `ts`. When one of them is `nothing`, the table names each entry by its position on the axis.
 
 The table has one of three shapes:
 

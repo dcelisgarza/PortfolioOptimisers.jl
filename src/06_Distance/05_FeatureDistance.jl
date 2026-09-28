@@ -1121,7 +1121,7 @@ end
 
 Stack the Feature Matrix a [`FeatureDistance`](@ref) measures, from the panel its `ape` slot resolves.
 
-One site resolves the panel. Under a `nothing` producer, `asset_panel(de.ape, pr, rd, X)` returns the panel that the carrier holds, and otherwise it builds one. The panel method of [`feature_matrix`](@ref) then stacks the columns that `de.sel` names, over the observation rows that `de.alg` reads. The kernel calls this method, and [`feature_labels`](@ref) resolves the panel through the same call, so the labels that a caller rebuilds name the columns that the kernel measured.
+One site resolves the panel. Under a `nothing` producer, `asset_panel(de.ape, pr, rd, X)` returns the panel that the [`ReturnsResult`](@ref) holds, and otherwise it builds one. The panel method of [`feature_matrix`](@ref) then stacks the columns that `de.sel` names, over the observation rows that `de.alg` reads. The kernel calls this method, and [`feature_labels`](@ref) resolves the panel through the same call, so the labels that a caller rebuilds name the columns that the kernel measured.
 
 The collapse algorithm names the rows, through [`collapse_rows`](@ref). Under [`LastObservation`](@ref), a time-varying panel stacks its last observation alone, `1 × assets × features`, which is the slice that the collapse measures. Every other collapse stacks every observation.
 
@@ -1168,7 +1168,7 @@ Name each column of the Feature Matrix a [`FeatureDistance`](@ref) measures.
 
 It is the sibling of [`feature_matrix`](@ref). It resolves the panel and the selector the same way, so the two agree by construction. A label is the selector entry that selects exactly that column, so the label vector is itself a selector that rebuilds the matrix. A caller who asks *what was measured* needs exactly that.
 
-The kernel never calls it, and no clustering or phylogeny result records the labels, because the estimator and the carriers derive them without a distance computation. A caller who wants them calls `feature_labels(de, res.pr, rd, rd.X)` with the arguments the optimiser received.
+The kernel never calls it, and no clustering or phylogeny result records the labels, because the estimator, `pr` and `rd` derive them without a distance computation. A caller who wants them calls `feature_labels(de, res.pr, rd, rd.X)` with the arguments the optimiser received.
 
 # Algorithm
 
@@ -1205,11 +1205,11 @@ end
 """
     distance(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
 
-Compute the distance matrix of the Feature Matrix that [`feature_matrix`](@ref) stacks from the carriers, for the clustering and network estimators.
+Compute the distance matrix of the Feature Matrix that [`feature_matrix`](@ref) stacks from `pr` and `rd`, for the clustering and network estimators.
 
 Every consumer in the clustering and network stack calls `cor_and_dist(de, ce, X; …)` or `distance(de, pl, X; …)`, and passes a covariance estimator and a returns matrix. [`logo!`](@ref) passes a similarity matrix in place of the covariance estimator, so the second positional is typed `::Any` rather than bounded. [`FeatureDistance`](@ref) does not read that positional. It **does** read `X`, because a producer measures it.
 
-The two carriers come in the keyword tail as `pr` and `rd`, and [`feature_matrix`](@ref) resolves the panel from them and from `de.ape`. A forwarder that takes a prior result passes both. Preselection passes `rd` alone.
+The prior result and the returns data come in the keyword tail as `pr` and `rd`, and [`feature_matrix`](@ref) resolves the panel from them and from `de.ape`. A forwarder that takes a prior result passes both. Preselection passes `rd` alone.
 
 **This method ignores `dims` and calls the kernel with `dims = 1`.** The ambient `dims` describes the returns matrix `X`, and a stacked Feature Matrix is assets-major whatever `dims` says. `dims` has a meaning only at the raw-matrix entry point `distance(de, Z; dims)`.
 
@@ -1252,9 +1252,9 @@ end
 """
     cor_and_dist(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
 
-Compute the similarity and distance matrices of the Feature Matrix that [`feature_matrix`](@ref) stacks from the carriers, for the clustering and network estimators.
+Compute the similarity and distance matrices of the Feature Matrix that [`feature_matrix`](@ref) stacks from `pr` and `rd`, for the clustering and network estimators.
 
-This is the form that [`clusterise`](@ref) and the network estimators call. It reads its arguments as the three-argument [`distance`](@ref) method does: the second positional is ignored, `X` reaches a producer, the carriers `pr` and `rd` resolve the panel, and `dims` is ignored.
+This is the form that [`clusterise`](@ref) and the network estimators call. It reads its arguments as the three-argument [`distance`](@ref) method does: the second positional is ignored, `X` reaches a producer, `pr` and `rd` resolve the panel, and `dims` is ignored.
 
 # Algorithm
 

@@ -992,7 +992,7 @@ end
 
 Solves the budgeted path programme of [`BudgetedHindsightPath`](@ref) over the rows of `rd`.
 
-[`optimise`](@ref) is the door, and it walks `est.fb` on a failure. The value of a variable fixed at zero is the solver's zero, so the fit writes an exact zero at every entry outside a row's mask.
+Every call reaches this method through [`optimise`](@ref), which walks `est.fb` on a failure. The value of a variable fixed at zero is the solver's zero, so the fit writes an exact zero at every entry outside a row's mask.
 
 # Algorithm
 

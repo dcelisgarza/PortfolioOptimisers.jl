@@ -92,7 +92,7 @@ Computes the rank-one covariance of a window of returns, `assets × assets`.
  3. Subtract the column means from `Xs`, and sum the squares of the result. The sum `trD` is the trace of the scatter matrix.
  4. Compute the singular value decomposition of `Xs`. Take `theta`, the square of the largest singular value, and `u`, its right singular vector.
  5. Compute `zeta = theta * sqrt(N * (w - 1) / trD)`. When every row of `Xs` is the same, or when `trD` is zero, `zeta` is zero. The method compares the rows, because the column means of equal rows carry round-off, and `trD` of a constant window is often a tiny positive number.
- 6. Return `zeta .* (u .* transpose(u))`. The method forms the outer product entry by entry, so the matrix is symmetric to the bit.
+ 6. Return `zeta .* (u .* transpose(u))`. The method forms the outer product entry by entry, so the matrix is exactly symmetric.
 
 # Arguments
 
@@ -134,7 +134,7 @@ function Statistics.cov(ce::RankOneCovariance, X::MatNum; dims::Int = 1, kwargs.
     else
         theta * sqrt(N * (w - 1) / trD)
     end
-    # Entry by entry, so the product is symmetric to the bit and a consumer's Hermitian check
+    # Entry by entry, so the product is exactly symmetric and a consumer's Hermitian check
     # holds; a matrix product need not be.
     return zeta .* (u .* transpose(u))
 end

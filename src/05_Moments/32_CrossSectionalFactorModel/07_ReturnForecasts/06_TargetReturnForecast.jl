@@ -9,7 +9,7 @@ The member transforms the target of the fit cross-sectionally before the fit rea
 
 The member computes no history. Its in-sample predictions are not a forecast, so `hist` on its Result is `nothing`.
 
-`whole_history` states the rows the fit trains on. Under `true` the member places the block's idiosyncratic returns into the rows of the carrier they were fitted on. Every pair with a finite score, a finite target and a positive weight is then one sample, so a signal row before the block whose forward window reaches into the block trains the model too. Under `false` the fit trains on the block's rows alone. The calibration reads the idiosyncratic variance at the signal row, and a row before the block has none, so such a row never enters the calibration. In [`IdiosyncraticSharpeUnit`](@ref) the target reads that variance too, so a row before the block trains nothing, and the two values of `whole_history` fit the same model.
+`whole_history` states the rows the fit trains on. Under `true` the member places the block's idiosyncratic returns into the rows of the returns data they were fitted on. Every pair with a finite score, a finite target and a positive weight is then one sample, so a signal row before the block whose forward window reaches into the block trains the model too. Under `false` the fit trains on the block's rows alone. The calibration reads the idiosyncratic variance at the signal row, and a row before the block has none, so such a row never enters the calibration. In [`IdiosyncraticSharpeUnit`](@ref) the target reads that variance too, so a row before the block trains nothing, and the two values of `whole_history` fit the same model.
 
 # Mathematical definition
 
@@ -671,18 +671,18 @@ Put the scores of a [`TargetReturnForecast`](@ref) and the histories it fits on 
 
 # Algorithm
 
- 1. `whole_history` is set: the function keeps the scores, the weights and the group labels on the carrier's axis. It places the two block histories into the block's rows through [`return_forecast_pad`](@ref). A row before the block carries a `NaN` idiosyncratic return, so it states a target only where its forward window reaches into the block.
+ 1. `whole_history` is set: the function keeps the scores, the weights and the group labels on the axis of the returns data. It places the two block histories into the block's rows through [`return_forecast_pad`](@ref). A row before the block carries a `NaN` idiosyncratic return, so it states a target only where its forward window reaches into the block.
  2. `whole_history` is not set: the function cuts the scores, the weights and the group labels to the block's rows through [`return_forecast_cut`](@ref). The two block histories are already on those rows.
 
 # Arguments
 
   - $(arg_dict[:rf_whole_history])
-  - `S`: The Descriptor scores, `observations × assets × descriptors`, on the carrier's axis.
+  - `S`: The Descriptor scores, `observations × assets × descriptors`, on the axis of the returns data.
   - `eps`: Idiosyncratic returns of the block, `observations × assets`.
   - `vs`: Idiosyncratic variance history of the block, `observations × assets`, or `nothing`.
-  - `w`: Cross-sectional weights, `observations × assets`, on the carrier's axis.
-  - `groups`: Group label matrix on the carrier's axis, or `nothing`.
-  - `rows`: The rows of the carrier the block lives on.
+  - `w`: Cross-sectional weights, `observations × assets`, on the axis of the returns data.
+  - `groups`: Group label matrix on the axis of the returns data, or `nothing`.
+  - `rows`: The rows of the returns data the block lives on.
 
 # Returns
 
@@ -715,7 +715,7 @@ Fit a Return Forecast with a regression target over every observation and asset 
 
 # Algorithm
 
- 1. Compute the Descriptor scores `S` over the whole carrier through [`descriptor_scores`](@ref), and read the idiosyncratic returns off the block. Read the variances through [`target_forecast_variances`](@ref), which states when the member needs them.
+ 1. Compute the Descriptor scores `S` over all the returns data through [`descriptor_scores`](@ref), and read the idiosyncratic returns off the block. Read the variances through [`target_forecast_variances`](@ref), which states when the member needs them.
  2. Put the scores and the two block histories on one observation axis through [`target_forecast_alignment`](@ref), which reads `whole_history`.
  3. Take the forward mean target `fwd` through [`forward_mean_returns`](@ref). Convert it to the Forecast Unit through [`forecast_unit_target`](@ref), and pass it through `target_outlier` and then `target_scoring`, giving `y`.
  4. Count the observations whose target has matured, all but the last `lag + horizon - 1`, giving `nt`. Flatten them into one sample per `(observation, asset)` pair through [`target_forecast_samples`](@ref), giving `Sf`, `yf` and `ok`.

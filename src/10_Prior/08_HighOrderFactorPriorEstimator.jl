@@ -405,7 +405,7 @@ Compute high order factor prior moments for asset returns using a factor model.
 
     The co-moments are computed from `F` as supplied, so they always describe the **pre-view** factor distribution, whichever Black-Litterman member is underneath. Where that member reports a *posterior* factor block — [`FactorBlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) — the nested `fpr` therefore mixes orders: `fpr.mu` and `fpr.sigma` carry the views, `fpr.kt`, `fpr.sk` and `fpr.V` do not. The `fpr.pr === pr.fpr` invariant still holds, because both routes reach the same posterior low order block; what differs is the order at which the views stop.
 
-    This is a consequence of Black-Litterman having no higher-moment update to apply, not of a value being discarded, and it is the same under [`BlackLittermanPrior`](@ref) — where the low order factor block is pre-view too, so the carrier happens to be uniform.
+    This is a consequence of Black-Litterman having no higher-moment update to apply, not of a value being discarded, and it is the same under [`BlackLittermanPrior`](@ref) — where the low order factor block is pre-view too, so the prior result happens to be uniform.
 
 # Mathematical definition
 
@@ -434,7 +434,7 @@ The factor comoments come from `pe.kte` and `pe.ske` fit on `F`, so a non-defaul
 # Algorithm
 
  1. Orient `X` and `F` to `observations × variables` with [`dims_oriented`](@ref).
- 2. Compute the low order block `pr` with `pe.pe`, and check that it carries a regression result. Derive the Investable Mask from it with [`investable_mask`](@ref), and reduce the whole carrier to the investable universe with [`port_opt_view`](@ref), giving `rpr`; `X` is an argument rather than a block of the carrier, so it is cut alongside as `Xr`. Take the reconstructed returns `posterior_X = rpr.X` and the loadings `M = rpr.rr.M`. The `nothing` sentinel of an all-investable universe reduces nothing, and every step below then runs on the carrier itself. The reduction happens **before** the lift because the lift squares the reach of a non-investable asset: one `NaN` loading row makes a whole `NaN` band of `kron(M, M)`, and the projection carries it across most of the cokurtosis, where [`posdef!`](@ref) refuses it in the name of LAPACK rather than of the asset.
+ 2. Compute the low order block `pr` with `pe.pe`, and check that it carries a regression result. Derive the Investable Mask from it with [`investable_mask`](@ref), and reduce the whole prior result to the investable universe with [`port_opt_view`](@ref), giving `rpr`; `X` is an argument rather than a block of the prior result, so it is cut alongside as `Xr`. Take the reconstructed returns `posterior_X = rpr.X` and the loadings `M = rpr.rr.M`. The `nothing` sentinel of an all-investable universe reduces nothing, and every step below then runs on `pr` itself. The reduction happens **before** the lift because the lift squares the reach of a non-investable asset: one `NaN` loading row makes a whole `NaN` band of `kron(M, M)`, and the projection carries it across most of the cokurtosis, where [`posdef!`](@ref) refuses it in the name of LAPACK rather than of the asset.
  3. Compute the factor square cokurtosis `f_kt` with `pe.kte` on `F`. When it exists, build `kM = kron(M, M)`, project `posterior_kt = kM * f_kt * transpose(kM)`, and process it with `pe.kte.mp`.
  4. Compute the factor coskewness `f_sk` and its negative spectral form `f_V` with `pe.ske` on `F`. When `f_sk` exists, build `kM` if step 3 did not, and project `posterior_sk = M * f_sk * transpose(kM)`.
  5. Build the structure matrices with [`dup_elim_sum_matrices`](@ref), twice: at the **full** asset count for `D2`, `L2` and `S2`, and at the factor count for `f_D2`, `f_L2` and `f_S2`. The asset count is the full one because step 12 expands the co-moments, and the constructor validates the triple against `length(pr.mu)`. The all-or-none rule is the one `prior(::HighOrderPriorEstimator, …)` applies, at both dimensions.
@@ -445,8 +445,8 @@ The factor comoments come from `pe.kte` and `pe.ske` fit on `F`, so a non-defaul
 10. Still under `pe.rsd`, add [`cokurtosis_residuals`](@ref)`(sigma, err, pe.kte.me, pe.ex)` to `posterior_kt`, and re-condition the sum with [`posdef!`](@ref) under `pe.kte.mp.pdm`.
 11. When step 4 produced a `posterior_sk`, recompute `posterior_V` from it with [`negative_spectral_coskewness`](@ref), so `V` describes the corrected coskewness rather than the projected one.
 12. Expand `posterior_kt`, `posterior_sk` and `posterior_V` back to the full asset universe with [`expand_moment`](@ref), `NaN` outside the investable block. `V` is expanded rather than recomputed, because it is a spectral quantity of the reduced coskewness and the frame carries no reduced returns to rebuild it from. The all-investable sentinel needs no branch of its own: [`expand_moment`](@ref) on a `nothing` mask hands the block straight back, at every one of its arities.
-13. Build the nested factor carrier `fpr` over `pr.fpr`, from the factor moments of steps 3 to 5. It is `nothing` when neither `f_kt` nor `f_sk` exists. The factor block is untouched by steps 2 and 12: `i` indexes assets, and these co-moments live on the factor axis.
-14. Assemble the asset [`HighOrderPrior`](@ref) through its keyword constructor, over the **full** `pr` rather than the reduced `rpr`, so the carrier lives on the full asset universe as the contract requires.
+13. Build the nested factor prior result `fpr` over `pr.fpr`, from the factor moments of steps 3 to 5. It is `nothing` when neither `f_kt` nor `f_sk` exists. The factor block is untouched by steps 2 and 12: `i` indexes assets, and these co-moments live on the factor axis.
+14. Assemble the asset [`HighOrderPrior`](@ref) through its keyword constructor, over the **full** `pr` rather than the reduced `rpr`, so the prior result lives on the full asset universe as the contract requires.
 
 Steps 9 and 10 are ordered, not independent. [`cokurtosis_residuals`](@ref) is defined on the systematic covariance, so step 9 has to undo the residual block that the wrapped estimator's own lift added before step 10 adds the residual cokurtosis.
 
@@ -467,7 +467,7 @@ Steps 9 and 10 are ordered, not independent. [`cokurtosis_residuals`](@ref) is d
 
 # Returns
 
-  - `pr::HighOrderPrior`: Result object containing asset returns, mean, covariance, coskewness tensor, cokurtosis tensor, and factor moments, on the **full** asset universe. An asset the wrapped prior could not estimate carries `NaN` in `mu`, on the diagonal of `sigma`, and at every fourth-moment index that names it in `kt`, `sk` and `V` — the carrier [`HighOrderPriorEstimator`](@ref) makes on the same gapped panel, which [`port_opt_view`](@ref) slices clean. Its `fpr` is a nested [`HighOrderPrior`](@ref) built over the wrapped prior's own factor block, so `fpr.pr === pr.fpr`: the factor co-moments and the low order factor moments describe one distribution, reachable by either route.
+  - `pr::HighOrderPrior`: Result object containing asset returns, mean, covariance, coskewness tensor, cokurtosis tensor, and factor moments, on the **full** asset universe. An asset the wrapped prior could not estimate carries `NaN` in `mu`, on the diagonal of `sigma`, and at every fourth-moment index that names it in `kt`, `sk` and `V` — the prior result that [`HighOrderPriorEstimator`](@ref) makes on the same gapped panel, which [`port_opt_view`](@ref) slices clean. Its `fpr` is a nested [`HighOrderPrior`](@ref) built over the wrapped prior's own factor block, so `fpr.pr === pr.fpr`: the factor co-moments and the low order factor moments describe one distribution, reachable by either route.
 
 # Related
 
@@ -510,8 +510,8 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
     # sentinel, and it takes the path this estimator always took.
     #
     # `port_opt_view` cuts every block the lift reads — `X`, `mu`, `sigma`, and `rr` on its
-    # asset axis — but the caller's `X` is an argument rather than a block of the carrier, so
-    # it is cut here alongside, on the same index.
+    # asset axis — but the caller's `X` is an argument rather than a block of the prior
+    # result, so it is cut here alongside, on the same index.
     #
     # A branch, where the expansion below is dispatch. The mask is a *value*, and
     # `investable_mask` is inferred `Union{Nothing, BitVector}`, so a `(::Nothing, …)`/
@@ -542,10 +542,12 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
         posterior_sk = M * f_sk * transpose(kM)
     end
     # The same all-or-none branching the asset block gets, at the factor dimension: the
-    # nested carrier validates its own `kt`/`L2`/`S2` triple against `length(pr.fpr.mu)`.
+    # nested prior result validates its own `kt`/`L2`/`S2` triple against
+    # `length(pr.fpr.mu)`.
     # The structure matrices are sized from the *full* asset count, not from the reduced
-    # `posterior_X`: the co-moments are expanded before the carrier is assembled, so the
-    # triple the constructor validates against `length(pr.mu)` has to describe that width.
+    # `posterior_X`: the co-moments are expanded before the prior result is assembled, so
+    # the triple the constructor validates against `length(pr.mu)` has to describe that
+    # width.
     if !isnothing(f_kt) && !isnothing(f_sk)
         D2, L2, S2 = dup_elim_sum_matrices(length(pr.mu))
         f_D2, f_L2, f_S2 = dup_elim_sum_matrices(size(F, 2))
@@ -594,7 +596,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
     end
     # The expansion, the second half of the contract. Every asset-side co-moment goes back
     # into a `NaN` frame of the full width through the same [`expand_moment`](@ref) the
-    # moment estimators use, so this estimator's carrier is the one
+    # moment estimators use, so this estimator's prior result is the one
     # [`HighOrderPriorEstimator`](@ref) makes on the same gapped panel — the fourth-moment
     # index of a non-investable asset is `NaN` and nothing else is — and `port_opt_view`
     # slices it clean again. `V` is expanded rather than recomputed: it is a spectral

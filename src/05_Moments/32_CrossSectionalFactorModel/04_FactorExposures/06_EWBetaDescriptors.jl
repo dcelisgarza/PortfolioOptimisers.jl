@@ -761,7 +761,7 @@ end
 """
     descriptor(de::EWBeta, rd::ReturnsResult) -> Matrix{<:Real}
 
-Compute an exponentially weighted market beta Descriptor from a carrier.
+Compute an exponentially weighted market beta Descriptor from a [`ReturnsResult`](@ref).
 
 # Algorithm
 
@@ -1089,7 +1089,7 @@ end
     descriptor(de::EWMacroSensitivity, rd::ReturnsResult;
                ref::Option{<:AbstractVector{<:Real}} = nothing) -> Matrix{<:Real}
 
-Compute an exponentially weighted macro sensitivity Descriptor from a carrier and a reference series.
+Compute an exponentially weighted macro sensitivity Descriptor from a [`ReturnsResult`](@ref) and a reference series.
 
 # Algorithm
 
@@ -1341,7 +1341,7 @@ end
 """
     descriptor(de::EWDownsideBeta, rd::ReturnsResult) -> Matrix{<:Real}
 
-Compute an exponentially weighted downside beta Descriptor from a carrier.
+Compute an exponentially weighted downside beta Descriptor from a [`ReturnsResult`](@ref).
 
 # Algorithm
 

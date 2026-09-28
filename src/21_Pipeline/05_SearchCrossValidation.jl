@@ -249,7 +249,7 @@ function search_cross_validation(pipe::Pipeline, gscv::GridSearchCrossValidation
             # The window is `nothing` here: a Pipeline's steps transform the data per
             # fold, so the returns the optimiser was handed are not the returns the split
             # names. See [`candidate_train_score`](@ref), whose `Nothing` arm scores
-            # through the carrier, which is what every arm did before.
+            # through the prior result, which is what every arm did before.
             write_candidate_scores!(test_scores, train_scores, i, predictions, rows,
                                     nothing, r, sgn, gscv.kwargs)
         end

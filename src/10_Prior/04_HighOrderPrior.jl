@@ -534,7 +534,7 @@ Answer with three `nothing`s when the first argument is not a matrix.
 
 The fallback of [`dup_elim_sum_view`](@ref). It builds nothing and reads none of its arguments; the matrix method is the one that calls [`dup_elim_sum_matrices`](@ref).
 
-Its two call sites are in [`port_opt_view`](@ref) on a [`HighOrderPrior`](@ref), which passes `pr.kt` as the first argument. No estimator in the library builds a carrier that reaches this method: `sk` and `V` travel together, and `kt`, `L2` and `S2` do too, so a carrier holding any of them holds `kt`. A hand-built carrier can — `D2` is the one moment field the constructor accepts on its own — and it is the case this method answers.
+Its two call sites are in [`port_opt_view`](@ref) on a [`HighOrderPrior`](@ref), which passes `pr.kt` as the first argument. No estimator in the library builds a `HighOrderPrior` that reaches this method: `sk` and `V` travel together, and `kt`, `L2` and `S2` do too, so a `HighOrderPrior` holding any of them holds `kt`. A hand-built `HighOrderPrior` can — `D2` is the one moment field the constructor accepts on its own — and it is the case this method answers.
 
 This is a varargs fallback, so it also answers any call whose argument count the matrix method does not take. `dup_elim_sum_view(M, n)` reaches the matrix method for a matrix `M`; `dup_elim_sum_view(M, n, extra)` reaches this one.
 
@@ -564,7 +564,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute duplication, elimination, and summation matrices at the dimension the caller names.
 
-Overload of [`dup_elim_sum_view`](@ref) for a matrix first argument. **The matrix is read for dispatch alone**, and the dimension is the second argument `n`, not `size` of the matrix. [`port_opt_view`](@ref) on a [`HighOrderPrior`](@ref) relies on that: it passes the carrier's full `N^2 × N^2` cokurtosis and the asset count of the **subproblem**, so the three matrices come back rebuilt at the smaller dimension rather than cut from the larger ones.
+Overload of [`dup_elim_sum_view`](@ref) for a matrix first argument. **The matrix is read for dispatch alone**, and the dimension is the second argument `n`, not `size` of the matrix. [`port_opt_view`](@ref) on a [`HighOrderPrior`](@ref) relies on that: it passes the full `N^2 × N^2` cokurtosis of the prior result and the asset count of the **subproblem**, so the three matrices come back rebuilt at the smaller dimension rather than cut from the larger ones.
 
 # Algorithm
 
@@ -807,7 +807,7 @@ function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = not
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
     X, F = dims_oriented(dims, X, F)
     pr = prior(pe.pe, X, F, pnl; kwargs...)
-    # The co-moments take the same seam the low order moments take: the panel travels as the
+    # The co-moments are fitted as the low order moments are: the panel travels as the
     # third positional argument, the tensor is fitted on the Coverage Universe, and it is
     # expanded onto the full asset universe. `D2`, `L2` and `S2` are then sized from the full
     # width of `pr.X`, which is what the expanded tensors carry.
@@ -820,7 +820,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assembles a [`HighOrderPrior`](@ref) from a low order result and the co-moments fitted beside it.
 
-The tail of every [`HighOrderPriorEstimator`](@ref) fit, written once: the batch method reaches it after running the two co-moment verbs over the caller's matrix, and the read-out of a folded estimator reaches it after reading the same two off their states. The duplication-elimination matrices a consumer needs depend on which co-moments are present and on nothing else, so the rule lives here rather than in each caller.
+The tail of every [`HighOrderPriorEstimator`](@ref) fit, written once: the batch method reaches it after running the two co-moment verbs over the caller's matrix, and `prior(pe)` with no data reaches it after reading the same two off their states. The duplication-elimination matrices a consumer needs depend on which co-moments are present and on nothing else, so the rule lives here rather than in each caller.
 
 `D2`, `L2` and `S2` are sized from the **full** width of `pr.X`, which is what the expanded tensors carry.
 
@@ -828,7 +828,7 @@ The tail of every [`HighOrderPriorEstimator`](@ref) fit, written once: the batch
 
  1. Build `D2`, `L2` and `S2` where both co-moments are present, and `L2` and `S2` alone where only the cokurtosis is.
  2. Assemble the [`HighOrderPrior`](@ref), carrying `pe.ske.mp` where a coskewness tensor was fitted.
- 3. Refuse a carrier whose blocks do not agree on the Coverage Universe, with [`assert_matched_coverage`](@ref).
+ 3. Refuse a prior result whose blocks do not agree on the Coverage Universe, with [`assert_matched_coverage`](@ref).
 
 # Arguments
 
@@ -840,7 +840,7 @@ The tail of every [`HighOrderPriorEstimator`](@ref) fit, written once: the batch
 
 # Validation
 
-  - Every block of the carrier agrees on the Coverage Universe. An error is thrown otherwise.
+  - Every block of the prior result agrees on the Coverage Universe. An error is thrown otherwise.
 
 # Returns
 
@@ -873,7 +873,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the per-asset diagonal of every co-moment a [`HighOrderPrior`](@ref) holds, and answers where all of them are finite.
 
-The higher-order half of the Investable Mask. A coskewness tensor's per-asset diagonal is `sk[i, (i - 1) * N + i]`, which is asset `i`'s third central moment, and a cokurtosis matrix's is `kt[j, j]` at the pair column `j = (i - 1) * N + i`, which is its fourth. Both are finite exactly where the fit answered for that asset, which is the same rule [`investable_mask`](@ref) reads off the diagonal of `sigma`. A moment the carrier does not hold constrains nothing, so a `nothing` reads as every asset admitted.
+The higher-order half of the Investable Mask. A coskewness tensor's per-asset diagonal is `sk[i, (i - 1) * N + i]`, which is asset `i`'s third central moment, and a cokurtosis matrix's is `kt[j, j]` at the pair column `j = (i - 1) * N + i`, which is its fourth. Both are finite exactly where the fit answered for that asset, which is the same rule [`investable_mask`](@ref) reads off the diagonal of `sigma`. A moment the prior result does not hold constrains nothing, so a `nothing` reads as every asset admitted.
 
 # Arguments
 
@@ -907,7 +907,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Derive the Investable Mask of a [`HighOrderPrior`](@ref), which reads every order the carrier holds.
+Derive the Investable Mask of a [`HighOrderPrior`](@ref), which reads every order the prior result holds.
 
 The [`AbstractPriorResult`](@ref) method reads `mu` and the diagonal of `sigma`, which under a [`CoveragePolicy`](@ref) no longer implies that the higher-order tensors are finite where it admits: the policy is set per estimator, so `pe.pe` may carry one while `pe.ske` and `pe.kte` do not. This method therefore ANDs the per-asset diagonals of `sk` and `kt` into it with [`comoment_investable`](@ref), so an asset the higher orders could not estimate leaves the problem rather than reaching a spectral step that throws.
 

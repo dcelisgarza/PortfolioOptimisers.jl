@@ -50,7 +50,7 @@ Abstract supertype for the running state of an incremental fit.
 
 All partial-fit state objects should subtype `AbstractPartialFitState`.
 
-A partial-fit state carries the quantities an estimator needs to fold one more observation into an estimate without reading the sample again. It subtypes [`AbstractResult`](@ref), so it inherits the length-1 iteration protocol and the pretty `show`, but it is not consumable: the rest of the library reads an ordinary Result, so a read-out verb turns a state into one first. It is the one kind of Result an estimator holds.
+A partial-fit state carries the quantities an estimator needs to fold one more observation into an estimate without reading the sample again. It subtypes [`AbstractResult`](@ref), so it inherits the length-1 iteration protocol and the pretty `show`, but it is not consumable: the rest of the library reads an ordinary Result, so the batch verb called with no data turns a state into one first. It is the one kind of Result an estimator holds.
 
 # Interfaces
 
@@ -91,7 +91,7 @@ In order to implement a new partial-fit state which will work seamlessly with th
 
 ### Algorithm
 
- 1. Name the state's own constructor, and pass `copy` of each array field and each scalar field unchanged. The constructor is named here rather than recovered by reflection, the way the prior carriers name theirs, so a family the library has never seen gets a `MethodError` naming this method rather than a state built by machinery.
+ 1. Name the state's own constructor, and pass `copy` of each array field and each scalar field unchanged. The constructor is named here rather than recovered by reflection, the way the prior results name theirs, so a family the library has never seen gets a `MethodError` naming this method rather than a state built by machinery.
 
 # Related
 

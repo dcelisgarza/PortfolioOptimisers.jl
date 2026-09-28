@@ -113,7 +113,7 @@ Compute the Factor Exposure derived from the Factor Exposure of another factor.
 
 # Algorithm
 
- 1. Read the benchmark weights and the group labels off the carrier.
+ 1. Read the benchmark weights and the group labels off the `ReturnsResult`.
  2. Apply `f` to the source exposure, and check that it kept the shape.
  3. Apply the outlier slot and then the scoring slot.
  4. Write `NaN` into every cell where the active mask is `false`, with [`exposure_active_fill!`](@ref), so the verb's convention holds whatever `f` returned there.
@@ -159,7 +159,7 @@ julia> factor_exposure(xe, rd, [1.0 2.0; 3.0 4.0])
   - [`CompositeExposure`](@ref)
 """
 function factor_exposure(xe::DerivedExposure, ::ReturnsResult)
-    return throw(ArgumentError("a derived Factor Exposure is computed from the Factor Exposure of the factor \"$(xe.source)\", which it cannot read from the carrier. The caller that holds the factor list computes the factors in dependency order, and passes the source exposure to the three-argument method factor_exposure(xe, rd, xs)"))
+    return throw(ArgumentError("a derived Factor Exposure is computed from the Factor Exposure of the factor \"$(xe.source)\", which it cannot read from the ReturnsResult. The caller that holds the factor list computes the factors in dependency order, and passes the source exposure to the three-argument method factor_exposure(xe, rd, xs)"))
 end
 function factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum)::Matrix
     w = exposure_benchmark_weights(rd, xe.bw)

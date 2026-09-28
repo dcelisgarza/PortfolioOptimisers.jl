@@ -3,7 +3,7 @@
 
 Absorb a [Routing Target](@ref PIPELINE_ROUTING_TARGETS)'s value into an optimiser, returning the rebuilt optimiser.
 
-This is the optimiser-owned half of the [`Pipeline`](@ref) seam: [`inject_context`](@ref) fans a [`PipelineContext`](@ref) slot out into routing targets and delivers each one here, knowing nothing about where it lands.
+This is the optimiser half of the routing of a [`Pipeline`](@ref) slot into an optimiser: [`inject_context`](@ref) fans a [`PipelineContext`](@ref) slot out into routing targets and delivers each one here, knowing nothing about where it lands.
 
 Targets are named after the field they land in — `:pe`, `:cle`, `:wb`, `:lcse`, `:ple` — because those names are this package's shared vocabulary (see `field_dict`) rather than any one optimiser's private layout. The default method therefore *is* the routing rule: a target lands in the like-named field of any optimiser that has one. Nothing is declared per type, so nothing can drift.
 

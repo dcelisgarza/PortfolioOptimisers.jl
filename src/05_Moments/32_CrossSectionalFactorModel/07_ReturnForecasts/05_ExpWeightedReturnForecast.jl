@@ -482,7 +482,7 @@ Fit a Return Forecast by exponentially weighted least squares on the forward idi
 
 # Algorithm
 
- 1. Compute the Descriptor scores over the whole carrier through [`descriptor_scores`](@ref), cut them to the block's rows, and read the idiosyncratic returns and variances off the block. A row before the block carries no idiosyncratic variance, so the fit drops it. The cut gives the same answer with less work.
+ 1. Compute the Descriptor scores over all the returns data through [`descriptor_scores`](@ref), cut them to the block's rows, and read the idiosyncratic returns and variances off the block. A row before the block carries no idiosyncratic variance, so the fit drops it. The cut gives the same answer with less work.
  2. Take the forward mean target through [`forward_mean_returns`](@ref), and convert it to the Forecast Unit through [`forecast_unit_target`](@ref).
  3. Read the regression weights through [`ew_forecast_weights`](@ref) and the eligibility mask through [`ew_forecast_valid`](@ref).
  4. Over the observations whose target is known, which are all but the last `lag + horizon - 1`, advance the normal equations through [`ew_forecast_accumulate!`](@ref) and solve them through [`ew_forecast_solve`](@ref). An observation with no valid asset advances nothing, does not decay `A` or `c`, and carries the previous coefficients forward.

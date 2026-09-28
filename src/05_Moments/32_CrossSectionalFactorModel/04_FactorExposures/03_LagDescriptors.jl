@@ -265,9 +265,9 @@ end
     descriptor(de::ChangeToScale, rd::ReturnsResult) -> Matrix{<:Real}
     descriptor(de::ChangeInIntensity, rd::ReturnsResult) -> Matrix{<:Real}
 
-Compute a lag Descriptor from the Panel Fields of a carrier.
+Compute a lag Descriptor from the Panel Fields of a [`ReturnsResult`](@ref).
 
-The three archetypes read through [`panel_field_values`](@ref), walk the observations from `lag + 1` to the end, and end through [`descriptor_active_fill!`](@ref). The first `lag` rows stay `NaN`, and a `NaN` at either end of the lag is a `NaN` in the Descriptor. A carrier with no more observations than the lag returns an all-`NaN` Descriptor rather than an error, because a fold of a cross-validation can be that short.
+The three archetypes read through [`panel_field_values`](@ref), walk the observations from `lag + 1` to the end, and end through [`descriptor_active_fill!`](@ref). The first `lag` rows stay `NaN`, and a `NaN` at either end of the lag is a `NaN` in the Descriptor. A `ReturnsResult` with no more observations than the lag returns an all-`NaN` Descriptor rather than an error, because a fold of a cross-validation can be that short.
 
 # Algorithm
 

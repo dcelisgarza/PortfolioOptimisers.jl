@@ -212,7 +212,7 @@ Return the positions of the assets in the Coverage Universe of a cross-validatio
 
 This is the sibling of [`cv_nobs`](@ref) for the asset axis. A fold that draws a subset of assets draws it from these positions, so it never draws a column that could not have been traded.
 
-The two data-level methods differ only in how they reach the numeric matrix. A returns carrier holds it directly, and a price carrier holds a `TimeArray`. The two mask-level methods take the `nothing` sentinel of an all-covered window and the mask of a window with gaps.
+The two data-level methods differ only in how they reach the numeric matrix. Returns data holds it directly, and price data holds a `TimeArray`. The two mask-level methods take the `nothing` sentinel of an all-covered window and the mask of a window with gaps.
 
 # Algorithm
 
@@ -352,11 +352,11 @@ Stores the portfolio return series of a cross-validation prediction, with the da
 aligned to it.
 
 `X` is the portfolio series, not the asset returns: one vector for a single portfolio, or one
-vector per member of a population. Beside it the carrier holds the factor returns, the
+vector per member of a population. Beside it the `PredictionReturnsResult` holds the factor returns, the
 benchmark series, the timestamps, the implied volatilities and the implied volatility risk
 premium adjustment of the same observations.
 
-The carrier holds no feature matrix. [`rebuild_returns_result`](@ref) computes the collapse of
+The `PredictionReturnsResult` holds no feature matrix. [`rebuild_returns_result`](@ref) computes the collapse of
 the outer problem from the original `rd.pnl` and the weights of each fold, which is the call the
 path without cross-validation makes. The weights of a fold are on the `res` of its
 [`PredictionResult`](@ref), and `ts` is the slice of the original clock that the fold covers,
@@ -923,7 +923,7 @@ function calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeigh
     # The record was expanded back to the caller's universe on the way out of `predict`, so
     # its matrix and its weight path span every asset while the result's fee spans the two
     # reduced axes. The mask is what reunites them: it says which columns the five per asset
-    # fields were priced on and which columns the two liquidation carriers were priced on.
+    # fields were priced on and which columns the two liquidation charges were priced on.
     return calc_net_asset_returns(weight_path(hw, pred.res.w), hw.X,
                                   fold_fees(pred.res, fees, hw.X),
                                   result_investable_mask(pred.res))
@@ -983,7 +983,7 @@ function risk_contribution(r::BaseRM_VecBaseRM,
                            fees::Option{<:Fees} = nothing; kwargs...)
     # The record and the target weights are on the caller's universe, and the result's
     # fee is on the investable one, so the fold views the first two at the mask before
-    # the finite difference and expands the answer back, as the value-level door does.
+    # the finite difference and expands the answer back, as the value-level method does.
     imsk = result_investable_mask(pred.res)
     rc = risk_contribution(r, investable_weights_view(imsk, pred.res.w),
                            investable_weights_view(imsk, pred.hw.X),
@@ -1625,14 +1625,14 @@ end
 
 Resolve the fee a fold-taking consumer charges: the result's own, or a caller's viewed at the result's Investable Mask.
 
-The three fold-taking consumers, [`calc_net_asset_returns`](@ref), [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) on a [`PredictionResult`](@ref), take an optional `fees`, so a caller can score a stored fold under a fee of their own. The two fees are on different universes. The fit reduced the fee of the result, so its five per-asset fields are on the investable axis and its two liquidation carriers are on the complement. A caller's fee is on the caller's universe, as a caller's `rd` is, so it takes the same view that a fee takes at the fit.
+The three fold-taking consumers, [`calc_net_asset_returns`](@ref), [`risk_contribution`](@ref) and [`factor_risk_contribution`](@ref) on a [`PredictionResult`](@ref), take an optional `fees`, so a caller can score a stored fold under a fee of their own. The two fees are on different universes. The fit reduced the fee of the result, so its five per-asset fields are on the investable axis and its two liquidation charges, `lq` and `flq`, are on the complement. A caller's fee is on the caller's universe, as a caller's `rd` is, so it takes the same view that a fee takes at the fit.
 
-Without the view, a per-asset rate on the full universe met the reduced weights with a `BoundsError`, and a carrier on the full universe was charged as though every position had been liquidated.
+Without the view, a per-asset rate on the full universe met the reduced weights with a `BoundsError`, and a liquidation charge on the full universe charged every position as though it had been liquidated.
 
 # Algorithm
 
  1. With no caller fee, give the fee of the result through [`extract_fees`](@ref).
- 2. With a caller fee, view it with [`investable_fees_view`](@ref). The per-asset fields are sliced to the mask and the carriers to its complement, which is found from the width of `X`. The carriers are removed when the mask is `nothing`, because no asset left.
+ 2. With a caller fee, view it with [`investable_fees_view`](@ref). The per-asset fields are sliced to the mask and the two liquidation charges to its complement, which is found from the width of `X`. The two liquidation charges are removed when the mask is `nothing`, because no asset left.
 
 # Arguments
 
@@ -1666,7 +1666,7 @@ It collapses the benchmark returns, the implied volatilities and the implied vol
 
 A benchmark matrix collapses as [`collapse_benchmark`](@ref) states: against the weight path when the fold carries a [`HeldWeightsResult`](@ref), and against the target weights when it does not. `iv` and `ivpa` are rates, so they collapse as convex combinations, against the weights of [`synthetic_asset_weights`](@ref).
 
-The fold does not collapse the panel of the carrier. A *square* feature matrix needs the weights of every synthetic asset at once for its second contraction, and only one weight vector is known here. [`rebuild_returns_result`](@ref) instead computes the collapse for the whole synthetic universe from the original `rd.pnl` and the fold weights `pred[f].res.w`.
+The fold does not collapse the panel of `rd`. A *square* feature matrix needs the weights of every synthetic asset at once for its second contraction, and only one weight vector is known here. [`rebuild_returns_result`](@ref) instead computes the collapse for the whole synthetic universe from the original `rd.pnl` and the fold weights `pred[f].res.w`.
 
 # Algorithm
 

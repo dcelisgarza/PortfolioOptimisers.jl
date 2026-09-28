@@ -1252,10 +1252,10 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     sh = reset_time_dependent_estimator(sh)
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd)
-    # Resolve the fee on the caller's own universe, before the door below narrows `sets`,
+    # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`,
     # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
-    # variance or a standard deviation, which a fee does not move. The fee rides on the
-    # result, where the net returns and a fold's forced exit read it.
+    # variance or a standard deviation, which a fee does not move. The result holds the
+    # fee, and the net returns and a fold's forced exit read it there.
     imsk = investable_mask(pr)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns, widened to a float only when it is an integer. An
@@ -1323,10 +1323,10 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     sh = reset_time_dependent_estimator(sh)
     rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd)
-    # Resolve the fee on the caller's own universe, before the door below narrows `sets`,
+    # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`,
     # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
-    # variance or a standard deviation, which a fee does not move. The fee rides on the
-    # result, where the net returns and a fold's forced exit read it.
+    # variance or a standard deviation, which a fee does not move. The result holds the
+    # fee, and the net returns and a fold's forced exit read it there.
     imsk = investable_mask(pr)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns, widened to a float only when it is an integer. An

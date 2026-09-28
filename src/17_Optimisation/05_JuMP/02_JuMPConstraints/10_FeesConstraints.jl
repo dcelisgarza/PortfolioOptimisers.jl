@@ -240,7 +240,7 @@ Where:
 # Arguments
 
   - $(arg_dict[:model])
-  - `lq`: The proportional liquidation carrier, or `nothing`.
+  - `lq`: The proportional liquidation rate, or `nothing`.
 
 # Returns
 
@@ -314,7 +314,7 @@ Where:
 # Arguments
 
   - $(arg_dict[:model])
-  - `flq`: The fixed liquidation carrier, or `nothing`.
+  - `flq`: The fixed liquidation charge, or `nothing`.
   - `kwargs`: Forwarded to `isapprox`, to decide how near zero a weight counts as zero.
 
 # Returns

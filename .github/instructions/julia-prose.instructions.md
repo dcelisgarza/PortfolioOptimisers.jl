@@ -75,8 +75,8 @@ file governs, and so does every other rule here.
   universe", then "the coverage universe" from there on. The capitalised forms that `CONTEXT.md`
   defines, such as `Coverage Universe`, `Panel Field` and `Online Scheme`, are for a contributor
   reading `CONTEXT.md`. A reader of a page has no glossary.
-- **A word for the mechanism of the code never appears.** "seam", "carrier", "read-out", "host"
-  for a type that holds another, "to the bit", "refused by name", and the section sign `§`. Say what
+- **A word for the mechanism of the code never appears.** "seam", "carrier", "read-out", "door",
+  "host" for a type that holds another, "to the bit", "refused by name", and the section sign `§`. Say what
   happens instead: "the optimiser hands its prior the new rows", not "the optimiser is the host of
   the seam".
 

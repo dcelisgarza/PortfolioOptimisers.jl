@@ -198,7 +198,7 @@ end
 """
     descriptor(de::EWVolatility, rd::ReturnsResult) -> Matrix{<:Real}
 
-Compute an exponentially weighted volatility Descriptor from a carrier.
+Compute an exponentially weighted volatility Descriptor from a [`ReturnsResult`](@ref).
 
 # Algorithm
 
@@ -490,7 +490,7 @@ end
 """
     descriptor(de::EWResidualVolatility, rd::ReturnsResult) -> Matrix{<:Real}
 
-Compute an exponentially weighted residual volatility Descriptor from a carrier.
+Compute an exponentially weighted residual volatility Descriptor from a [`ReturnsResult`](@ref).
 
 # Algorithm
 
