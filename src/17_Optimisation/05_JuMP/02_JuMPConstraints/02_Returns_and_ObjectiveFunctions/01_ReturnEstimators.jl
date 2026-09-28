@@ -3,17 +3,22 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries one return term's own weight in the return sum, its own lower bound, and the two charges netted out of it.
 
-A [`JuMPOptimiser`](@ref) takes one return term or a vector of them. The settings hold what
-belongs to one term rather than to the optimiser: its weight in the return expression, its own
-lower bound, whether it enters the expression at all, and which of the two portfolio charges
-the term nets. Every return estimator holds them in its first field, `settings`, as a risk
-measure holds its [`RiskMeasureSettings`](@ref).
+A [`JuMPOptimiser`](@ref) takes one return term or a vector of them. The settings hold the
+data of one term, not of the optimiser. They hold these items:
+
+  - The weight of the term in the return expression.
+  - The lower bound of the term.
+  - Whether the term enters the return expression.
+  - Which of the two portfolio charges the term nets.
+
+Every return estimator holds the settings in its first field, `settings`. A risk measure holds
+its [`RiskMeasureSettings`](@ref) in the same way.
 
 The library does not normalise the scales. Two terms at `scale = 1` charge their flagged fees
-twice, and two terms at `scale = 0.5` charge them once. `fee` and `mic` are separate flags,
-because the market impact cost already constrains the budget, so a term can net the fees and
-leave the impact cost out. A term with `rte = false` stays out of the return expression and
-still takes its own `lb`, which is the way to state a term that only constrains.
+two times, and two terms at `scale = 0.5` charge them one time. `fee` and `mic` are separate
+flags, because the market impact cost already constrains the budget. Thus a term can net the
+fees and not the impact cost. A term with `rte = false` stays out of the return expression,
+and its own `lb` still binds. Use it to state a term that only constrains the portfolio.
 
 # Mathematical definition
 
@@ -142,7 +147,7 @@ const JRE_VecJRE = Union{<:JuMPReturnsEstimator, <:VecJRE}
 
 Field bound for [`ArithmeticReturn`](@ref)'s `mu` slot, which holds the expected returns or the Estimator that computes them, a [`DeferredQuantity`](@ref).
 
-The bound is [`MuSlot`](@ref) less a [`VecScalar`](@ref), for two reasons. A `VecScalar` is a centring target for a moment risk measure, while the return expression is `dot_scalar(mu, w)`, which takes a number or a vector. A `VecScalar` is also an [`AbstractResult`](@ref), and an Estimator must not hold one.
+The bound is [`MuSlot`](@ref) less a [`VecScalar`](@ref), for two reasons. A `VecScalar` is the centre target of a moment risk measure. The return expression is `dot_scalar(mu, w)`, which takes a number or a vector. A `VecScalar` is also an [`AbstractResult`](@ref), and an Estimator must not hold one.
 
 # Related
 
@@ -165,10 +170,15 @@ expected return over the set instead of the point estimate, which gives a robust
 The `ucs` field takes a mean uncertainty set that [`mu_ucs`](@ref) built, or an estimator of
 one. A built set is the simpler route, as a built [`sigma_ucs`](@ref) result is for
 [`UncertaintySetVariance`](@ref). An estimator builds the set when the model is built, so the
-optimiser must pass it the returns data `rd`. The centre of the term comes from three places
-in order: the centre that the set carries, then `mu`, then the expected returns of the prior.
-A Deferred Quantity in `mu` resolves even when a set with its own centre outranks it, and it
-then goes unused, as a stated vector does. The lower bound of the term is `settings.lb`.
+optimiser must pass it the returns data `rd`. The term takes its centre from the first of
+these three items that exists:
+
+ 1. The centre that the set carries.
+ 2. The field `mu`.
+ 3. The expected returns of the prior.
+
+A Deferred Quantity in `mu` resolves when a set with its own centre outranks it. The term then
+does not use it, as for a stated vector. The lower bound of the term is `settings.lb`.
 
 # Mathematical definition
 
@@ -333,13 +343,13 @@ end
 
 Create a version of the return term with its lower bound removed.
 
-The frontier and the near-optimal centering sub-problems call it, because their corner solves
-must range over the whole feasible set.
+The sub-problems of the frontier and of [`NearOptimalCentering`](@ref) call it, because their
+corner solves must range over the whole feasible set.
 
-The function removes `lb`, and it removes `ucs` when `flag` is `false`. The term keeps
-everything else, `mu` included. Without `mu` the term would take the prior's own vector as its
-centre, and a set describes the neighbourhood of the one vector it was calibrated on. With
-several terms, every term would then give the same corner.
+The function removes `lb`, and it removes `ucs` when `flag` is `false`. The term keeps all
+other fields, `mu` included. Without `mu`, the term takes the prior's own vector as its
+centre. But a set describes the neighbourhood of the one vector that it was calibrated on.
+Also, with several terms, each term then gives the same corner.
 
 # Arguments
 
@@ -400,7 +410,7 @@ own expression, and the term still charges the same fees. This is the return-sid
 
 # Returns
 
-  - Return term carrying a unit scale.
+  - The return term with a unit scale.
 
 # Related
 
@@ -525,8 +535,8 @@ return term states that with it, and then no unused term changes the model class
 [`set_return_constraints!`](@ref) runs in the shared Model Assembly for every optimiser, and
 [`JuMPOptimiser`](@ref)'s `ret` slot defaults to [`ArithmeticReturn`](@ref).
 [`RiskBudgeting`](@ref), [`RelaxedRiskBudgeting`](@ref) and [`FactorRiskContribution`](@ref)
-never read `:ret`, so with the default they build the whole expression, cones of a mean
-uncertainty set included, and discard it. An unused term adds rows that the model does not
+never read `:ret`. With the default term, they build the whole expression and do not use it.
+The expression includes the cones of a mean uncertainty set. An unused term adds rows that the model does not
 need, and it can force a conic solver onto a linear programme. `NoReturn` keeps such a model
 in its own class, which is the main use of the type. It also lets a caller state that there is
 no return term, where the alternative is `settings.rte = false` on every term.
@@ -551,19 +561,19 @@ them can read `:ret`. [`FactorRiskContribution`](@ref) holds one, so it refuses 
 objectives as [`MeanRisk`](@ref).
 
 [`assert_no_return_objective_compatibility`](@ref) makes the objective refusals when the model
-is built. A [`MaximumReturn`](@ref) objective would be zero everywhere, so the solver would
-return an arbitrary feasible portfolio and report success. A [`MaximumRatio`](@ref) numerator
-would be zero. [`assert_return_term_required`](@ref) makes the [`NearOptimalCentering`](@ref)
-refusal in its constructor. That model would be infeasible, not degenerate, because its barrier
-constrains `exp(log_ret) <= ret - rt`, and with no return term both `ret` and `rt` are zero.
-Every refusal also applies to a vector of terms that all carry `settings.rte = false`, because
-the guards test the expression and not the type of the term.
+is built. Without the refusal, a [`MaximumReturn`](@ref) objective is zero everywhere, and the
+solver returns an arbitrary feasible portfolio and reports success. The numerator of a
+[`MaximumRatio`](@ref) objective is zero. [`assert_return_term_required`](@ref) makes the
+[`NearOptimalCentering`](@ref) refusal in its constructor. That model is infeasible, not
+degenerate, because its barrier constrains `exp(log_ret) <= ret - rt`. With no return term,
+`ret` and `rt` are both zero. Each refusal also applies to a vector of terms that all carry
+`settings.rte = false`. The guards test the expression, not the type of the term.
 
 The term holds no per-asset quantity, so `settings.scale`, `settings.fee` and `settings.mic`
-have no effect. A scaled zero is still zero, and the builder subtracts no charge, because a
-charge would make the expression non-zero and every guard above relies on the zero. A
-`settings.lb` is legal, but it binds on a quantity that is always zero, so a positive bound
-makes the model infeasible. [`NoRisk`](@ref)'s `settings.ub` behaves the same way.
+have no effect. A scaled zero is still zero. The builder subtracts no charge, because a charge
+makes the expression non-zero, and each guard above uses the zero. A `settings.lb` is legal,
+but it binds on a quantity that is always zero, so a positive bound makes the model
+infeasible. [`NoRisk`](@ref)'s `settings.ub` has the same effect.
 
 # Fields
 
@@ -610,8 +620,8 @@ Return a copy of return term `r` with its lower bound set to `lb`.
 The function pairs bounds with terms one to one. One term takes a scalar bound or `nothing`.
 A vector of ``n`` terms takes `nothing`, which clears all ``n`` bounds, or a vector of ``n``
 bounds, one for each term. It refuses a single number for a vector of terms. The bound binds on
-each term's own expression, and the terms can carry different units, so no check can tell
-whether one number means the same thing to all of them.
+each term's own expression, and the terms can have different units. Thus no check can find
+whether one number has the same meaning for all of the terms.
 
 # Arguments
 
