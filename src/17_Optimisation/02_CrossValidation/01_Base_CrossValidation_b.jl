@@ -593,5 +593,59 @@ function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; co
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
 end
+"""
+    assert_prediction_series(names::Option{<:VecStr}, A::Option{<:MatNum},
+                             X::Option{<:VecNum_VecVecNum}, ts::Option{<:VecDate},
+                             nsym::Symbol, sym::Symbol) -> nothing
+
+Check one named matrix of a [`PredictionReturnsResult`](@ref), the factor returns or the Exogenous Series, against the portfolio series and the timestamps.
+
+The matrix rides beside the portfolio series `X` on the observation axis, so it holds one row per observation of each series of `X`, and one per timestamp.
+
+# Arguments
+
+  - `names`: The column names, or `nothing`.
+  - `A`: The matrix, `observations × columns`, or `nothing`.
+  - `X`: The portfolio series, one vector or one vector per member of a population, or `nothing`.
+  - `ts`: The timestamps, or `nothing`.
+  - `nsym`: The name of the names field, which the messages print.
+  - `sym`: The name of the matrix field, which the messages print.
+
+# Validation
+
+  - The rules of [`check_names_and_returns_matrix`](@ref).
+  - When `A` and `X` are given, every series of `X` has `size(A, 1)` entries. Raises a `DimensionMismatch`.
+  - When `A` and `ts` are given, `length(ts) == size(A, 1)`. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`PredictionReturnsResult`](@ref)
+  - [`check_names_and_returns_matrix`](@ref)
+"""
+function assert_prediction_series(names::Option{<:VecStr}, A::Option{<:MatNum},
+                                  X::Option{<:VecNum_VecVecNum}, ts::Option{<:VecDate},
+                                  nsym::Symbol, sym::Symbol)::Nothing
+    check_names_and_returns_matrix(names, A, nsym, sym)
+    if isnothing(A)
+        return nothing
+    end
+    n = size(A, 1)
+    if isa(X, VecNum)
+        @argcheck(length(X) == n,
+                  DimensionMismatch("X must have one entry per row of $sym, got length(X) = $(length(X)) and size($sym, 1) = $n"))
+    elseif isa(X, VecVecNum)
+        @argcheck(all(x -> length(x) == n, X),
+                  DimensionMismatch("each element of X must have the same length as the number of rows in $sym"))
+    end
+    if !isnothing(ts)
+        @argcheck(length(ts) == n,
+                  DimensionMismatch("ts must have one entry per row of $sym, got length(ts) = $(length(ts)) and size($sym, 1) = $n"))
+    end
+    return nothing
+end
 
 export fit, fit_predict

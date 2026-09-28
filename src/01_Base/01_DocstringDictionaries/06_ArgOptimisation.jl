@@ -163,6 +163,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :pred_nf => "`nf`: Factor name vector.",#
                  :pred_nb => "`nb`: Benchmark name vector.",#
                  :pred_B => "`B`: Benchmark returns.",#
+                 :pred_ne => "`ne`: Exogenous Series name vector.",#
+                 :pred_E => "`E`: Exogenous Series, `observations × series`, whose columns a consumer reads by name. `NaN` marks an absent value.",#
                  :ts => "`ts`: Timestamp vector.",#
                  :iv_ret => "`iv`: Implied volatilities.",#
                  :ivpa => "`ivpa`: Implied volatility risk premium adjustment.",#

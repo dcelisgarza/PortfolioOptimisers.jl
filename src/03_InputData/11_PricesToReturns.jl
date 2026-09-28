@@ -281,9 +281,9 @@ The `PricesResult` states one clock. So this function reads a factor or benchmar
 # Arguments
 
   - `P`: The table the conversion is assembling, already carrying the clock and the asset columns.
-  - `A`: The factor or benchmark price series, or `nothing`.
+  - `A`: The factor, benchmark or Exogenous Series, or `nothing`.
   - `ts`: The asset timestamps, which are the clock of the `PricesResult`.
-  - `sym`: The block's name in the refusal, `:F` or `:B`.
+  - `sym`: The block's name in the refusal, `:F`, `:B` or `:E`.
 
 # Validation
 
@@ -358,17 +358,18 @@ The conversion applies the same rule to a benchmark ``B``, and carries the bench
 
 # Algorithm
 
- 1. Check with [`assert_distinct_series_names`](@ref) that the asset, factor and benchmark series have distinct names. Read the asset names and the asset timestamps from `pr.X`. Check `pr.pnl` against them with [`check_asset_panel`](@ref), and `pr.span` with [`assert_span_shape`](@ref).
- 2. Write the three price blocks side by side on the clock of the `PricesResult` with [`append_price_block!`](@ref), which writes every absent price as `NaN` with [`unify_gaps`](@ref). The `PricesResult` states one clock. So the function reads a factor or benchmark series at the asset timestamps, and does not join it onto them. It refuses a series on a different clock and names the series, because a join adds or drops observations and [`price_ingestion`](@ref) owns every change of the clock. A benchmark is one shared column, or one column per asset.
+ 1. Check with [`assert_distinct_series_names`](@ref) that the asset, factor, benchmark and Exogenous Series have distinct names. Read the asset names and the asset timestamps from `pr.X`. Check `pr.pnl` against them with [`check_asset_panel`](@ref), and `pr.span` with [`assert_span_shape`](@ref).
+ 2. Write the three price blocks and the Exogenous Series side by side on the clock of the `PricesResult` with [`append_price_block!`](@ref), which writes every absent price as `NaN` with [`unify_gaps`](@ref). The `PricesResult` states one clock. So the function reads a factor or benchmark series at the asset timestamps, and does not join it onto them. It refuses a series on a different clock and names the series, because a join adds or drops observations and [`price_ingestion`](@ref) owns every change of the clock. A benchmark is one shared column, or one column per asset.
  3. Convert the prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This step applies the formula above. It computes both branches through logarithms. The log return is ``\\ln p_{t,\\,i} - \\ln p_{t-1,\\,i}``, and the simple return is `expm1` of it. So the two agree with the closed forms above to floating point, and not always to the last bit. When `padding` is `true`, the step keeps the first observation with a `NaN` return, so the returns keep the length of the price clock.
  4. **A gap carried here does not spread.** The formula reads two prices, so a run of `k` gapped prices makes non-finite only the returns that read one of them. That is `k + 1` returns for a run inside the series, and `k` for a run at either end, because no return reads a price before the first row or after the last. Every later return of that column reads two observed prices. A gap also stays in its own column, because the return of an asset reads no price of another asset.
  5. Resolve the returns that a gap left non-finite with [`apply_gap_return`](@ref), under `gap_return_alg`. The method for `nothing` is the default rule. It returns the table unchanged, so the returns of step 3 stay bit for bit the same. An algorithm writes only a return that reads a gapped price, inside the Listing Span of its column, after the first observed price. So every return computed from two observed prices keeps its value. The function logs an `@info` when it finds no writable return.
- 6. Name the three blocks. Step 1 refused a name that two tables share and the name `timestamp`. So the asset names `nx`, the factor names `nf` and the benchmark names `nb` are the column names of the three tables, and `ts` is the `timestamp` column of the converted table.
+ 6. Name the four blocks. Step 1 refused a name that two tables share and the name `timestamp`. So the asset names `nx`, the factor names `nf`, the benchmark names `nb` and the Exogenous Series names `ne` are the column names of the four tables, and `ts` is the `timestamp` column of the converted table.
  7. Write each absent implied volatility as `NaN` with [`unify_gaps`](@ref), and index `pr.iv` by `ts`. Then check the implied volatilities and `pr.ivpa` against the asset count. The returns clock is the price clock, less the first observation when `padding` is `false`. So the implied volatilities of a `PricesResult` that the ingestion layer built cover it. The conversion carries an absent implied volatility as `NaN`, and the estimator that reads it excludes it.
  8. View the [`AssetPanel`](@ref) on the returns clock. Find the panel rows of the returns timestamps with [`feature_row_indices`](@ref), and view the panel with [`port_opt_view`](@ref). Give it the asset names, so that it also cuts a square tensor Panel Field on its label axis. The conversion removes no column, so the view keeps every asset. A time-varying panel loses only the observations that the returns clock does not hold.
  9. State the universe. Cut `pr.span` to the asset axis with [`listing_span_view`](@ref). Give it and the asset returns to [`returns_universe_masks`](@ref), which projects the span onto the returns clock and intersects it with finiteness. [`attach_universe_masks`](@ref) puts the two masks on the Asset Panel and keeps its Panel Fields. When the `PricesResult` holds no panel, it makes a panel with no Panel Field. A `PricesResult` with no span states no universe, so the function attaches no masks, and the panel is the one of step 8, or `nothing`.
 10. Build the factor and benchmark matrices from the columns of each block. A block with no column gives `nothing`, and a benchmark block with one column gives a vector. The asset matrix is always present, because the conversion removes no column.
-11. Return the [`ReturnsResult`](@ref).
+11. Build the Exogenous Series from its columns, or `nothing` when `pr.E` is `nothing`. It is converted with the assets, so it takes the same `ret_method`, the same `padding` and the same Gap Return rule, and a gap in it stays `NaN`.
+12. Return the [`ReturnsResult`](@ref).
 
 **The conversion removes no observation and no asset.** A deletion is a **Universe Policy**. A policy is fit on a training window and applied again by name, and a stateless conversion cannot do that. [`MissingDataFilter`](@ref) owns the deletion. Its `col_thr` deletes an asset and its `row_thr` deletes an observation.
 
@@ -384,15 +385,15 @@ The conversion applies the same rule to a benchmark ``B``, and carries the bench
 
   - `ret_method` is `:simple` or `:log`. `TimeSeries.percentchange` throws an `ArgumentError` otherwise.
   - Every price that reaches step 3 is non-negative. `TimeSeries.percentchange` takes a logarithm on both branches, so a negative price throws a `DomainError` from inside it, on the simple branch too. A zero price gives the returns that the mathematical definition states.
-  - The asset, factor and benchmark column names are pairwise disjoint, and none of them is `timestamp`. The function throws a [`ConflictingArgumentError`](@ref) that names the columns otherwise.
-  - If `pr.F` or `pr.B` is not `nothing`, its timestamps equal the asset timestamps. The function throws a [`ConflictingArgumentError`](@ref) otherwise. The message names [`price_ingestion`](@ref), which puts two series on one clock.
+  - The asset, factor, benchmark and Exogenous Series column names are pairwise disjoint, and none of them is `timestamp`. The function throws a [`ConflictingArgumentError`](@ref) that names the columns otherwise.
+  - If `pr.F`, `pr.B` or `pr.E` is not `nothing`, its timestamps equal the asset timestamps. The function throws a [`ConflictingArgumentError`](@ref) otherwise. The message names [`price_ingestion`](@ref), which puts two series on one clock.
   - If `pr.span` is not `nothing`, `size(pr.span) == size(values(pr.X))`. The function throws a `DimensionMismatch` otherwise.
   - If `pr.iv` is not `nothing`, the returns timestamps are a subset of `TimeSeries.timestamp(pr.iv)`. The function throws an `ArgumentError` otherwise. Then, with `iv = values(unify_gaps(pr.iv)[ts])`, `!isempty(iv)` holds, `size(iv) == size(X)` holds, and every present value is finite and non-negative. An absent value is `NaN`, and [`assert_nonneg_where_present`](@ref) skips it.
   - The function checks `pr.ivpa` in the same branch, so only when `pr.iv` is given. `all(x -> x > 0, ivpa)` and `all(x -> isfinite(x), ivpa)` hold, and a vector `ivpa` has `length(ivpa) == size(iv, 2)`. The bound is strict, so the function refuses a zero adjustment.
 
 # Returns
 
-  - `rr::ReturnsResult`: The asset, factor and benchmark returns, their names, the returns timestamps, the implied volatilities and the Asset Panel.
+  - `rr::ReturnsResult`: The asset, factor and benchmark returns, the Exogenous Series, their names, the returns timestamps, the implied volatilities and the Asset Panel.
 
 # Examples
 
@@ -416,6 +417,8 @@ ReturnsResult
      F ┼ nothing
     nb ┼ nothing
      B ┼ nothing
+    ne ┼ nothing
+     E ┼ nothing
     ts ┼ Vector{Dates.Date}: [Dates.Date("2020-01-02"), Dates.Date("2020-01-03")]
     iv ┼ nothing
   ivpa ┼ nothing
@@ -450,7 +453,7 @@ ReturnsResult
 function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
                            padding::Bool = false,
                            gap_return_alg::Option{<:AbstractGapReturnAlgorithm} = nothing)::ReturnsResult
-    assert_distinct_series_names(pr.X, pr.F, pr.B)
+    assert_distinct_series_names(pr.X, pr.F, pr.B, pr.E)
     asset_names = string.(TimeSeries.colnames(pr.X))
     asset_ts = TimeSeries.timestamp(pr.X)
     N = length(asset_names)
@@ -460,6 +463,7 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
     DataFrames.insertcols!(P, 1, :timestamp => asset_ts)
     factor_names = append_price_block!(P, pr.F, asset_ts, :F)
     benchmark_names = append_price_block!(P, pr.B, asset_ts, :B)
+    exogenous_names = append_price_block!(P, pr.E, asset_ts, :E)
     X = TimeSeries.percentchange(TimeSeries.TimeArray(P; timestamp = :timestamp),
                                  ret_method; padding = padding)
     X = DataFrames.DataFrame(X)
@@ -510,12 +514,126 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
     else
         length(nb) == 1 ? X[!, nb[1]] : Matrix(X[!, nb])
     end
+    ne = exogenous_names
+    E = isempty(ne) ? nothing : Matrix(X[!, ne])
     return ReturnsResult(; ts = ts, nx = nx, X = RX, nf = isempty(nf) ? nothing : nf, F = F,
-                         nb = isempty(nb) ? nothing : nb, B = B, iv = iv, ivpa = ivpa,
+                         nb = isempty(nb) ? nothing : nb, B = B,
+                         ne = isempty(ne) ? nothing : ne, E = E, iv = iv, ivpa = ivpa,
                          pnl = pnl)
 end
 function prices_to_returns(X::TimeSeries.TimeArray; kwargs...)::ReturnsResult
     return prices_to_returns(price_ingestion(PriceIngestion(), X); kwargs...)
+end
+"""
+    currency_excess_index(fx::TimeSeries.TimeArray, cash::TimeSeries.TimeArray,
+                          cash_base::TimeSeries.TimeArray) -> TimeSeries.TimeArray
+
+Build the Currency Excess Index of each currency, a level series for the Exogenous Series of a [`PricesResult`](@ref).
+
+The index of a currency is the value in the base currency of a deposit in that currency, funded in the base currency. Its return is the Currency Excess Return: the exchange-rate return and the cash return of the currency, less the cash return of the base currency. [`prices_to_returns`](@ref) converts the index with the return rule of the assets, so the Currency Factors of a [`CrossSectionalFactorPrior`](@ref) read returns on the same footing as the asset returns.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+I_{t,\\,c} &= S_{t,\\,c} \\, \\frac{K_{t,\\,c}}{K_{t,\\,b}}\\,, \\\\
+\\frac{I_{t,\\,c}}{I_{t - 1,\\,c}} - 1 &= \\frac{(1 + R^{S}_{t,\\,c})(1 + r_{t,\\,c})}{1 + r_{t,\\,b}} - 1\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``I_{t,\\,c}``: Currency Excess Index of the currency ``c`` at observation ``t``.
+  - ``S_{t,\\,c}``: Exchange rate of ``c``, in units of the base currency per unit of ``c``.
+  - ``K_{t,\\,c}``, ``K_{t,\\,b}``: Cash total-return indices of ``c`` and of the base currency ``b``, which accumulate the cash rate of each period.
+  - ``R^{S}_{t,\\,c}``: Return of the exchange rate over observation ``t``.
+  - ``r_{t,\\,c}``, ``r_{t,\\,b}``: Cash rates of ``c`` and of ``b`` over observation ``t``.
+
+With log returns the split of an asset return in the base currency is exact. An asset of currency ``c`` with local return ``R^{L}`` has the base-currency return ``(1 + R^{L})(1 + R^{S}) - 1``, so
+
+```math
+\\begin{align}
+\\ln(1 + R^{L}) - \\ln(1 + r_{c}) + \\ln\\frac{I_{t,\\,c}}{I_{t - 1,\\,c}} &= \\ln(1 + R^{B}) - \\ln(1 + r_{b})\\,,
+\\end{align}
+```
+
+and the local excess return plus the log return of the index is the base-currency excess return. With simple returns the split is not exact. The difference holds the cross term ``R^{L} R^{S}`` of each asset, and terms that depend on the currency alone and are of second order in the rates. No series with one column per currency can hold the cross term. Under the local returns a [`CrossSectionalFactorPrior`](@ref) derives, the term stays in the local return. Under a Panel Field of local returns the caller names, it is out of the model.
+
+The index of the base currency itself is constant, so its return is zero, and a Currency Factor of it would have no variance. Give the base currency to the `base` of [`CurrencyExposure`](@ref) instead: it then takes no factor and needs no index, and an asset of the base currency carries a zero exposure on every Currency Factor.
+
+# Algorithm
+
+ 1. Check that the three series state one clock, that `cash` holds a column for every currency of `fx`, and that `cash_base` holds one column.
+ 2. Write every absent value as `NaN` with [`unify_gaps`](@ref).
+ 3. Read the cash index of each currency of `fx` by its name, and compute the index of each currency.
+
+# Arguments
+
+  - `fx`: Exchange rates, `observations × currencies`, in units of the base currency per unit of each currency. Its column names name the currencies.
+  - `cash`: Cash total-return indices, `observations × currencies`, one column per currency of `fx`, named alike. Their order is free.
+  - `cash_base`: Cash total-return index of the base currency, `observations × 1`.
+
+# Validation
+
+  - `TimeSeries.timestamp(cash) == TimeSeries.timestamp(fx)` and `TimeSeries.timestamp(cash_base) == TimeSeries.timestamp(fx)`. Raises a [`ConflictingArgumentError`](@ref).
+  - `cash` holds a column for every column of `fx`. Raises an `ArgumentError` that names the missing ones.
+  - `cash_base` holds exactly one column. Raises a `DimensionMismatch`.
+  - Every value is `missing`, `NaN` or finite. Raises a `DomainError`, from [`unify_gaps`](@ref).
+
+# Returns
+
+  - `I::TimeSeries.TimeArray`: The Currency Excess Index, `observations × currencies`, named as the columns of `fx`.
+
+# Examples
+
+```jldoctest
+julia> ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 2);
+
+julia> fx = TimeArray(ts, [2.0 0.5; 3.0 0.75], [\"EUR\", \"JPY\"]);
+
+julia> cash = TimeArray(ts, [1.0 1.0; 1.0 1.25], [\"JPY\", \"EUR\"]);
+
+julia> base = TimeArray(ts, [1.0; 1.5;;], [\"USD\"]);
+
+julia> values(currency_excess_index(fx, cash, base))
+2×2 Matrix{Float64}:
+ 2.0  0.5
+ 2.5  0.5
+```
+
+# Related
+
+  - [`PricesResult`](@ref)
+  - [`prices_to_returns`](@ref)
+  - [`CurrencyExposure`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`unify_gaps`](@ref)
+"""
+function currency_excess_index(fx::TimeSeries.TimeArray, cash::TimeSeries.TimeArray,
+                               cash_base::TimeSeries.TimeArray)::TimeSeries.TimeArray
+    ts = TimeSeries.timestamp(fx)
+    for (A, sym) in ((cash, :cash), (cash_base, :cash_base))
+        @argcheck(TimeSeries.timestamp(A) == ts,
+                  ConflictingArgumentError("`$sym` must state the clock of `fx`, because the index of each observation reads the three series at that observation:\n\tlength(timestamp($sym)) => $(length(TimeSeries.timestamp(A)))\n\tlength(timestamp(fx)) => $(length(ts))"))
+    end
+    nc = TimeSeries.colnames(fx)
+    cn = TimeSeries.colnames(cash)
+    miss = setdiff(nc, cn)
+    @argcheck(isempty(miss),
+              ArgumentError("`cash` must hold the cash index of every currency of `fx`, by name, and it has no column for $miss"))
+    #! A TimeArray repeats no column name, so each currency finds exactly one column.
+    j = zeros(Int, length(nc))
+    for (a, c) in pairs(nc), (k, d) in pairs(cn)
+        if c == d
+            j[a] = k
+        end
+    end
+    @argcheck(length(TimeSeries.colnames(cash_base)) == 1,
+              DimensionMismatch("`cash_base` is the cash index of the base currency, so it holds one column; got $(length(TimeSeries.colnames(cash_base)))"))
+    S = values(unify_gaps(fx))
+    K = values(unify_gaps(cash))[:, j]
+    Kb = values(unify_gaps(cash_base))
+    return TimeSeries.TimeArray(ts, S .* K ./ view(Kb, :, 1), nc)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -634,5 +752,5 @@ end
 function apply_preprocessing(ptr::PricesToReturns, pr::PricesResult)::ReturnsResult
     return prices_to_returns(ptr, pr)
 end
-export prices_to_returns, PricesToReturns, CatchUpGapReturn
+export prices_to_returns, PricesToReturns, CatchUpGapReturn, currency_excess_index
 public AbstractGapReturnAlgorithm, gap_return

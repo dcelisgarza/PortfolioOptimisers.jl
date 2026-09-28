@@ -1,5 +1,5 @@
 ```@meta
-Description = "Returns result, private API of PortfolioOptimisers.jl: Prices_RR, check_names_and_returns_matrix, assert_asset_panel_supplied."
+Description = "Returns result, private API of PortfolioOptimisers.jl: Prices_RR, check_names_and_returns_matrix, check_exogenous_series, assert_asset_panel_supplied."
 ```
 
 # Returns result: private API
@@ -14,5 +14,6 @@ Prices_RR
 
 ```@docs
 check_names_and_returns_matrix
+check_exogenous_series
 PortfolioOptimisers.assert_asset_panel_supplied
 ```

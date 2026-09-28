@@ -926,7 +926,8 @@ function rebuild_returns_result(rd::ReturnsResult, predictions::VecMPredRes,
     end
     iv = iv_flag ? reshape(iv, :, N) : nothing
     return ReturnsResult(; nx = ["_$i" for i in 1:N], X = X, nf = rd1.nf, F = rd1.F,
-                         nb = nb, B = B, ts = rd1.ts, iv = iv, ivpa = ivpa, pnl = pnl)
+                         nb = nb, B = B, ne = rd1.ne, E = rd1.E, ts = rd1.ts, iv = iv,
+                         ivpa = ivpa, pnl = pnl)
 end
 """
     sub_portfolio_predictions(::Type{T}, opti, u, rd, cv, ex) where {T}
@@ -1060,7 +1061,8 @@ function predict_outer_returns(::Option{<:OptimisationCrossValidation}, ::Any,
                                    sub_portfolio_view(u, fees, i))
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,
-                         nb = nb, B = B, ts = rd.ts, iv = iv, ivpa = ivpa, pnl = pnl)
+                         nb = nb, B = B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = iv,
+                         ivpa = ivpa, pnl = pnl)
 end
 function predict_outer_returns(cv::OptimisationCrossValidation{<:NonCombOptCV}, opt,
                                u::SubPortfolioUniverse, rd::ReturnsResult,

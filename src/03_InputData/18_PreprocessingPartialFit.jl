@@ -12,8 +12,8 @@ The function concatenates a time-varying panel mask by mask, and refuses its Pan
 
 The method that Julia selects is the algorithm.
 
- 1. [`PricesResult`](@ref): check that the implied-volatility adjustment `ivpa` of `b` equals the one of `a`. Concatenate the prices `X`, the factors `F`, the benchmark `B` and the implied volatilities `iv` with [`vcat_optional`](@ref), which also checks the column names. Concatenate the panel with [`vcat_panel_rows`](@ref), and the Listing Span `span` with [`vcat_optional`](@ref).
- 2. [`ReturnsResult`](@ref): check that the names `nx`, `nf` and `nb` and the adjustment `ivpa` of `b` equal the ones of `a`. Concatenate `X`, `F`, `B`, the timestamps `ts` and `iv` with [`vcat_optional`](@ref), and the panel with [`vcat_panel_rows`](@ref).
+ 1. [`PricesResult`](@ref): check that the implied-volatility adjustment `ivpa` of `b` equals the one of `a`. Concatenate the prices `X`, the factors `F`, the benchmark `B`, the Exogenous Series `E` and the implied volatilities `iv` with [`vcat_optional`](@ref), which also checks the column names. Concatenate the panel with [`vcat_panel_rows`](@ref), and the Listing Span `span` with [`vcat_optional`](@ref).
+ 2. [`ReturnsResult`](@ref): check that the names `nx`, `nf`, `nb` and `ne` and the adjustment `ivpa` of `b` equal the ones of `a`. Concatenate `X`, `F`, `B`, `E`, the timestamps `ts` and `iv` with [`vcat_optional`](@ref), and the panel with [`vcat_panel_rows`](@ref).
 
 # Arguments
 
@@ -40,7 +40,7 @@ The method that Julia selects is the algorithm.
 function vcat_observations(a::PricesResult, b::PricesResult)
     assert_pinned_value(a.ivpa, b.ivpa, :ivpa)
     return PricesResult(; X = vcat_optional(a.X, b.X, :X), F = vcat_optional(a.F, b.F, :F),
-                        B = vcat_optional(a.B, b.B, :B),
+                        B = vcat_optional(a.B, b.B, :B), E = vcat_optional(a.E, b.E, :E),
                         iv = vcat_optional(a.iv, b.iv, :iv), ivpa = a.ivpa,
                         pnl = vcat_panel_rows(a.pnl, b.pnl),
                         span = vcat_optional(a.span, b.span, :span))
@@ -49,10 +49,12 @@ function vcat_observations(a::ReturnsResult, b::ReturnsResult)
     assert_pinned_value(a.nx, b.nx, :nx)
     assert_pinned_value(a.nf, b.nf, :nf)
     assert_pinned_value(a.nb, b.nb, :nb)
+    assert_pinned_value(a.ne, b.ne, :ne)
     assert_pinned_value(a.ivpa, b.ivpa, :ivpa)
     return ReturnsResult(; nx = a.nx, X = vcat_optional(a.X, b.X, :X), nf = a.nf,
                          F = vcat_optional(a.F, b.F, :F), nb = a.nb,
-                         B = vcat_optional(a.B, b.B, :B),
+                         B = vcat_optional(a.B, b.B, :B), ne = a.ne,
+                         E = vcat_optional(a.E, b.E, :E),
                          ts = vcat_optional(a.ts, b.ts, :ts),
                          iv = vcat_optional(a.iv, b.iv, :iv), ivpa = a.ivpa,
                          pnl = vcat_panel_rows(a.pnl, b.pnl))
@@ -298,7 +300,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Puts the series columns of the price data `pr` side by side: the assets, then the factors, then the benchmark.
+Puts the series columns of the price data `pr` side by side: the assets, then the factors, then the benchmark, then the Exogenous Series.
 
 [`series_values_returns`](@ref) lays the columns of a `ReturnsResult` out in the same order, so a column index of one matrix names the same series in the other.
 
@@ -307,7 +309,8 @@ Puts the series columns of the price data `pr` side by side: the assets, then th
  1. Read the asset prices `X` with each gap written as `NaN`, giving the first block of `cols`.
  2. When `pr` holds factor prices `F`, append them to `cols` in the same way.
  3. When `pr` holds benchmark prices `B`, append them to `cols` in the same way.
- 4. Concatenate `cols` horizontally.
+ 4. When `pr` holds an Exogenous Series `E`, append it to `cols` in the same way.
+ 5. Concatenate `cols` horizontally.
 
 # Returns
 
@@ -326,6 +329,9 @@ function series_values(pr::PricesResult)
     end
     if !isnothing(pr.B)
         push!(cols, values(unify_gaps(pr.B)))
+    end
+    if !isnothing(pr.E)
+        push!(cols, values(unify_gaps(pr.E)))
     end
     return reduce(hcat, cols)
 end
@@ -508,7 +514,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Puts the series columns of the returns data `rd` side by side, in the order of [`series_values`](@ref): the assets, then the factors, then the benchmark.
+Puts the series columns of the returns data `rd` side by side, in the order of [`series_values`](@ref): the assets, then the factors, then the benchmark, then the Exogenous Series.
 
 # Algorithm
 
@@ -534,6 +540,9 @@ function series_values_returns(rd::ReturnsResult)
     if !isnothing(rd.B)
         push!(cols, isa(rd.B, AbstractVector) ? reshape(collect(rd.B), :, 1) : Matrix(rd.B))
     end
+    if !isnothing(rd.E)
+        push!(cols, Matrix(rd.E))
+    end
     return reduce(hcat, cols)
 end
 """
@@ -545,9 +554,9 @@ A Gap Return writes a finite return where the default conversion left none. So t
 
 # Algorithm
 
- 1. Split `R` into the asset returns `X`, the factor returns `F` and the benchmark returns `B`, in the layout of [`series_values_returns`](@ref). `B` is one column when the benchmark of `rd` is a vector.
+ 1. Split `R` into the asset returns `X`, the factor returns `F`, the benchmark returns `B` and the Exogenous Series `E`, in the layout of [`series_values_returns`](@ref). `B` is one column when the benchmark of `rd` is a vector.
  2. When `rd` holds a time-varying panel, keep its active mask `amsk`, and derive the estimation mask `emsk` as the cells of `amsk` where `X` is finite. When `emsk` is true everywhere, [`compress_all_true`](@ref) replaces the two masks with one all-true mask.
- 3. Build the `ReturnsResult` from `X`, `F`, `B`, the panel, and the other fields of `rd`.
+ 3. Build the `ReturnsResult` from `X`, `F`, `B`, `E`, the panel, and the other fields of `rd`.
 
 # Returns
 
@@ -573,17 +582,22 @@ function returns_with_series(rd::ReturnsResult, R::AbstractMatrix,
     B = if isnothing(rd.B)
         nothing
     elseif isa(rd.B, AbstractVector)
-        R[:, k + 1]
+        k += 1
+        R[:, k]
     else
-        R[:, (k + 1):(k + size(rd.B, 2))]
+        nb = size(rd.B, 2)
+        k += nb
+        R[:, (k - nb + 1):k]
     end
+    E = isnothing(rd.E) ? nothing : R[:, (k + 1):(k + size(rd.E, 2))]
     pnl = rd.pnl
     if !isnothing(pnl) && !panel_is_static(pnl)
         amsk, emsk = compress_all_true(Matrix(pnl.amsk), Matrix(pnl.amsk) .& isfinite.(X))
         pnl = AssetPanel(; pf = pnl.pf, amsk = amsk, emsk = emsk)
     end
     return ReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = F, nb = rd.nb, B = B,
-                         ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa, pnl = pnl)
+                         ne = rd.ne, E = E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
+                         pnl = pnl)
 end
 """
     fit_preprocessing(ptr::PricesToReturns)
@@ -747,7 +761,7 @@ function partial_fit_transform(est::PriceGapFill, pr::PricesResult)
         end
     end
     X = TimeSeries.TimeArray(ts, vals, TimeSeries.colnames(pr.X))
-    out = PricesResult(; X = X, F = pr.F, B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
+    out = PricesResult(; X = X, F = pr.F, B = pr.B, E = pr.E, iv = pr.iv, ivpa = pr.ivpa,
                        pnl = pr.pnl, span = pr.span)
     cache = PriceGapFillState(; nx = names, v = vnew, held = hnew, te = last(ts))
     return rebuild_estimator(est, (; cache = cache)), out

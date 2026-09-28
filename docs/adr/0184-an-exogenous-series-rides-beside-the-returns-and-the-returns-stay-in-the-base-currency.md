@@ -36,53 +36,59 @@ as its keyword `ref`. `composite_score` calls `descriptor(de, rd)` with no keywo
 the prior the descriptor always throws.
 
 The identity that splits a base-currency return is exact only in log returns. With simple
-returns, `R_base = (1 + R_local)(1 + R_FX) - 1`, so the base-currency excess return is
-
-```text
-R_excess_base_i = R_excess_local_i + (R_FX_C + r_cash_C - r_cash_base) + R_local_i * R_FX_C
-```
-
-The cross term `R_local_i * R_FX_C` depends on the asset, so no series with one column for each
-currency can hold it. With log returns, `ln(1 + R_base) = ln(1 + R_local) + ln(1 + R_FX)`, and
-the split has no cross term.
+returns, `R_base = (1 + R_local)(1 + R_FX) - 1`, so the base-currency excess return holds a cross
+term `R_local * R_FX`. The term depends on the asset, so no series with one column for each
+currency can hold it. With log returns the split has no cross term.
 
 ## Decision
 
 1. **The asset returns stay in the base currency, with or without Currency Factors.** The
-   contract of `rd.X` does not change. By default the prior derives the local excess returns as
-   `X - Z_ccy * r_ccy`. `Z_ccy` is the one-hot currency exposure of each asset at each
-   observation. A field on the prior can name a `NumericPanelField` of local returns instead.
-   The regression then reads that field, and the caller's own measure of the local return enters
-   the fit unchanged. Two cases need the named field. The first is an asset with no currency label
-   at an observation: the derived path gives it a `NaN` local return, and the asset leaves that
-   regression. The second is a caller whose local returns are not `X - Z_ccy * r_ccy`, which
-   includes every simple-return panel because of the cross term.
-2. **A new block, the Exogenous Series, rides on `ReturnsResult` and on `PricesResult`.** The
-   block is a pair of fields, `ne` for the names and `E` for the `observations × series` matrix,
-   beside `nx/X`, `nf/F` and `nb/B`. It holds named series over the observation axis that belong
-   to no asset. A consumer reads a column only by its name, so no model takes the block whole as
-   its factors.
-3. **Every observation slice cuts `E` by rows, and an asset view passes it through.** Both
-   arities of `port_opt_view`, the validation of the constructor and every site that rebuilds a
+   contract of `rd.X` does not change. By default the prior regresses on the returns net of its
+   observed factors, `X_t - Z(t - lag) r_t`, where `Z` is the exposure of each asset to each
+   observed factor at the observation the model loads for `t`. Under Currency Factors these are
+   the local returns. A field `lx` on the prior can name a `NumericPanelField` of net returns
+   instead, and the regression then reads that field unchanged. Two cases need the named field:
+   an asset with no currency label at an observation, which the derived path gives a `NaN` net
+   return, and a caller whose local returns are not `X - Z r`, which includes every simple-return
+   panel because of the cross term.
+2. **A new block, the Exogenous Series, rides on `PricesResult` and on `ReturnsResult`.** It holds
+   named series over the observation axis that belong to no asset. `PricesResult.E` holds
+   **levels**, a `TimeArray` whose column names are the names, and `ReturnsResult` holds their
+   **returns** in the pair `ne`/`E`, beside `nx/X`, `nf/F` and `nb/B`. A consumer reads a column
+   only by its name, so no model takes the block whole as its factors.
+3. **`E` is data like every other series, and it never changes the universe of the assets.**
+   `price_ingestion` aligns `E` by timestamp to the clock it emits, as it aligns the implied
+   volatilities: it pads `NaN` where `E` is silent and names the padding, and `E` never adds or
+   drops an observation of the assets. `prices_to_returns` converts `E` with the same
+   `ret_method`, `padding` and Gap Return rule as `X`, so the two cannot use two different return
+   methods. The online form keeps the last price row, so it covers `E` too, and a price-level fold
+   and a `Pipeline` see `E` as one more price series. A gap stays a gap: the consumer that names
+   a series refuses a non-finite value only on the rows that it fits.
+4. **Every observation slice cuts `E` by rows, and an asset view passes it through.** Both
+   arities of `port_opt_view`, the validation of the constructors and every site that rebuilds a
    `ReturnsResult` carry the block. The asset-only view leaves it whole, as it leaves `F`.
-4. **`prices_to_returns` carries `E` unconverted.** `E` is already returns-level data, so the
-   ingestion aligns it by timestamp to the rows it keeps and does not difference it. A timestamp
-   that `E` lacks, and a `NaN` in `E`, stay `NaN`. `E` never drops, pads or fills a row, because
-   a series that one consumer reads must not remove observations from every asset. The consumer
-   that names a series refuses a non-finite value only on the rows that it fits.
-5. **The Currency Factors select their columns by the currency level.** The level of the
-   categorical Panel Field, for example `"USD"`, is the key, not the one-hot factor name
-   `"<field>=<level>"`. Columns that no currency names are ignored. A level with no column is
-   refused, even when no asset holds that level, because its factor enters the factor covariance
-   with zero loadings.
-6. **The library builds a Currency Excess Return, but it converts no asset return.** #927 ships
-   a helper that turns exchange rates, stated as base currency per unit of the currency, and cash
-   rates for each period into Currency Excess Returns. The helper takes the `ret_method` of
-   `prices_to_returns`. With `:log` it gives the exact split. With `:simple` it gives
-   `R_FX + r_cash_C - r_cash_base`, and its docstring states where the cross term goes: into the
-   derived local return, or out of the model when a named field supplies the local returns.
-7. **The family label `currency` is reserved** for the Currency Factors. No other Exposure
-   Estimator can claim it, and no Factor Family constraint can name it.
+5. **An observed factor is a kind of Exposure Estimator.** A member of
+   `AbstractObservedExposureEstimator` gives the exposures of its factors and names the column of
+   `E` that holds the return of each. `CurrencyExposure` gives one Currency Factor per level of a
+   categorical Panel Field, and selects its column by the level, for example `"USD"`.
+   `ObservedExposure` wraps an estimated member and names one series, for a macro factor (#1365)
+   or an observed market return. The prior takes observed members in its factor list and puts
+   them after the estimated factors on every axis. A series with no column is refused, even when
+   no asset loads on the factor, because its factor enters the factor covariance.
+6. **No family label is reserved.** The family of an observed factor is a property of its member,
+   `currency` by default for `CurrencyExposure`. A family holds estimated factors or observed ones,
+   never both, and no constrained family can name an observed family. The factor-model block
+   states its observed factors through `fx`, their returns on the rows of `csr.f`, and every
+   consumer finds them as the trailing columns of both axes: attribution reports them as direct
+   returns with no standard error, and the regression diagnostics read the design the regression
+   ran on.
+7. **The library builds a Currency Excess Index, and it converts no asset return.**
+   `currency_excess_index` turns exchange rates, stated as base currency per unit of the currency,
+   and cash total-return indices into one level series per currency:
+   `I_C(t) = FX_C(t) * cash_C(t) / cash_base(t)`. Its simple return is
+   `(1 + R_FX)(1 + r_C) / (1 + r_base) - 1`, the Currency Excess Return. The conversion applies
+   `ret_method`: with `:log` the split is exact, and with `:simple` the cross term of each asset
+   remains, in the derived net return or out of the model under a named field.
 
 ## Considered options
 
@@ -91,32 +97,37 @@ the split has no cross term.
   fold then hold local-currency returns.
 - **The derived path alone, or the named field alone.** The derived path alone loses the asset
   with no currency label and the caller's own local returns. The named field alone makes every
-  caller build one more `observations × assets` matrix, even when `X - Z_ccy * r_ccy` is what
-  they would supply. Both paths together cost one optional field.
-- **The currency returns inside `F`, selected by name.** Rejected by fact 3. No slicing site
-  needs an edit, but every time-series reader of `F` then models the currencies as factors.
+  caller build one more `observations × assets` matrix.
+- **The currency returns inside `F`, selected by name.** Rejected by fact 3.
 - **A dedicated currency block.** It needs the same edits as the Exogenous Series, and it serves
   one consumer. `EWMacroSensitivity` needs the same carrier.
 - **A keyword argument of `prior`.** Rejected by fact 4.
-- **A panel-level series on the Asset Panel.** Rejected by fact 2. It also adds a fourth kind of
-  Panel Field whose axis is not the asset, and about sixteen rebuild sites of the panel.
-- **The Exogenous Series on `ReturnsResult` only, attached after `prices_to_returns`.** It keeps
-  price containers free of returns-level data. It was not chosen, because a caller who starts
-  from prices then aligns the block by hand, outside the path that already aligns every other
-  series.
+- **A panel-level series on the Asset Panel.** Rejected by fact 2.
+- **`E` as returns-level data at the price level, carried unconverted.** The first text of this
+  ADR chose it. Rejected, because a `PricesResult` then held one returns-level series beside its
+  prices: `X` and `E` could use two different return methods, and the online form, the folds and
+  the Gap Return rule each needed a special case for `E`. Levels at the price level let the
+  existing conversion do all of it.
+- **A Currency Factor with a reserved family label `currency` and its own field on the prior.**
+  The first text of this ADR chose it. Rejected, because the mechanism "a factor whose return is
+  read from `E` by name" is not specific to currencies: #1365 needs it for macro series, and an
+  observed market return needs it too. A kind of member states it once, and a magic string does
+  not.
 - **`prices_to_returns` refuses a gap in `E`.** Rejected. It refuses rows that the fit never
   reads: the warm-up of the descriptors and the exposure lag consume the first rows.
 
 ## Consequences
 
-- `ReturnsResult` and `PricesResult` gain the fields `ne` and `E`. Each site that rebuilds a
-  `ReturnsResult` must carry them. The census on #926 names these sites: the two
-  `port_opt_view` arities, `prices_to_returns`, the cross-sectional prior's rebuilds, the partial
-  fit concatenation, `ReturnsBufferState`, the meta-optimisation rebuilds and the cross-validation
-  rebuild.
+- `ReturnsResult`, `PricesResult`, `PredictionReturnsResult` and `ReturnsBufferState` gain the
+  Exogenous Series, and every site that rebuilds one carries it (#1366).
+- `CrossSectionalFactorModel` gains `fx`, `FactorFamilyBasis` gains a pass-through arm, and the
+  regression diagnostics read the design of the regression (#1367). That change also makes them
+  answer on a block that a prior fitted with a constrained family, which threw before.
+- `CrossSectionalFactorPrior` takes observed members in its factor list (#1368).
+- The outer problem of a meta-optimiser views its returns data onto the observations its Prior
+  Result answers on, so a cross-sectional prior runs inside `NestedClustered` (#1369).
 - `CrossSectionalFactorPrior` has no online path now. A future online path must buffer `E` as
-  it buffers `F`, or a later batch loses its Currency Excess Returns.
+  it buffers `F`.
 - `EWMacroSensitivity` can name a column of the Exogenous Series in place of its keyword `ref`,
-  so that it works inside the prior. #1365, blocked by #927, tracks that work.
-- Factor attribution already treats the family label `currency` as a direct return with no
-  standard error, so the Currency Factors reach it with no change.
+  so that it works inside the prior, and an `ObservedExposure` can pair it with the observed
+  series. #1365 tracks that work.

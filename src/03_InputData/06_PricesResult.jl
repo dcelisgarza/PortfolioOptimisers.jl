@@ -77,11 +77,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Holds asset prices with optional factor, benchmark and implied volatility series, each a `TimeSeries.TimeArray`.
+Holds asset prices with optional factor, benchmark, Exogenous Series and implied volatility series, each a `TimeSeries.TimeArray`.
 
 It is the price-level counterpart of [`ReturnsResult`](@ref). The price-level preprocessing steps and [`prices_to_returns`](@ref) take it as input, and [`port_opt_view`](@ref) cuts it into the timestamp windows of pipeline cross-validation.
 
 The asset price series `X` is the master clock. [`port_opt_view`](@ref) selects observation windows on `X`, and each other series keeps its rows at the timestamps that `X` keeps.
+
+The Exogenous Series `E` holds level series that belong to no asset, for example a Currency Excess Index. [`price_ingestion`](@ref) aligns it by timestamp to the clock of `X`, and [`prices_to_returns`](@ref) converts it with the return rule of the assets. Its column names are the names that [`ReturnsResult`](@ref) carries in `ne`.
 
 The [`AssetPanel`](@ref) `pnl` and the Listing Span `span` hold no timestamps, so no timestamp aligns them. A Panel Field can be a 3-dimensional array, a static panel has no observation axis, and a span can be two integers per asset. Their axes run parallel to `X` by position instead. The asset axis follows `TimeSeries.colnames(X)`, and the observation axis of a time-varying panel follows `TimeSeries.timestamp(X)` row for row. A routine that drops an asset or an observation from `X` must drop it from `pnl` and `span` in the same step. [`port_opt_view`](@ref) does this through [`asset_panel_view`](@ref) and [`listing_span_view`](@ref), and [`MissingDataFilter`](@ref) and [`prices_to_returns`](@ref) do it too.
 
@@ -95,6 +97,7 @@ $(DocStringExtensions.FIELDS)
         X::TimeSeries.TimeArray,
         F::Option{<:TimeSeries.TimeArray} = nothing,
         B::Option{<:TimeSeries.TimeArray} = nothing,
+        E::Option{<:TimeSeries.TimeArray} = nothing,
         iv::Option{<:TimeSeries.TimeArray} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing,
         pnl::Option{<:AssetPanel} = nothing,
@@ -108,6 +111,7 @@ Keywords correspond to the struct's fields.
   - `!isempty(X)`.
   - If `F` is not `nothing`: `!isempty(F)`.
   - If `B` is not `nothing`: `!isempty(B)`, and `size(values(B), 2) in (1, size(values(X), 2))`.
+  - If `E` is not `nothing`: `!isempty(E)`.
   - If `iv` is not `nothing`: `!isempty(iv)`, `size(values(iv), 2) == size(values(X), 2)`, and every present value is finite and non-negative. An absent value is `NaN`, or `missing` on a `PricesResult` built by hand. See [`assert_nonneg_where_present`](@ref).
   - If `ivpa` is not `nothing`: `!isempty(ivpa)`, `all(isfinite, ivpa)` and `all(x -> x > 0, ivpa)`. If `ivpa` is a vector: `length(ivpa) == size(values(X), 2)`.
   - If `pnl` is not `nothing`: its asset axis has the length `size(values(X), 2)`, and the observation axis of a time-varying panel has the length `size(values(X), 1)`. See [`check_asset_panel`](@ref).
@@ -153,6 +157,10 @@ julia> size(values(pr.X))
     """
     B
     """
+    Optional Exogenous Series, `observations × series`: level series that belong to no asset, such as a Currency Excess Index. [`prices_to_returns`](@ref) converts them to the Exogenous Series of the [`ReturnsResult`](@ref).
+    """
+    E
+    """
     Optional implied volatilities, `observations × assets`. An absent value is `NaN`, and [`ImpliedVolatility`](@ref) removes the asset from its fit.
     """
     iv
@@ -170,6 +178,7 @@ julia> size(values(pr.X))
     span
     function PricesResult(X::TimeSeries.TimeArray, F::Option{<:TimeSeries.TimeArray},
                           B::Option{<:TimeSeries.TimeArray},
+                          E::Option{<:TimeSeries.TimeArray},
                           iv::Option{<:TimeSeries.TimeArray}, ivpa::Option{<:Num_VecNum},
                           pnl::Option{<:AssetPanel}, span::Option{<:AbstractMatrix{Bool}})
         @argcheck(!isempty(X), IsEmptyError)
@@ -179,6 +188,9 @@ julia> size(values(pr.X))
         if !isnothing(B)
             @argcheck(!isempty(B), IsEmptyError)
             @argcheck(size(values(B), 2) in (1, size(values(X), 2)), DimensionMismatch)
+        end
+        if !isnothing(E)
+            @argcheck(!isempty(E), IsEmptyError)
         end
         if !isnothing(iv)
             @argcheck(!isempty(iv), IsEmptyError)
@@ -196,27 +208,28 @@ julia> size(values(pr.X))
             @argcheck(size(span) == size(values(X)),
                       DimensionMismatch("a Listing Span states which assets are listed at each observation of the price clock, so it is the shape of the asset prices; got size(span) = $(size(span)) and size(values(X)) = $(size(values(X)))"))
         end
-        return new{typeof(X), typeof(F), typeof(B), typeof(iv), typeof(ivpa), typeof(pnl),
-                   typeof(span)}(X, F, B, iv, ivpa, pnl, span)
+        return new{typeof(X), typeof(F), typeof(B), typeof(E), typeof(iv), typeof(ivpa),
+                   typeof(pnl), typeof(span)}(X, F, B, E, iv, ivpa, pnl, span)
     end
 end
 function PricesResult(; X::TimeSeries.TimeArray,
                       F::Option{<:TimeSeries.TimeArray} = nothing,
                       B::Option{<:TimeSeries.TimeArray} = nothing,
+                      E::Option{<:TimeSeries.TimeArray} = nothing,
                       iv::Option{<:TimeSeries.TimeArray} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing,
                       pnl::Option{<:AssetPanel} = nothing,
                       span::Option{<:AbstractMatrix{Bool}} = nothing)::PricesResult
-    return PricesResult(X, F, B, iv, ivpa, pnl, span)
+    return PricesResult(X, F, B, E, iv, ivpa, pnl, span)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the `PricesResult` on the observation window `i` and the assets `j` of the asset price series `X`.
 
-Indexing a `TimeArray` copies its rows, so `X`, `F`, `B` and `iv` of the result are copies. `ivpa`, the Asset Panel and the Listing Span of the result can share memory with `pr`, and the call with two `Colon`s returns `pr` itself.
+Indexing a `TimeArray` copies its rows, so `X`, `F`, `B`, `E` and `iv` of the result are copies. `ivpa`, the Asset Panel and the Listing Span of the result can share memory with `pr`, and the call with two `Colon`s returns `pr` itself.
 
-The asset price series is the master clock. `i` selects rows of `X`, and the factor, benchmark and implied volatility series keep their rows at the timestamps that `X` keeps. The rows come back in clock order whatever the order of `i`, and a timestamp of `i` that `X` does not hold selects no row. `j` selects asset columns in the order it gives them, and its default is `:`. So a call that gives only `i` is an observation window over the whole universe.
+The asset price series is the master clock. `i` selects rows of `X`, and the factor, benchmark, Exogenous Series and implied volatility series keep their rows at the timestamps that `X` keeps. The rows come back in clock order whatever the order of `i`, and a timestamp of `i` that `X` does not hold selects no row. `j` selects asset columns in the order it gives them, and its default is `:`. So a call that gives only `i` is an observation window over the whole universe.
 
 The first index selects observations here. The two-argument method of [`ReturnsResult`](@ref) selects assets, so `i` names a different axis on the two types.
 
@@ -226,12 +239,12 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
 
  1. `i` and `j` are both `Colon`: return `pr` itself. No view is built.
 
- 2. `i` is a vector of timestamps and `j` is a `Colon`: index `X`, `F`, `B` and `iv` by the timestamps `i`. Recover the rows of a time-varying Asset Panel from the kept timestamps with [`feature_row_indices`](@ref), and view the panel on that observation axis with [`asset_panel_view`](@ref). A static panel has no observation axis and ignores the row index. View the Listing Span at the same timestamps with [`listing_span_view`](@ref). Pass `ivpa` through unchanged, because the asset index does not reach it. Rebuild the [`PricesResult`](@ref).
+ 2. `i` is a vector of timestamps and `j` is a `Colon`: index `X`, `F`, `B`, `E` and `iv` by the timestamps `i`. Recover the rows of a time-varying Asset Panel from the kept timestamps with [`feature_row_indices`](@ref), and view the panel on that observation axis with [`asset_panel_view`](@ref). A static panel has no observation axis and ignores the row index. View the Listing Span at the same timestamps with [`listing_span_view`](@ref). Pass `ivpa` through unchanged, because the asset index does not reach it. Rebuild the [`PricesResult`](@ref).
 
  3. `i` is a vector of timestamps and `j` is a vector of asset indices:
 
      1. Index `X` by the timestamps `i`, then keep the asset columns `j`.
-     2. Index `F` by the timestamps `i` alone. `j` is an asset index, and the factors are a separate axis, so every factor column stays.
+     2. Index `F` and `E` by the timestamps `i` alone. `j` is an asset index, and the factors and the Exogenous Series are separate axes, so every column of each stays.
      3. Index `B` by the timestamps `i`. Keep its columns `j` when `B` holds one column per asset, and keep its single column otherwise. The test reads the width of `B`, because a shared benchmark has only one column to give.
      4. Index `iv` by the timestamps `i` and the asset columns `j`, and view `ivpa` at `j`.
      5. Recover the rows of a time-varying Asset Panel with [`feature_row_indices`](@ref). View the panel at those rows and the assets `j` with [`asset_panel_view`](@ref), and give it the asset names. It then also cuts the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref).
@@ -288,12 +301,13 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
     X = pr.X[i]
     F = isnothing(pr.F) ? nothing : pr.F[i]
     B = isnothing(pr.B) ? nothing : pr.B[i]
+    E = isnothing(pr.E) ? nothing : pr.E[i]
     iv = isnothing(pr.iv) ? nothing : pr.iv[i]
     rows = feature_row_indices(pr.pnl, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X))
     pnl = asset_panel_view(pr.pnl, rows, :, nothing)
     span = listing_span_view(pr.span, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X),
                              :)
-    return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = pr.ivpa, pnl = pnl,
+    return PricesResult(; X = X, F = F, B = B, E = E, iv = iv, ivpa = pr.ivpa, pnl = pnl,
                         span = span)
 end
 function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime},
@@ -311,13 +325,15 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
     else
         pr.B[i]
     end
+    E = isnothing(pr.E) ? nothing : pr.E[i]
     iv = isnothing(pr.iv) ? nothing : pr.iv[i][TimeSeries.colnames(pr.iv)[j]]
     ivpa = nothing_scalar_array_view(pr.ivpa, j)
     rows = feature_row_indices(pr.pnl, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X))
     pnl = asset_panel_view(pr.pnl, rows, j, string.(TimeSeries.colnames(pr.X)))
     span = listing_span_view(pr.span, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X),
                              j)
-    return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = ivpa, pnl = pnl, span = span)
+    return PricesResult(; X = X, F = F, B = B, E = E, iv = iv, ivpa = ivpa, pnl = pnl,
+                        span = span)
 end
 function port_opt_view(pr::PricesResult,
                        i::Union{<:VecInt, <:AbstractRange{<:Integer}, Colon} = :,

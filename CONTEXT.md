@@ -117,13 +117,13 @@ The pervasive Algorithm distinction in moment estimation: `FullMoment` includes 
 
 **ReturnsResult**
 The central data structure carrying all return series through the library: asset, factor and benchmark returns, the Exogenous Series, their names, timestamps, implied volatility, and the Asset Panel. Produced by `prices_to_returns`.
-Its asset returns are in the investor's base currency, with or without Currency Factors (§3). A model that needs local-currency returns derives them, or reads them from a Panel Field the caller names; it never reads the asset returns as local. See ADR 0184.
+Its asset returns are in the investor's base currency, with or without Currency Factors (§3). A model that needs returns net of its Observed Factors, the local-currency returns under Currency Factors, derives them, or reads them from a Panel Field the caller names; it never reads the asset returns as local. See ADR 0184.
 
 **PricesResult**
-The container of aligned, time-indexed price-level series: the prices-level mirror of `ReturnsResult`, and the input to price Preprocessing Estimators. It also carries the Exogenous Series, which is already returns-level and passes to `ReturnsResult` unconverted.
+The container of aligned, time-indexed price-level series: the prices-level mirror of `ReturnsResult`, and the input to price Preprocessing Estimators. It also carries the Exogenous Series as level series, which `prices_to_returns` converts with the return rule of the assets.
 
 **Exogenous Series**
-A named series over the observation axis that belongs to no asset: a Currency Excess Return (§3), an exchange rate return, a rate of interest. A consumer reads a series only by its name, so no model takes the block whole as its factors. It follows every observation slice of the returns it rides beside, and it is never converted, filled, or used to drop an observation: a gap stays a gap, and the consumer that names the series refuses it only on the rows it fits. See ADR 0184.
+A named series over the observation axis that belongs to no asset: a Currency Excess Index (§3), a macro index, an observed market index. A `PricesResult` holds its levels and a `ReturnsResult` its returns, converted with the return rule of the assets. A consumer reads a series only by its name, so no model takes the block whole as its factors. It follows every observation slice of the data it rides beside, and it never adds or drops an observation of the assets: the ingestion aligns it by timestamp, a gap stays a gap, and the consumer that names the series refuses it only on the rows it fits. See ADR 0184.
 *Avoid*: factor returns, which a time-series factor model reads whole as its factors; and a Panel Field, which is per asset.
 
 **Feature Matrix**
@@ -304,13 +304,21 @@ The replacement of one Factor Exposure by its residual after a benchmark-weighte
 The time-varying change of basis that imposes each Factor Family's zero-sum constraint by dropping one member and rewriting the others, stored as the per-observation ratios of the retained members to the dropped one.
 *Avoid*: the reduced loadings, which are what the basis produces rather than the basis itself.
 
+**Currency Excess Index**
+The value in the base currency of a deposit in one currency funded in the base currency: the exchange rate times the cash total-return index of the currency, divided by the cash total-return index of the base currency. It is the level series whose return is the Currency Excess Return, and `currency_excess_index` builds it. See ADR 0184.
+*Avoid*: an exchange rate, which leaves out the two cash returns.
+
 **Currency Excess Return**
-The return, in the investor's base currency, of holding the cash of one currency: its exchange rate return plus its cash rate minus the base currency's cash rate. In log returns an asset's base-currency excess return is exactly its local excess return plus the Currency Excess Return of its currency. In simple returns the sum leaves out the cross term, the local return times the exchange rate return, which depends on the asset and so no per-currency series can hold. See ADR 0184.
-*Avoid*: a currency conversion; the library converts no return, and the Currency Excess Return is data the caller supplies or builds from exchange rates and cash rates.
+The return, in the investor's base currency, of holding the cash of one currency, which is the return of its Currency Excess Index: in simple returns (1 + exchange rate return)(1 + cash rate) / (1 + base cash rate) - 1. In log returns an asset's base-currency excess return is exactly its local excess return plus the Currency Excess Return of its currency. In simple returns the sum leaves out the cross term, the local return times the exchange rate return, which depends on the asset and so no per-currency series can hold. See ADR 0184.
+*Avoid*: a currency conversion; the library converts no asset return, and the Currency Excess Return is data the caller supplies or builds from exchange rates and cash rates.
+
+**Observed Factor**
+A factor of a Cross-Sectional Factor Prior whose return the caller observes and the fit does not estimate: its member, an `AbstractObservedExposureEstimator`, gives the exposures and names the column of the Exogenous Series that holds each return. The regression runs on the returns net of the Observed Factors, and the Observed Factors then follow the estimated factors on every axis of the factor model. No Factor Family Basis or Neutralisation touches them, and attribution reports them as direct returns with no standard error. A Factor Family holds estimated factors or Observed Factors, never both. See ADR 0184.
+*Avoid*: a time-series factor, which a `FactorPrior` reads whole from the factor returns and regresses each asset on.
 
 **Currency Factor**
-A factor whose return is observed, not estimated: the Currency Excess Return of one currency, read from the Exogenous Series by the currency's name, with a one-hot exposure on the assets that hold that currency. It never enters the Cross-Sectional Regression, and no Factor Family Basis or Neutralisation touches it. See ADR 0184.
-*Avoid*: a Factor Family; the currency factors carry the reserved family label `currency`, which carries no zero-sum constraint and which no other Exposure Estimator may claim.
+The Observed Factor of one currency: the Currency Excess Return of the currency, read from the Exogenous Series by the currency's name, with a one-hot exposure on the assets that hold that currency. `CurrencyExposure` gives one per currency level. See ADR 0184.
+*Avoid*: a reserved family label; the family of the Currency Factors is a property of their member, `currency` by default.
 
 ### 3.5 Matrix Processing
 

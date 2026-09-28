@@ -514,6 +514,7 @@ end
     price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
                     F::Option{<:TimeSeries.TimeArray} = nothing,
                     B::Option{<:TimeSeries.TimeArray} = nothing,
+                    E::Option{<:TimeSeries.TimeArray} = nothing,
                     iv::Option{<:TimeSeries.TimeArray} = nothing,
                     ivpa::Option{<:Num_VecNum} = nothing,
                     pnl::Option{<:AssetPanel} = nothing) -> PricesResult
@@ -529,13 +530,13 @@ The caller does not name the value type of the `PricesResult`. The layer promote
 
 # Algorithm
 
- 1. Check with [`assert_distinct_series_names`](@ref) that the asset, factor and benchmark series keep their names through the join. The join renames a name that two tables share, and a block would then take another block's column.
+ 1. Check with [`assert_distinct_series_names`](@ref) that the asset, factor and benchmark series keep their names through the join, and that no Exogenous Series takes the name of one of them. The join renames a name that two tables share, and a block would then take another block's column.
  2. Promote the value types that the three price tables contribute through [`series_value_type`](@ref), and widen the result with [`absence_type`](@ref), giving the target type. Unify the absent-price spelling of the three tables in that type with [`unify_gaps`](@ref), so a gap means one thing from here on.
  3. Join the factor and the benchmark series onto the asset clock under `join_method`. A left join keeps the asset clock and pads the others where they are silent. An outer join adds the rows that one series has and another does not, and can pad every table. An inner join keeps the rows that every table has. Before a join that can pad, ask [`assert_pad_spellable`](@ref), which throws an error that names a type that cannot spell the pad.
  4. Write the padding report lines of the asset, factor and benchmark tables against the joined clock with [`padding_report_line`](@ref), before the collapse renumbers it.
  5. Collapse the joined series to a lower frequency when `collapse_args` is not empty. This renumbers every observation.
  6. Split the joined series back into the asset, factor and benchmark blocks, all on one clock.
- 7. Align the implied volatilities to that clock with [`align_series`](@ref), in the type that [`absence_type`](@ref) derives from their own type, and pad the observations where they are silent. Write their report line, and carry `ivpa` through. An implied volatility is a volatility and not a price, so the layer carries it and never converts it to a return.
+ 7. Align the implied volatilities to that clock with [`align_series`](@ref), in the type that [`absence_type`](@ref) derives from their own type, and pad the observations where they are silent. Write their report line, and carry `ivpa` through. An implied volatility is a volatility and not a price, so the layer carries it and never converts it to a return. Align the Exogenous Series `E` to the same clock in the same way, and write its report line. `E` is aligned and never joined, so it adds and drops no observation of the assets: a series one consumer reads must not change the universe of every asset. It is a level series, so [`prices_to_returns`](@ref) converts it.
  8. Name what the layer padded with [`assert_join_padding`](@ref), which warns, or refuses under `strict`.
  9. Put a caller's [`AssetPanel`](@ref) on the emitted clock with [`project_panel_clock`](@ref). A caller states a Panel Field on the clock of the table they hold, and the join and the collapse move that clock, so the projection happens here. Each period of a collapse takes the Panel Field values of the last row of its group, as [`LastObservation`](@ref) does. The timestamp function of `collapse_args` does not change this row, so under `(Dates.week, first, last)` the prices and the Panel Field values of a week come from one day. A static panel has no observation axis, and the layer carries it through unchanged.
 10. Read the **Listing Span** off the asset block with [`listing_span`](@ref), unless the caller declared one. A declared span replaces the answer of the Span Rule.
@@ -549,6 +550,7 @@ Under the default join the emitted clock is the asset table's, so `timestamp(pr.
   - `X`: Asset prices, `observations × assets`.
   - `F`: Optional factor prices.
   - `B`: Optional benchmark prices, one column or one per asset.
+  - `E`: Optional Exogenous Series, level series on any clock, such as a Currency Excess Index. The layer aligns it to the emitted clock and pads `NaN` where it is silent.
   - `iv`: Optional implied volatilities, one column per asset, on any clock. The layer aligns them to the emitted clock and pads `NaN` where they are silent.
   - `ivpa`: Optional implied volatility adjustment.
   - `pnl`: Optional [`AssetPanel`](@ref) of Panel Fields the caller already holds. The layer keeps its Panel Fields and does not read its masks. A time-varying panel carries an `amsk` by construction, so that field cannot carry a declaration. A listing statement goes in `span`.
@@ -609,12 +611,13 @@ julia> Matrix(pr.span)
 function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
                          F::Option{<:TimeSeries.TimeArray} = nothing,
                          B::Option{<:TimeSeries.TimeArray} = nothing,
+                         E::Option{<:TimeSeries.TimeArray} = nothing,
                          iv::Option{<:TimeSeries.TimeArray} = nothing,
                          ivpa::Option{<:Num_VecNum} = nothing,
                          pnl::Option{<:AssetPanel} = nothing)::PricesResult
     @argcheck(!isempty(X),
               IsEmptyError("`X` cannot be empty: the ingestion layer states a universe from a price panel"))
-    assert_distinct_series_names(X, F, B)
+    assert_distinct_series_names(X, F, B, E)
     nx = TimeSeries.colnames(X)
     #! The three price tables are laid in one table by the join, so they take one value
     #! type, and it is the one the return arithmetic would widen them to: derived from the
@@ -650,6 +653,12 @@ function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
         push!(lines, padding_report_line("iv", iv, ts))
         align_series(unify_gaps(iv, absence_type(series_value_type(iv))), ts)
     end
+    Ea = if isnothing(E)
+        nothing
+    else
+        push!(lines, padding_report_line("E", E, ts))
+        align_series(unify_gaps(E, absence_type(series_value_type(E))), ts)
+    end
     assert_join_padding(lines, est.strict)
     #! The collapse is the one step here that renumbers an observation, and a Panel Field is
     #! stated on the clock of the table the caller holds, so the projection is owed here
@@ -657,7 +666,7 @@ function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
     #! clock and everything it holds is on it.
     pnl = project_panel_clock(pnl, tsj, X, est.collapse_args)
     span = isnothing(est.span) ? listing_span(values(Xa)) : est.span
-    return PricesResult(; X = Xa, F = Fa, B = Ba, iv = iva, ivpa = ivpa, pnl = pnl,
+    return PricesResult(; X = Xa, F = Fa, B = Ba, E = Ea, iv = iva, ivpa = ivpa, pnl = pnl,
                         span = span)
 end
 function price_ingestion(est::PriceIngestion, pr::PricesResult)::PricesResult
@@ -669,8 +678,8 @@ function price_ingestion(est::PriceIngestion, pr::PricesResult)::PricesResult
     span = isnothing(est.span) ? pr.span : est.span
     est = PriceIngestion(; join_method = est.join_method, collapse_args = est.collapse_args,
                          span = span, strict = est.strict)
-    return price_ingestion(est, pr.X; F = pr.F, B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
-                           pnl = pr.pnl)
+    return price_ingestion(est, pr.X; F = pr.F, B = pr.B, E = pr.E, iv = pr.iv,
+                           ivpa = pr.ivpa, pnl = pr.pnl)
 end
 """
     project_panel_clock(pnl::Nothing, tsj, X::TimeSeries.TimeArray, ca::Tuple) -> nothing
@@ -904,7 +913,7 @@ function assert_disjoint_series_names(a::AbstractVector{Symbol}, b::AbstractVect
                                       na::String, nb::String)::Nothing
     shared = intersect(a, b)
     @argcheck(isempty(shared),
-              ConflictingArgumentError("the asset, factor and benchmark series are joined onto one clock and a column name is what says which series a column came from, so `$na` and `$nb` cannot share one; both carry $(shared). Rename the colliding columns before the call."))
+              ConflictingArgumentError("a column name is what says which series a column came from, and the asset, factor and benchmark series are joined onto one clock, so `$na` and `$nb` cannot share one; both carry $(shared). Rename the colliding columns before the call."))
     return nothing
 end
 """
@@ -939,30 +948,33 @@ function assert_unreserved_series_names(n::AbstractVector{Symbol}, nn::String)::
     return nothing
 end
 """
-    assert_distinct_series_names(X::TimeSeries.TimeArray, F::Option{<:TimeSeries.TimeArray} = nothing, B::Option{<:TimeSeries.TimeArray} = nothing) -> nothing
+    assert_distinct_series_names(X::TimeSeries.TimeArray, F::Option{<:TimeSeries.TimeArray} = nothing, B::Option{<:TimeSeries.TimeArray} = nothing, E::Option{<:TimeSeries.TimeArray} = nothing) -> nothing
 
 Check that every price series reaching the layer can still be named after the join.
 
 Both entry points of the layer run this check before they merge, [`price_ingestion`](@ref) and [`prices_to_returns`](@ref). After it, every later piece can split the merged table by name. Each name belongs to exactly one of the asset, factor and benchmark blocks, and no name is the clock's.
 
+The Exogenous Series `E` is converted beside the three blocks, and a consumer selects its columns by name. So its names are also disjoint from the three blocks, and no name is the clock's.
+
 This function cannot check two series of one table. The `TimeSeries.TimeArray` constructor runs `TimeSeries.replace_dupes!` over its column names, so it renames the duplicates of a table before the table exists, and no duplicate reaches this function.
 
 # Algorithm
 
- 1. Read the three name lists, an absent table naming none, with [`series_names`](@ref).
- 2. Refuse a name shared by two of them with [`assert_disjoint_series_names`](@ref), over all three pairs.
- 3. Refuse the clock's own name in any of them with [`assert_unreserved_series_names`](@ref).
+ 1. Read the four name lists, an absent table naming none, with [`series_names`](@ref).
+ 2. Refuse a name shared by two of them with [`assert_disjoint_series_names`](@ref), over all six pairs.
+ 3. Refuse the clock's own name in any of the four with [`assert_unreserved_series_names`](@ref).
 
 # Arguments
 
   - `X`: Asset prices, `observations × assets`.
   - `F`: Optional factor prices.
   - `B`: Optional benchmark prices.
+  - `E`: Optional Exogenous Series.
 
 # Validation
 
-  - The asset, factor and benchmark names are pairwise disjoint. Raises a [`ConflictingArgumentError`](@ref) naming the shared columns.
-  - None of them is `timestamp`. Raises a [`ConflictingArgumentError`](@ref).
+  - The asset, factor, benchmark and Exogenous Series names are pairwise disjoint. Raises a [`ConflictingArgumentError`](@ref) naming the shared columns.
+  - None of the four is `timestamp`. Raises a [`ConflictingArgumentError`](@ref).
 
 # Returns
 
@@ -979,16 +991,22 @@ This function cannot check two series of one table. The `TimeSeries.TimeArray` c
 """
 function assert_distinct_series_names(X::TimeSeries.TimeArray,
                                       F::Option{<:TimeSeries.TimeArray} = nothing,
-                                      B::Option{<:TimeSeries.TimeArray} = nothing)::Nothing
+                                      B::Option{<:TimeSeries.TimeArray} = nothing,
+                                      E::Option{<:TimeSeries.TimeArray} = nothing)::Nothing
     nx = TimeSeries.colnames(X)
     nf = series_names(F)
     nb = series_names(B)
+    ne = series_names(E)
     assert_disjoint_series_names(nx, nf, "X", "F")
     assert_disjoint_series_names(nx, nb, "X", "B")
     assert_disjoint_series_names(nf, nb, "F", "B")
+    assert_disjoint_series_names(nx, ne, "X", "E")
+    assert_disjoint_series_names(nf, ne, "F", "E")
+    assert_disjoint_series_names(nb, ne, "B", "E")
     assert_unreserved_series_names(nx, "X")
     assert_unreserved_series_names(nf, "F")
     assert_unreserved_series_names(nb, "B")
+    assert_unreserved_series_names(ne, "E")
     return nothing
 end
 """

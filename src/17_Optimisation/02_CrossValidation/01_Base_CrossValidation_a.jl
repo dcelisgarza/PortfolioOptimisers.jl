@@ -353,7 +353,7 @@ aligned to it.
 
 `X` is the portfolio series, not the asset returns: one vector for a single portfolio, or one
 vector per member of a population. Beside it the `PredictionReturnsResult` holds the factor returns, the
-benchmark series, the timestamps, the implied volatilities and the implied volatility risk
+benchmark series, the Exogenous Series, the timestamps, the implied volatilities and the implied volatility risk
 premium adjustment of the same observations.
 
 The `PredictionReturnsResult` holds no feature matrix. [`rebuild_returns_result`](@ref) computes the collapse of
@@ -375,6 +375,8 @@ $(DocStringExtensions.FIELDS)
         F::Option{<:MatNum} = nothing,
         nb::Option{<:VecStr} = nothing,
         B::Option{<:VecNum_VecVecNum} = nothing,
+        ne::Option{<:VecStr} = nothing,
+        E::Option{<:MatNum} = nothing,
         ts::Option{<:VecDate} = nothing,
         iv::Option{<:VecNum_VecVecNum} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing
@@ -384,10 +386,9 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `nf` and `F` must be consistent: both `nothing`, or `F` has `length(nf)` columns.
-  - If `X` and `F` are given, `F` has one row per observation of each series in `X`.
+  - `nf` and `F`, and `ne` and `E`, pass [`assert_prediction_series`](@ref): each pair is consistent, and the matrix has one row per observation of each series in `X` and of `ts`.
   - If `B` and `X` are given, they have the same shape (`VecNum` or `VecVecNum`) and matching lengths. A mixed pair raises an `ArgumentError`.
-  - If `ts` is given, it is not empty, at least one of `X` and `F` is not `nothing`, and its length matches `X`, `F` and `B` where they are given.
+  - If `ts` is given, it is not empty, at least one of `X` and `F` is not `nothing`, and its length matches `X`, `F`, `B` and `E` where they are given.
   - If `iv` is given, `X` is given too, else an `IsNothingError` is raised.
   - If `iv` is a `VecNum`, `ivpa` is a scalar or `nothing`, `iv` is non-empty, non-negative and finite, `ivpa` is positive and finite, and `length(iv) == length(X)`.
   - If `iv` is a `VecVecNum`, `ivpa` is a `VecNum` or `nothing`, `length(iv) == length(X)`, and `length(ivpa) == length(X)` when `ivpa` is given. Each entry of `ivpa` is positive and finite, and each vector of `iv` is non-empty, non-negative, finite, and as long as its series in `X`.
@@ -424,6 +425,14 @@ Keywords correspond to the struct's fields.
     """
     B
     """
+    $(field_dict[:pred_ne])
+    """
+    ne
+    """
+    $(field_dict[:pred_E])
+    """
+    E
+    """
     $(field_dict[:ts])
     """
     ts
@@ -438,17 +447,11 @@ Keywords correspond to the struct's fields.
     function PredictionReturnsResult(nx::Option{<:VecStr}, X::Option{<:VecNum_VecVecNum},
                                      nf::Option{<:VecStr}, F::Option{<:MatNum},
                                      nb::Option{<:VecStr}, B::Option{<:VecNum_VecVecNum},
+                                     ne::Option{<:VecStr}, E::Option{<:MatNum},
                                      ts::Option{<:VecDate}, iv::Option{<:VecNum_VecVecNum},
                                      ivpa::Option{<:Num_VecNum})
-        check_names_and_returns_matrix(nf, F, :nf, :F)
-        if !isnothing(X) && !isnothing(F)
-            if isa(X, VecNum)
-                @argcheck(length(X) == size(F, 1), DimensionMismatch)
-            else
-                @argcheck(all(x -> length(x) == size(F, 1), X),
-                          DimensionMismatch("each element of X must have the same length as the number of rows in F"))
-            end
-        end
+        assert_prediction_series(nf, F, X, ts, :nf, :F)
+        assert_prediction_series(ne, E, X, ts, :ne, :E)
         if !isnothing(B) && !isnothing(X)
             if isa(B, VecNum) && isa(X, VecNum)
                 @argcheck(length(B) == length(X), DimensionMismatch)
@@ -469,9 +472,6 @@ Keywords correspond to the struct's fields.
             elseif isa(X, VecVecNum)
                 @argcheck(all(x -> length(x) == length(ts), X),
                           DimensionMismatch("each element of X must have length $(length(ts))"))
-            end
-            if !isnothing(F)
-                @argcheck(length(ts) == size(F, 1), DimensionMismatch)
             end
             if isa(B, VecNum)
                 @argcheck(length(ts) == length(B), DimensionMismatch)
@@ -503,7 +503,10 @@ Keywords correspond to the struct's fields.
             end
         end
         return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(nb), typeof(B),
-                   typeof(ts), typeof(iv), typeof(ivpa)}(nx, X, nf, F, nb, B, ts, iv, ivpa)
+                   typeof(ne), typeof(E), typeof(ts), typeof(iv), typeof(ivpa)}(nx, X, nf,
+                                                                                F, nb, B,
+                                                                                ne, E, ts,
+                                                                                iv, ivpa)
     end
 end
 function PredictionReturnsResult(; nx::Option{<:VecStr} = nothing,
@@ -512,10 +515,12 @@ function PredictionReturnsResult(; nx::Option{<:VecStr} = nothing,
                                  F::Option{<:MatNum} = nothing,
                                  nb::Option{<:VecStr} = nothing,
                                  B::Option{<:VecNum_VecVecNum} = nothing,
+                                 ne::Option{<:VecStr} = nothing,
+                                 E::Option{<:MatNum} = nothing,
                                  ts::Option{<:VecDate} = nothing,
                                  iv::Option{<:VecNum_VecVecNum} = nothing,
                                  ivpa::Option{<:Num_VecNum} = nothing)::PredictionReturnsResult
-    return PredictionReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa)
+    return PredictionReturnsResult(nx, X, nf, F, nb, B, ne, E, ts, iv, ivpa)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1084,7 +1089,8 @@ The fold-taking [`factor_risk_contribution`](@ref) reads `rd` by dispatch. A cal
 """
 function fold_factor_returns(imsk, ::Nothing, pred::PredictionResult)
     X = investable_weights_view(imsk, pred.hw.X)
-    return ReturnsResult(; nx = pred.rd.nx, X = X, nf = pred.rd.nf, F = pred.rd.F)
+    return ReturnsResult(; nx = pred.rd.nx, X = X, nf = pred.rd.nf, F = pred.rd.F,
+                         ne = pred.rd.ne, E = pred.rd.E)
 end
 function fold_factor_returns(imsk, rd::ReturnsResult, ::PredictionResult)
     return investable_returns_view(imsk, rd)
@@ -1208,13 +1214,15 @@ Keywords correspond to the struct's fields. `pred` is required. The constructor 
         F = isnothing(rd[1].F) ? nothing : mapreduce(x -> getproperty(x, :F), vcat, rd)
         nb = rd[1].nb
         B = isnothing(rd[1].B) ? nothing : mapreduce_RetMtx(rd, :B)
+        ne = rd[1].ne
+        E = isnothing(rd[1].E) ? nothing : mapreduce(x -> getproperty(x, :E), vcat, rd)
         ts = isnothing(rd[1].ts) ? nothing : mapreduce(x -> getproperty(x, :ts), vcat, rd)
         iv = isnothing(rd[1].iv) ? nothing : mapreduce(x -> getproperty(x, :iv), vcat, rd)
         # Per-asset, so it cannot stack; reduced to the last fold to pair with the last
         # row of `iv`, which is what `predict_realised_vols` divides by it.
         ivpa = rd[end].ivpa
         mrd = PredictionReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B,
-                                      ts = ts, iv = iv, ivpa = ivpa)
+                                      ne = ne, E = E, ts = ts, iv = iv, ivpa = ivpa)
         return new{typeof(pred), typeof(mrd), typeof(id), typeof(opt)}(pred, mrd, id, opt)
     end
 end
@@ -1717,7 +1725,8 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
         end
     end
     return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = rd.nb,
-                                   B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
+                                   B = B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = iv,
+                                   ivpa = ivpa)
 end
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                         X::VecVecNum, hw::Option{<:HeldWeightsResult} = nothing,
@@ -1743,7 +1752,8 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
         ivpa = range(; start = ivpa, stop = ivpa, length = length(res.w))
     end
     return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = nb,
-                                   B = B, ts = rd.ts, iv = iv, ivpa = ivpa)
+                                   B = B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = iv,
+                                   ivpa = ivpa)
 end
 """
     held_start_weights(retcode::OptimisationSuccess, w::VecNum, w_prev)
