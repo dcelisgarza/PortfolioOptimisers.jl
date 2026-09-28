@@ -16,6 +16,12 @@ a second moment about zero.
 
 The last testsets fit the fixture on the assets of one industry, which leaves the other
 industry factors empty (#1372).
+
+The `CrossSectionalFactorPriorMacro*` files hold the fit of a prior with an estimated
+macro-sensitivity factor (#1365): an `EWMacroSensitivity` that reads the column "FX" of the
+Exogenous Series. The `Plain*` files hold the fit with `EmpiricalPrior` and no currency. The
+`CurrencyDefault*` files hold the default fit beside three Currency Factors, where the
+Descriptors read the returns net of the currencies.
 =#
 using Statistics, Clarabel
 
@@ -245,5 +251,112 @@ end
                        fx.rd)
         @test sum(res.w) ≈ 1
         @test all(r -> r.retcode isa OptimisationSuccess, res.resi)
+    end
+end
+
+# Three industries, two styles, and one macro series each asset loads on with its own
+# sensitivity (#1365). The macro series is the column "FX" of the Exogenous Series. Under
+# `ccy = true` each asset also holds one of three currencies, and `X` is in the base currency.
+function mac_fixture(; T = 160, N = 40, seed = 1365, ccy = false)
+    rng = StableRNG(seed)
+    ind = [mod(i - 1, 3) + 1 for i in 1:N]
+    I3 = zeros(T, N, 3)
+    for i in 1:N
+        I3[:, i, ind[i]] .= 1.0
+    end
+    z(A) = (A .- mean(A; dims = 2)) ./ std(A; dims = 2, corrected = false)
+    s1 = z(randn(rng, T, N) .+ randn(rng, 1, N) .* 3)
+    s2 = z(randn(rng, T, N) .+ randn(rng, 1, N) .* 3)
+    mcap = exp.(randn(rng, 1, N) .* 0.8 .+ 0.05 .* cumsum(randn(rng, T, N); dims = 1))
+    fi = 0.01 .* randn(rng, T, 3)
+    fs = 0.004 .* randn(rng, T, 2)
+    fx = 0.006 .* randn(rng, T)
+    bx = randn(rng, N)
+    X = zeros(T, N)
+    for t in 2:T, i in 1:N
+        X[t, i] = fi[t, ind[i]] +
+                  s1[t - 1, i] * fs[t, 1] +
+                  s2[t - 1, i] * fs[t, 2] +
+                  bx[i] * fx[t] +
+                  0.01 * randn(rng)
+    end
+    X[1, :] .= 0.01 .* randn(rng, N)
+    codes = [mod(i, 3) + 1 for i in 1:N]
+    R = 0.005 .* randn(StableRNG(seed + 1), T, 3)
+    loc = copy(X)
+    if ccy
+        for t in 1:T, i in 1:N
+            X[t, i] += R[t, codes[i]]
+        end
+    end
+    lv = ["EUR", "JPY", "USD"]
+    pf = [NumericPanelInput(; name = "market_cap", vals = mcap),
+          NumericPanelInput(; name = "style1", vals = s1),
+          NumericPanelInput(; name = "style2", vals = s2),
+          [NumericPanelInput(; name = "ind$k", vals = I3[:, :, k]) for k in 1:3]...,
+          NumericPanelInput(; name = "local", vals = loc),
+          CategoricalPanelInput(; name = "currency",
+                                vals = repeat(permutedims(lv[codes]), T))]
+    pnl = asset_panel(pf; amsk = trues(T, N), emsk = trues(T, N))
+    ne = ccy ? [lv; "FX"] : ["FX"]
+    E = ccy ? hcat(R, fx) : reshape(fx, :, 1)
+    return ReturnsResult(; nx = ["a$i" for i in 0:(N - 1)], X = X, ne = ne, E = E,
+                         pnl = pnl)
+end
+function mac_factors(; ccy = false)
+    c = ccy ? ["currency" => CurrencyExposure()] : Pair{String}[]
+    return vcat(c,
+                ["ind1" => ccy_pass("ind1", "industry"),
+                 "ind2" => ccy_pass("ind2", "industry"),
+                 "ind3" => ccy_pass("ind3", "industry"),
+                 "style1" => ccy_pass("style1", "style"),
+                 "style2" => ccy_pass("style2", "style"),
+                 "macro" => CompositeExposure(;
+                                              descriptors = [EWMacroSensitivity(; series = "FX",
+                                                                                half_life = 10)],
+                                              outlier = nothing, scoring = nothing,
+                                              family = "macro")])
+end
+function mac_asset(name)
+    return Matrix(CSV.read(joinpath(@__DIR__, "assets",
+                                    "CrossSectionalFactorPriorMacro$(name).csv.gz"),
+                           DataFrame))
+end
+
+@testset "A macro-sensitivity factor at parity with a stored oracle (#1365)" begin
+    @testset "An estimated macro factor" begin
+        rd = mac_fixture()
+        pr = prior(CrossSectionalFactorPrior(; factors = mac_factors(),
+                                             pe = EmpiricalPrior()), rd)
+        @test pr.rr.nf == ["ind1", "ind2", "ind3", "style1", "style2", "macro"]
+        F = mac_asset("PlainFactorReturns")
+        @test size(pr.fpr.X) == size(F) == (150, 6)
+        @test maximum(abs, pr.fpr.X - F) < 1e-14
+        @test pr.fpr.sigma ≈ mac_asset("PlainFactorCov") rtol = 1e-12
+        @test pr.rr.M ≈ mac_asset("PlainLoadings") rtol = 1e-12
+        @test pr.mu ≈ vec(mac_asset("PlainMu")) rtol = 1e-12
+        @test pr.sigma ≈ mac_asset("PlainSigma") rtol = 1e-12
+    end
+    @testset "Beside Currency Factors, the Descriptors read the net returns" begin
+        # The estimated members read the returns the regression explains, so the macro
+        # sensitivity measures the local move of an asset and not the currency it holds.
+        rd = mac_fixture(; ccy = true)
+        pr = prior(CrossSectionalFactorPrior(; factors = mac_factors(; ccy = true)), rd)
+        @test pr.rr.nf[6:end] == ["macro", "currency=EUR", "currency=JPY", "currency=USD"]
+        @test pr.fpr.mu ≈ vec(mac_asset("CurrencyDefaultFactorMu")) rtol = 1e-12
+        @test pr.fpr.sigma ≈ mac_asset("CurrencyDefaultFactorCov") rtol = 1e-12
+        @test pr.rr.M ≈ mac_asset("CurrencyDefaultLoadings") rtol = 1e-12
+        @test pr.mu ≈ vec(mac_asset("CurrencyDefaultMu")) rtol = 1e-12
+        @test pr.sigma ≈ mac_asset("CurrencyDefaultSigma") rtol = 1e-12
+        # A Panel Field of the same local returns under `lx` gives the same fit, because the
+        # derived net returns take the exposure of the same observation on the first rows.
+        pl = prior(CrossSectionalFactorPrior(; factors = mac_factors(; ccy = true),
+                                             lx = "local"), rd)
+        @test pl.mu ≈ pr.mu rtol = 1e-12
+        @test pl.sigma ≈ pr.sigma rtol = 1e-12
+        # The macro loadings measured on the base returns differ, so the fit reads the net
+        # returns and not `X`.
+        de = EWMacroSensitivity(; series = "FX", half_life = 10)
+        @test !(pr.rr.M[:, 6] ≈ descriptor(de, rd)[end, :])
     end
 end

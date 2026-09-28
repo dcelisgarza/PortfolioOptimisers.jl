@@ -508,7 +508,8 @@ The observed factors carry the part of each return that their observed returns e
 
 ```math
 \\begin{align}
-x^{\\mathrm{net}}_{t,\\,i} &= x_{t,\\,i} - \\sum_{c \\,:\\, z_{t - \\ell,\\,i,\\,c} \\neq 0} z_{t - \\ell,\\,i,\\,c} \\, r_{t,\\,c}\\,.
+x^{\\mathrm{net}}_{t,\\,i} &= x_{t,\\,i} - \\sum_{c \\,:\\, z_{s,\\,i,\\,c} \\neq 0} z_{s,\\,i,\\,c} \\, r_{t,\\,c}\\,, \\\\
+s &= \\begin{cases} t - \\ell & t > \\ell\\,, \\\\ t & t \\leq \\ell\\,. \\end{cases}
 \\end{align}
 ```
 
@@ -518,9 +519,10 @@ Where:
   - $(math_dict[:x_ti_ret])
   - ``z_{t,\\,i,\\,c}``: Exposure of asset ``i`` to the observed factor ``c`` at observation ``t``.
   - ``r_{t,\\,c}``: Observed return of the factor ``c`` at observation ``t``.
+  - ``s``: The observation whose exposure the derivation removes.
   - $(math_dict[:ell_lag_cs])
 
-The exposures lag the returns, so the derivation removes each observed return through the exposure of ``t - \\ell``, which is the exposure the model loads for observation ``t``. The lagged combined exposures then reproduce `X` exactly. The sum runs over the non-zero exposures, so a non-finite return of a currency the asset does not hold does not reach it. An asset whose exposure is `NaN`, because it is inactive or carries no currency label, gets a `NaN` net return, and it leaves the regression of that observation. The first ``\\ell`` observations have no lagged exposure, and their net return is `NaN`. The fit never regresses them.
+The exposures lag the returns, so the derivation removes each observed return through the exposure of ``t - \\ell``, which is the exposure the model loads for observation ``t``. The lagged combined exposures then reproduce `X` exactly. The sum runs over the non-zero exposures, so a non-finite return of a currency the asset does not hold does not reach it. An asset whose exposure is `NaN`, because it is inactive or carries no currency label, gets a `NaN` net return, and it leaves the regression of that observation. The first ``\\ell`` observations have no lagged exposure, so the derivation takes the exposure of the same observation there. The fit never regresses them, but the estimated members read them: a Descriptor of the returns reads the net returns, and a row with no finite return leaves the market return undefined.
 
 Under Currency Factors and simple returns the identity of the local return is not exact: the base-currency return of an asset also holds the cross term of its local return and the exchange-rate return, see [`currency_excess_index`](@ref), and the derived net return keeps it.
 
@@ -554,11 +556,11 @@ function cross_sectional_local_returns(::Nothing, cc::NamedTuple, X::MatNum,
                                        ::ReturnsResult, lag::Integer)
     (; Z, R) = cc
     Xl = similar(X, promote_type(eltype(X), eltype(Z), eltype(R)))
-    fill!(Xl, nan_fill_value(Xl))
-    for t in (lag + 1):size(X, 1), i in axes(X, 2)
+    for t in axes(X, 1), i in axes(X, 2)
         x = X[t, i]
+        s = t > lag ? t - lag : t
         for c in axes(Z, 3)
-            z = Z[t - lag, i, c]
+            z = Z[s, i, c]
             if !iszero(z)
                 x -= z * R[t, c]
             end

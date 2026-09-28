@@ -50,7 +50,12 @@ currency can hold it. With log returns the split has no cross term.
    instead, and the regression then reads that field unchanged. Two cases need the named field:
    an asset with no currency label at an observation, which the derived path gives a `NaN` net
    return, and a caller whose local returns are not `X - Z r`, which includes every simple-return
-   panel because of the cross term.
+   panel because of the cross term. The estimated members of the prior read the same net
+   returns, so a Descriptor of the returns, such as a beta or a macro sensitivity, measures the
+   local move of an asset and not the currency it holds (#1365). The first `lag` observations
+   have no lagged exposure, so there the derivation takes the exposure of the same observation.
+   The fit never regresses them, but a Descriptor reads them. The observed members read `X`,
+   because the net returns derive from their exposures.
 2. **A new block, the Exogenous Series, rides on `PricesResult` and on `ReturnsResult`.** It holds
    named series over the observation axis that belong to no asset. `PricesResult.E` holds
    **levels**, a `TimeArray` whose column names are the names, and `ReturnsResult` holds their
