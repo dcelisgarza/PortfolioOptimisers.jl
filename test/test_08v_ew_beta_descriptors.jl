@@ -607,12 +607,33 @@ end
         @test err isa PO.IsNonFiniteError
         @test occursin("\"FX\"", err.msg)
         @test occursin("observation 50", err.msg)
-        @test_throws PO.IsNonFiniteError descriptor(EWMacroSensitivity(; series = "FX",
-                                                                       half_life = 5,
-                                                                       agg_obs = 3), rdn)
+        # With agg_obs = 3, the window of observations 49 to 51 still holds two finite
+        # values, and the recursion reads their mean, so the gap is accepted.
+        da = EWMacroSensitivity(; series = "FX", half_life = 5, agg_obs = 3)
+        @test isequal(descriptor(da, rdn),
+                      descriptor(EWMacroSensitivity(; half_life = 5, agg_obs = 3), rdn;
+                                 ref = f))
+        # A window with no finite value is refused, and the message names the window.
+        f3 = copy(ref)
+        f3[49:51] .= NaN
+        err = try
+            descriptor(da, ewb_macro_fixture(; fx = f3))
+        catch e
+            e
+        end
+        @test err isa PO.IsNonFiniteError
+        @test occursin("observations 49 to 51", err.msg)
         # The keyword keeps the rule of the recursion: the state holds its value there.
         D = descriptor(EWMacroSensitivity(; half_life = 5), rdn; ref = f)
         @test isequal(D[50, :], D[49, :])
+        # An infinite value is refused on both paths, in the warm-up too, because it is
+        # not a gap.
+        fi = copy(ref)
+        fi[2] = -Inf
+        rdi = ewb_macro_fixture(; fx = fi)
+        @test_throws PO.IsNonFiniteError descriptor(de, rdi)
+        @test_throws PO.IsNonFiniteError descriptor(EWMacroSensitivity(; half_life = 5),
+                                                    rdi; ref = fi)
         # An empty name is refused by the constructor.
         err = try
             EWMacroSensitivity(; series = "")
@@ -902,6 +923,14 @@ end
         @test size(D) == size(E)
         @test isequal(isnan.(D), isnan.(E))
         @test D[isfinite.(E)] ≈ E[isfinite.(E)]
+        # The same series named in the Exogenous Series gives the same case (#1365). Its
+        # gap at observation 123 falls in a window that holds two finite values.
+        rde = ReturnsResult(; nx = rd.nx, X = rd.X, ne = ["FX"], E = reshape(ref, :, 1),
+                            pnl = rd.pnl)
+        Ds = descriptor(EWMacroSensitivity(; series = "FX", half_life = 5, agg_obs = 3),
+                        rde)
+        @test isequal(isnan.(Ds), isnan.(E))
+        @test Ds[isfinite.(E)] ≈ E[isfinite.(E)]
     end
 end
 

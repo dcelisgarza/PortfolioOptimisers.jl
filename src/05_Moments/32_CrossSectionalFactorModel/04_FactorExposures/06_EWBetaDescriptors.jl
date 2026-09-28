@@ -1005,7 +1005,7 @@ Where:
   - $(math_dict[:r_mt_ewb])
   - $(math_dict[:min_val_ewb])
 
-Each moment follows the recursion that [`EWBeta`](@ref) states, with the decay `decay`, and every moment holds its value at an observation whose reference return is not finite. A series that `series` names is refused where it is not finite after the warm-up, as [`ew_macro_reference`](@ref) states.
+Each moment follows the recursion that [`EWBeta`](@ref) states, with the decay `decay`, and every moment holds its value at an observation whose reference return is not finite. A series that `series` names is refused where a window it reads after the warm-up holds no finite value, as [`ew_macro_reference`](@ref) states. An infinite reference return is refused on either path.
 
 # Fields
 
@@ -1107,14 +1107,14 @@ end
 
 Select the reference return of an [`EWMacroSensitivity`](@ref), from the keyword `ref` or from the column of the Exogenous Series that the field `series` names.
 
-The field and the keyword are two sources for one series, so a call that gives both is refused. The ingestion pads the Exogenous Series with `NaN` where the series is silent, for example before the first value of a series that starts late. The recursion of [`ew_macro_sensitivity_series`](@ref) skips an observation whose reference return is not finite, and in the warm-up that is correct. After the warm-up, a skipped observation freezes the partial beta of every asset, so this function refuses a named series that is not finite there. The keyword `ref` keeps the rule of the recursion at every observation.
+The field and the keyword are two sources for one series, so a call that gives both is refused. The ingestion pads the Exogenous Series with `NaN` where the series is silent, for example before the first value of a series that starts late. The recursion of [`ew_macro_sensitivity_series`](@ref) reads one value per window of `agg_obs` observations, the mean of the finite values of the window, and it skips a window that holds no finite value. In the warm-up that is correct. After the warm-up, a skipped window freezes the partial beta of every asset, so this function refuses a named series whose window holds no finite value there. A window with a gap and at least one finite value is read as its mean, so it is accepted. The keyword `ref` keeps the rule of the recursion at every window.
 
 # Algorithm
 
  1. With `series = nothing`, refuse a `ref` that is `nothing` or whose length is not the number of observations, and return `ref`.
  2. Otherwise, refuse a `ref` that is not `nothing`, an `rd.E` that is `nothing`, and a `series` that `rd.ne` does not hold. Take the column `rf` of `rd.E` that `series` names.
- 3. Walk the complete windows of `agg_obs` observations. Count in `c` each window that holds a finite value, until `c` reaches `min_obs`. This is the warm-up of the recursion.
- 4. In each later window, refuse the first value of `rf` that is not finite. Return `rf`.
+ 3. Walk the complete windows of `agg_obs` observations. Count in `c` each window that holds a finite value. The windows before `c` reaches `min_obs` are the warm-up of the recursion.
+ 4. Refuse the first window after the warm-up that holds no finite value. Return `rf`.
 
 # Arguments
 
@@ -1130,7 +1130,7 @@ The field and the keyword are two sources for one series, so a call that gives b
   - With a `series`, `ref` is `nothing`. Raises an `ArgumentError`.
   - With a `series`, `rd.E` is not `nothing`. Raises an [`IsNothingError`](@ref).
   - With a `series`, `rd.ne` holds `series`. Raises an `ArgumentError` that names the series.
-  - With a `series`, every value of `rf` after the warm-up is finite. Raises an [`IsNonFiniteError`](@ref) that names the series and the observation.
+  - With a `series`, every window of `rf` after the warm-up holds a finite value. Raises an [`IsNonFiniteError`](@ref) that names the series and the observations of the window.
 
 # Returns
 
@@ -1166,14 +1166,16 @@ function ew_macro_reference(series::AbstractString, de::EWMacroSensitivity,
     c = 0
     for k in 1:div(length(rf), a)
         w = ((k - 1) * a + 1):(k * a)
-        if c < de.min_obs
-            c += any(isfinite, view(rf, w))
-            continue
+        f = any(isfinite, view(rf, w))
+        if c >= de.min_obs && !f
+            at = if isone(a)
+                "at observation $(first(w))"
+            else
+                "at observations $(first(w)) to $(last(w))"
+            end
+            throw(IsNonFiniteError("the reference return \"$series\" must hold a finite value in every window of $a observation(s) that the estimator reads after its warm-up, and it holds none $at of the returns data. A gap in the warm-up is accepted, because the recursion skips it before it writes a sensitivity. Fill the gap, or pass the series as the keyword `ref`, whose recursion holds its state there."))
         end
-        t = findfirst(!isfinite, view(rf, w))
-        if !isnothing(t)
-            throw(IsNonFiniteError("the reference return \"$series\" must be finite on every observation the estimator reads after its warm-up, and it is not at observation $(w[t]) of the returns data. A gap in the warm-up is accepted, because the recursion skips it before it writes a sensitivity."))
-        end
+        c += f
     end
     return rf
 end
@@ -1187,7 +1189,7 @@ The reference series is the column of the Exogenous Series `rd.E` that the field
 
 # Algorithm
 
- 1. Select the reference return `rf` through [`ew_macro_reference`](@ref).
+ 1. Select the reference return `rf` through [`ew_macro_reference`](@ref), and refuse an infinite value of it on any observation.
  2. Mask the returns into `X` through [`ew_active_returns`](@ref).
  3. Build the market return `rm` through [`market_return_series`](@ref).
  4. Where `agg_obs` is greater than one, aggregate `X`, `rm` and `rf` into `Xa`, `rma` and `rfa` through [`ew_agg_series`](@ref) and [`ew_agg_vector`](@ref).
@@ -1205,6 +1207,7 @@ The reference series is the column of the Exogenous Series `rd.E` that the field
 
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
   - The rules of [`ew_macro_reference`](@ref).
+  - No value of the reference return is infinite. `NaN` is a gap, and an infinite value is not. Raises an [`IsNonFiniteError`](@ref) that names the observation.
   - The rules of [`market_return_series`](@ref).
 
 # Returns
@@ -1243,6 +1246,9 @@ function descriptor(de::EWMacroSensitivity, rd::ReturnsResult;
                     ref::Option{<:AbstractVector{<:Real}} = nothing)::Matrix{<:Real}
     pnl = descriptor_asset_panel(rd)
     rf = ew_macro_reference(de.series, de, rd, ref)
+    t = findfirst(isinf, rf)
+    @argcheck(isnothing(t),
+              IsNonFiniteError("the reference return must be finite or NaN on every observation, and it is infinite at observation $t of the returns data. NaN is a gap that the recursion skips, and an infinite value is not a gap."))
     X = ew_active_returns(rd.X, pnl)
     rm = market_return_series(rd, de.mcap)
     agg_obs = de.agg_obs

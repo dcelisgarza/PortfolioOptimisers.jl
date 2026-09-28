@@ -132,7 +132,10 @@ currency can hold it. With log returns the split has no cross term.
   so that it works inside the prior and inside a fold, and an `ObservedExposure` can pair it with
   the observed series (#1365). The keyword `ref` stays for a direct call, because its removal
   breaks released code. A call that gives both is refused, because no rule can say which of the
-  two the caller meant. The descriptor refuses a named series where it is not finite after the
-  warm-up of its recursion, as point 3 states. The keyword names no series, so it keeps its
-  released rule: the state of the recursion holds its value at a reference return that is not
-  finite.
+  two the caller meant. The recursion reads the mean of the finite values of each window of
+  `agg_obs` observations. After the warm-up, the descriptor refuses a named series whose window
+  holds no finite value, as point 3 states, because the recursion would freeze the beta of every
+  asset there. A window with a gap and a finite value is read as its mean and is accepted. The
+  keyword names no series, so it keeps its released rule: the state of the recursion holds its
+  value at such a window. An infinite value is not a gap, so both paths refuse it on every
+  observation.
