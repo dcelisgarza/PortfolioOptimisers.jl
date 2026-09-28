@@ -359,4 +359,32 @@ end
         de = EWMacroSensitivity(; series = "FX", half_life = 10)
         @test !(pr.rr.M[:, 6] ≈ descriptor(de, rd)[end, :])
     end
+    @testset "An observed macro factor reads the returns net of the Currency Factors (#1395)" begin
+        # The oracle has no observed macro factor, so the check is internal: the exposure of
+        # the observed factor is the Descriptor of a direct call on the local returns, which
+        # are the returns net of the Currency Factors in this fixture.
+        rd = mac_fixture(; ccy = true)
+        de = EWMacroSensitivity(; series = "FX", half_life = 10)
+        xe = CompositeExposure(; descriptors = [de], outlier = nothing, scoring = nothing,
+                               family = "fx")
+        fx = "fx" => ObservedExposure(; xe = xe, series = "FX")
+        @test PortfolioOptimisers.observed_reads_returns(last(fx))
+        @test !PortfolioOptimisers.observed_reads_returns(CurrencyExposure())
+        rdl = ReturnsResult(; nx = rd.nx,
+                            X = PortfolioOptimisers.panel_field_values(rd, "local"),
+                            ne = rd.ne, E = rd.E, pnl = rd.pnl)
+        ml = descriptor(de, rdl)[end, :]
+        fs = mac_factors(; ccy = true)[1:6]
+        # The two stages keep the order of the factor list, whichever stage a member is in.
+        for (f, nf) in
+            ((vcat(fs, [fx]), ["currency=EUR", "currency=JPY", "currency=USD", "fx"]),
+             (vcat([fx], fs), ["fx", "currency=EUR", "currency=JPY", "currency=USD"]))
+            pr = prior(CrossSectionalFactorPrior(; factors = f), rd)
+            @test pr.rr.nf[6:end] == nf
+            k = findfirst(==("fx"), pr.rr.nf)
+            @test pr.rr.M[:, k] ≈ ml rtol = 1e-12
+            @test !(pr.rr.M[:, k] ≈ descriptor(de, rd)[end, :])
+            @test pr.rr.fx[:, k - 5] == rd.E[(end - size(pr.rr.fx, 1) + 1):end, 4]
+        end
+    end
 end

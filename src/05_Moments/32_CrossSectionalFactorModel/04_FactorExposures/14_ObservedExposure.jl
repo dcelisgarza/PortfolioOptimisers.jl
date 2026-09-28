@@ -71,6 +71,8 @@ An observed factor whose exposure another Exposure Estimator gives, and whose re
 
 The member wraps an estimated member that gives one factor, for example a [`CompositeExposure`](@ref) over a Descriptor of the sensitivity of each asset to a macro series, or of its beta to the market. The wrapped member gives the exposure, and the column `series` of `rd.E` gives the return of the factor. The Cross-Sectional Regression does not estimate that return, so the observed series enters the factor model as it is.
 
+Inside a [`CrossSectionalFactorPrior`](@ref), the wrapped member reads the returns net of the observed members that read no returns, such as the Currency Factors of a [`CurrencyExposure`](@ref). So a Descriptor of the returns measures the local move of an asset, and not the currency it holds. It never reads returns net of its own factor, as [`cross_sectional_observed`](@ref) states.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -355,6 +357,36 @@ function currency_level_columns(xe::CurrencyExposure, rd::ReturnsResult)::Vector
               ArgumentError("the base currency \"$(xe.base)\" is not a level of the Panel Field \"$(xe.field)\", whose levels are $lv"))
     return findall(!=(xe.base), lv)
 end
+"""
+    observed_reads_returns(xe::AbstractObservedExposureEstimator) -> Bool
+    observed_reads_returns(xe::CurrencyExposure) -> Bool
+
+Return whether the exposures of an observed member can read the asset returns.
+
+A [`CrossSectionalFactorPrior`](@ref) reads its observed members in two stages, with [`cross_sectional_observed`](@ref). The members that read no returns come first, and the returns net of their factors are derived from their exposures. The members that can read returns then read those net returns. A member that reads returns thus never enters the net returns it reads.
+
+The answer is `true` unless the member states otherwise. That is the safe side: a member that reads no returns but answers `true` only reads returns net of fewer observed factors, and it gives the same exposure. [`ObservedExposure`](@ref) answers `true`, because the member it wraps can hold a Descriptor of the returns. [`CurrencyExposure`](@ref) answers `false`, because it reads only a categorical Panel Field.
+
+# Arguments
+
+  - `xe`: Observed Exposure Estimator.
+
+# Returns
+
+  - `flag::Bool`: `true` if the exposures of the member can read the asset returns.
+
+# Related
+
+  - [`AbstractObservedExposureEstimator`](@ref)
+  - [`cross_sectional_observed`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function observed_reads_returns(::AbstractObservedExposureEstimator)
+    return true
+end
+function observed_reads_returns(::CurrencyExposure)
+    return false
+end
 
 """
     cross_sectional_factor_partition(factors::AbstractVector{<:Pair}) -> NamedTuple
@@ -424,31 +456,33 @@ function assert_cross_sectional_observed_families(factors::AbstractVector{<:Pair
     return nothing
 end
 """
-    cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult)
+    cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult, lag::Integer)
         -> Option{<:NamedTuple}
 
 Read the observed factors of a [`CrossSectionalFactorPrior`](@ref) off the returns data: their exposures, their names, their families and their returns.
 
-A prior with no observed factor gets `nothing`. Otherwise each member gives its exposures and names, with [`factor_exposure`](@ref) and [`exposure_axis_names`](@ref), and the column of the Exogenous Series of each of its factors, with [`observed_series`](@ref). The function selects those columns from `rd.E` by name and ignores every other column. It refuses a series with no column, even when no asset loads on the factor, because the factor enters the factor covariance with zero loadings and its return must still be a number.
+A prior with no observed factor gets `nothing`. Otherwise each member gives its exposures and names, with [`factor_exposure`](@ref) and [`exposure_axis_names`](@ref), and the column of the Exogenous Series of each of its factors, with [`observed_series`](@ref).
+
+The members are read in two stages, as [`observed_reads_returns`](@ref) sorts them. The members that read no returns, such as [`CurrencyExposure`](@ref), read `rd`. The members that can read returns read a copy of `rd` whose `X` is net of the factors of the first stage, derived with [`cross_sectional_local_returns`](@ref). So a Descriptor of the returns inside an [`ObservedExposure`](@ref) measures the local move of an asset, as the estimated members do, and never the net returns its own factor enters. The copy is derived also when `lx` names a Panel Field of net returns, because that field is net of every observed factor, the member's own among them. When one stage is empty, every member reads `rd`.
 
 # Algorithm
 
  1. `obs` is empty: return `nothing`.
- 2. For each member, compute its exposures, as a three-dimensional block, and read its factor names, its family labels and its series names. Refuse a member whose series count is not its factor count.
- 3. Stack the blocks on the factor axis, giving `Z`.
- 4. Refuse returns data that carries no Exogenous Series, and a series the Exogenous Series has no column for.
- 5. Select the column of each series, in the order of the factors, giving `R`.
+ 2. Read the members for which [`observed_reads_returns`](@ref) answers `false` on `rd`.
+ 3. If a member answers `true` and a member answers `false`, stack the members of step 2 with [`cross_sectional_observed_stack`](@ref), and derive the returns net of their factors with [`cross_sectional_local_returns`](@ref). Copy `rd` with those returns in `X`.
+ 4. Read the members for which [`observed_reads_returns`](@ref) answers `true` on the copy, or on `rd` when step 3 made no copy.
+ 5. Stack every member, in the order of `obs`, with [`cross_sectional_observed_stack`](@ref).
 
 # Arguments
 
   - `obs`: The Pairs of the observed factors, from [`cross_sectional_factor_partition`](@ref).
   - $(arg_dict[:rd]) It carries the Asset Panel and the Exogenous Series.
+  - `lag`: Number of observations by which the exposures lag the returns.
 
 # Validation
 
   - Each member names one series per factor. Raises a `DimensionMismatch`.
-  - `rd.E` is not `nothing`. Raises an [`IsNothingError`](@ref).
-  - `rd.ne` names every series. Raises an `ArgumentError` that names the missing ones.
+  - The rules of [`cross_sectional_observed_stack`](@ref).
   - The rules of [`factor_exposure`](@ref) and [`observed_series`](@ref) of each member.
 
 # Returns
@@ -458,30 +492,83 @@ A prior with no observed factor gets `nothing`. Otherwise each member gives its 
 # Related
 
   - [`AbstractObservedExposureEstimator`](@ref)
+  - [`observed_reads_returns`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
   - [`cross_sectional_local_returns`](@ref)
   - [`cross_sectional_observed_block`](@ref)
   - [`ReturnsResult`](@ref)
 """
-function cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult)
+function cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult,
+                                  lag::Integer)
     if isempty(obs)
         return nothing
     end
-    Zs = AbstractArray{<:Real, 3}[]
+    function member(p, r)
+        (key, xe) = p
+        A = factor_exposure(xe, r)
+        A3 = ndims(A) == 2 ? reshape(A, size(A, 1), size(A, 2), 1) : A
+        n, f = exposure_axis_names(String(key), xe, r)
+        sr = observed_series(xe, r)
+        @argcheck(length(sr) == length(n) == size(A3, 3),
+                  DimensionMismatch("the observed factor \"$key\" gives $(size(A3, 3)) exposures and $(length(n)) names, and names $(length(sr)) series of the Exogenous Series; each factor reads one series"))
+        return (; Z = A3, lv = sr, nf = n, fam = f)
+    end
+    rr = [observed_reads_returns(last(p)) for p in obs]
+    ms = Vector{Any}(undef, length(obs))
+    for k in findall(!, rr)
+        ms[k] = member(obs[k], rd)
+    end
+    rdn = if any(rr) && !all(rr)
+        # The members that can read returns read the returns net of the members that read
+        # none, so a Descriptor of the returns measures the local move of an asset, and no
+        # member reads net returns that its own factor enters.
+        c1 = cross_sectional_observed_stack(ms[.!rr], rd)
+        ReturnsResult(; nx = rd.nx,
+                      X = cross_sectional_local_returns(nothing, c1, rd.X, rd, lag),
+                      nf = rd.nf, F = rd.F, nb = rd.nb, B = rd.B, ne = rd.ne, E = rd.E,
+                      ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa, pnl = rd.pnl)
+    else
+        rd
+    end
+    for k in findall(rr)
+        ms[k] = member(obs[k], rdn)
+    end
+    return cross_sectional_observed_stack(ms, rd)
+end
+"""
+    cross_sectional_observed_stack(ms::AbstractVector, rd::ReturnsResult) -> NamedTuple
+
+Stack the observed members that [`cross_sectional_observed`](@ref) read on the factor axis, and select the return of each factor from the Exogenous Series by name.
+
+The function selects the columns of the series from `rd.E` and ignores every other column. It refuses a series with no column, even when no asset loads on the factor, because the factor enters the factor covariance with zero loadings and its return must still be a number.
+
+# Arguments
+
+  - `ms`: One NamedTuple `(; Z, lv, nf, fam)` for each member: its exposures `observations × assets × factors`, its series names, its factor names and its family labels.
+  - $(arg_dict[:rd]) It carries the Exogenous Series.
+
+# Validation
+
+  - `rd.E` is not `nothing`. Raises an [`IsNothingError`](@ref).
+  - `rd.ne` names every series. Raises an `ArgumentError` that names the missing ones.
+
+# Returns
+
+  - `cc::NamedTuple`: `(; Z, R, lv, nf, fam)`: the exposures `observations × assets × factors`, the observed returns `observations × factors` over every observation of `rd`, the series names, the factor names and the family labels, in the order of `ms`.
+
+# Related
+
+  - [`cross_sectional_observed`](@ref)
+  - [`cross_sectional_local_returns`](@ref)
+"""
+function cross_sectional_observed_stack(ms::AbstractVector, rd::ReturnsResult)
     lv = String[]
     nf = String[]
     fam = String[]
-    for (key, xe) in obs
-        A = factor_exposure(xe, rd)
-        A3 = ndims(A) == 2 ? reshape(A, size(A, 1), size(A, 2), 1) : A
-        n, f = exposure_axis_names(String(key), xe, rd)
-        sr = observed_series(xe, rd)
-        @argcheck(length(sr) == length(n) == size(A3, 3),
-                  DimensionMismatch("the observed factor \"$key\" gives $(size(A3, 3)) exposures and $(length(n)) names, and names $(length(sr)) series of the Exogenous Series; each factor reads one series"))
-        push!(Zs, A3)
-        append!(lv, sr)
-        append!(nf, n)
-        append!(fam, f)
+    for m in ms
+        append!(lv, m.lv)
+        append!(nf, m.nf)
+        append!(fam, m.fam)
     end
     @argcheck(!isnothing(rd.E),
               IsNothingError("the observed factors read their returns from the Exogenous Series of the returns data, and rd.E is nothing. Give the PricesResult or the ReturnsResult an E with one column per series: $lv. currency_excess_index builds the levels of the Currency Factors."))
@@ -489,8 +576,8 @@ function cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult
     miss = unique(lv[isnothing.(j)])
     @argcheck(isempty(miss),
               ArgumentError("the observed factors read their returns from the columns of the Exogenous Series with these names, and rd.ne has no column for $miss. Every series needs a column, even one no asset loads on, because its factor enters the factor covariance. Got rd.ne => $(rd.ne)"))
-    return (; Z = reduce((a, b) -> cat(a, b; dims = 3), Zs), R = rd.E[:, Int.(j)], lv = lv,
-            nf = nf, fam = fam)
+    return (; Z = reduce((a, b) -> cat(a, b; dims = 3), [m.Z for m in ms]),
+            R = rd.E[:, Int.(j)], lv = lv, nf = nf, fam = fam)
 end
 """
     cross_sectional_local_returns(lx::Nothing, cc::Nothing, X::MatNum, rd::ReturnsResult,

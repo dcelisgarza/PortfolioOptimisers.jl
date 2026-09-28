@@ -54,8 +54,13 @@ currency can hold it. With log returns the split has no cross term.
    returns, so a Descriptor of the returns, such as a beta or a macro sensitivity, measures the
    local move of an asset and not the currency it holds (#1365). The first `lag` observations
    have no lagged exposure, so there the derivation takes the exposure of the same observation.
-   The fit never regresses them, but a Descriptor reads them. The observed members read `X`,
-   because the net returns derive from their exposures.
+   The fit never regresses them, but a Descriptor reads them. An observed member cannot read
+   those net returns, because they derive from its own exposures. So the observed members read
+   in two stages (#1395). The members that read no returns, such as `CurrencyExposure`, read
+   `X`. The members that can read returns, such as an `ObservedExposure` over a macro
+   sensitivity, read `X` net of the first stage, derived by the same rule even under `lx`,
+   because the named field is net of their own factors too. No member reads net returns that its
+   own factor enters.
 2. **A new block, the Exogenous Series, rides on `PricesResult` and on `ReturnsResult`.** It holds
    named series over the observation axis that belong to no asset. `PricesResult.E` holds
    **levels**, a `TimeArray` whose column names are the names, and `ReturnsResult` holds their
@@ -118,6 +123,9 @@ currency can hold it. With log returns the split has no cross term.
   read from `E` by name" is not specific to currencies: #1365 needs it for macro series, and an
   observed market return needs it too. A kind of member states it once, and a magic string does
   not.
+- **The observed members read `X`, or they are refused beside another observed member (#1395).**
+  Rejected. Under `X`, a macro sensitivity beside Currency Factors measures the currency of each
+  asset as well as its local move. A refusal forbids a model that the two stages fit.
 - **`prices_to_returns` refuses a gap in `E`.** Rejected. It refuses rows that the fit never
   reads: the warm-up of the descriptors and the exposure lag consume the first rows.
 
