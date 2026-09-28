@@ -60,7 +60,8 @@ The default holds out `2` of `10` folds for testing. This gives `binomial(10, 2)
 
   - `n_folds` must be non-empty, greater than zero, and finite.
   - `n_test_folds` must be non-empty, greater than zero, and finite.
-  - `purged_size` and `embargo_size` must be non-empty and finite.
+  - `n_test_folds < n_folds`, so that every split keeps a training fold.
+  - `purged_size` and `embargo_size` must be non-empty, finite, and non-negative.
   - `binomial(n_folds, n_test_folds) <= max_comb`. `max_comb` is a constructor argument, not a field, so it bounds the split count at construction and is not carried on the estimator.
   - [`Base.split`](@ref) additionally checks `purged_size + embargo_size < div(T, n_folds)`, because a gap as wide as the smallest fold would empty a training fold.
 
@@ -138,8 +139,12 @@ CombinatorialCrossValidation
                                           strict::Bool = false)
         assert_nonempty_gt0_finite_val(n_folds, :n_folds)
         assert_nonempty_gt0_finite_val(n_test_folds, :n_test_folds)
-        assert_nonempty_finite_val(purged_size, :purged_size)
-        assert_nonempty_finite_val(embargo_size, :embargo_size)
+        assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
+        assert_nonempty_nonneg_finite_val(embargo_size, :embargo_size)
+        # With every fold held out, no fold is left to train on.
+        @argcheck(n_test_folds < n_folds,
+                  DomainError(n_test_folds,
+                              "n_test_folds ($n_test_folds) must be less than n_folds ($n_folds), so that every split keeps a training fold"))
         @argcheck(binomial(n_folds, n_test_folds) <= max_comb,
                   ArgumentError("The number of splits for `n_folds = $n_folds` and `n_test_folds = $n_test_folds` is `$(binomial(n_folds, n_test_folds))`, which is greater than the maximum allowed `$max_comb`. The number of combinations should typically be between 10^1 to 10^4 for statistical power. Such a large number of combinations may lead to long computation times and memory issues. Consider reducing `n_folds` or shifting `n_test_folds` further away from being equal to `div(n_folds, 2) = $(div(n_folds, 2))`."))
 

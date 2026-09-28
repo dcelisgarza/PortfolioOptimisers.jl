@@ -674,6 +674,21 @@
         @test IndexWalkForward(100, 1) isa IndexWalkForward
         @test DateWalkForward(12, 1; period = Month(1)) isa DateWalkForward
     end
+    @testset "A split keeps a training fold, and a gap is not negative" begin
+        # With every fold held out, the one split had an empty training set and no error.
+        @test_throws DomainError CombinatorialCrossValidation(; n_folds = 3,
+                                                              n_test_folds = 3)
+        @test_throws DomainError CombinatorialCrossValidation(; n_folds = 2,
+                                                              n_test_folds = 2)
+        @test CombinatorialCrossValidation(; n_folds = 3, n_test_folds = 2) isa
+              CombinatorialCrossValidation
+        # A negative purge or embargo was accepted by both constructors.
+        @test_throws DomainError CombinatorialCrossValidation(; purged_size = -1)
+        @test_throws DomainError CombinatorialCrossValidation(; embargo_size = -1)
+        @test_throws DomainError KFold(; purged_size = -1)
+        @test_throws DomainError KFold(; embargo_size = -1)
+        @test KFold(; purged_size = 0, embargo_size = 0) isa KFold
+    end
     @testset "MultipleRandomised" begin
         cv = IndexWalkForward(127, 171)
         res = split(cv, rd)

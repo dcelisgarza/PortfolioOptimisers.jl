@@ -965,11 +965,12 @@ This method takes a [`NonMonotonicSchurComplement`](@ref) bundle. The [`Monotoni
  2. Take `gamma` from the argument, or from `params.gamma` when the argument is `nothing`.
  3. Set every entry of the weights `w` to one.
  4. Split each entry of `items` of more than one leaf into its halves, giving the new `items`. Stop when no entry has more than one leaf.
- 5. For each pair of halves `lc` and `rc`, read the blocks `A` and `C` of `sigma`. When `lc` holds more than one leaf, augment both blocks with [`schur_augmentation`](@ref), giving `A_aug` and `C_aug`, and write them back into `sigma`. A later split then reads the augmented blocks. Otherwise `A_aug` and `C_aug` are `A` and `C`.
- 6. When `params.flag` is `true`, repair `A_aug` and `C_aug` with `params.pdm`. The repaired copies give the risks of step 7, and `sigma` keeps the blocks of step 5. When `params.flag` is `false` and either block is not positive definite, return `nothing` as the weights.
- 7. Compute the risks `lrisk` and `rrisk` of the two blocks with [`naive_portfolio_risk`](@ref), and the split factor `alpha` from them.
- 8. Clamp `alpha` to `wb` with [`split_factor_weight_constraints`](@ref). Multiply the weights of `lc` by `alpha`, and the weights of `rc` by `1 - alpha`.
- 9. Go back to step 4.
+ 5. For each pair of halves `lc` and `rc`, read the blocks `A` and `C` of `sigma`. When `lc` holds more than one leaf, augment both blocks with [`schur_augmentation`](@ref). The results are `A_aug` and `C_aug`. Otherwise `A_aug` and `C_aug` are `A` and `C`.
+ 6. When `params.flag` is `true`, repair `A_aug` and `C_aug` with `params.pdm`. When `params.flag` is `false` and either block is not positive definite, return `nothing` as the weights.
+ 7. Write `A_aug` and `C_aug` back into `sigma`. A later split then reads the augmented and repaired blocks.
+ 8. Compute the risks `lrisk` and `rrisk` of the two blocks with [`naive_portfolio_risk`](@ref), and the split factor `alpha` from them.
+ 9. Clamp `alpha` to `wb` with [`split_factor_weight_constraints`](@ref). Multiply the weights of `lc` by `alpha`, and the weights of `rc` by `1 - alpha`.
+10. Go back to step 4.
 
 # Arguments
 
@@ -1028,8 +1029,6 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                 B = sigma[lc, rc]
                 A_aug = schur_augmentation(A, B, C, gamma)
                 C_aug = schur_augmentation(C, transpose(B), A, gamma)
-                sigma[lc, lc] = A_aug
-                sigma[rc, rc] = C_aug
             end
             if flag
                 try
@@ -1047,6 +1046,9 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                     return nothing, gamma, r
                 end
             end
+            # After the repair, so that a later split reads the repaired blocks.
+            sigma[lc, lc] = A_aug
+            sigma[rc, rc] = C_aug
             lrisk = naive_portfolio_risk(r, A_aug)
             rrisk = naive_portfolio_risk(r, C_aug)
             # Allocate weight to clusters.

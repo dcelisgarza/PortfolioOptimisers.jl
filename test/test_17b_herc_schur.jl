@@ -313,6 +313,69 @@ end
     @test gamma == 0
     @test w == nm_weights(pr, 0)
 end
+@testset "A later Schur split reads the repaired blocks" begin
+    #=
+    With `flag = true` the recursion repairs each augmented block before it reads the risk.
+    It wrote the block back into `sigma` BEFORE the repair, so a later split augmented the
+    unrepaired block. The write-back now follows the repair. The oracle below runs the
+    recursion with the write-back on either side of the repair, and the panel is one where
+    the two orders give different weights.
+    =#
+    PO = PortfolioOptimisers
+    function schur_oracle(pr, gamma, pdm, repaired_writeback)
+        sigma = copy(pr.sigma)
+        w = ones(size(sigma, 1))
+        items = [collect(axes(sigma, 1))]
+        while !isempty(items)
+            items = [i[j:k] for i in items
+                     for (j, k) in
+                         ((1, div(length(i), 2)), (div(length(i), 2) + 1, length(i)))
+                     if length(i) > 1]
+            for i in 1:2:length(items)
+                lc, rc = items[i], items[i + 1]
+                A, C = sigma[lc, lc], sigma[rc, rc]
+                if length(lc) > 1
+                    B = sigma[lc, rc]
+                    A = PO.schur_augmentation(A, B, C, gamma)
+                    C = PO.schur_augmentation(C, transpose(B), sigma[lc, lc], gamma)
+                end
+                if !repaired_writeback
+                    sigma[lc, lc], sigma[rc, rc] = A, C
+                end
+                PO.posdef!(pdm, A)
+                PO.posdef!(pdm, C)
+                if repaired_writeback
+                    sigma[lc, lc], sigma[rc, rc] = A, C
+                end
+                # Inverse-variance weights and the variance of each half, as the default
+                # `Variance` measure takes them.
+                la, lcw = inv.(diag(A)), inv.(diag(C))
+                la ./= sum(la)
+                lcw ./= sum(lcw)
+                lr, rr = dot(la, A, la), dot(lcw, C, lcw)
+                alpha = 1 - lr / (lr + rr)
+                w[lc] .*= alpha
+                w[rc] .*= 1 - alpha
+            end
+        end
+        return w
+    end
+    # The oracle assigns `w`, `B` and other names, and a function inside a testset assigns
+    # the testset's local of the same name. So no name here is one the oracle assigns.
+    rng = StableRNG(279)
+    Fp = randn(rng, 300, 2)
+    Bp = randn(rng, 8, 2)
+    Ep = randn(rng, 300, 8) * 0.3
+    prs = prior(EmpiricalPrior(), Fp * Bp' + Ep)
+    ps = SchurComplementParams(; gamma = 0.5, alg = NonMonotonicSchurComplement(),
+                               flag = true)
+    w_lib = PO.schur_complement_weights(prs, [collect(1:8)],
+                                        WeightBounds(; lb = zeros(8), ub = ones(8)), ps)[1]
+    w_fixed = schur_oracle(prs, 0.5, ps.pdm, true)
+    w_old = schur_oracle(prs, 0.5, ps.pdm, false)
+    @test isapprox(w_lib, w_fixed; rtol = 1e-12)
+    @test maximum(abs, w_fixed - w_old) > 0.02
+end
 @testset "The docstrings of 03_SchurComplementHierarchicalRiskParity.jl against numbers" begin
     PO = PortfolioOptimisers
     # A six-asset covariance matrix, its leaf order, and the weights of the reference

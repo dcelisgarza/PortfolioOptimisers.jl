@@ -210,9 +210,9 @@ meet `bgt`, so a portfolio that trades more may hold less.
 ```math
 \\begin{align}
 \\boldsymbol{1}^\\intercal \\boldsymbol{w} + \\boldsymbol{v}_p^\\intercal \\boldsymbol{w}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{w}_n &\\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]\\,, \\\\
-\\boldsymbol{w} - \\boldsymbol{w}_0 &= \\boldsymbol{w}_p - \\boldsymbol{w}_n\\,, \\\\
-\\boldsymbol{w}_p &\\leq \\boldsymbol{u}_p\\,, \\\\
-\\boldsymbol{w}_n &\\leq \\boldsymbol{u}_n\\,, \\\\
+\\boldsymbol{w} - k\\,\\boldsymbol{w}_0 &= \\boldsymbol{w}_p - \\boldsymbol{w}_n\\,, \\\\
+\\boldsymbol{w}_p &\\leq k\\,\\boldsymbol{u}_p\\,, \\\\
+\\boldsymbol{w}_n &\\leq k\\,\\boldsymbol{u}_n\\,, \\\\
 \\boldsymbol{w}_p,\\; \\boldsymbol{w}_n &\\geq \\boldsymbol{0}\\,.
 \\end{align}
 ```
@@ -226,6 +226,8 @@ Where:
   - ``\\boldsymbol{v}_p``, ``\\boldsymbol{v}_n``: Cost coefficient vectors for positive and negative changes.
   - ``\\boldsymbol{u}_p``, ``\\boldsymbol{u}_n``: Upper limits on the positive and negative increments.
   - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds. A scalar `bgt` pins them together.
+
+Every row is homogeneous in ``(\\boldsymbol{w}, k)``. Under [`MaximumRatio`](@ref), the start portfolio ``\\boldsymbol{w}_0``, the caps and the budget therefore scale with ``k``, and the weights do not depend on `ohf`. Every other objective fixes ``k = 1``.
 
 A pinned `bgt = 1.0` and a [`MaximumReturn`](@ref) objective reproduce the identity to
 **7.1e-9** on a five-asset sample: `sum(w) + 0.01 * sum(abs.(w - w0))` lands on
@@ -371,11 +373,11 @@ return expression** of every term whose `settings.mic` is `true`.
 ```math
 \\begin{align}
 \\boldsymbol{1}^\\intercal \\boldsymbol{w} + \\boldsymbol{v}_p^\\intercal \\boldsymbol{\\iota}_p + \\boldsymbol{v}_n^\\intercal \\boldsymbol{\\iota}_n &\\in [k\\,\\mathrm{lb},\\; k\\,\\mathrm{ub}]\\,, \\\\
-(\\iota_{p,i},\\; 1,\\; w_{p,i}) &\\in \\mathcal{K}_{\\mathrm{pow}}^\\beta \\quad \\forall i = 1,\\dots,N\\,, \\\\
-(\\iota_{n,i},\\; 1,\\; w_{n,i}) &\\in \\mathcal{K}_{\\mathrm{pow}}^\\beta \\quad \\forall i = 1,\\dots,N\\,, \\\\
-\\boldsymbol{w} - \\boldsymbol{w}_0 &= \\boldsymbol{w}_p - \\boldsymbol{w}_n\\,, \\\\
-\\boldsymbol{w}_p &\\leq \\boldsymbol{u}_p\\,, \\\\
-\\boldsymbol{w}_n &\\leq \\boldsymbol{u}_n\\,, \\\\
+(\\iota_{p,i},\\; k,\\; w_{p,i}) &\\in \\mathcal{K}_{\\mathrm{pow}}^\\beta \\quad \\forall i = 1,\\dots,N\\,, \\\\
+(\\iota_{n,i},\\; k,\\; w_{n,i}) &\\in \\mathcal{K}_{\\mathrm{pow}}^\\beta \\quad \\forall i = 1,\\dots,N\\,, \\\\
+\\boldsymbol{w} - k\\,\\boldsymbol{w}_0 &= \\boldsymbol{w}_p - \\boldsymbol{w}_n\\,, \\\\
+\\boldsymbol{w}_p &\\leq k\\,\\boldsymbol{u}_p\\,, \\\\
+\\boldsymbol{w}_n &\\leq k\\,\\boldsymbol{u}_n\\,, \\\\
 \\boldsymbol{w}_p,\\; \\boldsymbol{w}_n &\\geq \\boldsymbol{0}\\,.
 \\end{align}
 ```
@@ -392,6 +394,8 @@ Where:
   - ``\\boldsymbol{u}_p``, ``\\boldsymbol{u}_n``: Upper limits on the positive and negative increments.
   - ``\\mathcal{K}_{\\mathrm{pow}}^\\beta``: Three-dimensional power cone of exponent ``\\beta``.
   - ``\\mathrm{lb}``, ``\\mathrm{ub}``: Lower and upper budget bounds. A scalar `bgt` pins them together.
+
+Every row is homogeneous in ``(\\boldsymbol{w}, k)``. Under [`MaximumRatio`](@ref), the start portfolio ``\\boldsymbol{w}_0``, the caps and the budget therefore scale with ``k``, and the weights do not depend on `ohf`. Every other objective fixes ``k = 1``.
 
 !!! note
 
@@ -845,6 +849,7 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::VecNum)
     wb = bgt.w
     up = bgt.up
     un = bgt.un
+    k = get_k(model)
     sc = get_constraint_scale(model)
     N = length(w)
     JuMP.@variables(model, begin
@@ -852,9 +857,9 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetCosts, w::VecNum)
                         wn[1:N], (lower_bound = 0)
                     end)
     JuMP.@constraints(model, begin
-                          sc * (wp ⊖ up) <= 0
-                          sc * (wn ⊖ un) <= 0
-                          sc * (w - wb - wp + wn) == 0
+                          sc * (wp ⊖ up * k) <= 0
+                          sc * (wn ⊖ un * k) <= 0
+                          sc * (w - wb * k - wp + wn) == 0
                       end)
     set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w, wp, wn)
     return nothing
@@ -863,6 +868,7 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::
     wb = bgt.w
     up = bgt.up
     un = bgt.un
+    k = get_k(model)
     beta = bgt.beta
     sc = get_constraint_scale(model)
     N = length(w)
@@ -874,13 +880,13 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::
                     end)
     JuMP.@constraints(model,
                       begin
-                          sc * (wp ⊖ up) <= 0
-                          sc * (wn ⊖ un) <= 0
-                          sc * (w - wb - wp + wn) == 0
+                          sc * (wp ⊖ up * k) <= 0
+                          sc * (wn ⊖ un * k) <= 0
+                          sc * (w - wb * k - wp + wn) == 0
                           [i = 1:N],
-                          [sc * wip[i], 1, sc * wp[i]] in JuMP.MOI.PowerCone(beta)
+                          [sc * wip[i], k, sc * wp[i]] in JuMP.MOI.PowerCone(beta)
                           [i = 1:N],
-                          [sc * win[i], 1, sc * wn[i]] in JuMP.MOI.PowerCone(beta)
+                          [sc * win[i], k, sc * wn[i]] in JuMP.MOI.PowerCone(beta)
                       end)
     set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w, wip, win)
     return nothing
