@@ -304,6 +304,10 @@ The replacement of one Factor Exposure by its residual after a benchmark-weighte
 The time-varying change of basis that imposes each Factor Family's zero-sum constraint by dropping one member and rewriting the others, stored as the per-observation ratios of the retained members to the dropped one.
 *Avoid*: the reduced loadings, which are what the basis produces rather than the basis itself.
 
+**Empty Factor**
+An estimated factor of a Cross-Sectional Factor Prior whose exposure is zero at every pair of positive regression weight in one fit, so the data state nothing about its return. A sub-universe with no asset in one level of a one-hot factor leaves that level empty, and a meta-optimiser gives its sub-problems such sub-universes. The fit keeps the factor on every axis, with a return of zero at every observation, a mean of zero, and a zero row and column of the factor covariance.
+*Avoid*: a dropped factor, which is the member of a Factor Family that the Factor Family Basis rewrites through the others.
+
 **Currency Excess Index**
 The value in the base currency of a deposit in one currency funded in the base currency: the exchange rate times the cash total-return index of the currency, divided by the cash total-return index of the base currency. It is the level series whose return is the Currency Excess Return, and `currency_excess_index` builds it. See ADR 0184.
 *Avoid*: an exchange rate, which leaves out the two cash returns.

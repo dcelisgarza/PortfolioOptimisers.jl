@@ -13,6 +13,9 @@ The `*Default*` files hold the default fit on the same fixture (#1373, #1374): t
 the factor covariance, `mu`, `sigma` and the idiosyncratic variance of the latest observation.
 Its factor prior decays on the half-life of the idiosyncratic variance, and both of them measure
 a second moment about zero.
+
+The last testsets fit the fixture on the assets of one industry, which leaves the other
+industry factors empty (#1372).
 =#
 using Statistics, Clarabel
 
@@ -106,8 +109,9 @@ end
         @test pr.sigma ≈ ccy_asset("$(nm)DefaultSigma") rtol = 1e-12
     end
 
-    # Every cluster and every subset must estimate its own factors, so the factors here are
-    # continuous styles and a market intercept, which no subset of assets leaves empty.
+    # Every cluster and every subset estimates its own factors. The factors here are
+    # continuous styles and a market intercept, and the testsets of #1372 at the end of the
+    # file fit industry factors, which a cluster can leave empty.
     pe = CrossSectionalFactorPrior(;
                                    factors = ["style1" => ccy_pass("style1", "style"),
                                               "style2" => ccy_pass("style2", "style"),
@@ -159,5 +163,87 @@ end
         big = LowOrderPrior(; X = randn(StableRNG(1), 200, 40), mu = zeros(40),
                             sigma = Matrix(1.0I, 40, 40))
         @test_throws DimensionMismatch PO.outer_prior_rows(fx.rd, big)
+    end
+
+    # A sub-universe that holds the assets of industry 2 alone leaves the factors of
+    # industries 1 and 3 empty (#1372): no asset of positive weight carries a nonzero
+    # exposure to them. A cluster or a subset of a meta-optimiser is such a sub-universe.
+    fac3 = ["ind1" => ccy_pass("ind1", "industry"), "ind2" => ccy_pass("ind2", "industry"),
+            "ind3" => ccy_pass("ind3", "industry"), "style1" => ccy_pass("style1", "style")]
+    i2 = findall(==(2), fx.ind)
+    rd2 = PO.port_opt_view(fx.rd, i2)
+
+    cres = (("PseudoInverseFallback", CrossSectionalLinearRegression()),
+            ("RankDeficiencyRefusal",
+             CrossSectionalLinearRegression(; alg = RankDeficiencyRefusal())))
+    @testset "An Empty Factor has no return, mean or variance, $(nm)" for (nm, cre) in cres
+        pr = prior(CrossSectionalFactorPrior(; factors = fac3, cre = cre, minra = 5), rd2)
+        # The empty factors keep their place on every axis of the factor model.
+        @test pr.rr.nf == ["ind1", "ind2", "ind3", "style1"]
+        @test all(iszero, pr.fpr.X[:, [1, 3]])
+        @test all(iszero, pr.fpr.mu[[1, 3]])
+        @test all(iszero, pr.fpr.sigma[[1, 3], :]) && all(iszero, pr.fpr.sigma[:, [1, 3]])
+        @test all(isfinite, pr.mu) && all(isfinite, pr.sigma) && all(isfinite, pr.chol)
+        # An empty factor adds nothing to the fit, so the prior equals the one fitted on the
+        # other factors alone.
+        prl = prior(CrossSectionalFactorPrior(; factors = fac3[[2, 4]], cre = cre,
+                                              minra = 5), rd2)
+        @test pr.fpr.X[:, [2, 4]] == prl.fpr.X
+        @test pr.fpr.mu[[2, 4]] == prl.fpr.mu
+        @test pr.fpr.sigma[[2, 4], [2, 4]] == prl.fpr.sigma
+        @test pr.mu ≈ prl.mu rtol = 1e-12
+        @test pr.sigma ≈ prl.sigma rtol = 1e-12
+        @test transpose(pr.chol) * pr.chol ≈ pr.sigma rtol = 1e-10
+    end
+
+    @testset "An Empty Factor inside a constrained Factor Family" begin
+        pr = prior(CrossSectionalFactorPrior(; factors = fac3,
+                                             families = ["industry" => nothing], minra = 5),
+                   rd2)
+        @test length(pr.rr.nf) == 4
+        @test all(isfinite, pr.mu) && all(isfinite, pr.sigma)
+        @test all(isfinite, pr.fpr.sigma)
+    end
+
+    @testset "An exposure at a pair of zero weight does not make a factor live" begin
+        Z = zeros(3, 4, 2)
+        Z[:, :, 1] .= 1.0
+        Z[:, 4, 2] .= 5.0
+        X = [0.01 0.02 0.03 0.04; -0.01 0.0 0.01 0.02; 0.02 0.01 0.0 -0.01]
+        W = [1.0 1.0 1.0 0.0; 1.0 1.0 1.0 0.0; 1.0 1.0 1.0 0.0]
+        (; csr, lv) = PO.cross_sectional_live_regression(CrossSectionalLinearRegression(),
+                                                         Z, X, W)
+        @test lv == [true, false]
+        @test csr.f[:, 1] ≈ vec(sum(X[:, 1:3]; dims = 2)) ./ 3 rtol = 1e-12
+        @test all(iszero, csr.f[:, 2])
+        @test csr.n == [3, 3, 3]
+        W[2, 4] = 1.0
+        @test PO.cross_sectional_live_regression(CrossSectionalLinearRegression(), Z, X,
+                                                 W).lv == [true, true]
+        @test_throws ArgumentError PO.cross_sectional_live_regression(CrossSectionalLinearRegression(),
+                                                                      zeros(3, 4, 2), X, W)
+    end
+
+    @testset "A factor prior of the live factors, placed on the whole factor axis" begin
+        f = [0.01 0.0 0.02; -0.02 0.0 0.01; 0.03 0.0 -0.01; 0.0 0.0 0.02]
+        fm = PO.cross_sectional_factor_moments(EmpiricalPrior(), MatrixProcessing(), f,
+                                               BitVector([true, false, true]))
+        ref = prior(EmpiricalPrior(), f[:, [1, 3]])
+        @test fm.mu == [ref.mu[1], 0.0, ref.mu[2]]
+        @test fm.sigma[[1, 3], [1, 3]] == ref.sigma
+        @test all(iszero, fm.sigma[2, :]) && all(iszero, fm.sigma[:, 2])
+        @test fm.X[:, [1, 3]] == ref.X && all(iszero, fm.X[:, 2])
+        @test_throws DimensionMismatch PO.cross_sectional_factor_moments(EmpiricalPrior(),
+                                                                         MatrixProcessing(),
+                                                                         f, trues(2))
+    end
+
+    @testset "A NestedClustered over the industry factors fits every cluster (#1372)" begin
+        pei = CrossSectionalFactorPrior(; factors = fac3, minra = 3)
+        innr = MeanRisk(; opt = JuMPOptimiser(; pe = pei, slv = slv))
+        res = optimise(NestedClustered(; pe = pei, opti = innr, opto = EqualWeighted()),
+                       fx.rd)
+        @test sum(res.w) ≈ 1
+        @test all(r -> r.retcode isa OptimisationSuccess, res.resi)
     end
 end

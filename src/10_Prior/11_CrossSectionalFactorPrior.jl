@@ -341,7 +341,7 @@ Where:
   - $(math_dict[:N])
   - $(math_dict[:K])
 
-Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\Sigma}`` outside ``\\mathcal{I}`` is `NaN`. Without a Return Forecast Estimator the forecast terms are zero, so ``\\boldsymbol{\\mu}_{\\mathcal{I}} = \\lambda \\mathbf{Z}_{T, \\mathcal{I}} \\hat{\\boldsymbol{\\mu}}_{f}``. At ``\\lambda = 0`` and ``c = 1`` the two parts of the forecast add up to ``\\boldsymbol{\\alpha}_{T}``, so the expected return of an investable asset with a finite forecast is that forecast.
+Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\Sigma}`` outside ``\\mathcal{I}`` is `NaN`. An Empty Factor, an estimated factor whose exposure is zero at every pair of positive weight, has ``f_{tk} = 0`` at every observation, and ``\\hat{\\mathbf{\\Sigma}}_{f}`` holds a zero row and column for it. It keeps its place on every factor axis, so a sub-universe with no asset in one level of a one-hot factor still fits. Without a Return Forecast Estimator the forecast terms are zero, so ``\\boldsymbol{\\mu}_{\\mathcal{I}} = \\lambda \\mathbf{Z}_{T, \\mathcal{I}} \\hat{\\boldsymbol{\\mu}}_{f}``. At ``\\lambda = 0`` and ``c = 1`` the two parts of the forecast add up to ``\\boldsymbol{\\alpha}_{T}``, so the expected return of an investable asset with a finite forecast is that forecast.
 
 # Algorithm
 
@@ -352,9 +352,9 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
  5. Neutralise the exposures with [`cross_sectional_neutralise!`](@ref), under the benchmark weights and the prior's own regression estimator.
  6. Build the Factor Family Basis `fb` with [`cross_sectional_family_basis`](@ref), and reduce the exposures through it.
  7. Lag the reduced exposures and the market capitalisation by `pe.lag`, giving `Zl` and `mcl`. Trim the observed factors to the fitted observations with [`cross_sectional_observed_block`](@ref), which refuses a non-finite observed return among them. Take the eligibility mask `msk` of the fit with [`cross_sectional_eligible`](@ref) on `Xl`, and drop from it every pair whose lagged market capitalisation is not finite.
- 8. Regress each observation's `Xl` on its lagged reduced exposures, giving `csr`, under the weights `W` of [`cs_weights_initial`](@ref). Refuse a `csr` that carries an intercept. When [`needs_second_pass`](@ref) answers `true`, refine the weights with [`cs_weights_refine`](@ref) and regress again.
+ 8. Regress each observation's `Xl` on its lagged reduced exposures with [`cross_sectional_live_regression`](@ref), giving `csr` and the mask `lv` of the factors that are not empty, under the weights `W` of [`cs_weights_initial`](@ref). Refuse a `csr` that carries an intercept. When [`needs_second_pass`](@ref) answers `true`, refine the weights with [`cs_weights_refine`](@ref) and regress again.
  9. Take the idiosyncratic variance history `vs` with [`variance_series`](@ref), standardise the idiosyncratic returns by it with [`cross_sectional_standardised_residuals`](@ref), giving `S`, and take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref). Record the degrees of freedom and the divisor of each variance with [`variance_count`](@ref) and [`cross_sectional_variance_counts`](@ref).
-10. Append the observed factors after the estimated ones with [`cross_sectional_observed_append`](@ref): the observed returns after the factor returns, the observed exposures after the loadings and the exposure history, the names and the family labels, and pass-through factors on the Factor Family Basis. Fit `pe.pe` on the combined reduced factor returns, giving `f_pr`, refuse a non-finite factor moment with [`assert_cross_sectional_factor_moments`](@ref), and process the factor covariance in place under `pe.f_mp`, which is the matrix processing estimator of the factor axis and not the asset one. The method passes `strict` to `pe.pe`, as [`FactorPrior`](@ref) does, because the slot admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
+10. Append the observed factors after the estimated ones with [`cross_sectional_observed_append`](@ref): the observed returns after the factor returns, the observed exposures after the loadings and the exposure history, the names and the family labels, and pass-through factors on the Factor Family Basis. Fit `pe.pe` on the combined reduced factor returns of the factors that are not empty with [`cross_sectional_factor_moments`](@ref), giving `f_pr`, which refuses a non-finite factor moment and processes the factor covariance under `pe.f_mp`, the matrix processing estimator of the factor axis and not the asset one. An Observed Factor is never empty. The method passes `strict` to `pe.pe`, as [`FactorPrior`](@ref) does, because the slot admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
 11. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, a zero `b`, and the observed returns in `fx`.
 12. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the full returns data, so that a Descriptor of the forecast warms up over every observation the panel has, giving the block `rr` with the orthogonal part in `b` and the Result in `rf`. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref), and keep the mean of the observed factors, giving `f_mu`.
 13. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named.
@@ -386,6 +386,7 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
   - At least two observations are left after the Descriptor warm-up and the exposure lag, because a covariance of one observation is not a number. Raises an `ArgumentError`.
   - Every fitted observation carries at least `minra` eligible assets. Raises an `ArgumentError`.
   - Under observed factors, `E` carries a column for every observed series, and every observed return of the fitted observations is finite. Raises an [`IsNothingError`](@ref), an `ArgumentError` or an [`IsNonFiniteError`](@ref), from [`cross_sectional_observed`](@ref) and [`cross_sectional_observed_block`](@ref).
+  - At least one estimated factor is not empty. Raises an `ArgumentError`.
   - The regression fits no intercept. The prior states the moments through the factor returns alone, so an intercept would leave its mean out of `mu` and its variance out of `sigma`. Raises an `ArgumentError`.
   - The factor prior states a finite factor mean and a finite factor covariance. Raises an [`IsNonFiniteError`](@ref).
   - At least one asset is investable at the latest observation. Raises an [`IsEmptyError`](@ref).
@@ -472,12 +473,12 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
                                         pe.minra
                                     end)
     W = cs_weights_initial(pe.wa, mcl, msk)
-    csr = cross_sectional_regression(pe.cre, Zl, Xr, W)
+    (; csr, lv) = cross_sectional_live_regression(pe.cre, Zl, Xr, W)
     @argcheck(isnothing(csr.b),
               ArgumentError("a Cross-Sectional Factor Prior states its moments through the factor returns alone, and its regression estimator fitted an intercept, whose mean and variance the moments would leave out. Give cre an estimator with intercept = false, and state the common return as a factor, for example \"market\" => ConstantExposure()."))
     if needs_second_pass(pe.wa)
         W = cs_weights_refine(pe.wa, W, csr.eps, pe.ve, msk)
-        csr = cross_sectional_regression(pe.cre, Zl, Xr, W)
+        (; csr, lv) = cross_sectional_live_regression(pe.cre, Zl, Xr, W)
     end
     vs = variance_series(pe.ve, csr.eps; dims = 1)
     (; edof, ediv) = cross_sectional_variance_counts(variance_count(pe.ve, csr.eps), csr)
@@ -490,17 +491,19 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     # error to hear about under `strict`.
     ca = cross_sectional_observed_append(cb, csr.f, fb.Ms[r[end], :, :], Msw[r, :, :], nf,
                                          fam, fb.fcb)
-    f_pr = prior(pe.pe, ca.f; strict = strict)
-    assert_cross_sectional_factor_moments(f_pr.mu, f_pr.sigma, length(r))
     # The factor covariance takes its own estimator for the reason the asset one takes
     # `pe.mp`: they are different matrices. This one is estimated from the factor-return
     # series over a factor axis a constrained Family has already reduced, and
     # `cross_sectional_lift` factorises it for the low-rank square root, so a covariance
     # that is merely positive SEMI-definite -- a short warm-up, a collinear Family -- raises
     # a `PosDefException` out of the Cholesky rather than answering. The default `pdm` is a
-    # no-op on a matrix that is already positive definite, so a healthy fit is untouched,
-    # and `f_pr` is local to this method: nothing outside it holds the matrix.
-    matrix_processing!(pe.f_mp, f_pr.sigma, ca.f; kwargs...)
+    # no-op on a matrix that is already positive definite, so a healthy fit is untouched.
+    # An Empty Factor has no return to estimate a variance from, so the factor prior and
+    # `pe.f_mp` read the other factors. An Observed Factor carries the return the caller
+    # observed, so it is never empty.
+    f_pr = cross_sectional_factor_moments(pe.pe, pe.f_mp, ca.f,
+                                          vcat(lv, trues(size(ca.f, 2) - length(lv)));
+                                          strict = strict, kwargs...)
     fnow = cross_sectional_basis_now(ca.fcb, r)
     L = ca.L
     Msr = ca.Ms
@@ -515,8 +518,8 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     # The forecast spans the estimated factors alone, so the blend reaches their mean and
     # the mean of each observed factor is the one the factor prior states.
     Ke = size(csr.f, 2)
-    f_mu = vcat(cross_sectional_forecast_mu(pe.lambda, f_pr.mu[1:Ke], g),
-                f_pr.mu[(Ke + 1):end])
+    f_mu = @views vcat(cross_sectional_forecast_mu(pe.lambda, f_pr.mu[1:Ke], g),
+                       f_pr.mu[(Ke + 1):end])
     ex = cross_sectional_expand(ca.fcb, r, pe.lag, ca.f, f_mu, f_pr.sigma)
     ev = vs[end, :]
     idx = cross_sectional_investable(@view(amr[end, :]), L, ev)

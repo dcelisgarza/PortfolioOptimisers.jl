@@ -534,6 +534,144 @@ function assert_cross_sectional_factor_moments(mu::VecNum, sigma::MatNum,
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Regress each observation on the factors that are not empty, and give every Empty Factor a return of zero.
+
+A factor is empty when its exposure is zero at every pair of positive weight, which are the pairs that the regression reads. A sub-universe with no asset in one level of a one-hot factor leaves the factor of that level empty, and a meta-optimiser gives its sub-problems such sub-universes. The data then state nothing about the return of the factor. The function regresses on the other factors and writes a zero return, so the answer does not depend on how the solve algorithm of `cre` treats a rank-deficient design.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{E} &= \\left\\{k : B_{tik} = 0 \\ \\forall (t, i) : u_{ti} > 0\\right\\}\\,, \\\\
+f_{tk} &= 0\\,, \\quad k \\in \\mathcal{E}\\,,\\ t = 1, \\ldots, T\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{E}``: Empty Factors.
+  - $(math_dict[:B_tik_cs])
+  - $(math_dict[:u_ti_cs])
+  - $(math_dict[:f_t_att])
+  - $(math_dict[:T])
+
+A zero column of the design adds nothing to the fit, so the returns of the other factors are the returns of the regression on every factor. The minimum-norm solution of that regression gives the same zero to an Empty Factor.
+
+# Algorithm
+
+ 1. Take the pairs of positive weight with [`cross_sectional_design_mask`](@ref), giving `act`.
+ 2. Mark each factor whose exposure is not zero at a pair of `act`, giving `lv`.
+ 3. If every factor is in `lv`, regress on `Z` with [`cross_sectional_regression`](@ref) and return.
+ 4. Otherwise, regress on the columns of `Z` at `lv`, giving `csl`. Write its factor returns into the columns at `lv` of a zero matrix `f`, and keep its residuals, its counts and its intercept.
+
+# Arguments
+
+  - `cre`: Cross-sectional regression estimator.
+  - `Z`: Exposure tensor `observations × assets × factors`.
+  - `X`: Asset returns matrix `observations × assets`.
+  - `W`: Cross-sectional weights matrix `observations × assets`.
+
+# Validation
+
+  - At least one factor is not empty. Raises an `ArgumentError`.
+  - The rules of [`cross_sectional_design_mask`](@ref) and of [`cross_sectional_regression`](@ref).
+
+# Returns
+
+  - `csr::CrossSectionalRegression`: The regression on every factor of `Z`.
+  - `lv::BitVector`: `true` at each factor that is not empty.
+
+# Related
+
+  - [`cross_sectional_regression`](@ref)
+  - [`cross_sectional_factor_moments`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEstimator,
+                                         Z::Arr3Num, X::MatNum, W::MatNum)
+    act = findall(cross_sectional_design_mask(Z, X, W))
+    lv = BitVector([any(c -> !iszero(Z[c[1], c[2], k]), act) for k in axes(Z, 3)])
+    @argcheck(any(lv),
+              ArgumentError("every one of the $(size(Z, 3)) factors is empty: no factor has a nonzero exposure at an (observation, asset) pair of positive weight, so the regression has nothing to fit. Widen the eligible cross-section, or give factors that the assets load on."))
+    if all(lv)
+        return (; csr = cross_sectional_regression(cre, Z, X, W), lv = lv)
+    end
+    csl = cross_sectional_regression(cre, Z[:, :, lv], X, W)
+    f = zeros(eltype(csl.f), size(csl.f, 1), size(Z, 3))
+    f[:, lv] = csl.f
+    return (; csr = CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n, b = csl.b),
+            lv = lv)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Fit the factor prior of a Cross-Sectional Factor Prior on the factors that are not empty, and give every Empty Factor no mean and no variance.
+
+An Empty Factor has a return of zero at every fitted observation, from [`cross_sectional_live_regression`](@ref). A covariance estimator that turns the covariance into a correlation divides by the zero volatility of such a factor, and gives `NaN`. So the function fits `pe` and processes the covariance with `f_mp` on the other factors only. It then puts the answer on the whole factor axis, with a zero return in every scenario, a zero mean, and a zero row and column of the covariance at each Empty Factor. When no factor is empty, the moments are those that `pe` states over `f`.
+
+# Algorithm
+
+ 1. Take the columns of `f` at `lv`, giving `fl`. When every factor is in `lv`, `fl` is `f`.
+ 2. Fit `pe` on `fl`, giving `pr`.
+ 3. Refuse a non-finite moment of `pr` with [`assert_cross_sectional_factor_moments`](@ref).
+ 4. Process the covariance of `pr` in place with `f_mp`, over `fl`.
+ 5. When every factor is in `lv`, return the scenarios, the mean and the covariance of `pr`. Otherwise, write them into the columns at `lv` of a zero scenario matrix `X`, the entries at `lv` of a zero mean `mu`, and the block at `lv` of a zero covariance `sigma`.
+
+# Arguments
+
+  - `pe`: The factor prior estimator.
+  - `f_mp`: Matrix processing estimator of the factor covariance.
+  - `f`: The factor returns, `observations × factors`.
+  - `lv`: `true` at each factor that is not empty.
+  - $(arg_dict[:strict]) It is forwarded to `pe`.
+  - `kwargs...`: Additional keyword arguments passed to `matrix_processing!`.
+
+# Validation
+
+  - `lv` has one entry per column of `f`. Raises a `DimensionMismatch`.
+  - The rules of [`assert_cross_sectional_factor_moments`](@ref).
+
+# Returns
+
+  - `X::MatNum`: The factor return scenarios of `pr` on the whole factor axis.
+  - `mu::VecNum`: The expected factor returns on the whole factor axis.
+  - `sigma::MatNum`: The processed factor covariance on the whole factor axis.
+  - `w`, `ens`, `kld`, `ow`: The observation weights, the effective number of scenarios, the Kullback-Leibler divergence and the original weights of `pr`.
+
+# Related
+
+  - [`cross_sectional_live_regression`](@ref)
+  - [`cross_sectional_lift`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function cross_sectional_factor_moments(pe::AbstractLowOrderPriorEstimator_A_AF,
+                                        f_mp::AbstractMatrixProcessingEstimator, f::MatNum,
+                                        lv::AbstractVector{Bool}; strict::Bool = false,
+                                        kwargs...)
+    @argcheck(length(lv) == size(f, 2),
+              DimensionMismatch("lv ($(length(lv))) must have one entry per column of f ($(size(f, 2)))"))
+    live = all(lv)
+    fl = live ? f : f[:, lv]
+    pr = prior(pe, fl; strict = strict)
+    assert_cross_sectional_factor_moments(pr.mu, pr.sigma, size(f, 1))
+    matrix_processing!(f_mp, pr.sigma, fl; kwargs...)
+    if live
+        X, mu, sigma = pr.X, pr.mu, pr.sigma
+    else
+        K = length(lv)
+        X = zeros(eltype(pr.X), size(pr.X, 1), K)
+        X[:, lv] = pr.X
+        mu = zeros(eltype(pr.mu), K)
+        mu[lv] = pr.mu
+        sigma = zeros(eltype(pr.sigma), K, K)
+        sigma[lv, lv] = pr.sigma
+    end
+    return (; X = X, mu = mu, sigma = sigma, w = pr.w, ens = pr.ens, kld = pr.kld,
+            ow = pr.ow)
+end
+"""
     cross_sectional_variance_counts(cnt::Nothing, csr::CrossSectionalRegression)
     cross_sectional_variance_counts(cnt::NamedTuple, csr::CrossSectionalRegression)
 
@@ -1313,7 +1451,7 @@ Where:
   - ``\\mathbf{\\Sigma}``: Asset covariance.
   - ``\\mathbf{C}``: Low-rank square root of the asset covariance, ``(K + \\lvert \\mathcal{I} \\rvert) \\times N`` over the full asset universe.
   - ``\\mathbf{B}_{T,\\,\\mathcal{I}}``: The rows of ``\\mathbf{B}_{T}`` at the investable assets.
-  - ``\\operatorname{chol}``: Lower Cholesky factor.
+  - ``\\operatorname{chol}``: Lower Cholesky factor. Of a factor covariance with a zero row and column, which an Empty Factor carries, it is the Cholesky factor of the block of the other factors, with a zero row and column at the Empty Factor.
   - $(math_dict[:B_T_cs])
   - $(math_dict[:mu_f_patt])
   - $(math_dict[:F_patt])
@@ -1329,8 +1467,9 @@ A consequence of the definition: ``\\mathbf{C}_{\\cdot\\mathcal{I}}^{\\intercal}
  2. Project the factor mean through `Li`, giving `mui`, and the factor covariance, giving `si`.
  3. Process `si` with `mp`, as [`factor_lift`](@ref) does.
  4. Add `D` to `si`, and make the sum positive definite with `mp.pdm`.
- 5. Build `ci`, the low-rank square root `[Li * chol(f_sigma).L  R]`.
- 6. Scatter `mui`, `si` and `ci` into the full asset universe, giving `mu`, `sigma` and `chol`, with `NaN` at every asset outside `idx`.
+ 5. Take `lf`, the factors whose column of `f_sigma` is not zero, and the lower Cholesky factor `Lf` of the block of `f_sigma` at `lf`. Write `Lf` into the block at `lf` of a zero matrix `Cf`.
+ 6. Build `ci`, the low-rank square root `[Li * Cf  R]`.
+ 7. Scatter `mui`, `si` and `ci` into the full asset universe, giving `mu`, `sigma` and `chol`, with `NaN` at every asset outside `idx`.
 
 # Arguments
 
@@ -1370,7 +1509,11 @@ function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
     matrix_processing!(mp, si, Xs[:, idx]; kwargs...)
     si .+= D
     posdef!(mp.pdm, si)
-    ci = hcat(Li * Matrix(LinearAlgebra.cholesky(f_sigma).L), R)
+    lf = findall(k -> !all(iszero, view(f_sigma, :, k)), axes(f_sigma, 2))
+    Lf = LinearAlgebra.cholesky(f_sigma[lf, lf]).L
+    Cf = zeros(eltype(Lf), size(f_sigma))
+    Cf[lf, lf] = Lf
+    ci = hcat(Li * Cf, R)
     N = size(L, 1)
     Tf = real(eltype(si))
     mu = fill(Tf(NaN), N)
