@@ -409,4 +409,21 @@ The fixture is the online fold loop's, because the identities are structural.
         full = optimise(mr, rows(rd, cvr.train_idx[1]))
         @test expected_risk(r, full) == expected_risk(r, full.w, full.pr)
     end
+
+    @testset "Integer returns score in a floating point matrix" begin
+        # A score is a fraction and a failed fold scores NaN, so an integer element type
+        # of the returns cannot hold it: the matrix takes `float_if_integer` of that type.
+        Xi = rand(StableRNG(2), -3:3, 120, 5)
+        rdi = ReturnsResult(; nx = string.("A", 1:5), X = Xi)
+        rdf = ReturnsResult(; nx = string.("A", 1:5), X = float.(Xi))
+        for scheme in (IndexWalkForward(60, 20),
+                       CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2))
+            g = GridSearchCrossValidation(["fb" => [nothing, nothing]]; cv = scheme,
+                                          r = ConditionalValueatRisk(), train_score = true)
+            resi = search_cross_validation(EqualWeighted(), g, rdi)
+            resf = search_cross_validation(EqualWeighted(), g, rdf)
+            @test eltype(resi.test_scores) === Float64
+            @test resi.test_scores ≈ resf.test_scores
+        end
+    end
 end

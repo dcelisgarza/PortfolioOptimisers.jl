@@ -170,7 +170,20 @@ unique_key_dict!(math_dict, :math_dict,
                  :c_k_comb => "``c_k``: Coefficient of sub-portfolio ``k`` in the combination.",#
                  # A search over a parameter grid. The two methods of the grid search score
                  # folds and paths, and both select the winner by one rule.
-                 :Theta_grid => "``\\Theta``: Search grid, the sequence of grid points that [`lens_val_grid`](@ref) builds from `p`.",#
+                 :Theta_grid => "``\\Theta``: Search grid, the sequence of grid points that [`lens_val_grid`](@ref) builds from `p`. For a [`Pipeline`](@ref), [`pipeline_lens_val_grid`](@ref) builds it.",#
+                 :V_j_grid => "``V_j``: Candidate values of the ``j``-th key of one parameter set, the value vector that the set gives the key.",#
+                 :k_grid_keys => "``k``: Key count of one parameter set.",#
+                 :Theta_l_grid => "``\\Theta^{(l)}``: Grid of the ``l``-th parameter set, by the first two equations.",#
+                 :m_grid_sets => "``m``: Parameter set count, the count of the parameter sets that the search concatenates.",#
+                 :Vert_concat => "``\\Vert``: Concatenation of two sequences.",#
+                 :S_fi_search => "``S_{fi}``: Fold score, the test score of candidate ``i`` on fold ``f``, and the entry of the score matrix ``\\mathbf{S}``, ``F \\times |\\Theta|``.",#
+                 :P_f_search => "``\\hat{P}_{f}(\\theta_i)``: Fold prediction, the returns over the test window of fold ``f`` of the weights that ``\\theta_i`` fits on the training window of the fold.",#
+                 :F_folds_search => "``F``: Fold count, the count of the folds that `split` enumerates.",#
+                 :S_pi_search => "``S_{pi}``: Path score, the test score of candidate ``i`` on path ``p``, and the entry of the score matrix ``\\mathbf{S}``, ``n_{p} \\times |\\Theta|``.",#
+                 :P_p_search => "``\\hat{P}_{p}(\\theta_i)``: Path prediction, the predictions of candidate ``i`` for the test groups that path ``p`` holds, pooled into one series. The weights that ``\\theta_i`` fits on the training window of the fold that tests a group predict that group.",#
+                 :n_p_search => "``n_{p}``: Path count, the greatest entry of `path_ids` of the split.",#
+                 :S_C_search => "``\\mathbf{S}_{:,\\,\\mathcal{C}}``: Finite columns, the columns of ``\\mathbf{S}`` at the finite candidates, in grid order.",#
+                 :c_j_search => "``c_j``: Finite candidate ``j``, the ``j``-th smallest entry of ``\\mathcal{C}``.",#
                  :theta_i_cand => "``\\theta_i``: Candidate ``i``, the estimator with each tuned parameter set to its value at grid point ``i``. Column ``i`` of every score matrix belongs to it.",#
                  :s_orient_search => "``s \\in \\{1, -1\\}``: Orientation of the score, ``1`` when [`bigger_is_better`](@ref) holds for `r` and ``-1`` otherwise, so a higher score is always better.",#
                  :R_search => "``\\mathcal{R}``: Expected risk under `r`, as [`expected_risk`](@ref) computes it with the keyword arguments `kwargs`.",#

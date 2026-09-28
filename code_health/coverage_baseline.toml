@@ -382,7 +382,7 @@ commit = "8610300"
 "src/21_Pipeline/02_StepExecution.jl" = { lines = 127, misses = 8 }
 "src/21_Pipeline/03_Pipeline.jl" = { lines = 277, misses = 24 }
 "src/21_Pipeline/04_PredictionCV.jl" = { lines = 96, misses = 19 }
-"src/21_Pipeline/05_SearchCrossValidation.jl" = { lines = 131, misses = 23 }
+"src/21_Pipeline/05_SearchCrossValidation.jl" = { lines = 131, misses = 0 }
 "src/21_Pipeline/06_OnlinePipeline.jl" = { lines = 205, misses = 0 }
 "src/22_Plotting.jl" = { lines = 11, misses = 1 }
 "src/23_Aliases.jl" = { lines = 43, misses = 0 }
