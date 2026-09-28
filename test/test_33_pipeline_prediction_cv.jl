@@ -161,6 +161,50 @@ end
         # whole-data prediction with the default window
         pred_all = PortfolioOptimisers.predict(res, rd)
         @test size(pred_all.rd.X, 1) == 100
+
+        # A vector of windows predicts each window as one call does.
+        preds = PortfolioOptimisers.predict(res, rd, [61:80, 81:100])
+        @test length(preds) == 2
+        @test preds[1].rd.X ≈ rd.X[61:80, :] * res.w
+        @test preds[2].rd.X ≈ rd.X[81:100, :] * res.w
+        # The result form of fit_and_predict predicts as predict does.
+        fap = PortfolioOptimisers.fit_and_predict(res, rd; test_idx = collect(61:100))
+        @test fap.rd.X ≈ pred.rd.X
+        fapv = PortfolioOptimisers.fit_and_predict(res, rd;
+                                                   test_idx = [collect(61:80),
+                                                               collect(81:100)])
+        @test fapv[2].rd.X ≈ preds[2].rd.X
+    end
+
+    @testset "predict at price level, on several windows and from a result" begin
+        X = make_prices(; T = 60)
+        pr = PricesResult(; X = X)
+        res = fit(Pipeline(;
+                           steps = (PricesToReturns(), EmpiricalPrior(), EqualWeighted())),
+                  PortfolioOptimisers.port_opt_view(pr, 1:30))
+        P = values(X)
+        R = P[2:end, :] ./ P[1:(end - 1), :] .- 1
+        preds = PortfolioOptimisers.predict(res, pr, [31:45, 46:60])
+        @test length(preds) == 2
+        @test preds[2].rd.X ≈ R[46:59, :] * res.w
+        # The result form took returns data only, and a price window was a MethodError.
+        fap = PortfolioOptimisers.fit_and_predict(res, pr; test_idx = collect(46:60))
+        @test fap.rd.X ≈ preds[2].rd.X
+        # A returns window after a price fit: the fitted PricesToReturns passes it unchanged.
+        rw = ReturnsResult(; nx = string.("A", 1:5), X = R, ts = timestamp(X)[2:end])
+        @test PortfolioOptimisers.apply_fitted_step(PricesToReturns(), rw) === rw
+        mdf = PortfolioOptimisers.fit_preprocessing(MissingDataFilter(), pr)
+        @test PortfolioOptimisers.apply_fitted_step(mdf, rw) === rw
+        # A fitted context with no returns slot has no asset axis to check.
+        res_p = fit(Pipeline(; steps = (MissingDataFilter(),)), pr)
+        @test isnothing(res_p.ctx.returns)
+        @test isnothing(PortfolioOptimisers.assert_universe_aligned(res_p, rw))
+        @test PortfolioOptimisers.predict(res, rw, 46:59).rd.X ≈ preds[2].rd.X
+        # A pipeline with no optimisation result has nothing to predict with.
+        res0 = fit(Pipeline(; steps = (PricesToReturns(), EmpiricalPrior())), pr)
+        @test_throws PortfolioOptimisers.IsNothingError PortfolioOptimisers.fit_and_predict(res0,
+                                                                                            pr;
+                                                                                            test_idx = collect(46:60))
     end
 
     @testset "predict guards" begin

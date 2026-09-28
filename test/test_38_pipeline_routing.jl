@@ -195,6 +195,47 @@
         @test PO.pipe_required_targets(CentralityConstraint()) == (:cte,)
     end
 
+    @testset "each step declares the slot and the target that it writes" begin
+        ucs_step(t) = PipelineStep(; est = NormalUncertaintySet(), reads = (:returns,),
+                                   writes = :uncertainty, target = t)
+        mr = MeanRisk(; opt = jo(), r = UncertaintySetVariance())
+        # A constraint target on an uncertainty step computed both halves, as :both does.
+        @test_throws ArgumentError Pipeline(; steps = (EmpiricalPrior(), ucs_step(:lt), mr))
+        @test_throws ArgumentError PO.run_uncertainty_step(NormalUncertaintySet(), :lt,
+                                                           PO.PipelineContext())
+        # With no target, the step failed only when the fit reached it.
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (EmpiricalPrior(), ucs_step(nothing),
+                                                     mr))
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (EmpiricalPrior(),
+                                                     NormalUncertaintySet(), mr))
+        # A family writes its own slot when it runs, so `writes` must name that slot.
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (PipelineStep(;
+                                                                  est = WeightBoundsEstimator(;
+                                                                                              lb = 0.1),
+                                                                  reads = (:returns,),
+                                                                  writes = :phylogeny),
+                                                     EqualWeighted()))
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (EmpiricalPrior(),
+                                                     PipelineStep(;
+                                                                  est = NormalUncertaintySet(),
+                                                                  reads = (:returns,),
+                                                                  writes = :prior,
+                                                                  target = :mu), mr))
+        @test Pipeline(;
+                       steps = (PipelineStep(; est = EmpiricalPrior(), reads = (:returns,),
+                                             writes = :prior), EqualWeighted())).names ==
+              ("prior", "opt")
+        @test Pipeline(; steps = (EmpiricalPrior(), ucs_step(:both), mr)).names ==
+              ("prior", "uncertainty", "opt")
+        # A callable that writes :uncertainty names no target that the constructor knows.
+        @test PO.pipe_required_targets(PipelineStep(; est = ctx -> nothing,
+                                                    writes = :uncertainty)) == ()
+    end
+
     @testset "constraint slot fans out by carried target, then by result type" begin
         wb = WeightBounds(; lb = fill(0.1, 3), ub = fill(0.9, 3))
         lc = LinearConstraint(;

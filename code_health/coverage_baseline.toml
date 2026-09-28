@@ -380,7 +380,7 @@ commit = "8610300"
 "src/20_AssetSelection.jl" = { lines = 168, misses = 0 }
 "src/21_Pipeline/01_Base_Pipeline.jl" = { lines = 61, misses = 14 }
 "src/21_Pipeline/02_StepExecution.jl" = { lines = 127, misses = 8 }
-"src/21_Pipeline/03_Pipeline.jl" = { lines = 277, misses = 24 }
+"src/21_Pipeline/03_Pipeline.jl" = { lines = 277, misses = 0 }
 "src/21_Pipeline/04_PredictionCV.jl" = { lines = 96, misses = 0 }
 "src/21_Pipeline/05_SearchCrossValidation.jl" = { lines = 131, misses = 0 }
 "src/21_Pipeline/06_OnlinePipeline.jl" = { lines = 205, misses = 0 }

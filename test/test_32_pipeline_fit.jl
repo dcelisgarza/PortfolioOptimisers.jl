@@ -490,4 +490,43 @@ end
         # a pipeline is not an optimiser and cannot be wrapped in one
         @test_throws ArgumentError optimise(pipe, prices_to_returns(X))
     end
+
+    @testset "a nested pipeline changes no Data Slot that the outer pipeline misses" begin
+        rng = StableRNG(20260928)
+        rd = ReturnsResult(; nx = string.("A", 1:4), X = randn(rng, 60, 4) / 100)
+        sel = ScoreSelector(; score = MeanReturn(), rule = RankRule(; best = 2))
+        #=
+        The selector inside cut the prior to two assets, and the outer returns kept four.
+        The fit gave four weights over a two-asset prior, and the prediction then failed
+        with an error that blamed the ingestion of the data.
+        =#
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (Pipeline(;
+                                                              steps = (sel,
+                                                                       EmpiricalPrior())),
+                                                     EqualWeighted()))
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (PipelineStep(;
+                                                                  est = Pipeline(;
+                                                                                 steps = (sel,
+                                                                                          EmpiricalPrior())),
+                                                                  writes = :prior),
+                                                     EqualWeighted()))
+        # The same steps in the outer pipeline describe one universe.
+        flat = fit(Pipeline(; steps = (sel, EmpiricalPrior(), EqualWeighted())), rd)
+        @test length(flat.ctx.returns.nx) == 2
+        @test flat.w ≈ fill(0.5, 2)
+        # A nested pipeline that reads returns receives the returns slot.
+        nested = fit(Pipeline(;
+                              steps = (Pipeline(; steps = (EmpiricalPrior(),)),
+                                       EqualWeighted())), rd)
+        @test nested.ctx.prior.mu ≈ vec(mean(rd.X; dims = 1))
+        @test nested.ctx.prior.mu ≈ prior(EmpiricalPrior(), rd).mu
+        @test nested.w ≈ fill(0.25, 4)
+        # Returns input leaves the prices slot empty, so a price step cannot run on it.
+        @test_throws PortfolioOptimisers.IsNothingError fit(Pipeline(;
+                                                                     steps = (MissingDataFilter(),
+                                                                              EmpiricalPrior())),
+                                                            rd)
+    end
 end

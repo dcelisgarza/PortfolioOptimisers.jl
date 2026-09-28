@@ -1,11 +1,13 @@
 ```@meta
-Description = "Pipeline, private API of PortfolioOptimisers.jl: first_duplicate, inject_context, constraint_results, constraint_target_of, constraint_value_of, …"
+Description = "Pipeline, private API of PortfolioOptimisers.jl: first_duplicate, assert_step_declarations, assert_nested_data_slots, inject_context, constraint_results, …"
 ```
 
 # Pipeline: private API
 
 ```@docs
 first_duplicate
+assert_step_declarations
+assert_nested_data_slots
 ```
 
 ## Injection

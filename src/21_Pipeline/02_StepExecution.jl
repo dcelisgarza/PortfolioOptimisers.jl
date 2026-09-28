@@ -210,7 +210,7 @@ Which slot the step reads is decided by [`reads_prior_result`](@ref). An estimat
 """
 function run_uncertainty_step(ue::AbstractUncertaintySetEstimator, target::Option{Symbol},
                               ctx::PipelineContext)
-    @argcheck(target in PIPELINE_STEP_TARGETS,
+    @argcheck(target in (:mu, :sigma, :both),
               ArgumentError("the PipelineStep target of a $(typeof(ue)) step must be :mu, :sigma, or :both, got $(repr(target))"))
     src = uncertainty_step_source(ue, ctx)
     cur = ctx.uncertainty

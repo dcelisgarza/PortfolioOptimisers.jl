@@ -381,7 +381,7 @@ commit = "ebcacfda95"
 "src/20_AssetSelection.jl" = { cyc = 7, cog = 12, arg = 4, cyc_sum = 78, cog_sum = 77, arg_sum = 31, macros = [] }
 "src/21_Pipeline/01_Base_Pipeline.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 46, cog_sum = 8, arg_sum = 51, macros = [] }
 "src/21_Pipeline/02_StepExecution.jl" = { cyc = 5, cog = 9, arg = 3, cyc_sum = 52, cog_sum = 28, arg_sum = 54, macros = [] }
-"src/21_Pipeline/03_Pipeline.jl" = { cyc = 11, cog = 16, arg = 11, cyc_sum = 123, cog_sum = 93, arg_sum = 121, macros = ["@forward_properties"] }
+"src/21_Pipeline/03_Pipeline.jl" = { cyc = 11, cog = 16, arg = 11, cyc_sum = 130, cog_sum = 115, arg_sum = 115, macros = ["@forward_properties"] }
 "src/21_Pipeline/04_PredictionCV.jl" = { cyc = 4, cog = 5, arg = 12, cyc_sum = 40, cog_sum = 22, arg_sum = 66, macros = [] }
 "src/21_Pipeline/05_SearchCrossValidation.jl" = { cyc = 8, cog = 15, arg = 3, cyc_sum = 34, cog_sum = 30, arg_sum = 36, macros = [] }
 "src/21_Pipeline/06_OnlinePipeline.jl" = { cyc = 6, cog = 7, arg = 5, cyc_sum = 117, cog_sum = 68, arg_sum = 151, macros = [] }

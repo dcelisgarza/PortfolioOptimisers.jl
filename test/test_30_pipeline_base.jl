@@ -199,6 +199,28 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test Pipeline(; steps = (PricesToReturns(), EmpiricalPrior())) isa Pipeline
     end
 
+    @testset "step names" begin
+        PO = PortfolioOptimisers
+        # A slot that one step writes names the step; a repeated slot takes its position.
+        # The count includes the step with an explicit name.
+        @test Pipeline(; steps = (EmpiricalPrior(), EmpiricalPrior(), EqualWeighted())).names ==
+              ("prior_1", "prior_2", "opt")
+        @test Pipeline(; steps = ("mine" => EmpiricalPrior(), EmpiricalPrior())).names ==
+              ("mine", "prior_2")
+        # An explicit name can collide with a generated one, and the error names it.
+        err = try
+            Pipeline(;
+                     steps = ("prior_2" => EmpiricalPrior(), EmpiricalPrior(),
+                              EmpiricalPrior()))
+        catch e
+            e
+        end
+        @test err isa ArgumentError && occursin("\"prior_2\"", err.msg)
+        @test isnothing(PO.first_duplicate(()))
+        @test isnothing(PO.first_duplicate(("a", "b")))
+        @test PO.first_duplicate(("a", "b", "a", "b")) == "a"
+    end
+
     @testset "PipelineStep" begin
         ps = PipelineStep(; est = NormalUncertaintySet(), reads = (:returns,),
                           writes = :uncertainty, target = :mu)

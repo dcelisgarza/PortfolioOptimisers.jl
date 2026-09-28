@@ -62,6 +62,8 @@ end
     fit_and_predict(opt, rd::ReturnsResult, cv::CombCVER; cols, ex) -> PopulationPredictionResult
     fit_and_predict(opt, rd::ReturnsResult; train_idx = nothing, test_idx, cols) -> PredictionResult
     fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult; test_idx, cols) -> PredictionResult
+    fit_and_predict(pipe::Pipeline, data::Prices_RR; train_idx = nothing, test_idx, cols) -> PredictionResult
+    fit_and_predict(res::PipelineResult, data::Prices_RR; test_idx, cols) -> PredictionResult
 
 Fit an optimisation estimator on training data and predict on test data using cross-validation.
 
@@ -72,6 +74,8 @@ A combinatorial `cv` takes its own method, because its folds recombine into seve
 The estimator form reads `train_idx = nothing` as *the estimator holds its window*. It reads the estimator out through `optimise(opt)` in place of a fit over `port_opt_view(rd, train_idx, cols)`, and predicts over `test_idx` as before. The online arm of [`fold_loop`](@ref) reads a fold out this way. It is also the public entry for an estimator stepped by hand, warmed up with [`update_online_estimator`](@ref) and folded with [`partial_fit!`](@ref). `fit_and_predict(opt, rd; test_idx)` on a stepped estimator equals `fit_and_predict(opt, rd; train_idx, test_idx)` on the cold one over the same rows. The two arms belong to [`fit_fold_result`](@ref), and the method is defined beside them.
 
 The result form is fitted already, so it ignores `train_idx` and every keyword that [`predict`](@ref) does not take. The fold loop passes the same keywords to an estimator and to a result.
+
+The two [`Pipeline`](@ref) methods take price data or returns data. The `Pipeline` method fits the pipeline over the rows `train_idx` and the columns `cols` with [`pipeline_fold_fit`](@ref), or reads a stepped pipeline out when `train_idx` is `nothing`. It then predicts over `test_idx` with [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref). The [`PipelineResult`](@ref) method is fitted already, and predicts over `test_idx`.
 
 # Algorithm
 
