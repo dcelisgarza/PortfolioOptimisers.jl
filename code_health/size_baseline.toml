@@ -282,7 +282,7 @@ commit = "ebcacfda95"
 "src/17_Optimisation/01_Base_Optimisation/06_PanelCollapse.jl" = { code = 94, doc = 168, comment = 5, blank = 89, total = 356 }
 "src/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView.jl" = { code = 66, doc = 109, comment = 10, blank = 48, total = 233 }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { code = 497, doc = 989, comment = 32, blank = 411, total = 1929 }
-"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { code = 152, doc = 317, comment = 11, blank = 114, total = 594 }
+"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { code = 152, doc = 316, comment = 11, blank = 114, total = 593 }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 85, doc = 125, comment = 0, blank = 49, total = 259 }
 "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 257, doc = 303, comment = 7, blank = 123, total = 690 }
 "src/17_Optimisation/02_CrossValidation/04_WalkForward.jl" = { code = 432, doc = 694, comment = 2, blank = 226, total = 1354 }
@@ -383,7 +383,7 @@ commit = "ebcacfda95"
 "src/21_Pipeline/01_Base_Pipeline.jl" = { code = 154, doc = 347, comment = 0, blank = 151, total = 652 }
 "src/21_Pipeline/02_StepExecution.jl" = { code = 197, doc = 201, comment = 2, blank = 106, total = 506 }
 "src/21_Pipeline/03_Pipeline.jl" = { code = 441, doc = 409, comment = 4, blank = 220, total = 1074 }
-"src/21_Pipeline/04_PredictionCV.jl" = { code = 193, doc = 151, comment = 4, blank = 67, total = 415 }
+"src/21_Pipeline/04_PredictionCV.jl" = { code = 195, doc = 215, comment = 2, blank = 108, total = 520 }
 "src/21_Pipeline/05_SearchCrossValidation.jl" = { code = 161, doc = 105, comment = 24, blank = 52, total = 342 }
 "src/21_Pipeline/06_OnlinePipeline.jl" = { code = 389, doc = 476, comment = 0, blank = 226, total = 1091 }
 "src/22_Plotting.jl" = { code = 158, doc = 2801, comment = 111, blank = 943, total = 4013 }

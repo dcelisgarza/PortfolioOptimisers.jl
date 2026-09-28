@@ -400,6 +400,65 @@ end
             pd = Pipeline(; steps = (prep..., TimeDependent([ew, iv]; default = iv)))
             res = fit(pd, pr)
             @test isapprox(res.w, fit(static_pipe(iv), pr).w)
+            # A wrapped callable schedule resets to its `default` the same way.
+            ps = PipelineStep(; est = TimeDependent(ctx -> ew; default = iv), writes = :opt)
+            @test isapprox(fit(Pipeline(; steps = (prep..., ps)), pr).w, res.w)
+            ps0 = PipelineStep(; est = TimeDependent(ctx -> ew), writes = :opt)
+            @test_throws PortfolioOptimisers.TimeDependentDefaultError fit(Pipeline(;
+                                                                                    steps = (prep...,
+                                                                                             ps0)),
+                                                                           pr)
+        end
+
+        @testset "a PipelineStep answers for its estimator on every schedule route" begin
+            # Each route of the file reaches the estimator inside a `PipelineStep`: the
+            # fold-less reset, the swap of a fold, and the weights of the previous fold. A
+            # wrapped callable passes through the three routes unchanged.
+            using Clarabel
+            slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                         settings = Dict("verbose" => false))
+            fstep = PipelineStep(; est = ctx -> ctx.prior, reads = (:prior,),
+                                 writes = :prior)
+            # A scheduled field: the bound is 0.3 at fold 1, 0.25 at fold 2 and 0.22
+            # outside a fold.
+            wbs = TimeDependent([WeightBounds(; lb = 0.0, ub = 0.3),
+                                 WeightBounds(; lb = 0.0, ub = 0.25)];
+                                default = WeightBounds(; lb = 0.0, ub = 0.22))
+            mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = wbs))
+            bare = Pipeline(; steps = (prep..., mr))
+            wrapped = Pipeline(;
+                               steps = (prep..., fstep,
+                                        PipelineStep(; est = mr, writes = :opt)))
+            @test PortfolioOptimisers.is_time_dependent(wrapped)
+            rf = fit(bare, pr)
+            @test maximum(rf.w) <= 0.22 + 1e-6
+            @test isapprox(fit(wrapped, pr).w, rf.w)
+            pb = cross_val_predict(bare, pr, cvw; ex = FLoops.SequentialEx())
+            pw = cross_val_predict(wrapped, pr, cvw; ex = FLoops.SequentialEx())
+            @test maximum(pb.pred[1].res.w) <= 0.3 + 1e-6
+            @test maximum(pb.pred[2].res.w) <= 0.25 + 1e-6
+            @test all(isapprox(a.res.w, b.res.w) for (a, b) in zip(pb.pred, pw.pred))
+            # The turnover of fold 2 anchors on the weights of fold 1, not on `w0`.
+            w0 = [0.6, 0.1, 0.1, 0.1, 0.1]
+            mrt = MeanRisk(;
+                           opt = JuMPOptimiser(; slv = slv,
+                                               tn = Turnover(; w = w0, val = 0.1)))
+            tref = cross_val_predict(Pipeline(; steps = (prep..., mrt)), pr, cvw;
+                                     ex = FLoops.SequentialEx())
+            w1, w2 = tref.pred[1].res.w, tref.pred[2].res.w
+            @test maximum(abs, w2 - w1) <= 0.1 + 1e-6
+            @test maximum(abs, w2 - w0) > 0.1 + 1e-3
+            # A nested pipeline inside a `PipelineStep` lost the weights of the previous
+            # fold, so its turnover anchored on `w0` at every fold (issue #795).
+            inner = Pipeline(; steps = (EmpiricalPrior(), mrt))
+            rets = (MissingDataFilter(), PriceGapFill(), PricesToReturns())
+            for steps in ((prep..., fstep, PipelineStep(; est = mrt, writes = :opt)),
+                          (rets..., inner), (rets..., PipelineStep(; est = inner, writes = :opt)))
+                pipe = Pipeline(; steps = steps)
+                @test PortfolioOptimisers.needs_previous_weights(pipe)
+                p = cross_val_predict(pipe, pr, cvw; ex = FLoops.SequentialEx())
+                @test all(isapprox(a.res.w, b.res.w) for (a, b) in zip(tref.pred, p.pred))
+            end
         end
 
         @testset "construction and scheme guards" begin

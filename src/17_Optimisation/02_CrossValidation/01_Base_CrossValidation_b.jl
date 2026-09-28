@@ -489,9 +489,8 @@ parallel, because such a fold does not depend on the other folds.
 The loop reads the three predicates of `cv` by type, so inference folds the choice and removes
 the arms that cannot run. A `Bool` keyword cannot do this: its value survives only by constant
 propagation, which one call can lose, and the sequential arm is then inferred where it can never
-run. Of the two path-level sites, the optimiser passes the [`MultipleRandomised`](@ref) it runs,
-which answers for the walk-forward it wraps, and the Pipeline omits `cv`, for which
-`folds_are_time_ordered(nothing)` answers `true`.
+run. The two path-level sites, of the optimiser and of the Pipeline, pass the
+[`MultipleRandomised`](@ref) that they run, which answers for the walk-forward that it wraps.
 
 `ElT` is the element type of the result of one fold: a single [`PredictionResult`](@ref) for a
 time-ordered scheme, and a `Vector{PredictionResult}` for the multi-path combinatorial scheme.
