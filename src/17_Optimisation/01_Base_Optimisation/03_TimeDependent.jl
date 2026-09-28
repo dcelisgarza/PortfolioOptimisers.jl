@@ -1209,7 +1209,7 @@ function assert_special_nco_requirements(td::Union{<:TD_OptE_Opt, <:TD_VecOptE_O
     return nothing
 end
 """
-    assert_no_nearest_bind_optimiser_schedule(x, field::Symbol, host::Symbol)
+    assert_no_nearest_bind_optimiser_schedule(x, field::Symbol, opt_name::Symbol)
 
 Reject a `bind = :nearest` [`TimeDependent`](@ref) schedule in an optimiser-valued position no inner fold loop consumes.
 
@@ -1229,15 +1229,16 @@ So a `:nearest` schedule in any of them has no nearest fold loop to bind to, and
   - [`inner_fold_fields`](@ref)
   - [`TDO_OptE_Opt`](@ref)
 """
-function assert_no_nearest_bind_optimiser_schedule(x, field::Symbol, host::Symbol)::Nothing
+function assert_no_nearest_bind_optimiser_schedule(x, field::Symbol,
+                                                   opt_name::Symbol)::Nothing
     if isa(x, TimeDependent)
         @argcheck(x.bind !== :nearest,
-                  ArgumentError("field `$field` of $host holds a `bind = :nearest` TimeDependent schedule, but no inner fold loop of $host consumes `$field`, so there is no nearest fold loop for it to bind to. Use `bind = :outermost`: the fold loop that reaches the $host resolves the schedule."))
+                  ArgumentError("field `$field` of $opt_name holds a `bind = :nearest` TimeDependent schedule, but no inner fold loop of $opt_name consumes `$field`, so there is no nearest fold loop for it to bind to. Use `bind = :outermost`: the fold loop that reaches the $opt_name resolves the schedule."))
     end
     return nothing
 end
 """
-    assert_nearest_optimiser_schedule(x, field::Symbol, cv, host::Symbol)
+    assert_nearest_optimiser_schedule(x, field::Symbol, cv, opt_name::Symbol)
 
 Validate a `bind = :nearest` [`TimeDependent`](@ref) schedule in an optimiser-valued position that the inner cross-validation of the optimiser *does* consume.
 
@@ -1254,12 +1255,12 @@ No-op for anything that is not a `bind = :nearest` [`TimeDependent`](@ref).
   - [`inner_fold_fields`](@ref)
   - [`TimeDependentDefaultError`](@ref)
 """
-function assert_nearest_optimiser_schedule(x, field::Symbol, cv, host::Symbol)::Nothing
+function assert_nearest_optimiser_schedule(x, field::Symbol, cv, opt_name::Symbol)::Nothing
     if isa(x, TimeDependent) && x.bind === :nearest
         @argcheck(!isa(x.default, NoDefault),
-                  TimeDependentDefaultError("a `bind = :nearest` schedule in `$field` of $host must supply a `default`: besides the inner cross-validation fold loop, `$field` also has a fold-less full-sample consumer that always resolves the schedule to its `default`, so a defaultless one would throw on every solve. Give it a fold-less optimiser: TimeDependent(val, :nearest; default = opt)."))
+                  TimeDependentDefaultError("a `bind = :nearest` schedule in `$field` of $opt_name must supply a `default`: besides the inner cross-validation fold loop, `$field` also has a fold-less full-sample consumer that always resolves the schedule to its `default`, so a defaultless one would throw on every solve. Give it a fold-less optimiser: TimeDependent(val, :nearest; default = opt)."))
         @argcheck(!isnothing(cv),
-                  ArgumentError("a `bind = :nearest` schedule in `$field` of $host requires `cv`: without an inner cross-validation there is no inner fold loop, so the schedule could only ever resolve to its `default` — silently inert. Provide `cv`, or use `bind = :outermost` so the fold loop that reaches the $host consumes it."))
+                  ArgumentError("a `bind = :nearest` schedule in `$field` of $opt_name requires `cv`: without an inner cross-validation there is no inner fold loop, so the schedule could only ever resolve to its `default` — silently inert. Provide `cv`, or use `bind = :outermost` so the fold loop that reaches the $opt_name consumes it."))
     end
     return nothing
 end

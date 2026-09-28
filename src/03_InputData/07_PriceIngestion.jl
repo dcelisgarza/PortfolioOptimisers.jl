@@ -734,9 +734,9 @@ function project_panel_clock(pnl::AssetPanel, tsj, X::TimeSeries.TimeArray,
                          collect(eachindex(nx)), nx)
 end
 """
-    span_carrier_view(span::Nothing, ts_new, ts_old, j) -> nothing
-    span_carrier_view(span::AbstractMatrix{Bool}, ts_new, ts_old, j) -> SubArray
-    span_carrier_view(span::ListingSpan, ts_new, ts_old, j) -> Union{ListingSpan, SubArray}
+    listing_span_view(span::Nothing, ts_new, ts_old, j) -> nothing
+    listing_span_view(span::AbstractMatrix{Bool}, ts_new, ts_old, j) -> SubArray
+    listing_span_view(span::ListingSpan, ts_new, ts_old, j) -> Union{ListingSpan, SubArray}
 
 View the Listing Span of a `PricesResult` over the surviving timestamps and the assets `j`, or return `nothing` when the `PricesResult` holds none.
 
@@ -771,13 +771,13 @@ The method that Julia selects is the algorithm.
   - [`matched_row_indices`](@ref)
   - [`port_opt_view`](@ref)
 """
-function span_carrier_view(::Nothing, ::Any, ::Any, ::Any)
+function listing_span_view(::Nothing, ::Any, ::Any, ::Any)
     return nothing
 end
-function span_carrier_view(span::AbstractMatrix{Bool}, ts_new, ts_old, j)
+function listing_span_view(span::AbstractMatrix{Bool}, ts_new, ts_old, j)
     return view(span, matched_row_indices(ts_new, ts_old), j)
 end
-function span_carrier_view(span::ListingSpan, ts_new, ts_old, j)
+function listing_span_view(span::ListingSpan, ts_new, ts_old, j)
     i = matched_row_indices(ts_new, ts_old)
     #! A contiguous row window in clock order cuts every interval to an interval, so the
     #! two integers per asset survive the cut: the bounds shift by the rows the window

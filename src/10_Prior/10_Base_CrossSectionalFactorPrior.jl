@@ -67,7 +67,7 @@ An Exposure Estimator weights its cross-sectional transforms by a benchmark-weig
   - [`exposure_benchmark_weights`](@ref)
   - [`cross_sectional_cap_weights`](@ref)
 """
-function cross_sectional_benchmark_carrier(rd::ReturnsResult, name::AbstractString,
+function cross_sectional_benchmark_returns(rd::ReturnsResult, name::AbstractString,
                                            W::MatNum)::ReturnsResult
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),

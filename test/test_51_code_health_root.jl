@@ -126,7 +126,7 @@ run of this file annotates nothing and appends nothing.
 =#
 quietly(f) = withenv(f, "GITHUB_ACTIONS" => nothing, "GITHUB_STEP_SUMMARY" => nothing)
 
-@testset "Code-health root seam: a fixture tree drives the gate" begin
+@testset "Code-health root: a fixture tree drives the gate" begin
     using Test, TOML
 
     CH = CoverageSeam.CodeHealth

@@ -582,8 +582,8 @@ end
     # carrier the layer built answers. That is what keeps a fill off a window's edge: a
     # window-local derivation reads `d`'s suspension at the edge as an inception there.
     pr = price_ingestion(PriceIngestion(), X59)
-    @test PortfolioOptimisers.carrier_listing_span(pr) === pr.span
-    @test isnothing(PortfolioOptimisers.carrier_listing_span(PricesResult(; X = X59)))
+    @test PortfolioOptimisers.prices_listing_span(pr) === pr.span
+    @test isnothing(PortfolioOptimisers.prices_listing_span(PricesResult(; X = X59)))
 
     res = fit_preprocessing(PriceGapFill(), pr)
     pf = apply_preprocessing(res, pr)
@@ -1046,7 +1046,7 @@ end
             sort(ts[unique(rand(rng, 1:n, rand(rng, 1:n)))])
         end
         j = rand(rng) < 0.5 ? Colon() : sort(unique(rand(rng, 1:na, rand(rng, 1:na))))
-        v = PortfolioOptimisers.span_carrier_view(ls, sel, ts, j)
+        v = PortfolioOptimisers.listing_span_view(ls, sel, ts, j)
         nls += isa(v, PortfolioOptimisers.ListingSpan)
         agree &= Matrix(v) == Matrix(ls)[indexin(sel, ts), j]
     end

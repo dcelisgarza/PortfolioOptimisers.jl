@@ -24,5 +24,5 @@ PortfolioOptimisers.assert_span_shape
 PortfolioOptimisers.returns_universe_masks
 PortfolioOptimisers.compress_all_true
 PortfolioOptimisers.attach_universe_masks
-PortfolioOptimisers.span_carrier_view
+PortfolioOptimisers.listing_span_view
 ```

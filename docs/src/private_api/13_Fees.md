@@ -18,7 +18,7 @@ calc_asset_fixed_liquidation_fees
 add_liquidation_terms
 override_fee_amortisation
 two_axis_fees_view
-strip_liquidation_carriers
+strip_liquidation_charges
 investable_fees_view
 mark_fees
 lift_fees

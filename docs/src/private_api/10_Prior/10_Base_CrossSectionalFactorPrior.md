@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base cross-sectional factor Prior, private API of PortfolioOptimisers.jl: cross_sectional_prior_pairs, cross_sectional_benchmark_carrier, …"
+Description = "Base cross-sectional factor Prior, private API of PortfolioOptimisers.jl: cross_sectional_prior_pairs, cross_sectional_benchmark_returns, …"
 ```
 
 # [Base cross-sectional factor Prior: private API](@id private-api-base-cross-sectional-factor-prior)
@@ -16,7 +16,7 @@ The functions below are the steps of a [`CrossSectionalFactorPrior`](@ref) fit. 
 
 ```@docs
 PortfolioOptimisers.cross_sectional_prior_pairs
-PortfolioOptimisers.cross_sectional_benchmark_carrier
+PortfolioOptimisers.cross_sectional_benchmark_returns
 PortfolioOptimisers.cross_sectional_exposure_order
 PortfolioOptimisers.cross_sectional_exposure_widths
 PortfolioOptimisers.cross_sectional_exposure_write!

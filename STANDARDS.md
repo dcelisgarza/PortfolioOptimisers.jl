@@ -76,7 +76,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | An `export` line | [`CLAUDE.md`](CLAUDE.md) § Design rules | `test/test_43_exported_abstract_type_census.jl` |
 | A constructor signature | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) | `test/test_41_constructor_docstring_drift.jl` |
 | An optimiser fallback shortcut | `test/test_40_fallback_shortcut_census.jl` — the census comment is the only written statement of this Rule | the same file |
-| JuMP model state | ADR 0037, amending ADR 0004 | `test/test_28_seam_lock.jl` |
+| JuMP model state | ADR 0037, amending ADR 0004 | `test/test_28_model_state_lock.jl` |
 | A risk-measure ↔ optimiser pairing | ADR 0018 | `test/test_29_risk_measure_compatibility.jl` |
 | A range risk measure | ADR 0057 | `test/test_44_range_tails_census.jl` |
 | A moment estimator that joins a Choice Surface | [ADR 0099](docs/adr/0099-choice-surface-membership-means-the-verbs-exist.md) — the leaf answers its family's verbs, and `test/moment_family_setup.jl` holds the split and the ownership predicate | `test/test_08l_moment_verb_census.jl`, and `test/test_08d_dims_guard.jl` for the `dims` guard on each pairing it admits |
@@ -154,7 +154,7 @@ Every Gate below is a real check that fails on a real breach.
 | `test/test_73_performance_trap_census.jl` | each rule of `code_health/perf.jl` flags the shape it names and stays silent on the near shapes its docstring excludes, a `[[perf_dismissal]]` subtracts from its rule's count and not from `raw`, one without `code` covers its rule over one definition, a rise over the recorded row fails `check`, and an added file enters at zero | run the file |
 | `test/test_75_concrete_struct_census.jl` | no struct under `src/` or `ext/` declares its type parameters by hand outside `@concrete`, and no `@concrete` field bounds its parameter in the header with `field <: T`, except the entries of the two allow-lists in that file, each with its reason; every entry is still flagged, and a struct kept on the first list bounds none of its parameters | run the file |
 | `test/test_42_combination_weight_stacking.jl` | a combination weight on a meta-optimiser reaches the model | run the file |
-| `test/test_28_seam_lock.jl` | JuMP model state is reached only through its typed interface | run the file |
+| `test/test_28_model_state_lock.jl` | JuMP model state is reached only through its typed interface | run the file |
 | `test/test_29_risk_measure_compatibility.jl` | a risk measure is paired only with an optimiser that supports it | run the file |
 | `test/test_27_prefix_registration.jl` | a nested risk build namespaces its model-state keys | run the file |
 | `.github/workflows/Docs.yml` (`doctest`) | every `jldoctest` block still produces its printed output | see the `run-doctests` skill |

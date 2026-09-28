@@ -1,6 +1,6 @@
 """
-    vcat_carrier_rows(a::PricesResult, b::PricesResult) -> PricesResult
-    vcat_carrier_rows(a::ReturnsResult, b::ReturnsResult) -> ReturnsResult
+    vcat_observations(a::PricesResult, b::PricesResult) -> PricesResult
+    vcat_observations(a::ReturnsResult, b::ReturnsResult) -> ReturnsResult
 
 Concatenates the observations of two `PricesResult` values or two `ReturnsResult` values of one universe, `a` first.
 
@@ -37,19 +37,19 @@ The method that Julia selects is the algorithm.
   - [`vcat_panel_rows`](@ref)
   - [`partial_fit!`](@ref)
 """
-function vcat_carrier_rows(a::PricesResult, b::PricesResult)
-    assert_pinned_carrier(a.ivpa, b.ivpa, :ivpa)
+function vcat_observations(a::PricesResult, b::PricesResult)
+    assert_pinned_value(a.ivpa, b.ivpa, :ivpa)
     return PricesResult(; X = vcat_optional(a.X, b.X, :X), F = vcat_optional(a.F, b.F, :F),
                         B = vcat_optional(a.B, b.B, :B),
                         iv = vcat_optional(a.iv, b.iv, :iv), ivpa = a.ivpa,
                         pnl = vcat_panel_rows(a.pnl, b.pnl),
                         span = vcat_optional(a.span, b.span, :span))
 end
-function vcat_carrier_rows(a::ReturnsResult, b::ReturnsResult)
-    assert_pinned_carrier(a.nx, b.nx, :nx)
-    assert_pinned_carrier(a.nf, b.nf, :nf)
-    assert_pinned_carrier(a.nb, b.nb, :nb)
-    assert_pinned_carrier(a.ivpa, b.ivpa, :ivpa)
+function vcat_observations(a::ReturnsResult, b::ReturnsResult)
+    assert_pinned_value(a.nx, b.nx, :nx)
+    assert_pinned_value(a.nf, b.nf, :nf)
+    assert_pinned_value(a.nb, b.nb, :nb)
+    assert_pinned_value(a.ivpa, b.ivpa, :ivpa)
     return ReturnsResult(; nx = a.nx, X = vcat_optional(a.X, b.X, :X), nf = a.nf,
                          F = vcat_optional(a.F, b.F, :F), nb = a.nb,
                          B = vcat_optional(a.B, b.B, :B),
@@ -78,10 +78,10 @@ Refuses a block whose pinned value differs from the value that the first block p
 
 # Related
 
-  - [`vcat_carrier_rows`](@ref)
+  - [`vcat_observations`](@ref)
   - [`assert_pinned_context`](@ref)
 """
-function assert_pinned_carrier(pinned, given, name::Symbol)::Nothing
+function assert_pinned_value(pinned, given, name::Symbol)::Nothing
     @argcheck(isequal(pinned, given),
               ArgumentError("the `$name` of a block of observations must equal the one the first block pinned, because a concatenation that silently took a new one would put the next observation on the wrong column. Got $(pinned_repr(given)) against the pinned $(pinned_repr(pinned))."))
     return nothing
@@ -118,7 +118,7 @@ The method that Julia selects is the algorithm.
 
 # Related
 
-  - [`vcat_carrier_rows`](@ref)
+  - [`vcat_observations`](@ref)
 """
 function vcat_optional(::Nothing, ::Nothing, ::Symbol)
     return nothing
@@ -168,7 +168,7 @@ The method that Julia selects is the algorithm.
 
 # Related
 
-  - [`vcat_carrier_rows`](@ref)
+  - [`vcat_observations`](@ref)
   - [`AssetPanel`](@ref)
   - [`step_active_mask`](@ref)
 """
@@ -177,7 +177,7 @@ function vcat_panel_rows(::Nothing, ::Nothing)
 end
 function vcat_panel_rows(a::AssetPanel, b::AssetPanel)
     if panel_is_static(a) || panel_is_static(b)
-        assert_pinned_carrier(a, b, :pnl)
+        assert_pinned_value(a, b, :pnl)
         return a
     end
     @argcheck(isempty(a.pf) && isempty(b.pf),
@@ -198,10 +198,10 @@ Counts the observations of a `PricesResult` or a `ReturnsResult`.
 
 # Related
 
-  - [`vcat_carrier_rows`](@ref)
+  - [`vcat_observations`](@ref)
 """
-carrier_rows(pr::PricesResult) = length(TimeSeries.timestamp(pr.X))
-carrier_rows(rd::ReturnsResult) = size(rd.X, 1)
+data_row_count(pr::PricesResult) = length(TimeSeries.timestamp(pr.X))
+data_row_count(rd::ReturnsResult) = size(rd.X, 1)
 """
     partial_fit_transform(est, data) -> (est′, data′)
 
@@ -280,8 +280,8 @@ $(DocStringExtensions.FIELDS)
 end
 function PricesToReturnsState(; tail::PricesResult,
                               anchor::Option{<:AbstractVector} = nothing)::PricesToReturnsState
-    @argcheck(carrier_rows(tail) == 1,
-              DimensionMismatch("the tail of a PricesToReturnsState is the last price row folded, so it holds one observation; got $(carrier_rows(tail))"))
+    @argcheck(data_row_count(tail) == 1,
+              DimensionMismatch("the tail of a PricesToReturnsState is the last price row folded, so it holds one observation; got $(data_row_count(tail))"))
     return PricesToReturnsState(tail, anchor)
 end
 function Base.copy(x::PricesToReturnsState)
@@ -438,7 +438,7 @@ Each return of the rows that the verb returns equals the return that the batch c
 
  1. Check that the gap rule has an online form, and that the block holds one observation at least.
  2. On the first block, check that the block holds two observations when `padding` is `false`. Convert the block alone with [`prices_to_returns`](@ref), giving `rd`. The block is the whole history.
- 3. On a later block, put the kept row `tail` in front of the block with [`vcat_carrier_rows`](@ref), giving `window`. Convert `window` under the `ret_method` and the `padding` of the step and the default gap rule, giving `rw`. Keep the last `n` rows of `rw` as `rd`, where `n` is the number of observations of the block. The kept row gives the return of the first new observation, and the step drops the row that `padding` adds at the front of `window`.
+ 3. On a later block, put the kept row `tail` in front of the block with [`vcat_observations`](@ref), giving `window`. Convert `window` under the `ret_method` and the `padding` of the step and the default gap rule, giving `rw`. Keep the last `n` rows of `rw` as `rd`, where `n` is the number of observations of the block. The kept row gives the return of the first new observation, and the step drops the row that `padding` adds at the front of `window`.
  4. Under a [`CatchUpGapReturn`](@ref), on a later block, write the resolved cells of the new rows into `R` with [`block_gap_return!`](@ref), and rebuild `rd` from `R` with [`returns_with_series`](@ref).
  5. Keep the last price row of the block as the new `tail`. Under a [`CatchUpGapReturn`](@ref), move the anchor past the block with [`advance_anchor`](@ref), from an anchor of `NaN` on the first block.
 
@@ -452,7 +452,7 @@ Each return of the rows that the verb returns equals the return that the batch c
   - The gap rule is `nothing` or a [`CatchUpGapReturn`](@ref). A caller's own rule can read the whole price column, so its online form can differ from the batch conversion. An `ArgumentError` is thrown otherwise.
   - The block holds one observation at least. An `IsEmptyError` is thrown otherwise.
   - Without `padding`, the first block holds two observations at least, because a conversion of one price row gives no return. An `IsEmptyError` is thrown otherwise.
-  - A later block has the universe of the first block. [`vcat_carrier_rows`](@ref) throws an `ArgumentError` otherwise.
+  - A later block has the universe of the first block. [`vcat_observations`](@ref) throws an `ArgumentError` otherwise.
 
 # Returns
 
@@ -467,7 +467,7 @@ Each return of the rows that the verb returns equals the return that the batch c
 function partial_fit_transform(ptr::PricesToReturns, pr::PricesResult)
     @argcheck(supports_partial_fit(ptr),
               ArgumentError("a `PricesToReturns` with a `$(typeof(ptr.gap_return_alg).name.name)` gap rule has no online form: a Gap Return algorithm may read the whole price column, and a block holds the prices up to its own end only, so the returns written at one step can differ from the ones the whole history gives. Use `CatchUpGapReturn()` or the default rule, or declare a refit with `Online(pipe)`."))
-    n = carrier_rows(pr)
+    n = data_row_count(pr)
     @argcheck(n > 0, IsEmptyError("a block of prices holds at least one observation"))
     P = series_values(pr)
     state = ptr.cache
@@ -476,7 +476,7 @@ function partial_fit_transform(ptr::PricesToReturns, pr::PricesResult)
                   IsEmptyError("the first block of prices converts alone, and without padding a conversion of n price rows gives n - 1 returns, so the first block holds at least two observations; got one. Fold a longer first block, or set `padding = true`."))
         prices_to_returns(ptr, pr)
     else
-        window = vcat_carrier_rows(state.tail, pr)
+        window = vcat_observations(state.tail, pr)
         plain = PricesToReturns(; ret_method = ptr.ret_method, padding = ptr.padding)
         rw = prices_to_returns(plain, window)
         m = size(rw.X, 1)
@@ -664,7 +664,7 @@ function Base.copy(x::PriceGapFillState)
     return PriceGapFillState(copy(x.nx), copy(x.v), copy(x.held), x.te)
 end
 function merge_states(a::PriceGapFillState, b::PriceGapFillState)
-    assert_pinned_carrier(a.nx, b.nx, :nx)
+    assert_pinned_value(a.nx, b.nx, :nx)
     #! A column that `b` priced carries `b`'s flag. A column that `b` did not price carries
     #! `a`'s price, which reaches the end of `b` only when `b` holds no absence either.
     return PriceGapFillState(; nx = a.nx,
@@ -720,10 +720,10 @@ function partial_fit_transform(est::PriceGapFill, pr::PricesResult)
     v, held = if isnothing(state)
         Vector{Union{Missing, eltype(vals)}}(missing, length(names)), trues(length(names))
     else
-        assert_pinned_carrier(state.nx, names, :nx)
+        assert_pinned_value(state.nx, names, :nx)
         state.v, state.held
     end
-    raw = carrier_listing_span(pr)
+    raw = prices_listing_span(pr)
     span = gap_fill_span(raw, vals, est.strict)
     ts = TimeSeries.timestamp(pr.X)
     #! A carried price is written only after the rows it was read from, as the batch replay
@@ -840,7 +840,7 @@ function Base.copy(x::MissingDataFilterState)
     return MissingDataFilterState(copy(x.nx), copy(x.miss), x.n)
 end
 function merge_states(a::MissingDataFilterState, b::MissingDataFilterState)
-    assert_pinned_carrier(a.nx, b.nx, :nx)
+    assert_pinned_value(a.nx, b.nx, :nx)
     return MissingDataFilterState(; nx = a.nx, miss = a.miss .+ b.miss, n = a.n + b.n)
 end
 """
@@ -887,7 +887,7 @@ function partial_fit_transform(mdf::MissingDataFilter, pr::PricesResult)
     state = if isnothing(state)
         MissingDataFilterState(; nx = names, miss = miss, n = size(vals, 1))
     else
-        assert_pinned_carrier(state.nx, names, :nx)
+        assert_pinned_value(state.nx, names, :nx)
         MissingDataFilterState(; nx = names, miss = state.miss .+ miss,
                                n = state.n + size(vals, 1))
     end

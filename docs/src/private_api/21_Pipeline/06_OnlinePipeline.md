@@ -1,5 +1,5 @@
 ```@meta
-Description = "Online Pipeline, private API of PortfolioOptimisers.jl: PipelineResume, PipelineBufferState, fold_pipeline, fold_pipeline_owner, readout_pipeline, …"
+Description = "Online Pipeline, private API of PortfolioOptimisers.jl: PipelineResume, PipelineBufferState, fold_pipeline, fold_pipeline_owner, fit_pipeline_from_state, …"
 ```
 
 # [Online Pipeline: private API](@id private-api-online-pipeline)
@@ -9,10 +9,10 @@ PortfolioOptimisers.PipelineResume
 PortfolioOptimisers.PipelineBufferState
 PortfolioOptimisers.fold_pipeline
 PortfolioOptimisers.fold_pipeline_owner
-PortfolioOptimisers.readout_pipeline
+PortfolioOptimisers.fit_pipeline_from_state
 PortfolioOptimisers.pipeline_returns_result
-PortfolioOptimisers.readout_data_step
-PortfolioOptimisers.readout_owner
+PortfolioOptimisers.fit_data_step_from_state
+PortfolioOptimisers.fit_owner_from_state
 PortfolioOptimisers.view_owner
 PortfolioOptimisers.pipeline_fold_fit
 PortfolioOptimisers.step_estimator
@@ -27,7 +27,7 @@ PortfolioOptimisers.step_online_member
 PortfolioOptimisers.step_online_cap
 PortfolioOptimisers.assert_online_entry(p::Pipeline)
 PortfolioOptimisers.assert_online_owner
-PortfolioOptimisers.assert_pipeline_door
+PortfolioOptimisers.assert_pipeline_entry
 PortfolioOptimisers.pipe_writes(o::Online)
 PortfolioOptimisers.run_step(o::Online, ::PortfolioOptimisers.PipelineContext)
 PortfolioOptimisers.update_online_step

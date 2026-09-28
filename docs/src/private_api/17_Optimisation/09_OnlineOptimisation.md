@@ -19,7 +19,7 @@ PortfolioOptimisers.assert_online_entry(::TimeDependent)
 PortfolioOptimisers.assert_online_fee_source(::Any, ::Any)
 PortfolioOptimisers.returns_result(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
 PortfolioOptimisers.held_timestamps
-PortfolioOptimisers.readout_without_state
-PortfolioOptimisers.online_readout
+PortfolioOptimisers.batch_without_state
+PortfolioOptimisers.batch_from_state
 PortfolioOptimisers.show_fields(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:EqualWeighted, <:RandomWeighted, <:NestedClustered, <:Stacking, <:SubsetResampling})
 ```

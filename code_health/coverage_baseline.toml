@@ -59,7 +59,7 @@ commit = "8610300"
 "src/03_InputData/02_AssetPanelBuilder.jl" = { lines = 195, misses = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { lines = 51, misses = 0 }
 "src/03_InputData/04_Preprocessing.jl" = { lines = 6, misses = 0 }
-"src/03_InputData/05_CarrierViews.jl" = { lines = 23, misses = 0 }
+"src/03_InputData/05_PanelViews.jl" = { lines = 23, misses = 0 }
 "src/03_InputData/06_PricesResult.jl" = { lines = 47, misses = 0 }
 "src/03_InputData/07_PriceIngestion.jl" = { lines = 80, misses = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { lines = 57, misses = 0 }

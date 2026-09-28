@@ -1,4 +1,4 @@
-@testset "Seam-lock: Model State is reached only through its interface" begin
+@testset "Model State lock: Model State is reached only through its interface" begin
     using Test
 
     # Model State (the `JuMP.Model` object dictionary shared by every constraint and risk

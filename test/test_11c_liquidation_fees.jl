@@ -1,4 +1,4 @@
-@testset "Fee liquidation carriers" begin
+@testset "Fee liquidation charges" begin
     using PortfolioOptimisers, Test
 
     # ADR 0121 gives `Fees` and `FeesEstimator` two liquidation carriers, `lq` and `flq`.
@@ -427,7 +427,7 @@
         # which asset will delist. A window in which every asset is investable derives no
         # mask, so the door short-circuits and the carriers never meet a complement to be
         # sliced to. Left alone they survive at full width and are charged in full, for
-        # assets that never left. `strip_liquidation_carriers` closes that, and this pins
+        # assets that never left. `strip_liquidation_charges` closes that, and this pins
         # it in every family that resolves a fee, not the JuMP prelude alone.
         rng = StableRNG(987654321)
         nx = ["a", "b", "c", "d", "e"]
@@ -444,8 +444,8 @@
         # method and the `BitVector` mask method. Without a third method naming that pair
         # the call is ambiguous, so every family below fails on a delisting window that
         # states no fee at all.
-        @test isnothing(PortfolioOptimisers.strip_liquidation_carriers(nothing,
-                                                                       BitVector([1, 0, 1])))
+        @test isnothing(PortfolioOptimisers.strip_liquidation_charges(nothing,
+                                                                      BitVector([1, 0, 1])))
 
         hopt = HierarchicalOptimiser(; pe = EmpiricalPrior(), sets = sets, fees = fees)
         inner = HierarchicalRiskParity()
@@ -648,7 +648,7 @@
         @test isnothing(PortfolioOptimisers.port_opt_view(red, [1, 2]).imsk)
         # The strip, the amortisation override and the fold's previous-weight factory
         # carry the mark through.
-        @test PortfolioOptimisers.strip_liquidation_carriers(red, nothing).imsk == imsk
+        @test PortfolioOptimisers.strip_liquidation_charges(red, nothing).imsk == imsk
         @test PortfolioOptimisers.override_fee_amortisation(red, AmortisedFees()).imsk ==
               imsk
         @test factory(red, [0.5, 0.5, 0.5]).imsk == imsk

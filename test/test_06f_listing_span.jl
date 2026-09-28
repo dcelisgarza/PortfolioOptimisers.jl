@@ -210,7 +210,7 @@ The docstrings of `03_ListingSpan.jl` against numbers. Each unit states a closed
 tests below compute it cell by cell and compare it with the unit.
 
 A window of a longer clock gives a `ListingSpan` whose bounds lie outside the window, because
-`span_carrier_view` moves them by the rows the window drops in front. The padded projection moved
+`listing_span_view` moves them by the rows the window drops in front. The padded projection moved
 such an opening bound to `first + 1 <= 1`, so the first row of the returns clock was active for an
 asset listed before the window. The same window as a `Matrix{Bool}` leaves that row inactive. The
 projection now clamps the opening bound to the clock first.

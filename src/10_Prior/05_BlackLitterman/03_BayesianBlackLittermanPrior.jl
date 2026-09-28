@@ -449,7 +449,7 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
     # image of a smaller one, so a covariance on that axis is singular by construction.
     #
     # The inversion RAISES NOTHING on such a matrix. Measured on the fixture of
-    # `test/test_12i_cross_sectional_factor_carrier.jl`: the solve returns entries of order
+    # `test/test_12i_cross_sectional_factor_rr_slot.jl`: the solve returns entries of order
     # `1e18` and the update carries on to a posterior whose scale looks like the prior's, so
     # a caller reading the result sees no sign that it is meaningless. That is what the
     # refusal is for, and it is why the refusal reads the result's own statement rather than

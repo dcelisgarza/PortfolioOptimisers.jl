@@ -150,15 +150,15 @@ One place holds `F`. The context keeps the factor column only when the tree of t
 
 # Algorithm
 
- 1. Fold `rd` into `host.pe` with [`fold_prior`](@ref), giving the folded prior `pe`.
+ 1. Fold `rd` into `opt.pe` with [`fold_prior`](@ref), giving the folded prior `pe`.
  2. Read the buffer `rows` of `pe` with [`prior_returns_buffer`](@ref).
  3. Set `own_factors` to `true` when `needs_factor_returns(pe) === false`.
- 4. Fold `rd` into `host.cache` with [`fold_context`](@ref), under the cap `rows.max_history`, giving `cache`. The context never keeps the returns.
- 5. Rebuild `host` with `pe` and `cache`.
+ 4. Fold `rd` into `opt.cache` with [`fold_context`](@ref), under the cap `rows.max_history`, giving `cache`. The context never keeps the returns.
+ 5. Rebuild `opt` with `pe` and `cache`.
 
 # Arguments
 
-  - `host`: An estimator that holds `pe` and `cache`.
+  - `opt`: An estimator that holds `pe` and `cache`.
   - `rd`: The returns data to fold, `observations × assets`.
 
 # Validation
@@ -167,7 +167,7 @@ One place holds `F`. The context keeps the factor column only when the tree of t
 
 # Returns
 
-  - `host`: The optimiser, with its prior folded and its context recorded.
+  - `opt`: The optimiser, with its prior folded and its context recorded.
 
 # Related
 
@@ -176,12 +176,12 @@ One place holds `F`. The context keeps the factor column only when the tree of t
   - [`prior_returns_buffer`](@ref)
   - [`needs_factor_returns`](@ref)
 """
-function fold_returns(host, rd::ReturnsResult)
-    pe = fold_prior(host.pe, rd)
+function fold_returns(opt, rd::ReturnsResult)
+    pe = fold_prior(opt.pe, rd)
     rows = prior_returns_buffer(pe)
     own_factors = needs_factor_returns(pe) === false
-    cache = fold_context(host.cache, rd, rows.max_history, false, own_factors)
-    return rebuild_estimator(host, (; pe = pe, cache = cache))
+    cache = fold_context(opt.cache, rd, rows.max_history, false, own_factors)
+    return rebuild_estimator(opt, (; pe = pe, cache = cache))
 end
 """
     partial_fit!(opt::JuMPOptimisationEstimator, rd::ReturnsResult)
@@ -452,8 +452,8 @@ Refuses the prior of an optimiser when it is a [`TimeDependent`](@ref) schedule,
 
 # Arguments
 
-  - `pe`: The prior of `host`.
-  - `host`: The optimiser that holds `pe`, which the message names.
+  - `pe`: The prior of `opt`.
+  - `opt`: The optimiser that holds `pe`, which the message names.
 
 # Validation
 
@@ -463,8 +463,8 @@ Refuses the prior of an optimiser when it is a [`TimeDependent`](@ref) schedule,
 
   - [`assert_stateless_schedule`](@ref)
 """
-function assert_stateless_prior(::TimeDependent, host)
-    return throw(ArgumentError("`$(typeof(host).name.name).pe` holds a `TimeDependent` schedule, and the online arm of the fold loop cannot step it: `pe` carries the partial-fit state the loop threads from fold to fold, and a schedule replaces that value every fold, so the prior a fold is handed never saw the rows folded before it. A schedule reaches stateless fields only. Hold one prior in `pe`, and schedule a field that carries no state, or refit every fold with `ff = nothing`."))
+function assert_stateless_prior(::TimeDependent, opt)
+    return throw(ArgumentError("`$(typeof(opt).name.name).pe` holds a `TimeDependent` schedule, and the online arm of the fold loop cannot step it: `pe` carries the partial-fit state the loop threads from fold to fold, and a schedule replaces that value every fold, so the prior a fold is handed never saw the rows folded before it. A schedule reaches stateless fields only. Hold one prior in `pe`, and schedule a field that carries no state, or refit every fold with `ff = nothing`."))
 end
 function assert_stateless_prior(::Any, ::Any)
     return nothing
@@ -542,8 +542,8 @@ function assert_online_entry(est)
     return nothing
 end
 """
-    returns_result(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
-    returns_result(host::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio})
+    returns_result(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
+    returns_result(opt::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio})
     returns_result(opt::JuMPOptimisationEstimator)
     returns_result(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
 
@@ -553,11 +553,11 @@ This is the step of `optimise(opt)` with no returns that rebuilds the returns da
 
 # Arguments
 
-  - `host`: The optimiser, or the bundle it holds.
+  - `opt`: The optimiser, or the bundle it holds.
 
 # Validation
 
-  - `host` carries a fold context. An `ArgumentError` is thrown otherwise.
+  - `opt` carries a fold context. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -570,14 +570,14 @@ This is the step of `optimise(opt)` with no returns that rebuilds the returns da
   - [`partial_fit!`](@ref)
   - [`optimise`](@ref)
 """
-function returns_result(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                    <:InverseVolatility, <:NestedClustered, <:Stacking,
-                                    <:SubsetResampling})
-    return returns_result(partial_fit_cache(host), prior_returns_buffer(host.pe))
+function returns_result(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
+                                   <:InverseVolatility, <:NestedClustered, <:Stacking,
+                                   <:SubsetResampling})
+    return returns_result(partial_fit_cache(opt), prior_returns_buffer(opt.pe))
 end
-function returns_result(host::Union{<:EqualWeighted, <:RandomWeighted,
-                                    <:BestConstantRebalancedPortfolio})
-    state = partial_fit_cache(host)
+function returns_result(opt::Union{<:EqualWeighted, <:RandomWeighted,
+                                   <:BestConstantRebalancedPortfolio})
+    state = partial_fit_cache(opt)
     return returns_result(state, state.X)
 end
 function returns_result(opt::JuMPOptimisationEstimator)
@@ -589,7 +589,7 @@ function returns_result(opt::Union{<:HierarchicalRiskParity,
     return returns_result(opt.opt)
 end
 """
-    held_timestamps(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling, <:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio})
+    held_timestamps(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling, <:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio})
     held_timestamps(opt::JuMPOptimisationEstimator)
     held_timestamps(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
     held_timestamps(::PreviousWeights)
@@ -614,11 +614,11 @@ The alignment check of [`Resume`](@ref) reads this accessor. The [`ReturnsBuffer
   - [`Resume`](@ref)
   - [`Pipeline`](@ref): its method reads the state that the row owner keeps.
 """
-function held_timestamps(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                     <:InverseVolatility, <:NestedClustered, <:Stacking,
-                                     <:SubsetResampling, <:EqualWeighted, <:RandomWeighted,
-                                     <:BestConstantRebalancedPortfolio})
-    return context_timestamps(host.cache)
+function held_timestamps(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
+                                    <:InverseVolatility, <:NestedClustered, <:Stacking,
+                                    <:SubsetResampling, <:EqualWeighted, <:RandomWeighted,
+                                    <:BestConstantRebalancedPortfolio})
+    return context_timestamps(opt.cache)
 end
 function held_timestamps(opt::JuMPOptimisationEstimator)
     return held_timestamps(opt.opt)
@@ -632,23 +632,23 @@ function held_timestamps(::PreviousWeights)
     return nothing
 end
 """
-    online_readout(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
-    online_readout(host::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio})
-    online_readout(opt::JuMPOptimisationEstimator)
-    online_readout(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
-    online_readout(opt::FiniteAllocationOptimisationEstimator)
-    online_readout(opt::OptimisationEstimator)
+    batch_from_state(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
+    batch_from_state(opt::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio})
+    batch_from_state(opt::JuMPOptimisationEstimator)
+    batch_from_state(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
+    batch_from_state(opt::FiniteAllocationOptimisationEstimator)
+    batch_from_state(opt::OptimisationEstimator)
 
 Turns a folded optimiser into the batch call that reads it out, an estimator and a [`ReturnsResult`](@ref).
 
 `optimise(opt)` with no returns rebuilds the `ReturnsResult` and calls the ordinary batch path, so no member above the prior needs a method of its own. The prior becomes `prior(pe)`, a prior result, which the batch path does not refit, so the solve reads the folded prior. This function drops the context, because the estimator it returns is a batch configuration over the rebuilt `ReturnsResult`. It never writes the state, so two calls on one estimator give the same answer, and a fallback reads the same `ReturnsResult` as the optimiser it replaces.
 
-The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `nothing` has taken no step, and [`readout_without_state`](@ref) answers for it. This function returns any other optimiser, such as [`PreviousWeights`](@ref), with an empty `ReturnsResult`, and its batch function decides whether it answers without returns.
+The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `nothing` has taken no step, and [`batch_without_state`](@ref) answers for it. This function returns any other optimiser, such as [`PreviousWeights`](@ref), with an empty `ReturnsResult`, and its batch function decides whether it answers without returns.
 
 # Algorithm
 
  1. A JuMP head or a hierarchical head reads out the bundle it holds in `opt`, and rebuilds itself around the bundle.
- 2. An optimiser with no state goes to [`readout_without_state`](@ref).
+ 2. An optimiser with no state goes to [`batch_without_state`](@ref).
  3. Rebuild `rd` with [`returns_result`](@ref).
  4. Rebuild the optimiser with `cache = nothing`. An optimiser that holds a prior also replaces `pe` with `prior(pe)`, the result of the folded prior.
  5. Return the optimiser and `rd`.
@@ -660,7 +660,7 @@ The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `
 # Validation
 
   - `opt` is not a finite allocation. An `ArgumentError` is thrown otherwise, because a finite allocation has no step.
-  - Everything [`readout_without_state`](@ref) and [`returns_result`](@ref) refuse.
+  - Everything [`batch_without_state`](@ref) and [`returns_result`](@ref) refuse.
 
 # Returns
 
@@ -673,36 +673,36 @@ The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `
   - [`partial_fit!`](@ref)
   - [`prior`](@ref)
 """
-function online_readout(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
-                                    <:InverseVolatility, <:NestedClustered, <:Stacking,
-                                    <:SubsetResampling})
-    if isnothing(host.cache)
-        return readout_without_state(host, host.pe)
+function batch_from_state(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
+                                     <:InverseVolatility, <:NestedClustered, <:Stacking,
+                                     <:SubsetResampling})
+    if isnothing(opt.cache)
+        return batch_without_state(opt, opt.pe)
     end
-    rd = returns_result(host)
-    return rebuild_estimator(host, (; pe = prior(host.pe), cache = nothing)), rd
+    rd = returns_result(opt)
+    return rebuild_estimator(opt, (; pe = prior(opt.pe), cache = nothing)), rd
 end
-function online_readout(host::Union{<:EqualWeighted, <:RandomWeighted,
-                                    <:BestConstantRebalancedPortfolio})
-    if isnothing(host.cache)
-        return readout_without_state(host, nothing)
+function batch_from_state(opt::Union{<:EqualWeighted, <:RandomWeighted,
+                                     <:BestConstantRebalancedPortfolio})
+    if isnothing(opt.cache)
+        return batch_without_state(opt, nothing)
     end
-    rd = returns_result(host)
-    return rebuild_estimator(host, (; cache = nothing)), rd
+    rd = returns_result(opt)
+    return rebuild_estimator(opt, (; cache = nothing)), rd
 end
-function online_readout(opt::JuMPOptimisationEstimator)
-    host, rd = online_readout(opt.opt)
-    return rebuild_estimator(opt, (; opt = host)), rd
+function batch_from_state(opt::JuMPOptimisationEstimator)
+    inner, rd = batch_from_state(opt.opt)
+    return rebuild_estimator(opt, (; opt = inner)), rd
 end
-function online_readout(opt::Union{<:HierarchicalRiskParity,
-                                   <:HierarchicalEqualRiskContribution,
-                                   <:SchurComplementHierarchicalRiskParity})
-    host, rd = online_readout(opt.opt)
-    return rebuild_estimator(opt, (; opt = host)), rd
+function batch_from_state(opt::Union{<:HierarchicalRiskParity,
+                                     <:HierarchicalEqualRiskContribution,
+                                     <:SchurComplementHierarchicalRiskParity})
+    inner, rd = batch_from_state(opt.opt)
+    return rebuild_estimator(opt, (; opt = inner)), rd
 end
 """
-    readout_without_state(host, pe::AbstractPriorResult)
-    readout_without_state(host, pe)
+    batch_without_state(opt, pe::AbstractPriorResult)
+    batch_without_state(opt, pe)
 
 Answers for an optimiser that has taken no step.
 
@@ -714,19 +714,19 @@ An optimiser whose prior is already a result needs no returns to solve. This fun
 
 # Related
 
-  - [`online_readout`](@ref)
+  - [`batch_from_state`](@ref)
   - [`partial_fit!`](@ref)
 """
-function readout_without_state(host, ::AbstractPriorResult)
-    return host, ReturnsResult()
+function batch_without_state(opt, ::AbstractPriorResult)
+    return opt, ReturnsResult()
 end
-function readout_without_state(host, ::Any)
-    return throw(ArgumentError("`optimise(opt)` with no returns reads the state the online step wrote, and this `$(typeof(host).name.name)` has taken no step: its `cache` is `nothing`. Fold observations with `partial_fit!(opt, rd)` first, or pass the returns to `optimise(opt, rd)`."))
+function batch_without_state(opt, ::Any)
+    return throw(ArgumentError("`optimise(opt)` with no returns reads the state the online step wrote, and this `$(typeof(opt).name.name)` has taken no step: its `cache` is `nothing`. Fold observations with `partial_fit!(opt, rd)` first, or pass the returns to `optimise(opt, rd)`."))
 end
-function online_readout(opt::FiniteAllocationOptimisationEstimator)
+function batch_from_state(opt::FiniteAllocationOptimisationEstimator)
     return throw(ArgumentError("a `$(typeof(opt))` has no online step, so `optimise(opt)` with no returns has no state to read: a finite allocation reads no returns window. Allocate a weight vector with `optimise(da, w, p)`."))
 end
-function online_readout(opt::OptimisationEstimator)
+function batch_from_state(opt::OptimisationEstimator)
     return opt, ReturnsResult()
 end
 """
@@ -746,7 +746,7 @@ res = optimise(mr)                                     # reads out; solves once
 
 # Algorithm
 
- 1. Turn `opt` into a batch estimator and its `rd` with [`online_readout`](@ref).
+ 1. Turn `opt` into a batch estimator and its `rd` with [`batch_from_state`](@ref).
  2. Run `optimise(opt, rd; kwargs...)` on them.
 
 # Arguments
@@ -756,7 +756,7 @@ res = optimise(mr)                                     # reads out; solves once
 
 # Validation
 
-  - Everything [`online_readout`](@ref) refuses.
+  - Everything [`batch_from_state`](@ref) refuses.
 
 # Returns
 
@@ -765,12 +765,12 @@ res = optimise(mr)                                     # reads out; solves once
 # Related
 
   - [`partial_fit!`](@ref)
-  - [`online_readout`](@ref)
+  - [`batch_from_state`](@ref)
   - [`returns_result`](@ref)
   - [`update_online_estimator`](@ref): resolves an [`Online`](@ref) prior before the first step.
 """
 function optimise(opt::OptimisationEstimator; kwargs...)
-    opt, rd = online_readout(opt)
+    opt, rd = batch_from_state(opt)
     return optimise(opt, rd; kwargs...)
 end
 """

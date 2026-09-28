@@ -237,8 +237,8 @@ $(DocStringExtensions.FIELDS)
     strict
 end
 """
-    carrier_listing_span(pr::AbstractPricesResult) -> Nothing
-    carrier_listing_span(pr::PricesResult) -> Option{<:AbstractMatrix{Bool}}
+    prices_listing_span(pr::AbstractPricesResult) -> Nothing
+    prices_listing_span(pr::PricesResult) -> Option{<:AbstractMatrix{Bool}}
 
 Read the Listing Span that the price data `pr` states, or `nothing` when it states none.
 
@@ -267,10 +267,10 @@ The method that Julia selects is the algorithm.
   - [`PricesResult`](@ref)
   - [`Option`](@ref)
 """
-function carrier_listing_span(::AbstractPricesResult)
+function prices_listing_span(::AbstractPricesResult)
     return nothing
 end
-function carrier_listing_span(pr::PricesResult)
+function prices_listing_span(pr::PricesResult)
     return pr.span
 end
 """
@@ -308,7 +308,7 @@ The method that Julia selects is the algorithm.
 # Related
 
   - [`PriceGapFill`](@ref)
-  - [`PortfolioOptimisers.carrier_listing_span`](@ref)
+  - [`PortfolioOptimisers.prices_listing_span`](@ref)
   - [`listing_span`](@ref)
   - [`strict_diagnostic`](@ref)
 """
@@ -369,7 +369,7 @@ The method that Julia selects is the algorithm.
 
   - [`PriceGapFill`](@ref)
   - [`PortfolioOptimisers.gap_fill_seed`](@ref)
-  - [`PortfolioOptimisers.carrier_listing_span`](@ref)
+  - [`PortfolioOptimisers.prices_listing_span`](@ref)
 """
 function gap_fill_open(span::AbstractMatrix{Bool}, j::Integer, t::Integer)
     return all(view(span, t:size(span, 1), j))
@@ -562,7 +562,7 @@ function fit_preprocessing(est::PriceGapFill, pr::PricesResult)::PriceGapFillRes
     keep = Vector{Int}(undef, 0)
     v = Vector{Any}(undef, 0)
     obs = Vector{nonmissingtype(eltype(vals))}(undef, 0)
-    span = carrier_listing_span(pr)
+    span = prices_listing_span(pr)
     for i in axes(vals, 2)
         t = findlast(!is_missing_value, view(vals, :, i))
         if isnothing(t)
@@ -580,7 +580,7 @@ end
 function apply_preprocessing(res::PriceGapFillResult, pr::PricesResult)::PricesResult
     names = TimeSeries.colnames(pr.X)
     vals = copy(values(pr.X))
-    span = gap_fill_span(carrier_listing_span(pr), vals, res.strict)
+    span = gap_fill_span(prices_listing_span(pr), vals, res.strict)
     #! The seed is a training price, so it is written only after the training window. A
     #! `TimeArray`'s clock is sorted, so the first observation past `te` is the first the
     #! seed precedes; on the training window itself that is one past the end.

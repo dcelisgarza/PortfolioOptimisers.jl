@@ -33,10 +33,10 @@ function extract_pr(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing)
     end
 end
 """
-    result_investable_carrier(imsk, res::OptimisationResult, pr::Nothing)
-    result_investable_carrier(imsk::Nothing, res::OptimisationResult, pr::MatNum_Pr)
-    result_investable_carrier(imsk::BitVector, res::OptimisationResult, pr::Pr_RR)
-    result_investable_carrier(imsk::BitVector, res::OptimisationResult, X::MatNum)
+    result_investable_returns(imsk, res::OptimisationResult, pr::Nothing)
+    result_investable_returns(imsk::Nothing, res::OptimisationResult, pr::MatNum_Pr)
+    result_investable_returns(imsk::BitVector, res::OptimisationResult, pr::Pr_RR)
+    result_investable_returns(imsk::BitVector, res::OptimisationResult, X::MatNum)
 
 Resolve the returns data a result-taking consumer reads: the result's own prior, or a caller's viewed at the result's Investable Mask.
 
@@ -60,13 +60,13 @@ The returns-data half of [`result_investable_view`](@ref). The result's own prio
   - [`port_opt_view`](@ref)
   - [`fold_factor_returns`](@ref)
 """
-function result_investable_carrier(::Any, res::OptimisationResult, ::Nothing)
+function result_investable_returns(::Any, res::OptimisationResult, ::Nothing)
     return extract_pr(res, nothing)
 end
-function result_investable_carrier(::Nothing, ::OptimisationResult, pr::MatNum_Pr)
+function result_investable_returns(::Nothing, ::OptimisationResult, pr::MatNum_Pr)
     return pr
 end
-function result_investable_carrier(imsk::BitVector, res::OptimisationResult, pr::Pr_RR)
+function result_investable_returns(imsk::BitVector, res::OptimisationResult, pr::Pr_RR)
     # The result's own prior handed back is already on the investable universe. It is
     # known by identity: a width can coincide, an object cannot.
     return if hasproperty(res, :pr) && pr === res.pr
@@ -75,7 +75,7 @@ function result_investable_carrier(imsk::BitVector, res::OptimisationResult, pr:
         port_opt_view(pr, findall(imsk))
     end
 end
-function result_investable_carrier(imsk::BitVector, ::OptimisationResult, X::MatNum)
+function result_investable_returns(imsk::BitVector, ::OptimisationResult, X::MatNum)
     return view(X, :, imsk)
 end
 """
@@ -100,7 +100,7 @@ The fee half of [`result_investable_view`](@ref), and the rule [`fold_fees`](@re
 # Related
 
   - [`result_investable_view`](@ref)
-  - [`result_investable_carrier`](@ref)
+  - [`result_investable_returns`](@ref)
   - [`extract_fees`](@ref)
   - [`investable_fees_view`](@ref)
   - [`fold_fees`](@ref)
@@ -123,14 +123,14 @@ Pair the weights, the returns data, the fee and the axis names a result-taking c
 
 A result carries three things on two universes. An optimisation reduces to its Investable Mask at the entry and expands the solved weights back, so `res.w` is on the **full** universe the caller stated, while `res.pr` is the prior of the universe the fit **solved**, and `res.fees` was reduced at the same entry, its five per-asset fields to the mask and its two liquidation charges, `lq` and `flq`, to the complement. A consumer that reads two of the three separately pairs a full vector with a reduced one: a per-asset fee indexed at a full-length mask raises a `BoundsError`, a reduced returns matrix against a full weight vector a `DimensionMismatch`, and a reduced `mu` under the caller's full names draws every bar after the gap under the name of the asset before it. This verb is the one place the pairing is made, so every result-taking arity of [`expected_risk`](@ref), [`calc_net_returns`](@ref), [`factor_attribution`](@ref), [`performance_summary`](@ref) and the plotting extension reads all three through it.
 
-The answers are on the **investable** universe of `res`, which is the universe its own prior and fee are already on. The weights are viewed at the mask through [`investable_weights_view`](@ref). The returns data is resolved by [`result_investable_carrier`](@ref) and the fee by [`result_investable_fees`](@ref): the result's own are taken as they are, and a caller's, stated on the universe `res.w` spans, is viewed at the mask, the returns data through the [`port_opt_view`](@ref) its owner writes and the fee through [`investable_fees_view`](@ref), as at the fit. The axis names lie on the asset axis, so they take the mask directly, and a drawn figure labels each bar with its own asset.
+The answers are on the **investable** universe of `res`, which is the universe its own prior and fee are already on. The weights are viewed at the mask through [`investable_weights_view`](@ref). The returns data is resolved by [`result_investable_returns`](@ref) and the fee by [`result_investable_fees`](@ref): the result's own are taken as they are, and a caller's, stated on the universe `res.w` spans, is viewed at the mask, the returns data through the [`port_opt_view`](@ref) its owner writes and the fee through [`investable_fees_view`](@ref), as at the fit. The axis names lie on the asset axis, so they take the mask directly, and a drawn figure labels each bar with its own asset.
 
 A result whose mask is `nothing` reduced on nothing, so the weights and the names are returned unchanged. A per-asset answer a consumer forms on the investable universe expands back through [`expand_investable_weights`](@ref) with the mask this verb returns first, as the value-level functions do.
 
 # Algorithm
 
  1. Read the Investable Mask of `res` with [`result_investable_mask`](@ref).
- 2. On a `nothing` mask, return `nothing`, `res.w`, the returns data through [`result_investable_carrier`](@ref), the fee through [`result_investable_fees`](@ref), and `nx` unchanged.
+ 2. On a `nothing` mask, return `nothing`, `res.w`, the returns data through [`result_investable_returns`](@ref), the fee through [`result_investable_fees`](@ref), and `nx` unchanged.
  3. On a `BitVector` mask, return it, the view of `res.w` at it, the returns data and the fee through the same two verbs, and the view of `nx` at it.
 
 # Arguments
@@ -148,7 +148,7 @@ A result whose mask is `nothing` reduced on nothing, so the weights and the name
 # Related
 
   - [`result_investable_mask`](@ref)
-  - [`result_investable_carrier`](@ref)
+  - [`result_investable_returns`](@ref)
   - [`result_investable_fees`](@ref)
   - [`investable_weights_view`](@ref)
   - [`investable_fees_view`](@ref)
@@ -164,14 +164,14 @@ function result_investable_view(res::OptimisationResult, pr::Option{<:MatNum_Pr}
 end
 function result_investable_view(::Nothing, res::OptimisationResult, pr::Option{<:MatNum_Pr},
                                 fees::Option{<:Fees}, nx::Option{<:AbstractVector})
-    return nothing, res.w, result_investable_carrier(nothing, res, pr),
+    return nothing, res.w, result_investable_returns(nothing, res, pr),
            result_investable_fees(nothing, res, fees), nx
 end
 function result_investable_view(imsk::BitVector, res::OptimisationResult,
                                 pr::Option{<:MatNum_Pr}, fees::Option{<:Fees},
                                 nx::Option{<:AbstractVector})
     return imsk, investable_weights_view(imsk, res.w),
-           result_investable_carrier(imsk, res, pr),
+           result_investable_returns(imsk, res, pr),
            result_investable_fees(imsk, res, fees), nothing_scalar_array_view(nx, imsk)
 end
 """

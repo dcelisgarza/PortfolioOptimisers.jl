@@ -72,8 +72,8 @@ function copy_state(::Nothing)
     return nothing
 end
 """
-    carrier_timestamps(rd::ReturnsResult)
-    carrier_timestamps(pr::PricesResult)
+    data_timestamps(rd::ReturnsResult)
+    data_timestamps(pr::PricesResult)
 
 Returns the timestamps of `rd` or of `pr`, or `nothing` when it holds none.
 
@@ -84,10 +84,10 @@ A `PricesResult` always holds them, because its `TimeArray` has a timestamp colu
   - [`held_timestamps`](@ref)
   - [`resume_fold_count`](@ref)
 """
-function carrier_timestamps(rd::ReturnsResult)
+function data_timestamps(rd::ReturnsResult)
     return rd.ts
 end
-function carrier_timestamps(pr::PricesResult)
+function data_timestamps(pr::PricesResult)
     return TimeSeries.timestamp(pr.X)
 end
 """
@@ -240,7 +240,7 @@ The check is exact over the held span, and it costs one comparison per held time
 
 # Algorithm
 
- 1. Read the timestamps of `rd` through [`carrier_timestamps`](@ref), giving `given`. Refuse `nothing`.
+ 1. Read the timestamps of `rd` through [`data_timestamps`](@ref), giving `given`. Refuse `nothing`.
  2. Read the timestamps of the state through [`held_timestamps`](@ref), giving `held`. Refuse `nothing`.
  3. Take the last entry of `held`, giving `stop`.
  4. Find the first fold whose training window ends at a row with timestamp `stop`, giving `n_old`. Refuse when no fold ends there.
@@ -269,10 +269,10 @@ The check is exact over the held span, and it costs one comparison per held time
 
   - [`Resume`](@ref)
   - [`held_timestamps`](@ref)
-  - [`carrier_timestamps`](@ref)
+  - [`data_timestamps`](@ref)
 """
 function resume_fold_count(opt, rd, train_idx)
-    given = carrier_timestamps(rd)
+    given = data_timestamps(rd)
     @argcheck(!isnothing(given),
               ArgumentError("`Resume` aligns `rd` with the state by their timestamps, and `rd` holds none. Give `rd` the timestamps the run was made over; an index-only caller attaches a synthetic calendar, `ts = Date(1) .+ Day.(0:(T - 1))`."))
     held = held_timestamps(opt)
@@ -397,7 +397,7 @@ function online_folds(fit_fold, r::Resume, n::Integer, ::Type{ElT}, path_id = no
     n_old = resume_fold_count(res.opt, rd, train_idx)
     assert_resume_folds(n_old, n)
     last_end = last(train_idx[n_old])
-    assert_resume_full_fold(test_idx[n_old], res.pred[end], carrier_timestamps(rd))
+    assert_resume_full_fold(test_idx[n_old], res.pred[end], data_timestamps(rd))
     prev = nothing
     for pred in res.pred
         prev = advance_previous_fold(pws, prev, pred)

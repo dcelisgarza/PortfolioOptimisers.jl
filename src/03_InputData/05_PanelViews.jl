@@ -54,7 +54,7 @@ end
 
 Match the surviving timestamps back into the original clock, and return the rows they hold.
 
-[`feature_row_indices`](@ref) calls it for a time-varying [`AssetPanel`](@ref), and [`span_carrier_view`](@ref) calls it for a Listing Span. Both hold their observation axis parallel to the clock of the input data by position, so both recover their rows the same way.
+[`feature_row_indices`](@ref) calls it for a time-varying [`AssetPanel`](@ref), and [`listing_span_view`](@ref) calls it for a Listing Span. Both hold their observation axis parallel to the clock of the input data by position, so both recover their rows the same way.
 
 # Algorithm
 
@@ -82,7 +82,7 @@ The method that Julia selects is the algorithm.
 # Related
 
   - [`feature_row_indices`](@ref)
-  - [`span_carrier_view`](@ref)
+  - [`listing_span_view`](@ref)
   - [`AssetPanel`](@ref)
   - [`prices_to_returns`](@ref)
 """
@@ -138,8 +138,8 @@ function panel_feature_names(pnl::AssetPanel)
     return nz
 end
 """
-    panel_carrier_view(pnl::Nothing, i, j, nx) -> nothing
-    panel_carrier_view(pnl::AssetPanel, i, j, nx) -> AssetPanel
+    asset_panel_view(pnl::Nothing, i, j, nx) -> nothing
+    asset_panel_view(pnl::AssetPanel, i, j, nx) -> AssetPanel
 
 View the [`AssetPanel`](@ref) of a `PricesResult` or a `ReturnsResult`, or return `nothing` when the input data holds none.
 
@@ -171,9 +171,9 @@ The method that Julia selects is the algorithm.
   - [`PricesResult`](@ref)
   - [`MissingDataFilter`](@ref)
 """
-function panel_carrier_view(::Nothing, ::Any, ::Any, ::Any)
+function asset_panel_view(::Nothing, ::Any, ::Any, ::Any)
     return nothing
 end
-function panel_carrier_view(pnl::AssetPanel, i, j, nx::Option{<:VecStr})
+function asset_panel_view(pnl::AssetPanel, i, j, nx::Option{<:VecStr})
     return port_opt_view(pnl, i, j, nx)
 end

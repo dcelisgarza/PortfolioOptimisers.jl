@@ -305,7 +305,7 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
 # Algorithm
 
  1. Orient `X` and `F` by `dims`, rebuild the returns data that the Descriptors read, from `X`, `F`, `pnl`, `iv` and `ivpa`, and take the two universe masks off `pnl` with [`cross_sectional_panel_masks`](@ref).
- 2. Build the benchmark weights `BW` with [`cross_sectional_cap_weights`](@ref), over the assets of the estimation universe whose return and market capitalisation are finite, and write them onto a copy of the Asset Panel with [`cross_sectional_benchmark_carrier`](@ref). A benchmark power of zero reads no market capitalisation.
+ 2. Build the benchmark weights `BW` with [`cross_sectional_cap_weights`](@ref), over the assets of the estimation universe whose return and market capitalisation are finite, and write them onto a copy of the Asset Panel with [`cross_sectional_benchmark_returns`](@ref). A benchmark power of zero reads no market capitalisation.
  3. Build every Factor Exposure with [`cross_sectional_exposure_history`](@ref), in dependency order, giving `Ms`, `nf` and `fam`.
  4. Drop the leading observations the Descriptors warm up over, with [`cross_sectional_warmup`](@ref), giving the rows `rw`.
  5. Neutralise the exposures with [`cross_sectional_neutralise!`](@ref), under the benchmark weights and the prior's own regression estimator.
@@ -389,7 +389,7 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     cross_sectional_cap_finite!(bmsk, mcap)
     BW = cross_sectional_cap_weights(pe.bp, mcap, bmsk)
     (; Ms, nf, fam) = cross_sectional_exposure_history(pe.factors,
-                                                       cross_sectional_benchmark_carrier(rd,
+                                                       cross_sectional_benchmark_returns(rd,
                                                                                          pe.bw,
                                                                                          BW))
     rw = (cross_sectional_warmup(X, Ms, emsk) + 1):size(X, 1)

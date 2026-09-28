@@ -126,7 +126,7 @@ what keeps the JuMP families cheap.
                 est, out = po.partial_fit_transform(est, rows(data, b))
                 push!(parts, out)
             end
-            return est, reduce(po.vcat_carrier_rows, parts)
+            return est, reduce(po.vcat_observations, parts)
         end
         for ptr in
             (PricesToReturns(), PricesToReturns(; gap_return_alg = CatchUpGapReturn()),
@@ -229,7 +229,7 @@ what keeps the JuMP families cheap.
                 est, out = po.partial_fit_transform(est, rows(prfb, b))
                 push!(parts, out)
             end
-            online = reduce(po.vcat_carrier_rows, parts)
+            online = reduce(po.vcat_observations, parts)
             batch = apply_preprocessing(ptr, prfb)
             @test same_carrier(online, batch)
             @test isequal(Matrix(online.F), Matrix(batch.F))
@@ -251,9 +251,9 @@ what keeps the JuMP families cheap.
         @test_throws ArgumentError po.vcat_panel_rows(static, nothing)
         @test isnothing(po.vcat_panel_rows(nothing, nothing))
         rds = ReturnsResult(; nx = nx, X = rd.X[1:10, :], pnl = static)
-        @test po.vcat_carrier_rows(rds, rds).pnl === static
-        @test_throws ArgumentError po.vcat_carrier_rows(rds, rows(rd, 1:10))
-        @test_throws ArgumentError po.vcat_carrier_rows(rd,
+        @test po.vcat_observations(rds, rds).pnl === static
+        @test_throws ArgumentError po.vcat_observations(rds, rows(rd, 1:10))
+        @test_throws ArgumentError po.vcat_observations(rd,
                                                         ReturnsResult(; nx = nx,
                                                                       X = rd.X[1:10, :]))
     end
@@ -456,7 +456,7 @@ what keeps the JuMP families cheap.
         @test isa(opipe.cache, po.PipelineBufferState)
         @test_throws ArgumentError fit(opipe)
         opipe = po.partial_fit!(po.partial_fit!(opipe, rows(pr, 1:20)), rows(pr, 21:50))
-        @test po.carrier_rows(opipe.cache.data) == 30
+        @test po.data_row_count(opipe.cache.data) == 30
         @test isapprox(fit(opipe).w, fit(pipe, rows(pr, 21:50)).w; atol = 1e-10)
         half = po.partial_fit!(po.PipelineBufferState(), rows(pr, 1:20))
         @test isequal(values(po.merge_states(half,
@@ -695,7 +695,7 @@ what keeps the JuMP families cheap.
         # assets and for the factors, and a factor column that one block lacks by presence.
         other = price_ingestion(PriceIngestion(),
                                 TimeArray(ts[11:20], P[11:20, :], ["B$i" for i in 1:N]))
-        msg = message(() -> po.vcat_carrier_rows(rows(pr, 1:10), other))
+        msg = message(() -> po.vcat_observations(rows(pr, 1:10), other))
         @test occursin("the columns of `X`", msg) && occursin("\"B1\"", msg)
         @test occursin("the columns of `X`",
                        message(() -> po.partial_fit_transform(po.partial_fit!(PricesToReturns(),
@@ -707,10 +707,10 @@ what keeps the JuMP families cheap.
         prf1 = price_ingestion(PriceIngestion(), TimeArray(ts, P, nx); F = F1)
         prf2 = price_ingestion(PriceIngestion(), TimeArray(ts, P, nx); F = F2)
         @test occursin("the columns of `F`",
-                       message(() -> po.vcat_carrier_rows(rows(prf1, 1:10),
+                       message(() -> po.vcat_observations(rows(prf1, 1:10),
                                                           rows(prf2, 11:20))))
         @test occursin("the `F` column",
-                       message(() -> po.vcat_carrier_rows(rows(prf1, 1:10), rows(pr, 11:20))))
+                       message(() -> po.vcat_observations(rows(prf1, 1:10), rows(pr, 11:20))))
 
         # A first block of one price row has no return without padding, and the batch
         # conversion of that row refuses it as empty rather than out of bounds. With
@@ -724,7 +724,7 @@ what keeps the JuMP families cheap.
                     PricesToReturns(; padding = true, gap_return_alg = CatchUpGapReturn()))
             e1, o1 = po.partial_fit_transform(ptr, rows(pr, 1:1))
             e2, o2 = po.partial_fit_transform(e1, rows(pr, 2:160))
-            @test same_carrier(po.vcat_carrier_rows(o1, o2), apply_preprocessing(ptr, pr))
+            @test same_carrier(po.vcat_observations(o1, o2), apply_preprocessing(ptr, pr))
         end
 
         # A caller's Gap Return rule that reads the next price. The batch writes a zero at

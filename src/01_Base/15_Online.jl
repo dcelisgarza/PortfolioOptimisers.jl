@@ -1592,7 +1592,7 @@ function online_wrapper_path(::Any)
     return nothing
 end
 """
-    assert_batch_entry(est, door::AbstractString)
+    assert_batch_entry(est, entry::AbstractString)
 
 Refuses an estimator that holds an [`Online`](@ref) at the entry of a batch fit, with an error that names the path of the wrapper.
 
@@ -1606,7 +1606,7 @@ A wrapper is a declaration that the online arm of the fold loop resolves at its 
 # Arguments
 
   - `est`: The estimator handed to the entry function.
-  - `door`: The name of the entry function, as the message reads it.
+  - `entry`: The name of the entry function, as the message reads it.
 
 # Validation
 
@@ -1623,10 +1623,10 @@ A wrapper is a declaration that the online arm of the fold loop resolves at its 
   - [`optimise`](@ref)
   - [`fold_loop`](@ref)
 """
-function assert_batch_entry(est, door::AbstractString)
+function assert_batch_entry(est, entry::AbstractString)
     path = online_wrapper_path(est)
     @argcheck(isnothing(path),
-              ArgumentError("`$(typeof(est).name.name)` enters $(door) holding an `Online` at `$(path)`, and a batch fit cannot resolve it: `Online` declares the sample buffer the fold loop's online arm seeds at its warm-up and folds the wrapped estimator's rows into, and nothing else seeds one, so the wrapper would reach the batch verb unresolved. Run the estimator through an Online Scheme — `OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit` — or set `$(path)` to the estimator it wraps and let the batch fit refit it from its rows."))
+              ArgumentError("`$(typeof(est).name.name)` enters $(entry) holding an `Online` at `$(path)`, and a batch fit cannot resolve it: `Online` declares the sample buffer the fold loop's online arm seeds at its warm-up and folds the wrapped estimator's rows into, and nothing else seeds one, so the wrapper would reach the batch verb unresolved. Run the estimator through an Online Scheme — `OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit` — or set `$(path)` to the estimator it wraps and let the batch fit refit it from its rows."))
     return nothing
 end
 """

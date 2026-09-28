@@ -309,7 +309,7 @@ end
     pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::MultipleRandomised; ex = FLoops.ThreadedEx())
     pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::CVER; ex = FLoops.ThreadedEx(), id = nothing)
 
-The body of the `cross_val_predict` methods of a Pipeline, shared by the [`Pipeline`](@ref) and by `Online(pipe)`: it checks its entry through [`assert_pipeline_door`](@ref), splits the data, and runs the folds through [`fold_loop`](@ref), whose online arm resolves the wrapper at warm-up and threads the pipeline from fold to fold.
+The body of the `cross_val_predict` methods of a Pipeline, shared by the [`Pipeline`](@ref) and by `Online(pipe)`: it checks its entry through [`assert_pipeline_entry`](@ref), splits the data, and runs the folds through [`fold_loop`](@ref), whose online arm resolves the wrapper at warm-up and threads the pipeline from fold to fold.
 
 # Related
 
@@ -320,7 +320,7 @@ The body of the `cross_val_predict` methods of a Pipeline, shared by the [`Pipel
 function pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR,
                                     cv::MultipleRandomised;
                                     ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
-    assert_pipeline_door(pipe, cv)
+    assert_pipeline_entry(pipe, cv)
     cv_res = split(cv, data)
     (; train_idx, test_idx, asset_idx, path_ids) = cv_res
     assert_unshuffled_folds(cv, train_idx)
@@ -394,7 +394,7 @@ end
 function pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::CVER;
                                     ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                     id = nothing)
-    assert_pipeline_door(pipe, cv)
+    assert_pipeline_entry(pipe, cv)
     cv_res = split(cv, data)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)

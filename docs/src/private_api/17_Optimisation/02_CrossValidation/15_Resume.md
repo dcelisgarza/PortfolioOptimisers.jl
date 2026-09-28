@@ -12,7 +12,7 @@ PortfolioOptimisers.assert_resume_folds
 PortfolioOptimisers.assert_resume_full_fold
 PortfolioOptimisers.copy_states
 PortfolioOptimisers.copy_state
-PortfolioOptimisers.carrier_timestamps
+PortfolioOptimisers.data_timestamps
 PortfolioOptimisers.context_timestamps
 is_time_dependent(r::Resume)
 Base.vcat(a::MultiPeriodPredictionResult, b::MultiPeriodPredictionResult)

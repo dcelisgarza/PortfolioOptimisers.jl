@@ -26,7 +26,7 @@ re-derive them:
   - `PredictionReturnsResult` deliberately carries no `pnl`: `reconstruct_rd` collapses the
     asset axis onto one synthetic asset, and a panel over the old assets would be wrong.
 =#
-@testset "Asset Panel carrier census: the panel reaches every consumer" begin
+@testset "Asset Panel reach census: the panel reaches every consumer" begin
     PO = PortfolioOptimisers
 
     rng = StableRNG(20260902)
@@ -98,7 +98,7 @@ re-derive them:
                        :expected_risk => "reads `pr.X` and the moments; no feature matrix",
                        :risk_gradient => "differentiates `expected_risk` on `pr.X` and the moments; no feature matrix",
                        :calc_net_returns => "reads a returns matrix and fees; no feature matrix",
-                       :result_investable_carrier => "views a caller's carrier at the result's Investable Mask through the `port_opt_view` its owner writes; it reads no feature matrix of its own")
+                       :result_investable_returns => "views a caller's returns data at the result's Investable Mask through the `port_opt_view` its owner writes; it reads no feature matrix of its own")
 
         carrier_methods = Tuple{Symbol, Method}[]
         for n in names(PO; all = true)

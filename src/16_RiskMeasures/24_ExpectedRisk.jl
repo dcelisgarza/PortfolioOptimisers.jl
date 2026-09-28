@@ -116,7 +116,7 @@ function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, args...; kwargs...
     return expected_risk(risk_input_kind(r), r, w, args...; kwargs...)
 end
 """
-    missing_returns_carrier_message(r::AbstractBaseRiskMeasure)
+    missing_returns_data_message(r::AbstractBaseRiskMeasure)
 
 Build the error message that refuses `nothing` as the returns data of a measure that reads a return series.
 
@@ -136,7 +136,7 @@ Two methods raise this refusal, one for a weight vector and one for a weight pat
   - [`IsNothingError`](@ref)
   - [`risk_input_kind`](@ref)
 """
-function missing_returns_carrier_message(r::AbstractBaseRiskMeasure)
+function missing_returns_data_message(r::AbstractBaseRiskMeasure)
     return "`$(nameof(typeof(r)))` is evaluated on a return series, and no returns data was given. Either the call named none, or the result it was taken from carries none of its own. Pass one: `expected_risk(r, w, X)` or `expected_risk(r, res, X)` for a returns matrix, `expected_risk(r, w, pr)` or `expected_risk(r, res, pr)` for a prior result."
 end
 """
@@ -226,7 +226,7 @@ end
 function expected_risk(::Union{<:NetReturnsInput, <:WeightsReturnsFeesInput},
                        r::AbstractBaseRiskMeasure, w::VecNum, X::Nothing = nothing,
                        fees::Option{<:Fees} = nothing; kwargs...)
-    return throw(IsNothingError(missing_returns_carrier_message(r)))
+    return throw(IsNothingError(missing_returns_data_message(r)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -561,7 +561,7 @@ end
 # more fundamental one.
 function expected_risk(::NetReturnsInput, r::AbstractBaseRiskMeasure, w::MatNum,
                        X::Nothing = nothing, fees::Option{<:Fees} = nothing; kwargs...)
-    return throw(IsNothingError(missing_returns_carrier_message(r)))
+    return throw(IsNothingError(missing_returns_data_message(r)))
 end
 # The three ratio composites split by type for the same reason their `VecNum` twins do:
 # `NonOptimisationRiskRatio` names `sca1` and `sca2`, and `RiskRatio` carries neither.

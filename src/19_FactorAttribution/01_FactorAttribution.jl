@@ -383,7 +383,7 @@ function attribution_idiosyncratic_returns(rr::CrossSectionalFactorModel,
     return assert_attribution_field(rr.csr, :csr).eps
 end
 function attribution_idiosyncratic_returns(::Regression, pr::AbstractPriorResult)
-    return assert_attribution_carrier(pr.o_X, :o_X) - pr.X
+    return assert_attribution_prior_field(pr.o_X, :o_X) - pr.X
 end
 """
     attribution_factor_returns(rr::AbstractLoadingsRegressionResult,
@@ -663,8 +663,8 @@ function assert_attribution_field(x, ::Symbol)
     return x
 end
 """
-    assert_attribution_carrier(x::Nothing, sym::Symbol)
-    assert_attribution_carrier(x, sym::Symbol)
+    assert_attribution_prior_field(x::Nothing, sym::Symbol)
+    assert_attribution_prior_field(x, sym::Symbol)
 
 Return an optional field of the prior result that carries a factor model block, or raise naming it.
 
@@ -689,10 +689,10 @@ It is the sibling of [`assert_attribution_field`](@ref), and it names the prior 
   - [`assert_attribution_field`](@ref)
   - [`Regression`](@ref)
 """
-function assert_attribution_carrier(::Nothing, sym::Symbol)
+function assert_attribution_prior_field(::Nothing, sym::Symbol)
     return throw(IsNothingError("$(sym) cannot be nothing: a factor attribution over a static loadings block reads the return series it decomposes off the prior result the block travels on"))
 end
-function assert_attribution_carrier(x, ::Symbol)
+function assert_attribution_prior_field(x, ::Symbol)
     return x
 end
 """

@@ -40,7 +40,7 @@ function symmetric_from_edges(N, edges)
     return R
 end
 
-@testset "The DBHT seam (#1037)" begin
+@testset "The back half of DBHT (#1037)" begin
     @testset "BubbleHierarchy from a hand-built clique hierarchy" begin
         # Clique 1 is the root, cliques 2 and 3 are its children, and clique 4 is the child
         # of clique 2. Only cliques 1 and 2 are separating. The first bubble holds the root

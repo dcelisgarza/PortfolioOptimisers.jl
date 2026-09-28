@@ -66,7 +66,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/04_Preprocessing.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/05_CarrierViews.jl" = { raw = 1, reviewed = 1 }
+"src/03_InputData/05_PanelViews.jl" = { raw = 1, reviewed = 1 }
 "src/03_InputData/06_PricesResult.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/07_PriceIngestion.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { raw = 0, reviewed = 0 }
@@ -451,7 +451,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/04_Preprocessing.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/05_CarrierViews.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_PanelViews.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/06_PricesResult.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/07_PriceIngestion.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { raw = 0, reviewed = 0 }

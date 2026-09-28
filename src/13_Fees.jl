@@ -683,7 +683,7 @@ function needs_previous_weights(fe::FeesE_Fees)::Bool
            needs_previous_weights(fe.flq)
 end
 """
-    strip_liquidation_carriers(fees, imsk)
+    strip_liquidation_charges(fees, imsk)
 
 Drop the two liquidation charges, `lq` and `flq`, when no asset left the universe.
 
@@ -715,16 +715,16 @@ The verb does not check the mark `fees.imsk`. Under a `nothing` mask it drops `l
   - [`investable_mask`](@ref)
   - [`fees_constraints`](@ref)
 """
-function strip_liquidation_carriers(fees, ::BitVector)
+function strip_liquidation_charges(fees, ::BitVector)
     return fees
 end
-function strip_liquidation_carriers(::Nothing, ::Any)
+function strip_liquidation_charges(::Nothing, ::Any)
     return nothing
 end
-function strip_liquidation_carriers(::Nothing, ::BitVector)
+function strip_liquidation_charges(::Nothing, ::BitVector)
     return nothing
 end
-function strip_liquidation_carriers(fees::Fees, ::Nothing)
+function strip_liquidation_charges(fees::Fees, ::Nothing)
     return if isnothing(fees.lq) && isnothing(fees.flq)
         fees
     else
@@ -743,7 +743,7 @@ Place a fee resolved over the caller's universe onto the axes an Investable Mask
 
 [`fees_constraints`](@ref) resolves a fee against the `sets` the caller stated before the fee reaches this verb, and this verb then reduces the resolved fee. That order lets a name-keyed fee name an asset the data later delists. After the reduction, `sets` holds only the investable names, so a departed name is missing and `strict` refuses it. A liquidation charge keyed by name could not resolve at all, because its `w` is already on the complement while `sets` is on the mask. Resolving first and viewing after avoids both problems. It needs no new arithmetic, because [`port_opt_view`](@ref) already splits a resolved [`Fees`](@ref) across its two axes.
 
-The verb has one arm for each kind of mask. A `BitVector` means assets left, so the view runs at `findall(imsk)` and derives the complement from the width of the unreduced universe. A fit site gives that width through `X`, and a consumer that holds no full-width matrix states it as `n`. Such a consumer is a result-taking verb, which meets a caller's fee beside a result whose own prior is already reduced, and the only width it has is `length(imsk)`. A `nothing` mask means every asset is investable, so there is no complement to slice to. [`strip_liquidation_carriers`](@ref) drops `lq` and `flq` instead, which keeps that path allocation-free.
+The verb has one arm for each kind of mask. A `BitVector` means assets left, so the view runs at `findall(imsk)` and derives the complement from the width of the unreduced universe. A fit site gives that width through `X`, and a consumer that holds no full-width matrix states it as `n`. Such a consumer is a result-taking verb, which meets a caller's fee beside a result whose own prior is already reduced, and the only width it has is `length(imsk)`. A `nothing` mask means every asset is investable, so there is no complement to slice to. [`strip_liquidation_charges`](@ref) drops `lq` and `flq` instead, which keeps that path allocation-free.
 
 This is the only verb that writes `fees.imsk`. It checks the mark before it acts, so it is idempotent. A caller states the two liquidation charges over the full universe, and a result holds them on the complement of its mask. Their widths cannot tell the two apart, and this one verb serves both. `expected_risk(r, w, pr, fees)` on an all-investable prior meets the caller's fee under a `nothing` mask. It must drop `lq` and `flq`, or it charges the whole book as a forced exit on every period. `expected_risk(r, res)` on a reduced result meets the result's fee under the same `nothing` mask, because the reduced prior holds no `NaN`. It must charge the exit that `lq` and `flq` hold. The mark tells the two cases apart. An unmarked fee is a caller's statement and takes the arm the mask names. A fee marked with this mask has already been through this verb, and the verb returns it as it is. The verb refuses a fee marked with another mask, because its `lq` and `flq` hold no rate for an asset that the other reduction kept.
 
@@ -751,7 +751,7 @@ This is the only verb that writes `fees.imsk`. It checks the mark before it acts
 
  1. On a `nothing` fee, return `nothing`.
  2. On a marked fee, return it untouched when the mark is `imsk`, or when the mark is a `BitVector` and `imsk` is `nothing`. Raise an `ArgumentError` naming both masks when the mark is a `BitVector` other than `imsk`.
- 3. On an unmarked fee and a `nothing` mask, pass the fee to [`strip_liquidation_carriers`](@ref). That verb drops `lq` and `flq`, and it returns a fee that holds neither liquidation charge untouched.
+ 3. On an unmarked fee and a `nothing` mask, pass the fee to [`strip_liquidation_charges`](@ref). That verb drops `lq` and `flq`, and it returns a fee that holds neither liquidation charge untouched.
  4. On an unmarked fee and a `BitVector` mask, take [`two_axis_fees_view`](@ref) at `findall(imsk)` over the width of the unreduced universe, `size(X, 2)` or `n`. That view slices the five per-asset fields to the mask and `lq` and `flq` to its complement. Rebuild the result with `imsk` as its mark.
 
 # Arguments
@@ -774,7 +774,7 @@ This is the only verb that writes `fees.imsk`. It checks the mark before it acts
   - [`Fees`](@ref)
   - [`two_axis_fees_view`](@ref)
   - [`port_opt_view`](@ref)
-  - [`strip_liquidation_carriers`](@ref)
+  - [`strip_liquidation_charges`](@ref)
   - [`lift_fees`](@ref)
   - [`investable_mask`](@ref)
   - [`investable_reduction`](@ref)
@@ -788,7 +788,7 @@ function investable_fees_view(fees::Fees, ::Nothing, ::Any)
     # A marked fee has been through this verb: its `lq` and `flq` are on the complement of
     # its own mask and hold the exit charge, so they stay. An unmarked fee is a caller's
     # statement on the full universe, and a `nothing` mask means nothing left it.
-    return isnothing(fees.imsk) ? strip_liquidation_carriers(fees, nothing) : fees
+    return isnothing(fees.imsk) ? strip_liquidation_charges(fees, nothing) : fees
 end
 function investable_fees_view(fees::Fees, imsk::BitVector, X::MatNum)
     return investable_fees_view(fees, imsk, size(X, 2))

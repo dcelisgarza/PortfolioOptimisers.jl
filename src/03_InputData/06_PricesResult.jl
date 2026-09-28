@@ -83,7 +83,7 @@ It is the price-level counterpart of [`ReturnsResult`](@ref). The price-level pr
 
 The asset price series `X` is the master clock. [`port_opt_view`](@ref) selects observation windows on `X`, and each other series keeps its rows at the timestamps that `X` keeps.
 
-The [`AssetPanel`](@ref) `pnl` and the Listing Span `span` hold no timestamps, so no timestamp aligns them. A Panel Field can be a 3-dimensional array, a static panel has no observation axis, and a span can be two integers per asset. Their axes run parallel to `X` by position instead. The asset axis follows `TimeSeries.colnames(X)`, and the observation axis of a time-varying panel follows `TimeSeries.timestamp(X)` row for row. A routine that drops an asset or an observation from `X` must drop it from `pnl` and `span` in the same step. [`port_opt_view`](@ref) does this through [`panel_carrier_view`](@ref) and [`span_carrier_view`](@ref), and [`MissingDataFilter`](@ref) and [`prices_to_returns`](@ref) do it too.
+The [`AssetPanel`](@ref) `pnl` and the Listing Span `span` hold no timestamps, so no timestamp aligns them. A Panel Field can be a 3-dimensional array, a static panel has no observation axis, and a span can be two integers per asset. Their axes run parallel to `X` by position instead. The asset axis follows `TimeSeries.colnames(X)`, and the observation axis of a time-varying panel follows `TimeSeries.timestamp(X)` row for row. A routine that drops an asset or an observation from `X` must drop it from `pnl` and `span` in the same step. [`port_opt_view`](@ref) does this through [`asset_panel_view`](@ref) and [`listing_span_view`](@ref), and [`MissingDataFilter`](@ref) and [`prices_to_returns`](@ref) do it too.
 
 # Fields
 
@@ -226,7 +226,7 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
 
  1. `i` and `j` are both `Colon`: return `pr` itself. No view is built.
 
- 2. `i` is a vector of timestamps and `j` is a `Colon`: index `X`, `F`, `B` and `iv` by the timestamps `i`. Recover the rows of a time-varying Asset Panel from the kept timestamps with [`feature_row_indices`](@ref), and view the panel on that observation axis with [`panel_carrier_view`](@ref). A static panel has no observation axis and ignores the row index. View the Listing Span at the same timestamps with [`span_carrier_view`](@ref). Pass `ivpa` through unchanged, because the asset index does not reach it. Rebuild the [`PricesResult`](@ref).
+ 2. `i` is a vector of timestamps and `j` is a `Colon`: index `X`, `F`, `B` and `iv` by the timestamps `i`. Recover the rows of a time-varying Asset Panel from the kept timestamps with [`feature_row_indices`](@ref), and view the panel on that observation axis with [`asset_panel_view`](@ref). A static panel has no observation axis and ignores the row index. View the Listing Span at the same timestamps with [`listing_span_view`](@ref). Pass `ivpa` through unchanged, because the asset index does not reach it. Rebuild the [`PricesResult`](@ref).
 
  3. `i` is a vector of timestamps and `j` is a vector of asset indices:
 
@@ -234,8 +234,8 @@ The method that Julia selects is the algorithm. The timestamp methods do the wor
      2. Index `F` by the timestamps `i` alone. `j` is an asset index, and the factors are a separate axis, so every factor column stays.
      3. Index `B` by the timestamps `i`. Keep its columns `j` when `B` holds one column per asset, and keep its single column otherwise. The test reads the width of `B`, because a shared benchmark has only one column to give.
      4. Index `iv` by the timestamps `i` and the asset columns `j`, and view `ivpa` at `j`.
-     5. Recover the rows of a time-varying Asset Panel with [`feature_row_indices`](@ref). View the panel at those rows and the assets `j` with [`panel_carrier_view`](@ref), and give it the asset names. It then also cuts the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref).
-     6. View the Listing Span at the kept timestamps and the assets `j` with [`span_carrier_view`](@ref).
+     5. Recover the rows of a time-varying Asset Panel with [`feature_row_indices`](@ref). View the panel at those rows and the assets `j` with [`asset_panel_view`](@ref), and give it the asset names. It then also cuts the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref).
+     6. View the Listing Span at the kept timestamps and the assets `j` with [`listing_span_view`](@ref).
      7. Rebuild the [`PricesResult`](@ref).
 
  4. `i` and `j` are integer indices, ranges or `Colon`s: read the timestamps `TimeSeries.timestamp(pr.X)[i]`, and call step 2 or step 3 with them. A call such as `port_opt_view(pr, 2:3)` reaches this method.
@@ -290,8 +290,8 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
     B = isnothing(pr.B) ? nothing : pr.B[i]
     iv = isnothing(pr.iv) ? nothing : pr.iv[i]
     rows = feature_row_indices(pr.pnl, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X))
-    pnl = panel_carrier_view(pr.pnl, rows, :, nothing)
-    span = span_carrier_view(pr.span, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X),
+    pnl = asset_panel_view(pr.pnl, rows, :, nothing)
+    span = listing_span_view(pr.span, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X),
                              :)
     return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = pr.ivpa, pnl = pnl,
                         span = span)
@@ -314,8 +314,8 @@ function port_opt_view(pr::PricesResult, i::AbstractVector{<:Dates.AbstractTime}
     iv = isnothing(pr.iv) ? nothing : pr.iv[i][TimeSeries.colnames(pr.iv)[j]]
     ivpa = nothing_scalar_array_view(pr.ivpa, j)
     rows = feature_row_indices(pr.pnl, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X))
-    pnl = panel_carrier_view(pr.pnl, rows, j, string.(TimeSeries.colnames(pr.X)))
-    span = span_carrier_view(pr.span, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X),
+    pnl = asset_panel_view(pr.pnl, rows, j, string.(TimeSeries.colnames(pr.X)))
+    span = listing_span_view(pr.span, TimeSeries.timestamp(X), TimeSeries.timestamp(pr.X),
                              j)
     return PricesResult(; X = X, F = F, B = B, iv = iv, ivpa = ivpa, pnl = pnl, span = span)
 end

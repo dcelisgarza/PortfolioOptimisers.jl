@@ -224,10 +224,10 @@ end
     msk = isfinite.(rd.X) .& rd.pnl.emsk
     PO.cross_sectional_cap_finite!(msk, mcap)
     W = PO.cross_sectional_cap_weights(1.0, mcap, msk)
-    rdb = PO.cross_sectional_benchmark_carrier(rd, "benchmark_weights", W)
+    rdb = PO.cross_sectional_benchmark_returns(rd, "benchmark_weights", W)
     @testset "The carrier gains the benchmark weights, and replaces its own" begin
         @test PO.panel_field(rdb.pnl, "benchmark_weights").vals == W
-        again = PO.cross_sectional_benchmark_carrier(rdb, "benchmark_weights", 2 .* W)
+        again = PO.cross_sectional_benchmark_returns(rdb, "benchmark_weights", 2 .* W)
         @test PO.panel_field(again.pnl, "benchmark_weights").vals == 2 .* W
         @test length(again.pnl.pf) == length(rdb.pnl.pf)
     end
@@ -1102,7 +1102,7 @@ function csfp_oracle(pe, rd; alpha = nothing)
     bmsk = isfinite.(X) .& emsk .& isfinite.(mcap)
     BW = PO.cross_sectional_cap_weights(pe.bp, mcap, bmsk)
     Z = PO.cross_sectional_exposure_history(pe.factors,
-                                            PO.cross_sectional_benchmark_carrier(rd, pe.bw,
+                                            PO.cross_sectional_benchmark_returns(rd, pe.bw,
                                                                                  BW)).Ms
     ell = pe.lag
     ts = (PO.cross_sectional_warmup(X, Z, emsk) + ell + 1):Tn

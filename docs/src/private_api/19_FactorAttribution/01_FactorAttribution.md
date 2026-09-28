@@ -15,7 +15,7 @@ attribution_family_basis
 attribution_regression_weights
 attribution_idiosyncratic_variances
 assert_attribution_field
-assert_attribution_carrier
+assert_attribution_prior_field
 attribution_finite
 attribution_investable_diagnostic
 attribution_investable_rows

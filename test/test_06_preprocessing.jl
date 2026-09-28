@@ -1218,25 +1218,25 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test PortfolioOptimisers.panel_feature_names(pnl) == panel_feature_matrix(pnl)[1]
 
         # The view cuts the label axis of a square tensor field only when it has the names.
-        @test isnothing(PortfolioOptimisers.panel_carrier_view(nothing, 1:2, 1:2, nothing))
+        @test isnothing(PortfolioOptimisers.asset_panel_view(nothing, 1:2, 1:2, nothing))
         sq = AssetPanel(;
                         pf = [TensorPanelField(; name = "prox", axis = "asset",
                                                labels = ["A", "B", "C"],
                                                vals = [1.0 2.0 3.0; 4.0 5.0 6.0;
                                                        7.0 8.0 9.0])])
-        @test panel_feature_matrix(PortfolioOptimisers.panel_carrier_view(sq, :, [2, 3],
-                                                                          ["A", "B", "C"])) ==
+        @test panel_feature_matrix(PortfolioOptimisers.asset_panel_view(sq, :, [2, 3],
+                                                                        ["A", "B", "C"])) ==
               (["prox=B", "prox=C"], [5.0 6.0; 8.0 9.0])
-        @test panel_feature_matrix(PortfolioOptimisers.panel_carrier_view(sq, :, [2, 3],
-                                                                          nothing)) ==
+        @test panel_feature_matrix(PortfolioOptimisers.asset_panel_view(sq, :, [2, 3],
+                                                                        nothing)) ==
               (["prox=A", "prox=B", "prox=C"], [4.0 5.0 6.0; 7.0 8.0 9.0])
         # A time-varying panel is cut on both axes, and a static one ignores the rows.
         Z3 = reshape(Float64.(1:36), 6, 3, 2)
-        tv = PortfolioOptimisers.panel_carrier_view(matrix_panel(["f1", "f2"], Z3), [2, 5],
-                                                    [1, 3], nothing)
+        tv = PortfolioOptimisers.asset_panel_view(matrix_panel(["f1", "f2"], Z3), [2, 5],
+                                                  [1, 3], nothing)
         @test panel_feature_matrix(tv)[2] == Z3[[2, 5], [1, 3], :]
-        st = PortfolioOptimisers.panel_carrier_view(matrix_panel(["f1", "f2"], Z3[1, :, :]),
-                                                    [2, 5], [1, 3], nothing)
+        st = PortfolioOptimisers.asset_panel_view(matrix_panel(["f1", "f2"], Z3[1, :, :]),
+                                                  [2, 5], [1, 3], nothing)
         @test panel_feature_matrix(st)[2] == Z3[1, [1, 3], :]
     end
     @testset "the preprocessing family: its levels, its missing values and its stubs" begin

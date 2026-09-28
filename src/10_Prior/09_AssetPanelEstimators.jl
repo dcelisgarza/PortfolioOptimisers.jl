@@ -316,8 +316,8 @@ function panel_axis_labels(names::VecStr, n::Integer)
     return length(names) == n ? String[String(s) for s in names] : [string(k) for k in 1:n]
 end
 """
-    carrier_asset_names(rd::Nothing) -> nothing
-    carrier_asset_names(rd::AbstractReturnsResult) -> Option{<:VecStr}
+    returns_asset_names(rd::Nothing) -> nothing
+    returns_asset_names(rd::AbstractReturnsResult) -> Option{<:VecStr}
 
 Read the asset names that label the trailing axis of a producer's field, or `nothing`.
 
@@ -341,10 +341,10 @@ The method that Julia selects is the algorithm.
   - [`panel_axis_labels`](@ref)
   - [`ReturnsResult`](@ref)
 """
-function carrier_asset_names(::Nothing)
+function returns_asset_names(::Nothing)
     return nothing
 end
-function carrier_asset_names(rd::AbstractReturnsResult)
+function returns_asset_names(rd::AbstractReturnsResult)
     return rd.nx
 end
 """
@@ -578,7 +578,7 @@ A [`RegressionPanel`](@ref) takes seven steps:
 A [`PhylogenyPanel`](@ref) takes three steps:
 
  1. Grade the structure into an `assets × assets` matrix with [`phylogeny_features`](@ref), giving `Zp`.
- 2. Label the trailing axis with [`panel_axis_labels`](@ref), from [`carrier_asset_names`](@ref).
+ 2. Label the trailing axis with [`panel_axis_labels`](@ref), from [`returns_asset_names`](@ref).
  3. Return the panel that holds `Zp` as the field `"proximity"` on the axis `"asset"`.
 
 # Arguments
@@ -695,7 +695,7 @@ function asset_panel(ape::PhylogenyPanel, ::Any, rd, X::MatNum)
     Zp = phylogeny_features(ape.alg, ape.pl, X)
     return AssetPanel(;
                       pf = [TensorPanelField(; name = "proximity", axis = "asset",
-                                             labels = panel_axis_labels(carrier_asset_names(rd),
+                                             labels = panel_axis_labels(returns_asset_names(rd),
                                                                         size(Zp, 2)),
                                              vals = Zp)])
 end

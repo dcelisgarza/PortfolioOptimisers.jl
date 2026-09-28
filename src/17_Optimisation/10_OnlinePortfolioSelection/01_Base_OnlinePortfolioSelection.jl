@@ -1278,7 +1278,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the context of one row for every projection of that row: the rows that the head holds, the timestamp of the row, and the Held Steps recorded so far.
 
-The projection of the Online Update is `project(proj, set, q, w)`, with four arguments and no more. Two things must reach it outside that signature. The covariance cone and the tracking error of a programme set read the head's rows, and the head must see the record of a Held Step. Both go on the task-scoped [`PROJECTION_STEP`](@ref). The head opens one step for each row through [`with_projection_step`](@ref), around the whole Online Update. So every projection of that row, those of a mixture's experts and that of its blend, reads one set of rows and writes one log. The rows are the ones that the update gets, a [`ReturnsResult`](@ref) of the rows as they arrived, under the pinned names and the Asset Panel of the buffer. So a programme set fits its prior through [`rows_carrier`](@ref), as a batch head does. Outside a step, a projection reads no rows and reports a hold as a warning.
+The projection of the Online Update is `project(proj, set, q, w)`, with four arguments and no more. Two things must reach it outside that signature. The covariance cone and the tracking error of a programme set read the head's rows, and the head must see the record of a Held Step. Both go on the task-scoped [`PROJECTION_STEP`](@ref). The head opens one step for each row through [`with_projection_step`](@ref), around the whole Online Update. So every projection of that row, those of a mixture's experts and that of its blend, reads one set of rows and writes one log. The rows are the ones that the update gets, a [`ReturnsResult`](@ref) of the rows as they arrived, under the pinned names and the Asset Panel of the buffer. So a programme set fits its prior through [`buffer_returns_result`](@ref), as a batch head does. Outside a step, a projection reads no rows and reports a hold as a warning.
 
 # Fields
 
@@ -1288,7 +1288,7 @@ $(DocStringExtensions.FIELDS)
 
   - [`PROJECTION_STEP`](@ref)
   - [`with_projection_step`](@ref)
-  - [`rows_carrier`](@ref)
+  - [`buffer_returns_result`](@ref)
   - [`HeldStep`](@ref)
   - [`project`](@ref)
 """
@@ -1408,7 +1408,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the Partial Fit State of an online portfolio selection head: the Rule State, the rows, the Fold Context and every folded timestamp.
 
-The pair `(st, w)` is the Rule State, the unit over which the family recurses. The state holds once the rows that any rule of the tree reads, as a [`SampleBufferState`](@ref) of returns. The buffer keeps the rows of the Returns Result as they arrived, with `NaN` where there was no return, and under a time-varying panel it keeps the active mask of each row beside it. [`rows_needed`](@ref) of the rule tree caps the buffer, and the buffer is `nothing` for a tree that reads no rows. At every row the head reads the buffer out as a [`ReturnsResult`](@ref) through [`rows_carrier`](@ref), so a statistic over the rows reduces to its Coverage Universe as a batch fit over the same window does. No cap applies to the timestamps, so [`Resume`](@ref) works for a rule with no state. The active mask of the last folded row is the Investable Mask on which `optimise(opt)` with no data reduces the allocation, and it is `nothing` under a static panel. The recursion keeps the full `w` and never carries a forced zero.
+The pair `(st, w)` is the Rule State, the unit over which the family recurses. The state holds once the rows that any rule of the tree reads, as a [`SampleBufferState`](@ref) of returns. The buffer keeps the rows of the Returns Result as they arrived, with `NaN` where there was no return, and under a time-varying panel it keeps the active mask of each row beside it. [`rows_needed`](@ref) of the rule tree caps the buffer, and the buffer is `nothing` for a tree that reads no rows. At every row the head reads the buffer out as a [`ReturnsResult`](@ref) through [`buffer_returns_result`](@ref), so a statistic over the rows reduces to its Coverage Universe as a batch fit over the same window does. No cap applies to the timestamps, so [`Resume`](@ref) works for a rule with no state. The active mask of the last folded row is the Investable Mask on which `optimise(opt)` with no data reduces the allocation, and it is `nothing` under a static panel. The recursion keeps the full `w` and never carries a forced zero.
 
 # Fields
 

@@ -495,7 +495,7 @@ A row with a held projection warns once, with the row's timestamp and each hold,
  1. Name the Held Gaps of the returns `r` at the row's index `i` through [`report_row_gaps`](@ref).
  2. Push `r` verbatim, with its active mask `amsk`, into the rows buffer `X`, when the tree keeps one.
  3. Form the price relative `x` through [`price_relative`](@ref), which is one at a gap.
- 4. Read the buffer out as `rows`, a [`ReturnsResult`](@ref) of the rows that the head holds, through [`rows_carrier`](@ref).
+ 4. Read the buffer out as `rows`, a [`ReturnsResult`](@ref) of the rows that the head holds, through [`buffer_returns_result`](@ref).
  5. Take the Online Update through [`online_update!`](@ref), inside a projection step over `rows` and the timestamp `ts` that [`with_projection_step`](@ref) opens. This gives the new state `st` of the rule, the allocation `w` and the log of holds `held`.
  6. Warn on a hold through [`report_held_steps`](@ref), which gives the row's hold record.
 
@@ -517,7 +517,7 @@ A row with a held projection warns once, with the row's timestamp and each hold,
 
   - [`fold_online_selection`](@ref)
   - [`report_row_gaps`](@ref)
-  - [`rows_carrier`](@ref)
+  - [`buffer_returns_result`](@ref)
   - [`price_relative`](@ref)
   - [`online_update!`](@ref)
   - [`with_projection_step`](@ref)
@@ -532,15 +532,15 @@ function online_selection_row!(opt::OnlinePortfolioSelection, st, w::AbstractVec
         X = partial_fit!(X, r; active_mask = amsk)
     end
     x = price_relative.(r)
-    rows = rows_carrier(X, nx)
+    rows = buffer_returns_result(X, nx)
     (st, w), held = with_projection_step(() -> online_update!(opt.alg, st, w, x, rows, set),
                                          rows, ts; strict = opt.strict)
     return st, w, X, report_held_steps(held, ts)
 end
 """
-    rows_carrier(X::Nothing, nx)
-    rows_carrier(X::SampleBufferState, nx::VecStr)
-    rows_carrier(X::SampleBufferState, nx::Nothing)
+    buffer_returns_result(X::Nothing, nx)
+    buffer_returns_result(X::SampleBufferState, nx::VecStr)
+    buffer_returns_result(X::SampleBufferState, nx::Nothing)
 
 Reads the rows buffer out as the Returns Result that the Online Update gets.
 
@@ -559,13 +559,13 @@ Every statistic over the rows reads this Returns Result, and the batch verbs rea
   - [`SampleBufferState`](@ref)
   - [`ReturnsResult`](@ref)
 """
-function rows_carrier(::Nothing, ::Any)
+function buffer_returns_result(::Nothing, ::Any)
     return nothing
 end
-function rows_carrier(X::SampleBufferState, nx::VecStr)
+function buffer_returns_result(X::SampleBufferState, nx::VecStr)
     return ReturnsResult(; nx = nx, X = sample_buffer(X), pnl = buffer_panel(X))
 end
-function rows_carrier(::SampleBufferState, ::Nothing)
+function buffer_returns_result(::SampleBufferState, ::Nothing)
     return throw(IsNothingError("the head keeps rows and pins no asset names: a Returns Result that carries rows carries their names, so the rows that the rules read cannot be formed. Hand the head a Returns Result whose `nx` is set."))
 end
 """
@@ -577,7 +577,7 @@ The panel uses the active mask as its estimation mask too, because [`step_active
 
 # Related
 
-  - [`rows_carrier`](@ref)
+  - [`buffer_returns_result`](@ref)
   - [`sample_buffer_kwargs`](@ref)
 """
 function buffer_panel(X::SampleBufferState)
@@ -784,8 +784,8 @@ The Result expands ``\\bar{\\boldsymbol{w}}`` back over the pinned universe with
   - [`OnlinePortfolioSelectionState`](@ref)
   - [`NaiveOptimisationResult`](@ref)
 """
-function online_selection_readout(opt::OnlinePortfolioSelection,
-                                  state::OnlinePortfolioSelectionState)
+function online_selection_result(opt::OnlinePortfolioSelection,
+                                 state::OnlinePortfolioSelectionState)
     N = length(state.w)
     imsk = state.amsk
     idx = isnothing(imsk) ? Colon() : findall(imsk)
@@ -822,20 +822,20 @@ Runs the Causal Pass.
 
  1. Reset every schedule of the head to its fold-less value through [`reset_time_dependent_estimator`](@ref).
  2. Fold every row of `rd` from the Start Allocation, with no carried state, through [`fold_online_selection`](@ref), giving `state`.
- 3. Read the Next-Period Allocation out of `state` through [`online_selection_readout`](@ref).
+ 3. Read the Next-Period Allocation out of `state` through [`online_selection_result`](@ref).
 
 # Related
 
   - [`OnlinePortfolioSelection`](@ref)
   - [`fold_online_selection`](@ref)
-  - [`online_selection_readout`](@ref)
+  - [`online_selection_result`](@ref)
   - [`optimise`](@ref)
   - [`_optimise`](@ref)
 """
 function _optimise(opt::OnlinePortfolioSelection, rd::ReturnsResult; kwargs...)
     opt = reset_time_dependent_estimator(opt)
     state = fold_online_selection(opt, nothing, rd)
-    return online_selection_readout(opt, state)
+    return online_selection_result(opt, state)
 end
 """
     optimise(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; kwargs...) -> NaiveOptimisationResult
@@ -860,7 +860,7 @@ Runs the Causal Pass over `rd`, and returns the Next-Period Allocation.
 
   - [`OnlinePortfolioSelection`](@ref)
   - [`partial_fit!`](@ref)
-  - [`online_selection_readout`](@ref)
+  - [`online_selection_result`](@ref)
 """
 function optimise(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult; kwargs...)::NaiveOptimisationResult
@@ -878,7 +878,7 @@ The method refuses a head that has taken no step with an `ArgumentError`. The Re
 
  1. Refuse a head whose `cache` is `nothing`.
  2. Reset every schedule of the head to its fold-less value through [`reset_time_dependent_estimator`](@ref).
- 3. Read the state out through [`online_selection_readout`](@ref), giving `res`.
+ 3. Read the state out through [`online_selection_result`](@ref), giving `res`.
  4. Return `res` when it succeeded or when the head has no fallback.
  5. Otherwise warn, read the fallback out with `optimise(opt.fb)`, and return its Result through [`factory`](@ref), which records the failed pair of `opt` and `res`.
 
@@ -898,14 +898,14 @@ The method refuses a head that has taken no step with an `ArgumentError`. The Re
 # Related
 
   - [`OnlinePortfolioSelection`](@ref)
-  - [`online_selection_readout`](@ref)
+  - [`online_selection_result`](@ref)
   - [`partial_fit!`](@ref)
 """
 function optimise(opt::OnlinePortfolioSelection; kwargs...)
     @argcheck(!isnothing(opt.cache),
               ArgumentError("`optimise(opt)` with no returns reads the state the online step wrote, and this `OnlinePortfolioSelection` has taken no step: its `cache` is `nothing`. Fold observations with `partial_fit!(opt, rd)` first, or pass the returns to `optimise(opt, rd)`."))
     opt = reset_time_dependent_estimator(opt)
-    res = online_selection_readout(opt, opt.cache)
+    res = online_selection_result(opt, opt.cache)
     if isa(res.retcode, OptimisationSuccess) || isnothing(opt.fb)
         return res
     end
@@ -914,7 +914,7 @@ function optimise(opt::OnlinePortfolioSelection; kwargs...)
     return factory(optimise(opt.fb), fb)
 end
 """
-    online_readout(opt::OnlinePortfolioSelection)
+    batch_from_state(opt::OnlinePortfolioSelection)
 
 Refuses the head with an `ArgumentError`, because the head has no batch estimator to return.
 
@@ -922,10 +922,10 @@ The head gives a Recursion Result. `optimise(opt)` rebuilds no returns data, run
 
 # Related
 
-  - [`online_readout`](@ref)
+  - [`batch_from_state`](@ref)
   - [`optimise`](@ref)
 """
-function online_readout(::OnlinePortfolioSelection)
+function batch_from_state(::OnlinePortfolioSelection)
     return throw(ArgumentError("an `OnlinePortfolioSelection` head has a Recursion Result, not a reconstitution: its state holds the next allocation and no returns data to rebuild, so there is no batch estimator to hand back. Read it out with `optimise(opt)`."))
 end
 """

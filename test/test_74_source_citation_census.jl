@@ -47,10 +47,18 @@ said "the paper". There is no allow-list.
 The same rule says that a docstring defines each word it uses. Issue #1361 found about 1300
 lines under `src/` and `ext/` that named a value by a private word: "the carrier" for a
 `ReturnsResult`, "the seam", "the host", "the read-out" and "the door". The pages already
-fail on those words, through the `mechanism` pattern of `code_health/prose.jl`. The last testset
-reads that one pattern over every string literal of `src/` and `ext/`: the docstrings, the
-dictionary values, and the text of each error, warning and info message. A code span loses its
-text first, so a function named `rows_carrier` or an argument named `host` is not a match.
+fail on those words, through the `mechanism` pattern of `code_health/prose.jl`. A testset reads
+that one pattern over every string literal of `src/` and `ext/`: the docstrings, the dictionary
+values, and the text of each error, warning and info message. A code span loses its text first,
+so a function named `rows_carrier` or an argument named `host` is not a match there.
+
+Issue #1362 renamed the identifiers that still carried the words: 22 functions, the arguments
+`host` and `door`, one source file and six test files. A reader meets a name in the private API
+pages and in each docstring signature. The last testset reads every
+identifier of `src/` and `ext/`, and the path of every file under `src/`, `ext/` and `test/`. It
+splits a name into words at each underscore and at each capital letter, and it reads each word
+with the same `mechanism` pattern. So `span_carrier_view` and `05_CarrierViews.jl` are matches,
+and `CarriedPrice` and `ghost` are not.
 =#
 module SourceCitationCensus
 module CH
@@ -229,6 +237,68 @@ end
         isempty(offenders) ||
             @warn """$(length(offenders)) string(s) name a value by a word for the mechanism of the
                      code. Name the argument, the type or the function instead:\n  $(join(offenders, "\n  "))"""
+        @test offenders == String[]
+    end
+
+    # The words of a name: `rows_carrier` is `rows` and `carrier`, `CarrierViews` is `Carrier`
+    # and `Views`, and `ABCWeights` is `ABC` and `Weights`.
+    name_words(s) = [m.match for m in eachmatch(r"[A-Z]?[a-z0-9]+|[A-Z]+(?![a-z])", s)]
+    mechanism_name(s) = any(w -> occursin(MECHANISM, w), name_words(s))
+
+    # Every symbol of one source file: a binding, an argument, a local, a field, a keyword.
+    function identifiers(file)
+        acc = Set{Symbol}()
+        function walk(ex)
+            if ex isa Symbol
+                push!(acc, ex)
+            elseif ex isa QuoteNode
+                walk(ex.value)
+            elseif ex isa Expr
+                foreach(walk, ex.args)
+            end
+            return nothing
+        end
+        walk(Meta.parseall(read(file, String); filename = file))
+        return acc
+    end
+
+    @testset "the name pattern reads the words of a name" begin
+        @test mechanism_name("rows_carrier")
+        @test mechanism_name("append_carrier_block!")
+        @test mechanism_name("05_CarrierViews.jl")
+        @test mechanism_name("online_readout")
+        @test mechanism_name("test_28_seam_lock.jl")
+        @test mechanism_name("host")
+        @test mechanism_name("door")
+        @test !mechanism_name("CarriedPrice")
+        @test !mechanism_name("ghost_value")
+        @test !mechanism_name("indoors")
+        mktempdir() do dir
+            probe = joinpath(dir, "probe.jl")
+            write(probe,
+                  "\"the host\"\nf(host, x) = (y = x; y)\nstruct S\n    door::Int\nend\n")
+            @test sort!(filter(s -> mechanism_name(String(s)), collect(identifiers(probe)))) ==
+                  [:door, :host]
+        end
+    end
+
+    @testset "src and ext identifiers and the file paths name no mechanism of the code" begin
+        offenders = String[]
+        for dir in ("src", "ext"), f in files_under(joinpath(ROOT, dir))
+            for s in sort!(collect(identifiers(f)))
+                mechanism_name(String(s)) && push!(offenders, "$(relpath(f, ROOT)): $(s)")
+            end
+        end
+        for dir in ("src", "ext", "test"), (root, _, files) in walkdir(joinpath(ROOT, dir))
+            for f in files
+                p = relpath(joinpath(root, f), ROOT)
+                any(mechanism_name, splitpath(p)) && push!(offenders, p)
+            end
+        end
+        isempty(offenders) ||
+            @warn """$(length(offenders)) identifier(s) or path(s) name a value by a word for the
+                     mechanism of the code. Name the argument, the type or the function
+                     instead:\n  $(join(offenders, "\n  "))"""
         @test offenders == String[]
     end
 end

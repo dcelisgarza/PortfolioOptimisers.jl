@@ -264,8 +264,8 @@ function apply_gap_return(alg::AbstractGapReturnAlgorithm, R::DataFrames.DataFra
     return R
 end
 """
-    append_carrier_block!(P::DataFrames.DataFrame, A::Nothing, ts, sym::Symbol) -> Vector{String}
-    append_carrier_block!(P::DataFrames.DataFrame, A::TimeSeries.TimeArray, ts, sym::Symbol) -> Vector{String}
+    append_price_block!(P::DataFrames.DataFrame, A::Nothing, ts, sym::Symbol) -> Vector{String}
+    append_price_block!(P::DataFrames.DataFrame, A::TimeSeries.TimeArray, ts, sym::Symbol) -> Vector{String}
 
 Write one price block of the `PricesResult` beside the asset block, on the asset clock.
 
@@ -300,11 +300,11 @@ The `PricesResult` states one clock. So this function reads a factor or benchmar
   - [`unify_gaps`](@ref)
   - [`PricesResult`](@ref)
 """
-function append_carrier_block!(::DataFrames.DataFrame, ::Nothing, ::Any, ::Symbol)
+function append_price_block!(::DataFrames.DataFrame, ::Nothing, ::Any, ::Symbol)
     return String[]
 end
-function append_carrier_block!(P::DataFrames.DataFrame, A::TimeSeries.TimeArray, ts,
-                               sym::Symbol)
+function append_price_block!(P::DataFrames.DataFrame, A::TimeSeries.TimeArray, ts,
+                             sym::Symbol)
     @argcheck(TimeSeries.timestamp(A) == ts,
               ConflictingArgumentError("`$sym` is carried on the asset clock, and `price_ingestion` is what puts it there:\n\tlength(timestamp($sym)) => $(length(TimeSeries.timestamp(A)))\n\tlength(timestamp(X)) => $(length(ts))"))
     n = string.(TimeSeries.colnames(A))
@@ -359,14 +359,14 @@ The conversion applies the same rule to a benchmark ``B``, and carries the bench
 # Algorithm
 
  1. Check with [`assert_distinct_series_names`](@ref) that the asset, factor and benchmark series have distinct names. Read the asset names and the asset timestamps from `pr.X`. Check `pr.pnl` against them with [`check_asset_panel`](@ref), and `pr.span` with [`assert_span_shape`](@ref).
- 2. Write the three price blocks side by side on the clock of the `PricesResult` with [`append_carrier_block!`](@ref), which writes every absent price as `NaN` with [`unify_gaps`](@ref). The `PricesResult` states one clock. So the function reads a factor or benchmark series at the asset timestamps, and does not join it onto them. It refuses a series on a different clock and names the series, because a join adds or drops observations and [`price_ingestion`](@ref) owns every change of the clock. A benchmark is one shared column, or one column per asset.
+ 2. Write the three price blocks side by side on the clock of the `PricesResult` with [`append_price_block!`](@ref), which writes every absent price as `NaN` with [`unify_gaps`](@ref). The `PricesResult` states one clock. So the function reads a factor or benchmark series at the asset timestamps, and does not join it onto them. It refuses a series on a different clock and names the series, because a join adds or drops observations and [`price_ingestion`](@ref) owns every change of the clock. A benchmark is one shared column, or one column per asset.
  3. Convert the prices to returns with `TimeSeries.percentchange` under `ret_method` and `padding`. This step applies the formula above. It computes both branches through logarithms. The log return is ``\\ln p_{t,\\,i} - \\ln p_{t-1,\\,i}``, and the simple return is `expm1` of it. So the two agree with the closed forms above to floating point, and not always to the last bit. When `padding` is `true`, the step keeps the first observation with a `NaN` return, so the returns keep the length of the price clock.
  4. **A gap carried here does not spread.** The formula reads two prices, so a run of `k` gapped prices makes non-finite only the returns that read one of them. That is `k + 1` returns for a run inside the series, and `k` for a run at either end, because no return reads a price before the first row or after the last. Every later return of that column reads two observed prices. A gap also stays in its own column, because the return of an asset reads no price of another asset.
  5. Resolve the returns that a gap left non-finite with [`apply_gap_return`](@ref), under `gap_return_alg`. The method for `nothing` is the default rule. It returns the table unchanged, so the returns of step 3 stay bit for bit the same. An algorithm writes only a return that reads a gapped price, inside the Listing Span of its column, after the first observed price. So every return computed from two observed prices keeps its value. The function logs an `@info` when it finds no writable return.
  6. Name the three blocks. Step 1 refused a name that two tables share and the name `timestamp`. So the asset names `nx`, the factor names `nf` and the benchmark names `nb` are the column names of the three tables, and `ts` is the `timestamp` column of the converted table.
  7. Write each absent implied volatility as `NaN` with [`unify_gaps`](@ref), and index `pr.iv` by `ts`. Then check the implied volatilities and `pr.ivpa` against the asset count. The returns clock is the price clock, less the first observation when `padding` is `false`. So the implied volatilities of a `PricesResult` that the ingestion layer built cover it. The conversion carries an absent implied volatility as `NaN`, and the estimator that reads it excludes it.
  8. View the [`AssetPanel`](@ref) on the returns clock. Find the panel rows of the returns timestamps with [`feature_row_indices`](@ref), and view the panel with [`port_opt_view`](@ref). Give it the asset names, so that it also cuts a square tensor Panel Field on its label axis. The conversion removes no column, so the view keeps every asset. A time-varying panel loses only the observations that the returns clock does not hold.
- 9. State the universe. Cut `pr.span` to the asset axis with [`span_carrier_view`](@ref). Give it and the asset returns to [`returns_universe_masks`](@ref), which projects the span onto the returns clock and intersects it with finiteness. [`attach_universe_masks`](@ref) puts the two masks on the Asset Panel and keeps its Panel Fields. When the `PricesResult` holds no panel, it makes a panel with no Panel Field. A `PricesResult` with no span states no universe, so the function attaches no masks, and the panel is the one of step 8, or `nothing`.
+ 9. State the universe. Cut `pr.span` to the asset axis with [`listing_span_view`](@ref). Give it and the asset returns to [`returns_universe_masks`](@ref), which projects the span onto the returns clock and intersects it with finiteness. [`attach_universe_masks`](@ref) puts the two masks on the Asset Panel and keeps its Panel Fields. When the `PricesResult` holds no panel, it makes a panel with no Panel Field. A `PricesResult` with no span states no universe, so the function attaches no masks, and the panel is the one of step 8, or `nothing`.
 10. Build the factor and benchmark matrices from the columns of each block. A block with no column gives `nothing`, and a benchmark block with one column gives a vector. The asset matrix is always present, because the conversion removes no column.
 11. Return the [`ReturnsResult`](@ref).
 
@@ -440,11 +440,11 @@ ReturnsResult
   - [`CatchUpGapReturn`](@ref)
   - [`PriceIngestion`](@ref)
   - [`price_ingestion`](@ref)
-  - [`append_carrier_block!`](@ref)
+  - [`append_price_block!`](@ref)
   - [`unify_gaps`](@ref)
   - [`returns_universe_masks`](@ref)
   - [`attach_universe_masks`](@ref)
-  - [`span_carrier_view`](@ref)
+  - [`listing_span_view`](@ref)
   - [`returns_result_picker`](@ref): subtracts the carried benchmark, and only when the optimisation tracks it.
 """
 function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
@@ -458,8 +458,8 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
     assert_span_shape(pr.span, length(asset_ts), N)
     P = DataFrames.DataFrame(values(unify_gaps(pr.X)), asset_names)
     DataFrames.insertcols!(P, 1, :timestamp => asset_ts)
-    factor_names = append_carrier_block!(P, pr.F, asset_ts, :F)
-    benchmark_names = append_carrier_block!(P, pr.B, asset_ts, :B)
+    factor_names = append_price_block!(P, pr.F, asset_ts, :F)
+    benchmark_names = append_price_block!(P, pr.B, asset_ts, :B)
     X = TimeSeries.percentchange(TimeSeries.TimeArray(P; timestamp = :timestamp),
                                  ret_method; padding = padding)
     X = DataFrames.DataFrame(X)
@@ -501,7 +501,7 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
     #! `universe_masks` does the crossing. Both padding conventions reach it, and it reads
     #! which from the two row counts.
     RX = Matrix(X[!, nx])
-    amsk, emsk = returns_universe_masks(span_carrier_view(pr.span, asset_ts, asset_ts,
+    amsk, emsk = returns_universe_masks(listing_span_view(pr.span, asset_ts, asset_ts,
                                                           acols), RX)
     pnl = attach_universe_masks(pnl, amsk, emsk)
     F = isempty(nf) ? nothing : Matrix(X[!, nf])

@@ -59,7 +59,7 @@ $(DocStringExtensions.FIELDS)
 
   - [`AbstractPartialFitState`](@ref)
   - [`Online`](@ref)
-  - [`vcat_carrier_rows`](@ref)
+  - [`vcat_observations`](@ref)
   - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
 """
 @concrete struct PipelineBufferState <: AbstractPartialFitState
@@ -90,23 +90,23 @@ The state is immutable, so the method returns a new state and leaves `state` as 
 
 # Algorithm
 
- 1. Concatenate the held data and `data` by rows through [`vcat_carrier_rows`](@ref), giving `held`. When the state holds no data yet, `held` is `data`.
+ 1. Concatenate the held data and `data` by rows through [`vcat_observations`](@ref), giving `held`. When the state holds no data yet, `held` is `data`.
  2. Count the rows of `held`, giving `n`.
  3. When `max_history` is set and `n > max_history`, view the last `max_history` rows of `held`.
  4. Return a new state that holds `held` and carries the same cap.
 
 # Validation
 
-  - Everything [`vcat_carrier_rows`](@ref) refuses.
+  - Everything [`vcat_observations`](@ref) refuses.
 
 # Related
 
   - [`PipelineBufferState`](@ref)
-  - [`vcat_carrier_rows`](@ref)
+  - [`vcat_observations`](@ref)
 """
 function partial_fit!(state::PipelineBufferState, data::Prices_RR)
-    held = isnothing(state.data) ? data : vcat_carrier_rows(state.data, data)
-    n = carrier_rows(held)
+    held = isnothing(state.data) ? data : vcat_observations(state.data, data)
+    n = data_row_count(held)
     if !isnothing(state.max_history) && n > state.max_history
         held = pipeline_data_view(held, (n - state.max_history + 1):n)
     end
@@ -410,7 +410,7 @@ Refuses a row owner that cannot fold, with an error that names the step.
 
 A prior passes. An optimisation step passes when it passes the checks of [`assert_online_entry`](@ref) for an optimiser. A precomputed result never reaches this check. A result is not a step, so it enters a pipeline only as an entry of a schedule, and the check refuses the schedule first.
 
-The check refuses an [`OnlinePortfolioSelection`](@ref) head because of its call with no data, not because of its fold. `optimise(opt)` with no data on the head answers a Recursion Result, so it rebuilds no [`ReturnsResult`](@ref) ([`online_readout`](@ref)). `fit(pipe)` with no data rebuilds a `ReturnsResult` from the row owner, and then refits the universe steps over it. Two things are missing, and a `ReturnsResult` would supply only the first. A rule whose tree reads no rows holds no rows, so nothing exists to rebuild the `ReturnsResult` from. And `fit(pipe)` with no data expresses a selection as a view of the state of the owner. For a recursion that view is not the run over those columns, because the allocation is a path, the projection couples the columns, and the wealth factor reads every column.
+The check refuses an [`OnlinePortfolioSelection`](@ref) head because of its call with no data, not because of its fold. `optimise(opt)` with no data on the head answers a Recursion Result, so it rebuilds no [`ReturnsResult`](@ref) ([`batch_from_state`](@ref)). `fit(pipe)` with no data rebuilds a `ReturnsResult` from the row owner, and then refits the universe steps over it. Two things are missing, and a `ReturnsResult` would supply only the first. A rule whose tree reads no rows holds no rows, so nothing exists to rebuild the `ReturnsResult` from. And `fit(pipe)` with no data expresses a selection as a view of the state of the owner. For a recursion that view is not the run over those columns, because the allocation is a path, the projection couples the columns, and the wealth factor reads every column.
 
 # Validation
 
@@ -424,7 +424,7 @@ Each refusal throws an `ArgumentError` that names the step.
 
   - [`assert_online_entry(p::Pipeline)`](@ref)
   - [`fold_pipeline_owner`](@ref)
-  - [`online_readout`](@ref)
+  - [`batch_from_state`](@ref)
 """
 function assert_online_owner(::AbstractPriorEstimator, ::AbstractString)
     return nothing
@@ -457,11 +457,11 @@ Each refusal throws an `ArgumentError`.
   - [`folds_are_stepped`](@ref)
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
 """
-function assert_pipeline_door(pipe::Pipeline, ::Any)
+function assert_pipeline_entry(pipe::Pipeline, ::Any)
     assert_no_holdout(pipe)
     return nothing
 end
-function assert_pipeline_door(o::Online{<:Pipeline}, cv)
+function assert_pipeline_entry(o::Online{<:Pipeline}, cv)
     assert_no_holdout(o.est)
     @argcheck(folds_are_stepped(cv),
               ArgumentError("`Online(pipe)` declares a refit from a buffer the online arm of the fold loop seeds at its warm-up, and this scheme is not an Online Scheme, so every fold refits from its training window already. Build the scheme with `OnlineIndexWalkForward` or `OnlineDateWalkForward`, or hand `cross_val_predict` the plain pipeline."))
@@ -479,7 +479,7 @@ With `max_history = w` the buffer keeps the last `w` input rows, and the run equ
 
 # Validation
 
-  - Everything [`assert_pipeline_door`](@ref) refuses, a scheme that is not an Online Scheme included.
+  - Everything [`assert_pipeline_entry`](@ref) refuses, a scheme that is not an Online Scheme included.
   - Everything [`assert_online_entry`](@ref) refuses on the refit route.
 
 # Related
@@ -487,7 +487,7 @@ With `max_history = w` the buffer keeps the last `w` input rows, and the run equ
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
   - [`PipelineBufferState`](@ref)
   - [`Online`](@ref)
-  - [`assert_pipeline_door`](@ref)
+  - [`assert_pipeline_entry`](@ref)
 """
 function cross_val_predict(o::Online{<:Pipeline}, data::Prices_RR, cv::CVER;
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
@@ -638,7 +638,7 @@ A buffer of the input data answers with the timestamps of that data, and a Fold 
   - [`pipeline_row_owner`](@ref)
 """
 function pipeline_held_timestamps(::Pipeline, cache::PipelineBufferState)
-    return isnothing(cache.data) ? nothing : carrier_timestamps(cache.data)
+    return isnothing(cache.data) ? nothing : data_timestamps(cache.data)
 end
 function pipeline_held_timestamps(::Pipeline, cache::ReturnsBufferState)
     return cache.ts
@@ -671,21 +671,21 @@ This is the `cross_val_predict` method of the pipeline for [`Resume`](@ref). It 
 
 # Validation
 
-  - Everything [`assert_pipeline_door`](@ref) refuses for a `Resume`.
+  - Everything [`assert_pipeline_entry`](@ref) refuses for a `Resume`.
   - Everything the resumed arm of the fold loop refuses ([`Resume`](@ref)).
 
 # Related
 
   - [`Resume`](@ref)
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
-  - [`assert_pipeline_door`](@ref)
+  - [`assert_pipeline_entry`](@ref)
 """
 function cross_val_predict(r::PipelineResume, data::Prices_RR, cv::CVER;
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                            id = nothing)
     return pipeline_cross_val_predict(r, data, cv; ex = ex, id = id)
 end
-function assert_pipeline_door(r::PipelineResume, cv)
+function assert_pipeline_entry(r::PipelineResume, cv)
     assert_no_holdout(r.res.opt)
     assert_resume_scheme(cv)
     return nothing
@@ -842,9 +842,9 @@ This is the call with no data of the online step of the Pipeline, as `optimise(o
 # Algorithm
 
  1. Rebuild the `ReturnsResult` of the observations folded so far from the row owner through [`pipeline_returns_result`](@ref), giving `rd₀`. A prior owner gives its rows through [`prior_returns_buffer`](@ref), and the Pipeline adds the rest from its own [`ReturnsBufferState`](@ref). An optimisation owner gives its `ReturnsResult` through [`returns_result`](@ref). The `ReturnsResult` spans the input universe of the pipeline at warm-up width.
- 2. Walk the data steps before the owner in order, through [`readout_data_step`](@ref). A row-local step reads its fitted Result out of its state, restricted to the assets that survive so far. A universe-only step runs its batch verb over `rd₀` viewed to the surviving assets, and narrows the surviving set. The index `idx` of the surviving assets into `rd₀` is the column map, and `rd = port_opt_view(rd₀, :, idx)` is the context's returns.
+ 2. Walk the data steps before the owner in order, through [`fit_data_step_from_state`](@ref). A row-local step reads its fitted Result out of its state, restricted to the assets that survive so far. A universe-only step runs its batch verb over `rd₀` viewed to the surviving assets, and narrows the surviving set. The index `idx` of the surviving assets into `rd₀` is the column map, and `rd = port_opt_view(rd₀, :, idx)` is the context's returns.
  3. Run every other step before the owner over that context, as batch runs it. Such a step is a phylogeny step, an uncertainty-set step or a constraint step.
- 4. Read the owner out over the surviving assets through [`readout_owner`](@ref). A prior owner reads out through `prior(port_opt_view(pe, idx))`, which views its state by asset and never slices its rows again. An optimisation owner reads out through `optimise(opt)` on the viewed estimator, with the context injected.
+ 4. Read the owner out over the surviving assets through [`fit_owner_from_state`](@ref). A prior owner reads out through `prior(port_opt_view(pe, idx))`, which views its state by asset and never slices its rows again. An optimisation owner reads out through `optimise(opt)` on the viewed estimator, with the context injected.
  5. Run every step after the owner as batch, the optimisation step with the context injected, and return the result.
 
 So a selection that moves between two steps is a view of a state fitted over the whole universe, which is the batch fit over those columns. The selector ranks the assets again at every step, as the batch loop refits it at every fold.
@@ -855,7 +855,7 @@ Under `Online(pipe)`, `fit(pipe)` with no data is `fit(pipe, buffer)`, the batch
 
   - The pipeline has a row owner. An `ArgumentError` is thrown otherwise.
   - The pipeline has taken a step. An `ArgumentError` is thrown otherwise.
-  - A prior owner reads out over as many assets as survive the universe steps before it ([`readout_owner`](@ref)). An `ArgumentError` is thrown otherwise.
+  - A prior owner reads out over as many assets as survive the universe steps before it ([`fit_owner_from_state`](@ref)). An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -864,16 +864,16 @@ Under `Online(pipe)`, `fit(pipe)` with no data is `fit(pipe, buffer)`, the batch
 # Related
 
   - [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref)
-  - [`readout_data_step`](@ref)
+  - [`fit_data_step_from_state`](@ref)
   - [`returns_result`](@ref)
   - [`fit`](@ref)
 """
 function StatsAPI.fit(pipe::Pipeline)::PipelineResult
-    return readout_pipeline(pipe, pipe.cache)
+    return fit_pipeline_from_state(pipe, pipe.cache)
 end
 """
-    readout_pipeline(pipe::Pipeline, cache::PipelineBufferState)
-    readout_pipeline(pipe::Pipeline, cache::Option{<:ReturnsBufferState})
+    fit_pipeline_from_state(pipe::Pipeline, cache::PipelineBufferState)
+    fit_pipeline_from_state(pipe::Pipeline, cache::Option{<:ReturnsBufferState})
 
 The two routes of [`fit(pipe::Pipeline)`](@ref), selected by dispatch on the state that the Pipeline carries.
 
@@ -885,12 +885,12 @@ A buffer of the input data takes a batch fit. A Fold Context, or no state, takes
   - [`PipelineBufferState`](@ref)
   - [`ReturnsBufferState`](@ref)
 """
-function readout_pipeline(pipe::Pipeline, cache::PipelineBufferState)
+function fit_pipeline_from_state(pipe::Pipeline, cache::PipelineBufferState)
     @argcheck(!isnothing(cache.data),
               ArgumentError("`fit(pipe)` with no data reads the buffer `Online(pipe)` seeded, and this pipeline has folded nothing into it. Fold observations with `partial_fit!(pipe, data)` first, or pass the data to `fit(pipe, data)`."))
     return StatsAPI.fit(Pipeline(pipe.names, pipe.steps), cache.data)
 end
-function readout_pipeline(pipe::Pipeline, cache::Option{<:ReturnsBufferState})
+function fit_pipeline_from_state(pipe::Pipeline, cache::Option{<:ReturnsBufferState})
     k = pipeline_row_owner(pipe)
     @argcheck(k > 0,
               ArgumentError("a `Pipeline` with neither a prior step nor an optimisation step has no row owner, and so no state to read out."))
@@ -904,7 +904,7 @@ function readout_pipeline(pipe::Pipeline, cache::Option{<:ReturnsBufferState})
         if !is_data_step(step)
             continue
         end
-        fitted[i], idx = readout_data_step(step_estimator(step), rd0, idx)
+        fitted[i], idx = fit_data_step_from_state(step_estimator(step), rd0, idx)
     end
     rd = port_opt_view(rd0, :, idx)
     ctx = PipelineContext(; returns = rd)
@@ -915,7 +915,7 @@ function readout_pipeline(pipe::Pipeline, cache::Option{<:ReturnsBufferState})
         end
         fitted[i], ctx = run_step(maybe_inject_step(step, ctx), ctx)
     end
-    fitted[k], ctx = readout_owner(owner, idx, length(rd0.nx), ctx)
+    fitted[k], ctx = fit_owner_from_state(owner, idx, length(rd0.nx), ctx)
     for i in (k + 1):n
         fitted[i], ctx = run_step(maybe_inject_step(pipe.steps[i], ctx), ctx)
     end
@@ -954,7 +954,7 @@ function pipeline_returns_result(::Any, ::Nothing, name::AbstractString)
     return throw(ArgumentError("`fit(pipe)` with no data reads the state the online step wrote, and this pipeline has taken no step: its `cache` is `nothing` and the `$(name)` step, the row owner, carries none. Fold observations with `partial_fit!(pipe, data)` first, or pass the data to `fit(pipe, data)`."))
 end
 """
-    readout_data_step(est, rd0::ReturnsResult, idx::AbstractVector{<:Integer}) -> (fitted, idx′)
+    fit_data_step_from_state(est, rd0::ReturnsResult, idx::AbstractVector{<:Integer}) -> (fitted, idx′)
 
 Reads one data step of a folded [`Pipeline`](@ref) out, and narrows the surviving assets where the universe of the step does.
 
@@ -981,19 +981,19 @@ Dispatch on the estimator of the step selects the method.
   - [`fit_preprocessing`](@ref)
   - [`is_universe_step`](@ref)
 """
-function readout_data_step(est::AbstractPreprocessingEstimator, ::ReturnsResult,
-                           idx::AbstractVector{<:Integer})
+function fit_data_step_from_state(est::AbstractPreprocessingEstimator, ::ReturnsResult,
+                                  idx::AbstractVector{<:Integer})
     return fit_preprocessing(est), idx
 end
-function readout_data_step(est::PriceGapFill, rd0::ReturnsResult,
-                           idx::AbstractVector{<:Integer})
+function fit_data_step_from_state(est::PriceGapFill, rd0::ReturnsResult,
+                                  idx::AbstractVector{<:Integer})
     res = fit_preprocessing(est)
     cur = rd0.nx[idx]
     keep = findall(n -> string(n) in cur, res.nx)
     return PriceGapFillResult(res.nx[keep], res.v[keep], res.te, res.fill, res.strict), idx
 end
-function readout_data_step(est::MissingDataFilter, rd0::ReturnsResult,
-                           idx::AbstractVector{<:Integer})
+function fit_data_step_from_state(est::MissingDataFilter, rd0::ReturnsResult,
+                                  idx::AbstractVector{<:Integer})
     res = fit_preprocessing(est)
     cur = rd0.nx[idx]
     keep = findall(n -> string(n) in cur, res.nx)
@@ -1001,16 +1001,16 @@ function readout_data_step(est::MissingDataFilter, rd0::ReturnsResult,
     sel = findall(in(names), cur)
     return MissingDataFilterResult(res.nx[keep], res.row_thr), idx[sel]
 end
-function readout_data_step(sel::AbstractAssetSelector, rd0::ReturnsResult,
-                           idx::AbstractVector{<:Integer})
+function fit_data_step_from_state(sel::AbstractAssetSelector, rd0::ReturnsResult,
+                                  idx::AbstractVector{<:Integer})
     rd = port_opt_view(rd0, :, idx)
     res = fit_preprocessing(sel, rd)
     pos = [findfirst(==(name), rd.nx) for name in res.nx]
     return res, idx[pos]
 end
 """
-    readout_owner(pe::AbstractPriorEstimator, idx, n::Integer, ctx::PipelineContext)
-    readout_owner(opt::OptimisationEstimator, idx, n::Integer, ctx::PipelineContext)
+    fit_owner_from_state(pe::AbstractPriorEstimator, idx, n::Integer, ctx::PipelineContext)
+    fit_owner_from_state(opt::OptimisationEstimator, idx, n::Integer, ctx::PipelineContext)
 
 Reads the row owner of a folded [`Pipeline`](@ref) out over the surviving assets, and writes its slot.
 
@@ -1027,14 +1027,16 @@ The method views the state of the owner to the surviving assets through [`view_o
   - [`optimise`](@ref)
   - [`inject_context`](@ref)
 """
-function readout_owner(pe::AbstractPriorEstimator, idx, n::Integer, ctx::PipelineContext)
+function fit_owner_from_state(pe::AbstractPriorEstimator, idx, n::Integer,
+                              ctx::PipelineContext)
     pe = view_owner(pe, idx, n, ctx)
     pr = prior(pe)
     @argcheck(length(pr.mu) == length(idx),
               ArgumentError("the `$(typeof(pe).name.name)` owning the rows read out over $(length(pr.mu)) assets where $(length(idx)) survive the universe steps before it: its state has no asset view, so a selection that moves between two steps cannot be expressed as a view of it. Put the universe steps after the prior, or hold a prior whose state `port_opt_view` slices."))
     return pr, set_slot(ctx, :prior, pr)
 end
-function readout_owner(opt::OptimisationEstimator, idx, n::Integer, ctx::PipelineContext)
+function fit_owner_from_state(opt::OptimisationEstimator, idx, n::Integer,
+                              ctx::PipelineContext)
     opt = inject_context(view_owner(opt, idx, n, ctx), ctx)
     res = optimise(opt)
     return res, set_slot(ctx, :opt, res)
@@ -1046,7 +1048,7 @@ Views the row owner's state to the surviving assets, and leaves it alone when ev
 
 # Related
 
-  - [`readout_owner`](@ref)
+  - [`fit_owner_from_state`](@ref)
   - [`port_opt_view`](@ref)
 """
 function view_owner(est, idx, n::Integer, ctx::PipelineContext)

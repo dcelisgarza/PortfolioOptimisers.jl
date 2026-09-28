@@ -144,8 +144,8 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResu
     # column for its exit charge to land in, so `lq` and `flq` are dropped: the asset
     # that left is not drawn, and neither is its charge. The portfolio figure charges it.
     return PortfolioOptimisers.plot_asset_cumulative_returns(w, pr,
-                                                             strip_liquidation_carriers(fees,
-                                                                                        nothing);
+                                                             strip_liquidation_charges(fees,
+                                                                                       nothing);
                                                              nx = result_axis_names(imsk,
                                                                                     pr,
                                                                                     nothing),
@@ -159,8 +159,8 @@ function PortfolioOptimisers.plot_asset_cumulative_returns(res::OptimisationResu
                                                            kwargs...)
     imsk, w, pr, fees = result_investable_view(res, nothing, fees)
     return PortfolioOptimisers.plot_asset_cumulative_returns(w, pr,
-                                                             strip_liquidation_carriers(fees,
-                                                                                        nothing);
+                                                             strip_liquidation_charges(fees,
+                                                                                       nothing);
                                                              nx = result_axis_names(imsk,
                                                                                     pr,
                                                                                     nothing),
