@@ -21,18 +21,20 @@ A mode of the oracle can be missing from the library in three ways:
 
 ## Decision
 
-**A mode is built when a caller cannot reach its output today.** A mode that a library route
-reaches gets that route documented, and the build of a convenience surface is decided mode by mode.
-A mode that contradicts a recorded library rule is a deliberate difference. The parity target is
-the output, not the shape of the oracle's call.
+**The library does at least what the oracle does, and never less.** No decision removes a
+capability of the oracle. A mode is built when a caller cannot reach its output today. A mode that
+a library route reaches gets that route documented, and the build of a convenience surface is
+decided mode by mode. The parity target is the output, not the shape of the oracle's call. Where
+the library's own rule is better, the library's rule is the default and the oracle's rule stays one
+keyword away.
 
-### The deliberate differences
+### The deliberate differences are in a default or a form, not in capability
 
 | Mode of the oracle | The library | Why |
 | --- | --- | --- |
-| A nearest-correlation repair by clipping the correlation eigenvalues at `1e-13`, with one retry at `1e-12` | `Posdef(Newton)` in `f_mp` and `mp`, the library default | Newton gives the nearest correlation matrix in the Frobenius norm. The oracle's clip is a cheaper approximation of it. |
+| A nearest-correlation repair by clipping the correlation eigenvalues at `1e-13`, with one retry at `1e-12` | `Posdef(Newton)` in `f_mp` and `mp` stays the default. The oracle's repair is an algorithm that `Posdef` takes (#1412). | Newton gives the nearest correlation matrix in the Frobenius norm. The oracle's clip is a cheaper approximation of it, and a caller who wants the oracle's numbers selects it. |
 | An inactive-cell policy stored on each field: `NaN`, zero, or the value left as it is | Fields stay finite, and every consumer reads the masks. A read of a field takes the policy as an argument, so the caller chooses it for each read. | ADR 0102 rules that a numeric field's values stay finite. Every computed output keeps the oracle's capability: the descriptors write `NaN` on an inactive cell, and the weights are built over the estimation universe. The one view the oracle gives, a field with its inactive cells blanked, becomes a read, not a stored state. |
-| A warning when the regime half-life exceeds 138 observations | The `regime_decay` docstring states the threshold `2^(-1/138)` and its effect | The rule of #1282: the docstring states the condition, and the measure does not change its behaviour. |
+| A warning when the regime half-life exceeds 138 observations | The `regime_decay` docstring states the threshold `2^(-1/138)` and its effect | The rule of #1282: the docstring states the condition, and the measure does not change its behaviour. The numbers are the same; only the message at run time differs. |
 | An integer `cv`, which means K-fold with that many folds | `cv = KFold(; n)` | No field or verb of the library takes an integer as a short form for an estimator. |
 
 The oracle's history cap on its prior truncates the stored histories and the scenarios, and leaves
@@ -54,8 +56,10 @@ or the repair fails. Issue #1410 decides each other bare Cholesky in the library
 
 ### Built
 
-The build tickets are children of map #1375: #1396 to #1408, and #1411. #1409 decides the route of
-the prior onto the online seam. #1392 holds the table of all sixteen modes.
+The build tickets are children of map #1375: #1396 to #1408, #1411 and #1412. #1409 decides the
+route of the prior onto the online seam, and it keeps reachable both the oracle's window (the
+sample is cut once, at the first fit, and every later row is folded in) and the library's window
+(always the last rows). #1392 holds the table of all sixteen modes.
 
 ### A lost mask is caught by a test, not by a `NaN`
 
@@ -68,8 +72,9 @@ change. It gives the safety of the oracle's `NaN` with no cost at run time.
 ## Consequences
 
 - A measure ticket of map #1375 that finds a mode the oracle has and the library lacks applies the
-  rule above before it asks the maintainer.
-- A parity test does not compare the nearest-correlation repair with the oracle's clip. #1383
-  records that row as a deliberate difference.
+  rule above before it asks the maintainer. A design that leaves an oracle output out of reach
+  fails the rule, however simple it is.
+- A parity test of the nearest-correlation repair compares the oracle with the algorithm of #1412,
+  not with Newton. #1383 measures it.
 - The premise of #929, that the oracle persists nothing, was wrong. #1399 builds the round trip
   that parity needs.
