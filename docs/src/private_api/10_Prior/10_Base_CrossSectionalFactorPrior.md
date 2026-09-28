@@ -6,7 +6,7 @@ Description = "Base cross-sectional factor Prior, private API of PortfolioOptimi
 
 The functions below are the steps of a [`CrossSectionalFactorPrior`](@ref) fit. They compute these parts of it.
 
-- The benchmark weights that its exposure estimators read, which the prior computes from the market capitalisation.
+- The benchmark weights that its exposure estimators read, which the prior computes from the market capitalisation, and the check that each exposure estimator reads them from the field the prior writes.
 - The history of each factor exposure, in an order that puts each exposure after the exposures it is derived from.
 - The active mask and the estimation mask of the asset panel.
 - The idiosyncratic covariance of the latest observation, and the degrees of freedom and the divisor of each idiosyncratic variance.
@@ -17,6 +17,7 @@ The functions below are the steps of a [`CrossSectionalFactorPrior`](@ref) fit. 
 ```@docs
 PortfolioOptimisers.cross_sectional_prior_pairs
 PortfolioOptimisers.cross_sectional_benchmark_returns
+PortfolioOptimisers.assert_cross_sectional_benchmark_field
 PortfolioOptimisers.cross_sectional_exposure_order
 PortfolioOptimisers.cross_sectional_exposure_widths
 PortfolioOptimisers.cross_sectional_exposure_write!

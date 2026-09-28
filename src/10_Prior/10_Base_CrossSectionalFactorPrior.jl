@@ -44,7 +44,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the returns data that the Exposure Estimators of a Cross-Sectional Factor Prior are fitted on.
 
-An Exposure Estimator weights its cross-sectional transforms by a benchmark-weight Panel Field that it names. The prior computes those weights from the market capitalisation, and writes them onto a copy of the Asset Panel before it builds any Factor Exposure. The copy replaces a field of that name, so every member reads the weights of the prior.
+An Exposure Estimator weights its cross-sectional transforms by a benchmark-weight Panel Field that it names. The prior computes those weights from the market capitalisation, and writes them onto a copy of the Asset Panel before it builds any Factor Exposure. A panel that already holds a field of that name is refused rather than overwritten, so a field the caller built is never lost and every member reads the weights of the prior.
 
 # Arguments
 
@@ -55,6 +55,7 @@ An Exposure Estimator weights its cross-sectional transforms by a benchmark-weig
 # Validation
 
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
+  - `rd.pnl` holds no Panel Field named `name`. Raises an `ArgumentError`.
   - The rules of [`NumericPanelField`](@ref) and of [`AssetPanel`](@ref).
 
 # Returns
@@ -72,12 +73,58 @@ function cross_sectional_benchmark_returns(rd::ReturnsResult, name::AbstractStri
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
-    pf = Any[f for f in pnl.pf if f.name != name]
-    push!(pf, NumericPanelField(; name = name, vals = W))
+    @argcheck(all(f -> f.name != name, pnl.pf),
+              ArgumentError("a Cross-Sectional Factor Prior writes its benchmark weights onto the Panel Field \"$name\", and the Asset Panel already holds a field of that name. Rename the field of the panel, or set the bw of the prior to a name the panel does not use."))
+    pf = push!(Any[pnl.pf...], NumericPanelField(; name = name, vals = W))
     return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = rd.B,
                          ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
                          pnl = AssetPanel(; pf = identity.(pf), amsk = pnl.amsk,
                                           emsk = pnl.emsk))
+end
+"""
+    assert_cross_sectional_benchmark_field(key::AbstractString,
+                                           xe::AbstractExposureEstimator,
+                                           bw::AbstractString) -> nothing
+    assert_cross_sectional_benchmark_field(key::AbstractString,
+                                           xe::Union{<:CompositeExposure, <:DerivedExposure},
+                                           bw::AbstractString) -> nothing
+
+Refuse a factor whose Exposure Estimator reads its benchmark weights from a Panel Field the prior does not write.
+
+A Cross-Sectional Factor Prior writes its benchmark weights onto the Panel Field `bw`, and [`CompositeExposure`](@ref) and [`DerivedExposure`](@ref) each read them from the field their own `bw` names. When the two names differ, the member reads another field, or fails because the panel has none, so the prior refuses the pair when it is built. A member that reads no benchmark weight passes.
+
+# Arguments
+
+  - `key`: The factor name, for the message.
+  - `xe`: The Exposure Estimator of the factor.
+  - `bw`: Name of the benchmark-weight Panel Field of the prior.
+
+# Validation
+
+  - `xe.bw == bw` when `xe` reads benchmark weights. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`cross_sectional_benchmark_returns`](@ref)
+  - [`exposure_benchmark_weights`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function assert_cross_sectional_benchmark_field(::AbstractString,
+                                                ::AbstractExposureEstimator,
+                                                ::AbstractString)::Nothing
+    return nothing
+end
+function assert_cross_sectional_benchmark_field(key::AbstractString,
+                                                xe::Union{<:CompositeExposure,
+                                                          <:DerivedExposure},
+                                                bw::AbstractString)::Nothing
+    @argcheck(xe.bw == bw,
+              ArgumentError("factor \"$key\" reads its benchmark weights from the Panel Field \"$(xe.bw)\", and the prior writes them onto \"$bw\". Give the Exposure Estimator bw = \"$bw\", or give the prior bw = \"$(xe.bw)\"."))
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

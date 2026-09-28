@@ -39,6 +39,7 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
   - `th` lies in `[0, 1]`.
   - `bp` is finite and `>= 0`.
   - `mcap` and `bw` are not empty.
+  - Every factor whose Exposure Estimator reads benchmark weights names `bw` in its own `bw`, as [`assert_cross_sectional_benchmark_field`](@ref) states.
   - `lag` is `> 0`.
   - `minra`, when it is stated, is `> 0`.
   - `lambda` and `c` lie in `[0, 1]`.
@@ -139,7 +140,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     mcap
     """
-    Name of the numeric Panel Field the prior writes its benchmark weights onto, and the one every Exposure Estimator reads them from.
+    Name of the numeric Panel Field the prior writes its benchmark weights onto, and the one every Exposure Estimator reads them from. The Asset Panel must not already hold a field of this name.
     """
     bw
     """
@@ -181,6 +182,9 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         assert_nonneg(bp, :bp)
         assert_panel_terms(mcap, :mcap)
         assert_panel_terms(bw, :bw)
+        for (key, xe) in factors
+            assert_cross_sectional_benchmark_field(key, xe, bw)
+        end
         assert_gt0(lag, :lag)
         if !isnothing(minra)
             assert_gt0(minra, :minra)
@@ -338,6 +342,7 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
 
   - `pnl` is not `nothing`. Raises an [`IsNothingError`](@ref).
   - The Asset Panel is time-varying. Raises an `ArgumentError`.
+  - The Asset Panel holds no Panel Field named `pe.bw`, because the fit writes its benchmark weights onto that name. Raises an `ArgumentError`.
   - The history is longer than the exposure lag. Raises an `ArgumentError`.
   - At least two observations are left after the Descriptor warm-up and the exposure lag, because a covariance of one observation is not a number. Raises an `ArgumentError`.
   - Every fitted observation carries at least `minra` eligible assets. Raises an `ArgumentError`.

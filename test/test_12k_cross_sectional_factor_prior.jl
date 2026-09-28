@@ -207,6 +207,38 @@ fit_rows(rd, pr) = (size(rd.X, 1) - size(pr.X, 1) + 1):size(rd.X, 1)
         @test_throws PO.IsEmptyError CrossSectionalFactorPrior(; factors = f, mcap = "")
         @test_throws PO.IsEmptyError CrossSectionalFactorPrior(; factors = f, bw = "")
     end
+    @testset "A factor must read its benchmark weights from the field the prior writes" begin
+        size_w = CompositeExposure(; descriptors = [LogMarketCap()], bw = "w")
+        size2_w = DerivedExposure(; source = "size", f = x -> abs2.(x), bw = "w")
+        size_d = CompositeExposure(; descriptors = [LogMarketCap()])
+        # Each member that reads benchmark weights is checked on its own.
+        @test_throws ArgumentError CrossSectionalFactorPrior(; factors = ["size" => size_w])
+        @test_throws ArgumentError CrossSectionalFactorPrior(;
+                                                             factors = ["size" => size_d,
+                                                                        "size2" => size2_w])
+        @test_throws ArgumentError CrossSectionalFactorPrior(; factors = ["size" => size_d],
+                                                             bw = "w")
+        # A member that reads no benchmark weight passes whatever the prior names.
+        p = CrossSectionalFactorPrior(;
+                                      factors = ["market" => ConstantExposure(),
+                                                 "industry" =>
+                                                     OneHotExposure(; field = "industry",
+                                                                    family = "industry"),
+                                                 "size" => size_w, "size2" => size2_w],
+                                      bw = "w")
+        @test p.bw == "w"
+        # The name is a label and nothing more: renaming it on both sides fits the same model.
+        rd = csfp_panel(; n_assets = 20, n_observations = 60, n_industries = 3,
+                        seed = 782_001).rd
+        fd = ["market" => ConstantExposure(), "size" => size_d]
+        fw = ["market" => ConstantExposure(), "size" => size_w]
+        pd = prior(CrossSectionalFactorPrior(; factors = fd, minra = 5), rd)
+        pw = prior(CrossSectionalFactorPrior(; factors = fw, minra = 5, bw = "w"), rd)
+        # An asset the fit states no moment for is `NaN` in both, so `==` cannot compare them.
+        @test isequal(pw.mu, pd.mu)
+        @test isequal(pw.sigma, pd.sigma)
+        @test any(isnan, pd.mu)
+    end
     @testset "A matrix with no panel is refused by name" begin
         rd = csfp_panel(; n_assets = 10, n_observations = 20, n_industries = 2).rd
         @test_throws PO.IsNothingError prior(pe, rd.X)
@@ -225,11 +257,20 @@ end
     PO.cross_sectional_cap_finite!(msk, mcap)
     W = PO.cross_sectional_cap_weights(1.0, mcap, msk)
     rdb = PO.cross_sectional_benchmark_returns(rd, "benchmark_weights", W)
-    @testset "The carrier gains the benchmark weights, and replaces its own" begin
+    @testset "The panel gains the benchmark weights, and refuses to overwrite a field" begin
         @test PO.panel_field(rdb.pnl, "benchmark_weights").vals == W
-        again = PO.cross_sectional_benchmark_returns(rdb, "benchmark_weights", 2 .* W)
-        @test PO.panel_field(again.pnl, "benchmark_weights").vals == 2 .* W
-        @test length(again.pnl.pf) == length(rdb.pnl.pf)
+        @test length(rdb.pnl.pf) == length(rd.pnl.pf) + 1
+        # A field of the same name may be one the caller built, so writing over it would lose
+        # data without a word. The helper refuses it, and so does the fit that calls it.
+        @test_throws ArgumentError PO.cross_sectional_benchmark_returns(rdb,
+                                                                        "benchmark_weights",
+                                                                        2 .* W)
+        pe = CrossSectionalFactorPrior(; factors = csfp_factors(), minra = 5)
+        @test_throws ArgumentError prior(pe, rdb)
+        # Another name for the prior's field clears the clash.
+        rdw = PO.cross_sectional_benchmark_returns(rdb, "w", 2 .* W)
+        @test PO.panel_field(rdw.pnl, "w").vals == 2 .* W
+        @test PO.panel_field(rdw.pnl, "benchmark_weights").vals == W
     end
     @testset "A derived member is computed after its source, wherever it is written" begin
         f = ["size2" => DerivedExposure(; source = "size", f = x -> abs2.(x)),

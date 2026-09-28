@@ -15,10 +15,11 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
     res = synthetic_asset_panel(; n_assets = 10, n_observations = 30, n_industries = 3,
                                 rng = StableRNG(724_101))
     rd = res.rd
+    # The size member keeps the default benchmark-weight field, because the last testset builds
+    # a prior from these Pairs, and the prior refuses a member that reads another field.
     factors = ["market" => ConstantExposure(),
                "size" =>
-                   CompositeExposure(; descriptors = [Passthrough(; field = "market_cap")],
-                                     bw = "market_cap"),
+                   CompositeExposure(; descriptors = [Passthrough(; field = "market_cap")]),
                "industry" => OneHotExposure(; field = "industry", family = "industry")]
 
     @testset "A one-hot member expands to one name per level" begin
