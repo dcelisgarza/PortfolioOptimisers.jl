@@ -3,7 +3,7 @@
 
 Alias for a vector of portfolio optimisation estimators.
 
-Represents a collection of [`AbstractOptimisationEstimator`](@ref) objects, used for dispatch in routines that process multiple optimisers simultaneously.
+A method that takes many optimisers at one time dispatches on it.
 
 # Related
 
@@ -13,17 +13,17 @@ const VecOptE = AbstractVector{<:AbstractOptimisationEstimator}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for base portfolio optimisation estimators.
+Abstract supertype for the configurations that an optimiser holds.
 
-`BaseOptimisationEstimator` is the parent for all internal optimiser components that configure the optimisation problem but are not directly invokable as top-level optimisers.
+[`JuMPOptimiser`](@ref) and [`HierarchicalOptimiser`](@ref) are two of them. A configuration states the optimisation problem. It is not an optimiser, so [`optimise`](@ref) does not take it alone.
 
 # Interfaces
 
-A subtype gains from this supertype the methods that resolve the schedules its fields hold: [`is_time_dependent`](@ref), [`update_time_dependent_estimator`](@ref), [`reset_time_dependent_estimator`](@ref) and [`assert_time_dependent_fold_count`](@ref) all scan its fields generically, through [`time_dependent_fields`](@ref). One method is worth implementing:
+A subtype gets from this supertype the methods that resolve the schedules in its fields: [`is_time_dependent`](@ref), [`update_time_dependent_estimator`](@ref), [`reset_time_dependent_estimator`](@ref) and [`assert_time_dependent_fold_count`](@ref). Each of them reads the fields through [`time_dependent_fields`](@ref). A subtype can implement one method.
 
 ## `time_dependent_field_defaults`
 
-  - `time_dependent_field_defaults(opt::MyConfiguration) -> NamedTuple`: The static default of each field that may hold a [`TimeDependent`](@ref), for those whose default is not `nothing`. A *required* field is listed with [`NoDefault`](@ref), which declares that a schedule there must carry its own `default`.
+  - `time_dependent_field_defaults(opt::MyConfiguration) -> NamedTuple`: The static default of each field that can hold a [`TimeDependent`](@ref), for the fields whose default is not `nothing`. A required field has the value [`NoDefault`](@ref), which states that a schedule in that field must carry its own `default`.
 
 ### Arguments
 
@@ -31,7 +31,7 @@ A subtype gains from this supertype the methods that resolve the schedules its f
 
 ### Returns
 
-  - `defaults::NamedTuple`: The fold-less value of each listed field. The fallback method returns an empty tuple, which gives every scheduled field the fold-less value `nothing`.
+  - `defaults::NamedTuple`: The value of each listed field outside every fold loop. The fallback method returns an empty tuple, which gives each scheduled field the value `nothing` outside every fold loop.
 
 # Related
 
@@ -39,17 +39,14 @@ A subtype gains from this supertype the methods that resolve the schedules its f
   - [`OptimisationEstimator`](@ref)
 """
 abstract type BaseOptimisationEstimator <: AbstractOptimisationEstimator end
-function reset_time_dependent_estimator(opt::OptimisationEstimator)
-    return opt
-end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for optimisation algorithms used by portfolio optimisers.
+Abstract supertype for the algorithms that select a branch of a portfolio optimiser.
 
 # Interfaces
 
-A subtype is a tag that an optimiser dispatches on, so it declares no method of its own. To add a behaviour, subtype `OptimisationAlgorithm` and add the methods of the consuming optimiser that are specialised on it.
+A subtype is a tag that an optimiser dispatches on, so it declares no method of its own. To add a branch, subtype `OptimisationAlgorithm`, and add the methods of the optimiser that dispatch on the new tag.
 
 # Related
 
@@ -59,17 +56,17 @@ abstract type OptimisationAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for portfolio optimisation result types.
+Abstract supertype for the results of a portfolio optimisation.
 
-All concrete optimisation result types should subtype `OptimisationResult`.
+All concrete optimisation results must subtype `OptimisationResult`.
 
 # Interfaces
 
-A subtype declares no method, but [`optimise`](@ref) and [`factory`](@ref) read three properties of it. A subtype exposes them either as its own fields or by forwarding from an embedded core, as the JuMP and hierarchical leaves do:
+A subtype declares no method, but [`optimise`](@ref) and [`factory`](@ref) read three of its properties. A subtype holds them as fields, or forwards them from an embedded core, as the JuMP results and the hierarchical results do.
 
   - `w`: The portfolio weights.
-  - `retcode`: An [`OptimisationReturnCode`](@ref). [`optimise`](@ref) walks the fallback chain until it reads an [`OptimisationSuccess`](@ref).
-  - `fb`: The record of the fallbacks that ran. It must be the **last field** of the struct, because [`factory`](@ref) rebuilds the result by replacing its trailing field.
+  - `retcode`: An [`OptimisationReturnCode`](@ref). [`optimise`](@ref) runs the fallback chain until it reads an [`OptimisationSuccess`](@ref).
+  - `fb`: The record of the fallbacks that ran. It must be the last field of the struct, because [`factory`](@ref) rebuilds the result with a new last field.
 
 # Related
 
@@ -77,25 +74,22 @@ A subtype declares no method, but [`optimise`](@ref) and [`factory`](@ref) read 
   - [`OptimisationReturnCode`](@ref)
 """
 abstract type OptimisationResult <: AbstractResult end
-function reset_time_dependent_estimator(opt::OptimisationResult)
-    return opt
-end
 """
     result_investable_mask(res::OptimisationResult) -> Option{BitVector}
 
-Read the Investable Mask an optimisation result reduced on.
+Returns the Investable Mask that an optimisation result was reduced to.
 
-An optimisation reduces to the Investable Mask at its entry and expands the solved weights back to the caller's universe, so the result's own `w` is on the **full** universe and the mask is the record of which assets the optimisation traded. A fold reads that record to view its test window before it scores the weights.
+An optimisation reduces its universe to the Investable Mask at its entry, and it expands the solved weights back to the universe of the caller. So `res.w` spans the full universe, and the mask records which assets the optimisation traded. A fold reads the mask to view its test window before it scores the weights.
 
-The mask is read through this verb rather than off a field, because the families carry it in different places: a JuMP result holds it on its processed attribute bundle, a hierarchical leaf holds it on the core it wraps, and a family that derives no mask answers `nothing`. **A family that gains a mask must add its own method here**, and so must a leaf that forwards its properties into a core, because the verb dispatches on the type and a forwarded `res.imsk` never reaches it. `test/test_54_held_gap_filter.jl` censuses the concrete results and fails when one carries a mask this verb cannot read, as a field or as a forwarded property, so the omission cannot be silent.
+The families hold the mask in different places. A JuMP result holds it in its processed attributes, a hierarchical result holds it in the core it embeds, and a family that derives no mask has none. So this function dispatches on the type of the result. A family that gets a mask must add its own method here. A result that forwards its properties to a core must also add a method, because a forwarded `res.imsk` does not change the dispatch.
 
 # Arguments
 
-  - `res::OptimisationResult`: Fitted optimisation result.
+  - `res::OptimisationResult`: The optimisation result.
 
 # Returns
 
-  - `imsk::Option{BitVector}`: The Investable Mask, or `nothing` when the optimisation reduced on nothing.
+  - `imsk::Option{BitVector}`: The Investable Mask. The fallback method returns `nothing`, which states that the optimisation did not reduce its universe.
 
 # Related
 
@@ -109,11 +103,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for continuous (non-integer allocation) optimisation results.
+Abstract supertype for the results of a continuous optimisation, which gives weights and not share counts.
 
 # Interfaces
 
-The family adds no method to [`OptimisationResult`](@ref), but it is the bound of the generic [`factory`](@ref)`(res, fb)` that rebuilds a result with a new fallback record, which is why the trailing `fb` field is required here rather than one level up.
+The family adds no method to [`OptimisationResult`](@ref). It is the bound of the generic method [`factory`](@ref)`(res, fb)`, which rebuilds a result with a new fallback record. So the rule that `fb` is the last field is enforced at this level.
 
 # Related
 
@@ -126,15 +120,13 @@ abstract type NonFiniteAllocationOptimisationResult <: OptimisationResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for non-JuMP continuous optimisation results.
+Abstract supertype for the continuous optimisation results that hold no JuMP model.
 
-Groups the results that do not carry a JuMP model (naive, clustering, and meta-optimiser results). Mirrors the JuMP/non-JuMP split on the result side. The JuMP side is itself two halves, [`RiskJuMPOptimisationResult`](@ref) for the results that carry a risk measure and [`NonRiskJuMPOptimisationResult`](@ref) for those that carry none.
-
-The hierarchical members are grouped one level further down, under [`HierarchicalOptimisationResult`](@ref).
+The naive, hierarchical and meta-optimiser results are its members. On the JuMP side, [`RiskJuMPOptimisationResult`](@ref) holds the results that carry a risk measure, and [`NonRiskJuMPOptimisationResult`](@ref) holds the results that carry none. The hierarchical members have a family of their own one level down, [`HierarchicalOptimisationResult`](@ref).
 
 # Interfaces
 
-`NonJuMPOptimisationResult` adds no method to [`NonFiniteAllocationOptimisationResult`](@ref). It is a classification, and it is what lets a method state "carries no JuMP model" in a signature.
+`NonJuMPOptimisationResult` adds no method to [`NonFiniteAllocationOptimisationResult`](@ref). It is a classification, so a method signature can state that a result holds no JuMP model.
 
 # Related
 
@@ -148,15 +140,15 @@ abstract type NonJuMPOptimisationResult <: NonFiniteAllocationOptimisationResult
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the **core** field block shared by hierarchical optimisation results.
+Abstract supertype for the core field block that two hierarchical optimisation results embed.
 
-Sits off the optimisation-result tree on purpose, exactly as [`BaseJuMPOptimisationResult`](@ref) does on the JuMP side. A core is not a thing `optimise` returns, so it must not satisfy methods bounded on the result family — [`factory`](@ref)`(res::NonFiniteAllocationOptimisationResult, fb)` included.
+The type is not in the tree of optimisation results, as [`BaseJuMPOptimisationResult`](@ref) is not on the JuMP side. [`optimise`](@ref) does not return a core, so a core must not match a method whose bound is the family of results, for example [`factory`](@ref)`(res::NonFiniteAllocationOptimisationResult, fb)`.
 
-Its one subtype is [`HierarchicalResult`](@ref), embedded as `hr` by each leaf.
+Its one subtype is [`HierarchicalResult`](@ref), which each of the two results embeds as `hr`.
 
 # Interfaces
 
-A subtype is a field block, not a result. It declares no method, and it must **not** be given one that is bounded on the optimisation-result family, because the core is never what [`optimise`](@ref) returns.
+A subtype is a block of fields, not a result. It declares no method, and it must not get a method whose bound is the family of optimisation results.
 
 # Related
 
@@ -168,19 +160,17 @@ abstract type BaseHierarchicalOptimisationResult <: AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the results of the estimators that embed a hierarchical optimiser.
+Abstract supertype for the results of the estimators that hold a hierarchical optimiser in their field `opt`.
 
-The optimiser they embed is a [`HierarchicalOptimiser`](@ref), held in their estimator's `opt` field.
+The field holds a [`HierarchicalOptimiser`](@ref). The members are exactly the results of [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref). [`NestedClustered`](@ref) holds no `HierarchicalOptimiser`, and its result is not a member.
 
-The membership rule is exact: [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref) and [`SchurComplementHierarchicalRiskParity`](@ref) each hold an `opt::HierarchicalOptimiser`. [`NestedClustered`](@ref) does not, and its result is **not** in this family.
+The family is not called `ClusteringOptimisationResult`. [`ClusteringOptimisationEstimator`](@ref) has four subtypes, and one of them is [`NestedClustered`](@ref), so that name states a set that this family does not hold.
 
-The family is deliberately **not** called `ClusteringOptimisationResult`: [`ClusteringOptimisationEstimator`](@ref) has four subtypes and the fourth is [`NestedClustered`](@ref), so that name would claim a set this type does not hold.
-
-Two of the three members embed [`HierarchicalResult`](@ref) as `hr`; [`SchurComplementHierarchicalRiskParityResult`](@ref) keeps a flat field block, which is why the property forwarding lives on the leaves rather than here.
+Two of the three members embed [`HierarchicalResult`](@ref) as `hr`. [`SchurComplementHierarchicalRiskParityResult`](@ref) holds its fields directly. So each member that embeds `hr` forwards its own properties, and this family forwards none.
 
 # Interfaces
 
-The family adds no method to [`NonJuMPOptimisationResult`](@ref). Because the field block is not shared, a leaf that embeds [`HierarchicalResult`](@ref) declares its own property forwarding, so that the `w` and `retcode` properties [`OptimisationResult`](@ref) requires resolve through `hr`.
+The family adds no method to [`NonJuMPOptimisationResult`](@ref). A member that embeds [`HierarchicalResult`](@ref) declares its own property forwarding, so that the properties `w` and `retcode` that [`OptimisationResult`](@ref) needs resolve through `hr`.
 
 # Related
 
@@ -193,9 +183,7 @@ abstract type HierarchicalOptimisationResult <: NonJuMPOptimisationResult end
 """
     const VecOpt = AbstractVector{<:NonFiniteAllocationOptimisationResult}
 
-Alias for a vector of non-finite allocation optimisation results.
-
-Represents a collection of [`NonFiniteAllocationOptimisationResult`](@ref) objects.
+Alias for a vector of continuous optimisation results.
 
 # Related
 
@@ -206,13 +194,11 @@ const VecOpt = AbstractVector{<:NonFiniteAllocationOptimisationResult}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for optimisation return codes.
-
-Concrete subtypes indicate whether an optimisation succeeded or failed.
+Abstract supertype for the return codes that state whether an optimisation succeeded.
 
 # Interfaces
 
-A subtype declares no method. It carries one field, `res`, which holds the diagnostic text of a failure or `nothing`. [`optimise`](@ref) tests the code by type alone: only an [`OptimisationSuccess`](@ref) ends the fallback chain, so any other subtype is read as a failure.
+A subtype declares no method. It has one field, `res`, which holds the diagnostic text of a failure, or `nothing`. [`optimise`](@ref) reads the type of the code and nothing else. Only an [`OptimisationSuccess`](@ref) stops the fallback chain, so every other subtype is a failure.
 
 # Related
 
@@ -233,7 +219,9 @@ const VecOptRetCode = AbstractVector{<:OptimisationReturnCode}
 """
     const OptRetCode_VecOptRetCode = Union{<:OptimisationReturnCode, <:VecOptRetCode}
 
-Alias for either a single optimisation return code or a vector of return codes.
+Alias for one optimisation return code, or a vector of return codes.
+
+A result that holds a population of weight vectors holds one return code for each member.
 
 # Related
 
@@ -245,24 +233,24 @@ const OptRetCode_VecOptRetCode = Union{<:OptimisationReturnCode, <:VecOptRetCode
 """
     set_retcode(res::NonFiniteAllocationOptimisationResult, retcode::OptRetCode_VecOptRetCode)
 
-Rebuild an optimisation result with a different return code, and every other member unchanged.
+Rebuilds an optimisation result with a different return code, and every other field unchanged.
 
-A cross-validation fold that drifts a population's weights drops the members whose wealth is not positive, and it drops them by failing their entry of the result's return code. A result is an immutable record, so the drop rebuilds it. The rebuild is a per-type method that writes the constructor name once, rather than a reflection pass over the field list.
+A cross-validation fold that drifts the weights of a population drops each member whose wealth is not positive. It drops a member when it sets the return code of that member to a failure. A result is immutable, so the drop rebuilds it. Each type has its own method, which names its constructor once, in place of a pass over the field list.
 
-Only a result that can carry a population of weight vectors needs a method here, because only such a result can hold one return code per member. A result that reaches the fallback raises, and the message names the type that is missing its method.
+Only a result that can hold a population of weight vectors needs a method, because only such a result holds one return code for each member.
 
 # Arguments
 
-  - `res`: Optimisation result to rebuild.
-  - `retcode`: Return code, or one per member of the population.
+  - `res`: The optimisation result to rebuild.
+  - `retcode`: The return code, or one return code for each member of the population.
 
 # Validation
 
-  - The type of `res` declares a method of its own, else an `ArgumentError` is raised.
+  - The type of `res` has a method of its own. The fallback method throws an `ArgumentError` that names the type.
 
 # Returns
 
-  - `NonFiniteAllocationOptimisationResult`: The result, with the new return code.
+  - `res::NonFiniteAllocationOptimisationResult`: The result, with the new return code.
 
 # Related
 
@@ -276,13 +264,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for intermediate optimisation model results.
+Abstract supertype for the records of one solver attempt inside an optimisation.
 
-Sits off the optimisation-result tree, like [`BaseHierarchicalOptimisationResult`](@ref) does: an intermediate record is not a thing [`optimise`](@ref) returns. Its one subtype is [`JuMPOptimisationSolution`](@ref), the record of what a solver returned.
+The type is not in the tree of optimisation results, as [`BaseHierarchicalOptimisationResult`](@ref) is not. [`optimise`](@ref) does not return such a record. Its one subtype is [`JuMPOptimisationSolution`](@ref), the record of what a solver returned.
 
 # Interfaces
 
-A subtype is a record of one solver attempt, and it declares no method. It is held by a result rather than returned by an optimiser.
+A subtype declares no method. A result holds it, and an optimiser does not return it.
 
 # Related
 
@@ -293,9 +281,9 @@ abstract type OptimisationModelResult <: AbstractResult end
     const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
                            <:NonFiniteAllocationOptimisationResult}
 
-Alias for a non-finite allocation optimisation estimator or result.
+Alias for a continuous optimisation estimator, or a continuous optimisation result.
 
-Matches either a [`NonFiniteAllocationOptimisationEstimator`](@ref) (specifying an optimiser configuration) or a [`NonFiniteAllocationOptimisationResult`](@ref) (a pre-computed result). Used for dispatch in cross-validation and optimisation workflows that accept either form.
+An estimator states an optimiser. A result is a precomputed answer, which a fold predicts with and does not fit. Cross-validation and the fallback field `fb` take either form.
 
 # Related
 
@@ -308,9 +296,11 @@ const OptE_Opt = Union{<:NonFiniteAllocationOptimisationEstimator,
 """
     const FbChain = AbstractVector{<:Tuple{<:OptimisationEstimator, <:OptimisationResult}}
 
-Alias for a fallback chain: the `(estimator, result)` pair of every attempt that failed before the result that carries it, in the order the attempts ran.
+Alias for a fallback chain, the record of the attempts that failed before an optimisation gave its result.
 
-[`optimise`](@ref) pushes one pair each time an attempt fails and its estimator names a fallback, and hands the vector to `factory(res, fb)` once an attempt succeeds or the chain runs out. A result whose `fb` is a chain was therefore answered by a fallback: `fb[1][1]` is the estimator that was asked first, and `fb[end][2]` is the last failure before the answer. A result whose `fb` is `nothing` was answered by the estimator it was asked of.
+Each entry is the `(estimator, result)` pair of one failed attempt, in the order in which the attempts ran. [`optimise`](@ref) adds one pair each time an attempt fails and its estimator names a fallback. When an attempt succeeds, or no fallback remains, `optimise` gives the vector to `factory(res, fb)`.
+
+A result whose `fb` is a chain was given by a fallback. Then `fb[1][1]` is the estimator that the caller asked first, and `fb[end][2]` is the last failure before the result. A result whose `fb` is `nothing` was given by the estimator that the caller asked.
 
 # Related
 
@@ -322,7 +312,9 @@ const FbChain = AbstractVector{<:Tuple{<:OptimisationEstimator, <:OptimisationRe
 """
     const OptE_Opt_FbChain = Union{<:OptE_Opt, <:FbChain}
 
-Alias for what the `fb` field of a continuous optimisation result admits: a fallback estimator or precomputed result ([`OptE_Opt`](@ref)), or the fallback chain that answered the result ([`FbChain`](@ref)).
+Alias for the values that the field `fb` of a continuous optimisation result can hold.
+
+The field holds a fallback estimator or a precomputed result ([`OptE_Opt`](@ref)), or the fallback chain that gave the result ([`FbChain`](@ref)).
 
 # Related
 
@@ -334,9 +326,18 @@ const OptE_Opt_FbChain = Union{<:OptE_Opt, <:FbChain}
 """
     factory(res::NonFiniteAllocationOptimisationResult, fb::Option{<:OptE_Opt_FbChain})
 
-Rebuild a continuous optimisation result with an updated fallback record `fb`.
+Rebuilds a continuous optimisation result with a new fallback record `fb`.
 
-Every optimisation result carries `fb` as its last field, so the generic rebuild copies all fields unchanged except the trailing `fb`. Concrete result types may override this method when rebuilding requires more than swapping `fb`. [`optimise`](@ref) is the one caller, and it hands in the [`FbChain`](@ref) it walked.
+A concrete result can add its own method when a rebuild needs more than a new `fb`. [`optimise`](@ref) is the one caller, and it gives the [`FbChain`](@ref) of the attempts that failed.
+
+# Algorithm
+
+ 1. Read every field of `res`, in the order of the struct.
+ 2. Call the constructor of the type of `res` with every field except the last, and with `fb` as the last field.
+
+# Validation
+
+  - `fb` is the last field of the type of `res`. Every concrete optimisation result obeys this rule, so the method checks nothing.
 
 # Related
 
@@ -350,13 +351,13 @@ end
 """
     assert_special_nco_requirements(opt)
 
-Assert that the optimiser meets special requirements for Nested Clustered Optimisation (NCO).
+Checks that an optimiser meets the requirements of an inner optimiser of [`NestedClustered`](@ref).
 
-The default implementation does nothing. Overridden for estimators (e.g. [`Stacking`](@ref)) that have requirements which must be validated before NCO can proceed.
+The fallback method checks nothing. An estimator with a requirement adds a method, for example [`Stacking`](@ref).
 
 # Arguments
 
-  - `opt`: Optimisation estimator, result, or vector thereof.
+  - `opt`: An optimisation estimator or result, a schedule of them, or a vector of them.
 
 # Returns
 
@@ -373,9 +374,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `opt` unchanged.
+Returns `opt` unchanged.
 
-Default pass-through factory for optimisation estimators and results. Overridden for estimators that carry parameters requiring update at each optimisation step.
+This is the fallback [`factory`](@ref) of an optimisation estimator or result. An estimator whose parameters change at each step of an optimisation adds its own method. A precomputed result in a field of an estimator, for example in `fb`, reaches this method when [`factory`](@ref) gives the estimator the weights of the previous fold. A precomputed result does not change.
 
 # Related
 
@@ -388,17 +389,17 @@ end
 """
     needs_previous_weights(opt)
 
-Return `true` if the optimiser requires the previous period's weights.
+Returns `true` if the optimiser needs the weights of the previous period.
 
-The default returns `false`. Overridden for optimisers that contain turnover constraints, tracking error constraints, or other time-dependent components that require the previous optimisation's weights.
+A fold loop that finds such an optimiser runs its folds in sequence, and gives each fold the weights of the fold before it. The fallback returns `false`. An optimiser that holds a turnover constraint, a tracking error constraint or another input that reads the previous weights adds a method that returns `true`.
 
 # Arguments
 
-  - `opt`: Optimisation estimator, result, risk measure, fee structure, or vector thereof.
+  - `opt`: An optimisation estimator or result, a risk measure, a fee structure, or a vector of them.
 
 # Returns
 
-  - `Bool`: `true` if previous weights are needed.
+  - `flag::Bool`: `true` if the optimiser needs the previous weights.
 
 # Related
 
@@ -411,7 +412,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Indicates that a portfolio optimisation completed successfully.
+States that a portfolio optimisation succeeded.
 
 # Fields
 
@@ -448,7 +449,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Indicates that a portfolio optimisation failed.
+States that a portfolio optimisation failed.
 
 # Fields
 

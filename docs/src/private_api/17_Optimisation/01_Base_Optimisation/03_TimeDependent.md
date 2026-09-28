@@ -40,7 +40,7 @@ is_time_dependent(::TimeDependent)
 is_time_dependent(opt::VecOptE_Opt_TD)
 update_time_dependent_estimator
 update_time_dependent_fields
-reset_time_dependent_estimator(opt::OptE_Opt)
+reset_time_dependent_estimator(opt::Union{<:OptimisationEstimator, <:OptimisationResult})
 reset_time_dependent_estimator(opt::BaseOptimisationEstimator)
 reset_time_dependent_estimator(td::TD_OptE_Opt)
 reset_time_dependent_fields

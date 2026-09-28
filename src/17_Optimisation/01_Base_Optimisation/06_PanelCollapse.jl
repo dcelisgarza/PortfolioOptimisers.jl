@@ -1,20 +1,20 @@
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Obtains the fees to use for net return calculations from an optimisation result.
+Returns the fees for a net return calculation from an optimisation result.
 
-An explicitly provided `fees` wins. Otherwise the fees are read from the `fees` property of `res`, and a result exposing no such property gives `nothing`.
+A `fees` that the caller gives has priority. Else the function reads the property `fees` of `res`, and a result with no such property gives `nothing`.
+
+The fee of a result is on the universe that the fit solved, and `res.w` is on the universe of the caller. So a consumer that reads the fee with `res.w` reads both through [`result_investable_view`](@ref), and not through this function alone.
 
 # Arguments
 
-  - `res`: Optimisation result, potentially containing a `fees` property.
-  - `fees`: Optional fees to use, which take precedence over `res.fees` if provided.
+  - `res`: The optimisation result, which can have a property `fees`.
+  - `fees`: Fees that the caller gives, or `nothing`.
 
 # Returns
 
-  - `Option{<:Fees}`: The fees to use for net return calculations, or `nothing` if not found.
-
-A result's fee sits on the universe the fit **solved**, so a consumer that pairs it with `res.w`, which is on the caller's, reads both through [`result_investable_view`](@ref) rather than through this verb alone.
+  - `fees::Option{<:Fees}`: The fees for the net return calculation, or `nothing` when none is found.
 
 # Related
 
@@ -33,15 +33,18 @@ end
     calc_net_returns(res::OptimisationResult, X::MatNum, fees = nothing, wd = nothing, obs = nothing)
     calc_net_returns(res::OptimisationResult, pr::Pr_RR, fees = nothing, wd = nothing, obs = nothing)
 
-Compute net returns for a [`OptimisationResult`](@ref).
+Computes the net returns of the weights of an [`OptimisationResult`](@ref).
 
-`fees` takes precedence over `res.fees` if both are provided. Delegates to [`calc_net_returns(w, X, fees, wd, obs)`](@ref).
+The weights, the returns and the fee meet on the investable universe of `res`, through [`result_investable_view`](@ref). `res.w` is on the universe of the caller, and `res.fees` is on the universe that the fit solved. So the function views the weights and a matrix `X` of the caller at the Investable Mask of the result. A `fees` of the caller goes through [`investable_fees_view`](@ref), as a fee does at the fit. A `fees` of the caller has priority over `res.fees`.
 
-When `pr::Pr_RR` is passed, `pr` is paired whole and its `X` is read after.
+The method that takes `pr` gives the whole of `pr` to the view, and reads its `X` after the view.
 
-The weights, the matrix and the fee meet on the investable universe of `res`, through [`result_investable_view`](@ref): `res.w` is on the caller's universe and `res.fees` on the one the fit solved, so the weights and a caller's `X` are viewed at the result's Investable Mask, and a caller's `fees` goes through [`investable_fees_view`](@ref), as a fee does at the fit.
+The argument `wd` is the Weight Drift of the window. With `nothing`, the window is read at the constant weights `res.w`. A [`SelfFinancingDrift`](@ref) reads it as the wealth ratio of the drifted holdings, and `obs` names the observations in the message of a wealth that is not positive.
 
-`wd` is the Weight Drift the window is read under. `nothing` reads the window at the constant weights `res.w`, which is the library's original behaviour. A [`SelfFinancingDrift`](@ref) reads it as the wealth ratio of the drifted holdings, and `obs` then names the observations of the message a non-positive wealth raises.
+# Algorithm
+
+ 1. View the weights, the returns data and the fee on the investable universe of `res` with [`result_investable_view`](@ref).
+ 2. Return [`calc_net_returns(w, X, fees, wd, obs)`](@ref) of the viewed values.
 
 # Related
 
@@ -69,19 +72,35 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Normalises inner weights into the convex weights that collapse real assets onto a meta-optimiser's synthetic assets.
+Normalises inner weights into the convex weights that collapse the real assets onto the sub-portfolios of a meta-optimiser.
 
-Quantities carried alongside the returns matrix are either *extensive* (returns, benchmark returns) and collapse as a plain weighted sum `w'x`, or *intensive* (rates such as `rd.iv` and `rd.ivpa`) and collapse as a weighted *average*. A plain weighted sum scales an intensive quantity by the gross exposure `sⱼ = Σᵢ|wᵢⱼ|`, so a shorting or leveraged portfolio (`sⱼ ≠ 1`) inflates a rate that should not depend on gross exposure at all.
+A quantity beside the returns is extensive or intensive. An extensive quantity, such as a return or a benchmark return, collapses as the weighted sum ``\\mathbf{W}^\\intercal \\boldsymbol{x}``. An intensive quantity, such as the rates `rd.iv` and `rd.ivpa`, collapses as a weighted mean. A weighted sum multiplies an intensive quantity by the gross exposure ``s_k``, so a portfolio with short positions or leverage makes the rate larger. These weights make each product a convex combination, so a caller that collapses an intensive quantity passes its weights through this function.
 
-Normalising the weights once here makes every subsequent product a convex combination, so callers collapsing an intensive quantity need only pass their weights through this function.
+# Mathematical definition
+
+```math
+\\begin{align}
+s_{k} &= \\sum_{i=1}^{N} \\lvert W_{ik} \\rvert\\,,\\\\
+\\tilde{W}_{ik} &= \\begin{cases} \\lvert W_{ik} \\rvert / s_{k} & s_{k} > 0\\,,\\\\ 0 & s_{k} = 0\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:W_inner])
+  - $(math_dict[:W_tilde_syn])
+  - ``s_{k}``: Gross exposure of sub-portfolio ``k``.
+  - $(math_dict[:N])
+
+Each column of ``\\tilde{\\mathbf{W}}`` sums to one, except a column of zeros, which stays a column of zeros.
 
 # Arguments
 
-  - `w`: Inner weights. A vector collapses onto a single synthetic asset; a matrix (assets × synthetic assets) collapses each column independently.
+  - `w`: The inner weights. A vector collapses onto one sub-portfolio. A matrix, `assets × sub-portfolios`, collapses each column separately.
 
 # Returns
 
-  - `w`: `abs.(w)`, with each column scaled to sum to one. A column summing to zero — a degenerate synthetic asset — is left as-is rather than divided, preserving the zero row it already produced.
+  - `w`: The normalised weights, with the shape of the input.
 
 # Related
 
@@ -102,9 +121,9 @@ end
     collapse_panel_numeric(A::AbstractVector, W::MatNum) -> Vector
     collapse_panel_numeric(A::AbstractMatrix, W::MatNum) -> Matrix
 
-Collapse one numeric Panel Field array onto the synthetic assets, as a convex combination.
+Collapses the values of one numeric Panel Field onto the sub-portfolios, as a convex combination.
 
-`W` is the normalised weight matrix [`synthetic_asset_weights`](@ref) returns, `assets × synthetic assets`. A static array is one value per asset and a time-varying one is `observations × assets`, so the asset axis is the only one contracted in both.
+`W` is the normalised weight matrix that [`synthetic_asset_weights`](@ref) returns, `assets × sub-portfolios`. A static field holds one value for each asset, and a field that changes over time holds `observations × assets`. So the asset axis is the one axis that both forms contract. [`collapse_asset_panel`](@ref) states the mathematics.
 
 # Algorithm
 
@@ -113,11 +132,11 @@ The method that Julia selects is the algorithm. A vector contracts as `transpose
 # Arguments
 
   - `A`: The values, `assets` or `observations × assets`.
-  - `W`: Normalised inner weights, assets × synthetic assets.
+  - `W`: The normalised inner weights, `assets × sub-portfolios`.
 
 # Returns
 
-  - The collapsed values, `synthetic assets` or `observations × synthetic assets`.
+  - The collapsed values, `sub-portfolios` or `observations × sub-portfolios`.
 
 # Related
 
@@ -135,23 +154,26 @@ end
     collapse_panel_tensor(A::AbstractMatrix, W::MatNum, sq::Bool) -> Matrix
     collapse_panel_tensor(A::AbstractArray{<:Any, 3}, W::MatNum, sq::Bool) -> Array
 
-Collapse one tensor Panel Field array onto the synthetic assets, as a convex combination.
+Collapses the values of one tensor Panel Field onto the sub-portfolios, as a convex combination.
 
-A tensor array is `assets × labels` when static and `observations × assets × labels` when time-varying. The asset axis is always contracted. When `sq` is `true` the label axis **is** the asset axis ([`features_are_assets`](@ref)), so it is contracted too and the result is square again on the synthetic universe.
+A tensor array is `assets × labels` when it is static, and `observations × assets × labels` when it changes over time. The function always contracts the asset axis. When `sq` is `true`, the label axis is the asset axis, see [`features_are_assets`](@ref). Then the function contracts the label axis too, and the answer is square on the sub-portfolios. [`collapse_asset_panel`](@ref) states the mathematics.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. A matrix contracts as `transpose(W) * A`, and again as `* W` when `sq`. A three-dimensional array does the same one observation at a time, into a preallocated result.
+The method that Julia selects is the algorithm.
+
+ 1. A matrix contracts as `transpose(W) * A`. When `sq` is `true`, the answer is multiplied by `W` on the right.
+ 2. A three-dimensional array does the same for each observation, into a result that the method makes before the loop.
 
 # Arguments
 
   - `A`: The values.
-  - `W`: Normalised inner weights, assets × synthetic assets.
-  - `sq`: Whether the label axis is the asset axis.
+  - `W`: The normalised inner weights, `assets × sub-portfolios`.
+  - `sq`: `true` when the label axis is the asset axis.
 
 # Returns
 
-  - The collapsed values, with the asset axis, and the label axis under `sq`, replaced by the synthetic assets.
+  - The collapsed values. The sub-portfolios replace the asset axis, and also the label axis when `sq` is `true`.
 
 # Related
 
@@ -179,18 +201,18 @@ end
     collapse_panel_mask(m::AbstractVector{Bool}, W::MatNum) -> BitVector
     collapse_panel_mask(m::AbstractMatrix{Bool}, W::MatNum) -> BitMatrix
 
-Collapse one mask onto the synthetic assets, as the support of its convex combination.
+Collapses one mask onto the sub-portfolios, as the support of its convex combination.
 
-A synthetic asset is observed, active or in estimation at an observation when **any** member carrying weight is. So one kernel serves the values and the masks, the mask stays `Bool` by type, and the subset invariant between the estimation mask and the active mask survives with no second check.
+A sub-portfolio is observed, active or in estimation at an observation when one member with weight is. So the values and the masks use one kernel, and the mask stays `Bool` by its type. The estimation mask is a subset of the active mask, and the collapse keeps that relation with no second check. [`collapse_asset_panel`](@ref) states the mathematics.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. `nothing` stays `nothing`; otherwise the mask collapses through [`collapse_panel_numeric`](@ref) and the result is compared against zero.
+The method that Julia selects is the algorithm. `nothing` stays `nothing`. Else the mask collapses through [`collapse_panel_numeric`](@ref), and an entry of the answer is `true` where the collapsed value is larger than zero.
 
 # Arguments
 
   - `m`: The mask, or `nothing`.
-  - `W`: Normalised inner weights, assets × synthetic assets.
+  - `W`: The normalised inner weights, `assets × sub-portfolios`.
 
 # Returns
 
@@ -213,24 +235,24 @@ end
     collapse_panel_field(f::CategoricalPanelField, W, nx, syn) -> TensorPanelField
     collapse_panel_field(f::TensorPanelField, W, nx, syn) -> TensorPanelField
 
-Collapse one Panel Field onto the synthetic assets a meta-optimiser builds.
+Collapses one Panel Field onto the sub-portfolios of a meta-optimiser.
 
-The collapse acts **one field at a time** and returns a field, so the collapsed panel is a panel like any other and a selector written for the inner problem resolves on it unchanged.
+The collapse acts on one field at a time and returns a field. So the collapsed panel is an ordinary panel, and a selector that the caller wrote for the inner problem resolves on it with no change.
 
   - A numeric field stays numeric.
-  - A tensor field stays a tensor field of the same name and labels, one label at a time. When its labels are the asset names the contraction is two-sided, its labels are renamed after the synthetic assets and its groups are dropped, so the square case holds one level up.
-  - A categorical field becomes a **tensor field of membership fractions**: the same name, the axis `"level"`, the levels as labels, and the convex combination of its one-hot block as values. A one-hot column of the Feature Matrix is a `0`/`1` feature, so its convex combination is the share of the synthetic asset's weight in that level, and the collapsed panel's Feature Matrix equals the collapse of the original panel's. A convex combination of integer codes would mean nothing, and a majority level would lose the fractions and need a tie rule.
+  - A tensor field stays a tensor field with the same name and labels. When its labels are the asset names, the contraction acts on both axes. Then the sub-portfolios name the labels, and the groups are dropped, so the field is square on the sub-portfolios too.
+  - A categorical field becomes a tensor field of membership fractions. It has the same name, the axis `"level"`, the levels as labels, and the convex combination of its one-hot block as values. A one-hot column of the Feature Matrix holds `0` and `1`. So its convex combination is the fraction of the weight of the sub-portfolio in that level, and the Feature Matrix of the collapsed panel is the collapse of the Feature Matrix of the panel. A convex combination of integer codes has no meaning, and a majority level loses the fractions and needs a rule for ties.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. Each kind contracts its own values and its own observed mask, through [`collapse_panel_numeric`](@ref), [`collapse_panel_tensor`](@ref) and [`collapse_panel_mask`](@ref).
+The method that Julia selects is the algorithm. Each kind contracts its values and its observed mask, through [`collapse_panel_numeric`](@ref), [`collapse_panel_tensor`](@ref), [`collapse_panel_mask`](@ref) and [`collapse_categorical_mask`](@ref).
 
 # Arguments
 
   - `f`: The Panel Field.
-  - `W`: Normalised inner weights, assets × synthetic assets.
-  - `nx`: The asset names of the returns data, or `nothing`. Read for the square case alone.
-  - `syn`: The synthetic asset names.
+  - `W`: The normalised inner weights, `assets × sub-portfolios`.
+  - `nx`: The asset names of the returns data, or `nothing`. Only a tensor field reads it, to find the square case.
+  - `syn`: The names of the sub-portfolios.
 
 # Returns
 
@@ -269,23 +291,23 @@ end
     collapse_categorical_mask(m::AbstractVector{Bool}, W::MatNum, nl::Integer) -> BitMatrix
     collapse_categorical_mask(m::AbstractMatrix{Bool}, W::MatNum, nl::Integer) -> BitArray
 
-Collapse a categorical Panel Field's observed mask onto the tensor field its collapse returns.
+Collapses the observed mask of a categorical Panel Field onto the tensor field that its collapse returns.
 
-The collapsed field carries one label per level, so its mask needs the level axis the categorical mask does not have. The asset mask is collapsed once and then repeated across the levels: a cell was observed or not for the whole label, never per level.
+The collapsed field has one label for each level, so its mask needs a level axis, which the categorical mask does not have. A cell is observed or not for the whole label, never for one level. So the function collapses the asset mask once, and repeats it for each level.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. `nothing` stays `nothing`; otherwise the asset mask collapses through [`collapse_panel_mask`](@ref) and is repeated over `nl` levels.
+The method that Julia selects is the algorithm. `nothing` stays `nothing`. Else the asset mask collapses through [`collapse_panel_mask`](@ref), and the answer repeats it `nl` times on a new last axis.
 
 # Arguments
 
-  - `m`: The categorical field's observed mask, or `nothing`.
-  - `W`: Normalised inner weights, assets × synthetic assets.
-  - `nl`: Number of levels.
+  - `m`: The observed mask of the categorical field, `assets` or `observations × assets`, or `nothing`.
+  - `W`: The normalised inner weights, `assets × sub-portfolios`.
+  - `nl`: The number of levels.
 
 # Returns
 
-  - The collapsed mask over the level axis, or `nothing`.
+  - The collapsed mask, `sub-portfolios × levels` or `observations × sub-portfolios × levels`, or `nothing`.
 
 # Related
 
@@ -306,32 +328,60 @@ end
     collapse_asset_panel(pnl::Nothing, wi::MatNum, nx) -> nothing
     collapse_asset_panel(pnl::AssetPanel, wi::MatNum, nx::Option{<:VecStr}) -> AssetPanel
 
-Aggregate an [`AssetPanel`](@ref) onto the synthetic assets a meta-optimiser builds for its outer problem.
+Collapses an [`AssetPanel`](@ref) onto the sub-portfolios that a meta-optimiser builds for its outer problem.
 
-A meta-optimiser's outer problem allocates across *synthetic* assets — [`NestedClustered`](@ref)'s clusters, [`Stacking`](@ref)'s inner portfolios — each of which is a weighted combination of the real ones. Every quantity the outer [`ReturnsResult`](@ref) carries has to be re-expressed on that universe, and the panel is no exception: without this collapse the outer optimiser has no panel at all, so a [`FeatureDistance`](@ref) there throws rather than clustering the synthetic universe.
+The outer problem of a meta-optimiser allocates over sub-portfolios, which are the clusters of [`NestedClustered`](@ref) and the inner portfolios of [`Stacking`](@ref). Each of them is a weighted combination of the real assets. The outer [`ReturnsResult`](@ref) must state each quantity on that universe, and the panel too. With no collapse, the outer optimiser has no panel, and a [`FeatureDistance`](@ref) in it throws and does not cluster.
 
-Features are treated as **intensive**, exactly as `iv` and `ivpa` are: the collapse is a convex combination, obtained by pushing the inner weights through [`synthetic_asset_weights`](@ref) first. An un-normalised weighted sum would scale each synthetic asset's feature vector by its gross exposure `sⱼ = Σᵢ|wᵢⱼ|`, inflating it under leverage or shorting. Under the default [`AngularDist`](@ref) the normalisation is a mathematical no-op for a rectangular field — scaling one row of the result leaves every cosine unchanged — but it is *not* one in the square case, where the two-sided product rescales the label axis as well, and it is what keeps the collapse bounded for any `sⱼ > 0`. An extensive feature (a market capitalisation, a headcount) wanting a weighted *sum* is not supported: the divisor depends on the inner solve, so a caller cannot pre-scale their way to one.
+A feature is intensive, as `iv` and `ivpa` are. So the collapse is a convex combination, with the weights of [`synthetic_asset_weights`](@ref). A weighted sum with no normalisation multiplies the feature vector of a sub-portfolio by its gross exposure, which makes it larger under leverage or short positions. Under the default [`AngularDist`](@ref), the normalisation does not change a rectangular field, because a scale of one row changes no cosine. In the square case it does change the field, because the product on both sides scales the label axis too. The normalisation also keeps the collapse bounded for every gross exposure larger than zero.
 
-## Degenerate synthetic assets
+The collapse does not support an extensive feature, such as a market capitalisation or a headcount, that needs a weighted sum. The divisor comes from the inner solve, so a caller cannot scale the feature before the solve.
 
-A synthetic asset whose weights are entirely zero has `sⱼ = 0`; [`synthetic_asset_weights`](@ref) leaves the column alone rather than dividing, so the collapse gives that asset a **zero feature vector** instead of throwing. It then lands on the zero-feature-vector convention the distance kernel already implements, matching the zero returns column, `iv` and `ivpa` the same degenerate weights already produce.
+A sub-portfolio whose weights are all zero has a gross exposure of zero. [`synthetic_asset_weights`](@ref) keeps its column of zeros and does not divide, so the collapse gives that sub-portfolio a feature vector of zeros and does not throw. The distance kernel already handles a feature vector of zeros, and the same weights give a returns column of zeros, and zero `iv` and `ivpa`.
+
+# Mathematical definition
+
+At each observation of a field that changes over time:
+
+```math
+\\begin{align}
+\\boldsymbol{a}^{o} &= \\tilde{\\mathbf{W}}^\\intercal \\boldsymbol{a}\\,,\\\\
+\\mathbf{C}^{o} &= \\tilde{\\mathbf{W}}^\\intercal \\mathbf{C}\\,,\\\\
+\\mathbf{S}^{o} &= \\tilde{\\mathbf{W}}^\\intercal \\mathbf{S} \\tilde{\\mathbf{W}}\\,,\\\\
+\\mathbf{F}^{o} &= \\tilde{\\mathbf{W}}^\\intercal \\mathbf{H}\\,,\\\\
+m^{o}_{k} &= \\mathbf{1}\\left[\\left(\\tilde{\\mathbf{W}}^\\intercal \\boldsymbol{m}\\right)_{k} > 0\\right]\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{a}``, ``\\boldsymbol{a}^{o}``: Values of a numeric field, one entry for each asset and one for each sub-portfolio.
+  - ``\\mathbf{C}``, ``\\mathbf{C}^{o}``: Values of a tensor field whose labels are not the asset names, `assets × labels` and `sub-portfolios × labels`.
+  - ``\\mathbf{S}``, ``\\mathbf{S}^{o}``: Values of a tensor field whose labels are the asset names, `assets × assets` and `sub-portfolios × sub-portfolios`.
+  - ``\\mathbf{H}``: One-hot matrix of a categorical field, `assets × levels`.
+  - ``\\mathbf{F}^{o}``: Membership fractions, `sub-portfolios × levels`.
+  - ``\\boldsymbol{m}``, ``m^{o}_{k}``: A mask, one entry for each asset, and its entry for sub-portfolio ``k``.
+  - ``\\mathbf{1}[\\cdot]``: Indicator, ``1`` when the condition holds and ``0`` otherwise.
+  - $(math_dict[:W_tilde_syn])
+
+Each column of ``\\tilde{\\mathbf{W}}`` sums to one or is a column of zeros. So each collapsed value is a convex combination of the values of the members, or zero. A row of ``\\mathbf{F}^{o}`` sums to one when the sub-portfolio has weight and every member has a level.
 
 # Algorithm
 
  1. Return `nothing` when `pnl` is `nothing`.
- 2. Normalise the inner weights with [`synthetic_asset_weights`](@ref).
- 3. Collapse every Panel Field with [`collapse_panel_field`](@ref).
- 4. Collapse both universe masks with [`collapse_panel_mask`](@ref), which keeps them `nothing` for a static panel.
+ 2. Normalise the inner weights with [`synthetic_asset_weights`](@ref), giving `W`.
+ 3. Name the sub-portfolios `"_1"`, `"_2"`, …, giving `syn`.
+ 4. Collapse each Panel Field with [`collapse_panel_field`](@ref).
+ 5. Collapse the active mask and the estimation mask with [`collapse_panel_mask`](@ref). They stay `nothing` for a static panel.
 
 # Arguments
 
   - `pnl`: The Asset Panel, or `nothing`.
-  - `wi`: Inner weights, assets × synthetic assets.
-  - `nx`: The asset names of the returns data, or `nothing`. Read for the square case alone.
+  - `wi`: The inner weights, `assets × sub-portfolios`.
+  - `nx`: The asset names of the returns data, or `nothing`. Only a tensor field reads it, to find the square case.
 
 # Returns
 
-  - `pnl::Option{AssetPanel}`: The Asset Panel on the synthetic universe, or `nothing`.
+  - `pnl::Option{AssetPanel}`: The Asset Panel on the sub-portfolios, or `nothing`.
 
 # Related
 
