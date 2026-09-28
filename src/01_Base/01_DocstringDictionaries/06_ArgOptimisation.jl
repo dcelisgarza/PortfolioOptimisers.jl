@@ -134,7 +134,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :reduce_test => "`reduce_test`: Whether to allow the last test window to be smaller.",#
                  :subset_size => "`subset_size`: Size of each random subset.",#
                  :n_subsets => "`n_subsets`: Number of random subsets.",#
-                 :max_comb => "`max_comb`: Maximum number of unique asset subsets.",#
+                 :max_comb => "`max_comb`: Largest number of possible asset subsets for which the draw is exact. When `binomial(N, subset_size)` is larger, the draw takes each subset alone, and two subsets can be equal.",#
                  :window_size => "`window_size`: Rolling window size for randomised cross-validation.",#
                  :n_iter => "`n_iter`: Number of random iterations.",#
                  :cv => "`cv`: Cross-validation estimator.",#

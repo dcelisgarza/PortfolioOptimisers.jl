@@ -286,7 +286,7 @@ commit = "ebcacfda95"
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { code = 85, doc = 125, comment = 0, blank = 49, total = 259 }
 "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { code = 257, doc = 303, comment = 7, blank = 123, total = 690 }
 "src/17_Optimisation/02_CrossValidation/04_WalkForward.jl" = { code = 432, doc = 694, comment = 2, blank = 226, total = 1354 }
-"src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { code = 292, doc = 312, comment = 13, blank = 121, total = 738 }
+"src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { code = 293, doc = 312, comment = 14, blank = 121, total = 740 }
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { code = 16, doc = 19, comment = 0, blank = 9, total = 44 }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { code = 59, doc = 172, comment = 0, blank = 86, total = 317 }
 "src/17_Optimisation/02_CrossValidation/08_OptimisationCrossValidation.jl" = { code = 14, doc = 33, comment = 0, blank = 13, total = 60 }
@@ -356,7 +356,7 @@ commit = "ebcacfda95"
 "src/17_Optimisation/06_Meta/01_Base_MetaOptimisation.jl" = { code = 264, doc = 544, comment = 24, blank = 243, total = 1075 }
 "src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { code = 391, doc = 349, comment = 23, blank = 131, total = 894 }
 "src/17_Optimisation/06_Meta/03_Stacking.jl" = { code = 276, doc = 279, comment = 19, blank = 88, total = 662 }
-"src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { code = 273, doc = 299, comment = 14, blank = 88, total = 674 }
+"src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { code = 270, doc = 364, comment = 18, blank = 117, total = 769 }
 "src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { code = 189, doc = 494, comment = 11, blank = 189, total = 883 }
 "src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { code = 245, doc = 354, comment = 25, blank = 119, total = 743 }
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { code = 151, doc = 239, comment = 16, blank = 90, total = 496 }
