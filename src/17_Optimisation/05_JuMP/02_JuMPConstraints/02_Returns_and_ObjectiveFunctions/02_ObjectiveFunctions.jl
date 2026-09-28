@@ -110,10 +110,13 @@ The model solves the ratio in homogenised weights, and [`set_max_ratio_return_co
 picks one of two normalisations for it. In the risk form, every row of the model holds at
 ``\\boldsymbol{y} = \\boldsymbol{0}``, ``k = 0``, so [`set_maximum_ratio_scale_floor!`](@ref)
 bounds ``k`` below by ``k_{\\min}``. The floor binds only when no feasible portfolio's return
-expression is more than ``r_f``. A mean uncertainty set of a large radius can cause this.
-Thus a ``k`` equal to its floor shows that the objective never went above zero. The weights
-then maximise the return expression at that scale, not the ratio. The field `kmin` lets a caller
-read and set the floor, and a `kmin` that the caller names applies to both forms.
+expression is more than ``r_f``. A mean uncertainty set of a large radius can cause this, and
+so can a fee or a market impact cost that is more than every expected return. A term that
+deducts a worst-case penalty or a charge forces the risk form, because the return form has no
+solution in these cases. Thus a ``k`` equal to its floor shows that the objective never went
+above zero. The weights then maximise the return expression at that scale, not the ratio. The
+field `kmin` lets a caller read and set the floor, and a `kmin` that the caller names applies
+to both forms.
 
 # Mathematical definition
 

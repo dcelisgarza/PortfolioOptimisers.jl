@@ -107,13 +107,15 @@ end
                                     class = MuUncertaintySetClass())
     nb = NormBallUncertaintySet(; kappa = 1.5, L = Matrix(0.002I, N_ro, 2), p = 3,
                                 class = MuUncertaintySetClass())
-    for ret in (ArithmeticReturn(),
-                ArithmeticReturn(; ucs = L1UncertaintySet(; eps = 0.5, sd = sd)),
-                ArithmeticReturn(; ucs = SignedL1UncertaintySet(; ep = 0.3, en = 0.6, sd = sd)))
+    nb0 = NormBallUncertaintySet(; kappa = 1.5, L = zeros(N_ro, 0), p = 3,
+                                 class = MuUncertaintySetClass())
+    for ret in (ArithmeticReturn(), ArithmeticReturn(; ucs = nb0))
         @test form(ret)[1:2] == (true, false)
     end
     for ret in (ArithmeticReturn(; ucs = box), ArithmeticReturn(; ucs = ell),
-                ArithmeticReturn(; ucs = nb), LogarithmicReturn())
+                ArithmeticReturn(; ucs = nb), LogarithmicReturn(),
+                ArithmeticReturn(; ucs = L1UncertaintySet(; eps = 0.5, sd = sd)),
+                ArithmeticReturn(; ucs = SignedL1UncertaintySet(; ep = 0.3, en = 0.6, sd = sd)))
         @test form(ret)[1:2] == (false, true)
     end
     # Each term alone is below the rate, and the aggregate is above it.
@@ -123,17 +125,34 @@ end
           (true, false)
 end
 
-@testset "The return form reads the gross characteristic" begin
-    # The form test reads the characteristic before the l1 penalty and before the fees. When
-    # they leave no portfolio above the rate, the return form has no solution, although the
-    # risk form has one.
+@testset "A penalty or a charge forces the risk form (#1358)" begin
+    # The characteristic that the form test reads carries no l1 penalty and no charge. Each of
+    # these leaves no portfolio above the rate, so the return form had no solution.
     for kw in ((; ret = ArithmeticReturn(; ucs = L1UncertaintySet(; eps = 0.5))),
                (; ret = ArithmeticReturn(; ucs = SignedL1UncertaintySet(; ep = 0.5, en = 0.5))),
                (; ret = ArithmeticReturn(), fees = Fees(; l = 0.01)))
         res = solve_ro(MaximumRatio(), kw)
-        @test :sr_ret in entries_ro(res)
-        @test_broken isa(res.retcode, OptimisationSuccess)
+        @test isa(res.retcode, OptimisationSuccess)
+        @test :sr_risk in entries_ro(res)
+        @test !(:sr_ret in entries_ro(res))
+        # No portfolio beats the rate, so `k` sits on the floor.
+        @test isapprox(value(res.model[:k]), JuMP.lower_bound(res.model[:k]); rtol = 1e-3)
     end
+    # A long fee on a long-only book is `l` per unit of budget, so it is a rate of `rf + l`.
+    # The fee takes the risk form, the rate takes the return form, and both reach one maximiser.
+    l = 0.3 * maximum(pr_ro.mu)
+    res_fee = solve_ro(MaximumRatio(), (; fees = Fees(; l = l)))
+    res_rf = solve_ro(MaximumRatio(; rf = l), (;))
+    @test :sr_risk in entries_ro(res_fee)
+    @test :sr_ret in entries_ro(res_rf)
+    @test isapprox(res_fee.w, res_rf.w; atol = 1e-5)
+    # A term with `fee = false` deducts nothing, so it keeps the return form.
+    res = solve_ro(MaximumRatio(),
+                   (;
+                    ret = ArithmeticReturn(; settings = JuMPReturnsSettings(; fee = false)),
+                    fees = Fees(; l = l)))
+    @test :sr_ret in entries_ro(res)
+    @test isapprox(res.w, solve_ro(MaximumRatio(), (;)).w; atol = 1e-6)
 end
 
 @testset "The ratio sizes ohf and the scale floor from the characteristic" begin

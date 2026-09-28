@@ -185,7 +185,7 @@ function scalarise_return_expression!(model::JuMP.Model)
     return nothing
 end
 """
-    set_max_ratio_return_constraints!(model, obj, rets, mus, robust, pr)
+    set_max_ratio_return_constraints!(model, obj, rets, mus, forces_risk, pr)
 
 Add the maximum-ratio homogenisation constraint to the model.
 
@@ -195,11 +195,17 @@ registers one name several times, and each copy reads the wrong expression.
 
 The test on the aggregate characteristic is the single-term test applied to the sum. A test on
 each term sends two terms at ``0.9 r_f`` and `scale = 1` to the risk form, but their sum is
-``1.8 r_f``. The test reads the characteristic before the ``\\ell_1`` penalty of an
-[`L1UncertaintySet`](@ref) or a [`SignedL1UncertaintySet`](@ref), and before the fees and the
-market impact cost. When those leave no feasible portfolio above ``r_f``, the return form has
-no solution and the solver reports the model infeasible. The test also does not see the weight
-bounds or the linear constraints.
+``1.8 r_f``.
+
+The characteristic does not carry a worst-case penalty or a charge. A term that deducts one of
+them can leave no feasible portfolio above ``r_f``, although an entry of `mu` is more than
+``r_f``. The return form then has no solution, and the solver reports the model infeasible. The
+risk form has a solution in each of these cases. Thus a term that deducts a penalty or a charge
+forces the risk form.
+
+The test does not see the weight bounds or the linear constraints. A bound that keeps every
+feasible portfolio at or below ``r_f`` still takes the return form when an entry of `mu` is
+more than ``r_f``.
 
 [`assert_no_return_objective_compatibility`](@ref) refuses an empty numerator before this
 function runs, as [`NoRisk`](@ref) is refused under this objective. With every term out of
@@ -214,7 +220,7 @@ when ``r_f = 0``.
 
  3. Take the risk form if one of these conditions is true, and the return form if not:
 
-      + A term built a robust cone. A box, an ellipsoidal or a norm-ball set makes one.
+      + A term forces it. A term with a mean uncertainty set forces it, and so does a term that deducts a fee or a market impact cost. A norm ball whose map has no column and no charge does not.
       + `mu` is `nothing`, because no term carries a characteristic, as for a [`LogarithmicReturn`](@ref).
       + No entry of `mu` is more than `rf`.
 
@@ -249,7 +255,7 @@ Where:
   - `obj`: Objective function. The function does nothing unless it is a [`MaximumRatio`](@ref).
   - `rets`: The return terms.
   - `mus`: Each term's resolved characteristic, `nothing` where it has none.
-  - `robust`: Whether each term built a robust cone.
+  - `forces_risk`: Whether each term forces the risk form.
   - `pr`: Prior result. Its vector sizes `ohf` when no term carries a characteristic.
 
 # Returns
@@ -266,7 +272,7 @@ function set_max_ratio_return_constraints!(::JuMP.Model, ::ObjectiveFunction, ar
     return nothing
 end
 function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio, rets,
-                                           mus::AbstractVector, robust::AbstractVector,
+                                           mus::AbstractVector, forces_risk::AbstractVector,
                                            pr::AbstractPriorResult)
     # The empty-numerator refusal is not here: it is one of the three objective refusals
     # `assert_no_return_objective_compatibility` makes at the top of this seam.
@@ -277,7 +283,7 @@ function set_max_ratio_return_constraints!(model::JuMP.Model, obj::MaximumRatio,
     ohf = shared_get(model, :ohf)
     ret = get_ret(model)
     rf = obj.rf
-    risk_form = any(robust) || isnothing(mu) || all(x -> x <= rf, mu)
+    risk_form = any(forces_risk) || isnothing(mu) || all(x -> x <= rf, mu)
     if risk_form
         risk = get_risk(model)
         JuMP.@constraint(model, sr_risk, sc * (risk - ohf) <= 0)
@@ -334,7 +340,8 @@ end
 Subtract the fees expression from one term's return expression.
 
 The function does nothing when the term's `settings.fee` is `false`, or when the model holds
-no fees.
+no fees. It returns whether it deducted a fee, because a charged term forces the risk form of
+[`MaximumRatio`](@ref).
 
 The model holds two fee expressions. `:fees` holds the per period terms `l`, `s` and `tn`, and
 the return pays it in full. `:one_time_fees` holds the two fixed terms. The period of the
@@ -372,7 +379,7 @@ Where:
 
 # Returns
 
-  - `nothing`.
+  - `true` when the function deducted `:fees` or `:one_time_fees`, and `false` otherwise.
 
 # Related
 
@@ -381,17 +388,20 @@ Where:
 """
 function add_fees_to_ret!(model::JuMP.Model, ret, fee::Bool)
     if !fee
-        return nothing
+        return false
     end
+    charged = false
     if shared_has(model, :fees)
         JuMP.add_to_expression!(ret, -shared_get(model, :fees))
+        charged = true
     end
     # An expected return is a per period number, so a fee charged one time for the whole
     # holding period enters it divided by the observation count of the fit.
     if shared_has(model, :one_time_fees)
         JuMP.add_to_expression!(ret, -shared_get(model, :one_time_fees) / get_T(model))
+        charged = true
     end
-    return nothing
+    return charged
 end
 """
     add_market_impact_cost!(model, ret, mic::Bool)
@@ -402,7 +412,8 @@ The function does nothing when the term's `settings.mic` is `false`, or when the
 no market impact cost. Only [`BudgetMarketImpact`](@ref) registers one, and the function
 detects it by its `:wip` entry. A plain [`BudgetCosts`](@ref) also registers
 `cost_bgt_expr`, but its cost only constrains the budget and never reaches the return
-expression.
+expression. The function returns whether it deducted the cost, because a charged term forces
+the risk form of [`MaximumRatio`](@ref).
 
 # Mathematical definition
 
@@ -426,7 +437,7 @@ Where:
 
 # Returns
 
-  - `nothing`.
+  - `true` when the function deducted the market impact cost, and `false` otherwise.
 
 # Related
 
@@ -435,10 +446,10 @@ Where:
 """
 function add_market_impact_cost!(model::JuMP.Model, ret, mic::Bool)
     if !mic || !shared_has(model, :wip)
-        return nothing
+        return false
     end
     JuMP.add_to_expression!(ret, -shared_get(model, :cost_bgt_expr))
-    return nothing
+    return true
 end
 """
     set_return_constraints!(model, pret, obj, pr; kwargs...)
@@ -460,7 +471,7 @@ and on the shape of its uncertainty set. Each builder does these operations:
 
  1. Refuse an objective that reads a zero return expression, with [`assert_no_return_objective_compatibility`](@ref). A vector of terms must not be empty.
  2. For a single term, drop its `scale` with [`unit_scale_returns_estimator`](@ref).
- 3. Run the builder of each term `i`. The builder returns the characteristic `mus[i]` and the flag `robust[i]`.
+ 3. Run the builder of each term `i`. The builder returns the characteristic `mus[i]` and the flag `forces_risk[i]`.
  4. Sum the terms into `ret` with [`scalarise_return_expression!`](@ref).
  5. Add the ratio constraint with [`set_max_ratio_return_constraints!`](@ref), which does nothing unless the objective is a [`MaximumRatio`](@ref).
 
@@ -513,8 +524,9 @@ $(val_dict[:relax])
 # Returns
 
   - The four-argument methods return `nothing`. A per-term builder returns
-    `(mu, robust)`: the characteristic it resolved (or `nothing`), and whether it built a
-    robust cone.
+    `(mu, forces_risk)`: the characteristic it resolved (or `nothing`), and whether the term
+    forces the risk form of [`MaximumRatio`](@ref). A term with a mean uncertainty set or a
+    deducted charge forces it.
 
 # Related
 
@@ -537,9 +549,9 @@ function set_return_constraints!(model::JuMP.Model, pret::JuMPReturnsEstimator,
     # normalisation scaled while `:ret` is not — worse than not dropping it at all.
     assert_no_return_objective_compatibility(pret, obj)
     pret = unit_scale_returns_estimator(pret)
-    mu, robust = set_return_constraints!(model, 1, pret, pr; kwargs...)
+    mu, forces_risk = set_return_constraints!(model, 1, pret, pr; kwargs...)
     scalarise_return_expression!(model)
-    set_max_ratio_return_constraints!(model, obj, (pret,), [mu], [robust], pr)
+    set_max_ratio_return_constraints!(model, obj, (pret,), [mu], [forces_risk], pr)
     return nothing
 end
 function set_return_constraints!(model::JuMP.Model, pret::VecJRE, obj::ObjectiveFunction,
@@ -551,12 +563,12 @@ function set_return_constraints!(model::JuMP.Model, pret::VecJRE, obj::Objective
     # and `nothing` from a term that holds no characteristic at all — a `LogarithmicReturn`
     # or a `NoReturn`. `aggregate_return_characteristic` reads all three.
     mus = Vector{Option{Num_VecNum}}(undef, length(pret))
-    robust = Vector{Bool}(undef, length(pret))
+    forces_risk = Vector{Bool}(undef, length(pret))
     for (i, pret_i) in enumerate(pret)
-        mus[i], robust[i] = set_return_constraints!(model, i, pret_i, pr; kwargs...)
+        mus[i], forces_risk[i] = set_return_constraints!(model, i, pret_i, pr; kwargs...)
     end
     scalarise_return_expression!(model)
-    set_max_ratio_return_constraints!(model, obj, pret, mus, robust, pr)
+    set_max_ratio_return_constraints!(model, obj, pret, mus, forces_risk, pr)
     return nothing
 end
 function set_return_constraints!(model::JuMP.Model, i,
@@ -567,20 +579,23 @@ function set_return_constraints!(model::JuMP.Model, i,
     mu = ifelse(isnothing(pret.mu), pr.mu, pret.mu)
     ret = state_set!(model, Symbol(""), :ret_, i,
                      JuMP.@expression(model, dot_scalar(mu, w)))
-    add_fees_to_ret!(model, ret, settings.fee)
-    add_market_impact_cost!(model, ret, settings.mic)
+    # A charge is not in the characteristic, so the ratio's test on it cannot see the charge.
+    # The charged term takes the risk form, which has a solution for each charge (#1358).
+    fee = add_fees_to_ret!(model, ret, settings.fee)
+    mic = add_market_impact_cost!(model, ret, settings.mic)
     set_return_bounds!(model, i, ret, settings.lb)
     set_return_expression!(model, i, ret, settings.scale, settings.rte)
-    return mu, false
+    return mu, fee || mic
 end
 """
     set_ucs_return_constraints!(model, i, ucs::BoxUncertaintySet, mu, settings)
 
 Build one term's box-robust return expression.
 
-The five methods of this function build the worst case of the five mean uncertainty sets. The
-box and the ellipsoid force the risk form of [`MaximumRatio`](@ref), and so does a norm ball
-whose map has a column. The two ``\\ell_1`` sets do not.
+The five methods of this function build the worst case of the five mean uncertainty sets. Each
+set forces the risk form of [`MaximumRatio`](@ref), because the characteristic that the ratio
+tests does not carry the worst-case penalty. A norm ball whose map has no column has no penalty,
+and it forces the risk form only when the term deducts a charge.
 
 # Mathematical definition
 
@@ -639,7 +654,7 @@ $(val_dict[:relax])
 
 # Returns
 
-  - `(ret, mu, robust)`: the term's expression, the centre of the set, and whether the term forces the risk form of [`MaximumRatio`](@ref). The centre is the set's own field when it has one, and the fallback otherwise.
+  - `(ret, mu, forces_risk)`: the term's expression, the centre of the set, and whether the term forces the risk form of [`MaximumRatio`](@ref). The centre is the set's own field when it has one, and the fallback otherwise.
 
 # Related
 
@@ -748,7 +763,9 @@ end
 Build one term's ``\\ell_1``-robust return expression.
 
 The rows are linear, so the model is a linear programme whenever the rest of the problem is,
-see [`NoRisk`](@ref). The term does not force the risk form of [`MaximumRatio`](@ref).
+see [`NoRisk`](@ref). The term forces the risk form of [`MaximumRatio`](@ref). The rows are
+linear, but a radius can put every worst-case return at or below ``r_f``, and then the return
+form has no solution.
 
 # Mathematical definition
 
@@ -819,15 +836,16 @@ function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::L1UncertaintySet
                      JuMP.@expression(model, dot_scalar(mu, w) - ucs.eps * t_l1ucs))
     add_fees_to_ret!(model, ret, settings.fee)
     add_market_impact_cost!(model, ret, settings.mic)
-    return ret, mu, false
+    # The rows are linear, but the characteristic does not carry the penalty (#1358).
+    return ret, mu, true
 end
 """
     set_ucs_return_constraints!(model, i, ucs::SignedL1UncertaintySet, mu, settings)
 
 Build one term's signed-``\\ell_1``-robust return expression.
 
-The rows are linear, and the term does not force the risk form of [`MaximumRatio`](@ref). The
-worst case keeps the long-short problem as one problem. Thus it does not need the two
+The rows are linear, and the term forces the risk form of [`MaximumRatio`](@ref), as the
+``\\ell_1`` set does. The worst case keeps the long-short problem as one problem. Thus it does not need the two
 separate problems of equations (27) and (28) of [quintile](@cite). It also does not need the
 condition on complementary supports that Remark 12 of that source sets to join the two parts.
 
@@ -906,7 +924,8 @@ function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::SignedL1Uncertai
                                       ucs.en * t_sl1ucs_m))
     add_fees_to_ret!(model, ret, settings.fee)
     add_market_impact_cost!(model, ret, settings.mic)
-    return ret, mu, false
+    # The rows are linear, but the characteristic does not carry the penalty (#1358).
+    return ret, mu, true
 end
 """
     set_ucs_return_constraints!(model, i, ucs::NormBallUncertaintySet, mu, settings)
@@ -916,7 +935,8 @@ Build one term's norm-ball-robust return expression.
 The builder raises one cone of the dual order on ``\\mathbf{L}^{\\intercal}\\boldsymbol{w}``.
 The map of the set takes the place of the Cholesky factor of the ellipsoid, and the builder
 factorises nothing. A map with no column raises no cone and leaves the nominal return. That
-term does not force the risk form of [`MaximumRatio`](@ref). All other norm balls force it.
+term forces the risk form of [`MaximumRatio`](@ref) only when it deducts a charge. All other
+norm balls force it.
 The method takes the mean tag alone, and the [`ArithmeticReturn`](@ref) constructor refuses a
 set that carries the covariance tag.
 
@@ -986,9 +1006,9 @@ function set_ucs_return_constraints!(model::JuMP.Model, i,
         JuMP.@expression(model, dot_scalar(mu, w))
     end
     ret = state_set!(model, Symbol(""), :ret_, i, ret)
-    add_fees_to_ret!(model, ret, settings.fee)
-    add_market_impact_cost!(model, ret, settings.mic)
-    return ret, mu, robust
+    fee = add_fees_to_ret!(model, ret, settings.fee)
+    mic = add_market_impact_cost!(model, ret, settings.mic)
+    return ret, mu, robust || fee || mic
 end
 function set_return_constraints!(model::JuMP.Model, i,
                                  pret::ArithmeticReturn{<:Any, <:UcSE_UcS, <:Any},
@@ -1001,10 +1021,10 @@ function set_return_constraints!(model::JuMP.Model, i,
     # is fitted from the optimisation's own prior result rather than from returns data. An
     # estimator that carries its own `pe` drops it (see [`mu_ucs`](@ref)).
     uc = mu_ucs(pret.ucs, rd, pr; kwargs...)
-    ret, mu, robust = set_ucs_return_constraints!(model, i, uc, fb, settings)
+    ret, mu, forces_risk = set_ucs_return_constraints!(model, i, uc, fb, settings)
     set_return_bounds!(model, i, ret, settings.lb)
     set_return_expression!(model, i, ret, settings.scale, settings.rte)
-    return mu, robust
+    return mu, forces_risk
 end
 function set_return_constraints!(model::JuMP.Model, i, pret::LogarithmicReturn,
                                  pr::AbstractPriorResult; kwargs...)
@@ -1023,8 +1043,8 @@ function set_return_constraints!(model::JuMP.Model, i, pret::LogarithmicReturn,
         JuMP.@expression(model, Statistics.mean(t_elog_ret, wi))
     end
     state_set!(model, Symbol(""), :ret_, i, ret)
-    add_fees_to_ret!(model, ret, settings.fee)
-    add_market_impact_cost!(model, ret, settings.mic)
+    fee = add_fees_to_ret!(model, ret, settings.fee)
+    mic = add_market_impact_cost!(model, ret, settings.mic)
     kret = state_set!(model, Symbol(""), :kret_, i, JuMP.@expression(model, k .+ X))
     state_set!(model, Symbol(""), :elog_ret_ret_, i,
                JuMP.@constraint(model, [j = 1:T],
@@ -1032,8 +1052,9 @@ function set_return_constraints!(model::JuMP.Model, i, pret::LogarithmicReturn,
                                 JuMP.MOI.ExponentialCone()))
     set_return_bounds!(model, i, ret, settings.lb)
     set_return_expression!(model, i, ret, settings.scale, settings.rte)
-    # A logarithmic term holds no per-asset quantity, which forces the ratio's risk form.
-    return nothing, false
+    # A logarithmic term holds no per-asset quantity, which forces the ratio's risk form. A
+    # charge forces it too, when an arithmetic term supplies the characteristic (#1358).
+    return nothing, fee || mic
 end
 function set_return_constraints!(model::JuMP.Model, i, pret::NoReturn,
                                  ::AbstractPriorResult; kwargs...)

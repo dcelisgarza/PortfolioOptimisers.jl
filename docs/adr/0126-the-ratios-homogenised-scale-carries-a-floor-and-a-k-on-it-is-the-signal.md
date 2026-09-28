@@ -158,3 +158,35 @@ The floor is inert where the ratio is well posed **and the solver stops at `OPTI
 agrees with a `1e-14` floor to `6.7e-5` or better. An `ALMOST_OPTIMAL` stop is not inert, because
 any change of `1e-8` or more to the right-hand side of `k >= kmin` moves where Clarabel stops, and
 the size of the change does not predict the move, so the derived floor moves it too (#1280).
+
+## Amendment (2026-09-28)
+
+The list of terms that force the risk form grows. The Context above lists the box, the ellipsoidal
+and the norm-ball mean sets. Since #1358 these terms force the risk form too:
+
+- A term with an `L1UncertaintySet` or a `SignedL1UncertaintySet`. The rows of these sets are
+    linear, but the characteristic that the test `all(mu <= rf)` reads does not carry their
+    penalty.
+- A term that deducts a charge: `:fees`, `:one_time_fees`, or the market impact cost of a
+    `BudgetMarketImpact`. The characteristic does not carry a charge either.
+
+Before this change these terms took the return form. When the penalty or the charge left no
+feasible portfolio above `rf`, the equality `ret - rf k = ohf` had no solution, and the solver
+reported the model infeasible. An unscaled `L1UncertaintySet(; eps = 0.5)`, a
+`SignedL1UncertaintySet(; ep = 0.5, en = 0.5)` and a `Fees(; l = 0.01)` above every expected return
+each did this. The risk form has a solution in each case, and the floor of this ADR gives it a
+readable signal.
+
+The builders return the flag for each term. `add_fees_to_ret!` and `add_market_impact_cost!` return
+whether they deducted a charge, and the flag is the robust cone of the term or the charge. A norm
+ball whose map has no column still takes the return form, unless the term deducts a charge.
+
+The cost is the one that this ADR states for the risk form. A fee or an ℓ1 caller of
+`MaximumRatio` now gets the floored risk form, whose weights meet a bound to about `1e-5` and not
+`1e-7`. Where a tangency portfolio exists, both forms reach the same maximiser, so an answer moves
+by the solver tolerance only.
+
+The test still reads a proxy. It does not see the weight bounds or the linear constraints, so a
+bound that keeps every feasible portfolio at or below `rf` still takes the return form when an
+entry of `mu` is more than `rf`. The option to always take the risk form closes that gap too, but
+it moves every `MaximumRatio` answer, and #1358 did not take it.
