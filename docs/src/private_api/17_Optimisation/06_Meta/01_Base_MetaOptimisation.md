@@ -11,6 +11,7 @@ sub_portfolio_cv
 outer_optimisation_finaliser
 combination_weights
 prepare_outer_rd
+outer_prior_rows
 assert_fold_alignment
 fold_row_indices
 fold_asset_panel

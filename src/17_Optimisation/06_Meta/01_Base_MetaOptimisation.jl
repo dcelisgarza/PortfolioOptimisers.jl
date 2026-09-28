@@ -510,6 +510,39 @@ function prepare_outer_rd(rd::ReturnsResult, wi::MatNum)
     return nb, B, iv, ivpa, pnl, X
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+View the returns data of a meta-optimiser onto the observations its Prior Result answers on.
+
+The outer problem reads the net return of each sub-portfolio off the scenarios of the Prior Result, one row per scenario, so its returns data must hold one row per scenario too. A prior that answers on every observation leaves `rd` whole. A [`CrossSectionalFactorPrior`](@ref) answers on the observations it fitted, which are the last ones of `rd`, because its Descriptor warm-up and its exposure lag consume the first. So a prior with fewer scenarios than `rd` has observations takes the last rows of `rd`, and the timestamps, the benchmark, the Exogenous Series and the Asset Panel of the outer problem follow them.
+
+# Arguments
+
+  - `rd`: The returns data of the meta-optimiser.
+  - `pr`: The Prior Result over the whole universe.
+
+# Validation
+
+  - `size(pr.X, 1) <= size(rd.X, 1)`. Raises a `DimensionMismatch`, because a prior with more scenarios than observations states no row of `rd` for each of them.
+
+# Returns
+
+  - `rd::ReturnsResult`: `rd` itself, or its view onto its last `size(pr.X, 1)` observations.
+
+# Related
+
+  - [`predict_outer_returns`](@ref)
+  - [`prepare_outer_rd`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function outer_prior_rows(rd::ReturnsResult, pr::AbstractPriorResult)::ReturnsResult
+    T = size(rd.X, 1)
+    n = size(pr.X, 1)
+    @argcheck(n <= T,
+              DimensionMismatch("the outer problem of a meta-optimiser reads one row of net returns per scenario of the Prior Result, and the prior states $n scenarios over $T observations. A prior that generates more scenarios than observations cannot build the returns of the synthetic assets; give the meta-optimiser a prior that answers on the observations"))
+    return n == T ? rd : port_opt_view(rd, (T - n + 1):T, :)
+end
+"""
     assert_fold_alignment(predictions) -> VecPredRes
 
 Check that fold `f` of every sub-portfolio covers the same observations, and return the folds of the first sub-portfolio.
@@ -1017,7 +1050,7 @@ With Fees, [`calc_net_returns`](@ref) subtracts the fee of sub-portfolio ``k`` f
 
 Without folds:
 
- 1. Prepare the returns data of the outer problem with [`prepare_outer_rd`](@ref), giving `nb`, `B`, `iv`, `ivpa`, `pnl` and the buffer `X`.
+ 1. View `rd` onto the observations the Prior Result answers on with [`outer_prior_rows`](@ref). Prepare the returns data of the outer problem from it with [`prepare_outer_rd`](@ref), giving `nb`, `B`, `iv`, `ivpa`, `pnl` and the buffer `X`.
  2. For each inner result `res` in `resi`, write its net returns with [`calc_net_returns`](@ref) to column `i` of `X`, on the Prior Result and Fees viewed onto sub-portfolio `i`.
  3. Build the [`ReturnsResult`](@ref), with the asset names `_1`, `_2`, … and the factors and timestamps of `rd`.
 
@@ -1055,6 +1088,7 @@ function predict_outer_returns(::Option{<:OptimisationCrossValidation}, ::Any,
                                u::SubPortfolioUniverse, rd::ReturnsResult,
                                pr::AbstractPriorResult, fees::Option{<:Fees}, wi::MatNum,
                                resi::VecOpt)
+    rd = outer_prior_rows(rd, pr)
     nb, B, iv, ivpa, pnl, X = prepare_outer_rd(rd, wi)
     for (i, res) in enumerate(resi)
         X[:, i] = calc_net_returns(res, sub_portfolio_view(u, pr, i),
