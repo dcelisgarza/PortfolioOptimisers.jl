@@ -18,6 +18,7 @@
     - `fold_weight_matrix` puts zeros outside each cluster of a `ClusterUniverse`.
     - A fold count or a clock that disagrees raises `DimensionMismatch`, and a
       time-varying panel without a clock raises `IsNothingError`.
+    - Integer returns give the weights of the same returns as `Float64` (#1363).
     =#
 
     PO = PortfolioOptimisers
@@ -240,5 +241,45 @@
         # Neither removed method exists: no path gives either of them an argument.
         @test !hasmethod(PO.panel_field_stack, Tuple{Vector{PO.CategoricalPanelField}})
         @test !hasmethod(PO.fold_asset_panel, Tuple{Nothing, Any, Matrix{Float64}, Any})
+    end
+
+    @testset "integer returns give the weights of the same returns as Float64" begin
+        #=
+        #1363: a weight, a fee and a net return are fractions, so a meta-optimiser that took
+        its matrix of inner weights, its weight bounds, its fees or its buffer of outer
+        returns from the element type of integer returns threw `InexactError`. Each path
+        below threw before the fix.
+        =#
+        Xi = rand(StableRNG(2), -3:3, 120, 6)
+        nx = string.("A", 1:6)
+        rdi = ReturnsResult(; nx = nx, X = Xi)
+        rdf = ReturnsResult(; nx = nx, X = Matrix{Float64}(Xi))
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        fees = FeesEstimator(; l = ["A1" => 0.001], dl = 0.0005)
+        kcv = OptimisationCrossValidation(; cv = KFold(; n = 3))
+        ew = EqualWeighted()
+        sti = [EqualWeighted(), InverseVolatility()]
+        opts = [NestedClustered(; opti = ew, opto = ew),
+                NestedClustered(; opti = ew, opto = ew, cv = kcv),
+                NestedClustered(; opti = ew, opto = ew, fees = fees, sets = sets),
+                Stacking(; opti = sti, opto = ew),
+                Stacking(; opti = sti, opto = ew, cv = kcv),
+                Stacking(; opti = sti, opto = ew, fees = fees, sets = sets),
+                SubsetResampling(; opt = ew, subset_size = 3, n_subsets = 4, seed = 7),
+                SubsetResampling(; opt = ew, subset_size = 3, n_subsets = 4, seed = 7,
+                                 fees = fees, sets = sets)]
+        for opt in opts
+            wi = optimise(opt, rdi).w
+            wf = optimise(opt, rdf).w
+            @test eltype(wi) == Float64
+            @test isapprox(wi, wf; rtol = 0, atol = eps(Float64))
+        end
+        # The buffer of outer returns holds a net return, a fraction, for integer inputs.
+        _, _, _, _, _, Xo = PO.prepare_outer_rd(rdi, [1 0; 0 1; 1 0; 0 1; 1 0; 0 1])
+        @test eltype(Xo) == Float64
+        # A type that is not an integer is kept.
+        rdr = ReturnsResult(; nx = nx, X = Rational{Int}.(Xi))
+        _, _, _, _, _, Xr = PO.prepare_outer_rd(rdr, Rational{Int}.(ones(Int, 6, 2)))
+        @test eltype(Xr) == Rational{Int}
     end
 end

@@ -589,20 +589,25 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol 
     sr = reset_time_dependent_estimator(sr)
     rd = returns_result_picker(rd, sr.brt)
     pr = prior(sr.pe, rd)
+    # A weight and a fee are fractions, so integer returns take a floating point type.
+    Tf = float_if_integer(eltype(pr.X))
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
     imsk = investable_mask(pr)
-    fees = investable_fees_view(fees_constraints(sr.fees, sr.sets; datatype = eltype(pr.X),
+    fees = investable_fees_view(fees_constraints(sr.fees, sr.sets; datatype = Tf,
                                                  strict = sr.strict), imsk, pr.X)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here,
     # before the sample: `N` is then the count of investable assets, so every subset is
     # drawn from the investable universe alone and no subset can hold a dead asset.
     # `SubsetResamplingResult` expands the averaged weights back.
-    _, pr, sr, rd = investable_reduction(imsk, pr, sr, rd)
+    # The reduced `rd` takes a name of its own: a variable that is reassigned and then
+    # captured by the fold's closure is boxed, which FLoops reports as a correctness and
+    # performance problem on every call.
+    _, pr, sr, rdr = investable_reduction(imsk, pr, sr, rd)
     X = pr.X
     N = size(X, 2)
     (; subset_size, n_subsets, max_comb, rng, seed) = sr
@@ -618,12 +623,11 @@ function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol 
     FLoops.@floop sr.ex for i in 1:n_subsets
         idx = view(asset_idx, :, i)
         opti = port_opt_view(opt, idx, X)
-        rdi = port_opt_view(rd, idx)
+        rdi = port_opt_view(rdr, idx)
         ress[i] = optimise(opti, rdi; branchorder = branchorder, str_names = str_names,
                            save = save, kwargs...)
     end
-    wb = weight_bounds_constraints(sr.wb, sr.sets; N = N, strict = sr.strict,
-                                   datatype = eltype(X))
+    wb = weight_bounds_constraints(sr.wb, sr.sets; N = N, strict = sr.strict, datatype = Tf)
     retcode, w = subset_resampling_finaliser(N, n_subsets, asset_idx, wb, sr.wf, ress,
                                              ress[1].w)
     return SubsetResamplingResult(; pr = pr, wb = wb, fees = fees, ress = ress,

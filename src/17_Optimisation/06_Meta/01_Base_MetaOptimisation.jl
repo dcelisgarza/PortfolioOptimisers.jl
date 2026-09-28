@@ -451,7 +451,7 @@ A column of zeros in ``\\mathbf{W}`` gives a column of zeros in ``\\mathbf{V}^{o
  1. When `rd.B` is a matrix, collapse it, giving `B = rd.B * wi`, and name its columns `nb = ["_b1", …]`. Otherwise keep `rd.B` and `rd.nb`.
  2. When `rd.iv` is present or `rd.ivpa` is a vector, normalise `wi` with [`synthetic_asset_weights`](@ref), giving `wn`. Collapse `iv = rd.iv * wn` when it is present, and `ivpa = transpose(wn) * rd.ivpa` when it is a vector.
  3. Collapse the Asset Panel with [`collapse_asset_panel`](@ref), giving `pnl`.
- 4. Allocate the buffer `X`, `observations × sub-portfolios`, with the element type of `rd.X`.
+ 4. Allocate the buffer `X`, `observations × sub-portfolios`, with the element type that promotes the element types of `rd.X` and `wi`, through [`float_if_integer`](@ref), because a net return is a fraction.
 
 # Arguments
 
@@ -502,8 +502,11 @@ function prepare_outer_rd(rd::ReturnsResult, wi::MatNum)
     pnl = collapse_asset_panel(rd.pnl, wi, rd.nx)
     # `rd` is the meta-optimiser's own returns result, not a fitted prior, so this row
     # count is the panel the sub-portfolios were scored over. It is not the model-wide
-    # `:T` a JuMP head registers.
-    X = Matrix{eltype(rd.X)}(undef, size(rd.X, 1), size(wi, 2))
+    # `:T` a JuMP head registers. A net return is a fraction, so integer returns take a
+    # floating point type.
+    X = Matrix{float_if_integer(promote_type(eltype(rd.X), eltype(wi)))}(undef,
+                                                                         size(rd.X, 1),
+                                                                         size(wi, 2))
     return nb, B, iv, ivpa, pnl, X
 end
 """

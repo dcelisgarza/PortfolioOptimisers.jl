@@ -256,16 +256,16 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
     end
 end
 
-@testset "No meta-optimiser fold captures a boxed carrier" begin
+@testset "No meta-optimiser fold captures a boxed returns result" begin
     #=
-    `NestedClustered` and `Stacking` assign `rd` twice before their `@floop` — the
-    benchmark-relative picker, then the investable reduction — and a variable that is
-    reassigned and then captured by the fold's closure is boxed. FLoops reports a boxed
-    capture as a correctness and performance problem, once per process, so a test file whose
-    earlier NCO call already fired it never sees it again, and example 16 does on every fresh
-    run. The reduced carrier therefore takes a name of its own, and this gate asks FLoops to
-    throw rather than warn on the two fold loops. `assistant` is process-wide, so the default
-    `:warn` is restored whatever happens.
+    `NestedClustered`, `Stacking` and `SubsetResampling` assign `rd` twice before their
+    `@floop` — the benchmark-relative picker, then the investable reduction — and a variable
+    that is reassigned and then captured by the fold's closure is boxed. FLoops reports a
+    boxed capture as a correctness and performance problem, once per process, so a test file
+    whose earlier NCO call already fired it never sees it again, and example 16 does on every
+    fresh run. The reduced returns result therefore takes a name of its own, and this gate
+    asks FLoops to throw rather than warn on the three fold loops. `assistant` is
+    process-wide, so the default `:warn` is restored whatever happens.
     =#
     PortfolioOptimisers.FLoops.assistant(:error)
     try
@@ -280,6 +280,9 @@ end
                               MeanRisk(; opt = jopti)],
                       opto = HierarchicalRiskParity(; opt = hopto))
         @test isa(optimise(st, rd).retcode, OptimisationSuccess)
+        sr = SubsetResampling(; opt = HierarchicalRiskParity(; opt = hopti),
+                              subset_size = 3, n_subsets = 4, seed = 1)
+        @test isa(optimise(sr, rd).retcode, OptimisationSuccess)
     finally
         PortfolioOptimisers.FLoops.assistant(:warn)
     end

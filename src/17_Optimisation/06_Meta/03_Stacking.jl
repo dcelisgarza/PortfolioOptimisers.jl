@@ -573,13 +573,15 @@ function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optim
     st = reset_time_dependent_estimator(st)
     rd = returns_result_picker(rd, st.brt)
     pr = prior(st.pe, rd)
+    # A weight and a fee are fractions, so integer returns take a floating point type.
+    Tf = float_if_integer(eltype(pr.X))
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
     imsk = investable_mask(pr)
-    fees = investable_fees_view(fees_constraints(st.fees, st.sets; datatype = eltype(pr.X),
+    fees = investable_fees_view(fees_constraints(st.fees, st.sets; datatype = Tf,
                                                  strict = st.strict), imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
     # rebuilds, so only the result charges it. No sub-problem below holds that vector —
@@ -597,7 +599,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optim
     X = pr.X
     opti = st.opti
     Ni = length(opti)
-    wi = zeros(eltype(X), size(X, 2), Ni)
+    wi = zeros(Tf, size(X, 2), Ni)
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, Ni)
     FLoops.@floop st.ex for (i, opt) in pairs(opti)
         res = optimise(opt, rdr; branchorder = branchorder, str_names = str_names,
@@ -612,7 +614,7 @@ function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optim
     reso = optimise(st.opto, rdo; branchorder = branchorder, str_names = str_names,
                     save = save, kwargs...)
     wb = weight_bounds_constraints(st.wb, st.sets; N = size(X, 2), strict = st.strict,
-                                   datatype = eltype(X))
+                                   datatype = Tf)
     retcode, w = outer_optimisation_finaliser(wb, st.wf, resi, reso.retcode,
                                               combination_weights(st.scale, reso.w), wi)
     return StackingResult(; pr = pr, wb = wb, fees = fees, resi = resi, reso = reso,

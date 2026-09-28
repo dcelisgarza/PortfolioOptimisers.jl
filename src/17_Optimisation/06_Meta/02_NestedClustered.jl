@@ -799,14 +799,15 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     nco = reset_time_dependent_estimator(nco)
     rd = returns_result_picker(rd, nco.brt)
     pr = prior(nco.pe, rd)
+    # A weight and a fee are fractions, so integer returns take a floating point type.
+    Tf = float_if_integer(eltype(pr.X))
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
     imsk = investable_mask(pr)
-    fees = investable_fees_view(fees_constraints(nco.fees, nco.sets;
-                                                 datatype = eltype(pr.X),
+    fees = investable_fees_view(fees_constraints(nco.fees, nco.sets; datatype = Tf,
                                                  strict = nco.strict), imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
     # rebuilds, so only the result charges it. No sub-problem below holds that vector —
@@ -826,7 +827,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     assert_clustering_universe(clr, size(X, 2))
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
-    wi = zeros(eltype(X), size(X, 2), clr.k)
+    wi = zeros(Tf, size(X, 2), clr.k)
     opti = nco.opti
     resi = Vector{NonFiniteAllocationOptimisationResult}(undef, clr.k)
     FLoops.@floop nco.ex for (i, cl) in pairs(cls)
@@ -845,7 +846,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     reso = optimise(nco.opto, rdo; branchorder = branchorder, str_names = str_names,
                     save = save, kwargs...)
     wb = weight_bounds_constraints(nco.wb, nco.sets; N = size(X, 2), strict = nco.strict,
-                                   datatype = eltype(X))
+                                   datatype = Tf)
     retcode, w = outer_optimisation_finaliser(wb, nco.wf, resi, reso.retcode, reso.w, wi)
     return NestedClusteredResult(; pr = pr, clr = clr, wb = wb, fees = fees, resi = resi,
                                  reso = reso, cv = nco.cv, retcode = retcode, w = w,
