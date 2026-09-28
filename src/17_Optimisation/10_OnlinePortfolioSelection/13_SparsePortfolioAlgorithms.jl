@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Puts the whole budget on the asset with the largest Price Relative Forecast, and splits it in equal parts between tied assets.
 
-This is the optimum of the programme that the paper of the short-term sparse portfolio states, its equation (12). The optimum does not depend on ``\\lambda``, so the algorithm takes no parameter. Where the programme has no minimum, the algorithm returns the same split.
+This is the optimum of the programme of the short-term sparse portfolio, equation (12) of [lai2018sspo](@cite). The optimum does not depend on ``\\lambda``, so the algorithm takes no parameter. Where the programme has no minimum, the algorithm returns the same split.
 
 # Mathematical definition
 
@@ -49,7 +49,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Finds the fixed point of the alternating direction iteration of the short-term sparse portfolio in closed form.
 
-The paper's iteration converges to this point, so it is the default algorithm of [`ShortTermSparsePortfolio`](@ref). Where the programme has no minimum, the algorithm returns the split of [`L1Optimum`](@ref).
+The iteration of [lai2018sspo](@cite) converges to this point, so it is the default algorithm of [`ShortTermSparsePortfolio`](@ref). Where the programme has no minimum, the algorithm returns the split of [`L1Optimum`](@ref).
 
 # Mathematical definition
 
@@ -74,7 +74,7 @@ Where:
   - ``b_i(\\nu)``: Coordinate of asset ``i`` at the multiplier ``\\nu``, where ``\\lvert \\phi_i + \\nu \\rvert < \\lambda``.
   - $(math_dict[:N])
 
-The programme is equation (20) of the paper without its penalty on the budget residual, which is zero on the budget. The minimum over ``\\boldsymbol{g}`` is the soft threshold of ``\\boldsymbol{b}`` at ``\\gamma``, and it leaves the penalty ``h`` on each coordinate. The paper's equation (19) is ``h / \\lambda``.
+The programme is equation (20) of [lai2018sspo](@cite) without its penalty on the budget residual, which is zero on the budget. The minimum over ``\\boldsymbol{g}`` is the soft threshold of ``\\boldsymbol{b}`` at ``\\gamma``, and it leaves the penalty ``h`` on each coordinate. Equation (19) of [lai2018sspo](@cite) is ``h / \\lambda``.
 
 The derivative ``h'(b) = \\mathrm{clamp}(a b, -\\lambda, \\lambda)`` is bounded, so a multiplier ``\\nu`` exists only in the interval above. An asset with ``\\lvert \\phi_i + \\nu \\rvert < \\lambda`` holds ``b_i(\\nu)``. An asset with ``\\lvert \\phi_i + \\nu \\rvert = \\lambda`` can hold any amount past ``\\pm \\gamma``, with the sign of ``-(\\phi_i + \\nu)``, because ``h`` is linear there. The sum of the ``b_i(\\nu)`` falls piecewise linearly in ``\\nu``, with knots at ``-\\phi_i \\pm \\lambda``. The multiplier is the root of that sum at one, or the end of the interval where the sum cannot reach one. At the lower end the assets with the smallest ``\\phi_i`` take the remainder of the budget, and at the upper end the assets with the largest ``\\phi_i`` take it.
 
@@ -96,7 +96,7 @@ $(DocStringExtensions.FIELDS)
 
     HuberOptimum(; lambda::Real = 0.5, gamma::Real = 0.01) -> HuberOptimum
 
-Keywords correspond to the struct's fields, and the defaults are the paper's.
+Keywords correspond to the struct's fields, and the defaults come from [lai2018sspo](@cite).
 
 ## Validation
 
@@ -143,9 +143,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Runs the alternating direction iteration of the short-term sparse portfolio, and stops where the paper stops it.
+Runs the alternating direction iteration of the short-term sparse portfolio until its stopping rule holds.
 
-Take this algorithm to reproduce the paper's loop and its stop. Its fixed point is the point that [`HuberOptimum`](@ref) finds in closed form, but the stop comes long before the iterate reaches that point. The stop reads the budget residual, which changes sign as the dual variable adapts, and the iteration meets `tol = 1e-4` at one of those sign changes. The scaled projection of the stopped iterate is usually the fixed point's projection, but it can hold other assets. A tolerance that the sign changes never meet runs all `iters` iterations.
+Take this algorithm to reproduce the loop and the stopping rule of [lai2018sspo](@cite). Its fixed point is the point that [`HuberOptimum`](@ref) finds in closed form, but the stop comes long before the iterate reaches that point. The stop reads the budget residual, which changes sign as the dual variable adapts, and the iteration meets `tol = 1e-4` at one of those sign changes. The scaled projection of the stopped iterate is usually the fixed point's projection, but it can hold other assets. A tolerance that the sign changes never meet runs all `iters` iterations.
 
 The tests measure these numbers from the uniform seed. On `0.02 .* randn(StableRNG(11), 40, 4)`, over the 36 windows of five rows, the stop comes after 359 to 4619 iterations and 2 to 27 sign changes. At the stop the iterate is up to about 0.67 from the fixed point in one coordinate, and it comes within ``10^{-6}`` of the fixed point after 29461 to 104386 iterations. On `0.02 .* randn(StableRNG(1), 60, 4)`, rows 2 to 6 give two assets almost equal forecasts. At `zeta = 500` the stopped iterate projects to about `[0.46, 0, 0, 0.54]`, and the fixed point projects to `[0, 0, 0, 1]`.
 
@@ -177,11 +177,11 @@ Where:
   - ``\\boldsymbol{v}``: Any ``N \\times 1`` vector.
   - $(math_dict[:N])
 
-``L`` is the paper's equation (13), and the three updates are its equations (29), (32) and (27). The last line is the Sherman-Morrison identity. A fixed point of the updates has a zero budget residual, and it solves the programme of [`HuberOptimum`](@ref).
+``L`` is equation (13) of [lai2018sspo](@cite), and the three updates are equations (29), (32) and (27) of [lai2018sspo](@cite). The last line is the Sherman-Morrison identity. A fixed point of the updates has a zero budget residual, and it solves the programme of [`HuberOptimum`](@ref).
 
 # Algorithm
 
- 1. Seed `b` and `g` at the held allocation `w`, and `rho` at zero, as step 3 of the paper's Algorithm 1 does. Compute `a = lambda / gamma`.
+ 1. Seed `b` and `g` at the held allocation `w`, and `rho` at zero, as step 3 of Algorithm 1 of [lai2018sspo](@cite) does. Compute `a = lambda / gamma`.
  2. Compute the right-hand side `rhs` of the update of ``\\boldsymbol{b}`` from `g` and `rho`.
  3. Compute `b` from `rhs` with the inverse in closed form, in ``O(N)`` operations.
  4. Compute `g`, the soft threshold of `b` at `gamma`.
@@ -202,7 +202,7 @@ $(DocStringExtensions.FIELDS)
         tol::Real = 1e-4
     ) -> AlternatingDirectionMethod
 
-Keywords correspond to the struct's fields, and the defaults are the paper's.
+Keywords correspond to the struct's fields, and the defaults come from [lai2018sspo](@cite).
 
 ## Validation
 
@@ -279,7 +279,7 @@ end
 
 Finds the unscaled target of a [`ShortTermSparsePortfolio`](@ref) step for the objective vector `phi`.
 
-[`L1Optimum`](@ref) returns the optimum of the programme that the paper states. [`HuberOptimum`](@ref) returns the fixed point of the paper's iteration in closed form. [`AlternatingDirectionMethod`](@ref) runs the paper's iteration from the held allocation `w`, and it is the only method that reads `w`. The type docstrings state the formulas.
+[`L1Optimum`](@ref) returns the optimum of the programme of [lai2018sspo](@cite). [`HuberOptimum`](@ref) returns the fixed point of the iteration of [lai2018sspo](@cite) in closed form. [`AlternatingDirectionMethod`](@ref) runs that iteration from the held allocation `w`, and it is the only method that reads `w`. The type docstrings state the formulas.
 
 # Returns
 
@@ -291,6 +291,10 @@ Finds the unscaled target of a [`ShortTermSparsePortfolio`](@ref) step for the o
   - [`ShortTermSparsePortfolio`](@ref)
   - [`largest_forecast_split`](@ref)
   - [`huber_multiplier`](@ref)
+
+# References
+
+  - $(ref_dict[:lai2018sspo])
 """
 function sparse_portfolio_iterate(::L1Optimum, phi::AbstractVector, ::AbstractVector)
     return largest_forecast_split(phi)

@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimates the covariance of a short window as a rank-one matrix along the principal direction of its price relatives.
 
-Lai, Tan, Wu and Fang (2020) built the estimate for short-term portfolio optimisation, where the window holds a few observations of many assets. The matrix is positive semidefinite and singular, so it has no Cholesky factor. A consumer reads it as a quadratic form, as [`Variance`](@ref) does under [`QuadRiskExpr`](@ref).
+[lai2020spolc](@citet) define the estimate for short-term portfolio optimisation, where the window holds a few observations of many assets. The matrix is positive semidefinite and singular, so it has no Cholesky factor. A consumer reads it as a quadratic form, as [`Variance`](@ref) does under [`QuadRiskExpr`](@ref).
 
 # Mathematical definition
 
@@ -28,9 +28,9 @@ Where:
   - ``\\zeta_1^\\star``: Energy of the estimate along ``\\boldsymbol{u}_1``.
   - $(math_dict[:Sigma_hat_RO])
 
-This is Algorithm 1 of the paper. Its equations 42 and 49 write the trace of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}`` in the basis of the singular vectors of ``\\mathbf{X}``, as ``\\operatorname{tr}(D)``, which is the same number. The quotient ``\\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}) / (N (w - 1))`` is the mean of the ``N`` sample variances of the window. So ``\\zeta_1^\\star`` is ``\\theta_1`` over the root of the mean variance. That value minimises the trade-off of equation 48 between the magnitude of ``\\theta_1 \\boldsymbol{u}_1 \\boldsymbol{u}_1^\\intercal`` and the magnitude of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}``.
+This is Algorithm 1 of [lai2020spolc](@cite). Equations 42 and 49 of [lai2020spolc](@cite) write the trace of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}`` in the basis of the singular vectors of ``\\mathbf{X}``, as ``\\operatorname{tr}(D)``, which is the same number. The quotient ``\\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}) / (N (w - 1))`` is the mean of the ``N`` sample variances of the window. So ``\\zeta_1^\\star`` is ``\\theta_1`` over the root of the mean variance. That value minimises the trade-off of equation 48 between the magnitude of ``\\theta_1 \\boldsymbol{u}_1 \\boldsymbol{u}_1^\\intercal`` and the magnitude of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}``.
 
-Equation 47 divides the trace of a matrix by its rank, and equation 49 puts the rank of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}`` at ``w - 1``. That is the rank of a short window, ``w \\leq N + 1``, which is the case the paper studies. On a longer window the rank is at most ``N``, but the definition keeps ``w - 1``, as Algorithm 1 and the authors' code do. When every row of the window is the same, ``\\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}) = 0`` and ``\\zeta_1^\\star`` is not defined.
+Equation 47 divides the trace of a matrix by its rank, and equation 49 puts the rank of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}`` at ``w - 1``. That is the rank of a short window, ``w \\leq N + 1``, which is the case that [lai2020spolc](@cite) studies. On a longer window the rank is at most ``N``, but the definition keeps ``w - 1``, as Algorithm 1 and the code that accompanies [lai2020spolc](@cite) do. When every row of the window is the same, ``\\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}) = 0`` and ``\\zeta_1^\\star`` is not defined.
 
 # Fields
 
@@ -67,7 +67,7 @@ RankOneCovariance
 """
 struct RankOneCovariance{T1 <: Real} <: AbstractCovarianceEstimator
     """
-    Number added to every entry of the returns to form the price relatives ``\\mathbf{X}``. The default `1` turns returns into the price relatives that the paper reads, and `0` decomposes the rows as given.
+    Number added to every entry of the returns to form the price relatives ``\\mathbf{X}``. The default `1` turns returns into price relatives, which the estimate reads, and `0` decomposes the rows as given.
     """
     shift::T1
     function RankOneCovariance(shift::Real)

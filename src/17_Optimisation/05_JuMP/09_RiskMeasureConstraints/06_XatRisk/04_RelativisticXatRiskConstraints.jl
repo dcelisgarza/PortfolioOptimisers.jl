@@ -11,7 +11,7 @@ upper-tail relativistic expression.
 
 # Mathematical definition
 
-Relativistic Value-at-Risk (Damian et al. 2023):
+The Relativistic Value-at-Risk of [rlvar](@cite) is:
 
 ```math
 \\begin{align}
@@ -51,6 +51,10 @@ For observation-weighted samples the weight vector is normalised to ``\\boldsymb
 
   - [`risk_series`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
+
+# References
+
+  - $(ref_dict[:rlvar])
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRisk,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;

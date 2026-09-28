@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Takes an exponential average of the last `window` price levels, truncated and not normalised, which is the forecast of a rising asset in the trend promote price tracing of Dai, Liang, Dai, Huang and Adnan (2022).
+Takes an exponential average of the last `window` price levels, truncated and not normalised, which is the forecast of a rising asset in the trend promote price tracing, TPPT.
 
-The paper prints this forecast as a sum of five terms (eq. 7 and Algorithm 1). Its first term reads the level of the next period, ``\\boldsymbol{p}_{t+1}``, which is not known at period ``t``. If that term means ``\\boldsymbol{p}_{t-4}``, the oldest level gets the largest weight. The library keeps the paper's five coefficients and gives the largest one to the current level, as an exponential moving average does. Algorithm 1 of the paper sets `alpha = 0.5`, and its experiments use `window = 5`. These are the defaults.
+Equation (7) and Algorithm 1 of [dai2022tppt](@cite) print this forecast as a sum of five terms. Its first term reads the level of the next period, ``\\boldsymbol{p}_{t+1}``, which is not known at period ``t``. If that term means ``\\boldsymbol{p}_{t-4}``, the oldest level gets the largest weight. The library keeps the five coefficients of [dai2022tppt](@cite) and gives the largest one to the current level, as an exponential moving average does. Algorithm 1 of [dai2022tppt](@cite) sets `alpha = 0.5`, and the experiments of [dai2022tppt](@cite) use `window = 5`. These are the defaults.
 
 # Mathematical definition
 
@@ -89,9 +89,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Averages two Gaussian-weighted estimates of the next price level, which is the forecast of the Gaussian weighting reversion of Cai and Ye (2019).
+Averages two Gaussian-weighted estimates of the next price level, which is the forecast of the Gaussian weighting reversion, GWR.
 
-The first estimate weights the last ``l`` levels with the left half of a Gaussian. The second estimate is the same weighted mean, with the current level replaced by the first estimate of the previous period. The weights fall with age, and the window ``l`` is the number of levels whose weight is at least the cutoff. At the paper's `tau = 2.8` and `cutoff = 0.005`, which are the defaults, ``l = 9``. The previous estimate is a function of the levels ``\\boldsymbol{p}_{t-l}, \\ldots, \\boldsymbol{p}_{t-1}``, so the statistic carries no state and reads ``l`` returns. Over fewer levels, each estimate reads the levels it has.
+It is the forecast of [caiye2019](@citet). The first estimate weights the last ``l`` levels with the left half of a Gaussian. The second estimate is the same weighted mean, with the current level replaced by the first estimate of the previous period. The weights fall with age, and the window ``l`` is the number of levels whose weight is at least the cutoff. At `tau = 2.8` and `cutoff = 0.005`, the values of [caiye2019](@cite) and the defaults, ``l = 9``. The previous estimate is a function of the levels ``\\boldsymbol{p}_{t-l}, \\ldots, \\boldsymbol{p}_{t-1}``, so the statistic carries no state and reads ``l`` returns. Over fewer levels, each estimate reads the levels it has.
 
 # Mathematical definition
 
@@ -228,9 +228,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Takes the sign of the sum of the slopes between every pair of the last `window` levels, per asset, which is the trend test of the trend promote price tracing of Dai, Liang, Dai, Huang and Adnan (2022).
+Takes the sign of the sum of the slopes between every pair of the last `window` levels, per asset, which is the trend test of the trend promote price tracing, TPPT.
 
-At `window = 5` the sum runs over ten pairs. The paper's text counts these ten pairs, and its eq. (7) sums them. Its slope formula, eq. (6), writes only the four slopes from the current level, and the sign of those four can differ from the sign of the ten. The test has no threshold, so an asset is flat only when the sum is exactly zero, as it is on a constant window.
+It is the trend test of [dai2022tppt](@citet). At `window = 5` the sum runs over ten pairs. The text of [dai2022tppt](@cite) counts these ten pairs, and its Equation (7) sums them. The slope formula of [dai2022tppt](@cite), Equation (6), writes only the four slopes from the current level, and the sign of those four can differ from the sign of the ten. The test has no threshold, so an asset is flat only when the sum is exactly zero, as it is on a constant window.
 
 # Mathematical definition
 
@@ -325,11 +325,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Compares the ridge-regularised slope of a straight line through the last `window` levels with a threshold, per asset, which is the trend test of the local adaptive learning of Guan and An (2019).
+Compares the ridge-regularised slope of a straight line through the last `window` levels with a threshold, per asset, which is the trend test of the local adaptive learning, LOAD.
 
-The line has a free intercept, and the ridge weight penalises the slope alone, as in eq. (4) of the paper. The paper states no ridge weight, and `lambda = 0` is plain least squares. Its experiments use `window = 5` and `threshold = 0.1`, the defaults. An asset is rising when its slope is above the threshold, flat when the slope equals it, and falling when the slope is below it. So an asset with a small positive slope is falling. Local adaptive learning reads the same statistic on the flat and the falling branch, so this does not change the paper's rule.
+It is the trend test of [guanan2019](@citet). The line has a free intercept, and the ridge weight penalises the slope alone, as in Equation (4) of [guanan2019](@cite). [guanan2019](@citet) state no ridge weight, and `lambda = 0` is plain least squares. The experiments of [guanan2019](@cite) use `window = 5` and `threshold = 0.1`, the defaults. An asset is rising when its slope is above the threshold, flat when the slope equals it, and falling when the slope is below it. So an asset with a small positive slope is falling. Local adaptive learning reads the same statistic on the flat and the falling branch, so this does not change the rule of [guanan2019](@cite).
 
-The test takes the slope on the reconstructed path, whose last level is one. The threshold is therefore in units of the current price per period, and the paper's `0.1` means the same for every asset. The paper regresses on its own price series and states no normalisation, so there the threshold scales with the level of each asset.
+The test takes the slope on the reconstructed path, whose last level is one. The threshold is therefore in units of the current price per period, and the value `0.1` of [guanan2019](@cite) means the same for every asset. [guanan2019](@citet) regress on their own price series and state no normalisation, so there the threshold scales with the level of each asset.
 
 # Mathematical definition
 
@@ -433,9 +433,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Switches per asset between three statistics on the sign of a trend test, one statistic for a rising asset, one for a flat asset and one for a falling asset.
 
-The trend promote price tracing of Dai, Liang, Dai, Huang and Adnan (2022) switches on the [`PairwiseSlopeSum`](@ref). It takes the [`TruncatedExponentialMovingAverage`](@ref) of a rising asset, the current price of a flat one and the [`WindowPeak`](@ref) of a falling one. The local adaptive learning of Guan and An (2019) switches on the [`RegressionSlope`](@ref). It takes the [`WindowPeak`](@ref) above the threshold and the [`ExponentialMovingAverage`](@ref) otherwise, so its `flat` and `falling` branches hold the same statistic.
+The trend promote price tracing of [dai2022tppt](@citet) switches on the [`PairwiseSlopeSum`](@ref). It takes the [`TruncatedExponentialMovingAverage`](@ref) of a rising asset, the current price of a flat one and the [`WindowPeak`](@ref) of a falling one. The local adaptive learning of [guanan2019](@citet) switches on the [`RegressionSlope`](@ref). It takes the [`WindowPeak`](@ref) above the threshold and the [`ExponentialMovingAverage`](@ref) otherwise, so its `flat` and `falling` branches hold the same statistic.
 
-The composite holds the largest window of its test and its branches, and it reads each of them over its own window. A folding branch reads every level. The composite then holds every row, and the branch runs the paper's recursion over the full history.
+The composite holds the largest window of its test and its branches, and it reads each of them over its own window. A folding branch reads every level. The composite then holds every row, and the branch runs its published recursion over the full history.
 
 # Mathematical definition
 
@@ -583,11 +583,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Mixes several trend forecasts with radial basis weights, centred on the trend whose simplex-projected forecast had the best worst return over the last `window` periods, which is the forecast of the adaptive input and composite trend representation of Lai, Dai, Ren and Huang (2018).
+Mixes several trend forecasts with radial basis weights, centred on the trend whose simplex-projected forecast had the best worst return over the last `window` periods, which is the forecast of the adaptive input and composite trend representation, AICTR.
 
-The paper does not normalise its weights, so the centre takes weight one and every other trend takes less. The composite divides by the sum of the weights, so that it is a forecast on its own. The tracking step of [`AdaptiveInputCompositeTrend`](@ref) scales its centred direction to a fixed length, as eq. (15) and Algorithm 1 of the paper do, so the division does not change the step. Eq. (16) of the paper calls that scaling a projection onto a ball, which would keep the length of a shorter vector. The library follows eq. (15).
+It is the forecast of [lai2018aictr](@citet). [lai2018aictr](@citet) do not normalise the weights, so the centre takes weight one and every other trend takes less. The composite divides by the sum of the weights, so that it is a forecast on its own. The tracking step of [`AdaptiveInputCompositeTrend`](@ref) scales its centred direction to a fixed length, as Equation (15) and Algorithm 1 of [lai2018aictr](@cite) do, so the division does not change the step. Equation (16) of [lai2018aictr](@cite) calls that scaling a projection onto a ball, which would keep the length of a shorter vector. The library follows eq. (15).
 
-The back-test reads the trend forecasts of the last `window` periods, so the composite reads `window - 1` rows more than its widest trend. Over the first rows it back-tests the periods that it has, and without a period to back-test it centres on the first trend. The paper states no rule for these rows. The paper's trends are the simple moving average, the exponential moving average and the window peak, over `window = 5` levels, with `sigma2 = 0.0025`. These are the defaults. The paper states no smoothing weight for the exponential moving average, and the default of [`ExponentialMovingAverage`](@ref) stands.
+The back-test reads the trend forecasts of the last `window` periods, so the composite reads `window - 1` rows more than its widest trend. Over the first rows it back-tests the periods that it has, and without a period to back-test it centres on the first trend. [lai2018aictr](@citet) state no rule for these rows. The trends of [lai2018aictr](@cite) are the simple moving average, the exponential moving average and the window peak, over `window = 5` levels, with `sigma2 = 0.0025`. These are the defaults. [lai2018aictr](@citet) state no smoothing weight for the exponential moving average, and the default of [`ExponentialMovingAverage`](@ref) stands.
 
 # Mathematical definition
 
@@ -726,9 +726,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Reads the elastic-net regularisation path of Friedman, Hastie and Tibshirani (2010) at its middle point, which gives the regression of the initial state of [`KernelTrendPattern`](@ref) on the levels of its window.
+Reads the elastic-net regularisation path at its middle point, which gives the regression of the initial state of [`KernelTrendPattern`](@ref) on the levels of its window.
 
-The objective is eq. (15) of the kernel trend pattern paper of Lai, Yang, Wu and Fang (2018), the elastic net of Zou and Hastie (2005). That paper takes "the middle one in the regularization path" and states no grid. The path paper runs its path over 100 strengths on a log scale, down to a floor of ``10^{-3}`` times the largest strength (section 2.5). Such a grid has no single middle point. The library takes the geometric middle of the path, which lies between the 50th and the 51st point of that grid. The model of the kernel paper has no intercept, so the regression fits none and does not standardise the columns. The glmnet package does both by default, and its objective is the one below divided by twice the number of observations, so it holds the same path. `theta = 0.99` is the kernel paper's value. It is almost the lasso, and it keeps the objective strictly convex.
+The path is that of [friedman2010](@citet). The objective is Equation (15) of [lai2018ktpt](@cite), the elastic net of [zouhastie2005](@citet). [lai2018ktpt](@citet) take "the middle one in the regularization path" and state no grid. Section 2.5 of [friedman2010](@cite) runs the path over 100 strengths on a log scale, down to a floor of ``10^{-3}`` times the largest strength. Such a grid has no single middle point. The library takes the geometric middle of the path, which lies between the 50th and the 51st point of that grid. The model of [lai2018ktpt](@cite) has no intercept, so the regression fits none and does not standardise the columns. The glmnet package does both by default, and its objective is the one below divided by twice the number of observations, so it holds the same path. `theta = 0.99` is the value of [lai2018ktpt](@cite). It is almost the lasso, and it keeps the objective strictly convex.
 
 The columns are the levels of consecutive periods, so they are almost collinear, and the coordinate sweeps converge slowly. Each sweep therefore ends with an exact solve on the sign pattern that it leaves, see [`elastic_net_path`](@ref). The sweeps must still find the sign pattern of the optimum. On the 4 × 5 window of the test fixture they find it after between 2000 and 5000 sweeps, and a cap of 1000 stops more than 0.5 from the optimum in one coefficient. When the sweeps stop at `tol` or at `iters` before that, the result is the last sweep, which is not the optimum.
 
@@ -1004,15 +1004,15 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Predicts the next price level in three states, which is the forecast of the kernel-based trend pattern tracking of Lai, Yang, Wu and Fang (2018).
+Predicts the next price level in three states, which is the forecast of the kernel-based trend pattern tracking, KTPT.
 
-It is a folding statistic with a memory. It carries its previous prediction and the last `2 window` price relatives. The initial state mixes the window peak with the previous prediction. The intermediate state is the regression of that mix on the recent levels, with negative values clipped to zero as the text of the paper states. The final state moves from the intermediate state toward the peak by a reverting strength, which is long-term through the trend-reverting fraction and short-term through the reciprocal of the last price relative. The defaults `window = 5` and `nu = 0.5` are the paper's.
+It is the forecast of [lai2018ktpt](@citet). It is a folding statistic with a memory. It carries its previous prediction and the last `2 window` price relatives. The initial state mixes the window peak with the previous prediction. The intermediate state is the regression of that mix on the recent levels, with negative values clipped to zero as the text of [lai2018ktpt](@cite) states. The final state moves from the intermediate state toward the peak by a reverting strength, which is long-term through the trend-reverting fraction and short-term through the reciprocal of the last price relative. The defaults `window = 5` and `nu = 0.5` are the values of [lai2018ktpt](@cite).
 
-Over the first rows the window and the memory hold the levels that exist, as Algorithm 1 of the paper states. The paper states no rule for fewer than three levels or for the first prediction. The library sets the trend-reverting fraction to zero below three levels, and it seeds the first prediction at the current price.
+Over the first rows the window and the memory hold the levels that exist, as Algorithm 1 of [lai2018ktpt](@cite) states. [lai2018ktpt](@citet) state no rule for fewer than three levels or for the first prediction. The library sets the trend-reverting fraction to zero below three levels, and it seeds the first prediction at the current price.
 
-The regression pools the assets as its observations, so the fit changes when the levels of one asset are scaled. The library reads it on the reconstructed path, whose last level is one for every asset, so the assets enter in the same units. The data sets of the paper hold price relatives, and the paper does not state the anchor of the prices that it rebuilds from them. Under any other anchor, an asset with higher levels than the others weighs more in the fit.
+The regression pools the assets as its observations, so the fit changes when the levels of one asset are scaled. The library reads it on the reconstructed path, whose last level is one for every asset, so the assets enter in the same units. The data sets of [lai2018ktpt](@cite) hold price relatives, and [lai2018ktpt](@citet) do not state the anchor of the prices that they rebuild from them. Under any other anchor, an asset with higher levels than the others weighs more in the fit.
 
-Under an active mask the fit takes the active assets alone, because [`partial_fit!`](@ref) folds the Coverage Universe of the row and holds the other assets. The memory of an asset that the mask turns off stays flat over the inactive rows. When the asset relists, the memory holds its relisting level repeated. The window peak is then the peak of the levels that the asset has, which is the truncation of the paper, and the fit reads a flat column for the asset until the memory fills again.
+Under an active mask the fit takes the active assets alone, because [`partial_fit!`](@ref) folds the Coverage Universe of the row and holds the other assets. The memory of an asset that the mask turns off stays flat over the inactive rows. When the asset relists, the memory holds its relisting level repeated. The window peak is then the peak of the levels that the asset has, which is the truncation of [lai2018ktpt](@cite), and the fit reads a flat column for the asset until the memory fills again.
 
 # Mathematical definition
 
@@ -1142,7 +1142,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the trend-reverting fraction of a matrix of levels, the share of the interior levels, over every asset, at which the path turns.
 
-A level turns when its two neighbours are both above it or both below it, so the path rises and then falls there, or falls and then rises. A matrix of ``L`` levels and ``N`` assets has ``(L - 2) N`` interior levels. The fraction is zero below three levels. [`KernelTrendPattern`](@ref) states it as ``\\lambda_{t+1}``, after eq. (27) of the kernel trend pattern paper of Lai, Yang, Wu and Fang (2018).
+A level turns when its two neighbours are both above it or both below it, so the path rises and then falls there, or falls and then rises. A matrix of ``L`` levels and ``N`` assets has ``(L - 2) N`` interior levels. The fraction is zero below three levels. [`KernelTrendPattern`](@ref) states it as ``\\lambda_{t+1}``, after Equation (27) of [lai2018ktpt](@cite).
 
 # Arguments
 
@@ -1155,6 +1155,10 @@ A level turns when its two neighbours are both above it or both below it, so the
 # Related
 
   - [`KernelTrendPattern`](@ref)
+
+# References
+
+  - $(ref_dict[:lai2018ktpt]) Equation (27).
 """
 function trend_reverting_fraction(P::AbstractMatrix)
     L, N = size(P)

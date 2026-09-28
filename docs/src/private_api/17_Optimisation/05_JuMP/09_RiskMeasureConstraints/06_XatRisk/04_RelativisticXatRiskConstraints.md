@@ -10,3 +10,10 @@ set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRiskRange
 set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdownatRisk, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 set_relativistic_risk_constraints!
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

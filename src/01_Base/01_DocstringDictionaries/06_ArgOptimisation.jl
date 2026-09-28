@@ -198,7 +198,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Iterative solvers.
                  :tol => "`tol`: Convergence tolerance.",#
                  :lambda_sspo => "`lambda`: The weight of the ``L_1`` penalty of the short-term sparse portfolio.",#
-                 :gamma_sspo => "`gamma`: The soft-threshold width. The ratio `lambda / gamma` is the quadratic coupling of the paper's iteration.",#
+                 :gamma_sspo => "`gamma`: The soft-threshold width. The ratio `lambda / gamma` is the quadratic coupling of the iteration of [lai2018sspo](@cite).",#
                  :iter => "`iter`: Maximum number of iterations.",#
                  # Near optimal centering.
                  :w_opt_noc => "`w_opt`: Optimal portfolio weights.",#

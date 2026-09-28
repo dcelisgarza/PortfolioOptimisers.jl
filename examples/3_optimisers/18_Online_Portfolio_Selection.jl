@@ -22,12 +22,13 @@ one piece.
 
 !!! tip "When to reach for this"
     Reach for the family when you want a portfolio that reacts to every price and, under most
-    rules, needs no solver. Several follow-the-winner rules carry a bound, under the rate and
-    the projection their paper states, on how far they can fall behind the best constant
-    portfolio chosen with hindsight. The follow-the-loser rules carry none. The family also
-    tells you whether a market trended or reverted, and you assume neither beforehand. Run a
-    follow-the-winner rule beside a follow-the-loser rule before you put money on the second,
-    because a reversion rule bets on one property of the market and on nothing else.
+    rules, needs no solver. Several follow-the-winner rules carry a bound on how far they can
+    fall behind the best constant portfolio chosen with hindsight. The bound holds under the
+    rate and the projection that the work cited in the rule's docstring states. The
+    follow-the-loser rules carry none. The family also tells you whether a market trended or
+    reverted, and you assume neither beforehand. Run a follow-the-winner rule beside a
+    follow-the-loser rule before you put money on the second, because a reversion rule bets
+    on one property of the market and on nothing else.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames, Statistics
@@ -178,7 +179,7 @@ own rule, run through the same walk-forward with no fee.
 
 We reach the best constant rebalanced portfolio two ways. The first is [`MeanRisk`](@ref) with
 a maximum-return objective under a [`LogarithmicReturn`](@ref), solved by Clarabel. The second
-is [`BestConstantRebalancedPortfolio`](@ref), which is Cover's fixed point and needs no solver.
+is [`BestConstantRebalancedPortfolio`](@ref), which is the fixed point of [cover1984](@cite) and needs no solver.
 
 On a real panel the best constant portfolio holds few assets, three of the twenty here. The
 multiplicative iteration of the fixed point approaches such a point slowly, so at its default

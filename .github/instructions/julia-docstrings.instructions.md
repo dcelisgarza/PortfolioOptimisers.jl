@@ -225,6 +225,27 @@ The rule's Scope is every page a library user reaches without opening `docs/adr/
 
 ---
 
+## A docstring names a source by its citation
+
+A reader who meets a source in a docstring must be able to open that source. So a docstring names a published work through a citation that links to the bibliography. It never names a work by words that point to nothing, such as "the paper", "the authors" or an author list with a year.
+
+**Scope.** The prose of the docstrings of `src/**/*.jl` and `ext/**/*.jl`, and the dictionary values of [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/) that they interpolate. The rule does not read a code span, a `jldoctest` block, a LaTeX expression or a `# References` bullet.
+
+- **Cite the work in the sentence that uses it.** Write `[key](@cite)` when the work is a source for the sentence. Write `[key](@citet)` when the authors are the subject of the sentence. The key is the BibTeX key in `docs/src/References.bib`. The docs build uses the numeric style, so `[lihoi2012](@citet)` renders as "Li and Hoi [n]", and the number links to the bibliography.
+- **Do not write an author list or a year in place of a citation.** `Györfi and Schäfer (2003)` and `Damian et al. 2023` link to nothing. Write `[gyorfischafer2003](@citet)`.
+- **Do not refer to a work as "the paper", "the article", "the source paper" or "the authors".** Repeat the citation. Put a locator before the citation: `Equation 27 of [key](@cite)`.
+- **State what the library takes from the work, and then what it adds.** First say which part of the work the unit makes: `Each rule makes one target of [schaferstrimmer2005](@cite).` Then state a generalisation or a new method in a different sentence.
+- **Tell an implementer what to supply, not where it comes from.** Write ``subtype it with the parameters of the rule and a `proj` field``. Do not write `with the paper's parameters`: the reader of an abstract type has no paper.
+- **Define each word that an argument or a field description uses.** Use a word of [`CONTEXT.md`](../../CONTEXT.md) or a word that the docstring defines. A private name for a value, such as "the carrier of the rule", tells the reader nothing about the value.
+- **Do not cite in the first sentence of a type docstring.** The Capability Catalogue copies that sentence to a page that has no bibliography. Name the method in the first sentence, and cite its source in the second sentence.
+- **Every work that the prose cites has a bullet in `# References` of the same docstring.** A private unit can cite. Its page under `docs/src/private_api/` then carries the bibliography block that [The `# References` Section](#the--references-section) states.
+
+A method that has the name of a person, such as the Weiszfeld iteration or Welford's recursion, is a technical name. The name is not a citation, and the rule does not read it.
+
+**The Gate.** [`test/test_74_source_citation_census.jl`](../../test/test_74_source_citation_census.jl) reads the literal text of each docstring under `src/` and `ext/`, field docstrings included, and each value in the docstring dictionaries. It fails on the words "paper", "article", "co-author" and "the authors", and on a name with a capital letter that a year in parentheses follows. The census does not find an author list that has no year, or a private name for a value. Those two hold by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md). `test/test_26_docs.jl` checks that the key of each `[key](@cite)` and `[key](@citet)` is in `docs/src/References.bib`.
+
+---
+
 ## The prose passes `/unslop`
 
 The prose of a docstring reads as a person wrote it for a reader. The `unslop` skill states the patterns that mark generated text, and every rule of the skill holds on the prose in this section's Scope. **The skill is the Authority for the patterns.** This section cites it by name, copies none of its rules, and names a rule of the skill by the number the skill gives it.

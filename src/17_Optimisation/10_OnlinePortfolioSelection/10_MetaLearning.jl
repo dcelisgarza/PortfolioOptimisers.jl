@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Moves each weight to the other entries with probability ``\\gamma`` after the wealth step, the switching weighting of Singer (1997) (SP).
+Moves each weight to the other entries with probability ``\\gamma`` after the wealth step, the switching weighting (SP).
 
-As the weighting of an [`ExpertMixture`](@ref) it acts on the expert-return vector. There the wealth step is the buy-and-hold weighting, and the share is the switch from one expert to another. Over the single-asset constant rebalanced portfolios it is the paper's switching portfolio, [`SwitchingPortfolio`](@ref). On the head over the assets it gives the same numbers, because the blend of the unit experts is the weight vector itself. The rule keeps no state and reads no rows. The package does not build the paper's second version, whose rate falls the longer the process holds one asset.
+It is the switching rule of [singer1997](@citet). As the weighting of an [`ExpertMixture`](@ref) it acts on the expert-return vector. There the wealth step is the buy-and-hold weighting, and the share is the switch from one expert to another. Over the single-asset constant rebalanced portfolios it is the switching portfolio of [singer1997](@cite), [`SwitchingPortfolio`](@ref). On the head over the assets it gives the same numbers, because the blend of the unit experts is the weight vector itself. The rule keeps no state and reads no rows. The package does not build the second version in [singer1997](@cite), whose rate falls the longer the process holds one asset.
 
 # Mathematical definition
 
@@ -25,14 +25,14 @@ Where:
   - $(math_dict[:x_t_rel])
   - $(math_dict[:t_period])
 
-The first line is the paper's equation 4 written in weights. The second line is its equation 6, because the entries of ``\\hat{\\boldsymbol{w}}_t`` sum to one. The paper notes that the update resembles the fixed share of Herbster and Warmuth. The share is a stochastic matrix, so ``\\boldsymbol{w}_{t+1}`` lies on the simplex, and the Euclidean projection onto the simplex returns it unchanged. At ``\\gamma = 0`` the share is the identity. At ``\\gamma = (K - 1) / K`` every entry of ``\\boldsymbol{w}_{t+1}`` is ``1 / K``.
+The first line is Equation 4 of [singer1997](@cite), written in weights. The second line is Equation 6 of [singer1997](@cite), because the entries of ``\\hat{\\boldsymbol{w}}_t`` sum to one. [singer1997](@citet) notes that the update resembles the fixed share of [herbsterwarmuth1998](@citet). The share is a stochastic matrix, so ``\\boldsymbol{w}_{t+1}`` lies on the simplex, and the Euclidean projection onto the simplex returns it unchanged. At ``\\gamma = 0`` the share is the identity. At ``\\gamma = (K - 1) / K`` every entry of ``\\boldsymbol{w}_{t+1}`` is ``1 / K``.
 
 # Algorithm
 
  1. Compute `q`, the Price-Adjusted Allocation of `w` over `x`.
  2. Set `K` to the length of `q`.
  3. When `K` is one, set `p` to `q`, because one entry has no other entry to switch to. Otherwise, set `p` to the fixed share of `q` at the rate `gamma`.
- 4. Project `p` onto the Allocation Set with `alg.proj`, from `q`. Return the carrier `st` unchanged, and the projection.
+ 4. Project `p` onto the Allocation Set with `alg.proj`, from `q`. Return `st` unchanged, and the projection. `st` is the state of the rule: what the rule keeps from one update to the next. This rule keeps nothing.
 
 # Fields
 
@@ -42,7 +42,7 @@ $(DocStringExtensions.FIELDS)
 
     SwitchingWeighting(; gamma::Real = 1/3, proj::EuclideanProjection = EuclideanProjection()) -> SwitchingWeighting
 
-Keywords correspond to the struct's fields. The default rate is ``1/3``, the rate of the paper's experiments without transaction costs.
+Keywords correspond to the struct's fields. The default rate is ``1/3``, the rate of the experiments without transaction costs in [singer1997](@cite).
 
 ## Validation
 
@@ -68,6 +68,7 @@ SwitchingWeighting
 # References
 
   - $(ref_dict[:singer1997])
+  - $(ref_dict[:herbsterwarmuth1998])
 """
 struct SwitchingWeighting{T1 <: Real, T2 <: EuclideanProjection} <:
        AbstractOnlinePortfolioSelectionAlgorithm
@@ -104,9 +105,9 @@ end
 """
     SwitchingPortfolio(; N::Integer, gamma::Real = 1/3, eset::Option{<:BoundedAllocationSet} = nothing, proj::EuclideanProjection = EuclideanProjection())
 
-Builds Singer's (1997) switching portfolio, the [`ExpertMixture`](@ref) under [`SwitchingWeighting`](@ref) over the `N` single-asset [`ConstantRebalancedPortfolio`](@ref)s of the pinned universe (SP).
+Builds the switching portfolio, the [`ExpertMixture`](@ref) under [`SwitchingWeighting`](@ref) over the `N` single-asset [`ConstantRebalancedPortfolio`](@ref)s of the pinned universe (SP).
 
-The paper's portfolio is the Bayesian mixture over the paths of a hidden process. The process holds one asset, and each period it switches to one of the others with probability ``\\gamma``. The weight of the mixture on a unit expert is the posterior probability that the process holds that asset in the next period.
+It is the switching portfolio of [singer1997](@citet). [singer1997](@citet) defines it as the Bayesian mixture over the paths of a hidden process. The process holds one asset, and each period it switches to one of the others with probability ``\\gamma``. The weight of the mixture on a unit expert is the posterior probability that the process holds that asset in the next period.
 
 A view of the head onto a subset of the assets drops no expert. The unit expert of an excluded asset has no mass on the kept assets, so its constant rebalanced portfolio becomes the uniform allocation over them. The view then runs with one uniform expert for each excluded asset, and it is not the switching portfolio over the kept assets. Construct the portfolio over the assets that it will run on.
 
@@ -226,11 +227,11 @@ end
 """
     Ader(; eta_min::Real, K::Integer, eps::Real, obj::AbstractOnlineObjective = LogWealth(), eset::Option{<:BoundedAllocationSet} = nothing, proj::EuclideanProjection = EuclideanProjection())
 
-Builds the improved Ader of Zhang, Lu and Zhou (2018, Algorithms 3 and 4), an [`ExpertMixture`](@ref) of `K` [`GradientProjection`](@ref) experts on a geometric grid of rates.
+Builds the improved Ader, an [`ExpertMixture`](@ref) of `K` [`GradientProjection`](@ref) experts on a geometric grid of rates.
 
-Every expert takes one Euclidean step from its own iterate, on the gradient at the allocation that the mixture played, the [`BlendPoint`](@ref). The weighting is [`ExponentiatedGradient`](@ref) at the rate `eps`, from the paper's start over the experts. That start gives the largest weight to the smallest rate.
+It is Algorithms 3 and 4 of [zhang2018ader](@cite). Every expert takes one Euclidean step from its own iterate, on the gradient at the allocation that the mixture played, the [`BlendPoint`](@ref). The weighting is [`ExponentiatedGradient`](@ref) at the rate `eps`, from the start over the experts of [zhang2018ader](@cite). That start gives the largest weight to the smallest rate.
 
-The weighting sets the weights of the experts from their log wealth under every objective `obj`. So the mixture is the paper's algorithm only under the default [`LogWealth`](@ref) objective. Under another objective, such as [`RiskLoss`](@ref), the experts step on that objective, but the weights follow the log wealth of the experts. The paper tunes the grid and the rate for a known horizon. An online rule does not know the horizon, so the three values are the caller's.
+The weighting sets the weights of the experts from their log wealth under every objective `obj`. So the mixture is the algorithm of [zhang2018ader](@cite) only under the default [`LogWealth`](@ref) objective. Under another objective, such as [`RiskLoss`](@ref), the experts step on that objective, but the weights follow the log wealth of the experts. [zhang2018ader](@citet) tune the grid and the rate for a known horizon. An online rule does not know the horizon, so the three values are the caller's.
 
 # Mathematical definition
 
@@ -273,7 +274,7 @@ Where:
   - $(math_dict[:r_t_expert])
   - $(math_dict[:x_t_rel])
 
-Theorem 4 of the paper sets
+Theorem 4 of [zhang2018ader](@cite) sets
 
 ```math
 \\begin{align}
@@ -296,7 +297,7 @@ Under these values the dynamic regret against every comparator sequence is ``O(\
 
   - `eta_min`: The smallest rate of the grid.
   - `K`: The number of experts.
-  - `eps`: The weighting's rate, the paper's ``\\alpha``.
+  - `eps`: The weighting's rate, ``\\alpha`` in [zhang2018ader](@cite).
   - `obj`: The objective every expert steps on.
   - `eset`: The Expert Set the weighting projects onto, or `nothing` for the bare simplex.
   - `proj`: The geometry of the projection of the blend onto the head's Allocation Set.
@@ -339,13 +340,13 @@ end
 """
     Sword(; eta_min::Real, K::Integer, eps::Real, obj::AbstractOnlineObjective = LogWealth(), eset::Option{<:BoundedAllocationSet} = nothing, proj::EuclideanProjection = EuclideanProjection())
 
-Builds the small-loss Sword of Zhao, Zhang, Zhang and Zhou (2020, Theorem 5), an [`ExpertMixture`](@ref) of `K` [`GradientProjection`](@ref) experts on a geometric grid of rates, from the uniform start.
+Builds the small-loss Sword, an [`ExpertMixture`](@ref) of `K` [`GradientProjection`](@ref) experts on a geometric grid of rates, from the uniform start.
 
-The experts, the [`BlendPoint`](@ref) and the [`ExponentiatedGradient`](@ref) weighting are those of [`Ader`](@ref). The two differ in the start over the experts, which is uniform here, and in the grid that the paper tunes. The paper's meta-algorithm is the exponentially weighted forecaster on the linearised loss, with no optimism.
+It is the algorithm of Theorem 5 of [zhao2020sword](@cite). The experts, the [`BlendPoint`](@ref) and the [`ExponentiatedGradient`](@ref) weighting are those of [`Ader`](@ref). The two differ in the start over the experts, which is uniform here, and in the grid that [zhao2020sword](@citet) tune. The meta-algorithm of [zhao2020sword](@cite) is the exponentially weighted forecaster on the linearised loss, with no optimism.
 
-As for [`Ader`](@ref), the weighting sets the weights of the experts from their log wealth under every objective `obj`. So the mixture is the paper's algorithm only under the default [`LogWealth`](@ref) objective. The paper tunes the grid and the rate for a known horizon and a known cumulative loss. An online rule knows neither, so the three values are the caller's.
+As for [`Ader`](@ref), the weighting sets the weights of the experts from their log wealth under every objective `obj`. So the mixture is the algorithm of [zhao2020sword](@cite) only under the default [`LogWealth`](@ref) objective. [zhao2020sword](@citet) tune the grid and the rate for a known horizon and a known cumulative loss. An online rule knows neither, so the three values are the caller's.
 
-The package builds neither of the paper's two other forms. In the gradient-variation form, the experts take the extra-gradient step and the weighting carries an optimistic hint. The best-of-both-worlds form runs a second meta-algorithm that learns the hint.
+The package builds neither of the two other forms of [zhao2020sword](@cite). In the gradient-variation form, the experts take the extra-gradient step and the weighting carries an optimistic hint. The best-of-both-worlds form runs a second meta-algorithm that learns the hint.
 
 # Mathematical definition
 
@@ -373,7 +374,7 @@ Where:
   - ``\\varepsilon``: Learning rate of the weighting.
   - $(math_dict[:t_period])
 
-The paper writes the forecaster on ``\\langle \\nabla f_t(\\boldsymbol{w}_t), \\boldsymbol{h}_k(t) \\rangle``. That term differs from ``\\ell_t(\\boldsymbol{h}_k(t))`` by a term that is the same for every expert, so the two give the same weights. Under the log-wealth loss ``f_t(\\boldsymbol{w}) = -\\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_t \\rangle``, the weight update is the exponentiated-gradient step over the expert-return vector,
+[zhao2020sword](@citet) write the forecaster on ``\\langle \\nabla f_t(\\boldsymbol{w}_t), \\boldsymbol{h}_k(t) \\rangle``. That term differs from ``\\ell_t(\\boldsymbol{h}_k(t))`` by a term that is the same for every expert, so the two give the same weights. Under the log-wealth loss ``f_t(\\boldsymbol{w}) = -\\log \\langle \\boldsymbol{w}, \\boldsymbol{x}_t \\rangle``, the weight update is the exponentiated-gradient step over the expert-return vector,
 
 ```math
 \\begin{align}
@@ -386,7 +387,7 @@ Where:
   - $(math_dict[:r_t_expert])
   - $(math_dict[:x_t_rel])
 
-Theorem 5 of the paper sets
+Theorem 5 of [zhao2020sword](@cite) sets
 
 ```math
 \\begin{align}
@@ -412,7 +413,7 @@ Under these values the dynamic regret against every comparator sequence is ``O(\
 
   - `eta_min`: The smallest rate of the grid.
   - `K`: The number of experts.
-  - `eps`: The weighting's rate, the paper's ``\\varepsilon``.
+  - `eps`: The weighting's rate, ``\\varepsilon`` in [zhao2020sword](@cite).
   - `obj`: The objective every expert steps on.
   - `eset`: The Expert Set the weighting projects onto, or `nothing` for the bare simplex.
   - `proj`: The geometry of the projection of the blend onto the head's Allocation Set.

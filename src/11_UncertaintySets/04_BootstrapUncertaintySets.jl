@@ -226,7 +226,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits a box or an ellipsoidal uncertainty set from the spread of the statistics over a block bootstrap of the return series.
 
-It is the bootstrapping method of Equation 11.18 of the source, and it assumes no law for the returns. The `bootstrap` field picks one of the three block bootstraps, each of which the library implements itself in [`bootstrap_indices`](@ref) and cites its own paper for.
+It is the bootstrapping method of Equation 11.18 of [cajas2025](@cite), and it assumes no law for the returns. The `bootstrap` field picks one of the three block bootstraps, each of which the library implements itself in [`bootstrap_indices`](@ref). The docstring of each bootstrap type cites the work that defines it.
 
 **The name carries no volatility model.** It is inherited from the block-bootstrap routines of a volatility-modelling package, and this type fits no such model: it refits `me` and `ce` on each resample and reads the spread of the refits, so no docstring in this file states a conditional variance recursion.
 

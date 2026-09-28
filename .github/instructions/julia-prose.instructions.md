@@ -82,6 +82,21 @@ file governs, and so does every other rule here.
 
 ---
 
+## A page names a source by its citation
+
+A page names a published work through `[key](@cite)`, or through `[key](@citet)` when the authors
+are the subject of the sentence. It never names a work by words that link to nothing: "the paper",
+"the article", "the authors", or an author list with a year such as "Li and Hoi (2012)". Where a
+paragraph returns to the work, it repeats the citation: "Lemma 9 of [key](@cite) states that …",
+not "Lemma 9 of the paper states that …".
+
+[`.github/instructions/julia-docstrings.instructions.md`](julia-docstrings.instructions.md) §
+*A docstring names a source by its citation* owns the rule, and it holds on a page as it holds on a
+docstring. The one difference is the bibliography: a page that cites carries the block that the
+pages beside it carry.
+
+---
+
 ## A check is a number the reader reads, never a verdict
 
 A page can run a comparison and print its result. The prose says what the cell computes and what
@@ -204,6 +219,10 @@ row fails, and a text whose every count is zero carries no row, so the baseline 
 texts are rewritten. The reader is [`code_health/prose.jl`](../../code_health/prose.jl), which the
 census includes rather than copies. The rules the census cannot read hold by review, in the sense
 of [`STANDARDS.md`](../../STANDARDS.md).
+
+[`test/test_74_source_citation_census.jl`](../../test/test_74_source_citation_census.jl) reads the
+same four corpora through the same reader, and fails on a text that names a source by "paper",
+"article", "the authors" or an author list with a year. It holds no baseline: every match fails.
 
 **Three shapes of text feed one set of counters.** A Literate source gives its `#= … =#` blocks and
 every line that Literate renders as markdown: a bare `#`, or a `#` and a space followed by text,

@@ -18,3 +18,10 @@ PortfolioOptimisers.ensemble_programme
 PortfolioOptimisers.FollowTheLeadingHistoryState
 PortfolioOptimisers.expert_alive
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

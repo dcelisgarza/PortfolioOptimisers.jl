@@ -21,7 +21,7 @@ The wealth of such a rule cannot fall far behind the best constant portfolio cho
 That guarantee is a bound, and it is not a return. The follow-the-loser rules carry no such
 guarantee.
 
-The rules fall into the five groups of Li and Hoi's (2014) survey. Sections 1 to 4 run two
+The rules fall into the five groups of the survey of [lihoi2014](@cite). Sections 1 to 4 run two
 benchmarks, three follow-the-winner rules and three follow-the-loser rules, and measure them.
 Section 5 runs a follow-the-loser rule with a new forecast, section 6 runs the follow-the-winner
 step in three more geometries, and section 7 runs a pattern-matching rule. Section 8 measures the
@@ -114,7 +114,7 @@ of whether that market reverts or trends.
 The guarantee is stated against a comparator chosen in hindsight, and you measure such a
 comparator in two steps. Fit it on the rows the strategy was scored on, and predict it in sample over
 those same rows. Three comparators cover the literature. The best constant rebalanced portfolio is
-[`BestConstantRebalancedPortfolio`](@ref), Cover's (1984) fixed point, which needs no solver. It
+[`BestConstantRebalancedPortfolio`](@ref), the fixed point of [cover1984](@cite), which needs no solver. It
 stops at a budget of steps, so it is exact only to the precision of this page's tables. You can
 compute the same portfolio with [`MeanRisk`](@ref) under a [`LogarithmicReturn`](@ref) and a
 maximum-return objective, on a solver, to the tolerance of the solver. The best stock is a top-one [`ScoreSelector`](@ref) on log wealth
@@ -168,8 +168,8 @@ saw those rows and was chosen to win on this one sequence, so its `p` is optimis
 rank, and not as a probability.
 
 The literature bounds the row of the universal portfolio. The [`UniversalPortfolio`](@ref)
-docstring states both bounds and attributes them. Cover's (1991) `(N − 1) log(T + 1)` bounds the
-exact integral, and it is `24.7` at five assets and 480 periods. `log n_experts` bounds the
+docstring states both bounds and attributes them. The bound `(N − 1) log(T + 1)` of [cover1991](@cite)
+bounds the exact integral, and it is `24.7` at five assets and 480 periods. `log n_experts` bounds the
 sampled mixture the library runs against the best sampled expert, and it is `7.6` at the default
 two thousand experts. The row of the universal portfolio sits far inside both, as every row
 of the winner half does.
@@ -207,8 +207,8 @@ update of the rule uses its own target, never the drifted book. The gap in wealt
 often the rule rebalances. A reversion rule that rebalances on every row is paid on every
 reversal. One that rebalances every fifth row is paid on every fifth reversal and ends with
 less. The drift takes a little more. Neither path is
-wrong. A rule is designed for the rebalancing frequency its paper ran it at, and `test_size` is
-that frequency.
+wrong. A rule is designed for the rebalancing frequency at which the work that its docstring cites
+ran it, and `test_size` is that frequency.
 
 ## 4. Tuning a rate
 
@@ -398,7 +398,7 @@ the fixed leader, the best stock of each row, and every budget between them.
 
 Every rule below goes in the `alg` keyword of `OnlinePortfolioSelection`, except
 `BestConstantRebalancedPortfolio`, which is an optimiser of its own. A rate, a sample selector and
-an expert weighting go inside a rule. The groups are Li and Hoi's (2014), and the
+an expert weighting go inside a rule. The groups are those of [lihoi2014](@cite), and the
 [capability catalogue](@ref catalogue-online-portfolio-selection) lists the same roster.
 
   - **Benchmarks.** [`BuyAndHold`](@ref), [`ConstantRebalancedPortfolio`](@ref), and, in

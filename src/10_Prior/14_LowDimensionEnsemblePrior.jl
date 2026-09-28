@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Forecasts the next price relative and its covariance by averaging many low-dimensional lagged regressions, weighted by their in-sample fit.
 
-This is the prior of Xi, Li, Song and Ning (2023). It treats the market as one high-dimensional system and draws many small subsystems of `subsystem_size` assets from it at random. In each subsystem, the price relative of every asset is regressed on the price relatives of the subsystem's assets one period earlier. The forecast of a subsystem counts in proportion to a Gaussian kernel of its in-sample mean squared error. Each subsystem also gives a predictive covariance, and the aggregate weighs it by the product of the kernel weights of the two assets.
+It is the prior of [xi2023oldem](@citet). It treats the market as one high-dimensional system and draws many small subsystems of `subsystem_size` assets from it at random. In each subsystem, the price relative of every asset is regressed on the price relatives of the subsystem's assets one period earlier. The forecast of a subsystem counts in proportion to a Gaussian kernel of its in-sample mean squared error. Each subsystem also gives a predictive covariance, and the aggregate weighs it by the product of the kernel weights of the two assets.
 
 The mean and the covariance come from the same regressions. So the risk term of a programme that reads this prior measures the uncertainty of the forecast that its return term reads. A window of ``w`` regression pairs needs ``w + 1`` rows.
 
@@ -54,7 +54,7 @@ Where:
   - $(math_dict[:Sigma_hat_pred])
   - $(math_dict[:N])
 
-These are the equations 4 to 10 of the paper. When ``\\mathbf{X}^{(l)}`` has full column rank, the pseudo-inverse gives the paper's ``(\\mathbf{X}^{(l)\\intercal} \\mathbf{X}^{(l)})^{-1} \\mathbf{X}^{(l)\\intercal} \\boldsymbol{y}_k``. When the window has fewer pairs than the subsystem has assets, it gives the least-squares coefficients of least norm.
+These are Equations 4 to 10 of [xi2023oldem](@cite). When ``\\mathbf{X}^{(l)}`` has full column rank, the pseudo-inverse gives the estimate ``(\\mathbf{X}^{(l)\\intercal} \\mathbf{X}^{(l)})^{-1} \\mathbf{X}^{(l)\\intercal} \\boldsymbol{y}_k`` of [xi2023oldem](@cite). When the window has fewer pairs than the subsystem has assets, it gives the least-squares coefficients of least norm.
 
 Every ``\\hat{\\mathbf{\\Sigma}}^{(l)}`` is positive semidefinite. But ``\\hat{\\mathbf{\\Sigma}}_{t+1}`` averages them under weights that differ from entry to entry, so it need not be positive semidefinite itself.
 
@@ -66,7 +66,7 @@ $(DocStringExtensions.FIELDS)
 
     LowDimensionEnsemblePrior(; n_subsystems::Integer = 300, subsystem_size::Integer = 3, sigma::Real = 0.025, pdm::Option{<:Posdef} = Posdef(), rng::Random.AbstractRNG = Random.default_rng(), seed::Option{<:Integer} = nothing) -> LowDimensionEnsemblePrior
 
-Keywords correspond to the struct's fields. The defaults are the paper's. The paper scans ``L`` from 100 to 2000 and finds that the mean squared prediction error converges once ``L`` exceeds 300. It sets three assets in each subsystem and a kernel bandwidth of `0.025`.
+Keywords correspond to the struct's fields. The defaults are those of Section 5.3 of [xi2023oldem](@cite). [xi2023oldem](@citet) scan ``L`` from 100 to 2000 and find that the mean squared prediction error converges once ``L`` exceeds 300. [xi2023oldem](@citet) set three assets in each subsystem and a kernel bandwidth of `0.025`.
 
 ## Validation
 
@@ -107,15 +107,15 @@ struct LowDimensionEnsemblePrior{T1 <: Integer, T2 <: Integer, T3 <: Real,
                                  T6 <: Option{<:Integer}} <:
        AbstractLowOrderPriorEstimator_A
     """
-    The number of subsystems that every fit draws, the paper's ``L``.
+    The number of subsystems that every fit draws, ``L`` in [xi2023oldem](@cite).
     """
     n_subsystems::T1
     """
-    The number of assets in every subsystem, the paper's ``s``. When the rows hold fewer assets, the fit uses all of them.
+    The number of assets in every subsystem, ``s`` in [xi2023oldem](@cite). When the rows hold fewer assets, the fit uses all of them.
     """
     subsystem_size::T2
     """
-    The kernel bandwidth of the subsystem weights, the paper's ``\\sigma``.
+    The kernel bandwidth of the subsystem weights, ``\\sigma`` in [xi2023oldem](@cite).
     """
     sigma::T3
     """
@@ -220,7 +220,7 @@ The fit reads the Coverage Universe of the rows, as every prior does. An asset w
  3. Check that `T >= 3`.
  4. Form the price relatives `P = 1 + X`. Split them into the targets `Y`, every row but the first, the regressors `Z`, every row but the last, and the last row `z`.
  5. Clip the subsystem size to `N`, giving `s`.
- 6. Resolve the random number generator from `rng` and `seed`, and draw `L` subsystems `idxs` of `s` assets each, without replacement. One draw serves every target asset. With a `seed`, every call draws the same subsystems. Without one, every call draws new ones, so a rule that refits the prior at every period draws new subsystems at every period, as the paper does.
+ 6. Resolve the random number generator from `rng` and `seed`, and draw `L` subsystems `idxs` of `s` assets each, without replacement. One draw serves every target asset. With a `seed`, every call draws the same subsystems. Without one, every call draws new ones, so a rule that refits the prior at every period draws new subsystems at every period, as in [xi2023oldem](@cite).
  7. Solve one least-squares problem for each subsystem, for all the targets at once, giving the `s × N` coefficient matrices `Bs`. Julia's `\\` gives the coefficients of least norm when the window has fewer pairs than `s`.
  8. Compute the `L × N` in-sample mean squared errors `R` and the subsystem forecasts `F`.
  9. Subtract the smallest error of each asset from its column of `R`, giving `E`. This leaves every kernel ratio unchanged. It also stops the kernel from underflowing to zero for every subsystem when the errors are large against ``\\sigma^2``.
@@ -255,6 +255,10 @@ The fit reads the Coverage Universe of the rows, as every prior does. An asset w
   - [`prior`](@ref)
   - [`coverage_reduction`](@ref)
   - [`expand_moment`](@ref)
+
+# References
+
+  - $(ref_dict[:xi2023oldem])
 """
 function prior(pe::LowDimensionEnsemblePrior, X::MatNum, ::Option{<:MatNum} = nothing,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)

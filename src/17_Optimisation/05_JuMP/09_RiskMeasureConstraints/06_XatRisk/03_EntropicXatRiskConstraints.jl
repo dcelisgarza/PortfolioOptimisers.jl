@@ -10,7 +10,7 @@ lower and upper exponential cone.
 
 # Mathematical definition
 
-Entropic Value-at-Risk via exponential cone (Ahmadi-Javid 2012):
+The exponential cone form of the Entropic Value-at-Risk of [evar](@cite) is:
 
 ```math
 \\begin{align}
@@ -55,6 +55,10 @@ Where:
 
   - [`risk_series`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
+
+# References
+
+  - $(ref_dict[:evar])
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;

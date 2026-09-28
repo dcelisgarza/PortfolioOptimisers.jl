@@ -15,3 +15,10 @@ PortfolioOptimisers.mixed_relatives
 PortfolioOptimisers.reprojection
 PortfolioOptimisers.investable_risk_gradient
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

@@ -327,7 +327,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the diagonal of the belief covariance over the weights, for the confidence weighted mean reversion rule.
 
-[`ConfidenceWeightedMeanReversion`](@ref) seeds it and updates it once per period. The mean of the belief is the allocation held, so the carrier holds no mean.
+[`ConfidenceWeightedMeanReversion`](@ref) seeds it and updates it once per period. The mean of the belief is the allocation held, so the state holds no mean.
 
 # Fields
 
@@ -350,7 +350,7 @@ $(DocStringExtensions.FIELDS)
 end
 function merge_states(::ConfidenceWeightedMeanReversionState,
                       ::ConfidenceWeightedMeanReversionState)
-    return throw(ArgumentError("a `ConfidenceWeightedMeanReversionState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the carrier follows it."))
+    return throw(ArgumentError("a `ConfidenceWeightedMeanReversionState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the state of the rule follows it."))
 end
 function Base.copy(x::ConfidenceWeightedMeanReversionState)
     return ConfidenceWeightedMeanReversionState(x.n, copy(x.sigma))
@@ -363,9 +363,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Moves a Gaussian belief over the weights by the least relative entropy that puts the last return below `eps` with confidence.
 
-This is the confidence weighted mean reversion (CWMR) of Li, Hoi, Zhao and Gopalkrishnan. The mean of the belief is the allocation held, and its covariance is the confidence in each weight. The covariance is the rule's own. It is a belief over weights, not a moment of returns, so it never comes from a Prior. The rule sells what rose in the last period, a bet on mean reversion over one period, like [`PassiveAggressiveMeanReversion`](@ref).
+This is the confidence weighted mean reversion (CWMR) of [li2011cwmr](@cite) and [li2013cwmr](@cite). The mean of the belief is the allocation held, and its covariance is the confidence in each weight. The covariance is the rule's own. It is a belief over weights, not a moment of returns, so it never comes from a Prior. The rule sells what rose in the last period, a bet on mean reversion over one period, like [`PassiveAggressiveMeanReversion`](@ref).
 
-The Allocation Set constrains the mean alone. The paper projects the mean onto the simplex in the Euclidean distance, so the `proj` field is bound to [`EuclideanProjection`](@ref). The covariance is rescaled and never projected.
+The Allocation Set constrains the mean alone. [li2013cwmr](@citet) project the mean onto the simplex in the Euclidean distance, so the `proj` field is bound to [`EuclideanProjection`](@ref). The covariance is rescaled and never projected.
 
 # Mathematical definition
 
@@ -406,18 +406,18 @@ Where:
 
 [`VarianceUpdate`](@ref) and [`StandardDeviationUpdate`](@ref) state ``\\lambda_{t+1}`` and ``\\gamma_{t+1}``. The multiplier is ``0`` when the constraint holds at the current belief, so the mean does not move on such a period. The mean moves each weight in proportion to its variance in the belief. The rescale keeps the trace of the covariance at ``1 / N``, the trace of the seed ``I / N^2``.
 
-The 2013 text states the constraint on the return with ``\\epsilon = 0.5``, and this rule follows it. The 2011 text states it on the logarithm of the return with ``\\epsilon = -0.5`` and linearises the logarithm at the current mean. It also rescales the covariance to the trace ``1 / N^2``.
+[li2013cwmr](@citet) state the constraint on the return with ``\\epsilon = 0.5``, and this rule follows it. [li2011cwmr](@citet) state it on the logarithm of the return with ``\\epsilon = -0.5`` and linearise the logarithm at the current mean. [li2011cwmr](@citet) also rescale the covariance to the trace ``1 / N^2``.
 
 # Algorithm
 
- 1. Read `sigma`, the diagonal of ``\\Sigma_t``, from the carrier `st`.
+ 1. Read `sigma`, the diagonal of ``\\Sigma_t``, from `st`. `st` is the state of the rule: what the rule keeps from one update to the next, here a [`ConfidenceWeightedMeanReversionState`](@ref).
  2. Compute `M = dot(w, x)`, `V = dot(sigma, x .^ 2)`, `W = dot(sigma, x)` and `xbar = W / sum(sigma)`.
  3. Compute the multiplier `lam` with [`confidence_step`](@ref) under `alg.formulation`.
  4. Move the mean to `q = w .- lam .* sigma .* (x .- xbar)`.
  5. Compute the gain `gain` with [`confidence_gain`](@ref).
  6. Write `inv.(inv.(sigma) .+ gain .* x .^ 2)` into `sigma`.
  7. Divide `sigma` by `length(sigma) * sum(sigma)`, so its sum is ``1 / N``.
- 8. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. Return the carrier with its period count raised by one, and the projection.
+ 8. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. Return the state of the rule with its period count raised by one, and the projection.
 
 # Fields
 
@@ -432,7 +432,7 @@ $(DocStringExtensions.FIELDS)
         proj::EuclideanProjection = EuclideanProjection()
     ) -> ConfidenceWeightedMeanReversion
 
-Keywords correspond to the struct's fields. The defaults `eps = 0.5` and `phi = 2` are the values the 2013 paper sets without tuning. The paper reports that `phi` has little effect on the result.
+Keywords correspond to the struct's fields. The defaults `eps = 0.5` and `phi = 2` are the values that [li2013cwmr](@citet) set without tuning. [li2013cwmr](@citet) report that `phi` has little effect on the result.
 
 ## Validation
 
@@ -524,7 +524,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Moves wealth from an asset that grew more to one whose log returns follow its own one window later.
 
-This is the anti-correlation rule (Anticor) of Borodin, El-Yaniv and Gogan. The asset that receives the wealth is expected to repeat the earlier growth of the asset that gives it. The paper's headline algorithm, ANTI₁, is the uniform buy-and-hold mixture of this rule over the windows 2 to 30, which is an [`ExpertMixture`](@ref) over those experts under its default weighting.
+This is the anti-correlation rule (Anticor) of [borodin2004](@citet). The asset that receives the wealth is expected to repeat the earlier growth of the asset that gives it. The headline algorithm of [borodin2004](@cite), ANTI₁, is the uniform buy-and-hold mixture of this rule over the windows 2 to 30, which is an [`ExpertMixture`](@ref) over those experts under its default weighting.
 
 The rule recomputes the correlation from the rows the head holds at every period and carries nothing, so it reads the last ``2 \\ell`` rows. Until the head holds ``2 \\ell`` rows, the rule returns the wealth held, which is buy-and-hold. A gap in a row reads as a flat period, the leg held in cash, as [`price_relative`](@ref) reads it. The rule takes the logarithm of a price relative as `log1p` of the return. The correlation removes the mean of each window, and `1 + r` loses the precision of a small return. The raw step is in the simplex, so on the default Allocation Set the Euclidean projection returns it unchanged. On a stated set, the projection repairs it.
 
@@ -566,7 +566,7 @@ Where:
 
 The negative autocorrelation of an asset raises every claim that the asset takes part in. The transfers out of asset ``i`` sum to ``\\hat{w}_{t, i}`` or to zero, so no asset gives more than it holds, the budget stays one, and ``\\boldsymbol{w}_{t+1}`` is in the simplex.
 
-The paper states the transfers twice. Its prose computes them from ``\\boldsymbol{w}_t``, the allocation at the start of the period. Its algorithm box takes ``\\hat{\\boldsymbol{w}}_t`` as its only allocation input, returns it while ``t < 2 \\ell``, and starts the new allocation from it. The box's step 6(a) writes the transfer from ``\\boldsymbol{w}_t``, which is not an input of the box. This rule computes every transfer from ``\\hat{\\boldsymbol{w}}_t``. The box's step 5 also lets ``i = j`` claim a transfer to itself, which keeps a part of its wealth in place. The prose asks for ``\\mu_{2, i} > \\mu_{2, j}``, which excludes ``i = j``. This rule takes the box's ``\\geq`` and excludes ``i = j``.
+[borodin2004](@citet) state the transfers twice. The prose of [borodin2004](@cite) computes them from ``\\boldsymbol{w}_t``, the allocation at the start of the period. The algorithm box of [borodin2004](@cite) takes ``\\hat{\\boldsymbol{w}}_t`` as its only allocation input, returns it while ``t < 2 \\ell``, and starts the new allocation from it. The box's step 6(a) writes the transfer from ``\\boldsymbol{w}_t``, which is not an input of the box. This rule computes every transfer from ``\\hat{\\boldsymbol{w}}_t``. The box's step 5 also lets ``i = j`` claim a transfer to itself, which keeps a part of its wealth in place. The prose asks for ``\\mu_{2, i} > \\mu_{2, j}``, which excludes ``i = j``. This rule takes the box's ``\\geq`` and excludes ``i = j``.
 
 # Algorithm
 
@@ -576,7 +576,7 @@ The paper states the transfers twice. Its prose computes them from ``\\boldsymbo
  4. Take `Rw`, the last `2 * wn` rows of returns. Replace each return that is not finite with zero, and take `L`, the `log1p` of the result.
  5. Compute `cor` and `mu2` with [`lagged_window_correlation`](@ref) over the first `wn` rows and the last `wn` rows of `L`.
  6. Compute the claims with [`anticorrelation_claims`](@ref), and `q` with [`wealth_transfer`](@ref) from `wh`.
- 7. Project `q` onto the Allocation Set with `alg.proj`, from `wh`. Return the carrier `st` unchanged, and the projection.
+ 7. Project `q` onto the Allocation Set with `alg.proj`, from `wh`. Return `st` unchanged, and the projection. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
 
 # Fields
 
@@ -605,7 +605,7 @@ AntiCorrelation
 
   - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
   - [`OnlinePortfolioSelection`](@ref)
-  - [`ExpertMixture`](@ref): the mixture over the windows is the paper's headline algorithm.
+  - [`ExpertMixture`](@ref): the mixture over the windows is the headline algorithm of [borodin2004](@cite).
   - [`lagged_window_correlation`](@ref)
   - [`anticorrelation_claims`](@ref)
   - [`wealth_transfer`](@ref)
@@ -792,7 +792,7 @@ $(DocStringExtensions.FIELDS)
     s
 end
 function merge_states(::ExpectationMaximisationState, ::ExpectationMaximisationState)
-    return throw(ArgumentError("an `ExpectationMaximisationState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the carrier follows it."))
+    return throw(ArgumentError("an `ExpectationMaximisationState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the state of the rule follows it."))
 end
 function Base.copy(x::ExpectationMaximisationState)
     return ExpectationMaximisationState(x.n, copy(x.w1), copy_column(x.s))
@@ -806,7 +806,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Moves the allocation a share `eta` of the way to the wealth held at the end of the period.
 
-This is the expectation-maximisation update (EM) of Helmbold, Schapire, Singer and Warmuth. Orseau, Lattimore and Legg study the same update as Soft-Bayes. The wealth held at the end of the period is the posterior of the Bayesian mixture over the single assets, with the allocation as its prior. At `eta = 1` the rule is buy-and-hold, and below one it is that mixture slowed down. As the weighting of an [`ExpertMixture`](@ref), the rule is Soft-Bayes over the experts, the setting of the 2017 paper.
+This is the expectation-maximisation update (EM) of [helmbold1997](@citet). [orseau2017](@citet) study the same update as Soft-Bayes. The wealth held at the end of the period is the posterior of the Bayesian mixture over the single assets, with the allocation as its prior. At `eta = 1` the rule is buy-and-hold, and below one it is that mixture slowed down. As the weighting of an [`ExpertMixture`](@ref), the rule is Soft-Bayes over the experts, the setting of [orseau2017](@cite).
 
 The raw step is positive wherever the allocation is, and it sums to one, so on the default Allocation Set the Euclidean projection returns it unchanged. The `proj` field is bound to [`EuclideanProjection`](@ref), which repairs the step on a stated set.
 
@@ -820,7 +820,7 @@ w_{t+1, i} &= w_{t, i} \\left( 1 - \\eta + \\eta\\, g_{t, i} \\right) = (1 - \\e
 \\end{align}
 ```
 
-The rule writes the step in the online form of the 2017 paper, which pulls towards the Start Allocation when the rate falls:
+The rule writes the step in the online form of [orseau2017](@cite), which pulls towards the Start Allocation when the rate falls:
 
 ```math
 \\begin{align}
@@ -842,17 +842,17 @@ Where:
   - ``\\rho_t``: Ratio of the online form.
   - ``c_t``: Ceiling on the ratio, which [`correction_ratio_cap`](@ref) returns.
 
-The step sums to one without a normalisation, because ``\\langle \\boldsymbol{w}_t, \\boldsymbol{g}_t \\rangle = 1``. A weight rises by at most ``\\eta``, ``w_{t+1, i} \\leq (1 - \\eta)\\, w_{t, i} + \\eta``, and falls to no less than ``(1 - \\eta)\\, w_{t, i}``. Helmbold and co-authors derive the step with the chi-squared distance to ``\\boldsymbol{w}_t`` in place of the relative entropy, and it is the first-order approximation of [`ExponentiatedGradient`](@ref). At a constant rate, ``\\rho_t = 1`` and the online form is the plain step. When the rate falls, the online form moves a share ``1 - \\rho_t`` of the allocation back to the Start Allocation, so no weight falls below ``(1 - \\rho_t)\\, w_{1, i}``. The form needs a rate that does not rise.
+The step sums to one without a normalisation, because ``\\langle \\boldsymbol{w}_t, \\boldsymbol{g}_t \\rangle = 1``. A weight rises by at most ``\\eta``, ``w_{t+1, i} \\leq (1 - \\eta)\\, w_{t, i} + \\eta``, and falls to no less than ``(1 - \\eta)\\, w_{t, i}``. [helmbold1997](@citet) derive the step with the chi-squared distance to ``\\boldsymbol{w}_t`` in place of the relative entropy, and it is the first-order approximation of [`ExponentiatedGradient`](@ref). At a constant rate, ``\\rho_t = 1`` and the online form is the plain step. When the rate falls, the online form moves a share ``1 - \\rho_t`` of the allocation back to the Start Allocation, so no weight falls below ``(1 - \\rho_t)\\, w_{1, i}``. The form needs a rate that does not rise.
 
-The 2017 paper bounds the regret against every constant rebalanced portfolio, for every sequence of non-negative price relatives, with no lower bound on the price relatives. With ``\\bar{\\eta} = \\eta / (1 - \\eta)`` tuned to ``\\sqrt{\\log N / (T m)}``, the regret is at most ``2 \\sqrt{T m \\log N} + m \\log(N / m) + \\log N``, and so at most ``2 \\sqrt{T N \\log N} + \\log N``. Here ``m \\leq N`` is the number of assets that are the best of their period at least once, and ``T`` is the number of periods. With ``C_1 = \\sum_t \\max_i (g_{t, i} - 1)``, the regret is at most ``\\min(C_1,\\, \\eta^{-1} \\log N + \\eta C_1 / 2 + \\eta^2 T)``, and at ``\\eta = \\sqrt{2 \\log N / C_1}`` at most ``\\min(C_1,\\, \\sqrt{2 C_1 \\log N} + 2 T \\log N / C_1)``. [`SelfConfidentRate`](@ref) reads that rate from the running ``C_1``, and the paper states no bound for this online rate. Under that rate, the paper advises the ceiling ``c_t = \\sqrt{t / (t + 1)}``. Its rate stays still while the mixture predicts well, and without the ceiling a weight can decay exponentially. With the ceiling, no weight falls below ``O(1 / t)`` of its start.
+[orseau2017](@citet) bound the regret against every constant rebalanced portfolio, for every sequence of non-negative price relatives, with no lower bound on the price relatives. With ``\\bar{\\eta} = \\eta / (1 - \\eta)`` tuned to ``\\sqrt{\\log N / (T m)}``, the regret is at most ``2 \\sqrt{T m \\log N} + m \\log(N / m) + \\log N``, and so at most ``2 \\sqrt{T N \\log N} + \\log N``. Here ``m \\leq N`` is the number of assets that are the best of their period at least once, and ``T`` is the number of periods. With ``C_1 = \\sum_t \\max_i (g_{t, i} - 1)``, the regret is at most ``\\min(C_1,\\, \\eta^{-1} \\log N + \\eta C_1 / 2 + \\eta^2 T)``, and at ``\\eta = \\sqrt{2 \\log N / C_1}`` at most ``\\min(C_1,\\, \\sqrt{2 C_1 \\log N} + 2 T \\log N / C_1)``. [`SelfConfidentRate`](@ref) reads that rate from the running ``C_1``, and [orseau2017](@citet) state no bound for this online rate. Under that rate, [orseau2017](@citet) advise the ceiling ``c_t = \\sqrt{t / (t + 1)}``. Its rate stays still while the mixture predicts well, and without the ceiling a weight can decay exponentially. With the ceiling, no weight falls below ``O(1 / t)`` of its start.
 
 # Algorithm
 
- 1. Set the period `t = st.n + 1`.
- 2. When `restart(alg.eta, t)` holds, return the carrier with the period count `t`, the Start Allocation `st.w1` and the statistic of the schedule at its seed, and a copy of `st.w1`.
+ 1. Set the period `t = st.n + 1`. `st` is the state of the rule: what the rule keeps from one update to the next, here an [`ExpectationMaximisationState`](@ref).
+ 2. When `restart(alg.eta, t)` holds, return a state with the period count `t`, the Start Allocation `st.w1` and the statistic of the schedule at its seed, and a copy of `st.w1`.
  3. Read the rate `eta_t` of the period with [`learning_rate`](@ref).
  4. Compute `g = x ./ dot(w, x)` and the plain step `q = w .* (1 - eta_t .+ eta_t .* g)`.
- 5. Build the new carrier `stn`, with the period count `t` and the statistic that `schedule_update!` returns for the row.
+ 5. Build the new state `stn`, with the period count `t` and the statistic that `schedule_update!` returns for the row.
  6. Compute `ratio`, the smaller of the rate of the next period over `eta_t` and [`correction_ratio_cap`](@ref). [`learning_rate`](@ref) reads the rate of the next period from `stn`.
  7. When `ratio` is not one, set `q = ratio .* q .+ (1 - ratio) .* st.w1`.
  8. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. Return `stn` and the projection.
@@ -977,7 +977,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Multiplies each weight by its price relative raised to the rate `eta`, then normalises the result.
 
-This is the aggregating algorithm (AA) of Vovk and Watkins over a finite set. At `eta = 1` it is the wealth weighting of [`BuyAndHold`](@ref). Over experts it is the wealth-weighted mixture, and over sampled constant rebalanced portfolios it is Cover's universal portfolio. Below one it discounts the evidence of every period alike. The rate is fixed, and [`WeakAggregatingAlgorithm`](@ref) is the weighting whose rate shrinks with the period. The raw step multiplies a non-negative vector, so its geometry is the entropic one, and the `proj` field is bound to [`EntropicProjection`](@ref).
+This is the aggregating algorithm (AA) of [vovkwatkins1998](@citet) over a finite set. At `eta = 1` it is the wealth weighting of [`BuyAndHold`](@ref). Over experts it is the wealth-weighted mixture, and over sampled constant rebalanced portfolios it is the universal portfolio of [cover1991](@citet). Below one it discounts the evidence of every period alike. The rate is fixed, and [`WeakAggregatingAlgorithm`](@ref) is the weighting whose rate shrinks with the period. The raw step multiplies a non-negative vector, so its geometry is the entropic one, and the `proj` field is bound to [`EntropicProjection`](@ref).
 
 # Mathematical definition
 
@@ -997,12 +997,12 @@ Where:
   - $(math_dict[:N])
   - ``\\eta > 0``: Rate that the price relative is raised to.
 
-The weight of an asset, or of an expert, is its start weight times its wealth raised to ``\\eta``. As the weighting of an [`ExpertMixture`](@ref), the blend is the average of the experts' allocations under these weights, which is the prediction of Vovk and Watkins' algorithm. As ``\\eta`` grows without bound, the weight gathers on the wealthiest asset, which is [`TopK`](@ref) at ``k = 1``. As ``\\eta`` falls to zero, the weights stay at the Start Allocation.
+The weight of an asset, or of an expert, is its start weight times its wealth raised to ``\\eta``. As the weighting of an [`ExpertMixture`](@ref), the blend is the average of the experts' allocations under these weights, which is the prediction of Algorithm 1 of [vovkwatkins1998](@cite). As ``\\eta`` grows without bound, the weight gathers on the wealthiest asset, which is [`TopK`](@ref) at ``k = 1``. As ``\\eta`` falls to zero, the weights stay at the Start Allocation.
 
 # Algorithm
 
  1. Compute `q = w .* x .^ alg.eta`.
- 2. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. On the default set the entropic projection divides `q` by its sum. Return the carrier `st` unchanged, and the projection.
+ 2. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. On the default set the entropic projection divides `q` by its sum. Return `st` unchanged, and the projection. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
 
 # Fields
 
@@ -1038,6 +1038,7 @@ AggregatingAlgorithm
 # References
 
   - $(ref_dict[:vovkwatkins1998]) Algorithm 1.
+  - $(ref_dict[:cover1991])
 """
 struct AggregatingAlgorithm{T1 <: Real, T2 <: EntropicProjection} <:
        AbstractOnlinePortfolioSelectionAlgorithm
@@ -1095,7 +1096,7 @@ $(DocStringExtensions.FIELDS)
     p0
 end
 function merge_states(::CumulativeWealthState, ::CumulativeWealthState)
-    return throw(ArgumentError("a `CumulativeWealthState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the carrier follows it."))
+    return throw(ArgumentError("a `CumulativeWealthState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the state of the rule follows it."))
 end
 function Base.copy(x::CumulativeWealthState)
     return CumulativeWealthState(x.n, copy(x.G), copy(x.p0))
@@ -1108,7 +1109,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the ``k`` wealthiest assets, or experts, each weighted by its wealth.
 
-This is the top-``k`` combination of Li, Hoi and Gopalkrishnan (CORN-K). The paper combines its correlation-driven experts this way, with ``k = 5``. On an [`ExpertMixture`](@ref), the rule weights the experts. At ``k = 1`` it follows the single wealthiest asset. At ``k = N`` it is buy-and-hold from the uniform allocation. The raw step is in the simplex, so on the default Allocation Set the Euclidean projection returns it unchanged. On a stated set, the projection repairs it, and the `proj` field is bound to [`EuclideanProjection`](@ref).
+This is the top-``k`` combination (CORN-K) of [li2011corn](@citet). [li2011corn](@citet) combine the correlation-driven experts of CORN this way, with ``k = 5``. On an [`ExpertMixture`](@ref), the rule weights the experts. At ``k = 1`` it follows the single wealthiest asset. At ``k = N`` it is buy-and-hold from the uniform allocation. The raw step is in the simplex, so on the default Allocation Set the Euclidean projection returns it unchanged. On a stated set, the projection repairs it, and the `proj` field is bound to [`EuclideanProjection`](@ref).
 
 # Mathematical definition
 
@@ -1125,14 +1126,14 @@ Where:
   - $(math_dict[:N])
   - ``\\mathcal{K}_t``: The ``k`` assets of largest ``G_{t, i}``. Equal wealth goes to the lower index.
 
-``\\exp(G_{t, i})`` is the wealth of asset ``i`` after period ``t`` from a unit start, so the weights are the paper's uniform distribution over the top ``k`` times their wealth.
+``\\exp(G_{t, i})`` is the wealth of asset ``i`` after period ``t`` from a unit start, so the weights are the uniform distribution of [li2011corn](@cite) over the top ``k`` times their wealth.
 
 # Algorithm
 
- 1. Add `log.(x)` to `st.G`.
+ 1. Add `log.(x)` to `st.G`. `st` is the state of the rule: what the rule keeps from one update to the next, here a [`CumulativeWealthState`](@ref).
  2. Sort the assets by `st.G`, largest first, with a stable sort so that equal wealth keeps the index order. Take the first `alg.k` of them, `top`.
  3. Set `q` to `exp.(st.G[top] .- st.G[first(order)])` on `top` and to zero elsewhere, and divide `q` by its sum. The shift by the largest log wealth keeps the exponential finite.
- 4. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. Return the carrier with its period count raised by one, and the projection.
+ 4. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. Return the state of the rule with its period count raised by one, and the projection.
 
 # Fields
 
@@ -1142,7 +1143,7 @@ $(DocStringExtensions.FIELDS)
 
     TopK(; k::Integer = 5, proj::EuclideanProjection = EuclideanProjection()) -> TopK
 
-Keywords correspond to the struct's fields. The default `k = 5` is the value of the paper.
+Keywords correspond to the struct's fields. The default `k = 5` is the value of [li2011corn](@cite).
 
 ## Validation
 
@@ -1212,7 +1213,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Weights each asset, or expert, by its prior times its wealth raised to a power that shrinks with the period.
 
-This is the weak aggregating algorithm (WAA) of Kalnishkan and Vyugin, in the form that Yang, He, Lin and Zhang (2020) and Yang, He and Zhang (2022) apply to portfolios. It differs from [`AggregatingAlgorithm`](@ref) by the shrinking rate. The weights read the cumulative wealth and not the previous weights, so the carrier holds the prior and the wealth. The weights are normalised, which is the entropic projection onto the simplex, and the `proj` field is bound to [`EntropicProjection`](@ref).
+This is the weak aggregating algorithm (WAA) of [kalnishkanvyugin2008](@citet), in the form that [yang2020waeg](@citet) and [yang2022caeg](@citet) apply to portfolios. It differs from [`AggregatingAlgorithm`](@ref) by the shrinking rate. The weights read the cumulative wealth and not the previous weights, so the state of the rule holds the prior and the wealth. The weights are normalised, which is the entropic projection onto the simplex, and the `proj` field is bound to [`EntropicProjection`](@ref).
 
 # Mathematical definition
 
@@ -1229,13 +1230,13 @@ Where:
   - $(math_dict[:t_period])
   - $(math_dict[:N])
 
-Both applied papers take the rate ``1 / \\sqrt{t + 1}`` with no constant. At a fixed rate ``\\eta`` in place of ``1 / \\sqrt{t + 1}``, the weights are those of [`AggregatingAlgorithm`](@ref). Over experts with log returns in ``[-L, 0]``, Lemma 1 of the 2020 paper puts the cumulative log wealth of the mixture within ``\\sqrt{T} \\left( \\log K + L^2 \\right)`` of the best of ``K`` experts under a uniform prior. A common scale of the price relatives of a period moves every log return by the same amount, so the bound holds for every sequence whose worst price relative in a period is at least ``e^{-L}`` times its best. The average log growth rate of the mixture then tends to that of the best expert.
+[yang2020waeg](@citet) and [yang2022caeg](@citet) take the rate ``1 / \\sqrt{t + 1}`` with no constant. At a fixed rate ``\\eta`` in place of ``1 / \\sqrt{t + 1}``, the weights are those of [`AggregatingAlgorithm`](@ref). Over experts with log returns in ``[-L, 0]``, Lemma 1 of [yang2020waeg](@cite) puts the cumulative log wealth of the mixture within ``\\sqrt{T} \\left( \\log K + L^2 \\right)`` of the best of ``K`` experts under a uniform prior. A common scale of the price relatives of a period moves every log return by the same amount, so the bound holds for every sequence whose worst price relative in a period is at least ``e^{-L}`` times its best. The average log growth rate of the mixture then tends to that of the best expert.
 
 # Algorithm
 
- 1. Add `log.(x)` to `st.G`, and set the period `n = st.n + 1`.
+ 1. Add `log.(x)` to `st.G`, and set the period `n = st.n + 1`. `st` is the state of the rule: what the rule keeps from one update to the next, here a [`CumulativeWealthState`](@ref).
  2. Compute `q = st.p0 .* exp.((st.G .- maximum(st.G)) ./ sqrt(n + 1))`. The shift by the largest log wealth, which the normalisation removes, keeps the exponential finite.
- 3. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. On the default set the entropic projection divides `q` by its sum. Return the carrier with the period count `n`, and the projection.
+ 3. Project `q` onto the Allocation Set with `alg.proj`, from the Price-Adjusted Allocation. On the default set the entropic projection divides `q` by its sum. Return the state of the rule with the period count `n`, and the projection.
 
 # Fields
 
@@ -1306,9 +1307,9 @@ end
 
 Builds the mixture of exponentiated-gradient experts under the weak aggregating algorithm, with a uniform prior.
 
-This is the weak aggregating exponential gradient (WAEG) of Yang, He, Lin and Zhang (2020). The result is an [`ExpertMixture`](@ref) under [`WeakAggregatingAlgorithm`](@ref), with one [`ExponentiatedGradient`](@ref) expert for each rate in `etas`. Both papers prove the mixture universal under their assumptions on the price relatives: its average log growth rate tends to that of the best constant rebalanced portfolio.
+This is the weak aggregating exponential gradient (WAEG) of [yang2020waeg](@citet). The result is an [`ExpertMixture`](@ref) under [`WeakAggregatingAlgorithm`](@ref), with one [`ExponentiatedGradient`](@ref) expert for each rate in `etas`. [yang2020waeg](@citet) and [yang2022caeg](@citet) prove the mixture universal under their assumptions on the price relatives: its average log growth rate tends to that of the best constant rebalanced portfolio.
 
-Yang, He and Zhang (2022) index the experts by a continuum of rates under a measure (CAEG). In their experiments they discretise the continuum to the grid `0.01:0.01:0.2`, and the weight of an expert is then the weight of this constructor. So on that grid the two forms give the same allocations. The default of `etas` is that grid, which both papers use. The 2020 paper reports that the final wealth hardly changes with the number of experts on this range, and falls slowly as the upper end of the range rises from `0.1` to `0.8`.
+[yang2022caeg](@citet) index the experts by a continuum of rates under a measure (CAEG). The experiments of [yang2022caeg](@cite) discretise the continuum to the grid `0.01:0.01:0.2`, and the weight of an expert is then the weight of this constructor. So on that grid the two forms give the same allocations. The default of `etas` is that grid, which [yang2020waeg](@citet) and [yang2022caeg](@citet) both use. [yang2020waeg](@citet) report that the final wealth hardly changes with the number of experts on this range, and falls slowly as the upper end of the range rises from `0.1` to `0.8`.
 
 # Arguments
 

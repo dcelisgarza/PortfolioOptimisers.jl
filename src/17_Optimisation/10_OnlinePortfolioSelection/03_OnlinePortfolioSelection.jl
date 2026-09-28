@@ -15,11 +15,11 @@ A given `w0` is over the pinned names, and the head pins and views it with them.
 
 **The Online Update reads the recursion's own allocation, and no flag changes that.** The previous weights of the loop reach the head through [`factory`](@ref) alone. They go into `fees` and `fb`, and never into the recursion. The fund's held book is the one base against which a turnover fee on this family measures a trade. So the online arm of the fold loop refuses a head whose `fees` carry a `tn` term when the Previous-Weights Source of the walk-forward is `nothing`. It refuses by name and before any fold, and `pws = DriftedWeights()` is the whole configuration. A head with no `tn` fee is not checked.
 
-**A non-finite return is kept, and read in two ways.** The rule's step reads `x = 1` there, as if the leg held cash. At an asset that the panel marks inactive, or at one to which the recursion gives no weight, this is silent. At an active asset with a non-zero weight it is a Held Gap, which warns by default and refuses under `strict`. The rows buffer keeps the cell as `NaN`, with the row's active mask beside it. Every statistic over the rows reads them as the batch verb reads a carrier, and reduces to its own Coverage Universe. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. A plain estimator drops an asset with a gap anywhere in its window. A mask-aware estimator answers the asset from the rows it has. A kernel over price relatives reads the gap as one.
+**A non-finite return is kept, and read in two ways.** The rule's step reads `x = 1` there, as if the leg held cash. At an asset that the panel marks inactive, or at one to which the recursion gives no weight, this is silent. At an active asset with a non-zero weight it is a Held Gap, which warns by default and refuses under `strict`. The rows buffer keeps the cell as `NaN`, with the row's active mask beside it. Every statistic over the rows reads them as the batch verb reads a Returns Result, and reduces to its own Coverage Universe. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. A plain estimator drops an asset with a gap anywhere in its window. A mask-aware estimator answers the asset from the rows it has. A kernel over price relatives reads the gap as one.
 
 The head never forces a zero into the recursion's allocation, and a relisted asset comes back at the recursion's own weight. A programme set that fits on the rows writes a zero at a leg that its prior cannot price, as a batch head does. It admits the leg again when the prior can price it. Under a time-varying panel, the Investable Mask of the read-out is the active mask of the last folded row. The read-out slices the full allocation to that mask and renormalises it, and the Result expands it back with a zero at every non-investable asset.
 
-**The Allocation Set on `set` is the one the Constrained Update projects onto.** [`project`](@ref) projects the raw step of every rule onto it, in the rule's own Projection Geometry. The default [`BoundedAllocationSet`](@ref) is the simplex, and every projection onto it is closed form, so the default configuration solves nothing. A [`ProgrammeAllocationSet`](@ref) admits the full constraint vocabulary, and its projection is a programme. When a programme fails, the step is a **Held Step**. The projection returns the Price-Adjusted Allocation it was given, so the fund trades nothing that period, and the rule's carrier still absorbs the row. The head warns once, with the row's timestamp. The retcode of the Recursion Read-out is an [`OptimisationSuccess`](@ref) that carries the [`HeldStep`](@ref) record of the last folded row, so a fallback chain never runs on a hold. The constructor refuses a negative lower bound under an entropic, Tsallis or log-barrier rule.
+**The Allocation Set on `set` is the one the Constrained Update projects onto.** [`project`](@ref) projects the raw step of every rule onto it, in the rule's own Projection Geometry. The default [`BoundedAllocationSet`](@ref) is the simplex, and every projection onto it is closed form, so the default configuration solves nothing. A [`ProgrammeAllocationSet`](@ref) admits the full constraint vocabulary, and its projection is a programme. When a programme fails, the step is a **Held Step**. The projection returns the Price-Adjusted Allocation it was given, so the fund trades nothing that period, and the state of the rule still absorbs the row. The head warns once, with the row's timestamp. The retcode of the Recursion Read-out is an [`OptimisationSuccess`](@ref) that carries the [`HeldStep`](@ref) record of the last folded row, so a fallback chain never runs on a hold. The constructor refuses a negative lower bound under an entropic, Tsallis or log-barrier rule.
 
 `merge_states` on the state and `Online(head)` are refused by name. An update depends on the order of the rows, and the family never refits from a buffer.
 
@@ -326,16 +326,16 @@ The uniform start and a given `w0` meet the set in the same way. So the allocati
 
  1. Form `start`, which is `1/N` at each of the `N` pinned assets when `w0` is `nothing`, and `w0` otherwise.
  2. Project `start` once onto `set` in the rule's geometry through [`project_start`](@ref), giving `w0`. A set that reads rows returns `start` unchanged.
- 3. Seed the rule's carrier on `w0` and `set` through [`rule_state_seed`](@ref), giving `st`. Steps 2 and 3 run inside one [`with_projection_step`](@ref) under the head's `strict`, which collects the holds in `held`.
+ 3. Seed the state of the rule on `w0` and `set` through [`rule_state_seed`](@ref), giving `st`. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing. Steps 2 and 3 run inside one [`with_projection_step`](@ref) under the head's `strict`, which collects the holds in `held`.
  4. Warn on a hold through [`report_held_steps`](@ref).
  5. Size the rows buffer `X` from [`rows_needed`](@ref). A count of `nothing` gives an uncapped buffer, a count of zero gives no buffer, and any other count caps the buffer at that count.
- 6. Keep the carrier's panel as `pnl` when it is static, and `nothing` otherwise.
- 7. Return the state with no row folded, the allocation `w0`, the carrier `st`, the buffer `X`, the names and `pnl`.
+ 6. Keep the panel of `rd` as `pnl` when it is static, and `nothing` otherwise.
+ 7. Return the state with no row folded, the allocation `w0`, the state `st` of the rule, the buffer `X`, the names and `pnl`.
 
 # Arguments
 
   - `opt`: The head.
-  - `rd`: The carrier of the first block.
+  - `rd`: The returns data of the first block.
   - `set`: The Allocation Set, resolved over the pinned universe.
 
 # Validation
@@ -386,23 +386,23 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Folds every row of a carrier into the head's state, in order.
+Folds every row of a Returns Result into the head's state, in order.
 
-This is the Block Step, and a fold of the whole carrier from no state is the Causal Pass.
+This is the Block Step, and a fold of the whole Returns Result from no state is the Causal Pass.
 
 # Algorithm
 
- 1. Read the active mask of the carrier through [`step_active_mask`](@ref), giving `amsk`.
+ 1. Read the active mask of `rd` through [`step_active_mask`](@ref), giving `amsk`.
  2. Resolve the Allocation Set over the pinned universe through [`resolve_allocation_set`](@ref), giving `set`.
  3. Seed the state on the first block, or pin and check the carried state, through [`online_selection_pin`](@ref), giving `state`.
- 4. Fold each row in order through [`online_selection_row!`](@ref), under the timestamp that [`row_timestamp`](@ref) gives it. Each row updates the carrier `st`, the allocation `w`, the buffer `X` and the hold record `hold`, and adds one to the row count `n`.
+ 4. Fold each row in order through [`online_selection_row!`](@ref), under the timestamp that [`row_timestamp`](@ref) gives it. Each row updates the state `st` of the rule, the allocation `w`, the buffer `X` and the hold record `hold`, and adds one to the row count `n`. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
  5. Return the state with the new `n`, `w`, `st`, `X` and `hold`, the active mask of the last row, and the timestamps folded so far.
 
 # Arguments
 
   - `opt`: The head.
   - `cache`: The state, or `nothing` before the first row.
-  - `rd`: The carrier of the block, `observations × assets`.
+  - `rd`: The returns data of the block, `observations × assets`.
   - `set`: The block's Allocation Set, before resolution over the pinned universe. It defaults to the head's own, and the fold loop's online arm passes the fold's entry of a schedule (see [`online_step_fold`](@ref)).
 
 # Validation
@@ -486,7 +486,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Takes one row of the recursion, inside a [`ProjectionStep`](@ref) that gives every projection of the row the rows it reads and a log for its holds.
 
-The row reads a gap in two ways, and each reader gets the reading that the rest of the library gives it. The Online Update and every kernel over the price relatives read one at a gap, as if the leg held cash, which is the reading of a Held Gap. So the recursion stays over the full pinned universe and never carries a forced zero. Every statistic over the rows reads the carrier as a batch verb reads one, with `NaN` where there was no return and the active mask beside it. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. It reduces to its own Coverage Universe. So a window over an unlisted span never meets a constant column, and returns that never happened never dilute the statistic of a relisted asset.
+The row reads a gap in two ways, and each reader gets the reading that the rest of the library gives it. The Online Update and every kernel over the price relatives read one at a gap, as if the leg held cash, which is the reading of a Held Gap. So the recursion stays over the full pinned universe and never carries a forced zero. Every statistic over the rows reads them as a batch verb reads a Returns Result, with `NaN` where there was no return and the active mask beside it. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. It reduces to its own Coverage Universe. So a window over an unlisted span never meets a constant column, and returns that never happened never dilute the statistic of a relisted asset.
 
 A row with a held projection warns once, with the row's timestamp and each hold, and returns the first [`HeldStep`](@ref) record. A row whose projections all solved returns `nothing`.
 
@@ -495,14 +495,14 @@ A row with a held projection warns once, with the row's timestamp and each hold,
  1. Name the Held Gaps of the returns `r` at the row's index `i` through [`report_row_gaps`](@ref).
  2. Push `r` verbatim, with its active mask `amsk`, into the rows buffer `X`, when the tree keeps one.
  3. Form the price relative `x` through [`price_relative`](@ref), which is one at a gap.
- 4. Read the buffer out as the carrier `rows` through [`rows_carrier`](@ref).
- 5. Take the Online Update through [`online_update!`](@ref), inside a projection step over `rows` and the timestamp `ts` that [`with_projection_step`](@ref) opens. This gives the carrier `st`, the allocation `w` and the log of holds `held`.
+ 4. Read the buffer out as `rows`, a [`ReturnsResult`](@ref) of the rows that the head holds, through [`rows_carrier`](@ref).
+ 5. Take the Online Update through [`online_update!`](@ref), inside a projection step over `rows` and the timestamp `ts` that [`with_projection_step`](@ref) opens. This gives the new state `st` of the rule, the allocation `w` and the log of holds `held`.
  6. Warn on a hold through [`report_held_steps`](@ref), which gives the row's hold record.
 
 # Arguments
 
   - `opt`: The head.
-  - `st`: The rule's carrier.
+  - `st`: The state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
   - `w`: The allocation held during the row's period.
   - `X`: The rows buffer, or `nothing`.
   - `row`: The row, as a named tuple of four fields. `r` holds its returns verbatim, `amsk` holds its active mask or `nothing`, `ts` holds its timestamp or its index in the fold, and `i` holds its index in the fold.
@@ -511,7 +511,7 @@ A row with a held projection warns once, with the row's timestamp and each hold,
 
 # Returns
 
-  - `(st', w', X', hold)::Tuple`: The carrier, the allocation for the next period, the buffer after the row, and the row's hold record or `nothing`.
+  - `(st', w', X', hold)::Tuple`: The state of the rule, the allocation for the next period, the buffer after the row, and the row's hold record or `nothing`.
 
 # Related
 
@@ -542,11 +542,11 @@ end
     rows_carrier(X::SampleBufferState, nx::VecStr)
     rows_carrier(X::SampleBufferState, nx::Nothing)
 
-Reads the rows buffer out as the carrier that the Online Update gets.
+Reads the rows buffer out as the Returns Result that the Online Update gets.
 
-The carrier is a [`ReturnsResult`](@ref) of the buffer's rows verbatim, under the pinned names. When the buffer records active masks, [`buffer_panel`](@ref) makes them a time-varying Asset Panel on the carrier. The method returns `nothing` when the tree keeps no rows.
+The result is a [`ReturnsResult`](@ref) of the buffer's rows verbatim, under the pinned names. When the buffer records active masks, [`buffer_panel`](@ref) makes them a time-varying Asset Panel on that Returns Result. The method returns `nothing` when the tree keeps no rows.
 
-Every statistic over the rows reads this carrier, and it is the carrier that the batch verbs read. So `prior(pe, rd)`, `mean(me, rd.X, rd.pnl)` and `optimise(opt, rd)` reduce to the Coverage Universe of the window exactly as they do on a carrier that the ingestion layer built. The method takes no copy, because the carrier views the valid region of the buffer. A buffer with no pinned names is refused by name. A Returns Result that carries rows carries their names by its own contract, so the head never meets that pair.
+Every statistic over the rows reads this Returns Result, and the batch verbs read the same type. So `prior(pe, rd)`, `mean(me, rd.X, rd.pnl)` and `optimise(opt, rd)` reduce to the Coverage Universe of the window exactly as they do on a Returns Result that the ingestion layer built. The method takes no copy, because the Returns Result views the valid region of the buffer. A buffer with no pinned names is refused by name. A Returns Result that carries rows carries their names by its own contract, so the head never meets that pair.
 
 # Validation
 
@@ -566,12 +566,12 @@ function rows_carrier(X::SampleBufferState, nx::VecStr)
     return ReturnsResult(; nx = nx, X = sample_buffer(X), pnl = buffer_panel(X))
 end
 function rows_carrier(::SampleBufferState, ::Nothing)
-    return throw(IsNothingError("the head keeps rows and pins no asset names: a Returns Result that carries rows carries their names, so the carrier the rules read cannot be formed. Hand the head a carrier whose `nx` is set."))
+    return throw(IsNothingError("the head keeps rows and pins no asset names: a Returns Result that carries rows carries their names, so the rows that the rules read cannot be formed. Hand the head a Returns Result whose `nx` is set."))
 end
 """
     buffer_panel(X::SampleBufferState)
 
-Returns the active masks of a rows buffer as the [`AssetPanel`](@ref) of a carrier, or `nothing` when the buffer records none, which is the static panel.
+Returns the active masks of a rows buffer as the [`AssetPanel`](@ref) of a Returns Result, or `nothing` when the buffer records none, which is the static panel.
 
 The panel uses the active mask as its estimation mask too, because [`step_active_mask`](@ref) admits only that panel.
 
@@ -594,7 +594,7 @@ end
 
 Returns the timestamp under which a row of a block folds.
 
-It is the carrier's timestamp. When the carrier holds none, it is the row's index in the whole fold, `n + 1` after `n` rows.
+It is the timestamp of the row in the returns data. When the returns data holds no timestamps, it is the row's index in the whole fold, `n + 1` after `n` rows.
 
 # Related
 
@@ -674,14 +674,14 @@ end
 """
     partial_fit!(opt::OnlinePortfolioSelection, rd::ReturnsResult)
 
-Folds the rows of a carrier into the head's recursion as the Block Step, and reads nothing out.
+Folds the rows of a Returns Result into the head's recursion as the Block Step, and reads nothing out.
 
 Each row of `rd` is one Online Update, in order, and the state never learns the cadence of the loop. A fold of `k` rows is `k` updates and no read-out. After a fold of rows `1:t`, `optimise(opt)` equals `optimise(opt, rd[1:t])` exactly, because both take the same `t` single-row updates.
 
 # Arguments
 
   - `opt`: The head.
-  - `rd`: The carrier holding one row or a block of them, `observations × assets`.
+  - `rd`: The returns data, which holds one row or a block of rows, `observations × assets`.
 
 # Validation
 
@@ -714,7 +714,7 @@ The head is the one family whose online step is the optimisation. The Constraine
 
   - `opt`: The head the loop threads, with its schedules unresolved.
   - `ctx`: The fold's context.
-  - `rd`: The carrier of the rows the fold has gained.
+  - `rd`: The returns data of the rows that the fold has gained.
 
 # Returns
 
@@ -918,7 +918,7 @@ end
 
 Refuses by name, because the head has no batch estimator to return.
 
-A Recursion Read-out rebuilds no carrier and runs no batch path. `optimise(opt)` reads the state directly.
+A Recursion Read-out rebuilds no returns data and runs no batch path. `optimise(opt)` reads the state directly.
 
 # Related
 
@@ -926,7 +926,7 @@ A Recursion Read-out rebuilds no carrier and runs no batch path. `optimise(opt)`
   - [`optimise`](@ref)
 """
 function online_readout(::OnlinePortfolioSelection)
-    return throw(ArgumentError("an `OnlinePortfolioSelection` head has a Recursion Read-out, not a reconstitution: its state holds the next allocation and no carrier to rebuild, so there is no batch estimator to hand back. Read it out with `optimise(opt)`."))
+    return throw(ArgumentError("an `OnlinePortfolioSelection` head has a Recursion Read-out, not a reconstitution: its state holds the next allocation and no returns data to rebuild, so there is no batch estimator to hand back. Read it out with `optimise(opt)`."))
 end
 """
     held_timestamps(opt::OnlinePortfolioSelection)

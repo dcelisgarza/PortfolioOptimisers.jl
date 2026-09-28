@@ -255,10 +255,11 @@ nothing raises `@error "File exists but no references were collected"` in
     bib_keys = Set(m.captures[1]
                    for m in eachmatch(r"^@\w+\{([A-Za-z0-9_]+),"m, read(BIB, String)))
 
-    # A citation is `[key](@cite)` or `[key1,key2](@cite)`.
+    # A citation is `[key](@cite)` or `[key1,key2](@cite)`, and `@citet` in place of `@cite`
+    # when the authors are the subject of the sentence.
     function cited_keys(text)
         acc = Set{String}()
-        for m in eachmatch(r"\[([A-Za-z0-9_][A-Za-z0-9_,\s]*)\]\(@cite\)", text)
+        for m in eachmatch(r"\[([A-Za-z0-9_][A-Za-z0-9_,\s]*)\]\(@citet?\)", text)
             foreach(k -> push!(acc, strip(k)), split(m.captures[1], ','))
         end
         return acc
@@ -431,8 +432,9 @@ nothing raises `@error "File exists but no references were collected"` in
         for p in reduce(vcat, files_under.(API, ".md"))
             text = read(p, String)
             has_block = occursin("```@bibliography", text)
-            cites = occursin("(@cite)", text) ||
-                    any(n -> occursin("(@cite)", docstring_text(n)), docs_block_names(text))
+            cites = occursin(r"\(@citet?\)", text) ||
+                    any(n -> occursin(r"\(@citet?\)", docstring_text(n)),
+                        docs_block_names(text))
             if cites && !has_block
                 push!(missing_block, relpath(p, DOCS))
             elseif !cites && has_block
