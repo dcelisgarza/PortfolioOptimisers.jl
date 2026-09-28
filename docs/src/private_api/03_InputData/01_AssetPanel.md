@@ -1,8 +1,8 @@
 ```@meta
-Description = "The Asset Panel, private API of PortfolioOptimisers.jl: AllTrueMask, RepeatedLeading, panel_axes, features_are_assets, panel_onehot, panel_field_lift, …"
+Description = "Asset Panel, private API of PortfolioOptimisers.jl: AllTrueMask, RepeatedLeading, panel_axes, features_are_assets, panel_onehot, panel_field_lift, …"
 ```
 
-# The Asset Panel: private API
+# Asset Panel: private API
 
 ## Types
 

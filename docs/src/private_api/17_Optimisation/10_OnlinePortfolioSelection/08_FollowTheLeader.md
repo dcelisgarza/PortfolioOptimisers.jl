@@ -1,8 +1,8 @@
 ```@meta
-Description = "Online selection rules: the third set, private API of PortfolioOptimisers.jl: pattern_candidates, assert_pattern_window, histogram_cell, neighbour_count, …"
+Description = "Follow the leader, private API of PortfolioOptimisers.jl: pattern_candidates, assert_pattern_window, histogram_cell, neighbour_count, LeaderOptimiser, …"
 ```
 
-# Online selection rules: the third set: private API
+# Follow the leader: private API
 
 ```@docs
 PortfolioOptimisers.pattern_candidates

@@ -1,8 +1,8 @@
 ```@meta
-Description = "Threshold Constraints, public API of PortfolioOptimisers.jl: ThresholdEstimator, Threshold, threshold_constraints."
+Description = "Threshold constraint generation, public API of PortfolioOptimisers.jl: ThresholdEstimator, Threshold, threshold_constraints."
 ```
 
-# Threshold Constraints
+# Threshold constraint generation
 
 ```@docs
 ThresholdEstimator

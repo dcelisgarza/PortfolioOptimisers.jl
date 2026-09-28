@@ -1,8 +1,8 @@
 ```@meta
-Description = "Greedy allocation, public API of PortfolioOptimisers.jl: GreedyAllocationResult, GreedyAllocation, factory, optimise."
+Description = "Greedy finite allocation, public API of PortfolioOptimisers.jl: GreedyAllocationResult, GreedyAllocation, factory, optimise."
 ```
 
-# Greedy allocation
+# Greedy finite allocation
 
 ```@docs
 GreedyAllocationResult

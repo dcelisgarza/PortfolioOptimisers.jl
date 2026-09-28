@@ -1,8 +1,8 @@
 ```@meta
-Description = "Portfolio and asset fees, private API of PortfolioOptimisers.jl: AbstractFeeAmortisation, FeesE_Fees, calc_periodic_fees, calc_one_off_fees, …"
+Description = "Fees, private API of PortfolioOptimisers.jl: AbstractFeeAmortisation, FeesE_Fees, calc_periodic_fees, calc_one_off_fees, calc_asset_periodic_fees, …"
 ```
 
-# Portfolio and asset fees: private API
+# Fees: private API
 
 ```@docs
 AbstractFeeAmortisation

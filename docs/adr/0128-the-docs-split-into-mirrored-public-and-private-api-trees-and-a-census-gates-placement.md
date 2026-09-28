@@ -230,3 +230,28 @@ and third place the rule shows up, not a second rule.
   amended in turn.
 - `test/test_64_docs_page_metadata_census.jl` reads the page's description at its generator,
   keyed by the new path, exactly as it already did for the capability catalogue.
+
+## Amendment (2026-09-28): the H1 names the file of the page
+
+The H1 of a mirror page is the name of the page's file, without the numeric prefix and the
+extension, with its words separated. `01_Base_OnlinePortfolioSelection.md` takes
+`# Base Online Portfolio Selection`, and its private mirror takes
+`# Base Online Portfolio Selection: private API`. The case, the spaces and the punctuation are
+free, so `01_XatRisk.md` can take `# X at risk`. The words cannot change.
+
+Before this amendment, 105 page pairs had an H1 that described the page, for example
+`# Online selection rules: the first set` for `02_OnlineSelectionRules.md`. Documenter shows the
+H1 as the label of the page in the navigation, next to the groups that `docs/make.jl` labels by
+their directory names. A description there hid the file that the page documents, and the reader
+could not find the page from the source tree. The first paragraph of the page keeps the
+description.
+
+### Consequences of this amendment
+
+- The derived `Description` line of each changed page changed with its H1, because
+  `docs/page_metadata.jl` derives the line from the H1.
+- An `@id` label on a changed H1 took the new H1: `api-` or `private-api-` followed by the H1 in
+  lower case with hyphens between the words. Every `@ref` to the old label changed with it.
+- `names_its_file` in `docs/page_metadata.jl` states the rule.
+  `test/test_64_docs_page_metadata_census.jl` gates it on both trees.
+  `.github/instructions/julia-docstrings.instructions.md` states it for the author of a page.

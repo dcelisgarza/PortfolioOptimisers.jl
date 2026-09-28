@@ -1,8 +1,8 @@
 ```@meta
-Description = "Ordered Weights Array (a), public API of PortfolioOptimisers.jl: AbstractOrderedWeightsArrayFunction, ExponentialConeEntropy, RelativeEntropy, …"
+Description = "OWA risk measures (a), public API of PortfolioOptimisers.jl: AbstractOrderedWeightsArrayFunction, ExponentialConeEntropy, RelativeEntropy, MaximumEntropy, …"
 ```
 
-# Ordered Weights Array (a)
+# OWA risk measures (a)
 
 Several risk measures are ordered weighted averages. Such a measure sorts the portfolio returns, and weights each return by its rank [owa1,owa3](@cite). The higher L-moments are linear combinations of such averages [owa2](@cite).
 

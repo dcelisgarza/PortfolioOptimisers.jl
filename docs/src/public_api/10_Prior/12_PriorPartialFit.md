@@ -1,8 +1,8 @@
 ```@meta
-Description = "The prior family on the partial-fit seam, public API of PortfolioOptimisers.jl: partial_fit!, port_opt_view, merge_states, prior."
+Description = "Prior partial fit, public API of PortfolioOptimisers.jl: partial_fit!, port_opt_view, merge_states, prior."
 ```
 
-# The prior family on the partial-fit seam
+# Prior partial fit
 
 A prior updates with `partial_fit!` in one of two ways, and the type of the state it carries shows which.
 

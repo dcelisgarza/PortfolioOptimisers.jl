@@ -1,8 +1,8 @@
 ```@meta
-Description = "Ordered Weights Array (b), public API of PortfolioOptimisers.jl: OrderedWeightsArrayRange, factory."
+Description = "OWA risk measures (b), public API of PortfolioOptimisers.jl: OrderedWeightsArrayRange, factory."
 ```
 
-# Ordered Weights Array (b)
+# OWA risk measures (b)
 
 ```@docs
 OrderedWeightsArrayRange

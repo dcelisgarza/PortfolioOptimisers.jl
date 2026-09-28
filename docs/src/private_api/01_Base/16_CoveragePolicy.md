@@ -1,8 +1,8 @@
 ```@meta
-Description = "The coverage policy, private API of PortfolioOptimisers.jl: CoverageCounts, coverage_counts_seed, Base.copy, coverage_counts_view, coverage_valid, …"
+Description = "Coverage Policy, private API of PortfolioOptimisers.jl: CoverageCounts, coverage_counts_seed, Base.copy, coverage_counts_view, coverage_valid, …"
 ```
 
-# The coverage policy: private API
+# Coverage Policy: private API
 
 ```@docs
 PortfolioOptimisers.CoverageCounts

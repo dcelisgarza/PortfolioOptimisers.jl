@@ -1,8 +1,8 @@
 ```@meta
-Description = "Asset turnover, public API of PortfolioOptimisers.jl: TurnoverEstimator, Turnover, factory, turnover_constraints, port_opt_view, needs_previous_weights."
+Description = "Turnover, public API of PortfolioOptimisers.jl: TurnoverEstimator, Turnover, factory, turnover_constraints, port_opt_view, needs_previous_weights."
 ```
 
-# Asset turnover
+# Turnover
 
 The turnover measures the absolute change of each weight from a set of reference weights, such as the weights before a rebalance. You can use it to compute fees or as a constraint. It is also a risk measure, which the [turnover risk measure](@ref api-turnover-risk-measure) page describes.
 

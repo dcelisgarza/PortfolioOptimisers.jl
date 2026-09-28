@@ -1,8 +1,8 @@
 ```@meta
-Description = "The Pipeline's online step, private API of PortfolioOptimisers.jl: PipelineResume, PipelineBufferState, fold_pipeline, fold_pipeline_owner, …"
+Description = "Online Pipeline, private API of PortfolioOptimisers.jl: PipelineResume, PipelineBufferState, fold_pipeline, fold_pipeline_owner, readout_pipeline, …"
 ```
 
-# [The Pipeline's online step: private API](@id private-api-the-pipelines-online-step)
+# [Online Pipeline: private API](@id private-api-online-pipeline)
 
 ```@docs
 PortfolioOptimisers.PipelineResume

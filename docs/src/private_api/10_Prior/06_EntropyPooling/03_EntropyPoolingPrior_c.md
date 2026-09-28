@@ -1,8 +1,8 @@
 ```@meta
-Description = "Entropy Pooling (c), private API of PortfolioOptimisers.jl: VecEP, show_fields, ep_prior."
+Description = "Entropy pooling Prior (c), private API of PortfolioOptimisers.jl: VecEP, show_fields, ep_prior."
 ```
 
-# Entropy Pooling (c): private API
+# Entropy pooling Prior (c): private API
 
 ```@docs
 VecEP

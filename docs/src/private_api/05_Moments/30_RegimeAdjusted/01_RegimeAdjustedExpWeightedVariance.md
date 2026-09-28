@@ -1,8 +1,8 @@
 ```@meta
-Description = "Regime Adjusted Exponential Weighted Variance, private API of PortfolioOptimisers.jl: RegimeAdjustedVarianceState, get_regime_state, hac_squared_returns!, …"
+Description = "Regime adjusted exp weighted variance, private API of PortfolioOptimisers.jl: RegimeAdjustedVarianceState, get_regime_state, hac_squared_returns!, …"
 ```
 
-# Regime Adjusted Exponential Weighted Variance: private API
+# Regime adjusted exp weighted variance: private API
 
 ## Types
 

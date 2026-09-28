@@ -1,8 +1,8 @@
 ```@meta
-Description = "The Coverage Universe, private API of PortfolioOptimisers.jl: coverage_mask, coverage_sentinel, coverage_reduction, coverage_reduced_pair, …"
+Description = "Coverage Universe, private API of PortfolioOptimisers.jl: coverage_mask, coverage_sentinel, coverage_reduction, coverage_reduced_pair, panel_moment_masks, …"
 ```
 
-# The Coverage Universe: private API
+# Coverage Universe: private API
 
 The coverage universe of a fit is the set of assets whose returns are finite, and whose entries in the active mask of the [`AssetPanel`](@ref) are `true`, on every row of the window. A prior fits each ordinary moment estimator on the returns of those assets alone. It then writes the results into arrays over all the assets, where the entries of every other asset are `NaN`.
 

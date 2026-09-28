@@ -1,8 +1,8 @@
 ```@meta
-Description = "Kappa logarithm, private API of PortfolioOptimisers.jl: kappa_log."
+Description = "Kappa log, private API of PortfolioOptimisers.jl: kappa_log."
 ```
 
-# [Kappa logarithm: private API](@id private-api-kappa-logarithm)
+# [Kappa log: private API](@id private-api-kappa-log)
 
 ```@docs
 kappa_log

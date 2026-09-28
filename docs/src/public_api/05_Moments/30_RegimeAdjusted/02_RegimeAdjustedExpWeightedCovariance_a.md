@@ -1,8 +1,8 @@
 ```@meta
-Description = "Regime Adjusted Exponential Weighted Covariance (a), public API of PortfolioOptimisers.jl: RegimeAdjustedTarget, MahalanobisTarget, DiagonalTarget, …"
+Description = "Regime adjusted exp weighted covariance (a), public API of PortfolioOptimisers.jl: RegimeAdjustedTarget, MahalanobisTarget, DiagonalTarget, PortfolioTarget, …"
 ```
 
-# Regime Adjusted Exponential Weighted Covariance (a)
+# Regime adjusted exp weighted covariance (a)
 
 ## Types
 

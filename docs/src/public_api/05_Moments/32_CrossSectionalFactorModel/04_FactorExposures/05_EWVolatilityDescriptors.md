@@ -1,8 +1,8 @@
 ```@meta
-Description = "Exponentially Weighted Volatility Descriptors, public API of PortfolioOptimisers.jl: EWVolatility, EWResidualVolatility, descriptor, EWDownsideVolatility, …"
+Description = "EW volatility descriptors, public API of PortfolioOptimisers.jl: EWVolatility, EWResidualVolatility, descriptor, EWDownsideVolatility, …"
 ```
 
-# [Exponentially Weighted Volatility Descriptors](@id api-ew-volatility-descriptors)
+# [EW volatility descriptors](@id api-ew-volatility-descriptors)
 
 ## Types
 

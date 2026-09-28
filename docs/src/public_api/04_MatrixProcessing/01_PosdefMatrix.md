@@ -1,8 +1,8 @@
 ```@meta
-Description = "Positive definite matrix projection, public API of PortfolioOptimisers.jl: AbstractPosdefEstimator, Posdef, posdef, posdef!."
+Description = "Posdef matrix, public API of PortfolioOptimisers.jl: AbstractPosdefEstimator, Posdef, posdef, posdef!."
 ```
 
-# [Positive definite matrix projection](@id api-positive-definite-matrix-projection)
+# [Posdef matrix](@id api-posdef-matrix)
 
 Many optimisations need a positive definite covariance or correlation matrix to have a unique solution. An estimated matrix can fail this for three reasons: collinear assets, fewer observations than assets, and floating-point rounding. Such a matrix has zero or negative eigenvalues.
 

@@ -1,8 +1,8 @@
 ```@meta
-Description = "Exponentially Weighted Variance, public API of PortfolioOptimisers.jl: ExpWeightedVariance, var, std, partial_fit!, merge_states."
+Description = "Exp weighted variance, public API of PortfolioOptimisers.jl: ExpWeightedVariance, var, std, partial_fit!, merge_states."
 ```
 
-# Exponentially Weighted Variance
+# Exp weighted variance
 
 ## Types
 

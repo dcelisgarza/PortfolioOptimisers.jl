@@ -1,8 +1,8 @@
 ```@meta
-Description = "Dimensional Reduction Regression, private API of PortfolioOptimisers.jl: DimensionReductionTarget, _regression, prep_dim_red_reg."
+Description = "Dimension reduction regression, private API of PortfolioOptimisers.jl: DimensionReductionTarget, _regression, prep_dim_red_reg."
 ```
 
-# Dimensional Reduction Regression: private API
+# Dimension reduction regression: private API
 
 ```@docs
 DimensionReductionTarget

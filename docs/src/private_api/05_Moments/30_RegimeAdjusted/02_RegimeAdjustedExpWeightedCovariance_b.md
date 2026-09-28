@@ -1,8 +1,8 @@
 ```@meta
-Description = "Regime Adjusted Exponential Weighted Covariance (b), private API of PortfolioOptimisers.jl: gap_fill_value, Base.copy, variance_series."
+Description = "Regime adjusted exp weighted covariance (b), private API of PortfolioOptimisers.jl: gap_fill_value, Base.copy, variance_series."
 ```
 
-# Regime Adjusted Exponential Weighted Covariance (b): private API
+# Regime adjusted exp weighted covariance (b): private API
 
 ## Functions
 

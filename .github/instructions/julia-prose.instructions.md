@@ -166,7 +166,7 @@ Two such texts exist, and a page's path tells them apart, as
 already does:
 
 - **The H1 of a mirror page** under `docs/src/public_api/` or `docs/src/private_api/`, whose shape
-  ADR 0128 fixes and which ends in `: public API` or `: private API`.
+  ADR 0128 fixes. It names the page's file, and on the private side it ends in `: private API`.
 - **The `Description` line of a mirror page**, which `docs/page_metadata.jl` derives from the names
   the page hosts, and which
   [`test/test_64_docs_page_metadata_census.jl`](../../test/test_64_docs_page_metadata_census.jl)

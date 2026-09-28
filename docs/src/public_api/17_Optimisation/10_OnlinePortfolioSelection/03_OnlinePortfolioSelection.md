@@ -1,8 +1,8 @@
 ```@meta
-Description = "The online portfolio selection head, public API of PortfolioOptimisers.jl: OnlinePortfolioSelection, optimise, partial_fit!, factory, port_opt_view, Online, …"
+Description = "Online Portfolio Selection, public API of PortfolioOptimisers.jl: OnlinePortfolioSelection, optimise, partial_fit!, factory, port_opt_view, Online, …"
 ```
 
-# The online portfolio selection head
+# Online Portfolio Selection
 
 `OnlinePortfolioSelection` runs an online portfolio selection rule. It is a naive optimiser, so it needs a solver only when its set of allowed weights does. `optimise(opt, rd)` runs the rule from the start weights over every row of the returns in order, and returns the weights for the next period. `partial_fit!` updates the rule with a block of new rows, one row at a time. `optimise(opt)` with no data returns the current weights of the rule, and runs no batch fit.
 

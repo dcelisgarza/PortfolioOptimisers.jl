@@ -1,8 +1,8 @@
 ```@meta
-Description = "Entropy Pooling (c), public API of PortfolioOptimisers.jl: EntropyPoolingPrior, prior."
+Description = "Entropy pooling Prior (c), public API of PortfolioOptimisers.jl: EntropyPoolingPrior, prior."
 ```
 
-# Entropy Pooling (c)
+# Entropy pooling Prior (c)
 
 ```@docs
 EntropyPoolingPrior

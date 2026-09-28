@@ -1,8 +1,8 @@
 ```@meta
-Description = "Exponentially Weighted Return Forecast, public API of PortfolioOptimisers.jl: ExpWeightedReturnForecast, ExpWeightedReturnForecastResult, return_forecast."
+Description = "Exp weighted Return Forecast, public API of PortfolioOptimisers.jl: ExpWeightedReturnForecast, ExpWeightedReturnForecastResult, return_forecast."
 ```
 
-# [Exponentially Weighted Return Forecast](@id api-exp-weighted-return-forecast)
+# [Exp weighted Return Forecast](@id api-exp-weighted-return-forecast)
 
 ## Types
 

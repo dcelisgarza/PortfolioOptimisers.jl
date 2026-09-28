@@ -1,8 +1,8 @@
 ```@meta
-Description = "The online portfolio selection head, private API of PortfolioOptimisers.jl: online_selection_seed, fold_online_selection, online_selection_pin, …"
+Description = "Online Portfolio Selection, private API of PortfolioOptimisers.jl: online_selection_seed, fold_online_selection, online_selection_pin, …"
 ```
 
-# The online portfolio selection head: private API
+# Online Portfolio Selection: private API
 
 ```@docs
 PortfolioOptimisers.online_selection_seed

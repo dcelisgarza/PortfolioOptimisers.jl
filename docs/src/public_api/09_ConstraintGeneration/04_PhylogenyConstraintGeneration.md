@@ -1,8 +1,8 @@
 ```@meta
-Description = "Phylogeny Constraints, public API of PortfolioOptimisers.jl: SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator, …"
+Description = "Phylogeny constraint generation, public API of PortfolioOptimisers.jl: SemiDefinitePhylogenyEstimator, SemiDefinitePhylogeny, IntegerPhylogenyEstimator, …"
 ```
 
-# Phylogeny Constraints
+# Phylogeny constraint generation
 
 ```@docs
 SemiDefinitePhylogenyEstimator

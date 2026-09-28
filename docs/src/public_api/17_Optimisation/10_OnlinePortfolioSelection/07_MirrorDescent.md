@@ -1,8 +1,8 @@
 ```@meta
-Description = "Online selection rules: mirror descent, its schedules and its gradient transforms, public API of PortfolioOptimisers.jl: AbstractGradientTransform, …"
+Description = "Mirror descent, public API of PortfolioOptimisers.jl: AbstractGradientTransform, InverseSquareRootRate, DoublingTrickRate, SelfConfidentRate, …"
 ```
 
-# Online selection rules: mirror descent, its schedules and its gradient transforms
+# Mirror descent
 
 `MirrorDescent` is the first-order rule. At each period it takes one mirror descent step on the gradient, in the divergence of its projection geometry. Each constructor is named after the method of one paper. `ExponentiatedGradient` uses the entropic geometry, and `GradientProjection` uses the Euclidean one. `EGE`, `EGR` and `EGA` are the exponentiated gradient with momentum, with root-mean-square scaling and with adaptive moments.
 

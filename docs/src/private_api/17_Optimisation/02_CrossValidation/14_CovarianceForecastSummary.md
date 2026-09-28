@@ -1,8 +1,8 @@
 ```@meta
-Description = "The summary, comparison and re-projection of a covariance forecast evaluation, private API of PortfolioOptimisers.jl: summary_quantile, newey_west_variance."
+Description = "Covariance forecast summary, private API of PortfolioOptimisers.jl: summary_quantile, newey_west_variance."
 ```
 
-# The summary, comparison and re-projection of a covariance forecast evaluation: private API
+# Covariance forecast summary: private API
 
 ```@docs
 PortfolioOptimisers.summary_quantile

@@ -1,8 +1,8 @@
 ```@meta
-Description = "Error types, public API of PortfolioOptimisers.jl: IsNothingError, IsEmptyError, IsNonFiniteError, PropertyPathError, ConflictingArgumentError, …"
+Description = "Errors, public API of PortfolioOptimisers.jl: IsNothingError, IsEmptyError, IsNonFiniteError, PropertyPathError, ConflictingArgumentError, …"
 ```
 
-# Error types
+# Errors
 
 Most types of `PortfolioOptimisers.jl` check their values in the constructor. A method that receives such an object uses it without checking it again, which keeps the method short and fast. A check that needs data the constructor does not have runs at the start of the first function that has that data.
 

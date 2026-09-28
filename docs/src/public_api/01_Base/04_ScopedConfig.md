@@ -1,8 +1,8 @@
 ```@meta
-Description = "Scoped configuration, public API of PortfolioOptimisers.jl: Base.getindex."
+Description = "Scoped config, public API of PortfolioOptimisers.jl: Base.getindex."
 ```
 
-# Scoped configuration
+# Scoped config
 
 ```@docs
 Base.getindex(cfg::ScopedConfig)

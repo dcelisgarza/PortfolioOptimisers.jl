@@ -1,8 +1,8 @@
 ```@meta
-Description = "Ordered Weights Array (a), private API of PortfolioOptimisers.jl: AbstractOrderedWeightsArrayEstimator, AbstractOrderedWeightsArrayAlgorithm, …"
+Description = "OWA risk measures (a), private API of PortfolioOptimisers.jl: AbstractOrderedWeightsArrayEstimator, AbstractOrderedWeightsArrayAlgorithm, …"
 ```
 
-# Ordered Weights Array (a): private API
+# OWA risk measures (a): private API
 
 ```@docs
 AbstractOrderedWeightsArrayEstimator

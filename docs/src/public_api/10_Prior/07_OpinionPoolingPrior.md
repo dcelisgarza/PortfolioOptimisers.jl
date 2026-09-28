@@ -1,8 +1,8 @@
 ```@meta
-Description = "Opinion Pooling, public API of PortfolioOptimisers.jl: OpinionPoolingAlgorithm, LinearOpinionPooling, LogarithmicOpinionPooling, OpinionPoolingPrior, …"
+Description = "Opinion pooling Prior, public API of PortfolioOptimisers.jl: OpinionPoolingAlgorithm, LinearOpinionPooling, LogarithmicOpinionPooling, OpinionPoolingPrior, …"
 ```
 
-# Opinion Pooling
+# Opinion pooling Prior
 
 ```@docs
 OpinionPoolingAlgorithm

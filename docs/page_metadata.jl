@@ -194,6 +194,22 @@ function mirror_subject(h1::AbstractString, side::Symbol)
 end
 
 """
+    names_its_file(subject, file) -> Bool
+
+Whether the subject of a mirror page names the page's file. The file name loses its numeric
+prefix and its extension, and then both texts must spell the same letters and digits, with case
+ignored. The words can be separated, punctuated and cased freely. So
+`Base Online Portfolio Selection` names `01_Base_OnlinePortfolioSelection.md`,
+`X at risk` names `01_XatRisk.md` and `Gerber IQ covariance (a)` names
+`03_GerberIQCovariance_a.md`.
+"""
+function names_its_file(subject::AbstractString, file::AbstractString)
+    stem = replace(splitext(basename(file))[1], r"^\d+_" => "")
+    spelling(text) = lowercase(replace(text, r"[^0-9A-Za-z]" => ""))
+    return spelling(subject) == spelling(stem)
+end
+
+"""
     mirror_description(text, side) -> String
 
 The description a mirror page must carry, re-derived from the page's own text: its H1 and

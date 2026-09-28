@@ -1,8 +1,8 @@
 ```@meta
-Description = "Exponentially Weighted Beta Descriptors, public API of PortfolioOptimisers.jl: EWBeta, EWMacroSensitivity, EWDownsideBeta, descriptor, EWMarketBeta."
+Description = "EW beta descriptors, public API of PortfolioOptimisers.jl: EWBeta, EWMacroSensitivity, EWDownsideBeta, descriptor, EWMarketBeta."
 ```
 
-# [Exponentially Weighted Beta Descriptors](@id api-ew-beta-descriptors)
+# [EW beta descriptors](@id api-ew-beta-descriptors)
 
 ## Types
 

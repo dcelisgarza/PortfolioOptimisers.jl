@@ -1,8 +1,8 @@
 ```@meta
-Description = "Time-dependent estimators, private API of PortfolioOptimisers.jl: TD_Option, TD, TD_OptE_Opt, TDO_Option, OptE_TD, OptE_Opt_TD, VecOptE_Opt_TD, …"
+Description = "Time-dependent, private API of PortfolioOptimisers.jl: TD_Option, TD, TD_OptE_Opt, TDO_Option, OptE_TD, OptE_Opt_TD, VecOptE_Opt_TD, TD_VecOptE_Opt, …"
 ```
 
-# Time-dependent estimators: private API
+# Time-dependent: private API
 
 ```@docs
 TD_Option

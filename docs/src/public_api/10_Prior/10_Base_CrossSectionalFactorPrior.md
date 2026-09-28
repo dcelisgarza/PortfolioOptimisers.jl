@@ -1,7 +1,7 @@
 ```@meta
-Description = "Cross-Sectional Factor Prior internals has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Base cross-sectional factor Prior has no public API in PortfolioOptimisers.jl; its names are in the private API."
 ```
 
-# Cross-Sectional Factor Prior internals
+# Base cross-sectional factor Prior
 
-Every name of this topic is private. The [private page](@ref private-api-cross-sectional-factor-prior-internals) documents them.
+Every name of this topic is private. The [private page](@ref private-api-base-cross-sectional-factor-prior) documents them.

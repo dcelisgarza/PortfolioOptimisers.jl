@@ -1,8 +1,8 @@
 ```@meta
-Description = "PortfolioOptimisers pipeline, private API of PortfolioOptimisers.jl: first_duplicate, inject_context, constraint_results, constraint_target_of, …"
+Description = "Pipeline, private API of PortfolioOptimisers.jl: first_duplicate, inject_context, constraint_results, constraint_target_of, constraint_value_of, …"
 ```
 
-# PortfolioOptimisers pipeline: private API
+# Pipeline: private API
 
 ```@docs
 first_duplicate

@@ -1,8 +1,8 @@
 ```@meta
-Description = "Exponentially Weighted Return Forecast, private API of PortfolioOptimisers.jl: ew_forecast_weights, ew_forecast_valid, ew_forecast_design, …"
+Description = "Exp weighted Return Forecast, private API of PortfolioOptimisers.jl: ew_forecast_weights, ew_forecast_valid, ew_forecast_design, ew_forecast_accumulate!, …"
 ```
 
-# Exponentially Weighted Return Forecast: private API
+# Exp weighted Return Forecast: private API
 
 ## Functions
 

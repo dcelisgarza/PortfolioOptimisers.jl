@@ -1,8 +1,8 @@
 ```@meta
-Description = "Exponentially Weighted Covariance, private API of PortfolioOptimisers.jl: ExpWeightedCovarianceState, process_observation!, exp_weighted_pass!, …"
+Description = "Exp weighted covariance, private API of PortfolioOptimisers.jl: ExpWeightedCovarianceState, process_observation!, exp_weighted_pass!, exp_weighted_moment, …"
 ```
 
-# Exponentially Weighted Covariance: private API
+# Exp weighted covariance: private API
 
 ## Types
 

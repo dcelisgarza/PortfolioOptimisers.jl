@@ -1,8 +1,8 @@
 ```@meta
-Description = "Meucci Entropy Pooling, private API of PortfolioOptimisers.jl: VecMeucciEP, ep_cvar_views_setup, ep_cvar_views_solve!, ep_prior, show_fields."
+Description = "Meucci entropy pooling Prior, private API of PortfolioOptimisers.jl: VecMeucciEP, ep_cvar_views_setup, ep_cvar_views_solve!, ep_prior, show_fields."
 ```
 
-# Meucci Entropy Pooling: private API
+# Meucci entropy pooling Prior: private API
 
 ```@docs
 VecMeucciEP

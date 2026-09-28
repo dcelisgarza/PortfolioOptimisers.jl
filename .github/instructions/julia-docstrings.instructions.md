@@ -658,6 +658,21 @@ When adding a new symbol, also add it to the corresponding mirror page.
 `test/test_65_docs_public_private_placement_census.jl` gates that every `@docs` entry sits on
 the side its classification names.
 
+**The H1 names the file of the page.** The H1 is the name of the page's file, without the numeric
+prefix and the extension, with its words separated. Split the words at each underscore and at each
+change of case: `01_Base_OnlinePortfolioSelection.md` takes `# Base Online Portfolio Selection`,
+and `03_GerberIQCovariance_a.md` takes `# Gerber IQ covariance (a)`. The case, the spaces and the
+punctuation are free, so `01_XatRisk.md` can take `# X at risk`. A word cannot change: do not
+expand `Exp` to `Exponentially`, and do not write `ℓ1` for `L1`. The H1 does not describe the page.
+Put the description in the first paragraph under the H1. The private mirror adds `: private API`
+to the same text. Documenter shows the H1 as the label of the page in the navigation, and a
+description there hides the file that the page documents. The `Description` line of the page is
+derived from the H1, so a change to the H1 changes that line: take the new line from
+`mirror_description` in `docs/page_metadata.jl`. If the H1 carries an `@id` label, the label is
+`api-` or `private-api-` followed by the H1 in lower case with hyphens between the words. Change
+every `@ref` to the label in the same commit. `names_its_file` in `docs/page_metadata.jl` states
+the rule, and `test/test_64_docs_page_metadata_census.jl` gates it on both trees.
+
 ---
 
 ## Mathematical Notation

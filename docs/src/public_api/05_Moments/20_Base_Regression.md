@@ -1,8 +1,8 @@
 ```@meta
-Description = "Regression, public API of PortfolioOptimisers.jl: AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEstimator, LinearModel, …"
+Description = "Base regression, public API of PortfolioOptimisers.jl: AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEstimator, LinearModel, …"
 ```
 
-# [Regression](@id api-regression)
+# [Base regression](@id api-base-regression)
 
 ```@docs
 AbstractTimeSeriesRegressionEstimator

@@ -1,7 +1,7 @@
 ```@meta
-Description = "Data and moment notation has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Math data and moments has no public API in PortfolioOptimisers.jl; its names are in the private API."
 ```
 
-# Data and moment notation
+# Math data and moments
 
-This file defines no name. The [private page](@ref private-api-data-and-moment-notation) says which table it fills.
+This file defines no name. The [private page](@ref private-api-math-data-and-moments) says which table it fills.

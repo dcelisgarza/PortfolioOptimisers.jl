@@ -1,8 +1,8 @@
 ```@meta
-Description = "Exponentially Weighted Beta Descriptors, private API of PortfolioOptimisers.jl: ew_active_returns, ew_agg_series, ew_agg_vector, ew_beta_expand, …"
+Description = "EW beta descriptors, private API of PortfolioOptimisers.jl: ew_active_returns, ew_agg_series, ew_agg_vector, ew_beta_expand, ew_beta_output, …"
 ```
 
-# Exponentially Weighted Beta Descriptors: private API
+# EW beta descriptors: private API
 
 ## Functions
 

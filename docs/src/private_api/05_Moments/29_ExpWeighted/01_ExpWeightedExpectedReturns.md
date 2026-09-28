@@ -1,8 +1,8 @@
 ```@meta
-Description = "Exponentially Weighted Expected Returns, private API of PortfolioOptimisers.jl: ExpWeightedExpectedReturnsState, decay_half_life, process_observation!, …"
+Description = "Exp weighted expected returns, private API of PortfolioOptimisers.jl: ExpWeightedExpectedReturnsState, decay_half_life, process_observation!, …"
 ```
 
-# Exponentially Weighted Expected Returns: private API
+# Exp weighted expected returns: private API
 
 ## Types
 

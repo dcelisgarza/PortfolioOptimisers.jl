@@ -1,8 +1,8 @@
 ```@meta
-Description = "A Result resumes an online run, private API of PortfolioOptimisers.jl: OptimiserResume, resume_fold_count, assert_resume_scheme, assert_resume_folds, …"
+Description = "Resume, private API of PortfolioOptimisers.jl: OptimiserResume, resume_fold_count, assert_resume_scheme, assert_resume_folds, assert_resume_full_fold, …"
 ```
 
-# A Result resumes an online run: private API
+# Resume: private API
 
 ```@docs
 PortfolioOptimisers.OptimiserResume

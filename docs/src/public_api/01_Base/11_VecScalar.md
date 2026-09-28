@@ -1,8 +1,8 @@
 ```@meta
-Description = "Vector scalar, public API of PortfolioOptimisers.jl: VecScalar."
+Description = "Vec scalar, public API of PortfolioOptimisers.jl: VecScalar."
 ```
 
-# Vector scalar
+# Vec scalar
 
 ```@docs
 VecScalar

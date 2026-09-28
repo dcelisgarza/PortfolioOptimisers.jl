@@ -1,8 +1,8 @@
 ```@meta
-Description = "Online selection rules: the forecast-reading arm, public API of PortfolioOptimisers.jl: ForecastReversion, MovingAverageReversion, …"
+Description = "Forecast rules, public API of PortfolioOptimisers.jl: ForecastReversion, MovingAverageReversion, ExponentialMovingAverageReversion, RobustMedianReversion, …"
 ```
 
-# Online selection rules: the forecast-reading arm
+# Forecast rules
 
 These rules read a forecast of the next price relatives, which the expected returns estimator in their `me` field makes. `ForecastReversion` is the passive-aggressive reversion step, with an optional diagonal scale. Six constructors build it with the forecast of their paper: `MovingAverageReversion`, `ExponentialMovingAverageReversion`, `RobustMedianReversion`, `ReweightedPriceRelativeTracking`, `GaussianWeightingReversion` and `LocalAdaptiveLearning`.
 

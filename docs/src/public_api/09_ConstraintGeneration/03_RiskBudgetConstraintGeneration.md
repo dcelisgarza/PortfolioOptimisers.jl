@@ -1,8 +1,8 @@
 ```@meta
-Description = "Risk budget estimators, public API of PortfolioOptimisers.jl: RiskBudget, RiskBudgetEstimator, risk_budget_constraints."
+Description = "Risk budget constraint generation, public API of PortfolioOptimisers.jl: RiskBudget, RiskBudgetEstimator, risk_budget_constraints."
 ```
 
-# Risk budget estimators
+# Risk budget constraint generation
 
 ```@docs
 RiskBudget

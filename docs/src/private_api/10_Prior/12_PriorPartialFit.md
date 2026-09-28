@@ -1,8 +1,8 @@
 ```@meta
-Description = "The prior family on the partial-fit seam, private API of PortfolioOptimisers.jl: PriorCarryState, sample_buffer, returns_buffer, prior_returns_buffer, …"
+Description = "Prior partial fit, private API of PortfolioOptimisers.jl: PriorCarryState, sample_buffer, returns_buffer, prior_returns_buffer, fold_carry, Base.copy, …"
 ```
 
-# The prior family on the partial-fit seam: private API
+# Prior partial fit: private API
 
 ```@docs
 PortfolioOptimisers.PriorCarryState

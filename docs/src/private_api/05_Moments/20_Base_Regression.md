@@ -1,8 +1,8 @@
 ```@meta
-Description = "Regression, private API of PortfolioOptimisers.jl: PSEUDO_R2_VARIANTS, ADJUSTED_PSEUDO_R2_VARIANTS, MIN_VAL_STEPWISE_REGRESSION_CRITERIA, …"
+Description = "Base regression, private API of PortfolioOptimisers.jl: PSEUDO_R2_VARIANTS, ADJUSTED_PSEUDO_R2_VARIANTS, MIN_VAL_STEPWISE_REGRESSION_CRITERIA, …"
 ```
 
-# Regression: private API
+# Base regression: private API
 
 ```@docs
 PSEUDO_R2_VARIANTS

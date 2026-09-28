@@ -1,8 +1,8 @@
 ```@meta
-Description = "Exponentially Weighted Expected Returns, public API of PortfolioOptimisers.jl: ExpWeightedExpectedReturns, mean, partial_fit!, merge_states."
+Description = "Exp weighted expected returns, public API of PortfolioOptimisers.jl: ExpWeightedExpectedReturns, mean, partial_fit!, merge_states."
 ```
 
-# Exponentially Weighted Expected Returns
+# Exp weighted expected returns
 
 ## Types
 

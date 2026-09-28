@@ -1,8 +1,8 @@
 ```@meta
-Description = "The programme of a programme Allocation Set, private API of PortfolioOptimisers.jl: calibrated, resolve_allocation_set_rows, …"
+Description = "Allocation Set programme, private API of PortfolioOptimisers.jl: calibrated, resolve_allocation_set_rows, add_allocation_set_constraints!, …"
 ```
 
-# The programme of a programme Allocation Set: private API
+# Allocation Set programme: private API
 
 ```@docs
 PortfolioOptimisers.calibrated

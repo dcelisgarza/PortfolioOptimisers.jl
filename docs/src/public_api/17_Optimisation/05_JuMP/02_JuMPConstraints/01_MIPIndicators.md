@@ -1,7 +1,7 @@
 ```@meta
-Description = "MIP Constraints has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "MIP indicators has no public API in PortfolioOptimisers.jl; its names are in the private API."
 ```
 
-# MIP Constraints
+# MIP indicators
 
-Every name of this topic is private. The [private page](@ref private-api-mip-constraints) documents them.
+Every name of this topic is private. The [private page](@ref private-api-mip-indicators) documents them.

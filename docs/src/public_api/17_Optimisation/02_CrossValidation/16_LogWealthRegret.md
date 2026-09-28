@@ -1,8 +1,8 @@
 ```@meta
-Description = "Log-wealth regret against a comparator, public API of PortfolioOptimisers.jl: LogWealthRegretResult, log_wealth_regret, BudgetedHindsightPath, …"
+Description = "Log-wealth regret, public API of PortfolioOptimisers.jl: LogWealthRegretResult, log_wealth_regret, BudgetedHindsightPath, BudgetedHindsightPathResult, …"
 ```
 
-# Log-wealth regret against a comparator
+# Log-wealth regret
 
 [`log_wealth_regret`](@ref) compares two prediction results scored over the same timestamps, a strategy and a comparator. It returns the difference in log final wealth between the comparator and the strategy, which is positive when the comparator ends with more. It also returns the difference at each row, and a Diebold-Mariano-West test, with a Newey-West variance, that the two have the same expected log growth, in the same form as [`covariance_forecast_compare`](@ref). It was written for the online selection rules, and it accepts any two prediction results over one sequence of rows.
 

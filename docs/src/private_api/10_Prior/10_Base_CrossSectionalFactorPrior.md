@@ -1,8 +1,8 @@
 ```@meta
-Description = "Cross-Sectional Factor Prior internals, private API of PortfolioOptimisers.jl: cross_sectional_prior_pairs, cross_sectional_benchmark_carrier, …"
+Description = "Base cross-sectional factor Prior, private API of PortfolioOptimisers.jl: cross_sectional_prior_pairs, cross_sectional_benchmark_carrier, …"
 ```
 
-# [Cross-Sectional Factor Prior internals: private API](@id private-api-cross-sectional-factor-prior-internals)
+# [Base cross-sectional factor Prior: private API](@id private-api-base-cross-sectional-factor-prior)
 
 The functions below are the steps of a [`CrossSectionalFactorPrior`](@ref) fit. They compute these parts of it.
 

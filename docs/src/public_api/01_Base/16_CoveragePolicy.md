@@ -1,8 +1,8 @@
 ```@meta
-Description = "The coverage policy, public API of PortfolioOptimisers.jl: CoveragePolicy, AbstractCoverageAlgorithm, DecayCoverage, ResetCoverage, ExpireCoverage, …"
+Description = "Coverage Policy, public API of PortfolioOptimisers.jl: CoveragePolicy, AbstractCoverageAlgorithm, DecayCoverage, ResetCoverage, ExpireCoverage, …"
 ```
 
-# The coverage policy
+# Coverage Policy
 
 By default a moment estimator fits on the assets whose returns are finite and active at every observation of the window, the coverage universe. Put a [`CoveragePolicy`](@ref) in the `cvg` field of the estimator, and it fits each entry of its result on the observations where every asset of that entry is finite and active. An asset with a short history then still gets an estimate. An asset whose share of the observations is below `min_coverage` is `NaN` in the result.
 

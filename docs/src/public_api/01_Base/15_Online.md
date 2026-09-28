@@ -1,8 +1,8 @@
 ```@meta
-Description = "The online step, public API of PortfolioOptimisers.jl: Online, AbstractAllocationSet, AbstractProgrammeAllocationSet, partial_fit!, port_opt_view, …"
+Description = "Online, public API of PortfolioOptimisers.jl: Online, AbstractAllocationSet, AbstractProgrammeAllocationSet, partial_fit!, port_opt_view, merge_states."
 ```
 
-# The online step
+# Online
 
 Some estimators have no exact incremental fit. Such an estimator stores the observations it has seen in a [`PortfolioOptimisers.SampleBufferState`](@ref), and runs its ordinary batch fit over those rows when you read the estimate. Wrap the estimator in [`Online`](@ref) to give it a buffer. The `max_history` keyword of `Online` caps the buffer, and the estimate is then the batch fit over the last `max_history` observations.
 

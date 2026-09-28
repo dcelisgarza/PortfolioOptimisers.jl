@@ -1,8 +1,8 @@
 ```@meta
-Description = "Simple covariance, private API of PortfolioOptimisers.jl: show_fields, library_covariance_estimator, covariance_centre_and_estimator, CovarianceState, …"
+Description = "Covariance, private API of PortfolioOptimisers.jl: show_fields, library_covariance_estimator, covariance_centre_and_estimator, CovarianceState, Base.copy, …"
 ```
 
-# Simple covariance: private API
+# Covariance: private API
 
 The weights of a portfolio and the covariance matrix of its assets give the portfolio variance, which the classic Markowitz portfolio [markowitz1952](@cite) uses as its measure of risk. The entries below support the two sample estimators of the covariance and the correlation, [`GeneralCovariance`](@ref) and [`Covariance`](@ref).
 
