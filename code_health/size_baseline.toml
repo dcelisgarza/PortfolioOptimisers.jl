@@ -354,7 +354,7 @@ commit = "ebcacfda95"
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/17_VarianceSkewKurtosisConstraints.jl" = { code = 72, doc = 21, comment = 1, blank = 9, total = 103 }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/18_GenericValueatRiskRangeConstraints.jl" = { code = 6, doc = 20, comment = 0, blank = 8, total = 34 }
 "src/17_Optimisation/06_Meta/01_Base_MetaOptimisation.jl" = { code = 264, doc = 544, comment = 24, blank = 243, total = 1075 }
-"src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { code = 391, doc = 349, comment = 23, blank = 131, total = 894 }
+"src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { code = 387, doc = 447, comment = 24, blank = 160, total = 1018 }
 "src/17_Optimisation/06_Meta/03_Stacking.jl" = { code = 275, doc = 380, comment = 20, blank = 137, total = 812 }
 "src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { code = 270, doc = 364, comment = 18, blank = 117, total = 769 }
 "src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { code = 189, doc = 494, comment = 11, blank = 189, total = 883 }
