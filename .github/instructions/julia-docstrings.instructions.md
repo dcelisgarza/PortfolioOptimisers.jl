@@ -46,7 +46,7 @@ This is a real contract, not a convention that merely happens to hold. It is wha
 
 Write the first sentence so it stands alone in a bullet list:
 
-- **Lead with what it does**, in the active voice. `Denoises by setting the smallest \`num_factors\` eigenvalues to zero.` — not `A denoising algorithm that sets...`.
+- **Lead with what it does**, in the active voice. `Sets the smallest \`num_factors\` eigenvalues to zero to denoise the matrix.` — not `A denoising algorithm that sets...`.
 - **Keep it under ~120 characters.** If the idea needs more, put a crisp first sentence and move the detail into a *second* sentence, which still renders on the API page but not in the catalogue. Do not compress by deleting information.
 - **Avoid filler openers**: `A flexible container type for...`, `A concrete estimator type for...`. They cost a line and say nothing.
 - **Do not append `in \`PortfolioOptimisers.jl\``.** Every docstring in the package is in`PortfolioOptimisers.jl`.
@@ -55,12 +55,44 @@ Write the first sentence so it stands alone in a bullet list:
 - **Never leave a bare `_` outside a code span.** Markdown reads `_` as emphasis and will pair it with the underscore inside a neighbouring `` `snake_case` `` link, eating both and destroying the link. `(f_μ vector)` sitting next to `` [`plot_factor_mu`](@ref) `` rendered as ``(fμ vector … [`plotfactor_`` — a dead link that Documenter cannot resolve and the site builder reports only as a single anonymous `./@ref`. Write `` `f_mu` `` instead.
 - **Siblings should not all share a prefix.** If every algorithm in a family starts `Centrality algorithm type for ...`, the catalogue shows that boilerplate eight times over. Say what distinguishes each one.
 
-## Grammar
+## The prose follows ASD-STE100
 
-- Use present tense verbs (is, open) instead of past tense (was, opened).
-- Write factual statements and direct commands. Avoid hypotheticals like "could" or "would".
-- Use active voice where the subject performs the action.
-- Write in third person (one, the user) to keep statements consistent.
+The prose of a docstring follows ASD-STE100, Simplified Technical English, as the current issue of the specification states it. **The specification is the Authority for the words and the grammar.** This section states the Scope, the exception for the domain vocabulary, and the rules that a docstring adds to the specification.
+
+**Scope.** The Scope of [The prose passes `/unslop`](#the-prose-passes-unslop): the docstrings of `src/**/*.jl` and `ext/**/*.jl`, and the dictionary values of [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/) that they interpolate. The rule reads the prose alone. It does not read a code span, an identifier, a `jldoctest` block, a LaTeX expression, a heading that a template of this file fixes, or a `# References` bullet.
+
+**The words of `CONTEXT.md` are approved.** A term that [`CONTEXT.md`](../../CONTEXT.md) defines is an approved technical name, and a verb that it defines is an approved technical verb. The exception holds when the dictionary of the specification does not contain the word, and when the dictionary gives the word a different meaning or a different part of speech.
+
+- Use the glossary term with the meaning that the glossary gives it, and with no other meaning. In a docstring, the words Prior, Result and Estimator have the glossary meaning only.
+- Do not use a word that the glossary lists under *Avoid*, even when the dictionary of the specification approves it.
+- The exception covers the glossary words only. Every other word follows the dictionary, or the rules of the specification for technical names and technical verbs. The name of a published method is a technical name.
+- Do not coin a domain term in a docstring. Add the term to `CONTEXT.md` in the same change, and then use it.
+
+**The rules that a docstring breaks most often.** This list is a digest. It does not replace the specification.
+
+- Use each word with one meaning and one part of speech. Use the same word for the same thing each time.
+- Use the simple present tense, the imperative, the infinitive, or a past participle as an adjective. Do not use an "-ing" form of a verb, except in a technical name such as "floating point".
+- Use the active voice.
+- Use "must" for a requirement and "can" for a possibility. Do not use "should", "may", "shall", "could" or "would".
+- Keep an instruction to 20 words or fewer, and a descriptive sentence to 25 words or fewer.
+- Keep the articles "a", "an" and "the". Keep "that" at the start of a noun clause.
+- Do not make a noun cluster of more than three nouns. Break a longer cluster with "of" or "for".
+- Do not use a semicolon, a dash or a parenthesis to join two thoughts. Write two sentences.
+- Keep a paragraph to six sentences or fewer, about one topic.
+
+**What a docstring adds to the specification.**
+
+- Use the simple present tense for a fact about the unit. The specification also permits the simple past and the simple future, but a docstring describes the unit as it is now.
+- Write in the third person, or give a command in the imperative.
+
+**Where this rule meets the other rules of this file.**
+
+- A template of this file fixes the shape of a section. The specification applies to the sentences inside it. A `# Fields` bullet, a `Where:` bullet and a `# Related` entry stay list entries.
+- The rules of [The summary sentence](#the-summary-sentence-load-bearing--read-this-before-writing-a-type-docstring) and the specification both apply to the first sentence.
+- The `/unslop` pass and this rule both apply to the same prose. One rewrite can satisfy both.
+- A dictionary value is one text with many users. Rewrite it once, in its dictionary.
+
+**The Gate.** None. No parser in the repository reads the dictionary of the specification, so the rule holds by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md).
 
 ## Markdown Guidelines
 
