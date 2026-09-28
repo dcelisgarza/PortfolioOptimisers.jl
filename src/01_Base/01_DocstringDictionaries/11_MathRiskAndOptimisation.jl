@@ -105,6 +105,18 @@ unique_key_dict!(math_dict, :math_dict,
                  :c_t_one_off => "``c_t``: Charge fraction of observation ``t``, the part of ``f_o`` that the observation pays. Under a `nothing` or [`FirstObservationFees`](@ref) clock ``c_1 = 1`` and ``c_t = 0`` for ``t > 1``. Under an [`AmortisedFees`](@ref) clock ``c_t = 1 / T``.",#
                  :dd_t_model => "``dd_t``: Drawdown variable of observation ``t``, with ``dd_0 = 0``. The rows hold it at or above the drawdown ``-d_t``.",#
                  :s_t_series => "``s_t``: Entry ``t`` of the series that a conic risk measure reduces. It carries the sign of a return, so a loss is a negative entry.",#
+                 # The return layer of a JuMP model, and the objectives that read it.
+                 :ret_model => "``\\mathrm{ret}``: Return expression of the model, the model's `:ret`. It is the sum of the scaled expressions of the return terms whose `rte` is `true`.",#
+                 :ret_i_term => "``\\mathrm{ret}_i``: Expression of return term ``i``, the model's `:ret_i`, net of the charges that the term flags.",#
+                 :s_i_ret => "``s_i``: Term scale, the `scale` of return term ``i``, which is its weight in the return expression.",#
+                 :rhat_worst => "``\\hat{r}(\\boldsymbol{w})``: Worst-case expected return, the least value of ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}`` over the uncertainty set.",#
+                 :mu_hat_ucs => "``\\hat{\\boldsymbol{\\mu}}``: Centre of the mean uncertainty set, ``N \\times 1``. It is the centre that the set carries, else the `mu` of the term, else the expected returns of the prior.",#
+                 :r_f_ratio => "``r_f``: Risk-free rate of the ratio objective, the `rf` field of [`MaximumRatio`](@ref).",#
+                 :ohf_ratio => "``\\mathrm{ohf}``: Normalisation factor of the ratio problem, the model's `:ohf`. It is positive.",#
+                 :k_min_ratio => "``k_{\\min}``: Lower bound on the homogenisation variable ``k`` of the ratio problem. It is positive.",#
+                 :y_homog => "``\\boldsymbol{y} = k \\boldsymbol{w}``: Homogenised weights, the weight variable of the model under the ratio objective.",#
+                 :l_utility => "``l``: Risk aversion of the utility objective, the `l` field of [`MaximumUtility`](@ref). It is non-negative.",#
+                 :op_penalty => "``\\mathrm{op}``: Penalty term of the objective, the model's `:op`, which holds the Objective Penalty. The regularisation, soft-constraint and custom-term builders add to it, and it is zero when none of them does.",#
                  # Second-moment formulations.
                  :d_secmom => "``\\boldsymbol{d}``: Deviation vector ``T \\times 1`` that the formulation squares. The risk measure supplies it.",#
                  :c_secmom => "``c``: Correction factor that the risk measure supplies. It is ``1`` when the co-moment matrix already carries it.",#
