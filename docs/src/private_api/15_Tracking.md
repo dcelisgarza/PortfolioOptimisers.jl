@@ -1,5 +1,5 @@
 ```@meta
-Description = "Tracking, private API of PortfolioOptimisers.jl: AbstractTracking, VecTr, Tr_VecTr, VariableTracking, narrow_optimiser_vector."
+Description = "Tracking, private API of PortfolioOptimisers.jl: AbstractTracking, VecTr, Tr_VecTr, VariableTracking."
 ```
 
 # Tracking: private API
@@ -9,5 +9,4 @@ AbstractTracking
 VecTr
 Tr_VecTr
 VariableTracking
-narrow_optimiser_vector
 ```
