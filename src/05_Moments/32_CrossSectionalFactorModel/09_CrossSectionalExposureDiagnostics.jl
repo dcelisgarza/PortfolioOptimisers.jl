@@ -1307,7 +1307,7 @@ The block carries no asset returns, so the function reconstructs them from the s
 # Algorithm
 
  1. Refuse a block that carries no exposure history, or no cross-sectional fit.
- 2. Reconstruct the return of each observation as ``\\mathbf{B}_{t-\\ell} \\boldsymbol{f}_{t} + \\boldsymbol{\\varepsilon}_{t}``, and write `NaN` where the lag leaves it undefined.
+ 2. Reconstruct the return of each observation as ``\\mathbf{B}_{t-\\ell} \\boldsymbol{f}_{t} + \\boldsymbol{\\varepsilon}_{t}``, and write `NaN` where the lag leaves it undefined. The reconstruction runs on the axis the fit ran on: the exposures on the reduced axis when the block carries a family re-basis, and the factor returns of [`cross_sectional_factor_returns`](@ref), which put the observed factors after the estimated ones. So it gives back the returns of every asset, the part the observed factors carry included.
  3. Map the exposures through the family re-basis when `reduced`, and trim all three histories to the observations from ``\\max(1, \\ell)``.
 
 # Arguments
@@ -1319,7 +1319,7 @@ The block carries no asset returns, so the function reconstructs them from the s
 
   - `csfm.Ms` is not `nothing`. Otherwise the verb raises an `IsNothingError` that names `Ms`.
   - `csfm.csr` is not `nothing`. Otherwise the verb raises an `IsNothingError` that names `csr`.
-  - `size(csfm.Ms, 1) > csfm.lag`, and `csfm.csr.f` carries the observation axis of `csfm.Ms`.
+  - `size(csfm.Ms, 1) > csfm.lag`, and the factor returns carry the observation axis of `csfm.Ms` and the factor axis of its reduced exposures.
 
 # Returns
 
@@ -1347,12 +1347,15 @@ end
 function exposure_ic_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
                           csr::CrossSectionalRegression, reduced::Bool)
     lag = cs_regression_lag(csfm.lag)
-    T, N, K = size(Ms)
+    T, N = size(Ms, 1), size(Ms, 2)
     @argcheck(T > lag,
               DimensionMismatch("Ms ($T observations) must carry more observations than lag ($lag)"))
-    @argcheck(size(csr.f, 1) == T && size(csr.f, 2) == K,
-              DimensionMismatch("csr.f ($(size(csr.f, 1))×$(size(csr.f, 2))) must match Ms ($T observations, $K factors)"))
-    Tf = float_if_integer(promote_type(real(eltype(Ms)), real(eltype(csr.f)),
+    Bd = exposure_ic_exposures(csfm.fcb, Ms, true)
+    F = cross_sectional_factor_returns(csfm)
+    K = size(Bd, 3)
+    @argcheck(size(F, 1) == T && size(F, 2) == K,
+              DimensionMismatch("the factor returns ($(size(F, 1))×$(size(F, 2))) must match Ms ($T observations) and the reduced exposures ($K factors)"))
+    Tf = float_if_integer(promote_type(real(eltype(Ms)), real(eltype(F)),
                                        real(eltype(csr.eps))))
     start = max(1, lag)
     P = T - start + 1
@@ -1364,7 +1367,7 @@ function exposure_ic_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
             for i in 1:N
                 s = zero(Tf)
                 for k in 1:K
-                    s += Tf(Ms[j, i, k]) * Tf(csr.f[tau, k])
+                    s += Tf(Bd[j, i, k]) * Tf(F[tau, k])
                 end
                 R[r, i] = s + Tf(csr.eps[tau, i])
             end

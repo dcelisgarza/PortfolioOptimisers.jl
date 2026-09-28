@@ -243,7 +243,9 @@ using Statistics
         rng5 = StableRNG(19283746)
         Tr, Nr, Kr = 6, 5, 3
         Msr = randn(rng5, Tr, Nr, Kr)
-        fr = 0.02 * randn(rng5, Tr, Kr)
+        # A fit under a re-basis estimates its factor returns on the reduced axis, so the
+        # block states them there.
+        fr = 0.02 * randn(rng5, Tr, Kr - 1)
         epsr = 0.01 * randn(rng5, Tr, Nr)
         rwr = abs.(randn(rng5, Tr, Nr)) .+ 0.1
         # One constrained family holds factors 1 and 2, and drops the second of them.
@@ -438,4 +440,31 @@ using Statistics
         @test cs_regression_r2(B32, f32, e32, w32) isa Vector{Float32}
         @test cs_regression_aic(B32, f32, e32, w32) isa Vector{Float32}
     end
+end
+
+@testset "An observed factor leaves the design of the regression (#1367)" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1_367_08)
+    T, N = 8, 6
+    Ms = randn(rng, T, N, 3)
+    Ms[:, :, 3] .= 1.0
+    f = 0.02 * randn(rng, T, 2)
+    fx = 0.01 * randn(rng, T, 1)
+    eps = 0.01 * randn(rng, T, N)
+    rw = abs.(randn(rng, T, N)) .+ 0.1
+    csr = CrossSectionalRegression(; f = f, eps = eps, n = fill(N, T))
+    blk = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+                                    rw = rw, lag = 1, nf = ["value", "size", "usd"],
+                                    fam = ["style", "style", "currency"], fx = fx)
+    # The same block without the observed factor is the design the regression ran on.
+    est = CrossSectionalFactorModel(; M = Ms[T, :, 1:2], b = zeros(N), csr = csr,
+                                    Ms = Ms[:, :, 1:2], rw = rw, lag = 1,
+                                    nf = ["value", "size"])
+    @test cs_regression_t_stats(blk) == cs_regression_t_stats(est)
+    @test isequal(exposure_vif(blk), exposure_vif(est))
+    @test isequal(cs_regression_r2(blk), cs_regression_r2(est))
+    @test isequal(cs_regression_bic(blk), cs_regression_bic(est))
+    @test PO.cs_diagnostic_factor_names(blk) == ["value", "size"]
+    # The loadings axis still names the observed factor.
+    @test PO.cs_diagnostic_factor_names(blk.fcb, blk.nf) == ["value", "size", "usd"]
 end

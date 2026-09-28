@@ -1,4 +1,48 @@
 """
+    assert_observed_factor_returns(fx::Nothing, csr, K::Integer) -> nothing
+    assert_observed_factor_returns(fx::MatNum, csr, K::Integer) -> nothing
+
+Check the observed factor returns of a [`CrossSectionalFactorModel`](@ref) against the fit and the factor axis.
+
+The observed factors are the trailing columns of the reduced axis, after the factors that the fit estimated. So `csr.f` and `fx` together fill the reduced axis, row for row, and every consumer that reads the two side by side with [`cross_sectional_factor_returns`](@ref) meets one matrix of the width of the loadings. A block with no observed factor takes the method over `Nothing`.
+
+# Arguments
+
+  - `fx`: The observed factor returns, `observations × factors`, or `nothing`.
+  - `csr`: The nested cross-sectional regression result, or `nothing`.
+  - `K`: Number of factors on the reduced axis, the column count of `L`, or of `M` when `L` is unset.
+
+# Validation
+
+  - `csr` is not `nothing`. Raises an [`IsNothingError`](@ref).
+  - `!isempty(fx)`, and `size(fx, 1) == size(csr.f, 1)`.
+  - `size(csr.f, 2) + size(fx, 2) == K`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`cross_sectional_factor_returns`](@ref)
+  - [`AbstractObservedExposureEstimator`](@ref)
+"""
+function assert_observed_factor_returns(::Nothing, ::Any, ::Integer)::Nothing
+    return nothing
+end
+function assert_observed_factor_returns(fx::MatNum, csr::Option{<:CrossSectionalRegression},
+                                        K::Integer)::Nothing
+    @argcheck(!isnothing(csr),
+              IsNothingError("fx holds the returns of the observed factors beside the factor returns of the fit, so it needs the fit: csr cannot be nothing when fx is given"))
+    @argcheck(!isempty(fx), IsEmptyError("fx cannot be empty"))
+    @argcheck(size(fx, 1) == size(csr.f, 1),
+              DimensionMismatch("fx ($(size(fx, 1)) rows) must match csr.f ($(size(csr.f, 1)) rows), because the observed factors are observed on the rows the fit estimated"))
+    @argcheck(size(csr.f, 2) + size(fx, 2) == K,
+              DimensionMismatch("csr.f ($(size(csr.f, 2)) columns) and fx ($(size(fx, 2)) columns) must fill the reduced factor axis ($K columns), because the observed factors are its trailing columns"))
+    return nothing
+end
+"""
     assert_idiosyncratic_covariance(esigma::Nothing, N::Integer)
     assert_idiosyncratic_covariance(esigma::VecNum, N::Integer)
     assert_idiosyncratic_covariance(esigma::MatNum, N::Integer)
@@ -369,7 +413,8 @@ $(DocStringExtensions.FIELDS)
         fam::Option{<:VecStr} = nothing,
         fcb::Option{<:AbstractFactorFamilyBasis} = nothing,
         lag::Option{<:Integer} = nothing,
-        rf::Option{<:AbstractReturnForecastResult} = nothing
+        rf::Option{<:AbstractReturnForecastResult} = nothing,
+        fx::Option{<:MatNum} = nothing
     ) -> CrossSectionalFactorModel
 
 Keywords correspond to the struct's fields.
@@ -389,6 +434,7 @@ Keywords correspond to the struct's fields.
   - If provided, `edof` and `ediv` each carry `size(M, 1)` entries.
   - If provided, `lag >= 0`.
   - If provided, `length(rf.mu) == size(M, 1)`, and `rf.hist` carries `size(M, 1)` columns when the member computes one.
+  - If provided, `fx` passes [`assert_observed_factor_returns`](@ref): `csr` is given, `fx` has the rows of `csr.f`, and the two fill the column count of `L` (or of `M` when `L` is unset).
 
 ## View parameters
 
@@ -401,7 +447,7 @@ Keywords correspond to the struct's fields.
   - `esigma` is sliced by [`idiosyncratic_covariance_view`](@ref), on one axis or on both.
   - `edof` and `ediv` are sliced on their only axis, which is the asset axis.
   - `rf` is viewed by its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
-  - `nf`, `fam`, `fcb` and `lag` pass through unchanged. Each is indexed by factor, or by nothing at all, and neither follows an asset selection.
+  - `nf`, `fam`, `fcb`, `lag` and `fx` pass through unchanged. Each is indexed by factor, or by nothing at all, and neither follows an asset selection.
 
 # Examples
 
@@ -424,7 +470,8 @@ CrossSectionalFactorModel
      fam ┼ Vector{String}: ["style", "style"]
      fcb ┼ nothing
      lag ┼ Int64: 1
-      rf ┴ nothing
+      rf ┼ nothing
+      fx ┴ nothing
 ```
 
 # Related
@@ -501,6 +548,10 @@ CrossSectionalFactorModel
     The Return Forecast the prior fitted, or `nothing`. Its `mu` is the forecast `b` was split out of, so a consumer reads the forecast the split consumed rather than refitting it.
     """
     rf
+    """
+    Returns of the observed factors, `observations × factors`, on the rows of `csr.f`, or `nothing` when the model has no observed factor. The fit observes them, for example the Currency Excess Returns of the Currency Factors, and does not estimate them, so `csr` does not carry them. The observed factors are the trailing columns of the raw axis and of the reduced axis, and [`cross_sectional_factor_returns`](@ref) reads them beside `csr.f`.
+    """
+    fx
     function CrossSectionalFactorModel(M::MatNum, L::Option{<:MatNum}, b::VecNum,
                                        csr::Option{<:CrossSectionalRegression},
                                        Ms::Option{<:Arr3Num}, vs::Option{<:MatNum},
@@ -510,7 +561,8 @@ CrossSectionalFactorModel
                                        nf::Option{<:VecStr}, fam::Option{<:VecStr},
                                        fcb::Option{<:AbstractFactorFamilyBasis},
                                        lag::Option{<:Integer},
-                                       rf::Option{<:AbstractReturnForecastResult})
+                                       rf::Option{<:AbstractReturnForecastResult},
+                                       fx::Option{<:MatNum})
         @argcheck(!isempty(M), IsEmptyError("M cannot be empty"))
         @argcheck(!isempty(b), IsEmptyError("b cannot be empty"))
         N = size(M, 1)
@@ -544,6 +596,7 @@ CrossSectionalFactorModel
         assert_idiosyncratic_count(edof, N, :edof)
         assert_idiosyncratic_count(ediv, N, :ediv)
         assert_return_forecast_assets(rf, N)
+        assert_observed_factor_returns(fx, csr, isnothing(L) ? K : size(L, 2))
         tvs = cs_history_assets(vs, N, :vs)
         trw = cs_history_assets(rw, N, :rw)
         tbw = cs_history_assets(bw, N, :bw)
@@ -552,15 +605,9 @@ CrossSectionalFactorModel
         assert_cs_history_obs(tbw, tvs, :bw, :vs)
         return new{typeof(M), typeof(L), typeof(b), typeof(csr), typeof(Ms), typeof(vs),
                    typeof(esigma), typeof(edof), typeof(ediv), typeof(rw), typeof(bw),
-                   typeof(nf), typeof(fam), typeof(fcb), typeof(lag), typeof(rf)}(M, L, b,
-                                                                                  csr, Ms,
-                                                                                  vs,
-                                                                                  esigma,
-                                                                                  edof,
-                                                                                  ediv, rw,
-                                                                                  bw, nf,
-                                                                                  fam, fcb,
-                                                                                  lag, rf)
+                   typeof(nf), typeof(fam), typeof(fcb), typeof(lag), typeof(rf),
+                   typeof(fx)}(M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw, nf, fam,
+                               fcb, lag, rf, fx)
     end
 end
 function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b::VecNum,
@@ -576,9 +623,52 @@ function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b
                                    fam::Option{<:VecStr} = nothing,
                                    fcb::Option{<:AbstractFactorFamilyBasis} = nothing,
                                    lag::Option{<:Integer} = nothing,
-                                   rf::Option{<:AbstractReturnForecastResult} = nothing)::CrossSectionalFactorModel
+                                   rf::Option{<:AbstractReturnForecastResult} = nothing,
+                                   fx::Option{<:MatNum} = nothing)::CrossSectionalFactorModel
     return CrossSectionalFactorModel(M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw, nf,
-                                     fam, fcb, lag, rf)
+                                     fam, fcb, lag, rf, fx)
+end
+"""
+    cross_sectional_factor_returns(csfm::CrossSectionalFactorModel) -> MatNum
+
+Return the factor returns of a [`CrossSectionalFactorModel`](@ref) on the axis of its loadings `L`: the factors the fit estimated, then the observed factors.
+
+The fit estimates `csr.f` on its own design axis, which is the reduced axis less the observed factors, and it observes the returns `fx`. The two side by side are the factor returns that the loadings `L` (or `M` when the model has no family re-basis) multiply. So the loadings of observation `t - lag` times row `t` of the answer, plus the idiosyncratic return of `t`, give the returns of observation `t` in the base currency.
+
+# Algorithm
+
+ 1. Refuse a block that carries no fit.
+ 2. Return `csr.f` when `fx` is `nothing`, and `hcat(csr.f, fx)` otherwise.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+
+# Validation
+
+  - `csfm.csr` is not `nothing`. Raises an [`IsNothingError`](@ref).
+
+# Returns
+
+  - `f::MatNum`: The factor returns, `observations × factors`, on the axis of `L`.
+
+# Related
+
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`AbstractObservedExposureEstimator`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+"""
+function cross_sectional_factor_returns(csfm::CrossSectionalFactorModel)
+    return cross_sectional_factor_returns(csfm.csr, csfm.fx)
+end
+function cross_sectional_factor_returns(::Nothing, ::Any)
+    return throw(IsNothingError("csr cannot be nothing: the factor returns of a cross-sectional factor model are the returns its fit estimated, and this block carries no fit"))
+end
+function cross_sectional_factor_returns(csr::CrossSectionalRegression, ::Nothing)
+    return csr.f
+end
+function cross_sectional_factor_returns(csr::CrossSectionalRegression, fx::MatNum)
+    return hcat(csr.f, fx)
 end
 """
     idiosyncratic_variances(rr::AbstractLoadingsRegressionResult)
@@ -647,7 +737,7 @@ end
 # `Nothing` specialisation needs a rule (see [`@forward_properties`](@ref)'s `swap`).
 @forward_properties CrossSectionalFactorModel{<:Any, Nothing, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                              <:Any, <:Any, <:Any, <:Any} begin
+                                              <:Any, <:Any, <:Any, <:Any, <:Any} begin
     swap(L, M)
 end
 """
@@ -703,7 +793,7 @@ Return a view of a [`CrossSectionalFactorModel`](@ref) result, selecting only th
  4. Take a view of `Ms` on its second axis, and of `vs`, `rw` and `bw` on their second axis, giving the histories of the selected assets.
  5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape, and view `edof` and `ediv` with [`nothing_scalar_array_view`](@ref).
  6. View the Return Forecast with its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
- 7. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `nf`, `fam`, `fcb` and `lag` through, which re-runs every guard of the constructor.
+ 7. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `nf`, `fam`, `fcb`, `lag` and `fx` through, which re-runs every guard of the constructor.
 
 # Arguments
 
@@ -768,7 +858,7 @@ function port_opt_view(csfm::CrossSectionalFactorModel, i,
                                          nothing
                                      else
                                          port_opt_view(rf, i, args...)
-                                     end)
+                                     end, fx = csfm.fx)
 end
 """
     regression(csfm::CrossSectionalFactorModel, args...)
@@ -795,4 +885,4 @@ function regression(csfm::CrossSectionalFactorModel, args...)
     return csfm
 end
 
-export CrossSectionalFactorModel
+export CrossSectionalFactorModel, cross_sectional_factor_returns

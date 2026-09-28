@@ -480,14 +480,12 @@ end
     eps = Float32[0.001 -0.002 0.0015; -0.0005 0.001 -0.0008]
     rw = Float32[0.4 0.35 0.25; 0.3 0.45 0.25]
     vs = Float32[1.0e-4 2.0e-4 1.5e-4; 1.2e-4 1.8e-4 1.6e-4]
-    csr = CrossSectionalRegression(; f = f, eps = eps, n = [3, 3])
+    csr = CrossSectionalRegression(; f = f[:, 1:1], eps = eps, n = [3, 3])
     rr = CrossSectionalFactorModel(; M = Ms[2, :, :], b = Float32[0.001, 0.0005, 0.0012],
                                    csr = csr, Ms = Ms, vs = vs,
                                    esigma = Float32[1.2e-4, 1.8e-4, 1.6e-4], rw = rw,
                                    bw = rw, nf = ["market", "usd"],
-                                   fam = ["market",
-                                          PortfolioOptimisers.ATTRIBUTION_CURRENCY_FAMILY],
-                                   lag = 0)
+                                   fam = ["market", "currency"], lag = 0, fx = f[:, 2:2])
     X = Float32[0.011 0.003 0.02; 0.004 0.012 0.009]
     fpr = LowOrderPrior(; X = f, mu = vec(mean(f; dims = 1)), sigma = cov(f))
     p32 = LowOrderPrior(; X = X, mu = rr.M * fpr.mu .+ rr.b,
@@ -652,13 +650,16 @@ end
         @test b.sys.mu_se ≈ 12 * fa.sys.mu_se
         @test b.fbd.mu_se ≈ 12 * fa.fbd.mu_se
     end
-    @testset "A currency family carries no estimation uncertainty" begin
-        cur = CrossSectionalFactorModel(; M = rr.M, b = rr.b, csr = csr, Ms = Ms, vs = vs,
-                                        esigma = rr.esigma, rw = rw, bw = rw,
+    @testset "An observed factor carries no estimation uncertainty" begin
+        # The block states the observed factor through `fx`, whatever its family label.
+        cur = CrossSectionalFactorModel(; M = rr.M, b = rr.b,
+                                        csr = CrossSectionalRegression(; f = csr.f[:, 1:1],
+                                                                       eps = csr.eps,
+                                                                       n = csr.n), Ms = Ms,
+                                        vs = vs, esigma = rr.esigma, rw = rw, bw = rw,
                                         nf = ["market", "usd"],
-                                        fam = ["market",
-                                               PortfolioOptimisers.ATTRIBUTION_CURRENCY_FAMILY],
-                                        lag = 0)
+                                        fam = ["market", "currency"], lag = 0,
+                                        fx = csr.f[:, 2:2])
         prc = LowOrderPrior(; X = X, mu = mu, sigma = sigma, rr = cur, fpr = fpr)
         fc = factor_attribution(w, prc, X; se = true)
         @test isnan(fc.fbd.mu_se[2])
@@ -1065,9 +1066,9 @@ end
         al = PO.attribution_align(rr, pr, length(ret))
         T = size(al.f, 1)
         g = reduce(vcat, [transpose(transpose(al.B[t, :, :]) * w) for t in 1:T])
-        red = PO.attribution_reduce_for_errors(al.fcb, al.B, g, rr.fam, T)
+        red = PO.attribution_reduce_for_errors(al.fcb, al.B, g, al.no, T)
         @test red.nr < size(g, 2)
-        keep = findall(!, red.currency)
+        keep = findall(!, red.observed)
         Vf = [PO.attribution_expand_errors(al.fcb,
                                            PO.attribution_sandwich(view(red.B, t, :, :),
                                                                    view(al.rw, t, :),

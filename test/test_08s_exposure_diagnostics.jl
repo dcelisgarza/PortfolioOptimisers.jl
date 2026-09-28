@@ -429,7 +429,8 @@ using Statistics
         rng6 = StableRNG(864213579)
         Tr, Nr, Kr = 6, 5, 3
         Msr = randn(rng6, Tr, Nr, Kr)
-        fr = 0.02 * randn(rng6, Tr, Kr)
+        # A fit under a re-basis estimates its factor returns on the reduced axis.
+        fr = 0.02 * randn(rng6, Tr, Kr - 1)
         epsr = 0.01 * randn(rng6, Tr, Nr)
         rwr = abs.(randn(rng6, Tr, Nr)) .+ 0.1
         fcb = FactorFamilyBasis(; fnm = ["industry"], fi = [[1, 2]], di = [2],
@@ -582,4 +583,23 @@ using Statistics
         @test eltype(exposure_dispersion(B32)) == Float32
         @test eltype(exposure_ic_summary(exposure_ic(B32, R32)).t_stat) == Float32
     end
+end
+
+@testset "The information coefficient reconstructs the returns the observed factors carry (#1367)" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1_367_09)
+    T, N = 8, 6
+    Ms = randn(rng, T, N, 3)
+    f = 0.02 * randn(rng, T, 2)
+    fx = 0.01 * randn(rng, T, 1)
+    eps = 0.01 * randn(rng, T, N)
+    csr = CrossSectionalRegression(; f = f, eps = eps, n = fill(N, T))
+    blk = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+                                    lag = 1, fx = fx)
+    B, R, _ = PO.exposure_ic_data(blk, false)
+    F = hcat(f, fx)
+    for t in 2:T
+        @test R[t, :] ≈ Ms[t - 1, :, :] * F[t, :] + eps[t, :]
+    end
+    @test size(exposure_ic(blk)) == (T - 1, 3)
 end

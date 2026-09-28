@@ -306,3 +306,41 @@ absent together.
         @test !occursin("rsd", cs_err.msg)
     end
 end
+
+@testset "Observed factor returns ride in fx (#1367)" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1_367)
+    T, N = 5, 4
+    Ms = randn(rng, T, N, 3)
+    f = randn(rng, T, 2)
+    fx = randn(rng, T, 1)
+    csr = CrossSectionalRegression(; f = f, eps = randn(rng, T, N), n = fill(N, T))
+    blk = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+                                    nf = ["a", "b", "usd"], fam = ["s", "s", "currency"],
+                                    fx = fx)
+    @test cross_sectional_factor_returns(blk) == hcat(f, fx)
+    @test cross_sectional_factor_returns(CrossSectionalFactorModel(; M = Ms[T, :, 1:2],
+                                                                   b = zeros(N), csr = csr)) ===
+          f
+    # A view on the assets keeps the observed returns, which have no asset axis.
+    @test PO.port_opt_view(blk, [1, 3]).fx === fx
+    # The label of an observed factor is free; only the count is structural.
+    @test CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, fx = fx,
+                                    fam = ["s", "t", "anything"]) isa
+          CrossSectionalFactorModel
+    @test_throws PO.IsNothingError CrossSectionalFactorModel(; M = Ms[T, :, :],
+                                                             b = zeros(N), fx = fx)
+    @test_throws DimensionMismatch CrossSectionalFactorModel(; M = Ms[T, :, :],
+                                                             b = zeros(N), csr = csr,
+                                                             fx = fx[1:4, :])
+    @test_throws DimensionMismatch CrossSectionalFactorModel(; M = Ms[T, :, :],
+                                                             b = zeros(N), csr = csr,
+                                                             fx = hcat(fx, fx))
+    @test_throws PO.IsEmptyError CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N),
+                                                           csr = csr, fx = zeros(T, 0))
+    @test_throws PO.IsNothingError cross_sectional_factor_returns(CrossSectionalFactorModel(;
+                                                                                            M = Ms[T,
+                                                                                                   :,
+                                                                                                   :],
+                                                                                            b = zeros(N)))
+end

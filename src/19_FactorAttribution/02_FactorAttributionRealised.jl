@@ -1,17 +1,4 @@
 """
-    const ATTRIBUTION_CURRENCY_FAMILY = "currency"
-
-Family label whose rows carry no regression-estimation uncertainty.
-
-A currency factor is a direct return rather than a coefficient the cross-sectional fit estimates, so the sandwich covariance says nothing about it. [`factor_attribution`](@ref) keeps such a row out of the Gram matrix and reports `NaN` for its standard error and for the standard error of its family.
-
-# Related
-
-  - [`factor_attribution`](@ref)
-  - [`AttributionBreakdown`](@ref)
-"""
-const ATTRIBUTION_CURRENCY_FAMILY = "currency"
-"""
     attribution_slice(B::MatNum, t::Integer)
     attribution_slice(B::Arr3Num, t::Integer)
 
@@ -147,6 +134,7 @@ A fit that warmed up on the first observations keeps fewer than the caller's ser
   - `vs::Option{<:MatNum}`: The lag-aligned idiosyncratic variances, or `nothing`.
   - `fcb::Option{<:AbstractFactorFamilyBasis}`: The family re-basis over the aligned axis, or `nothing`.
   - `rows::UnitRange{Int}`: The rows of the caller's series the aligned history describes.
+  - `no::Int`: The number of observed factors, the last factors of the axis, from [`attribution_observed_count`](@ref).
 
 # Related
 
@@ -172,7 +160,8 @@ function attribution_align(rr::AbstractLoadingsRegressionResult, pr::AbstractPri
     fcb = attribution_trim_basis(attribution_family_basis(rr), Tb - lag)
     return (; B = B, f = attribution_finite(f[brows, :]),
             eps = attribution_finite(eps[brows, :]), rw = attribution_finite_rows(rw),
-            vs = attribution_finite_rows(vs), fcb = fcb, rows = rows)
+            vs = attribution_finite_rows(vs), fcb = fcb, rows = rows,
+            no = attribution_observed_count(rr))
 end
 """
     attribution_trim_exposures(B::MatNum, lag::Integer)
@@ -308,7 +297,7 @@ function attribution_window(al::NamedTuple, rows)
     return (; B = attribution_window_exposures(al.B, rows), f = al.f[rows, :],
             eps = al.eps[rows, :], rw = attribution_trim_rows(al.rw, rows),
             vs = attribution_trim_rows(al.vs, rows),
-            fcb = attribution_window_basis(al.fcb, rows), rows = rows)
+            fcb = attribution_window_basis(al.fcb, rows), rows = rows, no = al.no)
 end
 """
     attribution_window_exposures(B::MatNum, rows)
@@ -714,7 +703,7 @@ The systematic and the idiosyncratic errors are equal. The portfolio return is o
 \\end{align}
 ```
 
-[`attribution_sandwich`](@ref) states ``\\mathbf{V}_{t}``. The systematic error ``\\mathrm{SE}`` is the error of the mean of ``s_{t} = \\boldsymbol{g}_{t}^{\\intercal} \\hat{\\boldsymbol{f}}_{t}``, with the estimation errors of two observations taken as independent. A factor of the currency family is not estimated, so its row and its column of ``\\mathbf{V}_{t}`` are zero, and ``\\mathrm{SE}_{k}`` of such a factor is `NaN`.
+[`attribution_sandwich`](@ref) states ``\\mathbf{V}_{t}``. The systematic error ``\\mathrm{SE}`` is the error of the mean of ``s_{t} = \\boldsymbol{g}_{t}^{\\intercal} \\hat{\\boldsymbol{f}}_{t}``, with the estimation errors of two observations taken as independent. An observed factor, a Currency Factor for example, is not estimated, so its row and its column of ``\\mathbf{V}_{t}`` are zero, and ``\\mathrm{SE}_{k}`` of such a factor is `NaN`. The observed factors are the last `al.no` factors of both axes.
 
 Where:
 
@@ -748,16 +737,16 @@ Where:
 
   - [`factor_attribution`](@ref)
   - [`realised_attribution`](@ref)
-  - [`ATTRIBUTION_CURRENCY_FAMILY`](@ref)
+  - [`attribution_observed_indices`](@ref)
 """
 function attribution_standard_errors(g::MatNum, al::NamedTuple, fam::Option{<:VecStr},
                                      s1::Number, T::Integer)
     rw = assert_attribution_field(al.rw, :rw)
     vs = assert_attribution_field(al.vs, :vs)
     K = size(g, 2)
-    cur = attribution_currency_mask(fam, K)
-    red = attribution_reduce_for_errors(al.fcb, al.B, g, fam, T)
-    keep = findall(!, red.currency)
+    cur = attribution_observed_indices(al.no, K)
+    red = attribution_reduce_for_errors(al.fcb, al.B, g, al.no, T)
+    keep = findall(!, red.observed)
     se(v) = s1 * sqrt(max(zero(v), v)) / T
     V = [attribution_sandwich(view(red.B, t, :, :), view(rw, t, :), view(vs, t, :), keep)
          for t in 1:T]
@@ -769,37 +758,36 @@ function attribution_standard_errors(g::MatNum, al::NamedTuple, fam::Option{<:Ve
         factor[k] = oftype(factor[k], NaN)
     end
     return (; sys = sys, factor = factor,
-            family = attribution_family_errors(fam, g, Vf, s1, T))
+            family = attribution_family_errors(fam, g, Vf, s1, T, cur))
 end
 """
-    attribution_currency_mask(fam::Nothing, K::Integer)
-    attribution_currency_mask(fam::VecStr, K::Integer)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the raw factors whose family is the currency family.
+Return the factors of an axis whose returns are observed, which are its last `no` factors.
+
+An observed factor, a Currency Factor for example, is a direct return rather than a coefficient the cross-sectional fit estimates, so the sandwich covariance says nothing about it. A [`CrossSectionalFactorModel`](@ref) puts its observed factors after the estimated ones on the raw axis and on the reduced axis, and states their count through `fx`, so their position is the whole answer.
 
 # Arguments
 
-  - `fam`: The family label of each raw factor, or `nothing`.
-  - `K`: The number of raw factors.
+  - `no`: The number of observed factors, from [`attribution_observed_count`](@ref).
+  - `K`: The number of factors of the axis.
 
 # Returns
 
-  - `cur::Vector{Int}`: The raw factors of the currency family.
+  - `obs::UnitRange{Int}`: The positions of the observed factors on the axis.
 
 # Related
 
   - [`attribution_standard_errors`](@ref)
-  - [`ATTRIBUTION_CURRENCY_FAMILY`](@ref)
+  - [`attribution_observed_count`](@ref)
+  - [`AbstractObservedExposureEstimator`](@ref)
 """
-function attribution_currency_mask(::Nothing, ::Integer)
-    return Int[]
-end
-function attribution_currency_mask(fam::VecStr, ::Integer)
-    return findall(f -> String(f) == ATTRIBUTION_CURRENCY_FAMILY, fam)
+function attribution_observed_indices(no::Integer, K::Integer)::UnitRange{Int}
+    return (K - no + 1):K
 end
 """
-    attribution_reduce_for_errors(fcb::Nothing, B, g::MatNum, fam, T::Integer)
-    attribution_reduce_for_errors(fcb::FactorFamilyBasis, B, g::MatNum, fam, T::Integer)
+    attribution_reduce_for_errors(fcb::Nothing, B, g::MatNum, no::Integer, T::Integer)
+    attribution_reduce_for_errors(fcb::FactorFamilyBasis, B, g::MatNum, no::Integer, T::Integer)
 
 Return the exposures and the portfolio exposure the sandwich covariance is taken in.
 
@@ -810,14 +798,14 @@ A block that constrains no family is regressed on its raw axis, and the function
   - `fcb`: The family re-basis, or `nothing`.
   - `B`: The static loadings, or the aligned exposure history.
   - `g`: The per-observation portfolio exposure on the raw axis.
-  - `fam`: The family label of each raw factor, or `nothing`.
+  - `no`: The number of observed factors, the last columns of both axes.
   - `T`: The number of aligned observations.
 
 # Returns
 
   - `B::Arr3Num`: The exposures of the regression basis, one slice per observation.
   - `g::MatNum`: The portfolio exposure in the regression basis.
-  - `currency::Vector{Bool}`: Whether each column of the regression basis is a currency factor.
+  - `observed::Vector{Bool}`: Whether each column of the regression basis is an observed factor.
   - `nr::Int`: The number of columns of the regression basis.
 
 # Related
@@ -826,71 +814,39 @@ A block that constrains no family is regressed on its raw axis, and the function
   - [`reduce_exposures`](@ref)
   - [`project_factor_coordinates`](@ref)
 """
-function attribution_reduce_for_errors(::Nothing, B, g::MatNum, fam::Option{<:VecStr},
-                                       T::Integer)
+function attribution_reduce_for_errors(::Nothing, B, g::MatNum, no::Integer, T::Integer)
     K = size(g, 2)
     return (; B = attribution_broadcast_exposures(B, T), g = g,
-            currency = attribution_currency_flags(fam, K), nr = K)
+            observed = attribution_observed_flags(no, K), nr = K)
 end
-function attribution_reduce_for_errors(fcb::FactorFamilyBasis, B, g::MatNum,
-                                       fam::Option{<:VecStr}, T::Integer)
+function attribution_reduce_for_errors(fcb::FactorFamilyBasis, B, g::MatNum, no::Integer,
+                                       T::Integer)
     Br = reduce_exposures(fcb, attribution_broadcast_exposures(B, T))
     gr = project_factor_coordinates(fcb, g)
-    famr = attribution_reduce_families(fcb, fam)
-    return (; B = Br, g = gr, currency = attribution_currency_flags(famr, size(Br, 3)),
-            nr = size(Br, 3))
+    nr = size(Br, 3)
+    return (; B = Br, g = gr, observed = attribution_observed_flags(no, nr), nr = nr)
 end
 """
-    attribution_reduce_families(fcb::FactorFamilyBasis, fam::Nothing)
-    attribution_reduce_families(fcb::FactorFamilyBasis, fam::VecStr)
+$(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the family label of each column of the reduced factor axis.
+Return whether each factor of an axis is observed, which holds for its last `no` factors.
 
 # Arguments
 
-  - `fcb`: The family re-basis.
-  - `fam`: The family label of each raw factor, or `nothing`.
-
-# Returns
-
-  - `fam::Option{<:VecStr}`: The family label of each reduced factor, or `nothing`.
-
-# Related
-
-  - [`attribution_reduce_for_errors`](@ref)
-  - [`reduce_factor_names`](@ref)
-"""
-function attribution_reduce_families(::FactorFamilyBasis, ::Nothing)::Nothing
-    return nothing
-end
-function attribution_reduce_families(fcb::FactorFamilyBasis, fam::VecStr)
-    return String[String(fam[k]) for k in retained_factor_indices(fcb)]
-end
-"""
-    attribution_currency_flags(fam::Nothing, K::Integer)
-    attribution_currency_flags(fam::VecStr, K::Integer)
-
-Return whether each factor of an axis belongs to the currency family.
-
-# Arguments
-
-  - `fam`: The family label of each factor of the axis, or `nothing`.
+  - `no`: The number of observed factors.
   - `K`: The number of factors of the axis.
 
 # Returns
 
-  - `flags::Vector{Bool}`: Whether each factor belongs to the currency family.
+  - `flags::Vector{Bool}`: Whether each factor is observed.
 
 # Related
 
   - [`attribution_reduce_for_errors`](@ref)
-  - [`ATTRIBUTION_CURRENCY_FAMILY`](@ref)
+  - [`attribution_observed_indices`](@ref)
 """
-function attribution_currency_flags(::Nothing, K::Integer)
-    return falses(K)
-end
-function attribution_currency_flags(fam::VecStr, ::Integer)
-    return Bool[String(f) == ATTRIBUTION_CURRENCY_FAMILY for f in fam]
+function attribution_observed_flags(no::Integer, K::Integer)::Vector{Bool}
+    return Bool[k > K - no for k in 1:K]
 end
 """
     attribution_broadcast_exposures(B::MatNum, T::Integer)
@@ -1042,13 +998,13 @@ function attribution_scatter(V::MatNum, keep, nr::Integer)
 end
 """
     attribution_family_errors(fam::Nothing, g::MatNum, Vf::AbstractVector{<:MatNum},
-                              s1::Number, T::Integer)
+                              s1::Number, T::Integer, obs::AbstractVector{<:Integer})
     attribution_family_errors(fam::VecStr, g::MatNum, Vf::AbstractVector{<:MatNum},
-                              s1::Number, T::Integer)
+                              s1::Number, T::Integer, obs::AbstractVector{<:Integer})
 
 Return the standard error of each family's mean return contribution.
 
-A family's contribution sums the contributions of its factors, so its error reads the full covariance block of the family rather than the diagonal alone. The currency family reports `NaN`, because its rows carry no regression-estimation uncertainty.
+A family's contribution sums the contributions of its factors, so its error reads the full covariance block of the family rather than the diagonal alone. A family of observed factors reports `NaN`, because its rows carry no regression-estimation uncertainty.
 
 # Mathematical definition
 
@@ -1075,6 +1031,7 @@ Where:
   - `Vf`: The sandwich covariance of each observation, on the raw axis.
   - `s1`: The factor a mean takes under the annualisation.
   - `T`: The number of aligned observations.
+  - `obs`: The raw factors that are observed, from [`attribution_observed_indices`](@ref).
 
 # Returns
 
@@ -1086,17 +1043,18 @@ Where:
   - [`attribution_family_index`](@ref)
 """
 function attribution_family_errors(::Nothing, ::MatNum, ::AbstractVector{<:MatNum},
-                                   ::Number, ::Integer)::Nothing
+                                   ::Number, ::Integer,
+                                   ::AbstractVector{<:Integer})::Nothing
     return nothing
 end
 function attribution_family_errors(fam::VecStr, g::MatNum, Vf::AbstractVector{<:MatNum},
-                                   s1::Number, T::Integer)
+                                   s1::Number, T::Integer, obs::AbstractVector{<:Integer})
     fi = attribution_family_index(fam)
     se(v) = s1 * sqrt(max(zero(v), v)) / T
     out = [se(sum(LinearAlgebra.dot(view(g, t, i), view(Vf[t], i, i), view(g, t, i))
                   for t in 1:T)) for i in fi.idx]
     for j in eachindex(out)
-        if fi.labels[j] == ATTRIBUTION_CURRENCY_FAMILY
+        if any(in(obs), fi.idx[j])
             out[j] = oftype(out[j], NaN)
         end
     end

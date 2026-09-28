@@ -8,6 +8,7 @@ Description = "Factor attribution, private API of PortfolioOptimisers.jl: attrib
 attribution_idiosyncratic_covariance
 attribution_idiosyncratic_returns
 attribution_factor_returns
+attribution_observed_count
 attribution_exposures
 attribution_lag
 attribution_families

@@ -228,7 +228,8 @@ using Statistics
         rng5 = StableRNG(19283746)
         Tr, Nr, Kr = 6, 5, 3
         Msr = randn(rng5, Tr, Nr, Kr)
-        fr = 0.02 * randn(rng5, Tr, Kr)
+        # A fit under a re-basis estimates its factor returns on the reduced axis.
+        fr = 0.02 * randn(rng5, Tr, Kr - 1)
         epsr = 0.01 * randn(rng5, Tr, Nr)
         rwr = abs.(randn(rng5, Tr, Nr)) .+ 0.1
         # One constrained family holds factors 1 and 2, and drops the second of them.
@@ -245,7 +246,10 @@ using Statistics
         # The answer is on the raw axis, which is wider than the reduced one.
         @test length(fs.ann_return) == Kr
         @test length(fs.mean_abs_t) == Kr
-        # "size" is the dropped member, so it carries no Gram answer.
+        # "size" is the dropped member, so it carries no Gram answer and no return series.
+        @test isnan(fs.ann_return[2])
+        @test isnan(fs.autocorr[2])
+        @test fs.ann_return[[1, 3]] ≈ vec(Statistics.mean(fr; dims = 1))
         @test isnan(fs.mean_abs_t[2])
         @test isnan(fs.t_rate[2])
         @test isnan(fs.mean_vif[2])
@@ -387,4 +391,24 @@ using Statistics
         @test eltype(PortfolioOptimisers.factor_summary_autocorrelation(Float32.(fi))) ==
               Float32
     end
+end
+
+@testset "A summary of an observed factor states its returns and no regression column (#1367)" begin
+    rng = StableRNG(1_367_10)
+    T, N = 30, 6
+    Ms = randn(rng, T, N, 3)
+    f = 0.02 * randn(rng, T, 2)
+    fx = 0.01 * randn(rng, T, 1)
+    csr = CrossSectionalRegression(; f = f, eps = 0.01 * randn(rng, T, N), n = fill(N, T))
+    rw = abs.(randn(rng, T, N)) .+ 0.1
+    blk = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+                                    rw = rw, bw = rw, lag = 1,
+                                    nf = ["value", "size", "usd"], fx = fx)
+    fs = factor_model_summary(blk; step = 2, weighting = RegressionWeightMetric())
+    @test length(fs.ann_return) == 3
+    @test fs.ann_return ≈ vec(Statistics.mean(hcat(f, fx); dims = 1))
+    @test all(isfinite, fs.ann_volatility)
+    @test isnan(fs.mean_abs_t[3]) && isnan(fs.t_rate[3]) && isnan(fs.mean_vif[3])
+    @test all(isfinite, fs.mean_abs_t[1:2])
+    @test length(fs.coverage) == 3
 end

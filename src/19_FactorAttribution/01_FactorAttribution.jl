@@ -110,7 +110,7 @@ Arguments correspond to the struct's fields, in the order they are declared. The
     """
     mu_contrib
     """
-    Standard error of `mu_contrib`, one entry per row, or `nothing`. The realised side fills it under `se = true`, and a row of a currency family reports `NaN`.
+    Standard error of `mu_contrib`, one entry per row, or `nothing`. The realised side fills it under `se = true`, and a row of an observed factor, or of a family of observed factors, reports `NaN`.
     """
     mu_se
 end
@@ -395,7 +395,7 @@ Return the factor return series a realised factor attribution multiplies by the 
 
 It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. The series is on the raw factor axis, which is the axis the loadings name, so a family re-basis does not move it.
 
-The read takes the prior result `pr` beside the block, as [`attribution_idiosyncratic_returns`](@ref) does and for the same reason. A [`CrossSectionalFactorModel`](@ref) fits the factor returns itself, and reads them off its own fit when no family is constrained. A constrained Factor Family makes the fit solve in a reduced basis, one column short per constrained family, so a re-based block reads `pr.fpr.X` instead, which holds the same coefficients already expanded onto the raw axis. A [`Regression`](@ref) regresses on factors the caller supplied, so the series is `pr.fpr.X`, the scenarios of the nested factor-axis prior. That field needs no refusal of its own, because [`LowOrderPrior`](@ref) admits `rr` and `fpr` only together, so a prior result that answers a loadings result answers a factor-axis prior beside it.
+The read takes the prior result `pr` beside the block, as [`attribution_idiosyncratic_returns`](@ref) does and for the same reason. A [`CrossSectionalFactorModel`](@ref) fits the factor returns itself, and reads them off its own fit when no family is constrained, with its observed factor returns after them through [`cross_sectional_factor_returns`](@ref). A constrained Factor Family makes the fit solve in a reduced basis, one column short per constrained family, so a re-based block reads `pr.fpr.X` instead, which holds the same coefficients already expanded onto the raw axis. A [`Regression`](@ref) regresses on factors the caller supplied, so the series is `pr.fpr.X`, the scenarios of the nested factor-axis prior. That field needs no refusal of its own, because [`LowOrderPrior`](@ref) admits `rr` and `fpr` only together, so a prior result that answers a loadings result answers a factor-axis prior beside it.
 
 # Arguments
 
@@ -423,13 +423,42 @@ function attribution_factor_returns(rr::AbstractLoadingsRegressionResult,
     return throw(ArgumentError("`attribution_factor_returns` is not defined for `$(nameof(typeof(rr)))`. A realised factor attribution reads the factor return series of the block it decomposes, and every member of `AbstractLoadingsRegressionResult` that a caller attributes must add a method beside its own definition."))
 end
 function attribution_factor_returns(rr::CrossSectionalFactorModel, pr::AbstractPriorResult)
-    f = assert_attribution_field(rr.csr, :csr).f
+    assert_attribution_field(rr.csr, :csr)
     # `csr.f` holds the coefficients in the basis the fit solved in, and a Factor Family
     # re-basis drops one column per constrained family. The contract above is the raw factor
     # axis -- the axis `Ms` names -- so a re-based block reads the nested factor-axis prior,
-    # which carries the same coefficients already expanded onto that axis. The two series are
-    # equal when no family is constrained.
-    return has_family_rebasis(rr) ? pr.fpr.X : f
+    # which carries the same coefficients already expanded onto that axis. Without a
+    # re-basis the raw axis is the reduced one, and the observed factors follow the
+    # estimated ones on it.
+    return has_family_rebasis(rr) ? pr.fpr.X : cross_sectional_factor_returns(rr)
+end
+"""
+    attribution_observed_count(rr::AbstractLoadingsRegressionResult) -> Int
+    attribution_observed_count(rr::CrossSectionalFactorModel) -> Int
+
+Return the number of observed factors of a loadings result, which are the last factors of its axis.
+
+A [`Regression`](@ref) regresses on factor returns the caller supplied and estimates the loadings, so it has no observed factor in this sense. A [`CrossSectionalFactorModel`](@ref) states its observed factors through `fx`, and they are the trailing columns of both of its axes.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+
+# Returns
+
+  - `no::Int`: The number of observed factors.
+
+# Related
+
+  - [`attribution_align`](@ref)
+  - [`attribution_observed_indices`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function attribution_observed_count(::AbstractLoadingsRegressionResult)::Int
+    return 0
+end
+function attribution_observed_count(rr::CrossSectionalFactorModel)::Int
+    return isnothing(rr.fx) ? 0 : size(rr.fx, 2)
 end
 function attribution_factor_returns(::Regression, pr::AbstractPriorResult)
     return pr.fpr.X

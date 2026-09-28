@@ -292,13 +292,13 @@ end
 
 Return the lag-aligned regression history a cross-sectional diagnostic reads off a factor model block.
 
-Every block method of this file starts here. The verb trims the exposures at the tail and the return-like histories at the head, so the exposures of observation ``t - \\ell`` line up with the returns of observation ``t``. When the block carries a family re-basis, the verb maps the exposures and the factor returns onto the reduced axis, and every answer that carries a factor axis is then on the reduced axis too.
+Every block method of this file starts here. The verb trims the exposures at the tail and the return-like histories at the head, so the exposures of observation ``t - \\ell`` line up with the returns of observation ``t``. The answer is the design the regression ran on. `csr.f` holds the factors the fit estimated, on the reduced axis when the block carries a family re-basis, so the verb maps the exposures onto the reduced axis, and it drops the observed factors, which are the trailing columns of that axis and which the regression did not estimate. Every answer that carries a factor axis is then on the axis of `csr.f`.
 
 # Algorithm
 
  1. Refuse a block that carries no exposure history, or no cross-sectional fit.
  2. Trim the exposure history at the tail by `csfm.lag`, and the factor returns, the residuals and the regression weights at the head by the same count.
- 3. When `csfm.fcb` is set, slice the basis to the trimmed observation axis, map the exposures through [`reduce_exposures`](@ref), and map the factor returns through [`reduce_factor_returns`](@ref).
+ 3. Map the exposures onto the design of the regression with [`cs_regression_design`](@ref): onto the reduced axis when `csfm.fcb` is set, and without the observed factors that `csfm.fx` states. The factor returns `csr.f` are already on that axis.
 
 # Arguments
 
@@ -311,13 +311,17 @@ Every block method of this file starts here. The verb trims the exposures at the
 
 # Returns
 
-  - `data::NamedTuple`: `(; B, f, eps, w)`, the lag-aligned exposures, factor returns, residuals and regression weights. `w` is `nothing` when the block carries no regression weight history.
+  - `data::NamedTuple`: `(; B, f, eps, w)`, the lag-aligned exposures, factor returns, residuals and regression weights, on the design of the regression. `w` is `nothing` when the block carries no regression weight history.
+
+# Validation
+
+  - The design and `csr.f` agree on the factor axis. Raises a `DimensionMismatch` that names both counts.
 
 # Related
 
   - [`CrossSectionalFactorModel`](@ref)
   - [`reduce_exposures`](@ref)
-  - [`reduce_factor_returns`](@ref)
+  - [`cs_regression_design`](@ref)
   - [`cs_regression_t_stats`](@ref)
 """
 function cs_regression_data(csfm::CrossSectionalFactorModel)
@@ -341,8 +345,10 @@ function cs_regression_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
     f = csr.f[rows, :]
     eps = csr.eps[rows, :]
     w = cs_lagged_rows(csfm.rw, rows)
-    Br, fr = cs_reduce_regression(csfm.fcb, B, f, lag)
-    return (; B = Br, f = fr, eps = eps, w = w)
+    Br = cs_regression_design(csfm.fcb, B, isnothing(csfm.fx) ? 0 : size(csfm.fx, 2), lag)
+    @argcheck(size(Br, 3) == size(f, 2),
+              DimensionMismatch("the regression of the block ran on $(size(Br, 3)) factors, the reduced axis less the observed ones, and csr.f carries $(size(f, 2)). A block states csr.f on the axis the fit estimated, which is the reduced axis under a family re-basis"))
+    return (; B = Br, f = f, eps = eps, w = w)
 end
 """
     cs_regression_lag(lag::Nothing)
@@ -397,39 +403,38 @@ function cs_lagged_rows(A::MatNum, rows)
     return A[rows, :]
 end
 """
-    cs_reduce_regression(fcb::Nothing, B::Arr3Num, f::MatNum, lag::Integer)
-    cs_reduce_regression(fcb::FactorFamilyBasis, B::Arr3Num, f::MatNum, lag::Integer)
+    cs_regression_design(fcb::Nothing, B::Arr3Num, no::Integer, lag::Integer)
+    cs_regression_design(fcb::FactorFamilyBasis, B::Arr3Num, no::Integer, lag::Integer)
 
-Map a lag-aligned regression history onto the reduced factor axis of a family re-basis.
+Map a lag-aligned exposure history onto the design the cross-sectional regression ran on.
 
-A block that carries no re-basis is already on its own axis, so that case returns the pair unchanged. A block that carries one has a rank-deficient design on the raw axis, because every constrained family sums to zero, so the diagnostics answer on the reduced axis instead. The verb slices the basis to the trimmed observation axis before the basis maps the exposures, because [`cs_regression_data`](@ref) trimmed the exposures at the tail.
+A block that carries a family re-basis has a rank-deficient design on the raw axis, because every constrained family sums to zero, so the regression ran on the reduced axis, and the diagnostics answer there too. The verb slices the basis to the trimmed observation axis before the basis maps the exposures, because [`cs_regression_data`](@ref) trimmed the exposures at the tail. A block that carries no re-basis is already on its own axis. The observed factors are the last `no` columns of either axis, and the regression did not estimate them, so the verb drops them.
 
 # Arguments
 
   - `fcb`: The `fcb` field of a [`CrossSectionalFactorModel`](@ref), or `nothing`.
-  - `B`: Lag-aligned exposure history `observations × assets × factors`.
-  - `f`: Lag-aligned factor return matrix `observations × factors`.
+  - `B`: Lag-aligned exposure history `observations × assets × factors`, on the raw axis.
+  - `no`: The number of observed factors.
   - `lag`: Number of observations by which the exposures lag the returns.
 
 # Returns
 
-  - `B::Arr3Num`: The exposure history, on the reduced axis when a re-basis is set.
-  - `f::MatNum`: The factor returns, on the reduced axis when a re-basis is set.
+  - `B::Arr3Num`: The exposure history of the factors the regression estimated.
 
 # Related
 
   - [`FactorFamilyBasis`](@ref)
   - [`reduce_exposures`](@ref)
-  - [`reduce_factor_returns`](@ref)
   - [`cs_regression_data`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
 """
-function cs_reduce_regression(::Nothing, B::Arr3Num, f::MatNum, ::Integer)
-    return B, f
+function cs_regression_design(::Nothing, B::Arr3Num, no::Integer, ::Integer)
+    return B[:, :, 1:(size(B, 3) - no)]
 end
-function cs_reduce_regression(fcb::FactorFamilyBasis, B::Arr3Num, f::MatNum, lag::Integer)
+function cs_regression_design(fcb::FactorFamilyBasis, B::Arr3Num, no::Integer, lag::Integer)
     Tb = size(fcb.ratios, 1) - lag
-    fcbB = factor_basis_slice(fcb, 1:Tb)
-    return reduce_exposures(fcbB, B), reduce_factor_returns(fcb, f)
+    Br = reduce_exposures(factor_basis_slice(fcb, 1:Tb), B)
+    return Br[:, :, 1:(size(Br, 3) - no)]
 end
 """
     exposure_vif(G::Arr3Num) -> Matrix{<:Real}
@@ -1538,10 +1543,13 @@ end
 
 """
     cs_diagnostic_factor_names(csfm::CrossSectionalFactorModel)
+    cs_diagnostic_factor_names(fcb::Option{<:AbstractFactorFamilyBasis}, nf::Nothing)
+    cs_diagnostic_factor_names(fcb::Nothing, nf::VecStr)
+    cs_diagnostic_factor_names(fcb::FactorFamilyBasis, nf::VecStr)
 
 Return the factor names of the axis a cross-sectional regression diagnostic answers on.
 
-A diagnostic that carries a factor axis answers on the reduced axis when the block carries a family re-basis, so the names of the raw axis do not label it. This verb maps them, and it is what a plot reads to label its axis. A block that names no factor answers `nothing`, and the caller then labels the axis by position.
+A regression diagnostic that carries a factor axis answers on the design of the regression: the reduced axis when the block carries a family re-basis, less the observed factors, which are its last columns and which the regression did not estimate. So the names of the raw axis do not label it. The one-argument verb maps them, and it is what a plot reads to label its axis. The two-argument verb maps the names onto the whole reduced axis, observed factors included, which is the axis of the loadings `L`. A block that names no factor answers `nothing`, and the caller then labels the axis by position.
 
 # Arguments
 
@@ -1559,7 +1567,8 @@ A diagnostic that carries a factor axis answers on the reduced axis when the blo
   - [`exposure_vif`](@ref)
 """
 function cs_diagnostic_factor_names(csfm::CrossSectionalFactorModel)
-    return cs_diagnostic_factor_names(csfm.fcb, csfm.nf)
+    nf = cs_diagnostic_factor_names(csfm.fcb, csfm.nf)
+    return isnothing(nf) || isnothing(csfm.fx) ? nf : nf[1:(end - size(csfm.fx, 2))]
 end
 function cs_diagnostic_factor_names(::Option{<:AbstractFactorFamilyBasis},
                                     ::Nothing)::Nothing

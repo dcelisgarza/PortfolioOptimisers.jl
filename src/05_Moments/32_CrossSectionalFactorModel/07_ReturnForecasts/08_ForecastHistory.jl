@@ -6,7 +6,7 @@ Return the factor-model block truncated to its first `tb` observations.
 
 [`forecast_history_refit`](@ref) refits a member that computes no history at each row of a grid, and the fit at a row must read nothing after that row. This function gives the block that such a fit reads. It cuts every history of the block to the rows `1:tb`, and it sets the loadings `M` to the last slice of the cut exposure history.
 
-The function keeps the per-asset summaries `b`, `esigma`, `edof` and `ediv` unchanged. They describe the assets and not the observations, and no Return Forecast Estimator reads either of them. The function drops the family re-basis `L`, its basis `fcb` and the fitted forecast `rf` of the prior. A re-basis of the truncated block does not follow from the block, and an unset `L` reads back as `M`. The history of `rf` covers the rows after `tb`.
+The function keeps the per-asset summaries `b`, `esigma`, `edof` and `ediv` unchanged. They describe the assets and not the observations, and no Return Forecast Estimator reads either of them. The function drops the family re-basis `L`, its basis `fcb`, the Currency Excess Returns `fx` and the fitted forecast `rf` of the prior. A re-basis of the truncated block does not follow from the block, and an unset `L` reads back as `M`. `fx` fills the reduced axis beside `csr.f`, so it leaves with the re-basis, and no Return Forecast Estimator reads a factor return. The history of `rf` covers the rows after `tb`.
 
 # Algorithm
 
@@ -14,7 +14,7 @@ The function keeps the per-asset summaries `b`, `esigma`, `edof` and `ediv` unch
  2. Take the last slice of `Mb` as the loadings `M`, or keep the loadings of the block when it carries no exposure history.
  3. Cut the factor returns `f`, the residuals `eps`, the counts `n` and the intercepts `b` of the cross-sectional fit `csr` to the rows `1:tb`.
  4. Cut the variance history `vs`, the regression weight history `rw` and the benchmark weight history `bw` to the rows `1:tb`.
- 5. Build the block from these histories, with `b`, `esigma`, `edof`, `ediv`, `nf`, `fam` and `lag` unchanged, and with no `L`, `fcb` or `rf`.
+ 5. Build the block from these histories, with `b`, `esigma`, `edof`, `ediv`, `nf`, `fam` and `lag` unchanged, and with no `L`, `fcb`, `fx` or `rf`.
 
 # Arguments
 

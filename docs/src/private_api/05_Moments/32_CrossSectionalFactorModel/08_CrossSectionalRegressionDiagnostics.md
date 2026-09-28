@@ -15,7 +15,7 @@ cs_inverse_diagonal!
 cs_regression_data
 cs_regression_lag
 cs_lagged_rows
-cs_reduce_regression
+cs_regression_design
 cs_masked_vif
 cs_masked_condition_number
 cs_diagnostic_mask_weights

@@ -387,7 +387,7 @@ function regression_factor_names(::Regression{<:Any, Nothing, <:Any, <:Any},
     return rd.nf
 end
 function regression_factor_names(rr::CrossSectionalFactorModel, ::Any)
-    return cs_diagnostic_factor_names(rr)
+    return cs_diagnostic_factor_names(rr.fcb, rr.nf)
 end
 function regression_factor_names(::Any, ::Any)
     return nothing

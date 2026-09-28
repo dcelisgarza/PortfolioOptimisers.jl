@@ -930,3 +930,35 @@ end
         @test sum(abs2, v[fin]) ≈ 433.0 rtol=1e-12
     end
 end
+
+@testset "A pass-through arm appends factors the basis never re-bases (#1367)" begin
+    PO = PortfolioOptimisers
+    fcb = FactorFamilyBasis(; fnm = ["industry"], fi = [[2, 3]], di = [2],
+                            ratios = reshape([0.5, 0.4], 2, 1), K = 4)
+    nf = ["mkt", "ind0", "ind1", "style"]
+    fcb2 = PO.append_passthrough_factors(fcb, 2)
+    @test fcb2.K == 6
+    @test fcb2.fnm == fcb.fnm && fcb2.fi == fcb.fi && fcb2.di == fcb.di
+    @test fcb2.ratios == fcb.ratios
+    # The appended factors keep their order after every retained factor.
+    @test PO.reduce_factor_names(fcb2, [nf; "USD"; "EUR"]) ==
+          [PO.reduce_factor_names(fcb, nf); "USD"; "EUR"]
+    @test PO.retained_factor_indices(fcb2) == [1, 2, 4, 5, 6]
+    # Their row of the change of basis is an identity row: expanded returns, means and
+    # covariances carry them unchanged.
+    f = randn(StableRNG(1_367), 2, 5)
+    ef = PO.expand_factor_returns(fcb2, f)
+    @test ef[:, 5:6] == f[:, 4:5]
+    @test ef[:, 1:4] ≈ PO.expand_factor_returns(fcb, f[:, 1:3])
+    S = let A = randn(StableRNG(1), 5, 5)
+        A * A'
+    end
+    eS = PO.expand_factor_covariance(PO.factor_basis_slice(fcb2, 2:2), S)
+    @test eS[5:6, 5:6] ≈ S[4:5, 4:5]
+    # A zero count leaves the basis itself, and no basis stays no basis.
+    @test PO.append_passthrough_factors(fcb, 0) === fcb
+    @test isnothing(PO.append_passthrough_factors(nothing, 3))
+    @test_throws DomainError PO.append_passthrough_factors(fcb, -1)
+    @test_throws DomainError PO.append_passthrough_factors(nothing, -1)
+    @test_throws MethodError PO.append_passthrough_factors(fcb, 1.5)
+end

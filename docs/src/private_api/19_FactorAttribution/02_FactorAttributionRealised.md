@@ -1,11 +1,10 @@
 ```@meta
-Description = "Factor attribution realised, private API of PortfolioOptimisers.jl: ATTRIBUTION_CURRENCY_FAMILY, attribution_slice, attribution_weights, attribution_cov, …"
+Description = "Factor attribution realised, private API of PortfolioOptimisers.jl: attribution_slice, attribution_weights, attribution_cov, attribution_align, …"
 ```
 
 # [Factor attribution realised: private API](@id private-api-factor-attribution-realised)
 
 ```@docs
-ATTRIBUTION_CURRENCY_FAMILY
 attribution_slice
 attribution_weights
 attribution_cov
@@ -24,10 +23,9 @@ attribution_series_component
 attribution_family_spread
 attribution_no_errors
 attribution_standard_errors
-attribution_currency_mask
+attribution_observed_indices
 attribution_reduce_for_errors
-attribution_reduce_families
-attribution_currency_flags
+attribution_observed_flags
 attribution_broadcast_exposures
 attribution_sandwich
 attribution_expand_errors

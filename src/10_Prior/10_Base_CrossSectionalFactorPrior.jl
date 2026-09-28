@@ -1491,7 +1491,7 @@ Where:
 # Algorithm
 
  1. Fit `rfe` on the coverage universe through [`return_forecast`](@ref), giving `rf`. `rd` holds every observation, so the Descriptors of the forecast warm up over every observation of the panel. [`return_forecast_rows`](@ref) finds the block as a suffix of `rd` by its size.
- 2. Split `rf.mu` against the latest exposures with [`cross_sectional_alpha_split`](@ref), giving `g` and `ap`.
+ 2. Split `rf.mu` against the latest exposures of the estimated factors with [`cross_sectional_alpha_split`](@ref), giving `g` and `ap`. The observed factors are the trailing columns of `L`, and the split leaves them out, so `g` has one entry per column of `csr.f`.
  3. Rebuild the block with `b = c * ap` and with `rf` in its field `rf`. Read `L` with `getfield`. The property `L` of [`CrossSectionalFactorModel`](@ref) gives `M` when `L` is unset, and the rebuilt block would then hold `M` as a set `L`.
 
 # Arguments
@@ -1530,14 +1530,17 @@ function cross_sectional_return_forecast(rfe::AbstractReturnForecastEstimator,
                                          c::Real)
     rf = return_forecast(rfe, rd, csfm)
     rw = csfm.rw
-    (; g, ap) = cross_sectional_alpha_split(cre, rf.mu, csfm.L, @view(rw[size(rw, 1), :]))
+    #! The observed factors are the trailing columns of `L`, and the fit observes their
+    #! returns, so the forecast splits against the loadings the regression estimated.
+    L = view(csfm.L, :, 1:size(csfm.csr.f, 2))
+    (; g, ap) = cross_sectional_alpha_split(cre, rf.mu, L, @view(rw[size(rw, 1), :]))
     return (;
             rr = CrossSectionalFactorModel(; M = csfm.M, L = getfield(csfm, :L), b = c * ap,
                                            csr = csfm.csr, Ms = csfm.Ms, vs = csfm.vs,
                                            esigma = csfm.esigma, edof = csfm.edof,
                                            ediv = csfm.ediv, rw = rw, bw = csfm.bw,
                                            nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,
-                                           lag = csfm.lag, rf = rf), g = g)
+                                           lag = csfm.lag, rf = rf, fx = csfm.fx), g = g)
 end
 """
     cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::Nothing) -> VecNum
