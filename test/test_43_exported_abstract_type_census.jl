@@ -58,7 +58,8 @@
     `AbstractAssetSelector` and `SubPortfolioUniverse` — joined on 2026-09-25 (issue #1301).
     `AbstractPricesResult`, `AbstractPhylogenyFeatureAlgorithm`, `AbstractCollateralAlgorithm`
     and `SchurComplementAlgorithm` joined on 2026-09-26 (PR #1204), after #1012, #848, #1337
-    and #881 wrote their `# Interfaces` sections.
+    and #881 wrote their `# Interfaces` sections. `AbstractObservedExposureEstimator` joined
+    with its `# Interfaces` section on 2026-09-28 (issue #1368).
     They are held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
@@ -75,9 +76,10 @@
                           :AbstractDescriptorEstimator, :AbstractDetoneEstimator,
                           :AbstractEstimatorValueAlgorithm,
                           :AbstractExpectedReturnsEstimator, :AbstractExposureEstimator,
-                          :AbstractForecastTarget, :AbstractGapReturnAlgorithm,
-                          :AbstractGradientPredictor, :AbstractGradientTransform,
-                          :AbstractLearningRateSchedule, :AbstractHighOrderPriorEstimator_F,
+                          :AbstractObservedExposureEstimator, :AbstractForecastTarget,
+                          :AbstractGapReturnAlgorithm, :AbstractGradientPredictor,
+                          :AbstractGradientTransform, :AbstractLearningRateSchedule,
+                          :AbstractHighOrderPriorEstimator_F,
                           :AbstractLowOrderPriorEstimator_A,
                           :AbstractLowOrderPriorEstimator_AF,
                           :AbstractLowOrderPriorEstimator_F,

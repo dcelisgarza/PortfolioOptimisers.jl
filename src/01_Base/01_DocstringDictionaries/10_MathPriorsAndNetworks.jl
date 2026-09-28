@@ -68,6 +68,7 @@ unique_key_dict!(math_dict, :math_dict,
                  # The cross-sectional factor prior. Each symbol below is stated by two or
                  # more Units of `10_Prior/10_Base_CrossSectionalFactorPrior.jl`.
                  :a_ti_pnl => "``a_{ti}``: Panel activity of asset ``i`` at observation ``t``, ``1`` when the active mask of the Asset Panel activates the asset and ``0`` when it does not.",#
+                 :ell_lag_cs => "``\\ell``: Exposure lag, the count of observations by which the exposures lag the returns.",#
                  :e_ti_pnl => "``e_{ti}``: Estimation flag of asset ``i`` at observation ``t``, ``1`` when the estimation mask of the Asset Panel holds the asset and ``0`` when it does not.",#
                  :ztilde_ti_idio => "``\\tilde{z}_{ti}``: Filled standardised idiosyncratic return of asset ``i`` at observation ``t``. It is ``z_{ti}`` where that is finite, ``\\bar{z}_{t}`` where the asset is active and ``z_{ti}`` is not finite, and `NaN` where the asset is inactive.",#
                  :R_idio => "``\\mathbf{R}``: Idiosyncratic square root, lower triangular, with ``\\mathbf{R} \\mathbf{R}^{\\intercal} = \\mathbf{D}_{\\mathcal{I}\\mathcal{I}}``.",#

@@ -179,6 +179,7 @@ include("05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/10_DerivedEx
 include("05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/11_OneHotExposure.jl")
 include("05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/12_ConstantExposure.jl")
 include("05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/13_ExposureNeutralisation.jl")
+include("05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/14_ObservedExposure.jl")
 include("05_Moments/32_CrossSectionalFactorModel/05_FactorFamilyBasis.jl")
 include("05_Moments/32_CrossSectionalFactorModel/06_FactorFamilyBasisTransforms.jl")
 include("05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/01_Base_ReturnForecast.jl")

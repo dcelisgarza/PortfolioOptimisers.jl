@@ -91,7 +91,7 @@ end
 
 Refuse a factor whose Exposure Estimator reads its benchmark weights from a Panel Field the prior does not write.
 
-A Cross-Sectional Factor Prior writes its benchmark weights onto the Panel Field `bw`, and [`CompositeExposure`](@ref) and [`DerivedExposure`](@ref) each read them from the field their own `bw` names. When the two names differ, the member reads another field, or fails because the panel has none, so the prior refuses the pair when it is built. A member that reads no benchmark weight passes.
+A Cross-Sectional Factor Prior writes its benchmark weights onto the Panel Field `bw`, and [`CompositeExposure`](@ref) and [`DerivedExposure`](@ref) each read them from the field their own `bw` names. When the two names differ, the member reads another field, or fails because the panel has none, so the prior refuses the pair when it is built. A member that reads no benchmark weight passes. An [`ObservedExposure`](@ref) is checked through the member it wraps.
 
 # Arguments
 
@@ -117,6 +117,10 @@ function assert_cross_sectional_benchmark_field(::AbstractString,
                                                 ::AbstractExposureEstimator,
                                                 ::AbstractString)::Nothing
     return nothing
+end
+function assert_cross_sectional_benchmark_field(key::AbstractString, xe::ObservedExposure,
+                                                bw::AbstractString)::Nothing
+    return assert_cross_sectional_benchmark_field(key, xe.xe, bw)
 end
 function assert_cross_sectional_benchmark_field(key::AbstractString,
                                                 xe::Union{<:CompositeExposure,
