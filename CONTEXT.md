@@ -116,10 +116,15 @@ The pervasive Algorithm distinction in moment estimation: `FullMoment` includes 
 ## 2. Data
 
 **ReturnsResult**
-The central data structure carrying all return series through the library: asset, factor and benchmark returns, their names, timestamps, implied volatility, and the Asset Panel. Produced by `prices_to_returns`.
+The central data structure carrying all return series through the library: asset, factor and benchmark returns, the Exogenous Series, their names, timestamps, implied volatility, and the Asset Panel. Produced by `prices_to_returns`.
+Its asset returns are in the investor's base currency, with or without Currency Factors (§3). A model that needs local-currency returns derives them, or reads them from a Panel Field the caller names; it never reads the asset returns as local. See ADR 0184.
 
 **PricesResult**
-The container of aligned, time-indexed price-level series: the prices-level mirror of `ReturnsResult`, and the input to price Preprocessing Estimators.
+The container of aligned, time-indexed price-level series: the prices-level mirror of `ReturnsResult`, and the input to price Preprocessing Estimators. It also carries the Exogenous Series, which is already returns-level and passes to `ReturnsResult` unconverted.
+
+**Exogenous Series**
+A named series over the observation axis that belongs to no asset: a Currency Excess Return (§3), an exchange rate return, a rate of interest. A consumer reads a series only by its name, so no model takes the block whole as its factors. It follows every observation slice of the returns it rides beside, and it is never converted, filled, or used to drop an observation: a gap stays a gap, and the consumer that names the series refuses it only on the rows it fits. See ADR 0184.
+*Avoid*: factor returns, which a time-series factor model reads whole as its factors; and a Panel Field, which is per asset.
 
 **Feature Matrix**
 The assets × features matrix a Feature Distance measures, or its time-varying form, observations × assets × features. It is built at the point of use from the Panel Fields a Feature Selector names: a numeric field gives one column, a categorical field one 0/1 column per level, a tensor field one column per label, and an observed mask one 0/1 column. Each column carries a label, which is the Feature Selector entry that selects exactly that column. It is always finite.
@@ -298,6 +303,14 @@ The replacement of one Factor Exposure by its residual after a benchmark-weighte
 **Factor Family Basis**
 The time-varying change of basis that imposes each Factor Family's zero-sum constraint by dropping one member and rewriting the others, stored as the per-observation ratios of the retained members to the dropped one.
 *Avoid*: the reduced loadings, which are what the basis produces rather than the basis itself.
+
+**Currency Excess Return**
+The return, in the investor's base currency, of holding the cash of one currency: its exchange rate return plus its cash rate minus the base currency's cash rate. In log returns an asset's base-currency excess return is exactly its local excess return plus the Currency Excess Return of its currency. In simple returns the sum leaves out the cross term, the local return times the exchange rate return, which depends on the asset and so no per-currency series can hold. See ADR 0184.
+*Avoid*: a currency conversion; the library converts no return, and the Currency Excess Return is data the caller supplies or builds from exchange rates and cash rates.
+
+**Currency Factor**
+A factor whose return is observed, not estimated: the Currency Excess Return of one currency, read from the Exogenous Series by the currency's name, with a one-hot exposure on the assets that hold that currency. It never enters the Cross-Sectional Regression, and no Factor Family Basis or Neutralisation touches it. See ADR 0184.
+*Avoid*: a Factor Family; the currency factors carry the reserved family label `currency`, which carries no zero-sum constraint and which no other Exposure Estimator may claim.
 
 ### 3.5 Matrix Processing
 
