@@ -162,8 +162,15 @@ fit_rows(rd, pr) = (size(rd.X, 1) - size(pr.X, 1) + 1):size(rd.X, 1)
         @test isa(pe.cre, CrossSectionalLinearRegression)
         @test isa(pe.wa, MarketCapWeights)
         @test pe.wa.p == 0.5
+        # Issues #1373 and #1374. The factor prior decays on the half-life of the
+        # idiosyncratic variance, and both measure a second moment about zero.
         @test isa(pe.pe, EmpiricalPrior)
+        @test isa(pe.pe.me, ExpWeightedExpectedReturns)
+        @test isa(pe.pe.ce, RegimeAdjustedExpWeightedCovariance)
+        @test pe.pe.ce.centred
         @test isa(pe.ve, RegimeAdjustedExpWeightedVariance)
+        @test pe.ve.centred
+        @test pe.pe.me.decay == pe.pe.ce.decay == pe.ve.decay
         # Issue #925. `EWCovariance(assume_centered=True, nearest=False)` is the reference
         # implementation's own default, and `centred` is the whole residual against it.
         @test isa(pe.ce, ExpWeightedCovariance)
@@ -540,7 +547,11 @@ scenario mean.
             prior(pe_ep, rd)
         end
         @test length(logs) == 1
-        @test isapprox(pw.fpr.mu, pr.fpr.mu; atol = 1e-12)
+        # A view the prior drops leaves the moments of its own nested prior, a plain
+        # `EmpiricalPrior`, and not those of the default factor prior, which decays.
+        pr0 = prior(CrossSectionalFactorPrior(; factors = csfp_factors(), minra = 5,
+                                              pe = EmpiricalPrior()), rd)
+        @test isapprox(pw.fpr.mu, pr0.fpr.mu; atol = 1e-12)
         @test_throws ArgumentError prior(pe_ep, rd; strict = true)
         @test_throws ArgumentError prior(pe_ep, rd.X, nothing, rd.pnl; strict = true)
         # A view the axis carries is enforced on the factor prior under either setting.
@@ -910,8 +921,11 @@ end
                                                                 scoring = nothing),
                                       scale = 0.02)
     for (nm, fams) in (("", nothing), ("Family", ["industry" => nothing]))
+        # The stored cases were fitted with a sample factor prior, so the factor mean is the
+        # sample mean of the factor returns.
         pr = prior(CrossSectionalFactorPrior(; factors = factors, families = fams,
-                                             rfe = rfe, lambda = 1.0, c = 1.0), rd)
+                                             pe = EmpiricalPrior(), rfe = rfe, lambda = 1.0,
+                                             c = 1.0), rd)
         E = vec(Matrix(CSV.read(joinpath(@__DIR__,
                                          "assets/CrossSectionalFactorPrior$(nm)ForecastMu.csv.gz"),
                                 DataFrame)))
@@ -1033,9 +1047,15 @@ end
         @test isa(e, ArgumentError)
         @test occursin("covariance of one observation is not a number", e.msg)
         # The floor is exactly two, and no wider: at three observations the fit clears it
-        # and stops at the NEXT warm-up in the chain, the idiosyncratic variance
-        # estimator's, which refuses under its own name. Every band is named.
-        @test_throws PO.IsEmptyError prior(pe, rd)
+        # and stops at the NEXT warm-up in the chain. The default factor prior decays, so its
+        # own warm-up is next, and it refuses a factor moment that is not finite. A factor
+        # prior with no warm-up passes, and the idiosyncratic variance estimator's warm-up
+        # then refuses under its own name. Every band is named.
+        @test_throws PO.IsNonFiniteError prior(pe, rd)
+        @test_throws PO.IsEmptyError prior(CrossSectionalFactorPrior(; factors = factors,
+                                                                     lag = 1,
+                                                                     pe = EmpiricalPrior()),
+                                           rd)
     end
     @testset "A factor prior that warms up over the factor returns" begin
         # The reference implementation's own case: a factor prior whose covariance
@@ -1124,11 +1144,12 @@ method states, computed from first principles and compared with the fit.
 
 The oracle reads the Factor Exposures and the idiosyncratic covariance off the library, because
 they are the INPUT of the definition: the Exposure Estimators and the variance estimator state
-their own. Everything the definition itself states is rebuilt here: the eligibility of each pair,
-the weight `m^p` at the lagged market capitalisation, the weighted least squares of every
-observation through a pseudo-inverse, the sample mean and covariance of the factor returns, the
-weighted least squares of the forecast on the latest exposures, the blend, the investable set and
-the two lifted moments.
+their own. The factor moments are an input for the same reason: the definition states them as the
+moments the nested factor prior gives over the factor returns, so the oracle hands its own factor
+returns to `pe.pe`. Everything the definition itself states is rebuilt here: the eligibility of
+each pair, the weight `m^p` at the lagged market capitalisation, the weighted least squares of
+every observation through a pseudo-inverse, the weighted least squares of the forecast on the
+latest exposures, the blend, the investable set and the two lifted moments.
 
 The three factors are independent, so every weighted design has full column rank. Under the
 default four the factor covariance is singular in one direction, and whether its repair moves it
@@ -1163,8 +1184,9 @@ function csfp_oracle(pe, rd; alpha = nothing)
         s = sqrt.(Q[u, e])
         F[u, :] = LinearAlgebra.pinv(s .* Z[t - ell, e, :]) * (s .* X[t, e])
     end
-    muf = vec(Statistics.mean(F; dims = 1))
-    Sf = Statistics.cov(F; dims = 1)
+    fp = prior(pe.pe, F)
+    muf = fp.mu
+    Sf = fp.sigma
     ZT = Z[Tn, :, :]
     g = zeros(K)
     b = zeros(N)
@@ -1191,6 +1213,9 @@ end
     alpha = 0.01 * randn(StableRNG(829), size(rd.X, 2))
     alpha[3] = NaN
     cases = (("the defaults", CrossSectionalFactorPrior(; factors = factors), nothing),
+             ("a sample factor prior",
+              CrossSectionalFactorPrior(; factors = factors, pe = EmpiricalPrior()),
+              nothing),
              ("a lag of three", CrossSectionalFactorPrior(; factors = factors, lag = 3),
               nothing),
              ("a shrunk factor mean",
@@ -1222,6 +1247,12 @@ end
             @test all(isnan, pr.sigma[J, :])
             @test all(isnan, pr.sigma[:, J])
         end
+    end
+    @testset "A sample factor prior states the sample moments of the factor returns" begin
+        o = csfp_oracle(CrossSectionalFactorPrior(; factors = factors,
+                                                  pe = EmpiricalPrior()), rd)
+        @test isapprox(o.muf, vec(Statistics.mean(o.F; dims = 1)); rtol = 1e-12)
+        @test isapprox(o.Sf, Statistics.cov(o.F; dims = 1); rtol = 1e-12)
     end
     @testset "At lambda = 0 and c = 1 the expected return is the forecast" begin
         pe = CrossSectionalFactorPrior(; factors = factors, lambda = 0.0, c = 1.0,

@@ -8,6 +8,11 @@ with and without a constrained industry family. The nested factor prior of both 
 `EmpiricalPrior`. The fixture draws local returns, adds the Currency Excess Return of the currency
 of each asset to form the base-currency returns, and states three currencies, so the fit must
 recover the local model through the derived local returns.
+
+The `*Default*` files hold the default fit on the same fixture (#1373, #1374): the factor mean,
+the factor covariance, `mu`, `sigma` and the idiosyncratic variance of the latest observation.
+Its factor prior decays on the half-life of the idiosyncratic variance, and both of them measure
+a second moment about zero.
 =#
 using Statistics, Clarabel
 
@@ -72,7 +77,8 @@ end
                                                             (("Plain", nothing),
                                                              ("Family",
                                                               ["industry" => nothing]))
-        pr = prior(CrossSectionalFactorPrior(; factors = factors, families = fam), fx.rd)
+        pr = prior(CrossSectionalFactorPrior(; factors = factors, families = fam,
+                                             pe = EmpiricalPrior()), fx.rd)
         F = ccy_asset("$(nm)FactorReturns")
         @test size(pr.fpr.X) == size(F) == (119, 8)
         # The regression solves one weighted least squares by factorising the weighted
@@ -83,6 +89,21 @@ end
         @test pr.fpr.mu ≈ vec(ccy_asset("$(nm)FactorMu")) rtol = 1e-12
         @test pr.fpr.sigma ≈ ccy_asset("$(nm)FactorCov") rtol = 1e-12
         @test pr.mu ≈ vec(ccy_asset("$(nm)Mu")) rtol = 1e-12
+    end
+
+    @testset "The default fit matches the stored oracle, $(nm)" for (nm, fam) in
+                                                                    (("Plain", nothing),
+                                                                     ("Family",
+                                                                      ["industry" =>
+                                                                           nothing]))
+        pr = prior(CrossSectionalFactorPrior(; factors = factors, families = fam), fx.rd)
+        @test pr.fpr.mu ≈ vec(ccy_asset("$(nm)DefaultFactorMu")) rtol = 1e-12
+        @test pr.fpr.sigma ≈ ccy_asset("$(nm)DefaultFactorCov") rtol = 1e-12
+        @test pr.mu ≈ vec(ccy_asset("$(nm)DefaultMu")) rtol = 1e-12
+        # The idiosyncratic variance is a second moment about zero, because the model sets
+        # the mean of the idiosyncratic return to zero (#1373).
+        @test pr.rr.vs[end, :] ≈ vec(ccy_asset("$(nm)DefaultIdioVar")) rtol = 1e-12
+        @test pr.sigma ≈ ccy_asset("$(nm)DefaultSigma") rtol = 1e-12
     end
 
     # Every cluster and every subset must estimate its own factors, so the factors here are

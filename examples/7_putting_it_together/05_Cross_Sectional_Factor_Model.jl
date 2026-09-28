@@ -394,8 +394,8 @@ end
 ### The covariance radius moves the book by degrees
 
 `κ` scales a quadratic penalty on the orthogonal component, so raising it moves the book out of
-the orthogonal subspace one step at a time. The minimum-risk book below starts with 91% of its
-metric-scaled weight outside the factor span and ends with a tenth of a percent of it.
+the orthogonal subspace one step at a time. The minimum-risk book below starts with 89% of its
+metric-scaled weight outside the factor span and ends with 0.15% of it.
 =#
 
 kappa_grid = [0.0, 1.0, 10.0, 100.0, 1_000.0, 10_000.0]
@@ -469,7 +469,7 @@ chi-squared bound on a residual variance measures estimation error, and over thi
 error is small. The fit records how many observations each variance is worth, and the default
 exponentially weighted variance is worth about 115 of them, not the 440 rows of the fit, so the
 bound is wider than the row count suggests. A radius of that size still moves the book very
-little, and the table shows about 89% of the metric-scaled weight still outside the factor span. Reach for `VarianceFraction` when you want the
+little, and the table shows about 87% of the metric-scaled weight still outside the factor span. Reach for `VarianceFraction` when you want the
 book to move, because it is sized against the nominal variance rather than against the sampling
 error. It is also linear in `f`, so the resolved radius of the `f = 0.5` row is five times that of
 the `f = 0.1` row.
@@ -520,7 +520,7 @@ search_cross_validation(strategy, GridSearchCrossValidation(grid; cv = IndexWalk
 The mean set behaves differently. Its penalty is the norm `−κ‖Lᵀw‖`, and a norm is not
 differentiable at zero. Once the radius passes a threshold, the orthogonal component of the book is
 exactly zero, and a larger radius changes nothing. On this sample the threshold is below `0.5`,
-the first radius above zero in the grid. The maximum-return book below pays 5 bp of expected
+the first radius above zero in the grid. The maximum-return book below pays 6 bp of expected
 return for it, and it goes from 10 names to 73.
 =#
 

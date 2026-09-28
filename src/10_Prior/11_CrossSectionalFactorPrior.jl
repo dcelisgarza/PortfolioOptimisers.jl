@@ -7,7 +7,7 @@ The estimator reads per-asset Panel Fields, builds a Factor Exposure from each o
 
 The factor list can also hold observed factors, whose returns the caller observes and the fit does not estimate. A member of [`AbstractObservedExposureEstimator`](@ref) declares them: [`CurrencyExposure`](@ref) gives one Currency Factor per currency, and [`ObservedExposure`](@ref) gives one factor, such as a macro series or an observed market return. Each reads its return from the Exogenous Series `rd.E` by name. The regression reads the returns net of the observed factors: by default the fit derives them as `X - Z_obs * r_obs`, and `lx` can name a Panel Field of net returns the caller measured. [`cross_sectional_local_returns`](@ref) states both paths. Under Currency Factors the net returns are the local returns, and `rd.X` stays in the base currency. The observed factors then join the factor model after the estimated factors, whatever their place in the list, so the factor covariance, `mu`, the scenarios, the factor attribution and the exposure constraints see them, and the Neutralisation and the Factor Family Basis pass them through.
 
-The warm-ups of a fit add up, so a caller who sizes a window must sum three of them rather than take the longest. The longest warm-up of the Descriptors sets the first observation of the factor-return history, and `lag` adds `lag` observations to it. `pe` then warms up over that history, and `ve` over the idiosyncratic returns beside it. A window that covers the Descriptors alone can leave `pe` too few observations to state a factor covariance, and the fit then refuses with a message that names the cause. Cross-validation meets this most often. A fold gives the estimator its own rows alone, so the Descriptors warm up again in every fold, and a rolling train window never grows past the warm-up. Size the train window against the sum of the three warm-ups.
+The warm-ups of a fit add up, so a caller who sizes a window must sum three of them rather than take the longest. The longest warm-up of the Descriptors sets the first observation of the factor-return history, and `lag` adds `lag` observations to it. `pe` then warms up over that history, and `ve` over the idiosyncratic returns beside it. The default `pe` and the default `ve` each need 40 observations, their `min_obs`, so a default fit needs 40 observations after the Descriptor warm-up and the lag. A window that covers the Descriptors alone can leave `pe` too few observations to state a factor covariance, and the fit then refuses with a message that names the cause. Cross-validation meets this most often. A fold gives the estimator its own rows alone, so the Descriptors warm up again in every fold, and a rolling train window never grows past the warm-up. Size the train window against the sum of the three warm-ups.
 
 # Fields
 
@@ -20,8 +20,8 @@ $(DocStringExtensions.FIELDS)
                               families::Option{<:Dict_VecPair} = nothing,
                               cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
                               wa::AbstractCrossSectionalWeightsAlgorithm = MarketCapWeights(),
-                              pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                              ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(),
+                              pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(; me = ExpWeightedExpectedReturns(), ce = RegimeAdjustedExpWeightedCovariance(; centred = true)),
+                              ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(; centred = true),
                               ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(; centred = true),
                               f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                               mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
@@ -117,11 +117,11 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     @fprop wa
     """
-    $(field_dict[:pe]) The fit gives it the reduced factor-return series, so a constrained Factor Family gives it a full-rank covariance.
+    $(field_dict[:pe]) The fit gives it the reduced factor-return series, so a constrained Factor Family gives it a full-rank covariance. The default is an [`EmpiricalPrior`](@ref) of an [`ExpWeightedExpectedReturns`](@ref) and a [`RegimeAdjustedExpWeightedCovariance`](@ref) with `centred = true`. Its half-life is the 40 observations of the default `ve`, so the systematic part and the specific part of `sigma` answer on one horizon, and after a change of regime both of them move. The factor covariance is centred, which is the convention of `ce` and of `ve`.
     """
     @fprop pe
     """
-    $(field_dict[:ve]) [`variance_series`](@ref) on it gives the idiosyncratic variance history, whose last row is the idiosyncratic risk of the latest observation.
+    $(field_dict[:ve]) [`variance_series`](@ref) on it gives the idiosyncratic variance history, whose last row is the idiosyncratic risk of the latest observation. The default is a [`RegimeAdjustedExpWeightedVariance`](@ref) with `centred = true`, which measures the second moment of each idiosyncratic series about zero. The prior states the mean of an asset through the factors alone, so the model sets the mean of the idiosyncratic return to zero, and the specific risk is its second moment. A variance about a running mean would understate it, and would also move the regime multiplier.
     """
     @fprop @vprop ve
     """
@@ -239,8 +239,12 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    families::Option{<:Dict_VecPair} = nothing,
                                    cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
                                    wa::AbstractCrossSectionalWeightsAlgorithm = MarketCapWeights(),
-                                   pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
-                                   ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(),
+                                   pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(;
+                                                                                            me = ExpWeightedExpectedReturns(),
+                                                                                            ce = RegimeAdjustedExpWeightedCovariance(;
+                                                                                                                                     centred = true)),
+                                   ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(;
+                                                                                                       centred = true),
                                    ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(;
                                                                                              centred = true),
                                    f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
