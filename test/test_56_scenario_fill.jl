@@ -326,12 +326,12 @@ end
 @testset "The dilution identity a scenario measure reads" begin
     # THE COST OF THE FILL IS EXACT, and the invented zeros are not the reason a reader might
     # expect: they do not enter the tail, they inflate the denominator. For an admitted column
-    # of coverage `c` whose asset carries at least `ceil(alpha * T)` losses, the measure at
+    # of coverage `c` whose asset carries at least `floor(alpha * T) + 1` losses, the measure at
     # level `alpha` over the FILLED column equals the measure at level `alpha / c` over that
     # column's OBSERVED rows -- to the last bit, because `alpha * T` and `(alpha / c) * (c * T)`
     # are the same count, the same order statistic and the same denominator.
     #
-    # The shares are exact binary fractions so that the two `ceil(Int, alpha * T)` agree
+    # The shares are exact binary fractions so that the two `floor(Int, alpha * T)` agree
     # without a rounding argument. ADR 0118's own illustration is the same statement at
     # `c = 0.3`, where a 5% CVaR is a 16.7% CVaR.
     rngd = StableRNG(13579)
@@ -352,8 +352,9 @@ end
     @test isnothing(PO.investable_mask(prd))
     @test all(iszero, view(prd.X, 1:32, 2))
     observed = Xd[33:Td, 2]
-    # The column carries more than the four losses the identity needs.
-    @test count(<(0), observed) >= ceil(Int, alpha * Td)
+    # The column carries more than the five losses the identity needs: the four of the tail
+    # and the boundary loss, which the tail takes at zero weight.
+    @test count(<(0), observed) >= floor(Int, alpha * Td) + 1
 
     filled_col = reshape(prd.X[:, 2], :, 1)
     obs_col = reshape(observed, :, 1)

@@ -908,8 +908,8 @@ end
     # The view is a constraint on the posterior tail mass, so that mass is what the solve meets.
     @test isapprox(sum(pr.w[i] for i in axes(rd.X, 1) if rd.X[i, 1] <= -var_tgt), 0.05,
                    rtol = 1e-6)
-    # The reported value at risk is a sample order statistic, and the mass lands about `1e-8`
-    # short of `0.05`, which reads one observation further down the tail. `var_view_floor` is
+    # The reported value at risk is a sample order statistic, and a mass of `0.05`, or about
+    # `1e-8` short of it, reads one observation further down the tail. `var_view_floor` is
     # that observation. See issues #573 and #695.
     @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) >= var_view_floor(rd.X[:, 1], var_tgt)
     @test isapprox(pr.w,

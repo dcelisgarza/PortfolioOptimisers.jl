@@ -556,7 +556,7 @@
 
         # The empirical branch is untouched, and the two are different numbers.
         emp = expected_risk(ValueatRisk(; alpha = 0.05), w, pr)
-        @test isapprox(emp, -partialsort(rd.X * w, ceil(Int, 0.05 * size(rd.X, 1))))
+        @test isapprox(emp, -partialsort(rd.X * w, floor(Int, 0.05 * size(rd.X, 1)) + 1))
         @test !isapprox(emp, expected_risk(r, w, pr))
 
         # The range's two legs share one mean term, which cancels in their difference.

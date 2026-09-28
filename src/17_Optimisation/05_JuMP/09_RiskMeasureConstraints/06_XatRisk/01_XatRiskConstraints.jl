@@ -14,13 +14,14 @@ Empirical (MIP) VaR:
 
 ```math
 \\begin{align}
-z_t &\\in \\{0,1\\}, \\quad \\sum_t z_t \\leq \\alpha T, \\quad \\mathrm{VaR} \\geq -\\hat{r}_t - b\\,z_t \\quad \\forall\\, t\\,.
+z_t &\\in \\{0,1\\}, \\quad \\sum_t z_t \\leq (\\alpha + s) T, \\quad \\mathrm{VaR} \\geq -\\hat{r}_t - b\\,z_t \\quad \\forall\\, t\\,.
 \\end{align}
 ```
 
 Where:
 
   - ``z_t \\in \\{0,1\\}``: Binary indicator for tail losses.
+  - $(math_dict[:s_mip_slack])
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
   - ``\\mathrm{VaR}``: Value-at-Risk variable.
@@ -135,12 +136,12 @@ function set_mip_quantile_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
     wi = get_observation_weights(wi, pr.X)
     if isnothing(wi)
         state_set!(model, prefix, keys.cardinality, i,
-                   JuMP.@constraint(model, sc * (sum(z) - alpha * T + s * T) <= 0))
+                   JuMP.@constraint(model, sc * (sum(z) - alpha * T - s * T) <= 0))
     else
         sw = sum(wi)
         state_set!(model, prefix, keys.cardinality, i,
                    JuMP.@constraint(model,
-                                    sc * (LinearAlgebra.dot(wi, z) - alpha * sw + s * sw) <=
+                                    sc * (LinearAlgebra.dot(wi, z) - alpha * sw - s * sw) <=
                                     0))
     end
     state_set!(model, prefix, keys.exceedance, i,
@@ -480,7 +481,7 @@ When one is false, the constant is `1000`, the value that Cajas recommends.
 function mip_big_m(::JuMP.Model, b::Number, s::Number, args...; kwargs...)
     @argcheck(b > s,
               DomainError((b, s),
-                          "`b` is $b and `s` is $s. The big-M constant `b` relaxes a bound the slack `s` tightens, so `b > s` must hold."))
+                          "`b` is $b and `s` is $s. The big-M constant `b` must be larger than the slack `s`."))
     return b
 end
 function mip_big_m(model::JuMP.Model, ::Nothing, ::Number, alg::AbstractRiskSeriesAlgorithm,

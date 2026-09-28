@@ -47,15 +47,15 @@ unique_key_dict!(math_dict, :math_dict,
                  # The conditional tail family of `02_ConditionalXatRisk.jl`. The
                  # value-at-risk and drawdown measures share the tail average and its
                  # sorted form, and the two robust measures share the Esfahani-Kuhn loss.
-                 :nu_ru => "``\\nu``: Rockafellar-Uryasev threshold, the variable the tail average is minimised over. At a minimiser it is the lower ``\\alpha``-quantile of the series.",#
+                 :nu_ru => "``\\nu``: Rockafellar-Uryasev threshold, the variable the tail average is minimised over. The minimisers run from the lower to the upper ``\\alpha``-quantile of the series, which differ when ``\\alpha W_{T}`` is a cumulative weight. Minus the largest minimiser, the upper ``\\alpha``-quantile, is the Value-at-Risk.",#
                  :x_k_sorted => "``x_{(k)}``: ``k``-th smallest entry of the series, and ``w_{(k)}`` its observation weight.",#
                  :W_k_cum => "``W_{k} = \\sum_{j=1}^{k} w_{(j)}``: Cumulative weight of the ``k`` smallest entries, with ``W_{0} = 0``.",#
-                 :k_star_tail => "``k^{\\star} = \\min\\{k : W_{k} \\geq \\alpha W_{T}\\}``: Boundary index, the position of the one entry that the tail holds in part.",#
+                 :k_star_tail => "``k^{\\star} = \\min\\{k : W_{k} > \\alpha W_{T}\\}``: Boundary index, the position of the one entry that the tail holds in part. It is the position of the upper ``\\alpha``-quantile of the series, the order statistic of the Value-at-Risk.",#
                  :W_T_total => "``W_{T} = \\sum_{t=1}^{T} w_{t}``: Total observation weight.",#
                  # The empirical quantile family of `01_XatRisk.jl`: the mixed-integer
                  # programme and the functors select one order statistic by one rule.
-                 :s_mip_slack => "``s``: Cardinality slack of the mixed-integer quantile programme, ``0 < s < \\alpha``.",#
-                 :k_var_mip => "``k = \\min\\{k : W_{k} > (\\alpha - s) W_{T}\\}``: Quantile index, the position of the order statistic that the mixed-integer quantile programme selects.",#
+                 :s_mip_slack => "``s``: Cardinality slack of the mixed-integer quantile programme, ``s > 0``. It absorbs the rounding error of ``\\alpha W_{T}``.",#
+                 :k_var_mip => "``k = \\min\\{k : W_{k} > (\\alpha + s) W_{T}\\}``: Quantile index, the position of the order statistic that the mixed-integer quantile programme selects.",#
                  :l_ek => "``l``: Tail-term weight of the Esfahani-Kuhn loss, ``l > 0``. It does not scale the mean term.",#
                  :tau_ek => "``\\tau``: Esfahani-Kuhn level, the variable the worst-case expected loss is minimised over.",#
                  :pos_part => "``(\\cdot)_{+} = \\max(\\cdot, 0)``: Positive part.",#

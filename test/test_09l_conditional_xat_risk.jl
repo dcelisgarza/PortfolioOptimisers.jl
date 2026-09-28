@@ -20,7 +20,7 @@ end
 function sorted_tail(x, alpha)
     s = sort(x)
     aT = alpha * length(x)
-    k = ceil(Int, aT)
+    k = floor(Int, aT) + 1
     return -(sum(s[1:(k - 1)]) + (aT - (k - 1)) * s[k]) / aT
 end
 # The drawdown series of the definitions, with the running peaks starting at c_0 = 0 and C_0 = 1.

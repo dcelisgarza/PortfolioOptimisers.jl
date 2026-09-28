@@ -1,13 +1,15 @@
 # The quantile measures of `src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl`, checked against the
-# forms their docstrings state: every empirical functor against an independent solve of the
-# mixed-integer programme of Cajas, Equation 7.51, the parametric z-scores against the quantiles
-# of the unit-variance distributions, the models against the functors, and the validation of
-# the constructors.
+# forms their docstrings state: every empirical functor against the definition of Cajas,
+# Equation 7.50, and against an independent solve of the mixed-integer programme of Equation
+# 7.51 with its slack added, the parametric z-scores against the quantiles of the unit-variance
+# distributions, the models against the functors, and the validation of the constructors.
 using Clarabel, Distributions, HiGHS, JuMP
 
 # The minimum of the mixed-integer programme over a loss series `l`, with a big-M constant that
-# fits the losses and a tight integrality tolerance, so that no row is left loose.
-function mip_quantile(l, alpha, s = 1e-5, p = ones(length(l)))
+# fits the losses and a tight integrality tolerance, so that no row is left loose. The solver
+# accepts an indicator within its tolerance of zero as zero, which lowers `r` by up to `b` times
+# that tolerance, so the minimum is read as the largest loss that no indicator exempts.
+function mip_quantile(l, alpha, s = 1e-9, p = ones(length(l)))
     T = length(l)
     m = Model(HiGHS.Optimizer)
     set_silent(m)
@@ -16,11 +18,19 @@ function mip_quantile(l, alpha, s = 1e-5, p = ones(length(l)))
     b = 2 * (maximum(l) - minimum(l)) + 1
     @variable(m, r)
     @variable(m, z[1:T], Bin)
-    @constraint(m, dot(p, z) <= (alpha - s) * sum(p))
+    @constraint(m, dot(p, z) <= (alpha + s) * sum(p))
     @constraint(m, r .>= l .- b .* z)
     @objective(m, Min, r)
     optimize!(m)
-    return value(r)
+    return maximum(l[value.(z) .< 0.5])
+end
+# Equation 7.50, `-inf{x : F(x) > alpha}`, with `F` the weighted distribution function of the
+# returns `x`, read off the sorted sample in exact rational arithmetic, so no slack is needed.
+function upper_quantile(x, alpha, p = ones(Int, length(x)))
+    o = sortperm(x)
+    q = rationalize.(BigInt, p[o])
+    F = cumsum(q) ./ sum(q)
+    return x[o[findfirst(>(rationalize(BigInt, alpha)), F)]]
 end
 # The solver returns an order statistic to a rounding error, and neighbouring order statistics
 # of the samples below differ by far more than this tolerance.
@@ -67,9 +77,12 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
             p[1] = 0.0
             pw = pweights(p)
             p0 = copy(p)
+            # The functor is the definition, Equation 7.50, and the minimum of the programme.
+            @test ValueatRisk(; alpha = alpha)(x) == -upper_quantile(x, alpha)
+            @test ValueatRisk(; alpha = alpha, w = pw)(x) == -upper_quantile(x, alpha, p)
             @test same(ValueatRisk(; alpha = alpha)(x), mip_quantile(-x, alpha))
             @test same(ValueatRisk(; alpha = alpha, w = pw)(x),
-                       mip_quantile(-x, alpha, 1e-5, p))
+                       mip_quantile(-x, alpha, 1e-9, p))
             # Unit weights select the same order statistic as no weights.
             @test ValueatRisk(; alpha = alpha, w = pweights(ones(T)))(x) ==
                   ValueatRisk(; alpha = alpha)(x)
@@ -80,35 +93,64 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
                 @test same(ValueatRiskRange(; alpha = alpha, beta = beta)(x),
                            mip_quantile(-x, alpha) + mip_quantile(x, beta))
                 @test same(ValueatRiskRange(; alpha = alpha, beta = beta, w = pw)(x),
-                           mip_quantile(-x, alpha, 1e-5, p) +
-                           mip_quantile(x, beta, 1e-5, p))
+                           mip_quantile(-x, alpha, 1e-9, p) +
+                           mip_quantile(x, beta, 1e-9, p))
             end
+            @test same(DrawdownatRisk(; alpha = alpha)(x),
+                       -upper_quantile(abs_dd(x), alpha))
             @test same(DrawdownatRisk(; alpha = alpha)(x), mip_quantile(-abs_dd(x), alpha))
             @test same(DrawdownatRisk(; alpha = alpha, w = pw)(x),
-                       mip_quantile(-abs_dd(x), alpha, 1e-5, p))
+                       mip_quantile(-abs_dd(x), alpha, 1e-9, p))
             @test same(DrawdownatRisk(; alpha = alpha, s = 0.015)(x),
                        mip_quantile(-abs_dd(x), alpha, 0.015))
             @test same(RelativeDrawdownatRisk(; alpha = alpha)(x),
                        mip_quantile(-rel_dd(x), alpha))
             @test same(RelativeDrawdownatRisk(; alpha = alpha, w = pw)(x),
-                       mip_quantile(-rel_dd(x), alpha, 1e-5, p))
+                       mip_quantile(-rel_dd(x), alpha, 1e-9, p))
+            # The CVaR is the VaR plus the mean excess over it, so minus the VaR minimises the
+            # objective of Rockafellar and Uryasev. The losses above the VaR hold alpha T of
+            # the weight at an integer alpha T, so their mean is the CVaR (#1364).
+            v = ValueatRisk(; alpha = alpha)(x)
+            @test ConditionalValueatRisk(; alpha = alpha)(x) ≈
+                  v + sum(max.(-x .- v, 0)) / (alpha * T)
+            vw = ValueatRisk(; alpha = alpha, w = pw)(x)
+            @test ConditionalValueatRisk(; alpha = alpha, w = pw)(x) ≈
+                  vw + dot(p, max.(-x .- vw, 0)) / (alpha * sum(p))
+            vd = DrawdownatRisk(; alpha = alpha)(x)
+            @test ConditionalDrawdownatRisk(; alpha = alpha)(x) ≈
+                  vd + sum(max.(-abs_dd(x) .- vd, 0)) / (alpha * T)
+            if isinteger(round(alpha * T; digits = 8))
+                @test ConditionalValueatRisk(; alpha = alpha)(x) ≈ mean(-x[-x .> v])
+            end
             # No functor writes its input or the weights it holds.
             @test x == x0
             @test p == p0
         end
     end
-    @testset "Without weights the index is the ceiling of alpha T" begin
-        # `alpha * T` rounds above the integer at 0.07 * 100, and the slack absorbs it, so every
-        # level on a grid of hundredths selects the order statistic that its decimal value names.
+    @testset "Without weights the index is the floor of alpha T plus one" begin
+        # `alpha * T` rounds below the integer at 0.29 * 100, and the slack absorbs it, so every
+        # level on a grid of hundredths selects the order statistic after the one that its
+        # decimal value names.
         x = collect(range(-0.05, 0.05; length = 100)) .+ 0.0001 .* sin.(1:100)
         s = sort(x)
         for j in 1:99
-            @test ValueatRisk(; alpha = j / 100)(x) == -s[j]
+            @test ValueatRisk(; alpha = j / 100)(x) == -s[j + 1]
         end
+        @test 0.29 * 100 < 29
         @test 0.07 * 100 > 7
         # A fractional alpha T takes the next order statistic.
         x = collect(range(-0.05, 0.05; length = 37))
         @test ValueatRisk(; alpha = 0.1)(x) == -sort(x)[4]
+        # At alpha T = 1 the measure is the second largest loss, so it stays below the tail
+        # mean, which is the largest loss (#1364).
+        x = collect(range(-0.05, 0.05; length = 100))
+        @test ValueatRisk(; alpha = 0.01)(x) == -sort(x)[2]
+        @test ValueatRisk(; alpha = 0.01)(x) < ConditionalValueatRisk(; alpha = 0.01)(x)
+        # A slack of the old default moves the index at a non-integer alpha T once s T >= 1.
+        x = collect(range(-1.0, 1.0; length = 100_000))
+        @test ValueatRisk(; alpha = 0.050005)(x) == -sort(x)[5001]
+        @test ValueatRisk(; alpha = 0.050005, alg = MIPValueatRisk(; s = 1e-5))(x) ==
+              -sort(x)[5002]
         # The absolute and relative drawdowns follow their definitions.
         x = [0.01, -0.02, 0.005, -0.03, 0.04, -0.01]
         @test PortfolioOptimisers.absolute_drawdown_vec(x) ≈ abs_dd(x)
@@ -118,8 +160,8 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
     @testset "The defaults of the big-M constant and the slack" begin
         PO = PortfolioOptimisers
         # A `nothing` constant passes on, for the builder to derive from the data.
-        @test PO.mip_var_bounds(nothing, nothing) === (nothing, 1e-5)
-        @test PO.mip_var_bounds(2.0, nothing) == (2.0, 1e-5)
+        @test PO.mip_var_bounds(nothing, nothing) === (nothing, 1e-9)
+        @test PO.mip_var_bounds(2.0, nothing) == (2.0, 1e-9)
         @test PO.mip_var_bounds(nothing, 0.01) === (nothing, 0.01)
     end
     @testset "The bound on the gross exposure" begin
@@ -160,8 +202,10 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
         tslv = Solver(; name = :highs, solver = HiGHS.Optimizer,
                       settings = merge(opts, Dict("mip_feasibility_tolerance" => 1e-9)))
         # With b = 1000 the default tolerance of 1e-6 left these three about 1e-4 apart (#1323).
-        for r in (ValueatRisk(; alpha = 0.29), DrawdownatRisk(; alpha = 0.29),
-                  ValueatRiskRange(; alpha = 0.29, beta = 0.1))
+        # The levels exempt the 28 and 9 observations of that measurement. A range that exempts
+        # 10 gain observations, as beta = 0.1 now does, takes HiGHS twice as long (#1364).
+        for r in (ValueatRisk(; alpha = 0.285), DrawdownatRisk(; alpha = 0.285),
+                  ValueatRiskRange(; alpha = 0.285, beta = 0.095))
             sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
                                     opt = JuMPOptimiser(; pe = pr, slv = slv)))
             tsol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
