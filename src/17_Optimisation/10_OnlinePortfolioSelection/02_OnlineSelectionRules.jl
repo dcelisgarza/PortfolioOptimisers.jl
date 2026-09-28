@@ -63,11 +63,11 @@ BuyAndHold
 
   - $(ref_dict[:lihoi2014])
 """
-struct BuyAndHold{T1 <: EuclideanProjection} <: AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct BuyAndHold <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:proj])
     """
-    proj::T1
+    proj
     function BuyAndHold(proj::EuclideanProjection)
         return new{typeof(proj)}(proj)
     end
@@ -160,17 +160,15 @@ ConstantRebalancedPortfolio
 
   - $(ref_dict[:cover1991])
 """
-struct ConstantRebalancedPortfolio{T1 <: Option{<:AbstractVector},
-                                   T2 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct ConstantRebalancedPortfolio <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The target ``\\boldsymbol{b}``, the allocation that the rule rebalances to every period, over the pinned universe. A `nothing` value is the uniform allocation.
     """
-    w::T1
+    w
     """
     $(field_dict[:proj])
     """
-    proj::T2
+    proj
     function ConstantRebalancedPortfolio(w::Option{<:AbstractVector},
                                          proj::EuclideanProjection)
         if !isnothing(w)
@@ -329,25 +327,23 @@ NewtonStep
 
   - $(ref_dict[:agarwal2006])
 """
-struct NewtonStep{T1 <: Real, T2 <: Real, T3 <: Real,
-                  T4 <: Union{<:EuclideanProjection, <:GramProjection}} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct NewtonStep <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The trade-off parameter ``\\beta``, which scales the gradient sum.
     """
-    beta::T1
+    beta
     """
     The scale ``\\delta`` of the Newton direction.
     """
-    delta::T2
+    delta
     """
     The shrinkage ``\\eta`` of the Newton point towards the uniform allocation before the projection, in `[0, 1)`. At `0` the rule is the algorithm of [agarwal2006](@cite).
     """
-    eta::T3
+    eta
     """
     $(field_dict[:proj])
     """
-    proj::T4
+    proj
     function NewtonStep(beta::T1, delta::T2, eta::T3,
                         proj::T4) where {T1 <: Real, T2 <: Real, T3 <: Real,
                                          T4 <:
@@ -538,11 +534,11 @@ LinearSlack
 
   - $(ref_dict[:li2012pamr])
 """
-struct LinearSlack{T1 <: Real} <: AbstractPassiveAggressiveSlack
+@concrete struct LinearSlack <: AbstractPassiveAggressiveSlack
     """
     The aggressiveness ``C``, the cap on the step.
     """
-    C::T1
+    C
     function LinearSlack(C::Real)
         @argcheck(C > zero(C), DomainError(C, "C must be positive"))
         return new{typeof(C)}(C)
@@ -609,11 +605,11 @@ QuadraticSlack
 
   - $(ref_dict[:li2012pamr])
 """
-struct QuadraticSlack{T1 <: Real} <: AbstractPassiveAggressiveSlack
+@concrete struct QuadraticSlack <: AbstractPassiveAggressiveSlack
     """
     The aggressiveness ``C``, which softens the denominator.
     """
-    C::T1
+    C
     function QuadraticSlack(C::Real)
         @argcheck(C > zero(C), DomainError(C, "C must be positive"))
         return new{typeof(C)}(C)
@@ -764,21 +760,19 @@ PassiveAggressiveMeanReversion
 
   - $(ref_dict[:li2012pamr])
 """
-struct PassiveAggressiveMeanReversion{T1 <: Real, T2 <: AbstractPassiveAggressiveSlack,
-                                      T3 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct PassiveAggressiveMeanReversion <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The reversion threshold ``\\epsilon``. The rule moves only when the gross return of the last period is above it.
     """
-    eps::T1
+    eps
     """
     The step-length rule. It is one of the three variants of [li2012pamr](@cite).
     """
-    slack::T2
+    slack
     """
     $(field_dict[:proj])
     """
-    proj::T3
+    proj
     function PassiveAggressiveMeanReversion(eps::Real,
                                             slack::AbstractPassiveAggressiveSlack,
                                             proj::EuclideanProjection)
@@ -1059,35 +1053,31 @@ ExpertMixture
   - $(ref_dict[:zhang2018ader])
   - $(ref_dict[:zhao2020sword])
 """
-struct ExpertMixture{T1 <: AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm},
-                     T2 <: AbstractOnlinePortfolioSelectionAlgorithm,
-                     T3 <: Option{<:BoundedAllocationSet}, T4 <: EuclideanProjection,
-                     T5 <: Union{OwnPoint, BlendPoint}, T6 <: Option{<:AbstractVector}} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct ExpertMixture <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The expert rules, one Rule State each.
     """
-    experts::T1
+    experts
     """
     The weighting, a rule of the family that reads the expert-return vector in place of the price relative.
     """
-    alg::T2
+    alg
     """
     The Expert Set that the weighting projects onto, over the experts, or `nothing` for the bare simplex over them.
     """
-    eset::T3
+    eset
     """
     The geometry of the second projection, which projects the blend onto the head's Allocation Set.
     """
-    proj::T4
+    proj
     """
     The Gradient Point, where every first-order expert reads its gradient.
     """
-    grad::T5
+    grad
     """
     The Start Allocation over the experts, projected onto the Expert Set at the seed, or `nothing` for the uniform one.
     """
-    p0::T6
+    p0
     function ExpertMixture(experts::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm},
                            alg::AbstractOnlinePortfolioSelectionAlgorithm,
                            eset::Option{<:BoundedAllocationSet}, proj::EuclideanProjection,

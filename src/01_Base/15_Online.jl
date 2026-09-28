@@ -1274,15 +1274,15 @@ Online
   - [`OnlineDateWalkForward`](@ref)
   - [`OnlineHindsightSplit`](@ref)
 """
-struct Online{T1, T2} <: AbstractEstimator
+@concrete struct Online <: AbstractEstimator
     """
     Estimator that the wrapper seeds a buffer into. The field takes this value after the wrapper resolves.
     """
-    est::T1
+    est
     """
     $(field_dict[:pf_max_history])
     """
-    max_history::T2
+    max_history
     function Online(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator};
                     max_history::Option{<:Integer} = nothing)
         @argcheck(hasfield(typeof(est), :cache),

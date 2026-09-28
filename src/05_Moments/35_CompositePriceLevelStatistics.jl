@@ -57,16 +57,15 @@ TruncatedExponentialMovingAverage
 
   - $(ref_dict[:dai2022tppt]) Equation (7) and Algorithm 1.
 """
-struct TruncatedExponentialMovingAverage{T1 <: Real, T2 <: Integer} <:
-       AbstractPriceLevelStatistic
+@concrete struct TruncatedExponentialMovingAverage <: AbstractPriceLevelStatistic
     """
     The smoothing weight on the current level, `0 < alpha <= 1`.
     """
-    alpha::T1
+    alpha
     """
     $(field_dict[:price_window])
     """
-    window::T2
+    window
     function TruncatedExponentialMovingAverage(alpha::Real, window::Integer)
         @argcheck(zero(alpha) < alpha <= one(alpha),
                   DomainError(alpha, "alpha must be in (0, 1]"))
@@ -148,15 +147,15 @@ GaussianWeightedDoubleEstimate
 
   - $(ref_dict[:caiye2019]) Equations (2) to (6).
 """
-struct GaussianWeightedDoubleEstimate{T1 <: Real, T2 <: Real} <: AbstractPriceLevelStatistic
+@concrete struct GaussianWeightedDoubleEstimate <: AbstractPriceLevelStatistic
     """
     The width of the Gaussian, in periods.
     """
-    tau::T1
+    tau
     """
     The weight below which a level leaves the window.
     """
-    cutoff::T2
+    cutoff
     function GaussianWeightedDoubleEstimate(tau::Real, cutoff::Real)
         @argcheck(tau > zero(tau), DomainError(tau, "tau must be positive"))
         @argcheck(zero(cutoff) < cutoff < one(cutoff),
@@ -279,11 +278,11 @@ PairwiseSlopeSum
 
   - $(ref_dict[:dai2022tppt]) Equations (6) and (7).
 """
-struct PairwiseSlopeSum{T1 <: Integer} <: AbstractTrendTest
+@concrete struct PairwiseSlopeSum <: AbstractTrendTest
     """
     $(field_dict[:price_window])
     """
-    window::T1
+    window
     function PairwiseSlopeSum(window::Integer)
         assert_price_window(window)
         return new{typeof(window)}(window)
@@ -388,19 +387,19 @@ RegressionSlope
 
   - $(ref_dict[:guanan2019]) Equations (3) and (4).
 """
-struct RegressionSlope{T1 <: Integer, T2 <: Real, T3 <: Real} <: AbstractTrendTest
+@concrete struct RegressionSlope <: AbstractTrendTest
     """
     $(field_dict[:price_window])
     """
-    window::T1
+    window
     """
     The slope above which an asset is rising.
     """
-    threshold::T2
+    threshold
     """
     The ridge weight on the slope, `0` for plain least squares.
     """
-    lambda::T3
+    lambda
     function RegressionSlope(window::Integer, threshold::Real, lambda::Real)
         assert_price_window(window)
         @argcheck(lambda >= zero(lambda),
@@ -499,25 +498,23 @@ TrendSwitch
   - $(ref_dict[:dai2022tppt]) Equation (7).
   - $(ref_dict[:guanan2019]) Equations (5) and (6).
 """
-struct TrendSwitch{T1 <: AbstractTrendTest, T2 <: AbstractPriceLevelStatistic,
-                   T3 <: AbstractPriceLevelStatistic, T4 <: AbstractPriceLevelStatistic} <:
-       AbstractPriceLevelStatistic
+@concrete struct TrendSwitch <: AbstractPriceLevelStatistic
     """
     The per-asset trend test.
     """
-    test::T1
+    test
     """
     The statistic of a rising asset.
     """
-    rising::T2
+    rising
     """
     The statistic of a flat asset.
     """
-    flat::T3
+    flat
     """
     The statistic of a falling asset.
     """
-    falling::T4
+    falling
     function TrendSwitch(test::AbstractTrendTest, rising::AbstractPriceLevelStatistic,
                          flat::AbstractPriceLevelStatistic,
                          falling::AbstractPriceLevelStatistic)
@@ -661,20 +658,19 @@ CompositeTrend
 
   - $(ref_dict[:lai2018aictr]) Equations (9) to (12) and (15).
 """
-struct CompositeTrend{T1 <: AbstractVector{<:AbstractPriceLevelStatistic}, T2 <: Integer,
-                      T3 <: Real} <: AbstractPriceLevelStatistic
+@concrete struct CompositeTrend <: AbstractPriceLevelStatistic
     """
     The trend statistics that the composite mixes, one forecast each.
     """
-    trends::T1
+    trends
     """
     The number of periods over which the back-test scores the trend portfolios to choose the centre.
     """
-    window::T2
+    window
     """
     The squared width of the radial basis function over the trend portfolios.
     """
-    sigma2::T3
+    sigma2
     function CompositeTrend(trends::AbstractVector{<:AbstractPriceLevelStatistic},
                             window::Integer, sigma2::Real)
         @argcheck(!isempty(trends), IsEmptyError("trends must hold at least one statistic"))
@@ -794,24 +790,23 @@ ElasticNetPath
   - $(ref_dict[:zouhastie2005])
   - $(ref_dict[:lai2018ktpt]) Equation (15).
 """
-struct ElasticNetPath{T1 <: Real, T2 <: Real, T3 <: Integer, T4 <: Real} <:
-       AbstractAlgorithm
+@concrete struct ElasticNetPath <: AbstractAlgorithm
     """
     The share of the ``L_1`` penalty, `1` for the lasso.
     """
-    theta::T1
+    theta
     """
     The floor of the path as a fraction of the strength above which every coefficient is zero.
     """
-    ratio::T2
+    ratio
     """
     Maximum number of coordinate-descent sweeps. Each sweep ends with the exact solve on its sign pattern.
     """
-    iters::T3
+    iters
     """
     Tolerance on the largest change of a coefficient over one sweep. The sweeps stop below it when no exact solve has given the optimum.
     """
-    tol::T4
+    tol
     function ElasticNetPath(theta::Real, ratio::Real, iters::Integer, tol::Real)
         @argcheck(zero(theta) < theta <= one(theta),
                   DomainError(theta, "theta must be in (0, 1]"))
@@ -1104,20 +1099,19 @@ KernelTrendPattern
 
   - $(ref_dict[:lai2018ktpt]) Equations (11) to (16) and (26) to (31), Algorithm 1.
 """
-struct KernelTrendPattern{T1 <: Integer, T2 <: Real, T3 <: ElasticNetPath} <:
-       AbstractPriceLevelStatistic
+@concrete struct KernelTrendPattern <: AbstractPriceLevelStatistic
     """
     $(field_dict[:price_window])
     """
-    window::T1
+    window
     """
     The weight of the window peak in the initial state. The previous prediction takes the rest.
     """
-    nu::T2
+    nu
     """
     The elastic-net path of the intermediate state.
     """
-    path::T3
+    path
     function KernelTrendPattern(window::Integer, nu::Real, path::ElasticNetPath)
         assert_price_window(window)
         @argcheck(zero(nu) <= nu <= one(nu), DomainError(nu, "nu must be in [0, 1]"))

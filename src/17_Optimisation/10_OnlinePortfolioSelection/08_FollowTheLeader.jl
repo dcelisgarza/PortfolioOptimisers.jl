@@ -152,11 +152,11 @@ LastRows
   - $(ref_dict[:gaivoronski2000])
   - $(ref_dict[:lihoi2014]) Section 3.2.3.
 """
-struct LastRows{T1 <: Integer} <: AbstractSampleSelector
+@concrete struct LastRows <: AbstractSampleSelector
     """
     The number of rows of the window.
     """
-    W::T1
+    W
     function LastRows(W::Integer)
         @argcheck(W >= 1, DomainError(W, "W must be at least 1"))
         return new{typeof(W)}(W)
@@ -374,16 +374,15 @@ HistogramMatch
   - $(ref_dict[:gyorfischafer2003])
   - $(ref_dict[:lihoi2014]) Section 3.4.1.
 """
-struct HistogramMatch{T1 <: Integer, T2 <: AbstractVector{<:Real}} <:
-       AbstractPatternMatchSelector
+@concrete struct HistogramMatch <: AbstractPatternMatchSelector
     """
     The number of rows of the windows compared.
     """
-    window::T1
+    window
     """
     The cell boundaries of every entry's binning, increasing.
     """
-    edges::T2
+    edges
     function HistogramMatch(window::Integer, edges::AbstractVector{<:Real})
         assert_pattern_window(window)
         @argcheck(!isempty(edges), IsEmptyError("edges cannot be empty"))
@@ -485,15 +484,15 @@ KernelMatch
   - $(ref_dict[:ottucsakvajda2007])
   - $(ref_dict[:gyorfivajda2008])
 """
-struct KernelMatch{T1 <: Integer, T2 <: Real} <: AbstractPatternMatchSelector
+@concrete struct KernelMatch <: AbstractPatternMatchSelector
     """
     The number of rows of the windows compared.
     """
-    window::T1
+    window
     """
     The radius of the uniform kernel, in the Euclidean norm of the concatenated windows.
     """
-    radius::T2
+    radius
     function KernelMatch(window::Integer, radius::Real)
         assert_pattern_window(window)
         @argcheck(isfinite(radius) && radius > zero(radius),
@@ -570,15 +569,15 @@ NearestNeighbourMatch
 
   - $(ref_dict[:gyorfi2008])
 """
-struct NearestNeighbourMatch{T1 <: Integer, T2 <: Real} <: AbstractPatternMatchSelector
+@concrete struct NearestNeighbourMatch <: AbstractPatternMatchSelector
     """
     The number of rows of the windows compared.
     """
-    window::T1
+    window
     """
     The number of neighbours to keep, an `Integer` count or a fraction in `(0, 1)` of the candidate rows.
     """
-    neighbours::T2
+    neighbours
     function NearestNeighbourMatch(window::Integer, neighbours::Real)
         assert_pattern_window(window)
         if isa(neighbours, Integer)
@@ -697,15 +696,15 @@ CorrelationMatch
   - $(ref_dict[:li2011corn]) Equation 6, Algorithms 1 to 3 and Section 5.2.
   - $(ref_dict[:wang2018racorn]) Equation 3.
 """
-struct CorrelationMatch{T1 <: Integer, T2 <: Real} <: AbstractPatternMatchSelector
+@concrete struct CorrelationMatch <: AbstractPatternMatchSelector
     """
     The number of rows of the windows compared.
     """
-    window::T1
+    window
     """
     The correlation threshold a candidate window must reach.
     """
-    rho::T2
+    rho
     function CorrelationMatch(window::Integer, rho::Real)
         assert_pattern_window(window)
         @argcheck(-one(rho) <= rho <= one(rho), DomainError(rho, "rho must lie in [-1, 1]"))
@@ -791,16 +790,15 @@ julia> ClusterMatch(; clusterer = ClustersEstimator()).window
 
   - $(ref_dict[:khedmatiazin2020])
 """
-struct ClusterMatch{T1 <: Integer, T2 <: AbstractClustersEstimator} <:
-       AbstractPatternMatchSelector
+@concrete struct ClusterMatch <: AbstractPatternMatchSelector
     """
     The number of rows of the windows compared.
     """
-    window::T1
+    window
     """
     The clustering estimator that partitions the windows.
     """
-    clusterer::T2
+    clusterer
     function ClusterMatch(window::Integer, clusterer::AbstractClustersEstimator)
         assert_pattern_window(window)
         return new{typeof(window), typeof(clusterer)}(window, clusterer)
@@ -848,20 +846,25 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
   - [`AbstractAllocationSet`](@ref)
   - [`investable_reduction`](@ref): the reduction that views this constraint with the held optimiser.
 """
-struct AllocationSetConstraint{T1 <: AbstractAllocationSet, T2 <: AbstractVector,
-                               T3 <: Option{<:ReturnsResult}} <: CustomJuMPConstraint
+@concrete struct AllocationSetConstraint <: CustomJuMPConstraint
     """
     The Allocation Set, resolved over the pinned universe.
     """
-    set::T1
+    set
     """
     The Price-Adjusted Allocation the step trades from.
     """
-    w::T2
+    w
     """
     The rows that the head holds through the period, as a [`ReturnsResult`](@ref), or `nothing`.
     """
-    X::T3
+    X
+    function AllocationSetConstraint(set::T1, w::T2,
+                                     X::T3) where {T1 <: AbstractAllocationSet,
+                                                   T2 <: AbstractVector,
+                                                   T3 <: Option{<:ReturnsResult}}
+        return new{T1, T2, T3}(set, w, X)
+    end
 end
 function add_custom_constraint!(model::JuMP.Model, ccnt::AllocationSetConstraint, ::Any,
                                 ::Any)::Nothing
@@ -1023,25 +1026,23 @@ FollowTheLeader
   - $(ref_dict[:li2011corn])
   - $(ref_dict[:khedmatiazin2020])
 """
-struct FollowTheLeader{T1 <: AbstractSampleSelector, T2 <: LeaderOptimiser, T3 <: Real,
-                       T4 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct FollowTheLeader <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The Sample Selector that names the rows the estimator re-solves on.
     """
-    sel::T1
+    sel
     """
     The optimisation estimator re-solved on the selected rows.
     """
-    opt::T2
+    opt
     """
     The damping towards the held allocation, in `[0, 1]`. At `0` the rule plays the leader.
     """
-    gamma::T3
+    gamma
     """
     $(field_dict[:proj])
     """
-    proj::T4
+    proj
     function FollowTheLeader(sel::T1, opt::T2, gamma::T3,
                              proj::T4) where {T1 <: AbstractSampleSelector,
                                               T2 <: LeaderOptimiser, T3 <: Real,
@@ -1613,30 +1614,27 @@ FollowTheLeadingHistory
 
   - $(ref_dict[:hazanseshadhri2009]) Algorithm 1, Lemmas 3.1 and 3.2, and Appendix A.
 """
-struct FollowTheLeadingHistory{T1 <: AbstractOnlinePortfolioSelectionAlgorithm, T2 <: Real,
-                               T3 <: Bool, T4 <: Option{<:BoundedAllocationSet},
-                               T5 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct FollowTheLeadingHistory <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The base rule every expert is a copy of.
     """
-    alg::T1
+    alg
     """
     The exponent of the multiplicative update, ``\\alpha`` in [hazanseshadhri2009](@cite). At `1` the update is the wealth weighting.
     """
-    alpha::T2
+    alpha
     """
     Whether the rule prunes the working set to the streaming set of logarithmic size of [hazanseshadhri2009](@cite).
     """
-    prune::T3
+    prune
     """
     The Expert Set onto which the rule projects the weight vector, a scalar bound over the live experts, or `nothing` for the bare simplex over them.
     """
-    eset::T4
+    eset
     """
     The geometry of the last projection of the blend onto the head's Allocation Set.
     """
-    proj::T5
+    proj
     function FollowTheLeadingHistory(alg::AbstractOnlinePortfolioSelectionAlgorithm,
                                      alpha::Real, prune::Bool,
                                      eset::Option{<:BoundedAllocationSet},

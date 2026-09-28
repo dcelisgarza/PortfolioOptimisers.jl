@@ -65,11 +65,11 @@ RankOneCovariance
 
   - $(ref_dict[:lai2020spolc]) Algorithm 1 and equations 42 to 49.
 """
-struct RankOneCovariance{T1 <: Real} <: AbstractCovarianceEstimator
+@concrete struct RankOneCovariance <: AbstractCovarianceEstimator
     """
     Number added to every entry of the returns to form the price relatives ``\\mathbf{X}``. The default `1` turns returns into price relatives, which the estimate reads, and `0` decomposes the rows as given.
     """
-    shift::T1
+    shift
     function RankOneCovariance(shift::Real)
         @argcheck(isfinite(shift), DomainError(shift, "shift must be finite"))
         return new{typeof(shift)}(shift)

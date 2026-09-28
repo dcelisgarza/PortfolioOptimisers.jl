@@ -86,12 +86,11 @@ PriorExpectedReturns
   - [`PriceLevelExpectedReturns`](@ref)
   - [`ForecastReversion`](@ref)
 """
-struct PriorExpectedReturns{T1 <: AbstractPriorEstimator} <:
-       AbstractExpectedReturnsEstimator
+@concrete struct PriorExpectedReturns <: AbstractExpectedReturnsEstimator
     """
     The prior estimator whose `mu` is the expected return.
     """
-    pe::T1
+    pe
     function PriorExpectedReturns(pe::AbstractPriorEstimator)
         @argcheck(needs_factor_returns(pe) !== true,
                   ArgumentError("`$(typeof(pe).name.name)` requires factor returns, and an expected-returns estimator is fitted on returns alone: no `me` slot in the library carries a factor matrix. Hand the adapter a prior that fits on returns, or one whose factor argument is optional."))

@@ -51,27 +51,27 @@ ClusterNode
   - $(ref_dict[:virtanen2020])
   - $(ref_dict[:cajas2025]) Section 12.1.1, Equation 12.5.
 """
-struct ClusterNode{tid, tl, tr, td, tcnt} <: AbstractResult
+@concrete struct ClusterNode <: AbstractResult
     """
     $(field_dict[:id_node])
     """
-    id::tid
+    id
     """
     $(field_dict[:left_node])
     """
-    left::tl
+    left
     """
     $(field_dict[:right_node])
     """
-    right::tr
+    right
     """
     $(field_dict[:height_node])
     """
-    height::td
+    height
     """
     $(field_dict[:level_node])
     """
-    level::tcnt
+    level
     function ClusterNode(id, left::Option{<:ClusterNode} = nothing,
                          right::Option{<:ClusterNode} = nothing, height::Number = 0.0,
                          level::Int = 1)

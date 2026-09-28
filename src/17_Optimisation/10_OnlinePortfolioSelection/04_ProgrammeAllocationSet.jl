@@ -786,11 +786,11 @@ TsallisProjection
   - $(ref_dict[:abernethy2015])
   - $(ref_dict[:zimmertseldin2021])
 """
-struct TsallisProjection{T1 <: Real} <: AbstractProjectionGeometry
+@concrete struct TsallisProjection <: AbstractProjectionGeometry
     """
     The power of the potential, in `(0, 1)`.
     """
-    alpha::T1
+    alpha
     function TsallisProjection(alpha::Real)
         @argcheck(zero(alpha) < alpha < one(alpha),
                   DomainError(alpha, "alpha must be in (0, 1)"))

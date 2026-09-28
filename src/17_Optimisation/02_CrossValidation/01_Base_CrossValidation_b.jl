@@ -359,35 +359,35 @@ $(DocStringExtensions.FIELDS)
   - [`TimeDependentContext`](@ref)
   - [`fit_and_predict`](@ref)
 """
-struct Fold{T1, T2, T3, T4, T5, T6, T7}
+@concrete struct Fold
     """
     Index of the fold within the scheme's `split` enumeration (1-based).
     """
-    i::T1
+    i
     """
     Number of folds in the enumeration.
     """
-    n::T2
+    n
     """
     The fold's resolved estimator: asset-viewed, schedule-swapped, weights-threaded.
     """
-    est::T3
+    est
     """
     The fold's (possibly asset-viewed) input data.
     """
-    rd::T4
+    rd
     """
     The fold's training indices, or `nothing` when the estimator holds its window.
     """
-    train::T5
+    train
     """
     The fold's test indices.
     """
-    test::T6
+    test
     """
     The previous weights threaded into `est`, or `nothing` when there are none.
     """
-    w_prev::T7
+    w_prev
 end
 """
     folds_are_time_ordered(cv)

@@ -463,26 +463,23 @@ ForecastReversion
   - $(ref_dict[:caiye2019])
   - $(ref_dict[:guanan2019])
 """
-struct ForecastReversion{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real,
-                         T3 <: Option{<:AbstractPriceLevelStatistic},
-                         T4 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct ForecastReversion <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:forecaster])
     """
-    me::T1
+    me
     """
     Target of the forecast return. A larger target gives a longer step.
     """
-    eps::T2
+    eps
     """
     The statistic whose Price Relative Forecast preconditions the step, or `nothing` for the identity.
     """
-    scale::T3
+    scale
     """
     $(field_dict[:proj])
     """
-    proj::T4
+    proj
     function ForecastReversion(me::AbstractExpectedReturnsEstimator, eps::Real,
                                scale::Option{<:AbstractPriceLevelStatistic},
                                proj::EuclideanProjection)
@@ -880,21 +877,19 @@ ForecastTracking
   - $(ref_dict[:lai2018aictr])
   - $(ref_dict[:dai2022tppt])
 """
-struct ForecastTracking{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real,
-                        T3 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct ForecastTracking <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:forecaster])
     """
-    me::T1
+    me
     """
     Euclidean length of the step along the centred forecast.
     """
-    eps::T2
+    eps
     """
     $(field_dict[:proj])
     """
-    proj::T3
+    proj
     function ForecastTracking(me::AbstractExpectedReturnsEstimator, eps::Real,
                               proj::EuclideanProjection)
         assert_forecaster(me)
@@ -1160,25 +1155,23 @@ KernelTrendTracking
 
   - $(ref_dict[:lai2018ktpt])
 """
-struct KernelTrendTracking{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real, T3 <: Real,
-                           T4 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct KernelTrendTracking <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:forecaster])
     """
-    me::T1
+    me
     """
     Rate of the step on the centred forecast after the kernel scales it.
     """
-    eta::T2
+    eta
     """
     Shape of the kernel. The kernel raises the distance between the centred weight and the centred forecast of an asset to the power `1 / q`, so a larger `q` gives a flatter similarity.
     """
-    q::T3
+    q
     """
     $(field_dict[:proj])
     """
-    proj::T4
+    proj
     function KernelTrendTracking(me::AbstractExpectedReturnsEstimator, eta::Real, q::Real,
                                  proj::EuclideanProjection)
         assert_forecaster(me)
@@ -1362,25 +1355,23 @@ TransactionCostOptimisation
   - $(ref_dict[:li2018tco])
   - $(ref_dict[:moon2019])
 """
-struct TransactionCostOptimisation{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real,
-                                   T3 <: Real, T4 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct TransactionCostOptimisation <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:forecaster])
     """
-    me::T1
+    me
     """
     Step size of the linearised step. It also scales the soft threshold.
     """
-    eta::T2
+    eta
     """
     Proportional transaction cost rate. The soft threshold is `10 * eta * gamma`.
     """
-    gamma::T3
+    gamma
     """
     $(field_dict[:proj])
     """
-    proj::T4
+    proj
     function TransactionCostOptimisation(me::AbstractExpectedReturnsEstimator, eta::Real,
                                          gamma::Real, proj::EuclideanProjection)
         assert_forecaster(me)
@@ -1548,26 +1539,23 @@ ShortTermSparsePortfolio
 
   - $(ref_dict[:lai2018sspo])
 """
-struct ShortTermSparsePortfolio{T1 <: AbstractExpectedReturnsEstimator,
-                                T2 <: AbstractSparsePortfolioAlgorithm, T3 <: Real,
-                                T4 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct ShortTermSparsePortfolio <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:forecaster])
     """
-    me::T1
+    me
     """
     Algorithm that finds the iterate.
     """
-    alg::T2
+    alg
     """
     Scale of the iterate before the projection.
     """
-    zeta::T3
+    zeta
     """
     $(field_dict[:proj])
     """
-    proj::T4
+    proj
     function ShortTermSparsePortfolio(me::AbstractExpectedReturnsEstimator,
                                       alg::AbstractSparsePortfolioAlgorithm, zeta::Real,
                                       proj::EuclideanProjection)

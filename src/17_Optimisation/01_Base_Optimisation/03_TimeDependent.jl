@@ -117,14 +117,11 @@ PreviousWeightsFunction
   - [`TimeDependentContext`](@ref)
   - [`needs_previous_weights`](@ref)
 """
-struct PreviousWeightsFunction{T} <: AbstractAlgorithm
+@concrete struct PreviousWeightsFunction <: AbstractAlgorithm
     """
     Callable evaluated per fold as `f(ctx::TimeDependentContext)`, returning the fold's field value.
     """
-    f::T
-    function PreviousWeightsFunction(f)
-        return new{typeof(f)}(f)
-    end
+    f
 end
 function PreviousWeightsFunction(; f)::PreviousWeightsFunction
     return PreviousWeightsFunction(f)
@@ -254,11 +251,11 @@ TimeDependent
   - [`update_time_dependent_estimator`](@ref)
   - [`reset_time_dependent_estimator`](@ref)
 """
-struct TimeDependent{T1, T2} <: AbstractEstimator
+@concrete struct TimeDependent <: AbstractEstimator
     """
     Vector of per-fold values (in the consuming scheme's `split` enumeration order), or a callable of the fold's [`TimeDependentContext`](@ref): a bare function (optionally wrapped in [`PreviousWeightsFunction`](@ref)) or a [`TimeDependentCallable`](@ref) functor struct.
     """
-    val::T1
+    val
     """
     Which fold loop consumes the schedule: `:outermost` (default) binds it to the outermost fold loop processing the estimator tree; `:nearest` binds it to the nearest enclosing fold loop — inside a meta-optimiser's inner estimators that is the meta's own cross-validation leg, which then consumes the schedule even when the meta is backtested under an outer fold loop.
     """
@@ -266,7 +263,7 @@ struct TimeDependent{T1, T2} <: AbstractEstimator
     """
     Value the field takes outside every fold loop, overriding the host's static default (see [`time_dependent_field_defaults`](@ref)). [`NoDefault`](@ref) (the default) defers to the host's static default; a field that has none requires this to be set.
     """
-    default::T2
+    default
     function TimeDependent(val::Union{<:AbstractVector, <:Base.Callable,
                                       <:PreviousWeightsFunction, <:TimeDependentCallable},
                            bind::Symbol = :outermost; default = NoDefault())
@@ -473,35 +470,35 @@ Keywords correspond to the struct's fields.
   - [`TimeDependent`](@ref)
   - [`update_time_dependent_estimator`](@ref)
 """
-struct TimeDependentContext{T1, T2, T3, T4, T5, T6, T7} <: AbstractResult
+@concrete struct TimeDependentContext <: AbstractResult
     """
     Index of the fold within the scheme's `split` enumeration (1-based); indexes `train_idx`/`test_idx`.
     """
-    i::T1
+    i
     """
     Number of folds within the path.
     """
-    n::T2
+    n
     """
     The fold loop's (possibly asset-viewed) returns data.
     """
-    rd::T3
+    rd
     """
     Per-path training index vectors.
     """
-    train_idx::T4
+    train_idx
     """
     Per-path test index vectors.
     """
-    test_idx::T5
+    test_idx
     """
     Previous fold's portfolio weights, when threaded; `nothing` otherwise.
     """
-    w_prev::T6
+    w_prev
     """
     Path identifier under multi-path schemes; `nothing` otherwise.
     """
-    path_id::T7
+    path_id
     function TimeDependentContext(i::Integer, n::Integer, rd::Prices_RR, train_idx,
                                   test_idx, w_prev::Option{<:VecNum},
                                   path_id::Option{<:Integer})

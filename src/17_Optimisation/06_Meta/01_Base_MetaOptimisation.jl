@@ -129,11 +129,14 @@ $(DocStringExtensions.FIELDS)
   - [`FullUniverse`](@ref)
   - [`NestedClustered`](@ref)
 """
-struct ClusterUniverse{T <: VecVecInt} <: SubPortfolioUniverse
+@concrete struct ClusterUniverse <: SubPortfolioUniverse
     """
     Asset indices of each sub-portfolio. They partition the universe, so a column with zeros at the other assets is the real weight of the sub-portfolio over the whole asset axis.
     """
-    cls::T
+    cls
+    function ClusterUniverse(cls::T1) where {T1 <: VecVecInt}
+        return new{T1}(cls)
+    end
 end
 """
     sub_portfolio_count(u::FullUniverse, opti)

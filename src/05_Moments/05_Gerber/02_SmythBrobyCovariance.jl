@@ -1011,15 +1011,20 @@ The confusion zone thresholds the raw, uncentred return by `c1 * sigma`. Observa
 
   - $(ref_dict[:smyth2022enhanced])
 """
-struct SmythBrobyKernel{T1 <: SmythBrobyCovarianceAlgorithm, T2 <: ArrNum, T3 <: ArrNum,
-                        T4 <: Number, T5 <: Number, T6 <: Number, T7 <: Number}
-    alg::T1
-    mu::T2
-    sd::T3
-    c1::T4
-    c2::T5
-    c3::T6
-    n::T7
+@concrete struct SmythBrobyKernel
+    alg
+    mu
+    sd
+    c1
+    c2
+    c3
+    n
+    function SmythBrobyKernel(alg::T1, mu::T2, sd::T3, c1::T4, c2::T5, c3::T6,
+                              n::T7) where {T1 <: SmythBrobyCovarianceAlgorithm,
+                                            T2 <: ArrNum, T3 <: ArrNum, T4 <: Number,
+                                            T5 <: Number, T6 <: Number, T7 <: Number}
+        return new{T1, T2, T3, T4, T5, T6, T7}(alg, mu, sd, c1, c2, c3, n)
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

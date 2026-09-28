@@ -102,34 +102,31 @@ LowDimensionEnsemblePrior
 
   - $(ref_dict[:xi2023oldem]) Equations 4 to 10 and Section 5.3.
 """
-struct LowDimensionEnsemblePrior{T1 <: Integer, T2 <: Integer, T3 <: Real,
-                                 T4 <: Option{<:Posdef}, T5 <: Random.AbstractRNG,
-                                 T6 <: Option{<:Integer}} <:
-       AbstractLowOrderPriorEstimator_A
+@concrete struct LowDimensionEnsemblePrior <: AbstractLowOrderPriorEstimator_A
     """
     The number of subsystems that every fit draws, ``L`` in [xi2023oldem](@cite).
     """
-    n_subsystems::T1
+    n_subsystems
     """
     The number of assets in every subsystem, ``s`` in [xi2023oldem](@cite). When the rows hold fewer assets, the fit uses all of them.
     """
-    subsystem_size::T2
+    subsystem_size
     """
     The kernel bandwidth of the subsystem weights, ``\\sigma`` in [xi2023oldem](@cite).
     """
-    sigma::T3
+    sigma
     """
     The positive definite repair of the aggregated covariance, or `nothing` to leave the aggregate as it is. On short windows the aggregate is usually indefinite.
     """
-    pdm::T4
+    pdm
     """
     $(field_dict[:rng])
     """
-    rng::T5
+    rng
     """
     $(field_dict[:seed])
     """
-    seed::T6
+    seed
     function LowDimensionEnsemblePrior(n_subsystems::Integer, subsystem_size::Integer,
                                        sigma::Real, pdm::Option{<:Posdef},
                                        rng::Random.AbstractRNG, seed::Option{<:Integer})

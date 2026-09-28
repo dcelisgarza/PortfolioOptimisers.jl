@@ -117,11 +117,11 @@ MovingAverage
   - $(ref_dict[:lihoi2012])
   - $(ref_dict[:li2015olmar]) Equation (1).
 """
-struct MovingAverage{T1 <: Integer} <: AbstractPriceLevelStatistic
+@concrete struct MovingAverage <: AbstractPriceLevelStatistic
     """
     $(field_dict[:price_window])
     """
-    window::T1
+    window
     function MovingAverage(window::Integer)
         assert_price_window(window)
         return new{typeof(window)}(window)
@@ -190,11 +190,11 @@ ExponentialMovingAverage
   - $(ref_dict[:li2015olmar]) Equation (2).
   - $(ref_dict[:li2016olps])
 """
-struct ExponentialMovingAverage{T1 <: Real} <: AbstractPriceLevelStatistic
+@concrete struct ExponentialMovingAverage <: AbstractPriceLevelStatistic
     """
     The smoothing weight on the current level, `0 < alpha <= 1`. A smaller weight gives a longer memory.
     """
-    alpha::T1
+    alpha
     function ExponentialMovingAverage(alpha::Real)
         @argcheck(zero(alpha) < alpha <= one(alpha),
                   DomainError(alpha, "alpha must be in (0, 1]"))
@@ -271,20 +271,19 @@ SpatialMedian
   - $(ref_dict[:huang2016]) Equations (2) and (5), Algorithm 1.
   - $(ref_dict[:vardizhang2000])
 """
-struct SpatialMedian{T1 <: Integer, T2 <: Integer, T3 <: Real} <:
-       AbstractPriceLevelStatistic
+@concrete struct SpatialMedian <: AbstractPriceLevelStatistic
     """
     $(field_dict[:price_window])
     """
-    window::T1
+    window
     """
     Maximum number of Weiszfeld iterations.
     """
-    iters::T2
+    iters
     """
     Convergence tolerance on the Euclidean distance between two successive iterates.
     """
-    tol::T3
+    tol
     function SpatialMedian(window::Integer, iters::Integer, tol::Real)
         assert_price_window(window)
         @argcheck(iters >= 1, DomainError(iters, "iters must be at least 1"))
@@ -354,11 +353,11 @@ WindowPeak
   - $(ref_dict[:lai2018sspo]) Equations (10) and (11).
   - $(ref_dict[:liluoxu2023]) Equation (5).
 """
-struct WindowPeak{T1 <: Integer} <: AbstractPriceLevelStatistic
+@concrete struct WindowPeak <: AbstractPriceLevelStatistic
     """
     $(field_dict[:price_window])
     """
-    window::T1
+    window
     function WindowPeak(window::Integer)
         assert_price_window(window)
         return new{typeof(window)}(window)
@@ -422,11 +421,11 @@ LaggedPrice
 
   - $(ref_dict[:li2018tco]) Algorithm 2.
 """
-struct LaggedPrice{T1 <: Integer} <: AbstractPriceLevelStatistic
+@concrete struct LaggedPrice <: AbstractPriceLevelStatistic
     """
     The number of observations between the forecast level and the current one, `0` for the current level.
     """
-    lag::T1
+    lag
     function LaggedPrice(lag::Integer)
         @argcheck(lag >= 0, DomainError(lag, "lag must be non-negative"))
         return new{typeof(lag)}(lag)
@@ -496,11 +495,11 @@ ReweightedPriceRelative
   - $(ref_dict[:lai2018rprt])
   - $(ref_dict[:liluoxu2023]) Equations (8) and (11).
 """
-struct ReweightedPriceRelative{T1 <: Real} <: AbstractPriceLevelStatistic
+@concrete struct ReweightedPriceRelative <: AbstractPriceLevelStatistic
     """
     The reweighting strength `theta > 0` on the current price relative.
     """
-    theta::T1
+    theta
     function ReweightedPriceRelative(theta::Real)
         @argcheck(theta > zero(theta), DomainError(theta, "theta must be positive"))
         return new{typeof(theta)}(theta)
@@ -648,17 +647,15 @@ PriceLevelExpectedReturns
   - [`rows_needed`](@ref)
   - [`partial_fit!`](@ref)
 """
-struct PriceLevelExpectedReturns{T1 <: AbstractPriceLevelStatistic,
-                                 T2 <: Option{<:PriceLevelForecastState}} <:
-       AbstractExpectedReturnsEstimator
+@concrete struct PriceLevelExpectedReturns <: AbstractExpectedReturnsEstimator
     """
     The price-level statistic the forecast reads.
     """
-    alg::T1
+    alg
     """
     $(field_dict[:pfcache])
     """
-    cache::T2
+    cache
     function PriceLevelExpectedReturns(alg::AbstractPriceLevelStatistic,
                                        cache::Option{<:PriceLevelForecastState})
         return new{typeof(alg), typeof(cache)}(alg, cache)

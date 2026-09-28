@@ -70,16 +70,15 @@ SwitchingWeighting
   - $(ref_dict[:singer1997])
   - $(ref_dict[:herbsterwarmuth1998])
 """
-struct SwitchingWeighting{T1 <: Real, T2 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct SwitchingWeighting <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The switching rate, the share of each weight that moves to the other entries every period.
     """
-    gamma::T1
+    gamma
     """
     $(field_dict[:proj])
     """
-    proj::T2
+    proj
     function SwitchingWeighting(gamma::Real, proj::EuclideanProjection)
         @argcheck(zero(gamma) <= gamma <= one(gamma),
                   DomainError(gamma, "gamma must be in [0, 1]"))

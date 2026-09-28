@@ -122,15 +122,15 @@ HuberOptimum
 
   - $(ref_dict[:lai2018sspo])
 """
-struct HuberOptimum{T1 <: Real, T2 <: Real} <: AbstractSparsePortfolioAlgorithm
+@concrete struct HuberOptimum <: AbstractSparsePortfolioAlgorithm
     """
     $(field_dict[:lambda_sspo])
     """
-    lambda::T1
+    lambda
     """
     $(field_dict[:gamma_sspo])
     """
-    gamma::T2
+    gamma
     function HuberOptimum(lambda::Real, gamma::Real)
         @argcheck(lambda > zero(lambda), DomainError(lambda, "lambda must be positive"))
         @argcheck(gamma > zero(gamma), DomainError(gamma, "gamma must be positive"))
@@ -231,28 +231,27 @@ AlternatingDirectionMethod
 
   - $(ref_dict[:lai2018sspo])
 """
-struct AlternatingDirectionMethod{T1 <: Real, T2 <: Real, T3 <: Real, T4 <: Integer,
-                                  T5 <: Real} <: AbstractSparsePortfolioAlgorithm
+@concrete struct AlternatingDirectionMethod <: AbstractSparsePortfolioAlgorithm
     """
     $(field_dict[:lambda_sspo])
     """
-    lambda::T1
+    lambda
     """
     $(field_dict[:gamma_sspo])
     """
-    gamma::T2
+    gamma
     """
     The weight of the penalty on the budget residual, which is also the step of the dual variable.
     """
-    eta::T3
+    eta
     """
     $(field_dict[:iter])
     """
-    iters::T4
+    iters
     """
     The convergence tolerance on the budget residual.
     """
-    tol::T5
+    tol
     function AlternatingDirectionMethod(lambda::Real, gamma::Real, eta::Real,
                                         iters::Integer, tol::Real)
         @argcheck(lambda > zero(lambda), DomainError(lambda, "lambda must be positive"))

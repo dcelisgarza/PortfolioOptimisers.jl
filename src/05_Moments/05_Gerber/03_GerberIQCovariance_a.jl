@@ -2121,14 +2121,20 @@ Observations are thresholded against the pair's scaled thresholds from [`gerber_
   - [`gerber_IQ`](@ref)
   - [`gerber_comovement!`](@ref)
 """
-struct GerberIQKernel{T1 <: GerberCovarianceAlgorithm, T2 <: GerberIQCovarianceAlgorithm,
-                      T3 <: GerberIQDecayEstimator, T4, T5 <: Number, T6 <: ArrNum}
-    alg::T1
-    kind::T2
-    decay::T3
-    sc::T4
-    c::T5
-    sd::T6
+@concrete struct GerberIQKernel
+    alg
+    kind
+    decay
+    sc
+    c
+    sd
+    function GerberIQKernel(alg::T1, kind::T2, decay::T3, sc::T4, c::T5,
+                            sd::T6) where {T1 <: GerberCovarianceAlgorithm,
+                                           T2 <: GerberIQCovarianceAlgorithm,
+                                           T3 <: GerberIQDecayEstimator, T4, T5 <: Number,
+                                           T6 <: ArrNum}
+        return new{T1, T2, T3, T4, T5, T6}(alg, kind, decay, sc, c, sd)
+    end
 end
 @inline function comovement_pair_state(pol::GerberIQKernel, i::Integer, j::Integer)
     sci, scj = gerber_iq_scaling(pol.sc, pol.sd[i], pol.sd[j])

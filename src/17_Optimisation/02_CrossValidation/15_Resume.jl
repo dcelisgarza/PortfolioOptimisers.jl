@@ -163,11 +163,11 @@ $(DocStringExtensions.FIELDS)
   - [`Online`](@ref)
   - [`TimeDependent`](@ref)
 """
-struct Resume{T1}
+@concrete struct Resume
     """
     The Result of the online run to continue, carrying the threaded estimator in `opt`.
     """
-    res::T1
+    res
     function Resume(res::MultiPeriodPredictionResult)
         @argcheck(!isnothing(res.opt),
                   ArgumentError("`Resume` continues an online run, and this Result carries no estimator (`res.opt === nothing`), so it is a batch run and there is nothing to continue. Run the walk-forward as an Online Scheme (`OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit`), and resume the Result it returns."))

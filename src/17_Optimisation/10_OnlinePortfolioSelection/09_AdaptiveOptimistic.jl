@@ -59,11 +59,11 @@ PortfolioOptimisers.DiagonalProjection
 
   - $(ref_dict[:duchi2011])
 """
-struct DiagonalProjection{T1 <: AbstractVector} <: AbstractProjectionGeometry
+@concrete struct DiagonalProjection <: AbstractProjectionGeometry
     """
     The diagonal of the norm of the projection. The rule sets it to `delta` plus its gradient mass at the step.
     """
-    h::T1
+    h
     function DiagonalProjection(h::AbstractVector)
         @argcheck(all(x -> x > zero(x), h),
                   DomainError(h, "the diagonal of the projection norm must be positive"))
@@ -244,20 +244,19 @@ AdaptiveSubgradient
 
   - $(ref_dict[:duchi2011])
 """
-struct AdaptiveSubgradient{T1 <: Real, T2 <: Real, T3 <: AbstractOnlineObjective} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct AdaptiveSubgradient <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The learning rate of the step. A larger rate reacts faster and is less stable.
     """
-    eta::T1
+    eta
     """
     The offset ``\\delta`` that the rule adds to the gradient mass of every asset. It is ``\\delta`` in [duchi2011](@cite).
     """
-    delta::T2
+    delta
     """
     The objective whose gradient the rule takes, log wealth or a Risk Loss over the head's rows.
     """
-    obj::T3
+    obj
     function AdaptiveSubgradient(eta::Real, delta::Real, obj::AbstractOnlineObjective)
         @argcheck(eta > zero(eta), DomainError(eta, "eta must be positive"))
         @argcheck(delta >= zero(delta), DomainError(delta, "delta must be non-negative"))
@@ -499,11 +498,11 @@ ForecastGradient
   - $(ref_dict[:rakhlin2013colt])
   - $(ref_dict[:rakhlin2013nips])
 """
-struct ForecastGradient{T1 <: AbstractExpectedReturnsEstimator} <: AbstractGradientPredictor
+@concrete struct ForecastGradient <: AbstractGradientPredictor
     """
     The forecaster whose Price Relative Forecast gives the hint.
     """
-    me::T1
+    me
     function ForecastGradient(me::AbstractExpectedReturnsEstimator)
         assert_forecaster(me)
         return new{typeof(me)}(me)
@@ -689,11 +688,11 @@ HintResidualRate
 
   - $(ref_dict[:rakhlin2013nips])
 """
-struct HintResidualRate{T1 <: Real} <: AbstractLearningRateSchedule
+@concrete struct HintResidualRate <: AbstractLearningRateSchedule
     """
     The cap ``R_{\\max}``, which scales the rate and caps it. It is ``R_{\\max}`` in [rakhlin2013nips](@cite).
     """
-    rmax::T1
+    rmax
     function HintResidualRate(rmax::Real)
         @argcheck(rmax > zero(rmax), DomainError(rmax, "rmax must be positive"))
         return new{typeof(rmax)}(rmax)
@@ -912,16 +911,15 @@ OptimisticStep
   - $(ref_dict[:rakhlin2013nips])
   - $(ref_dict[:chiang2012])
 """
-struct OptimisticStep{T1 <: MirrorDescent, T2 <: AbstractGradientPredictor} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct OptimisticStep <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The first-order rule that takes both half-steps.
     """
-    alg::T1
+    alg
     """
     The Gradient Predictor whose hint the second half-step follows.
     """
-    predictor::T2
+    predictor
     function OptimisticStep(alg::MirrorDescent, predictor::AbstractGradientPredictor)
         @argcheck(isa(alg.grad, PlainGradient),
                   ArgumentError("the optimistic step wraps a `MirrorDescent` whose Gradient Transform is the identity: a `$(typeof(alg.grad).name.name)` keeps a state written once a period from one gradient, and the optimistic step reads two. Wrap the rule with `grad = PlainGradient()`."))

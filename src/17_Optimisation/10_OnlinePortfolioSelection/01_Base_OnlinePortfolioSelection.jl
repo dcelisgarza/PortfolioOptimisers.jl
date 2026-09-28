@@ -307,16 +307,15 @@ GramProjection
 
   - $(ref_dict[:agarwal2006])
 """
-struct GramProjection{T1 <: Slv_VecSlv, T2 <: Option{<:AbstractMatrix}} <:
-       AbstractProjectionGeometry
+@concrete struct GramProjection <: AbstractProjectionGeometry
     """
     $(field_dict[:slv])
     """
-    slv::T1
+    slv
     """
     The Gram matrix in whose norm the geometry projects. The rule binds it at each step, and it is `nothing` before the rule binds one.
     """
-    A::T2
+    A
     function GramProjection(slv::Slv_VecSlv, A::Option{<:AbstractMatrix})
         if !isnothing(A)
             @argcheck(size(A, 1) == size(A, 2),
@@ -1257,19 +1256,22 @@ $(DocStringExtensions.FIELDS)
   - [`OnlinePortfolioSelectionState`](@ref)
   - [`JuMPResult`](@ref)
 """
-struct HeldStep{T1, T2 <: AbstractString, T3}
+@concrete struct HeldStep
     """
     The timestamp of the row whose projection the step held. It is the index of the row in the fold when the rows have no timestamps, and `nothing` outside a fold.
     """
-    ts::T1
+    ts
     """
     The projection of the row that the step held, and the reason.
     """
-    reason::T2
+    reason
     """
     The solver trials of the failed programme, the `trials` of a [`JuMPResult`](@ref), or `nothing` when the projection built no programme.
     """
-    trials::T3
+    trials
+    function HeldStep(ts::T1, reason::T2, trials::T3) where {T1, T2 <: AbstractString, T3}
+        return new{T1, T2, T3}(ts, reason, trials)
+    end
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1290,15 +1292,15 @@ $(DocStringExtensions.FIELDS)
   - [`HeldStep`](@ref)
   - [`project`](@ref)
 """
-struct ProjectionStep{T1, T2}
+@concrete struct ProjectionStep
     """
     The rows that the head holds through the period, a [`ReturnsResult`](@ref) of the rows as they arrived, or `nothing`.
     """
-    rows::T1
+    rows
     """
     The timestamp of the row, or the index of the row in the fold.
     """
-    ts::T2
+    ts
     """
     The head's `strict` flag. A programme set reads it when it resolves its rows, so it refuses a name that an exposure row states and the universe does not carry, as the head refuses one.
     """

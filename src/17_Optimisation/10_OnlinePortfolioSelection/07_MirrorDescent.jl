@@ -54,11 +54,11 @@ InverseSquareRootRate
   - $(ref_dict[:orseau2017])
   - $(ref_dict[:helmbold1998])
 """
-struct InverseSquareRootRate{T1 <: Real} <: AbstractLearningRateSchedule
+@concrete struct InverseSquareRootRate <: AbstractLearningRateSchedule
     """
     The scale of the rate, the numerator of ``c / \\sqrt{t}``.
     """
-    c::T1
+    c
     function InverseSquareRootRate(c::Real)
         @argcheck(c > zero(c), DomainError(c, "c must be positive"))
         return new{typeof(c)}(c)
@@ -141,11 +141,11 @@ DoublingTrickRate
 
   - $(ref_dict[:helmbold1998])
 """
-struct DoublingTrickRate{T1 <: Integer} <: AbstractLearningRateSchedule
+@concrete struct DoublingTrickRate <: AbstractLearningRateSchedule
     """
     The number of assets. The stage lengths, the shares and the rates depend on it.
     """
-    N::T1
+    N
     function DoublingTrickRate(N::Integer)
         @argcheck(N >= 2, DomainError(N, "N must be at least 2"))
         return new{typeof(N)}(N)
@@ -273,11 +273,11 @@ SelfConfidentRate
 
   - $(ref_dict[:orseau2017])
 """
-struct SelfConfidentRate{T1 <: Real} <: AbstractLearningRateSchedule
+@concrete struct SelfConfidentRate <: AbstractLearningRateSchedule
     """
     The cap on the rate, answered while the running excess is zero and whenever the formula exceeds it.
     """
-    eta_max::T1
+    eta_max
     function SelfConfidentRate(eta_max::Real)
         @argcheck(eta_max > zero(eta_max), DomainError(eta_max, "eta_max must be positive"))
         return new{typeof(eta_max)}(eta_max)
@@ -425,16 +425,15 @@ WindowedBestRate
   - $(ref_dict[:zhang2022maeg])
   - $(ref_dict[:helmbold1998])
 """
-struct WindowedBestRate{T1 <: AbstractVector{<:Real}, T2 <: Option{<:Integer}} <:
-       AbstractLearningRateSchedule
+@concrete struct WindowedBestRate <: AbstractLearningRateSchedule
     """
     The rates the experts run at, one exponentiated-gradient run each.
     """
-    etas::T1
+    etas
     """
     The number of periods over which the schedule compares the experts' wealth. `nothing` compares the whole history.
     """
-    window::T2
+    window
     function WindowedBestRate(etas::AbstractVector{<:Real}, window::Option{<:Integer})
         assert_nonempty_gt0_finite_val(etas, :etas)
         if !isnothing(window)
@@ -598,11 +597,11 @@ GradientMomentum
 
   - $(ref_dict[:li2022egm])
 """
-struct GradientMomentum{T1 <: Real} <: AbstractGradientTransform
+@concrete struct GradientMomentum <: AbstractGradientTransform
     """
     The decay of the moving average of the gradient, in `[0, 1)`.
     """
-    gamma1::T1
+    gamma1
     function GradientMomentum(gamma1::Real)
         @argcheck(zero(gamma1) <= gamma1 < one(gamma1),
                   DomainError(gamma1, "gamma1 must be in [0, 1)"))
@@ -673,15 +672,15 @@ RootMeanSquareGradient
 
   - $(ref_dict[:li2022egm])
 """
-struct RootMeanSquareGradient{T1 <: Real, T2 <: Real} <: AbstractGradientTransform
+@concrete struct RootMeanSquareGradient <: AbstractGradientTransform
     """
     The decay of the moving average of the squared gradient, in `[0, 1)`.
     """
-    gamma2::T1
+    gamma2
     """
     The constant added to the root of the average before the division.
     """
-    eps::T2
+    eps
     function RootMeanSquareGradient(gamma2::Real, eps::Real)
         @argcheck(zero(gamma2) <= gamma2 < one(gamma2),
                   DomainError(gamma2, "gamma2 must be in [0, 1)"))
@@ -757,20 +756,19 @@ AdaptiveMomentGradient
 
   - $(ref_dict[:li2022egm])
 """
-struct AdaptiveMomentGradient{T1 <: Real, T2 <: Real, T3 <: Real} <:
-       AbstractGradientTransform
+@concrete struct AdaptiveMomentGradient <: AbstractGradientTransform
     """
     The decay of the moving average of the gradient, in `[0, 1)`.
     """
-    gamma1::T1
+    gamma1
     """
     The decay of the moving average of the squared gradient, in `[0, 1)`.
     """
-    gamma2::T2
+    gamma2
     """
     The constant added to the root of the second average before the division.
     """
-    eps::T3
+    eps
     function AdaptiveMomentGradient(gamma1::Real, gamma2::Real, eps::Real)
         @argcheck(zero(gamma1) <= gamma1 < one(gamma1),
                   DomainError(gamma1, "gamma1 must be in [0, 1)"))
@@ -1049,24 +1047,23 @@ RiskLoss
   - [`risk_gradient`](@ref)
   - [`expected_risk`](@ref)
 """
-struct RiskLoss{T1 <: BaseRM_VecBaseRM, T2 <: Integer, T3 <: Scalariser,
-                T4 <: AbstractPriorEstimator} <: AbstractOnlineObjective
+@concrete struct RiskLoss <: AbstractOnlineObjective
     """
     $(field_dict[:r])
     """
-    r::T1
+    r
     """
     The number of rows of the head's returns buffer that the loss reads.
     """
-    window::T2
+    window
     """
     $(field_dict[:sca])
     """
-    sca::T3
+    sca
     """
     $(field_dict[:pe])
     """
-    pe::T4
+    pe
     function RiskLoss(r::T1, window::T2, sca::T3,
                       pe::T4) where {T1 <: BaseRM_VecBaseRM, T2 <: Integer,
                                      T3 <: Scalariser, T4 <: AbstractPriorEstimator}
@@ -1341,32 +1338,27 @@ MirrorDescent
   - $(ref_dict[:zhang2018ader])
   - $(ref_dict[:zhao2020sword])
 """
-struct MirrorDescent{T1 <: Union{<:Real, <:AbstractLearningRateSchedule},
-                     T2 <:
-                     Union{<:EuclideanProjection, <:EntropicProjection, <:TsallisProjection,
-                           <:LogBarrierProjection}, T3 <: Real,
-                     T4 <: AbstractOnlineObjective, T5 <: AbstractGradientTransform} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct MirrorDescent <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The learning rate, a number or a Learning-Rate Schedule. A larger rate reacts faster and is less stable.
     """
-    eta::T1
+    eta
     """
     $(field_dict[:proj])
     """
-    proj::T2
+    proj
     """
     The uniform-mix share, in `[0, 1)`. At `0` the rule takes the plain step.
     """
-    alpha::T3
+    alpha
     """
     The objective whose gradient the rule reads, log wealth or a Risk Loss over the head's rows.
     """
-    obj::T4
+    obj
     """
     The Gradient Transform applied before the mirror step.
     """
-    grad::T5
+    grad
     function MirrorDescent(eta::T1, proj::T2, alpha::T3, obj::T4,
                            grad::T5) where {T1 <:
                                             Union{<:Real, <:AbstractLearningRateSchedule},

@@ -112,10 +112,14 @@ Sub-group MIP constraints: indicators gate the sub-group weights `smtx * w` and 
   - [`AssetMIPSpace`](@ref)
   - [`mip_key`](@ref)
 """
-struct SubsetMIPSpace{T1 <: MatNum, T2 <: Integer} <: AbstractMIPSpace
-    smtx::T1
+@concrete struct SubsetMIPSpace <: AbstractMIPSpace
+    smtx
     pfx::Symbol
-    i::T2
+    i
+    function SubsetMIPSpace(smtx::T1, pfx::Symbol,
+                            i::T2) where {T1 <: MatNum, T2 <: Integer}
+        return new{T1, T2}(smtx, pfx, i)
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -230,9 +234,9 @@ Long-only indicators: one *held* bit per asset, and no sign.
 
   - [`AbstractMIPIndicators`](@ref)
 """
-struct HeldIndicators{T1, T2} <: AbstractMIPIndicators
-    ib::T1
-    i_mip::T2
+@concrete struct HeldIndicators <: AbstractMIPIndicators
+    ib
+    i_mip
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -252,12 +256,12 @@ budgets at once.
 
   - [`AbstractMIPIndicators`](@ref)
 """
-struct LongShortIndicators{T1, T2, T3, T4, T5} <: AbstractMIPIndicators
-    ilb::T1
-    isb::T2
-    il::T3
-    is::T4
-    i_mip::T5
+@concrete struct LongShortIndicators <: AbstractMIPIndicators
+    ilb
+    isb
+    il
+    is
+    i_mip
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -278,8 +282,8 @@ decomposition use `N` binaries rather than `2N`.
 
   - [`AbstractMIPIndicators`](@ref)
 """
-struct SignIndicators{T1} <: AbstractMIPIndicators
-    xb::T1
+@concrete struct SignIndicators <: AbstractMIPIndicators
+    xb
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

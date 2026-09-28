@@ -464,26 +464,24 @@ ConfidenceWeightedMeanReversion
   - $(ref_dict[:li2011cwmr]) Algorithm 1.
   - $(ref_dict[:li2013cwmr]) Section 4, Algorithm 2.
 """
-struct ConfidenceWeightedMeanReversion{T1 <: Real, T2 <: Real,
-                                       T3 <: AbstractConfidenceUpdate,
-                                       T4 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct ConfidenceWeightedMeanReversion <:
+                 AbstractOnlinePortfolioSelectionAlgorithm
     """
     Reversion threshold ``\\epsilon``. The rule moves the belief only when the return of the last period, plus the confidence margin, exceeds it.
     """
-    eps::T1
+    eps
     """
     Confidence quantile ``\\phi = \\Phi^{-1}(\\theta)``. It scales the margin that the spread of the belief adds to the constraint.
     """
-    phi::T2
+    phi
     """
     Formulation of the constraint, [`VarianceUpdate`](@ref) for CWMR-Var or [`StandardDeviationUpdate`](@ref) for CWMR-Stdev.
     """
-    formulation::T3
+    formulation
     """
     $(field_dict[:proj])
     """
-    proj::T4
+    proj
     function ConfidenceWeightedMeanReversion(eps::Real, phi::Real,
                                              formulation::AbstractConfidenceUpdate,
                                              proj::EuclideanProjection)
@@ -615,16 +613,15 @@ AntiCorrelation
 
   - $(ref_dict[:borodin2004]) Section 3, Equations 2 and 3, and Figure 1.
 """
-struct AntiCorrelation{T1 <: Integer, T2 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct AntiCorrelation <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     Window length ``\\ell``. The rule reads the last ``2 \\ell`` rows as two consecutive windows of ``\\ell`` rows.
     """
-    window::T1
+    window
     """
     $(field_dict[:proj])
     """
-    proj::T2
+    proj
     function AntiCorrelation(window::Integer, proj::EuclideanProjection)
         @argcheck(window >= 2, DomainError(window, "window must be at least 2"))
         return new{typeof(window), typeof(proj)}(window, proj)
@@ -897,17 +894,15 @@ ExpectationMaximisation
   - $(ref_dict[:helmbold1997]) Section 3, Equation 7.
   - $(ref_dict[:orseau2017]) Equations 7 and 14, Theorems 3 and 6, and Remark 8.
 """
-struct ExpectationMaximisation{T1 <: Union{<:Real, <:AbstractLearningRateSchedule},
-                               T2 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct ExpectationMaximisation <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     Learning rate, a number in `(0, 1)` or a Learning-Rate Schedule. It is the share of the way that the allocation moves to the wealth held at the end of the period.
     """
-    eta::T1
+    eta
     """
     $(field_dict[:proj])
     """
-    proj::T2
+    proj
     function ExpectationMaximisation(eta::Union{<:Real, <:AbstractLearningRateSchedule},
                                      proj::EuclideanProjection)
         if isa(eta, Real)
@@ -1040,16 +1035,15 @@ AggregatingAlgorithm
   - $(ref_dict[:vovkwatkins1998]) Algorithm 1.
   - $(ref_dict[:cover1991])
 """
-struct AggregatingAlgorithm{T1 <: Real, T2 <: EntropicProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct AggregatingAlgorithm <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     Rate ``\\eta`` that the price relative is raised to. At `1` the rule is the wealth weighting.
     """
-    eta::T1
+    eta
     """
     $(field_dict[:proj])
     """
-    proj::T2
+    proj
     function AggregatingAlgorithm(eta::Real, proj::EntropicProjection)
         @argcheck(eta > zero(eta), DomainError(eta, "eta must be positive"))
         return new{typeof(eta), typeof(proj)}(eta, proj)
@@ -1171,16 +1165,15 @@ TopK
 
   - $(ref_dict[:li2011corn]) Equation 8 and Algorithm 3.
 """
-struct TopK{T1 <: Integer, T2 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct TopK <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     Number of assets, or experts, held.
     """
-    k::T1
+    k
     """
     $(field_dict[:proj])
     """
-    proj::T2
+    proj
     function TopK(k::Integer, proj::EuclideanProjection)
         @argcheck(k >= 1, DomainError(k, "k must be at least 1"))
         return new{typeof(k), typeof(proj)}(k, proj)
@@ -1270,12 +1263,11 @@ WeakAggregatingAlgorithm
   - $(ref_dict[:yang2020waeg]) Section 3.3, Algorithm 2 and Lemma 1, and Equations 9 and 11.
   - $(ref_dict[:yang2022caeg]) Equation 10 and Algorithm 1.
 """
-struct WeakAggregatingAlgorithm{T1 <: EntropicProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct WeakAggregatingAlgorithm <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:proj])
     """
-    proj::T1
+    proj
     function WeakAggregatingAlgorithm(proj::EntropicProjection)
         return new{typeof(proj)}(proj)
     end
