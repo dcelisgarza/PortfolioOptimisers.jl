@@ -262,7 +262,7 @@ multiplier stays at one and the estimator is the plain exponentially weighted re
 The statistic divides a realised square by an estimated variance, and the inverse of an estimate
 is too large on average (Jensen's inequality). With `debias = true`, the default, the statistic
 skips an estimate too young for a finite variance and divides the rest by the known size of the
-bias, as each target states (ADR 0190). `debias = false` scores the raw statistic.
+bias, as each target states. `debias = false` scores the raw statistic.
 
 # Mathematical definition
 
@@ -333,7 +333,7 @@ eigenvalue of its correlation is below ``-n\\,\\varepsilon`` times its largest, 
 the negative eigenvalues to zero, restores the unit diagonal and keeps the variances. Where every
 pair shares one history, the division is a congruence of a sum of outer products, so the matrix
 is positive semidefinite and the repair changes nothing. A congruence on different histories
-would shrink each correlation of the pair towards zero, which ADR 0181 measures.
+would shrink each correlation of the pair towards zero, and a simulation measured the cost.
 
 # Fields
 

@@ -1219,7 +1219,7 @@ a_{ti} &= s_{ti} + \\varepsilon_{ti}\\,.
 
 The systematic row of asset ``i`` is ``\\mathrm{VC}`` and ``\\mathrm{MC}`` of ``w_{\\cdot i} s_{\\cdot i}``, and the idiosyncratic row is the same two numbers of ``w_{\\cdot i} \\varepsilon_{\\cdot i}``. The total row is ``\\mathrm{VC}``, ``\\mathrm{PV}`` and ``\\mathrm{MC}`` of ``w_{\\cdot i} a_{\\cdot i}``. The weighted series of all the assets sum to ``s_{t}`` and ``e_{t}``, so the rows sum to the two components. An inactive pair is zero in both series, so it adds nothing to a row.
 
-The standalone numbers are those of the model return, which holds no per-observation intercept, over the active pairs of the asset alone. An asset has no return at an inactive pair: it was not listed, or it was on a holiday, which carries no information (ADR 0181). A zero there would state a return the asset never had, and dilute its mean by the observations it was absent. An asset with fewer than two active pairs has no standalone volatility and no correlation, and one with none has no mean.
+The standalone numbers are those of the model return, which holds no per-observation intercept, over the active pairs of the asset alone. An asset has no return at an inactive pair: it was not listed, or it was on a holiday, which carries no information. A zero there would state a return the asset never had, and dilute its mean by the observations it was absent. An asset with fewer than two active pairs has no standalone volatility and no correlation, and one with none has no mean.
 
 ```math
 \\begin{align}

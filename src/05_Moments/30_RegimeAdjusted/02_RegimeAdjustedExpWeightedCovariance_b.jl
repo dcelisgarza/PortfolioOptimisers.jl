@@ -736,7 +736,7 @@ is the same for the three methods to first order. What remains is of the next or
 ``9 s^{2}`` with ``s`` the sum of the squared weights, so it is largest in the warm-up rows: at
 12 assets, a half-life of 10 and ``R = I``, 1.34 at ``K = 5``, 1.08 at ``K = 10``, 1.02 at
 ``K = 20`` and 1.004 in the steady state. At the defaults the first row enters at ``K`` equal to
-the half-life, where the rest is 1.006 at a half-life of 40 (ADR 0190).
+the half-life, where the rest is 1.006 at a half-life of 40.
 
 # Arguments
 

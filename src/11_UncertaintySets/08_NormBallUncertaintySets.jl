@@ -242,7 +242,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of a mean [`NormBallUncertaintySet`](@ref) restricted to assets at index `i`.
 
-The view is the projection of the set onto the cluster's coordinates, and not a refit (ADR 0189): a row slice of the map is the map of the projected set, because the coordinates ``\\boldsymbol{u}`` of the ball are untouched by dropping rows of ``\\mathbf{L}``. It is what the ellipsoid's view returns too, since ``\\mathbf{\\Sigma}_{ii} = \\mathbf{L}_{i}\\mathbf{L}_{i}^{\\intercal}``. A caller who wants the set the same estimator would fit on the subset alone fits the subset.
+The view is the projection of the set onto the cluster's coordinates, and not a refit: a row slice of the map is the map of the projected set, because the coordinates ``\\boldsymbol{u}`` of the ball are untouched by dropping rows of ``\\mathbf{L}``. It is what the ellipsoid's view returns too, since ``\\mathbf{\\Sigma}_{ii} = \\mathbf{L}_{i}\\mathbf{L}_{i}^{\\intercal}``. A caller who wants the set the same estimator would fit on the subset alone fits the subset.
 
 # Algorithm
 

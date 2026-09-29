@@ -319,7 +319,7 @@ and [`EWVolatility`](@ref) is the one in the library.
 
 With `debias = true`, the default, `z²` is divided by the bias that the inverse of an estimated
 variance puts in the moment the method reads, and an estimate of four observations or fewer is not
-scored (ADR 0190). `debias = false` scores the raw `z²`.
+scored. `debias = false` scores the raw `z²`.
 
 This estimator is mask-aware, so a prior fitted with it keeps a young asset investable and
 zero-fills the rows the asset was missing through [`scenario_fill`](@ref): every consumer of a
@@ -804,8 +804,8 @@ and the relative variance ``v`` of that variable.
   - [`regime_bias_table`](@ref)
   - [`diagonal_law_factor`](@ref)
 """
-struct RegimeTermMoments{M}
-    method::M
+@concrete struct RegimeTermMoments
+    method
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
