@@ -132,6 +132,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :atol_cs => "`atol`: Absolute tolerance below which a cross-sectional scale counts as zero. An observation at or below it carries no dispersion, so its finite cells score zero rather than dividing by that scale.",#
                  # Descriptors.
                  :mcap => "`mcap`: Name of the Panel Field that weights the market return, the market capitalisation of each asset.",#
+                 :nonneg_pnl => "`nonneg`: Names of Panel Fields that must be non-negative wherever they are observed and active, or `nothing` for no check. A negative value raises a `DomainError`, because a volume, a share count, a price, a short interest or a dividend below zero is a data error and not a signal.",#
                  :agg_obs => "`agg_obs`: Number of consecutive observations aggregated into one update of the recursion. A value of one updates the recursion at every observation.",#
                  :group_ewb => "`group`: Name of the categorical Panel Field that the shrinkage groups the cross-section by, or `nothing` to leave every beta raw.",#
                  :min_group_size_ewb => "`min_group_size`: Smallest group, counted over the estimation set, that is shrunk toward its own mean. A smaller group is shrunk toward the mean of the whole estimation set, and an asset that carries no group keeps its raw beta.",#

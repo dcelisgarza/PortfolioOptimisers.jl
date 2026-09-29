@@ -1,6 +1,6 @@
 #=
 Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl` against the contract its
-docstrings state, and against the reference implementation's own rolling descriptors.
+docstrings state, and against the oracle's own rolling descriptors.
 Issue #720, map #643.
 
 FIVE CONVENTIONS SHAPE THE PROBES.
@@ -23,11 +23,11 @@ FIVE CONVENTIONS SHAPE THE PROBES.
 
 5. AN INFINITE RETURN IS A REFUSAL, FOR BOTH ESTIMATORS. The window sum is one difference of
    two cumulative sums, so one infinite return would make every later window `NaN`, also a
-   window that does not hold it. The reference implementation refuses it too (#741).
+   window that does not hold it. The oracle refuses it too (#741).
 
 The last two testsets run the estimators on the synthetic panel of `test06c_setup.jl` and
-compare them with the reference implementation. The parity is pinned twice: once as a
-re-derivation written out by hand in plain Julia, and once as the reference's own output at
+compare them with the oracle. The parity is pinned twice: once as a
+re-derivation written out by hand in plain Julia, and once as the oracle's own output at
 five observations, stored as a literal.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
@@ -179,7 +179,7 @@ end
         @test isequal(E, expm1.(S))
         # Two returns compound, so the simple return of the window is their product.
         @test E[2, 1] ≈ (1 + X[1, 1]) * (1 + X[2, 1]) - 1
-        # The sign is applied before the exponentiation, as the reference does.
+        # The sign is applied before the exponentiation, as the oracle does.
         R = descriptor(Reversal(; window = 2, exponentiate = true), rd)
         @test isequal(R, expm1.(-S))
     end
@@ -283,12 +283,12 @@ end
     end
 end
 
-@testset "The named Descriptors agree with the reference implementation on a panel with gaps" begin
+@testset "The named Descriptors agree with the oracle on a panel with gaps" begin
     #=
-    The reference implementation, installed from disk at v1.2.4, ran on this 8 x 3 panel. Asset
-    1 misses the return of row 4 inside an active listing. Asset 2 is inactive in rows 3 and 4,
+    The oracle ran on this 8 x 3 panel. Asset 1 misses the return of row 4 inside an active
+    listing. Asset 2 is inactive in rows 3 and 4,
     a gap inside its listing. Asset 3 lists late, at row 3, and misses the return of row 6. The
-    reference refuses a finite value on an inactive cell, so those cells hold NaN here.
+    oracle refuses a finite value on an inactive cell, so those cells hold NaN here.
     `mom_w2_s2` pins the rule on the current observation: row 4 of asset 2 has an active
     window, rows 1 and 2, and it is NaN because observation 4 is inactive.
     =#
@@ -386,8 +386,8 @@ end
         # A window of one has no warm-up at all.
         @test !any(isnan, descriptor(RollingMax(; window = 1), rolling_hand_panel(X))[1, :])
     end
-    @testset "A window of one is the return itself, which the reference refuses" begin
-        # The reference implementation raises for `window <= 1`. The port answers, which
+    @testset "A window of one is the return itself, which the oracle refuses" begin
+        # The oracle raises for `window <= 1`. The port answers, which
         # adds a mode rather than removes one. Restore the refusal by raising the bound of
         # `assert_gt0(window, :window)` in the inner constructor of `RollingMax`.
         rd = rolling_hand_panel(X)
@@ -441,9 +441,9 @@ end
     end
 end
 
-@testset "The reference implementation's own output, pinned" begin
+@testset "The oracle's own output, pinned" begin
     #=
-    The reference implementation was driven on the same synthetic panel, rebuilt as its own
+    The oracle was driven on the same synthetic panel, rebuilt as its own
     panel container with the same active and estimation masks, and its output at
     observations 296 to 300 is stored below. Asset 8 delists at observation 295, so its
     column pins the inactive rule as well as the arithmetic.
@@ -453,12 +453,12 @@ end
     of a one-bit difference in `log1p` itself on 9 of the 3474 returns of the panel; the
     two cumulative sums are taken in the same order.
     =#
-    reference_reversal_21 = [0.005157908733073507 0.028093695361967097 0.12535624416725344 0.026813586525631483 0.0343297254340056 0.0840484614301415 0.09754260674030271 NaN 0.13459419284319432 0.0634559227890284 0.1386150341782934 0.030867361361560597
+    oracle_reversal_21 = [0.005157908733073507 0.028093695361967097 0.12535624416725344 0.026813586525631483 0.0343297254340056 0.0840484614301415 0.09754260674030271 NaN 0.13459419284319432 0.0634559227890284 0.1386150341782934 0.030867361361560597
                                    -0.006743816405957448 0.013834529481491276 0.11600843205164058 0.02436438201512081 0.03047133581177322 0.07996858781623134 0.08743823363933584 NaN 0.13363775359043986 0.05438198569666042 0.12405686794558396 0.035775406692541395
                                    0.0006776615676298559 0.030254850755471074 0.11219040135996705 0.01522123064251657 0.02705239073655294 0.08545514958512845 0.07628570799226408 NaN 0.11405493566344696 0.05991986944125616 0.11630365270684817 0.05049959289708941
                                    -0.02950449992547463 0.0019573302318608987 0.08019697436427603 -0.04584546850027882 0.022572876148533413 0.05568418435993244 0.05963487774185494 NaN 0.08728377563883488 0.06670118720530782 0.06762213916522058 0.0507463797793371
                                    -0.044203394546773106 -0.00048265885253762075 0.09359272043606551 0.0049821566375432 0.026374438266559413 0.05894600925303006 0.045928205707354064 NaN 0.09270316512248242 0.07705538088004404 0.09992704661917473 0.06624252677832965]
-    reference_max_return_21 = [0.047040239006114946 0.019845745986494884 0.015747046220745013 0.05305034898441107 0.023668269945923172 0.031145013351726942 0.03526007018851601 NaN 0.022958162687840997 0.03231014345231089 0.017469906096132946 0.014427781564077926
+    oracle_max_return_21 = [0.047040239006114946 0.019845745986494884 0.015747046220745013 0.05305034898441107 0.023668269945923172 0.031145013351726942 0.03526007018851601 NaN 0.022958162687840997 0.03231014345231089 0.017469906096132946 0.014427781564077926
                                      0.047040239006114946 0.019845745986494884 0.015747046220745013 0.05305034898441107 0.023668269945923172 0.031145013351726942 0.03526007018851601 NaN 0.022958162687840997 0.03231014345231089 0.017469906096132946 0.014427781564077926
                                      0.047040239006114946 0.019845745986494884 0.015747046220745013 0.05305034898441107 0.023668269945923172 0.031145013351726942 0.03526007018851601 NaN 0.022958162687840997 0.03231014345231089 0.017469906096132946 0.014427781564077926
                                      0.047040239006114946 0.019845745986494884 0.018654034668595016 0.05305034898441107 0.023668269945923172 0.031145013351726942 0.03526007018851601 NaN 0.022958162687840997 0.03231014345231089 0.028353674929423155 0.014427781564077926
@@ -469,16 +469,16 @@ end
     rows = 296:300
     rev = descriptor(Reversal(), rd)[rows, :]
     mx = descriptor(MaxReturn(), rd)[rows, :]
-    @test isequal(isnan.(rev), isnan.(reference_reversal_21))
-    @test isequal(isnan.(mx), isnan.(reference_max_return_21))
-    ok = .!isnan.(reference_reversal_21)
-    @test isapprox(rev[ok], reference_reversal_21[ok]; rtol = 1e-14)
-    @test maximum(abs, rev[ok] - reference_reversal_21[ok]) < 1e-16
-    okm = .!isnan.(reference_max_return_21)
+    @test isequal(isnan.(rev), isnan.(oracle_reversal_21))
+    @test isequal(isnan.(mx), isnan.(oracle_max_return_21))
+    ok = .!isnan.(oracle_reversal_21)
+    @test isapprox(rev[ok], oracle_reversal_21[ok]; rtol = 1e-14)
+    @test maximum(abs, rev[ok] - oracle_reversal_21[ok]) < 1e-16
+    okm = .!isnan.(oracle_max_return_21)
     # The window selects one return of the history, and that return is itself the output of a
     # product whose reduction order is the BLAS thread count of the machine. A CI runner and a
     # developer machine therefore differ in the last bit, so the pin is one ulp wide, as the
     # `rev` pin above is.
-    @test isapprox(mx[okm], reference_max_return_21[okm]; rtol = 1e-14)
-    @test maximum(abs, mx[okm] - reference_max_return_21[okm]) < 1e-16
+    @test isapprox(mx[okm], oracle_max_return_21[okm]; rtol = 1e-14)
+    @test maximum(abs, mx[okm] - oracle_max_return_21[okm]) < 1e-16
 end

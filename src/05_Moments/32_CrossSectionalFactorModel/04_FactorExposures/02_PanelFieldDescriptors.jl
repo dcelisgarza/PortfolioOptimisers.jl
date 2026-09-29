@@ -43,14 +43,18 @@ function assert_panel_terms(x::AbstractVector{<:Pair{<:AbstractString, <:Real}},
     return nothing
 end
 """
+    panel_term_names(x::Nothing) -> Vector{String}
     panel_term_names(x::AbstractString) -> Vector{String}
     panel_term_names(x::AbstractVector{<:Pair{<:AbstractString, <:Real}}) -> Vector{String}
+    panel_term_names(x::AbstractVector{<:AbstractString}) -> Vector{String}
 
 Return the Panel Field names a term reads, in order.
 
+`nothing` names the returns of an [`EWVolumeRatio`](@ref), which are not a Panel Field, so it reads none. A vector of names is the product side of an [`EWVolumeRatio`](@ref), and it reads each name.
+
 # Arguments
 
-  - `x`: A Panel Field name, or a vector of `name => coefficient` pairs.
+  - `x`: `nothing`, a Panel Field name, a vector of `name => coefficient` pairs, or a vector of names.
 
 # Returns
 
@@ -74,11 +78,17 @@ julia> PortfolioOptimisers.panel_term_names([\"sales_ttm\" => 1, \"cost_of_reven
   - [`PanelFieldRatio`](@ref)
   - [`assert_panel_terms`](@ref)
 """
+function panel_term_names(::Nothing)::Vector{String}
+    return String[]
+end
 function panel_term_names(x::AbstractString)::Vector{String}
     return [String(x)]
 end
 function panel_term_names(x::AbstractVector{<:Pair{<:AbstractString, <:Real}})::Vector{String}
     return map(p -> String(first(p)), x)
+end
+function panel_term_names(x::AbstractVector{<:AbstractString})::Vector{String}
+    return map(String, x)
 end
 """
     assert_panel_guard_names(names::Nothing, known::VecStr, sym::Sym_Str) -> nothing
@@ -86,7 +96,7 @@ end
 
 Check that every Panel Field a guard names is one the ratio reads.
 
-A guard on a Panel Field the ratio never reads would be checked against nothing, and a typo in a guard would then pass in silence. The check runs in the constructor of [`PanelFieldRatio`](@ref).
+A guard on a Panel Field the ratio never reads would be checked against nothing, and a typo in a guard would then pass in silence. The check runs in the constructors of [`PanelFieldRatio`](@ref), [`EWVolumeRatio`](@ref) and [`DaysToCover`](@ref).
 
 # Arguments
 
@@ -203,7 +213,7 @@ PanelFieldRatio
     """
     den
     """
-    Names of Panel Fields that must be non-negative wherever they are observed and active, or `nothing`. A negative value raises a `DomainError`, because a dividend, a short interest or a dispersion below zero is a data error and not a signal.
+    $(field_dict[:nonneg_pnl])
     """
     nonneg
     """
@@ -360,6 +370,8 @@ Check that the named Panel Fields are non-negative on every cell that is observe
 # Related
 
   - [`PanelFieldRatio`](@ref)
+  - [`EWVolumeRatio`](@ref)
+  - [`DaysToCover`](@ref)
   - [`panel_field_values`](@ref)
 """
 function assert_nonneg_panel_fields(::ReturnsResult, ::Nothing)::Nothing

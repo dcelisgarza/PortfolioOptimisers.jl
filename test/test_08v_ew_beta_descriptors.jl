@@ -2,7 +2,7 @@
 Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl`, the residual half of
 `05_EWVolatilityDescriptors.jl`, and the market-return builder and beta recursion they share
 in `01_Base_Descriptor.jl`, against the contract their docstrings state and against the
-reference implementation. Issue #719, map #643.
+oracle. Issue #719, map #643.
 
 FIVE CONVENTIONS SHAPE THE PROBES, and the first three are `test_08u_ew_descriptors.jl`'s.
 
@@ -12,7 +12,7 @@ FIVE CONVENTIONS SHAPE THE PROBES, and the first three are `test_08u_ew_descript
    observation neither advances its state nor resets it, and the observation does not count
    toward its warm-up.
 
-3. AN INACTIVE CELL IS ALSO A GAP. The reference implementation's own container refuses a
+3. AN INACTIVE CELL IS ALSO A GAP. The oracle's own container refuses a
    return outside the active mask, so no member ever advances a state there. The library
    masks the returns through `ew_active_returns` before the recursion starts, which is the
    same rule stated on this side.
@@ -25,7 +25,7 @@ FIVE CONVENTIONS SHAPE THE PROBES, and the first three are `test_08u_ew_descript
    asset turns inactive. The three beta Descriptors freeze instead, so an asset that
    re-enters the universe resumes from the state it left.
 
-THE STORED CASES ARE THE REFERENCE IMPLEMENTATION'S OWN OUTPUT. `assets/EWMarketBeta.csv.gz`
+THE STORED CASES ARE THE ORACLE'S OWN OUTPUT. `assets/EWMarketBeta.csv.gz`
 is `EWMarketBeta(half_life = 5, group = "industry", min_group_size = 2,
 bounds = (0.1, 0.9))`, and `assets/EWMacroSensitivity.csv.gz` is
 `EWMacroSensitivity(half_life = 5, agg_obs = 3)`. Both were produced on the panel the last
@@ -35,6 +35,7 @@ an aggregated clock. All thirteen cases of the diff agreed with no difference in
 pattern and a worst relative difference of 2.5e-13 over the finite cells.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 # A small hand panel carrying a market capitalisation beside the returns, and optionally an
 # industry classification. Every numeric field takes a forward fill, so each earns an
@@ -865,14 +866,14 @@ end
     end
 end
 
-@testset "EW beta descriptors: the stored reference cases" begin
+@testset "EW beta descriptors: the stored oracle cases" begin
     res = synthetic_asset_panel(; n_assets = 12, n_observations = 300, n_industries = 3,
                                 rng = StableRNGs.StableRNG(719))
     rd0 = res.rd
     pnl = rd0.pnl
     amsk = Matrix{Bool}(pnl.amsk)
     T, N = size(amsk)
-    # The same forty gaps the reference implementation was driven on. The generator leaves
+    # The same forty gaps the oracle was driven on. The generator leaves
     # none inside the active mask, and a gap is what holds a recursion.
     Xg = Matrix{Float64}(rd0.X)
     let g = StableRNGs.StableRNG(7192), holes = 0
@@ -912,25 +913,22 @@ end
         D = descriptor(EWMarketBeta(; half_life = 5, group = "industry", min_group_size = 2,
                                     bounds = (0.1, 0.9)), rd)
         E = Matrix(CSV.read(joinpath(@__DIR__, "assets/EWMarketBeta.csv.gz"), DataFrame))
-        @test size(D) == size(E)
-        @test isequal(isnan.(D), isnan.(E))
-        @test D[isfinite.(E)] ≈ E[isfinite.(E)]
+        # rtol = 1e-12 cell by cell; measured maxrel 1.7e-15 (#1380).
+        @test parity_compare(D, E; name = "EWMarketBeta").ok
     end
     @testset "The aggregated macro sensitivity matches the stored case cell by cell" begin
         D = descriptor(EWMacroSensitivity(; half_life = 5, agg_obs = 3), rd; ref = ref)
         E = Matrix(CSV.read(joinpath(@__DIR__, "assets/EWMacroSensitivity.csv.gz"),
                             DataFrame))
-        @test size(D) == size(E)
-        @test isequal(isnan.(D), isnan.(E))
-        @test D[isfinite.(E)] ≈ E[isfinite.(E)]
+        # rtol = 1e-12 cell by cell; measured maxrel 3.1e-14 (#1380).
+        @test parity_compare(D, E; name = "EWMacroSensitivity").ok
         # The same series named in the Exogenous Series gives the same case (#1365). Its
         # gap at observation 123 falls in a window that holds two finite values.
         rde = ReturnsResult(; nx = rd.nx, X = rd.X, ne = ["FX"], E = reshape(ref, :, 1),
                             pnl = rd.pnl)
         Ds = descriptor(EWMacroSensitivity(; series = "FX", half_life = 5, agg_obs = 3),
                         rde)
-        @test isequal(isnan.(Ds), isnan.(E))
-        @test Ds[isfinite.(E)] ≈ E[isfinite.(E)]
+        @test parity_compare(Ds, E; name = "EWMacroSensitivity series").ok
     end
 end
 
