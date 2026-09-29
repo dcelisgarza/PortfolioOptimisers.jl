@@ -226,3 +226,26 @@ forecast against a proxy for a moment the forecast does not estimate.
 - The build was [#1023](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1023) on
   map #861; the plots, the optimiser-solved test portfolio, a `Pipeline` in the estimator slot,
   and the covariance metrics as search scorers are fog there.
+
+## Amendment (2026-09-29)
+
+**A step with no active asset is unscored, not refused.** `covariance_forecast_step` refused a
+step at which no asset had both a finite forecast variance and a finite test return, and the fold
+loop passed the refusal on, so one such step stopped the whole evaluation. That is valid input: a
+one-row test window on a market holiday, or a forecast still in its warm-up. The parity measure of
+[#1389](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1389) found that the oracle
+drops the step with no message.
+
+The kernel now returns the step unscored: `n_valid = 0`, and every diagnostic `NaN`. The step is
+kept, not dropped, so each step of `CovarianceForecastEvaluationResult` stays the step of its fold,
+as `test_idx` and `dates` state, and two evaluations over one walk-forward still share their
+steps when a forecast of one of them is in its warm-up. `covariance_forecast_summary` reads the
+scored steps only, and its `n_steps` counts them; it refuses an evaluation that scored no step.
+`covariance_forecast_compare` takes the loss difference over the steps that both evaluations
+scored. With a holiday inside the sample, every summary then equals the oracle's, and
+`test_24e_parity_covariance_forecast_evaluation.jl` pins the steps and the summaries in batch and
+online form.
+
+The same measure fixes the window convention of a parity run: the oracle's `train` rows before a
+purge of `purged` rows are `IndexWalkForward(train + purged, test; purged_size = purged)` here,
+because the training span of the library counts the purge.

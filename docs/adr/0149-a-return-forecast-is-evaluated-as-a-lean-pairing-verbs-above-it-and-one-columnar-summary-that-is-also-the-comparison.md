@@ -339,3 +339,24 @@ thresholds. The cross-sectional diagnostics, `exposure_ic`, `exposure_ic_summary
 same default. The rule is a named symbol and not a flag, as ADR 0044 decides for a named choice.
 `:ordinal` stays so that a caller can reproduce the reference's numbers where its sort keeps the
 asset order, which the parity fixtures of `test_08s` and `test_08t` do.
+
+## Amendment (2026-09-29)
+
+**The book carries its weights over a date with no scorable asset.** The decision that keeps such
+a date says that no statistic reads the difference from the oracle, which drops the date. The
+parity measure of [#1389](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1389)
+found one that did. `forecast_portfolio_weights` left the row of the kept date at zero, so the
+turnover of the next date read a trade out of an empty book, the whole gross of the new book, and
+`mean_turnover` moved with it. The forecast states nothing at such a date, so the date is no
+rebalance: the row now copies the book of the date before it. The return and the turnover of the
+kept date stay `NaN`, and the turnover of the next date reads the trade between the two books
+around the gap, which is the oracle's number. A date with one asset or a flat signal still holds
+no book, because the forecast states no spread there, and the oracle agrees.
+
+The coverage is still the one statistic that reads the kept date, by design: it counts the date as
+silenced, so the least coverage of a summary can be `0` where the oracle's, over the dates it
+kept, cannot.
+
+`test_08x_parity_forecast_evaluation.jl` pins every per-date series, the forward-window tables,
+the calibration curve and the summary against the oracle on nine cases, and the two differences
+this ADR rules (the t-statistic of an overlap and the kept date) by identity.

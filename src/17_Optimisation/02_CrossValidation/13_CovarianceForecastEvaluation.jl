@@ -713,9 +713,11 @@ Under [`RealisedCovariance`](@ref), ``L^{\\mathrm{QLIKE}}_t`` is ``-2`` times th
 
 ``L^{\\mathrm{P}}_t`` is the univariate QLIKE of the variance of the portfolio. It reads the per-row portfolio returns, whichever target formed ``\\mathbf{S}_t``.
 
+A step with no active asset has nothing to score: no asset has both a forecast and a realised return. That is valid input, for example a test window on a market holiday or a forecast still in its warm-up, so the kernel does not refuse it. It returns the step unscored, with `n_valid = 0` and every diagnostic `NaN`. The step keeps its place, so each step of an evaluation stays the step of its fold, and the summary and the comparison read the scored steps only.
+
 # Algorithm
 
- 1. Find the active subset `a`, the assets whose forecast variance and location are finite and which have at least one finite test return. Refuse an empty subset by name.
+ 1. Find the active subset `a`, the assets whose forecast variance and location are finite and which have at least one finite test return. For an empty subset, check the portfolios through [`resolve_forecast_weights`](@ref) and return the unscored step.
  2. Take the forecast on the active subset, giving `sa = sigma[a, a]`.
  3. Centre the test rows of `a` on `c[a]`, giving `Zc`. A non-finite cell stays non-finite.
  4. Form `(S, H)` through [`realised_target`](@ref), and the effective forecast `seff = H .* sa`.
@@ -737,12 +739,11 @@ Under [`RealisedCovariance`](@ref), ``L^{\\mathrm{QLIKE}}_t`` is ``-2`` times th
 # Validation
 
   - `sigma` is square and `Z`, `c` and every portfolio of `w` have its width. A `DimensionMismatch` is thrown otherwise.
-  - At least one asset is active: a finite forecast variance, a finite location, and a finite test return. An `ArgumentError` is thrown otherwise.
   - The forecast on the active subset is positive definite. A `LinearAlgebra.PosDefException` is thrown otherwise.
 
 # Returns
 
-  - `step::NamedTuple`: The diagnostics of the step. `n_valid` is the count of active assets. `mahalanobis_ratio`, `qlike` and `frobenius` are scalars, `diagonal_ratio` is `assets × 1`, and `standardised_return` and `portfolio_qlike` hold one entry per portfolio.
+  - `step::NamedTuple`: The diagnostics of the step. `n_valid` is the count of active assets. `mahalanobis_ratio`, `qlike` and `frobenius` are scalars, `diagonal_ratio` is `assets × 1`, and `standardised_return` and `portfolio_qlike` hold one entry per portfolio. A step with no active asset is unscored: `n_valid` is `0` and every diagnostic is `NaN`.
 
 # Related
 
@@ -760,8 +761,14 @@ function covariance_forecast_step(sigma::MatNum, Z::MatNum, c::VecNum,
               DimensionMismatch("the forecast is $(size(sigma, 1)) × $(size(sigma, 2)), the test rows have $(size(Z, 2)) columns and the location $(length(c)) entries; all three must share one asset axis."))
     a = findall(isfinite.(LinearAlgebra.diag(sigma)) .& isfinite.(c) .&
                 vec(any(isfinite, Z; dims = 1)))
-    @argcheck(!isempty(a),
-              ArgumentError("no asset is active at this step: every asset has a non-finite forecast variance or location, or no finite test return, so there is nothing to score. Drop the step, or hand the kernel a forecast and test rows that share at least one active asset."))
+    if isempty(a)
+        ws = resolve_forecast_weights(w, a, sigma[a, a], N)
+        nan = float_if_integer(promote_type(real(eltype(sigma)), real(eltype(Z)),
+                                            real(eltype(c))))(NaN)
+        return (; n_valid = 0, mahalanobis_ratio = nan, diagonal_ratio = fill(nan, N),
+                qlike = nan, frobenius = nan, standardised_return = fill(nan, length(ws)),
+                portfolio_qlike = fill(nan, length(ws)))
+    end
     h = size(Z, 1)
     na = length(a)
     sa = sigma[a, a]
@@ -1041,7 +1048,7 @@ The arguments correspond to the fields of the struct, in the order of their decl
     """
     target
     """
-    Number of active assets at each step, one entry per step. An active asset has a finite forecast variance, a finite location and at least one finite test return.
+    Number of active assets at each step, one entry per step. An active asset has a finite forecast variance, a finite location and at least one finite test return. A step with no active asset is unscored: its count is `0` and every diagnostic of the step is `NaN`.
     """
     n_valid
     """

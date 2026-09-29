@@ -588,14 +588,18 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test_throws DimensionMismatch covariance_forecast_step(sig, Z, c,
                                                                 [ones(N), ones(3)],
                                                                 RealisedCovariance())
-        e = @test_throws ArgumentError covariance_forecast_step(sig, fill(NaN, 2, N), c,
-                                                                nothing,
-                                                                RealisedCovariance())
-        @test occursin("no asset is active", e.value.msg)
-        nan_sig = fill(NaN, N, N)
-        e = @test_throws ArgumentError covariance_forecast_step(nan_sig, Z, c, nothing,
-                                                                RealisedCovariance())
-        @test occursin("no asset is active", e.value.msg)
+        # A step with no active asset is valid input with nothing to score (#1389): no test
+        # return, or no forecast. It is unscored, and it still checks the portfolios.
+        for (sg, Zs) in ((sig, fill(NaN, 2, N)), (fill(NaN, N, N), Z))
+            u = covariance_forecast_step(sg, Zs, c, [ones(N), ones(N)],
+                                         RealisedCovariance())
+            @test u.n_valid == 0
+            @test isnan(u.mahalanobis_ratio) && isnan(u.qlike) && isnan(u.frobenius)
+            @test all(isnan, u.diagonal_ratio) && length(u.diagonal_ratio) == N
+            @test all(isnan, u.standardised_return) && length(u.portfolio_qlike) == 2
+            @test_throws DimensionMismatch covariance_forecast_step(sg, Zs, c, ones(3),
+                                                                    RealisedCovariance())
+        end
         # A non-finite location drops the asset from the active subset.
         cn = copy(c)
         cn[2] = NaN

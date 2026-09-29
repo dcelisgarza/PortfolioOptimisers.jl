@@ -158,7 +158,7 @@ Arguments correspond to the struct's fields, in the order they are declared. [`c
     """
     exceedance
     """
-    Number of steps of each evaluation. One entry per evaluation.
+    Number of scored steps of each evaluation, the steps with at least one active asset. One entry per evaluation.
     """
     n_steps
     """
@@ -184,7 +184,7 @@ The mean of a ratio is a ratio of sums, which weights each step by its degrees o
 
 # Algorithm
 
- 1. For each evaluation, find the degrees of freedom of each step for the Mahalanobis ratio through [`target_dof`](@ref), and for the ratio of one asset through [`target_step_dof`](@ref).
+ 1. For each evaluation, keep the scored steps, the steps with `n_valid > 0`. An unscored step has no diagnostic, so no statistic reads it. Find the degrees of freedom of each step for the Mahalanobis ratio through [`target_dof`](@ref), and for the ratio of one asset through [`target_step_dof`](@ref).
  2. Reduce the diagonal ratio of each step to its mean over the active assets.
  3. For each ratio, take the weighted mean, the median, and the fifth and ninety-fifth percentiles through [`summary_quantile`](@ref).
  4. Find the half-width of the Gaussian band of each mean at `alpha`, from the sum of the degrees of freedom.
@@ -202,6 +202,7 @@ The mean of a ratio is a ratio of sums, which weights each step by its degrees o
 # Validation
 
   - `cfers` is not empty. An `IsEmptyError` is thrown otherwise.
+  - Every evaluation scored at least one step. An `IsEmptyError` is thrown otherwise.
   - `names` has one entry per evaluation when given. A `DimensionMismatch` is thrown otherwise.
   - `0 < alpha < 1`, and every level lies in `(0, 1)`. A `DomainError` is thrown otherwise.
 
@@ -257,11 +258,14 @@ function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastE
     np = Vector{Int}(undef, n)
     dbar = Vector{Tf}(undef, 0)
     for (i, cfer) in enumerate(cfers)
-        m = cfer.mahalanobis_ratio
-        dof = target_dof.(Ref(cfer.target), cfer.n_valid, cfer.horizon)
-        sdof = target_step_dof.(Ref(cfer.target), cfer.horizon)
+        k = findall(>(0), cfer.n_valid)
+        @argcheck(!isempty(k),
+                  IsEmptyError("evaluation $(i) scored no step: every step had no active asset, so there is nothing to summarise."))
+        m = cfer.mahalanobis_ratio[k]
+        dof = target_dof.(Ref(cfer.target), cfer.n_valid[k], cfer.horizon[k])
+        sdof = target_step_dof.(Ref(cfer.target), cfer.horizon[k])
         map!(t -> Statistics.mean(filter(isfinite, view(cfer.diagonal_ratio, t, :))),
-             resize!(dbar, size(cfer.diagonal_ratio, 1)), axes(cfer.diagonal_ratio, 1))
+             resize!(dbar, length(k)), k)
         mm[i] = LinearAlgebra.dot(dof, m) / sum(dof)
         mmed[i] = Statistics.median(m)
         m5[i] = summary_quantile(m, 0.05)
@@ -276,15 +280,16 @@ function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastE
         hwd = z * sqrt(2 / sum(sdof))
         dlo[i] = 1 - hwd
         dhi[i] = 1 + hwd
-        b = vec(Statistics.std(cfer.standardised_return; dims = 1))
+        b = vec(Statistics.std(view(cfer.standardised_return, k, :); dims = 1))
         bs[i] = Statistics.median(b)
         b5[i] = summary_quantile(b, 0.05)
         b25[i] = summary_quantile(b, 0.25)
         b75[i] = summary_quantile(b, 0.75)
         b95[i] = summary_quantile(b, 0.95)
-        ql[i] = Statistics.mean(cfer.qlike)
-        fr[i] = Statistics.mean(cfer.frobenius)
-        pql[i] = Statistics.median(vec(Statistics.mean(cfer.portfolio_qlike; dims = 1)))
+        ql[i] = Statistics.mean(view(cfer.qlike, k))
+        fr[i] = Statistics.mean(view(cfer.frobenius, k))
+        pql[i] = Statistics.median(vec(Statistics.mean(view(cfer.portfolio_qlike, k, :);
+                                                       dims = 1)))
         stat = dof .* m
         for (j, q) in enumerate(levels)
             thr = Distributions.quantile.(Distributions.Chisq.(dof), q)
@@ -376,7 +381,7 @@ Arguments correspond to the struct's fields, in the order they are declared. [`c
     """
     lags
     """
-    Number of steps compared.
+    Number of steps compared, the steps that both evaluations scored.
     """
     n_steps
 end
@@ -387,7 +392,7 @@ end
 
 Test whether two covariance forecasts differ in expected loss, one test per loss.
 
-The level of a loss on a proxy is not a calibration reading, so two mean losses side by side do not say which forecast is better. The comparison tests the difference of the losses instead. For each loss the per-step difference is a series, and the test compares its mean with zero through a long-run variance. The test windows of a walk-forward do not overlap, so no two steps share a test row. But the forecasts of two steps can share training rows, so their losses can be correlated, and the lags absorb a serial correlation of the difference up to their number.
+The level of a loss on a proxy is not a calibration reading, so two mean losses side by side do not say which forecast is better. The comparison tests the difference of the losses instead. For each loss the per-step difference is a series, and the test compares its mean with zero through a long-run variance. The test windows of a walk-forward do not overlap, so no two steps share a test row. But the forecasts of two steps can share training rows, so their losses can be correlated, and the lags absorb a serial correlation of the difference up to their number. A step that either evaluation did not score has no loss, so the difference is taken over the steps that both scored, and the long-run variance reads them as adjacent.
 
 # Mathematical definition
 
@@ -426,7 +431,7 @@ Under equal expected loss, ``\\mathrm{DMW}`` is asymptotically standard normal. 
 
   - `a.dates == b.dates` and `a.horizon == b.horizon`. An `ArgumentError` is thrown otherwise, because a per-step difference needs the same steps on both sides.
   - `a` and `b` carry the same number of test portfolios. A `DimensionMismatch` is thrown otherwise.
-  - `0 <= lags < n_steps`. A `DomainError` is thrown otherwise.
+  - `0 <= lags < n_steps`, where `n_steps` counts the steps that both evaluations scored. A `DomainError` is thrown otherwise.
 
 # Returns
 
@@ -454,12 +459,12 @@ function covariance_forecast_compare(a::CovarianceForecastEvaluationResult,
     P = size(a.portfolio_qlike, 2)
     @argcheck(size(b.portfolio_qlike, 2) == P,
               DimensionMismatch("the first evaluation carries $(P) test portfolio(s) and the second $(size(b.portfolio_qlike, 2)); hand both the same `w`."))
-    M = length(a.qlike)
+    t = findall((a.n_valid .> 0) .& (b.n_valid .> 0))
+    M = length(t)
     @argcheck(0 <= lags < M, DomainError(lags, "`lags` must lie in [0, n_steps)"))
     names = vcat(["qlike", "frobenius"], ["portfolio_qlike_$(k)" for k in 1:P])
-    series = vcat([a.qlike .- b.qlike, a.frobenius .- b.frobenius],
-                  [view(a.portfolio_qlike, :, k) .- view(b.portfolio_qlike, :, k)
-                   for k in 1:P])
+    series = vcat([a.qlike[t] .- b.qlike[t], a.frobenius[t] .- b.frobenius[t]],
+                  [a.portfolio_qlike[t, k] .- b.portfolio_qlike[t, k] for k in 1:P])
     md = [Statistics.mean(s) for s in series]
     v = [newey_west_variance(s, lags) for s in series]
     z = sqrt(M) .* md ./ sqrt.(v)
