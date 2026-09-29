@@ -735,22 +735,91 @@ end
                                             randn(StableRNG(3), 10, 4),
                                             LinearAlgebra.Diagonal(ones(4)))
         end
-        @testset "The chi-squared radius reads size(sigma_X, 1)" begin
-            # The degrees of freedom is the first dimension of the shape matrix, so the
-            # same algorithm gives N on the mean axis and N^2 on the covariance axis.
+        @testset "The chi-squared radius reads the dimension of the set (#1425)" begin
+            # Without `df`, `k_ucs` reads the side of the shape, which is the dimension of a
+            # shape of full rank: N on the mean axis, N^2 on a diagonal covariance shape.
             for p in (4, 16)
                 k = PortfolioOptimisers.k_ucs(ChiSqKUncertaintyAlgorithm(), 0.05, nothing,
                                               LinearAlgebra.Diagonal(ones(p)))
                 @test k ≈ sqrt(quantile(Distributions.Chisq(p), 0.95))
             end
-            # A symmetric N x N matrix carries N(N+1)/2 free entries, so the N^2 the
-            # covariance axis passes overstates the dimension of the ellipsoid, and the
-            # radius is the conservative one.
+            # A symmetric N x N matrix has N(N+1)/2 free entries, so a full covariance
+            # shape reads that many degrees of freedom. A diagonal shape keeps N^2, the
+            # expected value of its statistic, and the mean axis reads N either way.
             N = 4
-            k_sq = PortfolioOptimisers.k_ucs(ChiSqKUncertaintyAlgorithm(), 0.05, nothing,
-                                             LinearAlgebra.Diagonal(ones(N^2)))
+            ud = PortfolioOptimisers.ucs_dimension
+            @test ud(MuUncertaintySetClass(), false, N) == N
+            @test ud(MuUncertaintySetClass(), true, N) == N
+            @test ud(SigmaUncertaintySetClass(), true, N^2) == N^2
+            @test ud(SigmaUncertaintySetClass(), false, N^2) == N * (N + 1) ÷ 2
             k_free = sqrt(quantile(Distributions.Chisq(N * (N + 1) ÷ 2), 0.95))
-            @test k_sq > k_free
+            k_amb = sqrt(quantile(Distributions.Chisq(N^2), 0.95))
+            S = Matrix{Float64}(LinearAlgebra.I, N^2, N^2)
+            # `ambient = true` reads the side of the shape, N^2, on every route.
+            for (km, want) in ((ChiSqKUncertaintyAlgorithm(), k_free),
+                               (ChiSqKUncertaintyAlgorithm(; ambient = true), k_amb))
+                e = PortfolioOptimisers.ellipsoidal_set(false, km, 0.05, nothing, S,
+                                                        SigmaUncertaintySetClass())
+                @test e.k ≈ want
+                ed = PortfolioOptimisers.ellipsoidal_set(true, km, 0.05, nothing, S,
+                                                         SigmaUncertaintySetClass())
+                @test ed.k ≈ k_amb
+                for d in (false, true)
+                    alg = NormBallUncertaintySetAlgorithm(; method = km, diagonal = d)
+                    nb = PortfolioOptimisers.norm_ball_set(alg, 0.05, nothing, S,
+                                                           SigmaUncertaintySetClass())
+                    @test nb.kappa ≈ (d ? k_amb : want)
+                end
+                @test PortfolioOptimisers.k_ucs(km, 0.05, nothing, S, 3) ≈
+                      (km.ambient ? k_amb : sqrt(quantile(Distributions.Chisq(3), 0.95)))
+            end
+            # The empirical radius absorbs `df`, because its distances carry the dimension.
+            Xs = randn(StableRNG(1425), 50, 3)
+            C3 = Statistics.cov(Xs)
+            @test PortfolioOptimisers.k_ucs(NormalKUncertaintyAlgorithm(), 0.05, Xs, C3,
+                                            1) ==
+                  PortfolioOptimisers.k_ucs(NormalKUncertaintyAlgorithm(), 0.05, Xs, C3)
+        end
+        @testset "The full Normal covariance set holds its stated level (#1425)" begin
+            # The error of a sample covariance is symmetric, so the Normal shape
+            # (I + K)(Σ ⊗ Σ) / T has rank N(N+1)/2 = 15 of 25, and its squared Mahalanobis
+            # distance is chi-squared with 15 degrees of freedom. The chi-squared radius at
+            # 15 and the empirical radius of the sampled errors therefore agree, and the
+            # radius at N^2 = 25 covers almost every error.
+            rng = StableRNG(1425)
+            N, T = 5, 120
+            A = randn(rng, N, N) * 0.01
+            X = randn(rng, T, N) * transpose(A)
+            ell(km) = EllipsoidalUncertaintySetAlgorithm(; method = km, diagonal = false)
+            sc = sigma_ucs(NormalUncertaintySet(; alg = ell(ChiSqKUncertaintyAlgorithm())),
+                           X)
+            sa = sigma_ucs(NormalUncertaintySet(;
+                                                alg = ell(ChiSqKUncertaintyAlgorithm(;
+                                                                                     ambient = true))),
+                           X)
+            sn = sigma_ucs(NormalUncertaintySet(; alg = ell(NormalKUncertaintyAlgorithm()),
+                                                n_sim = 20_000, rng = StableRNG(7)), X)
+            @test sc.sigma == sa.sigma == sn.sigma
+            @test sc.k ≈ sqrt(quantile(Distributions.Chisq(15), 0.95))
+            @test sa.k ≈ sqrt(quantile(Distributions.Chisq(25), 0.95))
+            # Measured: 5.000 (chi-squared), 5.027 (empirical), 6.136 (ambient).
+            @test isapprox(sn.k, sc.k; rtol = 0.02)
+            @test sa.k / sn.k > 1.15
+            # The coverage of each radius on errors drawn from the fitted covariance, one
+            # sample covariance of T normal returns at a time.
+            Σ = sc.val
+            L = LinearAlgebra.cholesky(LinearAlgebra.Symmetric(Σ)).L
+            d2 = map(1:20_000) do _
+                E = Statistics.cov(randn(rng, T, N) * transpose(L)) - Σ
+                e = vec((E + transpose(E)) / 2)
+                return LinearAlgebra.dot(e, sc.sigma \ e)
+            end
+            # Measured: mean distance 15.13, the rank and not N^2 = 25. The radius at 15
+            # covers 0.939, short of 0.95 because a sample covariance of 120 returns is not
+            # exactly normal, and the radius at 25 covers 0.997.
+            @test isapprox(Statistics.mean(d2), 15; rtol = 0.02)
+            @test isapprox(Statistics.mean(d2 .<= sc.k^2), 0.95; atol = 0.02)
+            @test Statistics.mean(d2 .<= sa.k^2) > 0.99
         end
         @testset "The empirical radius measures against the shape it is given" begin
             # `ellipsoidal_set` takes the diagonal BEFORE it fits k, so on the default the
@@ -1847,8 +1916,9 @@ end
         @testset "The bootstrap covariance axis is exact, low rank, and repairs nothing" begin
             # A vectorised symmetric matrix spans N(N+1)/2 coordinates, so the sample
             # covariance of the deviations is rank deficient at every sample size. The
-            # ellipsoid's shape is therefore the repaired one and its radius reads N^2
-            # degrees of freedom; the map carries the sample second moment exactly and its
+            # ellipsoid's shape is therefore the repaired one, and its radius reads the
+            # N(N+1)/2 dimensions of the symmetric matrices (#1425, ADR 0188), or N^2 under
+            # `ambient = true`. The map carries the sample second moment exactly and its
             # radius reads the rank the sample has.
             for n_sim in (30, 12)
                 ub = ARCHUncertaintySet(;
@@ -1873,7 +1943,16 @@ end
                       1e-12 * maximum(abs, cov(Xd))
                 @test rank(sb.L) == min(n_sim - 1, div(N730 * (N730 + 1), 2))
                 @test sb.kappa == sqrt(cquantile(Chisq(rank(sb.L)), ub.q))
-                @test se.k == sqrt(cquantile(Chisq(N730^2), ueb.q))
+                @test se.k == sqrt(cquantile(Chisq(div(N730 * (N730 + 1), 2)), ueb.q))
+                uea = ARCHUncertaintySet(;
+                                         alg = EllipsoidalUncertaintySetAlgorithm(;
+                                                                                  method = ChiSqKUncertaintyAlgorithm(;
+                                                                                                                      ambient = true),
+                                                                                  diagonal = false),
+                                         n_sim = n_sim, seed = 7)
+                sea = sigma_ucs(uea, X730)
+                @test sea.sigma == se.sigma
+                @test sea.k == sqrt(cquantile(Chisq(N730^2), ueb.q))
                 # The ellipsoid's shape is not the sample's own second moment, because the
                 # sample is rank deficient and the default matrix processing repairs it.
                 @test !isposdef(cov(Xd))

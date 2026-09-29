@@ -479,6 +479,7 @@ Which of the two opposite quantities a Centrality algorithm's edge weights must 
 
 **Uncertainty Set**
 A neighbourhood of a specific quantity — a mean vector or a covariance matrix — within which a robust optimiser protects against the worst case. Shapes: **Box** (per-parameter bounds), **Ellipsoidal** (a joint confidence region), the covariance-only **Compact** (below), **Norm Ball** (below, a geometry map of any rank under a norm order, on either axis), and the mean-only **ℓ1** and **Signed ℓ1** cross-polytopes. Constructors: `DeltaUncertaintySet`, `NormalUncertaintySet`, `ARCHUncertaintySet`, `CharacteristicUncertaintySet`.
+The chi-squared radius of a joint region at level `1 − q` reads the dimension of the set, the number of free coordinates its error spans: `N` on the mean axis, `N(N + 1) / 2` on a full covariance shape, because a symmetric matrix has that many free entries, and `N²` on a diagonal covariance shape (ADR 0188).
 
 **Compact Covariance Uncertainty Set**
 The covariance shape stated as a radius, a diagonal metric square root and a basis of the directions the worst case spares, rather than as a shape matrix on the vectorised covariance. Its worst-case variance is a quadratic penalty on the weights, so the consumer adds one cone and one free coefficient vector rather than the lifted semidefinite block the Ellipsoidal shape needs. `CompactCovarianceUncertaintySet` builds it.

@@ -249,10 +249,16 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     nb(d) = NormBallUncertaintySetAlgorithm(; diagonal = d)
 
     @testset "The norm-ball member of the Normal and bootstrap estimators" begin
-        for (kind, ue) in (("Empirical", d -> NormalUncertaintySet(; alg = nb(d))),
-                           ("Bootstrap",
-                            d -> ARCHUncertaintySet(; alg = nb(d), n_sim = 400, block_size = 3,
-                                                    rng = StableRNG(11))))
+        function mk(kind, alg)
+            return if kind == "Empirical"
+                NormalUncertaintySet(; alg = alg)
+            else
+                ARCHUncertaintySet(; alg = alg, n_sim = 400, block_size = 3,
+                                   rng = StableRNG(11))
+            end
+        end
+        for (kind, ue) in (("Empirical", d -> mk("Empirical", nb(d))),
+                           ("Bootstrap", d -> mk("Bootstrap", nb(d))))
             radius = loadv("NormBallUncertaintySet", kind, "Radius")
             for (k, (d, dn)) in enumerate(((true, "Diag"), (false, "Full")))
                 m, s = ucs(ue(d), X)
@@ -284,16 +290,28 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                                               "Cov$(dn)LLt"); scale = :array,
                                          name = "$(kind) cov $(dn)").ok
                 end
-                if kind == "Bootstrap" && !d
-                    # Better. The deviations of a symmetric covariance live in the
-                    # N(N + 1) / 2 = 15 dimensions of the symmetric matrices, so `L` has rank
-                    # 15 and the Mahalanobis distance of the set is chi-squared with 15
-                    # degrees of freedom. The oracle reads N² = 25, a radius of 6.14 against
-                    # 5.00, whose level is not the stated one.
-                    @test rank(s.L) == N * (N + 1) ÷ 2
+                if !d
+                    # Better. The error of a symmetric covariance lives in the
+                    # N(N + 1) / 2 = 15 dimensions of the symmetric matrices: the bootstrap
+                    # deviations have rank 15, and so has the Normal shape (I + K)(Σ ⊗ Σ) / T
+                    # before its repair. The Mahalanobis distance of the set is chi-squared
+                    # with 15 degrees of freedom. The oracle reads N² = 25, a radius of 6.14
+                    # against 5.00, which covers 0.999 of the errors at a stated 0.95 (#1425,
+                    # ADR 0188). `ambient = true` gives the oracle's radius on both routes.
+                    if kind == "Bootstrap"
+                        @test rank(s.L) == N * (N + 1) ÷ 2
+                    end
                     @test isapprox(s.kappa, sqrt(quantile(Chisq(N * (N + 1) ÷ 2), 0.95));
                                    rtol = 1e-14)
                     @test radius[2 + k] > s.kappa
+                    amb = NormBallUncertaintySetAlgorithm(;
+                                                          method = ChiSqKUncertaintyAlgorithm(;
+                                                                                              ambient = true),
+                                                          diagonal = false)
+                    _, sa = ucs(mk(kind, amb), X)
+                    @test sa.L == s.L
+                    @test parity_compare([sa.kappa], [radius[2 + k]];
+                                         name = "$(kind) cov radius, ambient").ok
                 else
                     @test parity_compare([s.kappa], [radius[2 + k]];
                                          name = "$(kind) cov radius").ok

@@ -398,7 +398,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Factorise an asymptotic covariance into the geometry map of a [`NormBallUncertaintySet`](@ref).
 
-The map is square and of full column rank, because `cov` reaches this method already repaired to positive definiteness, so a caller reads its degrees of freedom off `size(L, 2)` and needs no rank measurement. Its sibling [`norm_ball_deviation_factor`](@ref) builds the map from a sample instead, and factorises nothing.
+The map is square and of full column rank, because `cov` reaches this method already repaired to positive definiteness. Full rank does not make `size(L, 2)` the dimension of the set: on a full covariance shape the repair adds ``N(N-1)/2`` flat directions that no error fills, so a caller reads its degrees of freedom from [`ucs_dimension`](@ref). Its sibling [`norm_ball_deviation_factor`](@ref) builds the map from a sample instead, and factorises nothing.
 
 # Algorithm
 
@@ -480,12 +480,12 @@ end
 """
     k_norm_ball(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, L::MatNum, ::Integer)
     k_norm_ball(::GeneralKUncertaintyAlgorithm, q::Number, args...)
-    k_norm_ball(::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, ::MatNum, df::Integer)
+    k_norm_ball(km::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, L::MatNum, df::Integer)
     k_norm_ball(type::Number, args...)
 
 Radius ``\\kappa`` of a [`NormBallUncertaintySet`](@ref), read against a geometry map rather than against a shape matrix.
 
-It is the norm-ball twin of [`k_ucs`](@ref), and the two differ on the two algorithms that read the geometry. [`NormalKUncertaintyAlgorithm`](@ref) solves in the factor rather than inverting a shape, so it serves a rank-deficient map, where a shape matrix would have to be repaired first. [`ChiSqKUncertaintyAlgorithm`](@ref) takes its degrees of freedom from `df`, the dimension of the ball, and not from the side of a shape matrix, because a flat set is a confidence region of its own subspace and not of the ambient space. [`GeneralKUncertaintyAlgorithm`](@ref) and a plain number read neither, and absorb the trailing arguments.
+It is the norm-ball twin of [`k_ucs`](@ref), and the two differ on the two algorithms that read the geometry. [`NormalKUncertaintyAlgorithm`](@ref) solves in the factor rather than inverting a shape, so it serves a rank-deficient map, where a shape matrix would have to be repaired first. [`ChiSqKUncertaintyAlgorithm`](@ref) takes its degrees of freedom from `df`, the dimension of the ball, and not from the row count of the map, because a flat set is a confidence region of its own subspace and not of the ambient space. Under `ambient = true` it reads the row count `size(L, 1)` instead. [`GeneralKUncertaintyAlgorithm`](@ref) and a plain number read neither, and absorb the trailing arguments.
 
 # Mathematical definition
 
@@ -512,7 +512,7 @@ Where:
 
  1. On [`NormalKUncertaintyAlgorithm`](@ref), solve `L \\ transpose(X)`, giving one column of ball coordinates per sampled error. Julia returns the minimum-norm solution, which is the pseudo-inverse applied to each error.
  2. Take the squared column norms, giving one squared distance per sample, and return the square root of their `1 - q` quantile.
- 3. On [`ChiSqKUncertaintyAlgorithm`](@ref), return the square root of the `1 - q` chi-squared quantile at `df` degrees of freedom.
+ 3. On [`ChiSqKUncertaintyAlgorithm`](@ref), return the square root of the `1 - q` chi-squared quantile at `df` degrees of freedom, or at `size(L, 1)` when `km.ambient` is `true`.
  4. On [`GeneralKUncertaintyAlgorithm`](@ref), return `sqrt((1 - q) / q)`, Cantelli's bound, which reads no geometry.
  5. On a `Number`, return it unchanged.
 
@@ -522,7 +522,7 @@ Where:
   - `q`: Significance level.
   - `X`: Sample of estimation errors, one row per simulation.
   - `L`: Geometry map.
-  - `df`: Degrees of freedom, the dimension of the ball. Its caller reads `size(L, 2)` from a full-rank map and `LinearAlgebra.rank(L)` from a deviation map.
+  - `df`: Degrees of freedom, the dimension of the ball. Its caller reads [`ucs_dimension`](@ref) for a map factorised from a shape, ``N(N+1)/2`` on a full covariance shape, and `LinearAlgebra.rank(L)` for a deviation map.
 
 # Returns
 
@@ -533,6 +533,7 @@ Where:
   - [`NormBallUncertaintySet`](@ref)
   - [`NormBallUncertaintySetAlgorithm`](@ref)
   - [`k_ucs`](@ref)
+  - [`ucs_dimension`](@ref)
   - [`norm_ball_set`](@ref)
   - [`norm_ball_deviation_set`](@ref)
 
@@ -548,8 +549,10 @@ end
 function k_norm_ball(::GeneralKUncertaintyAlgorithm, q::Number, args...)
     return sqrt((one(q) - q) / q)
 end
-function k_norm_ball(::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, ::MatNum, df::Integer)
-    return sqrt(Distributions.cquantile(Distributions.Chisq(df), q))
+function k_norm_ball(km::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, L::MatNum,
+                     df::Integer)
+    p = km.ambient ? size(L, 1) : df
+    return sqrt(Distributions.cquantile(Distributions.Chisq(p), q))
 end
 function k_norm_ball(type::Number, args...)::Number
     return type
@@ -559,12 +562,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assemble a [`NormBallUncertaintySet`](@ref) from an already-computed asymptotic covariance `cov`.
 
-It is the norm-ball twin of [`ellipsoidal_set`](@ref), and it takes the same two steps in the same order: the diagonal is taken before the radius is fitted, so an empirical radius is measured against whichever geometry the set carries. The map is square and of full column rank, so the degrees of freedom are `size(L, 2)`. Its sibling [`norm_ball_deviation_set`](@ref) reads a sample instead of a covariance, and is the route that spares the ``N^{2} \\times N^{2}`` matrix.
+It is the norm-ball twin of [`ellipsoidal_set`](@ref), and it takes the same two steps in the same order: the diagonal is taken before the radius is fitted, so an empirical radius is measured against whichever geometry the set carries. The degrees of freedom are the dimension of the set, which [`ucs_dimension`](@ref) gives: ``N(N+1)/2`` on a full covariance shape, although the repaired map has ``N^{2}`` columns. Its sibling [`norm_ball_deviation_set`](@ref) reads a sample instead of a covariance, and is the route that spares the ``N^{2} \\times N^{2}`` matrix.
 
 # Algorithm
 
  1. Build the map with [`norm_ball_factor`](@ref) under `alg.diagonal`, giving `L`.
- 2. Fit the radius with [`k_norm_ball`](@ref) on `alg.method`, passing `size(L, 2)` as the degrees of freedom.
+ 2. Fit the radius with [`k_norm_ball`](@ref) on `alg.method`, passing `ucs_dimension(class, alg.diagonal, size(L, 1))` as the degrees of freedom.
  3. Build a [`NormBallUncertaintySet`](@ref) from `alg.p`, `L`, the radius, `class` and `val`.
 
 # Arguments
@@ -587,6 +590,7 @@ It is the norm-ball twin of [`ellipsoidal_set`](@ref), and it takes the same two
   - [`norm_ball_factor`](@ref)
   - [`norm_ball_deviation_set`](@ref)
   - [`k_norm_ball`](@ref)
+  - [`ucs_dimension`](@ref)
   - [`ellipsoidal_set`](@ref)
 """
 function norm_ball_set(alg::NormBallUncertaintySetAlgorithm, q::Number, samples,
@@ -595,8 +599,9 @@ function norm_ball_set(alg::NormBallUncertaintySetAlgorithm, q::Number, samples,
     L = norm_ball_factor(alg.diagonal, cov)
     return NormBallUncertaintySet(;
                                   kappa = k_norm_ball(alg.method, q, samples, L,
-                                                      size(L, 2)), L = L, p = alg.p,
-                                  class = class, val = val)
+                                                      ucs_dimension(class, alg.diagonal,
+                                                                    size(L, 1))), L = L,
+                                  p = alg.p, class = class, val = val)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -370,7 +370,8 @@ Keywords correspond to the struct's fields.
 julia> OrthogonalUncertaintySet()
 OrthogonalUncertaintySet
         q ┼ Float64: 0.05
-   method ┼ ChiSqKUncertaintyAlgorithm()
+   method ┼ ChiSqKUncertaintyAlgorithm
+          │   ambient ┴ Bool: false
   scaling ┼ IdentityScaling()
     kappa ┼ Float64: 1.0
    metric ┴ InverseIdiosyncraticVarianceMetric()
