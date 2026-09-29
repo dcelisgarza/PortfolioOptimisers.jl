@@ -37,7 +37,7 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Computes the regime statistic of the diagonal target, with each term divided by the bias of its
-own estimated variance.
+own estimated variance, and the sum divided by the factor of its law.
 
 Each term ``u_{i}^{2} / \\hat{C}_{ii}`` reads one estimated variance of ``K_{i}`` observations,
 so its mean is ``\\mathbb{E}[Q^{-1}]`` at ``K_{i}``, from [`regime_bias_table`](@ref), and not
@@ -46,6 +46,10 @@ every correlation of the assets. A sum of ``n`` terms averages the errors of the
 estimates, so the root and the log that the other methods read see almost the same factor: at 12
 assets and a half-life of 10 the bias is 1.073 for the mean, 1.068 for the root and 1.063 for the
 log at a correlation of 0.3. The factor of each method alone is exact only at one asset.
+
+The mean of the sum is ``n`` at every correlation, but its root and its log are not: they read
+the law of the sum, which the correlation of the assets sets. So the sum is then divided by
+[`diagonal_law_factor`](@ref) of the method.
 
 # Arguments
 
@@ -63,6 +67,7 @@ log at a correlation of 0.3. The factor of each method alone is exact only at on
 
   - [`DiagonalTarget`](@ref)
   - [`regime_bias!`](@ref)
+  - [`diagonal_law_factor`](@ref)
   - [`update_regime!`](@ref)
 """
 function regime_target_statistic(::DiagonalTarget, cache::RegimeAdjustedCovarianceState,
@@ -70,8 +75,321 @@ function regime_target_statistic(::DiagonalTarget, cache::RegimeAdjustedCovarian
                                  idx::AbstractVector{<:Integer})
     f = regime_bias!.(Ref(cache.bias), Ref(RootMeanSquaredAdjusted()), ce.decay,
                       view(cache.obs_count, idx))
-    return regime_statistic(DiagonalTarget(), X[idx] ./ sqrt.(f),
-                            regime_covariance_block(cache, ce, idx), idx, ce.min_val)
+    C = regime_covariance_block(cache, ce, idx)
+    return regime_statistic(DiagonalTarget(), X[idx] ./ sqrt.(f), C, idx, ce.min_val) ./
+           diagonal_law_factor(ce.regime_method, cache, ce, C, idx)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns one, the law factor of a regime method that reads the mean of the diagonal statistic.
+
+The per-term factor of [`regime_target_statistic`](@ref) makes the mean of the sum ``n`` at every
+correlation, which is the constant that [`RootMeanSquaredAdjusted`](@ref) divides by. A regime
+method that the library does not define takes no law factor either.
+
+# Arguments
+
+  - `::RegimeAdjustedMethod`: Regime adjustment method.
+  - `::RegimeAdjustedCovarianceState`: Online covariance computation cache (unused).
+  - `::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration (unused).
+  - `C::MatNum`: Bias-corrected covariance block of the contributing assets.
+  - `::AbstractVector{<:Integer}`: Index of those assets (unused).
+
+# Returns
+
+  - `factor::Number`: `one(eltype(C))`.
+
+# Related
+
+  - [`regime_target_statistic`](@ref)
+  - [`regime_law_factor`](@ref)
+"""
+function diagonal_law_factor(::RegimeAdjustedMethod, ::RegimeAdjustedCovarianceState,
+                             ::RegimeAdjustedExpWeightedCovariance, C::MatNum,
+                             ::AbstractVector{<:Integer})
+    return one(eltype(C))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the factor by which the diagonal statistic is divided, so that its root or its log has
+the expectation that the method's constant assumes.
+
+The diagonal statistic ``S = \\sum_{i} z_{i}^{2}`` sums the squares of ``n`` returns with the
+correlation ``R``, so under a correctly calibrated model its law is
+``S = \\sum_{k} \\mu_{k} \\chi^{2}_{k}(1)``, on the eigenvalues ``\\mu_{k}`` of ``R``. The
+constants of [`regime_denom`](@ref) and [`regime_kappa`](@ref) assume a law that does not read
+``R``. At 12 assets and a half-life of 10 the squared multiplier on iid Normal returns is 0.93
+for the first moment and 0.94 for the log at a correlation of 0.3, and 0.72 and 0.54 at 0.9.
+
+The true ``R`` is not known, and the eigenvalues of its estimate ``\\hat{R}`` are too dispersed:
+the law of ``\\hat{R}`` over-corrects by up to 1.3 % and 2.7 %. So
+[`diagonal_law_spectrum`](@ref) shrinks ``\\hat{R}`` towards the identity until its dispersion is
+the unbiased one, and [`regime_law_factor`](@ref) takes the exact law of that spectrum. The factor
+reads the correlation alone, so a scaled return leaves it unchanged. Where `ce.debias` is `false`,
+the factor is one, which is the raw statistic.
+
+# Arguments
+
+  - `method::Union{<:FirstMomentRegimeAdjusted, <:LogRegimeAdjusted}`: Regime adjustment method.
+  - `cache::RegimeAdjustedCovarianceState`: Online covariance computation cache.
+  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
+  - `C::MatNum`: Bias-corrected covariance block of the contributing assets.
+  - `idx::AbstractVector{<:Integer}`: Index of those assets.
+
+# Returns
+
+  - `factor::Number`: The factor of the method's law at the shrunk spectrum, or one where
+    `ce.debias` is `false`.
+
+# Related
+
+  - [`regime_target_statistic`](@ref)
+  - [`diagonal_law_spectrum`](@ref)
+  - [`regime_law_factor`](@ref)
+  - [`DiagonalTarget`](@ref)
+"""
+function diagonal_law_factor(method::Union{<:FirstMomentRegimeAdjusted,
+                                           <:LogRegimeAdjusted},
+                             cache::RegimeAdjustedCovarianceState,
+                             ce::RegimeAdjustedExpWeightedCovariance, C::MatNum,
+                             idx::AbstractVector{<:Integer})
+    if !ce.debias
+        return one(eltype(C))
+    end
+
+    return regime_law_factor(method, diagonal_law_spectrum(cache, ce, C, idx))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the eigenvalues of the correlation of the contributing assets, shrunk towards the
+identity until their dispersion is unbiased.
+
+A sample correlation ``\\hat{r}`` of ``K`` effective observations has the variance
+``(1 - r^{2})^{2} / K``, so ``\\hat{r}^{2}`` is too large by that amount on average, and the
+eigenvalues of ``\\hat{R}`` are too dispersed. The dispersion of the eigenvalues is
+``\\sum_{k} (\\mu_{k} - 1)^{2} = \\sum_{i \\neq j} r_{ij}^{2}``. The shrunk correlation
+``\\tilde{R} = I + \\alpha (\\hat{R} - I)`` is a linear shrinkage towards the identity, with the
+intensity at which the dispersion of ``\\tilde{R}`` is the unbiased estimate of the dispersion of
+``R``. It is exact at the identity and at a correlation of one, where ``\\hat{r}^{2}`` has no
+variance.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\frac{1}{K_{ij}} &= \\frac{1 - \\lambda}{1 + \\lambda} \\cdot \\frac{2 - W_{ij}}{W_{ij}}\\,, \\\\
+\\alpha^{2} &= \\frac{\\sum_{i \\neq j} \\left(\\hat{r}_{ij}^{2} - (1 - \\hat{r}_{ij}^{2})^{2} / K_{ij}\\right)}
+{\\sum_{i \\neq j} \\hat{r}_{ij}^{2}}\\,, \\\\
+\\tilde{\\mu}_{k} &= \\max\\left(1 + \\alpha (\\hat{\\mu}_{k} - 1), 0\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``K_{ij}``: Effective count of the observations of the pair, the inverse of the sum of its
+    squared normalised weights.
+  - ``\\lambda``: Decay of the correlation, `cor_decay` on the separate path and `decay` else.
+  - ``W_{ij}``: Weight that the pair holds, ``1 - \\lambda^{k}`` after ``k`` joint observations.
+  - ``\\hat{r}_{ij}``: Entry of the estimated correlation.
+  - ``\\alpha``: Shrinkage intensity, clamped to ``[0, 1]``.
+  - ``\\hat{\\mu}_{k}``, ``\\tilde{\\mu}_{k}``: Eigenvalues of ``\\hat{R}`` and ``\\tilde{R}``.
+
+A pair that holds no weight has no estimate, and is left out of both sums.
+
+# Arguments
+
+  - `cache::RegimeAdjustedCovarianceState`: Online covariance computation cache.
+  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
+  - `C::MatNum`: Bias-corrected covariance block of the contributing assets.
+  - `idx::AbstractVector{<:Integer}`: Index of those assets.
+
+# Returns
+
+  - `mu::VecNum`: The eigenvalues of the shrunk correlation.
+
+# Related
+
+  - [`diagonal_law_factor`](@ref)
+  - [`regime_law_factor`](@ref)
+  - [`pair_weighted_block`](@ref)
+"""
+function diagonal_law_spectrum(cache::RegimeAdjustedCovarianceState,
+                               ce::RegimeAdjustedExpWeightedCovariance, C::MatNum,
+                               idx::AbstractVector{<:Integer})
+    T = eltype(C)
+    d = sqrt.(max.(LinearAlgebra.diag(C), ce.min_val))
+    rho = clamp.(C ./ (d .* transpose(d)), -one(T), one(T))
+    lambda, W = if has_separate_cor_decay(ce)
+        ce.cor_decay, view(cache.cor_weight, idx, idx)
+    else
+        ce.decay, view(cache.weight, idx, idx)
+    end
+    pairs = Iterators.filter(p -> p[1] != p[2] && W[p] > 0, CartesianIndices(rho))
+    q = sum(p -> rho[p]^2, pairs; init = zero(T))
+    v = (one(lambda) - lambda) / (one(lambda) + lambda)
+    q_unbiased = sum(p -> rho[p]^2 - (one(T) - rho[p]^2)^2 * v * (2 - W[p]) / W[p], pairs;
+                     init = zero(T))
+    alpha = sqrt(clamp(q_unbiased / max(q, eps(T)), zero(T), one(T)))
+    mu = LinearAlgebra.eigvals(LinearAlgebra.Symmetric(rho))
+
+    return max.(one(T) .+ alpha .* (mu .- one(T)), zero(T))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the log of the Laplace transform of a weighted sum of gamma variates, divided by its
+count.
+
+The law of ``S / n = \\sum_{k} \\mu_{k} G_{k} / n`` with ``G_{k}`` independent
+``\\mathrm{Gamma}(a, y)`` variates has the Laplace transform
+``\\prod_{k} (1 + y \\mu_{k} t / n)^{-a}``. At ``a = 1/2`` and ``y = 2`` each ``G_{k}`` is a
+``\\chi^{2}(1)`` variate.
+
+# Arguments
+
+  - `mu::VecNum`: Weights of the sum, the eigenvalues of the correlation.
+  - `a::Number`: Shape of each gamma variate.
+  - `y::Number`: Scale of each gamma variate.
+  - `t::Number`: Argument of the transform.
+
+# Returns
+
+  - `lL::Number`: ``-a \\sum_{k} \\ln(1 + y \\mu_{k} t / n)``.
+
+# Related
+
+  - [`regime_law_factor`](@ref)
+"""
+function regime_law_log_laplace(mu::VecNum, a::Number, y::Number, t::Number)
+    n = length(mu)
+    return -a * sum(m -> log1p(y * m * t / n), mu)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the grid of the integration variable ``x = \\ln t`` on which [`regime_law_factor`](@ref)
+takes the trapezoid rule.
+
+Each integrand is smooth and analytic in a strip about the real line, so the trapezoid rule
+converges faster than any power of the step. The transform of a wide block grows fast inside the
+strip, so the step must be small: at a step of ``1/4`` the factors agree with their closed forms at
+``\\mu_{k} = 1`` and at one eigenvalue ``n`` to ``10^{-14}``, from ``n = 1`` to ``20\\,000``,
+whereas a step of ``1/2`` is ``3 \\times 10^{-9}`` wrong at ``n = 200``. The slowest integrand
+decays as ``e^{-\\lvert x \\rvert / 2}`` at both ends, so the grid stops at
+``\\lvert x \\rvert = 75``.
+
+# Arguments
+
+  - `T::Type`: Number type of the grid.
+
+# Returns
+
+  - `x::AbstractRange`: The grid, of step ``1/4`` on ``[-75, 75]``.
+
+# Related
+
+  - [`regime_law_factor`](@ref)
+"""
+function regime_law_grid(T::Type)
+    return range(-75 * one(T), 75 * one(T); step = one(T) / 4)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the factor of the first-moment method, the squared ratio of the expected root of the
+diagonal statistic to the constant [`regime_denom`](@ref).
+
+# Mathematical definition
+
+```math
+\\mathbb{E}[\\sqrt{S}] = \\frac{\\sqrt{n}}{2 \\sqrt{\\pi}} \\int_{0}^{\\infty}
+\\left(1 - L(t)\\right) t^{-3/2}\\, \\mathrm{d}t\\,, \\quad
+L(t) = \\prod_{k} \\left(1 + 2 \\mu_{k} t / n\\right)^{-1/2}\\,.
+```
+
+The integral is taken on ``t = e^{x}`` over [`regime_law_grid`](@ref). At ``\\mu_{k} = 1`` it
+is the root of a ``\\chi^{2}(n)`` variate, and at one eigenvalue ``n`` it is
+``\\sqrt{2 n / \\pi}``.
+
+# Arguments
+
+  - `method::FirstMomentRegimeAdjusted`: First-moment regime adjustment method.
+  - `mu::VecNum`: Eigenvalues of the correlation, which sum to the count of assets.
+
+# Returns
+
+  - `factor::Number`: ``(\\mathbb{E}[\\sqrt{S}] / d_{n})^{2}``, with ``d_{n}`` from
+    [`regime_denom`](@ref).
+
+# Related
+
+  - [`diagonal_law_factor`](@ref)
+  - [`regime_law_log_laplace`](@ref)
+  - [`FirstMomentRegimeAdjusted`](@ref)
+"""
+function regime_law_factor(method::FirstMomentRegimeAdjusted, mu::VecNum)
+    T = eltype(mu)
+    x = regime_law_grid(T)
+    n = length(mu)
+    half = one(T) / 2
+    integral = sum(x) do xi
+        t = exp(xi)
+        return -expm1(regime_law_log_laplace(mu, half, 2 * one(T), t)) / sqrt(t)
+    end
+    root = sqrt(n * one(T)) * step(x) * integral / (2 * sqrt(pi * one(T)))
+
+    return (root / regime_denom(method, DiagonalTarget(), n))^2
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the factor of the log method, the exponential of the difference between the expected log
+of the diagonal statistic and the constant [`regime_kappa`](@ref).
+
+The method takes each square as a ``\\mathrm{Gamma}(x, y)`` variate, which is the law that its
+constant assumes, so the factor is one at ``\\mu_{k} = 1`` whatever the parameters.
+
+# Mathematical definition
+
+```math
+\\mathbb{E}[\\ln S] = \\ln n + \\int_{0}^{\\infty} \\left(\\frac{1}{1 + t} - L(t)\\right)
+t^{-1}\\, \\mathrm{d}t - \\gamma\\,, \\quad
+L(t) = \\prod_{k} \\left(1 + y \\mu_{k} t / n\\right)^{-x}\\,.
+```
+
+Where ``\\gamma`` is the Euler-Mascheroni constant. The integral is taken on ``t = e^{x}`` over
+[`regime_law_grid`](@ref).
+
+# Arguments
+
+  - `method::LogRegimeAdjusted`: Log regime adjustment method.
+  - `mu::VecNum`: Eigenvalues of the correlation, which sum to the count of assets.
+
+# Returns
+
+  - `factor::Number`: ``\\exp(\\mathbb{E}[\\ln S] - \\kappa_{n})``, with ``\\kappa_{n}`` from
+    [`regime_kappa`](@ref).
+
+# Related
+
+  - [`diagonal_law_factor`](@ref)
+  - [`regime_law_log_laplace`](@ref)
+  - [`LogRegimeAdjusted`](@ref)
+"""
+function regime_law_factor(method::LogRegimeAdjusted, mu::VecNum)
+    T = eltype(mu)
+    x = regime_law_grid(T)
+    n = length(mu)
+    integral = sum(x) do xi
+        t = exp(xi)
+        return inv(one(t) + t) - exp(regime_law_log_laplace(mu, method.x, method.y, t))
+    end
+    elog = log(n * one(T)) + step(x) * integral - Base.MathConstants.eulergamma
+
+    return exp(elog - regime_kappa(method, DiagonalTarget(), n))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -151,7 +151,7 @@ Targets the diagonal of a covariance matrix, in a regime adjustment and in a geo
 
 In a regime adjustment, the baseline covariance structure is diagonal, so the regime statistic reads the variances alone. In a [`GeodesicShrinkageCovariance`](@ref), the target matrix is the diagonal of the matrix being shrunk, which keeps the variances and removes every correlation.
 
-Each term of the regime statistic reads one estimated variance, and the inverse of an estimate is too large on average. Where the estimator has `debias = true`, [`regime_target_statistic`](@ref) divides each term by the mean of that inverse at the count of its asset, so the statistic has the mean ``n`` at every correlation.
+Each term of the regime statistic reads one estimated variance, and the inverse of an estimate is too large on average. Where the estimator has `debias = true`, [`regime_target_statistic`](@ref) divides each term by the mean of that inverse at the count of its asset, so the statistic has the mean ``n`` at every correlation. The root and the log of the statistic read its law, which the correlation of the assets sets, so for the first-moment and the log methods it then divides the sum by [`diagonal_law_factor`](@ref).
 
 # Related
 
@@ -622,7 +622,9 @@ whole active block.
 [`MahalanobisTarget`](@ref) and [`DiagonalTarget`](@ref) both sum `n` standardised squares, so
 the statistic is a ``\\chi^2(n)`` variate under correct calibration and its log has expectation
 ``\\psi(x n) + \\ln y``. The scalar case of [`RegimeAdjustedExpWeightedVariance`](@ref) is this
-expression at `n = 1`.
+expression at `n = 1`. The squares of the diagonal target are correlated, so its sum is not a
+``\\chi^2(n)`` variate: the debiased statistic is first divided by
+[`diagonal_law_factor`](@ref), which makes this constant exact at the correlation of the assets.
 
 # Arguments
 
@@ -733,8 +735,10 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Computes the first-moment normalisation of the regime statistic for the diagonal target.
 
-The diagonal statistic ignores the correlations, so only the second-moment calibration is exact
-in general. The root of `n` is kept as the diagonal-risk proxy.
+The root of `n` is the root of the mean of the statistic, not the mean of its root, so it is not
+the expectation of the root at any correlation. The raw statistic of `debias = false` divides by
+it. The debiased statistic is first divided by [`diagonal_law_factor`](@ref), which makes this
+constant exact at the correlation of the assets.
 
 # Arguments
 

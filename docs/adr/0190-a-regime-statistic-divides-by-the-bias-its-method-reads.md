@@ -70,6 +70,18 @@ factor. At 12 assets and a half-life of 10 the biases are 1.073, 1.068 and 1.063
 factor keeps `E[S] = n` exactly at every correlation. That calibration is the only one that the
 target's docstring states as exact.
 
+**`DiagonalTarget` then divides its sum by the factor of its law, for FirstMoment and Log (#1432).**
+The sum of `n` correlated squares is `S = Σ_k μ_k χ²_k(1)` on the eigenvalues `μ_k` of the
+correlation, so its root and its log read the correlation, which the constants `√n` and
+`ψ(x n) + ln y` do not. `diagonal_law_factor` divides `S` by `(E[√S] / √n)²` or by
+`exp(E[ln S] − κ)`, each one integral of the Laplace transform `Π_k (1 + y μ_k t / n)^(-x)`. The Log
+method takes each square as a `Gamma(x, y)` variate, which is the law that its constant assumes, so
+its factor is one at `μ = 1` whatever its parameters. The spectrum is that of the estimated
+correlation, shrunk towards the identity until `Σ_{i≠j} r_ij²` is its unbiased estimate: the
+variance of a sample correlation is `(1 − r²)² / K_ij`, with `K_ij` from the weight of the pair.
+The factor reads the correlation alone, so it keeps the scale invariance. `debias = false` takes no
+factor, and `RootMeanSquaredAdjusted` needs none, so neither pays the eigen-decomposition.
+
 **The gate is `K > n + 3`, where the variance of the statistic is finite.** At `n = 1` an estimate
 of four observations or fewer is not scored. The gate reads the count of each asset, so a young
 asset leaves the statistic as it does below `min_obs`.
@@ -85,9 +97,11 @@ asset leaves the statistic as it does below `min_obs`.
   - `MahalanobisTarget` keeps `b`, the moment of the mean, for every method, so it over-corrects
     FirstMoment and Log: 0.975 and 0.956 at 12 assets and a half-life of 10. The root and the log of
     `v' Ŵ⁻¹ v` for `n > 1` have no one-dimensional integral (#1431).
-  - The FirstMoment and Log calibrations of `DiagonalTarget` assume a `χ²(n)` sum. Before this
-    decision the Jensen bias hid part of that error; after it, correlated assets read 0.941 and 0.962
-    (#1432).
+  - The FirstMoment and Log calibrations of `DiagonalTarget` assumed a `χ²(n)` sum. Before this
+    decision the Jensen bias hid part of that error; after it, correlated assets read 0.941 and 0.962.
+    #1432 divides the sum by the factor of its law (see the decision above), and they read
+    0.995 and 0.989. The rest is the per-term factor of the mean, which the root and the log see
+    almost but not exactly: it grows with the correlation, to 0.986 and 0.971 at 0.9 (#1434).
   - The factor assumes the plain exponential weights, and a HAC estimate has others. At two lags it
     over-corrects the scalar estimator (0.898) and under-corrects the covariance targets (#1433).
 
@@ -104,5 +118,10 @@ asset leaves the statistic as it does below `min_obs`.
   times the half-life. Only a direction that reads no estimate is exact.
 - **A fixed default direction** (#1430). The factor of #1428 is exact for it on every row, but the
   target would then measure another portfolio, which the most volatile assets dominate.
+- **The law of the estimated correlation, not shrunk**, as #1432 first proposed. The eigenvalues of
+  a sample correlation are too dispersed, so it over-corrects: 1.008 and 1.016 at 12 assets and a
+  half-life of 10, and 1.013 and 1.027 at 30 assets.
+- **A two-moment Gamma law on the unbiased `Σ r_ij²`.** It is cheap, but a spike in the spectrum is
+  not a Gamma variate: at a correlation of 0.9 the Log method reads 1.36.
 - **A keyword on each target.** `DiagonalTarget` would carry a field that a geodesic shrinkage
   ignores, and the scalar estimator would need a keyword of its own anyway.

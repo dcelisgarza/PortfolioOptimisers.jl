@@ -168,7 +168,7 @@
 "src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { map = 3, units = 25, algorithm = 8, swept = true, bindings = ["ExpWeightedCovariance", "ExpWeightedCovarianceState", "copy", "cor", "cor", "cor", "cor", "cov", "cov", "cov", "cov", "exp_weighted_moment", "exp_weighted_pass!", "exp_weighted_pass!", "gap_fill_value", "merge_states", "pair_weighted_block", "partial_fit!", "partial_fit!", "process_observation!", "restore_psd!", "std", "var", "variance_series", "variance_series"] }
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { map = 3, units = 36, swept = false }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { map = 3, units = 33, swept = false }
-"src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { map = 3, units = 27, swept = false }
+"src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { map = 3, units = 34, swept = false }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { map = 3, units = 29, swept = false }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { map = 3, units = 20, swept = false }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { map = 3, units = 10, swept = false }

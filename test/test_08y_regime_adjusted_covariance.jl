@@ -679,9 +679,14 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
         @test variance_multiplier(method; debias = false) > 1.04
         @test covariance_multiplier(fixed, method; debias = false) > 1.04
     end
-    @test 0.98 <
-          covariance_multiplier(PO.DiagonalTarget(), PO.RootMeanSquaredAdjusted()) <
-          1.02
+    # The diagonal target also divides the sum by the factor of its law for the root and the log
+    # (#1432). Measured on this seed: 0.996 and 0.992 on both paths; 8 seeds read 0.941 and 0.962
+    # before, and 0.995 and 0.989 after.
+    methods = (PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted(),
+               PO.LogRegimeAdjusted())
+    for method in methods, extra in ((;), (; cor_decay = 2.0^(-1 / 20)))
+        @test 0.98 < covariance_multiplier(PO.DiagonalTarget(), method; extra...) < 1.02
+    end
     @test covariance_multiplier(PO.DiagonalTarget(), PO.RootMeanSquaredAdjusted();
                                 debias = false) > 1.05
 
@@ -799,4 +804,72 @@ correlation of the block (ADR 0190).
     @test 0.98 <
           covariance_multiplier(PO.RootMeanSquaredAdjusted(); cor_decay = 2.0^(-1 / 20)) <
           1.02
+end
+
+#=
+Issue #1432. The diagonal sum `S = Σ_i z_i²` of returns with the correlation `R` has the law
+`Σ_k μ_k χ²_k(1)` on the eigenvalues of `R`, so its root and its log read the correlation. The
+constants `√n` and `ψ(x n) + ln y` do not, so `DiagonalTarget` divides the sum by the factor of its
+law, on the estimated spectrum shrunk until its dispersion is unbiased (ADR 0190).
+=#
+@testset "the diagonal statistic divides by the factor of its law" begin
+    SF = PO.SpecialFunctions
+    FM, LG = PO.FirstMomentRegimeAdjusted(), PO.LogRegimeAdjusted()
+    chi_root(n) = sqrt(2) * exp(SF.loggamma((n + 1) / 2) - SF.loggamma(n / 2))
+    # The law is known at independent squares, a χ²(n) variate, and at one eigenvalue n, n times
+    # a χ²(1) variate. The Log factor is one at μ = 1 whatever its parameters, because it takes each
+    # square as the Gamma(x, y) variate that its constant assumes. Measured: 1e-13 or less.
+    for n in (1, 2, 12, 200)
+        spike = [n; zeros(n - 1)]
+        @test isapprox(PO.regime_law_factor(FM, ones(n)), chi_root(n)^2 / n; rtol = 1e-12)
+        @test isapprox(PO.regime_law_factor(FM, spike), 2 / pi; rtol = 1e-12)
+        @test isapprox(PO.regime_law_factor(LG, ones(n)), 1; rtol = 1e-12)
+        @test isapprox(PO.regime_law_factor(PO.LogRegimeAdjusted(; x = 1.3, y = 0.7),
+                                            ones(n)), 1; rtol = 1e-12)
+        @test isapprox(PO.regime_law_factor(LG, spike),
+                       exp(log(n) + SF.digamma(0.5) - SF.digamma(n / 2)); rtol = 1e-12)
+    end
+
+    rng = StableRNG(1432)
+    X = randn(rng, 200, 4) *
+        [1.0 0.5 0.3 0.0; 0.0 1.0 0.4 0.2; 0.0 0.0 1.0 0.6; 0.0 0.0 0.0 1.0] .* 0.01
+    idx = 1:4
+    lambda = 2.0^(-1 / 10)
+    for (lam, extra) in ((lambda, (;)), (2.0^(-1 / 20), (; cor_decay = 2.0^(-1 / 20))))
+        ce = RegimeAdjustedExpWeightedCovariance(; decay = lambda, min_obs = 5, extra...,
+                                                 regime_target = PO.DiagonalTarget(),
+                                                 regime_method = FM)
+        cache = partial_fit!(ce, X).cache
+        C = PO.regime_covariance_block(cache, ce, idx)
+        # Each pair read all 200 rows, so `1/K` is the sum of the squared normalised weights, and
+        # the shrunk spectrum keeps the trace and has the unbiased dispersion `Σ_{i≠j} r²`. On the
+        # separate path the correlation reads `cor_decay`.
+        w = [(1 - lam) * lam^j for j in 0:199]
+        w ./= sum(w)
+        rho = C ./ sqrt.(diag(C) * transpose(diag(C)))
+        q = sum(rho[i, j]^2 - (1 - rho[i, j]^2)^2 * sum(abs2, w)
+                for i in idx, j in idx if i != j)
+        mu = PO.diagonal_law_spectrum(cache, ce, C, idx)
+        @test isapprox(sum(mu), 4; rtol = 1e-12)
+        @test isapprox(sum(abs2, mu .- 1), q; rtol = 1e-10)
+        @test sum(abs2, mu .- 1) < sum(abs2, eigvals(Symmetric(rho)) .- 1)
+        # A block without correlation keeps the identity, and a block of correlation one keeps
+        # its single eigenvalue, because a sample correlation of one has no variance.
+        @test PO.diagonal_law_spectrum(cache, ce, Matrix(Diagonal([1.0, 2.0, 3.0, 4.0])),
+                                       idx) == ones(4)
+        v = [1.0, 2.0, 3.0, 4.0]
+        @test isapprox(PO.diagonal_law_spectrum(cache, ce, v * transpose(v), idx),
+                       [0, 0, 0, 4]; atol = 1e-12)
+
+        # The mean's method needs no factor, and the raw statistic takes none.
+        raw = RegimeAdjustedExpWeightedCovariance(; decay = lambda, min_obs = 5, extra...,
+                                                  regime_target = PO.DiagonalTarget(),
+                                                  regime_method = FM, debias = false)
+        @test PO.diagonal_law_factor(PO.RootMeanSquaredAdjusted(), cache, ce, C, idx) ===
+              1.0
+        @test PO.diagonal_law_factor(FM, cache, raw, C, idx) === 1.0
+        @test PO.diagonal_law_factor(FM, cache, ce, C, idx) ==
+              PO.regime_law_factor(FM, PO.diagonal_law_spectrum(cache, ce, C, idx))
+        @test PO.diagonal_law_factor(LG, cache, ce, C, idx) < 1
+    end
 end
