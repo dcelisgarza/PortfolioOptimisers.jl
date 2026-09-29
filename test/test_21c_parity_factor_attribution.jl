@@ -384,4 +384,23 @@ end
         @test_throws ArgumentError factor_attribution(wh, prb; strict = true)
         @test_throws ArgumentError factor_attribution(wb, prb, X; strict = true)
     end
+
+    @testset "A Scenario Cap leaves the realised attribution of a re-based fit (#1422)" begin
+        # The cap keeps the last rows of the scenarios, of `o_X` and of `fpr.X` alone, and
+        # leaves the block whole. The attribution reads the raw-axis factor returns off the
+        # block, so it pairs each factor return with the residual of its own row. It read
+        # `fpr.X` before, and the capped fit raised a `BoundsError`.
+        kw = (; factors = ind, families = ["industry" => nothing])
+        prf = fit(; kw...)
+        prc = fit(; kw...,
+                  pe = EmpiricalPrior(; me = GRID_PE.me, ce = GRID_PE.ce,
+                                      max_scenarios = 40))
+        @test size(prc.fpr.X, 1) == 40 < size(prc.rr.csr.f, 1)
+        @test isequal(prc.rr.fr, prf.rr.fr)
+        wf = fa_clean_weights(prf, X)
+        quiet() do
+            @test isequal(fa_pack(factor_attribution(wf, prc, X; assets = true)),
+                          fa_pack(factor_attribution(wf, prf, X; assets = true)))
+        end
+    end
 end

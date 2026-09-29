@@ -1058,7 +1058,16 @@ end
         @test size(rr.csr.f, 2) < size(rr.Ms, 3)
         f = PO.attribution_factor_returns(rr, pr)
         @test size(f, 2) == size(rr.Ms, 3) == length(rr.nf)
-        @test f === pr.fpr.X
+        # The block carries the raw-axis history itself. With no Scenario Cap to trim the
+        # nested factor prior, that prior holds the same rows (#1422).
+        @test f === rr.fr
+        @test f == pr.fpr.X
+        # A re-based block that carries no raw-axis history has nothing to multiply the
+        # exposures by, so the read refuses it.
+        nofr = CrossSectionalFactorModel(;
+                                         (k => getfield(rr, k)
+                                          for k in fieldnames(typeof(rr)) if k != :fr)...)
+        @test_throws PO.IsNothingError PO.attribution_factor_returns(nofr, pr)
     end
     @testset "The realised decomposition runs, and its identities close" begin
         fa = factor_attribution(w, pr, rd.X; assets = true)

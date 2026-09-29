@@ -203,14 +203,12 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         keep = trues(length(nf), length(cols))
         if c in fam
             # The factor return of a level the basis drops is fixed by the constraint of its
-            # family, and the oracle states its statistics. The block holds the basis of its
-            # own rows and not of the row before the first, so the summary states none
-            # (#1422).
+            # family. The block carries it on the raw axis in `fr`, so the summary states the
+            # four return statistics of that level too, at parity (#1422).
             red = PO.reduce_factor_names(csfm.fcb, nf)
             drop = [!(x in red) for x in nf]
-            @test isnan.(factor_model_summary(csfm).ann_return) == drop
-            @test all(isfinite, O[drop, 1])
-            keep[drop, 1:4] .= false
+            @test any(drop)
+            @test all(isfinite, factor_model_summary(csfm).ann_return[drop])
             # A level that empties leaves rows where the design is singular, and the mean
             # absolute t-statistic and the rate of its factor read them (#1421).
             t = cs_regression_t_stats(csfm)

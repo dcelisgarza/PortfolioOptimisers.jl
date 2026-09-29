@@ -72,7 +72,7 @@ absent together.
         # Every optional field after `b` reads back as `nothing` when it was not given.
         @test all(isnothing,
                   (csfm.csr, csfm.Ms, csfm.vs, csfm.esigma, csfm.rw, csfm.bw, csfm.fam,
-                   csfm.fcb, csfm.lag, csfm.rf))
+                   csfm.fcb, csfm.lag, csfm.rf, csfm.fx, csfm.fr))
     end
 
     @testset "A re-basis makes L narrower than M" begin
@@ -129,6 +129,21 @@ absent together.
                                                                  esigma = esigma_full[1:2,
                                                                                       1:2])
         @test_throws DomainError CrossSectionalFactorModel(; M = M, b = b, lag = -1)
+        # `fr` is the raw-axis history of a re-based fit: it needs the re-basis and the fit,
+        # and it has the rows of the fit and the columns of `M` (#1422).
+        fr = zeros(size(csr.f, 1), size(M, 2))
+        @test CrossSectionalFactorModel(; M = M, L = L, b = b, csr = csr, fcb = fcb,
+                                        fr = fr).fr === fr
+        @test_throws ArgumentError CrossSectionalFactorModel(; M = M, b = b, csr = csr,
+                                                             fr = fr)
+        @test_throws ArgumentError CrossSectionalFactorModel(; M = M, L = L, b = b,
+                                                             fcb = fcb, fr = fr)
+        @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M, L = L, b = b,
+                                                                 csr = csr, fcb = fcb,
+                                                                 fr = fr[1:3, :])
+        @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M, L = L, b = b,
+                                                                 csr = csr, fcb = fcb,
+                                                                 fr = fr[:, 1:1])
         @test_throws PortfolioOptimisers.IsEmptyError CrossSectionalFactorModel(; M = M,
                                                                                 b = b,
                                                                                 vs = Matrix{Float64}(undef,

@@ -268,6 +268,41 @@ using Statistics
         @test !any(isnothing, (fs.stability, fs.coverage))
         @test length(fs.coverage) == Kr
     end
+    @testset "a re-based block that carries fr states the returns of the dropped factor (#1422)" begin
+        # The constraint of the family fixes the return of the dropped factor, so a block that
+        # carries the raw-axis history states its four return statistics.
+        rng6 = StableRNG(56473829)
+        Tr, Nr, Kr = 6, 5, 3
+        Msr = randn(rng6, Tr, Nr, Kr)
+        fred = 0.02 * randn(rng6, Tr, Kr - 1)
+        fcb = FactorFamilyBasis(; fnm = ["industry"], fi = [[1, 2]], di = [2],
+                                ratios = reshape(collect(range(0.4, 0.9; length = Tr)), Tr,
+                                                 1), K = Kr)
+        fraw = PortfolioOptimisers.expand_factor_returns(fcb, fred)
+        csr_r = CrossSectionalRegression(; f = fred, eps = 0.01 * randn(rng6, Tr, Nr),
+                                         n = fill(Nr, Tr))
+        kw = (; M = Msr[Tr, :, :],
+              L = PortfolioOptimisers.reduce_loadings(fcb, Msr[Tr, :, :]), b = zeros(Nr),
+              csr = csr_r, Ms = Msr, rw = abs.(randn(rng6, Tr, Nr)) .+ 0.1, fcb = fcb,
+              lag = 1, nf = ["value", "size", "momentum"])
+        blk = CrossSectionalFactorModel(; kw..., fr = fraw)
+        fs = factor_model_summary(blk; ppy = 1, step = 2,
+                                  weighting = RegressionWeightMetric())
+        @test fs.ann_return ≈ vec(Statistics.mean(fraw; dims = 1)) rtol = 1e-14
+        @test isequal(fs.autocorr, PortfolioOptimisers.factor_summary_autocorrelation(fraw))
+        @test all(isfinite, fs.ann_volatility) && all(isfinite, fs.sharpe)
+        # The Gram columns still read the reduced axis, where the dropped factor has none.
+        @test isnan(fs.mean_abs_t[2]) && isnan(fs.t_rate[2]) && isnan(fs.mean_vif[2])
+        # The same block without `fr` states no return of the dropped factor, and agrees on
+        # every other column.
+        fs0 = factor_model_summary(CrossSectionalFactorModel(; kw...); ppy = 1, step = 2,
+                                   weighting = RegressionWeightMetric())
+        @test isnan(fs0.ann_return[2])
+        for cn in fieldnames(typeof(fs))
+            cn in (:ann_return, :ann_volatility, :sharpe, :autocorr) && continue
+            @test isequal(getfield(fs, cn), getfield(fs0, cn))
+        end
+    end
 
     @testset "the refusals" begin
         # A block with no cross-sectional fit carries no factor return history.

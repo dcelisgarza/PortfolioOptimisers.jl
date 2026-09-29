@@ -395,7 +395,7 @@ Return the factor return series a realised factor attribution multiplies by the 
 
 It is one of the five reads that [`factor_attribution`](@ref) takes off a loadings result. The series is on the raw factor axis, which is the axis the loadings name, so a family re-basis does not move it.
 
-The read takes the prior result `pr` beside the block, as [`attribution_idiosyncratic_returns`](@ref) does and for the same reason. A [`CrossSectionalFactorModel`](@ref) fits the factor returns itself, and reads them off its own fit when no family is constrained, with its observed factor returns after them through [`cross_sectional_factor_returns`](@ref). A constrained Factor Family makes the fit solve in a reduced basis, one column short per constrained family, so a re-based block reads `pr.fpr.X` instead, which holds the same coefficients already expanded onto the raw axis. A [`Regression`](@ref) regresses on factors the caller supplied, so the series is `pr.fpr.X`, the scenarios of the nested factor-axis prior. That field needs no refusal of its own, because [`LowOrderPrior`](@ref) admits `rr` and `fpr` only together, so a prior result that answers a loadings result answers a factor-axis prior beside it.
+The read takes the prior result `pr` beside the block, as [`attribution_idiosyncratic_returns`](@ref) does and for the same reason. A [`CrossSectionalFactorModel`](@ref) fits the factor returns itself, and reads them off its own fit when no family is constrained, with its observed factor returns after them through [`cross_sectional_factor_returns`](@ref). A constrained Factor Family makes the fit solve in a reduced basis, one column short per constrained family, so a re-based block reads its own `fr` instead, which holds the same coefficients already expanded onto the raw axis over every row of the fit. It does not read `pr.fpr.X`, because a Scenario Cap keeps the last rows of that field alone, and the other reads of the block cover every row (#1422). A [`Regression`](@ref) regresses on factors the caller supplied, so the series is `pr.fpr.X`, the scenarios of the nested factor-axis prior. That field needs no refusal of its own, because [`LowOrderPrior`](@ref) admits `rr` and `fpr` only together, so a prior result that answers a loadings result answers a factor-axis prior beside it.
 
 # Arguments
 
@@ -406,6 +406,7 @@ The read takes the prior result `pr` beside the block, as [`attribution_idiosync
 
   - The root method always raises an `ArgumentError` naming the type.
   - A [`CrossSectionalFactorModel`](@ref) whose `csr` is `nothing` raises an `IsNothingError`, with or without a family re-basis.
+  - A re-based [`CrossSectionalFactorModel`](@ref) whose `fr` is `nothing` raises an `IsNothingError`. A block the prior fits carries it.
 
 # Returns
 
@@ -426,11 +427,15 @@ function attribution_factor_returns(rr::CrossSectionalFactorModel, pr::AbstractP
     assert_attribution_field(rr.csr, :csr)
     # `csr.f` holds the coefficients in the basis the fit solved in, and a Factor Family
     # re-basis drops one column per constrained family. The contract above is the raw factor
-    # axis -- the axis `Ms` names -- so a re-based block reads the nested factor-axis prior,
-    # which carries the same coefficients already expanded onto that axis. Without a
+    # axis -- the axis `Ms` names -- so a re-based block reads `fr`, which carries the same
+    # coefficients already expanded onto that axis, on the rows of `csr.f`. Without a
     # re-basis the raw axis is the reduced one, and the observed factors follow the
     # estimated ones on it.
-    return has_family_rebasis(rr) ? pr.fpr.X : cross_sectional_factor_returns(rr)
+    return if has_family_rebasis(rr)
+        assert_attribution_field(rr.fr, :fr)
+    else
+        cross_sectional_factor_returns(rr)
+    end
 end
 """
     attribution_observed_count(rr::AbstractLoadingsRegressionResult) -> Int

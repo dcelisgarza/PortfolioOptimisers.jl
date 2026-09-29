@@ -1336,15 +1336,16 @@ function cross_sectional_basis_now(fcb::FactorFamilyBasis, r)
     return factor_basis_slice(fcb, r)
 end
 """
-    cross_sectional_expand(fcb::Nothing, r, lag::Integer, f, mu, sigma) -> NamedTuple
-    cross_sectional_expand(fcb::FactorFamilyBasis, r, lag::Integer, f, mu, sigma)
-        -> NamedTuple
+    cross_sectional_expand(fcb::Nothing, r, lag::Integer, f) -> Nothing
+    cross_sectional_expand(fcb::FactorFamilyBasis, r, lag::Integer, f) -> MatNum
+    cross_sectional_expand(fcb::Nothing, r, mu, sigma) -> NamedTuple
+    cross_sectional_expand(fcb::FactorFamilyBasis, r, mu, sigma) -> NamedTuple
 
-Expand a factor distribution from the reduced axis onto the raw one.
+Expand the realised factor returns, or the factor moments, from the reduced axis onto the raw one.
 
-The nested factor prior of a [`LowOrderPrior`](@ref) is on the raw axis, so a constraint written in the name of a dropped factor still resolves. A prior that constrains no Factor Family already fits on the raw axis, and the `nothing` method takes that case.
+The nested factor prior of a [`LowOrderPrior`](@ref) is on the raw axis, so a constraint written in the name of a dropped factor still resolves. A prior that constrains no Factor Family already fits on the raw axis, and the `nothing` methods take that case: the moments pass through, and the returns give `nothing`, because a block with no re-basis carries no second copy of its factor returns.
 
-The fit of observation `t` regresses the returns of `t` on the exposures of `t - lag`, so its coefficients are coordinates in the basis of `t - lag`. So the realised factor returns expand with the lagged ratios. The moments describe the next observation, so they expand with the current ratios. The function takes the whole basis and slices it twice. Two slice arguments could hold one basis and one `nothing`, and no method takes that pair.
+The fit of observation `t` regresses the returns of `t` on the exposures of `t - lag`, so its coefficients are coordinates in the basis of `t - lag`. So the realised factor returns expand with the lagged ratios, and the prior stores the answer on the block as `fr` before the moments exist. The block's own `fcb` covers its rows alone, so it cannot expand the first `lag` rows, and this is the one place where their basis still exists. The moments describe the next observation, so they expand with the ratios of the last fitted observation. Each method takes the whole basis and slices it. Two slice arguments could hold one basis and one `nothing`, and no method takes that pair.
 
 # Arguments
 
@@ -1361,7 +1362,7 @@ The fit of observation `t` regresses the returns of `t` on the exposures of `t -
 
 # Returns
 
-  - `f::MatNum`: The realised factor returns on the raw axis.
+  - `fr::Option{<:MatNum}`: The realised factor returns on the raw axis, or `nothing` with no re-basis.
   - `mu::VecNum`: The expected factor returns on the raw axis.
   - `sigma::MatNum`: The factor covariance on the raw axis.
 
@@ -1371,16 +1372,20 @@ The fit of observation `t` regresses the returns of `t` on the exposures of `t -
   - [`expand_factor_returns`](@ref)
   - [`expand_factor_mu`](@ref)
   - [`expand_factor_covariance`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
 """
-function cross_sectional_expand(::Nothing, r, ::Integer, f::MatNum, mu::VecNum,
-                                sigma::MatNum)
-    return (; f = f, mu = mu, sigma = sigma)
+function cross_sectional_expand(::Nothing, r, ::Integer, ::MatNum)
+    return nothing
 end
-function cross_sectional_expand(fcb::FactorFamilyBasis, r, lag::Integer, f::MatNum,
-                                mu::VecNum, sigma::MatNum)
+function cross_sectional_expand(fcb::FactorFamilyBasis, r, lag::Integer, f::MatNum)
+    return expand_factor_returns(factor_basis_slice(fcb, r .- lag), f)
+end
+function cross_sectional_expand(::Nothing, r, mu::VecNum, sigma::MatNum)
+    return (; mu = mu, sigma = sigma)
+end
+function cross_sectional_expand(fcb::FactorFamilyBasis, r, mu::VecNum, sigma::MatNum)
     now = factor_basis_slice(fcb, r)
-    return (; f = expand_factor_returns(factor_basis_slice(fcb, r .- lag), f),
-            mu = expand_factor_mu(now, mu), sigma = expand_factor_covariance(now, sigma))
+    return (; mu = expand_factor_mu(now, mu), sigma = expand_factor_covariance(now, sigma))
 end
 """
     cross_sectional_residual_block(esigma::VecNum, idx) -> NamedTuple
@@ -1718,7 +1723,8 @@ function cross_sectional_return_forecast(rfe::AbstractReturnForecastEstimator,
                                            esigma = csfm.esigma, edof = csfm.edof,
                                            ediv = csfm.ediv, rw = rw, bw = csfm.bw,
                                            nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,
-                                           lag = csfm.lag, rf = rf, fx = csfm.fx), g = g)
+                                           lag = csfm.lag, rf = rf, fx = csfm.fx,
+                                           fr = csfm.fr), g = g)
 end
 """
     cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::Nothing) -> VecNum

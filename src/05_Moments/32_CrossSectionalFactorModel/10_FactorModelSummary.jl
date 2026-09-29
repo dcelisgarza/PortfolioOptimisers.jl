@@ -325,39 +325,52 @@ function factor_summary_autocorrelation(f::MatNum)
 end
 """
     factor_summary_returns(csfm::CrossSectionalFactorModel)
-    factor_summary_returns(csr::Nothing)
-    factor_summary_returns(csr::CrossSectionalRegression)
+    factor_summary_returns(csfm::CrossSectionalFactorModel, csr::Nothing, fr)
+    factor_summary_returns(csfm::CrossSectionalFactorModel, csr::CrossSectionalRegression,
+                           fr::Nothing)
+    factor_summary_returns(csfm::CrossSectionalFactorModel, csr::CrossSectionalRegression,
+                           fr::MatNum)
 
-Return the factor return history that a summary reads off a factor model block.
+Return the factor return history that a summary reads off a factor model block, and the position of each raw factor on the axis of that history.
 
-The history is on the reduced factor axis, which is the axis the fit estimated in, with the observed factors after the estimated ones, as [`cross_sectional_factor_returns`](@ref) states it. [`factor_model_summary`](@ref) writes each statistic of it onto the raw axis with [`factor_summary_mapped`](@ref). A separate method handles a block with no fit, and its message names the field the caller must populate.
+A block that carries `fr` states its factor returns on the raw axis, so the history is `fr` and the position of raw factor `k` is `k`. That covers a factor a family re-basis dropped, whose return the constraint of its family fixes. A block with no `fr` gives the reduced axis, which is the axis the fit estimated in, with the observed factors after the estimated ones, as [`cross_sectional_factor_returns`](@ref) states it. The positions are then those of [`factor_summary_positions`](@ref), so a dropped factor takes `0`. [`factor_model_summary`](@ref) writes each statistic of the history onto the raw axis with [`factor_summary_mapped`](@ref). A separate method handles a block with no fit, and its message names the field the caller must populate.
 
 # Arguments
 
   - `csfm`: A cross-sectional factor model block.
   - `csr`: The `csr` field of the block, or `nothing`.
+  - `fr`: The `fr` field of the block, or `nothing`.
 
 # Validation
 
   - `csfm.csr` is not `nothing`, else the function raises an `IsNothingError` that names `csr`.
+  - The rules of [`factor_summary_positions`](@ref) when the block carries no `fr`.
 
 # Returns
 
   - `f::MatNum`: Factor return history `observations × factors`.
+  - `pos::Vector{Int}`: One entry per raw factor. Entry `k` is the column of `f` that holds raw factor `k`, or `0` when `f` holds none.
 
 # Related
 
   - [`CrossSectionalFactorModel`](@ref)
   - [`factor_model_summary`](@ref)
+  - [`factor_summary_positions`](@ref)
 """
 function factor_summary_returns(csfm::CrossSectionalFactorModel)
-    return factor_summary_returns(csfm, csfm.csr)
+    return factor_summary_returns(csfm, csfm.csr, csfm.fr)
 end
-function factor_summary_returns(::CrossSectionalFactorModel, ::Nothing)
+function factor_summary_returns(::CrossSectionalFactorModel, ::Nothing, ::Any)
     return throw(IsNothingError("csr cannot be nothing: a factor model summary reads the factor return history of the block"))
 end
-function factor_summary_returns(csfm::CrossSectionalFactorModel, ::CrossSectionalRegression)
-    return cross_sectional_factor_returns(csfm)
+function factor_summary_returns(csfm::CrossSectionalFactorModel, ::CrossSectionalRegression,
+                                ::Nothing)
+    return (; f = cross_sectional_factor_returns(csfm),
+            pos = factor_summary_positions(csfm))
+end
+function factor_summary_returns(::CrossSectionalFactorModel, ::CrossSectionalRegression,
+                                fr::MatNum)
+    return (; f = fr, pos = collect(axes(fr, 2)))
 end
 """
     factor_summary_positions(csfm::CrossSectionalFactorModel)
@@ -433,7 +446,9 @@ end
 """
     factor_summary_mapped(v::VecNum, pos::AbstractVector{Int})
 
-Return a statistic of the reduced factor axis, written onto the raw factor axis.
+Return a statistic of the axis of a factor return history, written onto the raw factor axis.
+
+The axis is the reduced one, or the raw one when the block carries `fr`, and `pos` names it.
 
 # Mathematical definition
 
@@ -449,18 +464,18 @@ v_{\\pi_{k}} & \\text{when } 0 < \\pi_{k} \\leq n\\,,\\\\
 Where:
 
   - ``m_{k}``: The statistic of raw factor ``k``.
-  - ``v_{j}``: The statistic of reduced factor ``j``.
-  - $(math_dict[:pi_k_summary])
+  - ``v_{j}``: The statistic of factor ``j`` of the axis.
+  - ``\\pi_{k}``: Position of raw factor ``k`` on the axis, and ``0`` when the axis holds none.
   - ``n``: Length of ``\\boldsymbol{v}``. A statistic of the regression covers the estimated factors alone, which come before the observed ones, so the position of an observed factor lies past ``n``.
 
 # Arguments
 
-  - `v`: A statistic, one entry per reduced factor, or per estimated reduced factor.
-  - `pos`: Position of each raw factor on the reduced axis, `0` where the re-basis dropped it.
+  - `v`: A statistic, one entry per factor of the axis, or per estimated reduced factor.
+  - `pos`: Position of each raw factor on the axis of `v`, `0` where that axis holds none, as [`factor_summary_returns`](@ref) gives it.
 
 # Returns
 
-  - `m::Vector{<:Real}`: One entry per raw factor, and `NaN` at a factor the re-basis dropped or `v` does not cover.
+  - `m::Vector{<:Real}`: One entry per raw factor, and `NaN` at a factor whose position is `0` or that `v` does not cover.
 
 # Related
 
@@ -866,10 +881,10 @@ The answer is on the **raw** factor axis. The regression group answers on the re
 
 # Algorithm
 
- 1. Read the factor return history on the reduced axis with [`factor_summary_returns`](@ref), and refuse a block that has none.
+ 1. Read the factor return history with [`factor_summary_returns`](@ref), and refuse a block that has none. It is on the raw axis when the block carries `fr`, and on the reduced axis otherwise.
  2. Take the annualised mean, the annualised volatility and the Sharpe ratio of each series with [`factor_summary_return_stats`](@ref). An absent return takes no part.
  3. Take the lag-one autocorrelation of each series with [`factor_summary_autocorrelation`](@ref).
- 4. Write the four statistics onto the raw axis with [`factor_summary_positions`](@ref) and [`factor_summary_mapped`](@ref). A factor a family re-basis dropped has no series of its own, and takes `NaN`.
+ 4. Write the four statistics onto the raw axis with [`factor_summary_mapped`](@ref), at the positions step 1 gives. A factor a family re-basis dropped has a series in `fr`, which the constraint of its family fixes. A block with a re-basis and no `fr` has no series for it, and gives `NaN`.
  5. Take the mean absolute t-statistic, the exceedance rate and the mean variance inflation factor with [`factor_summary_gram`](@ref), on the raw factor axis. A block with no exposure history gives `nothing` for all three. An observed factor was not estimated, so it takes `NaN` in the three.
  6. Take the median stability and the coverage with [`factor_summary_exposure`](@ref). A block with no exposure history gives `nothing` for both.
  7. Collect the nine columns and `ppy` into a [`FactorSummaryResult`](@ref).
@@ -906,8 +921,7 @@ function factor_model_summary(csfm::CrossSectionalFactorModel; ppy::Number = 1,
                               weighting = BenchmarkWeightMetric(),
                               coverage_weighting = RegressionWeightMetric())::FactorSummaryResult
     @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
-    f = factor_summary_returns(csfm)
-    pos = factor_summary_positions(csfm)
+    (; f, pos) = factor_summary_returns(csfm)
     ann_return, ann_volatility, sharpe = map(v -> factor_summary_mapped(v, pos),
                                              factor_summary_return_stats(f, ppy))
     autocorr = factor_summary_mapped(factor_summary_autocorrelation(f), pos)
