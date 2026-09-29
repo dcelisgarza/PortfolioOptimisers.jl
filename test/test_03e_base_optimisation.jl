@@ -131,6 +131,11 @@ end
         # The constructor refuses the stated values.
         @test_throws IsEmptyError TimeDependent([])
         @test_throws ArgumentError TimeDependent(TimeDependent([1, 2]))
+        @test_throws ArgumentError TimeDependent(TimeDependent([1, 2]), :nearest)
+        # The refusal of a nested schedule is no method of its own, so no call is ambiguous
+        # with the positional constructor that `@concrete` writes.
+        @test !any(p -> p[1].name === :TimeDependent || p[2].name === :TimeDependent,
+                   Test.detect_ambiguities(PortfolioOptimisers))
         @test_throws ArgumentError TimeDependent([TimeDependent([1, 2]), 3])
         @test_throws ArgumentError TimeDependent([1, 2]; default = TimeDependent([1, 2]))
         @test_throws ArgumentError TimeDependent([1, 2], :innermost)

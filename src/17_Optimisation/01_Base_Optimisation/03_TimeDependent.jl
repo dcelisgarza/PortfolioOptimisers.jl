@@ -269,8 +269,11 @@ TimeDependent
     """
     default
     function TimeDependent(val::Union{<:AbstractVector, <:Base.Callable,
-                                      <:PreviousWeightsFunction, <:TimeDependentCallable},
-                           bind::Symbol = :outermost; default = NoDefault())
+                                      <:PreviousWeightsFunction, <:TimeDependentCallable,
+                                      <:TimeDependent}, bind::Symbol = :outermost;
+                           default = NoDefault())
+        @argcheck(!isa(val, TimeDependent),
+                  ArgumentError("val cannot be a TimeDependent: schedules do not nest. An estimator swapped in by a schedule may carry schedules of its own — they resolve against the same fold context after the swap — but they belong in its fields, not inside this wrapper."))
         if isa(val, AbstractVector)
             @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
             @argcheck(!any(x -> isa(x, TimeDependent), val),
@@ -289,9 +292,6 @@ TimeDependent
                   ArgumentError("bind must be :outermost or :nearest, got :$bind"))
         return new{typeof(val), typeof(default)}(val, bind, default)
     end
-end
-function TimeDependent(::TimeDependent, args...; kwargs...)
-    return throw(ArgumentError("val cannot be a TimeDependent: schedules do not nest. An estimator swapped in by a schedule may carry schedules of its own — they resolve against the same fold context after the swap — but they belong in its fields, not inside this wrapper."))
 end
 function Online(::TimeDependent, args...; kwargs...)
     return throw(ArgumentError("est cannot be a TimeDependent: a schedule is not one estimator, so there is nothing for a buffer to belong to. The two wrappers resolve at different times and neither wraps the other — an `Online` resolves once at warm-up, because the buffer it seeds is threaded from step to step, and a schedule resolves once per fold, because its value is the fold's. They compose in the other order: an estimator an `Online` wraps may hold schedules of its own, which resolve per fold after the seeding, and one estimator may hold a wrapper in one field and a schedule in another."))
