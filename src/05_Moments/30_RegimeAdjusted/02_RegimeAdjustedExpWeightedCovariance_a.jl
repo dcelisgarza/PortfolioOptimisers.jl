@@ -69,14 +69,87 @@ $(DocStringExtensions.TYPEDEF)
 Regime-adjustment target that uses a Mahalanobis-distance-based baseline covariance
 structure. Requires at least two active assets.
 
+The statistic reads the inverse of an estimated block, and the inverse of an estimate is too
+large on average (Jensen's inequality): at 12 assets and a half-life of 10 the squared distance
+of a correctly calibrated return is 1.6 times its dimension. Before the block has more than
+`n + 1` observations the mean is not finite, and before it has more than `n + 3` the variance is
+not finite, so one observation can hold the smoothed regime state. With `debias = true`, the
+target skips those observations and divides the rest by the known size of the bias, so the
+statistic has the mean ``n`` that its calibration functions assume.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+d^{2} &= \\frac{u^{\\top} \\hat{C}^{-1} u}{b}\\,, &
+\\frac{1}{b} &= \\sum_{j=0}^{K-1} \\frac{w_{j}}{1 + (n + 1)\\, w_{j}\\, b}\\,, &
+w_{j} &= \\frac{(1 - \\lambda)\\, \\lambda^{j}}{1 - \\lambda^{K}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``u``: Returns of the ``n`` contributing assets at the observation.
+  - ``\\hat{C}``: Bias-corrected covariance block of those assets, from the observations before it.
+  - ``K``: Smallest count of observations among the contributing assets. The update is skipped
+    while ``K \\le n + 3``. The fixed point has a solution from ``K > n + 1``, where the mean is
+    finite.
+  - ``\\lambda``: `cor_decay` where the separate correlation path runs, else `decay`.
+  - ``b``: Bias factor, ``\\mathbb{E}[\\operatorname{tr}(W^{-1})] / n`` of
+    ``W = \\sum_{j} w_{j} z_{j} z_{j}^{\\top}``, ``z_{j} \\sim N(0, I_{n})``, by its deterministic
+    equivalent. With equal weights it is ``K / (K - n - 1)``, the exact inverse-Wishart mean. On
+    exponential weights it agrees with a Monte Carlo of ``b`` within 1 %, from 2 to 100 assets.
+
+With `debias = false`, ``b = 1`` and every observation above `min_obs` is scored: a block that
+is not positive definite takes the ridge of [`safe_regime_cholesky`](@ref). Its statistic can
+then be about ``10^{12}``, and that one value holds the regime state for many half-lives.
+
+The factor assumes one shared history of returns, and the weights of the recursion. On iid
+Normal returns the squared multiplier of `RootMeanSquaredAdjusted` is then 0.95 to 1.03, with or
+without the separate correlation path and the centring. A HAC adjustment makes the estimate
+noisier than its weights state, so the factor under-corrects it: the squared multiplier is 1.56
+at two lags, 12 assets and a half-life of 10.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    MahalanobisTarget(;
+        debias::Bool = true
+    ) -> MahalanobisTarget
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> MahalanobisTarget()
+MahalanobisTarget
+  debias ┴ Bool: true
+```
+
 # Related
 
   - [`RegimeAdjustedTarget`](@ref)
   - [`DiagonalTarget`](@ref)
   - [`PortfolioTarget`](@ref)
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+  - [`mahalanobis_bias`](@ref)
 """
-struct MahalanobisTarget <: RegimeAdjustedTarget end
+@concrete struct MahalanobisTarget <: RegimeAdjustedTarget
+    """
+    Whether the statistic skips an observation whose block has `n + 3` observations or fewer, and divides the rest by the bias factor ``b`` of the estimated block. `true` by default; `false` scores the raw squared distance.
+    """
+    debias
+    function MahalanobisTarget(debias::Bool)
+        return new{typeof(debias)}(debias)
+    end
+end
+function MahalanobisTarget(; debias::Bool = true)::MahalanobisTarget
+    return MahalanobisTarget(debias)
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -765,65 +838,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Factorises a covariance block for the Mahalanobis regime statistic, and refuses rather than
-throws when no ridge makes it factorise.
-
-A block that carries a late-listed asset is not yet positive definite, and the regime statistic
-is one observation of a smoother rather than a result a caller reads. A refusal therefore skips
-that observation's regime update, and the fit continues.
-
-# Algorithm
-
- 1. Try the plain factorisation of the lower triangle of `C`. Return it where it succeeds.
- 2. Symmetrise `C`, and take the mean absolute diagonal as the scale. Where that is not a finite
-    positive number, take the largest absolute entry, and at least one.
- 3. Add a ridge of `max(min_val * scale, eps * scale)` to the diagonal, and try again. Multiply
-    the ridge by ten after each failure, for three tries in all.
- 4. Return `nothing` where every try fails.
-
-# Arguments
-
-  - `C::MatNum`: Covariance block of the assets that contribute to the statistic.
-  - `min_val::Number`: Scale of the first ridge.
-
-# Returns
-
-  - `chol::Option{<:LinearAlgebra.Cholesky}`: The factorisation, or `nothing` where no ridge
-    makes the block factorise.
-
-# Related
-
-  - [`regime_statistic`](@ref)
-  - [`MahalanobisTarget`](@ref)
-  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
-"""
-function safe_regime_cholesky(C::MatNum, min_val::Number)
-    chol = LinearAlgebra.cholesky(LinearAlgebra.Hermitian(C, :L); check = false)
-    if LinearAlgebra.issuccess(chol)
-        return chol
-    end
-    S = (C + transpose(C)) / 2
-    base = Statistics.mean(abs, LinearAlgebra.diag(S))
-    scale = if base > zero(base) && isfinite(base)
-        base
-    else
-        max(maximum(abs, S), one(base))
-    end
-    ridge = max(min_val * scale, eps(scale) * scale)
-    for _ in 1:3
-        chol = LinearAlgebra.cholesky(LinearAlgebra.Hermitian(S + ridge * LinearAlgebra.I,
-                                                              :L); check = false)
-        if LinearAlgebra.issuccess(chol)
-            return chol
-        end
-        ridge *= 10
-    end
-
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Computes the squared Mahalanobis distance of one observation against the covariance block.
 
 The target reads every eigen-direction of the block, so it calibrates the whole covariance
@@ -1246,6 +1260,7 @@ above `min_obs` contributes, because the statistic is sensitive to a poorly esti
 # Related
 
   - [`RegimeAdjustedCovarianceState`](@ref)
+  - [`regime_target_statistic`](@ref)
   - [`regime_statistic`](@ref)
   - [`get_regime_state`](@ref)
 """
@@ -1265,8 +1280,7 @@ function update_regime!(cache::RegimeAdjustedCovarianceState,
         return cache
     end
     idx = findall(regime_mask)
-    stats = regime_statistic(ce.regime_target, X[idx],
-                             regime_covariance_block(cache, ce, idx), idx, ce.min_val)
+    stats = regime_target_statistic(ce.regime_target, cache, ce, X, idx)
     if isnothing(stats)
         return cache
     end

@@ -1,4 +1,257 @@
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the regime statistic of one observation for a target, from the covariance block that
+stands before it.
+
+Every target but [`MahalanobisTarget`](@ref) reads its [`regime_statistic`](@ref) of the block
+that [`regime_covariance_block`](@ref) returns.
+
+# Arguments
+
+  - `target::RegimeAdjustedTarget`: Regime-adjustment target.
+  - `cache::RegimeAdjustedCovarianceState`: Online covariance computation cache.
+  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
+  - `X::VecNum`: Current centred returns vector of every asset.
+  - `idx::AbstractVector{<:Integer}`: Index of the assets that contribute to the statistic.
+
+# Returns
+
+  - `stats::Option{<:VecNum}`: One statistic per calibration direction, or `nothing` where the
+    observation takes no regime update.
+
+# Related
+
+  - [`update_regime!`](@ref)
+  - [`regime_statistic`](@ref)
+  - [`RegimeAdjustedTarget`](@ref)
+"""
+function regime_target_statistic(target::RegimeAdjustedTarget,
+                                 cache::RegimeAdjustedCovarianceState,
+                                 ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
+                                 idx::AbstractVector{<:Integer})
+    return regime_statistic(target, X[idx], regime_covariance_block(cache, ce, idx), idx,
+                            ce.min_val)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Factorises a covariance block for the Mahalanobis regime statistic, and refuses rather than
+throws when no ridge makes it factorise.
+
+A block with fewer observations than assets is singular. With `debias = true`,
+[`regime_target_statistic`](@ref) skips such a block before it reaches this function, so the
+ridge serves a block that is singular in the data, and the raw statistic of `debias = false`.
+The regime statistic is one observation of a smoother rather than a result a caller reads, so a
+refusal skips that observation's regime update, and the fit continues.
+
+# Algorithm
+
+ 1. Try the plain factorisation of the lower triangle of `C`. Return it where it succeeds.
+ 2. Symmetrise `C`, and take the mean absolute diagonal as the scale. Where that is not a finite
+    positive number, take the largest absolute entry, and at least one.
+ 3. Add a ridge of `max(min_val * scale, eps * scale)` to the diagonal, and try again. Multiply
+    the ridge by ten after each failure, for three tries in all.
+ 4. Return `nothing` where every try fails.
+
+# Arguments
+
+  - `C::MatNum`: Covariance block of the assets that contribute to the statistic.
+  - `min_val::Number`: Scale of the first ridge.
+
+# Returns
+
+  - `chol::Option{<:LinearAlgebra.Cholesky}`: The factorisation, or `nothing` where no ridge
+    makes the block factorise.
+
+# Related
+
+  - [`regime_statistic`](@ref)
+  - [`MahalanobisTarget`](@ref)
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+"""
+function safe_regime_cholesky(C::MatNum, min_val::Number)
+    chol = LinearAlgebra.cholesky(LinearAlgebra.Hermitian(C, :L); check = false)
+    if LinearAlgebra.issuccess(chol)
+        return chol
+    end
+    S = (C + transpose(C)) / 2
+    base = Statistics.mean(abs, LinearAlgebra.diag(S))
+    scale = if base > zero(base) && isfinite(base)
+        base
+    else
+        max(maximum(abs, S), one(base))
+    end
+    ridge = max(min_val * scale, eps(scale) * scale)
+    for _ in 1:3
+        chol = LinearAlgebra.cholesky(LinearAlgebra.Hermitian(S + ridge * LinearAlgebra.I,
+                                                              :L); check = false)
+        if LinearAlgebra.issuccess(chol)
+            return chol
+        end
+        ridge *= 10
+    end
+
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the squared Mahalanobis distance of one observation, divided by the bias of the
+estimated block where `target.debias` is `true`.
+
+# Algorithm
+
+ 1. Where `target.debias` is `false`, the factor is one. Else take ``K``, the smallest count of
+    observations among the contributing assets, and return `nothing` where `K <= n + 3`. Else
+    find the factor with [`mahalanobis_bias`](@ref) at the decay of the correlation structure:
+    `cor_decay` on the separate path, else `decay`.
+ 2. Compute the squared distance with [`regime_statistic`](@ref), and return `nothing` where the
+    block does not factorise.
+ 3. Divide the statistic by the factor.
+
+# Arguments
+
+  - `target::MahalanobisTarget`: Mahalanobis regime-adjustment target.
+  - `cache::RegimeAdjustedCovarianceState`: Online covariance computation cache.
+  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
+  - `X::VecNum`: Current centred returns vector of every asset.
+  - `idx::AbstractVector{<:Integer}`: Index of the assets that contribute to the statistic.
+
+# Returns
+
+  - `stats::Option{<:VecNum}`: One statistic, or `nothing` where the observation takes no
+    regime update.
+
+# Related
+
+  - [`MahalanobisTarget`](@ref)
+  - [`mahalanobis_bias`](@ref)
+  - [`update_regime!`](@ref)
+"""
+function regime_target_statistic(target::MahalanobisTarget,
+                                 cache::RegimeAdjustedCovarianceState,
+                                 ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
+                                 idx::AbstractVector{<:Integer})
+    K = minimum(view(cache.obs_count, idx))
+    b = if !target.debias
+        one(ce.decay)
+    elseif K > length(idx) + 3
+        mahalanobis_bias(has_separate_cor_decay(ce) ? ce.cor_decay : ce.decay, K,
+                         length(idx))
+    else
+        nothing
+    end
+    if isnothing(b)
+        return nothing
+    end
+    stats = regime_statistic(target, X[idx], regime_covariance_block(cache, ce, idx), idx,
+                             ce.min_val)
+
+    return isnothing(stats) ? nothing : stats ./ b
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the bias factor of the squared Mahalanobis distance against an exponentially weighted
+covariance estimate.
+
+The factor is ``b = \\mathbb{E}[\\operatorname{tr}(W^{-1})] / n`` of
+``W = \\sum_{j} w_{j} z_{j} z_{j}^{\\top}``, ``z_{j} \\sim N(0, I_{n})``, which is the mean of
+``u^{\\top} \\hat{C}^{-1} u / n`` for a correctly calibrated return ``u`` that is independent of the
+estimate ``\\hat{C}``. It depends on the weights and on `n` alone, and it is the fixed point that
+[`MahalanobisTarget`](@ref) states. The fixed point exists where `K > n + 1`.
+
+# Algorithm
+
+ 1. Return `nothing` where `K <= n + 1`.
+ 2. Start at ``b = 1``. The map ``h(b) = b\\, g(b) - 1``, with ``g`` the right-hand side of the
+    fixed point, is concave and increasing, and ``h(1) < 0``, so Newton's method from ``b = 1``
+    rises to the root without overshoot.
+ 3. Evaluate ``g`` and ``h'`` with [`mahalanobis_bias_sums`](@ref), and stop when the step is
+    below four units in the last place of ``b``.
+
+# Arguments
+
+  - `decay::Number`: Decay of the weights.
+  - `K::Integer`: Count of observations in the estimate.
+  - `n::Integer`: Count of assets that contribute to the statistic.
+
+# Returns
+
+  - `b::Option{<:Number}`: The bias factor, or `nothing` where `K <= n + 1`.
+
+# Related
+
+  - [`MahalanobisTarget`](@ref)
+  - [`regime_target_statistic`](@ref)
+  - [`mahalanobis_bias_sums`](@ref)
+"""
+function mahalanobis_bias(decay::Number, K::Integer, n::Integer)
+    if K <= n + 1
+        return nothing
+    end
+    w0 = (one(decay) - decay) / (one(decay) - decay^K)
+    b = one(w0)
+    for _ in 1:100
+        g, dh = mahalanobis_bias_sums(decay, K, n + 1, w0, b)
+        step = (b * g - one(b)) / dh
+        b -= step
+        if abs(step) <= 4 * eps(b)
+            break
+        end
+    end
+
+    return b
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the right-hand side of the fixed point of [`mahalanobis_bias`](@ref) and the
+derivative of ``b\\, g(b)``.
+
+The weights fall geometrically, and a weight ``w_{j}`` with ``c\\, w_{j}\\, b`` below the
+machine epsilon of `decay` enters both sums as itself, so the loop stops there and adds the
+remaining mass ``1 - \\sum_{i < j} w_{i}`` to each sum. That keeps the cost bounded on a long
+history.
+
+# Arguments
+
+  - `decay::Number`: Decay of the weights.
+  - `K::Integer`: Count of observations in the estimate.
+  - `c::Integer`: `n + 1`.
+  - `w0::Number`: Normalised weight of the newest observation, `(1 - decay) / (1 - decay^K)`.
+  - `b::Number`: Current value of the bias factor.
+
+# Returns
+
+  - `(g, dh)::Tuple{<:Number, <:Number}`: ``\\sum_{j} w_{j} / (1 + c\\, w_{j}\\, b)`` and
+    ``\\sum_{j} w_{j} / (1 + c\\, w_{j}\\, b)^{2}``.
+
+# Related
+
+  - [`mahalanobis_bias`](@ref)
+"""
+function mahalanobis_bias_sums(decay::Number, K::Integer, c::Integer, w0::Number, b::Number)
+    g = zero(w0)
+    dh = zero(w0)
+    used = zero(w0)
+    w = w0
+    for _ in 1:K
+        t = c * w * b
+        if t <= eps(decay)
+            break
+        end
+        g += w / (one(t) + t)
+        dh += w / (one(t) + t)^2
+        used += w
+        w *= decay
+    end
+    tail = one(w0) - used
+
+    return g + tail, dh + tail
+end
+"""
     Statistics.cov(
         ce::RegimeAdjustedExpWeightedCovariance,
         X::MatNum;

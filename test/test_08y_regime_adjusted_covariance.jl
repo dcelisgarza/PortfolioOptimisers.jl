@@ -80,7 +80,8 @@ end
 
 @testset "the port reproduces the reference implementation" begin
     for (ce, oracle) in ((oracle_estimator(), ORACLE_DEFAULTS),
-                         (oracle_estimator(; regime_target = PO.MahalanobisTarget(),
+                         # The oracle scores the raw distance (#1415).
+                         (oracle_estimator(; regime_target = PO.MahalanobisTarget(; debias = false),
                                            regime_method = PO.LogRegimeAdjusted()), ORACLE_MAHALANOBIS_LOG),
                          (oracle_estimator(; regime_target = PO.DiagonalTarget(),
                                            regime_method = PO.RootMeanSquaredAdjusted(), hac_lags = 2),
@@ -550,4 +551,62 @@ end
         end
     end
     @test worst_cov > -1e-14
+end
+
+#=
+Issue #1415. The squared Mahalanobis distance against an estimated block is too large on average,
+because the inverse of an estimate is (Jensen's inequality). While the block had fewer
+observations than assets it was singular, the ridge of `safe_regime_cholesky` made the distance
+about 1e12, and that one value held the regime state for many half-lives. `debias = true` skips
+each row whose block has `n + 3` observations or fewer, where the variance of the statistic is not
+finite, and divides the rest by the fixed point `mahalanobis_bias`. `debias = false` is the
+oracle's raw statistic, which the first testset pins.
+=#
+@testset "the Mahalanobis statistic is divided by the bias of its estimated block" begin
+    # At equal weights the fixed point is the exact inverse-Wishart mean K / (K - n - 1). A half-life
+    # of 1e6 makes the 30 weights equal to within 3e-5.
+    @test isapprox(PO.mahalanobis_bias(2.0^(-1 / 1e6), 30, 5), 30 / 24; rtol = 1e-9)
+    # The fixed point has no solution where the mean of the statistic is not finite.
+    @test isnothing(PO.mahalanobis_bias(0.9, 6, 5))
+    @test !isnothing(PO.mahalanobis_bias(0.9, 7, 5))
+    # The factor solves the fixed point on the full sum, and the weights below the machine
+    # epsilon, which the loop adds as mass, move it by no more than round-off.
+    for (lambda, nobs, nassets) in
+        ((2.0^(-1 / 10), 200, 12), (2.0^(-1 / 40), 5000, 100), (0.9, 14, 12))
+        b = PO.mahalanobis_bias(lambda, nobs, nassets)
+        wts = [(1 - lambda) * lambda^j for j in 0:(nobs - 1)]
+        wts ./= sum(wts)
+        @test isapprox(1 / b, sum(wts ./ (1 .+ (nassets + 1) .* wts .* b)); rtol = 1e-13)
+    end
+
+    # On iid Normal returns, the squared multiplier of `RootMeanSquaredAdjusted` is the mean of
+    # the statistic over its dimension, so a correct statistic gives one. Measured on this seed:
+    # 0.998 with `debias = true`, 1.021 on the separate path, and 3.8e10 with `debias = false`,
+    # from the ridge of the singular rows. Six other seeds gave 0.95 to 1.03.
+    rng = StableRNG(1415)
+    na, nr = 12, 4000
+    A = randn(rng, na, na)
+    U = cholesky(Symmetric(A * transpose(A) / na + Diagonal(rand(rng, na)))).U
+    R = randn(rng, nr, na) * U .* 0.01
+    base = (; decay = 2.0^(-1 / 10), min_obs = 5, regime_lohi_mult = nothing,
+            regime_decay = 2.0^(-1 / 1000), regime_min_obs = 1, centred = true)
+    function squared_multiplier(target; extra...)
+        rms = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
+                                                  regime_target = target,
+                                                  regime_method = PO.RootMeanSquaredAdjusted())
+        off = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
+                                                  regime_method = nothing)
+        return mean(cov(rms, R) ./ cov(off, R))
+    end
+    @test 0.9 < squared_multiplier(PO.MahalanobisTarget()) < 1.1
+    @test 0.9 < squared_multiplier(PO.MahalanobisTarget(); cor_decay = 2.0^(-1 / 20)) < 1.1
+    @test squared_multiplier(PO.MahalanobisTarget(; debias = false)) > 1e6
+
+    # The gate skips each row whose block has n + 3 observations or fewer, and does not count it.
+    # The raw statistic scores every row after `min_obs`.
+    fit(target) = partial_fit!(RegimeAdjustedExpWeightedCovariance(; base...,
+                                                                   regime_target = target),
+                               R[1:60, :]).cache
+    @test fit(PO.MahalanobisTarget()).n_regime_obs == 60 - (na + 4)
+    @test fit(PO.MahalanobisTarget(; debias = false)).n_regime_obs == 60 - 5
 end

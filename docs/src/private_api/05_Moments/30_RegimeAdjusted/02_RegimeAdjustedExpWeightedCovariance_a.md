@@ -19,7 +19,6 @@ regime_denom
 get_regime_state(::RootMeanSquaredAdjusted, ::RegimeAdjustedTarget, stats::VecNum, n::Integer, ::Any)
 get_regime_state(method::FirstMomentRegimeAdjusted, target::RegimeAdjustedTarget, stats::VecNum, n::Integer, ::Any)
 get_regime_state(method::LogRegimeAdjusted, target::RegimeAdjustedTarget, stats::VecNum, n::Integer, min_val::Number)
-safe_regime_cholesky
 regime_statistic
 hac_outer_product!
 update_var_cor!

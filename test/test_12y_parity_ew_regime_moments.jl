@@ -34,8 +34,10 @@ THE MEASURE. Every case below agreed on the `NaN` pattern.
 | the clamp of a warm-up multiplier | Defect found and fixed | parity |
 | the separate path on a constant asset | Better: the variance 0, where the report floored it at `min_val` | `test_08y` |
 
-The Mahalanobis target with `min_obs = 5` on 12 assets reads a singular block (#1415), so its
-cases here use `min_obs = 13`.
+The Mahalanobis target with `min_obs = 5` on 12 assets reads a singular block, so its cases here
+use `min_obs = 13` and the oracle's raw statistic, `debias = false`. The default statistic skips a
+block with too few observations and divides the rest by the bias of the estimate (#1415, Better,
+`test_08y`).
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 
@@ -43,6 +45,8 @@ const P1383 = PortfolioOptimisers
 p1383_dk(hl) = 2.0^(-1.0 / hl)
 # The oracle's clip, floor and centring. The first two are the defaults since #1383.
 const P1383_ORC = (; regime_lohi_mult = (0.7, 1.6), min_val = 1e-12, centred = true)
+# The oracle's raw Mahalanobis statistic. The default divides it by the bias of the block (#1415).
+const P1383_MAHALANOBIS_RAW = P1383.MahalanobisTarget(; debias = false)
 
 function p1383_rv(; hl = 10, min_obs = 5, rhl = hl / 2, rmin = floor(Int, rhl), kw...)
     return RegimeAdjustedExpWeightedVariance(; decay = p1383_dk(hl), min_obs = min_obs,
@@ -104,14 +108,14 @@ const P1383_RC = ["RCDefault" => (n) -> p1383_rc(; hl = 40, min_obs = 40),
                   "RCPortfolioRms" =>
                       (n) -> p1383_rc(; regime_method = P1383.RootMeanSquaredAdjusted()),
                   "RCMahalanobisFirstFull" =>
-                      (n) -> p1383_rc(; regime_target = P1383.MahalanobisTarget(),
-                                      min_obs = 13, regime_lohi_mult = nothing),
+                      (n) -> p1383_rc(; regime_target = P1383_MAHALANOBIS_RAW, min_obs = 13,
+                                      regime_lohi_mult = nothing),
                   "RCMahalanobisLogFull" =>
-                      (n) -> p1383_rc(; regime_target = P1383.MahalanobisTarget(),
+                      (n) -> p1383_rc(; regime_target = P1383_MAHALANOBIS_RAW,
                                       regime_method = P1383.LogRegimeAdjusted(),
                                       min_obs = 13, regime_lohi_mult = nothing),
                   "RCMahalanobisRmsFull" =>
-                      (n) -> p1383_rc(; regime_target = P1383.MahalanobisTarget(),
+                      (n) -> p1383_rc(; regime_target = P1383_MAHALANOBIS_RAW,
                                       regime_method = P1383.RootMeanSquaredAdjusted(),
                                       min_obs = 13, regime_lohi_mult = nothing),
                   "RCCorrHL5" => (n) -> p1383_rc(; cor_decay = p1383_dk(5)),
