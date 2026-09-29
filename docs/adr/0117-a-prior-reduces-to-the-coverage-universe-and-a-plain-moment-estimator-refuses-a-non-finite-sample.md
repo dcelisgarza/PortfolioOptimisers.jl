@@ -272,3 +272,32 @@ for a covariance.
   own fell to the generic `cor`, which called `cov` again. A defect of the fallback chain and not of
   this decision; `c42ec32d12` gave `AbstractVarianceEstimator` a `cov` and a `cor` that throw a
   `MethodError` naming the verb, and a `std` that resolves from `var` alone.
+
+## Amendment (2026-09-29)
+
+**The block holds the variances that are finite and not zero.** A variance that is exactly zero
+belongs to a constant variable, such as cash at a zero return or a bootstrap deviation that every
+resample reproduces to the bit. It is finite, so it stayed inside the block, and every step that
+converts to a correlation, the positive definite repair, the denoising and the detoning, divided
+its row by zero and met LAPACK's `matrix contains Infs or NaNs`.
+[#1429](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1429) found it on the
+circular bootstrap ellipsoid at `block_size >= T`.
+
+The answer is forced, not chosen. The repair keeps the diagonal, and every 2×2 principal minor of a
+positive semidefinite matrix is non-negative, `Σᵢᵢ Σⱼⱼ − Σᵢⱼ² ≥ 0`, so `Σᵢᵢ = 0` forces a zero row
+and column. The maintainer chose that rule over a named refusal and over an invented variance.
+
+- `zero_variance_rows!` sets the row and column of each zero variance to zero, inside the finite
+  rows alone, and returns the block of the others. The test is `iszero`, with no tolerance.
+- `matrix_processing_block!`, both methods, takes its block from that helper. Every step runs on
+  the positive block, and the `NaN` frame around it stays as it is.
+- The bare `posdef!` applies the same rule above its algorithm, so every direct caller and every
+  `Posdef` algorithm gets it. This is the one change to the sentence above that the bare
+  `posdef!` keeps its whole-matrix refusal: it still refuses a `NaN`, and no longer a zero variance.
+- The result is positive semidefinite and not positive definite. No warning comes for the zero
+  rows, because they are the correct answer. The docstrings state the rule, and the warning of
+  `posdef!` fires only when the positive block stays indefinite.
+
+The oracle of map [#1375](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1375)
+refuses a variance that is not positive, so this is a **Better** row of that map. A negative
+variance is out of scope and keeps its `DomainError`.

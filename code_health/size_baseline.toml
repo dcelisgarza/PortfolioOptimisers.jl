@@ -75,10 +75,10 @@ commit = "ebcacfda95"
 "src/03_InputData/16_PanelDataFrame.jl" = { code = 150, doc = 264, comment = 0, blank = 124, total = 538 }
 "src/03_InputData/17_ReturnsBufferState.jl" = { code = 222, doc = 345, comment = 3, blank = 165, total = 735 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { code = 326, doc = 402, comment = 15, blank = 207, total = 950 }
-"src/04_MatrixProcessing/01_PosdefMatrix.jl" = { code = 45, doc = 155, comment = 0, blank = 73, total = 273 }
+"src/04_MatrixProcessing/01_PosdefMatrix.jl" = { code = 60, doc = 196, comment = 2, blank = 94, total = 352 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { code = 136, doc = 534, comment = 34, blank = 195, total = 899 }
 "src/04_MatrixProcessing/03_Detone.jl" = { code = 48, doc = 188, comment = 0, blank = 81, total = 317 }
-"src/04_MatrixProcessing/04_MatrixProcessing.jl" = { code = 141, doc = 480, comment = 7, blank = 187, total = 815 }
+"src/04_MatrixProcessing/04_MatrixProcessing.jl" = { code = 149, doc = 486, comment = 8, blank = 187, total = 830 }
 "src/05_Moments/01_Base_Moments.jl" = { code = 482, doc = 1117, comment = 9, blank = 468, total = 2076 }
 "src/05_Moments/02_SimpleExpectedReturns.jl" = { code = 172, doc = 435, comment = 2, blank = 192, total = 801 }
 "src/05_Moments/03_Covariance.jl" = { code = 360, doc = 892, comment = 5, blank = 367, total = 1624 }

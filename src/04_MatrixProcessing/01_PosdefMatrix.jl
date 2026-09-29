@@ -128,6 +128,8 @@ In-place projection of a matrix to the nearest positive definite matrix using th
 
 For matrices without unit diagonal, the function converts them into correlation matrices i.e. matrices with unit diagonal, applies the algorithm, and rescales them back.
 
+A variance that is exactly zero belongs to a constant variable, and it keeps a zero row and column. The repair runs on the block of positive variances, so the result is positive semidefinite and not positive definite. No warning comes for the zero rows, because they are the correct answer.
+
 # Mathematical definition
 
 Solves the nearest correlation matrix problem:
@@ -147,14 +149,17 @@ Where:
 
 For covariance matrices, first standardise ``\\mathbf{C} = \\mathrm{diag}(\\mathbf{\\Sigma})^{-1/2} \\mathbf{\\Sigma}\\, \\mathrm{diag}(\\mathbf{\\Sigma})^{-1/2}``, project, then rescale back.
 
+A zero variance has no correlation, so it cannot be standardised. The projection keeps the diagonal, and a positive semidefinite matrix with a zero diagonal entry has a zero row and column, as [`zero_variance_rows!`](@ref) states. The projection above then runs on the block of positive variances alone.
+
 # Algorithm
 
  1. Return `X` unchanged when it is already positive definite. The projection has nothing to do, and the check runs before every other step.
  2. Check that `X` is square.
- 3. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
- 4. Project `X` onto the nearest correlation matrix with `NearestCorrelationMatrix.nearest_cor!`, under the algorithm `pdm.alg` and the keyword arguments `pdm.kwargs`.
- 5. Warn when the projected `X` is still not positive definite. `X` is returned either way, so the caller must check the result when it cannot tolerate an unrepaired matrix.
- 6. When step 3 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 3, so the original diagonal returns exactly.
+ 3. Set the zero-variance rows and columns of `X` to zero with [`zero_variance_rows!`](@ref). When there is such a row, repair the block of positive variances with a recursive call, write the block back, and return `X`. The recursive call warns only when the block stays not positive definite.
+ 4. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
+ 5. Project `X` onto the nearest correlation matrix with `NearestCorrelationMatrix.nearest_cor!`, under the algorithm `pdm.alg` and the keyword arguments `pdm.kwargs`.
+ 6. Warn when the projected `X` is still not positive definite. `X` is returned either way, so the caller must check the result when it cannot tolerate an unrepaired matrix.
+ 7. When step 4 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 4, so the original diagonal returns up to rounding.
 
 # Arguments
 
@@ -193,10 +198,23 @@ julia> LinearAlgebra.isposdef(X)
 true
 ```
 
+The second variable below is constant. Its row and column stay zero, and the other two variables are repaired as above.
+
+```jldoctest
+julia> X = [1.0 0.0 2.0; 0.0 0.0 0.0; 2.0 0.0 1.0];
+
+julia> posdef!(Posdef(), X)
+3×3 Matrix{Float64}:
+ 1.0  0.0  1.0
+ 0.0  0.0  0.0
+ 1.0  0.0  1.0
+```
+
 # Related
 
   - [`posdef`](@ref)
   - [`Posdef`](@ref)
+  - [`zero_variance_rows!`](@ref)
   - [`MatNum`](@ref)
 """
 function posdef!(::Nothing, X::MatNum)::MatNum
@@ -207,6 +225,15 @@ function posdef!(pdm::Posdef, X::MatNum)
         return X
     end
     assert_matrix_issquare(X, :X)
+    # A zero variance forces a zero row and column, so only the positive block is repaired.
+    # The recursive call warns when that block stays indefinite, never for the zero rows.
+    p = zero_variance_rows!(X, trues(size(X, 1)))
+    if !all(p)
+        block = X[p, p]
+        posdef!(pdm, block)
+        X[p, p] = block
+        return X
+    end
     s = LinearAlgebra.diag(X)
     iscov = any(!isone, s)
     if iscov
@@ -221,6 +248,58 @@ function posdef!(pdm::Posdef, X::MatNum)
         StatsBase.cor2cov!(X, s)
     end
     return X
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Sets the rows and columns of the zero variances of a co-moment matrix to zero, and returns the mask of the positive variances.
+
+A variance that is exactly zero belongs to a constant variable. A positive semidefinite matrix with a zero diagonal entry has a zero row and column, so a repair that keeps the diagonal has no other answer for that row, and no correlation exists to standardise it. The test is `iszero`, with no tolerance: a variance of `1e-34` is positive and stays in the block.
+
+# Mathematical definition
+
+Every ``2 \\times 2`` principal minor of a positive semidefinite matrix is non-negative:
+
+```math
+\\begin{align}
+\\hat{\\mathbf{\\Sigma}}_{ii}\\,\\hat{\\mathbf{\\Sigma}}_{jj} - \\hat{\\mathbf{\\Sigma}}_{ij}^{2} &\\geq 0\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:Sigma_hat_ii])
+  - $(math_dict[:Sigma_hat_ij])
+
+So ``\\hat{\\mathbf{\\Sigma}}_{ii} = 0`` forces ``\\hat{\\mathbf{\\Sigma}}_{ij} = 0`` for every ``j``.
+
+# Algorithm
+
+ 1. Mark each row of `fin` whose diagonal entry in `X` is exactly zero.
+ 2. Set every entry of `X` whose row or column is marked, and whose other index is in `fin`, to zero.
+ 3. Return `fin` without the marked rows.
+
+# Arguments
+
+  - $(arg_dict[:sigrhoX])
+  - `fin`: The rows that the caller repairs. An entry whose row or column is outside `fin` is never written, so a `NaN` frame around the block stays as it is.
+
+# Returns
+
+  - `blk::BitVector`: The rows of `fin` with a variance that is not zero. The caller repairs this block.
+
+# Related
+
+  - [`posdef!`](@ref)
+  - [`matrix_processing_block!`](@ref)
+"""
+function zero_variance_rows!(X::MatNum, fin::AbstractVector{Bool})
+    z = fin .& iszero.(LinearAlgebra.diag(X))
+    if any(z)
+        X[z, fin] .= zero(eltype(X))
+        X[fin, z] .= zero(eltype(X))
+    end
+    return fin .& .!z
 end
 """
     posdef(pdm::Option{<:AbstractPosdefEstimator}, X::MatNum) -> MatNum

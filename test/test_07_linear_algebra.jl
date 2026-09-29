@@ -309,6 +309,93 @@ end
         @test r == X
         @test !LinearAlgebra.isposdef(r)
     end
+    @testset "Ticket 1429: a zero variance keeps a zero row, and the rest is repaired" begin
+        # A PSD matrix with a zero diagonal entry has a zero row and column (every 2x2 minor
+        # is non-negative), and `posdef!` keeps the diagonal, so that row has no other answer.
+        # The repair used to divide it by zero in `cov2cor!` and meet a LAPACK refusal.
+        z = [2, 4]
+        p = [1, 3, 5]
+        X = [1.0 0.0 0.9 0.0 -0.8
+             0.0 0.0 0.0 0.0 0.0
+             0.9 0.0 1.0 0.0 0.9
+             0.0 0.0 0.0 0.0 0.0
+             -0.8 0.0 0.9 0.0 2.0]
+        @test !LinearAlgebra.isposdef(X[p, p])
+        # The zero rows are the correct answer, so no warning comes for them.
+        r = @test_logs min_level = Logging.Warn posdef!(Posdef(), copy(X))
+        @test all(iszero, r[z, :])
+        @test all(iszero, r[:, z])
+        @test r[p, p] == posdef!(Posdef(), X[p, p])
+        @test LinearAlgebra.isposdef(r[p, p])
+        @test LinearAlgebra.diag(r)[z] == [0.0, 0.0]
+        # A covariance with a zero variance and a non-zero entry in its row is not PSD, and
+        # the only PSD matrix with that diagonal sets the entry to zero.
+        Y = copy(X)
+        Y[2, 3] = Y[3, 2] = 0.1
+        @test posdef!(Posdef(), Y) == r
+        # A matrix of zeros is PSD already in the only way it can be.
+        @test posdef!(Posdef(), zeros(3, 3)) == zeros(3, 3)
+        # The test is `iszero`: a tiny variance is positive and stays in the block.
+        @test PortfolioOptimisers.zero_variance_rows!([1e-34 0.0; 0.0 1.0], trues(2)) ==
+              [true, true]
+        # The warning still comes when the positive block stays indefinite.
+        est = Posdef(; alg = Ticket447Stub(), kwargs = (; ensure_pd = false))
+        W = [1.0 0.0 2.0; 0.0 0.0 0.0; 2.0 0.0 1.0]
+        w = @test_logs (:warn, "Matrix could not be made positive definite.") posdef!(est,
+                                                                                      copy(W))
+        @test w == W
+    end
+    @testset "Ticket 1429: the block repair leaves a zero variance out of every step" begin
+        # Denoise and Detone each convert to a correlation, so a zero variance broke them as it
+        # broke the positive definite step. The block holds the finite, non-zero variances.
+        rng = StableRNG(1429)
+        Xd = randn(rng, 120, 6) ./ 100
+        Xd[:, 3] .= 0.0
+        S = cov(Xd)
+        @test S[3, 3] == 0
+        mp = MatrixProcessing(; pdm = Posdef(), dn = Denoise(), dt = Detone(; n = 1))
+        p = [1, 2, 4, 5, 6]
+        byhand = matrix_processing(mp, S[p, p], Xd[:, p])
+        r = PortfolioOptimisers.matrix_processing_block!(mp, copy(S), Xd)
+        @test r[p, p] == byhand
+        @test all(iszero, r[3, :])
+        @test all(iszero, r[:, 3])
+        # The shape twin cuts the count of the block, not its columns.
+        T = size(Xd, 1)
+        byshape = copy(S[p, p])
+        matrix_processing!(mp, byshape, T, length(p))
+        rs = PortfolioOptimisers.matrix_processing_block!(mp, copy(S), T, size(S, 1))
+        @test rs[p, p] == byshape
+        @test all(iszero, rs[3, :])
+        # Every variance zero leaves nothing to repair, on both methods.
+        @test PortfolioOptimisers.matrix_processing_block!(mp, zeros(3, 3), zeros(4, 3)) ==
+              zeros(3, 3)
+        @test PortfolioOptimisers.matrix_processing_block!(mp, zeros(3, 3), 4, 3) ==
+              zeros(3, 3)
+        # A NaN frame stays as it is: the cell of a constant asset and an asset the fit left
+        # out is still NaN, and the zero row is zero inside the finite rows alone.
+        F = copy(S)
+        F[6, :] .= NaN
+        F[:, 6] .= NaN
+        Fs = copy(F)
+        rf = PortfolioOptimisers.matrix_processing_block!(mp, F, Xd)
+        q = [1, 2, 4, 5]
+        @test rf[q, q] == matrix_processing(mp, S[q, q], Xd[:, q])
+        @test all(isnan, rf[6, :])
+        @test all(iszero, rf[3, 1:5])
+        rfs = PortfolioOptimisers.matrix_processing_block!(mp, Fs, T, size(S, 1))
+        byq = copy(S[q, q])
+        matrix_processing!(mp, byq, T, length(q))
+        @test rfs[q, q] == byq
+        @test all(isnan, rfs[:, 6])
+        @test all(iszero, rfs[1:5, 3])
+        # The default covariance of returns with a constant asset (cash at a zero return) is
+        # finite and PSD, where it used to throw.
+        sigma = cov(PortfolioOptimisersCovariance(), Xd)
+        @test all(isfinite, sigma)
+        @test all(iszero, sigma[3, :])
+        @test LinearAlgebra.isposdef(sigma[p, p])
+    end
     @testset "Ticket 447: matrix_processing! applies mp.order" begin
         rng = StableRNG(90210)
         Xd = randn(rng, 120, 6)

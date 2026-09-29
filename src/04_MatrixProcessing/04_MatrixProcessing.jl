@@ -602,13 +602,15 @@ Applies matrix processing to the finite block of `sigma`, from the shape of the 
 
 The shape twin of [`matrix_processing_block!`](@ref), and the arm an incremental fit takes when the estimate is made from the state. It is the matrix method's body with one substitution: where that one cuts the columns of `X` to the block, this one cuts the **count** of them, because the only thing the steps read off those columns is how many there are.
 
-An estimate made from the state reaches this arm rather than the plain one for the reason the [`AssetPanel`](@ref) methods do: an estimator fitted over a changing universe answers `NaN` for an asset outside the Coverage Universe, and a positive-definite repair over a frame carrying one meets a LAPACK refusal rather than a named error. A complete matrix has no frame, and the body then runs the plain arm over the whole of it, so nothing is paid where nothing is missing.
+An estimate made from the state reaches this arm rather than the plain one for the reason the [`AssetPanel`](@ref) methods do: an estimator fitted over a changing universe answers `NaN` for an asset outside the Coverage Universe, and a positive-definite repair over a frame carrying one meets a LAPACK refusal rather than a named error. A complete matrix has no frame, and the body then runs the plain arm over the whole of it after the refusal, which names a non-finite off-diagonal entry that LAPACK would refuse without a name.
 
 # Algorithm
 
- 1. Read the block mask off the diagonal of `sigma`.
- 2. Run the plain arm where no asset is finite, and where every asset is.
- 3. Otherwise refuse a block carrying a non-finite entry, process the block with the block's own asset count, and write it back.
+ 1. Read the finite rows off the diagonal of `sigma`, and run the plain arm where no asset is finite.
+ 2. Refuse a non-finite entry inside the finite rows with an `IsNonFiniteError`, as the matrix method does.
+ 3. Set the rows and columns of the zero variances to zero with [`zero_variance_rows!`](@ref), and take the block as the finite rows whose variance is not zero. A zero variance has no correlation, so no step reads it.
+ 4. Run the plain arm where every asset is in the block, and return where no asset is.
+ 5. Otherwise process the block with the block's own asset count, and write it back.
 
 # Arguments
 
@@ -627,15 +629,24 @@ An estimate made from the state reaches this arm rather than the plain one for t
   - [`matrix_processing_block!`](@ref)
   - [`matrix_processing!`](@ref)
   - [`assert_finite_block`](@ref)
+  - [`zero_variance_rows!`](@ref)
 """
 function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator},
                                   sigma::MatNum, T::Integer, N::Integer; kwargs...)
-    blk = isfinite.(LinearAlgebra.diag(sigma))
-    if !any(blk) || all(blk)
+    fin = isfinite.(LinearAlgebra.diag(sigma))
+    if !any(fin)
         matrix_processing!(mp, sigma, T, N; kwargs...)
         return sigma
     end
-    assert_finite_block(view(sigma, blk, blk))
+    assert_finite_block(view(sigma, fin, fin))
+    blk = zero_variance_rows!(sigma, fin)
+    if all(blk)
+        matrix_processing!(mp, sigma, T, N; kwargs...)
+        return sigma
+    end
+    if !any(blk)
+        return sigma
+    end
     block = sigma[blk, blk]
     matrix_processing!(mp, block, T, count(blk); kwargs...)
     sigma[blk, blk] = block
@@ -717,7 +728,7 @@ Repair the finite block of a covariance-like frame in place, and leave the frame
 
 A composite estimator that forwards an Asset Panel to the estimator it wraps can get a **frame** back: a matrix whose rows and columns outside the Coverage Universe are `NaN`. The repair has no answer for a `NaN`, so it runs on the finite block alone, and the frame around the block is written back unchanged.
 
-The block is derived from the diagonal, exactly as [`investable_mask`](@ref) derives the Investable Mask from it. An off-diagonal `NaN` **inside** the block is refused with an `IsNonFiniteError`, and is not peeled away. A [`CoveragePolicy`](@ref) makes one whenever a pair shares no observation while both of its assets have observations of their own, so the refusal is the one the caller of an available-case fit meets. A peel here would hide it rather than repair a matrix.
+The block is derived from the diagonal, exactly as [`investable_mask`](@ref) derives the Investable Mask from it, and it holds the variances that are finite and not zero. A zero variance belongs to a constant variable: it has no correlation, and a positive semidefinite matrix gives it a zero row and column. So its row and column are set to zero and kept out of the block, and no step, the denoising and the detoning included, reads them. The result is then positive semidefinite and not positive definite. An off-diagonal `NaN` **inside** the finite block is refused with an `IsNonFiniteError`, and is not peeled away. A [`CoveragePolicy`](@ref) makes one whenever a pair shares no observation while both of its assets have observations of their own, so the refusal is the one the caller of an available-case fit meets. A peel here would hide it rather than repair a matrix.
 
 The block is the whole matrix when every diagonal entry is finite, and **the refusal covers that case too**: a complete diagonal is what an available-case pair with an empty intersection has, so a short-circuit past the refusal would send exactly the case the message was written for to LAPACK. A matrix with no finite diagonal is the one case that still goes straight to the plain repair, because it has no block to refuse anything inside.
 
@@ -725,11 +736,13 @@ The bare [`matrix_processing!`](@ref) and [`posdef!`](@ref) are unchanged, so a 
 
 # Algorithm
 
- 1. Take the block `blk` as `isfinite.(diag(sigma))`.
- 2. Run the ordinary repair and return where `blk` holds no `true`. A matrix with no finite diagonal has no block to repair, so it belongs to the plain repair and meets its refusal.
- 3. Refuse a non-finite entry inside the block with an `IsNonFiniteError`.
- 4. Run the ordinary repair on `sigma` itself and return where `blk` holds no `false`. A complete matrix has no frame to leave alone.
- 5. Copy the block out, repair the copy with [`matrix_processing!`](@ref) under the columns of `X` that the block names, write it back into `sigma`, and return `sigma`. `X` is cut only where the axis of `sigma` is the asset axis: a cokurtosis matrix is indexed by asset pairs, so its block names no column of `X` and the whole returns matrix is handed over, which is what the plain path does at that order.
+ 1. Take the finite rows `fin` as `isfinite.(diag(sigma))`.
+ 2. Run the ordinary repair and return where `fin` holds no `true`. A matrix with no finite diagonal has no block to repair, so it belongs to the plain repair and meets its refusal.
+ 3. Refuse a non-finite entry inside the finite rows with an `IsNonFiniteError`.
+ 4. Set the rows and columns of the zero variances to zero with [`zero_variance_rows!`](@ref), and take the block `blk` as the rows of `fin` whose variance is not zero.
+ 5. Run the ordinary repair on `sigma` itself and return where `blk` holds no `false`. A complete matrix has no frame to leave alone.
+ 6. Return `sigma` where `blk` holds no `true`. Every finite variance is zero, so nothing is left to repair.
+ 7. Copy the block out, repair the copy with [`matrix_processing!`](@ref) under the columns of `X` that the block names, write it back into `sigma`, and return `sigma`. `X` is cut only where the axis of `sigma` is the asset axis: a cokurtosis matrix is indexed by asset pairs, so its block names no column of `X` and the whole returns matrix is handed over, which is what the plain path does at that order.
 
 # Arguments
 
@@ -752,21 +765,27 @@ The bare [`matrix_processing!`](@ref) and [`posdef!`](@ref) are unchanged, so a 
   - [`matrix_processing!`](@ref)
   - [`investable_mask`](@ref)
   - [`IsNonFiniteError`](@ref)
+  - [`zero_variance_rows!`](@ref)
 """
 function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator},
                                   sigma::MatNum, X::MatNum, args...; kwargs...)
-    blk = isfinite.(LinearAlgebra.diag(sigma))
+    fin = isfinite.(LinearAlgebra.diag(sigma))
     # A matrix with no finite diagonal has no block to repair, so it is the plain repair's and
     # its refusal is the one its caller already met.
-    if !any(blk)
+    if !any(fin)
         matrix_processing!(mp, sigma, X, args...; kwargs...)
         return sigma
     end
-    assert_finite_block(view(sigma, blk, blk))
+    assert_finite_block(view(sigma, fin, fin))
+    # A zero variance has a zero row and column and no correlation, so it leaves the block.
+    blk = zero_variance_rows!(sigma, fin)
     # A complete matrix has no frame to leave alone, so the repair runs on it whole. The
     # refusal above has already covered its block, which is the matrix itself.
     if all(blk)
         matrix_processing!(mp, sigma, X, args...; kwargs...)
+        return sigma
+    end
+    if !any(blk)
         return sigma
     end
     block = sigma[blk, blk]
