@@ -47,6 +47,22 @@ most 2 100 entries, in about 0.05 s. The scalar estimator divides each `z²` by 
 count of its asset. `PortfolioTarget` divides each direction by the factor at the smallest count of
 the contributing assets.
 
+**The default inverse-volatility direction also divides by `1 + Δ`, its second-order excess
+(#1430).** `PortfolioTarget()` builds its direction from the estimate that it divides by, so the
+direction and the error of the estimate are correlated, and the factor of a fixed direction leaves
+1.058 at 12 assets and a half-life of 10. In units of the true volatilities the statistic is
+`q'Rq / 1'R̂1`, with `q_i = σ_i / σ̂_i`. A second-order expansion in the error of the estimate gives
+`Δ = s_v (1 + Σ₃/A − 2B/A²) + s_vc (1 − Σ₃/A − 2T/A² + 2B/A²)`, with `c = R1`, `A = 1'c`,
+`T = Σ c_i³`, `B = Σ c_i R_ij² c_j`, `Σ₃ = Σ R_ij³`, `s_v` the sum of the squared weights of the
+variance and `s_vc` the sum of the products of the variance and the correlation weights. On one
+decay it is `2 s₂ (1 − T/A²)`. The excess is the same for the three methods to first order, and
+`inverse_volatility_bias` reads it on the estimated correlation of the block in `O(n²)`. On
+simulated iid Normal returns the formula at the true `R` matches the excess to `5 × 10⁻⁴` on both
+paths, and the plug-in leaves at most 0.4 % in the steady state at a half-life of 10 and 0.03 % at
+40. The next order, about `9 s₂²`, is stated and not corrected: it is largest in the warm-up rows,
+1.08 at `K = 10` and a half-life of 10, and 1.006 on the first row at the default half-life of 40.
+A fixed `w` takes no change.
+
 **`DiagonalTarget` divides each term by `E[1/Q_i]` at its own count, whatever the method.** A sum
 of `n` terms averages the errors of `n` estimates, so the root and the log see almost the mean's
 factor. At 12 assets and a half-life of 10 the biases are 1.073, 1.068 and 1.063 at a correlation of
@@ -63,10 +79,9 @@ asset leaves the statistic as it does below `min_obs`.
 - Every default fit of a regime estimator moves, and so does every default fit of the
   Cross-Sectional Factor Prior, whose `ve` and `pe` are regime estimators. A stored oracle case
   states `debias = false`.
-- **Four limits remain, and four child issues of map #1375 hold them.**
-  - The default `PortfolioTarget()` builds its inverse-volatility direction from the estimate
-    itself. The direction and the error of the estimate are correlated, so a bias that no factor of
-    `(λ, K)` removes remains: 1.058 at a half-life of 10 (#1430).
+- The default inverse-volatility direction keeps the next order of its excess, about `9 s₂²`,
+  which the docstring of its statistic states with the warm-up rows.
+- **Three limits remain, and three child issues of map #1375 hold them.**
   - `MahalanobisTarget` keeps `b`, the moment of the mean, for every method, so it over-corrects
     FirstMoment and Log: 0.975 and 0.956 at 12 assets and a half-life of 10. The root and the log of
     `v' Ŵ⁻¹ v` for `n > 1` have no one-dimensional integral (#1431).
@@ -82,5 +97,12 @@ asset leaves the statistic as it does below `min_obs`.
   `RootMeanSquaredAdjusted` alone.
 - **A moment-matched chi-square on the Kish count.** It has closed forms, but it is 1.5 % wrong at
   `K = 5`. The exact table costs little.
+- **An inverse-volatility direction from an earlier or a slower estimate** (#1430). An exponential
+  estimate shares almost all its observations with the estimate of the step before and with a
+  slower one, so their errors stay correlated: at a half-life of 10 and `R = I` the residual is
+  1.064 with the current direction, 1.059 with the direction of the step before and 1.025 at four
+  times the half-life. Only a direction that reads no estimate is exact.
+- **A fixed default direction** (#1430). The factor of #1428 is exact for it on every row, but the
+  target would then measure another portfolio, which the most volatile assets dominate.
 - **A keyword on each target.** `DiagonalTarget` would carry a field that a geodesic shrinkage
   ignores, and the scalar estimator would need a keyword of its own anyway.

@@ -88,10 +88,16 @@ correlation half-life of 20, the squared multiplier of an equal-weight direction
 and 0.971 with `decay`. A HAC adjustment makes the estimate noisier than its weights state, so
 the factor under-corrects it: 1.055 at two lags.
 
-The default inverse-volatility direction is built from the same estimate, so the direction and
-the error of the estimate are correlated, and a bias remains: at 12 assets the squared multiplier
-of `RootMeanSquaredAdjusted` on iid Normal returns is 1.134 before and 1.058 after the factor at
-a half-life of 10, and 1.032 before at a half-life of 40.
+The default inverse-volatility direction (`w = nothing`) is built from the same estimate, so the
+direction and the error of the estimate are correlated. Its statistic is also divided by
+``1 + \\Delta``, the second-order excess of [`inverse_volatility_bias`](@ref), on the estimated
+correlation of the block. At 12 assets and a half-life of 10 the squared multiplier on iid
+Normal returns is 1.134 raw, 1.058 after the factor alone and 1.001 after both. The excess
+is the same for the three methods to first order. What remains is of the next order, about
+``9 s^{2}`` with ``s`` the sum of the squared weights, so it is largest in the warm-up rows: at
+12 assets, a half-life of 10 and ``R = I``, 1.34 at ``K = 5``, 1.08 at ``K = 10``, 1.02 at
+``K = 20`` and 1.004 in the steady state. At the defaults the first row enters at ``K`` equal to
+the half-life, where the rest is 1.006 at a half-life of 40 (ADR 0190).
 
 # Arguments
 
@@ -110,21 +116,134 @@ a half-life of 10, and 1.032 before at a half-life of 40.
 
   - [`PortfolioTarget`](@ref)
   - [`regime_bias!`](@ref)
+  - [`inverse_volatility_bias`](@ref)
   - [`update_regime!`](@ref)
 """
 function regime_target_statistic(target::PortfolioTarget,
                                  cache::RegimeAdjustedCovarianceState,
                                  ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
                                  idx::AbstractVector{<:Integer})
-    stats = regime_statistic(target, X[idx], regime_covariance_block(cache, ce, idx), idx,
-                             ce.min_val)
+    C = regime_covariance_block(cache, ce, idx)
+    stats = regime_statistic(target, X[idx], C, idx, ce.min_val)
     if isnothing(stats)
         return nothing
     end
 
-    decay = has_separate_cor_decay(ce) ? ce.cor_decay : ce.decay
-    return stats ./ regime_bias!(cache.bias, ce.regime_method, decay,
-                                 minimum(view(cache.obs_count, idx)))
+    K = minimum(view(cache.obs_count, idx))
+    separate = has_separate_cor_decay(ce)
+    f = regime_bias!(cache.bias, ce.regime_method, separate ? ce.cor_decay : ce.decay, K)
+    if isnothing(target.w) && !isnothing(cache.bias)
+        sv = exp_weight_cross_sum(ce.decay, ce.decay, K)
+        svc = separate ? exp_weight_cross_sum(ce.decay, ce.cor_decay, K) : sv
+        f *= one(f) + inverse_volatility_bias(C, sv, svc, ce.min_val)
+    end
+    return stats ./ f
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the sum of the products of two sets of normalised exponential weights over ``K``
+observations.
+
+# Mathematical definition
+
+```math
+\\sum_{j=0}^{K-1} w_{j}(a)\\, w_{j}(b) = \\frac{(1 - a)(1 - b)\\left(1 - (ab)^{K}\\right)}{(1 - ab)\\left(1 - a^{K}\\right)\\left(1 - b^{K}\\right)}\\,, \\quad w_{j}(a) = \\frac{(1 - a)\\, a^{j}}{1 - a^{K}}\\,.
+```
+
+At ``a = b`` it is the sum of the squared weights, the variance of an estimate of ``K``
+observations relative to the variance of one.
+
+# Arguments
+
+  - `a::Number`: Decay of the first set of weights.
+  - `b::Number`: Decay of the second set of weights.
+  - `K::Integer`: Count of observations that the weights span.
+
+# Returns
+
+  - `s::Number`: The sum of the products of the weights.
+
+# Related
+
+  - [`inverse_volatility_bias`](@ref)
+"""
+function exp_weight_cross_sum(a::Number, b::Number, K::Integer)
+    ab = a * b
+    return (one(a) - a) * (one(b) - b) * (one(ab) - ab^K) /
+           ((one(ab) - ab) * (one(a) - a^K) * (one(b) - b^K))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the second-order excess bias of the regime statistic of the inverse-volatility direction,
+which is built from the estimate it divides by.
+
+The direction ``p_{i} \\propto 1 / \\hat{\\sigma}_{i}`` reads the estimated volatilities, so its
+statistic is ``q^{\\top} R q / 1^{\\top} \\hat{R} 1`` in units of the true volatilities, with
+``q_{i} = \\sigma_{i} / \\hat{\\sigma}_{i}``. An asset whose volatility is under-estimated takes
+more weight, and its error enters the numerator but not the denominator. A second-order expansion
+in the error of the estimate gives the mean of the statistic as the factor of a fixed direction
+times ``1 + \\Delta``. The excess is the same for the three regime methods to first order. On one
+decay ``s_{vc} = s_{v}`` and ``\\Delta = 2 s_{v} \\kappa``, with
+``\\kappa = 1 - \\sum_{i} c_{i}^{3} / A^{2}``: ``1 - 1/n`` at ``R = I`` and zero at a correlation
+of one, where the estimated direction is proportional to the true one.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\Delta &= s_{v} \\left(1 + \\frac{\\Sigma_{3}}{A} - \\frac{2 B}{A^{2}}\\right) + s_{vc} \\left(1 - \\frac{\\Sigma_{3}}{A} - \\frac{2 T}{A^{2}} + \\frac{2 B}{A^{2}}\\right)\\,, \\\\
+c &= R 1\\,, \\quad A = 1^{\\top} c\\,, \\quad T = \\sum_{i} c_{i}^{3}\\,, \\quad B = \\sum_{ij} c_{i} R_{ij}^{2} c_{j}\\,, \\quad \\Sigma_{3} = \\sum_{ij} R_{ij}^{3}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``R``: Correlation of the block, the plug-in for the true correlation.
+  - ``s_{v}``: Sum of the squared weights of the variance estimate.
+  - ``s_{vc}``: Sum of the products of the weights of the variance and the correlation estimates.
+
+The plug-in and the next order leave about ``9 s_{v}^{2}``. At 12 assets and a half-life of 10
+the formula at the true ``R`` matches the simulated excess to ``5 \\times 10^{-4}``, on both paths.
+A block whose ``A`` is not positive has no inverse-volatility portfolio with a variance, and takes
+no excess.
+
+# Arguments
+
+  - `C::MatNum`: Bias-corrected covariance block of the contributing assets.
+  - `sv::Number`: Sum of the squared weights of the variance estimate.
+  - `svc::Number`: Sum of the products of the weights of the variance and the correlation
+    estimates.
+  - `min_val::Number`: Floor applied to each variance, as in [`regime_statistic`](@ref).
+
+# Returns
+
+  - `delta::Number`: The excess ``\\Delta``.
+
+# Related
+
+  - [`regime_target_statistic`](@ref)
+  - [`exp_weight_cross_sum`](@ref)
+  - [`PortfolioTarget`](@ref)
+"""
+function inverse_volatility_bias(C::MatNum, sv::Number, svc::Number, min_val::Number)
+    d = inv.(sqrt.(max.(LinearAlgebra.diag(C), min_val)))
+    c = (C * d) .* d
+    A = sum(c)
+    if !(A > zero(A))
+        return zero(A) * sv
+    end
+    B = zero(A)
+    S3 = zero(A)
+    for j in axes(C, 2), i in axes(C, 1)
+        r = d[i] * C[i, j] * d[j]
+        B += c[i] * r^2 * c[j]
+        S3 += r^3
+    end
+    T = sum(x -> x^3, c)
+    return sv * (one(A) + S3 / A - 2 * B / A^2) +
+           svc * (one(A) - S3 / A - 2 * T / A^2 + 2 * B / A^2)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

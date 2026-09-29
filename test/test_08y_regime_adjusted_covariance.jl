@@ -732,3 +732,71 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
     @test isequal(cov(partial_fit!(partial_fit!(ce, R[1:200, :]), R[201:400, :])),
                   cov(ce, R[1:400, :]))
 end
+
+#=
+Issue #1430. The default `PortfolioTarget()` builds its inverse-volatility direction from the
+estimate that it divides by, so the direction and the error of the estimate are correlated, and
+the factor of a fixed direction leaves 1.058 at 12 assets and a half-life of 10. `debias = true`
+also divides that direction by `1 + Δ`, its second-order excess, read on the estimated
+correlation of the block (ADR 0190).
+=#
+@testset "the inverse-volatility direction divides by its second-order excess" begin
+    # The sums of the products of the normalised weights, against the sums written out.
+    lambda, slow = 2.0^(-1 / 10), 2.0^(-1 / 20)
+    wts(d, K) = (w = [(1 - d) * d^j for j in 0:(K - 1)]; w ./ sum(w))
+    for K in (5, 17, 400)
+        @test isapprox(PO.exp_weight_cross_sum(lambda, lambda, K),
+                       sum(abs2, wts(lambda, K)); rtol = 1e-12)
+        @test isapprox(PO.exp_weight_cross_sum(lambda, slow, K),
+                       dot(wts(lambda, K), wts(slow, K)); rtol = 1e-12)
+    end
+    @test isapprox(PO.exp_weight_cross_sum(lambda, lambda, 10^6),
+                   (1 - lambda) / (1 + lambda); rtol = 1e-12)
+
+    # The excess against the formula written with matrices, on a correlation that is not
+    # uniform. It reads the correlation alone, so a scale of the volatilities does not move it.
+    rng = StableRNG(1430)
+    na = 12
+    F = randn(rng, na, 3)
+    S = F * transpose(F) + Diagonal(0.3 .+ rand(rng, na))
+    Rho = S ./ sqrt.(diag(S) .* transpose(diag(S)))
+    vol = 0.5 .+ rand(rng, na)
+    sv, svc = 0.03, 0.02
+    c = vec(sum(Rho; dims = 2))
+    A, T = sum(c), sum(c .^ 3)
+    B, S3 = dot(c, (Rho .^ 2) * c), sum(Rho .^ 3)
+    delta = sv * (1 + S3 / A - 2 * B / A^2) + svc * (1 - S3 / A - 2 * T / A^2 + 2 * B / A^2)
+    @test isapprox(PO.inverse_volatility_bias(vol .* Rho .* transpose(vol), sv, svc, 1e-12),
+                   delta; rtol = 1e-12)
+    # On one decay it is 2 s (1 - T / A²): 2 s (1 - 1/n) at R = I, and zero at a correlation of
+    # one, where the estimated direction is proportional to the true one.
+    @test isapprox(PO.inverse_volatility_bias(Rho, sv, sv, 1e-12), 2 * sv * (1 - T / A^2);
+                   rtol = 1e-12)
+    @test isapprox(PO.inverse_volatility_bias(Matrix(1.0I, na, na), sv, sv, 1e-12),
+                   2 * sv * (1 - 1 / na); rtol = 1e-12)
+    @test abs(PO.inverse_volatility_bias(vol .* transpose(vol), sv, sv, 1e-12)) < 1e-14
+    # A block whose inverse-volatility portfolio has no variance takes no excess.
+    @test iszero(PO.inverse_volatility_bias([1.0 -1.0; -1.0 1.0], sv, sv, 1e-12))
+
+    # On iid Normal returns the squared multiplier is one when the statistic is correct.
+    # Measured on this seed, half-life 10: 0.999 (RMS) and 0.982 (first moment) debiased, 1.110
+    # and 1.073 raw, and 1.013 (RMS) on the separate path. Eight seeds of this fixture: 1.0009 ±
+    # 0.0013 (RMS), 1.0042 ± 0.0051 (first moment) and 1.013 ± 0.019 (log, too noisy to pin).
+    U = cholesky(Symmetric(S)).U
+    R = randn(rng, 12000, na) * U .* 0.01
+    base = (; decay = lambda, min_obs = 5, regime_lohi_mult = nothing,
+            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centred = true)
+    function covariance_multiplier(method; extra...)
+        on = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
+                                                 regime_method = method)
+        off = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
+                                                  regime_method = nothing)
+        return mean(cov(on, R) ./ cov(off, R))
+    end
+    @test 0.99 < covariance_multiplier(PO.RootMeanSquaredAdjusted()) < 1.01
+    @test 0.97 < covariance_multiplier(PO.FirstMomentRegimeAdjusted()) < 1.03
+    @test covariance_multiplier(PO.RootMeanSquaredAdjusted(); debias = false) > 1.08
+    @test 0.98 <
+          covariance_multiplier(PO.RootMeanSquaredAdjusted(); cor_decay = 2.0^(-1 / 20)) <
+          1.02
+end

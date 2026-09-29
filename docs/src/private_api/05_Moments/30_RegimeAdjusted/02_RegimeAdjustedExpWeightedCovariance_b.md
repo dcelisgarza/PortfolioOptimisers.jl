@@ -1,5 +1,5 @@
 ```@meta
-Description = "Regime adjusted exp weighted covariance (b), private API of PortfolioOptimisers.jl: regime_target_statistic, safe_regime_cholesky, mahalanobis_bias, …"
+Description = "Regime adjusted exp weighted covariance (b), private API of PortfolioOptimisers.jl: regime_target_statistic, exp_weight_cross_sum, inverse_volatility_bias, …"
 ```
 
 # Regime adjusted exp weighted covariance (b): private API
@@ -8,6 +8,9 @@ Description = "Regime adjusted exp weighted covariance (b), private API of Portf
 
 ```@docs
 regime_target_statistic
+exp_weight_cross_sum
+inverse_volatility_bias
+regime_bias_state
 safe_regime_cholesky
 mahalanobis_bias
 mahalanobis_bias_sums
