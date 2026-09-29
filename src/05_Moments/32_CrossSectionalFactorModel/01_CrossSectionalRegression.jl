@@ -479,7 +479,7 @@ end
 function cross_sectional_solve(::RankDeficiencyRefusal, A::MatNum, y::VecNum, t::Integer)
     r = cross_sectional_rank(A)
     @argcheck(r == size(A, 2),
-              ArgumentError("the weighted design of observation $t has rank $r over $(size(A, 2)) factors and $(size(A, 1)) eligible assets, so its weighted least squares has no unique solution. Use PseudoInverseFallback() or MinimumNormSolve() to take the minimum-norm solution, UncheckedSolve() to take the truncated basic solution, drop the dependent factors, or widen the eligible cross-section"))
+              ArgumentError("the weighted design of observation $t has rank $r over $(size(A, 2)) factors and $(size(A, 1)) eligible assets, so its weighted least squares has no unique solution. Use PseudoInverseFallback() or MinimumNormSolve() to take the minimum-norm solution, UncheckedSolve() to take whatever `\\` returns, drop the dependent factors, or widen the eligible cross-section"))
     return A \ y
 end
 """
