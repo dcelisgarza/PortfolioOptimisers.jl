@@ -246,9 +246,10 @@ end
         rd = grid_fixture(fx)
         rdu = grid_fixture(fx; base_usd = true)
         N = size(rd.X, 2)
-        # Asset 4 of the small panel is in its warm-up at the latest observation. `test_12p`
-        # states why its `mu` and its covariances are a deliberate difference (#1384).
-        rest = fix == "Small" ? setdiff(1:N, fx.at.relist[1]) : (1:N)
+        # Asset 4 of the small panel is in its warm-up at the latest observation. Both sides
+        # state its mean and its covariances, which the model determines, and neither states
+        # its variance, so every asset compares, with its `NaN` pattern (#1384).
+        rest = 1:N
         fits = Dict{String, Any}()
         @testset "$(c)" for c in GRID_STRUCT
             rdc = c == "CurrencyBase" ? rdu : rd

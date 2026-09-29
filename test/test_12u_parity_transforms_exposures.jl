@@ -223,15 +223,12 @@ end
         @test pr.rr.nf == ["market", "size", "style1", "style2"]
         @test parity_compare(pr.rr.M, load("Loadings"); name = "loadings").ok
         @test parity_compare(pr.rr.csr.f, load("FactorReturns"); name = "factor returns").ok
-        # The relisted asset is in its warm-up at the latest observation, so the prior states
-        # no moment for it (#1377).
-        i4 = fx.at.relist[1]
-        rest = setdiff(axes(fx.rd.X, 2), i4)
-        @test parity_compare(pr.mu[rest], vec(load("Mu"))[rest]; name = "mu").ok
+        # The relisted asset is in its warm-up at the latest observation, so neither side
+        # states its variance, and both state its mean and its covariances (#1377, #1384).
+        @test parity_compare(pr.mu, vec(load("Mu")); name = "mu").ok
         # A covariance compares against its largest entry (#1376). Measured maxscaled 3.8e-13,
         # and maxrel 6.5e-11 cell by cell on its near-zero off-diagonal entries.
-        @test parity_compare(pr.sigma[rest, rest], load("Sigma")[rest, rest];
-                             scale = :array, name = "sigma").ok
+        @test parity_compare(pr.sigma, load("Sigma"); scale = :array, name = "sigma").ok
         # The Neutralisation left the other factors alone.
         pp = prior(parity_neutralise_prior(), fx.rd)
         @test isequal(pr.rr.M[:, 1:2], pp.rr.M[:, 1:2])

@@ -1448,18 +1448,20 @@ The square root `chol` factorises the factor model before `mp` processes it, as 
 
 ```math
 \\begin{align}
-\\boldsymbol{\\mu}_{\\mathcal{I}} &= \\mathbf{B}_{T,\\,\\mathcal{I}} \\, \\boldsymbol{\\mu}_{f}\\,, \\\\
-\\mathbf{\\Sigma}_{\\mathcal{I}\\mathcal{I}} &= \\mathbf{B}_{T,\\,\\mathcal{I}} \\, \\mathbf{F} \\, \\mathbf{B}_{T,\\,\\mathcal{I}}^{\\intercal} + \\mathbf{D}_{\\mathcal{I}\\mathcal{I}}\\,, \\\\
-\\mathbf{C} &= \\begin{bmatrix} \\mathbf{B}_{T,\\,\\mathcal{I}} \\, \\operatorname{chol}(\\mathbf{F}) & \\mathbf{R} \\end{bmatrix}^{\\intercal}\\,.
+\\mathcal{S} &= \\left\\{i : B_{Tik} \\in \\mathbb{R} \\ \\forall k \\in \\{1, \\ldots, K\\}\\right\\}\\,, \\\\
+\\boldsymbol{\\mu}_{\\mathcal{S}} &= \\mathbf{B}_{T,\\,\\mathcal{S}} \\, \\boldsymbol{\\mu}_{f}\\,, \\\\
+\\mathbf{\\Sigma}_{\\mathcal{S}\\mathcal{S}} &= \\mathbf{B}_{T,\\,\\mathcal{S}} \\, \\mathbf{F} \\, \\mathbf{B}_{T,\\,\\mathcal{S}}^{\\intercal} + \\mathbf{D}_{\\mathcal{S}\\mathcal{S}}\\,, \\\\
+\\mathbf{C}_{\\cdot\\mathcal{I}} &= \\begin{bmatrix} \\mathbf{B}_{T,\\,\\mathcal{I}} \\, \\operatorname{chol}(\\mathbf{F}) & \\mathbf{R} \\end{bmatrix}^{\\intercal}\\,.
 \\end{align}
 ```
 
 Where:
 
+  - ``\\mathcal{S}``: Assets with finite latest loadings, the assets whose systematic part the model states. It holds ``\\mathcal{I}``. The contract of [`factor_exposure`](@ref) writes `NaN` at every inactive cell, so an asset of ``\\mathcal{S}`` is active at the latest observation.
   - ``\\boldsymbol{\\mu}``: Expected asset returns.
   - ``\\mathbf{\\Sigma}``: Asset covariance.
   - ``\\mathbf{C}``: Low-rank square root of the asset covariance, ``(K + \\lvert \\mathcal{I} \\rvert) \\times N`` over the full asset universe.
-  - ``\\mathbf{B}_{T,\\,\\mathcal{I}}``: The rows of ``\\mathbf{B}_{T}`` at the investable assets.
+  - ``\\mathbf{B}_{T,\\,\\mathcal{S}}``, ``\\mathbf{B}_{T,\\,\\mathcal{I}}``: The rows of ``\\mathbf{B}_{T}`` at the assets of ``\\mathcal{S}`` and of ``\\mathcal{I}``.
   - ``\\operatorname{chol}``: Lower Cholesky factor. Of a factor covariance with a zero row and column, which an Empty Factor carries, it is the Cholesky factor of the block of the other factors, with a zero row and column at the Empty Factor.
   - $(math_dict[:B_T_cs])
   - $(math_dict[:mu_f_patt])
@@ -1468,7 +1470,9 @@ Where:
   - $(math_dict[:R_idio])
   - $(math_dict[:I_inv])
 
-A consequence of the definition: ``\\mathbf{C}_{\\cdot\\mathcal{I}}^{\\intercal} \\mathbf{C}_{\\cdot\\mathcal{I}} = \\mathbf{\\Sigma}_{\\mathcal{I}\\mathcal{I}}``. Every entry of ``\\boldsymbol{\\mu}``, ``\\mathbf{\\Sigma}`` and ``\\mathbf{C}`` outside the investable set is `NaN`.
+A consequence of the definition: ``\\mathbf{C}_{\\cdot\\mathcal{I}}^{\\intercal} \\mathbf{C}_{\\cdot\\mathcal{I}} = \\mathbf{\\Sigma}_{\\mathcal{I}\\mathcal{I}}``.
+
+The answer states an entry exactly when the model determines it. An asset of ``\\mathcal{S}`` outside ``\\mathcal{I}`` has no idiosyncratic variance, as in the warm-up of its variance. Its entry of ``\\boldsymbol{\\mu}`` is finite, and so is its covariance with each other asset of ``\\mathcal{S}`` when ``\\mathbf{D}`` is diagonal, because the model sets the idiosyncratic covariance of two assets to zero. Its variance is `NaN`, and so is each covariance that reads its variance through an idiosyncratic correlation. The first ``K`` entries of its column of ``\\mathbf{C}``, its systematic root, are finite, and the rest are `NaN`. Every entry outside ``\\mathcal{S}`` is `NaN`. The Investable Mask needs a finite mean and a finite variance, so it still leaves out every asset outside ``\\mathcal{I}``. `mp` processes the block over ``\\mathcal{I}`` alone, so an entry outside that block is the one the model states before any processing.
 
 # Algorithm
 
@@ -1478,7 +1482,8 @@ A consequence of the definition: ``\\mathbf{C}_{\\cdot\\mathcal{I}}^{\\intercal}
  4. Add `D` to `si`, and make the sum positive definite with `mp.pdm`.
  5. Take `lf`, the factors whose column of `f_sigma` is not zero, and the lower Cholesky factor `Lf` of the block of `f_sigma` at `lf`. Write `Lf` into the block at `lf` of a zero matrix `Cf`.
  6. Build `ci`, the low-rank square root `[Li * Cf  R]`.
- 7. Scatter `mui`, `si` and `ci` into the full asset universe, giving `mu`, `sigma` and `chol`, with `NaN` at every asset outside `idx`.
+ 7. Take `sdx`, the assets whose row of `L` is finite, and `Ls`, their rows. Project the factor covariance through `Ls`, and add the block of `esigma` at `sdx`, giving `ss`. A `NaN` variance in `esigma` makes `NaN` the entries that read it.
+ 8. Write `Ls * f_mu`, `ss` and the systematic root `Ls * Cf` at `sdx` into the full asset universe, over `NaN`, then `mui`, `si` and `ci` at `idx` over them, giving `mu`, `sigma` and `chol`. Write `NaN` on the diagonal of `sigma` at every asset of `sdx` outside `idx`, so the Investable Mask of the answer is never wider than `idx`.
 
 # Arguments
 
@@ -1496,9 +1501,9 @@ A consequence of the definition: ``\\mathbf{C}_{\\cdot\\mathcal{I}}^{\\intercal}
 
 # Returns
 
-  - `mu::Vector{<:Real}`: Expected asset returns, `NaN` at a non-investable asset.
-  - `sigma::Matrix{<:Real}`: Asset covariance, `NaN` in the row and the column of a non-investable asset.
-  - `chol::Matrix{<:Real}`: The low-rank square root, `NaN` in the column of a non-investable asset.
+  - `mu::Vector{<:Real}`: Expected asset returns, `NaN` at an asset outside ``\\mathcal{S}``.
+  - `sigma::Matrix{<:Real}`: Asset covariance, `NaN` at every entry the model does not determine.
+  - `chol::Matrix{<:Real}`: The low-rank square root, `NaN` in the column of an asset outside ``\\mathcal{S}``, and below the first ``K`` rows of an asset outside ``\\mathcal{I}``.
 
 # Related
 
@@ -1523,13 +1528,30 @@ function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
     Cf = zeros(eltype(Lf), size(f_sigma))
     Cf[lf, lf] = Lf
     ci = hcat(Li * Cf, R)
+    # An asset with finite loadings and no idiosyncratic variance, one in the warm-up of its
+    # variance, still has a mean and, under a diagonal block, a covariance with every other
+    # asset that the model states. Only the entries that read its variance are `NaN`, and
+    # the idiosyncratic block writes them (#1384).
+    sdx = findall(i -> all(isfinite, view(L, i, :)), axes(L, 1))
+    Ls = L[sdx, :]
+    # The product is symmetric only to rounding, and a covariance is exactly symmetric.
+    ss = Matrix(LinearAlgebra.Symmetric(Ls * f_sigma * transpose(Ls)))
+    ss .+= esigma isa AbstractVector ? LinearAlgebra.diagm(esigma[sdx]) : esigma[sdx, sdx]
     N = size(L, 1)
-    Tf = real(eltype(si))
+    Tf = promote_type(real(eltype(si)), real(eltype(ss)))
     mu = fill(Tf(NaN), N)
     sigma = fill(Tf(NaN), N, N)
     chol = fill(Tf(NaN), size(ci, 2), N)
+    mu[sdx] = Ls * f_mu
     mu[idx] = mui
+    sigma[sdx, sdx] = ss
+    # The prior states no variance for an asset outside the investable set, so the Investable
+    # Mask, which reads the diagonal, never holds an asset that `idx` leaves out.
+    for i in setdiff(sdx, idx)
+        sigma[i, i] = Tf(NaN)
+    end
     sigma[idx, idx] = si
+    chol[axes(Cf, 2), sdx] = transpose(Ls * Cf)
     chol[:, idx] = transpose(ci)
     return (; mu = mu, sigma = sigma, chol = chol)
 end

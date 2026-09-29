@@ -28,7 +28,6 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                                                                                      1.6)))
     load(c, o) = parity_load("CrossSectionalFactorPrior", c, o)
     i4 = at.relist[1]
-    rest = setdiff(axes(fx.rd.X, 2), i4)
 
     @testset "$(c)" for (c, wa) in (("MasksOnePass", MarketCapWeights()),
                                     ("MasksTwoPass", BlendedInverseVarianceWeights(; lambda = 0.5)))
@@ -41,18 +40,16 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # Measured maxrel 4.2e-16.
         @test parity_compare(pr.rr.rw, load(c, "RegressionWeights"); name = "$(c) rw").ok
         # The relisted asset is still in its warm-up at the latest observation, so neither side
-        # states its idiosyncratic variance. The oracle still states its `mu` and its
-        # covariances with the other assets, beside a `NaN` variance. The prior states no
-        # moment for an asset outside the investable set, so it writes `NaN` over the entry
-        # and the whole row and column. The oracle leaves the asset out of the investable set
-        # too, by its `NaN` variance.
+        # states its idiosyncratic variance. Both sides state its mean and its covariances
+        # with the other assets, which the model determines, and neither states its variance
+        # (#1384).
         @test isnan(pr.rr.vs[end, i4]) && isnan(load(c, "IdioVariances")[end, i4])
-        @test isnan(pr.mu[i4]) && all(isnan, pr.sigma[i4, :]) && all(isnan, pr.sigma[:, i4])
+        @test isfinite(pr.mu[i4]) && isnan(pr.sigma[i4, i4])
         # Measured maxrel 2.9e-14.
-        @test parity_compare(pr.mu[rest], vec(load(c, "Mu"))[rest]; name = "$(c) mu").ok
+        @test parity_compare(pr.mu, vec(load(c, "Mu")); name = "$(c) mu").ok
         # A covariance compares against its largest entry, because its small off-diagonal
         # entries come from a cancellation (#1376). Measured maxscaled 3.3e-13, and maxrel 1.6e-11 cell by cell.
-        @test parity_compare(pr.sigma[rest, rest], load(c, "Sigma")[rest, rest];
-                             scale = :array, name = "$(c) sigma").ok
+        @test parity_compare(pr.sigma, load(c, "Sigma"); scale = :array,
+                             name = "$(c) sigma").ok
     end
 end

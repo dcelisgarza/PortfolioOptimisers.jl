@@ -406,9 +406,8 @@ end
                                                                                          1.6)))
         ve = RegimeAdjustedExpWeightedVariance(; centred = true,
                                                regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
-        # Asset 4 is in its warm-up at the latest observation; `test_12p` states why its `mu`
-        # and its covariances are a deliberate difference.
-        rest = setdiff(axes(fx.rd.X, 2), fx.at.relist[1])
+        # Asset 4 is in its warm-up at the latest observation: both sides state its mean and
+        # its covariances, and neither states its variance (#1384).
         load(c, o) = parity_load("CrossSectionalFactorPrior", c, o)
         @testset "$(c)" for (c, wa) in ("WeightsBlend03Ratio3" =>
                                             BlendedInverseVarianceWeights(; lambda = 0.3, ratio = 3.0),
@@ -424,12 +423,12 @@ end
             @test parity_compare(pr.rr.csr.f, load(c, "FactorReturns"); name = "$(c) f").ok
             @test parity_compare(pr.rr.rw, load(c, "RegressionWeights"); name = "$(c) rw").ok
             @test parity_compare(pr.rr.vs, load(c, "IdioVariances"); name = "$(c) vs").ok
-            @test parity_compare(pr.mu[rest], vec(load(c, "Mu"))[rest]; name = "$(c) mu").ok
+            @test parity_compare(pr.mu, vec(load(c, "Mu")); name = "$(c) mu").ok
             # A covariance compares against its largest entry, because its small off-diagonal
             # entries come from a cancellation (#1376). Measured maxscaled 3.3e-13, and maxrel
             # 4.6e-11 cell by cell.
-            @test parity_compare(pr.sigma[rest, rest], load(c, "Sigma")[rest, rest];
-                                 scale = :array, name = "$(c) sigma").ok
+            @test parity_compare(pr.sigma, load(c, "Sigma"); scale = :array,
+                                 name = "$(c) sigma").ok
         end
     end
 

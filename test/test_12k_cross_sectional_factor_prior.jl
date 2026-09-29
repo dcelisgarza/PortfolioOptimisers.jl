@@ -241,10 +241,10 @@ fit_rows(rd, pr) = (size(rd.X, 1) - size(pr.X, 1) + 1):size(rd.X, 1)
         fw = ["market" => ConstantExposure(), "size" => size_w]
         pd = prior(CrossSectionalFactorPrior(; factors = fd, minra = 5), rd)
         pw = prior(CrossSectionalFactorPrior(; factors = fw, minra = 5, bw = "w"), rd)
-        # An asset the fit states no moment for is `NaN` in both, so `==` cannot compare them.
+        # An asset the fit states no variance for is `NaN` in both, so `==` cannot compare them.
         @test isequal(pw.mu, pd.mu)
         @test isequal(pw.sigma, pd.sigma)
-        @test any(isnan, pd.mu)
+        @test any(isnan, diag(pd.sigma))
     end
     @testset "A matrix with no panel is refused by name" begin
         rd = csfp_panel(; n_assets = 10, n_observations = 20, n_industries = 2).rd
@@ -1240,12 +1240,22 @@ end
             I = findall(i -> o.amsk[end, i] &&
                              isfinite(D[i]) &&
                              all(isfinite, view(o.ZT, i, :)), eachindex(D))
-            J = setdiff(eachindex(D), I)
-            @test !isempty(J)
+            @test !isempty(setdiff(eachindex(D), I))
             mu = o.ZT[I, :] * o.mut + o.b[I]
             S = o.ZT[I, :] * o.Sf * transpose(o.ZT[I, :]) + LinearAlgebra.Diagonal(D[I])
             @test isapprox(mu, pr.mu[I]; rtol = 1e-10, nans = true)
             @test isapprox(S, pr.sigma[I, I]; rtol = 1e-10)
+            # The model states the mean and the systematic covariances of every asset with
+            # finite latest exposures, and a variance that is not finite reaches only the
+            # diagonal (#1384). Every entry outside them is `NaN`.
+            Sx = findall(i -> all(isfinite, view(o.ZT, i, :)), eachindex(D))
+            @test all(i -> o.amsk[end, i], Sx)
+            J = setdiff(eachindex(D), Sx)
+            @test !isempty(J)
+            mus = o.ZT[Sx, :] * o.mut + o.b[Sx]
+            Ss = o.ZT[Sx, :] * o.Sf * transpose(o.ZT[Sx, :]) + LinearAlgebra.Diagonal(D[Sx])
+            @test isapprox(mus, pr.mu[Sx]; rtol = 1e-10, nans = true)
+            @test isapprox(Ss, pr.sigma[Sx, Sx]; rtol = 1e-10, nans = true)
             @test all(isnan, pr.mu[J])
             @test all(isnan, pr.sigma[J, :])
             @test all(isnan, pr.sigma[:, J])
@@ -1394,31 +1404,49 @@ allocated the exposure history in the element type of the returns, so integer re
         @test PO.cross_sectional_forecast_mu(0.3, [1.0, 2.0], [10.0, -10.0]) ≈
               0.3 .* [1.0, 2.0] .+ 0.7 .* [10.0, -10.0]
     end
-    @testset "The lift is the factor model on the investable block, and NaN off it" begin
+    @testset "The lift states every entry the model determines, and NaN elsewhere" begin
         rng = StableRNG(828_106)
         nN, nK = 8, 3
         L = randn(rng, nN, nK)
+        # Asset 3 has a loading that is not finite, so the model states nothing of it. Asset 6
+        # has finite loadings and no idiosyncratic variance, as in the warm-up of its variance.
         L[3, 2] = NaN
         A = randn(rng, nK, nK)
         Sf = A * A' + I
         muf = randn(rng, nK)
         ev = rand(rng, nN) .+ 0.1
+        ev[6] = NaN
         B = randn(rng, nN, nN)
         D = B * B' + I
+        D[6, :] .= NaN
+        D[:, 6] .= NaN
         idx = [1, 2, 4, 5, 7, 8]
-        off = setdiff(1:nN, idx)
         Xs = randn(rng, 30, nN)
         mp = CrossSectionalFactorPrior(; factors = csfp_factors()).mp
         Li = L[idx, :]
+        Cf = cholesky(Sf).L
         for (es, Di) in ((ev, Diagonal(ev[idx])), (D, D[idx, idx]))
             lf = PO.cross_sectional_lift(mp, L, muf, Sf, es, idx, Xs)
             @test lf.mu[idx] ≈ Li * muf
             @test lf.sigma[idx, idx] ≈ Li * Sf * Li' + Di
             @test lf.chol[:, idx]' * lf.chol[:, idx] ≈ lf.sigma[idx, idx]
             @test size(lf.chol) == (nK + length(idx), nN)
-            @test all(isnan, lf.mu[off])
-            @test all(isnan, lf.sigma[off, :]) && all(isnan, lf.sigma[:, off])
-            @test all(isnan, lf.chol[:, off])
+            @test isnan(lf.mu[3])
+            @test all(isnan, lf.sigma[3, :]) && all(isnan, lf.sigma[:, 3])
+            @test all(isnan, lf.chol[:, 3])
+            # Asset 6: its mean and its systematic root are finite, and its variance is not.
+            # Under a diagonal block its covariances are systematic and finite; a block with
+            # correlations reads its variance in each of them.
+            @test lf.mu[6] ≈ dot(L[6, :], muf)
+            @test isnan(lf.sigma[6, 6])
+            if es isa AbstractVector
+                @test lf.sigma[6, idx] ≈ Li * Sf * L[6, :]
+                @test lf.sigma[idx, 6] == lf.sigma[6, idx]
+            else
+                @test all(isnan, lf.sigma[6, :]) && all(isnan, lf.sigma[:, 6])
+            end
+            @test lf.chol[1:nK, 6] ≈ transpose(Cf) * L[6, :]
+            @test all(isnan, lf.chol[(nK + 1):end, 6])
             rb = PO.cross_sectional_residual_block(es, idx)
             @test rb.D ≈ Di
             @test rb.R * rb.R' ≈ Di
@@ -1430,6 +1458,12 @@ allocated the exposure history in the element type of the returns, so integer re
                                      Xs)
         @test lf.chol[:, idx]' * lf.chol[:, idx] ≈ Li * Sf * Li' + Diagonal(ev[idx])
         @test !isapprox(lf.chol[:, idx]' * lf.chol[:, idx], lf.sigma[idx, idx])
+        # An asset with finite inputs that `idx` leaves out keeps a `NaN` variance, so the
+        # Investable Mask of the answer is never wider than `idx`.
+        idx2 = setdiff(idx, 8)
+        lf = PO.cross_sectional_lift(mp, L, muf, Sf, ev, idx2, Xs)
+        @test isfinite(lf.mu[8]) && isnan(lf.sigma[8, 8])
+        @test findall(isfinite.(lf.mu) .& isfinite.(diag(lf.sigma))) == idx2
     end
     @testset "Integer returns fit, and equal the fit of their float copy" begin
         rd = csfp_panel(; n_assets = 40, n_observations = 80, n_industries = 3,
@@ -1446,8 +1480,8 @@ allocated the exposure history in the element type of the returns, so integer re
         @test isequal(pint.sigma, pflt.sigma)
         @test isequal(pint.X, pflt.X)
         @test isequal(pint.rr.Ms, pflt.rr.Ms)
-        # A non-investable asset carries NaN in every scenario, as it does in mu and on the
-        # diagonal of sigma: its latest exposures are NaN, so its systematic part is NaN.
+        # A non-investable asset carries NaN in every scenario, as it does on the diagonal of
+        # sigma: its latest exposures or its latest idiosyncratic variance are NaN.
         j = setdiff(eachindex(pflt.mu), csfp_investable(pflt))
         @test !isempty(j)
         @test all(isnan, pflt.X[:, j])

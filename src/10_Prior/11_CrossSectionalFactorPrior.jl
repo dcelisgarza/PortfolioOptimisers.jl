@@ -313,8 +313,8 @@ This is the returns-matrix method that every prior estimator implements, and the
 \\boldsymbol{\\varepsilon}_{t} &= \\boldsymbol{x}^{\\mathrm{loc}}_{t} - \\mathbf{Z}_{t - \\ell} \\boldsymbol{f}_{t}\\,, \\\\
 \\boldsymbol{g} &= \\underset{\\boldsymbol{g}}{\\arg\\min} \\left(\\boldsymbol{\\alpha}_{T} - \\mathbf{Z}_{T} \\boldsymbol{g}\\right)^\\intercal \\mathbf{Q}_{T} \\left(\\boldsymbol{\\alpha}_{T} - \\mathbf{Z}_{T} \\boldsymbol{g}\\right)\\,, \\\\
 \\tilde{\\boldsymbol{\\mu}}_{f} &= \\lambda \\hat{\\boldsymbol{\\mu}}_{f} + (1 - \\lambda) \\boldsymbol{g}\\,, \\\\
-\\boldsymbol{\\mu}_{\\mathcal{I}} &= \\mathbf{Z}_{T, \\mathcal{I}} \\tilde{\\boldsymbol{\\mu}}_{f} + c \\left(\\boldsymbol{\\alpha}_{T} - \\mathbf{Z}_{T} \\boldsymbol{g}\\right)_{\\mathcal{I}}\\,, \\\\
-\\mathbf{\\Sigma}_{\\mathcal{I} \\mathcal{I}} &= \\mathbf{Z}_{T, \\mathcal{I}} \\hat{\\mathbf{\\Sigma}}_{f} \\mathbf{Z}_{T, \\mathcal{I}}^\\intercal + \\mathbf{D}_{\\mathcal{I} \\mathcal{I}}\\,.
+\\boldsymbol{\\mu}_{\\mathcal{S}} &= \\mathbf{Z}_{T, \\mathcal{S}} \\tilde{\\boldsymbol{\\mu}}_{f} + c \\left(\\boldsymbol{\\alpha}_{T} - \\mathbf{Z}_{T} \\boldsymbol{g}\\right)_{\\mathcal{S}}\\,, \\\\
+\\mathbf{\\Sigma}_{\\mathcal{S} \\mathcal{S}} &= \\mathbf{Z}_{T, \\mathcal{S}} \\hat{\\mathbf{\\Sigma}}_{f} \\mathbf{Z}_{T, \\mathcal{S}}^\\intercal + \\mathbf{D}_{\\mathcal{S} \\mathcal{S}}\\,.
 \\end{align}
 ```
 
@@ -323,7 +323,7 @@ Where:
   - $(math_dict[:f_t_att])
   - $(math_dict[:x_t_obs])
   - ``\\boldsymbol{x}^{\\mathrm{loc}}_{t}``: Returns the regression reads at observation ``t``, ``N \\times 1``. They are ``\\boldsymbol{x}_{t}`` without Currency Factors, and the local returns of [`cross_sectional_local_returns`](@ref) with them.
-  - ``\\mathbf{Z}_{t}``: Factor Exposures of observation ``t``, ``N \\times K``, after the Neutralisation and on the reduced factor axis. ``\\mathbf{Z}_{T, \\mathcal{I}}`` holds the rows of the investable assets. Under Currency Factors the regression reads the estimated exposures alone, and every other line reads ``\\mathbf{Z}_{t}`` with the currency exposures appended as its last columns, ``\\boldsymbol{f}_{t}`` with the Currency Excess Returns appended, and ``\\boldsymbol{g}`` with zeros appended. The shrinkage ``\\lambda`` then reaches the estimated factors alone, and the expected return of a Currency Factor is the mean the nested factor prior states for it.
+  - ``\\mathbf{Z}_{t}``: Factor Exposures of observation ``t``, ``N \\times K``, after the Neutralisation and on the reduced factor axis. ``\\mathbf{Z}_{T, \\mathcal{S}}`` holds the rows of the assets of ``\\mathcal{S}``. Under Currency Factors the regression reads the estimated exposures alone, and every other line reads ``\\mathbf{Z}_{t}`` with the currency exposures appended as its last columns, ``\\boldsymbol{f}_{t}`` with the Currency Excess Returns appended, and ``\\boldsymbol{g}`` with zeros appended. The shrinkage ``\\lambda`` then reaches the estimated factors alone, and the expected return of a Currency Factor is the mean the nested factor prior states for it.
   - $(math_dict[:ell_lag_cs])
   - $(math_dict[:Q_t_att]) An asset that is not eligible at observation ``t`` takes a weight of zero.
   - $(math_dict[:eps_t_att])
@@ -336,12 +336,13 @@ Where:
   - $(math_dict[:mu_er])
   - ``\\mathbf{\\Sigma}``: Asset covariance matrix, ``N \\times N``.
   - $(math_dict[:D_orth])
+  - ``\\mathcal{S}``: Assets whose latest exposures are finite, whose systematic part the model states. An inactive asset has no finite exposure, so every asset of ``\\mathcal{S}`` is active at the latest observation.
   - ``\\mathcal{I}``: Investable assets, those that the Asset Panel activates at the latest observation and whose idiosyncratic variance and latest exposures are finite.
   - $(math_dict[:T])
   - $(math_dict[:N])
   - $(math_dict[:K])
 
-Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\Sigma}`` outside ``\\mathcal{I}`` is `NaN`. An Empty Factor, an estimated factor whose exposure is zero at every pair of positive weight, has ``f_{tk} = 0`` at every observation, and ``\\hat{\\mathbf{\\Sigma}}_{f}`` holds a zero row and column for it. It keeps its place on every factor axis, so a sub-universe with no asset in one level of a one-hot factor still fits. Without a Return Forecast Estimator the forecast terms are zero, so ``\\boldsymbol{\\mu}_{\\mathcal{I}} = \\lambda \\mathbf{Z}_{T, \\mathcal{I}} \\hat{\\boldsymbol{\\mu}}_{f}``. At ``\\lambda = 0`` and ``c = 1`` the two parts of the forecast add up to ``\\boldsymbol{\\alpha}_{T}``, so the expected return of an investable asset with a finite forecast is that forecast.
+The prior states an entry exactly when the model determines it. An asset of ``\\mathcal{S}`` outside ``\\mathcal{I}``, for example one in the warm-up of its idiosyncratic variance, has a finite expected return, and under a diagonal ``\\mathbf{D}`` a finite covariance with each other asset of ``\\mathcal{S}``, because the model sets the idiosyncratic covariance of two assets to zero. Its variance is `NaN`, and under a positive `th` so is each of its covariances, which read its variance. Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\Sigma}`` outside ``\\mathcal{S}`` is `NaN`. The Investable Mask needs a finite mean and a finite variance, so an optimiser still reads ``\\mathcal{I}`` alone. An Empty Factor, an estimated factor whose exposure is zero at every pair of positive weight, has ``f_{tk} = 0`` at every observation, and ``\\hat{\\mathbf{\\Sigma}}_{f}`` holds a zero row and column for it. It keeps its place on every factor axis, so a sub-universe with no asset in one level of a one-hot factor still fits. Without a Return Forecast Estimator the forecast terms are zero, so ``\\boldsymbol{\\mu}_{\\mathcal{S}} = \\lambda \\mathbf{Z}_{T, \\mathcal{S}} \\hat{\\boldsymbol{\\mu}}_{f}``. At ``\\lambda = 0`` and ``c = 1`` the two parts of the forecast add up to ``\\boldsymbol{\\alpha}_{T}``, so the expected return of an asset of ``\\mathcal{S}`` with a finite forecast is that forecast.
 
 # Algorithm
 
@@ -360,7 +361,7 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
 13. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named.
 14. Take the investable assets `idx` with [`cross_sectional_investable`](@ref).
 15. Rebuild the asset return scenarios `Xs` with [`cross_sectional_scenarios`](@ref).
-16. Lift the reduced factor distribution onto the investable assets with [`cross_sectional_lift`](@ref), and add `b` to the expected return it answers.
+16. Lift the reduced factor distribution onto the assets with [`cross_sectional_lift`](@ref), and add `b` to the expected return it answers. The lift states every entry the model determines: the investable block, and the mean and the systematic covariances of an asset with finite exposures and no idiosyncratic variance.
 17. Assemble a [`LowOrderPrior`](@ref) over `Xs`, with the fitted base-currency returns under `o_X`, the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the block under `rr`, and the expanded factor prior under `fpr`. The factor returns of `fpr` and the returns of `o_X` keep the last rows alone, as many as `Xs` holds, so a factor prior with a Scenario Cap pairs each scenario with its own observation.
 
 # Arguments
@@ -394,7 +395,7 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
 
 # Returns
 
-  - `pr::LowOrderPrior`: The prior on the full asset universe. At an asset that the estimator states no moment for, the entry of `mu` and the row and the column of `sigma` are `NaN`. `rr` is a [`CrossSectionalFactorModel`](@ref), and `fpr` is the factor prior on the raw factor axis. An asset in the warm-up of its idiosyncratic variance has no variance, so it is not investable, but its latest exposures can be finite. Its systematic mean and its systematic covariances with the other assets are then `(rr.M * fpr.mu + rr.b)[i]` and `(rr.M * fpr.sigma * rr.M')[i, :]`.
+  - `pr::LowOrderPrior`: The prior on the full asset universe. An entry that the model does not determine is `NaN`: the whole entry of `mu` and row and column of `sigma` of an asset with no finite latest exposure, and the variance of an asset with no idiosyncratic variance, with its covariances under a positive `th`. `rr` is a [`CrossSectionalFactorModel`](@ref), and `fpr` is the factor prior on the raw factor axis.
 
 # Related
 

@@ -49,18 +49,18 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     i4 = fxs.at.relist[1]
     rs = setdiff(axes(fxs.rd.X, 2), [fxs.at.delist[1], i4])
 
-    @testset "Every output of the default fit, $(c)" for (c, pr, i) in
-                                                         (("PitSmall", prs, rs),
-                                                          ("PitLarge", prl,
-                                                           findall(isfinite, prl.mu)))
+    @testset "Every output of the default fit, $(c)" for (c, pr) in (("PitSmall", prs),
+                                                                     ("PitLarge", prl))
         rr = pr.rr
         K = size(rr.L, 2)
-        @test findall(isfinite, pr.mu) == i
-        # Measured maxrel 1.9e-15 and 7.0e-15.
-        @test parity_compare(pr.mu[i], loadv(c, "Mu")[i]; name = "$(c) mu").ok
+        imsk = PO.investable_mask(pr)
+        i = isnothing(imsk) ? collect(axes(pr.mu, 1)) : findall(imsk)
+        # Every entry, with the `NaN` pattern of each side. Measured maxrel 1.9e-15 and
+        # 7.0e-15.
+        @test parity_compare(pr.mu, loadv(c, "Mu"); name = "$(c) mu").ok
         # A covariance compares against its largest entry (#1376). Measured maxscaled 3.0e-13
         # and 3.4e-13, and maxrel 1.4e-11 cell by cell.
-        @test parity_compare(pr.sigma[i, i], load(c, "Sigma")[i, i]; scale = :array,
+        @test parity_compare(pr.sigma, load(c, "Sigma"); scale = :array,
                              name = "$(c) sigma").ok
         # Measured maxrel 1.5e-15 at most.
         @test parity_compare(pr.fpr.mu, loadv(c, "FactorMu"); name = "$(c) fmu").ok
@@ -95,25 +95,35 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         @test isnothing(prs.w) && isnothing(prs.fpr.w)
     end
 
-    @testset "An asset in its warm-up: a deliberate difference" begin
+    @testset "An asset in its warm-up: every entry the model determines" begin
         # The asset lists again inside the history, and its idiosyncratic variance has not
-        # warmed up at the latest observation, so neither side states its variance. The oracle
-        # still states its mean and its covariances with the other assets beside a `NaN`
-        # variance. A distribution with a mean and no variance is not one an optimiser can
-        # read, and the oracle drops the asset by its own finite-moment rule. Its covariances
-        # are also not a stable answer: under a positive threshold they are `NaN` on the
-        # oracle's side too, below. The prior states no moment of an asset outside the
-        # investable set, so it writes `NaN` over its mean and its row and column, and the
-        # systematic part the oracle states stays one line away on the block.
+        # warmed up at the latest observation, so neither side states its variance. Its
+        # latest exposures are finite, so the model determines its mean, and under a diagonal
+        # idiosyncratic block, which sets the idiosyncratic covariance of two assets to zero,
+        # its covariance with every other asset. Both sides state exactly those entries
+        # (#1384). The Investable Mask needs a finite variance, so it still leaves the asset
+        # out, on both sides.
         om = loadv("PitSmall", "Mu")
         os = load("PitSmall", "Sigma")
-        @test isnan(prs.mu[i4]) && all(isnan, prs.sigma[i4, :])
-        @test isfinite(om[i4]) && isnan(os[i4, i4])
-        M = prs.rr.M
+        @test isfinite(prs.mu[i4]) && isnan(prs.sigma[i4, i4])
+        @test all(isfinite, prs.sigma[i4, rs])
         # Measured maxrel 3.1e-16 and 7.9e-16.
-        @test parity_compare([(M * prs.fpr.mu + prs.rr.b)[i4]], [om[i4]]; name = "mu4").ok
-        @test parity_compare((M * prs.fpr.sigma * transpose(M))[i4, rs], os[i4, rs];
-                             scale = :array, name = "sigma4").ok
+        @test parity_compare([prs.mu[i4]], [om[i4]]; name = "mu4").ok
+        @test parity_compare(prs.sigma[i4, rs], os[i4, rs]; scale = :array, name = "sigma4").ok
+        @test findall(PO.investable_mask(prs)) == rs
+        # Its systematic root, the loadings times the Cholesky factor of the factor
+        # covariance, is finite, and the rows of the idiosyncratic root are `NaN`, because
+        # they read its variance. The oracle's systematic root of the full universe agrees.
+        # Measured maxrel 4.5e-16.
+        K = size(prs.rr.L, 2)
+        @test parity_compare(transpose(prs.chol[1:K, :]),
+                             load("PitSmall", "SqrtSystematic"); name = "systematic root").ok
+        @test all(isnan, prs.chol[(K + 1):end, i4])
+        # Under a positive threshold each covariance of the asset reads its variance through
+        # its idiosyncratic correlation, so both sides write `NaN` over its row, and still
+        # state its mean.
+        po = prior(est(; minra = 5, th = 0.1), fxs.rd)
+        @test isfinite(po.mu[i4]) && all(isnan, po.sigma[i4, :])
         @test all(isnan, load("PitSmallOverlay", "Sigma")[i4, :])
     end
 
@@ -127,9 +137,9 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         pr = prior(est(; minra = 5, th = 0.1), fxs.rd)
         c = "PitSmallOverlay"
         K = size(pr.rr.L, 2)
-        @test parity_compare(pr.mu[rs], loadv(c, "Mu")[rs]; name = "overlay mu").ok
+        @test parity_compare(pr.mu, loadv(c, "Mu"); name = "overlay mu").ok
         # Measured maxscaled 3.0e-13, and maxrel 1.5e-15 and 5.3e-15.
-        @test parity_compare(pr.sigma[rs, rs], load(c, "Sigma")[rs, rs]; scale = :array,
+        @test parity_compare(pr.sigma, load(c, "Sigma"); scale = :array,
                              name = "overlay sigma").ok
         @test parity_compare(pr.rr.esigma, load(c, "IdioCov"); name = "overlay esigma").ok
         @test parity_compare(transpose(pr.chol[(K + 1):end, rs]), load(c, "InvSqrtIdio");
@@ -262,7 +272,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # Measured maxrel 1.7e-16, and a covariance bit-equal.
         @test parity_compare(pr.mu, p3.mu; name = "empty mu").ok
         @test parity_compare(pr.sigma[i, i], p3.sigma[i, i]; name = "empty sigma").ok
-        @test isapprox(transpose(pr.chol[:, i]) * pr.chol[:, i], pr.sigma[i, i];
+        ii = findall(PO.investable_mask(pr))
+        @test isapprox(transpose(pr.chol[:, ii]) * pr.chol[:, ii], pr.sigma[ii, ii];
                        rtol = 1e-12)
     end
 
@@ -285,15 +296,13 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         cold = deepcopy(fxs.rd)
         cold.pnl.pf[findfirst(x -> x.name == "style1", cold.pnl.pf)].vals .= NaN
         @test_throws ArgumentError prior(est(; minra = 5), cold)
-        # The fits on the other side of the boundary. Measured maxrel 2.3e-15 and 1.1e-14. The
-        # oracle states a mean for each active asset in its warm-up, see above.
+        # The fits on the other side of the boundary, with the `NaN` pattern: both sides state
+        # a mean for each active asset in the warm-up of its variance. Measured maxrel
+        # 2.3e-15 and 1.1e-14.
         @testset "$(c)" for (c, rd, kw) in (("Rows41", rows(41), (;)),
                                             ("Idio61", rows(61), (; ve = ve60)))
             pr = prior(est(; minra = 5, kw...), rd)
-            i = findall(isfinite, pr.mu)
-            o = loadv(c, "Mu")
-            @test all(isfinite, o[i])
-            @test parity_compare(pr.mu[i], o[i]; name = "$(c) mu").ok
+            @test parity_compare(pr.mu, loadv(c, "Mu"); name = "$(c) mu").ok
         end
     end
 end

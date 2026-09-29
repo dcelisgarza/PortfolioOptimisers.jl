@@ -831,9 +831,9 @@ end
 """
     attribution_investable_rows(A::AbstractArray, imsk::Option{BitVector})
 
-Return the loadings or the intercept with the rows of the non-investable assets replaced by zero.
+Return the loadings, the intercept or the expected returns with the rows of the non-investable assets replaced by zero.
 
-A non-investable asset can carry finite loadings while its idiosyncratic variance is `NaN`, because the prior needs three facts to state a moment and one missing fact is enough. [`attribution_finite`](@ref) replaces only the `NaN`, so the finite loadings of a held non-investable asset would reach the systematic component while the totals, which read `pr.mu` and `pr.sigma`, exclude the asset. The verb zeroes the whole row, so every component describes the portfolio without the non-investable assets, and the four still sum to the total.
+A non-investable asset can carry finite loadings while its idiosyncratic variance is `NaN`, because the prior needs three facts to state a moment and one missing fact is enough. A Cross-Sectional Factor Prior then also states its mean and its covariances with the other assets. [`attribution_finite`](@ref) replaces only the `NaN`, so the finite loadings of a held non-investable asset would reach the systematic component, and its finite mean and covariances would reach the totals. The verb zeroes the whole row, and its sibling [`attribution_investable_block`](@ref) the row and the column of `pr.sigma`, so every component and every total describes the portfolio without the non-investable assets, and the four still sum to the total.
 
 An absent mask means that every asset is investable, and the verb returns the array unchanged.
 
@@ -882,7 +882,7 @@ end
 
 Return the idiosyncratic covariance with the rows and the columns of the non-investable assets replaced by zero.
 
-The covariance sibling of [`attribution_investable_rows`](@ref). A diagonal covariance travels as a vector and loses the entries, and a full one loses the rows and the columns, so `w' D w` reads nothing of a held non-investable asset through either.
+The covariance sibling of [`attribution_investable_rows`](@ref). A diagonal covariance travels as a vector and loses the entries, and a full one loses the rows and the columns, so `w' D w` reads nothing of a held non-investable asset through either. The total variance takes the same zeroing on `pr.sigma`.
 
 # Mathematical definition
 
@@ -1333,8 +1333,10 @@ function factor_attribution(w::VecNum, pr::AbstractPriorResult; assets::Bool = f
     F = fpr.sigma
     mu_f = fpr.mu
     bp = attribution_investable_rows(attribution_finite(rr.b), imsk)
-    sigma = attribution_finite(pr.sigma)
-    mu = attribution_finite(pr.mu)
+    # A non-investable asset can carry a finite mean and finite covariances beside a `NaN`
+    # variance (#1384), so the totals zero its whole row as the components do.
+    sigma = attribution_investable_block(attribution_finite(pr.sigma), imsk)
+    mu = attribution_investable_rows(attribution_finite(pr.mu), imsk)
     D = attribution_idiosyncratic_matrix(attribution_investable_block(attribution_finite(attribution_idiosyncratic_covariance(rr)),
                                                                       imsk))
     bexp = transpose(M) * w
