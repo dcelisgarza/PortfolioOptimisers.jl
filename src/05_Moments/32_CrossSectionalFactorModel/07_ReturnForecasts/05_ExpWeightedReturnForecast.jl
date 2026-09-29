@@ -39,7 +39,7 @@ end
 
 Return the mask of the `(observation, asset)` pairs an [`ExpWeightedReturnForecast`](@ref) fits on.
 
-A pair enters the fit when it carries a positive cross-sectional weight, a finite forward target, a finite idiosyncratic variance and a finite score for every Descriptor. The function reads the four conditions once and returns a mask, so the gather of each observation does not derive them again.
+A pair enters the fit when it carries a positive cross-sectional weight, a finite forward target, a positive and finite idiosyncratic variance and a finite score for every Descriptor. A variance of zero leaves the pair out: the fit weights a pair by the inverse of its variance, and a zero variance is that of a pair its own level of a one-hot family fits exactly, whose residual carries no idiosyncratic return to forecast. The function reads the four conditions once and returns a mask, so the gather of each observation does not derive them again.
 
 # Arguments
 
@@ -61,7 +61,7 @@ A pair enters the fit when it carries a positive cross-sectional weight, a finit
 function ew_forecast_valid(S::Arr3Num, y::MatNum, vs::MatNum, w::MatNum)::BitMatrix
     valid = falses(size(w))
     for idx in CartesianIndices(valid)
-        ok = w[idx] > zero(w[idx]) && isfinite(y[idx]) && isfinite(vs[idx])
+        ok = w[idx] > zero(w[idx]) && isfinite(y[idx]) && zero(vs[idx]) < vs[idx] < Inf
         for k in axes(S, 3)
             ok &= isfinite(S[idx, k])
         end

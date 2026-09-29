@@ -271,6 +271,7 @@ Builds a factor model mapping factor returns to asset returns, underpinning fact
 
 **Cross-Sectional Regression**
 A regression of one observation's asset returns on the lagged Factor Exposures across the assets, one fit per observation.
+A **Leverage-One Pair** is an asset whose exposures give it a direction of the design of its own at one observation, such as the only member of a level of a one-hot factor: the fit reproduces its return, so its idiosyncratic return is zero by construction and states nothing about its specific risk. The fit marks it in `h1`, a least-squares fit writes an exact zero residual there, and the idiosyncratic diagnostics leave it out (#1423).
 *Avoid*: Regression Estimator (above), whose families fit one asset at a time over the observations.
 
 **Descriptor**

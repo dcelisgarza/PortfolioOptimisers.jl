@@ -78,6 +78,9 @@ function cross_sectional_panel(; T = 6, N = 25, K = 4, seed = 987)
     return Z, X, W, beta
 end
 
+# A regression target the library does not know, for `cross_sectional_least_squares`.
+struct LeverageTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+
 @testset "Cross-sectional regression" begin
     Z, X, W, beta = cross_sectional_panel()
     # Rows 2 onwards carry no missing entry, so a probe that needs a clean panel takes them.
@@ -342,9 +345,75 @@ end
         @test v.f === csr.f
         @test v.n === csr.n
         @test v.b === csr.b
+        @test v.h1 == csr.h1[:, [1, 3, 5]]
         # The passthrough returns the result it was handed.
         @test cross_sectional_regression(csr, Zc, Xc, Wc) === csr
         @test cross_sectional_regression(csr) === csr
+    end
+
+    @testset "A pair of leverage one has a zero residual and a mark (#1423)" begin
+        # Asset 4 is the only member of the second level, so the design gives it a direction
+        # of its own: the fit reproduces its return, whatever the return is. Its residual is
+        # zero in exact arithmetic, and the subtraction would leave only round-off.
+        T, N = 3, 5
+        Zh = zeros(T, N, 2)
+        Zh[:, :, 1] .= 1.0
+        Zh[:, 4, 2] .= 1.0
+        Xh = [0.1 0.7 0.3 0.123456789 -0.2; 0.3 -0.1 0.25 0.987654321 0.4;
+              -0.3 0.2 0.1 0.333333333 0.05]
+        Wh = [1.0 2.0 1.0 3.0 1.0; 1.0 1.0 1.0 1.0 1.0; 1.0 1.0 1.0 0.0 1.0]
+        mark = falses(T, N)
+        mark[1:2, 4] .= true
+        for cre in (CrossSectionalLinearRegression(), CrossSectionalTargetRegression(),
+                    CrossSectionalTargetRegression(; tgt = GeneralisedLinearModel()),
+                    CrossSectionalLinearRegression(; alg = MinimumNormSolve()))
+            csr = cross_sectional_regression(cre, Zh, Xh, Wh)
+            # The pair of zero weight at observation 3 left the fit, so it has no mark.
+            @test csr.h1 == mark
+            @test all(iszero, csr.eps[mark])
+            @test all(!iszero, csr.eps[.!mark])
+            # The mark reads the design alone, so the scale of the returns does not move it.
+            @test cross_sectional_regression(cre, Zh, 1e-9 .* Xh, Wh).h1 == mark
+        end
+        # With an intercept, the level's own column still gives asset 4 its direction.
+        Zi = Zh[:, :, 2:2]
+        csr = cross_sectional_regression(CrossSectionalLinearRegression(; intercept = true),
+                                         Zi, Xh, Wh)
+        @test csr.h1 == mark
+        @test all(iszero, csr.eps[mark])
+        # Under a log link the fit reproduces the pair on the scale of the link, so the
+        # residual on the scale of the returns keeps its value, and only the mark is set.
+        ls = PortfolioOptimisers.cross_sectional_least_squares
+        glmp = PortfolioOptimisers.GLM
+        nrm = PortfolioOptimisers.Distributions.Normal()
+        glm = GeneralisedLinearModel(; args = (nrm, glmp.LogLink()))
+        @test !ls(CrossSectionalTargetRegression(; tgt = glm))
+        @test ls(GeneralisedLinearModel(; args = (nrm, glmp.IdentityLink())))
+        @test !ls(LeverageTestTarget())
+        # The mask on its own: no row or no column marks nothing, a zero design has rank zero
+        # and marks nothing, and a design with fewer rows than columns fits every row.
+        lo = PortfolioOptimisers.cross_sectional_leverage_one
+        @test lo(zeros(0, 2), Float64[], false) == falses(0)
+        @test lo(zeros(3, 0), ones(3), false) == falses(3)
+        @test lo(zeros(3, 2), ones(3), false) == falses(3)
+        @test lo([1.0 2.0 3.0; 4.0 5.0 7.0], [1.0, 2.0], false) == trues(2)
+        @test lo([1.0 0.0; 1.0 0.0; 1.0 1.0], [1.0, 3.0, 0.5], false) ==
+              BitVector([false, false, true])
+        # With the intercept column, the constant minus the level's column is the other
+        # level's own direction, so a lone member of either level is marked, and a level of
+        # two members on each side marks nothing.
+        @test lo([0.0; 0.0; 1.0;;], [1.0, 1.0, 1.0], true) ==
+              BitVector([false, false, true])
+        @test lo([0.0; 1.0; 1.0;;], [1.0, 1.0, 1.0], true) ==
+              BitVector([true, false, false])
+        @test lo([0.0; 0.0; 1.0; 1.0;;], [1.0, 2.0, 1.0, 3.0], true) == falses(4)
+        # A result a caller builds by hand states no mark, and the constructor checks one.
+        f = [1.0 2.0; 3.0 4.0]
+        e = [0.1 0.2 0.3; 0.4 0.5 0.6]
+        @test isnothing(CrossSectionalRegression(; f = f, eps = e, n = [3, 3]).h1)
+        @test_throws DimensionMismatch CrossSectionalRegression(; f = f, eps = e,
+                                                                n = [3, 3],
+                                                                h1 = falses(2, 2))
     end
 
     @testset "The result refuses a malformed construction" begin

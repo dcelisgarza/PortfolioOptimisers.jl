@@ -601,7 +601,8 @@ function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEs
     csl = cross_sectional_regression(cre, Z[:, :, lv], X, W)
     f = zeros(eltype(csl.f), size(csl.f, 1), size(Z, 3))
     f[:, lv] = csl.f
-    return (; csr = CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n, b = csl.b),
+    return (; csr = CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n, b = csl.b,
+                                               h1 = csl.h1),
             lv = lv)
 end
 """

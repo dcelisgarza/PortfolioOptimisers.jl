@@ -130,6 +130,8 @@ Where:
 
 Each observation is one independent problem, so a factor return is a cross-sectional quantity and never a time-series one.
 
+A pair whose leverage is one has a direction of the design of its own, for example the only member of a level of a one-hot family. The fit reproduces its return whatever the return is, so its residual is zero by construction and tells nothing about its idiosyncratic risk. `h1` marks these pairs, and a least-squares fit writes an exact zero there in place of the round-off of the subtraction.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -140,7 +142,8 @@ $(DocStringExtensions.FIELDS)
         f::MatNum,
         eps::MatNum,
         n::AbstractVector{<:Integer},
-        b::Option{<:VecNum} = nothing
+        b::Option{<:VecNum} = nothing,
+        h1::Option{<:AbstractMatrix{Bool}} = nothing
     ) -> CrossSectionalRegression
 
 Keywords correspond to the struct's fields.
@@ -151,12 +154,13 @@ Keywords correspond to the struct's fields.
   - `size(f, 1) == size(eps, 1) == length(n)`.
   - `all(x -> x >= 0, n)`.
   - If provided, `!isempty(b)`, and `length(b) == size(f, 1)`.
+  - If provided, `size(h1) == size(eps)`.
 
 ## View parameters
 
 `CrossSectionalRegression` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
-  - `eps` is sliced on its **second** axis, which is the asset axis of a cross-sectional result.
+  - `eps` and `h1` are sliced on their **second** axis, which is the asset axis of a cross-sectional result.
   - `f`, `n` and `b` pass through unchanged. Each is indexed by observation and by factor, and neither axis follows an asset selection.
 
 # Examples
@@ -168,7 +172,8 @@ CrossSectionalRegression
     f ┼ 2×2 Matrix{Float64}
   eps ┼ 2×3 Matrix{Float64}
     n ┼ Vector{Int64}: [3, 3]
-    b ┴ nothing
+    b ┼ nothing
+   h1 ┴ nothing
 ```
 
 # Related
@@ -197,8 +202,13 @@ CrossSectionalRegression
     $(arg_dict[:b])
     """
     b
+    """
+    Leverage-one mask `observations × assets`, or `nothing`. An entry is true where the pair entered the fit with a leverage of one, so the fit reproduced its return and its residual is zero by construction. `nothing` states no mark, as a result that a caller builds by hand does.
+    """
+    h1
     function CrossSectionalRegression(f::MatNum, eps::MatNum, n::AbstractVector{<:Integer},
-                                      b::Option{<:VecNum})
+                                      b::Option{<:VecNum},
+                                      h1::Option{<:AbstractMatrix{Bool}})
         @argcheck(!isempty(f), IsEmptyError("f cannot be empty"))
         @argcheck(!isempty(eps), IsEmptyError("eps cannot be empty"))
         @argcheck(!isempty(n), IsEmptyError("n cannot be empty"))
@@ -211,12 +221,18 @@ CrossSectionalRegression
             @argcheck(length(b) == size(f, 1),
                       DimensionMismatch("b ($(length(b))) must match f ($(size(f, 1)) rows)"))
         end
-        return new{typeof(f), typeof(eps), typeof(n), typeof(b)}(f, eps, n, b)
+        if !isnothing(h1)
+            @argcheck(size(h1) == size(eps),
+                      DimensionMismatch("h1 ($(size(h1, 1))×$(size(h1, 2))) must match eps ($(size(eps, 1))×$(size(eps, 2)))"))
+        end
+        return new{typeof(f), typeof(eps), typeof(n), typeof(b), typeof(h1)}(f, eps, n, b,
+                                                                             h1)
     end
 end
 function CrossSectionalRegression(; f::MatNum, eps::MatNum, n::AbstractVector{<:Integer},
-                                  b::Option{<:VecNum} = nothing)::CrossSectionalRegression
-    return CrossSectionalRegression(f, eps, n, b)
+                                  b::Option{<:VecNum} = nothing,
+                                  h1::Option{<:AbstractMatrix{Bool}} = nothing)::CrossSectionalRegression
+    return CrossSectionalRegression(f, eps, n, b, h1)
 end
 """
     port_opt_view(csr::CrossSectionalRegression, i, args...)
@@ -226,7 +242,8 @@ Return a view of a [`CrossSectionalRegression`](@ref) result, selecting only the
 # Algorithm
 
  1. Take a column view of `eps` over `i`, giving the residuals of the selected assets. The asset axis of a cross-sectional result is the **second** one, because a row of `eps` is one observation.
- 2. Build a new [`CrossSectionalRegression`](@ref) from that view and the three untouched fields, which re-runs every guard of the constructor.
+ 2. Take the same view of `h1` when it is set, through [`nothing_scalar_array_view_odd_order`](@ref).
+ 3. Build a new [`CrossSectionalRegression`](@ref) from the two views and the three untouched fields, which re-runs every guard of the constructor.
 
 # Arguments
 
@@ -246,14 +263,16 @@ CrossSectionalRegression
     f ┼ 1×2 Matrix{Float64}
   eps ┼ 1×3 Matrix{Float64}
     n ┼ Vector{Int64}: [3]
-    b ┴ nothing
+    b ┼ nothing
+   h1 ┴ nothing
 
 julia> PortfolioOptimisers.port_opt_view(csr, [1, 3])
 CrossSectionalRegression
     f ┼ 1×2 Matrix{Float64}
   eps ┼ 1×2 SubArray{Float64, 2, Matrix{Float64}, Tuple{Base.Slice{Base.OneTo{Int64}}, Vector{Int64}}, false}
     n ┼ Vector{Int64}: [3]
-    b ┴ nothing
+    b ┼ nothing
+   h1 ┴ nothing
 ```
 
 # Related
@@ -263,7 +282,8 @@ CrossSectionalRegression
 """
 function port_opt_view(csr::CrossSectionalRegression, i, args...)::CrossSectionalRegression
     return CrossSectionalRegression(; f = csr.f, eps = view(csr.eps, :, i), n = csr.n,
-                                    b = csr.b)
+                                    b = csr.b,
+                                    h1 = nothing_scalar_array_view_odd_order(csr.h1, :, i))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -573,6 +593,108 @@ function cross_sectional_coefficients(cre::CrossSectionalTargetRegression, A::Ma
     return StatsAPI.coef(StatsAPI.fit(factory(cre.tgt, StatsBase.aweights(w)), A, y))
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the mask of the eligible assets of one observation whose leverage in the weighted design is one.
+
+The leverage of row ``i`` is the diagonal entry ``h_{i}`` of the projection onto the column span of the design. It is one exactly when the design gives the row a direction of its own, for example when the row is the only member of a level of a one-hot family. A least-squares fit then reproduces the target of that row whatever it is, so its residual is zero by construction and its variance under the design is zero too. The mask does not depend on the scale of the target, and it does not depend on a positive weight either, because a positive weight moves no row into or out of the span of the others.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+h_{i} &= \\sum_{j = 1}^{r} Q_{ij}^{2}\\,, &
+\\text{mark}_{i} &= 1 - h_{i} \\le \\sqrt{\\epsilon}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``h_{i}``: Leverage of row ``i``.
+  - ``\\mathbf{Q}``: Orthonormal factor of the column-pivoted `QR` of the weighted design `sqrt.(w) .* A`, with the column `sqrt.(w)` in front under `intercept`.
+  - ``r``: Numerical rank of the design, read as [`cross_sectional_rank`](@ref) reads it.
+  - ``\\epsilon``: Machine epsilon of the element type of ``\\mathbf{Q}``.
+
+The tolerance ``\\sqrt{\\epsilon}`` absorbs the round-off of ``h_{i}``, which is of order ``m \\epsilon`` for ``m`` rows. A row whose leverage is below one by more than that keeps a residual variance that the data can estimate.
+
+# Algorithm
+
+ 1. Scale the rows of `A` by `sqrt.(w)`, giving the weighted design `D`, and put the column `sqrt.(w)` in front of it when `intercept` is `true`.
+ 2. Read the numerical rank `r` of `D` through [`cross_sectional_rank`](@ref), which answers zero for a design with no row or no column. Return an all-false mask at rank zero.
+ 3. Take the column-pivoted `LinearAlgebra.qr` of `D` and the first `r` columns of its `Q`, and sum the squares of each row, giving the leverage `h`.
+ 4. Mark each row whose `1 - h` is at most `sqrt(eps)`.
+
+# Arguments
+
+  - `A::MatNum`: Exposures of the eligible assets, `eligible assets × factors`, not demeaned.
+  - `w::VecNum`: Cross-sectional weights of the eligible assets.
+  - `intercept::Bool`: Whether the fit has an intercept.
+
+# Returns
+
+  - `mark::BitVector`: Leverage-one mask, one entry per eligible asset.
+
+# Related
+
+  - [`cross_sectional_regression`](@ref)
+  - [`cross_sectional_rank`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+"""
+function cross_sectional_leverage_one(A::MatNum, w::VecNum, intercept::Bool)::BitVector
+    sq = sqrt.(w)
+    D = intercept ? hcat(sq, A .* sq) : A .* sq
+    r = cross_sectional_rank(D)
+    if iszero(r)
+        return falses(size(D, 1))
+    end
+    F = LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm())
+    h = vec(sum(abs2, F.Q * Matrix{eltype(F.R)}(LinearAlgebra.I, size(D, 1), r); dims = 2))
+    return BitVector(one.(h) .- h .<= sqrt(eps(real(eltype(h)))))
+end
+"""
+    cross_sectional_least_squares(cre::CrossSectionalLinearRegression) -> Bool
+    cross_sectional_least_squares(cre::CrossSectionalTargetRegression) -> Bool
+    cross_sectional_least_squares(tgt::LinearModel) -> Bool
+    cross_sectional_least_squares(tgt::GeneralisedLinearModel) -> Bool
+    cross_sectional_least_squares(tgt::AbstractRegressionTarget) -> Bool
+
+Return whether the fit of a cross-sectional regression reproduces the return of a pair whose leverage is one.
+
+[`cross_sectional_regression`](@ref) writes an exact zero residual at such a pair when this answers `true`. A least-squares fit projects the returns onto the span of the design, so the pair's residual is zero in exact arithmetic, and the subtraction leaves only its round-off. A generalised linear model with an identity link solves its score equations with the pair's own parameter, which also fits the pair exactly. Under any other link the fit reproduces the mean of the pair on the scale of the link, so the residual on the scale of the returns is not zero, and the verb answers `false`. So does a target the verb does not know.
+
+# Arguments
+
+  - `cre`: Cross-sectional regression estimator.
+  - `tgt`: Regression target of a [`CrossSectionalTargetRegression`](@ref).
+
+# Returns
+
+  - `ls::Bool`: `true` when the residual of a leverage-one pair is zero by construction.
+
+# Related
+
+  - [`cross_sectional_leverage_one`](@ref)
+  - [`cross_sectional_regression`](@ref)
+  - [`LinearModel`](@ref)
+  - [`GeneralisedLinearModel`](@ref)
+"""
+function cross_sectional_least_squares(::CrossSectionalLinearRegression)::Bool
+    return true
+end
+function cross_sectional_least_squares(cre::CrossSectionalTargetRegression)::Bool
+    return cross_sectional_least_squares(cre.tgt)
+end
+function cross_sectional_least_squares(::LinearModel)::Bool
+    return true
+end
+function cross_sectional_least_squares(tgt::GeneralisedLinearModel)::Bool
+    link = length(tgt.args) >= 2 ? tgt.args[2] : GLM.canonicallink(tgt.args[1])
+    return isa(link, GLM.IdentityLink)
+end
+function cross_sectional_least_squares(::AbstractRegressionTarget)::Bool
+    return false
+end
+"""
     cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimator, Z::Arr3Num,
                                X::MatNum, W::MatNum) -> CrossSectionalRegression
     cross_sectional_regression(csr::CrossSectionalRegression, args...) -> CrossSectionalRegression
@@ -587,10 +709,12 @@ The weight matrix `W` is an argument rather than a field, because a two-pass wei
 
  1. Take the eligibility mask through [`cross_sectional_design_mask`](@ref).
  2. For each observation `t`, gather the eligible assets, their weights `w`, their exposures `A` and their returns `y`, and record their count in `n`.
- 3. When `cre.intercept` is `true`, take the weighted means `ybar` and `xbar` of `y` and of `A`, and subtract them. An observation with no eligible asset takes zero for both.
- 4. Take the factor returns of the observation through [`cross_sectional_coefficients`](@ref), and write them into the row `t` of `f`. An observation with no eligible asset takes zero factor returns under [`CrossSectionalLinearRegression`](@ref), except under [`RankDeficiencyRefusal`](@ref), whose rank test reads an empty design as rank zero and refuses it by name.
- 5. When `cre.intercept` is `true`, write `ybar - dot(f[t, :], xbar)` into the entry `t` of `b`.
- 6. Subtract the systematic part, through [`cross_sectional_systematic`](@ref), from `X`, giving `eps`.
+ 3. Mark the eligible assets of leverage one in the row `t` of `h1`, through [`cross_sectional_leverage_one`](@ref).
+ 4. When `cre.intercept` is `true`, take the weighted means `ybar` and `xbar` of `y` and of `A`, and subtract them. An observation with no eligible asset takes zero for both.
+ 5. Take the factor returns of the observation through [`cross_sectional_coefficients`](@ref), and write them into the row `t` of `f`. An observation with no eligible asset takes zero factor returns under [`CrossSectionalLinearRegression`](@ref), except under [`RankDeficiencyRefusal`](@ref), whose rank test reads an empty design as rank zero and refuses it by name.
+ 6. When `cre.intercept` is `true`, write `ybar - dot(f[t, :], xbar)` into the entry `t` of `b`.
+ 7. Subtract the systematic part, through [`cross_sectional_systematic`](@ref), from `X`, giving `eps`.
+ 8. When [`cross_sectional_least_squares`](@ref) answers `true`, write an exact zero into `eps` at every pair that `h1` marks. The fit reproduced the return of that pair, so zero is its residual in exact arithmetic.
 
 # Arguments
 
@@ -619,7 +743,8 @@ CrossSectionalRegression
     f ┼ 1×2 Matrix{Float64}
   eps ┼ 1×3 Matrix{Float64}
     n ┼ Vector{Int64}: [3]
-    b ┴ nothing
+    b ┼ nothing
+   h1 ┴ 1×3 BitMatrix
 ```
 
 # Related
@@ -648,6 +773,7 @@ function cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimat
     f = zeros(Tf, size(X, 1), K)
     b = cre.intercept ? zeros(Tf, size(X, 1)) : nothing
     n = zeros(Int, size(X, 1))
+    h1 = falses(size(X))
     xbar = zeros(Tf, K)
     for t in axes(X, 1)
         idx = findall(view(act, t, :))
@@ -655,6 +781,7 @@ function cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimat
         w = Tf.(view(W, t, idx))
         A = Tf.(view(Z, t, idx, :))
         y = Tf.(view(X, t, idx))
+        h1[t, idx] = cross_sectional_leverage_one(A, w, cre.intercept)
         ybar = zero(Tf)
         fill!(xbar, zero(Tf))
         if cre.intercept
@@ -672,8 +799,10 @@ function cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimat
             b[t] = ybar - LinearAlgebra.dot(fi, xbar)
         end
     end
-    return CrossSectionalRegression(; f = f, eps = X - cross_sectional_systematic(f, b, Z),
-                                    n = n, b = b)
+    eps = X - cross_sectional_systematic(f, b, Z)
+    # A fit that is not least squares keeps the residual of a marked pair, and only marks it.
+    eps[h1 .& cross_sectional_least_squares(cre)] .= zero(eltype(eps))
+    return CrossSectionalRegression(; f = f, eps = eps, n = n, b = b, h1 = h1)
 end
 function cross_sectional_regression(csr::CrossSectionalRegression, args...)
     return csr

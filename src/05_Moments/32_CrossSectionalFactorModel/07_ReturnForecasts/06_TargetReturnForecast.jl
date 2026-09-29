@@ -504,7 +504,7 @@ end
 
 Gather the calibration sample of one observation of a [`TargetReturnForecast`](@ref).
 
-An asset enters when it carries a positive cross-sectional weight, a finite idiosyncratic variance, a finite uncalibrated prediction and a finite forward return. Its weight is the cross-sectional weight divided by its idiosyncratic variance. [`ExpWeightedReturnForecast`](@ref) weighs its regression the same way in the return unit.
+An asset enters when it carries a positive cross-sectional weight, a positive and finite idiosyncratic variance, a finite uncalibrated prediction and a finite forward return. A variance of zero would take an infinite weight: it is that of a pair its own level of a one-hot family fits exactly, so it leaves the sample. Its weight is the cross-sectional weight divided by its idiosyncratic variance. [`ExpWeightedReturnForecast`](@ref) weighs its regression the same way in the return unit.
 
 # Arguments
 
@@ -529,7 +529,7 @@ function target_forecast_calibration_design(P::MatNum, fwd::MatNum, vs::MatNum, 
     idx = Int[]
     for i in axes(P, 2)
         if w[t, i] > zero(w[t, i]) &&
-           isfinite(vs[t, i]) &&
+           zero(vs[t, i]) < vs[t, i] < Inf &&
            isfinite(P[t, i]) &&
            isfinite(fwd[t, i])
             push!(idx, i)

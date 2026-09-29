@@ -233,11 +233,41 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     end
 
     @testset "The idiosyncratic group, $(fix) $(c)" for (fix, c) in cases
-        # A level that holds one asset fits that asset exactly, so its residual and its
-        # variance are round-off, and so is their ratio, on both sides (#1423). The
-        # group has no factor axis, so the family cases add nothing else to it.
-        c in fam && continue
         csfm = block(fix, c)
+        if c in fam
+            # Better (#1423). Asset 3 is the only member of its industry until it delists,
+            # so the design gives it a direction of its own and the fit reproduces its
+            # return. Its residual is zero by construction, and so is its variance under the
+            # design: its standardised return is 0 / 0. The oracle divides the round-off of
+            # one by the round-off of the other, near 1e-18 / 1e-17, and enters an order-one
+            # number into every cross-section, so no stored case compares here. The fit
+            # marks the pair, writes an exact zero, and the group leaves the asset out, so
+            # each verb equals the same verb on the panel without asset 3.
+            h = csfm.csr.h1
+            act = .!isnan.(csfm.csr.eps)
+            @test findall(vec(any(h; dims = 1))) == [3]
+            @test h[:, 3] == act[:, 3]
+            @test all(iszero, csfm.csr.eps[h])
+            @test all(x -> iszero(x) || isnan(x), csfm.vs[:, 3])
+            @test all(isnan, standardised_idio_returns(PO.idio_diagnostic_data(csfm)...)[:, 3])
+            k = setdiff(axes(csfm.csr.eps, 2), 3)
+            ek = csfm.csr.eps[:, k]
+            vk = csfm.vs[:, k]
+            for ahead in (true, false)
+                @test isequal(idio_calibration(csfm; ahead = ahead),
+                              idio_calibration(ek, vk; ahead = ahead))
+                @test isequal(idio_tail_rate(csfm; ahead = ahead),
+                              idio_tail_rate(ek, vk; ahead = ahead))
+                @test isequal(idio_kurtosis(csfm; ahead = ahead),
+                              idio_kurtosis(ek, vk; ahead = ahead))
+                @test isequal(idio_skewness(csfm; ahead = ahead),
+                              idio_skewness(ek, vk; ahead = ahead))
+                @test isequal(idio_calibration_summary(csfm; ahead = ahead),
+                              idio_calibration_summary(ek, vk; ahead = ahead))
+            end
+            @test isequal(idio_vol_ic(csfm), idio_vol_ic(ek, vk))
+            continue
+        end
         n = "Diag$(fix)$(c)"
         I = load(n, "Idio")
         @test pc(idio_calibration(csfm; ahead = false), I[:, 1], "$(n) calibration")

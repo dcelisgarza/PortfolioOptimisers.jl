@@ -123,7 +123,8 @@ CrossSectionalRegression
     f ┼ 1×2 Matrix{Float64}
   eps ┼ 1×3 Matrix{Float64}
     n ┼ Vector{Int64}: [3]
-    b ┴ nothing
+    b ┼ nothing
+   h1 ┴ nothing
 ```
 
 # Related

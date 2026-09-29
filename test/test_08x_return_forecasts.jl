@@ -998,6 +998,13 @@ end
         @test PO.ew_forecast_valid(S, [0.1 0.2], [0.3 0.4], [0.0 1.0]) == [false false]
         @test PO.ew_forecast_valid(S, [NaN 0.2], [0.3 0.4], [1.0 1.0]) == [false false]
         @test PO.ew_forecast_valid(S, [0.1 0.2], [NaN 0.4], [1.0 1.0]) == [false false]
+        # A zero variance would take an infinite weight. It is the variance of a pair that its
+        # own level fits exactly, so the pair leaves the fit (#1423).
+        @test PO.ew_forecast_valid(S, [0.1 0.2], [0.0 0.4], [1.0 1.0]) == [false false]
+        a, y, wv = PO.target_forecast_calibration_design([1.0 2.0 3.0], [0.1 0.2 0.3],
+                                                         [0.5 0.0 0.25], [1.0 1.0 1.0], 1)
+        @test a == [1.0, 3.0]
+        @test wv == [2.0, 4.0]
         @test PO.ew_forecast_solve([1.0 1.0; 1.0 1.0], [2.0, 2.0], 0.0, 1) ≈ [1.0, 1.0]
         @test PO.ew_forecast_solve([2.0 0.0; 0.0 4.0], [2.0, 4.0], 0.0, 1) ≈ [1.0, 1.0]
         @test PO.ew_forecast_solve([2.0 0.0; 0.0 2.0], [2.0, 2.0], 1.0, 1) ≈ [0.5, 0.5]

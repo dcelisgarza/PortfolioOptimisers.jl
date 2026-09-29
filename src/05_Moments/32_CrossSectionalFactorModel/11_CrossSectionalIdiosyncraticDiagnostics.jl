@@ -924,6 +924,8 @@ Return the idiosyncratic return history and the idiosyncratic variance history t
 
 The group reads the residual of the fit against the variance the fit predicted for it. Neither history has a factor axis, so the group takes no lag and no family re-basis, and it reads the two histories as the block wrote them. Dispatch, not a branch, selects the absent case, and its message names the field the caller must populate.
 
+A pair that the `h1` field of the regression marks has a leverage of one: the design fitted its return exactly, so its residual is zero by construction and its variance under the design is zero too. Its standardised return is ``0 / 0``, which is not defined, so the verb writes `NaN` over its residual and every verb of the group leaves the pair out. A variance that read only such residuals is zero, and [`standardised_idio_value`](@ref) answers `NaN` for it.
+
 # Arguments
 
   - `csfm`: A cross-sectional factor model block.
@@ -937,7 +939,7 @@ The group reads the residual of the fit against the variance the fit predicted f
 
 # Returns
 
-  - `eps::MatNum`: Idiosyncratic return history `observations × assets`.
+  - `eps::MatNum`: Idiosyncratic return history `observations × assets`, `NaN` at a pair that `h1` marks.
   - `vs::MatNum`: Idiosyncratic variance history `observations × assets`.
 
 # Related
@@ -957,7 +959,13 @@ function idio_diagnostic_data(::CrossSectionalRegression, ::Nothing)
     return throw(IsNothingError("vs cannot be nothing: an idiosyncratic diagnostic reads the idiosyncratic variance history of the block"))
 end
 function idio_diagnostic_data(csr::CrossSectionalRegression, vs::MatNum)
-    return csr.eps, vs
+    if isnothing(csr.h1) || !any(csr.h1)
+        return csr.eps, vs
+    end
+    # The group divides by a square root, so the `NaN` takes the type of that division.
+    ep = typeof(sqrt(one(float_if_integer(real(eltype(csr.eps)))))).(csr.eps)
+    ep[csr.h1] .= NaN
+    return ep, vs
 end
 
 export standardised_idio_returns, idio_calibration, idio_tail_rate, idio_kurtosis,
