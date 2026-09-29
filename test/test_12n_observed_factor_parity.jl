@@ -2,12 +2,15 @@
 Currency factors at parity with a stored oracle, and inside the meta-optimisers and the folds
 (#1369).
 
-The oracle under `test/assets/CrossSectionalFactorPriorCurrency*.csv.gz` holds the factor
-returns, the factor mean, the factor covariance and `mu` of the same fit on the fixture below,
-with and without a constrained industry family. The nested factor prior of both is a plain
-`EmpiricalPrior`. The fixture draws local returns, adds the Currency Excess Return of the currency
-of each asset to form the base-currency returns, and states three currencies, so the fit must
-recover the local model through the derived local returns.
+The oracle under `test/assets/CrossSectionalFactorPriorCurrency{Plain,Family}*.csv.gz` holds the
+factor returns, the factor mean, the factor covariance, `mu` and the loadings of the latest
+observation. Each case was made through the harness of #1376 (#1381): `parity_write` of
+`ccy_fixture().rd`, and the oracle fit of three industry factors and two style factors, each a
+passthrough of its Panel Field, the Currency Factors of the `currency` field, and a plain
+`EmpiricalPrior` as the nested factor prior. `Family` adds the constrained industry family, and
+every other parameter is the default. The fixture draws local returns, adds the Currency Excess
+Return of the currency of each asset to form the base-currency returns, and states three
+currencies, so the fit must recover the local model through the derived local returns.
 
 The `*Default*` files hold the default fit on the same fixture (#1373, #1374): the factor mean,
 the factor covariance, `mu`, `sigma` and the idiosyncratic variance of the latest observation.
@@ -95,14 +98,21 @@ end
                                              pe = EmpiricalPrior()), fx.rd)
         F = ccy_asset("$(nm)FactorReturns")
         @test size(pr.fpr.X) == size(F) == (119, 8)
-        # The regression solves one weighted least squares by factorising the weighted
-        # design, so the factor returns agree to machine precision in absolute terms.
-        @test maximum(abs, pr.fpr.X - F) < 1e-14
+        # Measured cell by cell, Plain and Family: maxrel 9.5e-13 and 3.2e-13 (factor
+        # returns), 1.7e-14 and 1.7e-14 (factor mean), 6.9e-15 and 3.4e-15 (factor
+        # covariance), 5.4e-15 and 1.9e-13 (`mu`).
+        @test parity_compare(pr.fpr.X, F; name = "$(nm) factor returns").ok
         # The Currency Factors carry the observed returns, and no regression touched them.
         @test pr.fpr.X[:, 6:8] == fx.R[2:end, :]
-        @test pr.fpr.mu ≈ vec(ccy_asset("$(nm)FactorMu")) rtol = 1e-12
-        @test pr.fpr.sigma ≈ ccy_asset("$(nm)FactorCov") rtol = 1e-12
-        @test pr.mu ≈ vec(ccy_asset("$(nm)Mu")) rtol = 1e-12
+        @test parity_compare(pr.fpr.mu, vec(ccy_asset("$(nm)FactorMu"));
+                             name = "$(nm) factor mean").ok
+        @test parity_compare(pr.fpr.sigma, ccy_asset("$(nm)FactorCov");
+                             name = "$(nm) factor covariance").ok
+        @test parity_compare(pr.mu, vec(ccy_asset("$(nm)Mu")); name = "$(nm) mu").ok
+        # The loadings of the currency columns are the Currency Exposure. Measured bit-equal,
+        # the other columns too.
+        @test parity_compare(pr.rr.M, ccy_asset("$(nm)Loadings"); rtol = 0.0,
+                             name = "$(nm) loadings").ok
     end
 
     @testset "The default fit matches the stored oracle, $(nm)" for (nm, fam) in

@@ -1,8 +1,7 @@
 #=
 Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/08_Base_Exposure.jl`, `09_CompositeExposure.jl`,
 `10_DerivedExposure.jl`, `11_OneHotExposure.jl` and `12_ConstantExposure.jl` against the
-contract their docstrings state, and against the reference implementation the map of issue
-#643 ports. Issue #721.
+contract their docstrings state, and against the stored oracle. Issue #721.
 
 FOUR CONVENTIONS SHAPE THE PROBES.
 
@@ -18,20 +17,21 @@ FOUR CONVENTIONS SHAPE THE PROBES.
    so the read zeroes every unobserved and inactive cell, which puts it outside the
    estimation set of its observation rather than inside it with an unknown weight.
 
-4. THE STORED CASES ARE THE REFERENCE IMPLEMENTATION'S OWN OUTPUT.
-   `assets/CompositeExposure.csv.gz` and `assets/DerivedExposure.csv.gz` were produced by
-   the reference implementation's `FixedWeightedFactor` and `DerivedFactor`, driven on the
-   synthetic panel the last testset rebuilds, with the same two raw Descriptors, the same
-   weights, the same coverage threshold, the same two transforms and the same grouping.
-   The reference implementation's other two members were diffed the same way and agree to
-   the last bit, so they are checked here against their closed forms rather than stored.
+4. THE STORED CASES ARE THE OUTPUT OF THE ORACLE.
+   `assets/CompositeExposure.csv.gz` and `assets/DerivedExposure.csv.gz` hold the oracle's
+   composite and derived members, driven on the synthetic panel the last testset rebuilds,
+   with the same two raw Descriptors, the same weights, the same coverage threshold, the same
+   two transforms and the same grouping. They compare cell by cell with `parity_compare` of
+   the harness of #1376 (#1381). The other two members agree to the last bit, so they are
+   checked here against their closed forms, and `test_12u` stores the one-hot block.
 
-ONE DELIBERATE DEVIATION. The reference implementation's constant exposure returns one on
-every cell, including a cell outside the active universe. The library writes `NaN` there,
-because the root's contract makes every Factor Exposure `NaN` on an inactive cell. The
-regression drops those cells on both sides, so no fitted quantity moves.
+ONE DELIBERATE DEVIATION. The oracle's constant exposure returns one on every cell, including a
+cell outside the active universe. The library writes `NaN` there, because the root's contract
+makes every Factor Exposure `NaN` on an inactive cell. The regression drops those cells on both
+sides, so no fitted quantity moves.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 # A small hand panel carrying the benchmark weights beside the fields. Every numeric field
 # takes a forward fill, so each earns an observed-mask column and a raw `NaN` reads back as
@@ -60,7 +60,7 @@ function exposure_hand_panel(fields::AbstractVector{<:Pair{String, <:AbstractMat
 end
 
 @testset "Exposure constructors and their refusals" begin
-    @testset "Every member carries the reference implementation's own defaults" begin
+    @testset "Every member carries the oracle's own defaults" begin
         xc = CompositeExposure(; descriptors = [Passthrough(; field = "a")])
         @test isa(xc.outlier, CrossSectionalWinsoriser)
         @test isa(xc.scoring, CrossSectionalStandardiser)
@@ -363,7 +363,7 @@ end
     end
 end
 
-@testset "The members reproduce the reference implementation" begin
+@testset "The members reproduce the stored oracle" begin
     sp = synthetic_asset_panel(; n_assets = 20, n_observations = 60, n_industries = 4,
                                late_listing_proba = 0.3, delisting_proba = 0.3,
                                missing_ratio = 0.08, rng = StableRNG(987654321))
@@ -383,14 +383,14 @@ end
         E = Matrix(CSV.read(joinpath(@__DIR__, "assets/CompositeExposure.csv.gz"),
                             DataFrame))
         @test size(Lc) == size(E)
-        @test isequal(isnan.(Lc), isnan.(E))
-        @test Lc[isfinite.(E)] ≈ E[isfinite.(E)]
+        # Measured maxrel 3.9e-14 cell by cell, and the NaN pattern is equal.
+        @test parity_compare(Lc, E; name = "composite").ok
     end
     @testset "The derived exposure matches the stored case cell by cell" begin
         E = Matrix(CSV.read(joinpath(@__DIR__, "assets/DerivedExposure.csv.gz"), DataFrame))
         @test size(Ld) == size(E)
-        @test isequal(isnan.(Ld), isnan.(E))
-        @test Ld[isfinite.(E)] ≈ E[isfinite.(E)]
+        # Measured maxrel 4.4e-14 cell by cell, and the NaN pattern is equal.
+        @test parity_compare(Ld, E; name = "derived").ok
     end
     @testset "The one-hot block is the classification, and the constant is the ones" begin
         Lo = factor_exposure(OneHotExposure(; field = "industry", family = "industry"), rd)
