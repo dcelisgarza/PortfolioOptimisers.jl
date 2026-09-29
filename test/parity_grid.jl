@@ -52,9 +52,10 @@ end
 # and the one-member industry of the fixture puts a round-off variance there (`FamOne`).
 const GRID_PE = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                                ce = RegimeAdjustedExpWeightedCovariance(; centred = true,
+                                                                        debias = false,
                                                                         regime_lohi_mult = (0.7,
                                                                                             1.6)))
-const GRID_VE = RegimeAdjustedExpWeightedVariance(; centred = true,
+const GRID_VE = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false,
                                                   regime_lohi_mult = (0.7, 1.6),
                                                   min_val = 1e-12)
 

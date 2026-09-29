@@ -249,7 +249,7 @@ Computes an asset covariance (and correlation) matrix. Core wrappers: `Covarianc
 - **LowerTailDependenceCovariance**: dependence in the joint lower tail (crash co-movement).
 - **RankCovariance**: rank-correlation based — `KendallCovariance` (τ), `SpearmanCovariance` (ρ).
 - **MutualInfoCovariance**: dependence via mutual information, over a histogram binning Algorithm.
-- **RegimeAdjustedExpWeightedVariance/Covariance**: online exponentially-weighted estimators rescaled by a detected market regime state.
+- **RegimeAdjustedExpWeightedVariance/Covariance**: online exponentially-weighted estimators rescaled by a detected market regime state. The regime statistic divides a realised square by an estimated variance, so by default (`debias = true`) it divides by the bias that the inverse of the estimate puts in the moment its method reads (ADR 0190).
 - **ImpliedVolatility** (covariance): scales covariance using implied volatility.
 - **DenoiseCovariance / DetoneCovariance / ProcessedCovariance**: wrap another covariance estimator and apply matrix processing.
 - **GeodesicShrinkageCovariance**: wraps another covariance estimator and applies Geodesic Shrinkage (§3.5) to the matrix it computes.

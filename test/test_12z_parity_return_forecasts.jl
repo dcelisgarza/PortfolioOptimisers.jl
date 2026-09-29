@@ -46,10 +46,11 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                "style2" => mpass("style2")]
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centred = true,
+                                                                 debias = false,
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
-    ve = RegimeAdjustedExpWeightedVariance(; centred = true, regime_lohi_mult = (0.7, 1.6),
-                                           min_val = 0.0)
+    ve = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false,
+                                           regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
     fit(rd; kw...) = prior(CrossSectionalFactorPrior(; factors = factors, pe = pe, ve = ve,
                                                      kw...), rd)
     desc = [Passthrough(; field = "net_income_ttm"), Passthrough(; field = "sales_ttm"),

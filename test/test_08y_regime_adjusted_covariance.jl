@@ -75,13 +75,14 @@ function oracle_estimator(; kwargs...)
                                                regime_decay = exp2(-2 / inv(log2(inv(0.9)))),
                                                regime_min_obs = 2,
                                                regime_lohi_mult = (0.7, 1.6),
-                                               centred = true, min_val = 1e-12, kwargs...)
+                                               centred = true, min_val = 1e-12,
+                                               debias = false, kwargs...)
 end
 
 @testset "the port reproduces the reference implementation" begin
     for (ce, oracle) in ((oracle_estimator(), ORACLE_DEFAULTS),
-                         # The oracle scores the raw distance (#1415).
-                         (oracle_estimator(; regime_target = PO.MahalanobisTarget(; debias = false),
+                         # The oracle scores the raw statistic (#1415, #1428).
+                         (oracle_estimator(; regime_target = PO.MahalanobisTarget(),
                                            regime_method = PO.LogRegimeAdjusted()), ORACLE_MAHALANOBIS_LOG),
                          (oracle_estimator(; regime_target = PO.DiagonalTarget(),
                                            regime_method = PO.RootMeanSquaredAdjusted(), hac_lags = 2),
@@ -557,10 +558,11 @@ end
 Issue #1415. The squared Mahalanobis distance against an estimated block is too large on average,
 because the inverse of an estimate is (Jensen's inequality). While the block had fewer
 observations than assets it was singular, the ridge of `safe_regime_cholesky` made the distance
-about 1e12, and that one value held the regime state for many half-lives. `debias = true` skips
-each row whose block has `n + 3` observations or fewer, where the variance of the statistic is not
-finite, and divides the rest by the fixed point `mahalanobis_bias`. `debias = false` is the
-oracle's raw statistic, which the first testset pins.
+about 1e12, and that one value held the regime state for many half-lives. The estimator keyword
+`debias = true` skips each row whose block has `n + 3` observations or fewer, where the variance
+of the statistic is not finite, and divides the rest by the fixed point `mahalanobis_bias`.
+`debias = false` is the oracle's raw statistic, which the first testset pins. The keyword was a
+field of the target until #1428 moved it to the estimator.
 =#
 @testset "the Mahalanobis statistic is divided by the bias of its estimated block" begin
     # At equal weights the fixed point is the exact inverse-Wishart mean K / (K - n - 1). A half-life
@@ -600,13 +602,133 @@ oracle's raw statistic, which the first testset pins.
     end
     @test 0.9 < squared_multiplier(PO.MahalanobisTarget()) < 1.1
     @test 0.9 < squared_multiplier(PO.MahalanobisTarget(); cor_decay = 2.0^(-1 / 20)) < 1.1
-    @test squared_multiplier(PO.MahalanobisTarget(; debias = false)) > 1e6
+    @test squared_multiplier(PO.MahalanobisTarget(); debias = false) > 1e6
 
     # The gate skips each row whose block has n + 3 observations or fewer, and does not count it.
     # The raw statistic scores every row after `min_obs`.
-    fit(target) = partial_fit!(RegimeAdjustedExpWeightedCovariance(; base...,
-                                                                   regime_target = target),
-                               R[1:60, :]).cache
+    fit(target; extra...) = partial_fit!(RegimeAdjustedExpWeightedCovariance(; base...,
+                                                                             extra...,
+                                                                             regime_target = target),
+                                         R[1:60, :]).cache
     @test fit(PO.MahalanobisTarget()).n_regime_obs == 60 - (na + 4)
-    @test fit(PO.MahalanobisTarget(; debias = false)).n_regime_obs == 60 - 5
+    @test fit(PO.MahalanobisTarget(); debias = false).n_regime_obs == 60 - 5
+end
+
+#=
+Issue #1428. A statistic of one direction reads one estimated variance `v̂ = σ² Q`, with
+`Q = Σ w_j z_j²`, and each regime method reads its own moment of `Q`: `E[1/Q]` for the root mean
+square, `E[Q^(-1/2)]²` for the first moment, `exp(-E[ln Q])` for the log. `debias = true` divides
+by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divides each term by
+`E[1/Q_i]`, which keeps the mean of its sum at `n` at every correlation (ADR 0190).
+=#
+@testset "a one-direction regime statistic divides by the bias its method reads" begin
+    SF = PO.SpecialFunctions
+    # At equal weights `Q` is χ²(K)/K, so the three moments have closed forms. A half-life of 1e6
+    # makes the 30 weights equal to within 2e-5. Measured: 5.9e-13, 7.5e-13 and 5.4e-13.
+    K = 30
+    tables = [PO.regime_bias_table(m, 2.0^(-1 / 1e6), K)[K]
+              for m in (PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted(),
+                        PO.LogRegimeAdjusted())]
+    @test isapprox(tables[1], K / (K - 2); rtol = 1e-11)
+    @test isapprox(tables[2], (sqrt(K / 2) * SF.gamma((K - 1) / 2) / SF.gamma(K / 2))^2;
+                   rtol = 1e-11)
+    @test isapprox(tables[3], exp(log(K / 2) - SF.digamma(K / 2)); rtol = 1e-11)
+    # The moment of the mean is the fixed point of #1415 at n = 1 to within its 0.2 %.
+    @test isapprox(PO.regime_bias_table(PO.RootMeanSquaredAdjusted(), 2.0^(-1 / 10), 200)[200],
+                   PO.mahalanobis_bias(2.0^(-1 / 10), 200, 1); rtol = 2e-3)
+
+    # The table grows to twice the count, and past the count where λ^K is below the machine
+    # epsilon it no longer changes, so the last entry serves every larger count.
+    bias = Float64[]
+    f10 = PO.regime_bias!(bias, PO.RootMeanSquaredAdjusted(), 0.9, 10)
+    @test length(bias) == 64 && f10 == bias[10]
+    f_far = PO.regime_bias!(bias, PO.RootMeanSquaredAdjusted(), 0.9, 10^6)
+    @test length(bias) == ceil(Int, log(eps()) / log(0.9)) && f_far == bias[end]
+    @test PO.regime_bias!(nothing, PO.RootMeanSquaredAdjusted(), 0.9, 10) === one(0.9)
+    @test PO.regime_bias_gate(true, 1) == 4 && PO.regime_bias_gate(false, 1) == 0
+
+    # On iid Normal returns the squared multiplier is the mean of the transformed statistic,
+    # which is one when the statistic is correct. Measured on this seed, half-life 10:
+    # scalar variance 1.07 raw and 1.00 debiased (8 seeds: 1.0004 RMS, 0.9994 first moment,
+    # 0.9993 log); the fixed-weight portfolio and the diagonal target the same.
+    rng = StableRNG(1428)
+    na, nr = 12, 12000
+    A = randn(rng, na, na)
+    U = cholesky(Symmetric(A * transpose(A) / na + Diagonal(rand(rng, na)))).U
+    R = randn(rng, nr, na) * U .* 0.01
+    base = (; decay = 2.0^(-1 / 10), min_obs = 5, regime_lohi_mult = nothing,
+            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centred = true)
+    function covariance_multiplier(target, method; extra...)
+        on = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
+                                                 regime_target = target,
+                                                 regime_method = method)
+        off = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
+                                                  regime_method = nothing)
+        return mean(cov(on, R) ./ cov(off, R))
+    end
+    function variance_multiplier(method; extra...)
+        on = RegimeAdjustedExpWeightedVariance(; base..., extra..., regime_method = method)
+        off = RegimeAdjustedExpWeightedVariance(; base..., extra...,
+                                                regime_method = nothing)
+        return mean(var(on, R) ./ var(off, R))
+    end
+    fixed = PO.PortfolioTarget(; w = fill(1 / na, na))
+    for method in (PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted())
+        @test 0.98 < variance_multiplier(method) < 1.02
+        @test 0.98 < covariance_multiplier(fixed, method) < 1.02
+        @test variance_multiplier(method; debias = false) > 1.04
+        @test covariance_multiplier(fixed, method; debias = false) > 1.04
+    end
+    @test 0.98 <
+          covariance_multiplier(PO.DiagonalTarget(), PO.RootMeanSquaredAdjusted()) <
+          1.02
+    @test covariance_multiplier(PO.DiagonalTarget(), PO.RootMeanSquaredAdjusted();
+                                debias = false) > 1.05
+
+    # The gate skips an estimate of four observations or fewer. With `min_obs = 1` the raw
+    # statistic scores every row after the first, and the debiased one every row after the fifth.
+    short = (; base..., min_obs = 1)
+    for target in (PO.DiagonalTarget(), fixed)
+        state(debias) = partial_fit!(RegimeAdjustedExpWeightedCovariance(; short...,
+                                                                         regime_target = target,
+                                                                         debias = debias),
+                                     R[1:40, :]).cache
+        @test state(true).n_regime_obs == 40 - 5
+        @test state(false).n_regime_obs == 40 - 1
+        @test isnothing(state(false).bias)
+    end
+    vstate(debias) = partial_fit!(RegimeAdjustedExpWeightedVariance(; short...,
+                                                                    debias = debias),
+                                  R[1:40, :]).cache
+    @test vstate(true).n_regime_obs == 40 - 5
+    @test vstate(false).n_regime_obs == 40 - 1
+
+    # The state holds its own table, so a copy grows a table of its own. A regime method of
+    # `nothing` holds none.
+    st = vstate(true)
+    @test !isempty(st.bias) && copy(st).bias !== st.bias && copy(st).bias == st.bias
+    @test isnothing(partial_fit!(RegimeAdjustedExpWeightedVariance(; short...,
+                                                                   regime_method = nothing),
+                                 R[1:40, :]).cache.bias)
+    # A direction that keeps no weight over the contributing assets takes no update.
+    Xn = R[1:40, 1:3]
+    Xn[:, 3] .= NaN
+    none = PO.PortfolioTarget(; w = [0.0, 0.0, 1.0])
+    @test partial_fit!(RegimeAdjustedExpWeightedCovariance(; short...,
+                                                           regime_target = none), Xn).cache.n_regime_obs ==
+          0
+    # On the separate path the portfolio reads the factor at `cor_decay`, because the
+    # correlations carry most of the variance of a direction (8 seeds: 1.004 with it, 0.971 with
+    # `decay`, at a correlation half-life of 20).
+    sst = partial_fit!(RegimeAdjustedExpWeightedCovariance(; short...,
+                                                           regime_target = fixed,
+                                                           cor_decay = 2.0^(-1 / 20)),
+                       R[1:40, :]).cache
+    @test sst.bias[5:40] ==
+          PO.regime_bias_table(PO.FirstMomentRegimeAdjusted(), 2.0^(-1 / 20),
+                               length(sst.bias))[5:40]
+    # An incremental fit reads the same table as a fit over the sample.
+    ce = RegimeAdjustedExpWeightedCovariance(; short..., regime_target = fixed)
+    @test isequal(cov(partial_fit!(partial_fit!(ce, R[1:200, :]), R[201:400, :])),
+                  cov(ce, R[1:400, :]))
 end

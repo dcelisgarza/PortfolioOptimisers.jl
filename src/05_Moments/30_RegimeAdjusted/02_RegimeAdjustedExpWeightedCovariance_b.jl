@@ -4,8 +4,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Computes the regime statistic of one observation for a target, from the covariance block that
 stands before it.
 
-Every target but [`MahalanobisTarget`](@ref) reads its [`regime_statistic`](@ref) of the block
-that [`regime_covariance_block`](@ref) returns.
+A target that has no method of its own reads its [`regime_statistic`](@ref) of the block that
+[`regime_covariance_block`](@ref) returns, and takes no bias correction.
 
 # Arguments
 
@@ -36,12 +36,133 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Computes the regime statistic of the diagonal target, with each term divided by the bias of its
+own estimated variance.
+
+Each term ``u_{i}^{2} / \\hat{C}_{ii}`` reads one estimated variance of ``K_{i}`` observations,
+so its mean is ``\\mathbb{E}[Q^{-1}]`` at ``K_{i}``, from [`regime_bias_table`](@ref), and not
+one. Each term is divided by that factor whatever the method, so the sum has the mean ``n`` at
+every correlation of the assets. A sum of ``n`` terms averages the errors of the ``n``
+estimates, so the root and the log that the other methods read see almost the same factor: at 12
+assets and a half-life of 10 the bias is 1.073 for the mean, 1.068 for the root and 1.063 for the
+log at a correlation of 0.3. The factor of each method alone is exact only at one asset.
+
+# Arguments
+
+  - `::DiagonalTarget`: Diagonal regime-adjustment target.
+  - `cache::RegimeAdjustedCovarianceState`: Online covariance computation cache.
+  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
+  - `X::VecNum`: Current centred returns vector of every asset.
+  - `idx::AbstractVector{<:Integer}`: Index of the assets that contribute to the statistic.
+
+# Returns
+
+  - `stats::VecNum`: One statistic.
+
+# Related
+
+  - [`DiagonalTarget`](@ref)
+  - [`regime_bias!`](@ref)
+  - [`update_regime!`](@ref)
+"""
+function regime_target_statistic(::DiagonalTarget, cache::RegimeAdjustedCovarianceState,
+                                 ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
+                                 idx::AbstractVector{<:Integer})
+    f = regime_bias!.(Ref(cache.bias), Ref(RootMeanSquaredAdjusted()), ce.decay,
+                      view(cache.obs_count, idx))
+    return regime_statistic(DiagonalTarget(), X[idx] ./ sqrt.(f),
+                            regime_covariance_block(cache, ce, idx), idx, ce.min_val)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the regime statistic of the portfolio target, divided by the bias of the estimated
+variance of each direction.
+
+A direction reads one estimated variance ``p^{\\top} \\hat{C} p``, so its statistic is biased by
+the factor of [`regime_bias_table`](@ref) that the method reads, at ``K``, the smallest count of
+observations among the contributing assets. That factor is exact for a fixed direction on one
+shared history. On the separate correlation path the factor reads `cor_decay`, because the
+correlations carry most of the variance of a direction: at 12 assets, a half-life of 10 and a
+correlation half-life of 20, the squared multiplier of an equal-weight direction is 1.004 with it
+and 0.971 with `decay`. A HAC adjustment makes the estimate noisier than its weights state, so
+the factor under-corrects it: 1.055 at two lags.
+
+The default inverse-volatility direction is built from the same estimate, so the direction and
+the error of the estimate are correlated, and a bias remains: at 12 assets the squared multiplier
+of `RootMeanSquaredAdjusted` on iid Normal returns is 1.134 before and 1.058 after the factor at
+a half-life of 10, and 1.032 before at a half-life of 40.
+
+# Arguments
+
+  - `target::PortfolioTarget`: Portfolio regime-adjustment target.
+  - `cache::RegimeAdjustedCovarianceState`: Online covariance computation cache.
+  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
+  - `X::VecNum`: Current centred returns vector of every asset.
+  - `idx::AbstractVector{<:Integer}`: Index of the assets that contribute to the statistic.
+
+# Returns
+
+  - `stats::Option{<:VecNum}`: One statistic per direction, or `nothing` where no direction keeps
+    a positive weight.
+
+# Related
+
+  - [`PortfolioTarget`](@ref)
+  - [`regime_bias!`](@ref)
+  - [`update_regime!`](@ref)
+"""
+function regime_target_statistic(target::PortfolioTarget,
+                                 cache::RegimeAdjustedCovarianceState,
+                                 ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
+                                 idx::AbstractVector{<:Integer})
+    stats = regime_statistic(target, X[idx], regime_covariance_block(cache, ce, idx), idx,
+                             ce.min_val)
+    if isnothing(stats)
+        return nothing
+    end
+
+    decay = has_separate_cor_decay(ce) ? ce.cor_decay : ce.decay
+    return stats ./ regime_bias!(cache.bias, ce.regime_method, decay,
+                                 minimum(view(cache.obs_count, idx)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Makes the empty table of bias factors for a new state of a regime-adjusted estimator.
+
+# Arguments
+
+  - `ce::Union{<:RegimeAdjustedExpWeightedVariance, <:RegimeAdjustedExpWeightedCovariance}`:
+    Estimator configuration.
+  - `::Type{T}`: Element type of the state.
+
+# Returns
+
+  - `bias::Option{<:VecNum}`: An empty vector where `ce.debias` is `true` and a regime method is
+    set, else `nothing`.
+
+# Related
+
+  - [`regime_bias!`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
+  - [`RegimeAdjustedCovarianceState`](@ref)
+"""
+function regime_bias_state(ce::Union{<:RegimeAdjustedExpWeightedVariance,
+                                     <:RegimeAdjustedExpWeightedCovariance},
+                           ::Type{T}) where {T}
+    return ce.debias && !isnothing(ce.regime_method) ? T[] : nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Factorises a covariance block for the Mahalanobis regime statistic, and refuses rather than
 throws when no ridge makes it factorise.
 
-A block with fewer observations than assets is singular. With `debias = true`,
-[`regime_target_statistic`](@ref) skips such a block before it reaches this function, so the
-ridge serves a block that is singular in the data, and the raw statistic of `debias = false`.
+A block with fewer observations than assets is singular. Where the estimator has
+`debias = true`, [`regime_target_statistic`](@ref) skips such a block before it reaches this
+function, so the ridge serves a block that is singular in the data, and the raw statistic of
+`debias = false`.
 The regime statistic is one observation of a smoother rather than a result a caller reads, so a
 refusal skips that observation's regime update, and the fit continues.
 
@@ -98,11 +219,11 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Computes the squared Mahalanobis distance of one observation, divided by the bias of the
-estimated block where `target.debias` is `true`.
+estimated block where `ce.debias` is `true`.
 
 # Algorithm
 
- 1. Where `target.debias` is `false`, the factor is one. Else take ``K``, the smallest count of
+ 1. Where `ce.debias` is `false`, the factor is one. Else take ``K``, the smallest count of
     observations among the contributing assets, and return `nothing` where `K <= n + 3`. Else
     find the factor with [`mahalanobis_bias`](@ref) at the decay of the correlation structure:
     `cor_decay` on the separate path, else `decay`.
@@ -134,7 +255,7 @@ function regime_target_statistic(target::MahalanobisTarget,
                                  ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
                                  idx::AbstractVector{<:Integer})
     K = minimum(view(cache.obs_count, idx))
-    b = if !target.debias
+    b = if !ce.debias
         one(ce.decay)
     elseif K > length(idx) + 3
         mahalanobis_bias(has_separate_cor_decay(ce) ? ce.cor_decay : ce.decay, K,
@@ -471,7 +592,7 @@ true
 """
 function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:Any, <:Any,
                                                               <:Any, <:Any, <:Any, <:Any,
-                                                              <:Any, <:Any, <:Any,
+                                                              <:Any, <:Any, <:Any, <:Any,
                                                               <:Option{<:RegimeAdjustedCovarianceState}},
                       X::MatNum; dims::Int = 1,
                       estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
@@ -538,7 +659,7 @@ true
 """
 function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:Any, <:Any,
                                                               <:Any, <:Any, <:Any, <:Any,
-                                                              <:Any, <:Any, <:Any,
+                                                              <:Any, <:Any, <:Any, <:Any,
                                                               <:Option{<:RegimeAdjustedCovarianceState}},
                       x::VecNum;
                       estimation_mask::Option{<:AbstractVector{<:Bool}} = nothing,
@@ -796,6 +917,8 @@ calls before it folds. Every array field is copied, and the two scalar fields pa
 circular buffer of recent centred returns is rebuilt at the same capacity, and each observation
 it holds is copied into it, so a fold on the copy pushes into a buffer of its own. The two
 fields of the separate correlation recursion pass through as `nothing` where they are `nothing`.
+The table of bias factors is `nothing` or an array, and `deepcopy` copies an array and returns
+`nothing` unchanged.
 
 # Arguments
 
@@ -831,7 +954,7 @@ function Base.copy(x::RegimeAdjustedCovarianceState)
                                          cor_state, cor_weight, copy(x.XXt), copy(x.Xi),
                                          copy(x.X_old_i), copy(x.location),
                                          copy(x.obs_count), copy(x.active), x.regime_state,
-                                         x.n_regime_obs)
+                                         x.n_regime_obs, deepcopy(x.bias))
 end
 """
     Statistics.cov(

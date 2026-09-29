@@ -24,6 +24,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     # That default belongs to #1383; this file measures the masks.
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centred = true,
+                                                                 debias = false,
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
     load(c, o) = parity_load("CrossSectionalFactorPrior", c, o)
@@ -32,7 +33,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "$(c)" for (c, wa) in (("MasksOnePass", MarketCapWeights()),
                                     ("MasksTwoPass", BlendedInverseVarianceWeights(; lambda = 0.5)))
         pr = prior(CrossSectionalFactorPrior(; factors = factors, minra = 5, wa = wa,
-                                             pe = pe), fx.rd)
+                                             pe = pe, ve = PARITY_VE), fx.rd)
         # The variance resets when the asset delists, and warms up again after it lists, so
         # the non-finite cells of the relisted asset match. The regime statistic reads the
         # estimation universe alone. Measured maxrel 1.5e-15.

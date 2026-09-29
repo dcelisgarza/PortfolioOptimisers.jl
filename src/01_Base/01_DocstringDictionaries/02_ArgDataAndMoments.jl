@@ -153,6 +153,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :regime_lohi_mult => "`regime_lohi_mult`: Optional `(lo, hi)` tuple bounding the regime multiplier range. If `nothing`, no clamping is applied.",#
                  :min_val => "`min_val`: Minimum threshold to prevent division by zero or degenerate estimates.",#
                  :centred => "`centred`: Whether to treat the returns as pre-centred (mean zero). If `false`, the location is estimated online.",#
+                 :ra_debias => "`debias`: Whether the regime statistic corrects the bias of the estimate it reads. The inverse of an estimated variance is too large on average (Jensen's inequality), so where this is `true` the statistic skips an estimate of `n + 3` observations or fewer, for `n` directions, and divides the rest by the bias factor that its `regime_method` reads. `true` by default; `false` scores the raw statistic.",#
                  :ra_x => "`x`: Shape parameter of the log regime adjustment.",#
                  :ra_y => "`y`: Scale parameter of the log regime adjustment.",#
                  :ra_kappa => "`kappa`: Precomputed normalisation constant `digamma(x) + log(y)` for the log regime adjustment.",#
@@ -168,6 +169,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ra_active => "`active`: Boolean mask indicating which assets are currently active.",#
                  :regime_state => "`regime_state`: Current smoothed regime state value.",#
                  :n_regime_obs => "`n_regime_obs`: Number of observations used to update the regime state.",#
+                 :ra_bias => "`bias`: Table of the bias factors of the regime statistic, one per count of observations, which grows as the counts grow. It is `nothing` where the estimator has `debias = false` or has no regime method, and a target that reads no such table leaves it empty.",#
                  :cor_decay => "`cor_decay`: Exponential decay factor for the correlation smoother.",#
                  :regime_target => "`regime_target`: Target structure for the regime-adjusted covariance update.",#
                  :ra_w => "`w`: Optional portfolio weights for the portfolio target, as one vector over the assets or as a matrix whose rows are portfolios. If `nothing`, inverse-volatility weights are used, and they are rebuilt from the running variance at each observation.",#

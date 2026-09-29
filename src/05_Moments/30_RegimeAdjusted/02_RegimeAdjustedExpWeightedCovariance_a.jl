@@ -73,9 +73,10 @@ The statistic reads the inverse of an estimated block, and the inverse of an est
 large on average (Jensen's inequality): at 12 assets and a half-life of 10 the squared distance
 of a correctly calibrated return is 1.6 times its dimension. Before the block has more than
 `n + 1` observations the mean is not finite, and before it has more than `n + 3` the variance is
-not finite, so one observation can hold the smoothed regime state. With `debias = true`, the
-target skips those observations and divides the rest by the known size of the bias, so the
-statistic has the mean ``n`` that its calibration functions assume.
+not finite, so one observation can hold the smoothed regime state. Where the `debias` field of
+[`RegimeAdjustedExpWeightedCovariance`](@ref) is `true`, the target skips those observations and
+divides the rest by the known size of the bias, so the statistic has the mean ``n`` that its
+calibration functions assume.
 
 # Mathematical definition
 
@@ -106,29 +107,12 @@ then be about ``10^{12}``, and that one value holds the regime state for many ha
 
 The factor assumes one shared history of returns, and the weights of the recursion. On iid
 Normal returns the squared multiplier of `RootMeanSquaredAdjusted` is then 0.95 to 1.03, with or
-without the separate correlation path and the centring. A HAC adjustment makes the estimate
-noisier than its weights state, so the factor under-corrects it: the squared multiplier is 1.56
-at two lags, 12 assets and a half-life of 10.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    MahalanobisTarget(;
-        debias::Bool = true
-    ) -> MahalanobisTarget
-
-Keywords correspond to the struct's fields.
-
-# Examples
-
-```jldoctest
-julia> MahalanobisTarget()
-MahalanobisTarget
-  debias ┴ Bool: true
-```
+without the separate correlation path and the centring. ``b`` is the mean of the inverse, which is
+the moment that `RootMeanSquaredAdjusted` reads. `FirstMomentRegimeAdjusted` reads the mean of
+the root and `LogRegimeAdjusted` the mean of the log, which need smaller factors, so the target
+over-corrects them: the squared multiplier is 0.975 and 0.956 at 12 assets and a half-life of 10.
+A HAC adjustment makes the estimate noisier than its weights state, so the factor under-corrects
+it: the squared multiplier is 1.56 at two lags, 12 assets and a half-life of 10.
 
 # Related
 
@@ -138,18 +122,7 @@ MahalanobisTarget
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
   - [`mahalanobis_bias`](@ref)
 """
-@concrete struct MahalanobisTarget <: RegimeAdjustedTarget
-    """
-    Whether the statistic skips an observation whose block has `n + 3` observations or fewer, and divides the rest by the bias factor ``b`` of the estimated block. `true` by default; `false` scores the raw squared distance.
-    """
-    debias
-    function MahalanobisTarget(debias::Bool)
-        return new{typeof(debias)}(debias)
-    end
-end
-function MahalanobisTarget(; debias::Bool = true)::MahalanobisTarget
-    return MahalanobisTarget(debias)
-end
+struct MahalanobisTarget <: RegimeAdjustedTarget end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -178,6 +151,8 @@ Targets the diagonal of a covariance matrix, in a regime adjustment and in a geo
 
 In a regime adjustment, the baseline covariance structure is diagonal, so the regime statistic reads the variances alone. In a [`GeodesicShrinkageCovariance`](@ref), the target matrix is the diagonal of the matrix being shrunk, which keeps the variances and removes every correlation.
 
+Each term of the regime statistic reads one estimated variance, and the inverse of an estimate is too large on average. Where the estimator has `debias = true`, [`regime_target_statistic`](@ref) divides each term by the mean of that inverse at the count of its asset, so the statistic has the mean ``n`` at every correlation.
+
 # Related
 
   - [`RegimeAdjustedTarget`](@ref)
@@ -192,6 +167,12 @@ struct DiagonalTarget <: RegimeAdjustedTarget end
 $(DocStringExtensions.TYPEDEF)
 
 Regime-adjustment target that uses a portfolio-weighted baseline covariance structure.
+
+Each direction reads one estimated variance, and the inverse of an estimate is too large on
+average. Where the estimator has `debias = true`, [`regime_target_statistic`](@ref) divides each
+direction by the bias that the regime method reads. The factor is exact for fixed weights. The
+inverse-volatility direction of `w = nothing` is built from the same estimate, so a smaller bias
+remains, which that function states.
 
 # Fields
 
@@ -267,6 +248,11 @@ family carries no `CoveragePolicy` to derive a limit from, so every fill is name
 
 A `regime_method` of `nothing` turns the adjustment off: no regime state advances, so the
 multiplier stays at one and the estimator is the plain exponentially weighted recursion.
+
+The statistic divides a realised square by an estimated variance, and the inverse of an estimate
+is too large on average (Jensen's inequality). With `debias = true`, the default, the statistic
+skips an estimate too young for a finite variance and divides the rest by the known size of the
+bias, as each target states (ADR 0190). `debias = false` scores the raw statistic.
 
 # Mathematical definition
 
@@ -357,6 +343,7 @@ $(DocStringExtensions.FIELDS)
         regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = (0.7, 1.6),
         min_val::Number                                       = 1e-12,
         centred::Bool                                         = false,
+        debias::Bool                                          = true,
         cache::Option{<:AbstractPartialFitState}              = nothing
     ) -> RegimeAdjustedExpWeightedCovariance
 
@@ -440,6 +427,10 @@ true
     """
     centred
     """
+    $(field_dict[:ra_debias])
+    """
+    debias
+    """
     Running state of an incremental fit, or `nothing` before the first call to [`partial_fit!`](@ref). It is the one Result this estimator holds, and its type bound is the enforcement of that exception. [`Statistics.cov(ce::RegimeAdjustedExpWeightedCovariance)`](@ref) reads it, and a fit over a matrix ignores it.
     """
     cache
@@ -453,6 +444,7 @@ true
                                                  regime_lohi_mult::Option{<:Tuple{<:Number,
                                                                                   <:Number}},
                                                  min_val::Number, centred::Bool,
+                                                 debias::Bool,
                                                  cache::Option{<:AbstractPartialFitState})
         assert_unit_interval(decay, :decay)
         if !isnothing(cor_decay)
@@ -471,11 +463,15 @@ true
         return new{typeof(decay), typeof(cor_decay), typeof(min_obs), typeof(hac_lags),
                    typeof(regime_method), typeof(regime_decay), typeof(regime_min_obs),
                    typeof(regime_target), typeof(regime_lohi_mult), typeof(min_val),
-                   typeof(centred), typeof(cache)}(decay, cor_decay, min_obs, hac_lags,
-                                                   regime_method, regime_decay,
-                                                   regime_min_obs, regime_target,
-                                                   regime_lohi_mult, min_val, centred,
-                                                   cache)
+                   typeof(centred), typeof(debias), typeof(cache)}(decay, cor_decay,
+                                                                   min_obs, hac_lags,
+                                                                   regime_method,
+                                                                   regime_decay,
+                                                                   regime_min_obs,
+                                                                   regime_target,
+                                                                   regime_lohi_mult,
+                                                                   min_val, centred, debias,
+                                                                   cache)
     end
 end
 function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
@@ -502,11 +498,12 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                                                               <:Number}} = (0.7,
                                                                                             1.6),
                                              min_val::Number = 1e-12, centred::Bool = false,
+                                             debias::Bool = true,
                                              cache::Option{<:AbstractPartialFitState} = nothing)::RegimeAdjustedExpWeightedCovariance
     return RegimeAdjustedExpWeightedCovariance(decay, cor_decay, min_obs, hac_lags,
                                                regime_method, regime_decay, regime_min_obs,
                                                regime_target, regime_lohi_mult, min_val,
-                                               centred, cache)
+                                               centred, debias, cache)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -586,6 +583,10 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:n_regime_obs])
     """
     n_regime_obs
+    """
+    $(field_dict[:ra_bias])
+    """
+    bias
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1271,7 +1272,8 @@ function update_regime!(cache::RegimeAdjustedCovarianceState,
     if isnothing(ce.regime_method)
         return cache
     end
-    regime_mask = valid .& cache.active .& (cache.obs_count .>= ce.min_obs)
+    regime_mask = valid .& cache.active .& (cache.obs_count .>= ce.min_obs) .&
+                  (cache.obs_count .> regime_bias_gate(ce.debias, 1))
     if !isnothing(estimation_mask)
         regime_mask .&= estimation_mask
     end
@@ -1546,7 +1548,7 @@ function regime_adjusted_covariance_pass!(f, ce::RegimeAdjustedExpWeightedCovari
                                       separate ? zeros(Tf, N, N) : nothing,
                                       separate ? zeros(Tf, N, N) : nothing, zeros(Tf, N, N),
                                       zeros(Tf, N), zeros(Tf, N), location, zeros(Int, N),
-                                      trues(N), nothing, 0)
+                                      trues(N), nothing, 0, regime_bias_state(ce, Tf))
     else
         @argcheck(size(state.covariance, 1) == N,
                   DimensionMismatch("the state holds $(size(state.covariance, 1)) assets, and `X` holds $N"))

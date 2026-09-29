@@ -32,10 +32,11 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                "style2" => mpass("style2")]
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centred = true,
+                                                                 debias = false,
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
-    ve = RegimeAdjustedExpWeightedVariance(; centred = true, regime_lohi_mult = (0.7, 1.6),
-                                           min_val = 0.0)
+    ve = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false,
+                                           regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
     est(; kw...) = CrossSectionalFactorPrior(; factors = factors, pe = pe, ve = ve, kw...)
     load(c, o) = parity_load("CrossSectionalFactorPrior", c, o)
     loadv(c, o) = vec(load(c, o))
@@ -291,7 +292,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # fewest eligible assets of an observation, and a Descriptor that is never finite
         # leaves the whole history cold.
         rows(T) = PO.port_opt_view(fxs.rd, 1:T, :)
-        ve60 = RegimeAdjustedExpWeightedVariance(; centred = true,
+        ve60 = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false,
                                                  regime_lohi_mult = (0.7, 1.6),
                                                  min_val = 0.0, min_obs = 60)
         @test_throws PO.IsNonFiniteError prior(est(; minra = 5), rows(40))

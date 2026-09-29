@@ -120,7 +120,9 @@ end
                                                                      ("Family",
                                                                       ["industry" =>
                                                                            nothing]))
-        pr = prior(CrossSectionalFactorPrior(; factors = factors, families = fam), fx.rd)
+        # The defaults, with the oracle's raw regime statistic (#1428).
+        pr = prior(CrossSectionalFactorPrior(; factors = factors, families = fam,
+                                             pe = PARITY_PE, ve = PARITY_VE), fx.rd)
         @test pr.fpr.mu ≈ vec(ccy_asset("$(nm)DefaultFactorMu")) rtol = 1e-12
         @test pr.fpr.sigma ≈ ccy_asset("$(nm)DefaultFactorCov") rtol = 1e-12
         @test pr.mu ≈ vec(ccy_asset("$(nm)DefaultMu")) rtol = 1e-12
@@ -361,7 +363,7 @@ end
     @testset "An estimated macro factor" begin
         rd = mac_fixture()
         pr = prior(CrossSectionalFactorPrior(; factors = mac_factors(),
-                                             pe = EmpiricalPrior()), rd)
+                                             pe = EmpiricalPrior(), ve = PARITY_VE), rd)
         @test pr.rr.nf == ["ind1", "ind2", "ind3", "style1", "style2", "macro"]
         F = mac_asset("PlainFactorReturns")
         @test size(pr.fpr.X) == size(F) == (150, 6)
@@ -375,7 +377,9 @@ end
         # The estimated members read the returns the regression explains, so the macro
         # sensitivity measures the local move of an asset and not the currency it holds.
         rd = mac_fixture(; ccy = true)
-        pr = prior(CrossSectionalFactorPrior(; factors = mac_factors(; ccy = true)), rd)
+        # The defaults, with the oracle's raw regime statistic (#1428).
+        pr = prior(CrossSectionalFactorPrior(; factors = mac_factors(; ccy = true),
+                                             pe = PARITY_PE, ve = PARITY_VE), rd)
         @test pr.rr.nf[6:end] == ["macro", "currency=EUR", "currency=JPY", "currency=USD"]
         @test pr.fpr.mu ≈ vec(mac_asset("CurrencyDefaultFactorMu")) rtol = 1e-12
         @test pr.fpr.sigma ≈ mac_asset("CurrencyDefaultFactorCov") rtol = 1e-12
@@ -385,7 +389,8 @@ end
         # A Panel Field of the same local returns under `lx` gives the same fit, because the
         # derived net returns take the exposure of the same observation on the first rows.
         pl = prior(CrossSectionalFactorPrior(; factors = mac_factors(; ccy = true),
-                                             lx = "local"), rd)
+                                             pe = PARITY_PE, ve = PARITY_VE, lx = "local"),
+                   rd)
         @test pl.mu ≈ pr.mu rtol = 1e-12
         @test pl.sigma ≈ pr.sigma rtol = 1e-12
         # The macro loadings measured on the base returns differ, so the fit reads the net

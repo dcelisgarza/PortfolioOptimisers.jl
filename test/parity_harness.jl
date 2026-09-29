@@ -47,6 +47,14 @@ case states in one sentence how the case was made: the fixture, the configuratio
 =#
 using Statistics
 
+# The default factor prior and idiosyncratic variance of `CrossSectionalFactorPrior`, with the
+# oracle's raw regime statistic. The library's default divides the statistic by the bias of the
+# estimate it reads (#1428, ADR 0190), and the oracle does not.
+const PARITY_PE = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
+                                 ce = RegimeAdjustedExpWeightedCovariance(; centred = true,
+                                                                          debias = false))
+const PARITY_VE = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false)
+
 """
     parity_panel(; T, N, seed) -> NamedTuple
 
