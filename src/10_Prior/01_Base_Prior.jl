@@ -1286,6 +1286,9 @@ LowOrderPrior
         @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
+        imsk = isfinite.(mu) .& isfinite.(LinearAlgebra.diag(sigma))
+        @argcheck(all(isfinite, view(sigma, imsk, imsk)),
+                  IsFiniteError("sigma of investible assets must only contain finite values"))
         assert_matrix_issquare(sigma, :sigma)
         @argcheck(size(X, 2) == length(mu) == size(sigma, 1),
                   DimensionMismatch("size(X, 2) ($(size(X, 2))), length(mu) ($(length(mu))), and size(sigma, 1) ($(size(sigma, 1))) must all match"))
