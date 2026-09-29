@@ -1220,7 +1220,8 @@ end
                                                   calibrate = false, scale = 3.0), rd, csfm)
         @test rf.mu ≈ 3 .* rf1.mu
         rfc = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
-                                                   decay = 0.5, min_obs = 1), rd, csfm)
+                                                   decay = 0.5, min_obs = 1, cv = nothing),
+                              rd, csfm)
         @test isfinite(rfc.calib)
         @test rfc.mu ≈ rfc.calib .* rf1.mu
         rfw = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
@@ -1239,17 +1240,53 @@ end
         @test rf.mu ≈ ([a[4, :] b[4, :]] * (Sf \ yf)) .* sqrt.(vs[4, :])
     end
 
-    @testset "An out of fold calibration needs two samples per fold" begin
-        rf = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
-                                                  decay = 0.5, min_obs = 1,
-                                                  cv = KFold(; n = 3)), rd, csfm)
+    @testset "An out of fold calibration below two samples per fold is in its warm-up" begin
+        # The default calibrates out of fold on five folds (#1418), and nine valid samples
+        # are fewer than ten, so no prediction is out of fold.
+        @test TargetReturnForecast(; scores = ds).cv == KFold(; n = 5)
+        kw = (; scores = ds, target_outlier = nothing, decay = 0.5, min_obs = 1)
+        rf = return_forecast(TargetReturnForecast(; kw..., cv = KFold(; n = 3)), rd, csfm)
         @test isfinite(rf.calib)
-        @test_throws ArgumentError return_forecast(TargetReturnForecast(; scores = ds,
-                                                                        target_outlier = nothing,
-                                                                        decay = 0.5,
-                                                                        min_obs = 1,
-                                                                        cv = KFold(; n = 7)),
-                                                   rd, csfm)
+        for cv in (KFold(; n = 7), KFold())
+            rf = return_forecast(TargetReturnForecast(; kw..., cv = cv), rd, csfm)
+            @test isnan(rf.calib)
+            @test all(isnan, rf.mu)
+        end
+        Sf, yf, ok = PO.target_forecast_samples(cat(a[1:3, :], b[1:3, :]; dims = 3),
+                                                eps[2:4, :], ones(3, 3), 3)
+        p = PO.target_forecast_uncalibrated(KFold(; n = 7), TargetReturnForecast(; kw...),
+                                            nothing, Sf, yf, ok)
+        @test length(p) == 9
+        @test all(isnan, p)
+        # The in-sample calibration stays one keyword away.
+        @test isfinite(return_forecast(TargetReturnForecast(; kw..., cv = nothing), rd,
+                                       csfm).calib)
+    end
+
+    @testset "The intercept appends a column of ones to every design" begin
+        # #1419: the fit, the out-of-fold fits and the latest prediction all read the constant.
+        rf = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
+                                                  calibrate = false, intercept = true), rd,
+                             csfm)
+        Sf = [vec(transpose(a[1:3, :])) vec(transpose(b[1:3, :])) ones(9)]
+        yf = vec(transpose(eps[2:4, :]))
+        coef = Sf \ yf
+        @test PortfolioOptimisers.StatsAPI.coef(rf.model) ≈ coef
+        @test rf.mu ≈ [a[4, :] b[4, :] ones(3)] * coef
+        @test !TargetReturnForecast(; scores = ds).intercept
+        rfc = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
+                                                   decay = 0.5, min_obs = 1,
+                                                   cv = KFold(; n = 3), intercept = true),
+                              rd, csfm)
+        # The out-of-fold predictions of the first fold come from a model fitted on the other
+        # two, and they read the constant too.
+        p = PO.target_forecast_uncalibrated(KFold(; n = 3),
+                                            TargetReturnForecast(; scores = ds,
+                                                                 intercept = true), nothing,
+                                            Sf, yf, trues(9))
+        @test p[1:3] ≈ Sf[1:3, :] * (Sf[4:9, :] \ yf[4:9])
+        @test isfinite(rfc.calib)
+        @test rfc.mu ≈ rfc.calib .* rf.mu
     end
 
     @testset "A sample set with no valid pair fits nothing" begin
@@ -1391,7 +1428,8 @@ end
         emsk = [true false false; true true true; true true true; true true true]
         rd, csfm, ds = forecast_fit_panel(a, b, eps, vs; emsk = emsk)
         rf = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
-                                                  decay = 0.5, min_obs = 1), rd, csfm)
+                                                  decay = 0.5, min_obs = 1, cv = nothing),
+                             rd, csfm)
         # The first observation carries one asset, so it advances no accumulator; the rest do.
         @test isfinite(rf.calib)
     end
@@ -1459,8 +1497,8 @@ end
     for (unit, sharpe) in
         ((IdiosyncraticReturnUnit(), false), (IdiosyncraticSharpeUnit(), true))
         rf = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
-                                                  decay = lambda, min_obs = 1, unit = unit),
-                             rd, csfm)
+                                                  decay = lambda, min_obs = 1, unit = unit,
+                                                  cv = nothing), rd, csfm)
         kappa, calendar, alpha = closed_form(sharpe)
         @test rf.calib ≈ kappa rtol = 1e-12
         @test rf.mu ≈ alpha rtol = 1e-12

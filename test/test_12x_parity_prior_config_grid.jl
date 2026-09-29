@@ -128,10 +128,18 @@ function grid_config(name::AbstractString, rd::ReturnsResult)
     elseif name == "FcEW"
         (; kw..., fc..., rfe = ExpWeightedReturnForecast(; scores = ds, half_life = 10.0))
     elseif name == "FcTarget"
-        # The oracle calibrates its target member on the out-of-fold predictions of a 5-fold
-        # split even when it states no split, and fits no intercept here; `cv` states the split.
+        # Both sides calibrate the target member on the out-of-fold predictions of a 5-fold
+        # split by default (#1418). The oracle fits no intercept here.
+        (; kw..., fc..., rfe = TargetReturnForecast(; scores = ds, half_life = 10.0))
+    elseif name == "FcTargetIntercept"
+        # The oracle's default target member, which fits an intercept (#1419).
         (; kw..., fc...,
-         rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, cv = KFold(; n = 5)))
+         rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, intercept = true))
+    elseif name == "FcTargetRaw"
+        # The same, uncalibrated, so the fitted model alone is compared.
+        (; kw..., fc...,
+         rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, intercept = true,
+                                    calibrate = false))
     elseif name == "FcCustom"
         (; kw..., fc...,
          rfe = CustomValueReturnForecast(;
@@ -177,7 +185,9 @@ const GRID_STRUCT = ["Base", "Lag2", "Lag3", "ScoredBp1", "ScoredBp05", "ScoredB
                      "Target", "Blend", "Neutralised", "FamOne", "FamStated", "FamTwo",
                      "NeutFam", "Currency", "CurrencyLx", "Macro", "CurrencyBase"]
 const GRID_FORECAST = ["FcFixed" => "Base", "FcFixedSharpe" => "Base", "FcEW" => "Base",
-                       "FcTarget" => "Base", "FcCustom" => "Base", "FcFamily" => "FamOne"]
+                       "FcTarget" => "Base", "FcTargetIntercept" => "Base",
+                       "FcTargetRaw" => "Base", "FcCustom" => "Base",
+                       "FcFamily" => "FamOne"]
 const GRID_FAMILY = ["FamOne", "FamStated", "FamTwo", "NeutFam", "FcFamily"]
 
 # Compare one fit with the stored outputs of its case. The large panel stores its factor returns

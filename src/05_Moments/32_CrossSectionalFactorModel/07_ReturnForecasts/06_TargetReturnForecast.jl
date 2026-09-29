@@ -5,7 +5,9 @@ A Return Forecast fitted by a regression target over every observation and asset
 
 The member turns its Descriptors into scores with the recipe in `scores`, and hands every `(observation, asset)` pair whose forward target has matured to a regression target as one sample. The combination of the Descriptors is whatever the target fits, so this member admits a nonlinear one. [`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref) are two targets the library defines.
 
-The member transforms the target of the fit cross-sectionally before the fit reads it, so one extreme observation does not set the shape of the whole model. The transformed target has no unit, and neither has the prediction. One exponentially weighted scalar regression of the forward return on the prediction puts the prediction into return units. `cv` chooses whether that regression reads in-sample or out-of-fold predictions.
+The member transforms the target of the fit cross-sectionally before the fit reads it, so one extreme observation does not set the shape of the whole model. The transformed target has no unit, and neither has the prediction. One exponentially weighted scalar regression of the forward return on the prediction puts the prediction into return units. `cv` chooses whether that regression reads in-sample or out-of-fold predictions. The default is the out-of-fold predictions of a five-fold split. A prediction of a sample the model trained on agrees with its own target by construction, so an in-sample calibration gives a positive slope to scores that carry no information. A calibration slope is a measure of skill, and skill is an out-of-sample quantity.
+
+`intercept` states whether the fit adds a constant to the scores. The intercept adds the same value to the prediction of every asset of an observation. The target is the idiosyncratic return, and under a market factor its weighted cross-sectional mean is zero at every observation, so an intercept estimates a quantity near zero. The default fits none.
 
 The member computes no history. Its in-sample predictions are not a forecast, so `hist` on its Result is `nothing`.
 
@@ -36,11 +38,11 @@ Where:
   - $(math_dict[:g_ti_unit])
   - ``\\mathcal{T}``: The cross-sectional transform in `target_outlier` followed by the one in `target_scoring`. The member applies it to each observation, and an absent transform leaves the target as it is.
   - ``z_{ti}``: Target of the fit for asset ``i`` at observation ``t``.
-  - ``\\boldsymbol{s}_{ti}``: Descriptor scores of asset ``i`` at observation ``t``.
+  - ``\\boldsymbol{s}_{ti}``: Descriptor scores of asset ``i`` at observation ``t``. Under `intercept`, the member appends a one to them.
   - $(math_dict[:u_ti_cs])
   - ``\\mathcal{S}``: The valid samples, the pairs whose target has matured, ``t \\leq T - \\ell - h + 1``, with ``u_{ti} > 0`` and a finite ``z_{ti}`` and ``\\boldsymbol{s}_{ti}``.
   - ``\\mathcal{M}``: The model the regression target fits on the valid samples.
-  - ``p_{ti}``: Uncalibrated prediction of asset ``i`` at observation ``t``, in return units. Under a cross-validation estimator in `cv`, the calibration reads the prediction of each valid sample from the model fitted on the folds that do not hold that sample.
+  - ``p_{ti}``: Uncalibrated prediction of asset ``i`` at observation ``t``, in return units. Under a cross-validation estimator in `cv`, the calibration reads the prediction of each valid sample from the model fitted on the folds that do not hold that sample. Below two valid samples per fold, no prediction is out of fold, and the calibration is in its warm-up.
   - ``\\mathcal{A}_{t}``: The assets of a matured observation ``t`` that enter the calibration, those with ``u_{ti} > 0`` and a finite ``v_{ti}``, ``p_{ti}`` and ``\\bar{\\varepsilon}_{ti}``.
   - ``\\omega_{ti}``: Calibration weight of asset ``i`` at observation ``t``. The weights of one observation have a mean of one.
   - ``a_{t}``, ``c_{t}``: The weighted normal product and cross product of observation ``t``.
@@ -68,8 +70,9 @@ $(DocStringExtensions.TYPEDFIELDS)
                          calibrate::Bool = true, scale::Real = 1.0,
                          half_life::Real = 20.0, decay::Real = half_life_decay(half_life),
                          min_obs::Integer = half_life_min_obs(half_life),
-                         cv::Option{<:CrossValidationEstimator} = nothing,
-                         unit::AbstractForecastUnit = IdiosyncraticReturnUnit()) -> TargetReturnForecast
+                         cv::Option{<:CrossValidationEstimator} = KFold(),
+                         unit::AbstractForecastUnit = IdiosyncraticReturnUnit(),
+                         intercept::Bool = false) -> TargetReturnForecast
 
 Every keyword but `half_life` corresponds to a field. `half_life` is not a field. It fixes the defaults of `decay` and `min_obs` of the calibration, and the constructor keeps a value passed for either of those as it stands. `min_obs = 1` calibrates from the first observation that states a slope.
 
@@ -112,8 +115,16 @@ TargetReturnForecast
            scale ┼ Float64: 1.0
            decay ┼ Float64: 0.7071067811865476
          min_obs ┼ Int64: 2
-              cv ┼ nothing
-            unit ┴ IdiosyncraticReturnUnit()
+              cv ┼ KFold
+                 │                   n ┼ Int64: 5
+                 │         purged_size ┼ Int64: 0
+                 │        embargo_size ┼ Int64: 0
+                 │                  wd ┼ nothing
+                 │                  fa ┼ nothing
+                 │   store_weight_path ┼ Bool: false
+                 │              strict ┴ Bool: false
+            unit ┼ IdiosyncraticReturnUnit()
+       intercept ┴ Bool: false
 ```
 
 # Related
@@ -179,13 +190,17 @@ TargetReturnForecast
     $(field_dict[:rf_unit])
     """
     unit
+    """
+    Whether the fit appends a column of ones to the scores, so that the model carries an intercept.
+    """
+    intercept
     function TargetReturnForecast(scores::DescriptorScores, tgt::AbstractRegressionTarget,
                                   horizon::Integer, lag::Integer, whole_history::Bool,
                                   target_outlier::Option{<:AbstractCrossSectionalTransform},
                                   target_scoring::Option{<:AbstractCrossSectionalTransform},
                                   calibrate::Bool, scale::Real, decay::Real,
                                   min_obs::Integer, cv::Option{<:CrossValidationEstimator},
-                                  unit::AbstractForecastUnit)
+                                  unit::AbstractForecastUnit, intercept::Bool)
         assert_nonempty_gt0_finite_val(horizon, :horizon)
         assert_nonempty_gt0_finite_val(lag, :lag)
         assert_finite(scale, :scale)
@@ -195,9 +210,12 @@ TargetReturnForecast
         return new{typeof(scores), typeof(tgt), typeof(horizon), typeof(lag),
                    typeof(whole_history), typeof(target_outlier), typeof(target_scoring),
                    typeof(calibrate), typeof(scale), typeof(decay), typeof(min_obs),
-                   typeof(cv), typeof(unit)}(scores, tgt, horizon, lag, whole_history,
-                                             target_outlier, target_scoring, calibrate,
-                                             scale, decay, min_obs, cv, unit)
+                   typeof(cv), typeof(unit), typeof(intercept)}(scores, tgt, horizon, lag,
+                                                                whole_history,
+                                                                target_outlier,
+                                                                target_scoring, calibrate,
+                                                                scale, decay, min_obs, cv,
+                                                                unit, intercept)
     end
 end
 function TargetReturnForecast(; scores::DescriptorScores,
@@ -210,10 +228,12 @@ function TargetReturnForecast(; scores::DescriptorScores,
                               half_life::Real = 20.0,
                               decay::Real = half_life_decay(half_life),
                               min_obs::Integer = half_life_min_obs(half_life),
-                              cv::Option{<:CrossValidationEstimator} = nothing,
-                              unit::AbstractForecastUnit = IdiosyncraticReturnUnit())::TargetReturnForecast
+                              cv::Option{<:CrossValidationEstimator} = KFold(),
+                              unit::AbstractForecastUnit = IdiosyncraticReturnUnit(),
+                              intercept::Bool = false)::TargetReturnForecast
     return TargetReturnForecast(scores, tgt, horizon, lag, whole_history, target_outlier,
-                                target_scoring, calibrate, scale, decay, min_obs, cv, unit)
+                                target_scoring, calibrate, scale, decay, min_obs, cv, unit,
+                                intercept)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -393,7 +413,7 @@ Predict the uncalibrated forecast of the samples a [`TargetReturnForecast`](@ref
 The method that Julia selects is the algorithm.
 
  1. `nothing`: the fitted model predicts its own training samples, so the calibration runs in sample.
- 2. A cross-validation estimator: [`Base.split`](@ref) splits the valid samples. For each split, the function fits a model on the training folds and predicts the test fold, so the calibration never reads a prediction of a sample the model trained on. A sample that no split tests keeps its `NaN`.
+ 2. A cross-validation estimator: [`Base.split`](@ref) splits the valid samples. For each split, the function fits a model on the training folds and predicts the test fold, so the calibration never reads a prediction of a sample the model trained on. A sample that no split tests keeps its `NaN`. Below two valid samples per fold, which is twice the split count that [`n_splits`](@ref) reports, the function fits nothing, so every sample keeps its `NaN` and the calibration is in its warm-up. An in-sample prediction in their place would give the slope the bias that the split removes.
 
 # Arguments
 
@@ -404,13 +424,9 @@ The method that Julia selects is the algorithm.
   - `yf`: The flattened target.
   - `ok`: The mask of the valid samples.
 
-# Validation
-
-  - Under a cross-validation estimator, the count of valid samples is at least twice the split count that [`n_splits`](@ref) reports. Raises an `ArgumentError`.
-
 # Returns
 
-  - `p::VecNum`: The uncalibrated prediction of every sample, `NaN` where the sample is not valid.
+  - `p::VecNum`: The uncalibrated prediction of every sample, `NaN` where the sample is not valid, and everywhere in the warm-up of an out-of-fold calibration.
 
 # Related
 
@@ -433,9 +449,10 @@ function target_forecast_uncalibrated(cv::CrossValidationEstimator,
     idx = findall(ok)
     m = length(idx)
     rdx = ReturnsResult(; nx = ["sample"], X = zeros(Tf, m, 1))
-    ns = n_splits(cv, rdx)
-    @argcheck(m >= 2 * ns,
-              ArgumentError("an out of fold calibration needs at least two samples per fold, so $(2 * ns) valid samples over $ns folds, got $m"))
+    p = fill(Tf(NaN), length(ok))
+    if m < 2 * n_splits(cv, rdx)
+        return p
+    end
     Sv = Sf[idx, :]
     yv = yf[idx]
     q = fill(Tf(NaN), m)
@@ -445,7 +462,6 @@ function target_forecast_uncalibrated(cv::CrossValidationEstimator,
         te = fld.test_idx[k]
         q[te] = StatsAPI.predict(StatsAPI.fit(rfe.tgt, Sv[tr, :], yv[tr]), Sv[te, :])
     end
-    p = fill(Tf(NaN), length(ok))
     p[idx] = q
     return p
 end
@@ -716,7 +732,7 @@ Fit a Return Forecast with a regression target over every observation and asset 
 # Algorithm
 
  1. Compute the Descriptor scores `S` over all the returns data through [`descriptor_scores`](@ref), and read the idiosyncratic returns off the block. Read the variances through [`target_forecast_variances`](@ref), which states when the member needs them.
- 2. Put the scores and the two block histories on one observation axis through [`target_forecast_alignment`](@ref), which reads `whole_history`.
+ 2. Put the scores and the two block histories on one observation axis through [`target_forecast_alignment`](@ref), which reads `whole_history`. Under `intercept`, append a slice of ones to the scores, so that the fit, the out-of-fold fits and the latest prediction all read the constant.
  3. Take the forward mean target `fwd` through [`forward_mean_returns`](@ref). Convert it to the Forecast Unit through [`forecast_unit_target`](@ref), and pass it through `target_outlier` and then `target_scoring`, giving `y`.
  4. Count the observations whose target has matured, all but the last `lag + horizon - 1`, giving `nt`. Flatten them into one sample per `(observation, asset)` pair through [`target_forecast_samples`](@ref), giving `Sf`, `yf` and `ok`.
  5. Fit the regression target on the valid samples through [`target_forecast_fit`](@ref), giving `model`.
@@ -732,7 +748,7 @@ Fit a Return Forecast with a regression target over every observation and asset 
 
 # Validation
 
-  - The rules of [`descriptor_scores`](@ref), of [`forecast_idiosyncratic_returns`](@ref), of [`target_forecast_variances`](@ref) and of [`target_forecast_uncalibrated`](@ref).
+  - The rules of [`descriptor_scores`](@ref), of [`forecast_idiosyncratic_returns`](@ref) and of [`target_forecast_variances`](@ref).
 
 # Returns
 
@@ -757,7 +773,11 @@ function return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
                                    target_forecast_variances(rfe.unit, csfm, rfe.calibrate),
                                    return_forecast_weights(rd),
                                    exposure_group_labels(rd, ds.group), rows)
-    Sa = al.S
+    Sa = if rfe.intercept
+        cat(al.S, fill(one(eltype(al.S)), size(al.S, 1), size(al.S, 2), 1); dims = 3)
+    else
+        al.S
+    end
     vs = al.vs
     emsk = al.w
     groups = al.groups
