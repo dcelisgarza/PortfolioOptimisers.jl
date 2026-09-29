@@ -43,17 +43,23 @@ function standardised_idio_value(e::Real, v::Real)
     return s > zero(s) && isfinite(r) ? r : oftype(r, NaN)
 end
 """
-    standardised_idio_returns(eps::MatNum, vs::MatNum) -> Matrix{<:Real}
+    standardised_idio_returns(eps::MatNum, vs::MatNum; ahead::Bool = true)
+        -> Matrix{<:Real}
 
 Return the standardised idiosyncratic returns of a cross-sectional fit.
 
-Every calibration series of the idiosyncratic group reads it. The fit predicted a variance for each asset at each observation, and the standardised return states how large the realised return was against that prediction. A fit that is well calibrated leaves cross-sections of standardised returns whose standard deviation is `1`.
+Every calibration series of the idiosyncratic group reads it. The fit estimates a variance for each asset at each observation from the observations up to it, so the variance of observation ``t - 1`` is the forecast for observation ``t``. The standardised return states how large the realised return was against that forecast. A fit that is well calibrated leaves cross-sections of standardised returns whose standard deviation is `1`.
+
+The forecast must not have read the return it scores. The variance of observation ``t`` has read ``\\varepsilon_{ti}``, so a division by it bounds the standardised return: an exponentially weighted variance with a weight ``1 - \\lambda`` on the latest squared return gives ``|z_{ti}| \\le 1 / \\sqrt{1 - \\lambda}``. That pulls the standard deviation below `1` and the tail rate below its Gaussian reference for a forecast that is right. So the default divides by the variance of the previous observation, and `ahead = false` gives the division by the variance of the same observation.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-z_{ti} &= \\frac{\\varepsilon_{ti}}{\\hat{\\sigma}_{ti}}\\,.
+z_{ti} &= \\begin{cases}
+\\dfrac{\\varepsilon_{ti}}{\\hat{\\sigma}_{t - 1, i}} & \\text{if } \\texttt{ahead}\\,, \\\\
+\\dfrac{\\varepsilon_{ti}}{\\hat{\\sigma}_{ti}} & \\text{otherwise}\\,.
+\\end{cases}
 \\end{align}
 ```
 
@@ -64,12 +70,13 @@ Where:
   - $(math_dict[:sigma_ti_idio])
   - $(math_dict[:v_ti_idio])
 
-An entry is `NaN` where the predicted volatility is not positive or the ratio is not finite, as [`standardised_idio_value`](@ref) states.
+An entry is `NaN` where the predicted volatility is not positive or the ratio is not finite, as [`standardised_idio_value`](@ref) states. Under `ahead`, the first observation has no forecast, so its row is `NaN`.
 
 # Arguments
 
   - `eps`: Idiosyncratic return history `observations × assets`.
   - `vs`: Idiosyncratic variance history `observations × assets`.
+  - $(arg_dict[:idio_ahead])
 
 # Validation
 
@@ -78,12 +85,17 @@ An entry is `NaN` where the predicted volatility is not positive or the ratio is
 
 # Returns
 
-  - `z::Matrix{<:Real}`: Standardised idiosyncratic returns `observations × assets`, of a floating-point type. An entry whose predicted volatility is zero, or whose return is not finite, is `NaN`.
+  - `z::Matrix{<:Real}`: Standardised idiosyncratic returns `observations × assets`, of a floating-point type. An entry whose predicted volatility is zero, or whose return is not finite, is `NaN`, and under `ahead` the first row is `NaN`.
 
 # Examples
 
 ```jldoctest
 julia> standardised_idio_returns([1.0 -2.0; 3.0 4.0], [0.25 4.0; 1.0 0.0])
+2×2 Matrix{Float64}:
+ NaN    NaN
+   6.0    2.0
+
+julia> standardised_idio_returns([1.0 -2.0; 3.0 4.0], [0.25 4.0; 1.0 0.0]; ahead = false)
 2×2 Matrix{Float64}:
  2.0   -1.0
  3.0  NaN
@@ -97,15 +109,17 @@ julia> standardised_idio_returns([1.0 -2.0; 3.0 4.0], [0.25 4.0; 1.0 0.0])
   - [`idio_kurtosis`](@ref)
   - [`idio_skewness`](@ref)
 """
-function standardised_idio_returns(eps::MatNum, vs::MatNum)
+function standardised_idio_returns(eps::MatNum, vs::MatNum; ahead::Bool = true)
     @argcheck(!isempty(eps), IsEmptyError("eps cannot be empty"))
     @argcheck(size(vs, 1) == size(eps, 1) && size(vs, 2) == size(eps, 2),
               DimensionMismatch("vs ($(size(vs, 1))×$(size(vs, 2))) must match eps ($(size(eps, 1))×$(size(eps, 2)))"))
     Tf = typeof(one(real(eltype(eps))) / sqrt(one(real(eltype(vs)))))
     T, N = size(eps)
+    # The row of the variance that forecasts the return of row `t`.
+    d = ahead ? 1 : 0
     z = Matrix{Tf}(undef, T, N)
     for i in 1:N, t in 1:T
-        z[t, i] = standardised_idio_value(Tf(eps[t, i]), Tf(vs[t, i]))
+        z[t, i] = t > d ? standardised_idio_value(Tf(eps[t, i]), Tf(vs[t - d, i])) : Tf(NaN)
     end
     return z
 end
@@ -241,8 +255,8 @@ function idio_row_moments(z::MatNum, t::Integer)
 end
 """
     idio_calibration(z::MatNum) -> Vector{<:Real}
-    idio_calibration(eps::MatNum, vs::MatNum) -> Vector{<:Real}
-    idio_calibration(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
+    idio_calibration(eps::MatNum, vs::MatNum; ahead::Bool = true) -> Vector{<:Real}
+    idio_calibration(csfm::CrossSectionalFactorModel; ahead::Bool = true) -> Vector{<:Real}
 
 Return the cross-sectional standard deviation of the standardised idiosyncratic returns, one entry per observation.
 
@@ -272,6 +286,7 @@ The deviation is the sample one, so it divides by ``n_{t} - 1``. It is not defin
   - `eps`: Idiosyncratic return history `observations × assets`.
   - `vs`: Idiosyncratic variance history `observations × assets`.
   - `csfm`: A cross-sectional factor model block.
+  - $(arg_dict[:idio_ahead])
 
 # Validation
 
@@ -302,17 +317,19 @@ function idio_calibration(z::MatNum)
     end
     return c
 end
-function idio_calibration(eps::MatNum, vs::MatNum)
-    return idio_calibration(standardised_idio_returns(eps, vs))
+function idio_calibration(eps::MatNum, vs::MatNum; ahead::Bool = true)
+    return idio_calibration(standardised_idio_returns(eps, vs; ahead = ahead))
 end
-function idio_calibration(csfm::CrossSectionalFactorModel)
+function idio_calibration(csfm::CrossSectionalFactorModel; ahead::Bool = true)
     ep, vh = idio_diagnostic_data(csfm)
-    return idio_calibration(ep, vh)
+    return idio_calibration(ep, vh; ahead = ahead)
 end
 """
     idio_tail_rate(z::MatNum; threshold::Real = 3) -> Vector{<:Real}
-    idio_tail_rate(eps::MatNum, vs::MatNum; threshold::Real = 3) -> Vector{<:Real}
-    idio_tail_rate(csfm::CrossSectionalFactorModel; threshold::Real = 3) -> Vector{<:Real}
+    idio_tail_rate(eps::MatNum, vs::MatNum; threshold::Real = 3, ahead::Bool = true)
+        -> Vector{<:Real}
+    idio_tail_rate(csfm::CrossSectionalFactorModel; threshold::Real = 3,
+                   ahead::Bool = true) -> Vector{<:Real}
 
 Return the share of assets whose standardised idiosyncratic return exceeds a threshold, one entry per observation.
 
@@ -344,6 +361,7 @@ The rate is not defined for ``n_{t} = 0``. An entry that is not finite enters ne
   - `vs`: Idiosyncratic variance history `observations × assets`.
   - `csfm`: A cross-sectional factor model block.
   - `threshold`: Absolute standardised return above which an asset enters the rate.
+  - $(arg_dict[:idio_ahead])
 
 # Validation
 
@@ -380,17 +398,19 @@ function idio_tail_rate(z::MatNum; threshold::Real = 3)
     end
     return r
 end
-function idio_tail_rate(eps::MatNum, vs::MatNum; threshold::Real = 3)
-    return idio_tail_rate(standardised_idio_returns(eps, vs); threshold = threshold)
+function idio_tail_rate(eps::MatNum, vs::MatNum; threshold::Real = 3, ahead::Bool = true)
+    return idio_tail_rate(standardised_idio_returns(eps, vs; ahead = ahead);
+                          threshold = threshold)
 end
-function idio_tail_rate(csfm::CrossSectionalFactorModel; threshold::Real = 3)
+function idio_tail_rate(csfm::CrossSectionalFactorModel; threshold::Real = 3,
+                        ahead::Bool = true)
     ep, vh = idio_diagnostic_data(csfm)
-    return idio_tail_rate(ep, vh; threshold = threshold)
+    return idio_tail_rate(ep, vh; threshold = threshold, ahead = ahead)
 end
 """
     idio_kurtosis(z::MatNum) -> Vector{<:Real}
-    idio_kurtosis(eps::MatNum, vs::MatNum) -> Vector{<:Real}
-    idio_kurtosis(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
+    idio_kurtosis(eps::MatNum, vs::MatNum; ahead::Bool = true) -> Vector{<:Real}
+    idio_kurtosis(csfm::CrossSectionalFactorModel; ahead::Bool = true) -> Vector{<:Real}
 
 Return the cross-sectional excess kurtosis of the standardised idiosyncratic returns, one entry per observation.
 
@@ -420,6 +440,7 @@ It is the bias-corrected sample excess kurtosis, the estimator ``G_{2}`` of Joan
   - `eps`: Idiosyncratic return history `observations × assets`.
   - `vs`: Idiosyncratic variance history `observations × assets`.
   - `csfm`: A cross-sectional factor model block.
+  - $(arg_dict[:idio_ahead])
 
 # Validation
 
@@ -460,17 +481,17 @@ function idio_kurtosis(z::MatNum)
     end
     return k
 end
-function idio_kurtosis(eps::MatNum, vs::MatNum)
-    return idio_kurtosis(standardised_idio_returns(eps, vs))
+function idio_kurtosis(eps::MatNum, vs::MatNum; ahead::Bool = true)
+    return idio_kurtosis(standardised_idio_returns(eps, vs; ahead = ahead))
 end
-function idio_kurtosis(csfm::CrossSectionalFactorModel)
+function idio_kurtosis(csfm::CrossSectionalFactorModel; ahead::Bool = true)
     ep, vh = idio_diagnostic_data(csfm)
-    return idio_kurtosis(ep, vh)
+    return idio_kurtosis(ep, vh; ahead = ahead)
 end
 """
     idio_skewness(z::MatNum) -> Vector{<:Real}
-    idio_skewness(eps::MatNum, vs::MatNum) -> Vector{<:Real}
-    idio_skewness(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
+    idio_skewness(eps::MatNum, vs::MatNum; ahead::Bool = true) -> Vector{<:Real}
+    idio_skewness(csfm::CrossSectionalFactorModel; ahead::Bool = true) -> Vector{<:Real}
 
 Return the cross-sectional skewness of the standardised idiosyncratic returns, one entry per observation.
 
@@ -500,6 +521,7 @@ It is the bias-corrected sample skewness, the estimator ``G_{1}`` of Joanes and 
   - `eps`: Idiosyncratic return history `observations × assets`.
   - `vs`: Idiosyncratic variance history `observations × assets`.
   - `csfm`: A cross-sectional factor model block.
+  - $(arg_dict[:idio_ahead])
 
 # Validation
 
@@ -539,12 +561,12 @@ function idio_skewness(z::MatNum)
     end
     return s
 end
-function idio_skewness(eps::MatNum, vs::MatNum)
-    return idio_skewness(standardised_idio_returns(eps, vs))
+function idio_skewness(eps::MatNum, vs::MatNum; ahead::Bool = true)
+    return idio_skewness(standardised_idio_returns(eps, vs; ahead = ahead))
 end
-function idio_skewness(csfm::CrossSectionalFactorModel)
+function idio_skewness(csfm::CrossSectionalFactorModel; ahead::Bool = true)
     ep, vh = idio_diagnostic_data(csfm)
-    return idio_skewness(ep, vh)
+    return idio_skewness(ep, vh; ahead = ahead)
 end
 """
     idio_vol_dependence(eps::MatNum, vs::MatNum, standardise::Bool, ties::Symbol)
@@ -678,7 +700,7 @@ Return the rank correlation of the predicted idiosyncratic volatility against th
 
 Division of the realised move by the predicted volatility should remove the level of the prediction. So a fit that is well calibrated leaves a series near `0`, because the size of an asset's standardised move does not depend on how volatile the fit said the asset would be. A series that stays positive shows a fit that under-predicts the volatile assets, and a series that stays negative shows a fit that over-predicts them.
 
-The target divides the absolute return of observation ``t + 1`` by the volatility predicted at observation ``t``, not at observation ``t + 1``. The notation ``|z_{t+1}|`` can name either quantity, and the two differ wherever the prediction moved between the two observations.
+The target divides the absolute return of observation ``t + 1`` by the volatility estimated at observation ``t``, whose estimate has not read that return. It is the absolute standardised return ``|z_{t + 1, i}|`` of [`standardised_idio_returns`](@ref) under its default `ahead = true`. The volatility of observation ``t + 1`` has read the return, so a division by it would bound the target and pull it toward zero.
 
 Read it beside [`idio_vol_ic`](@ref). A fit that ranks well and leaves no residual dependence has a high information coefficient and a dependence near `0`.
 
@@ -830,8 +852,10 @@ function idio_nan_median(v::VecNum)
     return isempty(f) ? Tf(NaN) : Tf(Statistics.median(f))
 end
 """
-    idio_calibration_summary(eps::MatNum, vs::MatNum; threshold::Real = 3)
-    idio_calibration_summary(csfm::CrossSectionalFactorModel; threshold::Real = 3)
+    idio_calibration_summary(eps::MatNum, vs::MatNum; threshold::Real = 3,
+                             ahead::Bool = true)
+    idio_calibration_summary(csfm::CrossSectionalFactorModel; threshold::Real = 3,
+                             ahead::Bool = true)
 
 Return the five time-aggregated numbers of the calibration of a cross-sectional fit.
 
@@ -852,6 +876,7 @@ Under the normal law the expected values are `1`, `1`, `0`, `0` and ``2 \\Phi(-c
   - `vs`: Idiosyncratic variance history `observations × assets`.
   - `csfm`: A cross-sectional factor model block.
   - `threshold`: Absolute standardised return above which an asset enters the tail rate.
+  - $(arg_dict[:idio_ahead])
 
 # Validation
 
@@ -875,17 +900,19 @@ Under the normal law the expected values are `1`, `1`, `0`, `0` and ``2 \\Phi(-c
   - [`idio_tail_rate`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
-function idio_calibration_summary(eps::MatNum, vs::MatNum; threshold::Real = 3)
-    z = standardised_idio_returns(eps, vs)
+function idio_calibration_summary(eps::MatNum, vs::MatNum; threshold::Real = 3,
+                                  ahead::Bool = true)
+    z = standardised_idio_returns(eps, vs; ahead = ahead)
     cs = idio_calibration(z)
     return (; mean_cs_std = idio_nan_mean(cs), median_cs_std = idio_nan_median(cs),
             mean_kurtosis = idio_nan_mean(idio_kurtosis(z)),
             mean_skewness = idio_nan_mean(idio_skewness(z)),
             mean_tail_rate = idio_nan_mean(idio_tail_rate(z; threshold = threshold)))
 end
-function idio_calibration_summary(csfm::CrossSectionalFactorModel; threshold::Real = 3)
+function idio_calibration_summary(csfm::CrossSectionalFactorModel; threshold::Real = 3,
+                                  ahead::Bool = true)
     ep, vh = idio_diagnostic_data(csfm)
-    return idio_calibration_summary(ep, vh; threshold = threshold)
+    return idio_calibration_summary(ep, vh; threshold = threshold, ahead = ahead)
 end
 """
     idio_diagnostic_data(csfm::CrossSectionalFactorModel)

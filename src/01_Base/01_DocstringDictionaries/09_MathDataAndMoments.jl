@@ -145,7 +145,7 @@ unique_key_dict!(math_dict, :math_dict,
                  # The idiosyncratic diagnostics of a cross-sectional fit. Each symbol is
                  # stated by two or more Units of that file.
                  :eps_ti_idio => "``\\varepsilon_{ti}``: Idiosyncratic return of asset ``i`` at observation ``t``.",#
-                 :v_ti_idio => "``v_{ti}``: Idiosyncratic variance the fit predicted for asset ``i`` at observation ``t``.",#
+                 :v_ti_idio => "``v_{ti}``: Idiosyncratic variance of asset ``i`` that the fit estimated from the observations up to ``t``, so it is the forecast for observation ``t + 1``.",#
                  :sigma_ti_idio => "``\\hat{\\sigma}_{ti} = \\sqrt{\\max(v_{ti}, 0)}``: Predicted idiosyncratic volatility of asset ``i`` at observation ``t``. A negative variance counts as zero.",#
                  :z_ti_idio => "``z_{ti}``: Standardised idiosyncratic return of asset ``i`` at observation ``t``.",#
                  :F_t_idio => "``\\mathcal{F}_{t}``: Finite cross-section of observation ``t``, the assets whose standardised return ``z_{ti}`` is finite.",#

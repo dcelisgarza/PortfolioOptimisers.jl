@@ -2472,8 +2472,9 @@ function plot_exposure_stability end
 ## Cross-sectional idiosyncratic diagnostics
 ## ────────────────────────────────────────────────────────────────────────────
 """
-    plot_idio_calibration(csfm::CrossSectionalFactorModel; kwargs...) -> Plot
-    plot_idio_calibration(pr::AbstractPriorResult; kwargs...) -> Plot
+    plot_idio_calibration(csfm::CrossSectionalFactorModel; ahead::Bool = true, kwargs...)
+        -> Plot
+    plot_idio_calibration(pr::AbstractPriorResult; ahead::Bool = true, kwargs...) -> Plot
 
 Plot the cross-sectional standard deviation of the standardised idiosyncratic returns against the observation axis. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
 
@@ -2483,6 +2484,7 @@ The figure draws what [`idio_calibration`](@ref) returns and computes nothing of
 
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
+  - $(arg_dict[:idio_ahead])
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation
@@ -2506,11 +2508,13 @@ function plot_idio_calibration end
     plot_idio_tail_rate(
         csfm::CrossSectionalFactorModel;
         threshold::Real = 3,
+        ahead::Bool = true,
         kwargs...
     ) -> Plot
     plot_idio_tail_rate(
         pr::AbstractPriorResult;
         threshold::Real = 3,
+        ahead::Bool = true,
         kwargs...
     ) -> Plot
 
@@ -2523,6 +2527,7 @@ The figure draws what [`idio_tail_rate`](@ref) returns and computes nothing of i
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
   - `threshold`: Absolute standardised return above which an asset enters the rate.
+  - $(arg_dict[:idio_ahead])
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation
@@ -2543,8 +2548,9 @@ The figure draws what [`idio_tail_rate`](@ref) returns and computes nothing of i
 """
 function plot_idio_tail_rate end
 """
-    plot_idio_kurtosis(csfm::CrossSectionalFactorModel; kwargs...) -> Plot
-    plot_idio_kurtosis(pr::AbstractPriorResult; kwargs...) -> Plot
+    plot_idio_kurtosis(csfm::CrossSectionalFactorModel; ahead::Bool = true, kwargs...)
+        -> Plot
+    plot_idio_kurtosis(pr::AbstractPriorResult; ahead::Bool = true, kwargs...) -> Plot
 
 Plot the cross-sectional excess kurtosis of the standardised idiosyncratic returns against the observation axis. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
 
@@ -2554,6 +2560,7 @@ The figure draws what [`idio_kurtosis`](@ref) returns and computes nothing of it
 
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
+  - $(arg_dict[:idio_ahead])
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation
@@ -2574,8 +2581,9 @@ The figure draws what [`idio_kurtosis`](@ref) returns and computes nothing of it
 """
 function plot_idio_kurtosis end
 """
-    plot_idio_skewness(csfm::CrossSectionalFactorModel; kwargs...) -> Plot
-    plot_idio_skewness(pr::AbstractPriorResult; kwargs...) -> Plot
+    plot_idio_skewness(csfm::CrossSectionalFactorModel; ahead::Bool = true, kwargs...)
+        -> Plot
+    plot_idio_skewness(pr::AbstractPriorResult; ahead::Bool = true, kwargs...) -> Plot
 
 Plot the cross-sectional skewness of the standardised idiosyncratic returns against the observation axis. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
 
@@ -2585,6 +2593,7 @@ The figure draws what [`idio_skewness`](@ref) returns and computes nothing of it
 
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
+  - $(arg_dict[:idio_ahead])
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation

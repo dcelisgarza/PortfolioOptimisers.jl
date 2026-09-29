@@ -81,11 +81,13 @@ using Statistics
                   -0.10714285714285714, -0.17857142857142858, -0.11904761904761904, NaN,
                   0.19047619047619047, -0.9047619047619048, NaN, NaN]
 
-        @test idio_agrees(idio_calibration(eps, vs), ref_cal)
-        @test idio_agrees(idio_tail_rate(eps, vs), ref_tr3)
-        @test idio_agrees(idio_tail_rate(eps, vs; threshold = 2), ref_tr2)
-        @test idio_agrees(idio_kurtosis(eps, vs), ref_kur)
-        @test idio_agrees(idio_skewness(eps, vs), ref_skw)
+        # The oracle divides each return by the volatility of its own observation, which
+        # `ahead = false` states (#1387).
+        @test idio_agrees(idio_calibration(eps, vs; ahead = false), ref_cal)
+        @test idio_agrees(idio_tail_rate(eps, vs; ahead = false), ref_tr3)
+        @test idio_agrees(idio_tail_rate(eps, vs; threshold = 2, ahead = false), ref_tr2)
+        @test idio_agrees(idio_kurtosis(eps, vs; ahead = false), ref_kur)
+        @test idio_agrees(idio_skewness(eps, vs; ahead = false), ref_skw)
         @test idio_agrees(idio_vol_ic(eps, vs; ties = :ordinal), ref_ic)
         @test idio_agrees(idio_vol_residual_dependence(eps, vs; ties = :ordinal), ref_rd)
         # Under the default `ties = :average`, the two observations whose predictions tie
@@ -104,7 +106,7 @@ using Statistics
                       idio_vol_ic(eps, vs; ties = :ordinal))
 
         # The reference's own summary, under its own key names.
-        s = idio_calibration_summary(eps, vs)
+        s = idio_calibration_summary(eps, vs; ahead = false)
         @test isapprox(s.mean_cs_std, 1.0676183867528448; rtol = 1e-12)
         @test isapprox(s.median_cs_std, 0.9248180704996924; rtol = 1e-12)
         @test isapprox(s.mean_kurtosis, 0.4908334153749917; rtol = 1e-12)
@@ -113,7 +115,7 @@ using Statistics
     end
 
     @testset "the level-0 kernel" begin
-        z = standardised_idio_returns(eps, vs)
+        z = standardised_idio_returns(eps, vs; ahead = false)
         @test size(z) == (T, N)
         # A zero variance, a negative variance and a return that is not finite each read
         # `NaN`, and a variance that is not finite reads `NaN` too.
@@ -131,10 +133,48 @@ using Statistics
         @test s[1, 1] ≈ sqrt(vs[1, 1])
         @test isnan(s[7, 4])
         # The four `z`-verbs answer the same over `z` as over the two histories.
-        @test idio_agrees(idio_calibration(z), idio_calibration(eps, vs))
-        @test idio_agrees(idio_tail_rate(z), idio_tail_rate(eps, vs))
-        @test idio_agrees(idio_kurtosis(z), idio_kurtosis(eps, vs))
-        @test idio_agrees(idio_skewness(z), idio_skewness(eps, vs))
+        @test idio_agrees(idio_calibration(z), idio_calibration(eps, vs; ahead = false))
+        @test idio_agrees(idio_tail_rate(z), idio_tail_rate(eps, vs; ahead = false))
+        @test idio_agrees(idio_kurtosis(z), idio_kurtosis(eps, vs; ahead = false))
+        @test idio_agrees(idio_skewness(z), idio_skewness(eps, vs; ahead = false))
+        # The default divides the return of row `t` by the volatility of row `t - 1`, so the
+        # first row has no forecast and every other row is the same-row kernel of the
+        # shifted variance history.
+        za = standardised_idio_returns(eps, vs)
+        @test all(isnan, za[1, :])
+        @test isequal(za[2:end, :],
+                      standardised_idio_returns(eps[2:end, :], vs[1:(end - 1), :];
+                                                ahead = false))
+        @test za[4, 2] ≈ eps[4, 2] / sqrt(vs[3, 2])
+        # The zero variance of row 2 costs the return of row 3, not of row 2.
+        @test isfinite(za[2, 3]) && isnan(za[3, 3])
+        @test idio_agrees(idio_calibration(za), idio_calibration(eps, vs))
+        @test idio_agrees(idio_tail_rate(za), idio_tail_rate(eps, vs))
+        @test idio_agrees(idio_kurtosis(za), idio_kurtosis(eps, vs))
+        @test idio_agrees(idio_skewness(za), idio_skewness(eps, vs))
+        @test idio_calibration_summary(eps, vs) ==
+              idio_calibration_summary(eps[2:end, :], vs[1:(end - 1), :]; ahead = false)
+    end
+
+    @testset "a variance that has read its own return bounds the standardised return" begin
+        # An exponentially weighted variance puts the weight `1 - λ` on the latest squared
+        # return, so `v_t ≥ (1 - λ) ε_t²` and the same-row ratio can never pass
+        # `1 / sqrt(1 - λ)`, however large the shock. The variance of the previous row has not
+        # read the shock, so the default reports it at its full size (#1387).
+        lam = 0.9
+        e = [0.01 0.01; -0.01 0.01; 0.01 -0.01; 0.5 0.01; 0.01 0.01]
+        v = similar(e)
+        v[1, :] .= 1e-4
+        for t in 2:size(e, 1)
+            v[t, :] = lam .* v[t - 1, :] .+ (1 - lam) .* e[t, :] .^ 2
+        end
+        zs = standardised_idio_returns(e, v; ahead = false)
+        za = standardised_idio_returns(e, v)
+        @test maximum(abs, filter(isfinite, zs)) <= 1 / sqrt(1 - lam)
+        @test za[4, 1] ≈ 0.5 / sqrt(v[3, 1])
+        @test za[4, 1] > 45
+        @test idio_tail_rate(e, v; threshold = 4, ahead = false)[4] == 0.0
+        @test idio_tail_rate(e, v; threshold = 4)[4] == 0.5
     end
 
     @testset "the level-2 methods read the block" begin
@@ -150,6 +190,11 @@ using Statistics
         @test idio_calibration_summary(csfm) == idio_calibration_summary(eps, vs)
         @test idio_calibration_summary(csfm; threshold = 2) ==
               idio_calibration_summary(eps, vs; threshold = 2)
+        for f in (idio_calibration, idio_kurtosis, idio_skewness, idio_tail_rate)
+            @test idio_agrees(f(csfm; ahead = false), f(eps, vs; ahead = false))
+        end
+        @test idio_calibration_summary(csfm; threshold = 2, ahead = false) ==
+              idio_calibration_summary(eps, vs; threshold = 2, ahead = false)
     end
 
     @testset "the analytic cases" begin
@@ -173,7 +218,8 @@ using Statistics
         @test mean(idio_vol_ic(eps2, vs2)) > 0.2
         @test isapprox(mean(idio_vol_residual_dependence(eps2, vs2)), 0.0; atol = 0.03)
         # A scaled variance history moves the calibration by the inverse scale.
-        @test idio_calibration(eps2, 4 .* vs2) ≈ idio_calibration(eps2, vs2) ./ 2
+        @test idio_agrees(idio_calibration(eps2, 4 .* vs2),
+                          idio_calibration(eps2, vs2) ./ 2)
         # It moves neither dependence series: a positive scale is monotone, so it leaves
         # every rank of both cross-sections where it was.
         @test idio_vol_ic(eps2, 4 .* vs2) == idio_vol_ic(eps2, vs2)
@@ -181,13 +227,15 @@ using Statistics
               idio_vol_residual_dependence(eps2, vs2)
         # The five entries of the summary are the means and the median of the series. The
         # summary sums the entries in order and `Statistics.mean` sums them pairwise, so
-        # the two agree to the last bits of the answer and not bit for bit.
+        # the two agree to the last bits of the answer and not bit for bit. The first row
+        # has no forecast, so every series is `NaN` there and the summary skips it.
         z2 = standardised_idio_returns(eps2, vs2)
-        @test s2.mean_cs_std ≈ mean(idio_calibration(z2)) rtol = 1e-12
-        @test s2.median_cs_std == median(idio_calibration(z2))
-        @test s2.mean_kurtosis ≈ mean(idio_kurtosis(z2)) rtol = 1e-12
-        @test s2.mean_skewness ≈ mean(idio_skewness(z2)) rtol = 1e-12
-        @test s2.mean_tail_rate ≈ mean(idio_tail_rate(z2)) rtol = 1e-12
+        @test all(isnan, z2[1, :])
+        @test s2.mean_cs_std ≈ mean(idio_calibration(z2)[2:end]) rtol = 1e-12
+        @test s2.median_cs_std == median(idio_calibration(z2)[2:end])
+        @test s2.mean_kurtosis ≈ mean(idio_kurtosis(z2)[2:end]) rtol = 1e-12
+        @test s2.mean_skewness ≈ mean(idio_skewness(z2)[2:end]) rtol = 1e-12
+        @test s2.mean_tail_rate ≈ mean(idio_tail_rate(z2)[2:end]) rtol = 1e-12
     end
 
     @testset "an aggregate over a series that never answered" begin
@@ -231,7 +279,7 @@ using Statistics
         # An integer history answers in floating point rather than raising `InexactError`.
         e_int = [1 -2 3 0; 3 4 -1 2; 0 1 2 -3]
         v_int = [1 4 1 0; 1 0 4 1; 1 1 1 1]
-        z_int = standardised_idio_returns(e_int, v_int)
+        z_int = standardised_idio_returns(e_int, v_int; ahead = false)
         @test eltype(z_int) == Float64
         @test isequal(z_int, [1.0 -1.0 3.0 NaN; 3.0 NaN -0.5 2.0; 0.0 1.0 2.0 -3.0])
         @test idio_calibration([1 2 3; 4 5 7]) ≈ [1.0, std([4, 5, 7])]

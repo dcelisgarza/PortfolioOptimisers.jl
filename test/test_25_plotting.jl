@@ -600,7 +600,15 @@
                                                                                    Ms_ex[Te,
                                                                                          :,
                                                                                          :]),
-                                           b = zeros(Ne), csr = csr_ex, Ms = Ms_ex,
+                                           b = zeros(Ne),
+                                           # A re-based fit states its factor returns on the
+                                           # reduced axis (#1367).
+                                           csr = CrossSectionalRegression(;
+                                                                          f = PortfolioOptimisers.reduce_factor_returns(fcb_ex,
+                                                                                                                        csr_ex.f),
+                                                                          eps = csr_ex.eps,
+                                                                          n = csr_ex.n),
+                                           Ms = Ms_ex,
                                            rw = abs.(randn(rng_ex, Te, Ne)) .+ 0.1,
                                            fcb = fcb_ex, nf = ["value", "size", "momentum"],
                                            lag = 1)
