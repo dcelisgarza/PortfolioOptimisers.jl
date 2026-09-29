@@ -200,3 +200,12 @@ the same reason.
   matches each corner's prior.
 - A Pipeline that runs a prior-reading uncertainty step must run a prior step first. The refusal
   names the `:prior` slot.
+
+## Amendment (2026-09-29)
+
+The hierarchical route of this decision stands: an estimator crosses a cluster boundary unchanged
+and refits the set from the cluster's own prior view. The rule "refit or re-orthonormalise, never
+slice" that it quotes from #659 no longer holds for a **fitted** set. ADR 0189 (#1424) makes the
+view of every fitted uncertainty set the projection of the set: the compact covariance set keeps
+the sliced rows of its basis and completes them with a factor `R` of the rows it drops, so a
+cluster portfolio pays what it pays as a portfolio of the full universe.

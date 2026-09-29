@@ -60,6 +60,7 @@ A moment Estimator standing where a prior-derived value goes, so the slot admits
 
 **View**
 An index selection propagated down a composed struct tree, restricting an Estimator, Algorithm or Result to a subset of assets or observations.
+The View of a Result restricts what the Result states and never fits it again: the View of an Uncertainty Set is the projection of the set, the worst case of a portfolio that holds nothing outside the selection. An Estimator that crosses the selection fits the selected data instead.
 *Avoid*: using it for a **Tail View** (§3.6), which is a statement about the distribution rather than a selection.
 
 **Propagation Channel**

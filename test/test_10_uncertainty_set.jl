@@ -1390,6 +1390,17 @@ end
                                                                            C = [1.0, 1.0],
                                                                            Q = zeros(2, 1),
                                                                            val = ones(2, 3))
+            # A fitted set has no row in `R`, and `R` must be finite with one column per
+            # column of `Q`.
+            @test size(ucsc.R) == (0, Kc)
+            @test_throws Exception CompactCovarianceUncertaintySet(; kappa = 1.0,
+                                                                   C = [1.0, 1.0],
+                                                                   Q = zeros(2, 1),
+                                                                   R = fill(NaN, 1, 1))
+            @test_throws DimensionMismatch CompactCovarianceUncertaintySet(; kappa = 1.0,
+                                                                           C = [1.0, 1.0],
+                                                                           Q = zeros(2, 1),
+                                                                           R = zeros(1, 2))
             # A rank of zero is admitted, and so is a radius of zero.
             @test size(CompactCovarianceUncertaintySet(; kappa = 0.0, C = Cc,
                                                        Q = zeros(Nc, 0)).Q, 2) == 0
@@ -1424,26 +1435,64 @@ end
             @test_throws ArgumentError mu_ucs(ucsc)
             @test sigma_ucs(ucsc) === ucsc
         end
-        @testset "A view re-orthonormalises the basis it slices" begin
+        @testset "A view is the projection of the set (ADR 0189)" begin
             iv = [1, 2, 3, 4, 5]
             vc = PortfolioOptimisers.port_opt_view(ucsc, iv)
             @test vc.kappa == ucsc.kappa
             @test vc.C == Cc[iv]
-            # The slice is not orthonormal, and the view is.
+            # The view keeps the sliced rows, which are not orthonormal, and `R` completes
+            # them: the stacked columns are orthonormal.
+            @test vc.Q == Qc[iv, :]
             @test !isapprox(transpose(Qc[iv, :]) * Qc[iv, :], I(Kc); atol = 1e-8)
-            @test isapprox(transpose(vc.Q) * vc.Q, I(size(vc.Q, 2)); atol = 1e-12)
-            # The span survives the slice, so the view projects onto the same subspace.
-            @test isapprox(vc.Q * transpose(vc.Q) * Qc[iv, :], Qc[iv, :]; atol = 1e-10)
-            # A view equals a fit on the cluster's rows: the projector of the view and the
-            # projector of a fresh orthonormalisation of the same rows agree.
+            @test isapprox(transpose(vcat(vc.Q, vc.R)) * vcat(vc.Q, vc.R), I(Kc);
+                           atol = 1e-14)
+            # The penalty of the view is the principal block of the penalty of the full set,
+            # so a cluster portfolio pays what it pays as a portfolio of the full universe.
+            # Measured maxscaled 4e-16 against `BigFloat` on the design simulation.
+            M = Diagonal(Cc) * (I - Qc * transpose(Qc)) * Diagonal(Cc)
+            z5 = zeros(length(iv), length(iv))
+            rngv = StableRNG(1424)
+            for _ in 1:20
+                wv = randn(rngv, length(iv))
+                wf = zeros(Nc)
+                wf[iv] = wv
+                @test isapprox(PortfolioOptimisers.ucs_variance(vc, z5, wv),
+                               PortfolioOptimisers.ucs_variance(ucsc, zeros(Nc, Nc), wf);
+                               rtol = 1e-12)
+                @test isapprox(PortfolioOptimisers.ucs_variance(vc, z5, wv),
+                               ucsc.kappa * dot(wv, M[iv, iv], wv); rtol = 1e-12)
+            end
+            # A refit on the rows of the view spares the span of the sliced rows, and the
+            # full set does not spare it: the projection still charges that portfolio.
+            wsp = (Qc[iv, :] * [1.0, -0.5, 0.3]) ./ Cc[iv]
             Qfit = Matrix(qr(Qc[iv, :]).Q)[:, 1:Kc]
-            @test isapprox(vc.Q * transpose(vc.Q), Qfit * transpose(Qfit); atol = 1e-10)
-            # Slicing the projector instead is wrong: it is not even a projector.
-            Psliced = (I - Qc * transpose(Qc))[iv, iv]
-            @test !isapprox(Psliced * Psliced, Psliced; atol = 1e-8)
-            # The rank falls when the sliced columns become dependent.
-            @test size(PortfolioOptimisers.port_opt_view(ucsc, [1]).Q, 2) == 1
-            @test size(PortfolioOptimisers.orthonormalise_basis(zeros(Nc, 0)), 2) == 0
+            refit = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc[iv], Q = Qfit)
+            @test PortfolioOptimisers.ucs_variance(refit, z5, wsp) < 1e-20
+            @test PortfolioOptimisers.ucs_variance(vc, z5, wsp) > 1e-3
+            @test isapprox(PortfolioOptimisers.ucs_variance(vc, z5, wsp),
+                           ucsc.kappa * dot(wsp, M[iv, iv], wsp); rtol = 1e-12)
+            # A view of a view is the view of the composed index.
+            jv = [1, 3, 4]
+            vv = PortfolioOptimisers.port_opt_view(vc, jv)
+            vd = PortfolioOptimisers.port_opt_view(ucsc, iv[jv])
+            @test isapprox(transpose(vv.R) * vv.R, transpose(vd.R) * vd.R; atol = 1e-14)
+            wj = randn(rngv, length(jv))
+            @test isapprox(PortfolioOptimisers.ucs_variance(vv, zeros(3, 3), wj),
+                           ucsc.kappa * dot(wj, M[iv[jv], iv[jv]], wj); rtol = 1e-12)
+            # A single asset keeps every column, and `R` has one row per column.
+            v1 = PortfolioOptimisers.port_opt_view(ucsc, [1])
+            @test size(v1.Q) == (1, Kc) && size(v1.R) == (Kc, Kc)
+            @test isapprox(PortfolioOptimisers.ucs_variance(v1, zeros(1, 1), [1.0]),
+                           ucsc.kappa * M[1, 1]; rtol = 1e-12)
+            # A view that drops nothing keeps the set's own `R`, and so does a view that drops
+            # only zero rows. A rank-zero set drops no row into `R`.
+            @test size(PortfolioOptimisers.port_opt_view(ucsc, 1:Nc).R, 1) == 0
+            Qz = vcat(Qc, zeros(2, Kc))
+            ucsz = CompactCovarianceUncertaintySet(; kappa = 2.0, C = vcat(Cc, zeros(2)),
+                                                   Q = Qz)
+            @test size(PortfolioOptimisers.port_opt_view(ucsz, 1:Nc).R, 1) == 0
+            ucs0 = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc, Q = zeros(Nc, 0))
+            @test size(PortfolioOptimisers.port_opt_view(ucs0, iv).R) == (0, 0)
             # `val` is a covariance, so it is sliced on both axes.
             ucsv = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc, Q = Qc,
                                                    val = sigmac)
@@ -1459,6 +1508,22 @@ end
             @test isapprox(PortfolioOptimisers.JuMP.value(resc.model[keyc]),
                            PortfolioOptimisers.ucs_variance(ucsc, sigmac, resc.w);
                            rtol = 1e-6)
+            # A view states `R` in the model: at the optimum on the view's assets, the model's
+            # expression is the worst case of the padded portfolio under the full set.
+            iv = [1, 2, 3, 4, 5]
+            vc = PortfolioOptimisers.port_opt_view(ucsc, iv)
+            rdv = ReturnsResult(; X = Xc[:, iv], nx = string.("A", iv))
+            resv = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = vc),
+                                     obj = MinimumRisk(), opt = optc), rdv)
+            @test isa(resv.retcode, PortfolioOptimisers.OptimisationSuccess)
+            wpad = zeros(Nc)
+            wpad[iv] = resv.w
+            @test isapprox(PortfolioOptimisers.JuMP.value(resv.model[keyc]),
+                           PortfolioOptimisers.ucs_variance(ucsc, sigmac, wpad);
+                           rtol = 1e-6)
+            @test isapprox(PortfolioOptimisers.ucs_variance(vc, sigmac[iv, iv], resv.w),
+                           PortfolioOptimisers.ucs_variance(ucsc, sigmac, wpad);
+                           rtol = 1e-12)
             # No lifted matrix on this route, and one on the ellipsoidal route.
             @test !haskey(resc.model, :W)
             rese = optimise(MeanRisk(;

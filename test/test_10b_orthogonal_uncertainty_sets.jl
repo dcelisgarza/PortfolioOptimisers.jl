@@ -1216,9 +1216,8 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @test mu_ucs(ue, prp).L == mu_f.L
         @test sigma_ucs(ue, prp).Q == sg_f.Q
         # The reduced prior is what an optimiser hands the fit, and the expanded set viewed
-        # at the mask is that fit: `L` and `C` row for row, the basis as a projector, because
-        # the view re-orthonormalises the slice through a pivoted QR that may permute or
-        # flip its columns, and the radii untouched.
+        # at the mask is that fit: `L`, `C` and `Q` row for row, and the radii untouched. The
+        # rows outside the mask are zero, so the view puts no row into `R` (ADR 0189).
         prr = PO.port_opt_view(prp, idx)
         mu_r, sg_r = ucs(ue, prr)
         @test size(mu_r.L, 1) == count(msk)
@@ -1230,8 +1229,8 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @test sg_v.C == sg_r.C
         @test sg_v.kappa == sg_r.kappa
         @test sg_v.val == sg_r.val
-        @test size(sg_v.Q, 2) == size(sg_r.Q, 2)
-        @test isapprox(sg_v.Q * transpose(sg_v.Q), sg_r.Q * transpose(sg_r.Q); atol = 1e-12)
+        @test sg_v.Q == sg_r.Q
+        @test size(sg_v.R, 1) == 0
         # A non-finite loading inside the mask is a defect of the prior, and the span still
         # refuses it by name.
         # The block is rebuilt from a fresh fit and poisoned in place: `Accessors.@set`

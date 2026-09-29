@@ -302,6 +302,8 @@ One fit serves both axes. [`ucs`](@ref) takes the weighted factor span once and 
 
 The point estimates stay as the prior states them. The mean set is centred on `pr.mu` and the covariance set carries `pr.sigma`, so the prior is not shrunk. The correction is a worst case that grows with the exposure of the portfolio to the Orthogonal Subspace, and it counters an optimiser that over-allocates to the directions the factors do not span.
 
+Inside a cluster of a hierarchical optimiser, the two routes give different sets on purpose (ADR 0189). The estimator refits on the viewed prior, so it takes the factor span of the cluster's own loadings and sizes its radius on that span. A pair of sets fitted before is viewed instead, and each view is the projection of its set: the worst case of a cluster portfolio as a portfolio of the full universe, with the radius of the full set. The two views still spare the same portfolios.
+
 # Mathematical definition
 
 ```math

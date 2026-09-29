@@ -317,3 +317,12 @@ stated level with no way out except a smaller `q` chosen by hand.
   sample.
 - `Regression` gains two type parameters and `CrossSectionalFactorModel` two, so every printed
   block shows two more fields.
+
+## Amendment (2026-09-29)
+
+The paragraph on `orthonormalise_basis` describes a view that no longer exists. ADR 0189 (#1424)
+makes the view of a compact set the projection of the set: it keeps the sliced rows of the basis,
+adds the factor `R` of the rows it drops, and pays the principal block of the full penalty
+exactly. The rank does not fall, `orthonormalise_basis` is deleted, and the radius that crosses
+the view unchanged is now the exact radius of the projected set, not a stale one. A caller who
+wants a radius sized on the cluster alone still fits the set on a reduced prior.

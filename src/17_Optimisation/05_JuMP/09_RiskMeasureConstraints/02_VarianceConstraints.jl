@@ -847,7 +847,7 @@ The box, the ellipsoid and the norm ball bound the covariance matrix, so each li
 R_{\\mathrm{box}} &= \\underset{\\mathbf{A}_u,\\, \\mathbf{A}_l \\geq 0,\\ \\mathbf{A}_u - \\mathbf{A}_l = \\mathbf{W}}{\\min} \\langle \\mathbf{\\Sigma}_u, \\mathbf{A}_u \\rangle - \\langle \\mathbf{\\Sigma}_l, \\mathbf{A}_l \\rangle\\,, \\\\
 R_{\\mathrm{ell}} &= \\underset{\\mathbf{E} \\succeq 0}{\\min} \\langle \\hat{\\mathbf{\\Sigma}}, \\mathbf{W} + \\mathbf{E} \\rangle + k_{e} \\lVert \\mathbf{G}_{\\Omega} \\, \\mathrm{vec}(\\mathbf{W} + \\mathbf{E}) \\rVert_{2}\\,, \\\\
 R_{\\mathrm{nb}} &= \\underset{\\mathbf{E} \\succeq 0}{\\min} \\langle \\hat{\\mathbf{\\Sigma}}, \\mathbf{W} + \\mathbf{E} \\rangle + \\kappa_{b} \\lVert \\mathbf{L}^\\intercal \\mathrm{vec}(\\mathbf{W} + \\mathbf{E}) \\rVert_{p^{*}}\\,, \\\\
-R_{\\mathrm{cpt}} &= \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}^{2} + \\kappa \\underset{\\boldsymbol{z}}{\\min} \\lVert \\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z} \\rVert_{2}^{2}\\,.
+R_{\\mathrm{cpt}} &= \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}^{2} + \\kappa \\underset{\\boldsymbol{z}}{\\min} \\left( \\lVert \\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z} \\rVert_{2}^{2} + \\lVert \\mathbf{R} \\boldsymbol{z} \\rVert_{2}^{2} \\right)\\,.
 \\end{align}
 ```
 
@@ -860,7 +860,7 @@ Where:
   - ``\\mathbf{E}``: Dual matrix of the condition that the worst covariance is positive semidefinite.
   - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the upper Cholesky factor of its matrix ``\\mathbf{\\Omega}``, `sigma`.
   - ``\\kappa_{b}``, ``\\mathbf{L}``, ``p^{*}``: Radius of the norm ball, its map, and the dual order of its norm.
-  - ``\\mathbf{C}``, ``\\mathbf{Q}``, ``\\boldsymbol{z}``: Diagonal metric of the compact set, its basis, and the free coefficients of the basis.
+  - ``\\mathbf{C}``, ``\\mathbf{Q}``, ``\\mathbf{R}``, ``\\boldsymbol{z}``: Diagonal metric of the compact set, its basis, the factor of the rows a view dropped from the basis, and the free coefficients of the basis. A fitted set has no row in ``\\mathbf{R}``.
   - ``\\langle \\mathbf{X}, \\mathbf{Y} \\rangle = \\mathrm{Tr}(\\mathbf{X}^\\intercal \\mathbf{Y})``: Inner product of two matrices.
   - $(math_dict[:kappa_cpt])
   - $(math_dict[:W_lift])
@@ -884,7 +884,7 @@ Where:
   - `WpE`: ``\\mathbf{W} + \\mathbf{E}``.
   - `x_eucs`: ``\\mathbf{G}_{\\Omega} \\, \\mathrm{vec}(\\mathbf{W} + \\mathbf{E})``.
   - `eucs_variance_risk_`: ``\\langle \\hat{\\mathbf{\\Sigma}}, \\mathbf{W} + \\mathbf{E} \\rangle + k_{e} t_e``.
-  - `x_cucs`: ``\\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z}``, or ``\\mathbf{C} \\boldsymbol{w}`` when ``\\mathbf{Q}`` has no column.
+  - `x_cucs`: ``[\\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z}; \\mathbf{R} \\boldsymbol{z}]``, or ``\\mathbf{C} \\boldsymbol{w}`` when ``\\mathbf{Q}`` has no column. The second block has one entry per row of ``\\mathbf{R}``, so a fitted set states ``\\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z}`` alone.
   - `cucs_variance_risk_`: ``d^{2} + \\kappa t^{2}``.
   - `x_nbucs_`: ``\\mathbf{L}^\\intercal \\mathrm{vec}(\\mathbf{W} + \\mathbf{E})``, registered when ``\\mathbf{L}`` has a column. [`norm_ball_dual_norm_epigraph!`](@ref) bounds its norm by ``t_b``.
   - `nbucs_variance_risk_`: ``\\langle \\hat{\\mathbf{\\Sigma}}, \\mathbf{W} + \\mathbf{E} \\rangle + \\kappa_{b} t_b``, or the first term alone when ``\\mathbf{L}`` has no column.
@@ -1019,7 +1019,9 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any,
     x_cucs = if size(Q, 2) > zero(Int)
         z_cucs = state_set!(model, prefix, :z_cucs, i,
                             JuMP.@variable(model, [1:size(Q, 2)]))
-        JuMP.@expression(model, C .* w .- Q * z_cucs)
+        # The rows a view dropped from the basis enter against a zero target, so the
+        # residual of a view is the residual of the full set (ADR 0189).
+        JuMP.@expression(model, vcat(C .* w .- Q * z_cucs, ucs.R * z_cucs))
     else
         JuMP.@expression(model, C .* w)
     end

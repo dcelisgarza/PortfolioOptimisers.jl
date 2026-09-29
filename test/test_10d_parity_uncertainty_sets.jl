@@ -118,23 +118,33 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         sv = PO.port_opt_view(s, j)
         QQt = load("OrthogonalUncertaintySet", c, "CovQQt")
         LLt = load("OrthogonalUncertaintySet", c, "MuLLt")
-        # The view of the compact set re-orthonormalises the sliced basis (#653), so it is the
-        # set a fit on the sub-universe gives, and it equals the oracle's refit. Measured
-        # maxscaled 7.8e-16.
-        @test parity_compare(sv.Q * transpose(sv.Q), QQt; scale = :array,
-                             name = "$(c) view QQt").ok
-        @test parity_compare(collect(sv.C), loadv("OrthogonalUncertaintySet", c, "CovC");
-                             name = "$(c) view C").ok
-        # The mean set refitted on the sub-universe equals the oracle's refit. Measured
-        # maxscaled 1.2e-15.
+        # Both sets refitted on the sub-universe equal the oracle's refit. Measured maxscaled
+        # 7.8e-16 (Q Q') and 1.2e-15 (L L').
+        @test parity_compare(sr.Q * transpose(sr.Q), QQt; scale = :array,
+                             name = "$(c) refit QQt").ok
+        @test parity_compare(collect(sr.C), loadv("OrthogonalUncertaintySet", c, "CovC");
+                             name = "$(c) refit C").ok
         @test parity_compare(mr.L * transpose(mr.L), LLt; scale = :array,
                              name = "$(c) refit LLt").ok
-        # The view of the mean set is the projection of the set (#729): it slices the rows
-        # of `L` and keeps the radius, so it is not the refit. #1424 holds the question of
-        # which rule a view of the orthogonal mean set follows.
+        # The view of a fitted set is the projection of the set, not the refit (ADR 0189,
+        # #1424): a cluster portfolio pays what it pays as a portfolio of the full universe.
+        # The mean view slices the rows of `L`, and the covariance view keeps the sliced rows
+        # of `Q` and completes them with `R`. The refit is a different set: it spares the span
+        # of the cluster's own loadings, which the full set does not spare.
         mv = PO.port_opt_view(m, j)
         @test mv.L == m.L[j, :]
         @test !isapprox(mv.L * transpose(mv.L), LLt; rtol = 1e-2)
+        @test sv.C == s.C[j] && sv.Q == s.Q[j, :]
+        M = Diagonal(s.C) * (I - s.Q * transpose(s.Q)) * Diagonal(s.C)
+        Mjj = M[j, j]
+        wj = fill(inv(length(j)), length(j))
+        # Each set names its own centre, so the penalty is the worst case less the nominal
+        # variance at that centre.
+        penalty(set) = PO.ucs_variance(set, set.val, wj) - dot(wj, set.val, wj)
+        @test isapprox(penalty(sv), s.kappa * dot(wj, Mjj, wj); rtol = 1e-12)
+        # Per unit of radius, the refit charges the equal-weight portfolio less than the
+        # projection: 6.9 % and 14.9 % of it on the two panels (#1424).
+        @test penalty(sr) / sr.kappa < 0.5 * penalty(sv) / sv.kappa
     end
 
     # The objective each side's weights reach, from the closed forms. The ratio is over the
