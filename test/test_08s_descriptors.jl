@@ -158,6 +158,10 @@ const DESCRIPTOR_LAG_CONSTRUCTORS = (AssetsGrowthRate, SalesGrowthRate, Issuance
         @test isnan(PortfolioOptimisers.positive_divide(1.0, NaN))
         @test isnan(PortfolioOptimisers.positive_divide(NaN, 2.0))
         @test PortfolioOptimisers.positive_divide(1, 4) == 0.25
+        # A quotient of two finite values that overflows is NaN, not an infinity (#1379).
+        @test isnan(PortfolioOptimisers.positive_divide(1.0e300, 1.0e-10))
+        @test isnan(PortfolioOptimisers.positive_divide(-1.0e300, 1.0e-10))
+        @test PortfolioOptimisers.positive_divide(1.0e300, 1.0e10) == 1.0e290
     end
 end
 

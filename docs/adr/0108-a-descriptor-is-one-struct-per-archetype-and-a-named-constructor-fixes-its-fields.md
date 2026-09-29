@@ -175,3 +175,21 @@ call, and a call that gives both is refused. ADR 0184 states the Exogenous Serie
 of the table above is now `mcap`, `series`, `decay`, `min_obs`, `agg_obs`, `min_val`. The
 decision of this ADR does not change: `EWMacroSensitivity` stays one struct with no named
 constructor.
+
+## Amendment (2026-09-29)
+
+[#1379](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1379) measured the guards of
+this decision and records two rules that the text above does not state.
+
+**The `nonneg` guard reads the active observed cells alone.** `GrowthRate` reads its field under the
+same scope. An Asset Panel can hold a finite value outside the active mask, and
+`descriptor_active_fill!` writes `NaN` over every such cell of the Descriptor. A check over every
+finite cell would refuse a panel because of a value that no output reads. The guard therefore
+refuses a negative value only where that value can reach the Descriptor. An active cell that is not
+observed reads back as `NaN`, so the value of its fill policy is never checked either.
+
+**A quotient that is not finite is `NaN`.** `positive_divide` of two finite values can overflow,
+for example `1e300 / 1e-10`. The Asset Panel refuses an infinity in its input, and every
+cross-sectional transform refuses one in a Descriptor, so one infinite cell cost the whole fit.
+`positive_divide` now gives `NaN` there, and the cell costs one cell of the Descriptor, as a
+non-positive denominator does.

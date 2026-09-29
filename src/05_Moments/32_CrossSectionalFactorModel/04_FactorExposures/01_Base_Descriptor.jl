@@ -319,15 +319,17 @@ end
 """
     positive_divide(a::Real, b::Real) -> Real
 
-Divide `a` by `b` where `b` is strictly positive, and return `NaN` otherwise.
+Divide `a` by `b` where `b` is strictly positive and the quotient is finite, and return `NaN` otherwise.
 
 A ratio Descriptor is undefined where its denominator is zero, and it is meaningless where a quantity that is positive by construction, a market capitalisation or a total of assets, is negative. Both cases give `NaN` rather than a number or an error, so one bad cell costs one cell of the Descriptor and not the whole fit. A `NaN` denominator compares `false` against zero, so it also gives `NaN`.
+
+A quotient of two finite values can overflow, for example `1e300 / 1e-10`. That cell also gives `NaN`. The Asset Panel refuses an infinity in its input, and every cross-sectional transform refuses one in a Descriptor, so an infinite cell would cost the whole fit.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-q &= \\begin{cases} a / b & b > 0\\,, \\\\ \\mathrm{NaN} & \\text{otherwise}\\,. \\end{cases}
+q &= \\begin{cases} a / b & b > 0 \\text{ and } a / b \\text{ is finite}\\,, \\\\ \\mathrm{NaN} & \\text{otherwise}\\,. \\end{cases}
 \\end{align}
 ```
 
@@ -356,6 +358,9 @@ NaN
 
 julia> PortfolioOptimisers.positive_divide(1.0, -2.0)
 NaN
+
+julia> PortfolioOptimisers.positive_divide(1.0e300, 1.0e-10)
+NaN
 ```
 
 # Related
@@ -365,7 +370,7 @@ NaN
 """
 function positive_divide(a::Real, b::Real)::Real
     q = a / b
-    return b > zero(b) ? q : oftype(q, NaN)
+    return b > zero(b) && isfinite(q) ? q : oftype(q, NaN)
 end
 
 """
