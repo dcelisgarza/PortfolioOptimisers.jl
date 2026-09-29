@@ -162,8 +162,9 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # relisting or a holiday, ours is the oracle's times `sqrt(W_ii W_jj) / W_ij`, up to
         # 1.124 here: measured 2.4e-15 on the 1303 pairs that both keep, and 4 pairs cross the
         # threshold. The thresholded block is not positive definite, so the repair binds:
-        # ours takes the nearest correlation by Newton, and the oracle clips the eigenvalues,
-        # which #1412 builds as an algorithm of `Posdef` (ADR 0186).
+        # ours takes the nearest correlation by Newton, and the oracle clips the eigenvalues.
+        # `ClippedNearestCorrelation` in `mp.pdm` is the oracle's repair, and `test_07c` measures
+        # it on this block at parity (#1412).
         pl = prior(est(; th = 0.1), fxl.rd)
         eps = pl.rr.csr.eps
         amr = fxl.amsk[(end - size(eps, 1) + 1):end, :]

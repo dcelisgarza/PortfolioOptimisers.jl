@@ -17,6 +17,7 @@ THE CASES. The inputs are random matrices chosen so that each exit path of the r
 | Tolerance | 30 x 30 of low rank, variances over six orders | the last acceptance, `-n eps max abs(λ)` |
 | Large | 80 x 80, near equicorrelation | the clip at `tau` |
 | Frame | "Indefinite" inside a `NaN` frame of two assets | the block rule of `matrix_processing_block!` |
+| OverlayLarge | the oracle's idiosyncratic block of `test_12w` before its repair, `th = 0.1` on the large panel, 39 finite assets | the clip, on the block rule |
 | HighamStop | 30 x 30, with the alternating projections | the oracle refuses it; see below |
 | ZeroVariance | "Indefinite" with a constant asset | the oracle refuses it; see below |
 
@@ -93,6 +94,19 @@ const P1412_CASES = [("Indefinite", false), ("IndefiniteHigham", true),
         mp = MatrixProcessing(; pdm = p1412_pdm())
         PortfolioOptimisers.matrix_processing_block!(mp, X, zeros(1, size(X, 2)))
         @test parity_compare(X, p1412_out("Frame"); scale = :array, name = "Frame").ok
+    end
+    @testset "the idiosyncratic overlay of the prior, where the repair binds (#1383)" begin
+        # The input is the oracle's own block before its repair, `th = 0.1` on the large panel
+        # (`test_12w`). Its smallest correlation eigenvalue is -0.031, so the repair binds, and
+        # the oracle leaves by the clip. The prior repairs this block with `mp.pdm` over the
+        # assets with a finite variance, which is the block rule below. Newton differs from the
+        # oracle's repair by 7.8e-4 of the largest entry.
+        E = parity_load("CrossSectionalFactorPrior", "PitLargeOverlayRaw", "IdioCov")
+        mp = MatrixProcessing(; pdm = p1412_pdm())
+        PortfolioOptimisers.matrix_processing_block!(mp, E, zeros(1, size(E, 2)))
+        # Measured maxscaled 1.6e-15.
+        @test parity_compare(E, p1412_out("OverlayLarge"); scale = :array,
+                             name = "OverlayLarge").ok
     end
     @testset "Better: the alternating projections that stop go on to the clip" begin
         X = p1412_in("HighamStop")
