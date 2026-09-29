@@ -50,7 +50,8 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         # `missing_row_percent`, and the oracles below were recorded on the twenty assets
         # and five factors that survived it. The conversion now deletes nothing, so the
         # gap column arrives as a column of gaps and the oracle covers the columns beside
-        # it, bit for bit.
+        # it, bit for bit. #1414 recorded both files again from `(p_t - p_{t-1}) / p_{t-1}`,
+        # which is the correctly rounded return on every cell of this fixture.
         rd = prices_to_returns(price_ingestion(PriceIngestion(), Px; F = Py))
         ts1 = rd.ts
         X1 = rd.X
@@ -399,18 +400,15 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
     end
 
     @testset "prices_to_returns closed form" begin
-        # A two-row example, computed by hand. `TimeSeries.percentchange` routes the simple
-        # branch through `expm1(ln P_t - ln P_{t-1})` rather than the quotient the docstring
-        # states, so the two agree to floating point and not to the last bit.
+        # A two-row example, computed by hand. The simple branch is the formula the
+        # docstring states, bit for bit (#1414). The log branch is a difference of logarithms.
         ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 3))
         P = TimeArray(ts, [100.0 50.0; 110.0 45.0; 121.0 54.0], [:a, :b])
-        simple = [110/100-1 45/50-1; 121/110-1 54/45-1]
+        simple = [(110-100)/100 (45-50)/50; (121-110)/110 (54-45)/45]
         logret = [log(110 / 100) log(45 / 50); log(121 / 110) log(54 / 45)]
 
         rs = prices_to_returns(P)
-        @test rs.X ≈ simple
-        @test rs.X ==
-              expm1.(log.([110.0 45.0; 121.0 54.0]) .- log.([100.0 50.0; 110.0 45.0]))
+        @test rs.X == simple
         @test rs.nx == ["a", "b"]
         @test rs.ts == ts[2:3]
 
@@ -423,7 +421,20 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         rp = prices_to_returns(P; padding = true)
         @test rp.ts == ts
         @test all(isnan, rp.X[1, :])
-        @test rp.X[2:3, :] ≈ simple
+        @test rp.X[2:3, :] == simple
+
+        # #1414: the difference of two prices within a factor of two of each other is exact,
+        # so the division is the one rounding and the return is correctly rounded. The jump
+        # from 100.3 to 1000.7 rounds twice, and stays within one ulp. The old route,
+        # `expm1` of a log difference, matched no cell of this example exactly.
+        pq = [100.0, 100.1, 99.95, 100.3, 1000.7, 999.9]
+        tq = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 6))
+        rq = vec(prices_to_returns(TimeArray(tq, reshape(pq, :, 1), [:a])).X)
+        exact = big.(pq[2:end]) ./ big.(pq[1:(end - 1)]) .- 1
+        @test rq == (pq[2:end] .- pq[1:(end - 1)]) ./ pq[1:(end - 1)]
+        @test rq[[1, 2, 3, 5]] == Float64.(exact[[1, 2, 3, 5]])
+        @test abs(rq[4] - exact[4]) <= eps(rq[4])
+        @test rq != expm1.(log.(pq[2:end]) .- log.(pq[1:(end - 1)]))
 
         # A `NaN` price is carried, not deleted. The clock keeps its row, and the two
         # returns of `a` that read the absent price are the ones left non-finite: nothing
@@ -444,15 +455,23 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
               [210/200-1 145/150-1; 221/210-1 154/145-1]
         @test_throws MethodError prices_to_returns(P; map_func = (t, v) -> (t, 2 .* v))
 
-        # Both branches run through a logarithm, so both need a positive price. The simple
-        # branch throws too, although the closed form it documents is defined there.
-        @test_throws DomainError prices_to_returns(TimeArray(ts,
-                                                             [100.0 50.0; -110.0 45.0;
-                                                              121.0 54.0], [:a, :b]))
-        @test_throws DomainError prices_to_returns(TimeArray(ts,
-                                                             [100.0 50.0; -110.0 45.0;
-                                                              121.0 54.0], [:a, :b]);
-                                                   ret_method = :log)
+        # A price has no sign, so both branches refuse a negative price. The quotient of
+        # the simple branch takes no logarithm, so an explicit check refuses it (#1414),
+        # names the column, and skips an absent price.
+        neg_px = TimeArray(ts, [100.0 50.0; -110.0 45.0; 121.0 54.0], [:a, :b])
+        @test_throws DomainError prices_to_returns(neg_px)
+        @test_throws DomainError prices_to_returns(neg_px; ret_method = :log)
+        neg_err = try
+            prices_to_returns(neg_px)
+        catch err
+            err
+        end
+        @test neg_err.val == ["a"]
+        neg_f = TimeArray(ts, reshape([101.0, -102.0, 103.0], :, 1), [:f1])
+        @test_throws DomainError prices_to_returns(price_ingestion(PriceIngestion(), P;
+                                                                   F = neg_f))
+        @test prices_to_returns(TimeArray(ts, [100.0 -0.0; 110.0 45.0; 121.0 54.0],
+                                          [:a, :b])).X[1, 2] == Inf
         # A zero price is an infinity rather than a throw, on either branch.
         zero_px = TimeArray(ts, [100.0 50.0; 0.0 45.0; 121.0 54.0], [:a, :b])
         @test prices_to_returns(zero_px).X[:, 1] == [-1.0, Inf]
@@ -975,7 +994,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @testset "the writable set is the invariant, held once" begin
             base = prices_to_returns(Zg)
             rB = view(base.X, :, 2)
-            # `percentchange` reads two consecutive prices, so the k = 2 suspension leaves
+            # A return reads two consecutive prices, so the k = 2 suspension leaves
             # k + 1 = 3 non-finite returns, and the inception and the delisting one each.
             @test findall(!isfinite, rB) == [1, 3, 4, 5, 7]
             @test findall(!isfinite, view(base.X, :, 1)) == Int[]
@@ -1011,8 +1030,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             # stay non-finite and the re-pricing observation carries the whole move. The
             # inception cell (1) and the delisting cell (7) are untouched.
             @test findall(!isfinite, rB) == [1, 3, 4, 7]
-            @test rB[5] ≈ 24 / 21 - 1
-            @test rB[5] == expm1(log(24.0) - log(21.0))
+            @test rB[5] == (24 - 21) / 21
             # No return is written before the first price, and none after the last.
             @test !isfinite(rB[1])
             @test !isfinite(rB[7])

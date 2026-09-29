@@ -191,3 +191,29 @@ the default rule, so every cell the old rule admitted for a gap is still admitte
 `CatchUpGapReturn` writes the same values as before, in the batch conversion and in the online step.
 Only the cells of a zero price leave the set. The invariant this ADR states, that a cell computed
 from two observed prices is never altered, now holds without an exception.
+
+## Amendment (2026-09-29): the simple branch is `(p[t] - p[t-1]) / p[t-1]`, not `TimeSeries.percentchange`
+
+This ADR says that `prices_to_returns` computes returns with `TimeSeries.percentchange`. That
+function computes a simple return as `expm1` of a difference of two logarithms. Each logarithm
+rounds by about `eps * |ln p|`, and the difference cancels. #1414 measured a relative error of
+`1.1e-12` on prices near 100, so every parity test of a returns output needed a tolerance above
+`1e-12` for this cause alone.
+
+The simple branch is now `(p[t] - p[t-1]) / p[t-1]`, in `prices_to_returns` and in
+`gap_return_value`. When the two prices are within a factor of two of each other, the difference is
+exact (Sterbenz), and the division is the one rounding, so the return is correctly rounded. The
+quotient form `p[t] / p[t-1] - 1` was measured too, and it is worse on a small return: the quotient
+rounds by half an ulp of a number near one, and the subtraction of one keeps that absolute error. On
+the 2500 cells of a fixture of prices in `(0, 1)`, the largest error against the exact return was 0
+ulps for the difference form, 331 ulps for the log route, and 10317 ulps for the quotient form.
+
+The log branch keeps `TimeSeries.percentchange`. The difference form takes no logarithm, so it does
+not throw on a negative price. `prices_to_returns` now refuses a negative price on both branches
+with a `DomainError` of its own, which names the columns.
+
+Nothing that this ADR decides moves. A return still reads two consecutive prices, a gap still
+stays in its own column, and the writable set is the same. A zero price still gives `-1` on its
+observation and `Inf` on the next, and a signed zero `-0.0` reads as a zero price. An infinite price
+now gives `NaN` on the next observation, where the log route gave `-1`; an infinite price is not a
+price, and neither value is a return. Every simple return of the library changes in its last bits.

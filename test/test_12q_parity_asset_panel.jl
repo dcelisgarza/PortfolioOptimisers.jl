@@ -3,12 +3,14 @@ Parity of map #1375 for the Asset Panel, its builder, its views, the ingestion a
 export (#1378). Every `Parity_*` file this test reads is an output of the oracle, stored with the
 harness of #1376, and each testset states how its case was made.
 
-Two measured differences are open child issues of the map, and the test pins today's value of each:
+A measured difference is an open child issue of the map, and the test pins today's value of it:
 
   - #1413: `ForwardPanelFill` and `BackwardPanelFill` carry a value across an inactive stretch of
     the active mask, where the oracle stops at the edge of the stretch.
-  - #1414: a simple return goes through a logarithm, so it carries a relative round-off up to
-    1.1e-12 against the closed form. The returns comparisons set `rtol = 1.2e-12` for it.
+
+#1414 is closed. A simple return is `(p_t - p_{t-1}) / p_{t-1}`, which is correctly rounded on all
+58 finite returns of the ingestion case, where the oracle's `p_t / p_{t-1} - 1` is exact on 2. The
+returns comparisons keep `rtol = 1e-12`, and the difference left is the oracle's own rounding.
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 
@@ -189,9 +191,10 @@ end
         r0 = prices_to_returns(ic.X)
         live = r0.pnl.amsk
         # The default conversion keeps every gap: a run of k gapped prices is k + 1 NaN returns.
-        # rtol = 1.2e-12 for #1414; measured maxrel = 1.1e-12, maxabs = 7.8e-16.
+        # rtol = 1e-12; measured maxrel = 1.1e-13, maxabs = 1.0e-16 on the four returns cases,
+        # the oracle's rounding of its quotient (#1414).
         on = parity_load("prices_to_returns", "IngestNoFill", "X")
-        @test parity_compare(r0.X, on; rtol = 1.2e-12, name = "no fill").ok
+        @test parity_compare(r0.X, on; rtol = 1e-12, name = "no fill").ok
         # PriceGapFill carries a price inside the Listing Span and not past it. On the active
         # cells it is the oracle's forward fill; after the delisting the oracle carries the last
         # price, a return of zero, and the Span Rule makes the asset inactive (#955).
@@ -199,8 +202,8 @@ end
         r2 = prices_to_returns(PO.apply_preprocessing(PO.fit_preprocessing(PriceGapFill(),
                                                                            pr), pr))
         ok = parity_load("prices_to_returns", "IngestFillKeep", "X")
-        @test parity_compare(ifelse.(live, r2.X, NaN), ifelse.(live, ok, NaN);
-                             rtol = 1.2e-12, name = "fill").ok
+        @test parity_compare(ifelse.(live, r2.X, NaN), ifelse.(live, ok, NaN); rtol = 1e-12,
+                             name = "fill").ok
         @test all(iszero, ok[11:14, 4]) &&
               !any(live[11:14, 4]) &&
               all(isnan, r2.X[11:14, 4])
@@ -210,12 +213,12 @@ end
         rows = Int.(vec(parity_load("prices_to_returns", "IngestDefault", "Rows")))
         @test rows == 4:14
         @test parity_compare(ifelse.(live[rows, :], r2.X[rows, :], NaN),
-                             ifelse.(live[rows, :], od, NaN); rtol = 1.2e-12, name = "cut").ok
+                             ifelse.(live[rows, :], od, NaN); rtol = 1e-12, name = "cut").ok
         # CatchUpGapReturn books the catch-up of the oracle's fill route on the first priced
         # observation and keeps the Held Gap, where the fill route books zeros (#963).
         r1 = prices_to_returns(ic.X; gap_return_alg = CatchUpGapReturn())
         m = isfinite.(r1.X)
-        @test parity_compare(r1.X[m], ok[m]; rtol = 1.2e-12, name = "catch-up").ok
+        @test parity_compare(r1.X[m], ok[m]; rtol = 1e-12, name = "catch-up").ok
         @test all(isnan, r1.X[6:7, 3]) && all(iszero, ok[6:7, 3]) && isnan(r1.X[9, 5])
         # The listing half of the Span Rule is the oracle's; the delisting half is an addition.
         oa = parity_load("universe_masks", "Ingest", "ActiveAligned") .== 1
