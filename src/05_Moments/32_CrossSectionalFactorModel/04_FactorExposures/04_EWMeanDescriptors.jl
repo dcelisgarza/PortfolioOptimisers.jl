@@ -428,16 +428,17 @@ $(DocStringExtensions.FIELDS)
                    <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
                    <:AbstractVector{<:AbstractString}},
         nonneg::Option{<:VecStr} = nothing,
+        gt0::Option{<:VecStr} = nothing,
         decay::Real,
         min_obs::Integer
     ) -> EWVolumeRatio
 
-Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because they depend on the data frequency. [`EWShareTurnover`](@ref) and [`EWAmihudIlliquidity`](@ref) state a half-life instead. `nonneg` is `nothing` by default, because a side that combines Panel Fields, such as `["adj_volume" => 1, "short_interest" => -1]`, can be negative by design. The two presets name every Panel Field they read.
+Keywords correspond to the struct's fields. `decay` and `min_obs` take no default, because they depend on the data frequency. [`EWShareTurnover`](@ref) and [`EWAmihudIlliquidity`](@ref) state a half-life instead. `nonneg` is `nothing` by default, because a side that combines Panel Fields, such as `["adj_volume" => 1, "short_interest" => -1]`, can be negative by design, and `gt0` is `nothing` for the same reason. The two presets name every Panel Field they read, and put a share count or a price in `gt0`.
 
 ## Validation
 
   - The rules of [`assert_ew_ratio_side`](@ref) for `num` and for `den`.
-  - Every name in `nonneg` is a Panel Field that `num` or `den` reads, see [`assert_panel_guard_names`](@ref).
+  - Every name in `nonneg` and in `gt0` is a Panel Field that `num` or `den` reads, see [`assert_panel_guard_names`](@ref).
   - $(val_dict[:decay])
   - $(val_dict[:min_obs])
 
@@ -450,6 +451,7 @@ EWVolumeRatio
       num ┼ String: "adj_volume"
       den ┼ String: "adj_shares_outstanding"
    nonneg ┼ nothing
+      gt0 ┼ nothing
     decay ┼ Float64: 0.5
   min_obs ┴ Int64: 2
 ```
@@ -477,6 +479,10 @@ EWVolumeRatio
     """
     nonneg
     """
+    $(field_dict[:gt0_pnl])
+    """
+    gt0
+    """
     $(field_dict[:decay])
     """
     decay
@@ -490,15 +496,17 @@ EWVolumeRatio
                            den::Union{Nothing, <:AbstractString,
                                       <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
                                       <:AbstractVector{<:AbstractString}},
-                           nonneg::Option{<:VecStr}, decay::Real, min_obs::Integer)
+                           nonneg::Option{<:VecStr}, gt0::Option{<:VecStr}, decay::Real,
+                           min_obs::Integer)
         assert_ew_ratio_side(num, :num)
         assert_ew_ratio_side(den, :den)
-        assert_panel_guard_names(nonneg, vcat(panel_term_names(num), panel_term_names(den)),
-                                 :nonneg)
+        known = vcat(panel_term_names(num), panel_term_names(den))
+        assert_panel_guard_names(nonneg, known, :nonneg)
+        assert_panel_guard_names(gt0, known, :gt0)
         assert_ew_decay(decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
-        return new{typeof(num), typeof(den), typeof(nonneg), typeof(decay),
-                   typeof(min_obs)}(num, den, nonneg, decay, min_obs)
+        return new{typeof(num), typeof(den), typeof(nonneg), typeof(gt0), typeof(decay),
+                   typeof(min_obs)}(num, den, nonneg, gt0, decay, min_obs)
     end
 end
 function EWVolumeRatio(;
@@ -508,9 +516,9 @@ function EWVolumeRatio(;
                        den::Union{Nothing, <:AbstractString,
                                   <:AbstractVector{<:Pair{<:AbstractString, <:Real}},
                                   <:AbstractVector{<:AbstractString}},
-                       nonneg::Option{<:VecStr} = nothing, decay::Real,
-                       min_obs::Integer)::EWVolumeRatio
-    return EWVolumeRatio(num, den, nonneg, decay, min_obs)
+                       nonneg::Option{<:VecStr} = nothing, gt0::Option{<:VecStr} = nothing,
+                       decay::Real, min_obs::Integer)::EWVolumeRatio
+    return EWVolumeRatio(num, den, nonneg, gt0, decay, min_obs)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -633,7 +641,7 @@ Each of the three archetypes builds one `observations × assets` matrix and runs
 The method that Julia selects is the algorithm.
 
  1. [`EWMean`](@ref): check the returns through [`assert_log_returns`](@ref), then run the recursion over `log1p(rd.X)` delayed by `skip` observations. The first `skip` rows have no input. Take `expm1` of the series when `exponentiate` is set.
- 2. [`EWVolumeRatio`](@ref): check the `nonneg` guard through [`assert_panel_field_sign`](@ref), read both sides through [`ew_ratio_values`](@ref), divide them through [`positive_divide`](@ref), and run the recursion over the ratio.
+ 2. [`EWVolumeRatio`](@ref): check the `nonneg` and `gt0` guards through [`assert_panel_field_sign`](@ref), read both sides through [`ew_ratio_values`](@ref), divide them through [`positive_divide`](@ref), and run the recursion over the ratio.
  3. [`DaysToCover`](@ref): check the `nonneg` guard through [`assert_panel_field_sign`](@ref), run the recursion over the denominator's Panel Field, with every value that is not strictly positive read as a `NaN`, then divide the numerator's Panel Field by the series through [`positive_divide`](@ref).
 
 Every method then writes `NaN` into the inactive cells.
@@ -648,7 +656,7 @@ Every method then writes `NaN` into the inactive cells.
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
   - The rules of [`panel_field_values`](@ref) for every Panel Field the estimator names.
   - The rule of [`assert_log_returns`](@ref) for an [`EWMean`](@ref).
-  - The rule of [`assert_panel_field_sign`](@ref) for the `nonneg` guard of an [`EWVolumeRatio`](@ref) or a [`DaysToCover`](@ref).
+  - The rule of [`assert_panel_field_sign`](@ref) for the `nonneg` guard of an [`EWVolumeRatio`](@ref) or a [`DaysToCover`](@ref), and for the `gt0` guard of an [`EWVolumeRatio`](@ref).
 
 # Returns
 
@@ -707,6 +715,7 @@ end
 function descriptor(de::EWVolumeRatio, rd::ReturnsResult)::Matrix{<:Real}
     pnl = descriptor_asset_panel(rd)
     assert_panel_field_sign(rd, de.nonneg, false)
+    assert_panel_field_sign(rd, de.gt0, true)
     A = ew_ratio_values(rd, de.num)
     B = ew_ratio_values(rd, de.den)
     D = ew_mean_series(positive_divide.(A, B), de.decay, de.min_obs)
@@ -778,7 +787,8 @@ end
 """
     EWShareTurnover(; num::AbstractString = "adj_volume",
                     den::AbstractString = "adj_shares_outstanding",
-                    nonneg::Option{<:VecStr} = [num, den], half_life::Real = 21.0,
+                    nonneg::Option{<:VecStr} = [num, den],
+                    gt0::Option{<:VecStr} = [den], half_life::Real = 21.0,
                     decay::Real = half_life_decay(half_life),
                     min_obs::Integer = half_life_min_obs(half_life)) -> EWVolumeRatio
 
@@ -791,6 +801,7 @@ The value is the recursion of [`EWVolumeRatio`](@ref) over `adj_volume / adj_sha
   - `num`: Name of the traded volume Panel Field.
   - `den`: Name of the shares outstanding Panel Field. Both must use the same split adjustment.
   - `nonneg`: Names of the Panel Fields that must not be negative, both by default, because neither a volume nor a share count can be negative. `nothing` turns the check off.
+  - `gt0`: Names of the Panel Fields that must be strictly positive, the share count by default, because a listed asset has shares outstanding. A volume can be zero on a day with no trade, so it is not in `gt0`. `nothing` turns the check off, and a share count at or below zero then gives no ratio.
   - `half_life`: Half-life of the recursion, in observations. It fixes the defaults of `decay` and `min_obs`.
   - `decay`: Decay factor of the recursion.
   - `min_obs`: Warm-up, in valid observations per asset.
@@ -812,6 +823,7 @@ EWVolumeRatio
       num ┼ String: \"adj_volume\"
       den ┼ String: \"adj_shares_outstanding\"
    nonneg ┼ Vector{String}: [\"adj_volume\", \"adj_shares_outstanding\"]
+      gt0 ┼ Vector{String}: [\"adj_shares_outstanding\"]
     decay ┼ Float64: 0.7071067811865476
   min_obs ┴ Int64: 2
 ```
@@ -825,16 +837,18 @@ EWVolumeRatio
 """
 function EWShareTurnover(; num::AbstractString = "adj_volume",
                          den::AbstractString = "adj_shares_outstanding",
-                         nonneg::Option{<:VecStr} = [num, den], half_life::Real = 21.0,
+                         nonneg::Option{<:VecStr} = [num, den],
+                         gt0::Option{<:VecStr} = [den], half_life::Real = 21.0,
                          decay::Real = half_life_decay(half_life),
                          min_obs::Integer = half_life_min_obs(half_life))::EWVolumeRatio
-    return EWVolumeRatio(; num = num, den = den, nonneg = nonneg, decay = decay,
+    return EWVolumeRatio(; num = num, den = den, nonneg = nonneg, gt0 = gt0, decay = decay,
                          min_obs = min_obs)
 end
 """
     EWAmihudIlliquidity(; den::AbstractVector{<:AbstractString} = ["adj_close",
                                                                    "adj_volume"],
-                        nonneg::Option{<:VecStr} = copy(den), half_life::Real = 63.0,
+                        nonneg::Option{<:VecStr} = copy(den),
+                        gt0::Option{<:VecStr} = den[1:1], half_life::Real = 63.0,
                         decay::Real = half_life_decay(half_life),
                         min_obs::Integer = half_life_min_obs(half_life)) -> EWVolumeRatio
 
@@ -846,6 +860,7 @@ The value is the recursion of [`EWVolumeRatio`](@ref) over `abs(r) / (adj_close 
 
   - `den`: Names of the two Panel Fields whose product is the traded amount, a price and a volume on the same split adjustment.
   - `nonneg`: Names of the Panel Fields that must not be negative, both names of `den` by default, because neither a price nor a volume can be negative. `nothing` turns the check off.
+  - `gt0`: Names of the Panel Fields that must be strictly positive, the first name of `den`, the price, by default, because a price is positive by construction. A volume can be zero on a day with no trade, so it is not in `gt0`. `nothing` turns the check off.
   - `half_life`: Half-life of the recursion, in observations. It fixes the defaults of `decay` and `min_obs`.
   - `decay`: Decay factor of the recursion.
   - `min_obs`: Warm-up, in valid observations per asset.
@@ -867,6 +882,7 @@ EWVolumeRatio
       num ┼ nothing
       den ┼ Vector{String}: [\"adj_close\", \"adj_volume\"]
    nonneg ┼ Vector{String}: [\"adj_close\", \"adj_volume\"]
+      gt0 ┼ Vector{String}: [\"adj_close\"]
     decay ┼ Float64: 0.7071067811865476
   min_obs ┴ Int64: 2
 ```
@@ -881,11 +897,12 @@ EWVolumeRatio
 function EWAmihudIlliquidity(;
                              den::AbstractVector{<:AbstractString} = ["adj_close",
                                                                       "adj_volume"],
-                             nonneg::Option{<:VecStr} = copy(den), half_life::Real = 63.0,
+                             nonneg::Option{<:VecStr} = copy(den),
+                             gt0::Option{<:VecStr} = den[1:1], half_life::Real = 63.0,
                              decay::Real = half_life_decay(half_life),
                              min_obs::Integer = half_life_min_obs(half_life))::EWVolumeRatio
-    return EWVolumeRatio(; num = nothing, den = den, nonneg = nonneg, decay = decay,
-                         min_obs = min_obs)
+    return EWVolumeRatio(; num = nothing, den = den, nonneg = nonneg, gt0 = gt0,
+                         decay = decay, min_obs = min_obs)
 end
 
 export EWMean, EWVolumeRatio, DaysToCover, EWMomentum, EWShareTurnover, EWAmihudIlliquidity

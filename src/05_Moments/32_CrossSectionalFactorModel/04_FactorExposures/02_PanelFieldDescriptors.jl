@@ -226,7 +226,7 @@ PanelFieldRatio
     """
     pos
     """
-    Names of Panel Fields that must be strictly positive wherever they are observed and active, or `nothing`. A value at or below zero raises a `DomainError`, because a price, a market capitalisation, a share count or a total of assets at or below zero is a data error and not a state of the firm.
+    $(field_dict[:gt0_pnl])
     """
     gt0
     function PanelFieldRatio(num::Union{<:AbstractString,

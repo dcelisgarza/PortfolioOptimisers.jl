@@ -191,7 +191,7 @@ caller. The rule now separates the two cases:
 | Denominator | Valid at or below zero? | Result |
 | --- | --- | --- |
 | a price, a market capitalisation, a share count, a total of assets | no | the named constructor refuses it through the new `gt0` guard |
-| a debt, a sales figure | zero only | a negative value refuses through `nonneg`; a zero gives `NaN` |
+| a debt, a sales figure, a traded volume | zero only | a negative value refuses through `nonneg`; a zero gives `NaN` |
 | a book equity, an enterprise value, a total capital, the lagged base of a growth rate | yes | `NaN`: the ratio is not defined for that firm at that observation |
 
 `PanelFieldRatio` gains the field `gt0`, after `pos`: the names of Panel Fields that must be
@@ -199,7 +199,9 @@ strictly positive wherever they are observed and active. `PanelFieldLog`, `Chang
 `ChangeInIntensity` gain a Boolean `gt0` for their field or their scale. `assert_panel_field_sign`
 checks both guards, and replaces `assert_nonneg_panel_fields`. Each named constructor sets the
 guards of its default fields; `MarketLeverage` moves its market capitalisation from `pos` to
-`gt0`. The archetypes default to no guard, so a caller who wants `NaN` in such a cell builds the
+`gt0`. `EWVolumeRatio` gains the same `gt0` list, after `nonneg`: `EWShareTurnover` puts its
+share count in it and `EWAmihudIlliquidity` its price, and a volume, which is zero on a day with
+no trade, stays in `nonneg` alone. The archetypes default to no guard, so a caller who wants `NaN` in such a cell builds the
 archetype with the field in `pos`, or with `gt0 = false`. That is the oracle's output wherever
 the oracle does not refuse, so no output is out of reach (ADR 0186).
 

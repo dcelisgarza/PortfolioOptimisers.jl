@@ -263,6 +263,36 @@ end
         @test ew_same(D, ew_hand_mean(R, lam, 1))
         @test D[3, 2] == D[2, 2]
     end
+    @testset "A preset refuses a share count or a price at or below zero, not a zero volume" begin
+        # A share count and a price are positive by construction, so the `gt0` guard of the
+        # presets refuses a value at or below zero (#1379, ADR 0108). A volume is zero on a
+        # day with no trade, so it is not guarded, and its ratio is NaN.
+        @test EWShareTurnover().gt0 == ["adj_shares_outstanding"]
+        @test EWAmihudIlliquidity().gt0 == ["adj_close"]
+        @test EWAmihudIlliquidity(; den = ["p", "v"]).gt0 == ["p"]
+        @test isnothing(EWVolumeRatio(; num = "a", den = "b", decay = lam, min_obs = 1).gt0)
+        @test_throws ArgumentError EWShareTurnover(; gt0 = ["adj_close"])
+        fields(; v = vol, s = shr, p = px) = ["adj_volume" => copy(v),
+                                              "adj_shares_outstanding" => copy(s),
+                                              "adj_close" => copy(p),
+                                              "short_interest" => copy(si)]
+        zshr = copy(shr)
+        zshr[3, 2] = 0.0
+        rdz = ew_hand_panel(fields(; s = zshr), X)
+        @test_throws DomainError descriptor(EWShareTurnover(; half_life = 2), rdz)
+        # With the guard off, the zero share count gives no ratio and holds the state.
+        D = descriptor(EWShareTurnover(; half_life = 2, min_obs = 1, gt0 = nothing), rdz)
+        @test D[3, 2] == D[2, 2]
+        npx = copy(px)
+        npx[2, 1] = -1.0
+        rdn = ew_hand_panel(fields(; p = npx), X)
+        @test_throws DomainError descriptor(EWAmihudIlliquidity(; half_life = 2), rdn)
+        zvol = copy(vol)
+        zvol[2, 1] = 0.0
+        rdv = ew_hand_panel(fields(; v = zvol), X)
+        @test size(descriptor(EWShareTurnover(; half_life = 2), rdv)) == size(X)
+        @test size(descriptor(EWAmihudIlliquidity(; half_life = 2), rdv)) == size(X)
+    end
     @testset "DaysToCover smooths the denominator alone, and only a positive value advances" begin
         zvol = copy(vol)
         zvol[3, 1] = 0.0
