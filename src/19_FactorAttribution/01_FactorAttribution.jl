@@ -1201,7 +1201,7 @@ The verb reads the weights and the factor model block, and returns one [`FactorA
 
 **Every source of unexplained return lands in the remainder, and no guard reports it.** On the realised side the identity per observation is `portfolio return = systematic + idiosyncratic + unattributed`, and the remainder holds the per-observation intercept share `b_t * sum(w)`, the fees, the cash, the weight drift inside a period and the exposure lag. A large `pct_var` on the remainder means the model does not explain the portfolio, and the reader draws that conclusion.
 
-**A holding the prior could not estimate gets a warning and a zero contribution, and `strict` turns the warning into a refusal.** A non-investable asset carries `NaN` in `mu`, on the diagonal of `sigma` and across its rows of the block, so no moment of it exists to attribute. A portfolio that holds one takes the library's strictness policy through [`attribution_investable_diagnostic`](@ref). Under the default `strict = false` a warning names the assets, the verb replaces every `NaN` with zero, and the decomposition attributes nothing to them. Under `strict = true` an `ArgumentError` names them. On the realised side a held asset whose return is non-finite at an observation takes the same policy through [`attribution_net_returns`](@ref), which names the observations and the assets, and zeroes those pairs. A weight history from a walk-forward holds exactly this shape whenever an asset delisted inside the history, which is why the default warns rather than refuses.
+**A holding the prior could not estimate gets a warning and a zero contribution, and `strict` turns the warning into a refusal.** A non-investable asset carries `NaN` at least on the diagonal of `sigma`, so its variance is unknown, and with it the variance of any portfolio that holds it. A portfolio that holds one takes the library's strictness policy through [`attribution_investable_diagnostic`](@ref). Under the default `strict = false` a warning names the assets, the verb replaces every `NaN` with zero, and the decomposition attributes nothing to them. Under `strict = true` an `ArgumentError` names them. On the realised side a held asset whose return is non-finite at an observation takes the same policy through [`attribution_net_returns`](@ref), which names the observations and the assets, and zeroes those pairs. A pair the block cannot decompose, with no idiosyncratic return or no exposure, is zero in the systematic and the idiosyncratic series too, through [`attribution_zero_inactive`](@ref), so a pair that adds nothing to the total adds nothing to any component. A weight history from a walk-forward holds exactly this shape whenever an asset delisted inside the history, which is why the default warns rather than refuses.
 
 **The factor shares disagree with [`factor_risk_contribution`](@ref), and the disagreement is one term.** That verb computes `(M' w)_k * (pinv(M) * grad)_k` with `grad` a finite difference of any risk measure, so for the variance and `sigma = M F M' + D` it reads `grad = (M F M' w + D w) / sigma_P` and its factor share is `(M' w)_k * (F M' w + pinv(M) D w)_k / sigma_P`. This decomposition's factor share is the first term alone, `(M' w)_k * (F M' w)_k / sigma_P`, and it holds the second, the leakage `(M' w)_k * (pinv(M) D w)_k / sigma_P`, in the idiosyncratic component instead. The two therefore agree exactly when `pinv(M) D w` is zero. Neither is wrong. That verb is an Euler decomposition through a pseudo-inverse and holds for any risk measure, and this one is the analytic split of the model, specific to the variance.
 
@@ -1374,7 +1374,9 @@ function factor_attribution(w::VecNum, pr::AbstractPriorResult; assets::Bool = f
                                bexp .* mu_f .* sc.s1, nothing)
     fmbd = attribution_family_axis(attribution_families(rr), fbd, nothing, nothing)
     abd, afc = predicted_attribution_assets(assets, w,
-                                            (; M = M, F = F, mu_f = mu_f, D = D, bp = bp),
+                                            (; M = M, F = F, mu_f = mu_f, D = D, bp = bp,
+                                             Mr = rr.M, bpr = rr.b,
+                                             er = attribution_idiosyncratic_covariance(rr)),
                                             Fb, sigma_p, sc)
     return FactorAttributionResult(sys, idio, unattr, total, fbd, fmbd, abd, afc, false,
                                    ppy)
@@ -1390,6 +1392,8 @@ end
 Return the asset axis and the asset-by-factor matrices of a predicted attribution.
 
 The asset axis decomposes the model, not the totals. Every row reads `M F M' + D` and `M mu_f + b`, so the systematic rows sum to the systematic component, the idiosyncratic rows to the idiosyncratic component, and `vol_contrib` to the two together. It therefore does not reach the total, and the difference is the unattributed remainder, which is a property of the portfolio and has no per-asset split. The realised asset axis satisfies the same identity, so a reader compares the two sides row by row.
+
+The contributions of a non-investable asset are zero, because the decomposition describes the portfolio without it. Its standalone numbers are moments of the asset, not contributions, so they read the block's own entries. The model states the mean of an asset whose loadings and factor-orthogonal mean it states, and it states no volatility for an asset whose idiosyncratic variance is unknown, in the warm-up of a relisted asset for example: that volatility and its correlation are `NaN`, and a zero would state a moment the block does not hold.
 
 # Mathematical definition
 
@@ -1443,7 +1447,7 @@ Summed over the assets, ``\\mathrm{VC}^{S}_{i}`` gives ``\\sqrt{p}\\, \\boldsymb
 
   - `assets`: Whether to compute the two answers at all.
   - `w`: Portfolio weights.
-  - `mdl`: The factor model: the raw loadings `M`, the factor covariance `F`, the expected factor returns `mu_f`, the idiosyncratic covariance `D` and the factor-orthogonal expected return `bp`.
+  - `mdl`: The factor model: the loadings `M`, the factor covariance `F`, the expected factor returns `mu_f`, the idiosyncratic covariance `D` and the factor-orthogonal expected return `bp`, each zero on the rows of a non-investable asset, and the block's own loadings `Mr`, factor-orthogonal expected return `bpr` and idiosyncratic covariance `er`, which the standalone numbers read.
   - `Fb`: The product of the factor covariance and the portfolio exposure.
   - `sigma_p`: Portfolio volatility.
   - `sc`: The two annualisation factors.
@@ -1468,7 +1472,12 @@ function predicted_attribution_assets(assets::Bool, w::VecNum, mdl::NamedTuple, 
     sys_cov = M * F * transpose(M)
     full_cov = sys_cov + D
     cov_p = full_cov * w
-    vol = sqrt.(max.(LinearAlgebra.diag(full_cov), zero(eltype(sys_cov))))
+    # The standalone numbers read the block's own entries, so an entry the block does not state
+    # stays `NaN`, and a non-investable asset states the moments the model determines for it.
+    Mr = mdl.Mr
+    var_r = vec(sum((Mr * F) .* Mr; dims = 2)) .+
+            LinearAlgebra.diag(attribution_idiosyncratic_matrix(mdl.er))
+    vol = sqrt.(max.(var_r, zero(eltype(var_r))))
     vol_contrib = w .* cov_p ./ sigma_p
     sys_mu_contrib = w .* (M * mu_f)
     idio_mu_contrib = w .* bp
@@ -1478,7 +1487,7 @@ function predicted_attribution_assets(assets::Bool, w::VecNum, mdl::NamedTuple, 
                                     idio_mu_contrib .* sc.s1, vol .* sc.s2,
                                     [attribution_safe_corr(cov_p[i], vol[i], sigma_p)
                                      for i in eachindex(vol)], vol_contrib .* sc.s2,
-                                    vol_contrib ./ sigma_p, (M * mu_f .+ bp) .* sc.s1,
+                                    vol_contrib ./ sigma_p, (Mr * mu_f .+ mdl.bpr) .* sc.s1,
                                     (sys_mu_contrib .+ idio_mu_contrib) .* sc.s1)
     afc = AssetFactorContribution((w * transpose(Fb)) .* M ./ sigma_p .* sc.s2,
                                   (w * transpose(mu_f)) .* M .* sc.s1)

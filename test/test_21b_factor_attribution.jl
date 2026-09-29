@@ -48,6 +48,10 @@ function fa_factors()
             "value" => CompositeExposure(; descriptors = [BookToPrice()], family = "style")]
 end
 
+# An idiosyncratic variance estimate with no warm-up, so the standard errors read a stated variance
+# at every pair of the regression.
+const FA_VE1 = RegimeAdjustedExpWeightedVariance(; centred = true, min_obs = 1)
+
 function fa_prior(; n_assets::Integer = 20, n_observations::Integer = 60,
                   n_industries::Integer = 3, seed::Integer = 782_001, kwargs...)
     rd = synthetic_asset_panel(; n_assets = n_assets, n_observations = n_observations,
@@ -386,9 +390,13 @@ end
     lag, Tb = rr.lag, size(rr.csr.f, 1)
     n = Tb - lag
     rows = [Tx - Tb + lag + j for j in 1:n]
-    B = [fin.(rr.Ms[j, :, :]) for j in 1:n]
+    # A pair with no idiosyncratic return or no exposure adds nothing to the net series, so it
+    # is zero in both the exposure and the idiosyncratic return (#1388).
+    act = [all(isfinite, rr.Ms[j, i, :]) && isfinite(rr.csr.eps[j + lag, i])
+           for j in 1:n, i in 1:N]
+    B = [act[j, :] .* fin.(rr.Ms[j, :, :]) for j in 1:n]
     F = fin.(rr.csr.f[(1:n) .+ lag, :])
-    E = fin.(rr.csr.eps[(1:n) .+ lag, :])
+    E = act .* fin.(rr.csr.eps[(1:n) .+ lag, :])
     W = Wh[rows, :]
     r = ret[rows]
     sig = std(r)
@@ -441,14 +449,16 @@ end
         @test fa.abd.idio_vol_contrib ≈
               [cv(W[:, i] .* E[:, i]) / sig for i in 1:N] .* sqrt(ppy)
         @test fa.abd.idio_mu_contrib ≈ vec(mean(W .* E; dims = 1)) .* ppy
-        @test fa.abd.vol ≈ vec(std(A; dims = 1)) .* sqrt(ppy)
-        # An asset the prior could not estimate has a model return of zero, so no correlation.
-        @test isapprox(fa.abd.corr,
-                       [std(A[:, i]) > 0 ? cv(A[:, i]) / (std(A[:, i]) * sig) : NaN
-                        for i in 1:N]; nans = true)
+        # The standalone numbers read the active pairs of the asset alone. An asset with fewer
+        # than two has no volatility and no correlation, and one with none has no mean.
+        a(i) = A[act[:, i], i]
+        ra(i) = r[act[:, i]]
+        @test isapprox(fa.abd.vol, [std(a(i)) for i in 1:N] .* sqrt(ppy); nans = true)
+        @test isapprox(fa.abd.corr, [std(a(i)) > 0 ? cor(a(i), ra(i)) : NaN for i in 1:N];
+                       nans = true)
         @test fa.abd.vol_contrib ≈ [cv(W[:, i] .* A[:, i]) / sig for i in 1:N] .* sqrt(ppy)
         @test fa.abd.pct_var ≈ [cv(W[:, i] .* A[:, i]) / sig^2 for i in 1:N]
-        @test fa.abd.mu ≈ vec(mean(A; dims = 1)) .* ppy
+        @test isapprox(fa.abd.mu, [mean(a(i)) for i in 1:N] .* ppy; nans = true)
         @test fa.abd.mu_contrib ≈ vec(mean(W .* A; dims = 1)) .* ppy
     end
     @testset "Each asset-by-factor entry is one term of the systematic return" begin
@@ -511,7 +521,12 @@ end
     # observation is rank-deficient and the sandwich falls back to the pseudo-inverse. The answer is
     # the minimum-norm one, so it is finite; a plain solve would return an arbitrarily large number.
     PO = PortfolioOptimisers
-    pr, rd = fa_prior()
+    # The sandwich reads the idiosyncratic variance of every pair of the regression, so a history
+    # inside the warm-up of the default variance estimate has no standard error (#1388). An
+    # estimate with no warm-up states every variance.
+    pr0, rd = fa_prior()
+    @test isnan(factor_attribution(fa_weights(pr0), pr0, rd.X; se = true).sys.mu_se)
+    pr, rd = fa_prior(; ve = FA_VE1)
     w = fa_weights(pr)
     al = PO.attribution_align(pr.rr, pr, size(rd.X, 1))
     G = transpose(view(al.B, 1, :, :)) * Diagonal(view(al.rw, 1, :)) * view(al.B, 1, :, :)
@@ -1035,7 +1050,7 @@ end
 # fixture above leaves `families` unset, where the two axes happen to agree.
 @testset "A constrained Factor Family leaves the realised decomposition on the raw axis" begin
     PO = PortfolioOptimisers
-    pr, rd = fa_prior(; families = ["industry" => nothing])
+    pr, rd = fa_prior(; families = ["industry" => nothing], ve = FA_VE1)
     rr = pr.rr
     w = fa_weights(pr)
     @testset "The read answers the raw factor axis, not the basis the fit solved in" begin

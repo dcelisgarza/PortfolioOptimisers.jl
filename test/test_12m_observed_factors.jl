@@ -139,7 +139,12 @@ end
         @test size(cs_regression_t_stats(pr.rr), 2) == 1
         @test all(isfinite, cs_regression_r2(pr.rr))
         w = fill(1 / 12, 12)
-        fa = factor_attribution(w, pr, fx.rd.X; se = true)
+        # A standard error reads the idiosyncratic variance of every pair of the regression, so
+        # the attribution fits a variance estimate with no warm-up (#1388).
+        pa = prior(obs_prior(;
+                             ve = RegimeAdjustedExpWeightedVariance(; centred = true,
+                                                                    min_obs = 1)), fx.rd)
+        fa = factor_attribution(w, pa, fx.rd.X; se = true)
         @test isnan(fa.fbd.mu_se[2]) && isnan(fa.fbd.mu_se[3])
         @test isfinite(fa.fbd.mu_se[1])
     end

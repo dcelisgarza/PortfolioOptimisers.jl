@@ -109,10 +109,11 @@ A fit that warmed up on the first observations keeps fewer than the caller's ser
  1. Read the exposure lag `lag`, the factor returns `f` and the idiosyncratic returns `eps` off the block, and the number of block observations `Tb`.
  2. Check that the caller's series is at least as long as the block, and that the block is longer than the lag.
  3. Take the block rows `brows = lag + 1:Tb`, whose returns an exposure explains, and the caller's rows `rows`, the last `Tb - lag` of its `T`. Aligned observation `j` therefore reads the exposures of block row `j`, the returns of block row `j + lag`, and the caller's row `T - Tb + lag + j`.
- 4. Trim the exposure history by `lag` at its tail, giving `B`. A static loadings matrix is kept as it is.
+ 4. Trim the exposure history by `lag` at its tail. A static loadings matrix is kept as it is.
  5. Take the rows `brows` of `f`, of `eps`, of the regression weights `rw` and of the idiosyncratic variances `vs`.
- 6. Replace every non-finite entry of `B`, `f`, `eps`, `rw` and `vs` with zero.
- 7. Slice the family re-basis to its first `Tb - lag` observations, giving `fcb`.
+ 6. Zero every inactive `(observation, asset)` pair of the exposures and of `eps` with [`attribution_zero_inactive`](@ref), giving `B`, `eps` and the mask `act` of the active pairs.
+ 7. Replace every non-finite entry of `f` and `rw` with zero. `vs` keeps its non-finite entries, because a standard error that reads an unknown variance is unknown.
+ 8. Slice the family re-basis to its first `Tb - lag` observations, giving `fcb`.
 
 # Arguments
 
@@ -127,11 +128,12 @@ A fit that warmed up on the first observations keeps fewer than the caller's ser
 
 # Returns
 
-  - `B`: The exposures, static or lag-aligned.
+  - `B`: The exposures, static or lag-aligned, zero at every inactive pair.
   - `f::MatNum`: The lag-aligned factor returns.
-  - `eps::MatNum`: The lag-aligned idiosyncratic returns.
+  - `eps::MatNum`: The lag-aligned idiosyncratic returns, zero at every inactive pair.
+  - `act::AbstractMatrix{Bool}`: Whether each aligned `(observation, asset)` pair is active.
   - `rw::Option{<:MatNum}`: The lag-aligned regression weights, or `nothing`.
-  - `vs::Option{<:MatNum}`: The lag-aligned idiosyncratic variances, or `nothing`.
+  - `vs::Option{<:MatNum}`: The lag-aligned idiosyncratic variances, `NaN` where the block states none, or `nothing`.
   - `fcb::Option{<:AbstractFactorFamilyBasis}`: The family re-basis over the aligned axis, or `nothing`.
   - `rows::UnitRange{Int}`: The rows of the caller's series the aligned history describes.
   - `no::Int`: The number of observed factors, the last factors of the axis, from [`attribution_observed_count`](@ref).
@@ -154,13 +156,13 @@ function attribution_align(rr::AbstractLoadingsRegressionResult, pr::AbstractPri
               DimensionMismatch("the factor model block ($Tb observations) must carry more observations than the exposure lag ($lag)"))
     brows = (lag + 1):Tb
     rows = (T - Tb + lag + 1):T
-    B = attribution_finite(attribution_trim_exposures(attribution_exposures(rr), lag))
+    za = attribution_zero_inactive(attribution_trim_exposures(attribution_exposures(rr),
+                                                              lag), eps[brows, :])
     rw = attribution_trim_rows(attribution_regression_weights(rr), brows)
     vs = attribution_trim_rows(attribution_idiosyncratic_variances(rr), brows)
     fcb = attribution_trim_basis(attribution_family_basis(rr), Tb - lag)
-    return (; B = B, f = attribution_finite(f[brows, :]),
-            eps = attribution_finite(eps[brows, :]), rw = attribution_finite_rows(rw),
-            vs = attribution_finite_rows(vs), fcb = fcb, rows = rows,
+    return (; B = za.B, f = attribution_finite(f[brows, :]), eps = za.eps, act = za.act,
+            rw = attribution_finite_rows(rw), vs = vs, fcb = fcb, rows = rows,
             no = attribution_observed_count(rr))
 end
 """
@@ -189,6 +191,68 @@ function attribution_trim_exposures(B::MatNum, ::Integer)
 end
 function attribution_trim_exposures(B::Arr3Num, lag::Integer)
     return B[1:(size(B, 1) - lag), :, :]
+end
+"""
+    attribution_zero_inactive(B::MatNum, eps::MatNum)
+    attribution_zero_inactive(B::Arr3Num, eps::MatNum)
+
+Return the exposures and the idiosyncratic returns with every inactive pair zeroed, and the mask of the active pairs.
+
+A pair is inactive when the block states no idiosyncratic return for it, or no exposure to one of the factors: the asset was not listed, was on a holiday, or was outside the fit. The net series takes no return from a pair the block cannot decompose, so the pair contributes nothing to the total, and it must contribute nothing to any component. Zeroing only its idiosyncratic return would leave its systematic return `w B f` in the systematic component, and put the opposite amount in the remainder, which then reports a data gap as a return the model does not explain.
+
+A static loadings matrix keeps its shape when every inactive pair belongs to an asset without loadings, because that asset is inactive at every observation. Otherwise the matrix is broadcast to a history first, so a single observation of an asset can be zeroed.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+a_{ti} &= \\mathbb{1}\\left[\\varepsilon_{ti} \\text{ is finite}\\right] \\prod_{k} \\mathbb{1}\\left[B_{tik} \\text{ is finite}\\right]\\,, \\\\
+\\tilde{B}_{tik} &= \\begin{cases} B_{tik} & \\text{if } a_{ti} = 1\\,, \\\\ 0 & \\text{otherwise}\\,, \\end{cases} \\\\
+\\tilde{\\varepsilon}_{ti} &= \\begin{cases} \\varepsilon_{ti} & \\text{if } a_{ti} = 1\\,, \\\\ 0 & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``a_{ti}``: Whether the pair of observation ``t`` and asset ``i`` is active.
+  - ``B_{tik}``, ``\\varepsilon_{ti}``: Entries of ``\\mathbf{B}_{t}`` and ``\\boldsymbol{\\varepsilon}_{t}``. A static matrix is the same ``\\mathbf{B}_{t}`` at every observation.
+  - ``\\tilde{B}_{tik}``, ``\\tilde{\\varepsilon}_{ti}``: The returned exposure and idiosyncratic return.
+  - $(math_dict[:B_t_att])
+  - $(math_dict[:eps_t_att])
+
+# Arguments
+
+  - `B`: The static loadings, `assets × factors`, or the exposure history, `observations × assets × factors`.
+  - `eps`: The idiosyncratic returns, `observations × assets`.
+
+# Returns
+
+  - `B`: The exposures, zero at every inactive pair. A static matrix stays static when its inactive pairs are whole assets.
+  - `eps::MatNum`: The idiosyncratic returns, zero at every inactive pair.
+  - `act::AbstractMatrix{Bool}`: Whether each pair is active, `observations × assets`.
+
+# Related
+
+  - [`attribution_align`](@ref)
+  - [`attribution_broadcast_exposures`](@ref)
+"""
+function attribution_zero_inactive(B::MatNum, eps::MatNum)
+    live = vec(all(isfinite, B; dims = 2))
+    act = isfinite.(eps) .& transpose(live)
+    if all(view(act, :, live))
+        return (; B = ifelse.(live, B, zero(eltype(B))),
+                eps = ifelse.(act, eps, zero(eltype(eps))), act = act)
+    end
+    return attribution_zero_inactive(attribution_broadcast_exposures(B, size(eps, 1)), eps)
+end
+function attribution_zero_inactive(B::Arr3Num, eps::MatNum)
+    act = [isfinite(eps[t, i]) && all(isfinite, view(B, t, i, :))
+           for t in axes(eps, 1), i in axes(eps, 2)]
+    Bz = similar(B)
+    for k in axes(B, 3), i in axes(B, 2), t in axes(B, 1)
+        Bz[t, i, k] = act[t, i] ? B[t, i, k] : zero(eltype(B))
+    end
+    return (; B = Bz, eps = ifelse.(act, eps, zero(eltype(eps))), act = act)
 end
 """
     attribution_trim_rows(A::Nothing, rows)
@@ -295,7 +359,8 @@ The alignment runs once over the whole history, and a window is a slice of the a
 """
 function attribution_window(al::NamedTuple, rows)
     return (; B = attribution_window_exposures(al.B, rows), f = al.f[rows, :],
-            eps = al.eps[rows, :], rw = attribution_trim_rows(al.rw, rows),
+            eps = al.eps[rows, :], act = al.act[rows, :],
+            rw = attribution_trim_rows(al.rw, rows),
             vs = attribution_trim_rows(al.vs, rows),
             fcb = attribution_window_basis(al.fcb, rows), rows = rows, no = al.no)
 end
@@ -484,7 +549,7 @@ Where:
  1. Centre the portfolio series once, and take every covariance against it.
  2. Form the per-observation portfolio exposure `g` and the per-observation systematic and idiosyncratic series.
  3. Take each component's mean, volatility and covariance with the portfolio.
- 4. Put the difference between the portfolio series and the model's reconstruction into the remainder.
+ 4. Put the difference between the portfolio series and the model's reconstruction into the remainder. A difference that is constant within the round-off of its terms at every observation is that constant, by [`attribution_remainder`](@ref), so a model that reconstructs the series exactly, or misses it by a constant, reports a remainder with no volatility and a `NaN` correlation, not a correlation of round-off.
  5. Sum the factor rows by family, and over the assets when `assets = true`.
  6. Scale by `ppy`.
 
@@ -530,15 +595,20 @@ function realised_attribution(W::VecNum_MatNum, ret::VecNum, al::NamedTuple,
     sc = attribution_scale(ppy, zero(Tf))
     g = Matrix{Tf}(undef, T, K)
     sysr = Matrix{Tf}(undef, T, N)
+    mag = Vector{Tf}(undef, T)
     for t in 1:T
         Bt = attribution_slice(al.B, t)
-        g[t, :] = transpose(Bt) * attribution_weights(W, t)
+        wt = attribution_weights(W, t)
+        g[t, :] = transpose(Bt) * wt
         sysr[t, :] = Bt * view(f, t, :)
+        mag[t] = abs(ret[t]) +
+                 sum(abs, (wt .* Bt) .* transpose(view(f, t, :))) +
+                 sum(abs, wt .* view(eps, t, :))
     end
     fpnl = g .* f
     sys_pnl = vec(sum(fpnl; dims = 2))
     idio_pnl = [LinearAlgebra.dot(attribution_weights(W, t), view(eps, t, :)) for t in 1:T]
-    unattr_pnl = ret .- sys_pnl .- idio_pnl
+    unattr_pnl = attribution_remainder(ret .- sys_pnl .- idio_pnl, mag, N + K + 2)
     f_vol = vec(std(f; dims = 1))
     f_cov = [attribution_cov(view(f, :, k), retc) for k in 1:K]
     f_var_contrib = [attribution_cov(view(fpnl, :, k), retc) for k in 1:K]
@@ -556,8 +626,67 @@ function realised_attribution(W::VecNum_MatNum, ret::VecNum, al::NamedTuple,
                                vec(mean(f; dims = 1)) .* sc.s1,
                                vec(mean(fpnl; dims = 1)) .* sc.s1, sers.factor)
     fmbd = attribution_family_axis(fam, fbd, attribution_family_spread(fam, g), sers.family)
-    abd, afc = realised_attribution_assets(assets, W, al, sysr, retc, total_vol, sc)
+    abd, afc = realised_attribution_assets(assets, W, al, sysr, ret, total_vol, sc)
     return FactorAttributionResult(sys, idio, unattr, total, fbd, fmbd, abd, afc, true, ppy)
+end
+"""
+    attribution_remainder(u::VecNum, mag::VecNum, n::Integer)
+
+Return the unattributed series, or its mean at every observation when it is constant to working precision.
+
+The remainder is a difference, `r - s - e`. When the model reconstructs the portfolio return exactly, the difference is zero in exact arithmetic and round-off in floating point. When it misses the return by a constant, a per-observation intercept or a fixed fee for example, the difference is that constant and round-off. The volatility of round-off is harmless next to the portfolio's, but its correlation with the portfolio is a ratio of two round-off numbers, which can take any value in `[-1, 1]` and states a relation the data does not hold. A difference whose deviation from its mean is inside the forward-error bound of its own sums, at every observation, is therefore the constant, with no volatility and a `NaN` correlation, as a series without variance has no correlation. A single observation outside the bound keeps the whole series, because a remainder with one real deviation has a real volatility.
+
+The bound is relative to the size of the terms, so the test does not depend on the units of the returns.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+m_{t} &= |r_{t}| + \\sum_{i=1}^{N} \\sum_{k=1}^{K} |w_{ti} B_{tik} f_{tk}| + \\sum_{i=1}^{N} |w_{ti} \\varepsilon_{ti}|\\,, \\\\
+\\bar{u} &= \\frac{1}{T} \\sum_{t=1}^{T} u_{t}\\,, \\\\
+\\tilde{u}_{t} &= \\begin{cases} \\bar{u} & \\text{if } |u_{s} - \\bar{u}| \\le n\\, \\epsilon\\, m_{s} \\text{ for every } s\\,, \\\\ u_{t} & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``u_{t}``: Unattributed return of the portfolio at observation ``t``.
+  - ``\\bar{u}``: Mean unattributed return.
+  - ``m_{t}``: Size of the terms whose sums form ``u_{t}``.
+  - ``n``: Number of terms of the longest sum, `N + K + 2`: the exposure sums over the assets, the systematic sum over the factors, and the two subtractions.
+  - ``\\epsilon``: Machine epsilon of the element type of ``u``.
+  - ``\\tilde{u}_{t}``: Returned unattributed return.
+  - $(math_dict[:r_t_att])
+  - $(math_dict[:w_t_att])
+  - $(math_dict[:f_t_att])
+  - $(math_dict[:eps_t_att])
+  - $(math_dict[:B_t_att])
+  - $(math_dict[:N])
+  - $(math_dict[:K])
+
+# Arguments
+
+  - `u`: The unattributed series.
+  - `mag`: The size of the terms at each observation.
+  - `n`: The number of terms of the longest sum.
+
+# Returns
+
+  - `u::VecNum`: The unattributed series, or its mean at every observation.
+
+# Related
+
+  - [`realised_attribution`](@ref)
+  - [`attribution_series_component`](@ref)
+"""
+function attribution_remainder(u::VecNum, mag::VecNum, n::Integer)
+    tol = n * eps(real(eltype(u)))
+    ub = mean(u)
+    return if all(abs(u[t] - ub) <= tol * mag[t] for t in eachindex(u, mag))
+        fill(ub, length(u))
+    else
+        u
+    end
 end
 """
     attribution_series_component(pnl::VecNum, retc::VecNum, total_vol::Number,
@@ -579,7 +708,7 @@ The systematic, the idiosyncratic and the unattributed series are decomposed ali
 \\end{align}
 ```
 
-``\\rho(c)`` is `NaN` when ``\\operatorname{sd}(c)`` is zero. For series that sum to ``r``, the covariances sum to ``\\sigma_{P}^{2}``, so the volatility contributions sum to ``\\sqrt{p}\\, \\sigma_{P}`` and the variance shares sum to ``1``.
+``\\rho(c)`` is `NaN` when ``\\operatorname{sd}(c)`` is zero. A series whose entries are all equal has a volatility and a covariance of exactly zero: the sample formulas would give round-off, because the mean of equal floating-point numbers need not equal them. For series that sum to ``r``, the covariances sum to ``\\sigma_{P}^{2}``, so the volatility contributions sum to ``\\sqrt{p}\\, \\sigma_{P}`` and the variance shares sum to ``1``.
 
 Where:
 
@@ -613,6 +742,9 @@ function attribution_series_component(pnl::VecNum, retc::VecNum, total_vol::Numb
                                       sc::NamedTuple, mu_se)
     vol = std(pnl)
     cv = attribution_cov(pnl, retc)
+    if all(==(first(pnl)), pnl)
+        vol, cv = zero(vol), zero(cv)
+    end
     return AttributionComponent(vol * sc.s2, cv / total_vol * sc.s2, cv / total_vol^2,
                                 mean(pnl) * sc.s1,
                                 attribution_safe_corr(cv, vol, total_vol), mu_se)
@@ -694,6 +826,8 @@ Under a family re-basis the raw Gram matrix is singular by construction, so the 
 
 The systematic and the idiosyncratic errors are equal. The portfolio return is observed, so the two estimation errors sum to zero.
 
+**An unknown variance makes the error unknown.** The sandwich of an observation reads the idiosyncratic variance of every active pair with a non-zero regression weight. Where the block states no such variance, in the warm-up of the variance estimate for example, ``\\mathbf{V}_{t}`` is unknown, and every answer that sums over the observation is `NaN`. A zero variance would understate the error, and dropping the pair would give the covariance of a regression the fit did not run. A window after the warm-up, or a variance estimate with a shorter warm-up, states every entry. A pair outside the regression, or inactive, reads no variance.
+
 # Mathematical definition
 
 ```math
@@ -748,7 +882,11 @@ function attribution_standard_errors(g::MatNum, al::NamedTuple, fam::Option{<:Ve
     red = attribution_reduce_for_errors(al.fcb, al.B, g, al.no, T)
     keep = findall(!, red.observed)
     se(v) = s1 * sqrt(max(zero(v), v)) / T
-    V = [attribution_sandwich(view(red.B, t, :, :), view(rw, t, :), view(vs, t, :), keep)
+    # An active pair of the regression reads its variance, `NaN` when unknown; any other pair
+    # reads none, so its `NaN` must not reach the product `0 * NaN`.
+    s2 = [al.act[t, i] && !iszero(rw[t, i]) ? vs[t, i] : zero(vs[t, i])
+          for t in axes(vs, 1), i in axes(vs, 2)]
+    V = [attribution_sandwich(view(red.B, t, :, :), view(rw, t, :), view(s2, t, :), keep)
          for t in 1:T]
     sys = se(sum(LinearAlgebra.dot(view(red.g, t, keep), V[t], view(red.g, t, keep))
                  for t in 1:T))
@@ -1062,7 +1200,7 @@ function attribution_family_errors(fam::VecStr, g::MatNum, Vf::AbstractVector{<:
 end
 """
     realised_attribution_assets(assets::Bool, W::VecNum_MatNum, al::NamedTuple,
-                                sysr::MatNum, retc::VecNum, total_vol::Number,
+                                sysr::MatNum, ret::VecNum, total_vol::Number,
                                 sc::NamedTuple)
 
 Return the asset axis and the asset-by-factor matrices of a realised attribution.
@@ -1079,19 +1217,22 @@ a_{ti} &= s_{ti} + \\varepsilon_{ti}\\,.
 \\end{align}
 ```
 
-The systematic row of asset ``i`` is ``\\mathrm{VC}`` and ``\\mathrm{MC}`` of ``w_{\\cdot i} s_{\\cdot i}``, and the idiosyncratic row is the same two numbers of ``w_{\\cdot i} \\varepsilon_{\\cdot i}``. The total row is ``\\mathrm{VC}``, ``\\mathrm{PV}`` and ``\\mathrm{MC}`` of ``w_{\\cdot i} a_{\\cdot i}``. The weighted series of all the assets sum to ``s_{t}`` and ``e_{t}``, so the rows sum to the two components. The standalone numbers are those of the model return, which holds no per-observation intercept.
+The systematic row of asset ``i`` is ``\\mathrm{VC}`` and ``\\mathrm{MC}`` of ``w_{\\cdot i} s_{\\cdot i}``, and the idiosyncratic row is the same two numbers of ``w_{\\cdot i} \\varepsilon_{\\cdot i}``. The total row is ``\\mathrm{VC}``, ``\\mathrm{PV}`` and ``\\mathrm{MC}`` of ``w_{\\cdot i} a_{\\cdot i}``. The weighted series of all the assets sum to ``s_{t}`` and ``e_{t}``, so the rows sum to the two components. An inactive pair is zero in both series, so it adds nothing to a row.
+
+The standalone numbers are those of the model return, which holds no per-observation intercept, over the active pairs of the asset alone. An asset has no return at an inactive pair: it was not listed, or it was on a holiday, which carries no information (ADR 0181). A zero there would state a return the asset never had, and dilute its mean by the observations it was absent. An asset with fewer than two active pairs has no standalone volatility and no correlation, and one with none has no mean.
 
 ```math
 \\begin{align}
-\\mathrm{vol}_{i} &= \\sqrt{p}\\, \\operatorname{sd}(a_{\\cdot i})\\,, \\\\
-\\mu_{i} &= \\frac{p}{T} \\sum_{t=1}^{T} a_{ti}\\,, \\\\
-\\rho_{i} &= \\frac{\\operatorname{cov}(a_{\\cdot i}, r)}{\\operatorname{sd}(a_{\\cdot i})\\, \\sigma_{P}}\\,.
+\\mathrm{vol}_{i} &= \\sqrt{p}\\, \\operatorname{sd}_{t \\in \\mathcal{A}_{i}}(a_{ti})\\,, \\\\
+\\mu_{i} &= \\frac{p}{|\\mathcal{A}_{i}|} \\sum_{t \\in \\mathcal{A}_{i}} a_{ti}\\,, \\\\
+\\rho_{i} &= \\frac{\\operatorname{cov}_{t \\in \\mathcal{A}_{i}}(a_{ti}, r_{t})}{\\operatorname{sd}_{t \\in \\mathcal{A}_{i}}(a_{ti})\\, \\operatorname{sd}_{t \\in \\mathcal{A}_{i}}(r_{t})}\\,.
 \\end{align}
 ```
 
 Where:
 
   - ``\\varepsilon_{ti}``, ``a_{ti}``: Idiosyncratic and model return of asset ``i`` at observation ``t``.
+  - ``\\mathcal{A}_{i}``: Observations at which asset ``i`` is active, from [`attribution_zero_inactive`](@ref). When every pair is active, the correlation divides by ``\\sigma_{P}``.
   - $(math_dict[:s_ti_att])
   - $(math_dict[:s_e_t_att])
   - ``\\mathrm{vol}_{i}``, ``\\mu_{i}``, ``\\rho_{i}``: Standalone volatility, mean return and correlation with the portfolio of asset ``i``.
@@ -1112,7 +1253,7 @@ Where:
   - `W`: The constant weights, or the weight history.
   - `al`: The aligned factor model history.
   - `sysr`: The per-observation systematic return of each asset.
-  - `retc`: The centred portfolio return series.
+  - `ret`: The portfolio return series.
   - `total_vol`: The portfolio volatility.
   - `sc`: The two annualisation factors.
 
@@ -1124,11 +1265,12 @@ Where:
 # Related
 
   - [`realised_attribution`](@ref)
+  - [`attribution_zero_inactive`](@ref)
   - [`AssetAttributionBreakdown`](@ref)
   - [`AssetFactorContribution`](@ref)
 """
 function realised_attribution_assets(assets::Bool, W::VecNum_MatNum, al::NamedTuple,
-                                     sysr::MatNum, retc::VecNum, total_vol::Number,
+                                     sysr::MatNum, ret::VecNum, total_vol::Number,
                                      sc::NamedTuple)
     if !assets
         return nothing, nothing
@@ -1136,6 +1278,7 @@ function realised_attribution_assets(assets::Bool, W::VecNum_MatNum, al::NamedTu
     eps, f = al.eps, al.f
     T, N = size(eps)
     K = size(f, 2)
+    retc = ret .- mean(ret)
     ar = sysr .+ eps
     Tf = promote_type(eltype(W), eltype(sysr), eltype(eps))
     syspnl = Matrix{Tf}(undef, T, N)
@@ -1148,15 +1291,21 @@ function realised_attribution_assets(assets::Bool, W::VecNum_MatNum, al::NamedTu
     svc = [attribution_cov(view(syspnl, :, i), retc) for i in 1:N] ./ total_vol
     ivc = [attribution_cov(view(idiopnl, :, i), retc) for i in 1:N] ./ total_vol
     vc = svc .+ ivc
-    vol = vec(std(ar; dims = 1))
-    cvp = [attribution_cov(view(ar, :, i), retc) for i in 1:N]
+    sa = map(1:N) do i
+        a = view(al.act, :, i)
+        x = ar[a, i]
+        y = ret[a]
+        v = std(x)
+        return (; vol = v, mu = mean(x),
+                corr = attribution_safe_corr(attribution_cov(x, y .- mean(y)), v, std(y)))
+    end
     weight, weight_std = attribution_weight_moments(W, N)
     abd = AssetAttributionBreakdown(weight, weight_std, svc .* sc.s2,
                                     vec(mean(syspnl; dims = 1)) .* sc.s1, ivc .* sc.s2,
-                                    vec(mean(idiopnl; dims = 1)) .* sc.s1, vol .* sc.s2,
-                                    [attribution_safe_corr(cvp[i], vol[i], total_vol)
-                                     for i in 1:N], vc .* sc.s2, vc ./ total_vol,
-                                    vec(mean(ar; dims = 1)) .* sc.s1,
+                                    vec(mean(idiopnl; dims = 1)) .* sc.s1,
+                                    [x.vol for x in sa] .* sc.s2, [x.corr for x in sa],
+                                    vc .* sc.s2, vc ./ total_vol,
+                                    [x.mu for x in sa] .* sc.s1,
                                     vec(mean(syspnl .+ idiopnl; dims = 1)) .* sc.s1)
     afc = realised_attribution_asset_factor(W, al, retc, total_vol, sc, T, N, K)
     return abd, afc
