@@ -1328,6 +1328,12 @@ allocated the exposure history in the element type of the returns, so integer re
              for t in 1:nT, i in 1:nN]
         @test isequal(PO.cross_sectional_standardised_residuals(eps, vs, amsk), S)
         @test all(iszero, S[6, amsk[6, :]])
+        # With no fill, every cell that is not finite is `NaN`, the zero variance included,
+        # and the correlation of the overlay reads that form (#1384).
+        zn = [isfinite(x) ? x : NaN for x in z]
+        @test isequal(PO.cross_sectional_standardised_residuals(eps, vs, amsk;
+                                                                filled = false), zn)
+        @test isnan(zn[4, 2])
         @test [PO.cross_sectional_finite_mean(z, t) for t in 1:nT] ≈ zbar
     end
     @testset "The degrees of freedom charge each asset the fraction the fit leaves" begin

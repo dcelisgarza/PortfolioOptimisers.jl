@@ -353,7 +353,7 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
  6. Build the Factor Family Basis `fb` with [`cross_sectional_family_basis`](@ref), and reduce the exposures through it.
  7. Lag the reduced exposures and the market capitalisation by `pe.lag`, giving `Zl` and `mcl`. Trim the observed factors to the fitted observations with [`cross_sectional_observed_block`](@ref), which refuses a non-finite observed return among them. Take the eligibility mask `msk` of the fit with [`cross_sectional_eligible`](@ref) on `Xl`, and drop from it every pair whose lagged market capitalisation is not finite.
  8. Regress each observation's `Xl` on its lagged reduced exposures with [`cross_sectional_live_regression`](@ref), giving `csr` and the mask `lv` of the factors that are not empty, under the weights `W` of [`cs_weights_initial`](@ref). Refuse a `csr` that carries an intercept. When [`needs_second_pass`](@ref) answers `true`, refine the weights with [`cs_weights_refine`](@ref) and regress again. The refinement reads the idiosyncratic variance under the two universe masks, as step 9 does.
- 9. Take the idiosyncratic variance history `vs` with [`variance_series`](@ref), under the active mask and the estimation mask of the fitted observations. An estimator that reads the masks resets an asset that the active mask turns off, and measures its regime over the estimation universe alone. An estimator that reads no mask ignores them. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`, and take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref). Record the degrees of freedom and the divisor of each variance with [`variance_count`](@ref) and [`cross_sectional_variance_counts`](@ref).
+ 9. Take the idiosyncratic variance history `vs` with [`variance_series`](@ref), under the active mask and the estimation mask of the fitted observations. An estimator that reads the masks resets an asset that the active mask turns off, and measures its regime over the estimation universe alone. An estimator that reads no mask ignores them. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`, and take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation. Record the degrees of freedom and the divisor of each variance with [`variance_count`](@ref) and [`cross_sectional_variance_counts`](@ref).
 10. Append the observed factors after the estimated ones with [`cross_sectional_observed_append`](@ref): the observed returns after the factor returns, the observed exposures after the loadings and the exposure history, the names and the family labels, and pass-through factors on the Factor Family Basis. Fit `pe.pe` on the combined reduced factor returns of the factors that are not empty with [`cross_sectional_factor_moments`](@ref), giving `f_pr`, which refuses a non-finite factor moment and processes the factor covariance under `pe.f_mp`, the matrix processing estimator of the factor axis and not the asset one. An Observed Factor is never empty. The method passes `strict` to `pe.pe`, as [`FactorPrior`](@ref) does, because the slot admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
 11. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, a zero `b`, and the observed returns in `fx`.
 12. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the full returns data that the estimated members read, so that a Descriptor of the forecast warms up over every observation the panel has, giving the block `rr` with the orthogonal part in `b` and the Result in `rf`. Under observed factors the forecast thus reads `Xl`, and it forecasts the net return of each asset, which the split measures against loadings of the same returns. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref), and keep the mean of the observed factors, giving `f_mu`.
@@ -361,7 +361,7 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
 14. Take the investable assets `idx` with [`cross_sectional_investable`](@ref).
 15. Rebuild the asset return scenarios `Xs` with [`cross_sectional_scenarios`](@ref).
 16. Lift the reduced factor distribution onto the investable assets with [`cross_sectional_lift`](@ref), and add `b` to the expected return it answers.
-17. Assemble a [`LowOrderPrior`](@ref) over `Xs`, with the fitted base-currency returns under `o_X`, the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the block under `rr`, and the expanded factor prior under `fpr`.
+17. Assemble a [`LowOrderPrior`](@ref) over `Xs`, with the fitted base-currency returns under `o_X`, the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the block under `rr`, and the expanded factor prior under `fpr`. The factor returns of `fpr` and the returns of `o_X` keep the last rows alone, as many as `Xs` holds, so a factor prior with a Scenario Cap pairs each scenario with its own observation.
 
 # Arguments
 
@@ -394,7 +394,7 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
 
 # Returns
 
-  - `pr::LowOrderPrior`: The prior on the full asset universe. At an asset that the estimator states no moment for, the entry of `mu` and the row and the column of `sigma` are `NaN`. `rr` is a [`CrossSectionalFactorModel`](@ref), and `fpr` is the factor prior on the raw factor axis.
+  - `pr::LowOrderPrior`: The prior on the full asset universe. At an asset that the estimator states no moment for, the entry of `mu` and the row and the column of `sigma` are `NaN`. `rr` is a [`CrossSectionalFactorModel`](@ref), and `fpr` is the factor prior on the raw factor axis. An asset in the warm-up of its idiosyncratic variance has no variance, so it is not investable, but its latest exposures can be finite. Its systematic mean and its systematic covariances with the other assets are then `(rr.M * fpr.mu + rr.b)[i]` and `(rr.M * fpr.sigma * rr.M')[i, :]`.
 
 # Related
 
@@ -501,7 +501,15 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     vs = variance_series(pe.ve, csr.eps; dims = 1, estimation_mask = emr, active_mask = amr)
     (; edof, ediv) = cross_sectional_variance_counts(variance_count(pe.ve, csr.eps), csr)
     S = cross_sectional_standardised_residuals(csr.eps, vs, amr)
-    esigma = cross_sectional_idiosyncratic_covariance(pe.th, pe.ce, pe.mp.pdm, S,
+    # The correlation reads the residuals with no fill: the fill of the scenarios writes the
+    # mean of the other assets of an observation into a gap, and that value correlates the
+    # asset with each of them (#1384). The threshold of zero reads no residual.
+    Sc = if iszero(pe.th)
+        S
+    else
+        cross_sectional_standardised_residuals(csr.eps, vs, amr; filled = false)
+    end
+    esigma = cross_sectional_idiosyncratic_covariance(pe.th, pe.ce, pe.mp.pdm, Sc,
                                                       vs[end, :], amr)
     # `strict` reaches the nested factor prior for the reason it reaches `FactorPrior`'s:
     # the slot admits `BlackLittermanPrior` and `EntropyPoolingPrior`, whose views name
@@ -546,12 +554,16 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     @argcheck(!isempty(idx),
               IsEmptyError("no asset is investable at the latest observation: every asset is either inactive, or carries a non-finite idiosyncratic variance or Factor Exposure. Give more observations, or widen the active mask of the Asset Panel."))
     Xs = cross_sectional_scenarios(f_pr.X, L, S, ev)
+    # A factor prior with a Scenario Cap carries its last rows alone, and the scenarios pair
+    # the last rows of each history, so the factor returns and the original returns keep the
+    # rows the scenarios keep (#1384).
+    rs = (length(r) - size(Xs, 1) + 1):length(r)
     lift = cross_sectional_lift(pe.mp, L, f_mu, f_pr.sigma, esigma, idx, Xs; kwargs...)
-    fpr = LowOrderPrior(; X = ex.f, mu = ex.mu, sigma = ex.sigma, w = f_pr.w,
+    fpr = LowOrderPrior(; X = ex.f[rs, :], mu = ex.mu, sigma = ex.sigma, w = f_pr.w,
                         ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow)
-    return LowOrderPrior(; X = Xs, o_X = Xw[r, :], mu = lift.mu + rr.b, sigma = lift.sigma,
-                         chol = lift.chol, w = f_pr.w, ens = f_pr.ens, kld = f_pr.kld,
-                         ow = f_pr.ow, rr = rr, fpr = fpr)
+    return LowOrderPrior(; X = Xs, o_X = Xw[r[rs], :], mu = lift.mu + rr.b,
+                         sigma = lift.sigma, chol = lift.chol, w = f_pr.w, ens = f_pr.ens,
+                         kld = f_pr.kld, ow = f_pr.ow, rr = rr, fpr = fpr)
 end
 """
     prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...) -> LowOrderPrior

@@ -744,21 +744,21 @@ D_{ij} &= \\sqrt{v_{Ti} \\, v_{Tj}} \\, \\tilde{\\rho}_{ij}\\,.
 
 Where:
 
-  - ``C_{ij}``: Entry of the covariance that `ce` estimates from the filled standardised idiosyncratic returns ``\\tilde{z}_{ti}``.
+  - ``C_{ij}``: Entry of the covariance that `ce` estimates from the standardised idiosyncratic returns ``z_{ti}``, with no fill. A cell with no finite value stays a gap for `ce`, because a value written into it is not an observation of the pair: the mean of the other assets of its observation, which the scenarios take, would correlate the asset with each of them.
   - ``\\rho_{ij}``, ``\\tilde{\\rho}_{ij}``: Correlation of assets ``i`` and ``j``, before and after the threshold. The indicator is ``0`` when ``\\rho_{ij}`` is not finite.
   - ``\\tau``: The correlation threshold. At ``\\tau = 0`` the answer is the vector of the latest variances ``v_{Ti}``, which is the diagonal of ``\\mathbf{D}``.
   - ``D_{ij}``: Entry of ``\\mathbf{D}``.
   - $(math_dict[:D_orth])
-  - $(math_dict[:ztilde_ti_idio])
+  - $(math_dict[:z_ti_idio])
   - $(math_dict[:v_ti_idio])
   - $(math_dict[:T])
 
 # Algorithm
 
  1. If `th` is zero, return `ev`, the latest idiosyncratic variances. The block then carries a vector, and the asset covariance takes a diagonal.
- 2. Otherwise, get `fv` from `ce` with [`gap_fill_value`](@ref). `fv` is the value that `ce` gives a gapped cell of `S`. A cell of `S` is non-finite only where the asset is inactive.
+ 2. Otherwise, get `fv` from `ce` with [`gap_fill_value`](@ref). `fv` is the value that `ce` gives a gapped cell of `S`. A cell of `S` is non-finite where the asset is inactive, and where it is active with no finite standardised return: a missing return, or a variance in its warm-up.
  3. If `fv` is finite, write it over every non-finite cell of a copy of `S`, and estimate the covariance `C` of that copy with `ce`. The fallback `fv` is zero, which is the mean of a standardised series.
- 4. If `fv` is not finite, estimate `C` from `S` as it stands, with `amsk` as the `active_mask`. A gap-aware `ce` then freezes the block of an inactive asset and does not decay it.
+ 4. If `fv` is not finite, estimate `C` from `S` as it stands, with `amsk` as the `active_mask`. A gap-aware `ce` then freezes the block of an inactive asset and does not decay it, and it takes an active non-finite cell as a holiday.
  5. Convert `C` to the correlation `R`.
  6. Set to zero every entry of `R` off the diagonal whose magnitude does not exceed `th`, and set the diagonal to one. This step also sets a non-finite correlation to zero.
  7. Rescale `R` by the latest idiosyncratic volatilities, giving `D`.
@@ -769,7 +769,7 @@ Where:
   - `th`: The correlation threshold.
   - `ce`: Covariance estimator of the standardised idiosyncratic returns.
   - `pdm`: Positive definite matrix estimator, or `nothing`.
-  - `S`: Standardised idiosyncratic returns, `observations × assets`.
+  - `S`: Standardised idiosyncratic returns with no fill, `observations × assets`, from [`cross_sectional_standardised_residuals`](@ref) with `filled = false`.
   - `ev`: The latest idiosyncratic variances, one per asset.
   - `amsk`: The active mask, `observations × assets`. Only a `ce` with a non-finite [`gap_fill_value`](@ref) reads it.
 
@@ -882,6 +882,8 @@ Return the standardised idiosyncratic returns a scenario set is rebuilt from.
 
 The function divides each idiosyncratic return by the idiosyncratic volatility of the same observation, so the whole history is on one scale and the latest volatilities can rescale it. An active pair whose standardised return is not finite takes the average standardised return of its own observation, so a sparse history does not shorten the scenario set. An inactive pair stays `NaN`.
 
+Under `filled = false` the function returns ``z_{ti}`` with `NaN` at every cell that is not finite, and writes no average. The estimate of the idiosyncratic correlation reads that form, see [`cross_sectional_idiosyncratic_covariance`](@ref): the average of the other assets of an observation is not an observation of the pair, and it would correlate the asset with each of them.
+
 # Mathematical definition
 
 ```math
@@ -914,23 +916,30 @@ A zero variance gives ``0 / 0`` or ``\\pm\\infty``, and a variance still in warm
   - `eps`: Idiosyncratic returns, `observations × assets`.
   - `vs`: Idiosyncratic variance history, `observations × assets`.
   - `amsk`: The active mask, `observations × assets`.
+  - `filled`: When `true`, an active cell that is not finite takes ``\\bar{z}_{t}``. When `false`, it is `NaN`.
 
 # Returns
 
-  - `S::Matrix{<:Real}`: The standardised idiosyncratic returns, `observations × assets`.
+  - `S::Matrix{<:Real}`: The standardised idiosyncratic returns, `observations × assets`: ``\\tilde{z}_{ti}`` under `filled = true`, and ``z_{ti}`` with `NaN` at each cell that is not finite under `filled = false`.
 
 # Related
 
   - [`cross_sectional_finite_mean`](@ref)
   - [`cross_sectional_scenarios`](@ref)
+  - [`cross_sectional_idiosyncratic_covariance`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
 function cross_sectional_standardised_residuals(eps::MatNum, vs::MatNum,
-                                                amsk::AbstractMatrix{Bool})
+                                                amsk::AbstractMatrix{Bool};
+                                                filled::Bool = true)
     Tf = promote_type(real(eltype(eps)), real(eltype(vs)))
     S = Matrix{Tf}(undef, size(eps))
     for k in CartesianIndices(S)
-        S[k] = amsk[k] ? Tf(eps[k]) / sqrt(Tf(vs[k])) : Tf(NaN)
+        z = amsk[k] ? Tf(eps[k]) / sqrt(Tf(vs[k])) : Tf(NaN)
+        S[k] = filled || isfinite(z) ? z : Tf(NaN)
+    end
+    if !filled
+        return S
     end
     for t in axes(S, 1)
         avg = cross_sectional_finite_mean(S, t)
