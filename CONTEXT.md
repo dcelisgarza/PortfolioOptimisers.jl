@@ -340,6 +340,7 @@ Movement of a covariance matrix towards a target along the shortest path between
 
 **Posdef**
 Projection of a matrix to the nearest positive definite matrix.
+Its algorithm owns the test that leaves a matrix unchanged and the repair: `NearestCorrelationMatrix.Newton` (the default) finds the nearest correlation matrix, and `ClippedNearestCorrelation` clips the correlation eigenvalues at a floor, retries once at ten times the floor, and keeps the variances.
 
 **Matrix Processing**
 The composing estimator applying a sequence of post-processing steps — Posdef, Denoising, Detoning, and a custom algorithm — to a covariance/correlation matrix.

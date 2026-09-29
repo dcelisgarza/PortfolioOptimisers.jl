@@ -32,7 +32,7 @@ keyword away.
 
 | Mode of the oracle | The library | Why |
 | --- | --- | --- |
-| A nearest-correlation repair by clipping the correlation eigenvalues at `1e-13`, with one retry at `1e-12` | `Posdef(Newton)` in `f_mp` and `mp` stays the default. The oracle's repair is an algorithm that `Posdef` takes (#1412). | Newton gives the nearest correlation matrix in the Frobenius norm. The oracle's clip is a cheaper approximation of it, and a caller who wants the oracle's numbers selects it. |
+| A nearest-correlation repair by clipping the correlation eigenvalues at `1e-13`, with one retry at `1e-12` | `Posdef(Newton)` in `f_mp` and `mp` stays the default. The oracle's repair is `ClippedNearestCorrelation`, an algorithm that `Posdef` takes and that owns its acceptance test (#1412). It differs in three places: alternating projections that have not converged after `iter` iterations go on to the clip where the oracle refuses the input, a last result that fails every acceptance warns as every `posdef!` does, and the symmetry test reads the correlation matrix so that it does not move with the units. | Newton gives the nearest correlation matrix in the Frobenius norm. The oracle's clip is a cheaper approximation of it, and a caller who wants the oracle's numbers selects it. |
 | An inactive-cell policy stored on each field: `NaN`, zero, or the value left as it is | Fields stay finite, and every consumer reads the masks. A read of a field takes the policy as an argument, so the caller chooses it for each read. | ADR 0102 rules that a numeric field's values stay finite. Every computed output keeps the oracle's capability: the descriptors write `NaN` on an inactive cell, and the weights are built over the estimation universe. The one view the oracle gives, a field with its inactive cells blanked, becomes a read, not a stored state. |
 | A warning when the regime half-life exceeds 138 observations | The `regime_decay` docstring states the threshold `2^(-1/138)` and its effect | The rule of #1282: the docstring states the condition, and the measure does not change its behaviour. The numbers are the same; only the message at run time differs. |
 | An integer `cv`, which means K-fold with that many folds | `cv = KFold(; n)` | No field or verb of the library takes an integer as a short form for an estimator. |
@@ -75,6 +75,7 @@ change. It gives the safety of the oracle's `NaN` with no cost at run time.
   rule above before it asks the maintainer. A design that leaves an oracle output out of reach
   fails the rule, however simple it is.
 - A parity test of the nearest-correlation repair compares the oracle with the algorithm of #1412,
-  not with Newton. #1383 measures it.
+  not with Newton. `test/test_07c_parity_clipped_nearest_correlation.jl` measures it on every exit
+  path of the repair, and it is the measure of the last box of #1383.
 - The premise of #929, that the oracle persists nothing, was wrong. #1399 builds the round trip
   that parity needs.
