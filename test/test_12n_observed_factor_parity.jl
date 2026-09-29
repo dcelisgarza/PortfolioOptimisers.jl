@@ -22,8 +22,13 @@ macro-sensitivity factor (#1365): an `EWMacroSensitivity` that reads the column 
 Exogenous Series. The `Plain*` files hold the fit with `EmpiricalPrior` and no currency. The
 `CurrencyDefault*` files hold the default fit beside three Currency Factors, where the
 Descriptors read the returns net of the currencies.
+
+The `Parity_CrossSectionalFactorPrior_CurrencyForecast_*` files hold the default fit of the
+currency fixture with a Return Forecast over one `EWMomentum` (#1394): the forecast, the factor
+mean and `mu`. The oracle forecasts the local returns, and so does the prior.
 =#
 using Statistics, Clarabel
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 function ccy_fixture(; T = 120, N = 40, seed = 927_001)
     rng = StableRNG(seed)
@@ -113,6 +118,25 @@ end
         # the mean of the idiosyncratic return to zero (#1373).
         @test pr.rr.vs[end, :] ≈ vec(ccy_asset("$(nm)DefaultIdioVar")) rtol = 1e-12
         @test pr.sigma ≈ ccy_asset("$(nm)DefaultSigma") rtol = 1e-12
+    end
+
+    @testset "A Return Forecast beside Currency Factors forecasts the local returns (#1394)" begin
+        rfe = FixedWeightedReturnForecast(;
+                                          scores = DescriptorScores(;
+                                                                    descriptors = [EWMomentum(;
+                                                                                              half_life = 8.0,
+                                                                                              skip = 2)],
+                                                                    outlier = nothing,
+                                                                    scoring = nothing),
+                                          scale = 0.02)
+        pr = prior(CrossSectionalFactorPrior(; factors = factors, rfe = rfe, lambda = 0.5,
+                                             c = 1.0), fx.rd)
+        load(o) = vec(parity_load("CrossSectionalFactorPrior", "CurrencyForecast", o))
+        @test parity_compare(pr.rr.rf.mu, load("Alpha"); name = "alpha").ok
+        @test parity_compare(pr.fpr.mu, load("FactorMu"); name = "factor mu").ok
+        @test parity_compare(pr.mu, load("Mu"); name = "mu").ok
+        # The forecast of the base-currency returns differs, so the prior does not read `X`.
+        @test !(pr.rr.rf.mu ≈ return_forecast(rfe, fx.rd, pr.rr).mu)
     end
 
     # Every cluster and every subset estimates its own factors. The factors here are

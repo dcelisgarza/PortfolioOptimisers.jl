@@ -1644,7 +1644,7 @@ Where:
 # Arguments
 
   - `rfe`: Return Forecast Estimator, or `nothing`.
-  - $(arg_dict[:rd]) It is the full returns data the prior was fitted on, and the block is a suffix of it.
+  - $(arg_dict[:rd]) It is the full returns data that the estimated members of the prior read, and the block is a suffix of it. Under observed factors its `X` holds the returns net of them.
   - `csfm`: The factor-model block, built with a zero `b` and no Return Forecast.
   - `cre`: Cross-Sectional Regression Estimator of the split.
   - `c`: Confidence in the orthogonal part of the forecast.

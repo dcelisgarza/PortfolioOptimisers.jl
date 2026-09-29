@@ -52,7 +52,10 @@ currency can hold it. With log returns the split has no cross term.
    return, and a caller whose local returns are not `X - Z r`, which includes every simple-return
    panel because of the cross term. The estimated members of the prior read the same net
    returns, so a Descriptor of the returns, such as a beta or a macro sensitivity, measures the
-   local move of an asset and not the currency it holds (#1365). The first `lag` observations
+   local move of an asset and not the currency it holds (#1365). The Return Forecast reads them
+   too (#1394). It forecasts the net return of each asset, and the split of the forecast measures
+   it against loadings that the regression measured on the same returns. The expected return of
+   an observed factor, such as a currency, then comes only from the factor mean. The first `lag` observations
    have no lagged exposure, so there the derivation takes the exposure of the same observation.
    The fit never regresses them, but a Descriptor reads them. An observed member cannot read
    those net returns, because they derive from its own exposures. So the observed members read
@@ -126,6 +129,11 @@ currency can hold it. With log returns the split has no cross term.
 - **The observed members read `X`, or they are refused beside another observed member (#1395).**
   Rejected. Under `X`, a macro sensitivity beside Currency Factors measures the currency of each
   asset as well as its local move. A refusal forbids a model that the two stages fit.
+- **The Return Forecast reads `X` (#1394).** Rejected. The forecast then holds the currency move
+  of each asset, and the split measures that forecast against loadings of the net returns. The
+  spanned part adds a currency move to the mean of the estimated factors, and the orthogonal
+  part keeps the rest. The mean of the Currency Factors counts the same move a second time. The
+  oracle of map #1375 forecasts the net returns too.
 - **`prices_to_returns` refuses a gap in `E`.** Rejected. It refuses rows that the fit never
   reads: the warm-up of the descriptors and the exposure lag consume the first rows.
 

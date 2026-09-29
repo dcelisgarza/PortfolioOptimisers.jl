@@ -356,7 +356,7 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
  9. Take the idiosyncratic variance history `vs` with [`variance_series`](@ref), standardise the idiosyncratic returns by it with [`cross_sectional_standardised_residuals`](@ref), giving `S`, and take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref). Record the degrees of freedom and the divisor of each variance with [`variance_count`](@ref) and [`cross_sectional_variance_counts`](@ref).
 10. Append the observed factors after the estimated ones with [`cross_sectional_observed_append`](@ref): the observed returns after the factor returns, the observed exposures after the loadings and the exposure history, the names and the family labels, and pass-through factors on the Factor Family Basis. Fit `pe.pe` on the combined reduced factor returns of the factors that are not empty with [`cross_sectional_factor_moments`](@ref), giving `f_pr`, which refuses a non-finite factor moment and processes the factor covariance under `pe.f_mp`, the matrix processing estimator of the factor axis and not the asset one. An Observed Factor is never empty. The method passes `strict` to `pe.pe`, as [`FactorPrior`](@ref) does, because the slot admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
 11. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, a zero `b`, and the observed returns in `fx`.
-12. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the full returns data, so that a Descriptor of the forecast warms up over every observation the panel has, giving the block `rr` with the orthogonal part in `b` and the Result in `rf`. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref), and keep the mean of the observed factors, giving `f_mu`.
+12. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the full returns data that the estimated members read, so that a Descriptor of the forecast warms up over every observation the panel has, giving the block `rr` with the orthogonal part in `b` and the Result in `rf`. Under observed factors the forecast thus reads `Xl`, and it forecasts the net return of each asset, which the split measures against loadings of the same returns. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref), and keep the mean of the observed factors, giving `f_mu`.
 13. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named.
 14. Take the investable assets `idx` with [`cross_sectional_investable`](@ref).
 15. Rebuild the asset return scenarios `Xs` with [`cross_sectional_scenarios`](@ref).
@@ -526,7 +526,9 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
                                      vs = vs, esigma = esigma, edof = edof, ediv = ediv,
                                      rw = W, bw = bwr, nf = ca.nf, fam = ca.fam, fcb = fnow,
                                      lag = pe.lag, fx = ca.fx)
-    (; rr, g) = cross_sectional_return_forecast(pe.rfe, rd, csfm, pe.cre, pe.c)
+    # The forecast reads the returns the estimated members read, so under observed factors it
+    # forecasts the net return, which the split measures against loadings of the same returns.
+    (; rr, g) = cross_sectional_return_forecast(pe.rfe, rde, csfm, pe.cre, pe.c)
     # The forecast spans the estimated factors alone, so the blend reaches their mean and
     # the mean of each observed factor is the one the factor prior states.
     Ke = size(csr.f, 2)
