@@ -138,6 +138,25 @@ the noise at 10 and 40, at 1, 2 and 12 assets. The quadratic term reads
 machine epsilon keeps 2 to 8 terms at 12 and 40 assets, and the cost is a few products of order
 `n³` per scored row, not one of order `n⁴`.
 
+**`MahalanobisTarget` divides by the moment that its method reads too (#1431).** The squared
+distance of a correctly calibrated return is `χ²_n R`, with `R = 1/S` and `S` the Schur complement
+of one direction in `W = Σ_j w_j z_j z_j'`, so each method reads a moment of `R`. For `n > 1` on
+exponential weights no one-dimensional integral gives it. Given the other `n − 1` directions,
+`S` is a weighted chi-square, and the matrix determinant lemma gives its Laplace transform as the
+`n = 1` transform times `E[(det(Z₂'DZ₂) / det(Z₂'D_tZ₂))^{1/2}]`. The family `w/(1 + s w)` is
+closed under that step, so one recursion over the directions carries the transform from level to
+level, with one approximation: the mean log-determinant of each deflation goes inside the
+exponential. The recursion is exact at `n = 1` and at equal weights for every `n`. Against a
+Monte Carlo of a million draws at 12 assets and a half-life of 10, its three factors are 5e-4 to
+7e-4 low, where the fixed point `b` of #1415 is 0.55 % high for the mean and 2.5 % and 4.5 % high
+for the root and the log. The squared multipliers become 1.000 within 0.002 for all three
+methods (they were 0.994, 0.975 and 0.956). The recursion runs in its differentiated form, which
+is stable: an error at `s` flows only toward smaller `s`. It runs at 16 counts of observations,
+and the ratio to the inverse-Wishart law of mean `b` interpolates the other counts to 1e-6. The
+state keeps the nodes for each count of assets, at 0.3 s for 12 assets. The measure is on #1431.
+Under HAC the target keeps the fixed point of the mean on the spectrum of `A` for every method:
+the recursion reads `ln(1 + s μ)` over the spectrum, and `A` has negative eigenvalues (#1438).
+
 **The gate is `K > n + 3`, where the variance of the statistic is finite.** At `n = 1` an estimate
 of four observations or fewer is not scored. The gate reads the count of each asset, so a young
 asset leaves the statistic as it does below `min_obs`. Under HAC the effective count
@@ -156,9 +175,9 @@ observations, such as 12 assets at a half-life of 5, is never scored.
 - The default inverse-volatility direction keeps the next order of its excess, about `9 s₂²`,
   which the docstring of its statistic states with the warm-up rows.
 - **Two limits remain, and child issues of map #1375 hold them.**
-  - `MahalanobisTarget` keeps `b`, the moment of the mean, for every method, so it over-corrects
-    FirstMoment and Log: 0.975 and 0.956 at 12 assets and a half-life of 10. The root and the log of
-    `v' Ŵ⁻¹ v` for `n > 1` have no one-dimensional integral (#1431).
+  - Under HAC `MahalanobisTarget` keeps the fixed point of the mean for every method, so it
+    over-corrects FirstMoment and Log there: 0.952 and 0.920 at two lags (#1438). #1431 gave each
+    method its own moment without HAC.
   - On the separate correlation path the Mahalanobis factor reads `cor_decay` alone, so the noise
     of the variance at `decay` is not in it: 1.031 without HAC and 1.090 at two lags (#1437).
 - The FirstMoment and Log calibrations of `DiagonalTarget` assumed a `χ²(n)` sum. Before this
@@ -208,5 +227,11 @@ observations, such as 12 assets at a half-life of 5, is never scored.
   0.985 at a half-life of 5.
 - **The exact law at `R = I` alone** (#1434, fix 1). It is a double integral for each count, and it
   is exact only where the assets do not correlate.
+- **For the Mahalanobis target, a scaled inverse chi-square matched to `b`** (route 2 of #1431).
+  It is exact at equal weights, but at 12 assets and a half-life of 10 it misses the mean by
+  +0.5 %, the root by +0.07 % and the log by −0.3 %.
+- **For the Mahalanobis target, a first-order (Marchenko–Pastur) log-determinant in the Laplace
+  transform.** It is exact at both limits, but 0.34 % high at 12 assets. Its error is the
+  finite-size term that the recursion over directions carries exactly.
 - **A keyword on each target.** `DiagonalTarget` would carry a field that a geodesic shrinkage
   ignores, and the scalar estimator would need a keyword of its own anyway.

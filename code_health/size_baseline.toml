@@ -121,6 +121,7 @@ commit = "ebcacfda95"
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { code = 403, doc = 909, comment = 7, blank = 358, total = 1677 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { code = 488, doc = 786, comment = 6, blank = 321, total = 1601 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { code = 139, doc = 487, comment = 1, blank = 200, total = 827 }
+"src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl" = { code = 255, doc = 317, comment = 2, blank = 137, total = 711 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { code = 177, doc = 592, comment = 4, blank = 309, total = 1082 }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { code = 200, doc = 505, comment = 8, blank = 211, total = 924 }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { code = 145, doc = 366, comment = 0, blank = 166, total = 677 }

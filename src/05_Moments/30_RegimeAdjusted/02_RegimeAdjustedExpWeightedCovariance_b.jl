@@ -1096,11 +1096,12 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Makes the empty table of bias factors for a new state of a regime-adjusted covariance estimator.
+Makes the empty store of bias factors for a new state of a regime-adjusted covariance estimator.
 
-The table of a [`DiagonalTarget`](@ref) holds the moments of one term of
-[`RegimeTermMoments`](@ref), a triple for each count; the table of any other target holds one
-factor for each count.
+The regime target names the store with [`regime_bias_store`](@ref): the table of a
+[`DiagonalTarget`](@ref) holds the moments of one term of [`RegimeTermMoments`](@ref), a triple
+for each count; the store of a [`MahalanobisTarget`](@ref) holds the interpolation nodes of its
+factor for each count of assets; the table of any other target holds one factor for each count.
 
 # Arguments
 
@@ -1109,11 +1110,12 @@ factor for each count.
 
 # Returns
 
-  - `bias::Option{<:AbstractVector}`: An empty vector where `ce.debias` is `true` and a regime
-    method is set, else `nothing`.
+  - `bias::Option{<:Union{<:AbstractVector, <:AbstractDict}}`: The empty store where `ce.debias`
+    is `true` and a regime method is set, else `nothing`.
 
 # Related
 
+  - [`regime_bias_store`](@ref)
   - [`regime_bias!`](@ref)
   - [`RegimeAdjustedCovarianceState`](@ref)
 """
@@ -1122,7 +1124,8 @@ function regime_bias_state(ce::RegimeAdjustedExpWeightedCovariance, ::Type{T}) w
         return nothing
     end
 
-    return ce.regime_target isa DiagonalTarget ? NTuple{3, T}[] : T[]
+    return regime_bias_store(ce.regime_target,
+                             has_separate_cor_decay(ce) ? ce.cor_decay : ce.decay, T)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1190,14 +1193,16 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Computes the squared Mahalanobis distance of one observation, divided by the bias of the
-estimated block where `ce.debias` is `true`.
+estimated block that the regime method reads, where `ce.debias` is `true`.
 
 # Algorithm
 
  1. Where `ce.debias` is `false`, the factor is one. Else take ``K``, the smallest count of
-    observations among the contributing assets, and return `nothing` where `K <= n + 3`. Else
-    find the factor with [`mahalanobis_bias`](@ref) at the decay of the correlation structure:
-    `cor_decay` on the separate path, else `decay`.
+    observations among the contributing assets, and return `nothing` where
+    [`regime_bias_open`](@ref) refuses it. Else read the decay of the correlation structure:
+    `cor_decay` on the separate path, else `decay`. Without a HAC adjustment, find the factor of
+    `ce.regime_method` with [`mahalanobis_regime_bias!`](@ref). With one, find the factor of the
+    mean with [`mahalanobis_bias`](@ref) on the banded weight matrix, for every method.
  2. Compute the squared distance with [`regime_statistic`](@ref), and return `nothing` where the
     block does not factorise.
  3. Divide the statistic by the factor.
@@ -1218,7 +1223,7 @@ estimated block where `ce.debias` is `true`.
 # Related
 
   - [`MahalanobisTarget`](@ref)
-  - [`mahalanobis_bias`](@ref)
+  - [`mahalanobis_regime_bias!`](@ref)
   - [`update_regime!`](@ref)
 """
 function regime_target_statistic(target::MahalanobisTarget,
@@ -1226,15 +1231,16 @@ function regime_target_statistic(target::MahalanobisTarget,
                                  ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
                                  idx::AbstractVector{<:Integer})
     K = minimum(view(cache.obs_count, idx))
+    n = length(idx)
     decay = has_separate_cor_decay(ce) ? ce.cor_decay : ce.decay
     b = if !ce.debias
         one(ce.decay)
-    elseif !regime_bias_open(true, length(idx), decay, K, ce.hac_lags)
+    elseif !regime_bias_open(true, n, decay, K, ce.hac_lags)
         nothing
     elseif isnothing(ce.hac_lags)
-        mahalanobis_bias(decay, K, length(idx))
+        mahalanobis_regime_bias!(cache.bias, ce.regime_method, decay, K, n)
     else
-        mahalanobis_bias(decay, K, length(idx), ce.hac_lags)
+        mahalanobis_bias(decay, K, n, ce.hac_lags)
     end
     if isnothing(b)
         return nothing
@@ -1247,14 +1253,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Computes the bias factor of the squared Mahalanobis distance against an exponentially weighted
-covariance estimate.
+Computes the deterministic equivalent of the mean bias factor of the squared Mahalanobis distance
+against an exponentially weighted covariance estimate.
 
 The factor is ``b = \\mathbb{E}[\\operatorname{tr}(W^{-1})] / n`` of
 ``W = \\sum_{j} w_{j} z_{j} z_{j}^{\\top}``, ``z_{j} \\sim N(0, I_{n})``, which is the mean of
 ``u^{\\top} \\hat{C}^{-1} u / n`` for a correctly calibrated return ``u`` that is independent of the
-estimate ``\\hat{C}``. It depends on the weights and on `n` alone, and it is the fixed point that
-[`MahalanobisTarget`](@ref) states. The fixed point exists where `K > n + 1`.
+estimate ``\\hat{C}``. It depends on the weights and on `n` alone. It solves
+``1 / b = \\sum_{j} w_{j} / (1 + (n + 1) w_{j} b)``, which exists where `K > n + 1` and is exact at
+equal weights. On exponential weights it is 0.55 % above the mean at 12 assets and a half-life of
+10, so [`inverse_wishart_bias`](@ref) takes it only to name the pole of the factor at
+`K = n + 1`, and [`mahalanobis_regime_bias!`](@ref) corrects the result.
 
 # Algorithm
 
@@ -1278,7 +1287,7 @@ estimate ``\\hat{C}``. It depends on the weights and on `n` alone, and it is the
 # Related
 
   - [`MahalanobisTarget`](@ref)
-  - [`regime_target_statistic`](@ref)
+  - [`inverse_wishart_bias`](@ref)
   - [`mahalanobis_bias_sums`](@ref)
 """
 function mahalanobis_bias(decay::Number, K::Integer, n::Integer)
@@ -2105,8 +2114,8 @@ calls before it folds. Every array field is copied, and the two scalar fields pa
 circular buffer of recent centred returns is rebuilt at the same capacity, and each observation
 it holds is copied into it, so a fold on the copy pushes into a buffer of its own. The two
 fields of the separate correlation recursion pass through as `nothing` where they are `nothing`.
-The table of bias factors is `nothing` or an array, and `deepcopy` copies an array and returns
-`nothing` unchanged.
+The store of bias factors is `nothing`, an array or a dictionary, and `deepcopy` copies an array
+or a dictionary and returns `nothing` unchanged.
 
 # Arguments
 

@@ -560,7 +560,8 @@ because the inverse of an estimate is (Jensen's inequality). While the block had
 observations than assets it was singular, the ridge of `safe_regime_cholesky` made the distance
 about 1e12, and that one value held the regime state for many half-lives. The estimator keyword
 `debias = true` skips each row whose block has `n + 3` observations or fewer, where the variance
-of the statistic is not finite, and divides the rest by the fixed point `mahalanobis_bias`.
+of the statistic is not finite, and divides the rest by the bias factor of the regime method
+(#1431; the fixed point `mahalanobis_bias` was the factor of the mean alone).
 `debias = false` is the oracle's raw statistic, which the first testset pins. The keyword was a
 field of the target until #1428 moved it to the estimator.
 =#
@@ -582,9 +583,11 @@ field of the target until #1428 moved it to the estimator.
     end
 
     # On iid Normal returns, the squared multiplier of `RootMeanSquaredAdjusted` is the mean of
-    # the statistic over its dimension, so a correct statistic gives one. Measured on this seed:
-    # 0.998 with `debias = true`, 1.021 on the separate path, and 3.8e10 with `debias = false`,
-    # from the ridge of the singular rows. Six other seeds gave 0.95 to 1.03.
+    # the statistic over its dimension, so a correct statistic gives one. Measured on this seed
+    # after #1431: 0.957 with `debias = true` and 1.010 on the separate path, where the factor of
+    # the mean alone gave 0.951 and 1.009, and 3.8e10 with `debias = false`, from the ridge of
+    # the singular rows. The testset of #1431 measures the calibration over 12 000 rows and a
+    # regime half-life of 500.
     rng = StableRNG(1415)
     na, nr = 12, 4000
     A = randn(rng, na, na)
@@ -1120,4 +1123,89 @@ and `hac_floor = true` keeps it (ADR 0190).
     @test 0.97 < covariance_multiplier(PO.MahalanobisTarget(), RMS; min_obs = 17) < 1.03
     @test covariance_multiplier(PO.MahalanobisTarget(), RMS; min_obs = 17, debias = false) >
           2
+end
+
+#=
+Issue #1431. The squared Mahalanobis distance of a correctly calibrated return is `χ²_n R`, with
+`R = 1 / S` and `S` the Schur complement of one direction in the weighted Wishart `W`. Each regime
+method reads its own moment of `R`: `E[R]` for the root mean square, `E[√R]²` for the first moment
+and `exp(E[ln R])` for the log. The fixed point `b` of #1415 is a deterministic equivalent of the
+first moment alone, 0.55 % high at 12 assets and a half-life of 10, and dividing every method by
+it gave squared multipliers of 0.994, 0.975 and 0.956. `mahalanobis_level_bias` computes each
+moment by a recursion over the `n - 1` other directions, which is exact at one asset and at equal
+weights, and `mahalanobis_regime_bias!` interpolates it over the count of observations
+(ADR 0190).
+=#
+@testset "the Mahalanobis statistic divides by the bias its method reads" begin
+    methods = (PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted(),
+               PO.LogRegimeAdjusted())
+    # At equal weights `R = K / χ²(K - n + 1)`, the law of `inverse_wishart_bias` at `ν = K`. A
+    # half-life of 1e6 makes the 30 weights equal to within 2e-5. Measured at 12 assets: 2.4e-8,
+    # 1.7e-8 and 1.1e-8.
+    for n in (2, 12), m in methods
+        @test isapprox(PO.mahalanobis_level_bias(m, 2.0^(-1 / 1e6), [30], n)[1],
+                       PO.inverse_wishart_bias(m, 30 / (30 - n - 1), n); rtol = 1e-6)
+    end
+    # At one asset the recursion takes no step, and the factor is the exact table of the scalar
+    # estimator.
+    lam = 2.0^(-1 / 10)
+    for m in methods
+        @test isapprox(PO.mahalanobis_level_bias(m, lam, [200], 1)[1],
+                       PO.regime_bias_table(m, lam, 200)[200]; rtol = 1e-9)
+    end
+    # A Monte Carlo of one million draws at 12 assets, a half-life of 10 and 400 observations gave
+    # 1.6138, 1.5827 and 1.5524, each with a relative standard error of 3e-4. The recursion gives
+    # 1.6132, 1.5821 and 1.5519, below the truth by the sign its one approximation predicts. The
+    # moments are ordered by Jensen's inequality, and the fixed point is 0.55 % above the mean.
+    f = [PO.mahalanobis_level_bias(m, lam, [400], 12)[1] for m in methods]
+    for (fi, mc) in zip(f, (1.6138, 1.5827, 1.5524))
+        @test isapprox(fi, mc; rtol = 1.5e-3)
+    end
+    @test f[1] > f[2] > f[3]
+    @test PO.mahalanobis_bias(lam, 400, 12) > 1.004 * f[1]
+
+    # The interpolation over the count of observations reproduces the recursion between its
+    # nodes, and it reads the node exactly at the gate. A count past saturation reads the last node.
+    for (m, K) in zip(methods, (23, 61, 150))
+        store = PO.regime_bias_store(PO.MahalanobisTarget(), lam, Float64)
+        @test isapprox(PO.mahalanobis_regime_bias!(store, m, lam, K, 12),
+                       PO.mahalanobis_level_bias(m, lam, [K], 12)[1]; rtol = 1e-7)
+        @test collect(keys(store)) == [12]
+        @test PO.mahalanobis_regime_bias!(store, m, lam, 16, 12) ≈
+              PO.mahalanobis_level_bias(m, lam, [16], 12)[1]
+        Ksat = PO.mahalanobis_bias_saturation(lam, 12)
+        @test PO.mahalanobis_regime_bias!(store, m, lam, 10 * Ksat, 12) ==
+              PO.mahalanobis_regime_bias!(store, m, lam, Ksat, 12)
+    end
+
+    # On iid Normal returns the squared multiplier is the mean of the transformed statistic,
+    # which is one when the statistic is correct. Eight seeds gave 1.0000 ± 0.0020, 0.9999 ±
+    # 0.0011 and 0.9997 ± 0.0010, where the fixed point gave 0.994, 0.975 and 0.956.
+    rng = StableRNG(1431)
+    na, nr = 12, 12000
+    A = randn(rng, na, na)
+    U = cholesky(Symmetric(A * transpose(A) / na + Diagonal(rand(rng, na)))).U
+    R = randn(rng, nr, na) * U .* 0.01
+    base = (; decay = lam, min_obs = 5, regime_lohi_mult = nothing,
+            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centred = true)
+    function multiplier(method)
+        on = RegimeAdjustedExpWeightedCovariance(; base...,
+                                                 regime_target = PO.MahalanobisTarget(),
+                                                 regime_method = method)
+        off = RegimeAdjustedExpWeightedCovariance(; base..., regime_method = nothing)
+        return mean(cov(on, R) ./ cov(off, R))
+    end
+    for m in methods
+        @test 0.98 < multiplier(m) < 1.02
+    end
+
+    # The state keeps one set of nodes for each count of assets it meets, and a copy keeps its
+    # own. Without the correction the state keeps no store.
+    fit(; extra...) = partial_fit!(RegimeAdjustedExpWeightedCovariance(; base..., extra...,
+                                                                       regime_target = PO.MahalanobisTarget()),
+                                   R[1:60, :]).cache
+    st = fit()
+    @test st.bias isa AbstractDict && collect(keys(st.bias)) == [na]
+    @test copy(st).bias !== st.bias && copy(st).bias == st.bias
+    @test isnothing(fit(; debias = false).bias)
 end

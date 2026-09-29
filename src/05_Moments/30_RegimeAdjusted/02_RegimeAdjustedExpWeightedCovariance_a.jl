@@ -75,15 +75,16 @@ of a correctly calibrated return is 1.6 times its dimension. Before the block ha
 `n + 1` observations the mean is not finite, and before it has more than `n + 3` the variance is
 not finite, so one observation can hold the smoothed regime state. Where the `debias` field of
 [`RegimeAdjustedExpWeightedCovariance`](@ref) is `true`, the target skips those observations and
-divides the rest by the known size of the bias, so the statistic has the mean ``n`` that its
-calibration functions assume.
+divides the rest by the bias that its regime method reads, so the statistic has the calibration
+that the method assumes.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-d^{2} &= \\frac{u^{\\top} \\hat{C}^{-1} u}{b}\\,, &
-\\frac{1}{b} &= \\sum_{j=0}^{K-1} \\frac{w_{j}}{1 + (n + 1)\\, w_{j}\\, b}\\,, &
+d^{2} &= \\frac{u^{\\top} \\hat{C}^{-1} u}{\\beta}\\,, &
+u^{\\top} \\hat{C}^{-1} u &= \\chi^{2}_{n}\\, R\\,, &
+R &= \\frac{1}{S}\\,, &
 w_{j} &= \\frac{(1 - \\lambda)\\, \\lambda^{j}}{1 - \\lambda^{K}}\\,.
 \\end{align}
 ```
@@ -93,30 +94,35 @@ Where:
   - ``u``: Returns of the ``n`` contributing assets at the observation.
   - ``\\hat{C}``: Bias-corrected covariance block of those assets, from the observations before it.
   - ``K``: Smallest count of observations among the contributing assets. The update is skipped
-    while ``K \\le n + 3``. The fixed point has a solution from ``K > n + 1``, where the mean is
-    finite.
+    while ``K \\le n + 3``, and with a HAC adjustment while the effective count of the banded
+    weight matrix is ``n + 1`` or less.
   - ``\\lambda``: `cor_decay` where the separate correlation path runs, else `decay`.
-  - ``b``: Bias factor, ``\\mathbb{E}[\\operatorname{tr}(W^{-1})] / n`` of
-    ``W = \\sum_{j} w_{j} z_{j} z_{j}^{\\top}``, ``z_{j} \\sim N(0, I_{n})``, by its deterministic
-    equivalent. With equal weights it is ``K / (K - n - 1)``, the exact inverse-Wishart mean. On
-    exponential weights it agrees with a Monte Carlo of ``b`` within 1 %, from 2 to 100 assets.
+  - ``S``: Schur complement of one direction in ``W = \\sum_{j} w_{j} z_{j} z_{j}^{\\top}``,
+    ``z_{j} \\sim N(0, I_{n})``. ``R`` is independent of the ``\\chi^{2}_{n}`` factor.
+  - ``\\beta``: Bias factor of the regime method without a HAC adjustment, from
+    [`mahalanobis_regime_bias!`](@ref):
+    ``\\mathbb{E}[R]`` for `RootMeanSquaredAdjusted`, ``\\mathbb{E}[\\sqrt{R}]^{2}`` for
+    `FirstMomentRegimeAdjusted`, and ``\\exp(\\mathbb{E}[\\ln R])`` for `LogRegimeAdjusted`. With
+    equal weights ``R = K / \\chi^{2}_{K - n + 1}`` exactly. On exponential weights the factor comes
+    from a recursion over the ``n - 1`` other directions that is exact at one asset and at equal
+    weights, and it is within 0.15 % of a Monte Carlo at half-lives of 10 and more.
 
-With `debias = false`, ``b = 1`` and every observation above `min_obs` is scored: a block that
-is not positive definite takes the ridge of [`safe_regime_cholesky`](@ref). Its statistic can
-then be about ``10^{12}``, and that one value holds the regime state for many half-lives.
+With `debias = false`, ``\\beta = 1`` and every observation above `min_obs` is scored: a block
+that is not positive definite takes the ridge of [`safe_regime_cholesky`](@ref). Its statistic
+can then be about ``10^{12}``, and that one value holds the regime state for many half-lives.
 
 The factor assumes one shared history of returns, and the weights of the recursion. On iid
-Normal returns the squared multiplier of `RootMeanSquaredAdjusted` is then 0.95 to 1.03, with or
-without the separate correlation path and the centring. ``b`` is the mean of the inverse, which is
-the moment that `RootMeanSquaredAdjusted` reads. `FirstMomentRegimeAdjusted` reads the mean of
-the root and `LogRegimeAdjusted` the mean of the log, which need smaller factors, so the target
-over-corrects them: the squared multiplier is 0.975 and 0.956 at 12 assets and a half-life of 10.
-A HAC estimate reads the fixed point on the spectrum of its banded weight matrix, and skips a
-block with too few effective observations: at two lags, 12 assets and a half-life of 10 the
-squared multiplier of `RootMeanSquaredAdjusted` is 0.981 over 8 seeds, from 2.48 raw, which is the
-error of the deterministic equivalent on an estimate with half the degrees of freedom. On the
-separate correlation path the factor reads `cor_decay` alone, and the noise of the variance at
-`decay` leaves 1.031 without HAC and 1.090 at two lags.
+Normal returns at 12 assets and a half-life of 10, the squared multiplier of each of the three
+methods is then 1.000 within 0.002. A HAC estimate reads the fixed point of the mean on the
+spectrum of its banded weight matrix, for every method, and skips a block with too few effective
+observations: at two lags, 12 assets and a half-life of 10 the squared multiplier of
+`RootMeanSquaredAdjusted` is 0.981 over 8 seeds, from 2.48 raw, which is the error of the
+deterministic equivalent on an estimate with half the degrees of freedom. The mean factor
+over-corrects the other two methods there: `FirstMomentRegimeAdjusted` reads 0.952 and
+`LogRegimeAdjusted` 0.920. On the separate
+correlation path the factor reads `cor_decay` alone, and the noise of the variance at `decay`
+leaves 1.032, 1.030 and 1.027 for the three methods at a correlation half-life of 20, and 1.090
+at two lags.
 
 # Related
 
@@ -124,7 +130,7 @@ separate correlation path the factor reads `cor_decay` alone, and the noise of t
   - [`DiagonalTarget`](@ref)
   - [`PortfolioTarget`](@ref)
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
-  - [`mahalanobis_bias`](@ref)
+  - [`mahalanobis_regime_bias!`](@ref)
 """
 struct MahalanobisTarget <: RegimeAdjustedTarget end
 """
@@ -601,7 +607,7 @@ $(DocStringExtensions.FIELDS)
     """
     n_regime_obs
     """
-    $(field_dict[:ra_bias])
+    $(field_dict[:ra_cov_bias])
     """
     bias
 end
