@@ -584,7 +584,9 @@ function Base.split(mrcv::MultipleRandomised, rd::Prices_RR)
             start_obs = 1
             rdi = rd
         else
-            start_obs = rand(rng, 1:(T - window_size))
+            # A window of `window_size` rows fits at `T - window_size + 1` starts, the last
+            # of which ends on row `T`; a window of all `T` rows has the one start `1`.
+            start_obs = rand(rng, 1:(T - window_size + 1))
             idx = start_obs:(start_obs + window_size - 1)
             rdi = port_opt_view(rd, idx, :)
         end

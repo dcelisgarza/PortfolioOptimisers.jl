@@ -813,6 +813,26 @@
                                      window_size = ws)
             @test n_splits(cvn, rd) == length(split(cvn, rd).path_ids)
         end
+
+        # A window of `w` rows fits at `T - w + 1` starts. The draw must reach the last one,
+        # which ends on row `T`, and a window of all `T` rows has the one start `1`.
+        Xw = randn(StableRNG(393), 10, 4) ./ 100
+        rdw = ReturnsResult(; nx = string.('A':'D'), X = Xw)
+        resf = split(MultipleRandomised(IndexWalkForward(8, 2); rng = StableRNG(1),
+                                        n_subsets = 3, subset_size = 2, window_size = 10),
+                     rdw)
+        @test resf.train_idx == fill(1:8, 3)
+        @test resf.test_idx == fill(9:10, 3)
+        starts = Set{Int}()
+        for s in 1:100
+            resw = split(MultipleRandomised(IndexWalkForward(2, 2); rng = StableRNG(s),
+                                            n_subsets = 2, subset_size = 2,
+                                            window_size = 4), rdw)
+            for p in 1:2
+                push!(starts, minimum(first.(resw.train_idx[resw.path_ids .== p])))
+            end
+        end
+        @test starts == Set(1:7)
     end
     #=
     Issue #860, ADR 0120: a random asset subset is drawn from the Coverage Universe of its
