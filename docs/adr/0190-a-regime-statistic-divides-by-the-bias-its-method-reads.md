@@ -114,6 +114,30 @@ without a closed form. `hac_floor = false`, the default, keeps the recursion the
 and the scalar estimator floors the variance that it returns at zero. `hac_floor = true` is the
 oracle's rule of map #1375 (ADR 0186).
 
+**The factor of the law also reads the noise of each estimate, in the variable of the method
+(#1434).** Each term carries the noise `a_i = 1 / (f Q_i)` of its estimated variance, with
+`E[a_i] = 1`, but the root and the log read other moments of it, and the correlation of the assets
+correlates the noise: `Cov(Q_i, Q_j) = r_ij² Var(Q)`. The mean's factor thus left 0.986 and 0.971
+at a correlation of 0.9 and a half-life of 10, and 0.967 and 0.935 at 0.99 and a half-life of 5.
+The factor now expands the root in `u_i = a_i^(1/2)` and the log in `ℓ_i = ln a_i`, about their
+means. The root is 1-homogeneous in `u` and the log is additive in `ℓ`, so each is linear along the
+direction where every term carries the same noise, and the second-order term vanishes there. The
+factor is the exact law of `D R̃ D`, with `D = diag(b_i^(1/2))` at the mean of the variable
+(`b = E[Q^(-1/2)]² / f` or `exp(-E[ln Q]) / f`), plus that second-order term, whose covariance is
+`(v_i v_j)^(1/2) r̃_ij²` (`v = f / E[Q^(-1/2)]² − 1` or `Var[ln Q]`). `RegimeTermMoments` tables
+`(f, b, v)` for each count in the one pass of `regime_bias_table`, and `Var[ln Q]` is two single
+integrals of the Laplace transform, which agree with the trigamma function at equal weights. A HAC
+estimate is a banded quadratic form in the same returns, so its table reads the spectrum of its
+weight matrix, and the covariance of two of its estimates is still `r_ij²` times their variance.
+The factor is exact at one asset, where it is the scalar method's factor, and at a correlation of one.
+On simulated iid Normal returns with the true correlation (12 assets, 8 × 4 000 000 rows, standard
+error 1e-4), it is within 0.05 % from a correlation of 0 to 0.99 at a half-life of 5, and within
+the noise at 10 and 40, at 1, 2 and 12 assets. The quadratic term reads
+`Σ_ij C_ij M_ij(τ)²` on the tilted covariance `M(τ) = V diag(d(τ)) V'`: the τ-integral of
+`d d'` is a positive semi-definite matrix whose eigenvalues fall fast, so its truncation at the
+machine epsilon keeps 2 to 8 terms at 12 and 40 assets, and the cost is a few products of order
+`n³` per scored row, not one of order `n⁴`.
+
 **The gate is `K > n + 3`, where the variance of the statistic is finite.** At `n = 1` an estimate
 of four observations or fewer is not scored. The gate reads the count of each asset, so a young
 asset leaves the statistic as it does below `min_obs`. Under HAC the effective count
@@ -131,17 +155,20 @@ observations, such as 12 assets at a half-life of 5, is never scored.
   states `debias = false`.
 - The default inverse-volatility direction keeps the next order of its excess, about `9 s₂²`,
   which the docstring of its statistic states with the warm-up rows.
-- **Three limits remain, and child issues of map #1375 hold them.**
+- **Two limits remain, and child issues of map #1375 hold them.**
   - `MahalanobisTarget` keeps `b`, the moment of the mean, for every method, so it over-corrects
     FirstMoment and Log: 0.975 and 0.956 at 12 assets and a half-life of 10. The root and the log of
     `v' Ŵ⁻¹ v` for `n > 1` have no one-dimensional integral (#1431).
-  - The FirstMoment and Log calibrations of `DiagonalTarget` assumed a `χ²(n)` sum. Before this
-    decision the Jensen bias hid part of that error; after it, correlated assets read 0.941 and 0.962.
-    #1432 divides the sum by the factor of its law (see the decision above), and they read
-    0.995 and 0.989. The rest is the per-term factor of the mean, which the root and the log see
-    almost but not exactly: it grows with the correlation, to 0.986 and 0.971 at 0.9 (#1434).
   - On the separate correlation path the Mahalanobis factor reads `cor_decay` alone, so the noise
     of the variance at `decay` is not in it: 1.031 without HAC and 1.090 at two lags (#1437).
+- The FirstMoment and Log calibrations of `DiagonalTarget` assumed a `χ²(n)` sum. Before this
+  decision the Jensen bias hid part of that error; after it, correlated assets read 0.941 and 0.962.
+  #1432 divides the sum by the factor of its law, and #1434 makes that law read the noise of each
+  estimate (see the decisions above). The rest is of the third order in the noise, and the estimate
+  of the correlation that the law reads.
+- The diagonal factor of the first moment and the log costs one eigen-decomposition of `D R̃ D`, one
+  of the `n × n` integral of the tilted law, and a few products of order `n³` per scored row.
+  `RootMeanSquaredAdjusted` and `debias = false` pay none of it.
 
 ## Alternatives rejected
 
@@ -171,5 +198,15 @@ observations, such as 12 assets at a half-life of 5, is never scored.
   assets, where no draw is non-positive-definite.
 - **The per-term floor as the default.** It is 16 % too large at two lags, and it has no closed
   law, so no exact factor.
+- **A second-order expansion in `δ_i = a_i − 1`** (#1434, fix 2). It is second-order correct, but
+  the root and the log are not linear in `a` along the common direction, and `a` is skewed, so it
+  over-corrects where the noise is common: 1.0038 and 1.0073 at a correlation of 0.99 and a
+  half-life of 5, and 1.0039 and 1.0078 at one asset, where the scalar factor is exact.
+- **An interpolation on the effective count `n² / Σ μ²`** between the mean's factor and the
+  method's factor at one asset (#1434, fix 3). It is exact at a correlation of one, but at
+  independent assets the root and the log of a sum of 12 terms still see the noise: 0.992 and
+  0.985 at a half-life of 5.
+- **The exact law at `R = I` alone** (#1434, fix 1). It is a double integral for each count, and it
+  is exact only where the assets do not correlate.
 - **A keyword on each target.** `DiagonalTarget` would carry a field that a geodesic shrinkage
   ignores, and the scalar estimator would need a keyword of its own anyway.

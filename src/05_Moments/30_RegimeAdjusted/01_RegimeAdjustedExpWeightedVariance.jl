@@ -774,6 +774,169 @@ function regime_bias_factor(::LogRegimeAdjusted, s::VecNum, G::VecNum, c::Number
     return exp(-(h * sum(i -> exp(-s[i]) - G[i], eachindex(s, G)) + log(2 * c)))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Names the table of the moments of one term of a sum of regime statistics, which the table of a
+[`DiagonalTarget`](@ref) holds.
+
+A term ``u_{i}^{2} / \\hat{v}_{i}`` reads one estimated variance ``\\hat{v}_{i} = \\sigma_{i}^{2} Q_{i}``,
+and it is divided by the mean's factor ``f = \\mathbb{E}[Q^{-1}]``, so it carries the noise
+``a = 1 / (f Q)``, with ``\\mathbb{E}[a] = 1``. The root and the log of the sum read that noise
+through their own variable, the one in which the statistic is linear along the direction where every
+term carries the same noise: ``a^{1/2}`` for [`FirstMomentRegimeAdjusted`](@ref) and ``\\ln a`` for
+[`LogRegimeAdjusted`](@ref). For each count, [`regime_bias_factor`](@ref) gives the triple
+``(f, b, v)``: the mean's factor, the scale ``b`` at which the variable of the method has its mean,
+and the relative variance ``v`` of that variable.
+
+| Method                              | ``b``                               | ``v``                                 |
+|:----------------------------------- |:----------------------------------- |:------------------------------------- |
+| [`FirstMomentRegimeAdjusted`](@ref) | ``\\mathbb{E}[Q^{-1/2}]^{2} / f``   | ``f / \\mathbb{E}[Q^{-1/2}]^{2} - 1`` |
+| [`LogRegimeAdjusted`](@ref)         | ``\\exp(-\\mathbb{E}[\\ln Q]) / f`` | ``\\mathrm{Var}[\\ln Q]``             |
+| any other method                    | ``1``                               | ``0``                                 |
+
+# Fields
+
+  - `method`: $(field_dict[:ra_term_method])
+
+# Related
+
+  - [`regime_bias_factor`](@ref)
+  - [`regime_bias_table`](@ref)
+  - [`diagonal_law_factor`](@ref)
+"""
+struct RegimeTermMoments{M}
+    method::M
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the moments of one term for a method that reads the mean of the sum: the mean's factor, a
+scale of one and no variance.
+
+# Arguments
+
+  - `::RegimeTermMoments`: Table of the moments of one term.
+  - `s::VecNum`: Grid of the integration variable ``s = e^{x}``.
+  - `G::VecNum`: ``G(s)``, the Laplace transform of `Q` on the grid.
+  - `c::Number`: Normalised weight of the newest observation.
+  - `h::Number`: Step of the grid in ``x``.
+
+# Returns
+
+  - `moments::Tuple`: ``(\\mathbb{E}[Q^{-1}], 1, 0)``.
+
+# Related
+
+  - [`RegimeTermMoments`](@ref)
+"""
+function regime_bias_factor(::RegimeTermMoments, s::VecNum, G::VecNum, c::Number, h::Number)
+    f = regime_bias_factor(RootMeanSquaredAdjusted(), s, G, c, h)
+    return (f, one(f), zero(f))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the moments of one term for the first-moment method, which reads the root of the noise
+``a = 1 / (f Q)``.
+
+# Arguments
+
+  - `m::RegimeTermMoments{<:FirstMomentRegimeAdjusted}`: Table of the moments of one term.
+  - `s::VecNum`: Grid of the integration variable ``s = e^{x}``.
+  - `G::VecNum`: ``G(s)``, the Laplace transform of `Q` on the grid.
+  - `c::Number`: Normalised weight of the newest observation.
+  - `h::Number`: Step of the grid in ``x``.
+
+# Returns
+
+  - `moments::Tuple`: ``(f, q / f, f / q - 1)``, with ``f = \\mathbb{E}[Q^{-1}]`` and
+    ``q = \\mathbb{E}[Q^{-1/2}]^{2}``, so ``b = \\mathbb{E}[a^{1/2}]^{2}`` and ``v`` is the relative
+    variance of ``a^{1/2}``.
+
+# Related
+
+  - [`RegimeTermMoments`](@ref)
+"""
+function regime_bias_factor(m::RegimeTermMoments{<:FirstMomentRegimeAdjusted}, s::VecNum,
+                            G::VecNum, c::Number, h::Number)
+    f = regime_bias_factor(RootMeanSquaredAdjusted(), s, G, c, h)
+    q = regime_bias_factor(m.method, s, G, c, h)
+    return (f, q / f, f / q - one(f))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the moments of one term for the log method, which reads the log of the noise
+``a = 1 / (f Q)``.
+
+# Arguments
+
+  - `m::RegimeTermMoments{<:LogRegimeAdjusted}`: Table of the moments of one term.
+  - `s::VecNum`: Grid of the integration variable ``s = e^{x}``.
+  - `G::VecNum`: ``G(s)``, the Laplace transform of `Q` on the grid.
+  - `c::Number`: Normalised weight of the newest observation.
+  - `h::Number`: Step of the grid in ``x``.
+
+# Returns
+
+  - `moments::Tuple`: ``(f, e^{-\\mathbb{E}[\\ln Q]} / f, \\mathrm{Var}[\\ln Q])``, with
+    ``f = \\mathbb{E}[Q^{-1}]``, so ``b = \\exp(\\mathbb{E}[\\ln a])``, from
+    [`regime_log_variance`](@ref).
+
+# Related
+
+  - [`RegimeTermMoments`](@ref)
+  - [`regime_log_variance`](@ref)
+"""
+function regime_bias_factor(m::RegimeTermMoments{<:LogRegimeAdjusted}, s::VecNum, G::VecNum,
+                            c::Number, h::Number)
+    f = regime_bias_factor(RootMeanSquaredAdjusted(), s, G, c, h)
+    return (f, regime_bias_factor(m.method, s, G, c, h) / f, regime_log_variance(s, G, h))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the variance of the log of an estimated variance, from the Laplace transform of `Q`.
+
+The Mellin transform of ``Q' = 2 c Q`` expands about zero as
+``\\mathbb{E}[Q'^{-\\sigma}] = 1 + \\sigma I_{0} + \\sigma^{2} (I_{1} + \\gamma I_{0}) + O(\\sigma^{3})``,
+so its first two coefficients are the first two moments of ``-\\ln Q'``. A scale does not move a
+variance of a log, so the variance of ``\\ln Q'`` is that of ``\\ln Q``. At equal weights it agrees
+with the trigamma function ``\\psi'(K / 2)``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+I_{0} &= \\int_{0}^{\\infty} \\left(G(s) - e^{-s}\\right) s^{-1}\\, \\mathrm{d}s\\,, \\quad
+I_{1} = \\int_{0}^{\\infty} \\ln s \\left(G(s) - e^{-s}\\right) s^{-1}\\, \\mathrm{d}s\\,, \\\\
+\\mathrm{Var}[\\ln Q] &= 2 (I_{1} + \\gamma I_{0}) - I_{0}^{2}\\,.
+\\end{align}
+```
+
+Where ``\\gamma`` is the Euler-Mascheroni constant.
+
+# Arguments
+
+  - `s::VecNum`: Grid of the integration variable ``s = e^{x}``.
+  - `G::VecNum`: ``G(s)``, the Laplace transform of `Q` on the grid.
+  - `h::Number`: Step of the grid in ``x``.
+
+# Returns
+
+  - `v::Number`: ``\\mathrm{Var}[\\ln Q]``.
+
+# Related
+
+  - [`regime_bias_factor`](@ref)
+  - [`regime_bias_table`](@ref)
+"""
+function regime_log_variance(s::VecNum, G::VecNum, h::Number)
+    I0 = h * sum(i -> G[i] - exp(-s[i]), eachindex(s, G))
+    I1 = h * sum(i -> log(s[i]) * (G[i] - exp(-s[i])), eachindex(s, G))
+    return 2 * (I1 + Base.MathConstants.eulergamma * I0) - I0^2
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Computes the bias factor of a regime statistic that reads one estimated variance, for every count
@@ -816,13 +979,15 @@ The mean of ``Q^{-1}`` is finite from ``K = 3`` and its variance from ``K = 5``,
 
 # Arguments
 
-  - `method::RegimeAdjustedMethod`: Regime adjustment method, which names the moment.
+  - `method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments}`: Regime adjustment method,
+    which names the moment, or the table of the moments of one term.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Largest count of observations in the table.
 
 # Returns
 
-  - `table::VecNum`: The factor for each count from one to `K`.
+  - `table::AbstractVector`: The factor for each count from one to `K`, or the moments of
+    [`RegimeTermMoments`](@ref).
 
 # Related
 
@@ -831,7 +996,8 @@ The mean of ``Q^{-1}`` is finite from ``K = 3`` and its variance from ``K = 5``,
   - [`mahalanobis_bias`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
-function regime_bias_table(method::RegimeAdjustedMethod, decay::Number, K::Integer)
+function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
+                           decay::Number, K::Integer)
     h = one(decay) / 10
     s = exp.(range(-60 * one(h), 50 * one(h); step = h))
     lG = zero(s)
@@ -858,8 +1024,9 @@ larger count. A fit over ``T`` rows thus makes the table once or a few times, an
 
 # Arguments
 
-  - `bias::VecNum`: Table of the state (mutated where it grows).
-  - `method::RegimeAdjustedMethod`: Regime adjustment method, which names the moment.
+  - `bias::AbstractVector`: Table of the state (mutated where it grows).
+  - `method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments}`: Regime adjustment method,
+    which names the moment, or the table of the moments of one term.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations in the estimate.
   - `hac_lags::Option{<:Integer}`: Count of HAC lags of the estimate, whose table
@@ -867,16 +1034,17 @@ larger count. A fit over ``T`` rows thus makes the table once or a few times, an
 
 # Returns
 
-  - `factor::Number`: The factor at `K`.
+  - `factor`: The factor at `K`, or the moments of [`RegimeTermMoments`](@ref) at `K`.
 
 # Related
 
   - [`regime_bias_table`](@ref)
   - [`RegimeAdjustedVarianceState`](@ref)
 """
-function regime_bias!(bias::VecNum, method::RegimeAdjustedMethod, decay::Number, K::Integer,
-                      hac_lags::Option{<:Integer} = nothing)
-    Ksat = ceil(Int, log(eps(eltype(bias))) / log(decay))
+function regime_bias!(bias::AbstractVector,
+                      method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
+                      decay::Number, K::Integer, hac_lags::Option{<:Integer} = nothing)
+    Ksat = ceil(Int, log(eps(eltype(eltype(bias)))) / log(decay))
     if K > length(bias) && length(bias) < Ksat
         n = min(max(2 * K, 64), Ksat)
         table = if isnothing(hac_lags)

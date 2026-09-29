@@ -1,5 +1,5 @@
 ```@meta
-Description = "Regime adjusted exp weighted covariance (b), private API of PortfolioOptimisers.jl: regime_target_statistic, diagonal_law_factor, diagonal_law_spectrum, …"
+Description = "Regime adjusted exp weighted covariance (b), private API of PortfolioOptimisers.jl: regime_target_statistic, diagonal_law_factor, diagonal_law_correlation, …"
 ```
 
 # Regime adjusted exp weighted covariance (b): private API
@@ -9,11 +9,14 @@ Description = "Regime adjusted exp weighted covariance (b), private API of Portf
 ```@docs
 regime_target_statistic
 diagonal_law_factor
-diagonal_law_spectrum
+diagonal_law_correlation
 pair_weight_square_sum
 regime_law_log_laplace
 regime_law_grid
 regime_law_factor
+regime_law_shape
+regime_law_weights
+regime_law_correction
 exp_weight_cross_sum
 hac_ldl_row!
 hac_laplace!

@@ -851,28 +851,137 @@ law, on the estimated spectrum shrunk until its dispersion is unbiased (ADR 0190
         rho = C ./ sqrt.(diag(C) * transpose(diag(C)))
         q = sum(rho[i, j]^2 - (1 - rho[i, j]^2)^2 * sum(abs2, w)
                 for i in idx, j in idx if i != j)
-        mu = PO.diagonal_law_spectrum(cache, ce, C, idx)
-        @test isapprox(sum(mu), 4; rtol = 1e-12)
+        Rs = PO.diagonal_law_correlation(cache, ce, C, idx)
+        mu = eigvals(Symmetric(Rs))
+        @test isapprox(sum(mu), 4; rtol = 1e-12) &&
+              isapprox(diag(Rs), ones(4); rtol = 1e-14)
         @test isapprox(sum(abs2, mu .- 1), q; rtol = 1e-10)
         @test sum(abs2, mu .- 1) < sum(abs2, eigvals(Symmetric(rho)) .- 1)
         # A block without correlation keeps the identity, and a block of correlation one keeps
         # its single eigenvalue, because a sample correlation of one has no variance.
-        @test PO.diagonal_law_spectrum(cache, ce, Matrix(Diagonal([1.0, 2.0, 3.0, 4.0])),
-                                       idx) == ones(4)
+        @test PO.diagonal_law_correlation(cache, ce, Matrix(Diagonal([1.0, 2.0, 3.0, 4.0])),
+                                          idx) == I(4)
         v = [1.0, 2.0, 3.0, 4.0]
-        @test isapprox(PO.diagonal_law_spectrum(cache, ce, v * transpose(v), idx),
+        @test isapprox(eigvals(Symmetric(PO.diagonal_law_correlation(cache, ce,
+                                                                     v * transpose(v), idx))),
                        [0, 0, 0, 4]; atol = 1e-12)
 
-        # The mean's method needs no factor, and the raw statistic takes none.
+        # The mean's method needs no factor, and the raw statistic takes none. The debiased
+        # factor reads the moments of each term at the count of its asset (#1434).
         raw = RegimeAdjustedExpWeightedCovariance(; decay = lambda, min_obs = 5, extra...,
                                                   regime_target = PO.DiagonalTarget(),
                                                   regime_method = FM, debias = false)
-        @test PO.diagonal_law_factor(PO.RootMeanSquaredAdjusted(), cache, ce, C, idx) ===
+        m = [PO.regime_bias!(cache.bias, PO.RegimeTermMoments(FM), lambda, k)
+             for k in cache.obs_count[idx]]
+        @test PO.diagonal_law_factor(PO.RootMeanSquaredAdjusted(), cache, ce, C, idx, m) ===
               1.0
-        @test PO.diagonal_law_factor(FM, cache, raw, C, idx) === 1.0
-        @test PO.diagonal_law_factor(FM, cache, ce, C, idx) ==
-              PO.regime_law_factor(FM, PO.diagonal_law_spectrum(cache, ce, C, idx))
-        @test PO.diagonal_law_factor(LG, cache, ce, C, idx) < 1
+        @test PO.diagonal_law_factor(FM, cache, raw, C, idx, m) === 1.0
+        sb, sv = sqrt.(getindex.(m, 2)), sqrt.(getindex.(m, 3))
+        E = eigen(Symmetric(sb .* Rs .* transpose(sb)))
+        @test PO.diagonal_law_factor(FM, cache, ce, C, idx, m) ==
+              PO.regime_law_factor(FM, max.(E.values, 0), E.vectors,
+                                   sv .* Rs .^ 2 .* transpose(sv))
+        @test PO.diagonal_law_factor(LG, cache, ce, C, idx, m) < 1
+    end
+end
+
+#=
+Issue #1434. Each term of the diagonal sum carries the noise `a_i = 1 / (f Q_i)` of its estimated
+variance, and the correlation of the assets correlates that noise, so the per-term factor of the
+mean left 0.986 and 0.971 at a correlation of 0.9. The factor now expands the root and the log in
+`a^(1/2)` and `ln a`, the variables in which the statistic is linear along the direction where
+every term carries the same noise (ADR 0190).
+=#
+@testset "the diagonal factor reads the noise of each estimate" begin
+    SF = PO.SpecialFunctions
+    FM, LG = PO.FirstMomentRegimeAdjusted(), PO.LogRegimeAdjusted()
+    # At equal weights `Q` is χ²(K)/K, so the moments of one term have closed forms. A half-life of
+    # 1e6 makes the 30 weights equal to within 2e-5.
+    K = 30
+    eq = 2.0^(-1 / 1e6)
+    f = K / (K - 2)
+    qf = (sqrt(K / 2) * SF.gamma((K - 1) / 2) / SF.gamma(K / 2))^2
+    ql = exp(log(K / 2) - SF.digamma(K / 2))
+    tfm = PO.regime_bias_table(PO.RegimeTermMoments(FM), eq, K)[K]
+    tlg = PO.regime_bias_table(PO.RegimeTermMoments(LG), eq, K)[K]
+    trm = PO.regime_bias_table(PO.RegimeTermMoments(PO.RootMeanSquaredAdjusted()), eq, K)[K]
+    @test all(isapprox.(tfm, (f, qf / f, f / qf - 1); rtol = 1e-10))
+    @test all(isapprox.(tlg, (f, ql / f, SF.trigamma(K / 2)); rtol = 1e-10))
+    @test isapprox(trm[1], f; rtol = 1e-11) && trm[2:3] == (1.0, 0.0)
+    # A diagonal state holds the triples, and grows them as a table of factors grows.
+    bias = NTuple{3, Float64}[]
+    @test PO.regime_bias!(bias, PO.RegimeTermMoments(FM), 0.9, 10) == bias[10]
+    @test length(bias) == 64
+
+    # The correction vanishes where every term carries the same noise: at one asset the factor is
+    # the scalar method's, and at a correlation of one it is the law of one eigenvalue at the scale
+    # b. Measured: 2e-15 or less.
+    b, v = 0.93, 0.07
+    @test isapprox(PO.regime_law_factor(FM, [b], ones(1, 1), fill(v, 1, 1)), 2b / pi;
+                   rtol = 1e-12)
+    @test isapprox(PO.regime_law_factor(LG, [b], ones(1, 1), fill(v, 1, 1)), b;
+                   rtol = 1e-12)
+    n = 6
+    Es = eigen(Symmetric(fill(b, n, n)))
+    for method in (FM, LG, PO.LogRegimeAdjusted(; x = 1.3, y = 0.7))
+        @test abs(PO.regime_law_correction(method, max.(Es.values, 0), Es.vectors,
+                                           fill(v, n, n))) < 1e-14
+    end
+
+    # The reduction of the quadratic sum against the sum over every node written with matrices,
+    # on a correlation that is not uniform and on unequal scales.
+    rng = StableRNG(1434)
+    F = randn(rng, n, 2)
+    S = F * transpose(F) + Diagonal(0.5 .+ rand(rng, n))
+    R = S ./ sqrt.(diag(S) .* transpose(diag(S)))
+    sb, sv = sqrt.(0.9 .+ 0.05 .* rand(rng, n)), sqrt.(0.05 .+ 0.03 .* rand(rng, n))
+    Rb = sb .* R .* transpose(sb)
+    Cm = sv .* R .^ 2 .* transpose(sv)
+    E = eigen(Symmetric(Rb))
+    for method in (FM, LG, PO.LogRegimeAdjusted(; x = 1.3, y = 0.7))
+        a, nu = PO.regime_law_shape(method)
+        x = PO.regime_law_grid(Float64)
+        lin, quad = 0.0, 0.0
+        for xi in x
+            tau = exp(xi) / n
+            M = Rb / (I + 2tau * Rb)
+            L = det(I + 2tau * Rb)^(-a)
+            wl, wq = PO.regime_law_weights(method, tau)
+            lin += wl * L * dot(diag(Cm), diag(M))
+            quad += wq *
+                    L *
+                    sum(Cm .* (nu^2 .* diag(M) .* transpose(diag(M)) .+ 2nu .* M .^ 2))
+        end
+        @test isapprox(PO.regime_law_correction(method, E.values, E.vectors, Cm),
+                       step(x) * (lin - quad) / 2; rtol = 1e-10)
+    end
+
+    # Through the library: on iid Normal returns the squared multiplier is one when the statistic
+    # is correct. The #1428 fixture read 0.995 (first moment) and 0.989 (log) over 8 seeds after
+    # #1432, and reads 1.0001 and 0.9997 now (0.9995 and 1.0004 on this seed, 0.9993 and 1.0001
+    # on the separate path). Under two HAC lags the moments of each term come from the table of
+    # the banded weight matrix (#1433): 0.990 and 0.991 on this seed, and 1.002 and 0.999 over 8
+    # seeds of the #1433 fixture, whose standard error is 0.004.
+    rng = StableRNG(1428)
+    na, nr = 12, 12000
+    A = randn(rng, na, na)
+    U = cholesky(Symmetric(A * transpose(A) / na + Diagonal(rand(rng, na)))).U
+    Rt = randn(rng, nr, na) * U .* 0.01
+    base = (; decay = 2.0^(-1 / 10), min_obs = 5, regime_lohi_mult = nothing,
+            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centred = true,
+            regime_target = PO.DiagonalTarget())
+    function multiplier(method; extra...)
+        on = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
+                                                 regime_method = method)
+        off = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
+                                                  regime_method = nothing)
+        return mean(cov(on, Rt) ./ cov(off, Rt))
+    end
+    for method in (FM, LG), extra in ((;), (; cor_decay = 2.0^(-1 / 20)))
+        @test 0.99 < multiplier(method; extra...) < 1.01
+    end
+    for method in (FM, LG)
+        @test 0.97 < multiplier(method; hac_lags = 2) < 1.03
     end
 end
 

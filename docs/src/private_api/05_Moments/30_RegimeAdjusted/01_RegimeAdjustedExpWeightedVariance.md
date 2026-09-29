@@ -1,5 +1,5 @@
 ```@meta
-Description = "Regime adjusted exp weighted variance, private API of PortfolioOptimisers.jl: RegimeAdjustedVarianceState, get_regime_state, regime_bias_factor, …"
+Description = "Regime adjusted exp weighted variance, private API of PortfolioOptimisers.jl: RegimeAdjustedVarianceState, RegimeTermMoments, get_regime_state, …"
 ```
 
 # Regime adjusted exp weighted variance: private API
@@ -8,6 +8,7 @@ Description = "Regime adjusted exp weighted variance, private API of PortfolioOp
 
 ```@docs
 RegimeAdjustedVarianceState
+RegimeTermMoments
 ```
 
 ## Functions
@@ -17,6 +18,7 @@ get_regime_state(::RootMeanSquaredAdjusted, z2_valid::VecNum, ::Any)
 get_regime_state(method::FirstMomentRegimeAdjusted, z2_valid::VecNum, ::Any)
 get_regime_state(method::LogRegimeAdjusted, z2_valid::VecNum, min_val::Number = sqrt(eps(eltype(z2_valid))))
 regime_bias_factor
+regime_log_variance
 regime_bias_table
 regime_bias!
 regime_bias_open
