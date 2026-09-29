@@ -107,7 +107,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Change of a Panel Field over a fixed lag, scaled by the current value of a second Panel Field.
 
-This is the growth archetype for a field that can be negative. A growth rate over a negative base flips its sign, so an earnings change is instead divided by the current market capitalisation, and the sign of the Descriptor is the direction of the change. The first `lag` observations are `NaN`, and so is every cell where the scale is not strictly positive.
+This is the growth archetype for a field that can be negative. A growth rate over a negative base flips its sign, so an earnings change is instead divided by the current market capitalisation, and the sign of the Descriptor is the direction of the change. The first `lag` observations are `NaN`, and so is every cell where the scale is not strictly positive. Under `gt0 = true` a scale at or below zero is a data error instead, and the Descriptor refuses it: [`EarningsChangeToPrice`](@ref) sets it, because a market capitalisation is positive by construction.
 
 # Mathematical definition
 
@@ -130,7 +130,8 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ChangeToScale(; field::AbstractString, scale::AbstractString, lag::Integer) -> ChangeToScale
+    ChangeToScale(; field::AbstractString, scale::AbstractString, lag::Integer,
+                  gt0::Bool = false) -> ChangeToScale
 
 Keywords correspond to the struct's fields. `lag` takes no default, because it depends on the data frequency.
 
@@ -146,7 +147,8 @@ julia> ChangeToScale(; field = \"net_income_ttm\", scale = \"market_cap\", lag =
 ChangeToScale
   field ┼ String: \"net_income_ttm\"
   scale ┼ String: \"market_cap\"
-    lag ┴ Int64: 252
+    lag ┼ Int64: 252
+    gt0 ┴ Bool: false
 ```
 
 # Related
@@ -170,23 +172,29 @@ ChangeToScale
     Number of observations to look back.
     """
     lag
-    function ChangeToScale(field::AbstractString, scale::AbstractString, lag::Integer)
+    """
+    Whether the scale must be strictly positive wherever it is observed and active. A value at or below zero then raises a `DomainError`; otherwise its cell is `NaN`.
+    """
+    gt0
+    function ChangeToScale(field::AbstractString, scale::AbstractString, lag::Integer,
+                           gt0::Bool)
         assert_panel_terms(field, :field)
         assert_panel_terms(scale, :scale)
         assert_descriptor_lag(lag)
-        return new{typeof(field), typeof(scale), typeof(lag)}(field, scale, lag)
+        return new{typeof(field), typeof(scale), typeof(lag), typeof(gt0)}(field, scale,
+                                                                           lag, gt0)
     end
 end
-function ChangeToScale(; field::AbstractString, scale::AbstractString,
-                       lag::Integer)::ChangeToScale
-    return ChangeToScale(field, scale, lag)
+function ChangeToScale(; field::AbstractString, scale::AbstractString, lag::Integer,
+                       gt0::Bool = false)::ChangeToScale
+    return ChangeToScale(field, scale, lag, gt0)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Change of the ratio of two Panel Fields over a fixed lag.
 
-Where [`ChangeToScale`](@ref) divides the change of a level by the current scale, this archetype forms the ratio at both ends and takes the difference, so it measures a change in intensity: a capital expenditure that grew with the assets it serves reads zero. The first `lag` observations are `NaN`, and so is every cell where either ratio is undefined because its scale is not strictly positive.
+Where [`ChangeToScale`](@ref) divides the change of a level by the current scale, this archetype forms the ratio at both ends and takes the difference, so it measures a change in intensity: a capital expenditure that grew with the assets it serves reads zero. The first `lag` observations are `NaN`, and so is every cell where either ratio is undefined because its scale is not strictly positive. Under `gt0 = true` a scale at or below zero is a data error instead, and the Descriptor refuses it: [`CapexToAssetsChangeInIntensity`](@ref) sets it, because a total of assets is positive by construction.
 
 # Mathematical definition
 
@@ -209,7 +217,8 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    ChangeInIntensity(; field::AbstractString, scale::AbstractString, lag::Integer) -> ChangeInIntensity
+    ChangeInIntensity(; field::AbstractString, scale::AbstractString, lag::Integer,
+                      gt0::Bool = false) -> ChangeInIntensity
 
 Keywords correspond to the struct's fields. `lag` takes no default, because it depends on the data frequency.
 
@@ -225,7 +234,8 @@ julia> ChangeInIntensity(; field = \"capex_ttm\", scale = \"total_assets\", lag 
 ChangeInIntensity
   field ┼ String: \"capex_ttm\"
   scale ┼ String: \"total_assets\"
-    lag ┴ Int64: 252
+    lag ┼ Int64: 252
+    gt0 ┴ Bool: false
 ```
 
 # Related
@@ -249,16 +259,22 @@ ChangeInIntensity
     Number of observations to look back.
     """
     lag
-    function ChangeInIntensity(field::AbstractString, scale::AbstractString, lag::Integer)
+    """
+    Whether the scale must be strictly positive wherever it is observed and active. A value at or below zero then raises a `DomainError`; otherwise every ratio over it is `NaN`.
+    """
+    gt0
+    function ChangeInIntensity(field::AbstractString, scale::AbstractString, lag::Integer,
+                               gt0::Bool)
         assert_panel_terms(field, :field)
         assert_panel_terms(scale, :scale)
         assert_descriptor_lag(lag)
-        return new{typeof(field), typeof(scale), typeof(lag)}(field, scale, lag)
+        return new{typeof(field), typeof(scale), typeof(lag), typeof(gt0)}(field, scale,
+                                                                           lag, gt0)
     end
 end
-function ChangeInIntensity(; field::AbstractString, scale::AbstractString,
-                           lag::Integer)::ChangeInIntensity
-    return ChangeInIntensity(field, scale, lag)
+function ChangeInIntensity(; field::AbstractString, scale::AbstractString, lag::Integer,
+                           gt0::Bool = false)::ChangeInIntensity
+    return ChangeInIntensity(field, scale, lag, gt0)
 end
 """
     descriptor(de::GrowthRate, rd::ReturnsResult) -> Matrix{<:Real}
@@ -273,9 +289,9 @@ The three archetypes read through [`panel_field_values`](@ref), walk the observa
 
 The method that Julia selects is the algorithm.
 
- 1. [`GrowthRate`](@ref): check that the field is non-negative through [`assert_nonneg_panel_fields`](@ref), then write `z[t] / z[t - lag] - 1` through [`positive_divide`](@ref).
- 2. [`ChangeToScale`](@ref): write `(z[t] - z[t - lag]) / s[t]` through [`positive_divide`](@ref).
- 3. [`ChangeInIntensity`](@ref): write `z[t] / s[t] - z[t - lag] / s[t - lag]`, each ratio through [`positive_divide`](@ref).
+ 1. [`GrowthRate`](@ref): check that the field is non-negative through [`assert_panel_field_sign`](@ref), then write `z[t] / z[t - lag] - 1` through [`positive_divide`](@ref).
+ 2. [`ChangeToScale`](@ref): check the scale under `gt0`, then write `(z[t] - z[t - lag]) / s[t]` through [`positive_divide`](@ref).
+ 3. [`ChangeInIntensity`](@ref): check the scale under `gt0`, then write `z[t] / s[t] - z[t - lag] / s[t - lag]`, each ratio through [`positive_divide`](@ref).
 
 Every method then writes `NaN` into the inactive cells.
 
@@ -287,7 +303,7 @@ Every method then writes `NaN` into the inactive cells.
 # Validation
 
   - The rules of [`panel_field_values`](@ref) for every Panel Field the estimator names.
-  - The rule of [`assert_nonneg_panel_fields`](@ref) for a [`GrowthRate`](@ref).
+  - The rule of [`assert_panel_field_sign`](@ref) for a [`GrowthRate`](@ref), and for the scale of a [`ChangeToScale`](@ref) or a [`ChangeInIntensity`](@ref) under `gt0 = true`.
 
 # Returns
 
@@ -334,7 +350,7 @@ julia> descriptor(ChangeInIntensity(; field = \"sales_ttm\", scale = \"market_ca
   - [`descriptor_active_fill!`](@ref)
 """
 function descriptor(de::GrowthRate, rd::ReturnsResult)::Matrix{<:Real}
-    assert_nonneg_panel_fields(rd, [String(de.field)])
+    assert_panel_field_sign(rd, [String(de.field)], false)
     V = panel_field_values(rd, de.field)
     Tf = eltype(V)
     D = fill(Tf(NaN), size(V))
@@ -346,6 +362,9 @@ function descriptor(de::GrowthRate, rd::ReturnsResult)::Matrix{<:Real}
     return D
 end
 function descriptor(de::ChangeToScale, rd::ReturnsResult)::Matrix{<:Real}
+    if de.gt0
+        assert_panel_field_sign(rd, [String(de.scale)], true)
+    end
     V = panel_field_values(rd, de.field)
     S = panel_field_values(rd, de.scale)
     Tf = promote_type(eltype(V), eltype(S))
@@ -358,6 +377,9 @@ function descriptor(de::ChangeToScale, rd::ReturnsResult)::Matrix{<:Real}
     return D
 end
 function descriptor(de::ChangeInIntensity, rd::ReturnsResult)::Matrix{<:Real}
+    if de.gt0
+        assert_panel_field_sign(rd, [String(de.scale)], true)
+    end
     V = panel_field_values(rd, de.field)
     S = panel_field_values(rd, de.scale)
     Tf = promote_type(eltype(V), eltype(S))
@@ -486,7 +508,7 @@ end
 
 Change of trailing net income over one year, divided by the current market capitalisation.
 
-The value is `(net_income_ttm(t) - net_income_ttm(t - lag)) / market_cap(t)`, `NaN` on the first `lag` observations and where the market capitalisation is not strictly positive. It is the earnings momentum Descriptor, and it stays well defined through a loss, where a growth rate of the earnings would not.
+The value is `(net_income_ttm(t) - net_income_ttm(t - lag)) / market_cap(t)`, `NaN` on the first `lag` observations. A market capitalisation at or below zero is a data error, and the estimator raises on one. It is the earnings momentum Descriptor, and it stays well defined through a loss, where a growth rate of the earnings would not.
 
 # Arguments
 
@@ -496,7 +518,7 @@ The value is `(net_income_ttm(t) - net_income_ttm(t - lag)) / market_cap(t)`, `N
 
 # Returns
 
-  - `de::ChangeToScale`: The estimator, with the two Panel Fields and the lag fixed.
+  - `de::ChangeToScale`: The estimator, with the two Panel Fields and the lag fixed, and with `gt0 = true`.
 
 # Examples
 
@@ -505,7 +527,8 @@ julia> EarningsChangeToPrice()
 ChangeToScale
   field ┼ String: \"net_income_ttm\"
   scale ┼ String: \"market_cap\"
-    lag ┴ Int64: 252
+    lag ┼ Int64: 252
+    gt0 ┴ Bool: true
 ```
 
 # Related
@@ -518,7 +541,7 @@ ChangeToScale
 function EarningsChangeToPrice(; field::AbstractString = "net_income_ttm",
                                scale::AbstractString = "market_cap",
                                lag::Integer = 252)::ChangeToScale
-    return ChangeToScale(; field = field, scale = scale, lag = lag)
+    return ChangeToScale(; field = field, scale = scale, lag = lag, gt0 = true)
 end
 """
     CapexToAssetsChangeInIntensity(; field::AbstractString = "capex_ttm",
@@ -527,7 +550,7 @@ end
 
 Change of the capital expenditure to total assets ratio over one year.
 
-The value is `capex_ttm(t) / total_assets(t) - capex_ttm(t - lag) / total_assets(t - lag)`, `NaN` on the first `lag` observations and where either total assets value is not strictly positive. A positive value says that the firm invests a larger share of its assets than a year ago.
+The value is `capex_ttm(t) / total_assets(t) - capex_ttm(t - lag) / total_assets(t - lag)`, `NaN` on the first `lag` observations. Total assets at or below zero are a data error, and the estimator raises on them. A positive value says that the firm invests a larger share of its assets than a year ago.
 
 # Arguments
 
@@ -537,7 +560,7 @@ The value is `capex_ttm(t) / total_assets(t) - capex_ttm(t - lag) / total_assets
 
 # Returns
 
-  - `de::ChangeInIntensity`: The estimator, with the two Panel Fields and the lag fixed.
+  - `de::ChangeInIntensity`: The estimator, with the two Panel Fields and the lag fixed, and with `gt0 = true`.
 
 # Examples
 
@@ -546,7 +569,8 @@ julia> CapexToAssetsChangeInIntensity()
 ChangeInIntensity
   field ┼ String: \"capex_ttm\"
   scale ┼ String: \"total_assets\"
-    lag ┴ Int64: 252
+    lag ┼ Int64: 252
+    gt0 ┴ Bool: true
 ```
 
 # Related
@@ -558,7 +582,7 @@ ChangeInIntensity
 function CapexToAssetsChangeInIntensity(; field::AbstractString = "capex_ttm",
                                         scale::AbstractString = "total_assets",
                                         lag::Integer = 252)::ChangeInIntensity
-    return ChangeInIntensity(; field = field, scale = scale, lag = lag)
+    return ChangeInIntensity(; field = field, scale = scale, lag = lag, gt0 = true)
 end
 
 export GrowthRate, ChangeToScale, ChangeInIntensity, AssetsGrowthRate, SalesGrowthRate,

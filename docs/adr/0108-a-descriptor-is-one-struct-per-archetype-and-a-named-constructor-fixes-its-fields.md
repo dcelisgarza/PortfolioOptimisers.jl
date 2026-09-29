@@ -179,17 +179,36 @@ constructor.
 ## Amendment (2026-09-29)
 
 [#1379](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1379) measured the guards of
-this decision and records two rules that the text above does not state.
+this decision, and the maintainer changed one of them.
 
-**The `nonneg` guard reads the active observed cells alone.** `GrowthRate` reads its field under the
-same scope. An Asset Panel can hold a finite value outside the active mask, and
-`descriptor_active_fill!` writes `NaN` over every such cell of the Descriptor. A check over every
-finite cell would refuse a panel because of a value that no output reads. The guard therefore
-refuses a negative value only where that value can reach the Descriptor. An active cell that is not
-observed reads back as `NaN`, so the value of its fill policy is never checked either.
+**A data error refuses, and an undefined ratio is `NaN`.** The section *The guards are fields, and
+a non-positive denominator is `NaN`* above gave `NaN` for every denominator at or below zero. That
+hid a data error. A price, a market capitalisation, a share count or a total of assets is positive
+by construction, so a value at or below zero is wrong input, not a state of the firm. A `NaN` in
+its cell removed the asset from the cross-section of that observation, and nothing told the
+caller. The rule now separates the two cases:
+
+| Denominator | Valid at or below zero? | Result |
+| --- | --- | --- |
+| a price, a market capitalisation, a share count, a total of assets | no | the named constructor refuses it through the new `gt0` guard |
+| a debt, a sales figure | zero only | a negative value refuses through `nonneg`; a zero gives `NaN` |
+| a book equity, an enterprise value, a total capital, the lagged base of a growth rate | yes | `NaN`: the ratio is not defined for that firm at that observation |
+
+`PanelFieldRatio` gains the field `gt0`, after `pos`: the names of Panel Fields that must be
+strictly positive wherever they are observed and active. `PanelFieldLog`, `ChangeToScale` and
+`ChangeInIntensity` gain a Boolean `gt0` for their field or their scale. `assert_panel_field_sign`
+checks both guards, and replaces `assert_nonneg_panel_fields`. Each named constructor sets the
+guards of its default fields; `MarketLeverage` moves its market capitalisation from `pos` to
+`gt0`. The archetypes default to no guard, so a caller who wants `NaN` in such a cell builds the
+archetype with the field in `pos`, or with `gt0 = false`. That is the oracle's output wherever
+the oracle does not refuse, so no output is out of reach (ADR 0186).
+
+**The guards read the active observed cells alone.** A cell outside the active mask never reaches
+the Descriptor, because `descriptor_active_fill!` writes `NaN` over it. An active cell that is not
+observed reads back as `NaN`. A guard therefore refuses a value only where that value can reach
+the Descriptor. `GrowthRate` reads its field under the same scope.
 
 **A quotient that is not finite is `NaN`.** `positive_divide` of two finite values can overflow,
 for example `1e300 / 1e-10`. The Asset Panel refuses an infinity in its input, and every
 cross-sectional transform refuses one in a Descriptor, so one infinite cell cost the whole fit.
-`positive_divide` now gives `NaN` there, and the cell costs one cell of the Descriptor, as a
-non-positive denominator does.
+`positive_divide` now gives `NaN` there, and the cell costs one cell of the Descriptor.

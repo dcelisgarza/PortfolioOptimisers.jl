@@ -7,13 +7,23 @@ The measure found one defect, which this ticket fixes: a quotient of two finite 
 overflows gave an infinity, and every cross-sectional transform refuses an infinity, so one cell
 cost the whole fit. `positive_divide` now gives `NaN` there, as the oracle does.
 
-Two differences are deliberate, and ADR 0108 records both:
+A data error refuses, and an undefined ratio is `NaN` (ADR 0108). A field that is positive by
+construction (a price, a market capitalisation, a share count, a total of assets) refuses a value
+at or below zero through the `gt0` guard of its named constructor. A denominator that valid data
+can make zero or negative (a book equity, an enterprise value) gives `NaN`. Three differences
+from the oracle are deliberate, and ADR 0108 records them:
 
-  - a denominator at or below zero gives `NaN` in its cell, where the oracle refuses the panel for
-    the ratios over a price, a market capitalisation or a share count, and for the lag Descriptors
-    over a scale;
+  - the ratios over `total_assets` and `MarketLeverage` refuse a non-positive total of assets or
+    market capitalisation, where the oracle gives `NaN`; `GrossMargin` refuses a negative sales
+    figure;
+  - the archetypes `ChangeToScale` and `ChangeInIntensity` give `NaN` at a non-positive scale by
+    default, where the oracle refuses; their named constructors refuse, as the oracle does;
   - the non-negative guard reads the active observed cells alone, where the oracle reads every
     finite cell, a cell outside the active mask included.
+
+Every refusal keeps the oracle's output one keyword away: `parity_unguarded` rebuilds each named
+Descriptor with its `gt0` fields moved to `pos` and its sign guards off, and that estimator equals
+the oracle on every case.
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 
@@ -145,6 +155,22 @@ function parity_ratio_descriptors()
     return ds
 end
 
+# The route with no refusal: a ratio with its `gt0` fields moved to `pos` and no `nonneg`
+# guard, a logarithm and a scale with `gt0 = false`. It gives NaN in every cell that a guard
+# would refuse, which is the oracle's rule for a denominator it does not refuse.
+function parity_unguarded(de::PanelFieldRatio)
+    pos = unique([something(de.pos, String[]); something(de.gt0, String[])])
+    return PanelFieldRatio(; num = de.num, den = de.den, pos = isempty(pos) ? nothing : pos)
+end
+parity_unguarded(de::PanelFieldLog) = PanelFieldLog(; field = de.field)
+function parity_unguarded(de::ChangeToScale)
+    return ChangeToScale(; field = de.field, scale = de.scale, lag = de.lag)
+end
+function parity_unguarded(de::ChangeInIntensity)
+    return ChangeInIntensity(; field = de.field, scale = de.scale, lag = de.lag)
+end
+parity_unguarded(de) = de
+
 # The stored oracle of a case: the clean outputs, with the cells of `Changes` replaced. A row of
 # `Changes` is the index of the Descriptor in `parity_ratio_descriptors()`, the linear index of the
 # cell, and the oracle's value of the cell in that case.
@@ -173,51 +199,74 @@ end
             @test parity_compare(vec(descriptor(de, c.rd)), clean[:, k]; name = name).ok
         end
     end
-    # The non-positive case: `parity_ratio_case(:nonpositive)`. The oracle refuses the panel for
-    # the 19 Descriptors below, and the stored output of each is the oracle run on the panel with
-    # the non-positive cells of its refused field blanked to NaN, which is the output under the
-    # oracle's own NaN rule. Ours gives that output without the refusal. Measured `maxrel = 0.0`.
-    @testset "Non-positive denominators give NaN in the cell" begin
-        blanked = ["BookToPrice", "CashFlowToPrice", "SalesToPrice", "EarningsToPrice",
+    # The non-positive case: `parity_ratio_case(:nonpositive)`. The oracle refuses 19 Descriptors,
+    # and the stored output of each is the oracle run on the panel with the non-positive cells of
+    # its refused field blanked to NaN, which is the output under the oracle's own NaN rule. The
+    # 22 named Descriptors below refuse the panel through `gt0`. The four generic lag archetypes
+    # have `gt0 = false` and give NaN. Every Descriptor with no refusal, `parity_unguarded`,
+    # equals the stored oracle. Measured `maxrel = 0.0`.
+    @testset "A non-positive price, market cap, share count or total assets refuses" begin
+        refused = ["BookToPrice", "CashFlowToPrice", "SalesToPrice", "EarningsToPrice",
                    "ForwardEarningsToPrice", "DividendToPrice", "ForwardDividendToPrice",
-                   "ShareholderYield", "AnalystDispersionToPrice", "LogMarketCap",
-                   "ShortInterest", "EarningsChangeToPriceL1",
-                   "CapexToAssetsChangeInIntensityL1", "ChangeToScaleSalesAssetsL1",
-                   "ChangeInIntensityDebtMcapL1", "EarningsChangeToPriceL30",
-                   "CapexToAssetsChangeInIntensityL30", "ChangeToScaleSalesAssetsL30",
-                   "ChangeInIntensityDebtMcapL30"]
-        @test blanked ⊆ names
+                   "ShareholderYield", "MarketLeverage", "DebtToAssets",
+                   "GrossProfitability", "ReturnOnAssets", "AssetTurnover",
+                   "CashFlowToAssets", "AccrualsCashFlow", "AnalystDispersionToPrice",
+                   "LogMarketCap", "ShortInterest", "EarningsChangeToPriceL1",
+                   "CapexToAssetsChangeInIntensityL1", "EarningsChangeToPriceL30",
+                   "CapexToAssetsChangeInIntensityL30"]
+        @test refused ⊆ names
         c = parity_ratio_case(:nonpositive)
         changes = parity_load("ratio_lag_descriptors", "SmallNonpositive", "Changes")
         for (k, (name, de)) in enumerate(ds)
-            D = descriptor(de, c.rd)
-            @test parity_compare(vec(D), parity_ratio_oracle(clean, changes, k);
-                                 name = name).ok
-        end
-        # The cell of a non-positive market capitalisation is NaN, and its neighbours are not.
-        D = descriptor(BookToPrice(), c.rd)
-        @test isnan(D[60, 1]) && isnan(D[61, 2])
-        @test isfinite(D[59, 1]) && isfinite(D[62, 2])
-    end
-    # The negative case: `parity_ratio_case(:negative)`. Ours and the oracle refuse the same 13
-    # Descriptors. The oracle refuses the negative scale of the four blanked ones, and the stored
-    # output is the oracle run with those cells blanked. Measured `maxrel = 0.0`.
-    @testset "Negative guarded fields refuse on both sides" begin
-        refused = ["DividendToPrice", "ForwardDividendToPrice", "ShareholderYield",
-                   "AnalystDispersionToPrice", "ShortInterest", "AssetsGrowthRateL1",
-                   "SalesGrowthRateL1", "IssuanceGrowthRateL1", "GrowthRateCapexL1",
-                   "AssetsGrowthRateL30", "SalesGrowthRateL30", "IssuanceGrowthRateL30",
-                   "GrowthRateCapexL30"]
-        @test refused ⊆ names
-        c = parity_ratio_case(:negative)
-        changes = parity_load("ratio_lag_descriptors", "SmallNegative", "Changes")
-        for (k, (name, de)) in enumerate(ds)
+            oracle = parity_ratio_oracle(clean, changes, k)
             if name in refused
                 @test_throws DomainError descriptor(de, c.rd)
             else
-                @test parity_compare(vec(descriptor(de, c.rd)),
-                                     parity_ratio_oracle(clean, changes, k); name = name).ok
+                @test parity_compare(vec(descriptor(de, c.rd)), oracle; name = name).ok
             end
+            @test parity_compare(vec(descriptor(parity_unguarded(de), c.rd)), oracle;
+                                 name = "unguarded " * name).ok
+        end
+        # Without the guard, the cell of a non-positive market capitalisation is NaN, and its
+        # neighbours are not.
+        D = descriptor(parity_unguarded(BookToPrice()), c.rd)
+        @test isnan(D[60, 1]) && isnan(D[61, 2])
+        @test isfinite(D[59, 1]) && isfinite(D[62, 2])
+        # A book equity at or below zero is a state of the firm, not a data error: the
+        # fixture holds both, and the return on equity is NaN there with no refusal.
+        R = descriptor(ReturnOnEquity(), c.rd)
+        @test isnan(R[40, 7]) && all(isnan, R[41:50, 8])
+    end
+    # The negative case: `parity_ratio_case(:negative)`. Ours and the oracle refuse the same 13
+    # Descriptors, whose negative field the oracle also refuses. Ours also refuses the nine
+    # below, over a negative total of assets or a negative sales figure, where the oracle gives
+    # NaN or refuses the scale; the stored output of each is the oracle's, and
+    # `parity_unguarded` equals it. Measured `maxrel = 0.0`.
+    @testset "Negative guarded fields refuse" begin
+        both = ["DividendToPrice", "ForwardDividendToPrice", "ShareholderYield",
+                "AnalystDispersionToPrice", "ShortInterest", "AssetsGrowthRateL1",
+                "SalesGrowthRateL1", "IssuanceGrowthRateL1", "GrowthRateCapexL1",
+                "AssetsGrowthRateL30", "SalesGrowthRateL30", "IssuanceGrowthRateL30",
+                "GrowthRateCapexL30"]
+        ours = ["DebtToAssets", "GrossProfitability", "GrossMargin", "ReturnOnAssets",
+                "AssetTurnover", "CashFlowToAssets", "AccrualsCashFlow",
+                "CapexToAssetsChangeInIntensityL1", "CapexToAssetsChangeInIntensityL30"]
+        @test both ⊆ names && ours ⊆ names
+        c = parity_ratio_case(:negative)
+        changes = parity_load("ratio_lag_descriptors", "SmallNegative", "Changes")
+        for (k, (name, de)) in enumerate(ds)
+            if name in both
+                @test_throws DomainError descriptor(de, c.rd)
+                continue
+            end
+            oracle = parity_ratio_oracle(clean, changes, k)
+            if name in ours
+                @test_throws DomainError descriptor(de, c.rd)
+            else
+                @test parity_compare(vec(descriptor(de, c.rd)), oracle; name = name).ok
+            end
+            @test parity_compare(vec(descriptor(parity_unguarded(de), c.rd)), oracle;
+                                 name = "unguarded " * name).ok
         end
     end
     # The non-negative guard reads the active observed cells alone (ADR 0108). A negative value

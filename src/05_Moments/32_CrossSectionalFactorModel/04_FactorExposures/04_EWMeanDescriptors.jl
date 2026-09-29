@@ -633,8 +633,8 @@ Each of the three archetypes builds one `observations × assets` matrix and runs
 The method that Julia selects is the algorithm.
 
  1. [`EWMean`](@ref): check the returns through [`assert_log_returns`](@ref), then run the recursion over `log1p(rd.X)` delayed by `skip` observations. The first `skip` rows have no input. Take `expm1` of the series when `exponentiate` is set.
- 2. [`EWVolumeRatio`](@ref): check the `nonneg` guard through [`assert_nonneg_panel_fields`](@ref), read both sides through [`ew_ratio_values`](@ref), divide them through [`positive_divide`](@ref), and run the recursion over the ratio.
- 3. [`DaysToCover`](@ref): check the `nonneg` guard through [`assert_nonneg_panel_fields`](@ref), run the recursion over the denominator's Panel Field, with every value that is not strictly positive read as a `NaN`, then divide the numerator's Panel Field by the series through [`positive_divide`](@ref).
+ 2. [`EWVolumeRatio`](@ref): check the `nonneg` guard through [`assert_panel_field_sign`](@ref), read both sides through [`ew_ratio_values`](@ref), divide them through [`positive_divide`](@ref), and run the recursion over the ratio.
+ 3. [`DaysToCover`](@ref): check the `nonneg` guard through [`assert_panel_field_sign`](@ref), run the recursion over the denominator's Panel Field, with every value that is not strictly positive read as a `NaN`, then divide the numerator's Panel Field by the series through [`positive_divide`](@ref).
 
 Every method then writes `NaN` into the inactive cells.
 
@@ -648,7 +648,7 @@ Every method then writes `NaN` into the inactive cells.
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
   - The rules of [`panel_field_values`](@ref) for every Panel Field the estimator names.
   - The rule of [`assert_log_returns`](@ref) for an [`EWMean`](@ref).
-  - The rule of [`assert_nonneg_panel_fields`](@ref) for the `nonneg` guard of an [`EWVolumeRatio`](@ref) or a [`DaysToCover`](@ref).
+  - The rule of [`assert_panel_field_sign`](@ref) for the `nonneg` guard of an [`EWVolumeRatio`](@ref) or a [`DaysToCover`](@ref).
 
 # Returns
 
@@ -706,7 +706,7 @@ function descriptor(de::EWMean, rd::ReturnsResult)::Matrix{<:Real}
 end
 function descriptor(de::EWVolumeRatio, rd::ReturnsResult)::Matrix{<:Real}
     pnl = descriptor_asset_panel(rd)
-    assert_nonneg_panel_fields(rd, de.nonneg)
+    assert_panel_field_sign(rd, de.nonneg, false)
     A = ew_ratio_values(rd, de.num)
     B = ew_ratio_values(rd, de.den)
     D = ew_mean_series(positive_divide.(A, B), de.decay, de.min_obs)
@@ -715,7 +715,7 @@ function descriptor(de::EWVolumeRatio, rd::ReturnsResult)::Matrix{<:Real}
 end
 function descriptor(de::DaysToCover, rd::ReturnsResult)::Matrix{<:Real}
     pnl = descriptor_asset_panel(rd)
-    assert_nonneg_panel_fields(rd, de.nonneg)
+    assert_panel_field_sign(rd, de.nonneg, false)
     A = panel_field_values(rd, de.num)
     B = panel_field_values(rd, de.den)
     Tf = eltype(B)
