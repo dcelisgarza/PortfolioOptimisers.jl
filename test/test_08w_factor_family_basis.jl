@@ -4,12 +4,13 @@ The Factor Family Basis, its transforms and the Neutralisation verb (issue #724,
 Issue #651 decided that `fcb` is a `FactorFamilyBasis` carrying the time axis, that
 Neutralisation is a field of the prior applied to the exposure history, and that the automatic
 drop is the member with the largest time-average absolute benchmark-weighted exposure. This file
-holds the port of the reference implementation's basis tests and its Neutralisation validation
-tests, and it pins two parity cases measured against the reference on the synthetic Asset Panel
-of `test06c_setup.jl`.
+holds the ported basis tests and the Neutralisation validation tests, and it pins two parity
+cases measured against the oracle of map #1375 on the synthetic Asset Panel of `test06c_setup.jl`.
 
-The parity cases are literals rather than a live comparison: the reference is not a dependency
-of this package, so the numbers it produced are stored here and the test re-derives them.
+The parity cases are literals rather than a live comparison: the oracle is not a dependency of
+this package, so the numbers it produced are stored here and the test re-derives them. The basis
+inside a fitted prior, and each of its transforms, is measured in
+`test_12x_parity_prior_config_grid.jl` (#1385).
 =#
 using Statistics, Distributions, Dates, Random
 include(joinpath(@__DIR__, "test06c_setup.jl"))
@@ -75,9 +76,18 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
                                                      ratios = [0.5 0.25], K = 5)
         # The dropped position indexes its own family.
         @test_throws DomainError FactorFamilyBasis(; ok..., di = [3])
-        # `K` exceeds the number of families, so the reduced axis is not empty.
+        # The reduced axis is never empty: each family holds at least two members, the families
+        # are disjoint, and every member lies in `1:K`, so `K` is at least twice the number of
+        # families. A basis with `K` at most the number of families breaks one of those rules,
+        # and that rule refuses it (#1385).
         @test_throws ArgumentError FactorFamilyBasis(; fnm = ["a"], fi = [[1]], di = [1],
                                                      ratios = reshape([0.5], 1, 1), K = 1)
+        @test_throws ArgumentError FactorFamilyBasis(; fnm = ["a", "b"],
+                                                     fi = [[1, 2], [2, 1]], di = [1, 1],
+                                                     ratios = [0.5 0.25], K = 2)
+        @test_throws DomainError FactorFamilyBasis(; fnm = ["a", "b"],
+                                                   fi = [[1, 2], [3, 4]], di = [1, 1],
+                                                   ratios = [0.5 0.25], K = 2)
         # One column per retained member of a constrained family.
         @test_throws DimensionMismatch FactorFamilyBasis(; ok..., ratios = [0.5 0.25])
         # A non-finite ratio is refused, which is how a zero benchmark-weighted exposure on
@@ -857,14 +867,15 @@ end
     end
 end
 
-@testset "Parity with the reference implementation" begin
+@testset "Parity with the oracle" begin
     PO = PortfolioOptimisers
     #=
-    The reference implementation's basis builder and its Neutralisation verb were run on the
-    Factor Exposures built from the synthetic Asset Panel below. The two cases pinned here are
-    the constraint ratios of the automatic drop and of a stated drop. The reference's answers
-    are bit-identical to the ones this file recomputes, and the neutralised exposures agreed to
-    6e-15, which is the difference between two orders of the same weighted least squares.
+    The oracle's basis builder and its Neutralisation verb were run on the Factor Exposures
+    built from the synthetic Asset Panel below. The two cases pinned here are the constraint
+    ratios of the automatic drop and of a stated drop. The literals are the oracle's printed
+    values, and ours differ from them by 3.0e-16 at most, one or two units in the last place of
+    a sum taken in another order (#1385). The neutralised exposures agreed to 6e-15, which is the
+    difference between two orders of the same weighted least squares.
     =#
     res = synthetic_asset_panel(; n_assets = 12, n_observations = 40, n_industries = 3,
                                 rng = StableRNG(987))
@@ -890,28 +901,37 @@ end
                     "industry=Banks"]
     @test ax.fam == ["market", "style", "style", "industry", "industry", "industry"]
 
-    @testset "Case one: the automatic drop matches the reference" begin
+    @testset "Case one: the automatic drop matches the oracle" begin
         fcb = factor_family_basis(["industry" => nothing], Ms, bw, ax.nf, ax.fam)
         @test PO.dropped_factor_names(fcb, ax.nf) == ["industry=Software"]
         @test size(fcb.ratios) == (40, 2)
-        # The reference's own numbers, to the last bit it printed.
-        @test fcb.ratios[1, :] ≈ [0.45312850847114156, 0.5134232034472233]
-        @test fcb.ratios[2, :] ≈ [0.4499883905713916, 0.5141858044142668]
-        @test fcb.ratios[end, :] ≈ [0.4003878534447987, 0.4488185225503101]
-        @test vec(sum(fcb.ratios; dims = 1)) ≈ [17.16704789180863, 19.62192609499553]
+        # The oracle's own numbers, to the last bit it printed. Measured maxrel 0.0, 0.0,
+        # 1.4e-16 and 1.8e-16.
+        @test isapprox(fcb.ratios[1, :], [0.45312850847114156, 0.5134232034472233];
+                       rtol = 1e-15)
+        @test isapprox(fcb.ratios[2, :], [0.4499883905713916, 0.5141858044142668];
+                       rtol = 1e-15)
+        @test isapprox(fcb.ratios[end, :], [0.4003878534447987, 0.4488185225503101];
+                       rtol = 1e-15)
+        @test isapprox(vec(sum(fcb.ratios; dims = 1)),
+                       [17.16704789180863, 19.62192609499553]; rtol = 1e-15)
     end
 
-    @testset "Case two: a stated drop matches the reference" begin
+    @testset "Case two: a stated drop matches the oracle" begin
         fcb = factor_family_basis(["industry" => "industry=Real Estate"], Ms, bw, ax.nf,
                                   ax.fam)
         @test fcb.di == [1]
         @test PO.dropped_factor_names(fcb, ax.nf) == ["industry=Real Estate"]
-        @test fcb.ratios[1, :] ≈ [2.2068794642252954, 1.1330631241444427]
-        @test fcb.ratios[end, :] ≈ [2.4975782641664717, 1.1209593864769638]
-        @test vec(sum(fcb.ratios; dims = 1)) ≈ [93.32153055932386, 45.704976978893356]
+        # Measured maxrel 0.0, 2.0e-16 and 3.0e-16.
+        @test isapprox(fcb.ratios[1, :], [2.2068794642252954, 1.1330631241444427];
+                       rtol = 1e-15)
+        @test isapprox(fcb.ratios[end, :], [2.4975782641664717, 1.1209593864769638];
+                       rtol = 1e-15)
+        @test isapprox(vec(sum(fcb.ratios; dims = 1)),
+                       [93.32153055932386, 45.704976978893356]; rtol = 1e-15)
     end
 
-    @testset "The Neutralisation matches the reference" begin
+    @testset "The Neutralisation matches the oracle" begin
         Y = copy(Ms)
         PO.neutralise_exposures!(Y, ["vol" => ["size"]], CrossSectionalLinearRegression(),
                                  bw, ax.nf, ax.fam)

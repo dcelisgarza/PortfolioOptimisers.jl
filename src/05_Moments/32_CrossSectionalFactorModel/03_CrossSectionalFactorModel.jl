@@ -537,7 +537,7 @@ CrossSectionalFactorModel
     """
     fam
     """
-    The family re-basis `L` is written in. It is present exactly when `L` is present, and this result states no other rule about it.
+    The family re-basis `L` is written in. It is present exactly when `L` is present. Its rows are the rows of `Ms`, one basis for the exposures of each observation, and its last row re-bases `M` into `L`. The factor return of row `t` of `csr.f` was fitted on the exposures of row `t - lag`, so it is written in the basis of row `t - lag`: a transform of a factor-return history reads the basis rows `1:(T - lag)` against the return rows `(1 + lag):T`.
     """
     fcb
     """

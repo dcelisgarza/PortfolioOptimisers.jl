@@ -50,7 +50,7 @@ Keywords correspond to the struct's fields.
   - `di[j]` indexes `fi[j]`.
   - `ratios` has one column per retained member of a constrained family, `sum(length(fi[j]) - 1)` in all.
   - `ratios` is not empty, and every entry of it is finite.
-  - `K` is greater than the number of families, so the reduced axis is not empty.
+  - The reduced axis is not empty. The rules above imply it: the families are disjoint, each holds at least two members of `1:K`, so `K` is at least twice the number of families, and no separate check is needed.
 
 # Examples
 
@@ -100,8 +100,6 @@ FactorFamilyBasis
         @argcheck(length(fnm) == length(fi) == length(di),
                   DimensionMismatch("fnm ($(length(fnm))), fi ($(length(fi))) and di ($(length(di))) must have the same length"))
         @argcheck(allunique(fnm), ArgumentError("fnm must not repeat a family label"))
-        @argcheck(K > length(fnm),
-                  ArgumentError("K ($K) must exceed the number of constrained families ($(length(fnm))), because each family drops one factor and the reduced axis cannot be empty"))
         seen = Set{Int}()
         C = 0
         for j in eachindex(fi)

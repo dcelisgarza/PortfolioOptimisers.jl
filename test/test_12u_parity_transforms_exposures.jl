@@ -238,7 +238,8 @@ end
         @test maximum(abs, filter(isfinite, pr.rr.M[:, 3:4] .- pp.rr.M[:, 3:4])) > 0.5
     end
 
-    # The oracle has no observed factor of this form, so the check is internal. An observed
+    # The oracle's API has no observed factor of this form, so this check is internal;
+    # `test_12x` runs the oracle's observed-factor path on a continuous loading (`Macro`). An observed
     # member states its return, the column `series` of the Exogenous Series, and the regression
     # explains the returns net of it, `X_t - Z(t - lag) r_t`. So the estimated factors equal those
     # of the fit without the observed member on those net returns, which this testset builds by
