@@ -24,6 +24,7 @@ cs_weighted_rss
 cs_t_stat_row!
 cs_resolved_gram
 cs_regression_score_parts
+cs_score_regressors
 cs_score_observation!
 cs_systematic_return
 cs_weighted_score_sums

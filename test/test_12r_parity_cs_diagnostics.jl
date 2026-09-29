@@ -65,24 +65,57 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         K = size(t, 2)
         kap = exposure_condition_number(csfm)
         okap = R[:, 2K + 1]
-        # A row whose design both sides find singular identifies no coefficient of the factor
-        # it lost, so neither t-statistic of that factor means anything there
-        # (#1421). The constrained family's level that empties makes such rows, and
-        # both sides flag them.
+        # The constrained family's level that empties makes rows whose design is singular,
+        # and both sides flag them. Such a row identifies only the coefficients whose unit
+        # vector lies in the row space of its Gram. The oracle's t-statistic of another
+        # coefficient is a ratio of round-off (7.87 for a level with no member), and it
+        # divides every residual variance by `n - K`. Ours is `NaN` for an unidentified
+        # coefficient, its variance inflation factor is `Inf` (`R_k^2 = 1`) or `NaN` (a
+        # zero column), and the unbiased variance divides by `n - rank` (#1421), Better.
         idf = (kap .< 1e12) .& (okap .< 1e12)
         @test all(>=(1e12), kap[.!idf]) && all(>=(1e12), okap[.!idf])
         @test c in fam || all(idf)
         # A t-statistic near zero carries the relative round-off of the fit. Measured maxrel
         # 1.6e-12 on the large panel, and maxscaled 7.4e-15.
         @test pc(t[idf, :], R[idf, 1:K], "$(n) t"; rtol = 2e-12)
-        @test pc(exposure_vif(csfm)[idf, :], R[idf, (K + 1):(2K)], "$(n) vif")
+        vif = exposure_vif(csfm)
+        @test pc(vif[idf, :], R[idf, (K + 1):(2K)], "$(n) vif")
         @test pc(kap[idf], okap[idf], "$(n) kappa")
+        # An identified coefficient has one variance whatever basis of the column space the
+        # fit reads, so on a singular row its t-statistic equals that of the fit on a
+        # pivoted basis of the weighted design, which has full rank. Every coefficient
+        # outside the basis is unidentified. Measured maxrel 3.3e-15 over 233 coefficients.
+        d = PO.cs_regression_data(csfm)
+        mask, u = PO.cs_diagnostic_mask_weights(d.B, d.eps, d.w)
+        for r in findall(.!idf)
+            A = sqrt.(u[r, mask[r, :]]) .* d.B[r, mask[r, :], :]
+            kb = sort(qr(A, ColumnNorm()).p[1:rank(A)])
+            wr = isnothing(d.w) ? nothing : d.w[r:r, :]
+            tb = vec(cs_regression_t_stats(d.B[r:r, :, kb], d.f[r:r, kb], d.eps[r:r, :],
+                                           wr))
+            ib = .!isnan.(t[r, kb])
+            @test any(ib) && pc(t[r, kb][ib], tb[ib], "$(n) basis t $(r)"; rtol = 1e-13)
+            nb = setdiff(1:K, kb)
+            @test all(isnan, t[r, nb]) && all(v -> isinf(v) || isnan(v), vif[r, nb])
+            @test all(v -> isnan(v) || v >= 1, vif[r, :])
+        end
         # `1 - rss / tss` of a small score loses digits. Measured maxrel 2.5e-12 at a score
         # near 0.02 under the exposure lag of two, and maxscaled 6.5e-16.
         @test pc(cs_regression_r2(csfm), R[:, 2K + 2], "$(n) r2"; rtol = 3e-12)
-        @test pc(cs_regression_adjusted_r2(csfm), R[:, 2K + 3], "$(n) adjusted r2")
-        @test pc(cs_regression_aic(csfm), R[:, 2K + 4], "$(n) aic")
-        @test pc(cs_regression_bic(csfm), R[:, 2K + 5], "$(n) bic")
+        # A score charges the rank of each row, which the oracle's column count `k = K`
+        # exceeds on a singular row. So the default is at parity on the rows of full rank,
+        # `k = K` is at parity on every row, and on a singular row the AIC is the oracle's
+        # less `2 (K - rank)`. Measured maxrel 4.3e-14 on the adjusted score.
+        rk = PO.cs_score_regressors(nothing, d.B,
+                                    PO.cs_regression_score_parts(d.B, d.f, d.eps, d.w)[4])
+        @test all(==(K), rk[idf]) && all(<(K), rk[.!idf])
+        aic = cs_regression_aic(csfm)
+        @test pc(aic[.!idf], R[.!idf, 2K + 4] .- 2 .* (K .- rk[.!idf]), "$(n) aic rank")
+        for (j, verb) in ((3, cs_regression_adjusted_r2), (4, cs_regression_aic),
+                          (5, cs_regression_bic))
+            @test pc(verb(csfm)[idf], R[idf, 2K + j], "$(n) score $(j)")
+            @test pc(verb(csfm; k = K), R[:, 2K + j], "$(n) score $(j) k")
+        end
         if !(c in fam)
             tr = load(n, "TRate")
             @test pc(cs_regression_t_stat_exceedance_rate(csfm), tr[:, 1], "$(n) rate")
@@ -209,14 +242,32 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             drop = [!(x in red) for x in nf]
             @test any(drop)
             @test all(isfinite, factor_model_summary(csfm).ann_return[drop])
-            # A level that empties leaves rows where the design is singular, and the mean
-            # absolute t-statistic and the rate of its factor read them (#1421).
+            # A level that empties leaves rows where the design is singular. There a
+            # coefficient the design does not identify has no t-statistic and an infinite
+            # or absent factor, and the others divide by `n - rank`, where the oracle reads
+            # round-off and `n - K` (#1421, see the regression group). So the three columns
+            # that read them leave the comparison for every factor such a row reaches.
             t = cs_regression_t_stats(csfm)
+            vif = exposure_vif(csfm)
             R = load(n, "Regression")
-            bad = [!parity_compare(t[:, j], R[:, j]; rtol = 1e-9, name = "").ok
-                   for j in axes(t, 2)]
-            nbad = PO.cs_diagnostic_factor_names(csfm)[bad]
-            keep[[x in nbad for x in nf], 5:6] .= false
+            K = size(t, 2)
+            same(a, b) = parity_compare(a, b; rtol = 1e-9, name = "").ok
+            bad = [!(same(t[:, j], R[:, j]) && same(vif[:, j], R[:, K + j])) for j in 1:K]
+            @test any(bad)
+            nr = PO.cs_diagnostic_factor_names(csfm)
+            keep[[x in nr[bad] for x in nf], 5:7] .= false
+            # A factor that no singular row identifies reads the rows of full rank alone, so
+            # its mean absolute t-statistic is the mean of the oracle's over those rows
+            # (1.7500 for the level of one member, where the round-off rows gave 1.7755).
+            idf = (exposure_condition_number(csfm) .< 1e12) .& (R[:, 2K + 1] .< 1e12)
+            gone = [all(isnan, t[.!idf, j]) for j in 1:K]
+            @test any(gone)
+            fs = factor_model_summary(csfm; ppy = 252)
+            for j in findall(gone)
+                @test pc([fs.mean_abs_t[findfirst(==(nr[j]), nf)]],
+                         [mean(abs, filter(!isnan, R[idf, j]))], "$(n) mean abs t $(j)";
+                         rtol = 2e-12)
+            end
         end
         if c == "Macro"
             # The stability reads the benchmark weights of the fit, which differ on two cells

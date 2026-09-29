@@ -7,7 +7,7 @@ environment, and its answers are written out as literals. Rebuild them by genera
 same fixtures, exporting them, and running the reference's factor model block on them.
 
 The first fixture is the one `test_08r_cs_regression_diagnostics.jl` uses, whose design is
-well conditioned, so its Gram columns carry values. The second is the one
+well conditioned on every observation but one, so its Gram columns carry values. The second is the one
 `test_08s_exposure_diagnostics.jl` uses, whose third factor is a constant intercept, so it
 drives the patch that reads a constant exposure as perfectly stable.
 =#
@@ -55,9 +55,17 @@ using Statistics
         ref_ann_vol = [0.2500971159903252, 0.30449966488269103, 0.2801176875443828]
         ref_sharpe = [7.07246084075624, -15.450299576156583, 0.21785493252468693]
         ref_autocorr = [-0.5425646747475837, NaN, -0.39620089475439907]
-        ref_mean_abs_t = [1.3761850065112538, 4.764397545417589, 3.9180561817454196]
-        ref_t_rate = [0.4, 0.6, 0.4]
-        ref_mean_vif = [2.0598549319598916, 1.8428351056716823, 1.652400329922471]
+        # Observation 6 is collinear, and it identifies the second coefficient alone
+        # (#1421). The reference's three columns that read the t-statistics and the factors
+        # count its pseudo-inverse answers there. Ours drop the t-statistics of the pair
+        # (`0.6639470271883212` and `7.300135695412292` in the reference), scale the second
+        # (`14.363795117368108`) by `sqrt(4 / 3)` for a variance over `n - 2`, and give the
+        # pair an infinite factor. `test_08r_cs_regression_diagnostics.jl` pins each row.
+        ref_mean_abs_t = [(5 * 1.3761850065112538 - 0.6639470271883212) / 4,
+                          4.764397545417589 + 14.363795117368108 * (sqrt(4 / 3) - 1) / 5,
+                          (5 * 3.9180561817454196 - 7.300135695412292) / 4]
+        ref_t_rate = [2 / 4, 3 / 5, 1 / 4]
+        ref_mean_vif = [Inf, 1.8428351056716823, Inf]
         ref_stability = [-0.4257338194977316, 0.11924492275222029, 0.1814524979202049]
         ref_coverage = [0.9791666666666667, 1.0, 1.0]
 
@@ -108,7 +116,8 @@ using Statistics
         @test summary_agrees(fs21.coverage, ref_coverage)
 
         # The threshold steers the exceedance rate alone.
-        ref_t_rate_1 = [0.4, 0.8, 0.6]
+        # The reference's `[2 / 5, 4 / 5, 3 / 5]`, less observation 6 on the pair.
+        ref_t_rate_1 = [2 / 4, 4 / 5, 2 / 4]
         fst = factor_model_summary(csfmA; ppy = 252, step = 3, threshold = 1)
         @test summary_agrees(fst.t_rate, ref_t_rate_1)
         @test summary_agrees(fst.mean_abs_t, ref_mean_abs_t)

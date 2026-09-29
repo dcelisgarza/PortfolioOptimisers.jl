@@ -155,7 +155,7 @@ commit = "ebcacfda95"
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl" = { code = 123, doc = 262, comment = 0, blank = 110, total = 495 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { code = 92, doc = 202, comment = 0, blank = 91, total = 385 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { code = 248, doc = 447, comment = 7, blank = 150, total = 852 }
-"src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { code = 463, doc = 755, comment = 6, blank = 353, total = 1577 }
+"src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { code = 493, doc = 796, comment = 12, blank = 365, total = 1666 }
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { code = 463, doc = 647, comment = 6, blank = 292, total = 1408 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 235, doc = 471, comment = 8, blank = 203, total = 917 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 237, doc = 485, comment = 0, blank = 215, total = 937 }

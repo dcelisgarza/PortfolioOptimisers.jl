@@ -33,7 +33,7 @@ using Statistics
     Ms[2, 4, 1] = NaN
     # An observation whose factor return is not finite has no t-statistic.
     f[5, 2] = NaN
-    # An observation whose design is collinear needs the pseudo-inverse.
+    # An observation whose design is collinear identifies one coefficient of three.
     Ms[6, :, 3] = Ms[6, :, 1]
 
     csr = CrossSectionalRegression(; f = f, eps = eps, n = fill(N, T))
@@ -75,13 +75,40 @@ using Statistics
             return isapprox(a[m], b[m]; rtol = rtol)
         end
 
-        @test agrees(cs_regression_t_stats(csfm), ref_t)
-        @test agrees(exposure_vif(csfm), ref_vif)
-        @test agrees(cs_regression_t_stat_exceedance_rate(csfm), ref_rate)
+        # Observation 6 is collinear: its third column repeats the first, so the design
+        # identifies the second coefficient alone and has rank two (#1421). The reference
+        # answers there read the pseudo-inverse. Its t-statistics of the pair are ratios of
+        # an arbitrary split, its factors of the pair fall below one, and its variance and
+        # scores charge three regressors. Every other observation has full rank and agrees.
+        fr = [1:5; 7]
+        t = cs_regression_t_stats(csfm)
+        vif = exposure_vif(csfm)
+        @test agrees(t[fr, :], ref_t[fr, :])
+        @test agrees(vif[fr, :], ref_vif[fr, :])
         @test agrees(cs_regression_r2(csfm), ref_r2)
-        @test agrees(cs_regression_adjusted_r2(csfm), ref_adj)
-        @test agrees(cs_regression_aic(csfm), ref_aic)
-        @test agrees(cs_regression_bic(csfm), ref_bic)
+        for (verb, ref) in
+            ((cs_regression_adjusted_r2, ref_adj), (cs_regression_aic, ref_aic),
+             (cs_regression_bic, ref_bic))
+            @test agrees(verb(csfm)[fr], ref[fr])
+            # The reference's count of regressors is one keyword away.
+            @test agrees(verb(csfm; k = K), ref)
+        end
+        # The pair has no t-statistic and an infinite factor. The second coefficient keeps
+        # its factor, and its residual variance divides by `n - 2 = 4` rather than
+        # `n - 3 = 3`, so its t-statistic is the reference's times `sqrt(4 / 3)`.
+        @test all(isnan, t[6, [1, 3]]) && all(==(Inf), vif[6, [1, 3]])
+        @test isapprox(vif[6, 2], ref_vif[6, 2]; rtol = 1e-10)
+        @test isapprox(t[6, 2], ref_t[6, 2] * sqrt(4 / 3); rtol = 1e-10)
+        # A score charges two regressors: the AIC less 2, the BIC less `ln 6`, and the
+        # adjusted score over `n - 3` rather than `n - 4`.
+        @test isapprox(cs_regression_aic(csfm)[6], ref_aic[6] - 2; rtol = 1e-10)
+        @test isapprox(cs_regression_bic(csfm)[6], ref_bic[6] - log(6); rtol = 1e-10)
+        @test isapprox(cs_regression_adjusted_r2(csfm)[6], 1 - (1 - ref_r2[6]) * 5 / 3;
+                       rtol = 1e-10)
+        # The rate of the pair loses observation 6, where the reference counted 2 of 5 and
+        # 2 of 5. The second factor keeps it, at the reference's 3 of 5.
+        @test agrees(cs_regression_t_stat_exceedance_rate(csfm), [2 / 4, 3 / 5, 1 / 4])
+        @test ref_rate == [2 / 5, 3 / 5, 2 / 5]
 
         # The condition number agrees everywhere the design has full rank. The reference
         # answers `1.9e17` at the collinear observation where this answers `Inf`: the
@@ -168,11 +195,14 @@ using Statistics
         @test all(vif[:, 2] .< 2)
         @test all(exposure_condition_number(Bd, nothing) .> 1e3)
 
-        # An exactly duplicated column is singular. The pseudo-inverse answers it rather
-        # than raising, which is what the reference implementation does.
+        # An exactly duplicated column is singular. Each member of the pair is the other,
+        # so `R_k^2 = 1` and its factor is `Inf` (#1421). The third column is identified,
+        # and its factor is finite and at least one.
         Bs = copy(Bd)
         Bs[:, :, 3] = Bs[:, :, 1]
-        @test all(isfinite, exposure_vif(Bs, nothing))
+        vs = exposure_vif(Bs, nothing)
+        @test all(==(Inf), vs[:, [1, 3]])
+        @test all(v -> isfinite(v) && v >= 1, vs[:, 2])
 
         # An observation with no degrees of freedom has no answer.
         w = ones(4, 30)
@@ -385,20 +415,63 @@ using Statistics
         end
     end
 
-    @testset "a collinear design reads the pseudo-inverse" begin
-        # An intercept beside a one-hot block is exactly collinear. The answer is finite,
-        # the variance inflation factor falls below one, and the condition number shows the
-        # singular slice.
+    @testset "a collinear design states what it does not identify (#1421)" begin
+        # An intercept beside a one-hot block is exactly collinear, and the null vector
+        # `(1, -1, -1, -1)` touches every column. No coefficient is identified, so every
+        # factor is `Inf`: the diagonal of the pseudo-inverse gave values below one, which
+        # no `1 / (1 - R_k^2)` reaches.
         Nc = 9
         Bc = zeros(1, Nc, 4)
         Bc[1, :, 1] .= 1.0
         for i in 1:Nc
             Bc[1, i, 2 + mod(i, 3)] = 1.0
         end
-        vif = exposure_vif(Bc, nothing)
-        @test all(isfinite, vif)
-        @test minimum(vif) < 1
+        @test all(==(Inf), exposure_vif(Bc, nothing))
+        @test all(==(Inf), PortfolioOptimisers.cs_gram_inverse_diagonal(cs_gram(Bc)))
         @test exposure_condition_number(Bc, nothing)[1] > 1e12
+
+        # A design whose third column repeats the first, and whose fourth column is zero,
+        # against the same design with both columns removed. The fit is the minimum-norm
+        # solution. It identifies the second coefficient alone, and its residuals span
+        # `n - 2` dimensions, so the second t-statistic and the scores equal those of the
+        # reduced fit. The other coefficients have no t-statistic, the repeated pair has
+        # an infinite factor, and the zero column has no factor.
+        rngc = StableRNG(24681357)
+        Tc, Nd = 5, 12
+        Br = randn(rngc, Tc, Nd, 2)
+        Bx = cat(Br, Br[:, :, 1:1], zeros(Tc, Nd, 1); dims = 3)
+        wc = rand(rngc, Tc, Nd) .+ 0.5
+        fx = zeros(Tc, 4)
+        ex = zeros(Tc, Nd)
+        fr = zeros(Tc, 2)
+        for t in 1:Tc
+            y = Br[t, :, :] * [0.3, -0.2] + 0.1 * randn(rngc, Nd)
+            sw = sqrt.(wc[t, :])
+            fx[t, :] = pinv(sw .* Bx[t, :, :]) * (sw .* y)
+            ex[t, :] = y - Bx[t, :, :] * fx[t, :]
+            fr[t, :] = (sw .* Br[t, :, :]) \ (sw .* y)
+        end
+        @test fr ≈ fx[:, 1:2] .* [2 1] rtol = 1e-12
+        tx = cs_regression_t_stats(Bx, fx, ex, wc)
+        tr = cs_regression_t_stats(Br, fr, ex, wc)
+        @test isapprox(tx[:, 2], tr[:, 2]; rtol = 1e-10)
+        @test all(isnan, tx[:, [1, 3, 4]])
+        vx = exposure_vif(Bx, wc)
+        @test all(==(Inf), vx[:, [1, 3]]) && all(isnan, vx[:, 4])
+        @test all(v -> isfinite(v) && v >= 1, vx[:, 2])
+        @test PortfolioOptimisers.cs_score_regressors(nothing, Bx,
+                                                      PortfolioOptimisers.cs_regression_score_parts(Bx,
+                                                                                                    fx,
+                                                                                                    ex,
+                                                                                                    wc)[4]) ==
+              fill(2, Tc)
+        for verb in (cs_regression_adjusted_r2, cs_regression_aic, cs_regression_bic)
+            @test isapprox(verb(Bx, fx, ex, wc), verb(Br, fr, ex, wc); rtol = 1e-12)
+            # A count the caller states holds on every observation.
+            @test isapprox(verb(Bx, fx, ex, wc; k = 4), verb(Br, fr, ex, wc; k = 4);
+                           rtol = 1e-12)
+            @test !isapprox(verb(Bx, fx, ex, wc; k = 4), verb(Bx, fx, ex, wc))
+        end
     end
 
     @testset "the numeric types" begin
