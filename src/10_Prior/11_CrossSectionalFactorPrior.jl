@@ -352,8 +352,8 @@ Every entry of ``\\boldsymbol{\\mu}`` and every row and column of ``\\mathbf{\\S
  5. Neutralise the exposures with [`cross_sectional_neutralise!`](@ref), under the benchmark weights and the prior's own regression estimator.
  6. Build the Factor Family Basis `fb` with [`cross_sectional_family_basis`](@ref), and reduce the exposures through it.
  7. Lag the reduced exposures and the market capitalisation by `pe.lag`, giving `Zl` and `mcl`. Trim the observed factors to the fitted observations with [`cross_sectional_observed_block`](@ref), which refuses a non-finite observed return among them. Take the eligibility mask `msk` of the fit with [`cross_sectional_eligible`](@ref) on `Xl`, and drop from it every pair whose lagged market capitalisation is not finite.
- 8. Regress each observation's `Xl` on its lagged reduced exposures with [`cross_sectional_live_regression`](@ref), giving `csr` and the mask `lv` of the factors that are not empty, under the weights `W` of [`cs_weights_initial`](@ref). Refuse a `csr` that carries an intercept. When [`needs_second_pass`](@ref) answers `true`, refine the weights with [`cs_weights_refine`](@ref) and regress again.
- 9. Take the idiosyncratic variance history `vs` with [`variance_series`](@ref), standardise the idiosyncratic returns by it with [`cross_sectional_standardised_residuals`](@ref), giving `S`, and take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref). Record the degrees of freedom and the divisor of each variance with [`variance_count`](@ref) and [`cross_sectional_variance_counts`](@ref).
+ 8. Regress each observation's `Xl` on its lagged reduced exposures with [`cross_sectional_live_regression`](@ref), giving `csr` and the mask `lv` of the factors that are not empty, under the weights `W` of [`cs_weights_initial`](@ref). Refuse a `csr` that carries an intercept. When [`needs_second_pass`](@ref) answers `true`, refine the weights with [`cs_weights_refine`](@ref) and regress again. The refinement reads the idiosyncratic variance under the two universe masks, as step 9 does.
+ 9. Take the idiosyncratic variance history `vs` with [`variance_series`](@ref), under the active mask and the estimation mask of the fitted observations. An estimator that reads the masks resets an asset that the active mask turns off, and measures its regime over the estimation universe alone. An estimator that reads no mask ignores them. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`, and take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref). Record the degrees of freedom and the divisor of each variance with [`variance_count`](@ref) and [`cross_sectional_variance_counts`](@ref).
 10. Append the observed factors after the estimated ones with [`cross_sectional_observed_append`](@ref): the observed returns after the factor returns, the observed exposures after the loadings and the exposure history, the names and the family labels, and pass-through factors on the Factor Family Basis. Fit `pe.pe` on the combined reduced factor returns of the factors that are not empty with [`cross_sectional_factor_moments`](@ref), giving `f_pr`, which refuses a non-finite factor moment and processes the factor covariance under `pe.f_mp`, the matrix processing estimator of the factor axis and not the asset one. An Observed Factor is never empty. The method passes `strict` to `pe.pe`, as [`FactorPrior`](@ref) does, because the slot admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
 11. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, a zero `b`, and the observed returns in `fx`.
 12. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the full returns data that the estimated members read, so that a Descriptor of the forecast warms up over every observation the panel has, giving the block `rr` with the orthogonal part in `b` and the Result in `rf`. Under observed factors the forecast thus reads `Xl`, and it forecasts the net return of each asset, which the split measures against loadings of the same returns. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref), and keep the mean of the observed factors, giving `f_mu`.
@@ -488,11 +488,17 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     (; csr, lv) = cross_sectional_live_regression(pe.cre, Zl, Xr, W)
     @argcheck(isnothing(csr.b),
               ArgumentError("a Cross-Sectional Factor Prior states its moments through the factor returns alone, and its regression estimator fitted an intercept, whose mean and variance the moments would leave out. Give cre an estimator with intercept = false, and state the common return as a factor, for example \"market\" => ConstantExposure()."))
+    # The idiosyncratic variance is a folding statistic, so it reads both universe masks: it
+    # resets an asset the active mask turns off, and a regime-adjusted estimator measures its
+    # regime over the estimation universe alone (ADR 0172). An estimator that takes no mask
+    # ignores the two keywords.
+    emr = emsk[rw[r], :]
     if needs_second_pass(pe.wa)
-        W = cs_weights_refine(pe.wa, W, csr.eps, pe.ve, msk)
+        W = cs_weights_refine(pe.wa, W, csr.eps, pe.ve, msk; estimation_mask = emr,
+                              active_mask = amr)
         (; csr, lv) = cross_sectional_live_regression(pe.cre, Zl, Xr, W)
     end
-    vs = variance_series(pe.ve, csr.eps; dims = 1)
+    vs = variance_series(pe.ve, csr.eps; dims = 1, estimation_mask = emr, active_mask = amr)
     (; edof, ediv) = cross_sectional_variance_counts(variance_count(pe.ve, csr.eps), csr)
     S = cross_sectional_standardised_residuals(csr.eps, vs, amr)
     esigma = cross_sectional_idiosyncratic_covariance(pe.th, pe.ce, pe.mp.pdm, S,

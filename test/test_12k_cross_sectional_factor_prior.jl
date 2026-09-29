@@ -412,7 +412,10 @@ end
         @test isnothing(rr.fcb)
         @test !PO.has_family_rebasis(rr)
         @test isa(rr.esigma, AbstractVector)
-        @test rr.esigma == rr.vs[end, :]
+        # `isequal`, not `==`: the variance resets when the active mask turns an asset off,
+        # so an asset inactive at the latest observation carries a NaN variance (#1377).
+        @test isequal(rr.esigma, rr.vs[end, :])
+        @test all(isnan, rr.vs[end, .!rd.pnl.amsk[end, :]])
         # The pre-fit axis verb and the fitted block answer the same axis.
         ax = PO.cross_sectional_factor_axis(csfp_factors(), rd)
         @test ax.nf == rr.nf
