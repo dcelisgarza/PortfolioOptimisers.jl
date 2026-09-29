@@ -69,12 +69,12 @@ $(DocStringExtensions.TYPEDFIELDS)
                          target_scoring::Option{<:AbstractCrossSectionalTransform} = nothing,
                          calibrate::Bool = true, scale::Real = 1.0,
                          half_life::Real = 20.0, decay::Real = half_life_decay(half_life),
-                         min_obs::Integer = half_life_min_obs(half_life),
+                         min_obs::Integer = 1,
                          cv::Option{<:CrossValidationEstimator} = KFold(),
                          unit::AbstractForecastUnit = IdiosyncraticReturnUnit(),
                          intercept::Bool = false) -> TargetReturnForecast
 
-Every keyword but `half_life` corresponds to a field. `half_life` is not a field. It fixes the defaults of `decay` and `min_obs` of the calibration, and the constructor keeps a value passed for either of those as it stands. `min_obs = 1` calibrates from the first observation that states a slope.
+Every keyword but `half_life` corresponds to a field. `half_life` is not a field. It fixes the default of `decay` of the calibration, and the constructor keeps a value passed for `decay` as it stands. The default `min_obs = 1` calibrates from the first observation that states a slope. The weight ``1 - \\lambda^{n}`` that the first ``n`` observations carry multiplies both accumulators and the ridge alike, so the coefficient after ``n`` observations is the weighted least squares slope of those observations, with no start-up bias for a warm-up to wait out.
 
 ## Validation
 
@@ -114,7 +114,7 @@ TargetReturnForecast
        calibrate ┼ Bool: false
            scale ┼ Float64: 1.0
            decay ┼ Float64: 0.7071067811865476
-         min_obs ┼ Int64: 2
+         min_obs ┼ Int64: 1
               cv ┼ KFold
                  │                   n ┼ Int64: 5
                  │         purged_size ┼ Int64: 0
@@ -227,7 +227,7 @@ function TargetReturnForecast(; scores::DescriptorScores,
                               calibrate::Bool = true, scale::Real = 1.0,
                               half_life::Real = 20.0,
                               decay::Real = half_life_decay(half_life),
-                              min_obs::Integer = half_life_min_obs(half_life),
+                              min_obs::Integer = 1,
                               cv::Option{<:CrossValidationEstimator} = KFold(),
                               unit::AbstractForecastUnit = IdiosyncraticReturnUnit(),
                               intercept::Bool = false)::TargetReturnForecast

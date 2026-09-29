@@ -283,12 +283,12 @@ $(DocStringExtensions.TYPEDFIELDS)
 
     ExpWeightedReturnForecast(; scores::DescriptorScores, half_life::Real = 20.0,
                               decay::Real = half_life_decay(half_life),
-                              min_obs::Integer = half_life_min_obs(half_life),
-                              ridge::Real = 1e-6, horizon::Integer = 1, lag::Integer = 1,
+                              min_obs::Integer = 1, ridge::Real = 1e-6,
+                              horizon::Integer = 1, lag::Integer = 1,
                               scale::Real = 1.0, normalise::Bool = true,
                               unit::AbstractForecastUnit = IdiosyncraticReturnUnit()) -> ExpWeightedReturnForecast
 
-Every keyword but `half_life` corresponds to a field. `half_life` is not a field. It fixes the defaults of `decay` and `min_obs`, and the constructor keeps a value passed for either of those as it stands. `min_obs = 1` publishes a forecast from the first observation that advances the state.
+Every keyword but `half_life` corresponds to a field. `half_life` is not a field. It fixes the default of `decay`, and the constructor keeps a value passed for `decay` as it stands. The default `min_obs = 1` publishes a forecast from the first observation that advances the state. The weight ``1 - \\lambda^{n}`` that the first ``n`` observations carry multiplies both accumulators and the ridge alike, so the coefficients after ``n`` observations are the weighted least squares of those observations, with no start-up bias for a warm-up to wait out. A larger `min_obs` holds back a forecast that the model determines, and only a caller who wants fewer noisy early forecasts states one.
 
 ## Validation
 
@@ -319,7 +319,7 @@ ExpWeightedReturnForecast
             │               │             atol ┴ Float64: 1.0e-12
             │         group ┴ nothing
       decay ┼ Float64: 0.7071067811865476
-    min_obs ┼ Int64: 2
+    min_obs ┼ Int64: 1
       ridge ┼ Float64: 1.0e-6
     horizon ┼ Int64: 1
         lag ┼ Int64: 1
@@ -351,7 +351,7 @@ ExpWeightedReturnForecast
     """
     decay
     """
-    $(field_dict[:min_obs])
+    $(field_dict[:min_obs]) It counts the observations that advanced the recursion.
     """
     min_obs
     """
@@ -398,10 +398,9 @@ ExpWeightedReturnForecast
 end
 function ExpWeightedReturnForecast(; scores::DescriptorScores, half_life::Real = 20.0,
                                    decay::Real = half_life_decay(half_life),
-                                   min_obs::Integer = half_life_min_obs(half_life),
-                                   ridge::Real = 1e-6, horizon::Integer = 1,
-                                   lag::Integer = 1, scale::Real = 1.0,
-                                   normalise::Bool = true,
+                                   min_obs::Integer = 1, ridge::Real = 1e-6,
+                                   horizon::Integer = 1, lag::Integer = 1,
+                                   scale::Real = 1.0, normalise::Bool = true,
                                    unit::AbstractForecastUnit = IdiosyncraticReturnUnit())::ExpWeightedReturnForecast
     return ExpWeightedReturnForecast(scores, decay, min_obs, ridge, horizon, lag, scale,
                                      normalise, unit)

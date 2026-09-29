@@ -661,7 +661,8 @@ end
                             DataFrame))
         @test size(H) == size(E)
         @test isequal(isnan.(H), isnan.(E))
-        @test H[isfinite.(E)] ≈ E[isfinite.(E)]
+        # Measured maxrel 5.4e-14, cell by cell (#1386).
+        @test all(isapprox.(H[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
     end
 
     @testset "The neutralised Sharpe case matches the stored case cell by cell" begin
@@ -675,7 +676,11 @@ end
                             DataFrame))
         @test size(rf.hist) == size(E)
         @test isequal(isnan.(rf.hist), isnan.(E))
-        @test rf.hist[isfinite.(E)] ≈ E[isfinite.(E)]
+        # A score neutralised against the one-hot industry family is a residual, and a
+        # residual near zero comes from a cancellation, so the case compares against its
+        # largest entry. Measured 2.0e-16 there, and 1.7 relative on a cell near zero (#1386).
+        @test isapprox(rf.hist[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12,
+                       norm = x -> maximum(abs, x))
         @test isequal(rf.mu, rf.hist[end, :])
     end
 end
@@ -699,11 +704,15 @@ FOUR MORE CONVENTIONS SHAPE THESE PROBES.
    panel the file already rebuilds, with the idiosyncratic returns and variances drawn from
    the two closed forms the last testset writes and exported to both sides.
 
-8. TWO DELIBERATE DEPARTURES FROM THE REFERENCE, both settled by issue #655.
-   - `cv = nothing` calibrates IN SAMPLE. The reference's own `cv=None` still splits into
-     five folds, and `cv = KFold(; n = 5)` reproduces that to a relative 4.8e-13.
-   - `min_obs` gates the publication of a coefficient. The reference publishes from the
-     first fitted observation, which is `min_obs = 1`, and every stored case sets it.
+8. THE DEFAULTS CALIBRATE OUT OF FOLD AND PUBLISH FROM THE FIRST OBSERVATION.
+   - The default `cv = KFold()` calibrates on the out-of-fold predictions of five
+     unshuffled folds (#1418). An in-sample prediction was fitted to the target the
+     calibration regresses on it, so its slope is biased. `cv = nothing` calibrates in
+     sample, and a hand block with fewer than ten valid samples states it.
+   - The default `min_obs = 1` publishes from the first observation that advances the state
+     (#1386). The coefficients after `n` observations are the weighted least squares of those
+     observations, so a warm-up guards no bias. A stored case that sets `min_obs = 1` states
+     the default it was made under.
 =#
 
 function forecast_fit_panel(a::AbstractMatrix, b::AbstractMatrix, eps::AbstractMatrix,
@@ -1014,7 +1023,9 @@ end
                                                            scale = 0.0)
         @test ExpWeightedReturnForecast(; scores = ds, half_life = 2).decay ≈
               PO.half_life_decay(2)
-        @test ExpWeightedReturnForecast(; scores = ds, half_life = 2).min_obs == 2
+        # The half-life sets the decay alone. The coefficients after one observation are the
+        # weighted least squares of that observation, so the default publishes them (#1386).
+        @test ExpWeightedReturnForecast(; scores = ds, half_life = 2).min_obs == 1
 
         @test_throws PO.IsEmptyError ExpWeightedReturnForecastResult(; mu = Float64[],
                                                                      hist = [1.0 2.0],
@@ -1323,7 +1334,9 @@ end
         @test_throws DomainError TargetReturnForecast(; scores = ds, scale = 0.0)
         @test_throws DomainError TargetReturnForecast(; scores = ds, decay = 1.0)
         @test_throws DomainError TargetReturnForecast(; scores = ds, min_obs = 0)
-        @test TargetReturnForecast(; scores = ds, half_life = 2).min_obs == 2
+        # The half-life sets the decay alone, and the default calibrates from the first
+        # observation that states a slope (#1386).
+        @test TargetReturnForecast(; scores = ds, half_life = 2).min_obs == 1
         @test isa(TargetReturnForecast(; scores = ds).target_outlier,
                   CrossSectionalWinsoriser)
         @test isnothing(TargetReturnForecast(; scores = ds).target_scoring)
@@ -1382,7 +1395,8 @@ end
         E = stored("ExpWeightedReturnForecast1")
         @test size(rf.hist) == size(E)
         @test isequal(isnan.(rf.hist), isnan.(E))
-        @test rf.hist[isfinite.(E)] ≈ E[isfinite.(E)]
+        # Measured maxrel 2.6e-13, cell by cell (#1386).
+        @test all(isapprox.(rf.hist[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
         @test isequal(rf.mu, rf.hist[end, :])
     end
 
@@ -1396,8 +1410,10 @@ end
         E = stored("ExpWeightedReturnForecast2")
         @test size(rf.hist) == size(E)
         @test isequal(isnan.(rf.hist), isnan.(E))
-        m = isfinite.(E) .& (abs.(E) .> 1e-9)
-        @test rf.hist[m] ≈ E[m]
+        # A neutralised score is a residual, so a cell near zero comes from a cancellation,
+        # and the case compares against its largest entry. Measured 9.9e-16 there (#1386).
+        m = isfinite.(E)
+        @test isapprox(rf.hist[m], E[m]; rtol = 1e-12, norm = x -> maximum(abs, x))
     end
 
     @testset "The uncalibrated target forecast matches the stored case" begin
@@ -1405,7 +1421,8 @@ end
                                                   calibrate = false), rd, csfm)
         E = vec(stored("TargetReturnForecast1"))
         @test isequal(isnan.(rf.mu), isnan.(E))
-        @test rf.mu[isfinite.(E)] ≈ E[isfinite.(E)]
+        # Measured maxrel 1.8e-13 at most over the four stored cases, cell by cell (#1386).
+        @test all(isapprox.(rf.mu[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
     end
 
     @testset "The out of fold calibrated forecast matches the stored case" begin
@@ -1414,7 +1431,8 @@ end
                                                   cv = KFold(; n = 3)), rd, csfm)
         E = vec(stored("TargetReturnForecast2"))
         @test isequal(isnan.(rf.mu), isnan.(E))
-        @test rf.mu[isfinite.(E)] ≈ E[isfinite.(E)]
+        # Measured maxrel 1.8e-13 at most over the four stored cases, cell by cell (#1386).
+        @test all(isapprox.(rf.mu[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
     end
 end
 
@@ -1629,7 +1647,8 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
         @test size(rf.hist) == (Tb, N)
         B = E[rows, :]
         @test isequal(isnan.(rf.hist), isnan.(B))
-        @test rf.hist[isfinite.(B)] ≈ B[isfinite.(B)]
+        # Measured maxrel 1.2e-14, cell by cell (#1386).
+        @test all(isapprox.(rf.hist[isfinite.(B)], B[isfinite.(B)]; rtol = 1e-12))
         @test isequal(rf.mu, rf.hist[end, :])
     end
 
@@ -1658,7 +1677,8 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
         E = vec(Matrix(CSV.read(joinpath(@__DIR__, "assets/TargetReturnForecast3.csv.gz"),
                                 DataFrame)))
         @test isequal(isnan.(rf.mu), isnan.(E))
-        @test rf.mu[isfinite.(E)] ≈ E[isfinite.(E)]
+        # Measured maxrel 1.8e-13 at most over the four stored cases, cell by cell (#1386).
+        @test all(isapprox.(rf.mu[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
         # The block's rows alone lose the boundary band, so the fit is a different one.
         rb = return_forecast(TargetReturnForecast(; scores = ds, horizon = 2, lag = 1,
                                                   calibrate = false, whole_history = false),
@@ -1675,8 +1695,10 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
         E = vec(Matrix(CSV.read(joinpath(@__DIR__, "assets/TargetReturnForecast4.csv.gz"),
                                 DataFrame)))
         # The reference implementation's own coefficient, which the padded rows never enter.
-        @test rf.calib ≈ -0.7730488894268933
-        @test rf.mu[isfinite.(E)] ≈ E[isfinite.(E)]
+        # Bit-equal when measured (#1386).
+        @test isapprox(rf.calib, -0.7730488894268933; rtol = 1e-14)
+        # Measured maxrel 1.8e-13 at most over the four stored cases, cell by cell (#1386).
+        @test all(isapprox.(rf.mu[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
     end
 
     @testset "In the Sharpe unit a row before the block trains nothing" begin

@@ -316,11 +316,10 @@ pretty_table(DataFrame("Forecast" => [b[1] for b in books],
 
 #=
 The second question has the same answer as the first. The signal composite's two books earn a high
-Sharpe ratio. The trait regression's rank book earns a fraction of that, and its z-score book earns
-nothing you could tell from zero. Look at the turnover column as well. Both forecasts turn over
-close to their whole gross at every date, because a rank book rebuilt from each cross-section trades
-whatever the ranks moved, and `mean_turnover` is there so you can see that cost before an optimiser
-with a turnover constraint does.
+Sharpe ratio. The trait regression's two books earn nothing you could tell from zero. Look at the
+turnover column as well. Both forecasts turn over close to their whole gross at every date, because
+a rank book rebuilt from each cross-section trades whatever the ranks moved, and `mean_turnover` is
+there so you can see that cost before an optimiser with a turnover constraint does.
 
 !!! note "Every hit rate counts against the dates that scored"
     The hit rate in this table counts against the dates the book scored, because a date the book
