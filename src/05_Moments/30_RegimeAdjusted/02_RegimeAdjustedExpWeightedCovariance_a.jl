@@ -111,8 +111,12 @@ without the separate correlation path and the centring. ``b`` is the mean of the
 the moment that `RootMeanSquaredAdjusted` reads. `FirstMomentRegimeAdjusted` reads the mean of
 the root and `LogRegimeAdjusted` the mean of the log, which need smaller factors, so the target
 over-corrects them: the squared multiplier is 0.975 and 0.956 at 12 assets and a half-life of 10.
-A HAC adjustment makes the estimate noisier than its weights state, so the factor under-corrects
-it: the squared multiplier is 1.56 at two lags, 12 assets and a half-life of 10.
+A HAC estimate reads the fixed point on the spectrum of its banded weight matrix, and skips a
+block with too few effective observations: at two lags, 12 assets and a half-life of 10 the
+squared multiplier of `RootMeanSquaredAdjusted` is 0.981 over 8 seeds, from 2.48 raw, which is the
+error of the deterministic equivalent on an estimate with half the degrees of freedom. On the
+separate correlation path the factor reads `cor_decay` alone, and the noise of the variance at
+`decay` leaves 1.031 without HAC and 1.090 at two lags.
 
 # Related
 
@@ -336,6 +340,7 @@ $(DocStringExtensions.FIELDS)
         cor_decay::Option{<:Number}                           = nothing,
         min_obs::Integer                                      = round(Int, max(1, decay_half_life(decay), isnothing(cor_decay) ? 1 : decay_half_life(cor_decay, :cor_decay))),
         hac_lags::Option{<:Integer}                           = nothing,
+        hac_floor::Bool                                       = false,
         regime_method::Option{<:RegimeAdjustedMethod}         = FirstMomentRegimeAdjusted(),
         regime_decay::Number                                  = exp2(-2 / decay_half_life(decay)),
         regime_min_obs::Integer                               = round(Int, max(1, decay_half_life(decay) / 2)),
@@ -399,6 +404,10 @@ true
     """
     hac_lags
     """
+    $(field_dict[:hac_floor])
+    """
+    hac_floor
+    """
     $(field_dict[:regime_method])
     """
     regime_method
@@ -437,6 +446,7 @@ true
     function RegimeAdjustedExpWeightedCovariance(decay::Number, cor_decay::Option{<:Number},
                                                  min_obs::Integer,
                                                  hac_lags::Option{<:Integer},
+                                                 hac_floor::Bool,
                                                  regime_method::Option{<:RegimeAdjustedMethod},
                                                  regime_decay::Number,
                                                  regime_min_obs::Integer,
@@ -461,17 +471,22 @@ true
             assert_nonempty_gt0_finite_val(hac_lags, :hac_lags)
         end
         return new{typeof(decay), typeof(cor_decay), typeof(min_obs), typeof(hac_lags),
-                   typeof(regime_method), typeof(regime_decay), typeof(regime_min_obs),
-                   typeof(regime_target), typeof(regime_lohi_mult), typeof(min_val),
-                   typeof(centred), typeof(debias), typeof(cache)}(decay, cor_decay,
-                                                                   min_obs, hac_lags,
-                                                                   regime_method,
-                                                                   regime_decay,
-                                                                   regime_min_obs,
-                                                                   regime_target,
-                                                                   regime_lohi_mult,
-                                                                   min_val, centred, debias,
-                                                                   cache)
+                   typeof(hac_floor), typeof(regime_method), typeof(regime_decay),
+                   typeof(regime_min_obs), typeof(regime_target), typeof(regime_lohi_mult),
+                   typeof(min_val), typeof(centred), typeof(debias), typeof(cache)}(decay,
+                                                                                    cor_decay,
+                                                                                    min_obs,
+                                                                                    hac_lags,
+                                                                                    hac_floor,
+                                                                                    regime_method,
+                                                                                    regime_decay,
+                                                                                    regime_min_obs,
+                                                                                    regime_target,
+                                                                                    regime_lohi_mult,
+                                                                                    min_val,
+                                                                                    centred,
+                                                                                    debias,
+                                                                                    cache)
     end
 end
 function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
@@ -486,6 +501,7 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                                                                               :cor_decay)
                                                                           end)),
                                              hac_lags::Option{<:Integer} = nothing,
+                                             hac_floor::Bool = false,
                                              regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
                                              regime_decay::Number = exp2(-2 /
                                                                          decay_half_life(decay)),
@@ -501,9 +517,10 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                              debias::Bool = true,
                                              cache::Option{<:AbstractPartialFitState} = nothing)::RegimeAdjustedExpWeightedCovariance
     return RegimeAdjustedExpWeightedCovariance(decay, cor_decay, min_obs, hac_lags,
-                                               regime_method, regime_decay, regime_min_obs,
-                                               regime_target, regime_lohi_mult, min_val,
-                                               centred, debias, cache)
+                                               hac_floor, regime_method, regime_decay,
+                                               regime_min_obs, regime_target,
+                                               regime_lohi_mult, min_val, centred, debias,
+                                               cache)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1101,7 +1118,10 @@ function update_var_cor!(cache::RegimeAdjustedCovarianceState,
                          ce::RegimeAdjustedExpWeightedCovariance,
                          valid::AbstractVector{<:Bool}, pair_valid::AbstractMatrix{<:Bool})
     T = eltype(cache.variance)
-    hac_var = max.(LinearAlgebra.diag(cache.XXt), zero(T))
+    hac_var = LinearAlgebra.diag(cache.XXt)
+    if ce.hac_floor
+        hac_var .= max.(hac_var, zero(T))
+    end
     cache.variance[valid] .= ce.decay * view(cache.variance, valid) +
                              (one(ce.decay) - ce.decay) * view(hac_var, valid)
     positive = valid .& (cache.variance .> ce.min_val)
@@ -1277,7 +1297,7 @@ function update_regime!(cache::RegimeAdjustedCovarianceState,
         return cache
     end
     regime_mask = valid .& cache.active .& (cache.obs_count .>= ce.min_obs) .&
-                  (cache.obs_count .> regime_bias_gate(ce.debias, 1))
+                  regime_bias_open.(ce.debias, 1, ce.decay, cache.obs_count, ce.hac_lags)
     if !isnothing(estimation_mask)
         regime_mask .&= estimation_mask
     end

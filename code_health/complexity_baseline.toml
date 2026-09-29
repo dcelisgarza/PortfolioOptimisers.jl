@@ -117,9 +117,9 @@ commit = "ebcacfda95"
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { cyc = 5, cog = 7, arg = 6, cyc_sum = 26, cog_sum = 20, arg_sum = 48, macros = [] }
 "src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { cyc = 6, cog = 9, arg = 6, cyc_sum = 35, cog_sum = 25, arg_sum = 78, macros = [] }
 "src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 39, cog_sum = 31, arg_sum = 85, macros = [] }
-"src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { cyc = 13, cog = 19, arg = 11, cyc_sum = 77, cog_sum = 64, arg_sum = 141, macros = [] }
-"src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { cyc = 11, cog = 22, arg = 13, cyc_sum = 83, cog_sum = 81, arg_sum = 105, macros = [] }
-"src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { cyc = 5, cog = 8, arg = 6, cyc_sum = 27, cog_sum = 19, arg_sum = 69, macros = [] }
+"src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { cyc = 13, cog = 19, arg = 12, cyc_sum = 82, cog_sum = 71, arg_sum = 147, macros = [] }
+"src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { cyc = 13, cog = 28, arg = 14, cyc_sum = 84, cog_sum = 86, arg_sum = 109, macros = [] }
+"src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 103, cog_sum = 93, arg_sum = 163, macros = [] }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 32, cog_sum = 12, arg_sum = 70, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { cyc = 6, cog = 10, arg = 5, cyc_sum = 40, cog_sum = 33, arg_sum = 36, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { cyc = 5, cog = 5, arg = 4, cyc_sum = 24, cog_sum = 18, arg_sum = 5, macros = [] }

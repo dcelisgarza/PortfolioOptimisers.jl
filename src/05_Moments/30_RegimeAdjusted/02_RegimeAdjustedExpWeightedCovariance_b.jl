@@ -74,7 +74,7 @@ function regime_target_statistic(::DiagonalTarget, cache::RegimeAdjustedCovarian
                                  ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
                                  idx::AbstractVector{<:Integer})
     f = regime_bias!.(Ref(cache.bias), Ref(RootMeanSquaredAdjusted()), ce.decay,
-                      view(cache.obs_count, idx))
+                      view(cache.obs_count, idx), ce.hac_lags)
     C = regime_covariance_block(cache, ce, idx)
     return regime_statistic(DiagonalTarget(), X[idx] ./ sqrt.(f), C, idx, ce.min_val) ./
            diagonal_law_factor(ce.regime_method, cache, ce, C, idx)
@@ -190,7 +190,9 @@ variance.
 Where:
 
   - ``K_{ij}``: Effective count of the observations of the pair, the inverse of the sum of its
-    squared normalised weights.
+    squared normalised weights, from [`pair_weight_square_sum`](@ref). A HAC estimate has the
+    law of a plain one on the eigenvalues of its weight matrix, so its count is the inverse of
+    ``\\operatorname{tr}(A^{2})``, about half as large at two lags.
   - ``\\lambda``: Decay of the correlation, `cor_decay` on the separate path and `decay` else.
   - ``W_{ij}``: Weight that the pair holds, ``1 - \\lambda^{k}`` after ``k`` joint observations.
   - ``\\hat{r}_{ij}``: Entry of the estimated correlation.
@@ -229,13 +231,64 @@ function diagonal_law_spectrum(cache::RegimeAdjustedCovarianceState,
     end
     pairs = Iterators.filter(p -> p[1] != p[2] && W[p] > 0, CartesianIndices(rho))
     q = sum(p -> rho[p]^2, pairs; init = zero(T))
-    v = (one(lambda) - lambda) / (one(lambda) + lambda)
-    q_unbiased = sum(p -> rho[p]^2 - (one(T) - rho[p]^2)^2 * v * (2 - W[p]) / W[p], pairs;
+    q_unbiased = sum(p -> rho[p]^2 -
+                          (one(T) - rho[p]^2)^2 *
+                          pair_weight_square_sum(lambda, W[p], ce.hac_lags), pairs;
                      init = zero(T))
     alpha = sqrt(clamp(q_unbiased / max(q, eps(T)), zero(T), one(T)))
     mu = LinearAlgebra.eigvals(LinearAlgebra.Symmetric(rho))
 
     return max.(one(T) .+ alpha .* (mu .- one(T)), zero(T))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the sum of the squared normalised weights of a pair's estimate from the weight the pair
+holds, the variance of a sample correlation of the pair relative to ``(1 - r^{2})^{2}``.
+
+A pair of ``k`` joint observations holds ``W = 1 - \\lambda^{k}``, so the sum is a function of
+``W`` alone. With HAC lags the weights are the eigenvalues of the banded weight matrix ``A`` of
+[`regime_bias_table`](@ref), and the sum is ``\\operatorname{tr}(A^{2})``, which adds the squared
+Bartlett weight of each lag that reaches a joint observation.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\operatorname{tr}(A^{2}) &= \\frac{v}{W^{2}} \\left(W (2 - W) + 2 \\sum_{i=1}^{L} k_{i}^{2} \\max\\left(1 - \\frac{(1 - W)^{2}}{\\lambda^{2 i}}, 0\\right)\\right)\\,, \\quad v = \\frac{1 - \\lambda}{1 + \\lambda}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``k_{i}``: Bartlett weight ``1 - i / (L + 1)`` of lag ``i``.
+  - ``L``: `hac_lags`, and the sum is empty where it is `nothing`.
+
+# Arguments
+
+  - `lambda::Number`: Decay of the pair's estimate.
+  - `W::Number`: Weight that the pair holds.
+  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
+
+# Returns
+
+  - `s::Number`: The sum of the squared normalised weights.
+
+# Related
+
+  - [`diagonal_law_spectrum`](@ref)
+  - [`exp_weight_cross_sum`](@ref)
+"""
+function pair_weight_square_sum(lambda::Number, W::Number, hac_lags::Option{<:Integer})
+    v = (one(lambda) - lambda) / (one(lambda) + lambda)
+    t = v * (2 - W) / W
+    for i in 1:something(hac_lags, 0)
+        t += 2 *
+             (one(lambda) - i / (hac_lags + 1))^2 *
+             v *
+             max(one(W) - (one(W) - W)^2 / lambda^(2 * i), zero(W)) / W^2
+    end
+    return t
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -403,8 +456,10 @@ observations among the contributing assets. That factor is exact for a fixed dir
 shared history. On the separate correlation path the factor reads `cor_decay`, because the
 correlations carry most of the variance of a direction: at 12 assets, a half-life of 10 and a
 correlation half-life of 20, the squared multiplier of an equal-weight direction is 1.004 with it
-and 0.971 with `decay`. A HAC adjustment makes the estimate noisier than its weights state, so
-the factor under-corrects it: 1.055 at two lags.
+and 0.971 with `decay`. A HAC estimate reads the table of its banded weight matrix, which has
+about twice the excess of the plain weights: at two lags the squared multiplier of an
+equal-weight direction is 1.015 over 8 seeds, within its standard error of 0.013, from 1.165
+raw.
 
 The default inverse-volatility direction (`w = nothing`) is built from the same estimate, so the
 direction and the error of the estimate are correlated. Its statistic is also divided by
@@ -449,10 +504,11 @@ function regime_target_statistic(target::PortfolioTarget,
 
     K = minimum(view(cache.obs_count, idx))
     separate = has_separate_cor_decay(ce)
-    f = regime_bias!(cache.bias, ce.regime_method, separate ? ce.cor_decay : ce.decay, K)
+    f = regime_bias!(cache.bias, ce.regime_method, separate ? ce.cor_decay : ce.decay, K,
+                     ce.hac_lags)
     if isnothing(target.w) && !isnothing(cache.bias)
-        sv = exp_weight_cross_sum(ce.decay, ce.decay, K)
-        svc = separate ? exp_weight_cross_sum(ce.decay, ce.cor_decay, K) : sv
+        sv = exp_weight_cross_sum(ce.decay, ce.decay, K, ce.hac_lags)
+        svc = separate ? exp_weight_cross_sum(ce.decay, ce.cor_decay, K, ce.hac_lags) : sv
         f *= one(f) + inverse_volatility_bias(C, sv, svc, ce.min_val)
     end
     return stats ./ f
@@ -470,13 +526,19 @@ observations.
 ```
 
 At ``a = b`` it is the sum of the squared weights, the variance of an estimate of ``K``
-observations relative to the variance of one.
+observations relative to the variance of one. With HAC lags the sum is
+``\\operatorname{tr}(A_{a} A_{b})`` over the banded weight matrices of
+[`regime_bias_table`](@ref), whose law has the eigenvalues of ``A`` as its weights, so each lag
+``i`` that reaches an observation adds ``2 k_{i}^{2} (1 - (ab)^{K - i})`` to the factor
+``1 - (ab)^{K}`` of the numerator. At ``a = b`` its inverse is the effective count of
+observations that [`regime_bias_open`](@ref) reads.
 
 # Arguments
 
   - `a::Number`: Decay of the first set of weights.
   - `b::Number`: Decay of the second set of weights.
   - `K::Integer`: Count of observations that the weights span.
+  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
 
 # Returns
 
@@ -486,10 +548,187 @@ observations relative to the variance of one.
 
   - [`inverse_volatility_bias`](@ref)
 """
-function exp_weight_cross_sum(a::Number, b::Number, K::Integer)
+function exp_weight_cross_sum(a::Number, b::Number, K::Integer,
+                              hac_lags::Option{<:Integer} = nothing)
     ab = a * b
-    return (one(a) - a) * (one(b) - b) * (one(ab) - ab^K) /
+    t = one(ab) - ab^K
+    for i in 1:min(something(hac_lags, 0), K - 1)
+        t += 2 * (one(ab) - i / (hac_lags + 1))^2 * (one(ab) - ab^(K - i))
+    end
+    return (one(a) - a) * (one(b) - b) * t /
            ((one(ab) - ab) * (one(a) - a^K) * (one(b) - b^K))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the bias factor of a regime statistic that reads one HAC-adjusted variance estimate, for
+every count of observations from one to `K`.
+
+A HAC estimate of ``K`` observations is ``\\hat{v} = \\sigma^{2} Q`` with ``Q = z^{\\top} A z``, a
+quadratic form in the correctly calibrated returns. ``A = c B`` is banded: the weight of each
+square on its diagonal, and the Bartlett weight ``k_{i}`` times the weight of the newer return
+at lag ``i``. Diagonalised, ``Q`` has the law of a plain estimate whose weights are the
+eigenvalues ``\\mu`` of ``A``, so its Laplace transform is ``G(s) = \\det(I + s B)^{-1/2}`` on the
+scale ``s = 2 c t``, and [`regime_bias_factor`](@ref) reads it as it reads the transform of
+[`regime_bias_table`](@ref). The exponential weights break the identity that makes the Bartlett
+estimate a sum of squares, so ``A`` has negative eigenvalues from a count of 5 to 50, by the
+half-life, and ``Q`` can fall below zero. There the moment of ``Q^{-1}`` is not finite, and the
+table reads the moment of the positive part: past the minimum of ``G`` the negative eigenvalues
+rule the transform, so the integral stops there.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+B_{jj} &= \\lambda^{j}\\,, \\quad B_{j, j+i} = B_{j+i, j} = \\lambda^{j} k_{i}\\,, \\quad k_{i} = 1 - \\frac{i}{L + 1}\\,, \\quad i = 1, \\ldots, L\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``j``: Index of an observation, from zero for the newest.
+  - ``\\lambda``: `decay`.
+  - ``L``: `hac_lags`.
+
+# Algorithm
+
+ 1. Lay the grid of [`regime_bias_table`](@ref).
+ 2. For each ``K``, add one row of the banded LDLᵀ factorisation of ``I + s B`` at every point of
+    the grid with [`hac_ldl_row!`](@ref), so ``\\ln G`` takes the log of the new pivot and the
+    whole table costs one pass. A pivot that is not positive marks the point: past it, the
+    determinant has crossed zero.
+ 3. Cut the transform at its minimum with [`hac_laplace!`](@ref), and evaluate the factor of the
+    method with [`regime_bias_factor`](@ref).
+
+Where the estimate is positive definite, the table agrees with the eigenvalues of ``B`` on a grid
+of step ``1/200`` on ``[-75, 60]`` to ``10^{-10}``, and with a Monte Carlo of 400 000 draws to its
+noise. Where it is not, the grid agrees with the finer one to ``5 \\times 10^{-7}``, and to
+``4 \\times 10^{-4}`` at a half-life of 5 and five lags, where the estimate is negative in
+``6 \\times 10^{-5}`` of draws.
+
+# Arguments
+
+  - `method::RegimeAdjustedMethod`: Regime adjustment method, which names the moment.
+  - `decay::Number`: Decay of the weights.
+  - `K::Integer`: Largest count of observations in the table.
+  - `hac_lags::Integer`: Count of HAC lags.
+
+# Returns
+
+  - `table::VecNum`: The factor for each count from one to `K`.
+
+# Related
+
+  - [`hac_ldl_row!`](@ref)
+  - [`hac_laplace!`](@ref)
+  - [`regime_bias_table`](@ref)
+  - [`regime_bias!`](@ref)
+"""
+function regime_bias_table(method::RegimeAdjustedMethod, decay::Number, K::Integer,
+                           hac_lags::Integer)
+    h = one(decay) / 10
+    s = exp.(range(-60 * one(h), 50 * one(h); step = h))
+    T = eltype(s)
+    buf = (; l = zeros(T, length(s), hac_lags, hac_lags), d = ones(T, length(s), hac_lags),
+           row = zeros(T, length(s), hac_lags), num = zeros(T, length(s)),
+           lG = zeros(T, length(s)))
+    G = similar(s)
+    lam = one(decay)
+    return map(1:K) do k
+        hac_ldl_row!(buf, s, decay, lam, k - 1)
+        lam *= decay
+        return regime_bias_factor(method, s, hac_laplace!(G, buf.lG),
+                                  (one(decay) - decay) / (one(decay) - decay^k), h)
+    end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Adds the row of observation `m` to the banded LDLᵀ factorisation of ``I + s B`` at every point
+of the grid, and adds the log of its pivot to ``\\ln G``.
+
+The matrix is banded with `L` lags, so a new row reads only the last `L` rows of the factor and
+their pivots. The buffers hold them, the last row first.
+
+# Arguments
+
+  - `buf::NamedTuple`: Buffers of the factorisation (mutated): `l[g, r, i]`, the entry of row
+    ``m - r`` at column ``m - r - i``; `d[g, r]`, the pivot of row ``m - r``; `row` and `num`,
+    scratch; and `lG`, ``\\ln G`` at each point, ``-\\infty`` at a point whose pivot was not
+    positive.
+  - `s::VecNum`: Grid of ``s``.
+  - `decay::Number`: Decay of the weights.
+  - `lam::Number`: ``\\lambda^{m}``.
+  - `m::Integer`: Index of the new row, from zero for the newest observation.
+
+# Returns
+
+  - `buf::NamedTuple`: The buffers after the row.
+
+# Related
+
+  - [`regime_bias_table`](@ref)
+"""
+function hac_ldl_row!(buf::NamedTuple, s::VecNum, decay::Number, lam::Number, m::Integer)
+    (; l, d, row, num, lG) = buf
+    L = size(d, 2)
+    p = min(L, m)
+    for i in p:-1:1
+        num .= s .* (lam / decay^i * (one(decay) - i / (L + 1)))
+        for j in (i + 1):p
+            num .-= view(row, :, j) .* view(l, :, i, j - i) .* view(d, :, j)
+        end
+        row[:, i] .= num ./ view(d, :, i)
+    end
+    num .= one(lam) .+ s .* lam
+    for i in 1:p
+        num .-= view(row, :, i) .^ 2 .* view(d, :, i)
+    end
+    # A dead point keeps -Inf whatever its pivots hold, and `max` keeps the log defined there.
+    lG .= ifelse.(num .> 0, lG .- log.(max.(num, floatmin(eltype(num)))) ./ 2,
+                  -convert(eltype(lG), Inf))
+    for r in L:-1:2
+        d[:, r] .= view(d, :, r - 1)
+        l[:, r, :] .= view(l, :, r - 1, :)
+    end
+    d[:, 1] .= num
+    l[:, 1, :] .= row
+
+    return buf
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Forms the Laplace transform of a HAC estimate on the grid, cut at its minimum.
+
+Where the weight matrix is positive definite, ``G`` falls on the whole grid and nothing is cut.
+Where it is not, ``G`` falls to a minimum and then rises to the first zero of the determinant,
+where the negative part of the estimate rules the transform. The transform is cut at the minimum,
+and the last point takes the weight one half of a closed trapezoid, so the error of the cut is of
+the second order in the step.
+
+# Arguments
+
+  - `G::VecNum`: Transform on the grid (mutated).
+  - `lG::VecNum`: ``\\ln G`` on the grid, ``-\\infty`` past the first zero of the determinant.
+
+# Returns
+
+  - `G::VecNum`: The cut transform.
+
+# Related
+
+  - [`regime_bias_table`](@ref)
+"""
+function hac_laplace!(G::VecNum, lG::VecNum)
+    i = argmin(j -> isinf(lG[j]) ? typemax(eltype(lG)) : lG[j], eachindex(lG))
+    G .= exp.(lG)
+    if i < lastindex(G)
+        G[i] /= 2
+        G[(i + 1):end] .= zero(eltype(G))
+    end
+
+    return G
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -692,13 +931,15 @@ function regime_target_statistic(target::MahalanobisTarget,
                                  ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
                                  idx::AbstractVector{<:Integer})
     K = minimum(view(cache.obs_count, idx))
+    decay = has_separate_cor_decay(ce) ? ce.cor_decay : ce.decay
     b = if !ce.debias
         one(ce.decay)
-    elseif K > length(idx) + 3
-        mahalanobis_bias(has_separate_cor_decay(ce) ? ce.cor_decay : ce.decay, K,
-                         length(idx))
-    else
+    elseif !regime_bias_open(true, length(idx), decay, K, ce.hac_lags)
         nothing
+    elseif isnothing(ce.hac_lags)
+        mahalanobis_bias(decay, K, length(idx))
+    else
+        mahalanobis_bias(decay, K, length(idx), ce.hac_lags)
     end
     if isnothing(b)
         return nothing
@@ -808,6 +1049,219 @@ function mahalanobis_bias_sums(decay::Number, K::Integer, c::Integer, w0::Number
     tail = one(w0) - used
 
     return g + tail, dh + tail
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the bias factor of the squared Mahalanobis distance against a HAC-adjusted covariance
+estimate.
+
+A HAC estimate is ``\\hat{C} = Z^{\\top} A Z`` with the banded weight matrix ``A`` of
+[`regime_bias_table`](@ref), so it has the law of a plain estimate whose weights are the
+eigenvalues ``\\mu`` of ``A``, and the fixed point of [`mahalanobis_bias`](@ref) holds with ``\\mu``
+in place of the weights. Its sums are the derivatives of ``\\ell(t) = \\ln \\det(I + t A)``,
+so no eigenvalue is computed:
+
+```math
+\\begin{align}
+\\frac{1}{b} &= \\sum_{k} \\frac{\\mu_{k}}{1 + t \\mu_{k}} = \\ell'(t)\\,, \\quad t = (n + 1) b\\,.
+\\end{align}
+```
+
+Each term ``\\mu b / (1 + (n + 1) \\mu b)`` is concave in ``b`` where ``1 + t \\mu > 0``, also for a
+negative ``\\mu``, so Newton's method from ``b = 1`` rises to the root as in the plain case. A
+negative ``\\mu`` bounds ``t``: where a pivot of ``I + t A`` is not positive, or where the slope of
+the map is not positive, the map has passed its maximum below zero and no root exists. At 12
+assets, a half-life of 10 and two lags, the factor is 2.523 against a Monte Carlo of 2.479, and
+1.2654 against 1.2633 at a half-life of 40: the fixed point is a deterministic equivalent, and a
+HAC estimate has about half the degrees of freedom of a plain one.
+
+# Arguments
+
+  - `decay::Number`: Decay of the weights.
+  - `K::Integer`: Count of observations in the estimate.
+  - `n::Integer`: Count of assets that contribute to the statistic.
+  - `hac_lags::Integer`: Count of HAC lags.
+
+# Returns
+
+  - `b::Option{<:Number}`: The bias factor, or `nothing` where `K <= n + 1` or no root exists.
+
+# Related
+
+  - [`hac_log_det_slopes`](@ref)
+  - [`mahalanobis_bias`](@ref)
+  - [`MahalanobisTarget`](@ref)
+"""
+function mahalanobis_bias(decay::Number, K::Integer, n::Integer, hac_lags::Integer)
+    b = one(decay)
+    for _ in 1:(K > n + 1 ? 100 : 0)
+        slopes = hac_log_det_slopes(decay, K, (n + 1) * b, hac_lags)
+        if isnothing(slopes) || !(slopes[2] > zero(b))
+            return nothing
+        end
+        step = (b * slopes[1] - one(b)) / slopes[2]
+        b -= step
+        if abs(step) <= 4 * eps(b)
+            return b
+        end
+    end
+
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the two sums of the HAC fixed point of [`mahalanobis_bias`](@ref) from the banded LDLᵀ
+factorisation of ``I + t A``, with the first and second derivatives in ``t`` carried through it.
+
+``\\ell(t) = \\sum_{m} \\ln d_{m}(t)`` over the pivots, so ``\\ell' = \\sum_{m} d_{m}' / d_{m}`` and
+``\\ell'' = \\sum_{m} (d_{m}'' / d_{m} - (d_{m}' / d_{m})^{2})``. A row whose diagonal
+``t\\, c\\, \\lambda^{m}`` falls below the machine epsilon of `decay` times ``1 - \\lambda`` enters
+both sums as its weight, so the loop stops there and adds the remaining mass, as
+[`mahalanobis_bias_sums`](@ref) does.
+
+# Arguments
+
+  - `decay::Number`: Decay of the weights.
+  - `K::Integer`: Count of observations in the estimate.
+  - `t::Number`: Argument, ``(n + 1) b``.
+  - `hac_lags::Integer`: Count of HAC lags.
+
+# Returns
+
+  - `slopes::Option{<:Tuple{<:Number, <:Number}}`: ``(\\ell'(t), \\ell'(t) + t \\ell''(t))``, that is
+    ``\\sum_{k} \\mu_{k} / (1 + t \\mu_{k})`` and ``\\sum_{k} \\mu_{k} / (1 + t \\mu_{k})^{2}``, or
+    `nothing` where ``I + t A`` is not positive definite.
+
+# Related
+
+  - [`hac_ldl_taylor_row!`](@ref)
+  - [`mahalanobis_bias`](@ref)
+"""
+function hac_log_det_slopes(decay::Number, K::Integer, t::Number, hac_lags::Integer)
+    c = (one(decay) - decay) / (one(decay) - decay^K)
+    z = ntuple(_ -> zero(c * t), 3)
+    buf = (; l = fill(z, hac_lags, hac_lags), d = fill(z, hac_lags),
+           row = fill(z, hac_lags))
+    g1, g2 = zero(c * t), zero(c * t)
+    lam = one(decay)
+    for m in 0:(K - 1)
+        if t * c * lam <= eps(decay) * (one(decay) - decay)
+            tail = c * lam * (one(decay) - decay^(K - m)) / (one(decay) - decay)
+            return g1 + tail, g1 + t * g2 + tail
+        end
+        dn = hac_ldl_taylor_row!(buf, t * c * lam, c * lam, decay, min(hac_lags, m))
+        if !(dn[1] > zero(dn[1]))
+            return nothing
+        end
+        g1 += dn[2] / dn[1]
+        g2 += dn[3] / dn[1] - (dn[2] / dn[1])^2
+        lam *= decay
+    end
+
+    return g1, g1 + t * g2
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Adds one row to the banded LDLᵀ factorisation of ``I + t A``, with each entry carried as its value
+and its first two derivatives in ``t``.
+
+The entries of ``I + t A`` are linear in ``t``, so the diagonal of the row is ``(1 + t a, a, 0)``
+and its entry at lag ``i`` is ``(t a_{i}, a_{i}, 0)``, with ``a_{i} = k_{i}\\, a / \\lambda^{i}``.
+The recursion is that of [`hac_ldl_row!`](@ref), in [`taylor_mul`](@ref) and
+[`taylor_div`](@ref).
+
+# Arguments
+
+  - `buf::NamedTuple`: Buffers of the factorisation (mutated): `l[r, i]`, the entry of row
+    ``m - r`` at column ``m - r - i``; `d[r]`, the pivot of row ``m - r``; and `row`, scratch.
+  - `ta::Number`: ``t\\, c\\, \\lambda^{m}``, the diagonal of ``t A`` in the row.
+  - `a::Number`: ``c\\, \\lambda^{m}``, the diagonal of ``A`` in the row.
+  - `decay::Number`: Decay of the weights.
+  - `p::Integer`: Count of lags that reach an observation of the estimate, ``\\min(L, m)``.
+
+# Returns
+
+  - `pivot::NTuple{3, <:Number}`: The new pivot and its two derivatives.
+
+# Related
+
+  - [`hac_log_det_slopes`](@ref)
+"""
+function hac_ldl_taylor_row!(buf::NamedTuple, ta::Number, a::Number, decay::Number,
+                             p::Integer)
+    (; l, d, row) = buf
+    L = length(d)
+    for i in p:-1:1
+        k = (one(decay) - i / (L + 1)) / decay^i
+        num = (ta * k, a * k, zero(a))
+        for j in (i + 1):p
+            num = num .- taylor_mul(taylor_mul(row[j], l[i, j - i]), d[j])
+        end
+        row[i] = taylor_div(num, d[i])
+    end
+    pivot = (one(ta) + ta, a, zero(a))
+    for i in 1:p
+        pivot = pivot .- taylor_mul(taylor_mul(row[i], row[i]), d[i])
+    end
+    for r in L:-1:2
+        d[r] = d[r - 1]
+        l[r, :] .= view(l, r - 1, :)
+    end
+    d[1] = pivot
+    l[1, :] .= row
+
+    return pivot
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Multiplies two values carried with their first two derivatives.
+
+# Arguments
+
+  - `x::NTuple{3, <:Number}`: ``(x, x', x'')``.
+  - `y::NTuple{3, <:Number}`: ``(y, y', y'')``.
+
+# Returns
+
+  - `xy::NTuple{3, <:Number}`: ``(x y, x' y + x y', x'' y + 2 x' y' + x y'')``.
+
+# Related
+
+  - [`taylor_div`](@ref)
+  - [`hac_ldl_taylor_row!`](@ref)
+"""
+function taylor_mul(x::NTuple{3, <:Number}, y::NTuple{3, <:Number})
+    return (x[1] * y[1], x[2] * y[1] + x[1] * y[2],
+            x[3] * y[1] + 2 * x[2] * y[2] + x[1] * y[3])
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Divides two values carried with their first two derivatives.
+
+# Arguments
+
+  - `x::NTuple{3, <:Number}`: ``(x, x', x'')``.
+  - `y::NTuple{3, <:Number}`: ``(y, y', y'')``, with ``y \\neq 0``.
+
+# Returns
+
+  - `q::NTuple{3, <:Number}`: ``(q, q', q'')`` of ``q = x / y``: ``q' = (x' - q y') / y`` and
+    ``q'' = (x'' - 2 q' y' - q y'') / y``.
+
+# Related
+
+  - [`taylor_mul`](@ref)
+  - [`hac_ldl_taylor_row!`](@ref)
+"""
+function taylor_div(x::NTuple{3, <:Number}, y::NTuple{3, <:Number})
+    q = x[1] / y[1]
+    q1 = (x[2] - q * y[2]) / y[1]
+    return (q, q1, (x[3] - 2 * q1 * y[2] - q * y[3]) / y[1])
 end
 """
     Statistics.cov(
@@ -1030,6 +1484,7 @@ true
 function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:Any, <:Any,
                                                               <:Any, <:Any, <:Any, <:Any,
                                                               <:Any, <:Any, <:Any, <:Any,
+                                                              <:Any,
                                                               <:Option{<:RegimeAdjustedCovarianceState}},
                       X::MatNum; dims::Int = 1,
                       estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
@@ -1097,6 +1552,7 @@ true
 function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:Any, <:Any,
                                                               <:Any, <:Any, <:Any, <:Any,
                                                               <:Any, <:Any, <:Any, <:Any,
+                                                              <:Any,
                                                               <:Option{<:RegimeAdjustedCovarianceState}},
                       x::VecNum;
                       estimation_mask::Option{<:AbstractVector{<:Bool}} = nothing,

@@ -249,7 +249,7 @@ Computes an asset covariance (and correlation) matrix. Core wrappers: `Covarianc
 - **LowerTailDependenceCovariance**: dependence in the joint lower tail (crash co-movement).
 - **RankCovariance**: rank-correlation based — `KendallCovariance` (τ), `SpearmanCovariance` (ρ).
 - **MutualInfoCovariance**: dependence via mutual information, over a histogram binning Algorithm.
-- **RegimeAdjustedExpWeightedVariance/Covariance**: online exponentially-weighted estimators rescaled by a detected market regime state. The regime statistic divides a realised square by an estimated variance, so by default (`debias = true`) it divides by the bias that the inverse of the estimate puts in the moment its method reads (ADR 0190).
+- **RegimeAdjustedExpWeightedVariance/Covariance**: online exponentially-weighted estimators rescaled by a detected market regime state. The regime statistic divides a realised square by an estimated variance, so by default (`debias = true`) it divides by the bias that the inverse of the estimate puts in the moment its method reads (ADR 0190). A HAC estimate (`hac_lags`) is a quadratic form in the returns with a banded weight matrix, so that bias reads the spectrum of the matrix; the recursion keeps each HAC square unfloored by default (`hac_floor = false`), and the scalar estimator floors only the variance it returns.
 - **ImpliedVolatility** (covariance): scales covariance using implied volatility.
 - **DenoiseCovariance / DetoneCovariance / ProcessedCovariance**: wrap another covariance estimator and apply matrix processing.
 - **GeodesicShrinkageCovariance**: wraps another covariance estimator and applies Geodesic Shrinkage (§3.5) to the matrix it computes.

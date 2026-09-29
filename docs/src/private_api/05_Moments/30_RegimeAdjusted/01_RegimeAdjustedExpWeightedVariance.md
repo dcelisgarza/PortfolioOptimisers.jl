@@ -19,7 +19,7 @@ get_regime_state(method::LogRegimeAdjusted, z2_valid::VecNum, min_val::Number = 
 regime_bias_factor
 regime_bias_table
 regime_bias!
-regime_bias_gate
+regime_bias_open
 hac_squared_returns!
 process_observation!(cache::RegimeAdjustedVarianceState, ce::RegimeAdjustedExpWeightedVariance, X::VecNum, estimation_mask::Option{<:AbstractVector{<:Bool}}, active_mask::Option{<:AbstractVector{<:Bool}})
 regime_adjusted_variance_pass!

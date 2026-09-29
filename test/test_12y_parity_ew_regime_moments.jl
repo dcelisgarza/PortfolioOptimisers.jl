@@ -84,7 +84,10 @@ const P1383_RV = ["RVDefault" => () -> p1383_rv(; hl = 40, min_obs = 40),
                   "RVLog" => () -> p1383_rv(; regime_method = P1383.LogRegimeAdjusted()),
                   "RVRms" =>
                       () -> p1383_rv(; regime_method = P1383.RootMeanSquaredAdjusted()),
-                  "RVHac2" => () -> p1383_rv(; hac_lags = 2),
+                  # The oracle floors each HAC square at zero, which makes the variance 16 % too
+                  # large on returns with no autocorrelation; `hac_floor = true` keeps its rule
+                  # (#1433).
+                  "RVHac2" => () -> p1383_rv(; hac_lags = 2, hac_floor = true),
                   "RVRegimeHL3" => () -> p1383_rv(; rhl = 3, rmin = 4),
                   "RVNoClip" => () -> p1383_rv(; regime_lohi_mult = nothing),
                   "RVClipAboveOne" => () -> p1383_rv(; regime_lohi_mult = (1.1, 2.0)),

@@ -82,9 +82,47 @@ variance of a sample correlation is `(1 − r²)² / K_ij`, with `K_ij` from the
 The factor reads the correlation alone, so it keeps the scale invariance. `debias = false` takes no
 factor, and `RootMeanSquaredAdjusted` needs none, so neither pays the eigen-decomposition.
 
+**A HAC estimate reads the spectrum of its weight matrix (#1433).** Over `K` observations the
+HAC estimate is `Q = z' A z`, with `A = c B` banded: `B_jj = λ^j` and `B_{j,j+i} = λ^j k_i`, with
+the Bartlett weight `k_i = 1 − i/(L + 1)`. For the covariance, `Ĉ = Z' A Z`. Diagonalised, `U'Z`
+has the law of `Z`, so a HAC estimate has **exactly** the law of a plain estimate whose weights are
+the eigenvalues `μ` of `A`, and every factor above holds with `μ` in place of `w`. None needs an
+eigen-decomposition. `regime_bias_table(method, decay, K, hac_lags)` reads
+`G(s) = det(I + s B)^(-1/2)` from a banded LDLᵀ factorisation that adds one row per `K`, in one pass
+as before. `mahalanobis_bias(decay, K, n, hac_lags)` solves its fixed point from `ℓ'(t)` and
+`ℓ''(t)` of `ℓ = ln det(I + t A)`, carried through the same recursion. The inverse-volatility
+excess reads `s_v = tr(A²)` and `s_vc = tr(A_v A_c)`, and the pair count of `DiagonalTarget` reads
+`1 / tr(A²)`, all closed sums over the band. On a positive definite `A` the table agrees with the
+eigenvalues to `10⁻¹²`, and at two lags and a half-life of 10 the steady-state factor is 1.148, twice
+the excess of the plain weights. Without HAC, every path runs as before.
+
+**`A` is indefinite, so the Laplace integral stops at the minimum of `G`.** The exponential
+weights break the Fejér identity that makes the equal-weight Bartlett estimate a sum of squares.
+The smallest eigenvalue of `B` is negative from `K` of 5 to 50, by the half-life: −0.0067 times
+the largest at a half-life of 10 and two lags. So `Q` can fall below zero, and no moment of its
+inverse is finite. Past the minimum of `G` the negative eigenvalues rule the transform, and it
+rises to the first zero of the determinant; the table cuts it at the minimum, with the half weight
+of a closed trapezoid. Where `P(Q ≤ 0)` is below the reach of a Monte Carlo of 200 000 draws, as
+from a half-life of 5 at two lags, the cut matches the Monte Carlo to its noise.
+
+**The per-term floor at zero is off by default.** The scalar estimator and the variance of the
+separate correlation path floored each HAC square `x_t² + 2 Σ k_i x_t x_{t−i}` at zero, which the
+documented formula does not state. On returns with no autocorrelation the floor makes the variance
+6.7 %, 16 % and 41 % too large at one, two and five lags, and the scalar variance then differs from
+the diagonal of the covariance of one decay, which has no floor. The floor also leaves the law
+without a closed form. `hac_floor = false`, the default, keeps the recursion the quadratic form,
+and the scalar estimator floors the variance that it returns at zero. `hac_floor = true` is the
+oracle's rule of map #1375 (ADR 0186).
+
 **The gate is `K > n + 3`, where the variance of the statistic is finite.** At `n = 1` an estimate
 of four observations or fewer is not scored. The gate reads the count of each asset, so a young
-asset leaves the statistic as it does below `min_obs`.
+asset leaves the statistic as it does below `min_obs`. Under HAC the effective count
+`1 / tr(A²)` must also pass `n + 1`, the count at which the mean of the inverse of a plain estimate
+is finite. At 12 assets, a half-life of 10 and two lags, `K > n + 3` alone opens at `K = 16`,
+where 11 % of draws are not positive definite, and the effective count opens at `K = 54`. Over
+half-lives of 5, 10 and 40, one to five lags and one to 12 assets, the first scored row is not
+positive definite in at most `2 × 10⁻⁴` of draws, and a steady state with too few effective
+observations, such as 12 assets at a half-life of 5, is never scored.
 
 ## Consequences
 
@@ -93,7 +131,7 @@ asset leaves the statistic as it does below `min_obs`.
   states `debias = false`.
 - The default inverse-volatility direction keeps the next order of its excess, about `9 s₂²`,
   which the docstring of its statistic states with the warm-up rows.
-- **Three limits remain, and three child issues of map #1375 hold them.**
+- **Three limits remain, and child issues of map #1375 hold them.**
   - `MahalanobisTarget` keeps `b`, the moment of the mean, for every method, so it over-corrects
     FirstMoment and Log: 0.975 and 0.956 at 12 assets and a half-life of 10. The root and the log of
     `v' Ŵ⁻¹ v` for `n > 1` have no one-dimensional integral (#1431).
@@ -102,8 +140,8 @@ asset leaves the statistic as it does below `min_obs`.
     #1432 divides the sum by the factor of its law (see the decision above), and they read
     0.995 and 0.989. The rest is the per-term factor of the mean, which the root and the log see
     almost but not exactly: it grows with the correlation, to 0.986 and 0.971 at 0.9 (#1434).
-  - The factor assumes the plain exponential weights, and a HAC estimate has others. At two lags it
-    over-corrects the scalar estimator (0.898) and under-corrects the covariance targets (#1433).
+  - On the separate correlation path the Mahalanobis factor reads `cor_decay` alone, so the noise
+    of the variance at `decay` is not in it: 1.031 without HAC and 1.090 at two lags (#1437).
 
 ## Alternatives rejected
 
@@ -123,5 +161,15 @@ asset leaves the statistic as it does below `min_obs`.
   half-life of 10, and 1.013 and 1.027 at 30 assets.
 - **A two-moment Gamma law on the unbiased `Σ r_ij²`.** It is cheap, but a spike in the spectrum is
   not a Gamma variate: at a correlation of 0.9 the Log method reads 1.36.
+- **The Bartlett inflation alone** (#1433): the plain table at the effective count
+  `K / (1 + 2 Σ k_i²)`. The spectrum of `A` is not a rescaled geometric sequence, and it has
+  negative eigenvalues, so the rescaling is not exact.
+- **A HAC gate on `K > (n + 3)(1 + 2 Σ k_i²)`.** It guards the warm-up, but a steady state with too
+  few effective observations is scored forever: at a half-life of 5, two lags and 12 assets, 2.5 %
+  of draws are not positive definite at every `K`, and 95 % at five lags.
+- **A HAC gate on `1 / tr(A²) > n + 3`.** It never opens at a half-life of 10, two lags and 12
+  assets, where no draw is non-positive-definite.
+- **The per-term floor as the default.** It is 16 % too large at two lags, and it has no closed
+  law, so no exact factor.
 - **A keyword on each target.** `DiagonalTarget` would carry a field that a geodesic shrinkage
   ignores, and the scalar estimator would need a keyword of its own anyway.

@@ -645,7 +645,9 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
     f_far = PO.regime_bias!(bias, PO.RootMeanSquaredAdjusted(), 0.9, 10^6)
     @test length(bias) == ceil(Int, log(eps()) / log(0.9)) && f_far == bias[end]
     @test PO.regime_bias!(nothing, PO.RootMeanSquaredAdjusted(), 0.9, 10) === one(0.9)
-    @test PO.regime_bias_gate(true, 1) == 4 && PO.regime_bias_gate(false, 1) == 0
+    @test !PO.regime_bias_open(true, 1, 0.9, 4, nothing) &&
+          PO.regime_bias_open(true, 1, 0.9, 5, nothing) &&
+          PO.regime_bias_open(false, 1, 0.9, 1, nothing)
 
     # On iid Normal returns the squared multiplier is the mean of the transformed statistic,
     # which is one when the statistic is correct. Measured on this seed, half-life 10:
@@ -872,4 +874,141 @@ law, on the estimated spectrum shrunk until its dispersion is unbiased (ADR 0190
               PO.regime_law_factor(FM, PO.diagonal_law_spectrum(cache, ce, C, idx))
         @test PO.diagonal_law_factor(LG, cache, ce, C, idx) < 1
     end
+end
+
+#=
+Issue #1433. A HAC estimate over `K` observations is the quadratic form `z' A z` in the returns,
+with the banded weight matrix `A`, so it has the law of a plain estimate whose weights are the
+eigenvalues of `A`. Every bias factor reads that spectrum, without an eigen-decomposition: the
+tables and the Mahalanobis fixed point from a banded LDLᵀ factorisation of `I + s A`, and the
+effective count from `tr(A²)`. `A` is indefinite, so the gate also needs `1 / tr(A²) > n + 1`.
+The per-term floor at zero made the variance 16 % too large at two lags, so it is off by default,
+and `hac_floor = true` keeps it (ADR 0190).
+=#
+@testset "a HAC estimate reads the spectrum of its weight matrix" begin
+    function hac_A(lam, L, K)
+        B = diagm(lam .^ (0:(K - 1)))
+        for i in 1:L, j in 0:(K - i - 1)
+            B[j + 1, j + i + 1] = B[j + i + 1, j + 1] = lam^j * (1 - i / (L + 1))
+        end
+        return (1 - lam) / (1 - lam^K) * B
+    end
+    # The table, against the eigenvalues on a grid twenty times finer. Where `A` is positive
+    # definite the two agree to 6e-13; where it is not, to 5e-7 (measured 5.4e-7).
+    function eigen_factor(method, lam, L, K)
+        A = hac_A(lam, L, K)
+        mu = eigvals(Symmetric(A)) ./ ((1 - lam) / (1 - lam^K))
+        s = exp.(range(-75, 60; step = 1 / 200))
+        lG = map(x -> (v = 1 .+ x .* mu; any(<=(0), v) ? -Inf : -sum(log, v) / 2), s)
+        return PO.regime_bias_factor(method, s, PO.hac_laplace!(similar(s), lG),
+                                     (1 - lam) / (1 - lam^K), 1 / 200)
+    end
+    for (hl, L) in ((10, 1), (10, 2), (40, 5)),
+        method in (PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted(),
+                   PO.LogRegimeAdjusted())
+
+        lam = 2.0^(-1 / hl)
+        table = PO.regime_bias_table(method, lam, 200, L)
+        for K in (5, 20, 200)
+            definite = minimum(eigvals(Symmetric(hac_A(lam, L, K)))) > 0
+            @test isapprox(table[K], eigen_factor(method, lam, L, K);
+                           rtol = definite ? 1e-11 : 1e-6)
+        end
+    end
+    # At two lags and a half-life of 10 the steady-state factor is 1.148, twice the excess of the
+    # plain weights' 1.071, which a Monte Carlo of 400 000 draws reads as 1.146.
+    lam = 2.0^(-1 / 10)
+    @test isapprox(PO.regime_bias_table(PO.RootMeanSquaredAdjusted(), lam, 200, 2)[200],
+                   1.1476; atol = 1e-4)
+    # The state grows the HAC table where the estimator has HAC lags.
+    bias = Float64[]
+    @test PO.regime_bias!(bias, PO.RootMeanSquaredAdjusted(), lam, 30, 2) ==
+          PO.regime_bias_table(PO.RootMeanSquaredAdjusted(), lam, 64, 2)[30]
+
+    # The traces of the products of the weight matrices, and of the square of a pair's, against
+    # the matrices written out.
+    for L in (1, 2, 5), K in (3, 17, 300)
+        @test isapprox(PO.exp_weight_cross_sum(0.9, 0.95, K, L),
+                       tr(hac_A(0.9, L, K) * hac_A(0.95, L, K)); rtol = 1e-12)
+        @test isapprox(PO.pair_weight_square_sum(0.9, 1 - 0.9^K, L),
+                       sum(abs2, hac_A(0.9, L, K)); rtol = 1e-12)
+    end
+    @test PO.exp_weight_cross_sum(0.9, 0.95, 17, nothing) ==
+          PO.exp_weight_cross_sum(0.9, 0.95, 17)
+
+    # The two sums of the Mahalanobis fixed point, against the eigenvalues, and the fixed point.
+    for K in (20, 600), L in (1, 5), t in (1.0, 30.0)
+        mu = eigvals(Symmetric(hac_A(lam, L, K)))
+        slopes = PO.hac_log_det_slopes(lam, K, t, L)
+        @test isapprox(slopes[1], sum(mu ./ (1 .+ t .* mu)); rtol = 1e-12)
+        @test isapprox(slopes[2], sum(mu ./ (1 .+ t .* mu) .^ 2); rtol = 1e-12)
+    end
+    mu = eigvals(Symmetric(hac_A(lam, 2, 200)))
+    b = PO.mahalanobis_bias(lam, 200, 12, 2)
+    @test isapprox(inv(b), sum(mu ./ (1 .+ 13 .* mu .* b)); rtol = 1e-12)
+    # A Monte Carlo reads 2.479 there, and the plain fixed point 1.623. At 17 observations the
+    # estimate is not positive definite in 11 % of draws, and no root exists.
+    @test isapprox(b, 2.523; atol = 1e-3)
+    @test isnothing(PO.mahalanobis_bias(lam, 17, 12, 2))
+
+    # The gate: 12 assets at a half-life of 10 and two lags first score at 54 observations;
+    # at a half-life of 5 the steady state has 6.8 effective observations, and never scores.
+    first_open(n, d, L) = findfirst(K -> PO.regime_bias_open(true, n, d, K, L), 1:2000)
+    @test first_open(12, lam, 2) == 54
+    @test first_open(1, lam, 2) == 5
+    @test isnothing(first_open(12, 2.0^(-1 / 5), 2))
+    @test first_open(12, lam, nothing) == 16
+
+    # Without the floor the scalar HAC variance is the diagonal of the HAC covariance of one
+    # decay, as the plain variance is. The floor breaks that identity.
+    rng = StableRNG(1433)
+    na, nr = 12, 12000
+    A = randn(rng, na, na)
+    U = cholesky(Symmetric(A * transpose(A) / na + Diagonal(rand(rng, na)))).U
+    R = randn(rng, nr, na) * U .* 0.01
+    plain = (; decay = lam, min_obs = 5, regime_method = nothing, centred = true,
+             hac_lags = 2)
+    @test isapprox(var(RegimeAdjustedExpWeightedVariance(; plain...), R),
+                   diag(cov(RegimeAdjustedExpWeightedCovariance(; plain...), R));
+                   rtol = 1e-12)
+    @test !isapprox(var(RegimeAdjustedExpWeightedVariance(; plain..., hac_floor = true), R),
+                    diag(cov(RegimeAdjustedExpWeightedCovariance(; plain...), R));
+                    rtol = 1e-3)
+    # The separate path floors its variance only under `hac_floor = true` too.
+    sep = (; plain..., cor_decay = 2.0^(-1 / 20))
+    @test cov(RegimeAdjustedExpWeightedCovariance(; sep...), R) !=
+          cov(RegimeAdjustedExpWeightedCovariance(; sep..., hac_floor = true), R)
+
+    # On iid Normal returns the squared multiplier is one when the statistic is correct.
+    base = (; decay = lam, min_obs = 5, regime_lohi_mult = nothing, hac_lags = 2,
+            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centred = true)
+    function covariance_multiplier(target, method; extra...)
+        on = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
+                                                 regime_target = target,
+                                                 regime_method = method)
+        off = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
+                                                  regime_method = nothing)
+        return mean(cov(on, R) ./ cov(off, R))
+    end
+    function variance_multiplier(method; extra...)
+        on = RegimeAdjustedExpWeightedVariance(; base..., extra..., regime_method = method)
+        off = RegimeAdjustedExpWeightedVariance(; base..., extra...,
+                                                regime_method = nothing)
+        return mean(var(on, R) ./ var(off, R))
+    end
+    fixed = PO.PortfolioTarget(; w = fill(1 / na, na))
+    # Measured on this seed: scalar 1.000 (RMS) and 0.987 (first moment), 1.147 raw, and 0.837
+    # with the floor, which the factor then over-corrects; the equal-weight direction 1.013, from
+    # 1.162 raw; Mahalanobis 0.988, from 2.49 raw. Over 8 seeds: 1.002, 1.003, 1.015 and 0.981.
+    RMS, FM = PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted()
+    for method in (RMS, FM)
+        @test 0.97 < variance_multiplier(method) < 1.03
+    end
+    @test variance_multiplier(RMS; debias = false) > 1.1
+    @test variance_multiplier(RMS; hac_floor = true) < 0.9
+    @test 0.97 < covariance_multiplier(fixed, RMS) < 1.03
+    @test covariance_multiplier(fixed, RMS; debias = false) > 1.1
+    @test 0.97 < covariance_multiplier(PO.MahalanobisTarget(), RMS; min_obs = 17) < 1.03
+    @test covariance_multiplier(PO.MahalanobisTarget(), RMS; min_obs = 17, debias = false) >
+          2
 end
