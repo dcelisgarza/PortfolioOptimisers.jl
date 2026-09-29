@@ -1903,10 +1903,14 @@ end
 """
     ucs_dimension(::MuUncertaintySetClass, ::Bool, m::Integer)
     ucs_dimension(::SigmaUncertaintySetClass, diagonal::Bool, m::Integer)
+    ucs_dimension(class::AbstractUncertaintySetClass, diagonal::Bool, m::Integer,
+                  M::Integer)
 
 Dimension of an uncertainty set built on a shape of side `m`, the degrees of freedom of its chi-squared radius.
 
 The dimension is the number of free coordinates the estimation error spans, and the squared Mahalanobis distance of a normal error is chi-squared at that number. On the mean axis it is `m`, the number of assets. On the covariance axis the error is a vectorised symmetric matrix, so the entries ``(i, j)`` and ``(j, i)`` are one number. A full shape then has rank ``N(N+1)/2`` of its ``N^{2}``, and the positive definite repair that gives it full rank on paper adds ``N(N-1)/2`` flat directions, the antisymmetric matrices, that no error fills. A diagonal shape keeps ``N^{2}``: its statistic sums ``N^{2}`` terms of unit mean, so its expected value is ``N^{2}``.
+
+The four-argument method serves a full shape that is the sample covariance of ``M`` sampled errors. That shape has rank at most ``M - 1``, because the sample is centred, so the method caps the dimension there. The cap binds when ``M - 1`` is less than ``N`` on the mean axis, or less than ``N(N+1)/2`` on the covariance axis. A diagonal shape of sample variances has full rank and takes no cap. The cap assumes a plain sample covariance: a shrinkage estimator gives a shape of full rank, and the cap then understates its dimension.
 
 # Mathematical definition
 
@@ -1914,7 +1918,11 @@ The dimension is the number of free coordinates the estimation error spans, and 
 \\begin{align}
 d &= \\begin{cases}
 m & \\text{mean axis, or a diagonal shape}\\,, \\\\
-\\dfrac{N(N+1)}{2}\\,, \\quad N = \\sqrt{m} & \\text{full covariance shape}\\,.
+\\dfrac{N(N+1)}{2}\\,, \\quad N = \\sqrt{m} & \\text{full covariance shape}\\,,
+\\end{cases} \\\\
+d_{M} &= \\begin{cases}
+d & \\text{diagonal shape}\\,, \\\\
+\\min(d, M - 1) & \\text{full shape}\\,.
 \\end{cases}
 \\end{align}
 ```
@@ -1922,6 +1930,8 @@ m & \\text{mean axis, or a diagonal shape}\\,, \\\\
 Where:
 
   - ``d``: Dimension of the set.
+  - ``d_{M}``: Dimension of a set whose full shape is the sample covariance of ``M`` errors.
+  - ``M``: Number of sampled errors.
   - ``m``: Side of the shape matrix, or row count of the geometry map.
   - $(math_dict[:N])
 
@@ -1930,6 +1940,7 @@ Where:
   - `class`: Axis tag of the set.
   - `diagonal`: Whether the shape is the diagonal of the asymptotic covariance.
   - `m`: Side of the shape matrix, ``N`` on the mean axis and ``N^{2}`` on the covariance axis.
+  - `M`: Number of sampled errors the shape is the sample covariance of.
 
 # Returns
 
@@ -1953,32 +1964,38 @@ function ucs_dimension(::SigmaUncertaintySetClass, diagonal::Bool, m::Integer)
     N = isqrt(m)
     return div(N * (N + 1), 2)
 end
+function ucs_dimension(class::AbstractUncertaintySetClass, diagonal::Bool, m::Integer,
+                       M::Integer)
+    d = ucs_dimension(class, diagonal, m)
+    return diagonal ? d : min(d, M - 1)
+end
 """
-    ellipsoidal_set(diagonal::Bool, method, q::Number, samples, cov::MatNum,
-                    class::AbstractUncertaintySetClass,
-                    val::Option{<:ArrNum} = nothing)
+    ellipsoidal_set(alg::EllipsoidalUncertaintySetAlgorithm, q::Number, samples,
+                    cov::MatNum, class::AbstractUncertaintySetClass,
+                    val::Option{<:ArrNum} = nothing;
+                    df::Integer = ucs_dimension(class, alg.diagonal, size(cov, 1)))
 
 Assemble an [`EllipsoidalUncertaintySet`](@ref) from an already-computed asymptotic covariance `cov`.
 
-Shared by every ellipsoidal [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) construction across estimator families. [`k_ucs`](@ref) absorbs the trailing arguments its own algorithm does not read, so `samples` may be the deviation matrix, a `1:n_sim` range, or `nothing`, whichever the caller has.
+Shared by every ellipsoidal [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) construction across estimator families. It is the ellipsoidal twin of [`norm_ball_set`](@ref), and takes the set algorithm in the same place. [`k_ucs`](@ref) absorbs the trailing arguments its own algorithm does not read, so `samples` may be the deviation matrix, a `1:n_sim` range, or `nothing`, whichever the caller has.
 
 **The order of the two steps below is load-bearing.** The diagonal is taken *before* the radius is fitted, so under the `diagonal = true` default an empirical radius is a quantile of Mahalanobis distances measured against the diagonal shape and not against the full one, and neither shape reliably gives the larger radius. Taking the diagonal afterwards would pair a radius calibrated on one shape with a different shape, and the set would not hold the coverage its significance level names.
 
 # Algorithm
 
- 1. When `diagonal` is `true`, replace `cov` with `LinearAlgebra.Diagonal(cov)`, discarding the estimation-error correlations between entries. The result is stored as a `Diagonal`, not as a dense matrix.
- 2. Compute `k = k_ucs(method, q, samples, cov, ucs_dimension(class, diagonal, size(cov, 1)))`, the radius, measured against whichever shape step 1 left. The last argument is the dimension of the set, ``N(N+1)/2`` on a full covariance shape, and not the side of the shape.
+ 1. When `alg.diagonal` is `true`, replace `cov` with `LinearAlgebra.Diagonal(cov)`, discarding the estimation-error correlations between entries. The result is stored as a `Diagonal`, not as a dense matrix.
+ 2. Compute `k = k_ucs(alg.method, q, samples, cov, df)`, the radius, measured against whichever shape step 1 left. `df` is the dimension of the set, ``N(N+1)/2`` on a full covariance shape, and not the side of the shape.
  3. Build an [`EllipsoidalUncertaintySet`](@ref) from `cov`, `k`, `class` and `val`.
 
 # Arguments
 
-  - `diagonal`: Whether to restrict `cov` to its diagonal before the radius is fitted.
-  - `method`: Radius algorithm, or the radius itself as a `Number`.
+  - `alg`: Ellipsoidal uncertainty set algorithm, which carries the radius algorithm `alg.method` and the diagonal switch `alg.diagonal`.
   - `q`: Significance level.
-  - `samples`: Sampled estimation errors, or whatever container `method` reads. An algorithm that runs no simulation absorbs it.
+  - `samples`: Sampled estimation errors, or whatever container `alg.method` reads. An algorithm that runs no simulation absorbs it.
   - `cov`: Asymptotic covariance of the statistic, which becomes the shape matrix.
   - `class`: Axis tag, which fixes the size of the shape matrix and the index a view applies.
   - `val`: Quantity the set is a neighbourhood of — the fitted characteristic vector on the mean axis, the fitted covariance on the covariance axis. Every caller has it in hand, because every one of them fits a prior before it calls here.
+  - `df`: Dimension of the set, the degrees of freedom of a chi-squared radius. The default is the dimension of the shape of the statistic. A caller whose shape is the sample covariance of ``M`` errors passes the dimension capped at ``M - 1``, the rank of that shape.
 
 # Returns
 
@@ -1990,15 +2007,17 @@ Shared by every ellipsoidal [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@r
   - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
   - [`k_ucs`](@ref)
   - [`ucs_dimension`](@ref)
+  - [`norm_ball_set`](@ref)
   - [`ucs`](@ref)
 """
-function ellipsoidal_set(diagonal::Bool, method, q::Number, samples, cov::MatNum,
-                         class::AbstractUncertaintySetClass,
-                         val::Option{<:ArrNum} = nothing)
-    if diagonal
+function ellipsoidal_set(alg::EllipsoidalUncertaintySetAlgorithm, q::Number, samples,
+                         cov::MatNum, class::AbstractUncertaintySetClass,
+                         val::Option{<:ArrNum} = nothing;
+                         df::Integer = ucs_dimension(class, alg.diagonal, size(cov, 1)))
+    if alg.diagonal
         cov = LinearAlgebra.Diagonal(cov)
     end
-    k = k_ucs(method, q, samples, cov, ucs_dimension(class, diagonal, size(cov, 1)))
+    k = k_ucs(alg.method, q, samples, cov, df)
     return EllipsoidalUncertaintySet(; sigma = cov, k = k, class = class, val = val)
 end
 

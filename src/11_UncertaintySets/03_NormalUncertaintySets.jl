@@ -966,10 +966,10 @@ function ucs(ue::NormalUncertaintySet{Nothing,
     X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
     X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    mu_set, sigma_set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu,
-                                        sigma_mu, MuUncertaintySetClass(), prr.mu),
-                        ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma,
-                                        sigma_sigma, SigmaUncertaintySetClass(), prr.sigma)
+    mu_set, sigma_set = ellipsoidal_set(ue.alg, ue.q, X_mu, sigma_mu,
+                                        MuUncertaintySetClass(), prr.mu),
+                        ellipsoidal_set(ue.alg, ue.q, X_sigma, sigma_sigma,
+                                        SigmaUncertaintySetClass(), prr.sigma)
     return expand_investable_ucs(mu_set, imsk, pr),
            expand_investable_ucs(sigma_set, imsk, pr)
 end
@@ -1048,10 +1048,10 @@ function ucs(ue::NormalUncertaintySet{Nothing,
     T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    mu_set, sigma_set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing,
-                                        sigma_mu, MuUncertaintySetClass(), prr.mu),
-                        ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing,
-                                        sigma_sigma, SigmaUncertaintySetClass(), prr.sigma)
+    mu_set, sigma_set = ellipsoidal_set(ue.alg, ue.q, nothing, sigma_mu,
+                                        MuUncertaintySetClass(), prr.mu),
+                        ellipsoidal_set(ue.alg, ue.q, nothing, sigma_sigma,
+                                        SigmaUncertaintySetClass(), prr.sigma)
     return expand_investable_ucs(mu_set, imsk, pr),
            expand_investable_ucs(sigma_set, imsk, pr)
 end
@@ -1122,8 +1122,7 @@ function mu_ucs(ue::NormalUncertaintySet{Nothing,
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
     X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
-    set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
-                          MuUncertaintySetClass(), prr.mu)
+    set = ellipsoidal_set(ue.alg, ue.q, X_mu, sigma_mu, MuUncertaintySetClass(), prr.mu)
     return expand_investable_ucs(set, imsk, pr)
 end
 """
@@ -1190,8 +1189,7 @@ function mu_ucs(ue::NormalUncertaintySet{Nothing,
     sigma = prr.sigma
     T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_mu,
-                          MuUncertaintySetClass(), prr.mu)
+    set = ellipsoidal_set(ue.alg, ue.q, nothing, sigma_mu, MuUncertaintySetClass(), prr.mu)
     return expand_investable_ucs(set, imsk, pr)
 end
 """
@@ -1269,8 +1267,8 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
     rng = resolve_rng(ue.rng, ue.seed)
     X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
-                          SigmaUncertaintySetClass(), prr.sigma)
+    set = ellipsoidal_set(ue.alg, ue.q, X_sigma, sigma_sigma, SigmaUncertaintySetClass(),
+                          prr.sigma)
     return expand_investable_ucs(set, imsk, pr)
 end
 """
@@ -1343,8 +1341,8 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
     T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
-    set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, nothing, sigma_sigma,
-                          SigmaUncertaintySetClass(), prr.sigma)
+    set = ellipsoidal_set(ue.alg, ue.q, nothing, sigma_sigma, SigmaUncertaintySetClass(),
+                          prr.sigma)
     return expand_investable_ucs(set, imsk, pr)
 end
 

@@ -823,6 +823,42 @@ function sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     return expand_investable_ucs(set, imsk, pr)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Assemble the [`EllipsoidalUncertaintySet`](@ref) of a bootstrap estimator from its sampled errors and their sample covariance.
+
+The shape is the sample covariance of the ``M`` rows of `X`, so its rank is at most ``M - 1``. When ``M - 1`` is less than the dimension of the set, the shape is flat in the other directions after its repair, and a chi-squared radius at the full dimension is too large for the set it sizes. The degrees of freedom are therefore the dimension capped at ``M - 1``, which is the rank that [`norm_ball_deviation_set`](@ref) measures on the same sample. The two routes of one bootstrap set thus give one radius.
+
+# Algorithm
+
+ 1. Compute `df = ucs_dimension(class, ue.alg.diagonal, size(X, 2), size(X, 1))`, the dimension of the set capped at the number of rows of `X` less one.
+ 2. Build the set with [`ellipsoidal_set`](@ref) on `ue.alg`, `ue.q`, `X`, `cov`, `class`, `val` and `df`.
+
+# Arguments
+
+  - `ue`: Bootstrap uncertainty set estimator, which carries the set algorithm and the significance level.
+  - `X`: Sampled estimation errors, one row per resample.
+  - `cov`: Sample covariance of `X`, which becomes the shape matrix.
+  - `class`: Axis tag of the set.
+  - `val`: Quantity the set is a neighbourhood of, the fitted characteristic vector on the mean axis and the fitted covariance on the covariance axis.
+
+# Returns
+
+  - `ucs::EllipsoidalUncertaintySet`: The assembled set.
+
+# Related
+
+  - [`ellipsoidal_set`](@ref)
+  - [`ucs_dimension`](@ref)
+  - [`norm_ball_deviation_set`](@ref)
+  - [`ARCHUncertaintySet`](@ref)
+"""
+function bootstrap_ellipsoidal_set(ue::ARCHUncertaintySet, X::MatNum, cov::MatNum,
+                                   class::AbstractUncertaintySetClass, val::ArrNum)
+    df = ucs_dimension(class, ue.alg.diagonal, size(X, 2), size(X, 1))
+    return ellipsoidal_set(ue.alg, ue.q, X, cov, class, val; df = df)
+end
+"""
     ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any, <:EllipsoidalUncertaintySetAlgorithm, <:Any, <:Any,
                                <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
@@ -875,7 +911,7 @@ Where:
  4. Subtract `pr.mu` from each column of `mus`, and the vectorised `pr.sigma` from each slice of `sigmas`, giving the deviation matrices `X_mu` and `X_sigma`. Transpose both, so a row is one simulation.
  5. Fit `ue.ce` on `X_mu`, giving the shape matrix `sigma_mu`. This is the second reading of `ue.ce` on the covariance axis and the only one on the mean axis, so the shape matrices are empirical and no asymptotic formula enters.
  6. Fit `ue.ce` on `X_sigma`, giving the shape matrix `sigma_sigma`.
- 7. Build both sets with `ellipsoidal_set` under `ue.alg.diagonal` and `ue.alg.method`, which fits each radius `k` at the level `ue.q`.
+ 7. Build both sets with [`bootstrap_ellipsoidal_set`](@ref), which fits each radius `k` at the level `ue.q`, with the degrees of freedom capped at `ue.n_sim - 1`.
  8. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
@@ -916,10 +952,10 @@ function ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     X_sigma = transpose(X_sigma)
     sigma_mu = Statistics.cov(ue.ce, X_mu)
     sigma_sigma = Statistics.cov(ue.ce, X_sigma)
-    mu_set, sigma_set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu,
-                                        sigma_mu, MuUncertaintySetClass(), prr.mu),
-                        ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma,
-                                        sigma_sigma, SigmaUncertaintySetClass(), prr.sigma)
+    mu_set, sigma_set = bootstrap_ellipsoidal_set(ue, X_mu, sigma_mu,
+                                                  MuUncertaintySetClass(), prr.mu),
+                        bootstrap_ellipsoidal_set(ue, X_sigma, sigma_sigma,
+                                                  SigmaUncertaintySetClass(), prr.sigma)
     return expand_investable_ucs(mu_set, imsk, pr),
            expand_investable_ucs(sigma_set, imsk, pr)
 end
@@ -956,7 +992,7 @@ Where:
  3. Draw the resampled means with [`mu_bootstrap_generator`](@ref), giving `mus`.
  4. Subtract `pr.mu` from each column of `mus`, giving the deviation matrix `X_mu`. Transpose it, so a row is one simulation.
  5. Fit `ue.ce` on `X_mu`, giving the shape matrix `sigma_mu`. The shape is empirical and no asymptotic formula enters.
- 6. Build the set with `ellipsoidal_set` under `ue.alg.diagonal` and `ue.alg.method`, which fits the radius `k` at the level `ue.q`.
+ 6. Build the set with [`bootstrap_ellipsoidal_set`](@ref), which fits the radius `k` at the level `ue.q`, with the degrees of freedom capped at `ue.n_sim - 1`.
  7. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
@@ -992,8 +1028,7 @@ function mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     end
     X_mu = transpose(X_mu)
     sigma_mu = Statistics.cov(ue.ce, X_mu)
-    set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_mu, sigma_mu,
-                          MuUncertaintySetClass(), prr.mu)
+    set = bootstrap_ellipsoidal_set(ue, X_mu, sigma_mu, MuUncertaintySetClass(), prr.mu)
     return expand_investable_ucs(set, imsk, pr)
 end
 """
@@ -1029,7 +1064,7 @@ Where:
  3. Draw the resampled covariances with [`sigma_bootstrap_generator`](@ref), giving `sigmas`. This is the first reading of `ue.ce`.
  4. Subtract the vectorised `pr.sigma` from each slice of `sigmas`, giving the deviation matrix `X_sigma`. Transpose it, so a row is one simulation.
  5. Fit `ue.ce` on `X_sigma`, giving the shape matrix `sigma_sigma`. This is the second reading of `ue.ce`, and the shape is empirical rather than asymptotic.
- 6. Build the set with `ellipsoidal_set` under `ue.alg.diagonal` and `ue.alg.method`, which fits the radius `k` at the level `ue.q`.
+ 6. Build the set with [`bootstrap_ellipsoidal_set`](@ref), which fits the radius `k` at the level `ue.q`, with the degrees of freedom capped at `ue.n_sim - 1`.
  7. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
 # Arguments
@@ -1065,8 +1100,8 @@ function sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
     end
     X_sigma = transpose(X_sigma)
     sigma_sigma = Statistics.cov(ue.ce, X_sigma)
-    set = ellipsoidal_set(ue.alg.diagonal, ue.alg.method, ue.q, X_sigma, sigma_sigma,
-                          SigmaUncertaintySetClass(), prr.sigma)
+    set = bootstrap_ellipsoidal_set(ue, X_sigma, sigma_sigma, SigmaUncertaintySetClass(),
+                                    prr.sigma)
     return expand_investable_ucs(set, imsk, pr)
 end
 

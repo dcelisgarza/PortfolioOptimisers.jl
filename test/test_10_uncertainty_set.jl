@@ -465,13 +465,16 @@ end
         cov = [2.0 0.5; 0.5 3.0]
         Xs = randn(StableRNG(1), 50, 2)
         # Number method returns k == the number verbatim; cov passed through untouched.
-        s = PortfolioOptimisers.ellipsoidal_set(false, 5, q, nothing, cov,
-                                                MuUncertaintySetClass())
+        s = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(5,
+                                                                                   false),
+                                                q, nothing, cov, MuUncertaintySetClass())
         @test s.k == 5
         @test s.sigma == cov
         @test s.class isa MuUncertaintySetClass
         # diagonal = true restricts cov to its diagonal before fitting k.
-        sd = PortfolioOptimisers.ellipsoidal_set(true, 5, q, nothing, cov,
+        sd = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(5,
+                                                                                    true),
+                                                 q, nothing, cov,
                                                  SigmaUncertaintySetClass())
         @test sd.sigma == LinearAlgebra.Diagonal(cov)
         @test sd.class isa SigmaUncertaintySetClass
@@ -479,7 +482,9 @@ end
         for (method, samp) in ((GeneralKUncertaintyAlgorithm(), nothing),
                                (ChiSqKUncertaintyAlgorithm(), nothing), (NormalKUncertaintyAlgorithm(), Xs))
             for diag in (false, true)
-                e = PortfolioOptimisers.ellipsoidal_set(diag, method, q, samp, cov,
+                e = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(method,
+                                                                                           diag),
+                                                        q, samp, cov,
                                                         MuUncertaintySetClass())
                 cov_ref = diag ? LinearAlgebra.Diagonal(cov) : cov
                 @test e.sigma == cov_ref
@@ -752,16 +757,28 @@ end
             @test ud(MuUncertaintySetClass(), true, N) == N
             @test ud(SigmaUncertaintySetClass(), true, N^2) == N^2
             @test ud(SigmaUncertaintySetClass(), false, N^2) == N * (N + 1) ÷ 2
+            # A full shape that is the sample covariance of M errors has rank at most
+            # M - 1, so the dimension is capped there. A diagonal shape takes no cap.
+            @test ud(SigmaUncertaintySetClass(), false, N^2, 5) == 4
+            @test ud(SigmaUncertaintySetClass(), false, N^2, 100) == N * (N + 1) ÷ 2
+            @test ud(SigmaUncertaintySetClass(), true, N^2, 5) == N^2
+            @test ud(MuUncertaintySetClass(), false, N, 3) == 2
+            @test ud(MuUncertaintySetClass(), false, N, 100) == N
+            @test ud(MuUncertaintySetClass(), true, N, 3) == N
             k_free = sqrt(quantile(Distributions.Chisq(N * (N + 1) ÷ 2), 0.95))
             k_amb = sqrt(quantile(Distributions.Chisq(N^2), 0.95))
             S = Matrix{Float64}(LinearAlgebra.I, N^2, N^2)
             # `ambient = true` reads the side of the shape, N^2, on every route.
             for (km, want) in ((ChiSqKUncertaintyAlgorithm(), k_free),
                                (ChiSqKUncertaintyAlgorithm(; ambient = true), k_amb))
-                e = PortfolioOptimisers.ellipsoidal_set(false, km, 0.05, nothing, S,
+                e = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                           false),
+                                                        0.05, nothing, S,
                                                         SigmaUncertaintySetClass())
                 @test e.k ≈ want
-                ed = PortfolioOptimisers.ellipsoidal_set(true, km, 0.05, nothing, S,
+                ed = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                            true),
+                                                         0.05, nothing, S,
                                                          SigmaUncertaintySetClass())
                 @test ed.k ≈ k_amb
                 for d in (false, true)
@@ -828,9 +845,13 @@ end
             Xd = randn(rng, 252, 5) * 0.01
             cv = Statistics.cov(Xd)
             km = NormalKUncertaintyAlgorithm()
-            e_full = PortfolioOptimisers.ellipsoidal_set(false, km, 0.05, Xd, cv,
+            e_full = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                            false),
+                                                         0.05, Xd, cv,
                                                          MuUncertaintySetClass())
-            e_diag = PortfolioOptimisers.ellipsoidal_set(true, km, 0.05, Xd, cv,
+            e_diag = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                            true),
+                                                         0.05, Xd, cv,
                                                          MuUncertaintySetClass())
             d2_diag = [LinearAlgebra.dot(Xd[t, :], LinearAlgebra.Diagonal(cv) \ Xd[t, :])
                        for t in axes(Xd, 1)]
@@ -850,9 +871,13 @@ end
             n_diag_larger = count(1:60) do s
                 Xs = randn(StableRNG(s), 252, 5) * 0.01
                 cvs = Statistics.cov(Xs)
-                kf = PortfolioOptimisers.ellipsoidal_set(false, km, 0.05, Xs, cvs,
+                kf = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                            false),
+                                                         0.05, Xs, cvs,
                                                          MuUncertaintySetClass()).k
-                kd = PortfolioOptimisers.ellipsoidal_set(true, km, 0.05, Xs, cvs,
+                kd = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                            true),
+                                                         0.05, Xs, cvs,
                                                          MuUncertaintySetClass()).k
                 return kd > kf
             end
@@ -1917,10 +1942,12 @@ end
             # A vectorised symmetric matrix spans N(N+1)/2 coordinates, so the sample
             # covariance of the deviations is rank deficient at every sample size. The
             # ellipsoid's shape is therefore the repaired one, and its radius reads the
-            # N(N+1)/2 dimensions of the symmetric matrices (#1425, ADR 0188), or N^2 under
-            # `ambient = true`. The map carries the sample second moment exactly and its
-            # radius reads the rank the sample has.
-            for n_sim in (30, 12)
+            # N(N+1)/2 dimensions of the symmetric matrices (#1425, ADR 0188), capped at
+            # the rank n_sim - 1 of the sample, or N^2 under `ambient = true`. The map
+            # carries the sample second moment exactly and its radius reads the rank the
+            # sample has, so the two routes give one radius. At n_sim = 8 the cap binds:
+            # 7 < N(N+1)/2 = 10.
+            for n_sim in (30, 12, 8)
                 ub = ARCHUncertaintySet(;
                                         alg = NormBallUncertaintySetAlgorithm(;
                                                                               diagonal = false),
@@ -1943,7 +1970,10 @@ end
                       1e-12 * maximum(abs, cov(Xd))
                 @test rank(sb.L) == min(n_sim - 1, div(N730 * (N730 + 1), 2))
                 @test sb.kappa == sqrt(cquantile(Chisq(rank(sb.L)), ub.q))
-                @test se.k == sqrt(cquantile(Chisq(div(N730 * (N730 + 1), 2)), ueb.q))
+                @test se.k ==
+                      sqrt(cquantile(Chisq(min(n_sim - 1, div(N730 * (N730 + 1), 2))),
+                                     ueb.q))
+                @test se.k == sb.kappa
                 uea = ARCHUncertaintySet(;
                                          alg = EllipsoidalUncertaintySetAlgorithm(;
                                                                                   method = ChiSqKUncertaintyAlgorithm(;

@@ -49,6 +49,25 @@ Its output stays one keyword away (ADR 0186). Under `ambient = true` the bootstr
 `size(sigma_X, 1)` keeps the four-argument call of a released version. `NormalKUncertaintyAlgorithm`
 absorbs `df`, because its sampled distances carry the dimension themselves.
 
+**A bootstrap ellipsoid caps the dimension at `M − 1`.** Its full shape is the sample covariance of
+`M` resampled errors, so its rank is at most `M − 1`, and the repair makes it flat in the other
+directions. `ucs_dimension(class, diagonal, m, M)` gives `min(d, M − 1)` on a full shape and `d` on
+a diagonal one, and `bootstrap_ellipsoidal_set` passes it to `ellipsoidal_set` as `df`. The norm-ball
+deviation route measures the same rank with `rank(L)`, so the two routes of one bootstrap set give
+one radius. The cap binds when `M − 1 < N(N + 1) / 2`, which at the default of 3 000 resamples
+starts at `N = 77`. It assumes a plain sample covariance, the default `ce`: a shrinkage estimator
+gives a shape of full rank, and the cap then understates its dimension. `ellipsoidal_set` takes the
+set algorithm in place of its diagonal switch and its radius algorithm, as `norm_ball_set` does, so
+the new keyword adds no argument to the file.
+
+**`LinearAlgebra.rank` of the shape is not the rule.** The repair lifts the zero eigenvalues to
+between `1e-14` and `1e-12` of the largest, above the default tolerance, so `rank` of the repaired
+Normal shape returns `N²` (25, 100 and 400 at `N` = 5, 10 and 20): the defect this ADR removes.
+Before the repair it returns `N(N + 1) / 2`, which the closed form gives without an `O(N⁶)`
+decomposition and a tolerance. `rank` also needs a singular value decomposition, which a `Rational`
+or a dual number of automatic differentiation does not have. It is the rule only for a map that is
+not repaired, the deviation route.
+
 ## Consequences
 
 - The default radius of every full covariance set on the chi-squared rule falls, by `0.815` at
@@ -59,10 +78,10 @@ absorbs `df`, because its sampled distances carry the dimension themselves.
   full covariance set, as they agree on the mean axis.
 - A radius algorithm that a caller defines receives `df` as a fifth argument from
   `ellipsoidal_set`, and must take it.
-- The bootstrap ellipsoid built from fewer than `N(N + 1) / 2 + 1` resamples is flatter still. Its
-  repaired shape does not show its rank, so the radius reads `N(N + 1) / 2`. The norm-ball
-  deviation route measures that rank and is the route for a small resample.
-- `test/test_10_uncertainty_set.jl` pins the rule, the keyword, the agreement of the two radii, and
-  the bootstrap ellipsoid on both rules.
+- A bootstrap ellipsoid with fewer than `N(N + 1) / 2 + 1` resamples reads `M − 1` degrees of
+  freedom, as its norm ball does. Its set is flat where the true error is not, so no radius makes it
+  a confidence region of the whole error. More resamples is the remedy.
+- `test/test_10_uncertainty_set.jl` pins the rule, the keyword, the agreement of the two radii, the
+  cap, and the bootstrap ellipsoid on both rules, with the cap binding at 8 resamples.
   `test/test_10d_parity_uncertainty_sets.jl` pins the default as Better and the oracle's radius
   under `ambient = true` on both the Normal and the bootstrap norm ball.
