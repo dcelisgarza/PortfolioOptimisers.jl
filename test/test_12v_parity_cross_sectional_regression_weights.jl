@@ -13,7 +13,10 @@ returns carry a component along the null direction that round-off chooses. We gi
 minimum-norm solution. On a nearly singular design the normal equations square the condition
 number: against the exact least-squares answer, ours is within 8.8e-11 and the oracle's is within
 7.6e-4. A zero idiosyncratic variance is Better too: the oracle refuses its infinite inverse, and
-ours equals the oracle's own answer at a variance that is tiny but not zero.
+ours equals the oracle's own answer at a variance that is tiny but not zero. A missing market
+capitalisation is Better as well: the oracle refuses the whole fit, and the prior gives the pair a
+weight of zero, which keeps each cross-section a weighted least squares over the pairs whose
+weights are known.
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 
@@ -430,11 +433,15 @@ end
         end
     end
 
-    @testset "A missing market capitalisation: a deliberate difference (#725)" begin
+    @testset "A missing market capitalisation: Better (#725)" begin
         # The oracle refuses a panel whose market capitalisation is not finite on an active
-        # pair, and names the field. The prior drops the pair from both masks instead, which
-        # #725 records, so the observation that reads the lagged capitalisation fits without the
-        # asset.
+        # pair, and names the field, so one missing value stops the fit of every observation.
+        # The regression weight `cap^p` sets the efficiency of the fit and not its model: any
+        # non-negative weights of full rank give an unbiased weighted least squares. A pair whose
+        # weight is unknown therefore takes the weight zero, and the fit is the weighted least
+        # squares over the pairs whose weights are known. The prior drops the pair from both
+        # masks, which #725 records, and it imputes nothing: an imputation is the fill policy of
+        # the Panel Field, which runs before the prior reads it.
         fx = parity_small_panel()
         only(filter(f -> f.name == "market_cap", fx.rd.pnl.pf)).vals[46, 8] = NaN
         pr = prior(CrossSectionalFactorPrior(; factors = ["market" => ConstantExposure()],
@@ -445,6 +452,9 @@ end
         # The regression weights start at observation 2, after the lag of one.
         @test iszero(pr.rr.rw[47 - 1, 8])
         @test count(iszero, pr.rr.rw[46, :]) < size(pr.rr.rw, 2)
+        # The other weights of that observation are normalised again, so they sum to one.
+        @test isapprox(sum(pr.rr.rw[46, :]), 1; rtol = 1e-12)
+        @test all(isfinite, pr.rr.csr.f)
         # The weight policy alone refuses the capitalisation of an eligible pair, and names it.
         @test_throws DomainError PortfolioOptimisers.cs_weights_initial(MarketCapWeights(),
                                                                         [NaN 1.0],
