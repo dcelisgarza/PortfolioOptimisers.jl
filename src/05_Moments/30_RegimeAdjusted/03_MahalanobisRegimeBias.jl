@@ -688,8 +688,8 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Makes the empty store of interpolation nodes of the Mahalanobis bias factor, keyed by the count of
-assets.
+Makes the empty store of the Mahalanobis bias factor: its interpolation nodes, keyed by the count
+of assets, and the table of the variance factor of the separate correlation path.
 
 # Arguments
 
@@ -699,13 +699,117 @@ assets.
 
 # Returns
 
-  - `bias::Dict`: An empty dictionary from a count of assets to the nodes of
-    [`mahalanobis_bias_nodes`](@ref).
+  - `bias::NamedTuple`: `nodes`, an empty dictionary from a count of assets to the nodes of
+    [`mahalanobis_bias_nodes`](@ref); and `kappa`, the empty table of
+    [`variance_noise_bias!`](@ref), which only the separate path fills.
 
 # Related
 
   - [`mahalanobis_regime_bias!`](@ref)
+  - [`variance_noise_bias!`](@ref)
 """
 function regime_bias_store(::MahalanobisTarget, decay::Number, ::Type)
-    return Dict{Int, NamedTuple{(:sigma, :bw, :ratio), NTuple{3, Vector{typeof(decay)}}}}()
+    return (;
+            nodes = Dict{Int,
+                         NamedTuple{(:sigma, :bw, :ratio),
+                                    NTuple{3, Vector{typeof(decay)}}}}(),
+            kappa = typeof(decay)[])
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the factor by which the noise of the variance at `decay` moves the bias of the squared
+Mahalanobis distance on the separate correlation path, and grows the table of the state where the
+count is past its end.
+
+On the separate path the block is ``\\hat{C} = D \\hat{R} D``, with the volatilities ``D`` from the
+variance at `decay` and the correlation ``\\hat{R}`` from the recursion at `cor_decay`. The factor
+of [`mahalanobis_regime_bias!`](@ref) at `cor_decay` is the bias of an estimate whose diagonal
+carries the noise of `cor_decay`. At ``R = I`` the statistic is
+``\\sum_{i} (\\hat{R}^{-1})_{ii} / \\hat{V}_{i}``, and at equal weights ``\\hat{R}`` is independent of
+the variances, so the diagonal enters through ``\\mathbb{E}[1/Q]`` alone: the factor is the ratio
+of that moment at the two decays, from the exact tables of [`regime_bias_table`](@ref), plain or
+HAC. The one factor serves the three regime methods: the noise of the variances averages over the
+assets, so it moves the statistic through its mean.
+
+# Mathematical definition
+
+```math
+\\kappa_{K} = \\frac{\\mathbb{E}_{\\lambda}\\left[Q_{K}^{-1}\\right]}{\\mathbb{E}_{\\lambda_{c}}\\left[Q_{K}^{-1}\\right]}\\,.
+```
+
+Where:
+
+  - ``Q_{K}``: An estimated variance of ``K`` observations over the true one.
+  - ``\\lambda``, ``\\lambda_{c}``: `decay` and `cor_decay`.
+
+At 12 assets, a half-life of 10 and a correlation half-life of 20, ``\\kappa = 1.0347``, and
+1.0694 at two HAC lags. Against the true factor of the separate path, measured in the steady state
+over 64 seeds, the product with the factor at `cor_decay` is within 0.3 % without HAC, at a
+correlation of zero, at the correlation of a random factor model and at an equicorrelation of 0.8;
+at two HAC lags it is 1.7 % to 2.3 % below. The rest has three parts of the next order: the
+Schur complement that the inverse reads down-weights the newest rows, which the variance at
+`decay` reads most; the correlation of the assets; and the division of each row of the correlation
+recursion by the volatility after its own update.
+
+# Arguments
+
+  - `store::NamedTuple`: Store of the state, whose table `kappa` grows (mutated).
+  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
+  - `K::Integer`: Count of observations in the estimate.
+
+# Returns
+
+  - `kappa::Number`: The factor at `K`, one where the estimator runs one decay.
+
+# Related
+
+  - [`regime_bias_store`](@ref)
+  - [`regime_bias_table`](@ref)
+  - [`mahalanobis_regime_bias!`](@ref)
+  - [`regime_target_statistic`](@ref)
+"""
+function variance_noise_bias!(store::NamedTuple, ce::RegimeAdjustedExpWeightedCovariance,
+                              K::Integer)
+    if !has_separate_cor_decay(ce)
+        return one(ce.decay)
+    end
+    kappa = store.kappa
+    Ksat = ceil(Int, log(eps(eltype(kappa))) / log(max(ce.decay, ce.cor_decay)))
+    if K > length(kappa) && length(kappa) < Ksat
+        n = min(max(2 * K, 64), Ksat)
+        tv, tc = map((ce.decay, ce.cor_decay)) do decay
+            if isnothing(ce.hac_lags)
+                regime_bias_table(RootMeanSquaredAdjusted(), decay, n)
+            else
+                regime_bias_table(RootMeanSquaredAdjusted(), decay, n, ce.hac_lags)
+            end
+        end
+        resize!(kappa, n)
+        kappa .= tv ./ tc
+    end
+
+    return kappa[min(K, length(kappa))]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns one, the variance factor of a state that takes no bias correction.
+
+# Arguments
+
+  - `::Nothing`: The store of a state whose estimator has `debias = false` or no regime method.
+  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
+  - `::Integer`: Ignored count of observations.
+
+# Returns
+
+  - `one(ce.decay)`.
+
+# Related
+
+  - [`variance_noise_bias!`](@ref)
+"""
+function variance_noise_bias!(::Nothing, ce::RegimeAdjustedExpWeightedCovariance, ::Integer)
+    return one(ce.decay)
 end

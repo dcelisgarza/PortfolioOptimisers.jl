@@ -100,7 +100,8 @@ Where:
   - ``S``: Schur complement of one direction in ``W = \\sum_{j} w_{j} z_{j} z_{j}^{\\top}``,
     ``z_{j} \\sim N(0, I_{n})``. ``R`` is independent of the ``\\chi^{2}_{n}`` factor.
   - ``\\beta``: Bias factor of the regime method without a HAC adjustment, from
-    [`mahalanobis_regime_bias!`](@ref):
+    [`mahalanobis_regime_bias!`](@ref), times the variance factor of
+    [`variance_noise_bias!`](@ref) on the separate correlation path:
     ``\\mathbb{E}[R]`` for `RootMeanSquaredAdjusted`, ``\\mathbb{E}[\\sqrt{R}]^{2}`` for
     `FirstMomentRegimeAdjusted`, and ``\\exp(\\mathbb{E}[\\ln R])`` for `LogRegimeAdjusted`. With
     equal weights ``R = K / \\chi^{2}_{K - n + 1}`` exactly. On exponential weights the factor comes
@@ -120,9 +121,10 @@ observations: at two lags, 12 assets and a half-life of 10 the squared multiplie
 deterministic equivalent on an estimate with half the degrees of freedom. The mean factor
 over-corrects the other two methods there: `FirstMomentRegimeAdjusted` reads 0.952 and
 `LogRegimeAdjusted` 0.920. On the separate
-correlation path the factor reads `cor_decay` alone, and the noise of the variance at `decay`
-leaves 1.032, 1.030 and 1.027 for the three methods at a correlation half-life of 20, and 1.090
-at two lags.
+correlation path the factor reads `cor_decay`, and [`variance_noise_bias!`](@ref) adds the
+noise of the variance at `decay`: at a correlation half-life of 20 the three methods read 0.998,
+0.995 and 0.993 over 8 seeds, from 1.032, 1.030 and 1.027 at `cor_decay` alone, and
+`RootMeanSquaredAdjusted` reads 1.018 at two lags, from 1.090.
 
 # Related
 
@@ -131,6 +133,7 @@ at two lags.
   - [`PortfolioTarget`](@ref)
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
   - [`mahalanobis_regime_bias!`](@ref)
+  - [`variance_noise_bias!`](@ref)
 """
 struct MahalanobisTarget <: RegimeAdjustedTarget end
 """

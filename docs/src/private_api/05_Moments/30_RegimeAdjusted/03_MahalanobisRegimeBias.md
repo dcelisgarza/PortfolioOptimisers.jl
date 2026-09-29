@@ -22,4 +22,5 @@ mahalanobis_bias_saturation
 mahalanobis_bias_nodes
 mahalanobis_regime_bias!
 regime_bias_store
+variance_noise_bias!
 ```

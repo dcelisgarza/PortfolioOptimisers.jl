@@ -157,6 +157,24 @@ state keeps the nodes for each count of assets, at 0.3 s for 12 assets. The meas
 Under HAC the target keeps the fixed point of the mean on the spectrum of `A` for every method:
 the recursion reads `ln(1 + s μ)` over the spectrum, and `A` has negative eigenvalues (#1438).
 
+**On the separate correlation path the Mahalanobis factor also carries the noise of the variance
+at `decay`** (#1437). The block is `D R̂ D`, with `D` from the variance at `decay` and `R̂` from
+the correlation at `cor_decay`, and the factor at `cor_decay` holds the noise of a diagonal at
+`cor_decay`. At `R = I` and equal weights `R̂` is independent of the variances, so the diagonal
+enters through `E[1/Q]` alone: the factor is multiplied by
+`κ = E_decay[1/Q] / E_cor_decay[1/Q]`, the ratio of the two exact tables, plain or HAC
+(`variance_noise_bias!`). The maintainer ruled that the one `κ` serves the three methods: the
+noise of the variances averages over the assets, so it moves the statistic through its mean, and
+the per-method scalar ratios (1.026 and 1.017) correct too little. At 12 assets, a half-life of 10
+and a correlation half-life of 20 the squared multipliers become 0.9975, 0.9952 and 0.9927 over
+8 seeds, from 1.0321, 1.0297 and 1.0272, and RMS reads 1.018 at two HAC lags, from 1.090. The true factor of the block, measured without return
+noise over 64 seeds, is within 0.3 % of the corrected one at correlations of zero, of a random
+factor model and of 0.8, and 1.7 % to 2.3 % above it at two HAC lags. The rest has three parts
+of the next order, which #1439 holds: the Schur complement that the inverse
+reads down-weights the newest rows (−0.22 %, −0.92 % at two lags, with a closed form), the
+correlation of the assets (a second-order term), and the division of each correlation row by the
+volatility after its own update (+0.41 %, +4.0 % at two lags, no model yet).
+
 **The gate is `K > n + 3`, where the variance of the statistic is finite.** At `n = 1` an estimate
 of four observations or fewer is not scored. The gate reads the count of each asset, so a young
 asset leaves the statistic as it does below `min_obs`. Under HAC the effective count
@@ -178,8 +196,8 @@ observations, such as 12 assets at a half-life of 5, is never scored.
   - Under HAC `MahalanobisTarget` keeps the fixed point of the mean for every method, so it
     over-corrects FirstMoment and Log there: 0.952 and 0.920 at two lags (#1438). #1431 gave each
     method its own moment without HAC.
-  - On the separate correlation path the Mahalanobis factor reads `cor_decay` alone, so the noise
-    of the variance at `decay` is not in it: 1.031 without HAC and 1.090 at two lags (#1437).
+  - On the separate correlation path the Mahalanobis factor keeps the parts of the next order:
+    within 0.3 % without HAC, and 1.7 % to 2.3 % under-corrected at two lags (#1439).
 - The FirstMoment and Log calibrations of `DiagonalTarget` assumed a `χ²(n)` sum. Before this
   decision the Jensen bias hid part of that error; after it, correlated assets read 0.941 and 0.962.
   #1432 divides the sum by the factor of its law, and #1434 makes that law read the noise of each
