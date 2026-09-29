@@ -571,9 +571,10 @@ function Base.copy(x::RegimeAdjustedCovarianceState)
 
     variance = isnothing(x.variance) ? nothing : copy(x.variance)
     cor_state = isnothing(x.cor_state) ? nothing : copy(x.cor_state)
+    cor_weight = isnothing(x.cor_weight) ? nothing : copy(x.cor_weight)
 
     return RegimeAdjustedCovarianceState(ret_buffer, copy(x.covariance), variance,
-                                         cor_state, copy(x.XXt), copy(x.Xi),
+                                         cor_state, cor_weight, copy(x.XXt), copy(x.Xi),
                                          copy(x.X_old_i), copy(x.location),
                                          copy(x.obs_count), copy(x.active), x.regime_state,
                                          x.n_regime_obs)

@@ -10,10 +10,10 @@ The recursion is a port of the reference implementation, so the oracle of this f
 reference itself. `ORACLE_X` and the five matrices below were measured by fitting the reference
 on that fixture, one matrix per configuration, and pasted here as literals.
 
-This estimator's defaults are its variance twin's rather than the reference's, so
-`oracle_estimator` names the three that differ: the reference clamps the multiplier to
-`(0.7, 1.6)`, it assumes centred returns, and its numerical floor is `1e-12`. Those three are
-the whole of the gap, and every other keyword is the same value on both sides.
+`oracle_estimator` names three keywords of the reference: it clamps the multiplier to
+`(0.7, 1.6)`, it assumes centred returns, and its numerical floor is `1e-12`. Since #1383 the
+clamp and the floor are this estimator's defaults too, and only the centring differs. Every
+other keyword is the same value on both sides.
 
 Three of the five multipliers land inside the clamp and two are clamped at its upper bound, so
 the file covers both the free and the clamped branch of the read-out.

@@ -93,3 +93,55 @@ the clock of its common observations. Pairwise deletion is not positive semidefi
   both paths, where `hac_lags` is `nothing`. On its separate path, a sample with a holiday gives
   a new answer, and a sample without one gives the old answer, because a common count then
   corrects every pair by the same scalar.
+
+## Amendment (2026-09-29)
+
+Decision 4 and the last consequence claimed that a sample without a holiday gives the old answer
+on the separate path, "because a common count then corrects every pair by the same scalar". That
+is true only when every asset has the same count. An asset that lists late, or lists again after
+an inactive period, has fewer observations than an asset that did not. Its pairs then hold the
+weight `1 - cor_decay^n_j` in the correlation state, and the congruence of decision 4 divides them
+by `sqrt((1 - cor_decay^n_i)(1 - cor_decay^n_j))`. So the normalisation shrank each correlation of
+the late asset by `sqrt((1 - cor_decay^n_j) / (1 - cor_decay^n_i))`. With a correlation half-life
+of 20 and the default `min_obs` of 40, the shrink is 13% when the asset first enters the report
+(#1383).
+
+The shrink is not a property of the model. It comes from the division of a sum over the common
+observations of a pair by weight totals over other observations. A simulation measured it: six
+assets with a true correlation of 0.6, two of them listed late, 1000 draws, a variance half-life of
+40 and a correlation half-life of 20.
+
+| Observations of the late assets | RMSE, congruence | RMSE, weight of the pair | Bias of the late pairs, congruence | Bias, weight of the pair |
+| --- | --- | --- | --- | --- |
+| 40 | 0.145 | 0.118 | -0.148 | -0.078 |
+| 60 | 0.111 | 0.099 | -0.096 | -0.061 |
+| 120 | 0.083 | 0.083 | -0.029 | -0.024 |
+
+The separate path now keeps a weight state `W`, which takes the step of decision 1 on a unit outer
+product: `W <- D W D + (1 - cor_decay) v v'`, with `v` one on a valid asset and zero on any other.
+The report divides each pair by its own weight:
+
+```text
+rho[i, j] = (Q[i, j] / W[i, j]) / sqrt((Q[i, i] / W[i, i]) (Q[j, j] / W[j, j]))
+```
+
+- Without a holiday, `W[i, j]` is `1 - cor_decay^c` with `c` the count of the common observations
+  of the pair. The report then equals the correction by pair count of the oracle of map #1375.
+- On a holiday, `W` scales exactly as `Q` does, so decision 2 still holds: the correlation of each
+  pair that contains the asset does not move.
+- Where every asset has the same history, `W` is one scalar and the report is the old one.
+
+A matrix of pairs, each divided by its own weight, need not be positive semidefinite. When `W` is
+not one scalar and the smallest eigenvalue of the report is below `-n eps` times the largest, the
+report clips the negative eigenvalues to zero and restores the unit diagonal. The considered
+option "Repair at read-out" stays rejected for the holiday rule, where the error grew without
+bound. Here the division removes a bias, and the repair binds only on a short history: in the
+simulation above with a correlation half-life of 10, 19% of the draws at 10 observations, and none
+from 20 observations. The block that the regime statistic reads at each observation takes the
+division and no repair, because the Cholesky factor of the Mahalanobis target refuses a block that
+is not positive definite.
+
+The last consequence now reads: the estimate of `RegimeAdjustedExpWeightedCovariance` is positive
+semidefinite on both paths where `hac_lags` is `nothing`, by construction on the path with one
+decay, and through the repair on the separate path. On the separate path, a sample whose assets
+share one history gives the old answer, and a late listing or a holiday gives a new one.

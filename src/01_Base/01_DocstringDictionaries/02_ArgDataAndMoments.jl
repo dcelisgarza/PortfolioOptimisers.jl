@@ -172,6 +172,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ra_w => "`w`: Optional portfolio weights for the portfolio target, as one vector over the assets or as a matrix whose rows are portfolios. If `nothing`, inverse-volatility weights are used, and they are rebuilt from the running variance at each observation.",#
                  :ra_covariance => "`covariance`: Running exponentially weighted covariance matrix, seeded at zero.",#
                  :ra_cor_state => "`cor_state`: Running exponentially weighted correlation state, or `nothing` where one decay governs both the variance and the correlation.",#
+                 :ra_cor_weight => "`cor_weight`: Running total of the weights that each pair of assets holds in `cor_state`, advanced by the same step on a unit outer product, or `nothing` where one decay governs both the variance and the correlation.",#
                  :ra_XXt => "`XXt`: Working matrix for the current (possibly HAC-adjusted) outer product of the returns.",#
                  :ra_Xi => "`Xi`: Working array for the current centred returns.",#
                  # Plain exponentially weighted estimators.

@@ -219,7 +219,8 @@ are recombined:
 \\begin{align}
 v_{i,t} &= \\lambda v_{i,t-1} + (1-\\lambda) u_{i,t}^{2}\\,, \\\\
 Q_{ij,t} &= \\lambda_c Q_{ij,t-1} + (1-\\lambda_c) \\frac{u_{i,t} u_{j,t}}{\\sqrt{v_{i,t} v_{j,t}}}\\,, \\\\
-\\rho_{ij,t} &= \\frac{Q_{ij,t}}{\\sqrt{Q_{ii,t} Q_{jj,t}}}\\,.
+W_{ij,t} &= \\lambda_c W_{ij,t-1} + (1-\\lambda_c)\\,, \\\\
+\\rho_{ij,t} &= \\frac{Q_{ij,t} / W_{ij,t}}{\\sqrt{(Q_{ii,t} / W_{ii,t})(Q_{jj,t} / W_{jj,t})}}\\,.
 \\end{align}
 ```
 
@@ -229,7 +230,15 @@ Where:
   - ``Q_{ij,t}``: Raw exponentially weighted correlation state. On a holiday of asset ``i``,
     ``Q_{ii}`` holds and ``Q_{ij}`` decays by ``\\sqrt{\\lambda_c}``, so each correlation
     ``\\rho_{ij}`` holds and ``Q`` stays positive semidefinite.
-  - ``\\rho_{ij,t}``: Correlation, normalised from ``Q``.
+  - ``W_{ij,t}``: Weight that the pair holds in ``Q``, stepped only where both assets are
+    valid, and on a holiday exactly as ``Q``. Without a holiday it is ``1 - \\lambda_c^{c_{ij}}``,
+    with ``c_{ij}`` the count of the observations of the pair.
+  - ``\\rho_{ij,t}``: Correlation, the weighted mean of the standardised product over the
+    observations of the pair, over the root of the two weighted means of the squares. A late
+    listing holds fewer observations, so its pairs hold less weight than
+    ``\\sqrt{W_{ii} W_{jj}}``, and a normalisation of ``Q`` alone would shrink its correlations
+    towards zero. Where the matrix of pairs is not positive semidefinite, the report clips its
+    negative eigenvalues to zero and restores the unit diagonal.
 
 A zero seed damps the state, so [`bias_corrected_covariance`](@ref) removes the damping before it reports:
 
@@ -242,8 +251,8 @@ A zero seed damps the state, so [`bias_corrected_covariance`](@ref) removes the 
 Where:
 
   - $(math_dict[:Sigma_hat])
-  - ``n_i``: Count of valid observations of asset ``i``. The same correction of ``Q`` at
-    ``\\lambda_c`` cancels in the normalisation to ``\\rho``, so ``Q`` needs none.
+  - ``n_i``: Count of valid observations of asset ``i``. The division by ``W`` corrects ``Q``
+    for its zero seed, so ``Q`` needs no other correction.
   - ``\\mathrm{mult}(s_T)``: Regime multiplier of the smoothed regime state ``s_T``, clamped to
     `regime_lohi_mult` where that field is not `nothing`.
 
@@ -262,8 +271,8 @@ $(DocStringExtensions.FIELDS)
         regime_decay::Number                                  = exp2(-2 / decay_half_life(decay)),
         regime_min_obs::Integer                               = round(Int, max(1, decay_half_life(decay) / 2)),
         regime_target::RegimeAdjustedTarget                   = PortfolioTarget(),
-        regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = nothing,
-        min_val::Number                                       = sqrt(eps()),
+        regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = (0.7, 1.6),
+        min_val::Number                                       = 1e-12,
         centred::Bool                                         = false,
         cache::Option{<:AbstractPartialFitState}              = nothing
     ) -> RegimeAdjustedExpWeightedCovariance
@@ -407,9 +416,9 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                                                                  2)),
                                              regime_target::RegimeAdjustedTarget = PortfolioTarget(),
                                              regime_lohi_mult::Option{<:Tuple{<:Number,
-                                                                              <:Number}} = nothing,
-                                             min_val::Number = sqrt(eps()),
-                                             centred::Bool = false,
+                                                                              <:Number}} = (0.7,
+                                                                                            1.6),
+                                             min_val::Number = 1e-12, centred::Bool = false,
                                              cache::Option{<:AbstractPartialFitState} = nothing)::RegimeAdjustedExpWeightedCovariance
     return RegimeAdjustedExpWeightedCovariance(decay, cor_decay, min_obs, hac_lags,
                                                regime_method, regime_decay, regime_min_obs,
@@ -423,7 +432,7 @@ Internal mutable cache for the online covariance update in [`RegimeAdjustedExpWe
 
 This type is an implementation detail and is not intended for direct use.
 
-The two fields that carry the separate correlation recursion are `nothing` where `cor_decay`
+The three fields that carry the separate correlation recursion are `nothing` where `cor_decay`
 is `nothing`, because one decay then carries the whole matrix and no correlation state exists.
 
 # Fields
@@ -452,6 +461,10 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:ra_cor_state])
     """
     cor_state
+    """
+    $(field_dict[:ra_cor_weight])
+    """
+    cor_weight
     """
     $(field_dict[:ra_XXt])
     """
@@ -965,6 +978,70 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Returns the correlation of the separate path on a block of assets, each pair normalised by the
+weight it holds.
+
+The correlation state ``Q`` and the weight state ``W`` take the same step, ``W`` on a unit outer
+product, so ``Q_{ij} / W_{ij}`` is the weighted mean of the standardised product over the
+observations of the pair. The correlation divides it by the root of the two weighted means of the
+squares, each over the observations of its own asset. An asset that lists late holds fewer
+observations than an asset that did not, so its pairs hold less weight than the product of the two
+diagonal weights. A normalisation of ``Q`` alone divides by that product, and it shrinks the
+correlation of the late asset towards zero. With no late listing and no holiday, ``W`` is one
+scalar on every entry, and the two normalisations agree.
+
+A matrix of pairs, each normalised by its own weight, need not be positive semidefinite. Where
+`repair` is `true` and the weights are not one scalar, the function clips the negative eigenvalues
+to zero and restores the unit diagonal.
+
+# Arguments
+
+  - `cache::RegimeAdjustedCovarianceState`: Online covariance computation cache.
+  - `idx::AbstractVector{<:Integer}`: Index of the assets of the block.
+  - `min_val::Number`: Floor applied to each diagonal mean before its root is taken.
+  - `repair::Bool`: Whether to restore a positive semidefinite matrix.
+
+# Returns
+
+  - `rho::MatNum`: The correlation block, with a unit diagonal.
+
+# Related
+
+  - [`RegimeAdjustedCovarianceState`](@ref)
+  - [`update_var_cor!`](@ref)
+  - [`bias_corrected_covariance`](@ref)
+"""
+function pair_weighted_correlation(cache::RegimeAdjustedCovarianceState,
+                                   idx::AbstractVector{<:Integer}, min_val::Number,
+                                   repair::Bool)
+    Q = cache.cor_state[idx, idx]
+    W = cache.cor_weight[idx, idx]
+    T = eltype(Q)
+    C = ifelse.(W .> zero(T), Q ./ W, zero(T))
+    inv_d = inv.(sqrt.(clamp.(LinearAlgebra.diag(C), min_val, T(Inf))))
+    rho = clamp.(C .* (inv_d .* transpose(inv_d)), -one(T), one(T))
+    rho .= (rho + transpose(rho)) / 2
+    rho[LinearAlgebra.diagind(rho)] .= one(T)
+    w = sqrt.(LinearAlgebra.diag(W))
+    # One scalar weight on every pair is the congruence of ADR 0181, positive semidefinite.
+    if !repair || all(abs(W[i, j] - w[i] * w[j]) <= 4 * eps(T) * w[i] * w[j]
+                      for i in axes(W, 1), j in axes(W, 2))
+        return rho
+    end
+    vals, vecs = LinearAlgebra.eigen(LinearAlgebra.Symmetric(rho))
+    if vals[1] >= -length(idx) * eps(T) * maximum(abs, vals)
+        return rho
+    end
+    rho = vecs * LinearAlgebra.Diagonal(max.(vals, zero(T))) * transpose(vecs)
+    s = inv.(sqrt.(LinearAlgebra.diag(rho)))
+    rho .= clamp.(rho .* (s .* transpose(s)), -one(T), one(T))
+    rho .= (rho + transpose(rho)) / 2
+    rho[LinearAlgebra.diagind(rho)] .= one(T)
+    return rho
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Advances the separate variance and correlation recursions, and rebuilds the covariance from
 them.
 
@@ -981,9 +1058,10 @@ reads.
  3. Advance the correlation state by the step ``Q \\leftarrow D Q D + (1 - \\lambda_c) \\Delta``,
     where ``D`` holds ``\\sqrt{\\lambda_c}`` for a valid asset and one for any other asset, and
     ``\\Delta`` is the standardised outer product on the pairs of valid assets. A holiday thus
-    holds the correlation of each pair that contains its asset.
- 4. Normalise the correlation state of the active block to a unit diagonal, symmetrise it, and
-    rescale it by the running volatilities into `cache.covariance`.
+    holds the correlation of each pair that contains its asset. Advance the weight state by the
+    same step on a unit outer product.
+ 4. Normalise each pair of the active block by its weight with [`pair_weighted_correlation`](@ref),
+    and rescale the correlation by the running volatilities into `cache.covariance`.
 
 # Arguments
 
@@ -1019,21 +1097,20 @@ function update_var_cor!(cache::RegimeAdjustedCovarianceState,
     cache.cor_state .= d .* cache.cor_state .* transpose(d) .+
                        ifelse.(pair_valid, (one(ce.cor_decay) - ce.cor_decay) .* outer_std,
                                zero(T))
+    cache.cor_weight .= d .* cache.cor_weight .* transpose(d) .+
+                        ifelse.(pair_valid, one(T) - ce.cor_decay, zero(T))
 
     active = cache.active .& (cache.variance .> zero(T))
     if !any(active)
         return nothing
     end
     idx = findall(active)
-    cor_raw = cache.cor_state[idx, idx]
-    d = LinearAlgebra.diag(cor_raw)
-    if !all(>(ce.min_val), d)
+    if !all(>(ce.min_val), view(LinearAlgebra.diag(cache.cor_state), idx))
         return nothing
     end
-    inv_d = inv.(sqrt.(d))
-    rho = clamp.(cor_raw .* (inv_d .* transpose(inv_d)), -one(T), one(T))
-    rho .= (rho + transpose(rho)) / 2
-    rho[LinearAlgebra.diagind(rho)] .= one(T)
+    # The regime statistic reads this block at every observation, and its Cholesky factor
+    # refuses a block that is not positive definite, so the block takes no repair.
+    rho = pair_weighted_correlation(cache, idx, ce.min_val, false)
     sigma = sqrt.(view(cache.variance, idx))
     cache.covariance[idx, idx] = rho .* sigma .* transpose(sigma)
 
@@ -1048,9 +1125,11 @@ Removes the damping a zero seed leaves in the running state, and returns the cov
 The recursion is seeded at zero, and it damps the state by ``1 - \\lambda^{n}`` after `n`
 observations. The correction is a congruence transform, so it restores the scale without moving a
 correlation, and it keeps a positive semidefinite state positive semidefinite. Where `cor_decay`
-opens the separate path, the variance is corrected at `decay`. The correction of the correlation
-state at `cor_decay` is a congruence transform too, so it cancels in the normalisation to a unit
-diagonal, and this function normalises the state directly.
+opens the separate path, the variance is corrected at `decay`, and each pair of the correlation
+state is divided by the weight it holds, which [`pair_weighted_correlation`](@ref) does. A late
+listing leaves the pairs of its asset less weight than a congruence assumes, so the division is
+exact where a congruence would shrink the correlation. The function restores a positive
+semidefinite matrix where the division breaks it.
 
 # Arguments
 
@@ -1096,12 +1175,10 @@ function bias_corrected_covariance(cache::RegimeAdjustedCovarianceState,
     var_bc = view(cache.variance, idx) .*
              inv.(max.(one(ce.decay) .- ce.decay .^ view(cache.obs_count, idx),
                        eps(ce.decay)))
-    vol = sqrt.(max.(var_bc, ce.min_val))
-    cor_raw = cache.cor_state[idx, idx]
-    inv_d = inv.(sqrt.(clamp.(LinearAlgebra.diag(cor_raw), ce.min_val, T(Inf))))
-    rho = clamp.(cor_raw .* (inv_d .* transpose(inv_d)), -one(T), one(T))
-    rho .= (rho + transpose(rho)) / 2
-    rho[LinearAlgebra.diagind(rho)] .= one(T)
+    # The report divides by no volatility, so a variance of zero stays zero; only round-off
+    # below zero is removed.
+    vol = sqrt.(max.(var_bc, zero(T)))
+    rho = pair_weighted_correlation(cache, idx, ce.min_val, true)
     sigma[idx, idx] = rho .* vol .* transpose(vol)
 
     return sigma
@@ -1114,8 +1191,8 @@ statistic.
 
 This block calibrates the smoother and is never reported, so it applies the per-asset variance
 correction alone. Where the separate path runs, the correlation already sits inside
-`cache.covariance` normalised, and its correction for the zero seed cancels in that
-normalisation. [`bias_corrected_covariance`](@ref) makes the exact estimate from the state.
+`cache.covariance`, each pair normalised by its weight. [`bias_corrected_covariance`](@ref) makes
+the reported estimate from the state.
 
 # Arguments
 
@@ -1300,6 +1377,8 @@ function process_observation!(cache::RegimeAdjustedCovarianceState,
             cache.variance[newly_inactive] .= zero(T)
             cache.cor_state[newly_inactive, :] .= zero(T)
             cache.cor_state[:, newly_inactive] .= zero(T)
+            cache.cor_weight[newly_inactive, :] .= zero(T)
+            cache.cor_weight[:, newly_inactive] .= zero(T)
         end
         if !ce.centred
             cache.location[newly_inactive] .= T(NaN)
@@ -1448,6 +1527,7 @@ function regime_adjusted_covariance_pass!(f, ce::RegimeAdjustedExpWeightedCovari
                                           DataStructures.CircularBuffer{Vector{Tf}}(ce.hac_lags)
                                       end, zeros(Tf, N, N),
                                       separate ? zeros(Tf, N) : nothing,
+                                      separate ? zeros(Tf, N, N) : nothing,
                                       separate ? zeros(Tf, N, N) : nothing, zeros(Tf, N, N),
                                       zeros(Tf, N), zeros(Tf, N), location, zeros(Int, N),
                                       trues(N), nothing, 0)
@@ -1519,7 +1599,8 @@ so `cache.n_regime_obs` stays at zero, which is below every admissible `regime_m
 multiplier is then one and the covariance is the plain recursion.
 
 Where `ce.regime_lohi_mult` is not `nothing`, the multiplier is clamped to that `(lo, hi)` range
-before it is squared. Where it is `nothing`, no clamp runs.
+before it is squared. Where it is `nothing`, no clamp runs. The clamp bounds an estimate, so the
+multiplier of one before `regime_min_obs` holds even where `lo > 1` or `hi < 1`.
 
 # Arguments
 
@@ -1553,13 +1634,14 @@ function regime_adjusted_covariance(cache::RegimeAdjustedCovarianceState,
         sigma[idx, idx] = (block + transpose(block)) / 2
     end
 
+    # The clamp bounds an estimate; the warm-up factor of one is no estimate, so it holds.
     factor = if cache.n_regime_obs < ce.regime_min_obs
         one(T)
-    else
+    elseif isnothing(ce.regime_lohi_mult)
         regime_multiplier(ce.regime_method, cache.regime_state)
-    end
-    if !isnothing(ce.regime_lohi_mult)
-        factor = clamp(factor, ce.regime_lohi_mult[1], ce.regime_lohi_mult[2])
+    else
+        clamp(regime_multiplier(ce.regime_method, cache.regime_state),
+              ce.regime_lohi_mult[1], ce.regime_lohi_mult[2])
     end
 
     return sigma * factor^2

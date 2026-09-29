@@ -390,8 +390,8 @@ $(DocStringExtensions.FIELDS)
         regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
         regime_decay::Number      = exp2(-2 / decay_half_life(decay)),
         regime_min_obs::Integer   = round(Int, max(1, decay_half_life(decay) / 2)),
-        regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = nothing,
-        min_val::Number           = sqrt(eps()),
+        regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = (0.7, 1.6),
+        min_val::Number           = 1e-12,
         centred::Bool             = false,
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> RegimeAdjustedExpWeightedVariance
@@ -513,9 +513,9 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                                                                decay_half_life(decay) /
                                                                                2)),
                                            regime_lohi_mult::Option{<:Tuple{<:Number,
-                                                                            <:Number}} = nothing,
-                                           min_val::Number = sqrt(eps()),
-                                           centred::Bool = false,
+                                                                            <:Number}} = (0.7,
+                                                                                          1.6),
+                                           min_val::Number = 1e-12, centred::Bool = false,
                                            cache::Option{<:AbstractPartialFitState} = nothing)::RegimeAdjustedExpWeightedVariance
     return RegimeAdjustedExpWeightedVariance(decay, min_obs, hac_lags, regime_method,
                                              regime_decay, regime_min_obs, regime_lohi_mult,
@@ -962,7 +962,8 @@ Where `ce.regime_method` is `nothing`, [`process_observation!`](@ref) advances n
 multiplier is then one and the variance is the plain recursion.
 
 Where `ce.regime_lohi_mult` is not `nothing`, the multiplier is clamped to that `(lo, hi)` range
-before it is squared. Where it is `nothing`, no clamp runs.
+before it is squared. Where it is `nothing`, no clamp runs. The clamp bounds an estimate, so the
+multiplier of one before `regime_min_obs` holds even where `lo > 1` or `hi < 1`.
 
 # Arguments
 
@@ -994,13 +995,14 @@ function regime_adjusted_variance(cache::RegimeAdjustedVarianceState,
         variance[not_ready] .= NaN
     end
 
+    # The clamp bounds an estimate; the warm-up factor of one is no estimate, so it holds.
     factor = if cache.n_regime_obs < ce.regime_min_obs
         one(eltype(variance))
-    else
+    elseif isnothing(ce.regime_lohi_mult)
         regime_multiplier(ce.regime_method, cache.regime_state)
-    end
-    if !isnothing(ce.regime_lohi_mult)
-        factor = clamp(factor, ce.regime_lohi_mult[1], ce.regime_lohi_mult[2])
+    else
+        clamp(regime_multiplier(ce.regime_method, cache.regime_state),
+              ce.regime_lohi_mult[1], ce.regime_lohi_mult[2])
     end
 
     return variance * factor^2
