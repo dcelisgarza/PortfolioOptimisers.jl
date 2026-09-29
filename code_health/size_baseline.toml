@@ -58,7 +58,7 @@ commit = "ebcacfda95"
 "src/02_Tools/06_ForwardProperties.jl" = { code = 184, doc = 119, comment = 4, blank = 36, total = 343 }
 "src/02_Tools/07_VectorToScalarMeasures.jl" = { code = 147, doc = 469, comment = 0, blank = 211, total = 827 }
 "src/03_InputData/01_AssetPanel.jl" = { code = 451, doc = 808, comment = 7, blank = 393, total = 1659 }
-"src/03_InputData/02_AssetPanelBuilder.jl" = { code = 293, doc = 630, comment = 0, blank = 280, total = 1203 }
+"src/03_InputData/02_AssetPanelBuilder.jl" = { code = 338, doc = 689, comment = 0, blank = 312, total = 1339 }
 "src/03_InputData/03_ListingSpan.jl" = { code = 74, doc = 195, comment = 0, blank = 83, total = 352 }
 "src/03_InputData/04_Preprocessing.jl" = { code = 20, doc = 148, comment = 0, blank = 89, total = 257 }
 "src/03_InputData/05_PanelViews.jl" = { code = 35, doc = 93, comment = 0, blank = 51, total = 179 }

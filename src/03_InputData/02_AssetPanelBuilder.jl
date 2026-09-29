@@ -25,6 +25,8 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - `filled::Vector`: The same length as `v`, and free of blanks.
 
+[`asset_panel`](@ref) calls `panel_fill(alg, v, act, name)`, where `act` is the asset's column of the active mask, or `nothing` for a static Panel Field. A policy that defines only the three-argument method reads no mask: the four-argument fallback drops `act`. [`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref) define the four-argument method, so that no value crosses an inactive stretch.
+
 # Related
 
   - [`NoPanelFill`](@ref)
@@ -124,6 +126,8 @@ This is the safe fill over a cross-validation fold. It looks **backward** along 
 
 A leading blank has no earlier value to take, so it falls through to `val`.
 
+The fill runs within each stretch of constant activity of the asset's active mask. No value crosses an inactive stretch, so an asset that delists and lists again does not carry the last value of its first listing into its second, and the run of blanks that `lim` counts restarts in each stretch.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -187,6 +191,10 @@ Resolves a blank cell to the nearest later observed value of the same asset.
     [`asset_panel`](@ref) runs **once**, over the whole history, and has no fold machinery. A backward fill therefore carries a value from an observation into an earlier one, and a fold that ends before the source row still sees the value the source row supplied. A cross-validation score computed over a panel built this way is optimistic, and the size of the leak is the length of the blank run. Use [`ForwardPanelFill`](@ref) for anything a fold will read.
 
     The policy is offered rather than refused because a Panel Field may be built outside any fold, where nothing looks forward into anything.
+
+A trailing blank has no later value to take, so it falls through to `val`.
+
+The fill runs within each stretch of constant activity of the asset's active mask. No value crosses an inactive stretch, so an asset that delists and lists again does not carry the first value of its second listing back into its first, and the run of blanks that `lim` counts restarts in each stretch.
 
 # Fields
 
@@ -315,8 +323,12 @@ end
     panel_fill(alg::ConstantPanelFill, v::AbstractVector, name::AbstractString) -> Vector
     panel_fill(alg::ForwardPanelFill, v::AbstractVector, name::AbstractString) -> Vector
     panel_fill(alg::BackwardPanelFill, v::AbstractVector, name::AbstractString) -> Vector
+    panel_fill(alg::Union{<:ForwardPanelFill, <:BackwardPanelFill}, v::AbstractVector, act::AbstractVector{Bool}, name::AbstractString) -> Vector
+    panel_fill(alg::AbstractPanelFillAlgorithm, v::AbstractVector, act::Option{<:AbstractVector{Bool}}, name::AbstractString) -> Vector
 
 Resolve the blanks of one asset's column of one raw Panel Field, along the observation axis.
+
+The four-argument form reads the asset's column of the active mask. A directional policy fills each stretch of constant activity on its own, so no value crosses an inactive stretch. Every other policy, and a directional one given `act = nothing`, drops `act` and resolves the whole column.
 
 # Algorithm
 
@@ -326,11 +338,13 @@ The method that Julia selects is the algorithm, and the four differ in where the
  2. [`ConstantPanelFill`](@ref): replace every blank by `alg.val`.
  3. [`ForwardPanelFill`](@ref): walk the observations in order, carrying the last observed value. Fill a blank with the carried value while the run of blanks is no longer than `alg.lim`, and with `alg.val` otherwise.
  4. [`BackwardPanelFill`](@ref): the same walk, in reverse order. This looks forward in time; the type's docstring states what that costs a fold.
+ 5. With `act`, a directional policy splits the column into the stretches of constant activity with [`panel_activity_stretches`](@ref), and resolves each stretch with its three-argument method.
 
 # Arguments
 
   - `alg`: The fill policy.
   - `v`: One asset's raw values along the observation axis, blanks included.
+  - `act`: The asset's column of the active mask, the same length as `v`, or `nothing` for no mask.
   - `name`: The Panel Field's name, displayed in the [`NoPanelFill`](@ref) error message.
 
 # Validation
@@ -345,7 +359,9 @@ The method that Julia selects is the algorithm, and the four differ in where the
 
   - [`AbstractPanelFillAlgorithm`](@ref)
   - [`is_panel_blank`](@ref)
+  - [`panel_activity_stretches`](@ref)
   - [`asset_panel`](@ref)
+  - [`Option`](@ref)
 """
 function panel_fill(::NoPanelFill, v::AbstractVector, name::AbstractString)
     i = findfirst(is_panel_blank, v)
@@ -361,6 +377,57 @@ function panel_fill(alg::ForwardPanelFill, v::AbstractVector, ::AbstractString)
 end
 function panel_fill(alg::BackwardPanelFill, v::AbstractVector, ::AbstractString)
     return panel_directional_fill(v, alg.val, alg.lim, reverse(eachindex(v)))
+end
+function panel_fill(alg::AbstractPanelFillAlgorithm, v::AbstractVector,
+                    ::Option{<:AbstractVector{Bool}}, name::AbstractString)
+    return panel_fill(alg, v, name)
+end
+function panel_fill(alg::Union{<:ForwardPanelFill, <:BackwardPanelFill}, v::AbstractVector,
+                    act::AbstractVector{Bool}, name::AbstractString)
+    out = Vector{Union{eltype(v), typeof(alg.val)}}(undef, length(v))
+    for r in panel_activity_stretches(act)
+        out[r] = panel_fill(alg, view(v, r), name)
+    end
+    return out
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Split one asset's column of the active mask into its stretches of constant activity.
+
+A directional fill runs within one stretch at a time, because an inactive stretch separates two listings of the asset, and a value of one listing says nothing about the other.
+
+# Algorithm
+
+ 1. Start a stretch at the first observation.
+ 2. Walk the observations. Close the stretch before each observation whose activity differs from the one before it, and start the next stretch there.
+ 3. Close the last stretch at the last observation.
+
+# Arguments
+
+  - `act`: One asset's column of the active mask.
+
+# Returns
+
+  - `stretches::Vector{UnitRange{Int}}`: The stretches, in order. Together they cover `eachindex(act)`, and each one is active throughout or inactive throughout.
+
+# Related
+
+  - [`panel_fill`](@ref)
+  - [`ForwardPanelFill`](@ref)
+  - [`BackwardPanelFill`](@ref)
+"""
+function panel_activity_stretches(act::AbstractVector{Bool})
+    stretches = UnitRange{Int}[]
+    lo = firstindex(act)
+    for i in (lo + 1):lastindex(act)
+        if act[i] != act[i - 1]
+            push!(stretches, lo:(i - 1))
+            lo = i
+        end
+    end
+    push!(stretches, lo:lastindex(act))
+    return stretches
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -448,6 +515,8 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - `vals::AbstractArray`: The resolved values, in the raw input's own shape.
   - `obs::AbstractArray{Bool}`: Whether each raw cell was observed, the same shape as `vals`.
+
+[`asset_panel`](@ref) calls `panel_resolve(inp, amsk)` with the active mask, or `nothing`. An input type that defines only the one-argument method reads no mask: the two-argument fallback drops `amsk`. Define the two-argument method to pass the mask to the fill with [`panel_fill`](@ref)'s four-argument form.
 
 ## `panel_input_field`
 
@@ -864,25 +933,27 @@ function assert_panel_input_fill(inp::AbstractPanelFieldInput)::Nothing
     return nothing
 end
 """
-    panel_fill_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm, name::AbstractString, tv::Bool)
+    panel_fill_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm, name::AbstractString, amsk::Option{<:AbstractMatrix{Bool}})
 
 Resolve the blanks of one raw Panel Field, and return the filled array.
 
 The fill runs **per asset, along the observation axis**, which is the only axis a point-in-time panel blanks along: an asset lists late or delists, so its history has a head or a tail of blanks, and the cross-section at one observation is not the thing being carried across.
 
+A time-varying raw Panel Field resolves each column with the active mask of its asset, the second axis of `vals`, so a directional fill never crosses an inactive stretch.
+
 A static raw Panel Field has no observation axis. Its two admitted policies are cell-wise, so the whole array is resolved as one flat run and reshaped back.
 
 # Algorithm
 
- 1. When the raw Panel Field is static, resolve `vec(vals)` with [`panel_fill`](@ref) and reshape the result.
- 2. Otherwise walk the trailing axes, and resolve each column of the observation axis with [`panel_fill`](@ref).
+ 1. When `amsk` is `nothing`, the raw Panel Field is static: resolve `vec(vals)` with [`panel_fill`](@ref) and reshape the result.
+ 2. Otherwise walk the trailing axes, and resolve each column of the observation axis with [`panel_fill`](@ref) and the column of `amsk` for its asset.
 
 # Arguments
 
   - `vals`: The raw values, blanks included.
   - `alg`: The fill policy.
   - `name`: The Panel Field's name, displayed in the error messages.
-  - `tv`: Whether the raw values carry an observation axis.
+  - `amsk`: The active mask (observations × assets) of a time-varying raw Panel Field, as [`panel_input_mask`](@ref) returns it, or `nothing` for a static one.
 
 # Returns
 
@@ -891,35 +962,88 @@ A static raw Panel Field has no observation axis. Its two admitted policies are 
 # Related
 
   - [`panel_fill`](@ref)
+  - [`panel_input_mask`](@ref)
   - [`panel_resolve`](@ref)
   - [`asset_panel`](@ref)
+  - [`Option`](@ref)
 """
 function panel_fill_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm,
-                          name::AbstractString, tv::Bool)
-    if !tv
-        return reshape(panel_fill(alg, vec(vals), name), size(vals))
-    end
+                          name::AbstractString, ::Nothing)
+    return reshape(panel_fill(alg, vec(vals), name), size(vals))
+end
+function panel_fill_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm,
+                          name::AbstractString, amsk::AbstractMatrix{Bool})
     cols = CartesianIndices(size(vals)[2:end])
-    first = panel_fill(alg, view(vals, :, cols[1]), name)
+    first = panel_fill(alg, view(vals, :, cols[1]), view(amsk, :, cols[1][1]), name)
     out = Array{eltype(first)}(undef, size(vals))
     out[:, cols[1]] = first
     for k in 2:length(cols)
-        out[:, cols[k]] = panel_fill(alg, view(vals, :, cols[k]), name)
+        out[:, cols[k]] = panel_fill(alg, view(vals, :, cols[k]), view(amsk, :, cols[k][1]),
+                                     name)
     end
     return out
 end
 """
-    panel_resolve(inp::NumericPanelInput) -> Tuple{Array, BitArray}
-    panel_resolve(inp::CategoricalPanelInput) -> Tuple{Array{String}, BitArray}
-    panel_resolve(inp::TensorPanelInput) -> Tuple{Array, BitArray}
+    panel_input_mask(inp::AbstractPanelFieldInput, amsk::Option{<:AbstractMatrix{Bool}}) -> Option{<:AbstractMatrix{Bool}}
+
+Return the active mask that the fill of one raw Panel Field reads, checked against the raw values.
+
+A static raw Panel Field has no observation axis, so its fill reads no mask. A time-varying one with no mask reads an all-`true` mask, which is one stretch of activity for each asset, as [`asset_panel`](@ref) takes it.
+
+# Algorithm
+
+ 1. Return `nothing` when the raw Panel Field is static.
+ 2. Return an all-`true` mask of the first two axes of the raw values when `amsk` is `nothing`.
+ 3. Otherwise check the shape of `amsk`, and return it.
+
+# Arguments
+
+  - `inp`: The raw Panel Field.
+  - `amsk`: The active mask (observations × assets), or `nothing`.
+
+# Validation
+
+  - `size(amsk)` equals the first two axes of the raw values of a time-varying input. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `act::Option{<:AbstractMatrix{Bool}}`: The mask that [`panel_fill_array`](@ref) reads, or `nothing` for a static input.
+
+# Related
+
+  - [`panel_fill_array`](@ref)
+  - [`panel_resolve`](@ref)
+  - [`asset_panel`](@ref)
+  - [`Option`](@ref)
+"""
+function panel_input_mask(inp::AbstractPanelFieldInput,
+                          amsk::Option{<:AbstractMatrix{Bool}})
+    if panel_input_is_static(inp)
+        return nothing
+    end
+    ax = (size(inp.vals, 1), size(inp.vals, 2))
+    if isnothing(amsk)
+        return trues(ax)
+    end
+    @argcheck(size(amsk) == ax,
+              DimensionMismatch("the active mask of an Asset Panel is observations × assets, so it matches the first two axes of the Panel Field \"$(inp.name)\", got size(amsk) = $(size(amsk)) and a Panel Field of $(ax[1]) observations and $(ax[2]) assets"))
+    return amsk
+end
+"""
+    panel_resolve(inp::NumericPanelInput, amsk::Option{<:AbstractMatrix{Bool}} = nothing) -> Tuple{Array, BitArray}
+    panel_resolve(inp::CategoricalPanelInput, amsk::Option{<:AbstractMatrix{Bool}} = nothing) -> Tuple{Array{String}, BitArray}
+    panel_resolve(inp::TensorPanelInput, amsk::Option{<:AbstractMatrix{Bool}} = nothing) -> Tuple{Array, BitArray}
+    panel_resolve(inp::AbstractPanelFieldInput, amsk::Option{<:AbstractMatrix{Bool}}) -> Tuple
 
 Resolve one raw Panel Field's blanks, and record which of its cells were observed.
+
+The active mask sets the stretches that a directional fill runs within. The last method is the fallback for an input type that defines only the one-argument method: it drops `amsk`.
 
 # Algorithm
 
 The method that Julia selects is the algorithm, and the three differ only in the element type they resolve into. A categorical Panel Field resolves into `String`. A numeric and a tensor Panel Field resolve into the type their own filled cells carry, which [`panel_value_eltype`](@ref) derives: the raw array's element type is `Union{Missing, Float64}`, `Union{Nothing, Float64}` or `Any`, and none of those is the type the cells carry. Narrowing by the values is what drops the blank from the resolved field, and it is also what keeps a `Float32` field in `Float32`.
 
- 1. Fill the blanks with [`panel_fill_array`](@ref).
+ 1. Fill the blanks with [`panel_fill_array`](@ref), over the mask that [`panel_input_mask`](@ref) returns.
  2. Derive the resolved element type from the filled cells, with [`panel_value_eltype`](@ref).
  3. Walk the raw cells, recording which were observed and copying the filled value into the output.
  4. Check that a numeric or a tensor Panel Field carries no non-finite value, with [`assert_panel_finite`](@ref).
@@ -927,6 +1051,11 @@ The method that Julia selects is the algorithm, and the three differ only in the
 # Arguments
 
   - `inp`: The raw Panel Field.
+  - `amsk`: The active mask (observations × assets), or `nothing` for all-`true`.
+
+# Validation
+
+  - `size(amsk)` matches a time-varying input. See [`panel_input_mask`](@ref).
 
 # Returns
 
@@ -937,11 +1066,13 @@ The method that Julia selects is the algorithm, and the three differ only in the
 
   - [`AbstractPanelFieldInput`](@ref)
   - [`panel_fill_array`](@ref)
+  - [`panel_input_mask`](@ref)
   - [`panel_input_field`](@ref)
   - [`asset_panel`](@ref)
 """
-function panel_resolve(inp::NumericPanelInput)
-    f = panel_fill_array(inp.vals, inp.alg, inp.name, !panel_input_is_static(inp))
+function panel_resolve(inp::NumericPanelInput,
+                       amsk::Option{<:AbstractMatrix{Bool}} = nothing)
+    f = panel_fill_array(inp.vals, inp.alg, inp.name, panel_input_mask(inp, amsk))
     out = Array{panel_value_eltype(f)}(undef, size(inp.vals))
     obs = BitArray(undef, size(inp.vals))
     for i in CartesianIndices(inp.vals)
@@ -951,8 +1082,9 @@ function panel_resolve(inp::NumericPanelInput)
     assert_panel_finite(out, inp.name)
     return out, obs
 end
-function panel_resolve(inp::CategoricalPanelInput)
-    f = panel_fill_array(inp.vals, inp.alg, inp.name, !panel_input_is_static(inp))
+function panel_resolve(inp::CategoricalPanelInput,
+                       amsk::Option{<:AbstractMatrix{Bool}} = nothing)
+    f = panel_fill_array(inp.vals, inp.alg, inp.name, panel_input_mask(inp, amsk))
     out = Array{String}(undef, size(inp.vals))
     obs = BitArray(undef, size(inp.vals))
     for i in CartesianIndices(inp.vals)
@@ -961,8 +1093,9 @@ function panel_resolve(inp::CategoricalPanelInput)
     end
     return out, obs
 end
-function panel_resolve(inp::TensorPanelInput)
-    f = panel_fill_array(inp.vals, inp.alg, inp.name, !panel_input_is_static(inp))
+function panel_resolve(inp::TensorPanelInput,
+                       amsk::Option{<:AbstractMatrix{Bool}} = nothing)
+    f = panel_fill_array(inp.vals, inp.alg, inp.name, panel_input_mask(inp, amsk))
     out = Array{panel_value_eltype(f)}(undef, size(inp.vals))
     obs = BitArray(undef, size(inp.vals))
     for i in CartesianIndices(inp.vals)
@@ -971,6 +1104,9 @@ function panel_resolve(inp::TensorPanelInput)
     end
     assert_panel_finite(out, inp.name)
     return out, obs
+end
+function panel_resolve(inp::AbstractPanelFieldInput, ::Option{<:AbstractMatrix{Bool}})
+    return panel_resolve(inp)
 end
 """
     panel_input_field(inp::NumericPanelInput, vals, obs) -> NumericPanelField
@@ -1107,7 +1243,7 @@ An input set that is static throughout, with no mask, builds a **static panel**.
  1. Check that `inputs` is not empty and that the Panel Field names are unique.
  2. Check each input's fill policy against its shape, with [`assert_panel_input_fill`](@ref).
  3. Read the observation count the build takes, with [`panel_build_observations`](@ref).
- 4. Resolve every input with [`panel_resolve`](@ref), which fills its blanks and records the observed cells, and build its Panel Field with [`panel_input_field`](@ref). Lift a static Panel Field of a time-varying build with [`panel_field_lift`](@ref).
+ 4. Resolve every input with [`panel_resolve`](@ref), which fills its blanks within each stretch of constant activity of `amsk` and records the observed cells, and build its Panel Field with [`panel_input_field`](@ref). Lift a static Panel Field of a time-varying build with [`panel_field_lift`](@ref).
  5. Return the panel with no mask when the build is static.
  6. Otherwise fill in the masks that were not given, and return the panel. A missing active mask is all-`true`. A missing estimation mask is the active mask, because the estimation mask is a subset of the active mask and the only subset that needs no further information is the whole of it; an all-`true` default would break the subset rule at the first inactive cell. The [`AssetPanel`](@ref) constructor checks that every Panel Field shares one shape.
 
@@ -1164,7 +1300,7 @@ function asset_panel(inputs::AbstractVector{<:AbstractPanelFieldInput};
     pf = AbstractPanelField[]
     for inp in inputs
         assert_panel_input_fill(inp)
-        v, o = panel_resolve(inp)
+        v, o = panel_resolve(inp, amsk)
         f = panel_input_field(inp, v, o)
         push!(pf, isnothing(T) || !panel_input_is_static(inp) ? f : panel_field_lift(f, T))
     end

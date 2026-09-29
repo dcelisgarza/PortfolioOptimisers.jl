@@ -3,14 +3,15 @@ Parity of map #1375 for the Asset Panel, its builder, its views, the ingestion a
 export (#1378). Every `Parity_*` file this test reads is an output of the oracle, stored with the
 harness of #1376, and each testset states how its case was made.
 
-A measured difference is an open child issue of the map, and the test pins today's value of it:
+The two measured differences of this test were child issues of the map, and both are closed:
 
-  - #1413: `ForwardPanelFill` and `BackwardPanelFill` carry a value across an inactive stretch of
-    the active mask, where the oracle stops at the edge of the stretch.
-
-#1414 is closed. A simple return is `(p_t - p_{t-1}) / p_{t-1}`, which is correctly rounded on all
-58 finite returns of the ingestion case, where the oracle's `p_t / p_{t-1} - 1` is exact on 2. The
-returns comparisons keep `rtol = 1e-12`, and the difference left is the oracle's own rounding.
+  - #1413: `ForwardPanelFill` and `BackwardPanelFill` carried a value across an inactive stretch of
+    the active mask. The fill now stops at the edge of the stretch, as the oracle does, and the
+    fill case is at parity on every active cell.
+  - #1414: a simple return is `(p_t - p_{t-1}) / p_{t-1}`, which is correctly rounded on all 58
+    finite returns of the ingestion case, where the oracle's `p_t / p_{t-1} - 1` is exact on 2.
+    The returns comparisons keep `rtol = 1e-12`, and the difference left is the oracle's own
+    rounding.
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 
@@ -102,21 +103,18 @@ end
         # The fill case, written raw. The oracle forward and backward filled `x`, with no limit
         # and with a limit of two.
         fc = parity_fill_case()
-        cases = (("ForwardNone", ForwardPanelFill(), (8, 3), (3, 3)),
-                 ("ForwardLim2", ForwardPanelFill(; lim = 2), nothing, nothing),
-                 ("BackwardNone", BackwardPanelFill(), (4, 3), (9, 3)),
-                 ("BackwardLim2", BackwardPanelFill(; lim = 2), nothing, nothing))
-        for (case, alg, cross, src) in cases
+        cases = (("ForwardNone", ForwardPanelFill(), (8, 3)),
+                 ("ForwardLim2", ForwardPanelFill(; lim = 2), (8, 3)),
+                 ("BackwardNone", BackwardPanelFill(), (4, 3)),
+                 ("BackwardLim2", BackwardPanelFill(; lim = 2), (4, 3)))
+        for (case, alg, edge) in cases
             o = parity_load("asset_panel", "FillEdges", case)
             f = parity_fill_field(fc, alg)
             e = blank_to_val(o, fc.amsk, 0.0)
-            if !isnothing(cross)
-                # #1413: the oracle stops at the inactive stretch 5:7 of asset 3, and our fill
-                # carries the value of the other side across it.
-                @test isnan(o[cross...])
-                @test f.vals[cross...] == fc.x[src...]
-                e[cross...] = f.vals[cross...]
-            end
+            # #1413: the blank next to the inactive stretch 5:7 of asset 3 has nothing to carry
+            # on its own side of the stretch, so both sides leave it to the fill value.
+            @test isnan(o[edge...])
+            @test f.vals[edge...] == 0.0
             # Measured: maxrel = 0.0, bit-equal on every active cell that both fill.
             r = parity_compare(ifelse.(fc.amsk, f.vals, NaN), ifelse.(fc.amsk, e, NaN);
                                name = case)

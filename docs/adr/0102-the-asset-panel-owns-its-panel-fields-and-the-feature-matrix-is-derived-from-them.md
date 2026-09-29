@@ -382,3 +382,32 @@ the cross-validated path is time-varying and the static-shape coupling above hol
   collapse gives way to a collapse over the panel's fields. `panel_feature_matrix` stays, as the
   verb that stacks the panel whole.
 - **Panel persistence is not built.** It is in scope for map #643 and does not gate its close.
+
+## Amendment (2026-09-29)
+
+A directional fill runs **within each stretch of constant activity** of the asset's active mask
+([#1413](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1413), found by the parity
+audit of map #1375). `ForwardPanelFill` and `BackwardPanelFill` walked the whole observation axis
+with one carried value and one run counter. So an asset that delisted and listed again took, at a
+blank first cell of its second listing, the last value of its first listing, and `lim` counted the
+inactive cells as part of the run of blanks.
+
+An inactive stretch separates two listings, and the library already treats it as a reset: a
+folding statistic resets an asset that the active mask turns off (ADR 0172), and a relisting asset
+re-enters at the recursion's own weight (ADR 0157). The builder was the one place that crossed
+it. Now no value crosses an inactive stretch, and the run that `lim` counts restarts in each
+stretch. The old rule is not kept behind a keyword: it carries a value of one listing into the
+other, and no caller needs that.
+
+The seam is two optional methods, so an extension written before this amendment keeps working:
+
+- `asset_panel` calls `panel_resolve(inp, amsk)`. An input type that defines only
+  `panel_resolve(inp)` reaches it through a fallback that drops the mask.
+- `panel_fill_array` calls `panel_fill(alg, v, act, name)` with the asset's column of the mask. A
+  policy that defines only the three-argument method reaches it through a fallback that drops
+  `act`. `NoPanelFill` and `ConstantPanelFill` are cell-wise and read no mask, so the position in
+  the `NoPanelFill` error stays the position in the whole column.
+
+A blank inactive cell now gets the policy's `val` in place of a value carried into it. No active
+cell of the test fixtures changes: the change reaches an active cell only at a blank first cell of
+a relisting (forward) or a blank last cell before a delisting (backward).

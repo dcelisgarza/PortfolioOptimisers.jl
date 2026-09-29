@@ -57,7 +57,7 @@ commit = "ebcacfda95"
 "src/02_Tools/06_ForwardProperties.jl" = { cyc = 45, cog = 96, arg = 4, cyc_sum = 60, cog_sum = 117, arg_sum = 10, macros = [] }
 "src/02_Tools/07_VectorToScalarMeasures.jl" = { cyc = 3, cog = 4, arg = 3, cyc_sum = 32, cog_sum = 9, arg_sum = 76, macros = ["@propagatable"] }
 "src/03_InputData/01_AssetPanel.jl" = { cyc = 7, cog = 9, arg = 6, cyc_sum = 114, cog_sum = 72, arg_sum = 113, macros = [] }
-"src/03_InputData/02_AssetPanelBuilder.jl" = { cyc = 7, cog = 10, arg = 6, cyc_sum = 70, cog_sum = 55, arg_sum = 56, macros = [] }
+"src/03_InputData/02_AssetPanelBuilder.jl" = { cyc = 7, cog = 10, arg = 6, cyc_sum = 80, cog_sum = 63, arg_sum = 76, macros = [] }
 "src/03_InputData/03_ListingSpan.jl" = { cyc = 5, cog = 8, arg = 3, cyc_sum = 20, cog_sum = 13, arg_sum = 20, macros = [] }
 "src/03_InputData/04_Preprocessing.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 5, cog_sum = 2, arg_sum = 4, macros = [] }
 "src/03_InputData/05_PanelViews.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 11, cog_sum = 5, arg_sum = 20, macros = [] }
