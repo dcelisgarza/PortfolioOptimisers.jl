@@ -8,7 +8,8 @@ this file does not repeat them.
 THE FIXTURE. `parity_small_panel()`, 12 assets and 80 observations, with its late listing,
 delisting, relisting, asset outside the estimation mask and holiday. The case "Small" fills the
 holiday cell with a return, so it holds every condition of the panel except the holiday. The case
-"Holiday" is the panel as it is. The case "Milli" is "Small" in units one thousand times smaller.
+"Holiday" is the panel as it is. The case "Full" is "Small" without assets 2, 3 and 4, so every
+asset shares one history (#1420). The case "Milli" is "Small" in units one thousand times smaller.
 The estimators read the active mask, and the regime-adjusted ones the estimation mask too.
 
 THE CASES. One file holds the cases of one unit side by side, in the order of the constants below.
@@ -24,11 +25,11 @@ THE MEASURE. Every case below agreed on the `NaN` pattern.
 | Unit | Verdict | Largest difference |
 | --- | --- | --- |
 | `ExpWeightedExpectedReturns`, `ExpWeightedVariance` | Parity, with and without the holiday | 2.3e-16 |
-| `ExpWeightedCovariance` | Parity | 1.8e-15 of the largest entry, 1.2e-13 by cell |
-| `ExpWeightedCovariance` on a holiday | Deliberate difference, ADR 0181 | parity off the pairs of the holiday asset; those pairs 2.1e-3 |
+| `ExpWeightedCovariance` on "Full" | Parity | 3.3e-16 by cell |
+| `ExpWeightedCovariance` on a late listing or a holiday | Better, amendment of 2026-09-29 to ADR 0181 (#1420) | the raw state is the oracle's to 1e-16; each pair is divided by its own weight, where the oracle's congruence shrinks it |
 | `RegimeAdjustedExpWeightedVariance` | Parity, with and without the holiday | 8.9e-16 |
-| `RegimeAdjustedExpWeightedCovariance` | Parity | 1.0e-13 by cell, 2.0e-15 of the largest entry |
-| its separate `cor_decay` path on a late listing | Better, amendment of 2026-09-29 to ADR 0181 | the covariance over its multiplier squared 4.4e-15; the multiplier 6.0e-4 |
+| `RegimeAdjustedExpWeightedCovariance` on "Full" | Parity, report, multiplier and series | 3.3e-16 by cell |
+| the same on a late listing | Better, amendment of 2026-09-29 to ADR 0181 | the raw state is the oracle's to 1.9e-16; the separate path's report is the oracle's; the multiplier moves by up to 1.9% |
 | both regime estimators in small units | Defect found and fixed: the floor | parity at the new default floor |
 | the clamp of a warm-up multiplier | Defect found and fixed | parity |
 | the separate path on a constant asset | Better: the variance 0, where the report floored it at `min_val` | `test_08y` |
@@ -86,43 +87,51 @@ const P1383_RV = ["RVDefault" => () -> p1383_rv(; hl = 40, min_obs = 40),
                   "RVUncentred" => () -> p1383_rv(; centred = false),
                   "RVMinObs3" => () -> p1383_rv(; min_obs = 3)]
 # Two portfolios: equal weights, and weights proportional to the index of the asset.
-const P1383_W = vcat(fill(1 / 12, 1, 12), permutedims(collect(1.0:12) ./ 78))
+p1383_w(n) = vcat(fill(1 / n, 1, n), permutedims(collect(1.0:n) ./ (n * (n + 1) / 2)))
 const P1383_RV_SERIES = ["RVDefault", "RVLog", "RVHac2", "RVClipAboveOne", "RVUncentred"]
-const P1383_RC = ["RCDefault" => () -> p1383_rc(; hl = 40, min_obs = 40),
+const P1383_RC = ["RCDefault" => (n) -> p1383_rc(; hl = 40, min_obs = 40),
                   "RCDiagonalFirst" =>
-                      () -> p1383_rc(; regime_target = P1383.DiagonalTarget()),
+                      (n) -> p1383_rc(; regime_target = P1383.DiagonalTarget()),
                   "RCDiagonalLog" =>
-                      () -> p1383_rc(; regime_target = P1383.DiagonalTarget(),
-                                     regime_method = P1383.LogRegimeAdjusted()),
+                      (n) -> p1383_rc(; regime_target = P1383.DiagonalTarget(),
+                                      regime_method = P1383.LogRegimeAdjusted()),
                   "RCDiagonalRms" =>
-                      () -> p1383_rc(; regime_target = P1383.DiagonalTarget(),
-                                     regime_method = P1383.RootMeanSquaredAdjusted()),
-                  "RCPortfolioFirst" => () -> p1383_rc(),
+                      (n) -> p1383_rc(; regime_target = P1383.DiagonalTarget(),
+                                      regime_method = P1383.RootMeanSquaredAdjusted()),
+                  "RCPortfolioFirst" => (n) -> p1383_rc(),
                   "RCPortfolioLog" =>
-                      () -> p1383_rc(; regime_method = P1383.LogRegimeAdjusted()),
+                      (n) -> p1383_rc(; regime_method = P1383.LogRegimeAdjusted()),
                   "RCPortfolioRms" =>
-                      () -> p1383_rc(; regime_method = P1383.RootMeanSquaredAdjusted()),
+                      (n) -> p1383_rc(; regime_method = P1383.RootMeanSquaredAdjusted()),
                   "RCMahalanobisFirstFull" =>
-                      () -> p1383_rc(; regime_target = P1383.MahalanobisTarget(),
-                                     min_obs = 13, regime_lohi_mult = nothing),
+                      (n) -> p1383_rc(; regime_target = P1383.MahalanobisTarget(),
+                                      min_obs = 13, regime_lohi_mult = nothing),
                   "RCMahalanobisLogFull" =>
-                      () -> p1383_rc(; regime_target = P1383.MahalanobisTarget(),
-                                     regime_method = P1383.LogRegimeAdjusted(),
-                                     min_obs = 13, regime_lohi_mult = nothing),
+                      (n) -> p1383_rc(; regime_target = P1383.MahalanobisTarget(),
+                                      regime_method = P1383.LogRegimeAdjusted(),
+                                      min_obs = 13, regime_lohi_mult = nothing),
                   "RCMahalanobisRmsFull" =>
-                      () -> p1383_rc(; regime_target = P1383.MahalanobisTarget(),
-                                     regime_method = P1383.RootMeanSquaredAdjusted(),
-                                     min_obs = 13, regime_lohi_mult = nothing),
-                  "RCCorrHL5" => () -> p1383_rc(; cor_decay = p1383_dk(5)),
-                  "RCHac2" => () -> p1383_rc(; hac_lags = 2),
+                      (n) -> p1383_rc(; regime_target = P1383.MahalanobisTarget(),
+                                      regime_method = P1383.RootMeanSquaredAdjusted(),
+                                      min_obs = 13, regime_lohi_mult = nothing),
+                  "RCCorrHL5" => (n) -> p1383_rc(; cor_decay = p1383_dk(5)),
+                  "RCHac2" => (n) -> p1383_rc(; hac_lags = 2),
                   "RCWeights" =>
-                      () -> p1383_rc(; regime_target = P1383.PortfolioTarget(; w = P1383_W)),
-                  "RCNoClip" => () -> p1383_rc(; regime_lohi_mult = nothing),
-                  "RCClipAboveOne" => () -> p1383_rc(; regime_lohi_mult = (1.1, 2.0)),
-                  "RCUncentred" => () -> p1383_rc(; centred = false),
-                  "RCRegimeHL3" => () -> p1383_rc(; rhl = 3, rmin = 4)]
+                      (n) -> p1383_rc(;
+                                      regime_target = P1383.PortfolioTarget(;
+                                                                            w = p1383_w(n))),
+                  "RCNoClip" => (n) -> p1383_rc(; regime_lohi_mult = nothing),
+                  "RCClipAboveOne" => (n) -> p1383_rc(; regime_lohi_mult = (1.1, 2.0)),
+                  "RCUncentred" => (n) -> p1383_rc(; centred = false),
+                  "RCRegimeHL3" => (n) -> p1383_rc(; rhl = 3, rmin = 4)]
 const P1383_RC_SERIES = ["RCDefault", "RCDiagonalLog", "RCMahalanobisFirstFull",
                          "RCCorrHL5", "RCClipAboveOne"]
+# The library's multipliers on "Small", in the order of `P1383_RC` (Better, see below).
+const P1383_SMALL_MULT = [0.7562660923140582, 0.8388726265938486, 0.8211425463273536,
+                          0.8970151341030335, 0.7728297271335702, 0.7, 0.8437780453120634,
+                          1.1643502876725171, 1.1697258124619465, 1.1611765971360257,
+                          0.7605405673104944, 0.9212423935074233, 0.7208906150115325,
+                          0.7728297271335702, 1.1, 0.7867814999193841, 0.7]
 
 # The multiplier the report applies, read from the state after the fit.
 function p1383_mult(ce, X, am, em)
@@ -144,6 +153,12 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
     X = copy(Xh)
     X[fx.at.holiday...] = 0.0031
     N = size(X, 2)
+    # "Full": the assets that share one history, 1 and 5 to 12.
+    keep = [1; 5:12]
+    XF = X[:, keep]
+    aF = am[:, keep]
+    eF = em[:, keep]
+    NF = length(keep)
 
     @testset "The exponentially weighted moments" begin
         for (case, Xc) in (("Small", X), ("Holiday", Xh))
@@ -161,28 +176,36 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
             end
         end
         # A covariance compares against its largest entry: an off-diagonal cell of two unrelated
-        # assets is a cancellation, and carries a relative round-off near 1e-13.
-        Ocov = parity_load("ExpWeightedCovariance", "Small", "Cov")
+        # assets is a cancellation, and carries a relative round-off near 1e-13. On "Full"
+        # every asset shares one history, and the report is at parity.
+        Ocov = parity_load("ExpWeightedCovariance", "Full", "Cov")
         for (k, (name, make)) in enumerate(P1383_COV)
-            r = parity_compare(cov(make(), X; active_mask = am), p1383_col(Ocov, k, N);
-                               scale = :array, name = name)
+            r = parity_compare(cov(make(), XF; active_mask = aF), p1383_col(Ocov, k, NF);
+                               scale = :array, name = "Full $name")
             @test r.ok
         end
     end
 
-    @testset "A holiday holds the correlation, where the oracle holds the covariance (ADR 0181)" begin
-        # ADR 0181 changes the pairs of the asset on the holiday and no other entry. So the
-        # block without asset 5 agrees with the oracle, and the pairs of asset 5 do not.
-        Ocov = parity_load("ExpWeightedCovariance", "Holiday", "Cov")
-        k5 = setdiff(1:N, fx.at.holiday[2])
-        for (k, (name, make)) in enumerate(P1383_COV)
-            S = cov(make(), Xh; active_mask = am)
-            O = p1383_col(Ocov, k, N)
-            @test parity_compare(S[k5, k5], O[k5, k5]; scale = :array, name = name).ok
-            @test !parity_compare(S[:, 5], O[:, 5]; rtol = 1e-4, scale = :array).ok
-            f = findall(isfinite, LinearAlgebra.diag(S))
-            @test minimum(LinearAlgebra.eigvals(LinearAlgebra.Symmetric(S[f, f]))) >=
-                  -1e-15 * maximum(abs, S[f, f])
+    @testset "A late listing and a holiday: the oracle's raw state, each pair over its weight (ADR 0181)" begin
+        # Better, amendment of 2026-09-29 to ADR 0181 (#1420). The step is the oracle's, so the
+        # raw state is its raw state. The oracle divides it by the per-asset congruence, and the
+        # report divides each pair by the weight it holds, so the raw state of the oracle is its
+        # output times `w * w'`, with `w` the root of the diagonal weights. The congruence
+        # shrinks each correlation of a late listing or of a holiday towards zero.
+        for (case, Xc, out) in (("Small", X, "Cov"), ("Holiday", Xh, "CovRaw"))
+            O = parity_load("ExpWeightedCovariance", case, out)
+            for (k, (name, make)) in enumerate(P1383_COV)
+                st = partial_fit!(make(), Xc; active_mask = am).cache
+                Ok = p1383_col(O, k, N)
+                f = findall(isfinite, LinearAlgebra.diag(Ok))
+                w = sqrt.(LinearAlgebra.diag(st.weight))
+                @test parity_compare(st.covariance[f, f], (Ok .* (w * transpose(w)))[f, f];
+                                     scale = :array, name = "$case $name raw").ok
+                S = cov(make(), Xc; active_mask = am)
+                @test !parity_compare(S[f, f], Ok[f, f]; rtol = 1e-4, scale = :array).ok
+                @test minimum(LinearAlgebra.eigvals(LinearAlgebra.Symmetric(S[f, f]))) >=
+                      -1e-15 * maximum(abs, S[f, f])
+            end
         end
     end
 
@@ -207,33 +230,50 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
     end
 
     @testset "The regime-adjusted covariance, its multiplier and its series" begin
+        # "Full": every asset shares one history, so the report, the multiplier and the series
+        # are at parity.
+        Oc = parity_load("RegimeAdjustedExpWeightedCovariance", "Full", "Cov")
+        Om = parity_load("RegimeAdjustedExpWeightedCovariance", "Full", "Mult")
+        for (k, (name, make)) in enumerate(P1383_RC)
+            S = cov(make(NF), XF; active_mask = aF, estimation_mask = eF)
+            @test parity_compare(S, p1383_col(Oc, k, NF); scale = :array,
+                                 name = "Full $name").ok
+            @test parity_compare([p1383_mult(make(NF), XF, aF, eF)], Om[:, k];
+                                 name = "Full $name multiplier").ok
+        end
+        Os = parity_load("RegimeAdjustedExpWeightedCovariance", "Full", "Series")
+        for (k, name) in enumerate(P1383_RC_SERIES)
+            s = P1383.variance_series(Dict(P1383_RC)[name](NF), XF; active_mask = aF,
+                                      estimation_mask = eF)
+            @test parity_compare(s, p1383_col(Os, k, NF); scale = :array,
+                                 name = "Full $name series").ok
+        end
+        # "Small": assets 2 and 4 list late. Better, amendment of 2026-09-29 to ADR 0181. On the
+        # path with one decay the raw state is the oracle's, its output over its multiplier
+        # squared times `w * w'`. On the separate path the report is the oracle's, each side over
+        # its multiplier squared, because the oracle divides that path by the pair count too.
+        # The multiplier differs: the regime statistic reads the block with each pair over its
+        # own weight, where the oracle's reads the congruence that shrinks a late listing. It
+        # moves by 0 on the diagonal target, which reads the variances alone, and by up to 1.9%
+        # on the Mahalanobis target.
         Oc = parity_load("RegimeAdjustedExpWeightedCovariance", "Small", "Cov")
         Om = parity_load("RegimeAdjustedExpWeightedCovariance", "Small", "Mult")
         for (k, (name, make)) in enumerate(P1383_RC)
-            S = cov(make(), X; active_mask = am, estimation_mask = em)
-            m = p1383_mult(make(), X, am, em)
-            if name == "RCCorrHL5"
-                # Better, amendment of 2026-09-29 to ADR 0181. The report is at parity once each
-                # side's covariance is divided by its own multiplier squared. The multiplier is
-                # not: the regime statistic here standardises by the correlation of each pair
-                # over its own observations, and the oracle's statistic by the correlation that
-                # a late listing shrinks towards zero. Measured 0.76054 against 0.76100.
-                @test parity_compare(S ./ m^2, p1383_col(Oc, k, N) ./ Om[1, k]^2;
-                                     scale = :array, name = "$name report").ok
-                @test isapprox(m, 0.7605405673104944; rtol = 1e-12)
-                @test !isapprox(m, Om[1, k]; rtol = 1e-4)
-                continue
+            m = p1383_mult(make(N), X, am, em)
+            O = p1383_col(Oc, k, N)
+            if P1383.has_separate_cor_decay(make(N))
+                S = cov(make(N), X; active_mask = am, estimation_mask = em)
+                @test parity_compare(S ./ m^2, O ./ Om[1, k]^2; scale = :array,
+                                     name = "Small $name report").ok
+            else
+                st = partial_fit!(make(N), X; active_mask = am, estimation_mask = em).cache
+                f = findall(isfinite, LinearAlgebra.diag(O))
+                w = sqrt.(LinearAlgebra.diag(st.weight))
+                @test parity_compare(st.covariance[f, f],
+                                     (O ./ Om[1, k]^2 .* (w * transpose(w)))[f, f];
+                                     scale = :array, name = "Small $name raw").ok
             end
-            @test parity_compare(S, p1383_col(Oc, k, N); scale = :array, name = name).ok
-            @test parity_compare([m], Om[:, k]; name = "$name multiplier").ok
-        end
-        Os = parity_load("RegimeAdjustedExpWeightedCovariance", "Small", "Series")
-        for (k, name) in enumerate(P1383_RC_SERIES)
-            make = Dict(P1383_RC)[name]
-            s = P1383.variance_series(make(), X; active_mask = am, estimation_mask = em)
-            name == "RCCorrHL5" && continue # the multiplier of each row, as above
-            @test parity_compare(s, p1383_col(Os, k, N); scale = :array,
-                                 name = "$name series").ok
+            @test isapprox(m, P1383_SMALL_MULT[k]; rtol = 1e-12)
         end
     end
 
@@ -300,7 +340,8 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
             v = vec(var(make(), X .* c; active_mask = am, estimation_mask = em))
             @test parity_compare(v, Ov[:, k]; name = "$ce milli").ok
         end
-        Oc = parity_load("RegimeAdjustedExpWeightedCovariance", "Milli", "Cov")
+        # The covariance holds the same identity, `cov(cX) = c^2 cov(X)`. At the old floor the
+        # multiplier of the diagonal target fell from 0.839 to the clip 0.7.
         for (k, t) in
             enumerate(((P1383.DiagonalTarget(), P1383.FirstMomentRegimeAdjusted()),
                        (P1383.PortfolioTarget(), P1383.LogRegimeAdjusted())))
@@ -309,8 +350,9 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
                                                      regime_min_obs = 5,
                                                      regime_target = t[1],
                                                      regime_method = t[2], centred = true)
-            S = cov(ce, X .* c; active_mask = am, estimation_mask = em)
-            @test parity_compare(S, p1383_col(Oc, k, N); scale = :array, name = "milli $k").ok
+            S1 = cov(ce, X; active_mask = am, estimation_mask = em)
+            Sc = cov(ce, X .* c; active_mask = am, estimation_mask = em)
+            @test parity_compare(Sc, c^2 .* S1; scale = :array, name = "milli $k").ok
         end
     end
 

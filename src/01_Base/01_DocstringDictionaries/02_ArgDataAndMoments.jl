@@ -171,11 +171,13 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :regime_target => "`regime_target`: Target structure for the regime-adjusted covariance update.",#
                  :ra_w => "`w`: Optional portfolio weights for the portfolio target, as one vector over the assets or as a matrix whose rows are portfolios. If `nothing`, inverse-volatility weights are used, and they are rebuilt from the running variance at each observation.",#
                  :ra_covariance => "`covariance`: Running exponentially weighted covariance matrix, seeded at zero.",#
+                 :ra_weight => "`weight`: Running total of the weights that each pair of assets holds in `covariance`. It takes the step of `covariance` on a unit outer product, so a pair gains weight only at an observation where both of its assets are valid. It is `nothing` where `cor_decay` carries the correlation in `cor_state`.",#
                  :ra_cor_state => "`cor_state`: Running exponentially weighted correlation state, or `nothing` where one decay governs both the variance and the correlation.",#
-                 :ra_cor_weight => "`cor_weight`: Running total of the weights that each pair of assets holds in `cor_state`, advanced by the same step on a unit outer product, or `nothing` where one decay governs both the variance and the correlation.",#
+                 :ra_cor_weight => "`cor_weight`: Running total of the weights that each pair of assets holds in `cor_state`. It takes the step of `cor_state` on a unit outer product, so a pair gains weight only at an observation where both of its assets are valid. It is `nothing` where one decay governs both the variance and the correlation.",#
                  :ra_XXt => "`XXt`: Working matrix for the current (possibly HAC-adjusted) outer product of the returns.",#
                  :ra_Xi => "`Xi`: Working array for the current centred returns.",#
                  # Plain exponentially weighted estimators.
+                 :ew_weight => "`weight`: Running total of the weights that each pair of assets holds in `covariance`. It takes the step of `covariance` on a unit outer product, so a pair gains weight only at an observation where both of its assets are valid.",#
                  :ew_cache => "`cache`: Running state of an incremental fit, or `nothing` before the first call to [`partial_fit!`](@ref). It is the one Result this estimator holds, and its type bound is the enforcement of that exception. A fit over a matrix ignores it.",#
                  :ew_mu => "`mu`: Running exponentially weighted mean vector, seeded at zero.",#
                  :sq => "`sq`: Whether to use variance instead of volatility in the inverse weighting.",#

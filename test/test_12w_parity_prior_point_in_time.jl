@@ -154,12 +154,15 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                                                          nothing, Sf, pr.rr.vs[end, :], amr)
         @test count(!iszero, Df[rs, rs]) - length(rs) == 72
 
-        # On the large panel the block before its repair agrees on every pair but those of
-        # the asset with a holiday. There the oracle keeps the covariance of each pair on the
-        # holiday, and ours keeps the correlation, which keeps the state positive
-        # semidefinite (ADR 0181). The thresholded block is not positive definite, so the
-        # repair binds: ours takes the nearest correlation by Newton, and the oracle clips
-        # the eigenvalues, which #1412 builds as an algorithm of `Posdef` (ADR 0186).
+        # On the large panel the block before its repair agrees on every pair whose two assets
+        # share one history. The raw state of the correlation is the oracle's (#1420, ADR 0181
+        # amendment of 2026-09-29), and each pair is divided by the weight it holds, where the
+        # oracle divides by the per-asset congruence. So on the pairs of a late listing, a
+        # relisting or a holiday, ours is the oracle's times `sqrt(W_ii W_jj) / W_ij`, up to
+        # 1.124 here: measured 2.4e-15 on the 1303 pairs that both keep, and 4 pairs cross the
+        # threshold. The thresholded block is not positive definite, so the repair binds:
+        # ours takes the nearest correlation by Newton, and the oracle clips the eigenvalues,
+        # which #1412 builds as an algorithm of `Posdef` (ADR 0186).
         pl = prior(est(; th = 0.1), fxl.rd)
         eps = pl.rr.csr.eps
         amr = fxl.amsk[(end - size(eps, 1) + 1):end, :]
@@ -169,11 +172,15 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                                                                               centred = true),
                                                         nothing, Z, pl.rr.vs[end, :], amr)
         E = load("PitLargeOverlayRaw", "IdioCov")
-        h = fxl.at.holiday[2]
-        k = setdiff(axes(B, 1), h)
-        # Measured maxrel 2.2e-15 off the holiday, and 2.3e-3 on its pairs.
-        @test parity_compare(B[k, k], E[k, k]; name = "raw block").ok
-        @test !parity_compare(B[h, k], E[h, k]; name = "raw holiday").ok
+        st = partial_fit!(ExpWeightedCovariance(; centred = true), Z; active_mask = amr).cache
+        w = sqrt.(LinearAlgebra.diag(st.weight))
+        ratio = (w * transpose(w)) ./ st.weight
+        same = [isapprox(ratio[i, j], 1; rtol = 1e-12) for i in axes(B, 1), j in axes(B, 2)]
+        @test parity_compare(ifelse.(same, B, 0.0), ifelse.(same, E, 0.0);
+                             name = "raw block, one history").ok
+        kept = (B .!= 0) .& (E .!= 0) .& isfinite.(B) .& isfinite.(E)
+        @test all(isapprox.(B[kept], (E .* ratio)[kept]; rtol = 1e-12))
+        @test count(kept .& .!same) > 0
         il = findall(isfinite, pl.mu)
         Br = B[il, il]
         @test !LinearAlgebra.isposdef(LinearAlgebra.Symmetric(Br))
