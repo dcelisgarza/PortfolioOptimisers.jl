@@ -1001,7 +1001,10 @@ function set_ucs_return_constraints!(model::JuMP.Model, i,
     ret = if robust
         x_nbucs_w = state_set!(model, Symbol(""), :x_nbucs_w_, i,
                                JuMP.@expression(model, transpose(L) * w))
-        t_nbucs = norm_ball_dual_norm_epigraph!(model, Symbol(""), i, x_nbucs_w, ucs.p)
+        # The covariance builder registers its epigraph under the same prefix and index, so
+        # this one tags the index.
+        t_nbucs = norm_ball_dual_norm_epigraph!(model, Symbol(""), Symbol(:w_, i),
+                                                x_nbucs_w, ucs.p)
         JuMP.@expression(model, dot_scalar(mu, w) - ucs.kappa * t_nbucs)
     else
         JuMP.@expression(model, dot_scalar(mu, w))

@@ -1438,6 +1438,8 @@ end
         sg_tag = SigmaUncertaintySetClass()
         ret_key = PortfolioOptimisers.state_key(Symbol(""), :ret_, 1)
         skey(name) = PortfolioOptimisers.state_key(Symbol(""), name, 1)
+        # The mean builder tags its index, so its names differ from the covariance builder's.
+        wkey(name) = PortfolioOptimisers.state_key(Symbol(""), name, :w_1)
         dualq = PortfolioOptimisers.dual_norm_order
         # A maximum-utility objective pulls on the return term, so the epigraph is tight at
         # the optimum and the model's own expression is the worst case.
@@ -1524,11 +1526,11 @@ end
                 want = dot(mun, res.w) - ucs.kappa * norm(transpose(Ln) * res.w, dualq(p))
                 @test isapprox(PortfolioOptimisers.JuMP.value(res.model[ret_key]), want;
                                rtol = 1e-6)
-                @test haskey(res.model, skey(:t_nbucs_))
-                @test haskey(res.model, skey(:nbucs_cone_))
+                @test haskey(res.model, wkey(:t_nbucs_))
+                @test haskey(res.model, wkey(:nbucs_cone_))
                 # Only the power-cone route carries the per-entry auxiliaries.
-                @test haskey(res.model, skey(:r_nbucs_)) == (p == 3)
-                @test haskey(res.model, skey(:nbucs_cone_sum_)) == (p == 3)
+                @test haskey(res.model, wkey(:r_nbucs_)) == (p == 3)
+                @test haskey(res.model, wkey(:nbucs_cone_sum_)) == (p == 3)
             end
             # The penalty is linear in the radius and vanishes at zero, where the weights
             # are the nominal ones.
@@ -1651,7 +1653,7 @@ end
                                                     class = mu_tag))
             @test isa(res0.retcode, PortfolioOptimisers.OptimisationSuccess)
             @test isapprox(res0.w, resn.w; rtol = 1e-5, atol = 1e-6)
-            @test !haskey(res0.model, skey(:t_nbucs_))
+            @test !haskey(res0.model, wkey(:t_nbucs_))
             @test !haskey(res0.model, skey(:x_nbucs_w_))
             resv = optimise(MeanRisk(; r = Variance(), obj = MinimumRisk(), opt = optn),
                             rdn)
@@ -1668,6 +1670,24 @@ end
             u0s = NormBallUncertaintySet(; kappa = 1.0, L = zeros(Nn^2, 0), class = sg_tag)
             @test isapprox(PortfolioOptimisers.ucs_variance(u0s, sigman, wn),
                            dot(wn, sigman, wn))
+        end
+        @testset "A set on each axis builds one model (#1390)" begin
+            # Both builders register their epigraph under one prefix, and the mean builder
+            # tags its index. With one index, the second registration refused the model.
+            Lb = randn(rngn, Nn^2, 4) * 1e-4
+            um = NormBallUncertaintySet(; kappa = 1.0, L = Ln, class = mu_tag)
+            us = NormBallUncertaintySet(; kappa = 1.0, L = Lb, class = sg_tag)
+            res = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = us),
+                                    obj = MaximumUtility(; l = 2),
+                                    opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slvn,
+                                                        ret = ArithmeticReturn(; ucs = um))),
+                           rdn)
+            @test isa(res.retcode, PortfolioOptimisers.OptimisationSuccess)
+            @test haskey(res.model, wkey(:t_nbucs_))
+            @test haskey(res.model, skey(:t_nbucs_))
+            want = dot(mun, res.w) - norm(transpose(Ln) * res.w, 2)
+            @test isapprox(PortfolioOptimisers.JuMP.value(res.model[ret_key]), want;
+                           rtol = 1e-6)
         end
         @testset "The carried centre wins over the fallback (ADR 0050)" begin
             nbv = NormBallUncertaintySet(; kappa = 1.0, L = Ln, class = mu_tag,
