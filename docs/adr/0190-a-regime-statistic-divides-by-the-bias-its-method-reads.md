@@ -250,7 +250,7 @@ modulation of the rows and their coupling with `1 / V̂`, which the `κ` of the 
 read; it grows with the count of assets and of lags. The shrink of the `DiagonalTarget` spectrum
 subtracts the same noise from `Σ r̂²`, and it reads the same kernel (#1461): the Bartlett kernel put
 the mean of `r̂²` at `R = I` 14 % too high, the kernel 4 %, and the FirstMoment and Log factors move
-towards their truth by 0.1 % to 0.3 % and 0.2 % to 0.7 % at a correlated `R`, and by at most 0.26 %
+towards their truth by up to 0.3 % and 0.7 % at a correlated `R`, and by at most 0.26 %
 away from it at `R = I`, where the Bartlett over-shrink stopped on the identity. The variance keeps
 the Bartlett kernel, and `hac_vol_before = false` keeps the Bartlett kernel for the correlation too.
 

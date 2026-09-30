@@ -203,8 +203,8 @@ damped rows carry less noise than the Bartlett weights say: at two lags and half
 kernel of [`hac_row_kernel`](@ref) 4 % too high. With the kernel the unbiased dispersion reads
 4.9 % low on a three-factor correlation of 12 assets, where the Bartlett weights read 6.7 % low,
 and 6.9 % low at four lags, where they read 12.7 % low. The factor of
-[`diagonal_law_factor`](@ref) then moves towards its truth by 0.1 % to 0.3 % for the first
-moment and by 0.2 % to 0.7 % for the log, measured without return noise. At ``R = I`` the
+[`diagonal_law_factor`](@ref) then moves towards its truth by up to 0.3 % for the first moment
+and 0.7 % for the log, measured without return noise. At ``R = I`` the
 Bartlett weights over-shrink to the identity, which is the truth there, and the kernel moves
 the factor up by 0.05 % to 0.26 %, within 0.22 % of it.
 
