@@ -18,7 +18,6 @@ PortfolioOptimisers.MissingDataFilterState
 PortfolioOptimisers.vcat_observations
 PortfolioOptimisers.assert_pinned_value
 PortfolioOptimisers.vcat_optional
-PortfolioOptimisers.vcat_panel_rows
 PortfolioOptimisers.data_row_count
 PortfolioOptimisers.partial_fit_transform
 PortfolioOptimisers.series_values

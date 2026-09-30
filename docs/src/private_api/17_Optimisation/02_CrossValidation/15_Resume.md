@@ -15,5 +15,4 @@ PortfolioOptimisers.copy_state
 PortfolioOptimisers.data_timestamps
 PortfolioOptimisers.context_timestamps
 is_time_dependent(r::Resume)
-Base.vcat(a::MultiPeriodPredictionResult, b::MultiPeriodPredictionResult)
 ```

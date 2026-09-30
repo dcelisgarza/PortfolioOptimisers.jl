@@ -247,9 +247,9 @@ what keeps the JuMP families cheap.
         b = po.partial_fit!(PricesToReturns(), rows(pr, 71:160)).cache
         @test isnothing(po.merge_states(a, b).anchor)
         static = AssetPanel(; pf = [NumericPanelField(; name = "size", vals = ones(N))])
-        @test po.vcat_panel_rows(static, static) === static
-        @test_throws ArgumentError po.vcat_panel_rows(static, nothing)
-        @test isnothing(po.vcat_panel_rows(nothing, nothing))
+        @test vcat(static, static) === static
+        @test_throws ArgumentError po.vcat_optional(static, nothing, :pnl)
+        @test isnothing(po.vcat_optional(nothing, nothing, :pnl))
         rds = ReturnsResult(; nx = nx, X = rd.X[1:10, :], pnl = static)
         @test po.vcat_observations(rds, rds).pnl === static
         @test_throws ArgumentError po.vcat_observations(rds, rows(rd, 1:10))

@@ -6,14 +6,14 @@ Concatenates the observations of two `PricesResult` values or two `ReturnsResult
 
 Each online form of a data step reads this concatenation. [`PricesToReturns`](@ref) puts the last price row it kept in front of a new block, so that the conversion reads consecutive prices. The input-data buffer of `Online(pipe)` appends each block that it receives. `a` pins the universe: the names of the assets, the factors and the benchmark, the implied-volatility adjustment, and a static [`AssetPanel`](@ref). The function refuses a block `b` with a different universe, and the message names the field, as the step of [`ReturnsBufferState`](@ref) does. It also refuses a column that one of `a` and `b` holds and the other does not, because a factor series that some blocks hold and others do not is not one series.
 
-The function concatenates a time-varying panel mask by mask, and refuses its Panel Fields, as [`step_active_mask`](@ref) does. The rows of a time-varying field are sample data, and this function concatenates masks only.
+The function concatenates the [`AssetPanel`](@ref)s with [`Base.vcat(a::AssetPanel, bs::AssetPanel...)`](@ref), which joins the Panel Fields and the masks of a time-varying panel. When the two blocks hold equal static panels, the result keeps the panel of `a`.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. [`PricesResult`](@ref): check that the implied-volatility adjustment `ivpa` of `b` equals the one of `a`. Concatenate the prices `X`, the factors `F`, the benchmark `B`, the Exogenous Series `E` and the implied volatilities `iv` with [`vcat_optional`](@ref), which also checks the column names. Concatenate the panel with [`vcat_panel_rows`](@ref), and the Listing Span `span` with [`vcat_optional`](@ref).
- 2. [`ReturnsResult`](@ref): check that the names `nx`, `nf`, `nb` and `ne` and the adjustment `ivpa` of `b` equal the ones of `a`. Concatenate `X`, `F`, `B`, `E`, the timestamps `ts` and `iv` with [`vcat_optional`](@ref), and the panel with [`vcat_panel_rows`](@ref).
+ 1. [`PricesResult`](@ref): check that the implied-volatility adjustment `ivpa` of `b` equals the one of `a`. Concatenate the prices `X`, the factors `F`, the benchmark `B`, the Exogenous Series `E` and the implied volatilities `iv` with [`vcat_optional`](@ref), which also checks the column names. Concatenate the panel `pnl` and the Listing Span `span` with [`vcat_optional`](@ref).
+ 2. [`ReturnsResult`](@ref): check that the names `nx`, `nf`, `nb` and `ne` and the adjustment `ivpa` of `b` equal the ones of `a`. Concatenate `X`, `F`, `B`, `E`, the timestamps `ts`, `iv` and the panel `pnl` with [`vcat_optional`](@ref).
 
 # Arguments
 
@@ -22,9 +22,9 @@ The method that Julia selects is the algorithm.
 
 # Validation
 
-  - The names, the implied-volatility adjustment and a static panel of `b` equal the ones of `a`. An `ArgumentError` is thrown otherwise.
+  - The names and the implied-volatility adjustment of `b` equal the ones of `a`. An `ArgumentError` is thrown otherwise.
   - Each optional column is held by both `a` and `b` or by neither. An `ArgumentError` is thrown otherwise.
-  - A time-varying panel holds no Panel Field. An `ArgumentError` is thrown otherwise.
+  - The panels of `a` and `b` concatenate. [`Base.vcat(a::AssetPanel, bs::AssetPanel...)`](@ref) throws otherwise.
 
 # Returns
 
@@ -34,7 +34,7 @@ The method that Julia selects is the algorithm.
 
   - [`PricesResult`](@ref)
   - [`ReturnsResult`](@ref)
-  - [`vcat_panel_rows`](@ref)
+  - [`Base.vcat(a::AssetPanel, bs::AssetPanel...)`](@ref)
   - [`partial_fit!`](@ref)
 """
 function vcat_observations(a::PricesResult, b::PricesResult)
@@ -42,7 +42,7 @@ function vcat_observations(a::PricesResult, b::PricesResult)
     return PricesResult(; X = vcat_optional(a.X, b.X, :X), F = vcat_optional(a.F, b.F, :F),
                         B = vcat_optional(a.B, b.B, :B), E = vcat_optional(a.E, b.E, :E),
                         iv = vcat_optional(a.iv, b.iv, :iv), ivpa = a.ivpa,
-                        pnl = vcat_panel_rows(a.pnl, b.pnl),
+                        pnl = vcat_optional(a.pnl, b.pnl, :pnl),
                         span = vcat_optional(a.span, b.span, :span))
 end
 function vcat_observations(a::ReturnsResult, b::ReturnsResult)
@@ -57,7 +57,7 @@ function vcat_observations(a::ReturnsResult, b::ReturnsResult)
                          E = vcat_optional(a.E, b.E, :E),
                          ts = vcat_optional(a.ts, b.ts, :ts),
                          iv = vcat_optional(a.iv, b.iv, :iv), ivpa = a.ivpa,
-                         pnl = vcat_panel_rows(a.pnl, b.pnl))
+                         pnl = vcat_optional(a.pnl, b.pnl, :pnl))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -136,58 +136,6 @@ function vcat_optional(a, b, name::Symbol)
     @argcheck(!isnothing(a) && !isnothing(b),
               ArgumentError("the `$name` column is held by $(isnothing(a) ? "the later" : "the earlier") block of observations and not by the other, so the two cannot be one series: a column is present at every observation or at none."))
     return vcat(a, b)
-end
-"""
-    vcat_panel_rows(a::Nothing, b::Nothing) -> Nothing
-    vcat_panel_rows(a::AssetPanel, b::AssetPanel) -> AssetPanel
-    vcat_panel_rows(a, b)
-
-Concatenates the [`AssetPanel`](@ref)s of two blocks along the observation axis.
-
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. `a` and `b` are `nothing`: return `nothing`.
- 2. `a` or `b` is a static panel: check that the two panels are equal, and return `a`. A static panel has no observation axis, so there is nothing to concatenate.
- 3. `a` and `b` are time-varying: check that neither holds a Panel Field, and concatenate the active masks `amsk` and the estimation masks `emsk`. The rows of a time-varying field are sample data, and the online step keeps no copy of them.
- 4. One block holds a panel and the other does not: throw, because the two blocks did not come from one ingestion.
-
-# Arguments
-
-  - `a`: The panel of the earlier block, or `nothing`.
-  - `b`: The panel of the later block, or `nothing`.
-
-# Validation
-
-  - Both blocks hold a panel, or neither does. An `ArgumentError` is thrown otherwise.
-  - A static panel equals the other panel. An `ArgumentError` is thrown otherwise.
-  - A time-varying panel holds no Panel Field. An `ArgumentError` is thrown otherwise.
-
-# Returns
-
-  - `pnl`: The panel of the concatenated observations, or `nothing`.
-
-# Related
-
-  - [`vcat_observations`](@ref)
-  - [`AssetPanel`](@ref)
-  - [`step_active_mask`](@ref)
-"""
-function vcat_panel_rows(::Nothing, ::Nothing)
-    return nothing
-end
-function vcat_panel_rows(a::AssetPanel, b::AssetPanel)
-    if panel_is_static(a) || panel_is_static(b)
-        assert_pinned_value(a, b, :pnl)
-        return a
-    end
-    @argcheck(isempty(a.pf) && isempty(b.pf),
-              ArgumentError("a time-varying Asset Panel is concatenated through its masks alone, and this one holds $(length(a.pf) + length(b.pf)) Panel Field(s): a time-varying field's rows are sample, and the online step has nowhere to keep them. Drop the fields from the panel handed to the step, or fit in batch."))
-    return AssetPanel(; amsk = vcat(a.amsk, b.amsk), emsk = vcat(a.emsk, b.emsk))
-end
-function vcat_panel_rows(a, b)
-    return throw(ArgumentError("an Asset Panel is held by $(isnothing(a) ? "the later" : "the earlier") block of observations and not by the other, so the two did not come from one ingestion."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

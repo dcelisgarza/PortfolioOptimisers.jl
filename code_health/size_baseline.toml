@@ -74,7 +74,8 @@ commit = "ebcacfda95"
 "src/03_InputData/15_FeatureSelector.jl" = { code = 208, doc = 342, comment = 0, blank = 163, total = 713 }
 "src/03_InputData/16_PanelDataFrame.jl" = { code = 150, doc = 264, comment = 0, blank = 124, total = 538 }
 "src/03_InputData/17_ReturnsBufferState.jl" = { code = 222, doc = 345, comment = 3, blank = 165, total = 735 }
-"src/03_InputData/18_PreprocessingPartialFit.jl" = { code = 326, doc = 402, comment = 15, blank = 207, total = 950 }
+"src/03_InputData/18_PreprocessingPartialFit.jl" = { code = 324, doc = 378, comment = 15, blank = 195, total = 912 }
+"src/03_InputData/19_AssetPanelConcat.jl" = { code = 97, doc = 161, comment = 2, blank = 85, total = 345 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { code = 60, doc = 196, comment = 2, blank = 94, total = 352 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { code = 136, doc = 534, comment = 34, blank = 195, total = 899 }
 "src/04_MatrixProcessing/03_Detone.jl" = { code = 48, doc = 188, comment = 0, blank = 81, total = 317 }

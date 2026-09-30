@@ -1,5 +1,5 @@
 ```@meta
-Description = "Resume, public API of PortfolioOptimisers.jl: Resume, cross_val_predict, search_cross_validation."
+Description = "Resume, public API of PortfolioOptimisers.jl: Resume, cross_val_predict, search_cross_validation, Base.vcat."
 ```
 
 # Resume
@@ -10,4 +10,5 @@ The [`MultiPeriodPredictionResult`](@ref) of an online walk-forward stores the e
 Resume
 cross_val_predict(r::PortfolioOptimisers.OptimiserResume, rd::ReturnsResult, cv::CVER)
 search_cross_validation(::Resume, ::PortfolioOptimisers.AbstractSearchCrossValidationEstimator, ::Any)
+Base.vcat(a::MultiPeriodPredictionResult, b::MultiPeriodPredictionResult)
 ```
