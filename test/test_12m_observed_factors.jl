@@ -260,11 +260,17 @@ end
         @test all(iszero, pr.rr.Ms[:, usd, 2])
         @test all(isfinite, pr.sigma)
         @test cross_sectional_factor_axis(obs_prior(; factors = fb), rd).nf == pr.rr.nf
-        # A factor of the base currency has no variance, and the default factor covariance
-        # divides by its zero volatility and throws; `base` is the way out.
+        # A factor of the base currency has no variance. The factor covariance keeps its zero
+        # row and column (#1429), so the factor adds no risk, and the asset covariance is the
+        # one of the fit that `base` drops the factor from.
         rdz = ReturnsResult(; nx = fz.rd.nx, X = fz.rd.X, ne = ["EUR", "USD"], E = fz.R,
                             pnl = fz.rd.pnl)
-        @test_throws ArgumentError prior(obs_prior(), rdz)
+        prz = prior(obs_prior(), rdz)
+        @test prz.rr.nf == ["beta", "currency=EUR", "currency=USD"]
+        @test all(iszero, prz.fpr.sigma[3, :])
+        @test all(iszero, prz.fpr.sigma[:, 3])
+        @test all(isfinite, prz.sigma)
+        @test isapprox(prz.sigma, pr.sigma; rtol = 1e-12)
         @test_throws ArgumentError prior(obs_prior(;
                                                    factors = ["beta" => obs_pass("beta",
                                                                                  "market"),
