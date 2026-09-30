@@ -259,6 +259,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `n_sim > 0`.
+  - `n_sim > 1` when `alg` is an [`EllipsoidalUncertaintySetAlgorithm`](@ref) or a [`NormBallUncertaintySetAlgorithm`](@ref). Both shapes read the covariance of the resampled errors, and one resample has none. [`BoxUncertaintySetAlgorithm`](@ref) reads quantiles, so it accepts one resample.
   - `block_size > 0`.
   - `0 < q < 1`.
 
@@ -385,6 +386,12 @@ ARCHUncertaintySet
                                 seed::Option{<:Integer}, bootstrap::ARCHBootstrapSet,
                                 kwargs::NamedTuple)
         @argcheck(n_sim > zero(n_sim), DomainError(n_sim, "n_sim must be > 0"))
+        if alg isa
+           Union{EllipsoidalUncertaintySetAlgorithm, NormBallUncertaintySetAlgorithm}
+            @argcheck(n_sim > one(n_sim),
+                      DomainError(n_sim,
+                                  "an ellipsoid or a norm ball reads the covariance of the resampled errors, and one resample has no covariance. Set n_sim to at least 2, or use BoxUncertaintySetAlgorithm, which reads quantiles and accepts one resample"))
+        end
         assert_resource_cap(n_sim, RESOURCE_LIMITS[].max_n_sim, :n_sim, :max_n_sim)
         @argcheck(block_size > zero(block_size),
                   DomainError(block_size, "block_size must be > 0"))

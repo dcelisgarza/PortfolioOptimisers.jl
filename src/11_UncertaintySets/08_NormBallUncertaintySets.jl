@@ -452,7 +452,7 @@ Where:
 # Algorithm
 
  1. When `diagonal` is `true`, return `LinearAlgebra.Diagonal(sqrt.(vec(Statistics.var(X; dims = 1))))`, the square root of the entrywise variances. It is ``m \\times m`` and of full rank.
- 2. Otherwise subtract the column means from `X`, transpose the result, and divide by `sqrt(size(X, 1) - 1)`. A sample of one row divides by zero and the [`NormBallUncertaintySet`](@ref) constructor then refuses the non-finite map.
+ 2. Otherwise subtract the column means from `X`, transpose the result, and divide by `sqrt(size(X, 1) - 1)`. The map needs at least two rows, because a sample of one row divides by zero. [`ARCHUncertaintySet`](@ref) refuses `n_sim < 2` for a norm ball when it is built, so its resample always has two rows.
 
 # Arguments
 

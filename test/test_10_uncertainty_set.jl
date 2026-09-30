@@ -2055,6 +2055,26 @@ end
                 @test maximum(abs, Matrix(se.sigma) - cov(Xd)) > 0
             end
         end
+        @testset "An ellipsoid or a norm ball needs two resamples, a box needs one" begin
+            # Both shapes read the covariance of the resampled errors, and one resample has
+            # none: the constructor refuses it and names the remedy. The box reads
+            # quantiles, so one resample is valid, and two resamples give finite radii.
+            for alg in (EllipsoidalUncertaintySetAlgorithm(; diagonal = false),
+                        EllipsoidalUncertaintySetAlgorithm(),
+                        NormBallUncertaintySetAlgorithm(; diagonal = false),
+                        NormBallUncertaintySetAlgorithm())
+                msg = "one resample has no covariance"
+                @test_throws msg ARCHUncertaintySet(; alg = alg, n_sim = 1)
+                @test_throws DomainError ARCHUncertaintySet(; alg = alg, n_sim = 1)
+                ms, ss = ucs(ARCHUncertaintySet(; alg = alg, n_sim = 2, seed = 7), X730)
+                for s in (ms, ss)
+                    @test isfinite(hasproperty(s, :k) ? s.k : s.kappa)
+                end
+            end
+            mb, sb = ucs(ARCHUncertaintySet(; n_sim = 1, seed = 7), X730)
+            @test isa(mb, BoxUncertaintySet)
+            @test all(isfinite, sb.lb) && all(isfinite, sb.ub)
+        end
         @testset "The bootstrap pair and the two single-axis verbs agree under a seed" begin
             ub = ARCHUncertaintySet(; alg = NormBallUncertaintySetAlgorithm(), n_sim = 20,
                                     seed = 11)
