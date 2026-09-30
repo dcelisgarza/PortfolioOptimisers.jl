@@ -312,7 +312,8 @@ $(DocStringExtensions.FIELDS)
 
     CrossSectionalLinearRegression(;
         alg::AbstractCrossSectionalSolveAlgorithm = PseudoInverseFallback(),
-        intercept::Bool = false
+        intercept::Bool = false,
+        ex::FLoops.Transducers.Executor = ThreadedEx()
     ) -> CrossSectionalLinearRegression
 
 Keywords correspond to the struct's fields.
@@ -323,7 +324,8 @@ Keywords correspond to the struct's fields.
 julia> CrossSectionalLinearRegression()
 CrossSectionalLinearRegression
         alg ┼ PseudoInverseFallback()
-  intercept ┴ Bool: false
+  intercept ┼ Bool: false
+         ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
 
 # Related
@@ -343,15 +345,21 @@ CrossSectionalLinearRegression
     $(arg_dict[:csrint])
     """
     intercept
+    """
+    $(field_dict[:ex]) It runs the fits of the observations, which are independent problems. Each fit writes its own row, so every executor gives the same result, and a refusal is the one of the first observation that fails.
+    """
+    ex
     function CrossSectionalLinearRegression(alg::AbstractCrossSectionalSolveAlgorithm,
-                                            intercept::Bool)
-        return new{typeof(alg), typeof(intercept)}(alg, intercept)
+                                            intercept::Bool,
+                                            ex::FLoops.Transducers.Executor)
+        return new{typeof(alg), typeof(intercept), typeof(ex)}(alg, intercept, ex)
     end
 end
 function CrossSectionalLinearRegression(;
                                         alg::AbstractCrossSectionalSolveAlgorithm = PseudoInverseFallback(),
-                                        intercept::Bool = false)::CrossSectionalLinearRegression
-    return CrossSectionalLinearRegression(alg, intercept)
+                                        intercept::Bool = false,
+                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::CrossSectionalLinearRegression
+    return CrossSectionalLinearRegression(alg, intercept, ex)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -377,7 +385,8 @@ $(DocStringExtensions.FIELDS)
 
     CrossSectionalTargetRegression(;
         tgt::AbstractRegressionTarget = LinearModel(),
-        intercept::Bool = false
+        intercept::Bool = false,
+        ex::FLoops.Transducers.Executor = ThreadedEx()
     ) -> CrossSectionalTargetRegression
 
 Keywords correspond to the struct's fields.
@@ -389,7 +398,8 @@ julia> CrossSectionalTargetRegression()
 CrossSectionalTargetRegression
         tgt ┼ LinearModel
             │   kwargs ┴ @NamedTuple{}: NamedTuple()
-  intercept ┴ Bool: false
+  intercept ┼ Bool: false
+         ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
 ```
 
 # Related
@@ -410,13 +420,19 @@ CrossSectionalTargetRegression
     $(arg_dict[:csrint])
     """
     intercept
-    function CrossSectionalTargetRegression(tgt::AbstractRegressionTarget, intercept::Bool)
-        return new{typeof(tgt), typeof(intercept)}(tgt, intercept)
+    """
+    $(field_dict[:ex]) It runs the fits of the observations, which are independent problems. Each fit writes its own row, so every executor gives the same result, and a refusal is the one of the first observation that fails.
+    """
+    ex
+    function CrossSectionalTargetRegression(tgt::AbstractRegressionTarget, intercept::Bool,
+                                            ex::FLoops.Transducers.Executor)
+        return new{typeof(tgt), typeof(intercept), typeof(ex)}(tgt, intercept, ex)
     end
 end
 function CrossSectionalTargetRegression(; tgt::AbstractRegressionTarget = LinearModel(),
-                                        intercept::Bool = false)::CrossSectionalTargetRegression
-    return CrossSectionalTargetRegression(tgt, intercept)
+                                        intercept::Bool = false,
+                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::CrossSectionalTargetRegression
+    return CrossSectionalTargetRegression(tgt, intercept, ex)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -696,6 +712,50 @@ function cross_sectional_least_squares(::AbstractRegressionTarget)::Bool
     return false
 end
 """
+    cross_sectional_foreach(f, ex::FLoops.Transducers.Executor, idx::AbstractVector) -> nothing
+    cross_sectional_foreach(f, ex::FLoops.SequentialEx, idx::AbstractVector) -> nothing
+
+Call `f` on every entry of `idx` under the executor `ex`, and raise the error of the first entry that fails.
+
+The calls must be independent, and each must write a slice of its own. A threaded executor wraps an error in a `TaskFailedException`, and the entry that fails first in time depends on the schedule. So each call records its own error, and after the loop the function raises the recorded error of the lowest position, unchanged. Every executor therefore raises the error that a serial loop raises. Under `SequentialEx` the function runs the serial loop itself, so the error keeps the backtrace of the call that raised it.
+
+# Arguments
+
+  - `f`: Function of one entry of `idx`. Its return value is discarded.
+  - $(arg_dict[:ex])
+  - `idx`: The entries, in the order of the serial loop.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`cross_sectional_regression`](@ref)
+  - [`cross_sectional_exposure_history`](@ref)
+  - [`descriptor_scores`](@ref)
+"""
+function cross_sectional_foreach(f, ex::FLoops.Transducers.Executor,
+                                 idx::AbstractVector)::Nothing
+    err = Vector{Any}(nothing, length(idx))
+    FLoops.@floop ex for j in eachindex(err)
+        try
+            f(idx[begin + j - 1])
+        catch e
+            err[j] = e
+        end
+    end
+    j = findfirst(!isnothing, err)
+    if !isnothing(j)
+        throw(err[j])
+    end
+    return nothing
+end
+function cross_sectional_foreach(f, ::FLoops.SequentialEx, idx::AbstractVector)::Nothing
+    foreach(f, idx)
+    return nothing
+end
+"""
     cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimator, Z::Arr3Num,
                                X::MatNum, W::MatNum) -> CrossSectionalRegression
     cross_sectional_regression(csr::CrossSectionalRegression, args...) -> CrossSectionalRegression
@@ -709,7 +769,7 @@ The weight matrix `W` is an argument rather than a field, because a two-pass wei
 # Algorithm
 
  1. Take the eligibility mask through [`cross_sectional_design_mask`](@ref).
- 2. For each observation `t`, gather the eligible assets, their weights `w`, their exposures `A` and their returns `y`, and record their count in `n`.
+ 2. For each observation `t`, gather the eligible assets, their weights `w`, their exposures `A` and their returns `y`, and record their count in `n`. The observations are independent problems, and `cre.ex` runs them through [`cross_sectional_foreach`](@ref). Each writes its own row, so every executor gives the same result.
  3. Mark the eligible assets of leverage one in the row `t` of `h1`, through [`cross_sectional_leverage_one`](@ref).
  4. When `cre.intercept` is `true`, take the weighted means `ybar` and `xbar` of `y` and of `A`, and subtract them. An observation with no eligible asset takes zero for both.
  5. Take the factor returns of the observation through [`cross_sectional_coefficients`](@ref), and write them into the row `t` of `f`. An observation with no eligible asset takes zero factor returns under [`CrossSectionalLinearRegression`](@ref), except under [`RankDeficiencyRefusal`](@ref), whose rank test reads an empty design as rank zero and refuses it by name.
@@ -774,9 +834,10 @@ function cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimat
     f = zeros(Tf, size(X, 1), K)
     b = cre.intercept ? zeros(Tf, size(X, 1)) : nothing
     n = zeros(Int, size(X, 1))
-    h1 = falses(size(X))
-    xbar = zeros(Tf, K)
-    for t in axes(X, 1)
+    # A `BitMatrix` packs 64 entries into one word, so two threads that write rows of one word
+    # would race. Each fit writes its row into a `Matrix{Bool}`, whose entries are bytes.
+    h1 = zeros(Bool, size(X))
+    cross_sectional_foreach(cre.ex, axes(X, 1)) do t
         idx = findall(view(act, t, :))
         n[t] = length(idx)
         w = Tf.(view(W, t, idx))
@@ -784,7 +845,7 @@ function cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimat
         y = Tf.(view(X, t, idx))
         h1[t, idx] = cross_sectional_leverage_one(A, w, cre.intercept)
         ybar = zero(Tf)
-        fill!(xbar, zero(Tf))
+        xbar = zeros(Tf, K)
         if cre.intercept
             sw = sum(w)
             if sw > zero(sw)
@@ -803,7 +864,7 @@ function cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimat
     eps = X - cross_sectional_systematic(f, b, Z)
     # A fit that is not least squares keeps the residual of a marked pair, and only marks it.
     eps[h1 .& cross_sectional_least_squares(cre)] .= zero(eltype(eps))
-    return CrossSectionalRegression(; f = f, eps = eps, n = n, b = b, h1 = h1)
+    return CrossSectionalRegression(; f = f, eps = eps, n = n, b = b, h1 = BitMatrix(h1))
 end
 function cross_sectional_regression(csr::CrossSectionalRegression, args...)
     return csr

@@ -18,4 +18,5 @@ cross_sectional_coefficients
 cross_sectional_rank
 cross_sectional_solve
 cross_sectional_systematic
+cross_sectional_foreach
 ```

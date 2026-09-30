@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The shared recipe that turns Descriptors into cross-sectional scores.
 
-Every fitted member of the Return Forecast family starts with the same steps. It computes each Descriptor, transforms it cross-sectionally and stacks the results. When the caller names Neutralisation targets, it also residualises every score against the named Factor Exposures and scores it once more. The recipe is one struct in a slot, so no member repeats its six fields. It has a verb of its own, [`descriptor_scores`](@ref), so a caller can read the scores without the fit of a forecast.
+Every fitted member of the Return Forecast family starts with the same steps. It computes each Descriptor, transforms it cross-sectionally and stacks the results. When the caller names Neutralisation targets, it also residualises every score against the named Factor Exposures and scores it once more. The recipe is one struct in a slot, so no member repeats its seven fields. It has a verb of its own, [`descriptor_scores`](@ref), so a caller can read the scores without the fit of a forecast.
 
 The Descriptors carry no names, because no code reads a name. The weights of a member are positional, and [`descriptor_scores`](@ref) stacks the scores in the order of the Descriptors.
 
@@ -45,7 +45,8 @@ $(DocStringExtensions.TYPEDFIELDS)
                      cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
                      outlier::Option{<:AbstractCrossSectionalTransform} = CrossSectionalWinsoriser(),
                      scoring::Option{<:AbstractCrossSectionalTransform} = CrossSectionalStandardiser(),
-                     group::Option{<:AbstractString} = nothing)
+                     group::Option{<:AbstractString} = nothing,
+                     ex::FLoops.Transducers.Executor = ThreadedEx())
 
 # Related
 
@@ -81,12 +82,17 @@ $(DocStringExtensions.TYPEDFIELDS)
     Name of the categorical Panel Field whose group labels the transforms read, or `nothing` to transform each observation as one cross-section.
     """
     group
+    """
+    $(field_dict[:ex]) It computes the scores of the Descriptors, each of which reads the returns data alone. Every executor gives the same scores. The regressions of the Neutralisation run under the executor of `cre`.
+    """
+    ex
     function DescriptorScores(descriptors::AbstractVector{<:AbstractDescriptorEstimator},
                               neutralise::Option{<:Union{<:AbstractString, <:VecStr}},
                               cre::AbstractCrossSectionalRegressionEstimator,
                               outlier::Option{<:AbstractCrossSectionalTransform},
                               scoring::Option{<:AbstractCrossSectionalTransform},
-                              group::Option{<:AbstractString})
+                              group::Option{<:AbstractString},
+                              ex::FLoops.Transducers.Executor)
         @argcheck(!isempty(descriptors),
                   IsEmptyError("Descriptor Scores are built from Descriptors, so they need at least one"))
         if !isnothing(neutralise)
@@ -96,8 +102,8 @@ $(DocStringExtensions.TYPEDFIELDS)
             assert_panel_terms(group, :group)
         end
         return new{typeof(descriptors), typeof(neutralise), typeof(cre), typeof(outlier),
-                   typeof(scoring), typeof(group)}(descriptors, neutralise, cre, outlier,
-                                                   scoring, group)
+                   typeof(scoring), typeof(group), typeof(ex)}(descriptors, neutralise, cre,
+                                                               outlier, scoring, group, ex)
     end
 end
 function DescriptorScores(; descriptors::AbstractVector{<:AbstractDescriptorEstimator},
@@ -105,8 +111,9 @@ function DescriptorScores(; descriptors::AbstractVector{<:AbstractDescriptorEsti
                           cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
                           outlier::Option{<:AbstractCrossSectionalTransform} = CrossSectionalWinsoriser(),
                           scoring::Option{<:AbstractCrossSectionalTransform} = CrossSectionalStandardiser(),
-                          group::Option{<:AbstractString} = nothing)::DescriptorScores
-    return DescriptorScores(descriptors, neutralise, cre, outlier, scoring, group)
+                          group::Option{<:AbstractString} = nothing,
+                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::DescriptorScores
+    return DescriptorScores(descriptors, neutralise, cre, outlier, scoring, group, ex)
 end
 """
     assert_neutralisation_names(neutralise::AbstractString) -> nothing
@@ -285,7 +292,7 @@ The function computes the Descriptors over all the returns data. A Descriptor wi
 # Algorithm
 
  1. Read the cross-sectional weights off the estimation mask of the Asset Panel, the group labels off the named categorical Panel Field, and the block's rows with [`return_forecast_rows`](@ref).
- 2. Compute each Descriptor over all the returns data, and apply the outlier slot and then the scoring slot to it.
+ 2. Compute each Descriptor over all the returns data under `ds.ex`, through [`cross_sectional_foreach`](@ref), and apply the outlier slot and then the scoring slot to it.
  3. Stack the scores on a third axis of `S`, in the order of the Descriptors. The number type of `S` is the promotion of the number types of the scores and, when the recipe names Neutralisation targets, of the exposure history.
  4. When the recipe names Neutralisation targets, residualise every score of the block's rows against those Factor Exposures, score it once more, and write `NaN` on the rows before the block.
 
@@ -346,12 +353,19 @@ function descriptor_scores(ds::DescriptorScores, rd::ReturnsResult,
     w = return_forecast_weights(rd)
     groups = exposure_group_labels(rd, ds.group)
     rows = return_forecast_rows(rd, csfm)
-    # `stack` promotes the number types of the scores. Under a Neutralisation the residual is
-    # fitted on the exposure history, so `S` also takes the number type of that history. The
-    # bound on `S` keeps the `Nothing` method of `return_forecast_cut` out of every caller's
-    # inference, where a `stack` over an abstract Descriptor vector reads as `Any`.
-    S::Arr3Num = stack(composite_score(de, rd, ds.outlier, ds.scoring, w, groups)
-                       for de in ds.descriptors)
+    # Each Descriptor writes its own entry of `sc`. `stack` promotes the number types of the
+    # scores, whatever the element type of `sc`. It reads `sc` through a generator, because
+    # JET reads its method for a `Vector{Any}` as a call to an `Array` method that no type
+    # has. Under a Neutralisation the residual is fitted
+    # on the exposure history, so `S` also takes the number type of that history. The bound on
+    # `S` keeps the `Nothing` method of `return_forecast_cut` out of every caller's inference,
+    # where a `stack` over an abstract Descriptor vector reads as `Any`.
+    sc = Vector{Any}(undef, length(ds.descriptors))
+    cross_sectional_foreach(ds.ex, eachindex(ds.descriptors)) do k
+        return sc[k] = composite_score(ds.descriptors[k], rd, ds.outlier, ds.scoring, w,
+                                       groups)
+    end
+    S::Arr3Num = stack(s for s in sc)
     if !isnothing(ds.neutralise)
         Tf = promote_type(eltype(S), eltype(first(descriptor_scores_axis(csfm))))
         S = convert(Array{Tf, 3}, S)

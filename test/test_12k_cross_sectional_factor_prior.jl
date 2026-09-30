@@ -284,8 +284,9 @@ end
              "size" =>
                  CompositeExposure(; descriptors = [LogMarketCap()], family = "style"),
              "market" => ConstantExposure()]
-        ord, src = PO.cross_sectional_exposure_order(f)
-        @test ord == [2, 3, 1]
+        lay, src = PO.cross_sectional_exposure_order(f)
+        # The source and the constant member read nothing of each other, so they share a layer.
+        @test lay == [[2, 3], [1]]
         @test src == [2, 0, 0]
         hist = PO.cross_sectional_exposure_history(f, rdb)
         # The factor axis keeps the order the caller wrote, whatever order the fit took.
@@ -1485,5 +1486,115 @@ allocated the exposure history in the element type of the returns, so integer re
         j = setdiff(eachindex(pflt.mu), csfp_investable(pflt))
         @test !isempty(j)
         @test all(isnan, pflt.X[:, j])
+    end
+end
+
+@testset "The executor changes no number and no refusal (#1407)" begin
+    PO = PortfolioOptimisers
+    # `basesize = 1` gives every entry a task of its own, so a suite at one thread still takes
+    # the threaded path, with its tasks and the errors they wrap.
+    tex = PO.FLoops.ThreadedEx(; basesize = 1)
+    sex = PO.FLoops.SequentialEx()
+    # The error a call raises, or `nothing`, so two refusals compare by type and by message.
+    function csfp_error(f)
+        try
+            f()
+            return nothing
+        catch e
+            return e
+        end
+    end
+    rng = StableRNG(1407)
+    Z = randn(rng, 30, 20, 3)
+    X = randn(rng, 30, 20)
+    W = rand(rng, 30, 20)
+    # A pair with a non-finite entry must carry a zero weight, or the design check refuses it.
+    X[3, 4] = NaN
+    Z[5, 6, 2] = NaN
+    W[3, 4] = 0.0
+    W[5, 6] = 0.0
+    @testset "Both regressions fit every observation alike" begin
+        for mk in (ex -> CrossSectionalLinearRegression(; ex = ex),
+                   ex -> CrossSectionalLinearRegression(; intercept = true, ex = ex),
+                   ex -> CrossSectionalTargetRegression(; ex = ex),
+                   ex -> CrossSectionalTargetRegression(; intercept = true, ex = ex))
+            a = cross_sectional_regression(mk(tex), Z, X, W)
+            b = cross_sectional_regression(mk(sex), Z, X, W)
+            @test isequal(a.f, b.f)
+            @test isequal(a.eps, b.eps)
+            @test a.n == b.n
+            @test isequal(a.b, b.b)
+            @test a.h1 == b.h1
+            @test isa(a.h1, BitMatrix)
+        end
+    end
+    @testset "A refusal is the one of the first observation that fails, unwrapped" begin
+        # Observations 7 and 12 carry two equal columns, so the refusal names observation 7.
+        Zd = copy(Z)
+        Zd[7, :, 3] = Zd[7, :, 2]
+        Zd[12, :, 3] = Zd[12, :, 2]
+        mk(ex) = CrossSectionalLinearRegression(; alg = RankDeficiencyRefusal(), ex = ex)
+        et = csfp_error(() -> cross_sectional_regression(mk(tex), Zd, X, W))
+        es = csfp_error(() -> cross_sectional_regression(mk(sex), Zd, X, W))
+        @test isa(et, ArgumentError)
+        @test isa(es, ArgumentError)
+        @test sprint(showerror, et) == sprint(showerror, es)
+        @test occursin("7", sprint(showerror, et))
+    end
+    rd = csfp_panel(; n_assets = 40, n_observations = 120, n_industries = 3).rd
+    # The style composites read the benchmark weights, which the prior writes onto the panel
+    # before it builds the exposure history.
+    mcap = PO.panel_field_values(rd, "market_cap")
+    msk = isfinite.(rd.X) .& rd.pnl.emsk
+    PO.cross_sectional_cap_finite!(msk, mcap)
+    rdb = PO.cross_sectional_benchmark_returns(rd, "benchmark_weights",
+                                               PO.cross_sectional_cap_weights(1.0, mcap,
+                                                                              msk))
+    function csfp_executor_prior(ex)
+        cre = CrossSectionalLinearRegression(; ex = ex)
+        ds = DescriptorScores(; descriptors = [LogMarketCap(), BookToPrice()],
+                              neutralise = "industry", cre = cre, ex = ex)
+        # The derived member reads the size exposure, so the fit takes two layers.
+        factors = [csfp_factors();
+                   "size2" => DerivedExposure(; source = "size", f = x -> abs2.(x))]
+        return CrossSectionalFactorPrior(; factors = factors, cre = cre, minra = 5,
+                                         rfe = FixedWeightedReturnForecast(; scores = ds,
+                                                                           scale = 0.02),
+                                         ex = ex)
+    end
+    @testset "The Descriptor scores are the same" begin
+        pr = prior(csfp_executor_prior(sex), rd)
+        ds(ex) = csfp_executor_prior(ex).rfe.scores
+        a = descriptor_scores(ds(tex), rd, pr.rr)
+        b = descriptor_scores(ds(sex), rd, pr.rr)
+        @test isequal(a.S, b.S)
+        @test a.rows == b.rows
+    end
+    @testset "The exposure history takes its layers alike, and refuses alike" begin
+        f = csfp_executor_prior(sex).factors
+        a = PO.cross_sectional_exposure_history(f, rdb, tex)
+        b = PO.cross_sectional_exposure_history(f, rdb, sex)
+        @test isequal(a.Ms, b.Ms)
+        # Two members of the first layer fail, and the refusal is that of the first of them.
+        g = [f;
+             "bad1" => CompositeExposure(; descriptors = [Passthrough(; field = "nope1")]);
+             "bad2" => CompositeExposure(; descriptors = [Passthrough(; field = "nope2")])]
+        et = csfp_error(() -> PO.cross_sectional_exposure_history(g, rdb, tex))
+        es = csfp_error(() -> PO.cross_sectional_exposure_history(g, rdb, sex))
+        @test !isnothing(es)
+        @test typeof(et) == typeof(es)
+        @test sprint(showerror, et) == sprint(showerror, es)
+        @test occursin("nope1", sprint(showerror, et))
+    end
+    @testset "The whole prior is the same" begin
+        a = prior(csfp_executor_prior(tex), rd)
+        b = prior(csfp_executor_prior(sex), rd)
+        @test isequal(a.mu, b.mu)
+        @test isequal(a.sigma, b.sigma)
+        @test isequal(a.X, b.X)
+        @test isequal(a.rr.Ms, b.rr.Ms)
+        @test isequal(a.rr.csr.f, b.rr.csr.f)
+        @test isequal(a.rr.rf.hist, b.rr.rf.hist)
+        @test !iszero(a.rr.b)
     end
 end

@@ -133,15 +133,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the order in which a factor list is computed, and the source index of each factor.
+Return the dependency layers in which a factor list is computed, and the source index of each factor.
 
-A [`DerivedExposure`](@ref) is computed from the Factor Exposure of another factor of the same list, so the list is not always computed in the order it was written. The order this returns puts every source before the factor derived from it.
+A [`DerivedExposure`](@ref) is computed from the Factor Exposure of another factor of the same list, so the list is not always computed in the order it was written. The layers this returns put every source in a layer before the factor derived from it. No factor of a layer reads another factor of the same layer, so the members of one layer can be computed in parallel.
 
 # Algorithm
 
  1. Resolve the source name of every [`DerivedExposure`](@ref) to a position in the list, giving `src`.
- 2. Pass over the list, and append to `ord` every factor that has no source or whose source is already in `ord`. Repeat until `ord` holds every factor.
- 3. Refuse a pass that appends nothing, because the factors left over depend on each other.
+ 2. Pass over the list, and collect into a new layer every factor that is in no layer yet and that has no source or whose source is in an earlier layer. Repeat until the layers hold every factor.
+ 3. Refuse a pass that collects nothing, because the factors left over depend on each other.
 
 # Arguments
 
@@ -154,7 +154,7 @@ A [`DerivedExposure`](@ref) is computed from the Factor Exposure of another fact
 
 # Returns
 
-  - `ord::Vector{Int}`: The positions of `factors`, in the order they are computed.
+  - `lay::Vector{Vector{Int}}`: The positions of `factors`, one vector per layer, in the order the layers are computed.
   - `src::Vector{Int}`: The position of each factor's source, and `0` when it has none.
 
 # Related
@@ -177,22 +177,23 @@ function cross_sectional_exposure_order(factors::AbstractVector{<:Pair})
             src[i] = j
         end
     end
-    ord = Int[]
-    done = falses(n)
-    while length(ord) < n
+    # `lvl[i]` is the layer of factor `i`, and zero while it has none. A factor joins layer `k`
+    # when its source joined an earlier layer, so no member of a layer reads another member.
+    lvl = zeros(Int, n)
+    k = 0
+    while any(iszero, lvl)
+        k += 1
         moved = false
         for i in 1:n
-            if done[i] || (src[i] > 0 && !done[src[i]])
-                continue
+            if iszero(lvl[i]) && (iszero(src[i]) || 0 < lvl[src[i]] < k)
+                lvl[i] = k
+                moved = true
             end
-            push!(ord, i)
-            done[i] = true
-            moved = true
         end
         @argcheck(moved,
-                  ArgumentError("the factors $(nm[.!done]) are derived Factor Exposures that depend on each other, so no order computes a source before the factor derived from it"))
+                  ArgumentError("the factors $(nm[iszero.(lvl)]) are derived Factor Exposures that depend on each other, so no order computes a source before the factor derived from it"))
     end
-    return ord, src
+    return [findall(==(j), lvl) for j in 1:k], src
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -281,14 +282,15 @@ Build the exposure history of a factor list, and the factor axis it is written o
 # Algorithm
 
  1. Read the factor axis with [`cross_sectional_factor_axis`](@ref), and the column count of each factor with [`cross_sectional_exposure_widths`](@ref).
- 2. Take the computation order with [`cross_sectional_exposure_order`](@ref).
- 3. Compute each member in that order. Give a [`DerivedExposure`](@ref) the exposure of its source, which the order has already written.
+ 2. Take the dependency layers with [`cross_sectional_exposure_order`](@ref).
+ 3. Compute the layers in order, and the members of one layer under `ex` through [`cross_sectional_foreach`](@ref). Give a [`DerivedExposure`](@ref) the exposure of its source, which an earlier layer has already written. Each member writes its own columns of `Ms`, so every executor gives the same history.
  4. Write each Factor Exposure into `Ms` with [`cross_sectional_exposure_write!`](@ref). `Ms` takes the element type `float_if_integer(real(eltype(X)))`, so integer returns give a float history that can hold a fractional exposure and the `NaN` of an inactive cell.
 
 # Arguments
 
   - `factors`: Pairs of `factor name => Exposure Estimator`.
   - $(arg_dict[:rd]) It carries the Asset Panel every member reads.
+  - $(arg_dict[:ex]) It computes the members of one dependency layer.
 
 # Validation
 
@@ -308,24 +310,32 @@ Build the exposure history of a factor list, and the factor axis it is written o
   - [`CrossSectionalFactorPrior`](@ref)
 """
 function cross_sectional_exposure_history(factors::AbstractVector{<:Pair},
-                                          rd::ReturnsResult)
+                                          rd::ReturnsResult,
+                                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
     (; nf, fam) = cross_sectional_factor_axis(factors, rd)
     wid = cross_sectional_exposure_widths(factors, rd)
-    ord, src = cross_sectional_exposure_order(factors)
+    lay, src = cross_sectional_exposure_order(factors)
     col = cumsum(vcat(1, @view(wid[1:(end - 1)])))
+    for i in eachindex(factors)
+        if src[i] > 0
+            @argcheck(isone(wid[src[i]]),
+                      ArgumentError("the derived Factor Exposure $(first(factors[i])) reads one Factor Exposure, and its source \"$(nf[col[src[i]]])\" contributes $(wid[src[i]]) of them"))
+        end
+    end
     X = rd.X
     Tf = float_if_integer(real(eltype(X)))
     Ms = Array{Tf, 3}(undef, size(X, 1), size(X, 2), length(nf))
-    for i in ord
-        nm = String(first(factors[i]))
-        xe = last(factors[i])
-        if src[i] > 0
-            @argcheck(isone(wid[src[i]]),
-                      ArgumentError("the derived Factor Exposure $nm reads one Factor Exposure, and its source \"$(nf[col[src[i]]])\" contributes $(wid[src[i]]) of them"))
-            A = factor_exposure(xe, rd, Ms[:, :, col[src[i]]])
-            cross_sectional_exposure_write!(Ms, A, col[i], wid[i], nm)
-        else
-            cross_sectional_exposure_write!(Ms, factor_exposure(xe, rd), col[i], wid[i], nm)
+    for cur in lay
+        cross_sectional_foreach(ex, cur) do i
+            nm = String(first(factors[i]))
+            xe = last(factors[i])
+            # A derived member reads a copy of its source, which an earlier layer wrote.
+            A = if src[i] > 0
+                factor_exposure(xe, rd, Ms[:, :, col[src[i]]])
+            else
+                factor_exposure(xe, rd)
+            end
+            return cross_sectional_exposure_write!(Ms, A, col[i], wid[i], nm)
         end
     end
     return (; Ms = Ms, nf = nf, fam = fam)

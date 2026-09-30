@@ -173,7 +173,7 @@
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { map = 3, units = 51, swept = false }
 "src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl" = { map = 3, units = 27, swept = false }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { map = 3, units = 29, swept = false }
-"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { map = 3, units = 20, swept = false }
+"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { map = 3, units = 21, swept = false }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { map = 3, units = 10, swept = false }
 "src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl" = { map = 3, units = 15, algorithm = 1, swept = true, bindings = ["CrossSectionalFactorModel", "assert_cs_history_obs", "assert_cs_regression_assets", "assert_exposure_history", "assert_idiosyncratic_count", "assert_idiosyncratic_covariance", "assert_observed_factor_returns", "assert_return_forecast_assets", "cross_sectional_factor_returns", "cs_history_assets", "has_family_rebasis", "idiosyncratic_covariance_view", "idiosyncratic_variances", "port_opt_view", "regression"] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl" = { map = 3, units = 11, algorithm = 3, swept = true, bindings = ["AbstractDescriptorEstimator", "assert_log_returns", "descriptor", "descriptor_active_fill!", "descriptor_asset_panel", "ew_beta_reset!", "ew_beta_series", "market_return_series", "nan_fill_value", "panel_field_values", "positive_divide"] }

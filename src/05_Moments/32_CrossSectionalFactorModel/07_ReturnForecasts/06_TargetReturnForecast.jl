@@ -96,14 +96,16 @@ TargetReturnForecast
                  │    neutralise ┼ nothing
                  │           cre ┼ CrossSectionalLinearRegression
                  │               │         alg ┼ PseudoInverseFallback()
-                 │               │   intercept ┴ Bool: false
+                 │               │   intercept ┼ Bool: false
+                 │               │          ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
                  │       outlier ┼ CrossSectionalWinsoriser
                  │               │    low ┼ Float64: 0.01
                  │               │   high ┴ Float64: 0.99
                  │       scoring ┼ CrossSectionalStandardiser
                  │               │   min_group_size ┼ Int64: 8
                  │               │             atol ┴ Float64: 1.0e-12
-                 │         group ┴ nothing
+                 │         group ┼ nothing
+                 │            ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
              tgt ┼ LinearModel
                  │   kwargs ┴ @NamedTuple{}: NamedTuple()
          horizon ┼ Int64: 1
