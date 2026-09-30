@@ -72,7 +72,8 @@ term from the table of [`RegimeTermMoments`](@ref).
 function regime_target_statistic(::DiagonalTarget, cache::RegimeAdjustedCovarianceState,
                                  ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
                                  idx::AbstractVector{<:Integer})
-    m = regime_bias!.(Ref(cache.bias), Ref(RegimeTermMoments(ce.regime_method)), ce.decay,
+    moments = isnothing(cache.bias) ? nothing : cache.bias.moments
+    m = regime_bias!.(Ref(moments), Ref(RegimeTermMoments(ce.regime_method)), ce.decay,
                       view(cache.obs_count, idx), ce.hac_lags)
     C = regime_covariance_block(cache, ce, idx)
     return regime_statistic(DiagonalTarget(), X[idx] ./ sqrt.(first.(m)), C, idx,
@@ -196,6 +197,17 @@ intensity at which the dispersion of ``\\tilde{R}`` is the unbiased estimate of 
 ``R``. It is exact at the identity and at a correlation of one, where ``\\hat{r}^{2}`` has no
 variance.
 
+On the separate path under HAC, where each row divides by the volatility before its update, the
+damped rows carry less noise than the Bartlett weights say: at two lags and half-lives of 10 and
+20 the Bartlett weights put the mean of ``\\hat{r}^{2}`` at ``R = I`` 14 % too high, and the
+kernel of [`hac_row_kernel`](@ref) 4 % too high. With the kernel the unbiased dispersion reads
+4.9 % low on a three-factor correlation of 12 assets, where the Bartlett weights read 6.7 % low,
+and 6.9 % low at four lags, where they read 12.7 % low. The factor of
+[`diagonal_law_factor`](@ref) then moves towards its truth by 0.1 % to 0.3 % for the first
+moment and by 0.2 % to 0.7 % for the log, measured without return noise. At ``R = I`` the
+Bartlett weights over-shrink to the identity, which is the truth there, and the kernel moves
+the factor up by 0.05 % to 0.26 %, within 0.22 % of it.
+
 # Mathematical definition
 
 ```math
@@ -212,7 +224,10 @@ Where:
   - ``K_{ij}``: Effective count of the observations of the pair, the inverse of the sum of its
     squared normalised weights, from [`pair_weight_square_sum`](@ref). A HAC estimate has the
     law of a plain one on the eigenvalues of its weight matrix, so its count is the inverse of
-    ``\\operatorname{tr}(A^{2})``, about half as large at two lags.
+    ``\\operatorname{tr}(A^{2})``, about half as large at two lags. On the separate path under
+    HAC, where each row divides by the volatility before its update, the lagged terms of a row
+    are damped, and the weights are the kernel of [`hac_row_kernel`](@ref), from
+    [`correlation_hac_lags!`](@ref).
   - ``\\lambda``: Decay of the correlation, `cor_decay` on the separate path and `decay` else.
   - ``W_{ij}``: Weight that the pair holds, ``1 - \\lambda^{k}`` after ``k`` joint observations.
   - ``\\hat{r}_{ij}``: Entry of the estimated correlation.
@@ -248,12 +263,12 @@ function diagonal_law_correlation(cache::RegimeAdjustedCovarianceState,
     else
         ce.decay, view(cache.weight, idx, idx)
     end
+    hac = correlation_hac_lags!(cache.bias, ce)
     pairs = Iterators.filter(p -> p[1] != p[2] && W[p] > 0, CartesianIndices(rho))
     q = sum(p -> rho[p]^2, pairs; init = zero(T))
     q_unbiased = sum(p -> rho[p]^2 -
-                          (one(T) - rho[p]^2)^2 *
-                          pair_weight_square_sum(lambda, W[p], ce.hac_lags), pairs;
-                     init = zero(T))
+                          (one(T) - rho[p]^2)^2 * pair_weight_square_sum(lambda, W[p], hac),
+                     pairs; init = zero(T))
     alpha = sqrt(clamp(q_unbiased / max(q, eps(T)), zero(T), one(T)))
     R = alpha .* rho
     view(R, LinearAlgebra.diagind(R)) .+= one(T) - alpha
@@ -269,7 +284,7 @@ holds, the variance of a sample correlation of the pair relative to ``(1 - r^{2}
 A pair of ``k`` joint observations holds ``W = 1 - \\lambda^{k}``, so the sum is a function of
 ``W`` alone. With HAC lags the weights are the eigenvalues of the banded weight matrix ``A`` of
 [`regime_bias_table`](@ref), and the sum is ``\\operatorname{tr}(A^{2})``, which adds the squared
-Bartlett weight of each lag that reaches a joint observation.
+weight of each lag that reaches a joint observation.
 
 # Mathematical definition
 
@@ -281,14 +296,17 @@ Bartlett weight of each lag that reaches a joint observation.
 
 Where:
 
-  - ``k_{i}``: Bartlett weight ``1 - i / (L + 1)`` of lag ``i``.
-  - ``L``: `hac_lags`, and the sum is empty where it is `nothing`.
+  - ``k_{i}``: Weight of lag ``i``, the Bartlett weight ``1 - i / (L + 1)``.
+  - ``L``: `hac_lags`, and the sum is empty where it is `nothing`. Where `hac_lags` is a vector,
+    ``L`` is its length and ``k_{i}`` its entries, such as the kernel of
+    [`hac_row_kernel`](@ref).
 
 # Arguments
 
   - `lambda::Number`: Decay of the pair's estimate.
   - `W::Number`: Weight that the pair holds.
-  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
+  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag,
+    or `nothing`.
 
 # Returns
 
@@ -298,15 +316,15 @@ Where:
 
   - [`diagonal_law_correlation`](@ref)
   - [`exp_weight_cross_sum`](@ref)
+  - [`hac_lag_weights`](@ref)
 """
-function pair_weight_square_sum(lambda::Number, W::Number, hac_lags::Option{<:Integer})
+function pair_weight_square_sum(lambda::Number, W::Number,
+                                hac_lags::Option{<:Union{<:Integer, <:VecNum}})
     v = (one(lambda) - lambda) / (one(lambda) + lambda)
     t = v * (2 - W) / W
-    for i in 1:something(hac_lags, 0)
-        t += 2 *
-             (one(lambda) - i / (hac_lags + 1))^2 *
-             v *
-             max(one(W) - (one(W) - W)^2 / lambda^(2 * i), zero(W)) / W^2
+    k = hac_lag_weights(hac_lags, one(lambda))
+    for i in eachindex(k)
+        t += 2 * k[i]^2 * v * max(one(W) - (one(W) - W)^2 / lambda^(2 * i), zero(W)) / W^2
     end
     return t
 end
@@ -1104,10 +1122,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Makes the empty store of bias factors for a new state of a regime-adjusted covariance estimator.
 
-The regime target names the store with [`regime_bias_store`](@ref): the table of a
+The regime target names the store with [`regime_bias_store`](@ref): the store of a
 [`DiagonalTarget`](@ref) holds the moments of one term of [`RegimeTermMoments`](@ref), a triple
-for each count; the store of a [`MahalanobisTarget`](@ref) holds the interpolation nodes of its
-factor for each count of assets; the table of any other target holds one factor for each count.
+for each count, and the HAC kernel of its correlation; the store of a [`MahalanobisTarget`](@ref)
+holds the interpolation nodes of its factor for each count of assets; the table of any other
+target holds one factor for each count.
 
 # Arguments
 
@@ -1116,8 +1135,8 @@ factor for each count of assets; the table of any other target holds one factor 
 
 # Returns
 
-  - `bias::Option{<:Union{<:AbstractVector, <:AbstractDict}}`: The empty store where `ce.debias`
-    is `true` and a regime method is set, else `nothing`.
+  - `bias::Option{<:Union{<:AbstractVector, <:NamedTuple}}`: The empty store where `ce.debias` is
+    `true` and a regime method is set, else `nothing`.
 
 # Related
 

@@ -875,7 +875,7 @@ law, on the estimated spectrum shrunk until its dispersion is unbiased (ADR 0190
         raw = RegimeAdjustedExpWeightedCovariance(; decay = lambda, min_obs = 5, extra...,
                                                   regime_target = PO.DiagonalTarget(),
                                                   regime_method = FM, debias = false)
-        m = [PO.regime_bias!(cache.bias, PO.RegimeTermMoments(FM), lambda, k)
+        m = [PO.regime_bias!(cache.bias.moments, PO.RegimeTermMoments(FM), lambda, k)
              for k in cache.obs_count[idx]]
         @test PO.diagonal_law_factor(PO.RootMeanSquaredAdjusted(), cache, ce, C, idx, m) ===
               1.0
@@ -1671,4 +1671,74 @@ tables at `cor_decay` read (ADR 0190).
     truth = block_truth(sep(true), 12, 1445:1448, 12_000)
     @test 0.995 < truth / factor(sep(true), 12) < 1.025
     @test truth / factor(sep(false), 12) < 0.985
+end
+
+#=
+Issue #1461, found by #1445. The Diagonal target shrinks its estimated correlation towards the
+identity until the dispersion of its eigenvalues is unbiased, which subtracts the noise of each
+`r̂` from `Σ r̂²`. Under the rule before the update the lagged terms of each row are damped, so the
+noise is less than the Bartlett kernel says, and the shrink subtracted too much. The shrink reads
+the kernel of `hac_row_kernel`, as the Mahalanobis tables do (ADR 0190).
+=#
+@testset "under HAC the diagonal shrink reads the kernel of its damped rows" begin
+    lam, lamc = 2.0^(-1 / 10), 2.0^(-1 / 20)
+    kern = PO.hac_row_kernel(lam, 2)
+    # The sum of a pair's squared weights reads any weights of its lags, and it is the trace of the
+    # square of its banded weight matrix, `exp_weight_cross_sum` at one decay.
+    for K in (3, 17, 300), hac in (1, 2, 5, kern)
+        @test isapprox(PO.pair_weight_square_sum(lamc, 1 - lamc^K, hac),
+                       PO.exp_weight_cross_sum(lamc, lamc, K, hac); rtol = 1e-12)
+    end
+    @test PO.pair_weight_square_sum(lamc, 0.7, 2) ===
+          PO.pair_weight_square_sum(lamc, 0.7, PO.hac_lag_weights(2, 1.0))
+    @test PO.pair_weight_square_sum(0.9f0, 0.7f0, 2) isa Float32
+
+    # The state of a Diagonal target makes the kernel on the separate path under HAC with the
+    # rule before the update, and keeps the Bartlett weights elsewhere.
+    diag_ce(b; extra...) = RegimeAdjustedExpWeightedCovariance(; decay = lam,
+                                                               cor_decay = lamc,
+                                                               hac_lags = 2,
+                                                               hac_vol_before = b,
+                                                               regime_method = PO.FirstMomentRegimeAdjusted(),
+                                                               regime_target = PO.DiagonalTarget(),
+                                                               centred = true, min_obs = 1,
+                                                               extra...)
+    X = randn(StableRNG(1461), 300, 4) *
+        [1.0 0.5 0.3 0.0; 0.0 1.0 0.4 0.2; 0.0 0.0 1.0 0.6; 0.0 0.0 0.0 1.0]
+    for ce in (diag_ce(false), diag_ce(true; cor_decay = nothing))
+        @test isempty(partial_fit!(ce, X).cache.bias.kernel)
+    end
+    ce = diag_ce(true)
+    cache = partial_fit!(ce, X).cache
+    @test cache.bias.kernel == kern
+    # The shrunk spectrum has the dispersion that the kernel leaves, more than the Bartlett one.
+    idx = 1:4
+    C = PO.regime_covariance_block(cache, ce, idx)
+    rho = C ./ sqrt.(diag(C) * transpose(diag(C)))
+    q(hac) = sum(rho[i, j]^2 -
+                 (1 - rho[i, j]^2)^2 *
+                 PO.pair_weight_square_sum(lamc, cache.cor_weight[i, j], hac)
+                 for i in idx, j in idx if i != j)
+    mu = eigvals(Symmetric(PO.diagonal_law_correlation(cache, ce, C, idx)))
+    @test isapprox(sum(abs2, mu .- 1), q(kern); rtol = 1e-10) && q(kern) > q(2)
+
+    # At `R = I` the mean of `r̂²` is the noise alone. Over 4 seeds of 100 000 rows it reads
+    # 0.0320 ± 0.0003, which is 0.960 of the kernel's model and 0.874 of the Bartlett one (16
+    # seeds of 50 000 rows: 0.964 and 0.876).
+    r2 = mean(1461:1464) do s
+        Z = randn(StableRNG(s), 101_000, 2)
+        ce2 = diag_ce(true; regime_method = nothing)
+        acc, cnt = 0.0, 0
+        PO.regime_adjusted_covariance_pass!(ce2, Z, 1, nothing, nothing) do i, cache
+            if i > 1000
+                B = PO.regime_covariance_block(cache, ce2, 1:2)
+                acc += B[1, 2]^2 / (B[1, 1] * B[2, 2])
+                cnt += 1
+            end
+            return nothing
+        end
+        return acc / cnt
+    end
+    @test 0.93 < r2 / PO.pair_weight_square_sum(lamc, 1.0, kern) < 1
+    @test r2 / PO.pair_weight_square_sum(lamc, 1.0, 2) < 0.9
 end

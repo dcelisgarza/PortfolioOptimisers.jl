@@ -1217,26 +1217,30 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Makes the empty table of the diagonal target: the moments of one term of
-[`RegimeTermMoments`](@ref), a triple for each count of observations.
+Makes the empty store of the diagonal target: the moments of one term of
+[`RegimeTermMoments`](@ref), a triple for each count of observations, and the HAC kernel of its
+correlation.
 
 # Arguments
 
   - `::DiagonalTarget`: Diagonal regime-adjustment target.
-  - `::Number`: Ignored decay.
+  - `decay::Number`: Decay of the weights, whose type is the type of the kernel.
   - `::Type{T}`: Element type of the state.
 
 # Returns
 
-  - `bias::Vector{NTuple{3, T}}`: An empty vector.
+  - `bias::NamedTuple`: `moments`, an empty vector of `NTuple{3, T}`; and `kernel`, the empty
+    kernel of [`correlation_hac_lags!`](@ref), which only the separate path under HAC fills.
 
 # Related
 
   - [`regime_bias_state`](@ref)
   - [`RegimeTermMoments`](@ref)
+  - [`correlation_hac_lags!`](@ref)
+  - [`diagonal_law_correlation`](@ref)
 """
-function regime_bias_store(::DiagonalTarget, ::Number, ::Type{T}) where {T}
-    return NTuple{3, T}[]
+function regime_bias_store(::DiagonalTarget, decay::Number, ::Type{T}) where {T}
+    return (; moments = NTuple{3, T}[], kernel = typeof(decay)[])
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

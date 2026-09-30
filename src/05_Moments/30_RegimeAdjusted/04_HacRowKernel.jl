@@ -351,6 +351,7 @@ before its update, else `ce.hac_lags`. The kernel is made the first time the sta
   - [`hac_row_kernel`](@ref)
   - [`regime_bias_store`](@ref)
   - [`variance_noise_bias!`](@ref)
+  - [`diagonal_law_correlation`](@ref)
   - [`update_var_cor!`](@ref)
 """
 function correlation_hac_lags!(store::NamedTuple, ce::RegimeAdjustedExpWeightedCovariance)

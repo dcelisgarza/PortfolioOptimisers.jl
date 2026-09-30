@@ -247,8 +247,12 @@ at a half-life of 10 and two lags is 0.613, 0.290, −0.022 and −0.003, agains
 0.333. With it the statistic reads 0.2 % to 2.2 % high at `R = I` and −2.6 % to +3.4 % over every
 correlation of the same grid. What remains is the part that every row rule has, the time
 modulation of the rows and their coupling with `1 / V̂`, which the `κ` of the variance does not
-read; it grows with the count of assets and of lags. The variance keeps the Bartlett kernel, and
-`hac_vol_before = false` keeps the Bartlett kernel for the correlation too.
+read; it grows with the count of assets and of lags. The shrink of the `DiagonalTarget` spectrum
+subtracts the same noise from `Σ r̂²`, and it reads the same kernel (#1461): the Bartlett kernel put
+the mean of `r̂²` at `R = I` 14 % too high, the kernel 4 %, and the FirstMoment and Log factors move
+towards their truth by 0.1 % to 0.3 % and 0.2 % to 0.7 % at a correlated `R`, and by at most 0.26 %
+away from it at `R = I`, where the Bartlett over-shrink stopped on the identity. The variance keeps
+the Bartlett kernel, and `hac_vol_before = false` keeps the Bartlett kernel for the correlation too.
 
 **Without HAC the factor does not read the correlation of the assets, and this is a documented
 limit** (the maintainer ruled so on #1447). With `h_i = √(Q_ii / V̂_i)` the statistic splits
@@ -293,7 +297,8 @@ observations, such as 12 assets at a half-life of 5, is never scored.
 - The Mahalanobis nodes under HAC cost 0.3 s to 1.5 s for each count of assets at half-lives up
   to 40, and up to 3.7 s at a half-life of 250 and five lags. On the separate path under HAC the
   kernel of the damped rows costs 0.1 s at a half-life of 10 and two lags, and 4 s at a half-life
-  of 250, once for each state.
+  of 250, once for each state of a Mahalanobis target, or of a Diagonal target whose method is
+  FirstMoment or Log.
 - The FirstMoment and Log calibrations of `DiagonalTarget` assumed a `χ²(n)` sum. Before this
   decision the Jensen bias hid part of that error; after it, correlated assets read 0.941 and 0.962.
   #1432 divides the sum by the factor of its law, and #1434 makes that law read the noise of each
