@@ -115,7 +115,7 @@ Keywords correspond to the struct's fields.
 
   - If `crit` is a `Symbol`, `crit in STEPWISE_REGRESSION_CRITERIA`. The constructor stores `Val(crit)`.
   - If `crit` is `Val(:adjr2)`, `tgt` is a [`GeneralisedLinearModel`](@ref) and `tgt.variant` is set, `tgt.variant in ADJUSTED_PSEUDO_R2_VARIANTS`.
-  - If `tgt.kwargs` carries a `weights` entry, it must be an `ObsWeights` and, when it is a vector, `!isempty(tgt.kwargs.weights)`.
+  - If `tgt` is a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref) and `tgt.kwargs` carries a `weights` entry, it must be an `ObsWeights` and, when it is a vector, `!isempty(tgt.kwargs.weights)`. A caller's own target is not checked here: the fit reads its weights through its own `factory` and `StatsAPI.fit` methods, and the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states the methods the fit reads.
 
 ## Propagated parameters
 
@@ -172,7 +172,8 @@ StepwiseRegression
             @argcheck(tgt.variant in ADJUSTED_PSEUDO_R2_VARIANTS,
                       "The :adjr2 criterion reads StatsAPI.adjr2, which accepts a variant in $ADJUSTED_PSEUDO_R2_VARIANTS. Got\ntgt.variant => $(tgt.variant)")
         end
-        if haskey(tgt.kwargs, :weights)
+        if isa(tgt, Union{LinearModel, GeneralisedLinearModel}) &&
+           haskey(tgt.kwargs, :weights)
             @argcheck(isa(tgt.kwargs.weights, ObsWeights),
                       ArgumentError("tgt.kwargs.weights must be a vector of observation weights, one element per observation, of type ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}. Got\ntgt.kwargs.weights => $(typeof(tgt.kwargs.weights))"))
             if isa(tgt.kwargs.weights, AbstractVector)

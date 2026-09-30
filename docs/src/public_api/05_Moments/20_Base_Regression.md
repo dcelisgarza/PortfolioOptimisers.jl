@@ -9,6 +9,8 @@ AbstractTimeSeriesRegressionEstimator
 AbstractCrossSectionalRegressionEstimator
 AbstractRegressionTarget
 factory(tgt::AbstractRegressionTarget, w::ObsWeights)
+regression_target_weights(tgt::AbstractRegressionTarget)
+regression_target_weights(tgt::Union{LinearModel, GeneralisedLinearModel})
 LinearModel
 GeneralisedLinearModel
 Regression

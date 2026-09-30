@@ -431,7 +431,17 @@ A target is the model a regression estimator fits, and the library ships two: [`
 
 # Interfaces
 
-In order to implement a new regression target that works seamlessly with [`CrossSectionalTargetRegression`](@ref) and [`TargetReturnForecast`](@ref), subtype `AbstractRegressionTarget` with all necessary parameters as part of the struct, and implement the following methods. [`CrossSectionalTargetRegression`](@ref) reads `factory`, `StatsAPI.fit` and `StatsAPI.coef`. [`TargetReturnForecast`](@ref) reads `StatsAPI.fit` and `StatsAPI.predict`. A time-series regression estimator reads more of the fitted model, for example [`StepwiseRegression`](@ref) reads the score its criterion names.
+In order to implement a new regression target that works seamlessly with the regression estimators of the library, subtype `AbstractRegressionTarget` with all necessary parameters as part of the struct, and implement the following methods. Each estimator reads only some of them, so a target implements the methods of the estimators it runs under:
+
+| Estimator                                | Methods it reads                                                                                                               |
+|:---------------------------------------- |:------------------------------------------------------------------------------------------------------------------------------ |
+| [`CrossSectionalTargetRegression`](@ref) | `factory`, `StatsAPI.fit`, `StatsAPI.coef`                                                                                     |
+| [`TargetReturnForecast`](@ref)           | `StatsAPI.fit`, `StatsAPI.predict`                                                                                             |
+| [`ImpliedVolatilityRegression`](@ref)    | `StatsAPI.fit`, `StatsAPI.predict`                                                                                             |
+| [`StepwiseRegression`](@ref)             | `StatsAPI.fit`, and `StatsAPI.coeftable` under [`PValue`](@ref) or the score verb of its criterion under every other criterion |
+| [`DimensionReductionRegression`](@ref)   | `StatsAPI.fit`, `StatsAPI.coef`, `regression_target_weights`                                                                   |
+
+The three time-series estimators carry their target through [`factory`](@ref), so each of them also reads `factory` when it is given observation weights.
 
 ## `factory`
 
@@ -487,6 +497,48 @@ The cross-sectional regression fits every observation under its cross-sectional 
 
   - `yhat::VecNum`: Predicted response, one entry per row of `A`.
 
+## `StatsAPI.coeftable`
+
+  - `StatsAPI.coeftable(m::MyRegressionFit) -> StatsBase.CoefTable`: Return the coefficient table of the fit, with the p-value of each coefficient in column 4.
+
+[`StepwiseRegression`](@ref) reads it under [`PValue`](@ref) only. It reads column 4 of the table, which is the column `GLM` puts the p-values in, and it reads one row per column of the design, in the order of the design.
+
+### Arguments
+
+  - `m`: Fitted model that `StatsAPI.fit` returns.
+
+### Returns
+
+  - `ct::StatsBase.CoefTable`: Coefficient table, one row per column of the design. Column 4 holds the p-values.
+
+## The score verbs
+
+  - `StatsAPI.aic(m::MyRegressionFit) -> Number`, and the same signature for `StatsAPI.aicc`, `StatsAPI.bic`, `StatsAPI.r2` and `StatsAPI.adjr2`: Return the score of the fit that the criterion of the same name in [`STEPWISE_REGRESSION_CRITERIA`](@ref) reads.
+
+[`StepwiseRegression`](@ref) reads the verb of its own criterion and no other, so a target implements only the verbs of the criteria it runs under. A criterion whose verb has no method for the fit raises a `MethodError` at the first fit.
+
+### Arguments
+
+  - `m`: Fitted model that `StatsAPI.fit` returns.
+
+### Returns
+
+  - `s::Number`: Score of the fit. The criterion states whether a smaller or a larger score is better.
+
+## `regression_target_weights`
+
+  - `regression_target_weights(tgt::MyRegressionTarget) -> Option{ObsWeights}`: Return the observation weights the fit of `tgt` applies, or `nothing` when it applies none.
+
+[`DimensionReductionRegression`](@ref) rebuilds the intercept of each asset from the mean of the response, and it weights that mean by these weights, so that the intercept agrees with the fit. A target with no such method is refused by [`regression_target_weights(::AbstractRegressionTarget)`](@ref) when the estimator is built, because the intercept would otherwise ignore the weights that `factory` stored in the target.
+
+### Arguments
+
+  - `tgt`: The new regression target.
+
+### Returns
+
+  - `w::Option{ObsWeights}`: The weights that `factory(tgt, w)` stored in `tgt`, or `nothing` when `tgt` carries none.
+
 # Related
 
   - [`AbstractRegressionAlgorithm`](@ref)
@@ -494,7 +546,11 @@ The cross-sectional regression fits every observation under its cross-sectional 
   - [`GeneralisedLinearModel`](@ref)
   - [`CrossSectionalTargetRegression`](@ref)
   - [`TargetReturnForecast`](@ref)
+  - [`ImpliedVolatilityRegression`](@ref)
+  - [`StepwiseRegression`](@ref)
+  - [`DimensionReductionRegression`](@ref)
   - [`factory`](@ref)
+  - [`regression_target_weights`](@ref)
 """
 abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
 """
@@ -866,6 +922,56 @@ function StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
     return StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; kwargs...)
 end
 """
+    regression_target_weights(tgt::AbstractRegressionTarget)
+
+Refuse a regression target that does not state the observation weights its fit applies.
+
+[`DimensionReductionRegression`](@ref) weights the mean of the response by the weights of its target, so it must read them. A target states them with its own method, as the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states. Only a target with no such method reaches this one, and the estimator calls it at construction, so the refusal comes before any fit.
+
+# Arguments
+
+  - `tgt`: Regression target with no `regression_target_weights` method of its own.
+
+# Validation
+
+  - The call always throws an `ArgumentError` that names the method `tgt` lacks.
+
+# Related
+
+  - [`AbstractRegressionTarget`](@ref)
+  - [`regression_target_weights(::Union{LinearModel, GeneralisedLinearModel})`](@ref)
+  - [`DimensionReductionRegression`](@ref)
+  - [`factory(::AbstractRegressionTarget, ::ObsWeights)`](@ref)
+"""
+function regression_target_weights(tgt::AbstractRegressionTarget)
+    return throw(ArgumentError("$(nameof(typeof(tgt))) has no method regression_target_weights(::$(nameof(typeof(tgt)))), so the estimator cannot read the observation weights its fit applies. Define PortfolioOptimisers.regression_target_weights(tgt::$(nameof(typeof(tgt)))) to return those weights, or nothing when the fit applies none, as the # Interfaces section of AbstractRegressionTarget states"))
+end
+"""
+    regression_target_weights(tgt::Union{LinearModel, GeneralisedLinearModel})
+
+Return the observation weights a library target carries into its fit, or `nothing`.
+
+Both targets keep the weights under the `weights` key of `tgt.kwargs`, where [`factory`](@ref) puts them. The entry is returned as stored, so a [`DynamicAbstractWeights`](@ref) is not resolved against a design here.
+
+# Arguments
+
+  - `tgt`: A [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref).
+
+# Returns
+
+  - `w::Option{ObsWeights}`: `tgt.kwargs.weights`, or `nothing` when `tgt.kwargs` has no `weights` key.
+
+# Related
+
+  - [`AbstractRegressionTarget`](@ref)
+  - [`regression_target_weights(::AbstractRegressionTarget)`](@ref)
+  - [`factory(::LinearModel, ::ObsWeights)`](@ref)
+  - [`factory(::GeneralisedLinearModel, ::ObsWeights)`](@ref)
+"""
+function regression_target_weights(tgt::Union{LinearModel, GeneralisedLinearModel})
+    return get(tgt.kwargs, :weights, nothing)
+end
+"""
     MIN_VAL_STEPWISE_REGRESSION_CRITERIA
 
 Tuple of the symbols naming a stepwise regression criterion that a lower value scores better.
@@ -1091,15 +1197,15 @@ Return the function that scores a fitted model under a stepwise regression crite
 
 The method dispatches on the `Val` naming the criterion and on the regression target, because the two maximisation criteria read a different quantity under each target. The map is:
 
-| Criterion | [`LinearModel`](@ref) | [`GeneralisedLinearModel`](@ref)          |
-|:--------- |:--------------------- |:----------------------------------------- |
-| `:aic`    | `StatsAPI.aic`        | `StatsAPI.aic`                            |
-| `:aicc`   | `StatsAPI.aicc`       | `StatsAPI.aicc`                           |
-| `:bic`    | `StatsAPI.bic`        | `StatsAPI.bic`                            |
-| `:r2`     | `StatsAPI.r2`         | `model -> StatsAPI.r2(model, variant)`    |
-| `:adjr2`  | `StatsAPI.adjr2`      | `model -> StatsAPI.adjr2(model, variant)` |
+| Criterion | [`GeneralisedLinearModel`](@ref)          | Every other target |
+|:--------- |:----------------------------------------- |:------------------ |
+| `:aic`    | `StatsAPI.aic`                            | `StatsAPI.aic`     |
+| `:aicc`   | `StatsAPI.aicc`                           | `StatsAPI.aicc`    |
+| `:bic`    | `StatsAPI.bic`                            | `StatsAPI.bic`     |
+| `:r2`     | `model -> StatsAPI.r2(model, variant)`    | `StatsAPI.r2`      |
+| `:adjr2`  | `model -> StatsAPI.adjr2(model, variant)` | `StatsAPI.adjr2`   |
 
-`StatsAPI.aic`, `StatsAPI.aicc` and `StatsAPI.bic` accept a fitted model of either target, so the three minimisation criteria take one method each. `StatsAPI.r2` and `StatsAPI.adjr2` accept a fitted [`LinearModel`](@ref) without a variant, and a fitted [`GeneralisedLinearModel`](@ref) needs a named pseudo-``R^2`` variant, so the two maximisation criteria take two methods each. [`PValue`](@ref) has no method here: it reads the coefficient p-values of the fitted model rather than one score, so its stepwise methods are separate.
+`StatsAPI.aic`, `StatsAPI.aicc` and `StatsAPI.bic` accept a fitted model of either library target, so the three minimisation criteria take one method each. `StatsAPI.r2` and `StatsAPI.adjr2` accept a fitted [`LinearModel`](@ref) without a variant, and a fitted [`GeneralisedLinearModel`](@ref) needs a named pseudo-``R^2`` variant, so the two maximisation criteria take two methods each. The method of every other target serves [`LinearModel`](@ref) and a caller's own target alike: it returns the `StatsAPI` verb, and the fit of a caller's target states that verb, as the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states. [`PValue`](@ref) has no method here: it reads the coefficient p-values of the fitted model rather than one score, so its stepwise methods are separate.
 
 # Algorithm
 
@@ -1134,10 +1240,10 @@ end
 function regression_criterion_func(::Val{:bic}, ::AbstractRegressionTarget)
     return StatsAPI.bic
 end
-function regression_criterion_func(::Val{:r2}, ::LinearModel)
+function regression_criterion_func(::Val{:r2}, ::AbstractRegressionTarget)
     return StatsAPI.r2
 end
-function regression_criterion_func(::Val{:adjr2}, ::LinearModel)
+function regression_criterion_func(::Val{:adjr2}, ::AbstractRegressionTarget)
     return StatsAPI.adjr2
 end
 function regression_criterion_func(crit::Val{:r2}, tgt::GeneralisedLinearModel)
@@ -1512,5 +1618,6 @@ public AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEs
 # src/11_UncertaintySets/09_OrthogonalUncertaintySets.jl -- the same split #1137 already used.
 public AbstractOrthogonalityMetric, orthogonality_weights, cs_diagnostic_weights
 # The `# Interfaces`-marked type of #1397 (ADR 0154): a caller's own regression target. The
-# verbs its section names are `factory`, which is exported, and three `StatsAPI` verbs.
-public AbstractRegressionTarget
+# verbs its section names are `factory`, which is exported, `StatsAPI` verbs, and
+# `regression_target_weights`, which #1441 added for the time-series estimators.
+public AbstractRegressionTarget, regression_target_weights

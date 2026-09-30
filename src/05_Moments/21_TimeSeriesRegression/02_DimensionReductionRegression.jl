@@ -238,7 +238,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `retgt.kwargs` carries a `weights` entry, it must be an `ObsWeights` and, when it is a vector, `!isempty(retgt.kwargs.weights)`.
+  - `retgt` states its observation weights through [`regression_target_weights`](@ref), which returns `retgt.kwargs.weights` for a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref). A caller's own target without that method is refused with an `ArgumentError`.
+  - If `regression_target_weights(retgt)` is not `nothing`, it must be an `ObsWeights` and, when it is a vector, not empty.
 
 ## Propagated parameters
 
@@ -276,6 +277,7 @@ DimensionReductionRegression
   - [`AbstractVarianceEstimator`](@ref)
   - [`DimensionReductionTarget`](@ref)
   - [`AbstractRegressionTarget`](@ref)
+  - [`regression_target_weights`](@ref)
   - [`StepwiseRegression`](@ref)
   - [`Regression`](@ref)
   - [`factory`](@ref)
@@ -303,11 +305,12 @@ DimensionReductionRegression
     function DimensionReductionRegression(ve::AbstractVarianceEstimator,
                                           drtgt::DimensionReductionTarget,
                                           retgt::AbstractRegressionTarget)
-        if haskey(retgt.kwargs, :weights)
-            @argcheck(isa(retgt.kwargs.weights, ObsWeights),
-                      ArgumentError("retgt.kwargs.weights must be a vector of observation weights, one element per observation, of type ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}. Got\nretgt.kwargs.weights => $(typeof(retgt.kwargs.weights))"))
-            if isa(retgt.kwargs.weights, AbstractVector)
-                @argcheck(!isempty(retgt.kwargs.weights), IsEmptyError)
+        w = regression_target_weights(retgt)
+        if !isnothing(w)
+            @argcheck(isa(w, ObsWeights),
+                      ArgumentError("The weights of retgt, which regression_target_weights(retgt) returns and which a LinearModel or a GeneralisedLinearModel keeps in retgt.kwargs.weights, must be a vector of observation weights, one element per observation, of type ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}. Got\nregression_target_weights(retgt) => $(typeof(w))"))
+            if isa(w, AbstractVector)
+                @argcheck(!isempty(w), IsEmptyError)
             end
         end
         return new{typeof(ve), typeof(drtgt), typeof(retgt)}(ve, drtgt, retgt)
@@ -408,7 +411,7 @@ Where:
 
 # Algorithm
 
- 1. Take the mean of `y`, giving `mean_y`. Weight it by `re.retgt.kwargs.weights` when that entry is present.
+ 1. Read the weights of `re.retgt` with [`regression_target_weights`](@ref), giving `w`. Take the mean of `y`, weighted by `w` when it is not `nothing`, giving `mean_y`.
  2. Fit `re.retgt` to `x1` and `y`, and drop the leading coefficient, giving `beta_pc`.
  3. Map `beta_pc` through `Vp` and divide by `sigma`, giving `beta`, the coefficients in the original factor space.
  4. Subtract the `mu`-weighted sum of `beta` from `mean_y`, giving `beta0`.
@@ -431,6 +434,7 @@ Where:
 
   - [`DimensionReductionRegression`](@ref)
   - [`prep_dim_red_reg`](@ref)
+  - [`regression_target_weights`](@ref)
 
 # References
 
@@ -439,11 +443,8 @@ Where:
 """
 function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum,
                      x1::MatNum, Vp::MatNum)
-    mean_y = if !haskey(re.retgt.kwargs, :weights)
-        Statistics.mean(y)
-    else
-        Statistics.mean(y, re.retgt.kwargs.weights)
-    end
+    w = regression_target_weights(re.retgt)
+    mean_y = isnothing(w) ? Statistics.mean(y) : Statistics.mean(y, w)
     fit_result = StatsAPI.fit(re.retgt, x1, y)
     beta_pc = StatsAPI.coef(fit_result)[2:end]
     beta = Vp * beta_pc ./ sigma
