@@ -41,7 +41,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a factor ``\\mathbf{G}`` of a covariance matrix with ``\\mathbf{G}^\\intercal \\mathbf{G} = \\mathbf{\\Sigma}``, for a singular matrix as well as a positive definite one.
 
-A positive definite matrix gives its upper Cholesky factor. A singular positive semidefinite matrix, such as a rank-one estimate, has no Cholesky factor, so it gives the factor of its eigendecomposition. The second-order cone ``\\sigma \\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_2`` is well posed on either factor.
+A positive definite matrix gives its upper Cholesky factor. A singular positive semidefinite matrix, such as a rank-one estimate, has no Cholesky factor, so it gives the factor of its eigendecomposition. The factor is the transpose of the square root that [`EigenFallbackSquareRoot`](@ref) takes with [`matrix_square_root`](@ref). The second-order cone ``\\sigma \\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_2`` is well posed on either factor.
 
 # Mathematical definition
 
@@ -78,16 +78,8 @@ Where:
   - [`RankOneCovariance`](@ref)
 """
 function covariance_factor(sigma::AbstractMatrix)
-    F = LinearAlgebra.cholesky(sigma; check = false)
-    if LinearAlgebra.issuccess(F)
-        return F.U
-    end
-    @argcheck(LinearAlgebra.ishermitian(sigma), LinearAlgebra.PosDefException(-1))
-    E = LinearAlgebra.eigen(LinearAlgebra.Symmetric(sigma))
-    tol = -length(E.values) * eps(eltype(E.values)) * maximum(abs, E.values)
-    @argcheck(minimum(E.values) >= tol, LinearAlgebra.PosDefException(1))
-    return LinearAlgebra.Diagonal(sqrt.(max.(E.values, zero(eltype(E.values))))) *
-           transpose(E.vectors)
+    # The cone reads the upper factor, and the square root is the lower one.
+    return copy(transpose(matrix_square_root(EigenFallbackSquareRoot(), sigma)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

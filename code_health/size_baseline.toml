@@ -79,6 +79,7 @@ commit = "ebcacfda95"
 "src/04_MatrixProcessing/02_Denoise.jl" = { code = 136, doc = 534, comment = 34, blank = 195, total = 899 }
 "src/04_MatrixProcessing/03_Detone.jl" = { code = 48, doc = 188, comment = 0, blank = 81, total = 317 }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { code = 149, doc = 486, comment = 8, blank = 187, total = 830 }
+"src/04_MatrixProcessing/05_MatrixSquareRoot.jl" = { code = 61, doc = 182, comment = 1, blank = 81, total = 325 }
 "src/05_Moments/01_Base_Moments.jl" = { code = 482, doc = 1117, comment = 9, blank = 468, total = 2076 }
 "src/05_Moments/02_SimpleExpectedReturns.jl" = { code = 172, doc = 435, comment = 2, blank = 192, total = 801 }
 "src/05_Moments/03_Covariance.jl" = { code = 360, doc = 892, comment = 5, blank = 367, total = 1624 }

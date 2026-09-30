@@ -77,6 +77,7 @@ commit = "8610300"
 "src/04_MatrixProcessing/02_Denoise.jl" = { lines = 80, misses = 0 }
 "src/04_MatrixProcessing/03_Detone.jl" = { lines = 30, misses = 0 }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { lines = 33, misses = 0 }
+"src/04_MatrixProcessing/05_MatrixSquareRoot.jl" = { lines = 42, misses = 0 }
 "src/05_Moments/01_Base_Moments.jl" = { lines = 245, misses = 0 }
 "src/05_Moments/02_SimpleExpectedReturns.jl" = { lines = 10, misses = 0 }
 "src/05_Moments/03_Covariance.jl" = { lines = 39, misses = 0 }

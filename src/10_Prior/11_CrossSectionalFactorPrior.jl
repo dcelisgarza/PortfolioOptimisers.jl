@@ -31,7 +31,8 @@ $(DocStringExtensions.FIELDS)
                               minra::Option{<:Integer} = nothing,
                               rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
                               lambda::Real = 1.0, c::Real = 1.0,
-                              lx::Option{<:AbstractString} = nothing) -> CrossSectionalFactorPrior
+                              lx::Option{<:AbstractString} = nothing,
+                              sqrt_alg::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing) -> CrossSectionalFactorPrior
 
 Keywords correspond to the struct's fields. `factors`, `neutralise` and `families` also take a dictionary, and the constructor collects each one into a vector of Pairs.
 
@@ -129,7 +130,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     @fprop @vprop ce
     """
-    $(field_dict[:f_mp]) It processes the factor covariance that `pe` states, which is a different matrix from the asset covariance that `mp` processes. The factor covariance is on the factor axis, `pe` estimates it from the factor-return series, and a Factor Family that drops a member can leave it singular. [`cross_sectional_lift`](@ref) takes its Cholesky factor for the low-rank square root, so a factor covariance that is not positive definite fails there rather than in the asset block.
+    $(field_dict[:f_mp]) It processes the factor covariance that `pe` states, which is a different matrix from the asset covariance that `mp` processes. The factor covariance is on the factor axis, `pe` estimates it from the factor-return series, and a Factor Family that drops a member can leave it singular. [`cross_sectional_lift`](@ref) takes its square root under `sqrt_alg` for the low-rank square root, so under the default `sqrt_alg` a factor covariance that is not positive definite fails there rather than in the asset block.
     """
     @fprop f_mp
     """
@@ -176,6 +177,10 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     Name of a numeric Panel Field of the returns net of the observed factors, or `nothing` to derive them as `X - Z_obs * r_obs`. The regression reads the named field unchanged. Under Currency Factors the net returns are the local returns. A caller names a field when some asset has no currency label, which the derived path gives a `NaN` net return, or when their own local returns are not `X - Z_obs * r_obs`, which includes every panel of simple returns because of the cross term, see [`currency_excess_index`](@ref).
     """
     lx
+    """
+    $(field_dict[:sqrt_alg])
+    """
+    sqrt_alg
     function CrossSectionalFactorPrior(factors::AbstractVector{<:Pair},
                                        neutralise::Option{<:AbstractVector{<:Pair}},
                                        families::Option{<:AbstractVector{<:Pair}},
@@ -189,7 +194,8 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        bp::Real, mcap::AbstractString, bw::AbstractString,
                                        lag::Integer, minra::Option{<:Integer},
                                        rfe::Option{<:AbstractReturnForecastEstimator},
-                                       lambda::Real, c::Real, lx::Option{<:AbstractString})
+                                       lambda::Real, c::Real, lx::Option{<:AbstractString},
+                                       sqrt_alg::Option{<:AbstractMatrixSquareRootAlgorithm})
         assert_closed_unit_interval(th, :th)
         assert_finite(bp, :bp)
         assert_nonneg(bp, :bp)
@@ -213,25 +219,10 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         return new{typeof(factors), typeof(neutralise), typeof(families), typeof(cre),
                    typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(f_mp), typeof(mp),
                    typeof(th), typeof(bp), typeof(mcap), typeof(bw), typeof(lag),
-                   typeof(minra), typeof(rfe), typeof(lambda), typeof(c), typeof(lx)}(factors,
-                                                                                      neutralise,
-                                                                                      families,
-                                                                                      cre,
-                                                                                      wa,
-                                                                                      pe,
-                                                                                      ve,
-                                                                                      ce,
-                                                                                      f_mp,
-                                                                                      mp,
-                                                                                      th,
-                                                                                      bp,
-                                                                                      mcap,
-                                                                                      bw,
-                                                                                      lag,
-                                                                                      minra,
-                                                                                      rfe,
-                                                                                      lambda,
-                                                                                      c, lx)
+                   typeof(minra), typeof(rfe), typeof(lambda), typeof(c), typeof(lx),
+                   typeof(sqrt_alg)}(factors, neutralise, families, cre, wa, pe, ve, ce,
+                                     f_mp, mp, th, bp, mcap, bw, lag, minra, rfe, lambda, c,
+                                     lx, sqrt_alg)
     end
 end
 function CrossSectionalFactorPrior(; factors::Dict_VecPair,
@@ -255,12 +246,13 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    lag::Integer = 1, minra::Option{<:Integer} = nothing,
                                    rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
                                    lambda::Real = 1.0, c::Real = 1.0,
-                                   lx::Option{<:AbstractString} = nothing)::CrossSectionalFactorPrior
+                                   lx::Option{<:AbstractString} = nothing,
+                                   sqrt_alg::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)::CrossSectionalFactorPrior
     return CrossSectionalFactorPrior(cross_sectional_prior_pairs(factors, :factors),
                                      cross_sectional_prior_option(neutralise, :neutralise),
                                      cross_sectional_prior_option(families, :families), cre,
                                      wa, pe, ve, ce, f_mp, mp, th, bp, mcap, bw, lag, minra,
-                                     rfe, lambda, c, lx)
+                                     rfe, lambda, c, lx, sqrt_alg)
 end
 """
     cross_sectional_prior_option(x::Nothing, sym::Sym_Str) -> nothing
@@ -521,10 +513,11 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     # The factor covariance takes its own estimator for the reason the asset one takes
     # `pe.mp`: they are different matrices. This one is estimated from the factor-return
     # series over a factor axis a constrained Family has already reduced, and
-    # `cross_sectional_lift` factorises it for the low-rank square root, so a covariance
-    # that is merely positive SEMI-definite -- a short warm-up, a collinear Family -- raises
-    # a `PosDefException` out of the Cholesky rather than answering. The default `pdm` is a
-    # no-op on a matrix that is already positive definite, so a healthy fit is untouched.
+    # `cross_sectional_lift` factorises it for the low-rank square root, so under the default
+    # `sqrt_alg` a covariance that is merely positive SEMI-definite -- a short warm-up, a
+    # collinear Family -- raises a `PosDefException` out of the Cholesky rather than
+    # answering. The default `pdm` is a no-op on a matrix that is already positive definite,
+    # so a healthy fit is untouched.
     # An Empty Factor has no return to estimate a variance from, so the factor prior and
     # `pe.f_mp` read the other factors. An Observed Factor carries the return the caller
     # observed, so it is never empty.
@@ -563,7 +556,8 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     # the last rows of each history, so the factor returns and the original returns keep the
     # rows the scenarios keep (#1384).
     rs = (length(r) - size(Xs, 1) + 1):length(r)
-    lift = cross_sectional_lift(pe.mp, L, f_mu, f_pr.sigma, esigma, idx, Xs; kwargs...)
+    lift = cross_sectional_lift(pe.mp, L, f_mu, f_pr.sigma, esigma, idx, Xs;
+                                sqrt_alg = pe.sqrt_alg, kwargs...)
     fpr = LowOrderPrior(; X = something(fr, ca.f)[rs, :], mu = ex.mu, sigma = ex.sigma,
                         w = f_pr.w, ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow)
     return LowOrderPrior(; X = Xs, o_X = Xw[r[rs], :], mu = lift.mu + rr.b,

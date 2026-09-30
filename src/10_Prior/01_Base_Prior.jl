@@ -1185,6 +1185,7 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
   - `X`, `mu`, and `sigma` must be non-empty.
   - `size(sigma, 1) == size(sigma, 2)`.
   - `size(X, 2) == length(mu) == size(sigma, 1)`.
+  - Every entry of `sigma` between two investable assets is finite, an investable asset being one with a finite `mu` and a finite variance. Raises an `IsNonFiniteError`.
   - If `w` is not `nothing`, `!isempty(w)` and `length(w) == size(X, 1)`.
   - If `kld` is an `AbstractVector`, `!isempty(kld)`.
   - If `ow` is not `nothing`, `!isempty(ow)`.
@@ -1288,7 +1289,7 @@ LowOrderPrior
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
         imsk = isfinite.(mu) .& isfinite.(LinearAlgebra.diag(sigma))
         @argcheck(all(isfinite, view(sigma, imsk, imsk)),
-                  IsFiniteError("sigma of investible assets must only contain finite values"))
+                  IsNonFiniteError("sigma of investible assets must only contain finite values"))
         assert_matrix_issquare(sigma, :sigma)
         @argcheck(size(X, 2) == length(mu) == size(sigma, 1),
                   DimensionMismatch("size(X, 2) ($(size(X, 2))), length(mu) ($(length(mu))), and size(sigma, 1) ($(size(sigma, 1))) must all match"))

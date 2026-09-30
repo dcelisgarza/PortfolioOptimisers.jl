@@ -172,7 +172,7 @@ julia> PortfolioOptimisers.gap_return(CatchUpGapReturn(), [100.0, NaN, NaN, 110.
 3-element Vector{Float64}:
  NaN
  NaN
-   0.0999999999999999
+   0.1
 ```
 
 # Related

@@ -85,6 +85,7 @@
                           :AbstractLowOrderPriorEstimator_F,
                           :AbstractMatrixProcessingAlgorithm,
                           :AbstractMatrixProcessingEstimator,
+                          :AbstractMatrixSquareRootAlgorithm,
                           :AbstractNormCeilingCalibrationAlgorithm,
                           :AbstractOptimisationEstimator, :AbstractAllocationSet,
                           :AbstractProgrammeAllocationSet, :AbstractOnlineObjective,

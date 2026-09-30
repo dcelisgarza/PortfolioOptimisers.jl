@@ -17,6 +17,7 @@ $(DocStringExtensions.FIELDS)
         re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
         ve::AbstractVarianceEstimator = SimpleVariance(),
         rsd::Bool = true,
+        sqrt_alg::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> FactorPrior
 
@@ -43,7 +44,7 @@ This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing
 
   - The factor block `fpr` **is** the wrapped factor prior, forwarded whole and untouched: it needs no reconstruction, because the asset moments are its projection rather than an update of it.
   - `mu` and `sigma` are that block projected through the loadings, so the returned prior result is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction. `sigma` optionally gains a residual correction when `rsd` is `true`.
-  - `chol` is not forwarded but **rebuilt on the asset axis**, as `M * cholesky(fpr.sigma).L` widened by the residual block when `rsd` is `true`, so it stays in sync with the `sigma` it factorises.
+  - `chol` is not forwarded but **rebuilt on the asset axis**, as `M * matrix_square_root(sqrt_alg, fpr.sigma)` widened by the residual block when `rsd` is `true`, so it stays in sync with the `sigma` it factorises.
   - `w` is the factor prior's, and is over the right axis: this estimator wraps only a factor prior, and `posterior_X` has exactly `F`'s rows, so it is the only weighting in existence. Its `ens`, `kld` and `ow` travel with it.
 
 # Examples
@@ -51,48 +52,49 @@ This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing
 ```jldoctest
 julia> FactorPrior()
 FactorPrior
-   pe ┼ EmpiricalPrior
-      │           ce ┼ PortfolioOptimisersCovariance
-      │              │   ce ┼ Covariance
-      │              │      │    me ┼ SimpleExpectedReturns
-      │              │      │       │   w ┴ nothing
-      │              │      │    ce ┼ GeneralCovariance
-      │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │              │      │       │    w ┴ nothing
-      │              │      │   alg ┼ FullMoment()
-      │              │      │     w ┴ nothing
-      │              │   mp ┼ MatrixProcessing
-      │              │      │     pdm ┼ Posdef
-      │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │              │      │      dn ┼ nothing
-      │              │      │      dt ┼ nothing
-      │              │      │     alg ┼ nothing
-      │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │           me ┼ SimpleExpectedReturns
-      │              │   w ┴ nothing
-      │      horizon ┼ nothing
-      │   fill_limit ┴ nothing
-   mp ┼ MatrixProcessing
-      │     pdm ┼ Posdef
-      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │      dn ┼ nothing
-      │      dt ┼ nothing
-      │     alg ┼ nothing
-      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-   re ┼ StepwiseRegression
-      │   crit ┼ PValue
-      │        │   t ┴ Float64: 0.05
-      │    alg ┼ ForwardSelection()
-      │    tgt ┼ LinearModel
-      │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
-   ve ┼ SimpleVariance
-      │          me ┼ SimpleExpectedReturns
-      │             │   w ┴ nothing
-      │           w ┼ nothing
-      │   corrected ┴ Bool: true
-  rsd ┴ Bool: true
+        pe ┼ EmpiricalPrior
+           │           ce ┼ PortfolioOptimisersCovariance
+           │              │   ce ┼ Covariance
+           │              │      │    me ┼ SimpleExpectedReturns
+           │              │      │       │   w ┴ nothing
+           │              │      │    ce ┼ GeneralCovariance
+           │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+           │              │      │       │    w ┴ nothing
+           │              │      │   alg ┼ FullMoment()
+           │              │      │     w ┴ nothing
+           │              │   mp ┼ MatrixProcessing
+           │              │      │     pdm ┼ Posdef
+           │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+           │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+           │              │      │      dn ┼ nothing
+           │              │      │      dt ┼ nothing
+           │              │      │     alg ┼ nothing
+           │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+           │           me ┼ SimpleExpectedReturns
+           │              │   w ┴ nothing
+           │      horizon ┼ nothing
+           │   fill_limit ┴ nothing
+        mp ┼ MatrixProcessing
+           │     pdm ┼ Posdef
+           │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+           │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+           │      dn ┼ nothing
+           │      dt ┼ nothing
+           │     alg ┼ nothing
+           │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        re ┼ StepwiseRegression
+           │   crit ┼ PValue
+           │        │   t ┴ Float64: 0.05
+           │    alg ┼ ForwardSelection()
+           │    tgt ┼ LinearModel
+           │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        ve ┼ SimpleVariance
+           │          me ┼ SimpleExpectedReturns
+           │             │   w ┴ nothing
+           │           w ┼ nothing
+           │   corrected ┴ Bool: true
+       rsd ┼ Bool: true
+  sqrt_alg ┴ nothing
 ```
 
 ## The incremental fit
@@ -142,6 +144,10 @@ This prior has no exact incremental recursion, so it takes the online step by **
     """
     rsd
     """
+    $(field_dict[:sqrt_alg])
+    """
+    sqrt_alg
+    """
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
@@ -149,17 +155,19 @@ This prior has no exact incremental recursion, so it takes the online step by **
                          mp::AbstractMatrixProcessingEstimator,
                          re::AbstractTimeSeriesRegressionEstimator,
                          ve::AbstractVarianceEstimator, rsd::Bool,
+                         sqrt_alg::Option{<:AbstractMatrixSquareRootAlgorithm},
                          cache::Option{<:AbstractPartialFitState})
         return new{typeof(pe), typeof(mp), typeof(re), typeof(ve), typeof(rsd),
-                   typeof(cache)}(pe, mp, re, ve, rsd, cache)
+                   typeof(sqrt_alg), typeof(cache)}(pe, mp, re, ve, rsd, sqrt_alg, cache)
     end
 end
 function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
                      mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                      re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
                      ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true,
+                     sqrt_alg::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
                      cache::Option{<:AbstractPartialFitState} = nothing)::FactorPrior
-    return FactorPrior(pe, mp, re, ve, rsd, cache)
+    return FactorPrior(pe, mp, re, ve, rsd, sqrt_alg, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -174,7 +182,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:pe, :mp, :re, :ve, :rsd)`.
+  - `fields::Tuple`: The field names to render, which is `(:pe, :mp, :re, :ve, :rsd, :sqrt_alg)`.
 
 # Related
 
@@ -182,7 +190,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-show_fields(::FactorPrior) = (:pe, :mp, :re, :ve, :rsd)
+show_fields(::FactorPrior) = (:pe, :mp, :re, :ve, :rsd, :sqrt_alg)
 # Expose `:me` and `:ce` from the embedded asset prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
 @forward_properties FactorPrior begin
@@ -229,7 +237,9 @@ end
 """
     factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
                 rsd::Bool, rr::AbstractLoadingsRegressionResult, f_mu::VecNum, f_sigma::MatNum,
-                X::MatNum, posterior_X::MatNum; kwargs...) -> NamedTuple
+                X::MatNum, posterior_X::MatNum;
+                sqrt_alg::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
+                kwargs...) -> NamedTuple
 
 Project factor moments onto the asset axis through the regression loadings.
 
@@ -256,7 +266,7 @@ Where:
   - ``\\mathbf{\\Sigma}_f``: ``K \\times K`` factor covariance matrix, `f_sigma`.
   - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal matrix of residual variances, present only when `rsd` is `true`.
 
-The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\mathbf{\\Sigma}_\\varepsilon^{1/2}]``, where ``\\mathbf{L}_f`` is the lower Cholesky factor of ``\\mathbf{\\Sigma}_f``. It is therefore ``(K + N) \\times N`` when `rsd` is `true`, and ``K \\times N`` when `rsd` is `false`, the residual block being absent from `chol` and from ``\\hat{\\mathbf{\\Sigma}}`` alike.
+The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\mathbf{\\Sigma}_\\varepsilon^{1/2}]``, where ``\\mathbf{L}_f`` is the square root of ``\\mathbf{\\Sigma}_f`` that [`matrix_square_root`](@ref) takes under `sqrt_alg`, the lower Cholesky factor by default. It is therefore ``(K + N) \\times N`` when `rsd` is `true`, and ``K \\times N`` when `rsd` is `false`, the residual block being absent from `chol` and from ``\\hat{\\mathbf{\\Sigma}}`` alike.
 
 ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma}}`` holds **before** matrix processing, and that qualifier is load-bearing. `chol` is built from the `f_sigma` the caller passed, so step 4 of the algorithm rewrites `sigma` without rewriting `chol`. Under an `mp` that leaves the projected covariance where it found it — which the default [`MatrixProcessing`](@ref) does, its `pdm` being a no-op on a matrix that is already positive semi-definite — the two agree and the identity holds on the returned pair. Under an `mp` that denoises or detones, `sigma` moves and `chol` stays behind, so the identity holds against the unprocessed covariance alone. A consumer that needs a factor of the returned `sigma` must refactorise it.
 
@@ -266,7 +276,7 @@ The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\ma
  2. Project the factor mean through the loadings, giving `posterior_mu`.
  3. Project the factor covariance through the loadings, giving `posterior_sigma`, the systematic block.
  4. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `mp` and `posterior_X`.
- 5. Carry the lower Cholesky factor of `f_sigma` through the loadings, giving `posterior_csigma`. This reads the `f_sigma` the caller passed, which step 4 does not touch.
+ 5. Carry the square root of `f_sigma` under `sqrt_alg`, from [`matrix_square_root`](@ref), through the loadings, giving `posterior_csigma`. This reads the `f_sigma` the caller passed, which step 4 does not touch.
  6. When `rsd` is `true`, take the reconstruction error `err = X - posterior_X`, and read `esigma`, the column variances of `err` under `ve`. Read the counts of those variances with [`variance_count`](@ref), and restate them with [`residual_variance_counts`](@ref) against the `edof` of `rr`, giving `edof` and `ediv`. Size the residual block as `err_sigma`, the diagonal matrix of the variances. When `rsd` is `false`, `esigma` and `ediv` are `nothing`, and `edof` is the `edof` of `rr`.
  7. Still under `rsd`, add `err_sigma` to `posterior_sigma` and re-condition the sum with [`posdef!`](@ref), under `mp.pdm`. This is the body's only explicit [`posdef!`](@ref) call. `mp.pdm` also reaches `posterior_sigma` inside step 4, whenever `:pdm` is a member of `mp.order`.
  8. Still under `rsd`, widen `posterior_csigma` with `sqrt.(err_sigma)`, so the block that step 7 added to the covariance enters the factor as well.
@@ -282,6 +292,7 @@ The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\ma
   - `f_sigma`: Factor covariance matrix, `factors × factors`.
   - $(arg_dict[:X])
   - `posterior_X`: Reconstructed asset returns from [`factor_reconstruction`](@ref).
+  - $(arg_dict[:sqrt_alg])
   - `kwargs...`: Additional keyword arguments passed to matrix processing.
 
 # Returns
@@ -299,12 +310,14 @@ The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\ma
 """
 function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
                      rsd::Bool, rr::AbstractLoadingsRegressionResult, f_mu::VecNum,
-                     f_sigma::MatNum, X::MatNum, posterior_X::MatNum; kwargs...)
+                     f_sigma::MatNum, X::MatNum, posterior_X::MatNum;
+                     sqrt_alg::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
+                     kwargs...)
     (; b, M) = rr
     posterior_mu = M * f_mu + b
     posterior_sigma = M * f_sigma * transpose(M)
     matrix_processing!(mp, posterior_sigma, posterior_X; kwargs...)
-    posterior_csigma = M * LinearAlgebra.cholesky(f_sigma).L
+    posterior_csigma = M * matrix_square_root(sqrt_alg, f_sigma)
     esigma = nothing
     edof = rr.edof
     ediv = nothing
@@ -519,7 +532,8 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
     rr, posterior_X = factor_reconstruction(pe.re, Xc, F)
     (; mu, sigma, chol, esigma, edof, ediv) = factor_lift(pe.mp, pe.ve, pe.rsd, rr,
                                                           f_prior.mu, f_prior.sigma, Xc,
-                                                          posterior_X; kwargs...)
+                                                          posterior_X;
+                                                          sqrt_alg = pe.sqrt_alg, kwargs...)
     # The lift already measured the residual variances, so the block carries them instead of
     # making every consumer recompute them from the reconstruction error. Under `rsd = false`
     # the lift added no residual block and `esigma` is `nothing`, which is what the field then

@@ -601,9 +601,9 @@ function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEs
     csl = cross_sectional_regression(cre, Z[:, :, lv], X, W)
     f = zeros(eltype(csl.f), size(csl.f, 1), size(Z, 3))
     f[:, lv] = csl.f
-    return (; csr = CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n, b = csl.b,
-                                               h1 = csl.h1),
-            lv = lv)
+    return (;
+            csr = CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n, b = csl.b,
+                                           h1 = csl.h1), lv = lv)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1389,8 +1389,8 @@ function cross_sectional_expand(fcb::FactorFamilyBasis, r, mu::VecNum, sigma::Ma
     return (; mu = expand_factor_mu(now, mu), sigma = expand_factor_covariance(now, sigma))
 end
 """
-    cross_sectional_residual_block(esigma::VecNum, idx) -> NamedTuple
-    cross_sectional_residual_block(esigma::MatNum, idx) -> NamedTuple
+    cross_sectional_residual_block(esigma::VecNum, idx, sqrt_alg = nothing) -> NamedTuple
+    cross_sectional_residual_block(esigma::MatNum, idx, sqrt_alg = nothing) -> NamedTuple
 
 Return the idiosyncratic block of the asset covariance and a square root of it.
 
@@ -1402,14 +1402,14 @@ The idiosyncratic covariance is a vector of variances or a full matrix, and each
 \\begin{align}
 \\mathbf{R} &= \\begin{cases}
     \\operatorname{diag}\\left(\\sqrt{v_{Ti}}\\right)_{i \\in \\mathcal{I}} & \\mathbf{D} \\text{ diagonal}\\,, \\\\
-    \\operatorname{chol}\\left(\\mathbf{D}_{\\mathcal{I}\\mathcal{I}}\\right) & \\text{otherwise}\\,.
+    \\operatorname{sqrt}\\left(\\mathbf{D}_{\\mathcal{I}\\mathcal{I}}\\right) & \\text{otherwise}\\,.
 \\end{cases}
 \\end{align}
 ```
 
 Where:
 
-  - ``\\operatorname{chol}``: Lower Cholesky factor.
+  - ``\\operatorname{sqrt}``: The square root that [`matrix_square_root`](@ref) takes under `sqrt_alg`, the lower Cholesky factor by default.
   - $(math_dict[:R_idio])
   - $(math_dict[:D_orth])
   - $(math_dict[:I_inv])
@@ -1420,10 +1420,11 @@ Where:
 
   - `esigma`: The idiosyncratic variances, or the idiosyncratic covariance.
   - `idx`: The investable assets.
+  - $(arg_dict[:sqrt_alg]) The vector method reads no square-root algorithm.
 
 # Validation
 
-  - A full block restricted to `idx` factorises. Raises a `PosDefException`.
+  - A full block restricted to `idx` has a square root under `sqrt_alg`. Raises a `LinearAlgebra.PosDefException`.
 
 # Returns
 
@@ -1435,20 +1436,22 @@ Where:
   - [`cross_sectional_lift`](@ref)
   - [`cross_sectional_idiosyncratic_covariance`](@ref)
 """
-function cross_sectional_residual_block(esigma::VecNum, idx::AbstractVector{<:Integer})
+function cross_sectional_residual_block(esigma::VecNum, idx::AbstractVector{<:Integer},
+                                        ::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
     d = esigma[idx]
     return (; D = LinearAlgebra.diagm(d), R = LinearAlgebra.diagm(sqrt.(d)))
 end
-function cross_sectional_residual_block(esigma::MatNum, idx::AbstractVector{<:Integer})
+function cross_sectional_residual_block(esigma::MatNum, idx::AbstractVector{<:Integer},
+                                        sqrt_alg::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
     D = esigma[idx, idx]
-    return (; D = D, R = Matrix(LinearAlgebra.cholesky(D).L))
+    return (; D = D, R = Matrix(matrix_square_root(sqrt_alg, D)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Lift a factor distribution onto the assets of a Cross-Sectional Factor Prior.
 
-The square root `chol` factorises the factor model before `mp` processes it, as in [`factor_lift`](@ref). So `chol' * chol` equals `sigma` only when the processing leaves the matrix unchanged, which the default `mp` does to a positive definite matrix. A detoning `mp` moves `sigma` and leaves `chol` where it was.
+The square root `chol` factorises the factor model before `mp` processes it, as in [`factor_lift`](@ref). [`matrix_square_root`](@ref) takes the square root of each block under `sqrt_alg`. So `chol' * chol` equals `sigma` only when the processing leaves the matrix unchanged, which the default `mp` does to a positive definite matrix. A detoning `mp` moves `sigma` and leaves `chol` where it was.
 
 # Mathematical definition
 
@@ -1468,7 +1471,7 @@ Where:
   - ``\\mathbf{\\Sigma}``: Asset covariance.
   - ``\\mathbf{C}``: Low-rank square root of the asset covariance, ``(K + \\lvert \\mathcal{I} \\rvert) \\times N`` over the full asset universe.
   - ``\\mathbf{B}_{T,\\,\\mathcal{S}}``, ``\\mathbf{B}_{T,\\,\\mathcal{I}}``: The rows of ``\\mathbf{B}_{T}`` at the assets of ``\\mathcal{S}`` and of ``\\mathcal{I}``.
-  - ``\\operatorname{chol}``: Lower Cholesky factor. Of a factor covariance with a zero row and column, which an Empty Factor carries, it is the Cholesky factor of the block of the other factors, with a zero row and column at the Empty Factor.
+  - ``\\operatorname{chol}``: The square root that [`matrix_square_root`](@ref) takes under `sqrt_alg`, the lower Cholesky factor by default. Of a factor covariance with a zero row and column, which an Empty Factor carries, it is the square root of the block of the other factors, with a zero row and column at the Empty Factor.
   - $(math_dict[:B_T_cs])
   - $(math_dict[:mu_f_patt])
   - $(math_dict[:F_patt])
@@ -1486,7 +1489,7 @@ The answer states an entry exactly when the model determines it. An asset of ``\
  2. Project the factor mean through `Li`, giving `mui`, and the factor covariance, giving `si`.
  3. Process `si` with `mp`, as [`factor_lift`](@ref) does.
  4. Add `D` to `si`, and make the sum positive definite with `mp.pdm`.
- 5. Take `lf`, the factors whose column of `f_sigma` is not zero, and the lower Cholesky factor `Lf` of the block of `f_sigma` at `lf`. Write `Lf` into the block at `lf` of a zero matrix `Cf`.
+ 5. Take `lf`, the factors whose column of `f_sigma` is not zero, and the square root `Lf` of the block of `f_sigma` at `lf` under `sqrt_alg`. Write `Lf` into the block at `lf` of a zero matrix `Cf`.
  6. Build `ci`, the low-rank square root `[Li * Cf  R]`.
  7. Take `sdx`, the assets whose row of `L` is finite, and `Ls`, their rows. Project the factor covariance through `Ls`, and add the block of `esigma` at `sdx`, giving `ss`. A `NaN` variance in `esigma` makes `NaN` the entries that read it.
  8. Write `Ls * f_mu`, `ss` and the systematic root `Ls * Cf` at `sdx` into the full asset universe, over `NaN`, then `mui`, `si` and `ci` at `idx` over them, giving `mu`, `sigma` and `chol`. Write `NaN` on the diagonal of `sigma` at every asset of `sdx` outside `idx`, so the Investable Mask of the answer is never wider than `idx`.
@@ -1500,10 +1503,12 @@ The answer states an entry exactly when the model determines it. An asset of ``\
   - `esigma`: The idiosyncratic variances, or the idiosyncratic covariance.
   - `idx`: The investable assets.
   - `Xs`: The asset return scenarios, `scenarios × assets`, which the processing reads.
+  - $(arg_dict[:sqrt_alg])
 
 # Validation
 
   - `L`, `f_mu` and `f_sigma` agree on the factor axis. Raises a `DimensionMismatch`.
+  - The block of `f_sigma` at `lf` has a square root under `sqrt_alg`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`.
 
 # Returns
 
@@ -1519,18 +1524,20 @@ The answer states an entry exactly when the model determines it. An asset of ``\
 """
 function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
                               f_mu::VecNum, f_sigma::MatNum, esigma::VecNum_MatNum,
-                              idx::AbstractVector{<:Integer}, Xs::MatNum; kwargs...)
+                              idx::AbstractVector{<:Integer}, Xs::MatNum;
+                              sqrt_alg::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
+                              kwargs...)
     @argcheck(size(L, 2) == length(f_mu) == size(f_sigma, 1),
               DimensionMismatch("L ($(size(L, 2)) columns), f_mu ($(length(f_mu))) and f_sigma ($(size(f_sigma, 1)) rows) must agree on the factor axis"))
     Li = L[idx, :]
-    (; D, R) = cross_sectional_residual_block(esigma, idx)
+    (; D, R) = cross_sectional_residual_block(esigma, idx, sqrt_alg)
     mui = Li * f_mu
     si = Li * f_sigma * transpose(Li)
     matrix_processing!(mp, si, Xs[:, idx]; kwargs...)
     si .+= D
     posdef!(mp.pdm, si)
     lf = findall(k -> !all(iszero, view(f_sigma, :, k)), axes(f_sigma, 2))
-    Lf = LinearAlgebra.cholesky(f_sigma[lf, lf]).L
+    Lf = matrix_square_root(sqrt_alg, f_sigma[lf, lf])
     Cf = zeros(eltype(Lf), size(f_sigma))
     Cf[lf, lf] = Lf
     ci = hcat(Li * Cf, R)

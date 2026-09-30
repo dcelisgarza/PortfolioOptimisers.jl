@@ -3010,3 +3010,17 @@ Sweep ticket #536.
     # This estimator adds no residual block, so it declares none.
     @test isnothing(PO.factor_residual_config(pv))
 end
+
+@testset "LowOrderPrior refuses a non-finite covariance between investable assets" begin
+    X = [0.01 0.02 0.03; -0.01 0.0 0.01; 0.02 -0.01 0.0]
+    mu = [0.001, 0.002, 0.003]
+    sigma = [1.0 0.1 0.0; 0.1 1.0 0.2; 0.0 0.2 1.0]
+    s = copy(sigma)
+    s[1, 2] = s[2, 1] = NaN
+    @test_throws PortfolioOptimisers.IsNonFiniteError LowOrderPrior(; X = X, mu = mu,
+                                                                    sigma = s)
+    # An asset outside the investable set, here one with no mean, may carry a `NaN` row.
+    m = copy(mu)
+    m[1] = NaN
+    @test LowOrderPrior(; X = X, mu = m, sigma = s) isa LowOrderPrior
+end

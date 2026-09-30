@@ -84,6 +84,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/04_MatrixProcessing/02_Denoise.jl" = { raw = 1, reviewed = 1 }
 "src/04_MatrixProcessing/03_Detone.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { raw = 0, reviewed = 0 }
+"src/04_MatrixProcessing/05_MatrixSquareRoot.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/01_Base_Moments.jl" = { raw = 1, reviewed = 1 }
 "src/05_Moments/02_SimpleExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/03_Covariance.jl" = { raw = 0, reviewed = 0 }
@@ -471,6 +472,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/04_MatrixProcessing/02_Denoise.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/03_Detone.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { raw = 0, reviewed = 0 }
+"src/04_MatrixProcessing/05_MatrixSquareRoot.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/01_Base_Moments.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/02_SimpleExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/03_Covariance.jl" = { raw = 0, reviewed = 0 }

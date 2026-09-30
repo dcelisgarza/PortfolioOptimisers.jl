@@ -345,6 +345,10 @@ Its algorithm owns the test that leaves a matrix unchanged and the repair: `Near
 **Matrix Processing**
 The composing estimator applying a sequence of post-processing steps — Posdef, Denoising, Detoning, and a custom algorithm — to a covariance/correlation matrix.
 
+**Matrix Square Root**
+A matrix `L` with `L L' = Σ`, which a factor prior states its covariance through as `chol`, and which a second-order cone reads. `nothing` takes the plain Cholesky factor and refuses a matrix that is not positive definite. `RidgeCholeskySquareRoot` adds a ridge to the diagonal that grows tenfold until the factor exists, and `EigenFallbackSquareRoot` takes the square root of the eigendecomposition of a positive semidefinite matrix. A factor prior holds the algorithm in `sqrt_alg`.
+*Avoid*: Cholesky factor, for a square root that is not triangular or that carries a ridge.
+
 ### 3.6 Prior
 
 **Prior**

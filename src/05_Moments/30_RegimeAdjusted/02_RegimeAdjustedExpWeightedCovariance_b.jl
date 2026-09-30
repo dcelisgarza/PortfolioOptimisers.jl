@@ -1142,12 +1142,10 @@ refusal skips that observation's regime update, and the fit continues.
 
 # Algorithm
 
- 1. Try the plain factorisation of the lower triangle of `C`. Return it where it succeeds.
- 2. Symmetrise `C`, and take the mean absolute diagonal as the scale. Where that is not a finite
-    positive number, take the largest absolute entry, and at least one.
- 3. Add a ridge of `max(min_val * scale, eps * scale)` to the diagonal, and try again. Multiply
-    the ridge by ten after each failure, for three tries in all.
- 4. Return `nothing` where every try fails.
+ 1. Build a [`RidgeCholeskySquareRoot`](@ref) with `ridge = max(min_val, 0)` and three tries. A
+    negative `min_val` gives the ridge of a zero `min_val`, the floor `eps * scale`.
+ 2. Return [`ridge_cholesky`](@ref) of `C` under it: the plain factorisation, or the first ridge
+    that makes `C` factorise, or `nothing`.
 
 # Arguments
 
@@ -1162,32 +1160,14 @@ refusal skips that observation's regime update, and the fit continues.
 # Related
 
   - [`regime_statistic`](@ref)
+  - [`ridge_cholesky`](@ref)
+  - [`RidgeCholeskySquareRoot`](@ref)
   - [`MahalanobisTarget`](@ref)
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
 """
 function safe_regime_cholesky(C::MatNum, min_val::Number)
-    chol = LinearAlgebra.cholesky(LinearAlgebra.Hermitian(C, :L); check = false)
-    if LinearAlgebra.issuccess(chol)
-        return chol
-    end
-    S = (C + transpose(C)) / 2
-    base = Statistics.mean(abs, LinearAlgebra.diag(S))
-    scale = if base > zero(base) && isfinite(base)
-        base
-    else
-        max(maximum(abs, S), one(base))
-    end
-    ridge = max(min_val * scale, eps(scale) * scale)
-    for _ in 1:3
-        chol = LinearAlgebra.cholesky(LinearAlgebra.Hermitian(S + ridge * LinearAlgebra.I,
-                                                              :L); check = false)
-        if LinearAlgebra.issuccess(chol)
-            return chol
-        end
-        ridge *= 10
-    end
-
-    return nothing
+    # A negative `min_val` gives the floor `eps * scale`, as a zero one does.
+    return ridge_cholesky(RidgeCholeskySquareRoot(max(min_val, zero(min_val)), 3), C)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

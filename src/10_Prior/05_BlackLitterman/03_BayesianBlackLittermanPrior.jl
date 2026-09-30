@@ -88,66 +88,67 @@ julia> BayesianBlackLittermanPrior(;
                                                                             \"F2 == 0.04\"]))
 BayesianBlackLittermanPrior
           pe ┼ FactorPrior
-             │    pe ┼ EmpiricalPrior
-             │       │           ce ┼ PortfolioOptimisersCovariance
-             │       │              │   ce ┼ Covariance
-             │       │              │      │    me ┼ SimpleExpectedReturns
-             │       │              │      │       │   w ┴ nothing
-             │       │              │      │    ce ┼ GeneralCovariance
-             │       │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │       │              │      │       │    w ┴ nothing
-             │       │              │      │   alg ┼ FullMoment()
-             │       │              │      │     w ┴ nothing
-             │       │              │   mp ┼ MatrixProcessing
-             │       │              │      │     pdm ┼ Posdef
-             │       │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │       │              │      │      dn ┼ nothing
-             │       │              │      │      dt ┼ nothing
-             │       │              │      │     alg ┼ nothing
-             │       │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-             │       │           me ┼ EquilibriumExpectedReturns
-             │       │              │   ce ┼ PortfolioOptimisersCovariance
-             │       │              │      │   ce ┼ Covariance
-             │       │              │      │      │    me ┼ SimpleExpectedReturns
-             │       │              │      │      │       │   w ┴ nothing
-             │       │              │      │      │    ce ┼ GeneralCovariance
-             │       │              │      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │       │              │      │      │       │    w ┴ nothing
-             │       │              │      │      │   alg ┼ FullMoment()
-             │       │              │      │      │     w ┴ nothing
-             │       │              │      │   mp ┼ MatrixProcessing
-             │       │              │      │      │     pdm ┼ Posdef
-             │       │              │      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │              │      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │       │              │      │      │      dn ┼ nothing
-             │       │              │      │      │      dt ┼ nothing
-             │       │              │      │      │     alg ┼ nothing
-             │       │              │      │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-             │       │              │    w ┼ nothing
-             │       │              │    l ┴ Int64: 1
-             │       │      horizon ┼ nothing
-             │       │   fill_limit ┴ nothing
-             │    mp ┼ MatrixProcessing
-             │       │     pdm ┼ Posdef
-             │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │       │      dn ┼ nothing
-             │       │      dt ┼ nothing
-             │       │     alg ┼ nothing
-             │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-             │    re ┼ StepwiseRegression
-             │       │   crit ┼ PValue
-             │       │        │   t ┴ Float64: 0.05
-             │       │    alg ┼ ForwardSelection()
-             │       │    tgt ┼ LinearModel
-             │       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │    ve ┼ SimpleVariance
-             │       │          me ┼ SimpleExpectedReturns
-             │       │             │   w ┴ nothing
-             │       │           w ┼ nothing
-             │       │   corrected ┴ Bool: true
-             │   rsd ┴ Bool: true
+             │         pe ┼ EmpiricalPrior
+             │            │           ce ┼ PortfolioOptimisersCovariance
+             │            │              │   ce ┼ Covariance
+             │            │              │      │    me ┼ SimpleExpectedReturns
+             │            │              │      │       │   w ┴ nothing
+             │            │              │      │    ce ┼ GeneralCovariance
+             │            │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │            │              │      │       │    w ┴ nothing
+             │            │              │      │   alg ┼ FullMoment()
+             │            │              │      │     w ┴ nothing
+             │            │              │   mp ┼ MatrixProcessing
+             │            │              │      │     pdm ┼ Posdef
+             │            │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │            │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │            │              │      │      dn ┼ nothing
+             │            │              │      │      dt ┼ nothing
+             │            │              │      │     alg ┼ nothing
+             │            │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+             │            │           me ┼ EquilibriumExpectedReturns
+             │            │              │   ce ┼ PortfolioOptimisersCovariance
+             │            │              │      │   ce ┼ Covariance
+             │            │              │      │      │    me ┼ SimpleExpectedReturns
+             │            │              │      │      │       │   w ┴ nothing
+             │            │              │      │      │    ce ┼ GeneralCovariance
+             │            │              │      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │            │              │      │      │       │    w ┴ nothing
+             │            │              │      │      │   alg ┼ FullMoment()
+             │            │              │      │      │     w ┴ nothing
+             │            │              │      │   mp ┼ MatrixProcessing
+             │            │              │      │      │     pdm ┼ Posdef
+             │            │              │      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │            │              │      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │            │              │      │      │      dn ┼ nothing
+             │            │              │      │      │      dt ┼ nothing
+             │            │              │      │      │     alg ┼ nothing
+             │            │              │      │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+             │            │              │    w ┼ nothing
+             │            │              │    l ┴ Int64: 1
+             │            │      horizon ┼ nothing
+             │            │   fill_limit ┴ nothing
+             │         mp ┼ MatrixProcessing
+             │            │     pdm ┼ Posdef
+             │            │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │            │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │            │      dn ┼ nothing
+             │            │      dt ┼ nothing
+             │            │     alg ┼ nothing
+             │            │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+             │         re ┼ StepwiseRegression
+             │            │   crit ┼ PValue
+             │            │        │   t ┴ Float64: 0.05
+             │            │    alg ┼ ForwardSelection()
+             │            │    tgt ┼ LinearModel
+             │            │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │         ve ┼ SimpleVariance
+             │            │          me ┼ SimpleExpectedReturns
+             │            │             │   w ┴ nothing
+             │            │           w ┼ nothing
+             │            │   corrected ┴ Bool: true
+             │        rsd ┼ Bool: true
+             │   sqrt_alg ┴ nothing
         f_mp ┼ MatrixProcessing
              │     pdm ┼ Posdef
              │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
