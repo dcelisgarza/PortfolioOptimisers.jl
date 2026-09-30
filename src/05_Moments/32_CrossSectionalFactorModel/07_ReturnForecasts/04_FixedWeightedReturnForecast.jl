@@ -387,6 +387,9 @@ function return_forecast(rfe::FixedWeightedReturnForecast, rd::ReturnsResult,
     hist = forecast_return_units(rfe.unit, rfe.scale * Z, csfm.vs)
     return FixedWeightedReturnForecastResult(; mu = hist[end, :], hist = hist, weights = wv)
 end
+function lookback(rfe::FixedWeightedReturnForecast)::Option{<:Integer}
+    return lookback(rfe.scores.descriptors)
+end
 
 """
     port_opt_view(rf::FixedWeightedReturnForecastResult, i, args...)

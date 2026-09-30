@@ -110,5 +110,8 @@ function factor_exposure(::ConstantExposure, rd::ReturnsResult)::Matrix{<:Real}
     exposure_active_fill!(L, pnl)
     return L
 end
+function lookback(::ConstantExposure)::Integer
+    return 1
+end
 
 export ConstantExposure

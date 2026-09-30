@@ -295,5 +295,8 @@ function factor_exposure(xe::OneHotExposure, rd::ReturnsResult)::Array{<:Real, 3
     exposure_active_fill!(B, rd.pnl)
     return B
 end
+function lookback(::OneHotExposure)::Integer
+    return 1
+end
 
 export OneHotExposure

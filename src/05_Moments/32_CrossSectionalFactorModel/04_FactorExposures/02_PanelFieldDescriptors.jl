@@ -555,6 +555,9 @@ function descriptor(de::Passthrough, rd::ReturnsResult)::Matrix{<:Real}
     descriptor_active_fill!(D, rd.pnl)
     return D
 end
+function lookback(::Union{PanelFieldRatio, PanelFieldLog, Passthrough})::Integer
+    return 1
+end
 """
     BookToPrice(; num::AbstractString = "book_equity",
                 den::AbstractString = "market_cap") -> PanelFieldRatio

@@ -410,6 +410,12 @@ function descriptor(de::RollingMax, rd::ReturnsResult)::Matrix{<:Real}
     descriptor_active_fill!(D, pnl)
     return D
 end
+function lookback(de::RollingLogReturn)::Integer
+    return de.skip + de.window
+end
+function lookback(de::RollingMax)::Integer
+    return de.window
+end
 """
     RollingMomentum(; window::Integer = 252, skip::Integer = 21, sign::Real = 1,
                     exponentiate::Bool = false) -> RollingLogReturn

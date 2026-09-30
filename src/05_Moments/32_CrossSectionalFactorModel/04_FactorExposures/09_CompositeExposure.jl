@@ -396,5 +396,8 @@ function factor_exposure(xe::CompositeExposure, rd::ReturnsResult)::Matrix{<:Rea
     composite_finalise!(num, den, xe.min_coverage)
     return length(des) > 1 ? exposure_transform(xe.scoring, num, w, groups) : num
 end
+function lookback(xe::CompositeExposure)::Option{<:Integer}
+    return lookback(xe.descriptors)
+end
 
 export CompositeExposure

@@ -167,6 +167,9 @@ end
 function observed_series(xe::ObservedExposure, ::ReturnsResult)::Vector{String}
     return [String(xe.series)]
 end
+function lookback(xe::ObservedExposure)::Option{<:Integer}
+    return lookback(xe.xe)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -323,6 +326,9 @@ function factor_exposure(xe::CurrencyExposure, rd::ReturnsResult)::Array{<:Real,
 end
 function observed_series(xe::CurrencyExposure, rd::ReturnsResult)::Vector{String}
     return String.(one_hot_field(rd, xe.field).levels[currency_level_columns(xe, rd)])
+end
+function lookback(::CurrencyExposure)::Integer
+    return 1
 end
 """
     currency_level_columns(xe::CurrencyExposure, rd::ReturnsResult) -> Vector{Int}

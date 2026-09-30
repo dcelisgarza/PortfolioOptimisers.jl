@@ -712,5 +712,10 @@ function factor_residual_config(::CrossSectionalFactorPrior)
     # added, which is false, so the method refuses instead.
     return throw(ArgumentError("a Cross-Sectional Factor Prior states no residual declaration. The block it adds is the idiosyncratic covariance it measured, which the result carries at `rr.esigma`; it is not `var(ve, X - posterior_X)`, so a consumer that rebuilds the block from a variance estimator would subtract a different matrix."))
 end
+function lookback(pe::CrossSectionalFactorPrior)::Option{<:Integer}
+    L = lookback(map(last, pe.factors))
+    lr = isnothing(pe.rfe) ? 1 : lookback(pe.rfe)
+    return isnothing(L) || isnothing(lr) ? nothing : max(L + pe.lag, lr)
+end
 
 export CrossSectionalFactorPrior

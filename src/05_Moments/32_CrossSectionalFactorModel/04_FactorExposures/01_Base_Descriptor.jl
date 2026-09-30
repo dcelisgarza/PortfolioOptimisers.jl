@@ -28,6 +28,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - [`AbstractEstimator`](@ref)
   - [`descriptor`](@ref)
+  - [`lookback`](@ref): The number of trailing observations that a Descriptor reads. A subtype can state its own method. The fallback returns `nothing`, which is exact for every Descriptor but makes a fold of the prior keep every row.
   - [`PanelFieldRatio`](@ref)
   - [`PanelFieldLog`](@ref)
   - [`Passthrough`](@ref)
@@ -616,6 +617,82 @@ function ew_beta_reset!(amsk::AbstractMatrix{Bool}, mu::AbstractVector{<:Number}
         act[i] = amsk[t, i]
     end
     return nothing
+end
+"""
+    lookback(est::AbstractEstimator) -> Option{<:Integer}
+    lookback(ests::AbstractVector) -> Option{<:Integer}
+
+Return the look-back of an estimator: the number of trailing observations that its value at one observation reads.
+
+The count includes the observation of the value, so a Descriptor that reads its own row has a look-back of one. A value that is computed from the last `lookback` rows of a panel alone equals the value at the last row of the full panel. A fold of a [`CrossSectionalFactorPrior`](@ref) can therefore keep only those rows. `nothing` states an unbounded look-back, because the value is a recursion from the first observation. An estimator that states no look-back of its own takes the fallback, which returns `nothing`. Its fold keeps every row, so its value stays exact.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`PanelFieldRatio`](@ref), a [`PanelFieldLog`](@ref) and a [`Passthrough`](@ref) read their own row, so each returns one. So do a [`ConstantExposure`](@ref), a [`OneHotExposure`](@ref), a [`CurrencyExposure`](@ref) and a [`CustomValueReturnForecast`](@ref).
+ 2. A [`GrowthRate`](@ref), a [`ChangeToScale`](@ref) and a [`ChangeInIntensity`](@ref) read their own row and the row `lag` observations earlier, so each returns `lag + 1`.
+ 3. A [`RollingLogReturn`](@ref) returns `skip + window`, and a [`RollingMax`](@ref) returns `window`.
+ 4. A vector of estimators returns the largest look-back of its members, and `nothing` when one member returns `nothing`. A [`CompositeExposure`](@ref) returns it over its Descriptors, and a [`FixedWeightedReturnForecast`](@ref) over the Descriptors of its scores. An [`ObservedExposure`](@ref) returns the look-back of the member it wraps.
+ 5. A [`DerivedExposure`](@ref) returns one. The factor it is derived from is in the same factor list, so the look-back of the prior counts the rows of that factor.
+ 6. A [`CrossSectionalFactorPrior`](@ref) returns the look-back of its factors plus `lag`, because the regression of one observation reads the Factor Exposures `lag` observations earlier. The look-back of its Return Forecast Estimator replaces that sum when it is larger. `nothing` from either part gives `nothing`.
+ 7. Every other estimator returns `nothing`. This covers every exponentially weighted Descriptor, an [`ExpWeightedReturnForecast`](@ref) and a [`TargetReturnForecast`](@ref), which fit over every observation.
+
+The look-back of the prior counts the Asset Panel rows that its Factor Exposures and its Return Forecast read. Its moment estimators `pe` and `ve` read every factor return and every idiosyncratic return, and a fold keeps their state rather than their rows.
+
+# Arguments
+
+  - `est`: A Descriptor Estimator, an Exposure Estimator, a Return Forecast Estimator or a [`CrossSectionalFactorPrior`](@ref).
+  - `ests`: A vector of estimators.
+
+# Returns
+
+  - `L::Option{<:Integer}`: The look-back, at least one, or `nothing` when it is unbounded.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.lookback(RollingMomentum())
+273
+
+julia> PortfolioOptimisers.lookback(GrowthRate(; field = \"sales_ttm\", lag = 252))
+253
+
+julia> isnothing(PortfolioOptimisers.lookback(EWMomentum()))
+true
+
+julia> PortfolioOptimisers.lookback(CompositeExposure(; descriptors = [Reversal(), MaxReturn()]))
+21
+
+julia> PortfolioOptimisers.lookback(CrossSectionalFactorPrior(;
+                                                              factors = [\"momentum\" =>
+                                                                             CompositeExposure(;
+                                                                                               descriptors = [RollingMomentum()])],
+                                                              lag = 2))
+275
+```
+
+# Related
+
+  - [`descriptor`](@ref)
+  - [`factor_exposure`](@ref)
+  - [`return_forecast`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`AbstractDescriptorEstimator`](@ref)
+"""
+function lookback(::AbstractEstimator)::Nothing
+    return nothing
+end
+function lookback(ests::AbstractVector)::Option{<:Integer}
+    L = 1
+    for est in ests
+        l = lookback(est)
+        if isnothing(l)
+            return nothing
+        end
+        L = max(L, l)
+    end
+    return L
 end
 
 export descriptor

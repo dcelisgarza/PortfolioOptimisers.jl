@@ -16,4 +16,5 @@ ew_beta_reset!
 nan_fill_value
 descriptor_active_fill!
 positive_divide
+lookback
 ```

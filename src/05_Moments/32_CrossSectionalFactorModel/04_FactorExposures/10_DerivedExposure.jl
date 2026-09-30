@@ -58,7 +58,7 @@ DerivedExposure
     """
     source
     """
-    Function applied to the source Factor Exposure. It takes an `observations × assets` matrix and returns one of the same size.
+    Function applied to the source Factor Exposure. It takes an `observations × assets` matrix and returns one of the same size. Each row of the result must depend on the same row of the source alone, because [`lookback`](@ref) counts one row for the member.
     """
     f
     """
@@ -174,6 +174,9 @@ function factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum)::Ma
     D = exposure_transform(xe.scoring, D, w, groups)
     exposure_active_fill!(D, rd.pnl)
     return D
+end
+function lookback(::DerivedExposure)::Integer
+    return 1
 end
 
 export DerivedExposure

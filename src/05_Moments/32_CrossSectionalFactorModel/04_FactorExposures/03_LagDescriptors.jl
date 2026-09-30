@@ -392,6 +392,9 @@ function descriptor(de::ChangeInIntensity, rd::ReturnsResult)::Matrix{<:Real}
     descriptor_active_fill!(D, rd.pnl)
     return D
 end
+function lookback(de::Union{GrowthRate, ChangeToScale, ChangeInIntensity})::Integer
+    return de.lag + 1
+end
 """
     AssetsGrowthRate(; field::AbstractString = "total_assets", lag::Integer = 252) -> GrowthRate
 
