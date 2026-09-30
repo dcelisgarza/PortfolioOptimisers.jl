@@ -341,7 +341,7 @@ Compute the Factor Exposure of a fixed weighted combination of Descriptors.
 
 # Validation
 
-  - The rules of [`panel_field_values`](@ref) for the benchmark weights and for every Panel Field the Descriptors name.
+  - The rules of [`descriptor_field_values`](@ref) for the benchmark weights and for every Panel Field the Descriptors name.
   - The rules of [`cross_sectional_transform`](@ref) for both transform slots.
 
 # Returns

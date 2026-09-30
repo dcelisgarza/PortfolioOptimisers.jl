@@ -433,9 +433,9 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     # observed series over the warm-up would otherwise move it. Neither reads the observed
     # factors, so the benchmark weights are written before any member reads the panel: an
     # observed member that wraps a composite reads them too.
-    Xu = isnothing(pe.lx) ? X : panel_field_values(rd, pe.lx)
+    Xu = isnothing(pe.lx) ? X : descriptor_field_values(rd, pe.lx)
     mcap = if cross_sectional_needs_market_cap(pe.bp, pe.wa)
-        panel_field_values(rd, pe.mcap)
+        descriptor_field_values(rd, pe.mcap)
     else
         nothing
     end

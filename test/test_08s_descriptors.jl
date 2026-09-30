@@ -194,37 +194,38 @@ const DESCRIPTOR_LAG_CONSTRUCTORS = (AssetsGrowthRate, SalesGrowthRate, Issuance
     end
 end
 
-@testset "The shared read: a fill reads back as NaN, and the active mask fills" begin
+@testset "The shared read: a fill and an inactive cell read back as NaN (#1411)" begin
     amsk = [true true true; true false true; true true true]
     rd = descriptor_hand_panel(["mcap" => [1.0 2.0 3.0; NaN 5.0 6.0; 7.0 8.0 9.0],
                                 "debt" => [0.5 1.0 1.5; 2.0 2.5 3.0; 3.5 4.0 4.5]];
                                amsk = amsk)
-    V = PortfolioOptimisers.panel_field_values(rd, "mcap")
+    V = PortfolioOptimisers.descriptor_field_values(rd, "mcap")
     @test isa(V, Matrix{Float64})
     @test isnan(V[2, 1])
     @test V[1, :] == [1.0, 2.0, 3.0]
-    # The read itself does not touch the active mask: cell (2, 2) is inactive but observed.
-    @test V[2, 2] == 5.0
-    W = PortfolioOptimisers.panel_field_values(rd, ["mcap" => 1, "debt" => -2])
+    # Cell (2, 2) is inactive but observed, and it reads as NaN too: a lag or a recursion
+    # that reaches it must not read the finite value the panel keeps there (#1411).
+    @test isnan(V[2, 2])
+    W = PortfolioOptimisers.descriptor_field_values(rd, ["mcap" => 1, "debt" => -2])
     @test W[1, :] == [0.0, 0.0, 0.0]
     @test W[3, 3] == 9.0 - 9.0
     @test isnan(W[2, 1])
-    @test_throws IsEmptyError PortfolioOptimisers.panel_field_values(rd,
-                                                                     Pair{String, Int}[])
-    @test_throws KeyError PortfolioOptimisers.panel_field_values(rd, "mcp")
+    @test_throws IsEmptyError PortfolioOptimisers.descriptor_field_values(rd,
+                                                                          Pair{String, Int}[])
+    @test_throws KeyError PortfolioOptimisers.descriptor_field_values(rd, "mcp")
     # A carrier with no panel cannot be read, and a categorical field is not one number.
     bare = ReturnsResult(; nx = ["A1", "A2", "A3"], X = zeros(3, 3))
-    @test_throws IsNothingError PortfolioOptimisers.panel_field_values(bare, "mcap")
+    @test_throws IsNothingError PortfolioOptimisers.descriptor_field_values(bare, "mcap")
     @test_throws IsNothingError descriptor(BookToPrice(), bare)
     res = asset_panel([NumericPanelInput(; name = "mcap", vals = ones(2, 2)),
                        CategoricalPanelInput(; name = "sector", vals = ["a" "b"; "a" "b"],
                                              levels = ["a", "b"])]; amsk = trues(2, 2),
                       emsk = trues(2, 2))
     rdc = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = res)
-    @test_throws ArgumentError PortfolioOptimisers.panel_field_values(rdc, "sector")
+    @test_throws ArgumentError PortfolioOptimisers.descriptor_field_values(rdc, "sector")
     @test_throws ArgumentError descriptor(Passthrough(; field = "sector"), rdc)
     # A field that cannot blank carries no observed-mask column, and reads back whole.
-    @test PortfolioOptimisers.panel_field_values(rdc, "mcap") == ones(2, 2)
+    @test PortfolioOptimisers.descriptor_field_values(rdc, "mcap") == ones(2, 2)
     # The read lands in the type a division of the field lands in, which is the one that
     # carries a NaN: an exact integer field reads in Float64, a Float32 field stays Float32,
     # and every archetype that reads it can then write NaN on an inactive or blank cell.
@@ -236,12 +237,12 @@ end
                         NumericPanelInput(; name = "f32", vals = Float32[1 2; 3 4])];
                        amsk = ami, emsk = ami)
     rdi = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = pint)
-    Vi = PortfolioOptimisers.panel_field_values(rdi, "shares")
+    Vi = PortfolioOptimisers.descriptor_field_values(rdi, "shares")
     @test eltype(Vi) === Float64
-    @test Vi == [10.0 20.0; 30.0 40.0]
-    Vg = PortfolioOptimisers.panel_field_values(rdi, "gap")
+    @test isequal(Vi, [10.0 20.0; 30.0 NaN])
+    Vg = PortfolioOptimisers.descriptor_field_values(rdi, "gap")
     @test isnan(Vg[1, 2])
-    @test eltype(PortfolioOptimisers.panel_field_values(rdi, "f32")) === Float32
+    @test eltype(PortfolioOptimisers.descriptor_field_values(rdi, "f32")) === Float32
     Dp = descriptor(Passthrough(; field = "shares"), rdi)
     @test isnan(Dp[2, 2])
     @test Dp[1, :] == [10.0, 20.0]
@@ -508,7 +509,10 @@ end
                    ChangeInIntensity(; field = "sales_ttm", scale = "market_cap", lag = 1))
             D = descriptor(de, rd)
             @test isnan(D[6, 2])
-            @test count(isnan, D) == N + 1
+            # Observation 7 lags into the inactive cell, which reads as missing, so it is
+            # NaN too: the panel keeps a finite value there, and no lag may read it (#1411).
+            @test isnan(D[7, 2])
+            @test count(isnan, D) == N + 2
         end
     end
 end
@@ -733,13 +737,13 @@ end
                        NumericPanelInput(; name = "f64", vals = [1e-9 0.0; 0.0 2.5])];
                       amsk = trues(2, 2), emsk = trues(2, 2))
     rd = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = pnl)
-    V1 = PortfolioOptimisers.panel_field_values(rd, ["f32" => 1, "f64" => 1])
-    V2 = PortfolioOptimisers.panel_field_values(rd, ["f64" => 1, "f32" => 1])
+    V1 = PortfolioOptimisers.descriptor_field_values(rd, ["f32" => 1, "f64" => 1])
+    V2 = PortfolioOptimisers.descriptor_field_values(rd, ["f64" => 1, "f32" => 1])
     @test eltype(V1) === Float64 && eltype(V2) === Float64
     @test V1 == V2
     @test V1[1, 1] == 1.0 + 1e-9
     # One Float32 term with an integer coefficient stays Float32.
-    V3 = PortfolioOptimisers.panel_field_values(rd, ["f32" => 2])
+    V3 = PortfolioOptimisers.descriptor_field_values(rd, ["f32" => 2])
     @test eltype(V3) === Float32
     @test V3 == Float32[2 4; 6 8]
 end

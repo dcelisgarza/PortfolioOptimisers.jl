@@ -70,12 +70,13 @@ commit = "ebcacfda95"
 "src/03_InputData/11_PricesToReturns.jl" = { cyc = 11, cog = 19, arg = 4, cyc_sum = 39, cog_sum = 40, arg_sum = 29, macros = [] }
 "src/03_InputData/12_TrainTestSplit.jl" = { cyc = 6, cog = 6, arg = 4, cyc_sum = 17, cog_sum = 9, arg_sum = 16, macros = [] }
 "src/03_InputData/13_Base_AssetSelection.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 4, cog_sum = 1, arg_sum = 4, macros = [] }
-"src/03_InputData/14_CrossSectionalTransforms.jl" = { cyc = 6, cog = 11, arg = 8, cyc_sum = 102, cog_sum = 102, arg_sum = 75, macros = [] }
+"src/03_InputData/14_CrossSectionalTransforms.jl" = { cyc = 6, cog = 11, arg = 8, cyc_sum = 98, cog_sum = 99, arg_sum = 75, macros = [] }
 "src/03_InputData/15_FeatureSelector.jl" = { cyc = 8, cog = 10, arg = 4, cyc_sum = 70, cog_sum = 53, arg_sum = 30, macros = [] }
 "src/03_InputData/16_PanelDataFrame.jl" = { cyc = 7, cog = 9, arg = 7, cyc_sum = 38, cog_sum = 35, arg_sum = 47, macros = [] }
 "src/03_InputData/17_ReturnsBufferState.jl" = { cyc = 9, cog = 15, arg = 4, cyc_sum = 62, cog_sum = 58, arg_sum = 45, macros = [] }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 75, cog_sum = 77, arg_sum = 54, macros = [] }
 "src/03_InputData/19_AssetPanelConcat.jl" = { cyc = 4, cog = 5, arg = 2, cyc_sum = 25, cog_sum = 14, arg_sum = 18, macros = [] }
+"src/03_InputData/20_PanelFieldValues.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 12, cog_sum = 4, arg_sum = 15, macros = [] }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { cyc = 6, cog = 6, arg = 3, cyc_sum = 33, cog_sum = 21, arg_sum = 22, macros = [] }
 "src/04_MatrixProcessing/02_Denoise.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 18, cog_sum = 11, arg_sum = 30, macros = [] }
 "src/04_MatrixProcessing/03_Detone.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 8, cog_sum = 3, arg_sum = 8, macros = [] }
@@ -129,7 +130,7 @@ commit = "ebcacfda95"
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { cyc = 6, cog = 10, arg = 5, cyc_sum = 40, cog_sum = 33, arg_sum = 36, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { cyc = 5, cog = 5, arg = 4, cyc_sum = 24, cog_sum = 18, arg_sum = 5, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl" = { cyc = 8, cog = 15, arg = 18, cyc_sum = 48, cog_sum = 26, arg_sum = 43, macros = ["@forward_properties"] }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 36, cog_sum = 40, arg_sum = 8, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 34, cog_sum = 35, arg_sum = 8, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/02_PanelFieldDescriptors.jl" = { cyc = 6, cog = 11, arg = 4, cyc_sum = 54, cog_sum = 26, arg_sum = 6, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/03_LagDescriptors.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 18, cog_sum = 6, arg_sum = 8, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl" = { cyc = 5, cog = 9, arg = 4, cyc_sum = 32, cog_sum = 19, arg_sum = 12, macros = [] }

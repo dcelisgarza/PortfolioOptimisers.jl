@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base descriptor, private API of PortfolioOptimisers.jl: panel_field_values, descriptor_asset_panel, assert_log_returns, market_return_series, …"
+Description = "Base descriptor, private API of PortfolioOptimisers.jl: descriptor_field_values, descriptor_asset_panel, assert_log_returns, market_return_series, …"
 ```
 
 # Base descriptor: private API
@@ -7,7 +7,7 @@ Description = "Base descriptor, private API of PortfolioOptimisers.jl: panel_fie
 ## Functions
 
 ```@docs
-panel_field_values
+descriptor_field_values
 descriptor_asset_panel
 assert_log_returns
 market_return_series

@@ -246,8 +246,8 @@ Read one side of an exponentially weighted ratio out of a [`ReturnsResult`](@ref
 A side takes four forms. Julia selects the method from the form, and each method reads the side as follows.
 
  1. `nothing` reads the absolute returns `abs.(rd.X)`. Returns are not a Panel Field, so this is how a ratio names them.
- 2. A name reads that one Panel Field, through [`panel_field_values`](@ref).
- 3. A vector of `name => coefficient` pairs reads their sum, through [`panel_field_values`](@ref). `["a" => 1, "b" => -1]` reads `a - b`.
+ 2. A name reads that one Panel Field, through [`descriptor_field_values`](@ref).
+ 3. A vector of `name => coefficient` pairs reads their sum, through [`descriptor_field_values`](@ref). `["a" => 1, "b" => -1]` reads `a - b`.
  4. A vector of names reads their product. `["adj_close", "adj_volume"]` reads a traded amount out of a price and a volume, which no single Panel Field carries.
 
 # Arguments
@@ -257,7 +257,7 @@ A side takes four forms. Julia selects the method from the form, and each method
 
 # Validation
 
-  - The rules of [`panel_field_values`](@ref) for every Panel Field the side names.
+  - The rules of [`descriptor_field_values`](@ref) for every Panel Field the side names.
 
 # Returns
 
@@ -267,23 +267,23 @@ A side takes four forms. Julia selects the method from the form, and each method
 
   - [`EWVolumeRatio`](@ref)
   - [`assert_ew_ratio_side`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
 """
 function ew_ratio_values(rd::ReturnsResult, ::Nothing)::Matrix{<:Real}
     return abs.(rd.X)
 end
 function ew_ratio_values(rd::ReturnsResult, x::AbstractString)::Matrix{<:Real}
-    return panel_field_values(rd, x)
+    return descriptor_field_values(rd, x)
 end
 function ew_ratio_values(rd::ReturnsResult,
                          x::AbstractVector{<:Pair{<:AbstractString, <:Real}})::Matrix{<:Real}
-    return panel_field_values(rd, x)
+    return descriptor_field_values(rd, x)
 end
 function ew_ratio_values(rd::ReturnsResult,
                          x::AbstractVector{<:AbstractString})::Matrix{<:Real}
-    V = panel_field_values(rd, x[1])
+    V = descriptor_field_values(rd, x[1])
     for k in 2:length(x)
-        V .*= panel_field_values(rd, x[k])
+        V .*= descriptor_field_values(rd, x[k])
     end
     return V
 end
@@ -654,7 +654,7 @@ Every method then writes `NaN` into the inactive cells.
 # Validation
 
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
-  - The rules of [`panel_field_values`](@ref) for every Panel Field the estimator names.
+  - The rules of [`descriptor_field_values`](@ref) for every Panel Field the estimator names.
   - The rule of [`assert_log_returns`](@ref) for an [`EWMean`](@ref).
   - The rule of [`assert_panel_field_sign`](@ref) for the `nonneg` guard of an [`EWVolumeRatio`](@ref) or a [`DaysToCover`](@ref), and for the `gt0` guard of an [`EWVolumeRatio`](@ref).
 
@@ -725,8 +725,8 @@ end
 function descriptor(de::DaysToCover, rd::ReturnsResult)::Matrix{<:Real}
     pnl = descriptor_asset_panel(rd)
     assert_panel_field_sign(rd, de.nonneg, false)
-    A = panel_field_values(rd, de.num)
-    B = panel_field_values(rd, de.den)
+    A = descriptor_field_values(rd, de.num)
+    B = descriptor_field_values(rd, de.den)
     Tf = eltype(B)
     V = [b > zero(b) ? b : Tf(NaN) for b in B]
     D = positive_divide.(A, ew_mean_series(V, de.decay, de.min_obs))

@@ -623,7 +623,7 @@ Under Currency Factors and simple returns the identity of the local return is no
 
 # Validation
 
-  - The rules of [`panel_field_values`](@ref) for the named method.
+  - The rules of [`descriptor_field_values`](@ref) for the named method.
 
 # Returns
 
@@ -658,7 +658,7 @@ function cross_sectional_local_returns(::Nothing, cc::NamedTuple, X::MatNum,
 end
 function cross_sectional_local_returns(lx::AbstractString, ::NamedTuple, ::MatNum,
                                        rd::ReturnsResult, ::Integer)
-    return panel_field_values(rd, lx)
+    return descriptor_field_values(rd, lx)
 end
 """
     cross_sectional_observed_block(cc::Nothing, rw, r) -> nothing

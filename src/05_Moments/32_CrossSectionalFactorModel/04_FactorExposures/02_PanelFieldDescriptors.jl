@@ -4,7 +4,7 @@
 
 Check that a Panel Field term is well formed: one non-empty name, or a non-empty vector of `name => coefficient` pairs with non-empty names and finite coefficients.
 
-A term is what the numerator or the denominator of a [`PanelFieldRatio`](@ref) holds. The check runs once, in the constructor, so the read through [`panel_field_values`](@ref) can assume a well-formed term.
+A term is what the numerator or the denominator of a [`PanelFieldRatio`](@ref) holds. The check runs once, in the constructor, so the read through [`descriptor_field_values`](@ref) can assume a well-formed term.
 
 # Arguments
 
@@ -24,7 +24,7 @@ A term is what the numerator or the denominator of a [`PanelFieldRatio`](@ref) h
 
   - [`PanelFieldRatio`](@ref)
   - [`panel_term_names`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
 """
 function assert_panel_terms(x::AbstractString, sym::Sym_Str)::Nothing
     @argcheck(!isempty(x),
@@ -346,7 +346,7 @@ Passthrough
 
   - [`AbstractDescriptorEstimator`](@ref)
   - [`descriptor`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
   - [`PanelFieldRatio`](@ref)
   - [`PanelFieldLog`](@ref)
 """
@@ -373,7 +373,7 @@ A field that is non-negative by construction, a dividend or a sales figure, is c
 
 # Algorithm
 
- 1. Read each named Panel Field through [`panel_field_values`](@ref).
+ 1. Read each named Panel Field through [`descriptor_field_values`](@ref).
  2. Find the first cell that is active, observed and below zero, or at or below zero under `strict`. Throw, naming the Panel Field, the observation and the asset.
 
 # Arguments
@@ -399,14 +399,14 @@ A field that is non-negative by construction, a dividend or a sales figure, is c
   - [`ChangeInIntensity`](@ref)
   - [`EWVolumeRatio`](@ref)
   - [`DaysToCover`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
 """
 function assert_panel_field_sign(::ReturnsResult, ::Nothing, ::Bool)::Nothing
     return nothing
 end
 function assert_panel_field_sign(rd::ReturnsResult, names::VecStr, strict::Bool)::Nothing
     for name in names
-        V = panel_field_values(rd, name)
+        V = descriptor_field_values(rd, name)
         amsk = rd.pnl.amsk
         z = zero(eltype(V))
         k = findfirst(k -> amsk[k] && (strict ? V[k] <= z : V[k] < z), eachindex(V, amsk))
@@ -425,7 +425,7 @@ Write `NaN` into every cell of a Descriptor where one of the named Panel Fields 
 
 # Algorithm
 
- 1. Read each named Panel Field through [`panel_field_values`](@ref).
+ 1. Read each named Panel Field through [`descriptor_field_values`](@ref).
  2. Write `NaN` into `D` wherever the field is zero, negative or `NaN`.
 
 # Arguments
@@ -442,7 +442,7 @@ Write `NaN` into every cell of a Descriptor where one of the named Panel Fields 
 
   - [`PanelFieldRatio`](@ref)
   - [`positive_divide`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
 """
 function positive_panel_fields_fill!(::AbstractMatrix{<:Real}, ::ReturnsResult,
                                      ::Nothing)::Nothing
@@ -452,7 +452,7 @@ function positive_panel_fields_fill!(D::AbstractMatrix{<:Real}, rd::ReturnsResul
                                      names::VecStr)::Nothing
     Tf = eltype(D)
     for name in names
-        V = panel_field_values(rd, name)
+        V = descriptor_field_values(rd, name)
         for k in CartesianIndices(D)
             if !(V[k] > zero(eltype(V)))
                 D[k] = Tf(NaN)
@@ -468,7 +468,7 @@ end
 
 Compute a point-in-time Descriptor from the Panel Fields of a [`ReturnsResult`](@ref).
 
-The three archetypes read the same way, through [`panel_field_values`](@ref), and end the same way, through [`descriptor_active_fill!`](@ref). They part on the arithmetic between the two.
+The three archetypes read the same way, through [`descriptor_field_values`](@ref), and end the same way, through [`descriptor_active_fill!`](@ref). They part on the arithmetic between the two.
 
 # Algorithm
 
@@ -487,7 +487,7 @@ Every method then writes `NaN` into the inactive cells.
 
 # Validation
 
-  - The rules of [`panel_field_values`](@ref) for every Panel Field the estimator names.
+  - The rules of [`descriptor_field_values`](@ref) for every Panel Field the estimator names.
   - The rule of [`assert_panel_field_sign`](@ref) for a [`PanelFieldRatio`](@ref) with a `nonneg` or a `gt0` guard, and for a [`PanelFieldLog`](@ref) under `gt0 = true`. A named constructor sets these guards, so `BookToPrice()` and `LogMarketCap()` refuse the zero market capitalisation of the example below.
 
 # Returns
@@ -525,14 +525,15 @@ julia> descriptor(Passthrough(; field = \"market_cap\"), rd)
   - [`PanelFieldRatio`](@ref)
   - [`PanelFieldLog`](@ref)
   - [`Passthrough`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
   - [`positive_divide`](@ref)
   - [`descriptor_active_fill!`](@ref)
 """
 function descriptor(de::PanelFieldRatio, rd::ReturnsResult)::Matrix{<:Real}
     assert_panel_field_sign(rd, de.nonneg, false)
     assert_panel_field_sign(rd, de.gt0, true)
-    D = positive_divide.(panel_field_values(rd, de.num), panel_field_values(rd, de.den))
+    D = positive_divide.(descriptor_field_values(rd, de.num),
+                         descriptor_field_values(rd, de.den))
     positive_panel_fields_fill!(D, rd, de.pos)
     descriptor_active_fill!(D, rd.pnl)
     return D
@@ -541,7 +542,7 @@ function descriptor(de::PanelFieldLog, rd::ReturnsResult)::Matrix{<:Real}
     if de.gt0
         assert_panel_field_sign(rd, [String(de.field)], true)
     end
-    D = panel_field_values(rd, de.field)
+    D = descriptor_field_values(rd, de.field)
     Tf = eltype(D)
     for k in eachindex(D)
         D[k] = D[k] > zero(Tf) ? log(D[k]) : Tf(NaN)
@@ -550,7 +551,7 @@ function descriptor(de::PanelFieldLog, rd::ReturnsResult)::Matrix{<:Real}
     return D
 end
 function descriptor(de::Passthrough, rd::ReturnsResult)::Matrix{<:Real}
-    D = panel_field_values(rd, de.field)
+    D = descriptor_field_values(rd, de.field)
     descriptor_active_fill!(D, rd.pnl)
     return D
 end

@@ -75,6 +75,7 @@ commit = "8610300"
 "src/03_InputData/17_ReturnsBufferState.jl" = { lines = 93, misses = 0 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { lines = 186, misses = 0 }
 "src/03_InputData/19_AssetPanelConcat.jl" = { lines = 57, misses = 0 }
+"src/03_InputData/20_PanelFieldValues.jl" = { lines = 30, misses = 0 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { lines = 26, misses = 0 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { lines = 80, misses = 0 }
 "src/04_MatrixProcessing/03_Detone.jl" = { lines = 30, misses = 0 }

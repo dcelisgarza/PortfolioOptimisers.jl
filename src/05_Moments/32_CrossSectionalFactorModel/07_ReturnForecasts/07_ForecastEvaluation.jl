@@ -83,7 +83,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Scores a Return Forecast against the forward mean of a named numeric Panel Field.
 
-[`panel_field_values`](@ref) reads the field, so a cell the panel fill touched comes back as `NaN` and never enters the target. The target holds the name of the field, not its values. So the Result can carry and print it, and the read refuses a field that the panel does not hold.
+[`descriptor_field_values`](@ref) reads the field, so a cell the panel fill touched comes back as `NaN` and never enters the target. The target holds the name of the field, not its values. So the Result can carry and print it, and the read refuses a field that the panel does not hold.
 
 # Fields
 
@@ -112,7 +112,7 @@ PanelFieldTarget
   - [`AbstractForecastTarget`](@ref)
   - [`IdiosyncraticTarget`](@ref)
   - [`AssetReturnTarget`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
 """
 @concrete struct PanelFieldTarget <: AbstractForecastTarget
     """
@@ -150,7 +150,7 @@ It is the one method that each member of the [`AbstractForecastTarget`](@ref) fa
 
   - `csfm.csr` is given, for [`IdiosyncraticTarget`](@ref). Raises an [`IsNothingError`](@ref).
   - The rules of [`return_forecast_rows`](@ref), for the other two members.
-  - The rules of [`panel_field_values`](@ref), for [`PanelFieldTarget`](@ref).
+  - The rules of [`descriptor_field_values`](@ref), for [`PanelFieldTarget`](@ref).
 
 # Returns
 
@@ -173,7 +173,7 @@ function forecast_target_history(::AssetReturnTarget, rd::ReturnsResult,
 end
 function forecast_target_history(target::PanelFieldTarget, rd::ReturnsResult,
                                  csfm::CrossSectionalFactorModel)::MatNum
-    return return_forecast_cut(panel_field_values(rd, target.name),
+    return return_forecast_cut(descriptor_field_values(rd, target.name),
                                return_forecast_rows(rd, csfm))
 end
 """

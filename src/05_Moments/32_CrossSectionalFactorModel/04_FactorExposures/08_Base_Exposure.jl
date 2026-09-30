@@ -100,7 +100,7 @@ end
 
 Read the benchmark weights a cross-sectional transform of an exposure is weighted by.
 
-A benchmark weight is a selector first and a weight second, so a cell that carries no weight is out of the estimation set of its observation rather than in it with an unknown weight. This reads the named Panel Field through [`panel_field_values`](@ref) and writes a zero into every cell the Asset Panel does not observe and every cell it does not activate, which is the one shape [`cross_sectional_transform`](@ref) accepts.
+A benchmark weight is a selector first and a weight second, so a cell that carries no weight is out of the estimation set of its observation rather than in it with an unknown weight. This reads the named Panel Field through [`descriptor_field_values`](@ref) and writes a zero into every cell the Asset Panel does not observe and every cell it does not activate, which is the one shape [`cross_sectional_transform`](@ref) accepts.
 
 # Algorithm
 
@@ -114,7 +114,7 @@ A benchmark weight is a selector first and a weight second, so a cell that carri
 
 # Validation
 
-  - The rules of [`panel_field_values`](@ref).
+  - The rules of [`descriptor_field_values`](@ref).
 
 # Returns
 
@@ -124,11 +124,11 @@ A benchmark weight is a selector first and a weight second, so a cell that carri
 
   - [`CompositeExposure`](@ref)
   - [`DerivedExposure`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
   - [`cross_sectional_transform`](@ref)
 """
 function exposure_benchmark_weights(rd::ReturnsResult, name::AbstractString)::Matrix{<:Real}
-    W = panel_field_values(rd, name)
+    W = descriptor_field_values(rd, name)
     exposure_weight_fill!(W, rd.pnl)
     return W
 end

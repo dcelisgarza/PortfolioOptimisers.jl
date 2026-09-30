@@ -733,7 +733,7 @@ function ew_beta_output(group::AbstractString, de::EWBeta, rd::ReturnsResult,
                         Ba::AbstractMatrix{<:Real}, Vm::AbstractVector{<:Real},
                         Xa::AbstractMatrix{<:Real},
                         rma::AbstractVector{<:Real})::Matrix{<:Real}
-    W = Matrix(panel_field_values(rd, de.mcap))
+    W = Matrix(descriptor_field_values(rd, de.mcap))
     L = cross_sectional_groups(descriptor_asset_panel(rd), group)
     Vr = ew_beta_residual_variance(Xa, rma, Ba, de.decay, de.min_obs)
     en = 2 * decay_half_life(de.decay)

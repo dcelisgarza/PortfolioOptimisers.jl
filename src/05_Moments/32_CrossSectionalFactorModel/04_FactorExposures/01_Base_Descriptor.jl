@@ -62,25 +62,25 @@ Every Descriptor Estimator implements this function. It reads the Panel Fields t
 # Related
 
   - [`AbstractDescriptorEstimator`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
   - [`descriptor_active_fill!`](@ref)
   - [`ReturnsResult`](@ref)
   - [`AssetPanel`](@ref)
 """
 function descriptor end
 """
-    panel_field_values(rd::ReturnsResult, name::AbstractString) -> Matrix{<:Real}
-    panel_field_values(rd::ReturnsResult,
-                       terms::AbstractVector{<:Pair{<:AbstractString, <:Real}}) -> Matrix{<:Real}
+    descriptor_field_values(rd::ReturnsResult, name::AbstractString) -> Matrix{<:Real}
+    descriptor_field_values(rd::ReturnsResult,
+                            terms::AbstractVector{<:Pair{<:AbstractString, <:Real}}) -> Matrix{<:Real}
 
-Read one numeric Panel Field, or a linear combination of numeric Panel Fields, out of a [`ReturnsResult`](@ref).
+Read one numeric Panel Field, or a linear combination of numeric Panel Fields, out of a [`ReturnsResult`](@ref), for a Descriptor.
 
-Every Descriptor Estimator reads its Panel Fields through this function. A blank cell never reaches a `ReturnsResult`, because [`asset_panel`](@ref) resolves each one to a fill value and records the resolution in the observed-mask column of the field. This function writes `NaN` back into each cell that the fill set, so a Descriptor cannot mistake a fill value for data.
+Every Descriptor Estimator reads its Panel Fields through this function. A blank cell never reaches a `ReturnsResult`, because [`asset_panel`](@ref) resolves each one to a fill value and records the resolution in the observed-mask column of the field. A cell outside the universe holds a finite value too. This function writes `NaN` into both kinds of cell, through [`panel_field_values`](@ref) with `inactive = NaN`, so a Descriptor cannot mistake a fill value or the value of an inactive cell for data. A lag or a recursion that reaches back to a cell before a listing, or into a stretch where the asset is out of the universe, reads `NaN` there.
 
 # Algorithm
 
- 1. Look the Panel Field up by name through [`panel_field`](@ref), and copy its values into a matrix whose element type is `float_if_integer` of the field's. An integer field reads in `Float64`, and a `Float32` field stays `Float32`.
- 2. When the Panel Field carries an observed mask, write `NaN` into every cell whose mask entry is `false`.
+ 1. Check that the Panel Field is numeric and time-varying.
+ 2. Read it through [`panel_field_values`](@ref) with `inactive = NaN` and `unobserved = NaN`. An integer field reads in `Float64`, and a `Float32` field stays `Float32`.
  3. For a vector of `name => coefficient` pairs, read each named field the same way and multiply it by its coefficient. Return the sum of those terms in the type that all of them promote to, so the order of the terms does not change the result. A `NaN` in any term is a `NaN` in the sum.
 
 # Arguments
@@ -97,7 +97,7 @@ Every Descriptor Estimator reads its Panel Fields through this function. A blank
 
 # Returns
 
-  - `V::Matrix{<:Real}`: The values, `observations × assets`, `NaN` where the Panel Field was not observed.
+  - `V::Matrix{<:Real}`: The values, `observations × assets`, `NaN` where the Panel Field was not observed and where the asset is outside the universe.
 
 # Examples
 
@@ -105,30 +105,31 @@ Every Descriptor Estimator reads its Panel Fields through this function. A blank
 julia> pnl = asset_panel([NumericPanelInput(; name = \"mcap\", vals = [1.0 2.0; NaN 4.0],
                                             alg = ForwardPanelFill(; val = 0.0)),
                           NumericPanelInput(; name = \"debt\", vals = [0.5 1.0; 1.5 2.0])];
-                         amsk = trues(2, 2), emsk = trues(2, 2));
+                         amsk = [true false; true true], emsk = [true false; true true]);
 
 julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = zeros(2, 2), pnl = pnl);
 
-julia> PortfolioOptimisers.panel_field_values(rd, \"mcap\")
+julia> PortfolioOptimisers.descriptor_field_values(rd, \"mcap\")
 2×2 Matrix{Float64}:
-   1.0  2.0
- NaN    4.0
+   1.0  NaN
+ NaN      4.0
 
-julia> PortfolioOptimisers.panel_field_values(rd, [\"mcap\" => 1, \"debt\" => 1])
+julia> PortfolioOptimisers.descriptor_field_values(rd, [\"mcap\" => 1, \"debt\" => 1])
 2×2 Matrix{Float64}:
-   1.5  3.0
- NaN    6.0
+   1.5  NaN
+ NaN      6.0
 ```
 
 # Related
 
   - [`descriptor`](@ref)
+  - [`panel_field_values`](@ref)
   - [`panel_field`](@ref)
   - [`asset_panel`](@ref)
   - [`AssetPanel`](@ref)
   - [`NumericPanelField`](@ref)
 """
-function panel_field_values(rd::ReturnsResult, name::AbstractString)::Matrix{<:Real}
+function descriptor_field_values(rd::ReturnsResult, name::AbstractString)::Matrix{<:Real}
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
               IsNothingError("a Descriptor reads its Panel Fields off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
@@ -137,23 +138,13 @@ function panel_field_values(rd::ReturnsResult, name::AbstractString)::Matrix{<:R
               ArgumentError("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be a NumericPanelField, got a $(nameof(typeof(f)))"))
     @argcheck(ndims(f.vals) == 2,
               DimensionMismatch("a Descriptor reads one number per observation and asset, so the Panel Field \"$name\" must be time-varying; this Asset Panel is static"))
-    Tf = float_if_integer(eltype(f.vals))
-    V = Matrix{Tf}(f.vals)
-    omsk = f.omsk
-    if !isnothing(omsk)
-        for k in CartesianIndices(V)
-            if !omsk[k]
-                V[k] = Tf(NaN)
-            end
-        end
-    end
-    return V
+    return panel_field_values(pnl, name; inactive = NaN, unobserved = NaN)
 end
-function panel_field_values(rd::ReturnsResult,
-                            terms::AbstractVector{<:Pair{<:AbstractString, <:Real}})::Matrix{<:Real}
+function descriptor_field_values(rd::ReturnsResult,
+                                 terms::AbstractVector{<:Pair{<:AbstractString, <:Real}})::Matrix{<:Real}
     @argcheck(!isempty(terms),
               IsEmptyError("a Panel Field combination needs at least one `name => coefficient` term"))
-    Vs = [panel_field_values(rd, name) .* c for (name, c) in terms]
+    Vs = [descriptor_field_values(rd, name) .* c for (name, c) in terms]
     V = similar(Vs[1], mapreduce(eltype, promote_type, Vs))
     V .= Vs[1]
     for k in 2:length(Vs)
@@ -166,7 +157,7 @@ end
 
 Read the Asset Panel a Descriptor needs out of a [`ReturnsResult`](@ref).
 
-[`panel_field_values`](@ref) refuses a `ReturnsResult` that holds no Asset Panel. A Descriptor over the returns reads no Panel Field, so it calls this function to get the same refusal and the active mask that [`descriptor_active_fill!`](@ref) reads.
+[`descriptor_field_values`](@ref) refuses a `ReturnsResult` that holds no Asset Panel. A Descriptor over the returns reads no Panel Field, so it calls this function to get the same refusal and the active mask that [`descriptor_active_fill!`](@ref) reads.
 
 # Arguments
 
@@ -184,7 +175,7 @@ Read the Asset Panel a Descriptor needs out of a [`ReturnsResult`](@ref).
 
   - [`descriptor`](@ref)
   - [`descriptor_active_fill!`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
   - [`AssetPanel`](@ref)
 """
 function descriptor_asset_panel(rd::ReturnsResult)::AssetPanel
@@ -399,7 +390,7 @@ Where:
 
 # Algorithm
 
- 1. Read the capitalisation ``c`` through [`panel_field_values`](@ref), so a cell that a fill touched is `NaN` and leaves ``\\mathcal{E}_{t}``.
+ 1. Read the capitalisation ``c`` through [`descriptor_field_values`](@ref), so a cell that a fill touched is `NaN` and leaves ``\\mathcal{E}_{t}``.
  2. At each observation, add up the numerator and the denominator of ``r_{m,t}`` over ``\\mathcal{E}_{t}``.
  3. Refuse a denominator at or below zero, and store the quotient as ``r_{m,t}``.
 
@@ -435,12 +426,12 @@ julia> PortfolioOptimisers.market_return_series(rd, \"market_cap\")
 
   - [`descriptor`](@ref)
   - [`ew_beta_series`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
   - [`AssetPanel`](@ref)
 """
 function market_return_series(rd::ReturnsResult, mcap::AbstractString)
     pnl = descriptor_asset_panel(rd)
-    W = panel_field_values(rd, mcap)
+    W = descriptor_field_values(rd, mcap)
     X = rd.X
     emsk = pnl.emsk
     Tf = promote_type(eltype(X), eltype(W))

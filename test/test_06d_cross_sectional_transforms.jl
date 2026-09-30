@@ -575,7 +575,7 @@ end
     @test_throws ArgumentError cross_sectional_groups(pnl, "size")
     @test_throws KeyError cross_sectional_groups(pnl, "country")
     # A cell a fill policy wrote is not a membership: it reads as CS_MISSING_GROUP, which is
-    # what OneHotExposure and panel_field_values answer for the same cell.
+    # what OneHotExposure and descriptor_field_values answer for the same cell.
     filled = asset_panel([CategoricalPanelInput(; name = "sector",
                                                 vals = ["a" "b" missing; missing "a" "a"],
                                                 alg = ForwardPanelFill(; val = "b"))];

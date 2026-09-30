@@ -283,7 +283,7 @@ end
 
 Compute a lag Descriptor from the Panel Fields of a [`ReturnsResult`](@ref).
 
-The three archetypes read through [`panel_field_values`](@ref), walk the observations from `lag + 1` to the end, and end through [`descriptor_active_fill!`](@ref). The first `lag` rows stay `NaN`, and a `NaN` at either end of the lag is a `NaN` in the Descriptor. A `ReturnsResult` with no more observations than the lag returns an all-`NaN` Descriptor rather than an error, because a fold of a cross-validation can be that short.
+The three archetypes read through [`descriptor_field_values`](@ref), walk the observations from `lag + 1` to the end, and end through [`descriptor_active_fill!`](@ref). The first `lag` rows stay `NaN`, and a `NaN` at either end of the lag is a `NaN` in the Descriptor. A `ReturnsResult` with no more observations than the lag returns an all-`NaN` Descriptor rather than an error, because a fold of a cross-validation can be that short.
 
 # Algorithm
 
@@ -302,7 +302,7 @@ Every method then writes `NaN` into the inactive cells.
 
 # Validation
 
-  - The rules of [`panel_field_values`](@ref) for every Panel Field the estimator names.
+  - The rules of [`descriptor_field_values`](@ref) for every Panel Field the estimator names.
   - The rule of [`assert_panel_field_sign`](@ref) for a [`GrowthRate`](@ref), and for the scale of a [`ChangeToScale`](@ref) or a [`ChangeInIntensity`](@ref) under `gt0 = true`.
 
 # Returns
@@ -345,13 +345,13 @@ julia> descriptor(ChangeInIntensity(; field = \"sales_ttm\", scale = \"market_ca
   - [`GrowthRate`](@ref)
   - [`ChangeToScale`](@ref)
   - [`ChangeInIntensity`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
   - [`positive_divide`](@ref)
   - [`descriptor_active_fill!`](@ref)
 """
 function descriptor(de::GrowthRate, rd::ReturnsResult)::Matrix{<:Real}
     assert_panel_field_sign(rd, [String(de.field)], false)
-    V = panel_field_values(rd, de.field)
+    V = descriptor_field_values(rd, de.field)
     Tf = eltype(V)
     D = fill(Tf(NaN), size(V))
     lag = de.lag
@@ -365,8 +365,8 @@ function descriptor(de::ChangeToScale, rd::ReturnsResult)::Matrix{<:Real}
     if de.gt0
         assert_panel_field_sign(rd, [String(de.scale)], true)
     end
-    V = panel_field_values(rd, de.field)
-    S = panel_field_values(rd, de.scale)
+    V = descriptor_field_values(rd, de.field)
+    S = descriptor_field_values(rd, de.scale)
     Tf = promote_type(eltype(V), eltype(S))
     D = fill(Tf(NaN), size(V))
     lag = de.lag
@@ -380,8 +380,8 @@ function descriptor(de::ChangeInIntensity, rd::ReturnsResult)::Matrix{<:Real}
     if de.gt0
         assert_panel_field_sign(rd, [String(de.scale)], true)
     end
-    V = panel_field_values(rd, de.field)
-    S = panel_field_values(rd, de.scale)
+    V = descriptor_field_values(rd, de.field)
+    S = descriptor_field_values(rd, de.scale)
     Tf = promote_type(eltype(V), eltype(S))
     D = fill(Tf(NaN), size(V))
     lag = de.lag
