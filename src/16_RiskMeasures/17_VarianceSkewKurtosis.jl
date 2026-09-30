@@ -556,7 +556,8 @@ VarianceSkewKurtosis
            │      sigma ┼ nothing
            │       chol ┼ nothing
            │         rc ┼ nothing
-           │        alg ┴ SquaredSOCRiskExpr()
+           │        alg ┼ SquaredSOCRiskExpr()
+           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
         sk ┼ Skewness
            │   settings ┼ MaxRiskMeasureSettings
            │            │   scale ┼ Float64: 1.0
@@ -582,7 +583,8 @@ VarianceSkewKurtosis
            │          N ┼ nothing
            │       alg1 ┼ FullMoment()
            │       alg2 ┼ SOCRiskExpr()
-           │         pe ┴ nothing
+           │         pe ┼ nothing
+           │   mtx_sqrt ┴ nothing
         pe ┴ nothing
 ```
 

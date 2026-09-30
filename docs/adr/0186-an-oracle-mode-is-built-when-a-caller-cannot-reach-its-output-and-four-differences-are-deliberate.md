@@ -52,7 +52,19 @@ which is the oracle's policy). An algorithm type now names the last two, and a f
 `CrossSectionalFactorPrior` and `FactorPrior` selects one. The field defaults to `nothing`, which
 keeps the bare Cholesky that throws. With the default repair on, all three agree, because the
 matrix reaches the Cholesky positive definite. They differ only when a caller turns the repair off
-or the repair fails. Issue #1410 decides each other bare Cholesky in the library.
+or the repair fails.
+
+Issue #1410 gave the field, named `mtx_sqrt`, to every estimator that takes a square root of a
+covariance, and removed `covariance_factor`, which `matrix_square_root` supersedes. The owners are
+the two factor priors, `Variance`, `StandardDeviation`, `DistributionValueatRisk`,
+`UncertaintySetVariance`, `ArithmeticReturn`, `RelaxedRiskBudgeting`, `Kurtosis`,
+`NegativeSkewness` and `NormBallUncertaintySetAlgorithm`. A default keeps what the site did before:
+`nothing` where it took the bare Cholesky, and `EigenFallbackSquareRoot()` where it took
+`covariance_factor` or `sqrt(V)`. A square root that feeds only a second-order cone needs
+`G' G = Σ`, so a singular positive semidefinite matrix is valid input there. Four sites keep a bare
+Cholesky with a documented refusal, because each needs an inverse, which a singular matrix does
+not have: the whitening of the radial tail calibration, the QLIKE of the covariance forecast
+evaluation, the geodesic shrinkage target, and the Gram matrix of `GramProjection`.
 
 ### Built
 

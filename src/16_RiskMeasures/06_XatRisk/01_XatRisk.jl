@@ -356,7 +356,8 @@ $(DocStringExtensions.FIELDS)
         sigma::Option{<:SigmaSlot} = nothing,
         chol::Option{<:MatNum} = nothing,
         pe::Option{<:AbstractPriorEstimator} = nothing,
-        dist::Distributions.Distribution = Distributions.Normal()
+        dist::Distributions.Distribution = Distributions.Normal(),
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot()
     ) -> DistributionValueatRisk
 
 Keywords correspond to the struct's fields.
@@ -378,18 +379,19 @@ Keywords correspond to the struct's fields.
   - The method slices `mu` to the selected assets. A Deferred Quantity passes through unsliced, and resolves on the subset later.
   - The method slices a stated `sigma` on both axes. A Deferred Quantity passes through unsliced, and resolves on the subset later.
   - The method slices `chol` on its columns alone. Its rows index the factorisation, and the asset selection does not address them.
-  - `pe` and `dist` pass through unchanged. `dist` describes the standardised loss, so it has no asset axis.
+  - `pe`, `dist` and `mtx_sqrt` pass through unchanged. `dist` describes the standardised loss, so it has no asset axis.
 
 # Examples
 
 ```jldoctest
 julia> DistributionValueatRisk()
 DistributionValueatRisk
-     mu ┼ nothing
-  sigma ┼ nothing
-   chol ┼ nothing
-     pe ┼ nothing
-   dist ┴ Distributions.Normal{Float64}: Distributions.Normal{Float64}(μ=0.0, σ=1.0)
+        mu ┼ nothing
+     sigma ┼ nothing
+      chol ┼ nothing
+        pe ┼ nothing
+      dist ┼ Distributions.Normal{Float64}: Distributions.Normal{Float64}(μ=0.0, σ=1.0)
+  mtx_sqrt ┴ EigenFallbackSquareRoot()
 ```
 
 # Related
@@ -428,10 +430,15 @@ DistributionValueatRisk
     $(field_dict[:dist])
     """
     dist
+    """
+    Square-root algorithm of the covariance matrix that the cone of the parametric quantile reads when no `chol` is at hand, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. The default takes the square root of the eigendecomposition of a singular positive semidefinite matrix. [`matrix_square_root`](@ref) states each algorithm.
+    """
+    mtx_sqrt
     function DistributionValueatRisk(mu::Option{<:MuSlot}, sigma::Option{<:SigmaSlot},
                                      chol::Option{<:MatNum},
                                      pe::Option{<:AbstractPriorEstimator},
-                                     dist::Distributions.Distribution)
+                                     dist::Distributions.Distribution,
+                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end
@@ -443,19 +450,17 @@ DistributionValueatRisk
             @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
         end
         assert_derived_slot_has_source(chol, sigma, :chol, :sigma)
-        return new{typeof(mu), typeof(sigma), typeof(chol), typeof(pe), typeof(dist)}(mu,
-                                                                                      sigma,
-                                                                                      chol,
-                                                                                      pe,
-                                                                                      dist)
+        return new{typeof(mu), typeof(sigma), typeof(chol), typeof(pe), typeof(dist),
+                   typeof(mtx_sqrt)}(mu, sigma, chol, pe, dist, mtx_sqrt)
     end
 end
 function DistributionValueatRisk(; mu::Option{<:MuSlot} = nothing,
                                  sigma::Option{<:SigmaSlot} = nothing,
                                  chol::Option{<:MatNum} = nothing,
                                  pe::Option{<:AbstractPriorEstimator} = nothing,
-                                 dist::Distributions.Distribution = Distributions.Normal())::DistributionValueatRisk
-    return DistributionValueatRisk(mu, sigma, chol, pe, dist)
+                                 dist::Distributions.Distribution = Distributions.Normal(),
+                                 mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::DistributionValueatRisk
+    return DistributionValueatRisk(mu, sigma, chol, pe, dist, mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -521,7 +526,7 @@ Create an instance of [`DistributionValueatRisk`](@ref) by resolving its Deferre
  1. Resolve the Deferred Quantities with [`resolve_deferred_quantities`](@ref).
  2. Select `sigma` and `chol` as a pair with [`sigma_chol_selector`](@ref).
  3. Take `mu` from the formulation, or from `pr` when the formulation states none.
- 4. Build the formulation with the three values, `pe = nothing` and the same `dist`.
+ 4. Build the formulation with the three values, `pe = nothing` and the same `dist` and `mtx_sqrt`.
 
 # Related
 
@@ -534,14 +539,14 @@ function factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...;
     alg = resolve_deferred_quantities(alg, pr)
     sigma, chol = sigma_chol_selector(alg.sigma, alg.chol, pr)
     return DistributionValueatRisk(; mu = sel(alg.mu, pr.mu), sigma = sigma, chol = chol,
-                                   pe = nothing, dist = alg.dist)
+                                   pe = nothing, dist = alg.dist, mtx_sqrt = alg.mtx_sqrt)
 end
 function port_opt_view(alg::DistributionValueatRisk, i, args...)::DistributionValueatRisk
     mu = nothing_scalar_array_view(alg.mu, i)
     sigma = nothing_scalar_array_view(alg.sigma, i)
     chol = isnothing(alg.chol) ? nothing : view(alg.chol, :, i)
     return DistributionValueatRisk(; mu = mu, sigma = sigma, chol = chol, pe = alg.pe,
-                                   dist = alg.dist)
+                                   dist = alg.dist, mtx_sqrt = alg.mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDEF)

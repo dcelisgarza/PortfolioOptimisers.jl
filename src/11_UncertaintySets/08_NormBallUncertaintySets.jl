@@ -45,9 +45,11 @@ $(DocStringExtensions.FIELDS)
         class::AbstractUncertaintySetClass,
         val::Option{<:ArrNum} = nothing
     ) -> NormBallUncertaintySet
-    NormBallUncertaintySet(ucs::EllipsoidalUncertaintySet) -> NormBallUncertaintySet
+    NormBallUncertaintySet(ucs::EllipsoidalUncertaintySet,
+                           mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+        -> NormBallUncertaintySet
 
-Keywords correspond to the struct's fields. The second constructor converts a built [`EllipsoidalUncertaintySet`](@ref) with one Cholesky factorisation at construction time: `L = LinearAlgebra.cholesky(ucs.sigma).L`, `p = 2`, and `kappa`, `class` and `val` carried through from `k`, `class` and `val`. It is the route through which every estimator that emits an ellipsoid reaches this type.
+Keywords correspond to the struct's fields. The second constructor converts a built [`EllipsoidalUncertaintySet`](@ref) with one square root at construction time: `L = matrix_square_root(mtx_sqrt, ucs.sigma)`, `p = 2`, and `kappa`, `class` and `val` carried through from `k`, `class` and `val`. It is the route through which every estimator that emits an ellipsoid reaches this type. `mtx_sqrt = nothing` takes the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. At `p = 2` the set reads `L` only through ``\\mathbf{L}\\mathbf{L}^{\\intercal}``, so the eigen square root of a singular shape gives the same set as the ellipsoid.
 
 ## Validation
 
@@ -136,9 +138,10 @@ function NormBallUncertaintySet(; kappa::Number, L::MatNum, p::Number = 2,
                                 val::Option{<:ArrNum} = nothing)::NormBallUncertaintySet
     return NormBallUncertaintySet(kappa, L, p, class, val)
 end
-function NormBallUncertaintySet(ucs::EllipsoidalUncertaintySet)::NormBallUncertaintySet
-    return NormBallUncertaintySet(ucs.k, LinearAlgebra.cholesky(ucs.sigma).L, 2, ucs.class,
-                                  ucs.val)
+function NormBallUncertaintySet(ucs::EllipsoidalUncertaintySet,
+                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)::NormBallUncertaintySet
+    return NormBallUncertaintySet(ucs.k, matrix_square_root(mtx_sqrt, ucs.sigma), 2,
+                                  ucs.class, ucs.val)
 end
 """
     assert_norm_ball_axis(::MuUncertaintySetClass, L::MatNum)
@@ -398,21 +401,26 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Factorise an asymptotic covariance into the geometry map of a [`NormBallUncertaintySet`](@ref).
 
-The map is square and of full column rank, because `cov` reaches this method already repaired to positive definiteness. Full rank does not make `size(L, 2)` the dimension of the set: on a full covariance shape the repair adds ``N(N-1)/2`` flat directions that no error fills, so a caller reads its degrees of freedom from [`ucs_dimension`](@ref). Its sibling [`norm_ball_deviation_factor`](@ref) builds the map from a sample instead, and factorises nothing.
+The map is square. It is of full column rank when `cov` reaches this method repaired to positive definiteness, which the `pdm` of the estimator does. Full rank does not make `size(L, 2)` the dimension of the set: on a full covariance shape the repair adds ``N(N-1)/2`` flat directions that no error fills, so a caller reads its degrees of freedom from [`ucs_dimension`](@ref). Its sibling [`norm_ball_deviation_factor`](@ref) builds the map from a sample instead, and factorises nothing.
 
 # Algorithm
 
  1. When `diagonal` is `true`, return `LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(cov)))`, the square root of the diagonal shape. The result is stored as a `Diagonal`, not as a dense matrix.
- 2. Otherwise return `LinearAlgebra.cholesky(cov).L`, the lower Cholesky factor, which satisfies ``\\mathbf{L}\\mathbf{L}^{\\intercal} = \\mathbf{S}`` and is the map the converter constructor of [`NormBallUncertaintySet`](@ref) builds.
+ 2. Otherwise return `matrix_square_root(mtx_sqrt, cov)`, which satisfies ``\\mathbf{L}\\mathbf{L}^{\\intercal} = \\mathbf{S}`` and is the map the converter constructor of [`NormBallUncertaintySet`](@ref) builds.
 
 # Arguments
 
   - `diagonal`: Whether to discard the off-diagonal entries of `cov` before the factorisation.
-  - `cov`: Asymptotic covariance of the statistic, positive definite.
+  - `cov`: Asymptotic covariance of the statistic.
+  - `mtx_sqrt`: Square-root algorithm of `cov`, the `mtx_sqrt` of the [`NormBallUncertaintySetAlgorithm`](@ref), or `nothing` for the plain Cholesky factor.
+
+# Validation
+
+  - When `diagonal` is `false`, `cov` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`. The asymptotic covariance of a covariance, ``T (\\mathbf{I} + \\mathbf{K}) (\\mathbf{\\Sigma}_{\\mu} \\otimes \\mathbf{\\Sigma}_{\\mu})``, has rank ``N(N+1)/2`` of ``N^{2}``, so with `pdm = nothing` the plain Cholesky factor refuses it.
 
 # Returns
 
-  - `L::MatNum`: Geometry map, square and of full column rank.
+  - `L::MatNum`: Geometry map, square.
 
 # Related
 
@@ -421,11 +429,12 @@ The map is square and of full column rank, because `cov` reaches this method alr
   - [`norm_ball_deviation_factor`](@ref)
   - [`norm_ball_set`](@ref)
 """
-function norm_ball_factor(diagonal::Bool, cov::MatNum)
+function norm_ball_factor(diagonal::Bool, cov::MatNum,
+                          mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
     return if diagonal
         LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(cov)))
     else
-        LinearAlgebra.cholesky(cov).L
+        matrix_square_root(mtx_sqrt, cov)
     end
 end
 """
@@ -566,7 +575,7 @@ It is the norm-ball twin of [`ellipsoidal_set`](@ref), and it takes the same two
 
 # Algorithm
 
- 1. Build the map with [`norm_ball_factor`](@ref) under `alg.diagonal`, giving `L`.
+ 1. Build the map with [`norm_ball_factor`](@ref) under `alg.diagonal` and `alg.mtx_sqrt`, giving `L`.
  2. Fit the radius with [`k_norm_ball`](@ref) on `alg.method`, passing `ucs_dimension(class, alg.diagonal, size(L, 1))` as the degrees of freedom.
  3. Build a [`NormBallUncertaintySet`](@ref) from `alg.p`, `L`, the radius, `class` and `val`.
 
@@ -575,7 +584,7 @@ It is the norm-ball twin of [`ellipsoidal_set`](@ref), and it takes the same two
   - `alg`: Norm-ball uncertainty set algorithm, which carries the radius algorithm, the diagonal switch and the norm order.
   - `q`: Significance level.
   - `samples`: Sampled estimation errors, or whatever container `alg.method` reads. An algorithm that runs no simulation absorbs it.
-  - `cov`: Asymptotic covariance of the statistic, positive definite.
+  - `cov`: Asymptotic covariance of the statistic. It has a square root under `alg.mtx_sqrt`.
   - `class`: Axis tag, which fixes the row count of the map and the index a view applies.
   - `val`: Quantity the set is a neighbourhood of, the fitted characteristic vector on the mean axis and the fitted covariance on the covariance axis.
 
@@ -596,7 +605,7 @@ It is the norm-ball twin of [`ellipsoidal_set`](@ref), and it takes the same two
 function norm_ball_set(alg::NormBallUncertaintySetAlgorithm, q::Number, samples,
                        cov::MatNum, class::AbstractUncertaintySetClass,
                        val::Option{<:ArrNum} = nothing)
-    L = norm_ball_factor(alg.diagonal, cov)
+    L = norm_ball_factor(alg.diagonal, cov, alg.mtx_sqrt)
     return NormBallUncertaintySet(;
                                   kappa = k_norm_ball(alg.method, q, samples, L,
                                                       ucs_dimension(class, alg.diagonal,

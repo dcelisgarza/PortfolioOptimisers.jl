@@ -167,7 +167,8 @@ HierarchicalRiskParity
       │      sigma ┼ nothing
       │       chol ┼ nothing
       │         rc ┼ nothing
-      │        alg ┴ SquaredSOCRiskExpr()
+      │        alg ┼ SquaredSOCRiskExpr()
+      │   mtx_sqrt ┴ EigenFallbackSquareRoot()
   sca ┼ SumScalariser()
    fb ┴ nothing
 ```

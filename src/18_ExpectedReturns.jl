@@ -633,7 +633,8 @@ ExpectedReturn
            │            │     fee ┼ Bool: true
            │            │     mic ┴ Bool: true
            │        ucs ┼ nothing
-           │         mu ┴ nothing
+           │         mu ┼ nothing
+           │   mtx_sqrt ┴ nothing
 ```
 
 # Related
@@ -775,7 +776,8 @@ ExpectedReturnRiskRatio
            │            │     fee ┼ Bool: true
            │            │     mic ┴ Bool: true
            │        ucs ┼ nothing
-           │         mu ┴ nothing
+           │         mu ┼ nothing
+           │   mtx_sqrt ┴ nothing
         rk ┼ Variance
            │   settings ┼ RiskMeasureSettings
            │            │   scale ┼ Float64: 1.0
@@ -784,7 +786,8 @@ ExpectedReturnRiskRatio
            │      sigma ┼ nothing
            │       chol ┼ nothing
            │         rc ┼ nothing
-           │        alg ┴ SquaredSOCRiskExpr()
+           │        alg ┼ SquaredSOCRiskExpr()
+           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
        sca ┼ SumScalariser()
         rf ┴ Float64: 0.0
 ```

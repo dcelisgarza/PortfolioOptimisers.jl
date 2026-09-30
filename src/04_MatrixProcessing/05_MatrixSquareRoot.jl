@@ -185,7 +185,6 @@ true
   - [`AbstractMatrixSquareRootAlgorithm`](@ref)
   - [`RidgeCholeskySquareRoot`](@ref)
   - [`matrix_square_root`](@ref)
-  - [`covariance_factor`](@ref)
 """
 struct EigenFallbackSquareRoot <: AbstractMatrixSquareRootAlgorithm end
 """
@@ -296,7 +295,6 @@ true
   - [`RidgeCholeskySquareRoot`](@ref)
   - [`EigenFallbackSquareRoot`](@ref)
   - [`ridge_cholesky`](@ref)
-  - [`covariance_factor`](@ref)
 """
 function matrix_square_root(::Nothing, sigma::MatNum)
     return LinearAlgebra.cholesky(sigma).L

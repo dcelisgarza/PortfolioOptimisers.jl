@@ -266,7 +266,7 @@ HighOrderFactorPriorEstimator
       │            │           w ┼ nothing
       │            │   corrected ┴ Bool: true
       │        rsd ┼ Bool: true
-      │   sqrt_alg ┴ nothing
+      │   mtx_sqrt ┴ nothing
   kte ┼ Cokurtosis
       │      me ┼ SimpleExpectedReturns
       │         │   w ┴ nothing

@@ -10,7 +10,7 @@ A square root ``\mathbf{L}`` of a covariance matrix ``\mathbf{\Sigma}`` satisfie
 - [`RidgeCholeskySquareRoot`](@ref) adds a small ridge to the diagonal, and grows it until the Cholesky factor exists.
 - [`EigenFallbackSquareRoot`](@ref) takes the square root of the eigendecomposition of a positive semidefinite matrix, with no ridge.
 
-`FactorPrior` and `CrossSectionalFactorPrior` take the algorithm in their field `sqrt_alg`.
+Each estimator that takes a square root of a covariance holds the algorithm in its field `mtx_sqrt`: [`FactorPrior`](@ref), [`CrossSectionalFactorPrior`](@ref), [`UncertaintySetVariance`](@ref), [`ArithmeticReturn`](@ref), [`RelaxedRiskBudgeting`](@ref), [`Kurtosis`](@ref), [`NegativeSkewness`](@ref) and [`NormBallUncertaintySetAlgorithm`](@ref). The default of each is `nothing`, the plain Cholesky factor, except for [`NegativeSkewness`](@ref), whose matrix is often singular and whose default is [`EigenFallbackSquareRoot`](@ref).
 
 ```@docs
 AbstractMatrixSquareRootAlgorithm

@@ -74,6 +74,7 @@ $(DocStringExtensions.FIELDS)
         alg1::AbstractMomentAlgorithm = FullMoment(),
         alg2::SecondMomentFormulation = SOCRiskExpr(),
         pe::Option{<:AbstractPriorEstimator} = nothing,
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
     ) -> Kurtosis
 
 Keywords correspond to the struct's fields.
@@ -131,7 +132,8 @@ Kurtosis
          N ┼ nothing
       alg1 ┼ FullMoment()
       alg2 ┼ SOCRiskExpr()
-        pe ┴ nothing
+        pe ┼ nothing
+  mtx_sqrt ┴ nothing
 ```
 
 # Related
@@ -186,10 +188,15 @@ Kurtosis
     $(field_dict[:pe_rm])
     """
     pe
+    """
+    Square-root algorithm of the projected co-kurtosis matrix ``\\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal`` that the exact formulation reads, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. A sample co-kurtosis of ``T`` observations has rank at most ``T``, so the projected matrix is singular when ``N(N+1)/2 > T`` and no matrix processing repairs it. [`matrix_square_root`](@ref) states each algorithm. The approximate formulation reads no square root.
+    """
+    mtx_sqrt
     function Kurtosis(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
                       mu::Option{<:MuSlot}, kt::Option{<:KtSlot}, N::Option{<:Integer},
                       alg1::AbstractMomentAlgorithm, alg2::SecondMomentFormulation,
-                      pe::Option{<:AbstractPriorEstimator})
+                      pe::Option{<:AbstractPriorEstimator},
+                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
         mu_flag = isa(mu, VecNum)
         kt_flag = isa(kt, MatNum)
         if mu_flag
@@ -214,8 +221,10 @@ Kurtosis
             @argcheck(N > zero(N), DomainError(N, "N must be positive"))
         end
         return new{typeof(settings), typeof(w), typeof(mu), typeof(kt), typeof(N),
-                   typeof(alg1), typeof(alg2), typeof(pe)}(settings, w, mu, kt, N, alg1,
-                                                           alg2, pe)
+                   typeof(alg1), typeof(alg2), typeof(pe), typeof(mtx_sqrt)}(settings, w,
+                                                                             mu, kt, N,
+                                                                             alg1, alg2, pe,
+                                                                             mtx_sqrt)
     end
 end
 function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
@@ -223,8 +232,9 @@ function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   kt::Option{<:KtSlot} = nothing, N::Option{<:Integer} = nothing,
                   alg1::AbstractMomentAlgorithm = FullMoment(),
                   alg2::SecondMomentFormulation = SOCRiskExpr(),
-                  pe::Option{<:AbstractPriorEstimator} = nothing)::Kurtosis
-    return Kurtosis(settings, w, mu, kt, N, alg1, alg2, pe)
+                  pe::Option{<:AbstractPriorEstimator} = nothing,
+                  mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)::Kurtosis
+    return Kurtosis(settings, w, mu, kt, N, alg1, alg2, pe, mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -385,7 +395,7 @@ function factory(r::Kurtosis, pr::HighOrderPrior, args...; kwargs...)::Kurtosis
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     kt = nothing_scalar_array_selector(r.kt, pr.kt)
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
-                    alg1 = r.alg1, alg2 = r.alg2, pe = nothing)
+                    alg1 = r.alg1, alg2 = r.alg2, pe = nothing, mtx_sqrt = r.mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -405,7 +415,7 @@ function factory(r::Kurtosis, pr::LowOrderPrior, args...; kwargs...)::Kurtosis
     mu = nothing_scalar_array_selector(r.mu, pr.mu)
     kt = nothing_scalar_array_selector(r.kt, nothing)
     return Kurtosis(; settings = r.settings, w = w, mu = mu, kt = kt, N = r.N,
-                    alg1 = r.alg1, alg2 = r.alg2, pe = nothing)
+                    alg1 = r.alg1, alg2 = r.alg2, pe = nothing, mtx_sqrt = r.mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -436,7 +446,7 @@ function port_opt_view(r::Kurtosis, i, args...)::Kurtosis
     end
     mu = nothing_scalar_array_view(mu, i)
     return Kurtosis(; settings = r.settings, w = r.w, mu = mu, kt = kt, N = r.N,
-                    alg1 = r.alg1, alg2 = r.alg2, pe = r.pe)
+                    alg1 = r.alg1, alg2 = r.alg2, pe = r.pe, mtx_sqrt = r.mtx_sqrt)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

@@ -1433,7 +1433,8 @@ $(DocStringExtensions.FIELDS)
     NormBallUncertaintySetAlgorithm(;
         method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
         diagonal::Bool = true,
-        p::Number = 2
+        p::Number = 2,
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing
     ) -> NormBallUncertaintySetAlgorithm
 
 Keywords correspond to the struct's fields.
@@ -1450,7 +1451,8 @@ NormBallUncertaintySetAlgorithm
     method ┼ ChiSqKUncertaintyAlgorithm
            │   ambient ┴ Bool: false
   diagonal ┼ Bool: true
-         p ┴ Int64: 2
+         p ┼ Int64: 2
+  mtx_sqrt ┴ nothing
 ```
 
 # Related
@@ -1481,15 +1483,23 @@ NormBallUncertaintySetAlgorithm
     Norm order ``p \\geq 1`` of the ball, `Inf` admitted. It reaches the set unchanged, and the consumer raises the cone of the dual order.
     """
     p
-    function NormBallUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool, p::Number)
+    """
+    Square-root algorithm of the full asymptotic covariance that gives the geometry map, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. The covariance of the covariance is singular by construction and positive definite only after the repair of `pdm`. A [`NormalKUncertaintyAlgorithm`](@ref) radius solves with the map, so it needs a map of full rank: a ridge gives one, and the eigen square root of a singular matrix does not. A diagonal shape reads no square root.
+    """
+    mtx_sqrt
+    function NormBallUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool, p::Number,
+                                             mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
         @argcheck(!isnan(p) && p >= one(p), DomainError(p, "p must be >= 1"))
-        return new{typeof(method), typeof(diagonal), typeof(p)}(method, diagonal, p)
+        return new{typeof(method), typeof(diagonal), typeof(p), typeof(mtx_sqrt)}(method,
+                                                                                  diagonal,
+                                                                                  p,
+                                                                                  mtx_sqrt)
     end
 end
 function NormBallUncertaintySetAlgorithm(; method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
-                                         diagonal::Bool = true,
-                                         p::Number = 2)::NormBallUncertaintySetAlgorithm
-    return NormBallUncertaintySetAlgorithm(method, diagonal, p)
+                                         diagonal::Bool = true, p::Number = 2,
+                                         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)::NormBallUncertaintySetAlgorithm
+    return NormBallUncertaintySetAlgorithm(method, diagonal, p, mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDEF)

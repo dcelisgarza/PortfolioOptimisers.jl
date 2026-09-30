@@ -15,7 +15,7 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
     @test_throws PortfolioOptimisers.IsNonFiniteError JuMPReturnsSettings(; lb = Inf)
     @test_throws PortfolioOptimisers.IsEmptyError JuMPReturnsSettings(; lb = Float64[])
     @test_throws PortfolioOptimisers.IsNonFiniteError JuMPReturnsSettings(; lb = [0.1, NaN])
-    # The bundle sits first, matching `Variance(settings, sigma, chol, rc, alg)`.
+    # The bundle sits first, as `settings` does on every risk measure.
     @test fieldnames(ArithmeticReturn)[1] === :settings
     @test fieldnames(LogarithmicReturn)[1] === :settings
     # `lb` lives on the bundle, not on the term.

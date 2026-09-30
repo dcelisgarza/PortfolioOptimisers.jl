@@ -1,12 +1,11 @@
 ```@meta
-Description = "Variance Constraints, private API of PortfolioOptimisers.jl: get_chol_or_sigma_pm, covariance_factor, chol_sigma_selector, …"
+Description = "Variance Constraints, private API of PortfolioOptimisers.jl: get_chol_or_sigma_pm, chol_sigma_selector, set_variance_risk_bounds_and_expression!, …"
 ```
 
 # Variance Constraints: private API
 
 ```@docs
 get_chol_or_sigma_pm
-covariance_factor
 chol_sigma_selector
 set_variance_risk_bounds_and_expression!
 risk_contribution_constraints(r::Variance, opt::NonFRCJuMPOpt, pr::AbstractPriorResult)

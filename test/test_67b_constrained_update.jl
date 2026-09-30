@@ -793,7 +793,8 @@ end
         @test isapprox(w0v, w0s; atol = 1e-8)
         # A stated factor is the one the cone reads, and an indefinite matrix is refused by
         # the factor, as the shared builder refuses it.
-        G = Matrix(qr(randn(StableRNG(3), 4, 4)).Q) * po.covariance_factor(S)
+        G = Matrix(qr(randn(StableRNG(3), 4, 4)).Q) *
+            transpose(matrix_square_root(EigenFallbackSquareRoot(), S))
         wch = po.project(EuclideanProjection(),
                          resolve(ProgrammeAllocationSet(; slv = slv,
                                                         r = Variance(; sigma = S, chol = G,

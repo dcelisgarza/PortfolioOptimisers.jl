@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the factor of the prior's covariance matrix, and register it in the model on the first call.
 
-The factor is the prior's `chol` when the prior carries one, and [`covariance_factor`](@ref) of the prior's `sigma` otherwise. The factor of a factor prior is not square, and the second-order cone is well posed on it. `G` is a shared entry, so every measure of the model that falls back to the prior reads one factor, and a later call returns it without a second factorisation.
+The factor is the prior's `chol` when the prior carries one, and the transpose of the square root of the prior's `sigma` under `mtx_sqrt` otherwise, which [`matrix_square_root`](@ref) takes. The factor of a factor prior is not square, and the second-order cone is well posed on it. `G` is a shared entry, so every measure of the model that falls back to the prior reads one factor, and a later call returns it without a second factorisation. The first measure that falls back to the prior sets the algorithm. On a positive definite matrix every algorithm gives the Cholesky factor.
 
 # JuMP formulation
 
@@ -19,6 +19,11 @@ Where:
 
   - $(arg_dict[:model])
   - `pr::AbstractPriorResult`: The prior result. The function reads its `sigma` and its `chol`.
+  - `mtx_sqrt`: Square-root algorithm of `pr.sigma`, or `nothing` for the plain Cholesky factor.
+
+# Validation
+
+  - When `pr.chol` is `nothing`, `pr.sigma` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`.
 
 # Returns
 
@@ -26,60 +31,21 @@ Where:
 
 # Related
 
-  - [`covariance_factor`](@ref)
+  - [`matrix_square_root`](@ref)
   - [`chol_sigma_selector`](@ref)
 """
-function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
+function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult,
+                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     if !shared_has(model, :G)
-        G = isnothing(pr.chol) ? covariance_factor(pr.sigma) : pr.chol
+        # The cone reads the upper factor, and the square root is the lower one.
+        G = if isnothing(pr.chol)
+            copy(transpose(matrix_square_root(mtx_sqrt, pr.sigma)))
+        else
+            pr.chol
+        end
         JuMP.@expression(model, G, G)
     end
     return shared_get(model, :G)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a factor ``\\mathbf{G}`` of a covariance matrix with ``\\mathbf{G}^\\intercal \\mathbf{G} = \\mathbf{\\Sigma}``, for a singular matrix as well as a positive definite one.
-
-A positive definite matrix gives its upper Cholesky factor. A singular positive semidefinite matrix, such as a rank-one estimate, has no Cholesky factor, so it gives the factor of its eigendecomposition. The factor is the transpose of the square root that [`EigenFallbackSquareRoot`](@ref) takes with [`matrix_square_root`](@ref). The second-order cone ``\\sigma \\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_2`` is well posed on either factor.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathbf{G} &= \\mathbf{U}\\,, \\quad \\text{when } \\mathbf{\\Sigma} = \\mathbf{U}^\\intercal \\mathbf{U} \\succ 0\\,, \\\\
-\\mathbf{G} &= \\max(\\mathbf{\\Lambda}, 0)^{1/2} \\mathbf{V}^\\intercal\\,, \\quad \\text{when } \\mathbf{\\Sigma} = \\mathbf{V} \\mathbf{\\Lambda} \\mathbf{V}^\\intercal \\text{ is singular}\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:G_cov_factor])
-  - ``\\mathbf{U}``: Upper triangular Cholesky factor.
-  - ``\\mathbf{V}``, ``\\mathbf{\\Lambda}``: Eigenvectors, and the diagonal matrix of the eigenvalues. The maximum with zero removes a negative eigenvalue of rounding.
-
-# Arguments
-
-  - `sigma::AbstractMatrix`: The covariance matrix, `assets × assets`.
-
-# Validation
-
-  - A matrix that has no Cholesky factor and is not Hermitian raises `LinearAlgebra.PosDefException(-1)`.
-  - A matrix whose smallest eigenvalue is below ``-N \\epsilon \\max_i \\lvert \\lambda_i \\rvert`` raises `LinearAlgebra.PosDefException(1)`. Here ``\\epsilon`` is the machine epsilon of the element type. So the function refuses a `BigFloat` copy of a `Float64` matrix that rounding left indefinite, and it accepts the `Float64` matrix.
-
-# Returns
-
-  - `G::AbstractMatrix`: The factor, `assets × assets`.
-
-# Related
-
-  - [`get_chol_or_sigma_pm`](@ref)
-  - [`chol_sigma_selector`](@ref)
-  - [`RankOneCovariance`](@ref)
-"""
-function covariance_factor(sigma::AbstractMatrix)
-    # The cone reads the upper factor, and the square root is the lower one.
-    return copy(transpose(matrix_square_root(EigenFallbackSquareRoot(), sigma)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -89,14 +55,14 @@ Return the factor of the covariance matrix that a risk measure reads.
 The measure's own matrix wins over the prior's, and a stated factor wins over one computed here:
 
   - `r.chol`, when the measure states it.
-  - [`covariance_factor`](@ref) of `r.sigma`, when the measure states `sigma` alone.
+  - The transpose of the square root of `r.sigma` under `r.mtx_sqrt`, which [`matrix_square_root`](@ref) takes, when the measure states `sigma` alone.
   - [`get_chol_or_sigma_pm`](@ref), the prior's factor, when the measure states neither.
 
 # Arguments
 
   - $(arg_dict[:model])
   - $(arg_dict[:pr])
-  - `r::CholRM`: The measure, or the algorithm of a measure, that carries the optional `sigma` and `chol`.
+  - `r::CholRM`: The measure, or the algorithm of a measure, that carries the optional `sigma` and `chol`, and the square-root algorithm `mtx_sqrt`.
 
 # Returns
 
@@ -105,14 +71,14 @@ The measure's own matrix wins over the prior's, and a stated factor wins over on
 # Related
 
   - [`get_chol_or_sigma_pm`](@ref)
-  - [`covariance_factor`](@ref)
+  - [`matrix_square_root`](@ref)
 """
 function chol_sigma_selector(model::JuMP.Model, pr::Option{<:AbstractPriorResult},
                              r::CholRM)
     return if isnothing(r.sigma) && isnothing(r.chol)
-        get_chol_or_sigma_pm(model, pr)
+        get_chol_or_sigma_pm(model, pr, r.mtx_sqrt)
     elseif isnothing(r.chol)
-        covariance_factor(r.sigma)
+        copy(transpose(matrix_square_root(r.mtx_sqrt, r.sigma)))
     else
         r.chol
     end
@@ -830,7 +796,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the worst-case variance of an uncertainty set over the covariance matrix.
 
-The box, the ellipsoid and the norm ball bound the covariance matrix, so each lifts the weights into ``\\mathbf{W}`` with [`set_sdp_constraints!`](@ref) and states the dual of its worst case over ``\\mathbf{W}``. The compact set bounds a quadratic form in the weights, so it lifts nothing and leaves the programme a second-order cone programme. It factorises its centre with [`covariance_factor`](@ref), so it accepts a singular centre, as [`Variance`](@ref) does.
+The box, the ellipsoid and the norm ball bound the covariance matrix, so each lifts the weights into ``\\mathbf{W}`` with [`set_sdp_constraints!`](@ref) and states the dual of its worst case over ``\\mathbf{W}``. The compact set bounds a quadratic form in the weights, so it lifts nothing and leaves the programme a second-order cone programme. It takes the square root of its centre under the `mtx_sqrt` of the [`UncertaintySetVariance`](@ref), so under the default it accepts a singular centre, as [`Variance`](@ref) does.
 
 # Mathematical definition
 
@@ -850,7 +816,7 @@ Where:
   - ``\\mathbf{A}_l``, ``\\mathbf{A}_u``: Dual matrices of the two sides of the box.
   - ``\\hat{\\mathbf{\\Sigma}}``: Centre of the set, the set's `val` when it states one and `sigma` otherwise.
   - ``\\mathbf{E}``: Dual matrix of the condition that the worst covariance is positive semidefinite.
-  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the upper Cholesky factor of its matrix ``\\mathbf{\\Omega}``, `sigma`.
+  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the transpose of the square root of its matrix ``\\mathbf{\\Omega}``, `sigma`, that [`matrix_square_root`](@ref) takes under `mtx_sqrt`, so ``\\mathbf{G}_{\\Omega}^\\intercal \\mathbf{G}_{\\Omega} = \\mathbf{\\Omega}``.
   - ``\\kappa_{b}``, ``\\mathbf{L}``, ``p^{*}``: Radius of the norm ball, its map, and the dual order of its norm.
   - ``\\mathbf{C}``, ``\\mathbf{Q}``, ``\\mathbf{R}``, ``\\boldsymbol{z}``: Diagonal metric of the compact set, its basis, the factor of the rows a view dropped from the basis, and the free coefficients of the basis. A fitted set has no row in ``\\mathbf{R}``.
   - ``\\langle \\mathbf{X}, \\mathbf{Y} \\rangle = \\mathrm{Tr}(\\mathbf{X}^\\intercal \\mathbf{Y})``: Inner product of two matrices.
@@ -913,6 +879,7 @@ $(val_dict[:relax])
   - $(arg_dict[:ci])
   - `ucs`: The uncertainty set, a [`BoxUncertaintySet`](@ref), an [`EllipsoidalUncertaintySet`](@ref), a [`CompactCovarianceUncertaintySet`](@ref) or a covariance [`NormBallUncertaintySet`](@ref).
   - `sigma::MatNum`: The fallback centre. The set's own `val` wins over it, and the box ignores both, because it names no centre.
+  - `mtx_sqrt`: Square-root algorithm of the matrix of an ellipsoid and of the centre of a compact set, the `mtx_sqrt` of the [`UncertaintySetVariance`](@ref), or `nothing` for the plain Cholesky factor. The box and the norm ball ignore it.
 
 # Keyword arguments
 
@@ -960,7 +927,9 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
     return ucs_variance_risk, :bucs_variance_risk_
 end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncertaintySet,
-                                sigma::MatNum; prefix::Symbol = Symbol(""))
+                                sigma::MatNum,
+                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing;
+                                prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     W = set_sdp_constraints!(model; prefix = prefix)
     state_build!(model, prefix, :E) do
@@ -976,7 +945,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncer
     # centre. The risk measure's field and then the prior are the fallbacks (ADR 0050).
     sigma = something(ucs.val, sigma)
     k = ucs.k
-    G = LinearAlgebra.cholesky(ucs.sigma).U
+    G = transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
     t_eucs = state_set!(model, prefix, :t_eucs, i, JuMP.@variable(model))
     x_eucs, ucs_variance_risk = JuMP.@expressions(model,
                                                   begin
@@ -992,14 +961,15 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncer
     return ucs_variance_risk, :eucs_variance_risk_
 end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any,
-                                ucs::CompactCovarianceUncertaintySet, sigma::MatNum;
+                                ucs::CompactCovarianceUncertaintySet, sigma::MatNum,
+                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot();
                                 prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     # The set is a neighbourhood of the covariance it was calibrated on, so it names the
     # centre. The risk measure's field and then the prior are the fallbacks (ADR 0050).
     sigma = something(ucs.val, sigma)
-    G = covariance_factor(sigma)
+    G = transpose(matrix_square_root(mtx_sqrt, sigma))
     dev_cucs = state_set!(model, prefix, :dev_cucs, i, JuMP.@variable(model))
     state_set!(model, prefix, :cdev_cucs_soc, i,
                JuMP.@constraint(model,
@@ -1030,7 +1000,7 @@ end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any,
                                 ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
                                                             <:SigmaUncertaintySetClass},
-                                sigma::MatNum; prefix::Symbol = Symbol(""))
+                                sigma::MatNum, ::Any = nothing; prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     W = set_sdp_constraints!(model; prefix = prefix)
     state_build!(model, prefix, :E) do
@@ -1176,7 +1146,8 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
     # The prior travels beside the returns, because an `AbstractPriorUncertaintySetEstimator`
     # is fitted from the optimisation's own prior result rather than from returns data.
     ucs = sigma_ucs(r.ucs, rd, pr; kwargs...)
-    ucs_variance_risk, name = set_ucs_variance_risk!(model, i, ucs, sigma; prefix = prefix)
+    ucs_variance_risk, name = set_ucs_variance_risk!(model, i, ucs, sigma, r.mtx_sqrt;
+                                                     prefix = prefix)
     bound_expr, ub, bound_name = ucs_variance_risk_bounds!(model, i, ucs, ucs_variance_risk,
                                                            name, r.settings.ub;
                                                            prefix = prefix)

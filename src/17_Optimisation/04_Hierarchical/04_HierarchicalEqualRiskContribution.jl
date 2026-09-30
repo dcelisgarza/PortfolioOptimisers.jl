@@ -177,7 +177,8 @@ HierarchicalEqualRiskContribution
        │      sigma ┼ nothing
        │       chol ┼ nothing
        │         rc ┼ nothing
-       │        alg ┴ SquaredSOCRiskExpr()
+       │        alg ┼ SquaredSOCRiskExpr()
+       │   mtx_sqrt ┴ EigenFallbackSquareRoot()
     ro ┼ Variance
        │   settings ┼ RiskMeasureSettings
        │            │   scale ┼ Float64: 1.0
@@ -186,7 +187,8 @@ HierarchicalEqualRiskContribution
        │      sigma ┼ nothing
        │       chol ┼ nothing
        │         rc ┼ nothing
-       │        alg ┴ SquaredSOCRiskExpr()
+       │        alg ┼ SquaredSOCRiskExpr()
+       │   mtx_sqrt ┴ EigenFallbackSquareRoot()
   scai ┼ SumScalariser()
   scao ┼ SumScalariser()
     ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()

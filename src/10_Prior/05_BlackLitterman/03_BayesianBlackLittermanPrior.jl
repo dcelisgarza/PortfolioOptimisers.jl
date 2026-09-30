@@ -148,7 +148,7 @@ BayesianBlackLittermanPrior
              │            │           w ┼ nothing
              │            │   corrected ┴ Bool: true
              │        rsd ┼ Bool: true
-             │   sqrt_alg ┴ nothing
+             │   mtx_sqrt ┴ nothing
         f_mp ┼ MatrixProcessing
              │     pdm ┼ Posdef
              │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton

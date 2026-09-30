@@ -663,7 +663,8 @@ $(val_dict[:relax])
   - [`ArithmeticReturn`](@ref)
 """
 function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::BoxUncertaintySet,
-                                     mu::Num_VecNum, settings::JuMPReturnsSettings)
+                                     mu::Num_VecNum, settings::JuMPReturnsSettings,
+                                     ::Any = nothing)
     sc = get_constraint_scale(model)
     w = get_w(model)
     N = length(w)
@@ -681,7 +682,8 @@ function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::BoxUncertaintySe
     return ret, mu, true
 end
 """
-    set_ucs_return_constraints!(model, i, ucs::EllipsoidalUncertaintySet, mu, settings)
+    set_ucs_return_constraints!(model, i, ucs::EllipsoidalUncertaintySet, mu, settings,
+                                mtx_sqrt = nothing)
 
 Build one term's ellipsoid-robust return expression.
 
@@ -703,7 +705,7 @@ Where:
   - $(math_dict[:w_port])
   - ``\\kappa``: Radius of the ellipsoid, the `k` field of the set. The set is ``(\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}})^\\intercal \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}^{-1} (\\boldsymbol{\\mu} - \\hat{\\boldsymbol{\\mu}}) \\leq \\kappa^{2}``.
   - ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``: Shape matrix of the ellipsoid, the `sigma` field of the set.
-  - ``\\mathbf{G}``: Upper Cholesky factor of ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``, so ``\\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2^{2} = \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}} \\boldsymbol{w}``.
+  - ``\\mathbf{G}``: Transpose of the square root of ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}`` that [`matrix_square_root`](@ref) takes under `mtx_sqrt`, the `mtx_sqrt` of the [`ArithmeticReturn`](@ref). `nothing` takes the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. So ``\\lVert \\mathbf{G}\\boldsymbol{w} \\rVert_2^{2} = \\boldsymbol{w}^\\intercal \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}} \\boldsymbol{w}``.
 
 # JuMP formulation
 
@@ -741,11 +743,12 @@ $(val_dict[:relax])
   - [`CharacteristicUncertaintySet`](@ref)
 """
 function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::EllipsoidalUncertaintySet,
-                                     mu::Num_VecNum, settings::JuMPReturnsSettings)
+                                     mu::Num_VecNum, settings::JuMPReturnsSettings,
+                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
     sc = get_constraint_scale(model)
     w = get_w(model)
     mu = something(ucs.val, mu)
-    G = LinearAlgebra.cholesky(ucs.sigma).U
+    G = transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
     k = ucs.k
     x_eucs_w = state_set!(model, Symbol(""), :x_eucs_w_, i, JuMP.@expression(model, G * w))
     t_eucs_gw = state_set!(model, Symbol(""), :t_eucs_gw_, i, JuMP.@variable(model))
@@ -822,7 +825,8 @@ $(val_dict[:relax])
   - [`CharacteristicUncertaintySet`](@ref)
 """
 function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::L1UncertaintySet,
-                                     mu::Num_VecNum, settings::JuMPReturnsSettings)
+                                     mu::Num_VecNum, settings::JuMPReturnsSettings,
+                                     ::Any = nothing)
     sc = get_constraint_scale(model)
     w = get_w(model)
     mu = something(ucs.mu, mu)
@@ -905,7 +909,8 @@ $(val_dict[:relax])
   - [`L1UncertaintySet`](@ref)
 """
 function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::SignedL1UncertaintySet,
-                                     mu::Num_VecNum, settings::JuMPReturnsSettings)
+                                     mu::Num_VecNum, settings::JuMPReturnsSettings,
+                                     ::Any = nothing)
     sc = get_constraint_scale(model)
     w = get_w(model)
     mu = something(ucs.mu, mu)
@@ -991,7 +996,8 @@ $(val_dict[:relax])
 function set_ucs_return_constraints!(model::JuMP.Model, i,
                                      ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
                                                                  <:MuUncertaintySetClass},
-                                     mu::Num_VecNum, settings::JuMPReturnsSettings)
+                                     mu::Num_VecNum, settings::JuMPReturnsSettings,
+                                     ::Any = nothing)
     w = get_w(model)
     mu = something(ucs.val, mu)
     L = ucs.L
@@ -1025,7 +1031,8 @@ function set_return_constraints!(model::JuMP.Model, i,
     # is fitted from the optimisation's own prior result rather than from returns data. An
     # estimator that carries its own `pe` drops it (see [`mu_ucs`](@ref)).
     uc = mu_ucs(pret.ucs, rd, pr; kwargs...)
-    ret, mu, forces_risk = set_ucs_return_constraints!(model, i, uc, fb, settings)
+    ret, mu, forces_risk = set_ucs_return_constraints!(model, i, uc, fb, settings,
+                                                       pret.mtx_sqrt)
     set_return_bounds!(model, i, ret, settings.lb)
     set_return_expression!(model, i, ret, settings.scale, settings.rte)
     return mu, forces_risk

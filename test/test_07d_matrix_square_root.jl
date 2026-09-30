@@ -1,6 +1,6 @@
 #=
 The square root of a covariance matrix (#1396, map #1375): the three policies that
-`matrix_square_root` names, the two helpers that route through them, and the field `sqrt_alg` of
+`matrix_square_root` names, the helpers that route through them, and the field `mtx_sqrt` of
 `FactorPrior` and `CrossSectionalFactorPrior`. Every `Parity_MatrixSquareRoot_*` and
 `Parity_CrossSectionalFactorPrior_Mirror_*` file this test reads is an output of the oracle,
 stored with the harness of #1376.
@@ -83,15 +83,21 @@ const PO = PortfolioOptimisers
     @test_throws DomainError RidgeCholeskySquareRoot(; tries = 0)
 end
 
-@testset "covariance_factor and safe_regime_cholesky route through the policies" begin
+@testset "The factor of a variance and safe_regime_cholesky route through the policies" begin
     A = let X = randn(StableRNG(1396), 30, 4)
         X' * X ./ 30
     end
     S1 = [1.0 1.0; 1.0 1.0]
-    @test PO.covariance_factor(A) ==
-          transpose(matrix_square_root(EigenFallbackSquareRoot(), A))
-    @test PO.covariance_factor(S1) ==
-          transpose(matrix_square_root(EigenFallbackSquareRoot(), S1))
+    # The cone of a variance reads the transpose of the square root under its `mtx_sqrt`.
+    model = PO.JuMP.Model()
+    G = PO.chol_sigma_selector(model, nothing, Variance(; sigma = S1))
+    @test G == transpose(matrix_square_root(EigenFallbackSquareRoot(), S1))
+    G = PO.chol_sigma_selector(model, nothing,
+                               Variance(; sigma = A, mtx_sqrt = RidgeCholeskySquareRoot()))
+    @test G == transpose(matrix_square_root(RidgeCholeskySquareRoot(), A))
+    @test_throws PosDefException PO.chol_sigma_selector(model, nothing,
+                                                        StandardDeviation(; sigma = S1,
+                                                                          mtx_sqrt = nothing))
     @test PO.safe_regime_cholesky(S1, 1e-12).L ==
           matrix_square_root(RidgeCholeskySquareRoot(), S1)
     # A negative scale gives the ridge of a zero one.
@@ -141,14 +147,14 @@ end
     rd = ReturnsResult(; nx = rd0.nx, X = rd0.X, ne = [rd0.ne; "MACRO2"],
                        E = hcat(rd0.E, -rd0.E[:, 4]), pnl = rd0.pnl)
     cfg = grid_config("Macro", rd)
-    function mirror(sqrt_alg)
+    function mirror(mtx_sqrt)
         f = [cfg.factors;
              "macro2" =>
                  ObservedExposure(; xe = grid_pass("macro_beta"; family = "macro2"),
                                   series = "MACRO2", family = "macro2")]
         return CrossSectionalFactorPrior(; cfg..., factors = f,
                                          f_mp = MatrixProcessing(; pdm = nothing),
-                                         sqrt_alg = sqrt_alg)
+                                         mtx_sqrt = mtx_sqrt)
     end
     # The default keeps the Cholesky factor that refuses the singular factor covariance.
     @test_throws PosDefException prior(mirror(nothing), rd)
@@ -189,14 +195,14 @@ end
     F = hcat(F, -F[:, 1])
     X = F[:, 1:3] * (0.5 .+ rand(rng, 3, 6)) .+ 0.005 .* randn(rng, 120, 6)
     mp = MatrixProcessing(; pdm = nothing)
-    function fp(sqrt_alg)
+    function fp(mtx_sqrt)
         return FactorPrior(;
                            pe = EmpiricalPrior(;
                                                ce = PortfolioOptimisersCovariance(;
                                                                                   mp = mp)),
-                           mp = mp, sqrt_alg = sqrt_alg)
+                           mp = mp, mtx_sqrt = mtx_sqrt)
     end
-    @test FactorPrior().sqrt_alg === nothing
+    @test FactorPrior().mtx_sqrt === nothing
     @test_throws PosDefException prior(fp(nothing), X, F)
     pr = prior(fp(RidgeCholeskySquareRoot()), X, F)
     @test isapprox(pr.chol' * pr.chol, pr.sigma; rtol = 1e-11)

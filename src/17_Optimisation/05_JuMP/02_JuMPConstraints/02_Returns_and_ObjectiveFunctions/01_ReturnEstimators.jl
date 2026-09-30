@@ -209,7 +209,8 @@ $(DocStringExtensions.FIELDS)
     ArithmeticReturn(;
         settings::JuMPReturnsSettings = JuMPReturnsSettings(),
         ucs::Option{<:UcSE_UcS} = nothing,
-        mu::Option{<:ArithRetMu} = nothing
+        mu::Option{<:ArithRetMu} = nothing,
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing
     ) -> ArithmeticReturn
 
 Keywords correspond to the struct's fields.
@@ -249,8 +250,13 @@ Keywords correspond to the struct's fields.
     $(field_dict[:mu_ret_slot])
     """
     mu
+    """
+    Square-root algorithm of the matrix of an [`EllipsoidalUncertaintySet`](@ref) in `ucs`, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. The other sets read no square root.
+    """
+    mtx_sqrt
     function ArithmeticReturn(settings::JuMPReturnsSettings, ucs::Option{<:UcSE_UcS},
-                              mu::Option{<:ArithRetMu})
+                              mu::Option{<:ArithRetMu},
+                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
         if isa(ucs, EllipsoidalUncertaintySet)
             @argcheck(isa(ucs,
                           EllipsoidalUncertaintySet{<:Any, <:Any, <:MuUncertaintySetClass}),
@@ -268,13 +274,16 @@ Keywords correspond to the struct's fields.
         elseif isa(mu, Number)
             @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
         end
-        return new{typeof(settings), typeof(ucs), typeof(mu)}(settings, ucs, mu)
+        return new{typeof(settings), typeof(ucs), typeof(mu), typeof(mtx_sqrt)}(settings,
+                                                                                ucs, mu,
+                                                                                mtx_sqrt)
     end
 end
 function ArithmeticReturn(; settings::JuMPReturnsSettings = JuMPReturnsSettings(),
                           ucs::Option{<:UcSE_UcS} = nothing,
-                          mu::Option{<:ArithRetMu} = nothing)
-    return ArithmeticReturn(settings, ucs, mu)
+                          mu::Option{<:ArithRetMu} = nothing,
+                          mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+    return ArithmeticReturn(settings, ucs, mu, mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -311,24 +320,27 @@ function factory(rt::ArithmeticReturn, pr::AbstractPriorResult, ::Any,
                  ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
     return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
-                            mu = nothing_scalar_array_selector(rt.mu, pr.mu))
+                            mu = nothing_scalar_array_selector(rt.mu, pr.mu),
+                            mtx_sqrt = rt.mtx_sqrt)
 end
 function factory(rt::ArithmeticReturn, pr::AbstractPriorResult,
                  ucs::Option{<:UcSE_UcS} = nothing; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
     return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
-                            mu = nothing_scalar_array_selector(rt.mu, pr.mu))
+                            mu = nothing_scalar_array_selector(rt.mu, pr.mu),
+                            mtx_sqrt = rt.mtx_sqrt)
 end
 function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, pr::AbstractPriorResult; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)
     return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
-                            mu = nothing_scalar_array_selector(rt.mu, pr.mu))
+                            mu = nothing_scalar_array_selector(rt.mu, pr.mu),
+                            mtx_sqrt = rt.mtx_sqrt)
 end
 function factory(rt::ArithmeticReturn, ucs::UcSE_UcS, args...; kwargs...)
     # No prior in hand, so a Deferred Quantity cannot resolve here. It travels on unchanged
     # and the prior-carrying `factory` the sub-problem runs resolves it.
     return ArithmeticReturn(; settings = rt.settings, ucs = ucs_selector(rt.ucs, ucs),
-                            mu = rt.mu)
+                            mu = rt.mu, mtx_sqrt = rt.mtx_sqrt)
 end
 function port_opt_view(r::ArithmeticReturn, i, args...)
     uset = port_opt_view(r.ucs, i)
@@ -336,7 +348,8 @@ function port_opt_view(r::ArithmeticReturn, i, args...)
     # identity on an Estimator. It then computes on the subset, which is the whole
     # fold-stability argument for the feature.
     mu = nothing_scalar_array_view(r.mu, i)
-    return ArithmeticReturn(; settings = r.settings, ucs = uset, mu = mu)
+    return ArithmeticReturn(; settings = r.settings, ucs = uset, mu = mu,
+                            mtx_sqrt = r.mtx_sqrt)
 end
 """
     no_bounds_returns_estimator(r, args...)
@@ -368,7 +381,8 @@ Also, with several terms, each term then gives the same corner.
 """
 function no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool = true)
     return ArithmeticReturn(; settings = no_bounds_returns_settings(r.settings),
-                            ucs = ifelse(flag, r.ucs, nothing), mu = r.mu)
+                            ucs = ifelse(flag, r.ucs, nothing), mu = r.mu,
+                            mtx_sqrt = r.mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

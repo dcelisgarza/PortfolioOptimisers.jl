@@ -660,7 +660,8 @@ SchurComplementHierarchicalRiskParity
          │         │      sigma ┼ nothing
          │         │       chol ┼ nothing
          │         │         rc ┼ nothing
-         │         │        alg ┴ SquaredSOCRiskExpr()
+         │         │        alg ┼ SquaredSOCRiskExpr()
+         │         │   mtx_sqrt ┴ EigenFallbackSquareRoot()
          │   gamma ┼ Float64: 0.5
          │     pdm ┼ Posdef
          │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton

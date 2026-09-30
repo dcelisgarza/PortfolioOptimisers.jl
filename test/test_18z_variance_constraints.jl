@@ -26,18 +26,19 @@ rc_vc = LinearConstraint(;
                          ineq = PartialLinearConstraint(; A = Matrix(1.0I, N_vc, N_vc),
                                                         B = fill(0.5, N_vc)))
 
-@testset "covariance_factor: a Cholesky factor, an eigen factor, or a refusal" begin
-    G = PO.covariance_factor(S_vc)
+@testset "The default factor of a variance: a Cholesky factor, an eigen factor, or a refusal" begin
+    factor(S) = PO.chol_sigma_selector(JuMP.Model(), nothing, Variance(; sigma = S))
+    G = factor(S_vc)
     @test G isa UpperTriangular
     @test isapprox(transpose(G) * G, S_vc; rtol = 1e-12)
     # A singular covariance has no Cholesky factor, and its eigen factor still reproduces it.
     v = randn(StableRNG(9), N_vc)
     S1 = v * transpose(v)
     @test !issuccess(cholesky(S1; check = false))
-    G1 = PO.covariance_factor(S1)
+    G1 = factor(S1)
     @test isapprox(transpose(G1) * G1, S1; atol = 1e-12)
-    @test_throws PosDefException(-1) PO.covariance_factor([1.0 0.5; 0.4 1.0])
-    @test_throws PosDefException(1) PO.covariance_factor([1.0 2.0; 2.0 1.0])
+    @test_throws PosDefException(-1) factor([1.0 0.5; 0.4 1.0])
+    @test_throws PosDefException(1) factor([1.0 2.0; 2.0 1.0])
 end
 
 @testset "chol_sigma_selector: a stated factor, then a stated matrix, then the prior" begin

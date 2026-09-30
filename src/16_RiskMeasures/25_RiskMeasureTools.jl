@@ -249,7 +249,8 @@ end
 function resolve_observation_weights(r::Kurtosis{<:Any, <:DynamicAbstractWeights},
                                      X::VecNum_MatNum)
     return Kurtosis(; settings = r.settings, w = get_observation_weights(r.w, X), mu = r.mu,
-                    kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2, pe = r.pe)
+                    kt = r.kt, N = r.N, alg1 = r.alg1, alg2 = r.alg2, pe = r.pe,
+                    mtx_sqrt = r.mtx_sqrt)
 end
 function resolve_observation_weights(r::Skewness{<:Any, <:Any, <:Any,
                                                  <:DynamicAbstractWeights},

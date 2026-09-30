@@ -1012,7 +1012,8 @@ RiskLoss
          │      sigma ┼ nothing
          │       chol ┼ nothing
          │         rc ┼ nothing
-         │        alg ┴ SquaredSOCRiskExpr()
+         │        alg ┼ SquaredSOCRiskExpr()
+         │   mtx_sqrt ┴ EigenFallbackSquareRoot()
   window ┼ Int64: 20
      sca ┼ SumScalariser()
       pe ┼ EmpiricalPrior

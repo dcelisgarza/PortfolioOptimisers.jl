@@ -689,6 +689,7 @@ Where:
 
   - Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref): `all(>= 0, q)` and `sum(q) > 0`. A `DomainError` is thrown otherwise.
   - Under [`GramProjection`](@ref): `proj.A` is not `nothing`. An `ArgumentError` is thrown otherwise: the rule binds the matrix.
+  - Under [`GramProjection`](@ref): `proj.A` is positive definite. A `LinearAlgebra.PosDefException` is thrown otherwise. A singular Gram matrix states a seminorm, in which the projection is not unique. [`NewtonStep`](@ref) binds ``\\mathbf{I} + \\sum_{s} \\boldsymbol{g}_s \\boldsymbol{g}_s^\\intercal``, which is positive definite.
 
 # Related
 

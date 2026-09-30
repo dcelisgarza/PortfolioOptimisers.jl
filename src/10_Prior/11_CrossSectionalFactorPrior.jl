@@ -32,7 +32,7 @@ $(DocStringExtensions.FIELDS)
                               rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
                               lambda::Real = 1.0, c::Real = 1.0,
                               lx::Option{<:AbstractString} = nothing,
-                              sqrt_alg::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
+                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
                               ex::FLoops.Transducers.Executor = ThreadedEx()) -> CrossSectionalFactorPrior
 
 Keywords correspond to the struct's fields. `factors`, `neutralise` and `families` also take a dictionary, and the constructor collects each one into a vector of Pairs.
@@ -131,7 +131,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     @fprop @vprop ce
     """
-    $(field_dict[:f_mp]) It processes the factor covariance that `pe` states, which is a different matrix from the asset covariance that `mp` processes. The factor covariance is on the factor axis, `pe` estimates it from the factor-return series, and a Factor Family that drops a member can leave it singular. [`cross_sectional_lift`](@ref) takes its square root under `sqrt_alg` for the low-rank square root, so under the default `sqrt_alg` a factor covariance that is not positive definite fails there rather than in the asset block.
+    $(field_dict[:f_mp]) It processes the factor covariance that `pe` states, which is a different matrix from the asset covariance that `mp` processes. The factor covariance is on the factor axis, `pe` estimates it from the factor-return series, and a Factor Family that drops a member can leave it singular. [`cross_sectional_lift`](@ref) takes its square root under `mtx_sqrt` for the low-rank square root, so under the default `mtx_sqrt` a factor covariance that is not positive definite fails there rather than in the asset block.
     """
     @fprop f_mp
     """
@@ -179,9 +179,9 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     lx
     """
-    $(field_dict[:sqrt_alg])
+    $(field_dict[:mtx_sqrt])
     """
-    sqrt_alg
+    mtx_sqrt
     """
     $(field_dict[:ex]) It computes the Factor Exposures of one dependency layer, whose members read no exposure of each other. Each member writes its own columns of the exposure history, so every executor gives the same prior. The regression runs under the executor of `cre`, and a Return Forecast under the executor of its own Descriptor Scores.
     """
@@ -200,7 +200,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        lag::Integer, minra::Option{<:Integer},
                                        rfe::Option{<:AbstractReturnForecastEstimator},
                                        lambda::Real, c::Real, lx::Option{<:AbstractString},
-                                       sqrt_alg::Option{<:AbstractMatrixSquareRootAlgorithm},
+                                       mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
                                        ex::FLoops.Transducers.Executor)
         assert_closed_unit_interval(th, :th)
         assert_finite(bp, :bp)
@@ -226,9 +226,9 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                    typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(f_mp), typeof(mp),
                    typeof(th), typeof(bp), typeof(mcap), typeof(bw), typeof(lag),
                    typeof(minra), typeof(rfe), typeof(lambda), typeof(c), typeof(lx),
-                   typeof(sqrt_alg), typeof(ex)}(factors, neutralise, families, cre, wa, pe,
+                   typeof(mtx_sqrt), typeof(ex)}(factors, neutralise, families, cre, wa, pe,
                                                  ve, ce, f_mp, mp, th, bp, mcap, bw, lag,
-                                                 minra, rfe, lambda, c, lx, sqrt_alg, ex)
+                                                 minra, rfe, lambda, c, lx, mtx_sqrt, ex)
     end
 end
 function CrossSectionalFactorPrior(; factors::Dict_VecPair,
@@ -253,13 +253,13 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
                                    lambda::Real = 1.0, c::Real = 1.0,
                                    lx::Option{<:AbstractString} = nothing,
-                                   sqrt_alg::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
+                                   mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::CrossSectionalFactorPrior
     return CrossSectionalFactorPrior(cross_sectional_prior_pairs(factors, :factors),
                                      cross_sectional_prior_option(neutralise, :neutralise),
                                      cross_sectional_prior_option(families, :families), cre,
                                      wa, pe, ve, ce, f_mp, mp, th, bp, mcap, bw, lag, minra,
-                                     rfe, lambda, c, lx, sqrt_alg, ex)
+                                     rfe, lambda, c, lx, mtx_sqrt, ex)
 end
 """
     cross_sectional_prior_option(x::Nothing, sym::Sym_Str) -> nothing
@@ -521,7 +521,7 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     # `pe.mp`: they are different matrices. This one is estimated from the factor-return
     # series over a factor axis a constrained Family has already reduced, and
     # `cross_sectional_lift` factorises it for the low-rank square root, so under the default
-    # `sqrt_alg` a covariance that is merely positive SEMI-definite -- a short warm-up, a
+    # `mtx_sqrt` a covariance that is merely positive SEMI-definite -- a short warm-up, a
     # collinear Family -- raises a `PosDefException` out of the Cholesky rather than
     # answering. The default `pdm` is a no-op on a matrix that is already positive definite,
     # so a healthy fit is untouched.
@@ -564,7 +564,7 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     # rows the scenarios keep (#1384).
     rs = (length(r) - size(Xs, 1) + 1):length(r)
     lift = cross_sectional_lift(pe.mp, L, f_mu, f_pr.sigma, esigma, idx, Xs;
-                                sqrt_alg = pe.sqrt_alg, kwargs...)
+                                mtx_sqrt = pe.mtx_sqrt, kwargs...)
     fpr = LowOrderPrior(; X = something(fr, ca.f)[rs, :], mu = ex.mu, sigma = ex.sigma,
                         w = f_pr.w, ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow)
     return LowOrderPrior(; X = Xs, o_X = Xw[r[rs], :], mu = lift.mu + rr.b,
