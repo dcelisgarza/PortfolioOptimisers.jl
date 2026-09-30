@@ -898,5 +898,355 @@ This method is a pass-through for [`CrossSectionalFactorModel`](@ref) results, a
 function regression(csfm::CrossSectionalFactorModel, args...)
     return csfm
 end
+"""
+$(DocStringExtensions.TYPEDEF)
 
-export CrossSectionalFactorModel, cross_sectional_factor_returns
+Holds the answer of a Factor Model Diagnostic together with the names and the family labels of its factor axis.
+
+A diagnostic verb called on a [`CrossSectionalFactorModel`](@ref) returns it. The method of the same verb over bare histories returns the bare array, because it has no names to carry. [`port_opt_view`](@ref) selects factors of the answer by position, by name, or by family with a [`LabelGroup`](@ref). It cuts every factor dimension of `X`, and `nf` and `fam` with it. So a caller computes a diagnostic once, over every factor, and then selects the factors it reads.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    FactorDiagnosticResult(;
+        X::AbstractArray,
+        nf::Option{<:VecStr} = nothing,
+        fam::Option{<:VecStr} = nothing,
+        dims::Tuple{Vararg{Integer}} = (ndims(X),)
+    ) -> FactorDiagnosticResult
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(dims)`, and `dims` names distinct dimensions of `X`. Raises a `DomainError` otherwise.
+  - Every dimension of `X` that `dims` names has one length, the factor count `K`. Raises a `DimensionMismatch` otherwise.
+  - If provided, `length(nf) == K`, and `nf` repeats no name.
+  - If provided, `length(fam) == K`.
+
+# Examples
+
+```jldoctest
+julia> r = FactorDiagnosticResult(; X = [1.0 2.0 3.0; 4.0 5.0 6.0], nf = [\"value\", \"size\", \"tech\"],
+                                  fam = [\"style\", \"style\", \"industry\"]);
+
+julia> PortfolioOptimisers.port_opt_view(r, LabelGroup(\"style\")).X
+2×2 view(::Matrix{Float64}, :, [1, 2]) with eltype Float64:
+ 1.0  2.0
+ 4.0  5.0
+
+julia> PortfolioOptimisers.port_opt_view(r, [\"tech\"]).nf
+1-element view(::Vector{String}, [3]) with eltype String:
+ "tech"
+```
+
+# Related
+
+  - [`port_opt_view`](@ref)
+  - [`LabelGroup`](@ref)
+  - [`cs_diagnostic_factor_names`](@ref)
+  - [`FactorSummaryResult`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+@concrete struct FactorDiagnosticResult <: AbstractResult
+    """
+    The answer of the diagnostic: a vector with one entry per factor, a matrix `observations × factors`, or a matrix `factors × factors`.
+    """
+    X
+    """
+    $(field_dict[:fd_nf])
+    """
+    nf
+    """
+    $(field_dict[:fd_fam])
+    """
+    fam
+    """
+    The dimensions of `X` that run over the factors: `(ndims(X),)` for a series of the factors, and `(1, 2)` for a matrix of factor pairs.
+    """
+    dims
+    function FactorDiagnosticResult(X::AbstractArray, nf::Option{<:VecStr},
+                                    fam::Option{<:VecStr}, dims::Tuple{Vararg{Integer}})
+        @argcheck(!isempty(dims) && allunique(dims) && all(d -> 1 <= d <= ndims(X), dims),
+                  DomainError(dims,
+                              "dims must name distinct dimensions of X, which has $(ndims(X))"))
+        K = size(X, first(dims))
+        @argcheck(all(d -> size(X, d) == K, dims),
+                  DimensionMismatch("every factor dimension of X must have one length. Got size(X) => $(size(X)) and dims => $(dims)"))
+        if !isnothing(nf)
+            @argcheck(length(nf) == K,
+                      DimensionMismatch("nf ($(length(nf))) must match the factor axis of X ($K)"))
+            @argcheck(allunique(nf), ArgumentError("nf must not repeat a factor name"))
+        end
+        if !isnothing(fam)
+            @argcheck(length(fam) == K,
+                      DimensionMismatch("fam ($(length(fam))) must match the factor axis of X ($K)"))
+        end
+        return new{typeof(X), typeof(nf), typeof(fam), typeof(dims)}(X, nf, fam, dims)
+    end
+end
+function FactorDiagnosticResult(; X::AbstractArray, nf::Option{<:VecStr} = nothing,
+                                fam::Option{<:VecStr} = nothing,
+                                dims::Tuple{Vararg{Integer}} = (ndims(X),))
+    return FactorDiagnosticResult(X, nf, fam, dims)
+end
+"""
+    factor_axis_positions(nf::Option{<:VecStr}, fam::Option{<:VecStr}, i) -> typeof(i)
+    factor_axis_positions(nf::Option{<:VecStr}, fam::Option{<:VecStr}, i::Integer) -> UnitRange{Int}
+    factor_axis_positions(nf::Option{<:VecStr}, fam::Nothing, i::LabelGroup) -> Union{}
+    factor_axis_positions(nf::Option{<:VecStr}, fam::VecStr, i::LabelGroup) -> Vector{Int}
+
+Turn the factor index of a view of a diagnostic answer into positions on its factor axis.
+
+A position, a range and a `Colon` pass through. A vector of names goes through [`label_positions`](@ref), which refuses a name it cannot find. One integer becomes a range of one position, so the answer keeps its factor axis. A [`LabelGroup`](@ref) selects every factor whose family label is the group, in the order of the axis.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `i` is not an integer and not a [`LabelGroup`](@ref): return [`label_positions`](@ref) of `nf` and `i`.
+ 2. `i` is an integer: return `i:i`.
+ 3. `i` is a [`LabelGroup`](@ref) and `fam` is `nothing`: throw.
+ 4. `i` is a [`LabelGroup`](@ref): return the positions of the entries of `fam` that equal the group, and throw when there is none.
+
+# Arguments
+
+  - $(arg_dict[:fd_nf])
+  - $(arg_dict[:fd_fam])
+  - `i`: The factor index of the view: positions, a range, a `Colon`, a vector of names, or a [`LabelGroup`](@ref).
+
+# Validation
+
+  - `nf` is not `nothing` when `i` is a vector of names. Raises an `ArgumentError`.
+  - Every name of `i` is in `nf`. Raises an `ArgumentError` that suggests the nearest name.
+  - `fam` is not `nothing` when `i` is a [`LabelGroup`](@ref). Raises an `ArgumentError`.
+  - At least one entry of `fam` is the group of `i`. Raises an `ArgumentError` that suggests the nearest family.
+
+# Returns
+
+  - `pos`: The positions of the selected factors, or `i` unchanged.
+
+# Related
+
+  - [`FactorDiagnosticResult`](@ref)
+  - [`label_positions`](@ref)
+  - [`LabelGroup`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function factor_axis_positions(nf::Option{<:VecStr}, ::Option{<:VecStr}, i)
+    return label_positions(nf, i, "factor")
+end
+function factor_axis_positions(::Option{<:VecStr}, ::Option{<:VecStr}, i::Integer)
+    return i:i
+end
+function factor_axis_positions(::Option{<:VecStr}, ::Nothing, i::LabelGroup)
+    return throw(ArgumentError("the view selects the factors of the family $(i.group), but the answer carries no family labels. Build the block with its family labels `fam`, or select the factors by position or by name."))
+end
+function factor_axis_positions(::Option{<:VecStr}, fam::VecStr, i::LabelGroup)
+    pos = findall(==(i.group), fam)
+    @argcheck(!isempty(pos),
+              ArgumentError("the view selects the factors of the family $(i.group), and no factor of the answer carries that label. The families are $(join(unique(fam), ", "))." *
+                            did_you_mean(i.group, unique(fam))))
+    return pos
+end
+"""
+    port_opt_view(r::FactorDiagnosticResult, i, args...)
+
+Return a view of a [`FactorDiagnosticResult`](@ref) that keeps only the factors that `i` selects.
+
+# Algorithm
+
+ 1. Turn `i` into positions on the factor axis with [`factor_axis_positions`](@ref).
+ 2. View `X` at those positions on each dimension that `dims` names, and in full on each other dimension.
+ 3. View `nf` and `fam` at those positions with [`nothing_scalar_array_view`](@ref).
+ 4. Build a new [`FactorDiagnosticResult`](@ref) from the views, which runs the guards of the constructor again.
+
+# Arguments
+
+  - `r`: A diagnostic answer.
+  - `i`: The factor index: positions, a range, a `Colon`, a vector of names, or a [`LabelGroup`](@ref).
+  - `args...`: Additional positional arguments (ignored).
+
+# Validation
+
+  - The rules of [`factor_axis_positions`](@ref).
+
+# Returns
+
+  - `r::FactorDiagnosticResult`: The answer on the selected factors.
+
+# Examples
+
+```jldoctest
+julia> r = FactorDiagnosticResult(; X = [1.0 0.5; 0.5 1.0], nf = [\"value\", \"size\"], dims = (1, 2));
+
+julia> PortfolioOptimisers.port_opt_view(r, 2).X
+1×1 view(::Matrix{Float64}, 2:2, 2:2) with eltype Float64:
+ 1.0
+```
+
+# Related
+
+  - [`FactorDiagnosticResult`](@ref)
+  - [`factor_axis_positions`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function port_opt_view(r::FactorDiagnosticResult, i, args...)::FactorDiagnosticResult
+    p = factor_axis_positions(r.nf, r.fam, i)
+    idx = ntuple(d -> d in r.dims ? p : Colon(), ndims(r.X))
+    return FactorDiagnosticResult(view(r.X, idx...), nothing_scalar_array_view(r.nf, p),
+                                  nothing_scalar_array_view(r.fam, p), r.dims)
+end
+"""
+    factor_table_fields(r::AbstractResult, i) -> Tuple
+
+Return every field of a per-factor table, cut to the factors that `i` selects.
+
+A per-factor table is a Result whose fields are vectors with one entry per factor, scalars, or `nothing`, and which carries the names `nf` and the family labels `fam` of its factors. The answer is in the order of the fields, so the positional constructor of the table takes it.
+
+# Algorithm
+
+ 1. Turn `i` into positions on the factor axis with [`factor_axis_positions`](@ref).
+ 2. View each field at those positions with [`nothing_scalar_array_view`](@ref), which keeps a scalar and `nothing` unchanged.
+
+# Arguments
+
+  - `r`: A per-factor table.
+  - `i`: The factor index: positions, a range, a `Colon`, a vector of names, or a [`LabelGroup`](@ref).
+
+# Validation
+
+  - The rules of [`factor_axis_positions`](@ref).
+
+# Returns
+
+  - `fields::Tuple`: One entry per field of `r`, in the order of the fields.
+
+# Related
+
+  - [`FactorSummaryResult`](@ref)
+  - [`ExposureICSummaryResult`](@ref)
+  - [`factor_axis_positions`](@ref)
+"""
+function factor_table_fields(r::AbstractResult, i)
+    p = factor_axis_positions(r.nf, r.fam, i)
+    return ntuple(k -> nothing_scalar_array_view(getfield(r, k), p), fieldcount(typeof(r)))
+end
+"""
+    cs_diagnostic_factor_names(csfm::CrossSectionalFactorModel)
+    cs_diagnostic_factor_names(fcb::Option{<:AbstractFactorFamilyBasis}, nf::Nothing)
+    cs_diagnostic_factor_names(fcb::Nothing, nf::VecStr)
+    cs_diagnostic_factor_names(fcb::AbstractFactorFamilyBasis, nf::VecStr)
+
+Return the factor names of the axis a cross-sectional regression diagnostic answers on.
+
+A regression diagnostic that carries a factor axis answers on the design of the regression: the reduced axis when the block carries a family re-basis, less the observed factors, which are its last columns and which the regression did not estimate. So the names of the raw axis do not label it. The one-argument verb maps them, and the [`FactorDiagnosticResult`](@ref) of a regression diagnostic carries its answer. The two-argument verb maps the names onto the whole reduced axis, observed factors included, which is the axis of the loadings `L`. It maps family labels the same way. A block that names no factor answers `nothing`.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `fcb`: The family re-basis of the block, or `nothing`.
+  - `nf`: The names, or the family labels, of the raw factor axis, or `nothing`.
+
+# Returns
+
+  - `nf::Option{<:Vector{String}}`: The names of the answer's factor axis, or `nothing` when the block names no factor.
+
+# Examples
+
+```jldoctest
+julia> csfm = CrossSectionalFactorModel(; M = [1.0 2.0; 3.0 4.0], b = [0.1, 0.2],
+                                        esigma = [0.4, 0.5], nf = [\"value\", \"size\"]);
+
+julia> PortfolioOptimisers.cs_diagnostic_factor_names(csfm)
+2-element Vector{String}:
+ "value"
+ "size"
+```
+
+# Related
+
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`FactorDiagnosticResult`](@ref)
+  - [`reduce_factor_names`](@ref)
+  - [`cs_design_labels`](@ref)
+  - [`cs_regression_t_stats`](@ref)
+  - [`exposure_vif`](@ref)
+"""
+function cs_diagnostic_factor_names(csfm::CrossSectionalFactorModel)
+    return cs_design_labels(csfm, csfm.nf)
+end
+function cs_diagnostic_factor_names(::Option{<:AbstractFactorFamilyBasis},
+                                    ::Nothing)::Nothing
+    return nothing
+end
+function cs_diagnostic_factor_names(::Nothing, nf::VecStr)::Vector{String}
+    return String[String(n) for n in nf]
+end
+function cs_diagnostic_factor_names(fcb::AbstractFactorFamilyBasis,
+                                    nf::VecStr)::Vector{String}
+    return reduce_factor_names(fcb, nf)
+end
+"""
+    cs_design_labels(csfm::CrossSectionalFactorModel, labels::Option{<:VecStr})
+
+Map labels of the raw factor axis onto the design axis of the cross-sectional regression.
+
+The design axis is the reduced axis less the observed factors, which [`cs_diagnostic_factor_names`](@ref) states. The labels are the names or the family labels of the raw axis.
+
+# Algorithm
+
+ 1. Map the labels onto the whole reduced axis with the two-argument [`cs_diagnostic_factor_names`](@ref).
+ 2. Drop the last `size(csfm.fx, 2)` entries when the block carries observed factor returns.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `labels`: The names or the family labels of the raw factor axis, or `nothing`.
+
+# Returns
+
+  - `labels::Option{<:Vector{String}}`: The labels of the design axis, or `nothing` when `labels` is `nothing`.
+
+# Related
+
+  - [`cs_diagnostic_factor_names`](@ref)
+  - [`cs_design_result`](@ref)
+"""
+function cs_design_labels(csfm::CrossSectionalFactorModel, labels::Option{<:VecStr})
+    lb = cs_diagnostic_factor_names(csfm.fcb, labels)
+    return isnothing(lb) || isnothing(csfm.fx) ? lb : lb[1:(end - size(csfm.fx, 2))]
+end
+"""
+    cs_design_result(csfm::CrossSectionalFactorModel, X::AbstractArray)
+
+Wrap the answer of a regression diagnostic of a block in a [`FactorDiagnosticResult`](@ref) on the design axis.
+
+The last dimension of `X` is the factor axis. The names and the family labels are those of the design axis, from [`cs_design_labels`](@ref).
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `X`: The answer of the diagnostic, with the factors on its last dimension.
+
+# Returns
+
+  - `r::FactorDiagnosticResult`: The answer with the labels of its factor axis.
+
+# Related
+
+  - [`FactorDiagnosticResult`](@ref)
+  - [`cs_design_labels`](@ref)
+  - [`exposure_vif`](@ref)
+  - [`cs_regression_t_stats`](@ref)
+"""
+function cs_design_result(csfm::CrossSectionalFactorModel, X::AbstractArray)
+    return FactorDiagnosticResult(X, cs_design_labels(csfm, csfm.nf),
+                                  cs_design_labels(csfm, csfm.fam), (ndims(X),))
+end
+
+export CrossSectionalFactorModel, cross_sectional_factor_returns, FactorDiagnosticResult
+public cs_diagnostic_factor_names

@@ -61,7 +61,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         csfm = block(fix, c)
         n = "Diag$(fix)$(c)"
         R = load(n, "Regression")
-        t = cs_regression_t_stats(csfm)
+        t = cs_regression_t_stats(csfm).X
         K = size(t, 2)
         kap = exposure_condition_number(csfm)
         okap = R[:, 2K + 1]
@@ -78,7 +78,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         # A t-statistic near zero carries the relative round-off of the fit. Measured maxrel
         # 1.6e-12 on the large panel, and maxscaled 7.4e-15.
         @test pc(t[idf, :], R[idf, 1:K], "$(n) t"; rtol = 2e-12)
-        vif = exposure_vif(csfm)
+        vif = exposure_vif(csfm).X
         @test pc(vif[idf, :], R[idf, (K + 1):(2K)], "$(n) vif")
         @test pc(kap[idf], okap[idf], "$(n) kappa")
         # An identified coefficient has one variance whatever basis of the column space the
@@ -118,9 +118,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         end
         if !(c in fam)
             tr = load(n, "TRate")
-            @test pc(cs_regression_t_stat_exceedance_rate(csfm), tr[:, 1], "$(n) rate")
-            @test pc(cs_regression_t_stat_exceedance_rate(csfm; threshold = 1.5), tr[:, 2],
-                     "$(n) rate 1.5")
+            @test pc(cs_regression_t_stat_exceedance_rate(csfm).X, tr[:, 1], "$(n) rate")
+            @test pc(cs_regression_t_stat_exceedance_rate(csfm; threshold = 1.5).X,
+                     tr[:, 2], "$(n) rate 1.5")
         end
     end
 
@@ -183,9 +183,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         end
         # The verbs over the block read the block's own weights through the same kernels.
         u = PO.cs_diagnostic_weights(BenchmarkWeightMetric(), csfm)
-        @test isequal(exposure_correlation(csfm), exposure_correlation(B, u))
-        @test isequal(exposure_stability(csfm), exposure_stability(B, u))
-        @test isequal(exposure_dispersion(csfm), exposure_dispersion(B, u))
+        @test isequal(exposure_correlation(csfm).X, exposure_correlation(B, u))
+        @test isequal(exposure_stability(csfm).X, exposure_stability(B, u))
+        @test isequal(exposure_dispersion(csfm).X, exposure_dispersion(B, u))
     end
 
     @testset "The exposure information coefficient, $(fix) $(c)" for (fix, c) in cases
@@ -196,7 +196,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         for (h, o) in ((1, load(n, "IC1")), (3, load(n, "IC3"))),
             (j, rank) in enumerate((true, false))
 
-            ic = exposure_ic(csfm; horizon = h, rank = rank, ties = :ordinal)
+            ic = exposure_ic(csfm; horizon = h, rank = rank, ties = :ordinal).X
             # A linear coefficient near zero carries the round-off of the fit's returns.
             # Measured maxrel 1.4e-12 on the large panel, and maxscaled 7.4e-16.
             @test pc(ic, o[:, ((j - 1) * K + 1):(j * K)], "$(n) ic $(h) $(rank)";
@@ -219,9 +219,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         if c in fam
             o = load(n, "ICRed")
             Kr = size(o, 2) ÷ 2
-            @test pc(exposure_ic(csfm; ties = :ordinal, reduced = true), o[:, 1:Kr],
+            @test pc(exposure_ic(csfm; ties = :ordinal, reduced = true).X, o[:, 1:Kr],
                      "$(n) reduced rank ic")
-            @test pc(exposure_ic(csfm; rank = false, reduced = true), o[:, (Kr + 1):end],
+            @test pc(exposure_ic(csfm; rank = false, reduced = true).X, o[:, (Kr + 1):end],
                      "$(n) reduced linear ic"; rtol = 1.5e-12)
         end
     end
@@ -247,8 +247,8 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             # or absent factor, and the others divide by `n - rank`, where the oracle reads
             # round-off and `n - K` (#1421, see the regression group). So the three columns
             # that read them leave the comparison for every factor such a row reaches.
-            t = cs_regression_t_stats(csfm)
-            vif = exposure_vif(csfm)
+            t = cs_regression_t_stats(csfm).X
+            vif = exposure_vif(csfm).X
             R = load(n, "Regression")
             K = size(t, 2)
             same(a, b) = parity_compare(a, b; rtol = 1e-9, name = "").ok
@@ -300,7 +300,8 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             @test h[:, 3] == act[:, 3]
             @test all(iszero, csfm.csr.eps[h])
             @test all(x -> iszero(x) || isnan(x), csfm.vs[:, 3])
-            @test all(isnan, standardised_idio_returns(PO.idio_diagnostic_data(csfm)...)[:, 3])
+            @test all(isnan,
+                      standardised_idio_returns(PO.idio_diagnostic_data(csfm)...)[:, 3])
             k = setdiff(axes(csfm.csr.eps, 2), 3)
             ek = csfm.csr.eps[:, k]
             vk = csfm.vs[:, k]
@@ -370,7 +371,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         n = "DiagSmallBaseAverage"
         Q = load(n, "ICSummary")
         for (h, o) in ((1, load(n, "IC1")), (3, load(n, "IC3")))
-            ic = exposure_ic(csfm; horizon = h)
+            ic = exposure_ic(csfm; horizon = h).X
             @test pc(ic, o, "average ic $(h)")
             @test all(isnan, ic[:, 1])
             s = exposure_ic_summary(csfm; horizon = h)

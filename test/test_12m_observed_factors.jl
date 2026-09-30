@@ -136,7 +136,7 @@ end
         fx = obs_fixture()
         pr = prior(obs_prior(), fx.rd)
         @test PO.cs_diagnostic_factor_names(pr.rr) == ["beta"]
-        @test size(cs_regression_t_stats(pr.rr), 2) == 1
+        @test size(cs_regression_t_stats(pr.rr).X, 2) == 1
         @test all(isfinite, cs_regression_r2(pr.rr))
         w = fill(1 / 12, 12)
         # A standard error reads the idiosyncratic variance of every pair of the regression, so

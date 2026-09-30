@@ -411,7 +411,7 @@ end
 """
     exposure_correlation(B::Arr3Num, w::Option{<:MatNum} = nothing) -> Matrix{<:Real}
     exposure_correlation(csfm::CrossSectionalFactorModel;
-                         weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> Matrix{<:Real}
+                         weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> FactorDiagnosticResult
 
 Return the time-averaged correlation between every pair of factor exposures.
 
@@ -461,7 +461,8 @@ Where:
 
 # Returns
 
-  - `C::Matrix{<:Real}`: `factors × factors`, symmetric, with a diagonal of `1`.
+  - `C::Matrix{<:Real}`: `factors × factors`, symmetric, with a diagonal of `1`, on the method over histories.
+  - `r::FactorDiagnosticResult`: On the block method, the same matrix in `X`, with the names and the family labels of the raw factor axis, and `dims = (1, 2)`, so a view selects the rows and the columns of a sub-block together. The block method returned the bare matrix in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Related
 
@@ -485,8 +486,9 @@ function exposure_correlation(B::Arr3Num, w::Option{<:MatNum} = nothing)
 end
 function exposure_correlation(csfm::CrossSectionalFactorModel;
                               weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
-    return exposure_correlation(cs_diagnostic_exposures(csfm),
-                                cs_diagnostic_weights(weighting, csfm))
+    C = exposure_correlation(cs_diagnostic_exposures(csfm),
+                             cs_diagnostic_weights(weighting, csfm))
+    return FactorDiagnosticResult(C, csfm.nf, csfm.fam, (1, 2))
 end
 """
     exposure_pair_correlation(B::Arr3Num, u::MatNum, k::Integer, l::Integer)
@@ -626,7 +628,7 @@ end
                 horizon::Integer = 1, rank::Bool = true,
                 ties::Symbol = :average) -> Matrix{<:Real}
     exposure_ic(csfm::CrossSectionalFactorModel; horizon::Integer = 1, rank::Bool = true,
-                reduced::Bool = false, ties::Symbol = :average) -> Matrix{<:Real}
+                reduced::Bool = false, ties::Symbol = :average) -> FactorDiagnosticResult
 
 Return the information coefficient of every factor exposure, one row per pair of observations.
 
@@ -682,7 +684,8 @@ A one-hot exposure, such as an industry, is a block of `0` and a block of `1`, s
 
 # Returns
 
-  - `ic::Matrix{<:Real}`: `(observations - horizon) × factors`. Row `t` scores the exposures of observation `t` against the returns that follow it.
+  - `ic::Matrix{<:Real}`: `(observations - horizon) × factors`, on the method over histories. Row `t` scores the exposures of observation `t` against the returns that follow it.
+  - `r::FactorDiagnosticResult`: On the block method, the same matrix in `X`, with the names and the family labels of its factor axis: the raw axis, or under `reduced` the whole reduced axis that [`cs_diagnostic_factor_names`](@ref) maps with two arguments. The block method returned the bare matrix in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Related
 
@@ -719,13 +722,108 @@ end
 function exposure_ic(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
                      rank::Bool = true, reduced::Bool = false, ties::Symbol = :average)
     B, R, w = exposure_ic_data(csfm, reduced)
-    return exposure_ic(B, R, w; horizon = horizon, rank = rank, ties = ties)
+    ic = exposure_ic(B, R, w; horizon = horizon, rank = rank, ties = ties)
+    if reduced
+        return FactorDiagnosticResult(ic, cs_diagnostic_factor_names(csfm.fcb, csfm.nf),
+                                      cs_diagnostic_factor_names(csfm.fcb, csfm.fam), (2,))
+    end
+    return FactorDiagnosticResult(ic, csfm.nf, csfm.fam, (2,))
 end
 """
-    exposure_ic_summary(ic::MatNum; lags::Integer = 0)
+$(DocStringExtensions.TYPEDEF)
+
+Holds the summary of an information coefficient series per factor, with the names and the families of the factors.
+
+[`exposure_ic_summary`](@ref) returns it when it reads a [`FactorDiagnosticResult`](@ref) or a block. The method over a bare matrix returns a `NamedTuple` of the same five vectors, and a caller reads a field of either by the same name. [`port_opt_view`](@ref) selects the factors of the summary by position, by name, or by family with a [`LabelGroup`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ExposureICSummaryResult(
+        mean_ic, std_ic, ic_ir, t_stat, hit_rate, nf, fam
+    ) -> ExposureICSummaryResult
+
+The arguments are the fields, in the order of their declaration. The type is a Result, so [`exposure_ic_summary`](@ref) builds it and a caller reads it. It has no keyword constructor, and it checks none of its values.
+
+# Related
+
+  - [`exposure_ic_summary`](@ref)
+  - [`exposure_ic`](@ref)
+  - [`FactorDiagnosticResult`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+@concrete struct ExposureICSummaryResult <: AbstractResult
+    """
+    Mean of the information coefficient over the observations at which it is finite, one entry per factor.
+    """
+    mean_ic
+    """
+    Standard deviation of the information coefficient over the same observations, one entry per factor.
+    """
+    std_ic
+    """
+    Information ratio, the mean over the standard deviation, one entry per factor.
+    """
+    ic_ir
+    """
+    T-statistic of the mean, with a long-run standard error, one entry per factor.
+    """
+    t_stat
+    """
+    Fraction of the same observations at which the information coefficient is positive, one entry per factor.
+    """
+    hit_rate
+    """
+    $(field_dict[:fd_nf])
+    """
+    nf
+    """
+    $(field_dict[:fd_fam])
+    """
+    fam
+end
+"""
+    port_opt_view(s::ExposureICSummaryResult, i, args...)
+
+Return a view of an [`ExposureICSummaryResult`](@ref) that keeps only the factors that `i` selects.
+
+# Algorithm
+
+ 1. Cut every field to the selected factors with [`factor_table_fields`](@ref).
+ 2. Build a new [`ExposureICSummaryResult`](@ref) from the views.
+
+# Arguments
+
+  - `s`: A summary of an information coefficient series.
+  - `i`: The factor index: positions, a range, a `Colon`, a vector of names, or a [`LabelGroup`](@ref).
+  - `args...`: Additional positional arguments (ignored).
+
+# Validation
+
+  - The rules of [`factor_axis_positions`](@ref).
+
+# Returns
+
+  - `s::ExposureICSummaryResult`: The summary of the selected factors.
+
+# Related
+
+  - [`ExposureICSummaryResult`](@ref)
+  - [`factor_table_fields`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function port_opt_view(s::ExposureICSummaryResult, i, args...)::ExposureICSummaryResult
+    return ExposureICSummaryResult(factor_table_fields(s, i)...)
+end
+"""
+    exposure_ic_summary(ic::MatNum; lags::Integer = 0) -> NamedTuple
+    exposure_ic_summary(ic::FactorDiagnosticResult; lags::Integer = 0) -> ExposureICSummaryResult
     exposure_ic_summary(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
                         rank::Bool = true, reduced::Bool = false,
-                        ties::Symbol = :average)
+                        ties::Symbol = :average) -> ExposureICSummaryResult
 
 Return the summary of an information coefficient series, one entry per factor.
 
@@ -758,7 +856,7 @@ Where:
 
 # Arguments
 
-  - `ic`: Information coefficient series `pairs × factors`.
+  - `ic`: Information coefficient series `pairs × factors`, or the [`FactorDiagnosticResult`](@ref) of [`exposure_ic`](@ref), whose labels the answer keeps.
   - `lags`: Number of autocovariances the t-statistic's standard error reads. It is one less than the number of rows a forward window spans, `horizon - 1` for a series scored at every observation.
   - `csfm`: A cross-sectional factor model block.
   - `horizon`: Forward window, in observations.
@@ -770,10 +868,12 @@ Where:
 
   - `!isempty(ic)`.
   - `lags >= 0`. Raises a `DomainError`.
+  - A [`FactorDiagnosticResult`](@ref) is a series `pairs × factors`: `X` is a matrix and `dims == (2,)`. Raises an `ArgumentError`.
 
 # Returns
 
-  - `summary::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, hit_rate)`, each one entry per factor.
+  - `summary::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, hit_rate)`, each one entry per factor, on the method over a matrix.
+  - `s::ExposureICSummaryResult`: On the other two methods, the same five vectors, with the names and the family labels of the factor axis of the series. The block method returned the `NamedTuple` in earlier releases, and a field of the Result has the name of the field of the `NamedTuple`.
 
 # Related
 
@@ -935,6 +1035,12 @@ function exposure_ic_t_stat(c::VecNum, m::Real, q::Real, n::Integer, lags::Integ
     lrsd = n > 1 && lrv > zero(Tf) ? sqrt(lrv / (n - 1)) : Ts(NaN)
     return isfinite(m) && isfinite(lrsd) ? m / lrsd * sqrt(Ts(n)) : Ts(NaN)
 end
+function exposure_ic_summary(ic::FactorDiagnosticResult; lags::Integer = 0)
+    @argcheck(ndims(ic.X) == 2 && ic.dims == (2,),
+              ArgumentError("exposure_ic_summary reads a series `pairs × factors`, whose factor axis is its second dimension. Got size(ic.X) => $(size(ic.X)) and ic.dims => $(ic.dims)"))
+    (; mean_ic, std_ic, ic_ir, t_stat, hit_rate) = exposure_ic_summary(ic.X; lags = lags)
+    return ExposureICSummaryResult(mean_ic, std_ic, ic_ir, t_stat, hit_rate, ic.nf, ic.fam)
+end
 function exposure_ic_summary(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
                              rank::Bool = true, reduced::Bool = false,
                              ties::Symbol = :average)
@@ -946,7 +1052,7 @@ end
     exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing;
                        step::Integer = 21) -> Matrix{<:Real}
     exposure_stability(csfm::CrossSectionalFactorModel; step::Integer = 21,
-                       weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> Matrix{<:Real}
+                       weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> FactorDiagnosticResult
 
 Return the stability of every factor exposure, one row per pair of observations.
 
@@ -986,7 +1092,8 @@ Where:
 
 # Returns
 
-  - `S::Matrix{<:Real}`: `(observations - step) × factors`.
+  - `S::Matrix{<:Real}`: `(observations - step) × factors`, on the method over histories.
+  - `r::FactorDiagnosticResult`: On the block method, the same matrix in `X`, with the names and the family labels of the raw factor axis. The block method returned the bare matrix in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Related
 
@@ -1013,13 +1120,14 @@ function exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing; step::Int
 end
 function exposure_stability(csfm::CrossSectionalFactorModel; step::Integer = 21,
                             weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
-    return exposure_stability(cs_diagnostic_exposures(csfm),
-                              cs_diagnostic_weights(weighting, csfm); step = step)
+    S = exposure_stability(cs_diagnostic_exposures(csfm),
+                           cs_diagnostic_weights(weighting, csfm); step = step)
+    return FactorDiagnosticResult(S, csfm.nf, csfm.fam, (2,))
 end
 """
     exposure_dispersion(B::Arr3Num, w::Option{<:MatNum} = nothing) -> Matrix{<:Real}
     exposure_dispersion(csfm::CrossSectionalFactorModel;
-                        weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> Matrix{<:Real}
+                        weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> FactorDiagnosticResult
 
 Return the weighted cross-sectional standard deviation of every factor exposure, one row per observation.
 
@@ -1055,7 +1163,8 @@ Where:
 
 # Returns
 
-  - `D::Matrix{<:Real}`: `observations × factors`.
+  - `D::Matrix{<:Real}`: `observations × factors`, on the method over histories.
+  - `r::FactorDiagnosticResult`: On the block method, the same matrix in `X`, with the names and the family labels of the raw factor axis. The block method returned the bare matrix in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Related
 
@@ -1133,13 +1242,14 @@ function exposure_cross_section_std(B::Arr3Num, u::MatNum, t::Integer, k::Intege
 end
 function exposure_dispersion(csfm::CrossSectionalFactorModel;
                              weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
-    return exposure_dispersion(cs_diagnostic_exposures(csfm),
-                               cs_diagnostic_weights(weighting, csfm))
+    D = exposure_dispersion(cs_diagnostic_exposures(csfm),
+                            cs_diagnostic_weights(weighting, csfm))
+    return FactorDiagnosticResult(D, csfm.nf, csfm.fam, (2,))
 end
 """
     exposure_coverage(B::Arr3Num, w::Option{<:MatNum} = nothing) -> Vector{<:Real}
     exposure_coverage(csfm::CrossSectionalFactorModel;
-                      weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> Vector{<:Real}
+                      weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> FactorDiagnosticResult
 
 Return the coverage of every factor exposure, one entry per factor.
 
@@ -1176,7 +1286,8 @@ Where:
 
 # Returns
 
-  - `c::Vector{<:Real}`: One entry per factor, between `0` and `1`. An observation whose universe is empty contributes `0`.
+  - `c::Vector{<:Real}`: One entry per factor, between `0` and `1`, on the method over histories. An observation whose universe is empty contributes `0`.
+  - `r::FactorDiagnosticResult`: On the block method, the same vector in `X`, with the names and the family labels of the raw factor axis. The block method returned the bare vector in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Related
 
@@ -1257,8 +1368,9 @@ function exposure_covered_count(B::Arr3Num, u::MatNum, t::Integer, k::Integer)
 end
 function exposure_coverage(csfm::CrossSectionalFactorModel;
                            weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
-    return exposure_coverage(cs_diagnostic_exposures(csfm),
-                             cs_diagnostic_weights(weighting, csfm))
+    c = exposure_coverage(cs_diagnostic_exposures(csfm),
+                          cs_diagnostic_weights(weighting, csfm))
+    return FactorDiagnosticResult(c, csfm.nf, csfm.fam, (1,))
 end
 """
     cs_diagnostic_exposures(csfm::CrossSectionalFactorModel)
@@ -1407,5 +1519,5 @@ function exposure_ic_exposures(fcb::FactorFamilyBasis, Ms::Arr3Num, reduced::Boo
     return reduced ? reduce_exposures(fcb, Ms) : Ms
 end
 
-export exposure_correlation, exposure_ic, exposure_ic_summary, exposure_stability,
-       exposure_dispersion, exposure_coverage
+export ExposureICSummaryResult, exposure_correlation, exposure_ic, exposure_ic_summary,
+       exposure_stability, exposure_dispersion, exposure_coverage

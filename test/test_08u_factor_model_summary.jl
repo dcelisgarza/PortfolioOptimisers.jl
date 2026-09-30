@@ -198,9 +198,9 @@ using Statistics
 
     @testset "the Gram columns are the means of the level-2 series" begin
         fs = factor_model_summary(csfmA; ppy = 252, step = 3)
-        t = cs_regression_t_stats(csfmA)
-        vif = exposure_vif(csfmA)
-        rate = cs_regression_t_stat_exceedance_rate(csfmA; threshold = 2)
+        t = cs_regression_t_stats(csfmA).X
+        vif = exposure_vif(csfmA).X
+        rate = cs_regression_t_stat_exceedance_rate(csfmA; threshold = 2).X
         for k in 1:KA
             at = filter(!isnan, abs.(t[:, k]))
             av = filter(!isnan, vif[:, k])
@@ -209,11 +209,12 @@ using Statistics
         end
         @test fs.t_rate == rate
         # The stability column is the MEDIAN of the series, and not its mean.
-        S = exposure_stability(csfmA; step = 3)
+        S = exposure_stability(csfmA; step = 3).X
         for k in 1:KA
             @test isapprox(fs.stability[k], Statistics.median(filter(!isnan, S[:, k])))
         end
-        @test fs.coverage == exposure_coverage(csfmA; weighting = RegressionWeightMetric())
+        @test fs.coverage ==
+              exposure_coverage(csfmA; weighting = RegressionWeightMetric()).X
     end
 
     @testset "a block with no exposure history carries five absent columns" begin
@@ -231,6 +232,11 @@ using Statistics
         @test summary_agrees(fs.ann_volatility, full.ann_volatility)
         @test summary_agrees(fs.sharpe, full.sharpe)
         @test summary_agrees(fs.autocorr, full.autocorr)
+        # A view keeps an absent column absent, and a block that names no factor is
+        # selected by position.
+        fv = PortfolioOptimisers.port_opt_view(fs, 1:2)
+        @test isnothing(fv.mean_abs_t) && isnothing(fv.nf) && isnothing(fv.fam)
+        @test fv.ann_return == fs.ann_return[1:2]
     end
 
     @testset "a re-based block writes NaN on the factor the basis dropped" begin
@@ -249,11 +255,25 @@ using Statistics
         L = PortfolioOptimisers.reduce_loadings(fcb, Msr[Tr, :, :])
         blk = CrossSectionalFactorModel(; M = Msr[Tr, :, :], L = L, b = zeros(Nr),
                                         csr = csr_r, Ms = Msr, rw = rwr, fcb = fcb, lag = 1,
-                                        nf = ["value", "size", "momentum"])
+                                        nf = ["value", "size", "momentum"],
+                                        fam = ["industry", "industry", "style"])
         fs = factor_model_summary(blk; ppy = 1, step = 2,
                                   weighting = RegressionWeightMetric())
         # The answer is on the raw axis, which is wider than the reduced one.
         @test length(fs.ann_return) == Kr
+        # It carries the names and the families of the raw axis, and a view selects every
+        # column of the factors it keeps, the dropped member included.
+        @test fs.nf == ["value", "size", "momentum"]
+        @test fs.fam == ["industry", "industry", "style"]
+        fi = PortfolioOptimisers.port_opt_view(fs, LabelGroup("industry"))
+        @test fi.ppy == fs.ppy
+        for f in fieldnames(FactorSummaryResult)
+            f == :ppy && continue
+            @test isequal(getfield(fi, f), getfield(fs, f)[1:2])
+            @test isequal(getfield(PortfolioOptimisers.port_opt_view(fs, ["momentum"]), f),
+                          getfield(fs, f)[3:3])
+        end
+        @test_throws ArgumentError PortfolioOptimisers.port_opt_view(fs, ["beta"])
         @test length(fs.mean_abs_t) == Kr
         # "size" is the dropped member, so it carries no Gram answer and no return series.
         @test isnan(fs.ann_return[2])
@@ -263,9 +283,9 @@ using Statistics
         @test isnan(fs.t_rate[2])
         @test isnan(fs.mean_vif[2])
         # The retained members carry the reduced answers, in the reduced order.
-        t = cs_regression_t_stats(blk)
-        vif = exposure_vif(blk)
-        rate = cs_regression_t_stat_exceedance_rate(blk)
+        t = cs_regression_t_stats(blk).X
+        vif = exposure_vif(blk).X
+        rate = cs_regression_t_stat_exceedance_rate(blk).X
         @test size(t, 2) == 2
         for (raw, red) in ((1, 1), (3, 2))
             @test isapprox(fs.mean_abs_t[raw],

@@ -1510,27 +1510,40 @@ end
     fb = forecast_evaluation(fw, rd, csfm; horizon = 2, lag = 1)
 
     @testset "The exposure history is the block's own, unlagged" begin
-        @test isequal(forecast_factor_correlation(fb, csfm),
+        @test isequal(forecast_factor_correlation(fb, csfm).X,
                       forecast_factor_correlation(fb, PO.cs_diagnostic_exposures(csfm)))
-        @test size(forecast_factor_correlation(fb, csfm)) ==
+        @test size(forecast_factor_correlation(fb, csfm).X) ==
               (size(fb.alpha, 1), length(csfm.nf))
     end
 
+    @testset "The answer carries the names and the families of the raw axis" begin
+        c = forecast_factor_correlation(fb, csfm)
+        @test c.nf == csfm.nf && isequal(c.fam, csfm.fam)
+        # The summary of the answer keeps the labels, and a view by name selects one
+        # factor of both.
+        s = exposure_ic_summary(c)
+        @test s.nf == csfm.nf
+        k = csfm.nf[end]
+        cv = PO.port_opt_view(c, [k])
+        @test isequal(cv.X, c.X[:, end:end])
+        @test isequal(exposure_ic_summary(cv).mean_ic, PO.port_opt_view(s, [k]).mean_ic)
+    end
+
     @testset "The row set passes through to the bare method" begin
-        @test isequal(forecast_factor_correlation(fb, csfm; dates = fb.dates),
+        @test isequal(forecast_factor_correlation(fb, csfm; dates = fb.dates).X,
                       forecast_factor_correlation(fb, PO.cs_diagnostic_exposures(csfm);
                                                   dates = fb.dates))
-        @test isequal(forecast_factor_correlation(fb, csfm; dates = fb.dates),
-                      forecast_factor_correlation(fb, csfm)[fb.dates, :])
+        @test isequal(forecast_factor_correlation(fb, csfm; dates = fb.dates).X,
+                      forecast_factor_correlation(fb, csfm).X[fb.dates, :])
     end
 
     @testset "A weighting moves the weighted form and leaves the rank one" begin
         cw = forecast_factor_correlation(fb, csfm;
-                                         weighting = InverseIdiosyncraticVarianceMetric())
-        @test !isequal(cw, forecast_factor_correlation(fb, csfm))
+                                         weighting = InverseIdiosyncraticVarianceMetric()).X
+        @test !isequal(cw, forecast_factor_correlation(fb, csfm).X)
         @test isequal(forecast_factor_correlation(fb, csfm; rank = true,
-                                                  weighting = InverseIdiosyncraticVarianceMetric()),
-                      forecast_factor_correlation(fb, csfm; rank = true))
+                                                  weighting = InverseIdiosyncraticVarianceMetric()).X,
+                      forecast_factor_correlation(fb, csfm; rank = true).X)
         # A metric naming a history the block does not carry refuses by name.
         @test_throws PO.IsNothingError forecast_factor_correlation(fb, csfm;
                                                                    weighting = BenchmarkWeightMetric())
@@ -1555,8 +1568,8 @@ end
                           outlier = ds.outlier, scoring = ds.scoring, group = ds.group)
     raw = FixedWeightedReturnForecast(; scores = ds, scale = 1.0, weights = [0.4, 0.6])
     neu = FixedWeightedReturnForecast(; scores = dn, scale = 1.0, weights = [0.4, 0.6])
-    cr = forecast_factor_correlation(forecast_evaluation(raw, rd, csfm; horizon = 2), csfm)
-    cn = forecast_factor_correlation(forecast_evaluation(neu, rd, csfm; horizon = 2), csfm)
+    cr = forecast_factor_correlation(forecast_evaluation(raw, rd, csfm; horizon = 2), csfm).X
+    cn = forecast_factor_correlation(forecast_evaluation(neu, rd, csfm; horizon = 2), csfm).X
     mraw = abs(sum(filter(isfinite, view(cr, :, 1))) / count(isfinite, view(cr, :, 1)))
     mneu = abs(sum(filter(isfinite, view(cn, :, 1))) / count(isfinite, view(cn, :, 1)))
 
@@ -1584,7 +1597,7 @@ end
                                outlier = ds.outlier, scoring = ds.scoring, group = ds.group)
         nei = FixedWeightedReturnForecast(; scores = dni, scale = 1.0, weights = [0.4, 0.6])
         cni = forecast_factor_correlation(forecast_evaluation(nei, rd, csfm; horizon = 2),
-                                          csfm)
+                                          csfm).X
         mnei = abs(sum(filter(isfinite, view(cni, :, 1))) /
                    count(isfinite, view(cni, :, 1)))
         @test mnei < mneu
@@ -1688,8 +1701,8 @@ const FC_REF_SUMMARY = (; mean = 0.9835597986375235, std = 0.004192196953212379,
     fw = FixedWeightedReturnForecast(; scores = px.scores, scale = 1.0,
                                      weights = [0.4, 0.6])
     fe = forecast_evaluation(fw, px.rd, px.csfm; horizon = 5, lag = 1)
-    c = forecast_factor_correlation(fe, px.csfm)
-    cg = forecast_factor_correlation(fe, px.csfm; dates = fe.dates)
+    c = forecast_factor_correlation(fe, px.csfm).X
+    cg = forecast_factor_correlation(fe, px.csfm; dates = fe.dates).X
     s = exposure_ic_summary(c)
     sg = exposure_ic_summary(cg)
 
@@ -1737,7 +1750,7 @@ const FC_REF_SUMMARY = (; mean = 0.9835597986375235, std = 0.004192196953212379,
         tgt = TargetReturnForecast(; scores = px.scores, horizon = 2, lag = 1,
                                    calibrate = false)
         ft = forecast_evaluation(tgt, px.rd, px.csfm; horizon = 2, lag = 1)
-        ct = forecast_factor_correlation(ft, px.csfm)
+        ct = forecast_factor_correlation(ft, px.csfm).X
         T = size(ft.alpha, 1)
         written = [any(isfinite, view(ft.alpha, t, :)) for t in 1:T]
         @test findall(written) == collect(1:ft.step:T)
@@ -1747,7 +1760,7 @@ const FC_REF_SUMMARY = (; mean = 0.9835597986375235, std = 0.004192196953212379,
         @test findall(isfinite, view(ct, :, 1)) == findall(written)
         # The grid reads the style column finite on every date, and the whole axis reads
         # the same entries there.
-        cg = forecast_factor_correlation(ft, px.csfm; dates = ft.dates)
+        cg = forecast_factor_correlation(ft, px.csfm; dates = ft.dates).X
         @test all(isfinite, view(cg, :, 1))
         @test isequal(cg, ct[ft.dates, :])
     end

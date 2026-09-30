@@ -29,5 +29,4 @@ cs_score_observation!
 cs_systematic_return
 cs_weighted_score_sums
 cs_estimation_weights_only
-cs_diagnostic_factor_names
 ```

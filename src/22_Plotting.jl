@@ -2053,6 +2053,11 @@ The figure draws what [`cs_regression_bic`](@ref) returns and computes nothing o
 function plot_cs_regression_bic end
 """
     plot_cs_regression_t_stats(
+        t::FactorDiagnosticResult;
+        nf::Option{<:AbstractVector} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_cs_regression_t_stats(
         csfm::CrossSectionalFactorModel;
         nf::Option{<:AbstractVector} = nothing,
         kwargs...
@@ -2069,9 +2074,10 @@ The figure draws what [`cs_regression_t_stats`](@ref) returns and computes nothi
 
 # Arguments
 
+  - `t`: The answer of [`cs_regression_t_stats`](@ref), or a view of it from [`port_opt_view`](@ref). The figure draws it and labels it with the names it carries.
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
-  - `nf`: Factor names of the answer's axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `nf`: Factor names of the answer's axis. `nothing` reads them off the answer, and falls back to the position of the factor.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation
@@ -2093,6 +2099,12 @@ The figure draws what [`cs_regression_t_stats`](@ref) returns and computes nothi
 """
 function plot_cs_regression_t_stats end
 """
+    plot_cs_regression_t_stat_exceedance_rate(
+        t::FactorDiagnosticResult;
+        nf::Option{<:AbstractVector} = nothing,
+        threshold::Number = 2,
+        kwargs...
+    ) -> Plot
     plot_cs_regression_t_stat_exceedance_rate(
         csfm::CrossSectionalFactorModel;
         nf::Option{<:AbstractVector} = nothing,
@@ -2126,9 +2138,10 @@ Where:
 
 # Arguments
 
+  - `t`: The t-statistics of [`cs_regression_t_stats`](@ref), or a view of them from [`port_opt_view`](@ref). The figure takes the rate over them and labels it with the names they carry.
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
-  - `nf`: Factor names of the answer's axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `nf`: Factor names of the answer's axis. `nothing` reads them off the answer, and falls back to the position of the factor.
   - `threshold`: Absolute t-statistic above which an observation counts as significant.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
@@ -2152,6 +2165,11 @@ Where:
 function plot_cs_regression_t_stat_exceedance_rate end
 """
     plot_exposure_vif(
+        vif::FactorDiagnosticResult;
+        nf::Option{<:AbstractVector} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_exposure_vif(
         csfm::CrossSectionalFactorModel;
         nf::Option{<:AbstractVector} = nothing,
         kwargs...
@@ -2168,9 +2186,10 @@ The figure draws what [`exposure_vif`](@ref) returns and computes nothing of its
 
 # Arguments
 
+  - `vif`: The answer of [`exposure_vif`](@ref), or a view of it from [`port_opt_view`](@ref). The figure draws it and labels it with the names it carries.
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
-  - `nf`: Factor names of the answer's axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `nf`: Factor names of the answer's axis. `nothing` reads them off the answer, and falls back to the position of the factor.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation
@@ -2224,6 +2243,11 @@ The figure draws what [`exposure_condition_number`](@ref) returns and computes n
 function plot_exposure_condition_number end
 """
     plot_exposure_correlation(
+        r::FactorDiagnosticResult;
+        nf::Option{<:AbstractVector} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_exposure_correlation(
         csfm::CrossSectionalFactorModel;
         nf::Option{<:AbstractVector} = nothing,
         weighting = BenchmarkWeightMetric(),
@@ -2242,9 +2266,10 @@ The figure draws what [`exposure_correlation`](@ref) returns and computes nothin
 
 # Arguments
 
+  - `r`: The answer of [`exposure_correlation`](@ref), or a view of it from [`port_opt_view`](@ref). The figure draws it and labels it with the names it carries. A view by family draws the sub-block of that family.
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
-  - `nf`: Factor names of the raw factor axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `nf`: Factor names of the raw factor axis. `nothing` reads them off the answer, and falls back to the position of the factor.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
@@ -2266,6 +2291,12 @@ The figure draws what [`exposure_correlation`](@ref) returns and computes nothin
 """
 function plot_exposure_correlation end
 """
+    plot_cumulative_exposure_ic(
+        ic::FactorDiagnosticResult;
+        nf::Option{<:AbstractVector} = nothing,
+        title::AbstractString = "Cumulative Exposure IC",
+        kwargs...
+    ) -> Plot
     plot_cumulative_exposure_ic(
         csfm::CrossSectionalFactorModel;
         nf::Option{<:AbstractVector} = nothing,
@@ -2304,12 +2335,14 @@ Where:
 
 # Arguments
 
+  - `ic`: The answer of [`exposure_ic`](@ref), or a view of it from [`port_opt_view`](@ref). The figure draws it and labels it with the names it carries. The `csfm` method reads it at a horizon of one observation.
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
-  - `nf`: Factor names of the axis of the answer. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `nf`: Factor names of the axis of the answer. `nothing` reads them off the answer, and falls back to the position of the factor.
   - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise.
   - `reduced`: Map the exposures through the family re-basis of the block before the correlation.
   - $(arg_dict[:cs_ties]) The weighted correlation reads no rank, so it ignores `ties`.
+  - `title`: Title of the figure. The `csfm` and `pr` methods pass one that names the method or the step.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation
@@ -2379,6 +2412,11 @@ The figure draws one slice of the exposure history of the block and computes not
 function plot_exposure_distribution end
 """
     plot_exposure_dispersion(
+        D::FactorDiagnosticResult;
+        nf::Option{<:AbstractVector} = nothing,
+        kwargs...
+    ) -> Plot
+    plot_exposure_dispersion(
         csfm::CrossSectionalFactorModel;
         nf::Option{<:AbstractVector} = nothing,
         weighting = BenchmarkWeightMetric(),
@@ -2397,9 +2435,10 @@ The figure draws what [`exposure_dispersion`](@ref) returns and computes nothing
 
 # Arguments
 
+  - `D`: The answer of [`exposure_dispersion`](@ref), or a view of it from [`port_opt_view`](@ref). The figure draws it and labels it with the names it carries.
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
-  - `nf`: Factor names of the raw factor axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `nf`: Factor names of the raw factor axis. `nothing` reads them off the answer, and falls back to the position of the factor.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
@@ -2422,6 +2461,12 @@ The figure draws what [`exposure_dispersion`](@ref) returns and computes nothing
 function plot_exposure_dispersion end
 """
     plot_exposure_stability(
+        S::FactorDiagnosticResult;
+        nf::Option{<:AbstractVector} = nothing,
+        title::AbstractString = "Exposure Stability",
+        kwargs...
+    ) -> Plot
+    plot_exposure_stability(
         csfm::CrossSectionalFactorModel;
         nf::Option{<:AbstractVector} = nothing,
         step::Integer = 21,
@@ -2442,11 +2487,13 @@ The figure draws what [`exposure_stability`](@ref) returns and computes nothing 
 
 # Arguments
 
+  - `S`: The answer of [`exposure_stability`](@ref), or a view of it from [`port_opt_view`](@ref). The figure draws it and labels it with the names it carries.
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
-  - `nf`: Factor names of the raw factor axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `nf`: Factor names of the raw factor axis. `nothing` reads them off the answer, and falls back to the position of the factor.
   - `step`: Number of observations between the two cross-sections.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
+  - `title`: Title of the figure. The `csfm` and `pr` methods pass one that names the method or the step.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation
@@ -3186,7 +3233,7 @@ The columns are not on one scale, and the figure rescales none of them. Read a c
   - `fs`: A factor model summary.
   - `csfm`: A cross-sectional factor model block, which the figure summarises first.
   - `pr`: A prior result whose `rr` is such a block.
-  - `nf`: Factor names of the raw factor axis. `nothing` reads them off the block for the `csfm` and `pr` methods, and numbers the factors for the `fs` method. A list of the wrong length raises a `DimensionMismatch`.
+  - `nf`: Factor names of the raw factor axis. `nothing` reads them off the summary, which carries the names of the block, and numbers the factors when the summary names none. A view of the summary from [`port_opt_view`](@ref) draws the factors it keeps. A list of the wrong length raises a `DimensionMismatch`.
   - `ppy`: Periods per year the summary annualises with.
   - `threshold`: Absolute t-statistic the exceedance rate counts against.
   - `step`: Number of observations between the two cross-sections the stability reads.
@@ -3320,13 +3367,13 @@ function plot_factor_forecast_volatilities end
 
 Plot the cumulative return of every factor, one series per factor.
 
-The figure draws [`cumulative_returns`](@ref) of each column of the factor return history `csr.f`, on the raw factor axis: the running sum of the returns, or their running product when `compound` is `true`. The figure sets a factor return that is not finite to zero first, so that observation holds the series flat and one absent cross-section breaks no series. [`plot_cumulative_exposure_ic`](@ref) follows the same convention. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
+The figure draws [`cumulative_returns`](@ref) of each column of the factor return history that [`factor_summary_returns`](@ref) reads: `fr` on the raw factor axis, or the whole reduced axis for a block that carries no `fr`. It is the running sum of the returns, or their running product when `compound` is `true`. The figure sets a factor return that is not finite to zero first, so that observation holds the series flat and one absent cross-section breaks no series. [`plot_cumulative_exposure_ic`](@ref) follows the same convention. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
 
 # Arguments
 
   - `csfm`: A cross-sectional factor model block.
   - `pr`: A prior result whose `rr` is such a block.
-  - `nf`: Factor names of the raw factor axis. `nothing` reads them off the block, and falls back to the position of the factor.
+  - `nf`: Factor names of the axis of the history. `nothing` reads them off the block, and falls back to the position of the factor.
   - `compound`: Whether the cumulative series compounds.
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
@@ -3889,6 +3936,12 @@ function plot_forecast_portfolio_decay end
         weighting = IdentityMetric(),
         kwargs...
     ) -> Plot
+    plot_forecast_factor_correlation(
+        c::FactorDiagnosticResult;
+        nf::Option{<:AbstractVector} = nothing,
+        dates::AbstractVector{<:Integer} = axes(c.X, 1),
+        kwargs...
+    ) -> Plot
 
 Plot the contemporaneous correlation of a Return Forecast with every factor exposure. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
 
@@ -3904,8 +3957,9 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
   - `B`: Exposure history `observations × assets × factors`, on the axis of the forecast.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of the forecast, or `nothing` for equal weights.
   - `csfm`: A cross-sectional factor model block, whose exposure history and weight history are read.
-  - `nf`: Factor names of the axis of the answer. `nothing` reads them off the block for the `csfm` method, and numbers the factors for the `B` method.
-  - `dates`: Row indices of `fe.alpha` the correlation is read and drawn on. The default is every observation; `fe.dates` reads the evaluation grid.
+  - `c`: The answer of the block method of [`forecast_factor_correlation`](@ref), or a view of it from [`port_opt_view`](@ref). The figure draws it and labels it with the names it carries.
+  - `nf`: Factor names of the axis of the answer. `nothing` reads them off the block for the `csfm` method and off the answer for the `c` method, and numbers the factors for the `B` method.
+  - `dates`: Row indices of `fe.alpha` the correlation is read and drawn on. The default is every observation; `fe.dates` reads the evaluation grid. On the `c` method, `dates` labels the rows of `c.X`, and its default numbers them.
   - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
   - `min_count`: Least number of assets a cross-section needs before a correlation of it is reported.

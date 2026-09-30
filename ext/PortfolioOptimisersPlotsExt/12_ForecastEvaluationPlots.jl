@@ -380,11 +380,22 @@ function PortfolioOptimisers.plot_forecast_factor_correlation(fe::PortfolioOptim
     return PortfolioOptimisers.plot_forecast_factor_correlation(fe, B,
                                                                 PortfolioOptimisers.cs_diagnostic_weights(weighting,
                                                                                                           csfm);
-                                                                nf = exposure_diagnostic_labels(csfm,
-                                                                                                nf,
-                                                                                                size(B,
-                                                                                                     3)),
-                                                                kwargs...)
+                                                                nf = if isnothing(nf)
+                                                                    csfm.nf
+                                                                else
+                                                                    nf
+                                                                end, kwargs...)
+end
+# The answer of the block method carries its names but not its rows, so `dates` states
+# them, and the default reads every row of the answer.
+function PortfolioOptimisers.plot_forecast_factor_correlation(c::PortfolioOptimisers.FactorDiagnosticResult;
+                                                              nf::Option{<:AbstractVector} = nothing,
+                                                              dates::AbstractVector{<:Integer} = axes(c.X,
+                                                                                                      1),
+                                                              kwargs...)
+    return forecast_plot_series(dates, c.X, diagnostic_result_labels(c, nf),
+                                "Forecast Factor Correlation", "Observation", "ρ";
+                                kwargs...)
 end
 # The summary figure follows `plot_factor_model_summary`: the axis is the statistic, the
 # series is the forecast, and a block the Result carries as `nothing` is not drawn and the

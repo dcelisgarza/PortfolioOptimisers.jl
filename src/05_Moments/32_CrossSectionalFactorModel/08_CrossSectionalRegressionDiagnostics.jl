@@ -454,7 +454,7 @@ end
 """
     exposure_vif(G::Arr3Num) -> Matrix{<:Real}
     exposure_vif(B::Arr3Num, w::Option{<:MatNum}) -> Matrix{<:Real}
-    exposure_vif(csfm::CrossSectionalFactorModel) -> Matrix{<:Real}
+    exposure_vif(csfm::CrossSectionalFactorModel) -> FactorDiagnosticResult
 
 Return the variance inflation factor of every factor, one row per observation.
 
@@ -494,7 +494,8 @@ Where:
 
 # Returns
 
-  - `vif::Matrix{<:Real}`: `observations × factors`.
+  - `vif::Matrix{<:Real}`: `observations × factors`, on the methods over histories.
+  - `r::FactorDiagnosticResult`: On the block method, the same matrix in `X`, with the names and the family labels of the design axis. The block method returned the bare matrix in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Examples
 
@@ -532,7 +533,7 @@ end
 function exposure_vif(csfm::CrossSectionalFactorModel)
     data = cs_regression_data(csfm)
     mask, u = cs_diagnostic_mask_weights(data.B, data.eps, data.w)
-    return cs_masked_vif(data.B, mask, u)
+    return cs_design_result(csfm, cs_masked_vif(data.B, mask, u))
 end
 """
     cs_masked_vif(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
@@ -554,7 +555,9 @@ Return the variance inflation factors of a design whose mask a caller has alread
   - [`exposure_vif`](@ref)
 """
 function cs_masked_vif(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
-    G = cs_gram_from_weights(B, u)
+    # The assertion keeps the call on the method over a Gram history: the block method of
+    # the same verb returns a Result.
+    G = cs_gram_from_weights(B, u)::Arr3Num
     vif = exposure_vif(G)
     K = size(B, 3)
     for t in axes(vif, 1)
@@ -716,7 +719,7 @@ end
         w::Option{<:MatNum} = nothing;
         G::Option{<:Arr3Num} = nothing
     ) -> Matrix{<:Real}
-    cs_regression_t_stats(csfm::CrossSectionalFactorModel) -> Matrix{<:Real}
+    cs_regression_t_stats(csfm::CrossSectionalFactorModel) -> FactorDiagnosticResult
 
 Return the t-statistic of every factor return, one row per observation.
 
@@ -769,7 +772,8 @@ Where:
 
 # Returns
 
-  - `t::Matrix{<:Real}`: `observations × factors`.
+  - `t::Matrix{<:Real}`: `observations × factors`, on the method over histories.
+  - `r::FactorDiagnosticResult`: On the block method, the same matrix in `X`, with the names and the family labels of the design axis. The block method returned the bare matrix in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Examples
 
@@ -817,7 +821,7 @@ function cs_regression_t_stats(B::Arr3Num, f::MatNum, eps::MatNum,
 end
 function cs_regression_t_stats(csfm::CrossSectionalFactorModel)
     data = cs_regression_data(csfm)
-    return cs_regression_t_stats(data.B, data.f, data.eps, data.w)
+    return cs_design_result(csfm, cs_regression_t_stats(data.B, data.f, data.eps, data.w))
 end
 """
     cs_row_is_finite(A::MatNum, t::Integer)
@@ -951,9 +955,13 @@ end
 """
     cs_regression_t_stat_exceedance_rate(t::MatNum; threshold::Number = 2) -> Vector{<:Real}
     cs_regression_t_stat_exceedance_rate(
+        t::FactorDiagnosticResult;
+        threshold::Number = 2
+    ) -> FactorDiagnosticResult
+    cs_regression_t_stat_exceedance_rate(
         csfm::CrossSectionalFactorModel;
         threshold::Number = 2
-    ) -> Vector{<:Real}
+    ) -> FactorDiagnosticResult
 
 Return the fraction of observations at which a factor's t-statistic exceeds a threshold.
 
@@ -972,7 +980,7 @@ Where:
 
 # Arguments
 
-  - `t`: T-statistic matrix `observations × factors`.
+  - `t`: T-statistic matrix `observations × factors`, or the [`FactorDiagnosticResult`](@ref) of [`cs_regression_t_stats`](@ref), whose labels the answer keeps.
   - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis.
   - `threshold`: Absolute t-statistic above which an observation counts as significant.
 
@@ -982,7 +990,8 @@ Where:
 
 # Returns
 
-  - `rate::Vector{<:Real}`: One entry per factor. A factor with no finite t-statistic answers zero.
+  - `rate::Vector{<:Real}`: One entry per factor, on the method over a matrix. A factor with no finite t-statistic answers zero.
+  - `r::FactorDiagnosticResult`: On the other two methods, the same vector in `X`, with the names and the family labels of the factor axis of `t`. The block method returned the bare vector in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Examples
 
@@ -1017,6 +1026,12 @@ function cs_regression_t_stat_exceedance_rate(t::MatNum; threshold::Number = 2)
         rate[k] = iszero(n) ? zero(Tf) : Tf(s) / Tf(n)
     end
     return rate
+end
+function cs_regression_t_stat_exceedance_rate(t::FactorDiagnosticResult;
+                                              threshold::Number = 2)
+    return FactorDiagnosticResult(cs_regression_t_stat_exceedance_rate(t.X;
+                                                                       threshold = threshold),
+                                  t.nf, t.fam, (1,))
 end
 function cs_regression_t_stat_exceedance_rate(csfm::CrossSectionalFactorModel;
                                               threshold::Number = 2)
@@ -1619,46 +1634,6 @@ end
 function cs_regression_bic(csfm::CrossSectionalFactorModel; k::Option{<:Integer} = nothing)
     data = cs_regression_data(csfm)
     return cs_regression_bic(data.B, data.f, data.eps, data.w; k = k)
-end
-
-"""
-    cs_diagnostic_factor_names(csfm::CrossSectionalFactorModel)
-    cs_diagnostic_factor_names(fcb::Option{<:AbstractFactorFamilyBasis}, nf::Nothing)
-    cs_diagnostic_factor_names(fcb::Nothing, nf::VecStr)
-    cs_diagnostic_factor_names(fcb::FactorFamilyBasis, nf::VecStr)
-
-Return the factor names of the axis a cross-sectional regression diagnostic answers on.
-
-A regression diagnostic that carries a factor axis answers on the design of the regression: the reduced axis when the block carries a family re-basis, less the observed factors, which are its last columns and which the regression did not estimate. So the names of the raw axis do not label it. The one-argument verb maps them, and it is what a plot reads to label its axis. The two-argument verb maps the names onto the whole reduced axis, observed factors included, which is the axis of the loadings `L`. A block that names no factor answers `nothing`, and the caller then labels the axis by position.
-
-# Arguments
-
-  - `csfm`: A cross-sectional factor model block.
-
-# Returns
-
-  - `nf::Option{<:Vector{String}}`: The names of the answer's factor axis, or `nothing` when the block names no factor.
-
-# Related
-
-  - [`CrossSectionalFactorModel`](@ref)
-  - [`reduce_factor_names`](@ref)
-  - [`cs_regression_t_stats`](@ref)
-  - [`exposure_vif`](@ref)
-"""
-function cs_diagnostic_factor_names(csfm::CrossSectionalFactorModel)
-    nf = cs_diagnostic_factor_names(csfm.fcb, csfm.nf)
-    return isnothing(nf) || isnothing(csfm.fx) ? nf : nf[1:(end - size(csfm.fx, 2))]
-end
-function cs_diagnostic_factor_names(::Option{<:AbstractFactorFamilyBasis},
-                                    ::Nothing)::Nothing
-    return nothing
-end
-function cs_diagnostic_factor_names(::Nothing, nf::VecStr)::Vector{String}
-    return String[String(n) for n in nf]
-end
-function cs_diagnostic_factor_names(fcb::FactorFamilyBasis, nf::VecStr)::Vector{String}
-    return reduce_factor_names(fcb, nf)
 end
 
 export cs_gram, cs_regression_t_stats, cs_regression_t_stat_exceedance_rate, exposure_vif,

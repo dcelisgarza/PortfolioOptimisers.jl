@@ -458,18 +458,23 @@ block, the rows before the common grid of section 2 included, because the alignm
 and not its forecast. The trait regression has a forecast on its grid only. Its column is `NaN`
 between two refits, and the mean below is taken over the rows it was fitted on. Pass
 `dates = fe.dates` for the correlations on the same dates as the coefficients.
+
+The answer is a [`FactorDiagnosticResult`](@ref). It holds the correlations in `X` and the names and
+the families of the factors in `nf` and `fam`, so the table below reads the names off the answer.
+`PortfolioOptimisers.port_opt_view(fc_signal, LabelGroup("industry"))` keeps the columns of one
+family.
 =#
 
 fc_signal = forecast_factor_correlation(fe_signal, csfm)
 fc_trait = forecast_factor_correlation(fe_trait, csfm)
 
-fc_mean(fc, k) = mean(filter(isfinite, view(fc, :, k)))
+fc_mean(fc, k) = mean(filter(isfinite, view(fc.X, :, k)))
 
-pretty_table(DataFrame("Factor" => csfm.nf,
+pretty_table(DataFrame("Factor" => fc_signal.nf,
                        "signal composite" =>
-                           [fc_mean(fc_signal, k) for k in axes(fc_signal, 2)],
+                           [fc_mean(fc_signal, k) for k in axes(fc_signal.X, 2)],
                        "trait regression" =>
-                           [fc_mean(fc_trait, k) for k in axes(fc_trait, 2)]);
+                           [fc_mean(fc_trait, k) for k in axes(fc_trait.X, 2)]);
              formatters = [numfmt], title = "Mean correlation with each factor exposure")
 
 #=

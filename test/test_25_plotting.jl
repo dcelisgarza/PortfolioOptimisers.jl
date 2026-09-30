@@ -485,6 +485,21 @@
         bare = CrossSectionalFactorModel(; M = Ms_cs[Tc, :, :], b = zeros(Nc), csr = csr_cs,
                                          Ms = Ms_cs, lag = 1)
         @test is_plot(plot_exposure_vif(bare))
+        # Each figure draws a view of the answer, labelled with the names the view keeps.
+        PO = PortfolioOptimisers
+        t_cs = PO.port_opt_view(cs_regression_t_stats(csfm_cs), [1, 3])
+        for plt in (plot_cs_regression_t_stats, plot_exposure_vif,
+                    plot_cs_regression_t_stat_exceedance_rate)
+            r_cs = if plt === plot_exposure_vif
+                PO.port_opt_view(exposure_vif(csfm_cs), [1, 3])
+            else
+                t_cs
+            end
+            @test is_plot(plt(r_cs))
+        end
+        p_tv = plot_cs_regression_t_stats(t_cs)
+        @test [x[:label] for x in p_tv.series_list] == string.(t_cs.nf)
+        @test isequal(p_tv.series_list[2][:y], t_cs.X[:, 2])
         # A prior result that carries no factor block names the remedy.
         no_rr = LowOrderPrior(; X = randn(rng_cs, Tc, Nc), mu = zeros(Nc),
                               sigma = Matrix(1.0 * I, Nc, Nc))
@@ -613,6 +628,25 @@
                                            fcb = fcb_ex, nf = ["value", "size", "momentum"],
                                            lag = 1)
         @test is_plot(plot_cumulative_exposure_ic(reb_ex; reduced = true))
+        # Each exposure figure draws a view of the answer, labelled with the names the view
+        # keeps.
+        PO = PortfolioOptimisers
+        keep = ["momentum", "value"]
+        p_cv = plot_exposure_correlation(PO.port_opt_view(exposure_correlation(csfm_ex),
+                                                          keep))
+        @test is_plot(p_cv)
+        @test size(p_cv.series_list[1][:z]) == (2, 2)
+        for (plt, r) in ((plot_exposure_dispersion, exposure_dispersion(csfm_ex)),
+                         (plot_exposure_stability, exposure_stability(csfm_ex; step = 3)),
+                         (plot_cumulative_exposure_ic, exposure_ic(csfm_ex)))
+            p_v = plt(PO.port_opt_view(r, keep))
+            @test is_plot(p_v)
+            @test [x[:label] for x in p_v.series_list if !isempty(x[:label])] == keep
+        end
+        @test [x[:label]
+               for x in
+                   plot_cumulative_exposure_ic(exposure_ic(reb_ex; reduced = true)).series_list] ==
+              ["value", "momentum"]
         # A prior result that carries no factor block names the remedy.
         no_rr_ex = LowOrderPrior(; X = randn(rng_ex, Te, Ne), mu = zeros(Ne),
                                  sigma = Matrix(1.0 * I, Ne, Ne))
@@ -643,6 +677,9 @@
         fs = factor_model_summary(csfm_fs; ppy = 252, step = 3)
         @test is_plot(plot_factor_model_summary(fs))
         @test is_plot(plot_factor_model_summary(fs; nf = ["a", "b", "c"]))
+        # A view of the summary draws the factors it keeps.
+        p_fsv = plot_factor_model_summary(PortfolioOptimisers.port_opt_view(fs, 2:3))
+        @test length(p_fsv.series_list) >= 2
         @test is_plot(plot_factor_model_summary(csfm_fs; ppy = 252, step = 3))
         @test is_plot(plot_factor_model_summary(pr_fs; ppy = 252, step = 3))
         @test is_plot(plot_factor_model_summary(csfm_fs; ppy = 252, step = 3,
@@ -674,6 +711,12 @@
                                                                           n = csr_fs.n),
                                            Ms = Ms_fs, lag = 1)
         @test is_plot(plot_factor_cumulative_returns(gap_fs))
+        # The series are the columns of the history, labelled with the names of the block,
+        # and the running sum holds flat over the absent return.
+        p_cum = plot_factor_cumulative_returns(csfm_fs)
+        @test [x[:label] for x in p_cum.series_list] == csfm_fs.nf
+        p_gap = plot_factor_cumulative_returns(gap_fs)
+        @test p_gap.series_list[2][:y][4] == p_gap.series_list[2][:y][3]
         # A prior result that carries no factor block names the remedy.
         no_rr_fs = LowOrderPrior(; X = randn(rng_fs, Tf, Nf), mu = zeros(Nf),
                                  sigma = Matrix(1.0 * I, Nf, Nf))
@@ -922,6 +965,13 @@
         @test [s[:label]
                for s in plot_forecast_factor_correlation(fe_fp, csfm_fp).series_list] ==
               csfm_fp.nf
+        # The answer of the block method draws with its names, and a view draws the factors
+        # it keeps.
+        c_fp = forecast_factor_correlation(fe_fp, csfm_fp)
+        p_cr = plot_forecast_factor_correlation(PortfolioOptimisers.port_opt_view(c_fp,
+                                                                                  [3]))
+        @test [x[:label] for x in p_cr.series_list] == [csfm_fp.nf[3]]
+        @test isequal(p_cr.series_list[1][:y], c_fp.X[:, 3])
         @test [s[:label]
                for s in
                    plot_forecast_factor_correlation(fe_fp, csfm_fp; nf = ["a", "b", "c"]).series_list] ==

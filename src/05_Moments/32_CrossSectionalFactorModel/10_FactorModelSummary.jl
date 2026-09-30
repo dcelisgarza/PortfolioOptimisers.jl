@@ -539,9 +539,10 @@ function factor_summary_gram(::Nothing, ::CrossSectionalFactorModel, ::Number)
 end
 function factor_summary_gram(::Arr3Num, csfm::CrossSectionalFactorModel, threshold::Number)
     pos = factor_summary_positions(csfm)
-    t = cs_regression_t_stats(csfm)
-    vif = exposure_vif(csfm)
-    rate = cs_regression_t_stat_exceedance_rate(csfm; threshold = threshold)
+    tr = cs_regression_t_stats(csfm)
+    t = tr.X
+    vif = exposure_vif(csfm).X
+    rate = cs_regression_t_stat_exceedance_rate(tr; threshold = threshold).X
     Kr = size(t, 2)
     Tf = promote_type(real(eltype(t)), real(eltype(vif)))
     at = abs.(t)
@@ -740,7 +741,7 @@ function factor_summary_stability(Ms::Arr3Num, csfm::CrossSectionalFactorModel;
     if size(Ms, 1) <= step
         return Tf[con[k] ? one(Tf) : Tf(NaN) for k in 1:K]
     end
-    S = exposure_stability(csfm; step = step, weighting = weighting)
+    S = exposure_stability(csfm; step = step, weighting = weighting).X
     return Tf[con[k] ? one(Tf) : Tf(factor_summary_column_median(S, k)) for k in 1:K]
 end
 """
@@ -788,7 +789,7 @@ function factor_summary_exposure(Ms::Arr3Num, csfm::CrossSectionalFactorModel;
                                  step::Integer = 21, weighting = BenchmarkWeightMetric(),
                                  coverage_weighting = RegressionWeightMetric())
     stability = factor_summary_stability(Ms, csfm; step = step, weighting = weighting)
-    coverage = exposure_coverage(csfm; weighting = coverage_weighting)
+    coverage = exposure_coverage(csfm; weighting = coverage_weighting).X
     return stability, coverage
 end
 """
@@ -796,7 +797,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The headline statistics of every factor of a cross-sectional factor model.
 
-[`factor_model_summary`](@ref) returns a `FactorSummaryResult`. It holds the nine columns that [`plot_factor_model_summary`](@ref) draws, one entry per raw factor, and the annualisation factor of the first three. A caller can tabulate a summary, compare it across fits, test it, or read it with no plotting package installed.
+[`factor_model_summary`](@ref) returns a `FactorSummaryResult`. It holds the nine columns that [`plot_factor_model_summary`](@ref) draws, one entry per raw factor, the annualisation factor of the first three, and the names and the family labels of the raw factors. A caller can tabulate a summary, compare it across fits, test it, or read it with no plotting package installed. [`port_opt_view`](@ref) selects the factors of a summary by position, by name, or by family with a [`LabelGroup`](@ref).
 
 # The five columns that can be absent
 
@@ -814,7 +815,7 @@ $(DocStringExtensions.FIELDS)
 
     FactorSummaryResult(
         ann_return, ann_volatility, sharpe, autocorr,
-        mean_abs_t, t_rate, mean_vif, stability, coverage, ppy
+        mean_abs_t, t_rate, mean_vif, stability, coverage, ppy, nf, fam
     ) -> FactorSummaryResult
 
 The arguments are the fields, in the order of their declaration. The type is a Result, so [`factor_model_summary`](@ref) builds it and a caller reads it. It has no keyword constructor, and it checks none of its values.
@@ -866,6 +867,47 @@ The arguments are the fields, in the order of their declaration. The type is a R
     $(field_dict[:ps_ppy]) It defaults to `1`, which reports the statistics per period.
     """
     ppy
+    """
+    $(field_dict[:fd_nf])
+    """
+    nf
+    """
+    $(field_dict[:fd_fam])
+    """
+    fam
+end
+"""
+    port_opt_view(fs::FactorSummaryResult, i, args...)
+
+Return a view of a [`FactorSummaryResult`](@ref) that keeps only the factors that `i` selects.
+
+# Algorithm
+
+ 1. Cut every column, `nf` and `fam` to the selected factors with [`factor_table_fields`](@ref). An absent column stays `nothing`, and `ppy` stays as it is.
+ 2. Build a new [`FactorSummaryResult`](@ref) from the views.
+
+# Arguments
+
+  - `fs`: A factor model summary.
+  - `i`: The factor index: positions, a range, a `Colon`, a vector of names, or a [`LabelGroup`](@ref).
+  - `args...`: Additional positional arguments (ignored).
+
+# Validation
+
+  - The rules of [`factor_axis_positions`](@ref).
+
+# Returns
+
+  - `fs::FactorSummaryResult`: The summary of the selected factors.
+
+# Related
+
+  - [`FactorSummaryResult`](@ref)
+  - [`factor_table_fields`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function port_opt_view(fs::FactorSummaryResult, i, args...)::FactorSummaryResult
+    return FactorSummaryResult(factor_table_fields(fs, i)...)
 end
 """
     factor_model_summary(csfm::CrossSectionalFactorModel; ppy::Number = 1,
@@ -887,7 +929,7 @@ The answer is on the **raw** factor axis. The regression group answers on the re
  4. Write the four statistics onto the raw axis with [`factor_summary_mapped`](@ref), at the positions step 1 gives. A factor a family re-basis dropped has a series in `fr`, which the constraint of its family fixes. A block with a re-basis and no `fr` has no series for it, and gives `NaN`.
  5. Take the mean absolute t-statistic, the exceedance rate and the mean variance inflation factor with [`factor_summary_gram`](@ref), on the raw factor axis. A block with no exposure history gives `nothing` for all three. An observed factor was not estimated, so it takes `NaN` in the three.
  6. Take the median stability and the coverage with [`factor_summary_exposure`](@ref). A block with no exposure history gives `nothing` for both.
- 7. Collect the nine columns and `ppy` into a [`FactorSummaryResult`](@ref).
+ 7. Collect the nine columns, `ppy`, and the names and the family labels of the raw axis into a [`FactorSummaryResult`](@ref).
 
 # Arguments
 
@@ -929,7 +971,8 @@ function factor_model_summary(csfm::CrossSectionalFactorModel; ppy::Number = 1,
     stability, coverage = factor_summary_exposure(csfm; step = step, weighting = weighting,
                                                   coverage_weighting = coverage_weighting)
     return FactorSummaryResult(ann_return, ann_volatility, sharpe, autocorr, mean_abs_t,
-                               t_rate, mean_vif, stability, coverage, ppy)
+                               t_rate, mean_vif, stability, coverage, ppy, csfm.nf,
+                               csfm.fam)
 end
 
 export FactorSummaryResult, factor_model_summary

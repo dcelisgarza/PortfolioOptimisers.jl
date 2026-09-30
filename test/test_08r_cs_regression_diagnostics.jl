@@ -81,8 +81,8 @@ using Statistics
         # an arbitrary split, its factors of the pair fall below one, and its variance and
         # scores charge three regressors. Every other observation has full rank and agrees.
         fr = [1:5; 7]
-        t = cs_regression_t_stats(csfm)
-        vif = exposure_vif(csfm)
+        t = cs_regression_t_stats(csfm).X
+        vif = exposure_vif(csfm).X
         @test agrees(t[fr, :], ref_t[fr, :])
         @test agrees(vif[fr, :], ref_vif[fr, :])
         @test agrees(cs_regression_r2(csfm), ref_r2)
@@ -107,7 +107,7 @@ using Statistics
                        rtol = 1e-10)
         # The rate of the pair loses observation 6, where the reference counted 2 of 5 and
         # 2 of 5. The second factor keeps it, at the reference's 3 of 5.
-        @test agrees(cs_regression_t_stat_exceedance_rate(csfm), [2 / 4, 3 / 5, 1 / 4])
+        @test agrees(cs_regression_t_stat_exceedance_rate(csfm).X, [2 / 4, 3 / 5, 1 / 4])
         @test ref_rate == [2 / 5, 3 / 5, 2 / 5]
 
         # The condition number agrees everywhere the design has full rank. The reference
@@ -125,10 +125,10 @@ using Statistics
     end
 
     @testset "the answers carry the lagged observation axis" begin
-        @test size(cs_regression_t_stats(csfm)) == (T - 1, K)
-        @test size(exposure_vif(csfm)) == (T - 1, K)
+        @test size(cs_regression_t_stats(csfm).X) == (T - 1, K)
+        @test size(exposure_vif(csfm).X) == (T - 1, K)
         @test length(exposure_condition_number(csfm)) == T - 1
-        @test length(cs_regression_t_stat_exceedance_rate(csfm)) == K
+        @test length(cs_regression_t_stat_exceedance_rate(csfm).X) == K
         for verb in (cs_regression_r2, cs_regression_adjusted_r2, cs_regression_aic,
                      cs_regression_bic)
             @test length(verb(csfm)) == T - 1
@@ -286,16 +286,43 @@ using Statistics
         L = PortfolioOptimisers.reduce_loadings(fcb, Msr[Tr, :, :])
         blk = CrossSectionalFactorModel(; M = Msr[Tr, :, :], L = L, b = zeros(Nr),
                                         csr = csr_r, Ms = Msr, rw = rwr, fcb = fcb, lag = 1,
-                                        nf = ["value", "size", "momentum"])
+                                        nf = ["value", "size", "momentum"],
+                                        fam = ["industry", "industry", "style"])
         Kred = PortfolioOptimisers.reduced_factor_count(fcb)
         @test Kred == 2
-        @test size(cs_regression_t_stats(blk)) == (Tr - 1, Kred)
-        @test size(exposure_vif(blk)) == (Tr - 1, Kred)
-        @test length(cs_regression_t_stat_exceedance_rate(blk)) == Kred
+        @test size(cs_regression_t_stats(blk).X) == (Tr - 1, Kred)
+        @test size(exposure_vif(blk).X) == (Tr - 1, Kred)
+        @test length(cs_regression_t_stat_exceedance_rate(blk).X) == Kred
         @test length(exposure_condition_number(blk)) == Tr - 1
         @test length(cs_regression_r2(blk)) == Tr - 1
         # The factor names of the answer's axis are the reduced ones.
         @test PortfolioOptimisers.cs_diagnostic_factor_names(blk) == ["value", "momentum"]
+        # Each answer carries the names and the family labels of the reduced axis, and a
+        # view selects its factors by position, by name and by family.
+        t = cs_regression_t_stats(blk)
+        @test t.nf == ["value", "momentum"] && t.fam == ["industry", "style"]
+        @test t.dims == (2,)
+        for r in (t, exposure_vif(blk), cs_regression_t_stat_exceedance_rate(blk))
+            @test r.nf == ["value", "momentum"] && r.fam == ["industry", "style"]
+            by_family = PortfolioOptimisers.port_opt_view(r, LabelGroup("style"))
+            by_name = PortfolioOptimisers.port_opt_view(r, ["momentum"])
+            by_index = PortfolioOptimisers.port_opt_view(r, 2)
+            for v in (by_family, by_name, by_index)
+                @test v.nf == ["momentum"] && v.fam == ["style"]
+                @test isequal(v.X, selectdim(r.X, ndims(r.X), 2:2))
+            end
+            @test isequal(PortfolioOptimisers.port_opt_view(r, :).X, r.X)
+        end
+        # The rate over a view of the t-statistics is the view of the rate.
+        rv = cs_regression_t_stat_exceedance_rate(PortfolioOptimisers.port_opt_view(t,
+                                                                                    LabelGroup("industry")))
+        @test rv.nf == ["value"]
+        @test rv.X == cs_regression_t_stat_exceedance_rate(blk).X[1:1]
+        # A name or a family the axis does not hold is refused, and the dropped factor of
+        # the re-basis is not on the axis.
+        @test_throws ArgumentError PortfolioOptimisers.port_opt_view(t, ["size"])
+        @test_throws ArgumentError PortfolioOptimisers.port_opt_view(t,
+                                                                     LabelGroup("sector"))
         @test isnothing(PortfolioOptimisers.cs_diagnostic_factor_names(csfm))
         @test PortfolioOptimisers.cs_diagnostic_factor_names(CrossSectionalFactorModel(;
                                                                                        M = Msr[Tr,
@@ -343,8 +370,8 @@ using Statistics
                                         eps = 0.01 * randn(rng6, Tn, Nn), n = fill(Nn, Tn))
         blk = CrossSectionalFactorModel(; M = Msn[Tn, :, :], b = zeros(Nn), csr = csrn,
                                         Ms = Msn)
-        @test size(cs_regression_t_stats(blk)) == (Tn, Kn)
-        @test isapprox(cs_regression_t_stats(blk),
+        @test size(cs_regression_t_stats(blk).X) == (Tn, Kn)
+        @test isapprox(cs_regression_t_stats(blk).X,
                        cs_regression_t_stats(Msn, csrn.f, csrn.eps); rtol = 1e-12)
     end
 
@@ -533,8 +560,11 @@ end
     est = CrossSectionalFactorModel(; M = Ms[T, :, 1:2], b = zeros(N), csr = csr,
                                     Ms = Ms[:, :, 1:2], rw = rw, lag = 1,
                                     nf = ["value", "size"])
-    @test cs_regression_t_stats(blk) == cs_regression_t_stats(est)
-    @test isequal(exposure_vif(blk), exposure_vif(est))
+    @test cs_regression_t_stats(blk).X == cs_regression_t_stats(est).X
+    @test isequal(exposure_vif(blk).X, exposure_vif(est).X)
+    # The answer drops the observed factor from its names and from its families.
+    @test cs_regression_t_stats(blk).nf == ["value", "size"]
+    @test exposure_vif(blk).fam == ["style", "style"]
     @test isequal(cs_regression_r2(blk), cs_regression_r2(est))
     @test isequal(cs_regression_bic(blk), cs_regression_bic(est))
     @test PO.cs_diagnostic_factor_names(blk) == ["value", "size"]
