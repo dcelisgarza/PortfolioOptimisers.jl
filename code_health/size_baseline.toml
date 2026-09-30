@@ -58,7 +58,7 @@ commit = "ebcacfda95"
 "src/02_Tools/05_Propagatable.jl" = { code = 321, doc = 693, comment = 42, blank = 302, total = 1358 }
 "src/02_Tools/06_ForwardProperties.jl" = { code = 184, doc = 119, comment = 4, blank = 36, total = 343 }
 "src/02_Tools/07_VectorToScalarMeasures.jl" = { code = 147, doc = 469, comment = 0, blank = 211, total = 827 }
-"src/03_InputData/01_AssetPanel.jl" = { code = 451, doc = 808, comment = 7, blank = 393, total = 1659 }
+"src/03_InputData/01_AssetPanel.jl" = { code = 451, doc = 874, comment = 7, blank = 416, total = 1748 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { code = 338, doc = 689, comment = 0, blank = 312, total = 1339 }
 "src/03_InputData/03_ListingSpan.jl" = { code = 74, doc = 195, comment = 0, blank = 83, total = 352 }
 "src/03_InputData/04_Preprocessing.jl" = { code = 20, doc = 148, comment = 0, blank = 89, total = 257 }
@@ -78,6 +78,7 @@ commit = "ebcacfda95"
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { code = 324, doc = 378, comment = 15, blank = 195, total = 912 }
 "src/03_InputData/19_AssetPanelConcat.jl" = { code = 97, doc = 161, comment = 2, blank = 85, total = 345 }
 "src/03_InputData/20_PanelFieldValues.jl" = { code = 50, doc = 116, comment = 0, blank = 53, total = 219 }
+"src/03_InputData/21_AssetPanelSummary.jl" = { code = 211, doc = 408, comment = 0, blank = 202, total = 821 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { code = 60, doc = 196, comment = 2, blank = 94, total = 352 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { code = 136, doc = 534, comment = 34, blank = 195, total = 899 }
 "src/04_MatrixProcessing/03_Detone.jl" = { code = 48, doc = 188, comment = 0, blank = 81, total = 317 }

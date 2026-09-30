@@ -168,6 +168,11 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :panel_frame_fields => "a step of panel_dataframe",
                                            :panel_frame_long => "a step of panel_dataframe",
                                            :panel_frame_wide => "a step of panel_dataframe",
+                                           # A report whose share of all cells counts every cell by design; its other
+                                           # numbers are the cases of describe and panel_info_levels below.
+                                           :panel_info => "a report of every cell",
+                                           :panel_info_header => "a step of panel_info",
+                                           :panel_info_fields => "a step of panel_info",
                                            # Steps whose public caller has a case below.
                                            :descriptor_active_fill! => "a step of every Descriptor",
                                            :ew_active_returns => "a step of the exponentially weighted Descriptors",
@@ -331,6 +336,21 @@ end
                 ((:AssetReturnTarget,), "the evaluation", fe(AssetReturnTarget())),
                 ((:PanelFieldTarget,), "the evaluation",
                  fe(PanelFieldTarget(; name = "market_cap"))),
+                # The summary of a panel. The share of all cells counts every cell by design,
+                # so the case of describe reads its active columns and its levels.
+                ((:panel_align_active,), "the alignment",
+                 r -> (a = panel_align_active(r.pnl,
+                                              ["book_equity", "industry", "loadings"]);
+                       (a.pnl.amsk, a.pnl.emsk, a.n))),
+                ((:describe, :panel_active_cells), "the active columns and the levels",
+                 r -> (d = describe(r.pnl);
+                       (d.active_cells, d.active_missing, d.assets_missing,
+                        Matrix(describe(r.pnl; by = "industry")[:, [:cells, :missing]])))),
+                ((:panel_info_levels,), "the level groups",
+                 r -> sprint(io -> CENSUS_PO.panel_info_levels(io, r.pnl,
+                                                               panel_field(r.pnl,
+                                                                           "industry"),
+                                                               r.pnl.amsk))),
                 # The moments that read the masks of a panel.
                 ((:mean,), "mean",
                  r -> mean(SimpleExpectedReturns(; cvg = cvg), r.X, r.pnl)),

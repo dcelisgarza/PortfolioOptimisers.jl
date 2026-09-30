@@ -1227,6 +1227,70 @@ $(DocStringExtensions.FIELDS)
   - Every Panel Field shares one [`panel_field_axes`](@ref). Raises a `DimensionMismatch`.
   - The masks are both `nothing` when the Panel Fields are static, and both given when they are time-varying. See [`assert_panel_masks`](@ref).
 
+# Examples
+
+A panel is a Result, so an edit makes a new panel through this constructor, which checks the new panel again. Each edit below starts from this panel.
+
+```jldoctest asset_panel_edits
+julia> pnl = AssetPanel(;
+                        pf = [NumericPanelField(; name = \"mcap\",
+                                                vals = [1.0 2.0 3.0; 4.0 5.0 6.0]),
+                              CategoricalPanelField(; name = \"sector\", levels = [\"Tech\", \"Energy\"],
+                                                    codes = [1 2 1; 1 2 1])], amsk = trues(2, 3),
+                        emsk = trues(2, 3));
+
+```
+
+To rename a Panel Field, make the field again with the new name and its values and observed mask. A categorical or a tensor Panel Field also keeps its levels, or its axis, labels and groups.
+
+```jldoctest asset_panel_edits
+julia> f = panel_field(pnl, \"mcap\");
+
+julia> renamed = AssetPanel(;
+                            pf = [NumericPanelField(; name = \"size\", vals = f.vals, omsk = f.omsk);
+                                  filter(g -> g.name != \"mcap\", pnl.pf)], amsk = pnl.amsk,
+                            emsk = pnl.emsk);
+
+julia> [g.name for g in renamed.pf]
+2-element Vector{String}:
+ \"size\"
+ \"sector\"
+```
+
+To drop a Panel Field, keep the other fields.
+
+```jldoctest asset_panel_edits
+julia> dropped = AssetPanel(; pf = filter(g -> g.name != \"sector\", pnl.pf), amsk = pnl.amsk,
+                            emsk = pnl.emsk);
+
+julia> [g.name for g in dropped.pf]
+1-element Vector{String}:
+ \"mcap\"
+```
+
+To drop observations or assets, view the panel over the complement indices with [`port_opt_view`](@ref).
+
+```jldoctest asset_panel_edits
+julia> kept = PortfolioOptimisers.port_opt_view(pnl, setdiff(1:2, [1]), setdiff(1:3, [2]));
+
+julia> panel_field(kept, \"mcap\").vals
+1×2 view(::Matrix{Float64}, [2], [1, 3]) with eltype Float64:
+ 4.0  6.0
+```
+
+To edit the masks, make the panel with the new masks. The estimation mask must stay a subset of the active mask, so intersect it with the new active mask. [`panel_align_active`](@ref) makes one edit of the active mask from the observed masks of the Panel Fields.
+
+```jldoctest asset_panel_edits
+julia> amsk = Bool[1 1 0; 1 1 1];
+
+julia> edited = AssetPanel(; pf = pnl.pf, amsk = amsk, emsk = pnl.emsk .& amsk);
+
+julia> edited.emsk
+2×3 BitMatrix:
+ 1  1  0
+ 1  1  1
+```
+
 # Related
 
   - [`AbstractPanelField`](@ref)
@@ -1239,6 +1303,9 @@ $(DocStringExtensions.FIELDS)
   - [`assert_panel_masks`](@ref)
   - [`ReturnsResult`](@ref)
   - [`port_opt_view`](@ref)
+  - [`DataFrames.describe(pnl::AssetPanel)`](@ref)
+  - [`panel_info`](@ref)
+  - [`panel_align_active`](@ref)
   - [`Option`](@ref)
 """
 @concrete struct AssetPanel <: AbstractResult

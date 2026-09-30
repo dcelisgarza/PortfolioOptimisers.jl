@@ -1,7 +1,7 @@
 using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, DocumenterCodeBlocks,
       DocumenterLandingPage, Literate, StatsPlots, GraphRecipes, Handcalcs, StatsBase,
-      Dates, JuMP, StatsAPI, Random
+      Dates, JuMP, StatsAPI, Random, DataFrames
 
 f = x -> !contains(string(x), r"#|^eval$|^include$")
 exported_symbols = filter!(f, names(PortfolioOptimisers))

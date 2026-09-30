@@ -77,6 +77,7 @@ commit = "ebcacfda95"
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 75, cog_sum = 77, arg_sum = 54, macros = [] }
 "src/03_InputData/19_AssetPanelConcat.jl" = { cyc = 4, cog = 5, arg = 2, cyc_sum = 25, cog_sum = 14, arg_sum = 18, macros = [] }
 "src/03_InputData/20_PanelFieldValues.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 12, cog_sum = 4, arg_sum = 15, macros = [] }
+"src/03_InputData/21_AssetPanelSummary.jl" = { cyc = 9, cog = 11, arg = 4, cyc_sum = 55, cog_sum = 47, arg_sum = 19, macros = [] }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { cyc = 6, cog = 6, arg = 3, cyc_sum = 33, cog_sum = 21, arg_sum = 22, macros = [] }
 "src/04_MatrixProcessing/02_Denoise.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 18, cog_sum = 11, arg_sum = 30, macros = [] }
 "src/04_MatrixProcessing/03_Detone.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 8, cog_sum = 3, arg_sum = 8, macros = [] }

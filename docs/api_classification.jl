@@ -18,7 +18,7 @@
 # name qualified or bare, and both resolve to the same classification, so the set holds only
 # the bare form.
 const FOREIGN_PUBLIC_BINDINGS = Set([:iterate, :getproperty, :getindex, :propertynames,
-                                     :showerror, :split, :fit, :predict, :vcat])
+                                     :showerror, :split, :fit, :predict, :vcat, :describe])
 
 """
     classify_binding(name) -> Symbol
