@@ -1,5 +1,5 @@
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    reduce_factor_names(fcb::FactorFamilyBasis, nf::VecStr)
 
 Return the names of the reduced factor axis.
 
@@ -40,7 +40,7 @@ function reduce_factor_names(fcb::FactorFamilyBasis, nf::VecStr)::Vector{String}
     return [String(nf[i]) for i in retained_factor_indices(fcb)]
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    reduce_exposures(fcb::FactorFamilyBasis, Ms::Arr3Num)
 
 Map an exposure history onto the reduced factor axis.
 
@@ -106,10 +106,11 @@ function reduce_exposures(fcb::FactorFamilyBasis, Ms::Arr3Num)
 end
 """
     reduce_loadings(fcb::FactorFamilyBasis, M::MatNum, t::Integer = size(fcb.ratios, 1))
+    reduce_loadings(fcb::FactorFamilyBasis, M::Arr3Num)
 
 Map a point-in-time loading matrix onto the reduced factor axis.
 
-This is [`reduce_exposures`](@ref) at one observation. It applies the ratios of observation `t` to a matrix of assets by raw factors.
+This is [`reduce_exposures`](@ref) at one observation. It applies the ratios of observation `t` to a matrix of assets by raw factors. A stack of loading matrices, one slice per observation of the basis, is an exposure history, and the function reduces it with [`reduce_exposures`](@ref).
 
 # Mathematical definition
 
@@ -130,16 +131,16 @@ Where:
 # Arguments
 
   - `fcb`: A Factor Family Basis.
-  - `M::MatNum`: Loading matrix on the raw axis, `assets × factors`.
-  - `t::Integer`: Observation whose ratios the function applies. It defaults to the last observation of the basis.
+  - `M::MatNum_Arr3Num`: Loading matrix on the raw axis, `assets × factors`, or a stack of them, `observations × assets × factors`.
+  - `t::Integer`: Observation whose ratios the function applies to a matrix. It defaults to the last observation of the basis.
 
 # Validation
 
-  - `size(M, 2) == fcb.K`, and `t` indexes the observation axis of the basis.
+  - The factor axis of `M` is `fcb.K`, `t` indexes the observation axis of the basis, and a stack matches that axis.
 
 # Returns
 
-  - `L::Matrix{<:Real}`: The loading matrix on the reduced axis, `assets × reduced factors`.
+  - `L::Array{<:Real}`: The loading matrix on the reduced axis, `assets × reduced factors`, or the stack of them.
 
 # Related
 
@@ -165,6 +166,9 @@ function reduce_loadings(fcb::FactorFamilyBasis, M::MatNum,
         end
     end
     return L
+end
+function reduce_loadings(fcb::FactorFamilyBasis, M::Arr3Num)
+    return reduce_exposures(fcb, M)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -196,7 +200,8 @@ function assert_factor_basis_index(t::Integer, fcb::FactorFamilyBasis)::Nothing
     return nothing
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    reduce_factor_returns(fcb::FactorFamilyBasis, f::MatNum)
+    reduce_factor_returns(fcb::FactorFamilyBasis, f::VecNum)
 
 Drop the redundant factor returns, giving the reduced-axis factor returns.
 
@@ -249,7 +254,7 @@ function reduce_factor_returns(fcb::FactorFamilyBasis, f::VecNum)
     return f[retained_factor_indices(fcb)]
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    reduce_factor_mu(fcb::FactorFamilyBasis, mu::VecNum)
 
 Drop the redundant entries of a factor mean, giving the reduced-axis mean.
 
@@ -298,11 +303,12 @@ function reduce_factor_mu(fcb::FactorFamilyBasis, mu::VecNum)
     return mu[retained_factor_indices(fcb)]
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    reduce_factor_covariance(fcb::FactorFamilyBasis, sigma::MatNum)
+    reduce_factor_covariance(fcb::FactorFamilyBasis, sigma::Arr3Num)
 
 Take the full-rank block of a factor covariance, giving the reduced-axis covariance.
 
-The reduced factor returns are the retained raw ones, so the reduced covariance is the block of the retained factors and the reduction applies no ratio. It undoes [`expand_factor_covariance`](@ref), and the converse holds only for a raw covariance of the form ``\\mathbf{R}_{t} \\mathbf{\\Sigma}^{\\mathrm{red}} \\mathbf{R}_{t}^{\\intercal}``.
+The reduced factor returns are the retained raw ones, so the reduced covariance is the block of the retained factors and the reduction applies no ratio. It undoes [`expand_factor_covariance`](@ref), and the converse holds only for a raw covariance of the form ``\\mathbf{R}_{t} \\mathbf{\\Sigma}^{\\mathrm{red}} \\mathbf{R}_{t}^{\\intercal}``. A stack of covariances, one slice per observation, gives the stack of their blocks.
 
 # Mathematical definition
 
@@ -327,15 +333,15 @@ Where:
 # Arguments
 
   - `fcb`: A Factor Family Basis.
-  - `sigma::MatNum`: Factor covariance on the raw axis, `factors × factors`.
+  - `sigma::MatNum_Arr3Num`: Factor covariance on the raw axis, `factors × factors`, or a stack of them, `observations × factors × factors`.
 
 # Validation
 
-  - `size(sigma) == (fcb.K, fcb.K)`.
+  - Both factor axes of `sigma` are `fcb.K`.
 
 # Returns
 
-  - `sigma::Matrix{<:Real}`: The factor covariance on the reduced axis.
+  - `sigma::Array{<:Real}`: The factor covariance on the reduced axis, of the same number of dimensions as the input.
 
 # Related
 
@@ -348,12 +354,19 @@ function reduce_factor_covariance(fcb::FactorFamilyBasis, sigma::MatNum)
     ret = retained_factor_indices(fcb)
     return sigma[ret, ret]
 end
+function reduce_factor_covariance(fcb::FactorFamilyBasis, sigma::Arr3Num)
+    assert_factor_axis_length(size(sigma, 2), fcb.K, :sigma)
+    assert_factor_axis_length(size(sigma, 3), fcb.K, :sigma)
+    ret = retained_factor_indices(fcb)
+    return sigma[:, ret, ret]
+end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    dropped_factor_weights(fcb::FactorFamilyBasis, t::Integer)
+    dropped_factor_weights(fcb::FactorFamilyBasis)
 
 Return the reduced-axis weights that reconstruct the dropped factors at one observation.
 
-Row `j` holds the coefficients of the zero-sum condition of family `j`, so the row applied to a reduced-axis vector gives the entry of the factor that family drops. The function builds these rows from the ratios and never forms the change of basis.
+Row `j` holds the coefficients of the zero-sum condition of family `j`, so the row applied to a reduced-axis vector gives the entry of the factor that family drops. The function builds these rows from the ratios and never forms the change of basis. Without `t`, it gives the weights of every observation of the basis, one slice per observation.
 
 # Mathematical definition
 
@@ -384,7 +397,7 @@ Where:
 
 # Returns
 
-  - `W::Matrix{<:Real}`: The reconstruction weights, `constrained families × reduced factors`.
+  - `W::Array{<:Real}`: The reconstruction weights, `constrained families × reduced factors`, or without `t` the stack of them, `observations × constrained families × reduced factors`.
 
 # Related
 
@@ -403,8 +416,17 @@ function dropped_factor_weights(fcb::FactorFamilyBasis, t::Integer)
     end
     return W
 end
+function dropped_factor_weights(fcb::FactorFamilyBasis)
+    T = size(fcb.ratios, 1)
+    W = zeros(real(eltype(fcb.ratios)), T, length(fcb.fnm), reduced_factor_count(fcb))
+    for t in 1:T
+        W[t, :, :] = dropped_factor_weights(fcb, t)
+    end
+    return W
+end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    expand_factor_returns(fcb::FactorFamilyBasis, g::MatNum)
+    expand_factor_returns(fcb::FactorFamilyBasis, g::VecNum)
 
 Reconstruct the raw-axis factor returns from the reduced-axis ones.
 
@@ -476,10 +498,11 @@ function expand_factor_returns(fcb::FactorFamilyBasis, g::VecNum)
 end
 """
     expand_factor_mu(fcb::FactorFamilyBasis, mu::VecNum, t::Integer = size(fcb.ratios, 1))
+    expand_factor_mu(fcb::FactorFamilyBasis, mu::MatNum)
 
 Reconstruct the raw-axis factor mean from the reduced-axis one.
 
-The retained entries pass through, and the zero-sum condition of each family at observation `t` gives the entry of the factor it drops. [`reduce_factor_mu`](@ref) undoes it.
+The retained entries pass through, and the zero-sum condition of each family at observation `t` gives the entry of the factor it drops. [`reduce_factor_mu`](@ref) undoes it. A matrix holds one mean per observation of the basis, one per row, and the function expands each row with the ratios of that row, as [`expand_factor_returns`](@ref) does.
 
 # Mathematical definition
 
@@ -499,21 +522,22 @@ Where:
 # Arguments
 
   - `fcb`: A Factor Family Basis.
-  - `mu::VecNum`: Factor mean on the reduced axis.
-  - `t::Integer`: Observation whose ratios the function applies. It defaults to the last observation of the basis.
+  - `mu::VecNum_MatNum`: Factor mean on the reduced axis, or one mean per observation, `observations × reduced factors`.
+  - `t::Integer`: Observation whose ratios the function applies to a vector. It defaults to the last observation of the basis.
 
 # Validation
 
-  - `length(mu)` is the reduced factor count, and `t` indexes the observation axis of the basis.
+  - The factor axis of `mu` is the reduced factor count, `t` indexes the observation axis of the basis, and a matrix matches that axis.
 
 # Returns
 
-  - `mu::Vector{<:Real}`: The factor mean on the raw axis.
+  - `mu::Array{<:Real}`: The factor mean on the raw axis, of the same number of dimensions as the input.
 
 # Related
 
   - [`FactorFamilyBasis`](@ref)
   - [`reduce_factor_mu`](@ref)
+  - [`expand_factor_returns`](@ref)
 """
 function expand_factor_mu(fcb::FactorFamilyBasis, mu::VecNum,
                           t::Integer = size(fcb.ratios, 1))
@@ -536,13 +560,17 @@ function expand_factor_mu(fcb::FactorFamilyBasis, mu::VecNum,
     end
     return f
 end
+function expand_factor_mu(fcb::FactorFamilyBasis, mu::MatNum)
+    return expand_factor_returns(fcb, mu)
+end
 """
     expand_factor_covariance(fcb::FactorFamilyBasis, sigma::MatNum,
                              t::Integer = size(fcb.ratios, 1))
+    expand_factor_covariance(fcb::FactorFamilyBasis, sigma::Arr3Num)
 
 Reconstruct the raw-axis factor covariance from the reduced-axis one.
 
-The answer is singular by construction, because the raw axis is a linear image of a smaller one. [`reduce_factor_covariance`](@ref) undoes it.
+The answer is singular by construction, because the raw axis is a linear image of a smaller one. [`reduce_factor_covariance`](@ref) undoes it. A stack holds one covariance per observation of the basis, and the function expands slice `t` with the ratios of observation `t`. The standard errors of a realised attribution read such a stack, one covariance of the estimated factor returns per observation.
 
 # Mathematical definition
 
@@ -576,20 +604,43 @@ Where:
  3. Multiply `W` by `sigma`, giving `DR`, the block of the dropped rows against the retained columns.
  4. Multiply `DR` by the transpose of `W`, giving `DD`, the dropped block.
  5. Write `sigma`, `DR`, the transpose of `DR` and `DD` into their blocks of the ``K \\times K`` answer `raw`.
+ 6. For a stack, check that it holds one slice per observation of the basis, and do steps 1 to 5 on slice `t` with the ratios of observation `t`.
 
 # Arguments
 
   - `fcb`: A Factor Family Basis.
-  - `sigma::MatNum`: Factor covariance on the reduced axis, `reduced factors × reduced factors`.
-  - `t::Integer`: Observation whose ratios the function applies. It defaults to the last observation of the basis.
+  - `sigma::MatNum_Arr3Num`: Factor covariance on the reduced axis, `reduced factors × reduced factors`, or a stack of them, `observations × reduced factors × reduced factors`.
+  - `t::Integer`: Observation whose ratios the function applies to a matrix. It defaults to the last observation of the basis.
 
 # Validation
 
-  - `size(sigma)` is the reduced factor count on both axes, and `t` indexes the observation axis of the basis.
+  - Both factor axes of `sigma` are the reduced factor count, `t` indexes the observation axis of the basis, and a stack matches that axis.
 
 # Returns
 
-  - `sigma::Matrix{<:Real}`: The factor covariance on the raw axis.
+  - `sigma::Array{<:Real}`: The factor covariance on the raw axis, of the same number of dimensions as the input.
+
+# Examples
+
+```jldoctest
+julia> fcb = FactorFamilyBasis(; fnm = [\"ind\"], fi = [[2, 3]], di = [2],
+                               ratios = reshape([0.5, 2.0], 2, 1), K = 3);
+
+julia> V = cat([1.0 0.0; 0.0 1.0], [1.0 0.0; 0.0 4.0]; dims = 3);
+
+julia> V = permutedims(V, (3, 1, 2));
+
+julia> S = PortfolioOptimisers.expand_factor_covariance(fcb, V);
+
+julia> S[1, :, :]
+3×3 Matrix{Float64}:
+ 1.0   0.0   0.0
+ 0.0   1.0  -0.5
+ 0.0  -0.5   0.25
+
+julia> S[2, :, :] == PortfolioOptimisers.expand_factor_covariance(fcb, V[2, :, :], 2)
+true
+```
 
 # Related
 
@@ -621,8 +672,19 @@ function expand_factor_covariance(fcb::FactorFamilyBasis, sigma::MatNum,
     end
     return raw
 end
+function expand_factor_covariance(fcb::FactorFamilyBasis, sigma::Arr3Num)
+    assert_factor_basis_obs(size(sigma, 1), fcb, :sigma)
+    Tf = promote_type(real(eltype(sigma)), real(eltype(fcb.ratios)))
+    T = size(sigma, 1)
+    raw = Array{Tf, 3}(undef, T, fcb.K, fcb.K)
+    for t in 1:T
+        raw[t, :, :] = expand_factor_covariance(fcb, view(sigma, t, :, :), t)
+    end
+    return raw
+end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    project_factor_coordinates(fcb::FactorFamilyBasis, x::MatNum)
+    project_factor_coordinates(fcb::FactorFamilyBasis, x::VecNum)
 
 Project raw factor-space coordinates into the reduced basis.
 
@@ -705,3 +767,8 @@ function project_factor_coordinates(fcb::FactorFamilyBasis, x::VecNum)
     end
     return y
 end
+
+public reduce_factor_names, reduce_exposures, reduce_loadings, reduce_factor_returns,
+       reduce_factor_mu, reduce_factor_covariance, dropped_factor_weights,
+       expand_factor_returns, expand_factor_mu, expand_factor_covariance,
+       project_factor_coordinates

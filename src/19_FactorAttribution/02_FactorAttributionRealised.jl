@@ -890,8 +890,8 @@ function attribution_standard_errors(g::MatNum, al::NamedTuple, fam::Option{<:Ve
          for t in 1:T]
     sys = se(sum(LinearAlgebra.dot(view(red.g, t, keep), V[t], view(red.g, t, keep))
                  for t in 1:T))
-    Vf = [attribution_expand_errors(al.fcb, V[t], keep, red.nr, t) for t in 1:T]
-    factor = [se(sum(g[t, k]^2 * Vf[t][k, k] for t in 1:T)) for k in 1:K]
+    Vf = attribution_expand_errors(al.fcb, attribution_scatter(V, keep, red.nr))
+    factor = [se(sum(g[t, k]^2 * Vf[t, k, k] for t in 1:T)) for k in 1:K]
     for k in cur
         factor[k] = oftype(factor[k], NaN)
     end
@@ -1074,71 +1074,66 @@ function attribution_sandwich(Bt::MatNum, q::VecNum, s2::VecNum,
     return Gi * S * Gi
 end
 """
-    attribution_expand_errors(fcb::Nothing, V::MatNum, keep, nr::Integer, t::Integer)
-    attribution_expand_errors(fcb::FactorFamilyBasis, V::MatNum, keep, nr::Integer,
-                              t::Integer)
+    attribution_expand_errors(fcb::Nothing, V::Arr3Num)
+    attribution_expand_errors(fcb::FactorFamilyBasis, V::Arr3Num)
 
-Return the sandwich covariance of one observation on the raw factor axis.
+Return the sandwich covariance of every observation on the raw factor axis.
 
-The sandwich runs over the factors the regression estimates, so the answer is first scattered back into the full regression axis, and then, under a family re-basis, mapped from the reduced axis onto the raw one.
+Under a family re-basis, the function maps the covariance of each observation from the reduced axis onto the raw one with the ratios of that observation. Without a re-basis, the regression axis is the raw axis, and the function returns `V` unchanged.
 
 # Arguments
 
   - `fcb`: The family re-basis, or `nothing`.
-  - `V`: The covariance over the estimated factors.
-  - `keep`: The factors the regression estimates.
-  - `nr`: The number of columns of the regression basis.
-  - `t`: The observation.
+  - `V`: The covariance of each observation on the regression axis, `observations × factors × factors`, from [`attribution_scatter`](@ref).
 
 # Returns
 
-  - `Vf::MatNum`: The covariance on the raw factor axis.
+  - `Vf::Arr3Num`: The covariance of each observation on the raw factor axis.
 
 # Related
 
   - [`attribution_standard_errors`](@ref)
   - [`expand_factor_covariance`](@ref)
 """
-function attribution_expand_errors(::Nothing, V::MatNum, keep, nr::Integer, ::Integer)
-    return attribution_scatter(V, keep, nr)
+function attribution_expand_errors(::Nothing, V::Arr3Num)
+    return V
 end
-function attribution_expand_errors(fcb::FactorFamilyBasis, V::MatNum, keep, nr::Integer,
-                                   t::Integer)
-    return expand_factor_covariance(fcb, attribution_scatter(V, keep, nr), t)
+function attribution_expand_errors(fcb::FactorFamilyBasis, V::Arr3Num)
+    return expand_factor_covariance(fcb, V)
 end
 """
-    attribution_scatter(V::MatNum, keep, nr::Integer)
+    attribution_scatter(V::AbstractVector{<:MatNum}, keep, nr::Integer)
 
-Return a covariance over a subset of factors, placed into a zero matrix of the full axis.
+Return the covariance of each observation over a subset of factors, placed into a zero stack of the full axis.
 
 A factor the regression does not estimate carries no estimation uncertainty, so its row and its column are zero rather than absent.
 
 # Arguments
 
-  - `V`: The covariance over the estimated factors.
+  - `V`: The covariance over the estimated factors, one matrix per observation.
   - `keep`: The factors the regression estimates.
   - `nr`: The number of factors of the full axis.
 
 # Returns
 
-  - `S::MatNum`: The covariance on the full axis.
+  - `S::Arr3Num`: The covariance of each observation on the full axis, `observations × factors × factors`.
 
 # Related
 
   - [`attribution_expand_errors`](@ref)
 """
-function attribution_scatter(V::MatNum, keep, nr::Integer)
-    S = zeros(eltype(V), nr, nr)
-    for b in eachindex(keep), a in eachindex(keep)
-        S[keep[a], keep[b]] = V[a, b]
+function attribution_scatter(V::AbstractVector{<:MatNum}, keep, nr::Integer)
+    S = zeros(eltype(eltype(V)), length(V), nr, nr)
+    for t in eachindex(V), b in eachindex(keep), a in eachindex(keep)
+        S[t, keep[a], keep[b]] = V[t][a, b]
     end
     return S
 end
 """
-    attribution_family_errors(fam::Nothing, g::MatNum, Vf::AbstractVector{<:MatNum},
-                              s1::Number, T::Integer, obs::AbstractVector{<:Integer})
-    attribution_family_errors(fam::VecStr, g::MatNum, Vf::AbstractVector{<:MatNum},
-                              s1::Number, T::Integer, obs::AbstractVector{<:Integer})
+    attribution_family_errors(fam::Nothing, g::MatNum, Vf::Arr3Num, s1::Number, T::Integer,
+                              obs::AbstractVector{<:Integer})
+    attribution_family_errors(fam::VecStr, g::MatNum, Vf::Arr3Num, s1::Number, T::Integer,
+                              obs::AbstractVector{<:Integer})
 
 Return the standard error of each family's mean return contribution.
 
@@ -1166,7 +1161,7 @@ Where:
 
   - `fam`: The family label of each raw factor, or `nothing`.
   - `g`: The per-observation portfolio exposure on the raw axis.
-  - `Vf`: The sandwich covariance of each observation, on the raw axis.
+  - `Vf`: The sandwich covariance of each observation, on the raw axis, `observations × factors × factors`.
   - `s1`: The factor a mean takes under the annualisation.
   - `T`: The number of aligned observations.
   - `obs`: The raw factors that are observed, from [`attribution_observed_indices`](@ref).
@@ -1180,16 +1175,15 @@ Where:
   - [`attribution_standard_errors`](@ref)
   - [`attribution_family_index`](@ref)
 """
-function attribution_family_errors(::Nothing, ::MatNum, ::AbstractVector{<:MatNum},
-                                   ::Number, ::Integer,
+function attribution_family_errors(::Nothing, ::MatNum, ::Arr3Num, ::Number, ::Integer,
                                    ::AbstractVector{<:Integer})::Nothing
     return nothing
 end
-function attribution_family_errors(fam::VecStr, g::MatNum, Vf::AbstractVector{<:MatNum},
-                                   s1::Number, T::Integer, obs::AbstractVector{<:Integer})
+function attribution_family_errors(fam::VecStr, g::MatNum, Vf::Arr3Num, s1::Number,
+                                   T::Integer, obs::AbstractVector{<:Integer})
     fi = attribution_family_index(fam)
     se(v) = s1 * sqrt(max(zero(v), v)) / T
-    out = [se(sum(LinearAlgebra.dot(view(g, t, i), view(Vf[t], i, i), view(g, t, i))
+    out = [se(sum(LinearAlgebra.dot(view(g, t, i), view(Vf, t, i, i), view(g, t, i))
                   for t in 1:T)) for i in fi.idx]
     for j in eachindex(out)
         if any(in(obs), fi.idx[j])

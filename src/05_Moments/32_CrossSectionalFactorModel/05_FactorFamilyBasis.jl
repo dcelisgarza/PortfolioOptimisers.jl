@@ -71,6 +71,12 @@ FactorFamilyBasis
   - [`factor_family_basis`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`has_family_rebasis`](@ref)
+  - [`reduce_factor_names`](@ref): the names of the reduced axis.
+  - [`reduce_exposures`](@ref) and [`reduce_loadings`](@ref): exposures onto the reduced axis.
+  - [`reduce_factor_returns`](@ref), [`reduce_factor_mu`](@ref) and [`reduce_factor_covariance`](@ref): the reduced-axis moments.
+  - [`expand_factor_returns`](@ref), [`expand_factor_mu`](@ref) and [`expand_factor_covariance`](@ref): the raw-axis moments.
+  - [`project_factor_coordinates`](@ref): raw coordinates, such as a factor exposure of a portfolio, into the reduced basis.
+  - [`dropped_factor_weights`](@ref): the reduced-axis weights of the dropped factors.
 """
 @concrete struct FactorFamilyBasis <: AbstractFactorFamilyBasis
     """

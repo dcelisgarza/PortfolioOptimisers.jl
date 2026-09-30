@@ -1,7 +1,21 @@
 ```@meta
-Description = "Factor Family Basis Transforms has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Factor Family Basis Transforms, public API of PortfolioOptimisers.jl: reduce_factor_names, reduce_exposures, reduce_loadings, reduce_factor_returns, …"
 ```
 
 # [Factor Family Basis Transforms](@id api-factor-family-basis-transforms)
 
-Every name of this topic is private. The [private page](@ref private-api-factor-family-basis-transforms) documents them.
+## Functions
+
+```@docs
+reduce_factor_names
+reduce_exposures
+reduce_loadings
+reduce_factor_returns
+reduce_factor_mu
+reduce_factor_covariance
+expand_factor_returns
+expand_factor_mu
+expand_factor_covariance
+project_factor_coordinates
+dropped_factor_weights
+```

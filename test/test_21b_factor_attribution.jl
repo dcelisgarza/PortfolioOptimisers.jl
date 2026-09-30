@@ -1093,14 +1093,12 @@ end
         red = PO.attribution_reduce_for_errors(al.fcb, al.B, g, al.no, T)
         @test red.nr < size(g, 2)
         keep = findall(!, red.observed)
-        Vf = [PO.attribution_expand_errors(al.fcb,
-                                           PO.attribution_sandwich(view(red.B, t, :, :),
-                                                                   view(al.rw, t, :),
-                                                                   view(al.vs, t, :), keep),
-                                           keep, red.nr, t) for t in 1:T]
-        @test fa.sys.mu_se ≈ sqrt(sum(dot(g[t, :], Vf[t], g[t, :]) for t in 1:T)) / T
+        V = [PO.attribution_sandwich(view(red.B, t, :, :), view(al.rw, t, :),
+                                     view(al.vs, t, :), keep) for t in 1:T]
+        Vf = PO.attribution_expand_errors(al.fcb, PO.attribution_scatter(V, keep, red.nr))
+        @test fa.sys.mu_se ≈ sqrt(sum(dot(g[t, :], Vf[t, :, :], g[t, :]) for t in 1:T)) / T
         @test fa.fbd.mu_se ≈
-              [sqrt(sum(g[t, k]^2 * Vf[t][k, k] for t in 1:T)) / T for k in axes(g, 2)]
+              [sqrt(sum(g[t, k]^2 * Vf[t, k, k] for t in 1:T)) / T for k in axes(g, 2)]
         @test all(isfinite, fa.fmbd.mu_se)
     end
     @testset "The predicted decomposition answers the same axis" begin

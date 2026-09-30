@@ -10,10 +10,12 @@ cases measured against the oracle of map #1375 on the synthetic Asset Panel of `
 The parity cases are literals rather than a live comparison: the oracle is not a dependency of
 this package, so the numbers it produced are stored here and the test re-derives them. The basis
 inside a fitted prior, and each of its transforms, is measured in
-`test_12x_parity_prior_config_grid.jl` (#1385).
+`test_12x_parity_prior_config_grid.jl` (#1385). The stacked forms of the transforms, one slice per
+observation (#1406), are pinned against the stored oracle `Parity_FactorFamilyBasis_Stack_*`.
 =#
 using Statistics, Distributions, Dates, Random
 include(joinpath(@__DIR__, "test06c_setup.jl"))
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 @testset "FactorFamilyBasis construction and structure" begin
     PO = PortfolioOptimisers
@@ -238,6 +240,51 @@ end
         @test (W * mu)[1] ≈ PO.expand_factor_mu(fcb, mu)[fcb.fi[1][fcb.di[1]]]
     end
 
+    @testset "A stack is the loop of the single form over the observations" begin
+        # Each transform whose single form reads the ratios of one observation takes a stack,
+        # one slice per observation, and applies the ratios of each slice's own observation.
+        A = randn(rng, T, Kr, Kr)
+        V = similar(A)
+        for t in 1:T
+            V[t, :, :] = A[t, :, :] * transpose(A[t, :, :])
+        end
+        S = PO.expand_factor_covariance(fcb, V)
+        @test size(S) == (T, K, K)
+        for t in 1:T
+            @test S[t, :, :] == PO.expand_factor_covariance(fcb, V[t, :, :], t)
+        end
+        @test PO.reduce_factor_covariance(fcb, S) == V
+        for t in 1:T
+            @test PO.reduce_factor_covariance(fcb, S)[t, :, :] ==
+                  PO.reduce_factor_covariance(fcb, S[t, :, :])
+        end
+        W = PO.dropped_factor_weights(fcb)
+        @test size(W) == (T, 1, Kr)
+        for t in 1:T
+            @test W[t, :, :] == PO.dropped_factor_weights(fcb, t)
+        end
+        mu = randn(rng, T, Kr)
+        raw = PO.expand_factor_mu(fcb, mu)
+        @test size(raw) == (T, K)
+        for t in 1:T
+            @test raw[t, :] == PO.expand_factor_mu(fcb, mu[t, :], t)
+        end
+        L = PO.reduce_loadings(fcb, Ms)
+        @test L == PO.reduce_exposures(fcb, Ms)
+        for t in 1:T
+            @test L[t, :, :] == PO.reduce_loadings(fcb, Ms[t, :, :], t)
+        end
+        # A stack whose observation axis is not the basis's is refused, as a history is.
+        @test_throws DimensionMismatch PO.expand_factor_covariance(fcb, V[1:(T - 1), :, :])
+        @test_throws DimensionMismatch PO.expand_factor_mu(fcb, mu[1:(T - 1), :])
+        @test_throws DimensionMismatch PO.reduce_loadings(fcb, Ms[1:(T - 1), :, :])
+        @test_throws DimensionMismatch PO.expand_factor_covariance(fcb,
+                                                                   randn(rng, T, Kr + 1,
+                                                                         Kr + 1))
+        @test_throws DimensionMismatch PO.reduce_factor_covariance(fcb,
+                                                                   randn(rng, T, K + 1, K))
+    end
+
     @testset "A transform refuses a wrong axis" begin
         @test_throws DimensionMismatch PO.reduce_exposures(fcb, randn(rng, T, N, K + 1))
         @test_throws DimensionMismatch PO.reduce_exposures(fcb, randn(rng, T + 1, N, K))
@@ -271,6 +318,43 @@ end
         end
         @test occursin("g carries a factor axis", msg)
     end
+end
+
+@testset "The stacked transforms equal the stored oracle" begin
+    #=
+    Two constrained families with a free factor between them and a factor after them: `ind`
+    (factors 2 to 4) drops its last member and `cty` (factors 6 to 8) its first, so the reduced
+    axis interleaves retained members of both. Six observations, each with its own ratios and
+    its own reduced covariance. The oracle expanded the whole stack at once, reduced its answer,
+    built the weights of the dropped factors for every observation, and expanded one mean per
+    row. Each output is a vertical stack, row `(t - 1) n + a` holding entry `(t, a, :)`.
+    Measured on 2026-09-30: every cell is bit-equal. The tolerance stays at `1e-12`, because the
+    products go through BLAS, which can round them differently on another host.
+    =#
+    PO = PortfolioOptimisers
+    rng = StableRNG(1406)
+    T, K = 6, 9
+    ratios = hcat(0.2 .+ rand(rng, T, 2), -0.5 .+ 3 .* rand(rng, T, 2))
+    fcb = FactorFamilyBasis(; fnm = ["ind", "cty"], fi = [[2, 3, 4], [6, 7, 8]],
+                            di = [3, 1], ratios = ratios, K = K)
+    Kr = PO.reduced_factor_count(fcb)
+    V = zeros(T, Kr, Kr)
+    for t in 1:T
+        A = randn(rng, Kr, Kr + 2)
+        V[t, :, :] = A * transpose(A) ./ (Kr + 2)
+    end
+    M = randn(rng, T, Kr)
+    unstack(S, n) = [S[(t - 1) * n + a, b] for t in 1:T, a in 1:n, b in axes(S, 2)]
+    oracle(o, n) = unstack(parity_load("FactorFamilyBasis", "Stack", o), n)
+    E = PO.expand_factor_covariance(fcb, V)
+    # A covariance compares against its largest entry: an off-diagonal cell can be a
+    # cancellation.
+    @test parity_compare(E, oracle("Expanded", K); scale = :array).ok
+    @test parity_compare(PO.reduce_factor_covariance(fcb, E), oracle("Reduced", Kr);
+                         scale = :array).ok
+    @test parity_compare(PO.dropped_factor_weights(fcb), oracle("Weights", 2)).ok
+    @test parity_compare(PO.expand_factor_mu(fcb, M),
+                         parity_load("FactorFamilyBasis", "Stack", "Mu")).ok
 end
 
 @testset "FactorFamilyBasis transforms agree with their closed forms in exact arithmetic" begin
@@ -417,6 +501,9 @@ end
                                                  Matrix{Float32}(LinearAlgebra.I, Kr, Kr))) ==
               Float32
         @test eltype(PO.dropped_factor_weights(f32, 1)) == Float32
+        @test eltype(PO.dropped_factor_weights(f32)) == Float32
+        @test eltype(PO.expand_factor_covariance(f32, ones(Float32, T, Kr, Kr))) == Float32
+        @test eltype(PO.reduce_factor_covariance(f32, ones(Float32, T, K, K))) == Float32
         @test eltype(PO.project_factor_coordinates(f32, ones(Float32, T, K))) == Float32
         @test eltype(PO.project_factor_coordinates(f32, ones(Float32, K))) == Float32
     end
