@@ -161,6 +161,7 @@ end
     for kwargs in ((decay = 0.9, min_obs = 3, regime_min_obs = 2),
                    (decay = 0.9, min_obs = 3, regime_min_obs = 2, hac_lags = 2),
                    (decay = 0.9, cor_decay = 0.95, min_obs = 3, regime_min_obs = 2),
+                   (decay = 0.9, cor_decay = 0.95, min_obs = 3, regime_min_obs = 2, hac_lags = 2),
                    (decay = 0.9, min_obs = 3, regime_min_obs = 2, centred = false))
         ce = RegimeAdjustedExpWeightedCovariance(; kwargs...)
         batch = cov(ce, X)
@@ -1275,11 +1276,12 @@ a child issue of map #1375; #1439 then added the spread of each method (the test
     @test all(m -> 0.98 < m < 1.02, mults)
     # The per-method term of #1439 brings Log to 0.0042 of RMS on this seed, from 0.0079.
     @test mults[1] - mults[3] < 0.006
-    # At two lags, measured on this seed: 1.0337, and about 1.098 with the factor at `cor_decay`
-    # alone. Eight seeds gave 1.0260 ± 0.0059, where the factor at `cor_decay` alone gave 1.0898;
-    # the rest is #1445. Before #1438 the factor at `cor_decay` was the mean's fixed point, 1.8 %
-    # too large, and the eight seeds gave 1.0184.
-    @test 0.97 < multiplier(RMS; hac_lags = 2, min_obs = 17) < 1.05
+    # At two lags, measured on this seed: 0.9743, and 1.0337 where each row divides by the
+    # volatility after its update (`hac_vol_before = false`, #1448). Eight seeds gave
+    # 0.9659 ± 0.0050, and 1.0260 ± 0.0059 with the rule after the update, where the factor at
+    # `cor_decay` alone gave 1.0898; the rest is #1445. Before #1438 the factor at `cor_decay` was
+    # the mean's fixed point, 1.8 % too large, and the eight seeds gave 1.0184.
+    @test 0.94 < multiplier(RMS; hac_lags = 2, min_obs = 17) < 1.02
 
     # The state of the separate path fills the table, and a copy keeps its own.
     st = partial_fit!(RegimeAdjustedExpWeightedCovariance(; base...,
@@ -1470,4 +1472,80 @@ the recursion itself, and the interpolation serves the rest (ADR 0190).
     for m in methods
         @test 0.98 < multiplier(m) < 1.02
     end
+end
+
+#=
+Issue #1448, ruled on #1444. Under HAC the diagonal of a row, `x_t² + 2 Σ w_l x_t x_{t-l}`, can be
+negative. A volatility that holds the row damps a positive row and amplifies a negative one, so
+the diagonal of the correlation state is skewed down and falls on the guards of `update_var_cor!`
+and `pair_weighted_correlation`. So under HAC the separate path divides each row by the volatility
+before its update, and `hac_vol_before = false` keeps the rule after it. Without HAC the diagonal
+is `x_t² ≥ 0`, and the rule after the update stays (#1440).
+=#
+@testset "under HAC the separate path divides each row by the volatility before its update" begin
+    # The recursion by hand on a two-asset case of six rows and one lag.
+    function by_hand(X, lam, lamc, before)
+        v, Q, prev = zeros(2), zeros(2, 2), nothing
+        for t in axes(X, 1)
+            x = X[t, :]
+            A = x * transpose(x)
+            if !isnothing(prev)
+                A += (x * transpose(prev) + prev * transpose(x)) / 2
+            end
+            s = before ? v : lam * v + (1 - lam) * diag(A)
+            v = lam * v + (1 - lam) * diag(A)
+            is = [si > 1e-12 ? 1 / sqrt(si) : 0.0 for si in s]
+            Q = lamc * Q + (1 - lamc) * A .* (is * transpose(is))
+            prev = x
+        end
+        return v, Q
+    end
+    X = randn(StableRNG(1448), 6, 2) .* [0.02 0.01]
+    rule(b; extra...) = RegimeAdjustedExpWeightedCovariance(; decay = 0.8, cor_decay = 0.9,
+                                                            hac_lags = 1,
+                                                            hac_vol_before = b,
+                                                            regime_method = nothing,
+                                                            centred = true, min_obs = 1,
+                                                            extra...)
+    states = map((true, false)) do b
+        return PO.regime_adjusted_covariance_pass!(rule(b), X, 1, nothing, nothing)
+    end
+    for (b, st) in zip((true, false), states)
+        v, Q = by_hand(X, 0.8, 0.9, b)
+        @test st.variance ≈ v rtol = 1e-14
+        @test st.cor_state ≈ Q rtol = 1e-14
+    end
+    # The two rules differ, and the default is the rule before the update.
+    @test !isapprox(states[1].cor_state, states[2].cor_state; rtol = 1e-2)
+    @test RegimeAdjustedExpWeightedCovariance().hac_vol_before
+
+    # Without HAC, or on the path with one decay, the keyword changes nothing.
+    Y = randn(StableRNG(1449), 200, 3) .* 0.01
+    for extra in ((; hac_lags = nothing), (; cor_decay = nothing))
+        @test isequal(cov(rule(true; extra...), Y), cov(rule(false; extra...), Y))
+    end
+
+    # At eight lags, on iid returns at a correlation of 0.3 and half-lives of 10 and 20, the rule
+    # after the update holds the covariance, or clamps the correlation, on 529 to 772 of 20 000
+    # rows over three seeds (1.1 % to 3.0 % over 16 seeds of 10⁶ rows on #1444). The rule before
+    # the update does neither.
+    function guard_rows(b, X)
+        ce = RegimeAdjustedExpWeightedCovariance(; decay = 2.0^(-1 / 10),
+                                                 cor_decay = 2.0^(-1 / 20), hac_lags = 8,
+                                                 hac_vol_before = b,
+                                                 regime_method = nothing, centred = true)
+        rows = 0
+        PO.regime_adjusted_covariance_pass!(ce, X, 1, nothing, nothing) do i, cache
+            if i > 500
+                Q = PO.pair_weighted_block(cache.cor_state, cache.cor_weight, 1:2)
+                rows += any(<=(ce.min_val), diag(cache.cor_state)) ||
+                        abs(Q[1, 2]) > sqrt(Q[1, 1] * Q[2, 2])
+            end
+            return nothing
+        end
+        return rows
+    end
+    Z = randn(StableRNG(1448), 20_000, 2) * cholesky([1 0.3; 0.3 1]).U
+    @test guard_rows(true, Z) == 0
+    @test guard_rows(false, Z) > 100
 end

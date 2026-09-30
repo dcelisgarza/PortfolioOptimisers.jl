@@ -123,7 +123,7 @@ commit = "ebcacfda95"
 "src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { cyc = 6, cog = 9, arg = 6, cyc_sum = 35, cog_sum = 25, arg_sum = 78, macros = [] }
 "src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 39, cog_sum = 31, arg_sum = 85, macros = [] }
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { cyc = 13, cog = 19, arg = 12, cyc_sum = 82, cog_sum = 71, arg_sum = 147, macros = [] }
-"src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { cyc = 13, cog = 28, arg = 14, cyc_sum = 84, cog_sum = 86, arg_sum = 109, macros = [] }
+"src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { cyc = 13, cog = 28, arg = 15, cyc_sum = 86, cog_sum = 89, arg_sum = 110, macros = [] }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 109, cog_sum = 92, arg_sum = 185, macros = [] }
 "src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl" = { cyc = 8, cog = 9, arg = 6, cyc_sum = 80, cog_sum = 80, arg_sum = 110, macros = [] }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 32, cog_sum = 12, arg_sum = 70, macros = [] }

@@ -1769,7 +1769,7 @@ true
 function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:Any, <:Any,
                                                               <:Any, <:Any, <:Any, <:Any,
                                                               <:Any, <:Any, <:Any, <:Any,
-                                                              <:Any,
+                                                              <:Any, <:Any,
                                                               <:Option{<:RegimeAdjustedCovarianceState}},
                       X::MatNum; dims::Int = 1,
                       estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
@@ -1837,7 +1837,7 @@ true
 function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:Any, <:Any,
                                                               <:Any, <:Any, <:Any, <:Any,
                                                               <:Any, <:Any, <:Any, <:Any,
-                                                              <:Any,
+                                                              <:Any, <:Any,
                                                               <:Option{<:RegimeAdjustedCovarianceState}},
                       x::VecNum;
                       estimation_mask::Option{<:AbstractVector{<:Bool}} = nothing,

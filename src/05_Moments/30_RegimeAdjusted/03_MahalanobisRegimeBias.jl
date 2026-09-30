@@ -1204,12 +1204,14 @@ in the steady state over 64 seeds, the three methods then read 1.0018, 1.0018 an
 ``R = I``, where the spread had put them at 1.0018, 0.9999 and 0.9980. At 4 assets and half-lives
 of 5 and 40 the power leaves 0.02 % and 0.06 % of a gap of 1.5 % and 3.0 %. It holds the noise of
 the variances with the correlation fixed. The noise of ``\\hat{R}`` amplifies the spread, the data
-that the two estimates share reduces it, and the division of each correlation row by the volatility
-after its own update adds to it. Without HAC the three cancel at ``R = I``; at two lags the power
-carries about three quarters of the spread. The spread grows with the correlation of the assets,
-which the power does not read: at an equicorrelation of 0.8 it carries 42 % of it, so the methods read
-0.9969, 0.9943 and 0.9917. Under HAC the mean reads up to 3.1 % high at two lags, where the division
-of each correlation row by the volatility after its own update dominates.
+that the two estimates share reduces it, and the rule that divides each correlation row by a
+volatility moves it. Without HAC the three cancel at ``R = I``. At two lags, where each row divides
+by the volatility before its update, the power carries about 1.6 times the spread at ``R = I``, so
+`FirstMomentRegimeAdjusted` and `LogRegimeAdjusted` read 0.14 % and 0.26 % above
+`RootMeanSquaredAdjusted`. The spread grows with the correlation of the assets, which the power
+does not read: at an equicorrelation of 0.8 it carries 42 % of it, so the methods read 0.9969,
+0.9943 and 0.9917. Under HAC the mean reads 2.7 % to 4.1 % low at two lags, and 1.1 % to 3.0 %
+high where each row divides by the volatility after its update (`hac_vol_before = false`).
 
 The factor does not read the correlation of the assets. With ``h_{i} = \\sqrt{Q_{ii} / \\hat{V}_{i}}``
 the statistic splits exactly as

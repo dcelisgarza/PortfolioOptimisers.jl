@@ -121,8 +121,9 @@ assets and a half-life of 10 the three methods read 1.0035, 1.0031 and 1.0023 wi
 correlation path the factor reads `cor_decay`, and [`variance_noise_bias!`](@ref) adds the
 noise of the variance at `decay`, to the mean and to the spread of each method: at a correlation
 half-life of 20 the three methods read 0.998, 0.997 and 0.996 over 8 seeds, from 1.032, 1.030
-and 1.027 at `cor_decay` alone, and `RootMeanSquaredAdjusted` reads 1.026 at two lags, from
-1.090.
+and 1.027 at `cor_decay` alone. At two HAC lags, where each correlation row divides by the
+volatility before its update, `RootMeanSquaredAdjusted` reads 0.966, from 1.090 at `cor_decay`
+alone and 1.026 with the rule after the update.
 
 # Related
 
@@ -305,7 +306,9 @@ Where:
   - ``v_{i,t}``: Raw exponentially weighted variance of asset ``i``.
   - ``Q_{ij,t}``: Raw exponentially weighted correlation state. Like ``S``, it steps only on
     the pairs of which both assets are valid, so a holiday of asset ``i`` holds every entry of
-    ``i``.
+    ``i``. Where `hac_lags` is not `nothing` and `hac_vol_before` is `true`, the product
+    divides by ``\\sqrt{v_{i,t-1} v_{j,t-1}}``, the variances before the step, because the
+    diagonal of a HAC product can be negative and a variance that holds it amplifies it.
   - ``W_{ij,t}``: Weight that the pair holds in ``Q``, with the step of ``Q`` on a unit
     product: ``1 - \\lambda_c^{n_{ij}}``.
   - ``\\rho_{ij,t}``: Correlation, the weighted mean of the standardised product over the
@@ -348,6 +351,7 @@ $(DocStringExtensions.FIELDS)
         min_obs::Integer                                      = round(Int, max(1, decay_half_life(decay), isnothing(cor_decay) ? 1 : decay_half_life(cor_decay, :cor_decay))),
         hac_lags::Option{<:Integer}                           = nothing,
         hac_floor::Bool                                       = false,
+        hac_vol_before::Bool                                  = true,
         regime_method::Option{<:RegimeAdjustedMethod}         = FirstMomentRegimeAdjusted(),
         regime_decay::Number                                  = exp2(-2 / decay_half_life(decay)),
         regime_min_obs::Integer                               = round(Int, max(1, decay_half_life(decay) / 2)),
@@ -415,6 +419,10 @@ true
     """
     hac_floor
     """
+    $(field_dict[:hac_vol_before])
+    """
+    hac_vol_before
+    """
     $(field_dict[:regime_method])
     """
     regime_method
@@ -453,7 +461,7 @@ true
     function RegimeAdjustedExpWeightedCovariance(decay::Number, cor_decay::Option{<:Number},
                                                  min_obs::Integer,
                                                  hac_lags::Option{<:Integer},
-                                                 hac_floor::Bool,
+                                                 hac_floor::Bool, hac_vol_before::Bool,
                                                  regime_method::Option{<:RegimeAdjustedMethod},
                                                  regime_decay::Number,
                                                  regime_min_obs::Integer,
@@ -478,22 +486,14 @@ true
             assert_nonempty_gt0_finite_val(hac_lags, :hac_lags)
         end
         return new{typeof(decay), typeof(cor_decay), typeof(min_obs), typeof(hac_lags),
-                   typeof(hac_floor), typeof(regime_method), typeof(regime_decay),
-                   typeof(regime_min_obs), typeof(regime_target), typeof(regime_lohi_mult),
-                   typeof(min_val), typeof(centred), typeof(debias), typeof(cache)}(decay,
-                                                                                    cor_decay,
-                                                                                    min_obs,
-                                                                                    hac_lags,
-                                                                                    hac_floor,
-                                                                                    regime_method,
-                                                                                    regime_decay,
-                                                                                    regime_min_obs,
-                                                                                    regime_target,
-                                                                                    regime_lohi_mult,
-                                                                                    min_val,
-                                                                                    centred,
-                                                                                    debias,
-                                                                                    cache)
+                   typeof(hac_floor), typeof(hac_vol_before), typeof(regime_method),
+                   typeof(regime_decay), typeof(regime_min_obs), typeof(regime_target),
+                   typeof(regime_lohi_mult), typeof(min_val), typeof(centred),
+                   typeof(debias), typeof(cache)}(decay, cor_decay, min_obs, hac_lags,
+                                                  hac_floor, hac_vol_before, regime_method,
+                                                  regime_decay, regime_min_obs,
+                                                  regime_target, regime_lohi_mult, min_val,
+                                                  centred, debias, cache)
     end
 end
 function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
@@ -509,6 +509,7 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                                                           end)),
                                              hac_lags::Option{<:Integer} = nothing,
                                              hac_floor::Bool = false,
+                                             hac_vol_before::Bool = true,
                                              regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
                                              regime_decay::Number = exp2(-2 /
                                                                          decay_half_life(decay)),
@@ -524,8 +525,8 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                              debias::Bool = true,
                                              cache::Option{<:AbstractPartialFitState} = nothing)::RegimeAdjustedExpWeightedCovariance
     return RegimeAdjustedExpWeightedCovariance(decay, cor_decay, min_obs, hac_lags,
-                                               hac_floor, regime_method, regime_decay,
-                                               regime_min_obs, regime_target,
+                                               hac_floor, hac_vol_before, regime_method,
+                                               regime_decay, regime_min_obs, regime_target,
                                                regime_lohi_mult, min_val, centred, debias,
                                                cache)
 end
@@ -1097,8 +1098,12 @@ reads.
 # Algorithm
 
  1. Advance the variance with the diagonal of the outer product, floored at zero.
- 2. Standardise the outer product by the running volatilities. An asset whose variance is not
-    above `min_val` contributes zero.
+ 2. Standardise the outer product by the running volatilities: after the step of 1, or, where
+    `hac_lags` is not `nothing` and `hac_vol_before` is `true`, before it. The diagonal of a HAC
+    row can be negative, and a volatility that holds the row amplifies a negative row, so the
+    diagonal of the correlation state is skewed down. An asset whose variance is not above
+    `min_val` contributes zero, so under the rule before the step an asset contributes nothing
+    on its first row.
  3. On the pairs of which both assets are valid, advance the correlation state by the step
     ``Q_{ij} \\leftarrow \\lambda_c Q_{ij} + (1 - \\lambda_c) \\Delta_{ij}``, where ``\\Delta`` is
     the standardised outer product, and the weight state by the same step with ``\\Delta_{ij}``
@@ -1131,11 +1136,13 @@ function update_var_cor!(cache::RegimeAdjustedCovarianceState,
     if ce.hac_floor
         hac_var .= max.(hac_var, zero(T))
     end
+    # Under HAC a row divides by the variance before the step, a copy; else `v` aliases the state
+    # and reads it after the step (ADR 0190).
+    v = ce.hac_vol_before && !isnothing(ce.hac_lags) ? copy(cache.variance) : cache.variance
     cache.variance[valid] .= ce.decay * view(cache.variance, valid) +
                              (one(ce.decay) - ce.decay) * view(hac_var, valid)
-    positive = valid .& (cache.variance .> ce.min_val)
-    inv_sigma = ifelse.(positive, inv.(sqrt.(ifelse.(positive, cache.variance, one(T)))),
-                        zero(T))
+    positive = valid .& (v .> ce.min_val)
+    inv_sigma = ifelse.(positive, inv.(sqrt.(ifelse.(positive, v, one(T)))), zero(T))
     outer_std = cache.XXt .* (inv_sigma .* transpose(inv_sigma))
     # Each pair ages on its common observations, and a holiday holds it (ADR 0181).
     step = one(ce.cor_decay) - ce.cor_decay

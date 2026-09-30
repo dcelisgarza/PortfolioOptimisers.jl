@@ -192,21 +192,45 @@ decays. On a sphere of `n` independent terms the second-order change of the root
 at one asset, one for the mean, and `κ` alone as `n` grows. At 12 assets, a half-life of 10 and a
 correlation half-life of 20 the power is 0.9981 and 0.9963 (0.9964 and 0.9928 at two lags), and
 the squared multipliers become 0.9975, 0.9970 and 0.9964 over 8 seeds, from 1.0321, 1.0297 and
-1.0272 at `cor_decay` alone and 0.9975, 0.9952 and 0.9927 with one `κ`; RMS reads 1.026 at two
-HAC lags, from 1.090. Against the true factor of the block, measured without return noise over 64
-seeds, the three methods read 1.0018, 1.0018 and 1.0017 at `R = I`, 0.9972, 0.9966 and 0.9958 on
-a random factor model, and 0.9969, 0.9943 and 0.9917 at an equicorrelation of 0.8; at two lags
-RMS reads 1.022 to 1.031. The power holds the noise of the variances with the correlation fixed:
+1.0272 at `cor_decay` alone and 0.9975, 0.9952 and 0.9927 with one `κ`; at two HAC lags RMS
+reads 0.966, from 1.090 at `cor_decay` alone (1.026 where each row divides by the volatility after
+its update). Against the true factor of the block, measured without return noise over 64 seeds,
+the three methods read 1.0018, 1.0018 and 1.0017 at `R = I`, 0.9972, 0.9966 and 0.9958 on a random
+factor model, and 0.9969, 0.9943 and 0.9917 at an equicorrelation of 0.8. At two lags they read
+0.9708, 0.9722 and 0.9734 at `R = I`, 0.9602, 0.9598 and 0.9593 on a three-factor model with a `γ`
+of 1.95, and 0.9685, 0.9640 and 0.9594 at an equicorrelation of 0.8; the rule after the update
+read 1.0304, 1.0293 and 1.0280, 1.0172, 1.0144 and 1.0114, and 1.0299, 1.0228 and 1.0157 on the
+same data (#1448). The power holds the noise of the variances with the correlation fixed:
 on 4 assets and half-lives of 5 and 40 it leaves 0.02 % and 0.06 % of a gap of 1.5 % and 3.0 %.
 In the full path the noise of `R̂` amplifies the spread, the data the two estimates share reduces
-it, and the division of each correlation row by the volatility after its own update adds to it;
-without HAC they cancel at `R = I`, at two lags the power carries about three quarters of the
-spread, and at an equicorrelation of 0.8 it carries 42 %. The maintainer ruled on #1439 that the
-term lands at this strength, because the mean at a correlated `R` needs the noise of `V̂_i / Q_ii`
-together with its coupling to the correlation (#1447): the bias of the standardised correlation
-and a compensating rise in its noise are of one order there, and a fix of `R = I` alone makes the
-correlated cases worse. The mean under HAC, where the row rule adds +3.9 %, waits on the question
-whether the HAC rows divide by the volatility before or after their update (#1444, #1445).
+it, and the rule that divides each correlation row by a volatility moves it. Without HAC they
+cancel at `R = I`, and at an equicorrelation of 0.8 the power carries 42 % of the spread. At two
+lags, with each row divided by the volatility before its update, the power carries about 1.6 times
+the spread at `R = I` (FirstMoment and Log read 0.14 % and 0.26 % above RMS), and at an
+equicorrelation of 0.8 FirstMoment and Log read 0.46 % and 0.94 % below RMS; the rule after the
+update left them 0.11 % and 0.24 %, and 0.69 % and 1.38 %, below RMS. The maintainer ruled on #1439
+that the term lands at this strength, because the mean at a correlated `R` needs the noise of
+`V̂_i / Q_ii` together with its coupling to the correlation (#1447): the bias of the standardised
+correlation and a compensating rise in its noise are of one order there, and a fix of `R = I`
+alone makes the correlated cases worse. Under HAC the rule before the update moves the whole
+factor by −5.5 % to −6.1 % on paired data, so the statistic reads 2.7 % to 4.1 % low at two lags,
+where the rule after the update read 1.1 % to 3.0 % high. That mean is #1445.
+
+**Each row of the correlation state divides by the volatility after its update, and under HAC by
+the volatility before it** (#1440, #1444). The step of `Q` divides the product of row `t` by the
+root of the two variances. Without HAC the diagonal of the row is `x_t² ≥ 0`. On iid Normal
+returns the two rules have the same bias, and where the volatility moves the rule after the update
+is 0.5 points closer to the true correlation, so it stays (#1440). Under HAC the diagonal
+`x_t² + 2 Σ_l w_l x_t x_{t−l}` can be negative. A variance that holds the row damps a positive row
+and amplifies a negative one, so the diagonal of `Q` is skewed down and can fall to zero. At two
+lags the rule after the update has 9 % to 19 % more mean squared error than the rule before it on
+11 of 13 cases of returns, 20 % to 40 % more at four lags or at half-lives of 5 and 10, and 136 %
+to 252 % more at eight lags. There 1.1 % to 3.0 % of its rows fall on the guards of the state,
+which hold the covariance where a diagonal of `Q` is not above `min_val` and clamp the correlation
+to `[−1, 1]`; the rule before the update trips no guard. So under HAC the row divides by the
+variance before the step. It needs no new state, and its row is conditionally Gaussian given the
+past, which keeps the model of the mean simpler (#1445). `hac_vol_before = false` keeps the rule
+after the update, the rule of the oracle (ADR 0186).
 
 **Without HAC the factor does not read the correlation of the assets, and this is a documented
 limit** (the maintainer ruled so on #1447). With `h_i = √(Q_ii / V̂_i)` the statistic splits
@@ -243,8 +267,10 @@ observations, such as 12 assets at a half-life of 5, is never scored.
   which the docstring of its statistic states with the warm-up rows.
 - **Two limits remain.** On the separate correlation path the Mahalanobis factor does not read the
   correlation of the assets: without HAC the three methods read 0.9897 to 1.0018 of the truth, a
-  documented limit (#1447); at two lags RMS reads 1.022 to 1.031, which a child issue of map #1375
-  holds (#1445, after the question of the HAC row rule, #1444).
+  documented limit (#1447); at two lags, with each row divided by the volatility before its
+  update, the three methods read 0.959 to 0.973, which a child issue of map #1375 holds (#1445).
+- A HAC fit on the separate path moves with the row rule of #1444; no stored oracle case runs that
+  path, and `hac_vol_before = false` gives the rule of the oracle bit for bit.
 - The Mahalanobis nodes under HAC cost 0.3 s to 1.5 s for each count of assets at half-lives up
   to 40, and up to 3.7 s at a half-life of 250 and five lags.
 - The FirstMoment and Log calibrations of `DiagonalTarget` assumed a `χ²(n)` sum. Before this
@@ -322,5 +348,13 @@ observations, such as 12 assets at a half-life of 5, is never scored.
   mean moves the wrong way with `R`, and on rows that are not standardised the pair term is 21 %
   below the product of its means at an equicorrelation of 0.8. A term in `γ` alone cannot hold a
   factor model and an equicorrelation at once.
+- **Under HAC, each row divided by the volatility after its update** (#1444). It is the rule of
+  the oracle and of the plain path, but a variance that holds a HAC row amplifies a negative
+  diagonal: 9 % to 19 % more mean squared error at two lags, and the guards of the state bind on
+  up to 3 % of rows at eight lags. It stays one keyword away.
+- **Under HAC, each row divided by the volatility of a plain variance after its update** (#1444).
+  It has the smallest bias of the three rules and the lowest mean squared error at a correlation of
+  0.9 with a moving volatility, but a higher one at 0.3 and 0.6 on every setting, by 3 % to 8 % at
+  two lags and up to 34 % at eight, and it needs one more vector in the state.
 - **A keyword on each target.** `DiagonalTarget` would carry a field that a geodesic shrinkage
   ignores, and the scalar estimator would need a keyword of its own anyway.
