@@ -176,7 +176,8 @@ commit = "ebcacfda95"
 "src/06_Distance/02_Distance.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 33, cog_sum = 18, arg_sum = 112, macros = [] }
 "src/06_Distance/03_DistanceDistance.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 5, arg_sum = 19, macros = [] }
 "src/06_Distance/04_Similarity.jl" = { cyc = 1, cog = 1, arg = 3, cyc_sum = 11, cog_sum = 1, arg_sum = 17, macros = [] }
-"src/06_Distance/05_FeatureDistance.jl" = { cyc = 9, cog = 11, arg = 6, cyc_sum = 61, cog_sum = 46, arg_sum = 84, macros = ["@propagatable"] }
+"src/06_Distance/05_FeatureDistance.jl" = { cyc = 9, cog = 11, arg = 6, cyc_sum = 77, cog_sum = 52, arg_sum = 104, macros = ["@propagatable"] }
+"src/06_Distance/06_FeatureDistanceActiveRows.jl" = { cyc = 6, cog = 6, arg = 5, cyc_sum = 87, cog_sum = 47, arg_sum = 151, macros = [] }
 "src/07_JuMPModelOptimisation.jl" = { cyc = 5, cog = 7, arg = 2, cyc_sum = 17, cog_sum = 16, arg_sum = 2, macros = [] }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { cyc = 5, cog = 5, arg = 1, cyc_sum = 27, cog_sum = 13, arg_sum = 4, macros = [] }
 "src/08_Phylogeny/02_Clusters.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 17, cog_sum = 9, arg_sum = 20, macros = ["@propagatable"] }

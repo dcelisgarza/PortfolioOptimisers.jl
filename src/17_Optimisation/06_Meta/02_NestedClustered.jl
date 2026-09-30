@@ -906,7 +906,9 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    imsk = investable_mask(pr)
+    # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    imsk = feature_readable_mask(nco.cle, investable_mask(pr), rd)
     fees = investable_fees_view(fees_constraints(nco.fees, nco.sets; datatype = Tf,
                                                  strict = nco.strict), imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit

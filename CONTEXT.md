@@ -129,7 +129,7 @@ A named series over the observation axis that belongs to no asset: a Currency Ex
 
 **Feature Matrix**
 The assets × features matrix a Feature Distance measures, or its time-varying form, observations × assets × features. It is built at the point of use from the Panel Fields a Feature Selector names: a numeric field gives one column, a categorical field one 0/1 column per level, a tensor field one column per label, and an observed mask one 0/1 column. Each column carries a label, which is the Feature Selector entry that selects exactly that column. It is always finite.
-The time-varying form holds the observation rows its consumer reads, not every row of the panel: a Feature Distance stacks the rows its collapse algorithm names, so under the default `LastObservation` the kernel's matrix is the last observation alone, 1 × assets × features, and a lifted static field is read once. A matrix stacked by hand from the panel holds every row unless `rows` says otherwise.
+The time-varying form holds the observation rows its consumer reads, not every row of the panel: a Feature Distance stacks the rows its collapse algorithm names, so under the default `LastObservation` the kernel's matrix is the last observation alone, 1 × assets × features, and a lifted static field is read once. The active mask of the stacked rows rides beside it. A matrix stacked by hand from the panel holds every row unless `rows` says otherwise.
 *Avoid*: reading it as a stored quantity. No `PricesResult` or `ReturnsResult` holds a Feature Matrix; an Asset Panel holds Panel Fields, and the matrix is derived from them. Also Characteristic (see **Characteristic Vector**, §3.9); and reading "feature" as *factor*, which is a return series.
 
 **Feature Selector**
@@ -453,6 +453,9 @@ Converts correlation or returns into a distance: `SimpleDistance`, `SimpleAbsolu
 
 **Feature Distance**
 The one Distance Estimator measuring something other than returns: it applies a metric to the rows of a Feature Matrix, stacked from the Panel Fields its Feature Selector names, so the resulting hierarchy expresses exogenous structure. A clustering or phylogeny result records nothing about that matrix: `feature_labels(de, pr, rd, X)` derives what it measured from the estimator, the prior result and the returns data, and the kernel derives the matrix the same way.
+It reads each asset, or each pair of assets, only at its own active rows of the Asset Panel, as a Coverage Policy fits a covariance cell: `LastObservation` reads the last row under `LastRow` and each asset's last active row under `LastActiveRow`, the two aggregates restrict their weights to the active rows, and `StackObservations` stacks the rows a pair shares and rescales the distance to the whole window. See ADR 0191.
+An asset it cannot read departs at the entry of a fit as a non-investable asset, and a direct call refuses it. A pair with no shared active row takes the `pair` rule of its collapse: `RefusePair` refuses, `DropFewerRows` drops the asset with fewer active rows at the entry of a fit, and `FeatureFallback` measures the pair by each asset's features collapsed over its own active rows.
+*Avoid*: reading an inactive cell as a value the distance measures. It holds a fill value, a zero or a stale value (ADR 0102), and no collapse reads it.
 
 **Similarity Matrix Algorithm**
 The transform turning a Distance Matrix into a similarity matrix: `MaximumDistanceSimilarity`, `ExponentialSimilarity`, `GeneralExponentialSimilarity`, `ComplementSimilarity`, `AngularSimilarity`.

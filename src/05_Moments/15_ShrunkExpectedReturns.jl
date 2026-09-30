@@ -797,7 +797,7 @@ Three consequences of the form separate this algorithm from the other two.
   - ``uv - w^2`` is a Cauchy-Schwarz gap in the inner product ``\\langle \\boldsymbol{x}, \\boldsymbol{y} \\rangle = \\boldsymbol{x}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{y}``, so it vanishes exactly when the target is a multiple of the sample mean. At ``N = 1`` every vector is such a multiple, so a one-asset sample raises a `DomainError` under all three targets.
   - ``\\beta \\boldsymbol{b}`` is the projection of ``(1-\\alpha) \\hat{\\boldsymbol{\\mu}}`` onto the line through ``\\boldsymbol{b}`` in the same inner product, so it reads the direction of the target and not its scale. Every target of this file is a multiple of the vector of ones, ``\\boldsymbol{b} = c \\boldsymbol{1}``, so ``v`` and ``w`` scale with ``c^2`` and ``c``. The factor cancels in ``\\alpha`` and in ``\\beta \\boldsymbol{b}``, and the three targets return the same estimate on one sample.
 
-The coefficient ``\\beta`` is equation 7 of [bodnar2019](@cite), which divides by the quadratic form ``v`` of the target. Equation 3.45 of [cajas2025](@cite) divides by ``u`` instead. That quotient does not minimise the quadratic loss that the paper derives both coefficients from, so this method follows the paper.
+The coefficient ``\\beta`` is equation 7 of [bodnar2019](@cite), which divides by the quadratic form ``v`` of the target. Equation 3.45 of [cajas2025](@cite) divides by ``u`` instead. That quotient does not minimise the quadratic loss from which [bodnar2019](@cite) derives both coefficients, so this method follows [bodnar2019](@cite).
 
 # Algorithm
 

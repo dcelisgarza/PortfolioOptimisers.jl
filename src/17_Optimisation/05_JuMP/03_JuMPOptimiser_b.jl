@@ -75,7 +75,9 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    imsk = investable_mask(pr)
+    # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    imsk = feature_readable_mask((opt.ple, opt.cte), investable_mask(pr), rd)
     fees = investable_fees_view(fees_constraints(opt.fees, opt.sets;
                                                  datatype = eltype(pr.X),
                                                  strict = opt.strict), imsk, pr.X)

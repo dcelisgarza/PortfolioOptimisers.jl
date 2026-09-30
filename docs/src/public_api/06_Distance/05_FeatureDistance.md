@@ -1,5 +1,5 @@
 ```@meta
-Description = "Feature Distance, public API of PortfolioOptimisers.jl: AngularDist, MeanCollapse, MedianCollapse, LastObservation, AggregateFeatures, AggregateDistances, …"
+Description = "Feature Distance, public API of PortfolioOptimisers.jl: AngularDist, MeanCollapse, MedianCollapse, LastObservation, LastRow, LastActiveRow, …"
 ```
 
 # Feature Distance
@@ -9,7 +9,12 @@ AngularDist
 MeanCollapse
 MedianCollapse
 LastObservation
+LastRow
+LastActiveRow
 AggregateFeatures
+RefusePair
+DropFewerRows
+FeatureFallback
 AggregateDistances
 StackObservations
 FeatureDistance

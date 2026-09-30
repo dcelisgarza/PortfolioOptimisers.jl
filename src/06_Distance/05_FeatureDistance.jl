@@ -201,24 +201,100 @@ abstract type AbstractFeatureCollapseAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Discards the window and measures the last observation's feature matrix alone.
+Abstract supertype for the rules that name the row [`LastObservation`](@ref) reads for each asset.
 
-The cheapest member of the family and its default, because it is the only one whose result depends on no aggregation choice. It is also the one member that names its rows before the stack exists: [`collapse_rows`](@ref) answers the last row, so the kernel stacks a window of one observation from an Asset Panel rather than every observation the collapse then discards.
+A time-varying Asset Panel lists and delists assets, so an asset can be inactive at the last row of the window. A rule states which row of the window the collapse reads for each asset. It is the `alg` field of [`LastObservation`](@ref).
+
+# Related
+
+  - [`LastRow`](@ref)
+  - [`LastActiveRow`](@ref)
+  - [`LastObservation`](@ref)
+"""
+abstract type AbstractLastObservationAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Reads every asset at the last row of the window, the default rule of [`LastObservation`](@ref).
+
+An asset that is inactive at the last row has no value to read. Inside a fit, the entry of the optimiser drops the asset as a non-investable asset. A direct call refuses the asset and names it.
+
+# Related
+
+  - [`AbstractLastObservationAlgorithm`](@ref)
+  - [`LastActiveRow`](@ref)
+  - [`LastObservation`](@ref)
+"""
+struct LastRow <: AbstractLastObservationAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Reads each asset at its last active row of the window, the most recent value that an investor had.
+
+An asset that delisted before the last row is read at the last row at which it was active. An asset with no active row in the window has no value to read.
+
+# Related
+
+  - [`AbstractLastObservationAlgorithm`](@ref)
+  - [`LastRow`](@ref)
+  - [`LastObservation`](@ref)
+"""
+struct LastActiveRow <: AbstractLastObservationAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Discards the window and measures one row of each asset's features.
+
+The cheapest member of the family and its default, because it is the only one whose result depends on no aggregation choice. `alg` names the row of each asset. [`LastRow`](@ref) reads the last row of the window, and [`LastActiveRow`](@ref) reads the last row at which each asset is active. It is also the one member that names its rows before the stack exists: [`collapse_rows`](@ref) answers the rows that `alg` can read, so the kernel stacks those rows of an Asset Panel alone.
 
 # Algorithm
 
- 1. Take the last slice of the observation axis, `view(Z, size(Z, 1), :, :)`, giving an `assets × features` matrix.
- 2. Apply the metric to that matrix once.
+ 1. Under [`LastRow`](@ref), or when every asset is active at the last row, take the last slice of the observation axis, `view(Z, size(Z, 1), :, :)`, giving an `assets × features` matrix.
+ 2. Under [`LastActiveRow`](@ref), take for each asset the row of its last active observation, giving an `assets × features` matrix.
+ 3. Apply the metric to that matrix once.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    LastObservation(;
+        alg::AbstractLastObservationAlgorithm = LastRow()
+    ) -> LastObservation
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> LastObservation()
+LastObservation
+  alg ┴ LastRow()
+```
 
 # Related
 
   - [`AbstractFeatureCollapseAlgorithm`](@ref)
+  - [`AbstractLastObservationAlgorithm`](@ref)
   - [`AggregateFeatures`](@ref)
   - [`AggregateDistances`](@ref)
   - [`StackObservations`](@ref)
   - [`collapse_rows`](@ref)
 """
-struct LastObservation <: AbstractFeatureCollapseAlgorithm end
+@concrete struct LastObservation <: AbstractFeatureCollapseAlgorithm
+    """
+    $(field_dict[:loalg])
+    """
+    alg
+    function LastObservation(alg::AbstractLastObservationAlgorithm)::LastObservation
+        return new{typeof(alg)}(alg)
+    end
+end
+function LastObservation(;
+                         alg::AbstractLastObservationAlgorithm = LastRow())::LastObservation
+    return LastObservation(alg)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -301,18 +377,58 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Measures every observation, then aggregates the resulting distance matrices.
+Abstract supertype for the rules that give the distance of a pair of assets with no shared active row.
 
-Produces one distance matrix per observation and combines them into a single `assets × assets` matrix. Costs `observations` metric evaluations against [`AggregateFeatures`](@ref)'s one, and accumulates into a single buffer rather than materialising the whole stack.
+[`AggregateDistances`](@ref) and [`StackObservations`](@ref) read each pair of assets at the rows at which both assets are active. Two assets whose active rows do not meet have no such row, so the collapse has nothing to read for the pair. A rule states what the collapse does then. It is the `pair` field of the two collapses.
 
-Only [`MeanCollapse`](@ref) is accepted: a convex combination of metrics is a metric, an entrywise median of them is not. Because the metric is applied *before* the aggregation, the zero-feature convention is applied per observation — an asset that is zero at some observations but not others is treated as zero only in the observations where it is.
+# Related
 
-# Algorithm
+  - [`RefusePair`](@ref)
+  - [`DropFewerRows`](@ref)
+  - [`FeatureFallback`](@ref)
+  - [`AggregateDistances`](@ref)
+  - [`StackObservations`](@ref)
+"""
+abstract type AbstractEmptyPairAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
 
- 1. Resolve `w` against `Z` with [`collapse_weights`](@ref), giving a weight vector of one entry per observation, or `nothing`.
- 2. Allocate the accumulator `D` and the single per-observation buffer `Dt`, both `assets × assets`, and set the weight total `sw` to zero.
- 3. For each observation `t`: measure that slice of `Z` into `Dt`; apply the zero-feature-vector convention to `Dt`; read the observation's weight `wt`, which is `one(T)` when `w` is `nothing`; add `wt .* Dt` to `D`; and add `wt` to `sw`.
- 4. Divide `D` by `sw`, giving the convex combination of the per-observation distance matrices.
+Refuses a pair of assets with no shared active row, the default rule for an empty pair.
+
+The refusal names the two assets and the two other rules.
+
+# Related
+
+  - [`AbstractEmptyPairAlgorithm`](@ref)
+  - [`DropFewerRows`](@ref)
+  - [`FeatureFallback`](@ref)
+"""
+struct RefusePair <: AbstractEmptyPairAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Drops the asset of an empty pair that has fewer active rows, at the entry of a fit.
+
+The entry of the optimiser finds the first pair of assets with no shared active row, drops the asset of the pair with fewer active rows, and repeats until no pair is empty. On a tie it drops the asset that comes later in the universe. A dropped asset departs as a non-investable asset: the fit announces it, gives it a zero weight, and lists it on the Non-Investable Axis.
+
+A direct call of [`distance`](@ref) or [`clusterise`](@ref) has no entry of a fit, so it refuses an empty pair under this rule and names the remedy.
+
+# Related
+
+  - [`AbstractEmptyPairAlgorithm`](@ref)
+  - [`RefusePair`](@ref)
+  - [`FeatureFallback`](@ref)
+  - [`investable_reduction`](@ref)
+"""
+struct DropFewerRows <: AbstractEmptyPairAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Measures an empty pair by the features of the two assets, each aggregated over its own active rows.
+
+For a pair of assets with no shared active row, each asset's features are collapsed over its own active rows by `alg`, under the weights `w` restricted to those rows. The distance of the pair is then the distance of the two assets as if each held its aggregated features at every row of the window. Every other pair keeps the rule of its collapse.
+
+The rule gives one scale to the whole matrix. Under [`AggregateDistances`](@ref) the distance of the pair is the metric of the two aggregated feature vectors, the value that every row of the window then gives. Under [`StackObservations`](@ref) each asset's aggregated feature vector fills each row of the stack, so a metric of the Minkowski family gives the same distance times the rescale of the stack at one shared row.
 
 # Fields
 
@@ -320,17 +436,16 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    AggregateDistances(;
+    FeatureFallback(;
         w::Option{<:ObsWeights} = nothing,
         alg::AbstractCollapseAlgorithm = MeanCollapse()
-    ) -> AggregateDistances
+    ) -> FeatureFallback
 
 Keywords correspond to the struct's fields.
 
 ## Validation
 
   - $(val_dict[:oow])
-  - `alg` is not a [`MedianCollapse`](@ref).
 
 ## Propagated parameters
 
@@ -347,10 +462,115 @@ When [`obs_weights_view`](@ref) is called on this type, the following fields are
 # Examples
 
 ```jldoctest
-julia> AggregateDistances()
-AggregateDistances
+julia> FeatureFallback()
+FeatureFallback
     w ┼ nothing
   alg ┴ MeanCollapse()
+```
+
+# Related
+
+  - [`AbstractEmptyPairAlgorithm`](@ref)
+  - [`RefusePair`](@ref)
+  - [`DropFewerRows`](@ref)
+  - [`AggregateFeatures`](@ref)
+"""
+@propagatable @concrete struct FeatureFallback <: AbstractEmptyPairAlgorithm
+    """
+    $(field_dict[:oow])
+    """
+    @wprop w
+    """
+    $(field_dict[:calg])
+    """
+    alg
+    function FeatureFallback(w::Option{<:ObsWeights},
+                             alg::AbstractCollapseAlgorithm)::FeatureFallback
+        assert_nonempty_nonneg_finite_val(w, :w)
+        return new{typeof(w), typeof(alg)}(w, alg)
+    end
+end
+function FeatureFallback(; w::Option{<:ObsWeights} = nothing,
+                         alg::AbstractCollapseAlgorithm = MeanCollapse())::FeatureFallback
+    return FeatureFallback(w, alg)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Measures every observation, then aggregates the resulting distance matrices.
+
+Produces one distance matrix per observation and combines them into a single `assets × assets` matrix. Costs `observations` metric evaluations against [`AggregateFeatures`](@ref)'s one, and accumulates into a single buffer rather than materialising the whole stack.
+
+Only [`MeanCollapse`](@ref) is accepted: a convex combination of metrics is a metric, an entrywise median of them is not. Because the metric is applied *before* the aggregation, the zero-feature convention is applied per observation — an asset that is zero at some observations but not others is treated as zero only in the observations where it is.
+
+A window of an Asset Panel can hold an inactive cell. Each pair of assets is then read at the rows at which both assets are active, and the weights of those rows are divided by their sum. This is available-case estimation, as a Coverage Policy fits a covariance cell. A pair with no shared active row, or with a zero weight on each of them, takes the rule in `pair`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+D_{i,\\,j} &= \\dfrac{\\sum\\limits_{t=1}^{T} w_{t} a_{t,\\,i} a_{t,\\,j} D_{t,\\,i,\\,j}}{\\sum\\limits_{t=1}^{T} w_{t} a_{t,\\,i} a_{t,\\,j}}\\,,
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:D_ij_dist])
+  - ``D_{t,\\,i,\\,j}``: Distance of assets ``i`` and ``j`` at observation ``t``.
+  - ``a_{t,\\,i}``: Entry of the active mask, `1` when asset ``i`` is active at observation ``t`` and `0` otherwise.
+  - $(math_dict[:w_t_obs])
+  - $(math_dict[:T])
+
+# Algorithm
+
+ 1. Resolve `w` against `Z` with [`collapse_weights`](@ref), giving a weight vector of one entry per observation, or `nothing`.
+ 2. Allocate the accumulator `D` and the single per-observation buffer `Dt`, both `assets × assets`, and set the weight total `sw` to zero.
+ 3. For each observation `t`: measure that slice of `Z` into `Dt`; apply the zero-feature-vector convention to `Dt`; read the observation's weight `wt`, which is `one(T)` when `w` is `nothing`; add `wt .* Dt` to `D`; and add `wt` to `sw`.
+ 4. Divide `D` by `sw`, giving the convex combination of the per-observation distance matrices.
+
+When the window holds an inactive cell, [`active_feature_distance`](@ref) keeps one weight total per pair in step 2, adds an entry in step 3 only at a row where both of its assets are active, divides each entry by its own total in step 4, and gives each empty pair to `pair`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    AggregateDistances(;
+        w::Option{<:ObsWeights} = nothing,
+        alg::AbstractCollapseAlgorithm = MeanCollapse(),
+        pair::AbstractEmptyPairAlgorithm = RefusePair()
+    ) -> AggregateDistances
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - $(val_dict[:oow])
+  - `alg` is not a [`MedianCollapse`](@ref).
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+  - `pair`: Recursively updated via [`factory`](@ref).
+
+## Observation weight parameters
+
+When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+
+  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `pair`: Recursively indexed via [`obs_weights_view`](@ref).
+
+# Examples
+
+```jldoctest
+julia> AggregateDistances()
+AggregateDistances
+     w ┼ nothing
+   alg ┼ MeanCollapse()
+  pair ┴ RefusePair()
 
 julia> AggregateDistances(; alg = MedianCollapse())
 ERROR: ArgumentError: alg must not be a MedianCollapse: an entrywise median of distance matrices need not satisfy the triangle inequality, so the result would not be a metric. Use MeanCollapse, or aggregate the features instead with AggregateFeatures.
@@ -361,6 +581,7 @@ ERROR: ArgumentError: alg must not be a MedianCollapse: an entrywise median of d
 
   - [`AbstractFeatureCollapseAlgorithm`](@ref)
   - [`AbstractCollapseAlgorithm`](@ref)
+  - [`AbstractEmptyPairAlgorithm`](@ref)
   - [`AggregateFeatures`](@ref)
   - [`FeatureDistance`](@ref)
   - [`factory`](@ref)
@@ -375,17 +596,22 @@ ERROR: ArgumentError: alg must not be a MedianCollapse: an entrywise median of d
     $(field_dict[:calg])
     """
     alg
-    function AggregateDistances(w::Option{<:ObsWeights},
-                                alg::AbstractCollapseAlgorithm)::AggregateDistances
+    """
+    $(field_dict[:fdpair])
+    """
+    @fprop pair
+    function AggregateDistances(w::Option{<:ObsWeights}, alg::AbstractCollapseAlgorithm,
+                                pair::AbstractEmptyPairAlgorithm)::AggregateDistances
         assert_nonempty_nonneg_finite_val(w, :w)
         @argcheck(!isa(alg, MedianCollapse),
                   ArgumentError("alg must not be a MedianCollapse: an entrywise median of distance matrices need not satisfy the triangle inequality, so the result would not be a metric. Use MeanCollapse, or aggregate the features instead with AggregateFeatures."))
-        return new{typeof(w), typeof(alg)}(w, alg)
+        return new{typeof(w), typeof(alg), typeof(pair)}(w, alg, pair)
     end
 end
 function AggregateDistances(; w::Option{<:ObsWeights} = nothing,
-                            alg::AbstractCollapseAlgorithm = MeanCollapse())::AggregateDistances
-    return AggregateDistances(w, alg)
+                            alg::AbstractCollapseAlgorithm = MeanCollapse(),
+                            pair::AbstractEmptyPairAlgorithm = RefusePair())::AggregateDistances
+    return AggregateDistances(w, alg, pair)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -396,20 +622,84 @@ Turns `observations × assets × features` into an `assets × (observations · f
 
 Equals none of the other members of the family in general, but agrees with all of them when `observations == 1`.
 
+A window of an Asset Panel can hold an inactive cell. Each pair of assets then stacks the ``n`` rows at which both assets are active, and [`stack_rescale`](@ref) rescales its distance from those rows to the ``T`` rows of the window. A metric that sums over the coordinates, such as the Minkowski family, `Distances.SqEuclidean` or `Distances.ChiSqDist`, takes a factor of ``T / n`` inside its power. A ratio metric, such as [`AngularDist`](@ref) or `Distances.CosineDist`, takes no factor. A metric with no rescale method refuses a pair that shares fewer rows than the window. A pair with no shared active row takes the rule in `pair`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+D_{i,\\,j} &= \\left(\\dfrac{T}{n_{i,\\,j}}\\right)^{1/p} m\\left(\\boldsymbol{z}_{i,\\,\\mathcal{S}_{i,\\,j}},\\, \\boldsymbol{z}_{j,\\,\\mathcal{S}_{i,\\,j}}\\right)\\,,
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:D_ij_dist])
+  - ``\\mathcal{S}_{i,\\,j}``: Rows at which both assets ``i`` and ``j`` are active.
+  - ``n_{i,\\,j}``: Number of rows in ``\\mathcal{S}_{i,\\,j}``.
+  - ``\\boldsymbol{z}_{i,\\,\\mathcal{S}_{i,\\,j}}``: Stacked feature vector of asset ``i`` over the rows of ``\\mathcal{S}_{i,\\,j}``.
+  - ``m``: Distance metric, `metric`.
+  - ``p``: Power of the metric: ``1`` for `Distances.Cityblock`, `Distances.SqEuclidean` and `Distances.ChiSqDist`, ``2`` for `Distances.Euclidean`, ``p`` for `Distances.Minkowski`, and ``\\infty`` for a ratio metric, which takes no factor.
+  - $(math_dict[:T])
+
+This is the rule that R's `stats::dist` applies to a missing coordinate. A weighted metric of the Minkowski family takes the ratio of its weight sums in place of ``T / n``.
+
 # Algorithm
 
  1. Permute `Z` so the asset axis leads: `(2, 1, 3)` at `dims = 1`, and `(3, 1, 2)` at `dims = 2`.
  2. Reshape the permuted array to `assets × (observations · features)`, giving one long feature vector per asset.
  3. Apply the metric to that matrix once, along its first axis.
 
+When the window holds an inactive cell, [`active_feature_distance`](@ref) then measures each pair that shares fewer rows than the window again, over its shared rows, rescales it with [`stack_rescale`](@ref), and gives each empty pair to `pair`.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    StackObservations(;
+        pair::AbstractEmptyPairAlgorithm = RefusePair()
+    ) -> StackObservations
+
+Keywords correspond to the struct's fields.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+
+  - `pair`: Recursively updated via [`factory`](@ref).
+
+# Examples
+
+```jldoctest
+julia> StackObservations()
+StackObservations
+  pair ┴ RefusePair()
+```
+
 # Related
 
   - [`AbstractFeatureCollapseAlgorithm`](@ref)
+  - [`AbstractEmptyPairAlgorithm`](@ref)
   - [`LastObservation`](@ref)
   - [`AggregateFeatures`](@ref)
   - [`AggregateDistances`](@ref)
+  - [`stack_rescale`](@ref)
 """
-struct StackObservations <: AbstractFeatureCollapseAlgorithm end
+@propagatable @concrete struct StackObservations <: AbstractFeatureCollapseAlgorithm
+    """
+    $(field_dict[:fdpair])
+    """
+    @fprop pair
+    function StackObservations(pair::AbstractEmptyPairAlgorithm)::StackObservations
+        return new{typeof(pair)}(pair)
+    end
+end
+function StackObservations(;
+                           pair::AbstractEmptyPairAlgorithm = RefusePair())::StackObservations
+    return StackObservations(pair)
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -497,7 +787,8 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 julia> FeatureDistance()
 FeatureDistance
   metric ┼ AngularDist: AngularDist()
-     alg ┼ LastObservation()
+     alg ┼ LastObservation
+         │   alg ┴ LastRow()
      sim ┼ AngularSimilarity()
      ape ┼ nothing
      sel ┼ nothing
@@ -506,7 +797,8 @@ FeatureDistance
 julia> FeatureDistance(; metric = PortfolioOptimisers.Distances.CosineDist())
 FeatureDistance
   metric ┼ Distances.CosineDist: Distances.CosineDist()
-     alg ┼ LastObservation()
+     alg ┼ LastObservation
+         │   alg ┴ LastRow()
      sim ┼ ComplementSimilarity()
      ape ┼ nothing
      sel ┼ nothing
@@ -957,23 +1249,29 @@ function feature_distance(de::FeatureDistance{<:Any, <:AggregateDistances}, Z::A
 end
 """
     distance(de::FeatureDistance, Z::MatNum; dims::Int = 1, kwargs...)
-    distance(de::FeatureDistance, Z::Arr3Num; dims::Int = 1, kwargs...)
+    distance(de::FeatureDistance, Z::Arr3Num; dims::Int = 1, amsk = nothing, nx = nothing,
+             kwargs...)
 
 Compute the distance matrix from a feature matrix.
 
 The 2-D method never consults `de.alg`: a static feature matrix has no observation axis to collapse, so the collapse algorithm is inert rather than an error. The 3-D method dispatches on it. Assets whose feature vector is entirely zero are given the convention documented in [`patch_zero_feature_vectors!`](@ref).
 
+The 3-D method reads the active mask `amsk` of the window. A collapse then reads each asset, or each pair of assets, at its own active rows, as each member of [`AbstractFeatureCollapseAlgorithm`](@ref) states. A window with no inactive cell gives the result that it gives with no mask.
+
 # Algorithm
 
  1. Validate `Z` and `dims` with [`assert_feature_matrix`](@ref).
  2. On the 2-D method, hand `de.metric` and `Z` to the kernel.
- 3. On the 3-D method, hand `de` and `Z` to the collapse dispatcher, which selects the branch that `de.alg` names.
+ 3. On the 3-D method, check the active mask with [`active_window`](@ref), and check that the collapse can read each asset with [`assert_feature_readable`](@ref).
+ 4. With no inactive cell, hand `de` and `Z` to the collapse dispatcher [`feature_distance`](@ref), which selects the branch that `de.alg` names. Otherwise hand the window to [`active_feature_distance`](@ref).
 
 # Arguments
 
   - `de`: Feature distance estimator.
   - $(arg_dict[:Z])
   - $(arg_dict[:dims])
+  - `amsk`: The active mask of the window, `observations × assets`, or `nothing` when every cell is active. The 3-D method alone reads it.
+  - `nx`: The asset names that a refusal quotes, or `nothing` to quote positions. The 3-D method alone reads it.
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Validation
@@ -982,6 +1280,8 @@ The 2-D method never consults `de.alg`: a static feature matrix has no observati
   - `!isempty(Z)`.
   - `all(isfinite, Z)`.
   - `Z` lies in `de.metric`'s domain (see [`assert_metric_domain`](@ref)).
+  - On the 3-D method, `amsk` is `observations × assets`, and the collapse can read each asset. See [`assert_feature_readable`](@ref).
+  - On the 3-D method, a pair of assets with no shared active row takes the rule of the `pair` field of [`AggregateDistances`](@ref) and [`StackObservations`](@ref).
 
 # Returns
 
@@ -1010,10 +1310,17 @@ function distance(de::FeatureDistance, Z::MatNum; dims::Int = 1, kwargs...)
     assert_feature_matrix(de, Z, dims)
     return feature_distance(de.metric, Z, dims)
 end
-function distance(de::FeatureDistance, Z::Arr3Num; dims::Int = 1, kwargs...)
+function distance(de::FeatureDistance, Z::Arr3Num; dims::Int = 1, amsk = nothing,
+                  nx = nothing, kwargs...)
     assert_dims(dims)
     assert_feature_matrix(de, Z, dims)
-    return feature_distance(de, Z, dims)
+    A = active_window(amsk, Z, dims)
+    assert_feature_readable(de.alg, A, nx)
+    return if isnothing(A)
+        feature_distance(de, Z, dims)
+    else
+        active_feature_distance(de, (; Z = Z, dims = dims, A = A, nx = nx))
+    end
 end
 """
     cor_and_dist(de::FeatureDistance, Z::MatNum; dims::Int = 1, kwargs...)
@@ -1081,7 +1388,7 @@ end
 
 Name the observation rows a collapse algorithm reads, so the kernel stacks those rows alone.
 
-A time-varying Feature Matrix is stacked from an Asset Panel and then collapsed along its observation axis, and a collapse that reads one row has no use for the others. [`LastObservation`](@ref) reads the last row, so it names it, and the stack it is handed is a window of one observation: a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), is then read once rather than once per observation, and the kernel's cost under the default collapse is the `assets × features` slice it measures. Every other member answers `Colon()`, every row. The two aggregates resolve their weights against the stacked window itself (see [`collapse_weights`](@ref)), so a window they could cut is not known before the stack exists, and [`StackObservations`](@ref) reads the whole stack by definition.
+A time-varying Feature Matrix is stacked from an Asset Panel and then collapsed along its observation axis, and a collapse that reads one row has no use for the others. [`LastObservation`](@ref) under [`LastRow`](@ref) reads the last row, so it names it, and the stack it is handed is a window of one observation: a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), is then read once rather than once per observation, and the kernel's cost under the default collapse is the `assets × features` slice it measures. Under [`LastActiveRow`](@ref) it names the rows from the earliest last active row of an asset to the last row, which hold the last active row of every asset that has one. Every other member answers `Colon()`, every row. The two aggregates resolve their weights against the stacked window itself (see [`collapse_weights`](@ref)), so a window they could cut is not known before the stack exists, and [`StackObservations`](@ref) reads the whole stack by definition.
 
 A static panel has no observation axis, so every member answers `Colon()` on one, [`LastObservation`](@ref) included.
 
@@ -1089,17 +1396,19 @@ A static panel has no observation axis, so every member answers `Colon()` on one
 
 The method that Julia selects is the algorithm.
 
- 1. [`LastObservation`](@ref) on a time-varying panel: the last observation, `nobs:nobs`, where `nobs` is the observation count [`panel_axes`](@ref) reads.
- 2. Every other case: `Colon()`.
+ 1. [`LastObservation`](@ref) forwards to its rule.
+ 2. [`LastRow`](@ref) on a time-varying panel: the last observation, `nobs:nobs`, where `nobs` is the observation count [`panel_axes`](@ref) reads.
+ 3. [`LastActiveRow`](@ref) on a time-varying panel: `r0:nobs`, where `r0` is the earliest of the last active rows of the assets that have one, or `nobs` when no asset has one.
+ 4. Every other case: `Colon()`.
 
 # Arguments
 
-  - `alg`: The collapse algorithm.
+  - `alg`: The collapse algorithm, or the rule of a [`LastObservation`](@ref).
   - `pnl`: The Asset Panel the Feature Matrix is stacked from.
 
 # Returns
 
-  - `rows`: A one-observation range, or `Colon()`. The `rows` keyword of [`feature_matrix`](@ref).
+  - `rows`: A range of observations, or `Colon()`. The `rows` keyword of [`feature_matrix`](@ref).
 
 # Related
 
@@ -1112,9 +1421,21 @@ The method that Julia selects is the algorithm.
 function collapse_rows(::AbstractFeatureCollapseAlgorithm, ::AssetPanel)
     return Colon()
 end
-function collapse_rows(::LastObservation, pnl::AssetPanel)
+function collapse_rows(alg::LastObservation, pnl::AssetPanel)
+    return collapse_rows(alg.alg, pnl)
+end
+function collapse_rows(::LastRow, pnl::AssetPanel)
     ax = panel_axes(pnl)
     return length(ax) == 2 ? (ax[1]:ax[1]) : Colon()
+end
+function collapse_rows(::LastActiveRow, pnl::AssetPanel)
+    amsk = pnl.amsk
+    if isnothing(amsk)
+        return Colon()
+    end
+    nobs = size(amsk, 1)
+    r0 = minimum(i -> something(findlast(view(amsk, :, i)), nobs), axes(amsk, 2))
+    return r0:nobs
 end
 """
     feature_matrix(de::FeatureDistance, pr, rd, X) -> AbstractArray{<:Number}
@@ -1157,9 +1478,88 @@ The collapse algorithm names the rows, through [`collapse_rows`](@ref). Under [`
   - [`cor_and_dist`](@ref)
 """
 function feature_matrix(de::FeatureDistance, pr, rd, X)
+    return first(feature_window(de, pr, rd, X))
+end
+"""
+    feature_window(de::FeatureDistance, pr, rd, X) -> (Z, A)
+
+Stack the Feature Matrix a [`FeatureDistance`](@ref) measures, beside the active mask of the rows it stacks.
+
+It is [`feature_matrix`](@ref) with the active mask added. The mask is the active mask of the panel, cut to the rows that [`collapse_rows`](@ref) names, so it has one row per observation of the stack. A static panel has no active mask, and its mask is `nothing`.
+
+# Algorithm
+
+ 1. Resolve the panel with [`asset_panel`](@ref).
+ 2. Name the rows the collapse reads with [`collapse_rows`](@ref).
+ 3. Stack the panel over those rows with [`feature_matrix`](@ref), and cut the active mask of the panel to them.
+
+# Arguments
+
+  - `de`: Feature distance estimator.
+  - $(arg_dict[:pr_rr])
+  - $(arg_dict[:rd])
+  - $(arg_dict[:X_sub]) A producer reads it.
+
+# Returns
+
+  - `Z::Array`: The Feature Matrix, as [`feature_matrix`](@ref) returns it.
+  - `A::Option{<:AbstractMatrix{Bool}}`: The active mask of the stacked rows, `observations × assets`, or `nothing` for a static panel.
+
+# Related
+
+  - [`feature_matrix`](@ref)
+  - [`collapse_rows`](@ref)
+  - [`distance`](@ref)
+"""
+function feature_window(de::FeatureDistance, pr, rd, X)
     pnl = asset_panel(de.ape, pr, rd, X)
-    return feature_matrix(pnl, de.sel; strict = de.strict,
-                          rows = collapse_rows(de.alg, pnl))
+    rows = collapse_rows(de.alg, pnl)
+    return feature_matrix(pnl, de.sel; strict = de.strict, rows = rows),
+           window_activity(pnl.amsk, rows)
+end
+"""
+    window_activity(amsk, rows)
+
+Cut the active mask of an Asset Panel to the rows that a Feature Matrix stacks. A static panel has no active mask, so its window has none either.
+
+# Arguments
+
+  - `amsk`: The active mask of the panel, `observations × assets`, or `nothing` for a static panel.
+  - $(arg_dict[:fdrows])
+
+# Returns
+
+  - `A::Option{<:AbstractMatrix{Bool}}`: `amsk[rows, :]`, or `nothing`.
+
+# Related
+
+  - [`feature_window`](@ref)
+  - [`collapse_rows`](@ref)
+"""
+function window_activity(::Nothing, ::Any)
+    return nothing
+end
+function window_activity(amsk::AbstractMatrix{Bool}, rows)
+    return amsk[rows, :]
+end
+"""
+    feature_asset_names(pr, rd)
+
+Give the asset names that a refusal of a [`FeatureDistance`](@ref) quotes: those of the returns data `rd`, or those of `pr` when a `ReturnsResult` comes in its place, and `nothing` otherwise, so that the refusal quotes positions.
+
+# Related
+
+  - [`feature_asset_labels`](@ref)
+  - [`distance`](@ref)
+"""
+function feature_asset_names(::Any, rd::ReturnsResult)
+    return rd.nx
+end
+function feature_asset_names(pr::ReturnsResult, ::Nothing)
+    return pr.nx
+end
+function feature_asset_names(::Any, ::Any)
+    return nothing
 end
 """
     feature_labels(de::FeatureDistance, pr, rd, X) -> Vector
@@ -1215,8 +1615,8 @@ The prior result and the returns data come in the keyword tail as `pr` and `rd`,
 
 # Algorithm
 
- 1. Stack the Feature Matrix with [`feature_matrix`](@ref), which resolves the panel and cuts it to `de.sel` and to the observation rows that `de.alg` reads.
- 2. Compute the distance matrix `D` of that stack with the two-argument method, at `dims = 1`.
+ 1. Stack the Feature Matrix with [`feature_window`](@ref), which resolves the panel and cuts it to `de.sel` and to the observation rows that `de.alg` reads, beside the active mask of those rows.
+ 2. Compute the distance matrix `D` of that stack with the two-argument method, at `dims = 1`, with the active mask and the asset names of `rd`.
 
 # Arguments
 
@@ -1232,6 +1632,7 @@ The prior result and the returns data come in the keyword tail as `pr` and `rd`,
   - $(val_dict[:fd_panel])
   - $(val_dict[:fd_strict])
   - The stacked Feature Matrix passes [`assert_feature_matrix`](@ref) at `dims = 1`: it is not empty, every entry is finite, and it lies in the domain of `de.metric`.
+  - The collapse can read each asset at the active rows of the window, see [`assert_feature_readable`](@ref), and a pair with no shared active row takes the `pair` rule of its collapse. A fit drops an unreadable asset at its entry with [`feature_readable_mask`](@ref), and this call refuses it.
 
 # Returns
 
@@ -1247,7 +1648,8 @@ The prior result and the returns data come in the keyword tail as `pr` and `rd`,
   - [`phylogeny_matrix`](@ref)
 """
 function distance(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
-    return distance(de, feature_matrix(de, pr, rd, X); dims = 1)
+    Z, A = feature_window(de, pr, rd, X)
+    return distance(de, Z; dims = 1, amsk = A, nx = feature_asset_names(pr, rd))
 end
 """
     cor_and_dist(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
@@ -1258,8 +1660,8 @@ This is the form that [`clusterise`](@ref) and the network estimators call. It r
 
 # Algorithm
 
- 1. Stack the Feature Matrix with [`feature_matrix`](@ref), which resolves the panel and cuts it to `de.sel` and to the observation rows that `de.alg` reads.
- 2. Compute the similarity matrix `S` and the distance matrix `D` of that stack with the two-argument method, at `dims = 1`.
+ 1. Stack the Feature Matrix with [`feature_window`](@ref), which resolves the panel and cuts it to `de.sel` and to the observation rows that `de.alg` reads, beside the active mask of those rows.
+ 2. Compute the similarity matrix `S` and the distance matrix `D` of that stack with the two-argument method, at `dims = 1`, with the active mask and the asset names of `rd`.
 
 # Arguments
 
@@ -1275,6 +1677,7 @@ This is the form that [`clusterise`](@ref) and the network estimators call. It r
   - $(val_dict[:fd_panel])
   - $(val_dict[:fd_strict])
   - The stacked Feature Matrix passes [`assert_feature_matrix`](@ref) at `dims = 1`: it is not empty, every entry is finite, and it lies in the domain of `de.metric`.
+  - The collapse can read each asset at the active rows of the window, see [`assert_feature_readable`](@ref), and a pair with no shared active row takes the `pair` rule of its collapse. A fit drops an unreadable asset at its entry with [`feature_readable_mask`](@ref), and this call refuses it.
 
 # Returns
 
@@ -1290,8 +1693,10 @@ This is the form that [`clusterise`](@ref) and the network estimators call. It r
   - [`clusterise`](@ref)
 """
 function cor_and_dist(de::FeatureDistance, ::Any, X; pr = nothing, rd = nothing, kwargs...)
-    return cor_and_dist(de, feature_matrix(de, pr, rd, X); dims = 1)
+    Z, A = feature_window(de, pr, rd, X)
+    return cor_and_dist(de, Z; dims = 1, amsk = A, nx = feature_asset_names(pr, rd))
 end
 
 export AngularDist, MeanCollapse, MedianCollapse, LastObservation, AggregateFeatures,
-       AggregateDistances, StackObservations, FeatureDistance
+       AggregateDistances, StackObservations, FeatureDistance, LastRow, LastActiveRow,
+       RefusePair, DropFewerRows, FeatureFallback

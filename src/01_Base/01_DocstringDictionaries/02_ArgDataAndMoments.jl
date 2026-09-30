@@ -95,6 +95,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :fdmetric => "`metric`: Distance metric applied to the rows of the feature matrix.",#
                  :fcalg => "`alg`: Feature collapse algorithm, used to reduce a window of time-varying features to a single distance matrix. Inert for a 2-D feature matrix.",#
                  :calg => "`alg`: Collapse algorithm, the aggregator applied along the observation axis.",#
+                 :loalg => "`alg`: Rule that names the row of the window read for each asset.",#
+                 :fdpair => "`pair`: Rule for a pair of assets with no shared active row in the window.",#
                  :fdsim => "`sim`: Similarity matrix algorithm used to derive the similarity counterpart of the feature distance matrix.",#
                  :fdape => "`ape`: Asset Panel producer, or `nothing` to read the panel that the returns data holds. A producer is configuration: it builds a static panel at the point of use, from the prior result and the returns of the subproblem that runs it, so a view passes it through and a fold refits it.",#
                  :fdsel => "`sel`: Feature Selector naming the Panel Fields the Feature Matrix stacks, or `nothing` to stack every field's values. An entry is a field name, a field paired with the levels or labels it keeps, a field paired with one level or label, a tensor field paired with a [`LabelGroup`](@ref), or a field paired with `:observed`. The vector order is the column order.",#

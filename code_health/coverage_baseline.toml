@@ -50,7 +50,7 @@ commit = "8610300"
 "src/01_Base/15_Online.jl" = { lines = 110, misses = 0 }
 "src/01_Base/16_CoveragePolicy.jl" = { lines = 117, misses = 0 }
 "src/02_Tools/01_Operators.jl" = { lines = 23, misses = 0 }
-"src/02_Tools/02_ArrayViews.jl" = { lines = 55, misses = 0 }
+"src/02_Tools/02_ArrayViews.jl" = { lines = 57, misses = 0 }
 "src/02_Tools/03_TypeUtilities.jl" = { lines = 14, misses = 0 }
 "src/02_Tools/04_Factory.jl" = { lines = 12, misses = 0 }
 "src/02_Tools/05_Propagatable.jl" = { lines = 198, misses = 0 }
@@ -174,7 +174,8 @@ commit = "8610300"
 "src/06_Distance/02_Distance.jl" = { lines = 72, misses = 0 }
 "src/06_Distance/03_DistanceDistance.jl" = { lines = 14, misses = 0 }
 "src/06_Distance/04_Similarity.jl" = { lines = 32, misses = 0 }
-"src/06_Distance/05_FeatureDistance.jl" = { lines = 138, misses = 0 }
+"src/06_Distance/05_FeatureDistance.jl" = { lines = 175, misses = 0 }
+"src/06_Distance/06_FeatureDistanceActiveRows.jl" = { lines = 165, misses = 0 }
 "src/07_JuMPModelOptimisation.jl" = { lines = 46, misses = 0 }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { lines = 55, misses = 0 }
 "src/08_Phylogeny/02_Clusters.jl" = { lines = 35, misses = 0 }

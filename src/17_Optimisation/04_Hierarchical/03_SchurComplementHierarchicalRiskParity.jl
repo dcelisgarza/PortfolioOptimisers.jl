@@ -1258,7 +1258,9 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
     # variance or a standard deviation, which a fee does not move. The result holds the
     # fee, and the net returns and a fold's forced exit read it there.
-    imsk = investable_mask(pr)
+    # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    imsk = feature_readable_mask(sh.opt.cle, investable_mask(pr), rd)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns, widened to a float only when it is an integer. An
     # integer sample then allocates in floating point, and a `Float32` sample stays in
@@ -1329,7 +1331,9 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
     # variance or a standard deviation, which a fee does not move. The result holds the
     # fee, and the net returns and a fold's forced exit read it there.
-    imsk = investable_mask(pr)
+    # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    imsk = feature_readable_mask(sh.opt.cle, investable_mask(pr), rd)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns, widened to a float only when it is an integer. An
     # integer sample then allocates in floating point, and a `Float32` sample stays in

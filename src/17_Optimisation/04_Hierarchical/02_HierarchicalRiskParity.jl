@@ -386,7 +386,9 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # A weight is a quotient of two risks, so an integer sample takes a float weight type,
     # and every other sample keeps its own type.
     T = float_if_integer(eltype(pr.X))
-    imsk = investable_mask(pr)
+    # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    imsk = feature_readable_mask(hrp.opt.cle, investable_mask(pr), rd)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -549,7 +551,9 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # A weight is a quotient of two risks, so an integer sample takes a float weight type,
     # and every other sample keeps its own type.
     T = float_if_integer(eltype(pr.X))
-    imsk = investable_mask(pr)
+    # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    imsk = feature_readable_mask(hrp.opt.cle, investable_mask(pr), rd)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)

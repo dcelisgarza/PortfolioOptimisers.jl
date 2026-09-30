@@ -177,7 +177,8 @@ commit = "ebcacfda95"
 "src/06_Distance/02_Distance.jl" = { code = 162, doc = 350, comment = 0, blank = 157, total = 669 }
 "src/06_Distance/03_DistanceDistance.jl" = { code = 39, doc = 132, comment = 0, blank = 58, total = 229 }
 "src/06_Distance/04_Similarity.jl" = { code = 61, doc = 354, comment = 0, blank = 159, total = 574 }
-"src/06_Distance/05_FeatureDistance.jl" = { code = 234, doc = 724, comment = 2, blank = 337, total = 1297 }
+"src/06_Distance/05_FeatureDistance.jl" = { code = 314, doc = 953, comment = 2, blank = 433, total = 1702 }
+"src/06_Distance/06_FeatureDistanceActiveRows.jl" = { code = 290, doc = 294, comment = 0, blank = 146, total = 730 }
 "src/07_JuMPModelOptimisation.jl" = { code = 91, doc = 206, comment = 2, blank = 92, total = 391 }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { code = 121, doc = 585, comment = 10, blank = 278, total = 994 }
 "src/08_Phylogeny/02_Clusters.jl" = { code = 113, doc = 456, comment = 0, blank = 180, total = 749 }

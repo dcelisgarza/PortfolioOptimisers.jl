@@ -151,6 +151,25 @@ function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
            non_investable_universe(port_opt_view(opt, idx, pr.X), ni),
            port_opt_view(rd, idx)
 end
+# The estimators that hold a distance estimator, each forwarded to the estimator it holds, so
+# that `feature_readable_mask` finds each `FeatureDistance` of a fit. They load after the
+# distance estimators, so their methods live here, beside the reduction that reads them.
+function feature_readable_mask(x::Union{<:ClustersEstimator, <:NetworkEstimator},
+                               imsk::Option{<:BitVector}, rd)
+    return feature_readable_mask(x.de, imsk, rd)
+end
+function feature_readable_mask(x::NetworkClustersEstimator, imsk::Option{<:BitVector}, rd)
+    return feature_readable_mask(x.nte, imsk, rd)
+end
+function feature_readable_mask(x::Union{<:CentralityEstimator,
+                                        <:SemiDefinitePhylogenyEstimator,
+                                        <:IntegerPhylogenyEstimator},
+                               imsk::Option{<:BitVector}, rd)
+    return feature_readable_mask(x.pl, imsk, rd)
+end
+function feature_readable_mask(x::CentralityConstraint, imsk::Option{<:BitVector}, rd)
+    return feature_readable_mask(x.A, imsk, rd)
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

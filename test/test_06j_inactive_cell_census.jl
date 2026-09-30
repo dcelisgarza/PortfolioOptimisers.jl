@@ -24,9 +24,10 @@ Each name on the first list has a case below or an exemption that states why no 
 answer. Each type on the second list has a case. A new consumer fails the census until it gets
 one, so it is checked the day it lands.
 
-Two consumers read the inactive cells, and each needs a decision of the maintainer; their cases
-are `@test_broken`, and the issue each names holds the reproduction: `FeatureDistance` (#1450)
-and the panel collapse of a meta-optimiser (#1451).
+One consumer reads the inactive cells and waits on its build; its case is `@test_broken`, and the
+issue it names holds the reproduction: the panel collapse of a meta-optimiser (#1451).
+`FeatureDistance` reads each asset and each pair at its own active rows since #1454 (the
+decision of #1450), and its cases cover each collapse and each rule for an empty pair.
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 
@@ -152,7 +153,8 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :panel_feature_names => "reads the names",
                                            :panel_column_label => "reads the names",
                                            :feature_labels => "reads the names",
-                                           :collapse_rows => "reads the axes",
+                                           :collapse_rows => "reads the axes and the active mask",
+                                           :entry_activity => "a step of feature_readable_mask, whose case is below",
                                            # Transport: a cut, a view or a move keeps each inactive cell as it was, and the consumer
                                            # that reads the result is the one a case runs.
                                            :port_opt_view => "a view",
@@ -187,9 +189,10 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :windowed_variance_series => "a step of variance_series on a windowed estimator",
                                            :prior_forecast_location => "a step of forecast_location on a prior",
                                            :ep_prior => "passes the panel to the prior it wraps",
-                                           # The stack of the Feature Matrix returns the stored cells, and FeatureDistance reads it.
-                                           :panel_feature_matrix => "the stack FeatureDistance reads, whose case is below (#1450)",
-                                           :feature_matrix => "the stack FeatureDistance reads, whose case is below (#1450)",
+                                           # The stack of the Feature Matrix returns the stored cells, and FeatureDistance reads
+                                           # it beside the active mask.
+                                           :panel_feature_matrix => "the stack FeatureDistance reads, whose cases are below",
+                                           :feature_matrix => "the stack FeatureDistance reads, whose cases are below",
                                            :select_fields => "a step of feature_matrix",
                                            :select_fields_push! => "a step of feature_matrix")
 
@@ -373,11 +376,55 @@ end
                  r -> (CENSUS_PO.cross_sectional_panel_masks(r.pnl),
                        CENSUS_PO.panel_moment_masks(r.pnl),
                        CENSUS_PO.last_active_mask(r.pnl)))]
+    # FeatureDistance reads each asset and each pair at its own active rows (#1454). The
+    # last row holds every asset but the delisted asset 3, and rows 1 to 20 beside rows 61 to 80
+    # give the pair (2, 3) no shared active row.
+    fsel = ["style1", "style2"]
+    fd(alg; kwargs...) = FeatureDistance(; sel = fsel, alg = alg, kwargs...)
+    last_view(r) = CENSUS_PO.port_opt_view(r, findall(r.pnl.amsk[end, :]))
+    gap_view(r) = CENSUS_PO.port_opt_view(r, vcat(1:20, 61:80), :)
+    fdist(de, r) = distance(de, nothing, r.X; rd = r)
+    fmsg(f) =
+        try
+            f()
+        catch e
+            sprint(showerror, e)
+        end
+    euc = CENSUS_PO.Distances.Euclidean()
+    fb = FeatureFallback()
+    append!(cases,
+            Any[((:FeatureDistance,),
+                 "FeatureDistance under LastRow, on the assets it reads",
+                 r -> fdist(fd(LastObservation()), last_view(r))),
+                ((:FeatureDistance,),
+                 "FeatureDistance under LastRow refuses the delisted asset",
+                 r -> fmsg(() -> fdist(fd(LastObservation()), r))),
+                ((:FeatureDistance,), "FeatureDistance under LastActiveRow",
+                 r -> fdist(fd(LastObservation(; alg = LastActiveRow())), r)),
+                ((:FeatureDistance,), "FeatureDistance under AggregateFeatures",
+                 r -> fdist(fd(AggregateFeatures()), r)),
+                ((:FeatureDistance,), "FeatureDistance under a weighted median",
+                 r -> fdist(fd(AggregateFeatures(; alg = MedianCollapse(),
+                                                 w = CENSUS_PO.StatsBase.eweights(size(r.X,
+                                                                                       1),
+                                                                                  0.05))),
+                            r)),
+                ((:FeatureDistance,), "FeatureDistance under AggregateDistances",
+                 r -> fdist(fd(AggregateDistances()), r)),
+                ((:FeatureDistance,), "FeatureDistance under StackObservations",
+                 r -> fdist(fd(StackObservations(); metric = euc), r)),
+                ((:FeatureDistance,), "an empty pair under RefusePair",
+                 r -> fmsg(() -> fdist(fd(AggregateDistances()), gap_view(r)))),
+                ((:FeatureDistance,), "an empty pair under FeatureFallback",
+                 r -> (fdist(fd(AggregateDistances(; pair = fb)), gap_view(r)),
+                       fdist(fd(StackObservations(; pair = fb); metric = euc), gap_view(r)))),
+                ((:FeatureDistance, :feature_readable_mask),
+                 "an empty pair under DropFewerRows, at the entry of a fit",
+                 r -> CENSUS_PO.feature_readable_mask(fd(StackObservations(;
+                                                                           pair = DropFewerRows())),
+                                                      nothing, gap_view(r)))])
     # Each case whose consumer reads an inactive cell, and the issue that holds the decision.
-    broken = Any[((:FeatureDistance,), "FeatureDistance at the last observation (#1450)",
-                  r -> distance(FeatureDistance(; sel = ["market_cap", "industry"]),
-                                nothing, r.X; rd = r)),
-                 ((:collapse_asset_panel,), "the panel of a meta-optimiser (#1451)",
+    broken = Any[((:collapse_asset_panel,), "the panel of a meta-optimiser (#1451)",
                   r -> CENSUS_PO.collapse_asset_panel(r.pnl,
                                                       [fill(1 / 6, 6) zeros(6);
                                                        zeros(6) fill(1 / 6, 6)], r.nx))]
