@@ -74,7 +74,9 @@ prs = [k => prior(EmpiricalPrior(; me = me), rd) for (k, me) in mes]
 #=
 Shrinkage toward the grand mean, in `BS(GM)` and `JS(GM)`, keeps the average over the assets
 and narrows the spread around it. The volatility-weighted target and the mean squared error
-target move the average as well.
+target move the average as well. Bodnar-Okhrin-Parolya reads only the direction of its target.
+The three targets all point along the vector of ones, so `BOP(MSE)` returns the same vector as
+it does under the other two targets.
 =#
 
 pretty_table(DataFrame(["Assets" => rd.nx; [k => p.mu for (k, p) in prs]]);

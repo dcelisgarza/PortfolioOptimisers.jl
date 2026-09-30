@@ -3037,11 +3037,19 @@ end
                 v = dot(b, isigma460, b)
                 w = dot(vm, isigma460, b)
                 a_bop = ((u - N460 / (T460 - N460)) * v - w^2) / (u * v - w^2)
-                b_bop = (1 - a_bop) * w / u
-                @test isapprox(vec(mean(ShrunkExpectedReturns(;
-                                                              alg = BodnarOkhrinParolya(;
-                                                                                        tgt = tgt)),
-                                        X460)), a_bop * vm + b_bop * b)
+                # Equation 7 of the paper divides `beta` by the target's quadratic form `v`.
+                # Equation 3.45 of Cajas (2025) divides by `u`, and the method copied it.
+                b_bop = (1 - a_bop) * w / v
+                r_bop = vec(mean(ShrunkExpectedReturns(;
+                                                       alg = BodnarOkhrinParolya(;
+                                                                                 tgt = tgt)),
+                                 X460))
+                @test isapprox(r_bop, a_bop * vm + b_bop * b)
+                # `beta * b` is the projection of `(1 - alpha) * mu` onto the target in the
+                # `inv(S)` inner product, so the residual is orthogonal to the target. The
+                # quotient over `u` leaves a residual that is not.
+                @test isapprox(dot((1 - a_bop) * vm - (r_bop - a_bop * vm), isigma460, b),
+                               0; atol = 1e-10 * v)
             end
         end
 
@@ -3106,8 +3114,9 @@ end
 
         @testset "the Bodnar-Okhrin-Parolya coefficient does not read the target scale" begin
             # Every target of this file is a multiple of the vector of ones, so the
-            # multiplier cancels in `alpha` and survives in `beta * b`. The coefficient is
-            # therefore one number per sample, and the three results still differ.
+            # multiplier cancels in `alpha` and in `beta * b`. `beta * b` is a projection
+            # onto the line through the target, and it reads the direction only. The three
+            # targets therefore return the same estimate on one sample.
             u = dot(vec(mu460), isigma460, vec(mu460))
             alphas = map(tgts460) do tgt
                 b = vec(collect(PortfolioOptimisers.target_mean(tgt, mu460, sigma460,
@@ -3123,8 +3132,8 @@ end
                                                                                 tgt = tgt)),
                                 X460))
             end
-            @test !isapprox(results[1], results[2])
-            @test !isapprox(results[1], results[3])
+            @test isapprox(results[1], results[2])
+            @test isapprox(results[1], results[3])
         end
 
         @testset "the James-Stein intensity is negative for two assets or fewer" begin
