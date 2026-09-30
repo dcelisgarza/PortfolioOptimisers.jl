@@ -329,7 +329,8 @@ Where:
   - `decay::Number`: Decay of the weights.
   - `Ks::AbstractVector{<:Integer}`: Counts of observations, each above `n + 1`.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
-  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
+  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+    `nothing`.
 
 # Returns
 
@@ -347,7 +348,7 @@ Where:
 """
 function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
                                 Ks::AbstractVector{<:Integer}, n::Integer,
-                                hac_lags::Option{<:Integer} = nothing)
+                                hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing)
     grid = mahalanobis_bias_grid(decay)
     hf = step(grid.xf)
     G, Rh, peaks = mahalanobis_lattice(decay, Ks, grid.xf, hac_lags)
@@ -395,7 +396,8 @@ the cut of each count. A point past the first zero of the determinant holds ``g 
   - `decay::Number`: Decay of the weights.
   - `Ks::AbstractVector{<:Integer}`: Counts of observations.
   - `xf::AbstractRange`: Lattice of ``\\ln s``.
-  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
+  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+    `nothing`.
 
 # Returns
 
@@ -431,7 +433,7 @@ function mahalanobis_lattice(decay::Number, Ks::AbstractVector{<:Integer},
     return G, Rh, fill(nothing, length(Ks))
 end
 function mahalanobis_lattice(decay::Number, Ks::AbstractVector{<:Integer},
-                             xf::AbstractRange, hac_lags::Integer)
+                             xf::AbstractRange, hac_lags::Union{<:Integer, <:VecNum})
     ef = exp.(xf)
     G = Matrix{eltype(ef)}(undef, length(ef), length(Ks))
     Rh = similar(G)
@@ -469,7 +471,7 @@ row, which no lag reads, so the path is that of the plain weights.
   - `r::VecNum`: Output: the derivative at each count, zero where `g` is ``\\infty`` (mutated).
   - `s::Number`: Point of the lattice.
   - `decay::Number`: Decay of the weights.
-  - `hac_lags::Integer`: Count of HAC lags.
+  - `hac_lags::Union{<:Integer, <:VecNum}`: Count of HAC lags, or the weight of each lag.
 
 # Returns
 
@@ -481,15 +483,16 @@ row, which no lag reads, so the path is that of the plain weights.
   - [`hac_ldl_taylor_row!`](@ref)
 """
 function hac_log_det_path!(g::VecNum, r::VecNum, s::Number, decay::Number,
-                           hac_lags::Integer)
+                           hac_lags::Union{<:Integer, <:VecNum})
     z = ntuple(_ -> zero(s), 3)
-    Lb = max(hac_lags, 1)
-    buf = (; l = fill(z, Lb, Lb), d = fill(z, Lb), row = fill(z, Lb))
+    k = hac_lag_weights(hac_lags, decay)
+    Lb = max(length(k), 1)
+    buf = (; l = fill(z, Lb, Lb), d = fill(z, Lb), row = fill(z, Lb), k)
     lam = one(decay)
     gk = zero(s)
     rk = zero(s)
     for m in eachindex(g, r)
-        dn = hac_ldl_taylor_row!(buf, s * lam, lam, decay, min(hac_lags, m - 1))
+        dn = hac_ldl_taylor_row!(buf, s * lam, lam, decay, min(length(k), m - 1))
         if !(dn[1] > zero(dn[1]))
             g[m:end] .= convert(eltype(g), Inf)
             r[m:end] .= zero(eltype(r))
@@ -526,7 +529,7 @@ rule.
   - `xf::AbstractRange`: Lattice of ``\\ln \\sigma``.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations.
-  - `hac_lags::Integer`: Count of HAC lags.
+  - `hac_lags::Union{<:Integer, <:VecNum}`: Count of HAC lags, or the weight of each lag.
 
 # Returns
 
@@ -541,7 +544,7 @@ rule.
   - [`hac_log_det_slopes`](@ref)
 """
 function hac_log_det_peak(gh::VecNum, rh::VecNum, xf::AbstractRange, decay::Number,
-                          K::Integer, hac_lags::Integer)
+                          K::Integer, hac_lags::Union{<:Integer, <:VecNum})
     p = findfirst(i -> !(rh[i] > zero(rh[i])) || isinf(gh[i]), eachindex(gh, rh))
     if isnothing(p)
         return nothing
@@ -566,6 +569,115 @@ function hac_log_det_peak(gh::VecNum, rh::VecNum, xf::AbstractRange, decay::Numb
     return lo,
            gh[p - 1] +
            (lo - a) / 2 * sum(((t, wt),) -> wt * slope(a + (lo - a) * (1 + t) / 2), rule)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the two sums of the HAC fixed point of [`mahalanobis_bias`](@ref) from the banded LDLᵀ
+factorisation of ``I + t A``, with the first and second derivatives in ``t`` carried through it.
+
+``\\ell(t) = \\sum_{m} \\ln d_{m}(t)`` over the pivots, so ``\\ell' = \\sum_{m} d_{m}' / d_{m}`` and
+``\\ell'' = \\sum_{m} (d_{m}'' / d_{m} - (d_{m}' / d_{m})^{2})``. A row whose diagonal
+``t\\, c\\, \\lambda^{m}`` falls below the machine epsilon of `decay` times ``1 - \\lambda`` enters
+both sums as its weight, so the loop stops there and adds the remaining mass, as
+[`mahalanobis_bias_sums`](@ref) does.
+
+# Arguments
+
+  - `decay::Number`: Decay of the weights.
+  - `K::Integer`: Count of observations in the estimate.
+  - `t::Number`: Argument, ``(n + 1) b``.
+  - `hac_lags::Union{<:Integer, <:VecNum}`: Count of HAC lags, or the weight of each lag.
+
+# Returns
+
+  - `slopes::Option{<:Tuple{<:Number, <:Number}}`: ``(\\ell'(t), \\ell'(t) + t \\ell''(t))``, that is
+    ``\\sum_{k} \\mu_{k} / (1 + t \\mu_{k})`` and ``\\sum_{k} \\mu_{k} / (1 + t \\mu_{k})^{2}``, or
+    `nothing` where ``I + t A`` is not positive definite.
+
+# Related
+
+  - [`hac_ldl_taylor_row!`](@ref)
+  - [`mahalanobis_bias`](@ref)
+"""
+function hac_log_det_slopes(decay::Number, K::Integer, t::Number,
+                            hac_lags::Union{<:Integer, <:VecNum})
+    c = (one(decay) - decay) / (one(decay) - decay^K)
+    z = ntuple(_ -> zero(c * t), 3)
+    k = hac_lag_weights(hac_lags, decay)
+    L = length(k)
+    buf = (; l = fill(z, L, L), d = fill(z, L), row = fill(z, L), k)
+    g1, g2 = zero(c * t), zero(c * t)
+    lam = one(decay)
+    for m in 0:(K - 1)
+        if t * c * lam <= eps(decay) * (one(decay) - decay)
+            tail = c * lam * (one(decay) - decay^(K - m)) / (one(decay) - decay)
+            return g1 + tail, g1 + t * g2 + tail
+        end
+        dn = hac_ldl_taylor_row!(buf, t * c * lam, c * lam, decay, min(L, m))
+        if !(dn[1] > zero(dn[1]))
+            return nothing
+        end
+        g1 += dn[2] / dn[1]
+        g2 += dn[3] / dn[1] - (dn[2] / dn[1])^2
+        lam *= decay
+    end
+
+    return g1, g1 + t * g2
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Adds one row to the banded LDLᵀ factorisation of ``I + t A``, with each entry carried as its value
+and its first two derivatives in ``t``.
+
+The entries of ``I + t A`` are linear in ``t``, so the diagonal of the row is ``(1 + t a, a, 0)``
+and its entry at lag ``i`` is ``(t a_{i}, a_{i}, 0)``, with ``a_{i} = k_{i}\\, a / \\lambda^{i}``.
+The recursion is that of [`hac_ldl_row!`](@ref), in [`taylor_mul`](@ref) and
+[`taylor_div`](@ref).
+
+# Arguments
+
+  - `buf::NamedTuple`: Buffers of the factorisation (mutated): `l[r, i]`, the entry of row
+    ``m - r`` at column ``m - r - i``; `d[r]`, the pivot of row ``m - r``; `row`, scratch; and
+    `k`, the weight ``k_{i}`` of each lag, from [`hac_lag_weights`](@ref).
+  - `ta::Number`: ``t\\, c\\, \\lambda^{m}``, the diagonal of ``t A`` in the row.
+  - `a::Number`: ``c\\, \\lambda^{m}``, the diagonal of ``A`` in the row.
+  - `decay::Number`: Decay of the weights.
+  - `p::Integer`: Count of lags that reach an observation of the estimate, ``\\min(L, m)``.
+
+# Returns
+
+  - `pivot::NTuple{3, <:Number}`: The new pivot and its two derivatives.
+
+# Related
+
+  - [`hac_log_det_slopes`](@ref)
+"""
+function hac_ldl_taylor_row!(buf::NamedTuple, ta::Number, a::Number, decay::Number,
+                             p::Integer)
+    (; l, d, row, k) = buf
+    L = length(d)
+    for i in p:-1:1
+        ki = k[i] / decay^i
+        num = (ta * ki, a * ki, zero(a))
+        for j in (i + 1):p
+            num = num .- taylor_mul(taylor_mul(row[j], l[i, j - i]), d[j])
+        end
+        row[i] = taylor_div(num, d[i])
+    end
+    pivot = (one(ta) + ta, a, zero(a))
+    for i in 1:p
+        pivot = pivot .- taylor_mul(taylor_mul(row[i], row[i]), d[i])
+    end
+    for r in L:-1:2
+        d[r] = d[r - 1]
+        l[r, :] .= view(l, r - 1, :)
+    end
+    d[1] = pivot
+    l[1, :] .= row
+
+    return pivot
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -943,7 +1055,8 @@ at [`mahalanobis_bias_saturation`](@ref).
 
   - `decay::Number`: Decay of the weights.
   - `n::Integer`: Count of assets that contribute to the statistic.
-  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
+  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+    `nothing`.
 
 # Returns
 
@@ -957,7 +1070,8 @@ at [`mahalanobis_bias_saturation`](@ref).
 function mahalanobis_bias_start(::Number, n::Integer, ::Nothing)
     return n + 4
 end
-function mahalanobis_bias_start(decay::Number, n::Integer, hac_lags::Integer)
+function mahalanobis_bias_start(decay::Number, n::Integer,
+                                hac_lags::Union{<:Integer, <:VecNum})
     K = n + 4
     Ksat = mahalanobis_bias_saturation(decay, n)
     while K < Ksat && !regime_bias_open(true, n, decay, K, hac_lags)
@@ -994,7 +1108,8 @@ and up to 3.7 s at a half-life of 250, five lags and 12 assets.
   - `method::RegimeAdjustedMethod`: Regime adjustment method, which names the moment.
   - `decay::Number`: Decay of the weights.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
-  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
+  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+    `nothing`.
 
 # Returns
 
@@ -1010,7 +1125,7 @@ and up to 3.7 s at a half-life of 250, five lags and 12 assets.
   - [`inverse_wishart_bias`](@ref)
 """
 function mahalanobis_bias_nodes(method::RegimeAdjustedMethod, decay::Number, n::Integer,
-                                hac_lags::Option{<:Integer} = nothing)
+                                hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing)
     start = mahalanobis_bias_start(decay, n, hac_lags)
     Ksat = max(mahalanobis_bias_saturation(decay, n), start)
     K1 = min(start + (isnothing(hac_lags) ? 0 : 32), Ksat)
@@ -1041,7 +1156,8 @@ interpolation the first time the state meets a count of assets.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations in the estimate, that [`regime_bias_open`](@ref) scores.
   - `n::Integer`: Count of assets that contribute to the statistic.
-  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
+  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+    `nothing`.
 
 # Returns
 
@@ -1057,7 +1173,7 @@ interpolation the first time the state meets a count of assets.
 """
 function mahalanobis_regime_bias!(store::AbstractDict, method::RegimeAdjustedMethod,
                                   decay::Number, K::Integer, n::Integer,
-                                  hac_lags::Option{<:Integer} = nothing)
+                                  hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing)
     nodes = get!(() -> mahalanobis_bias_nodes(method, decay, n, hac_lags), store, n)
     i = K - nodes.start + 1
     if i in eachindex(nodes.exact)
@@ -1126,7 +1242,8 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Makes the empty store of the Mahalanobis bias factor: its interpolation nodes, keyed by the count
-of assets, and the two tables of the variance factor of the separate correlation path.
+of assets, the two tables of the variance factor of the separate correlation path, and the HAC
+kernel of its correlation.
 
 # Arguments
 
@@ -1137,13 +1254,15 @@ of assets, and the two tables of the variance factor of the separate correlation
 # Returns
 
   - `bias::NamedTuple`: `nodes`, an empty dictionary from a count of assets to the nodes of
-    [`mahalanobis_bias_nodes`](@ref); and `kappa` and `spread`, the empty tables of
-    [`variance_noise_bias!`](@ref), which only the separate path fills.
+    [`mahalanobis_bias_nodes`](@ref); `kappa` and `spread`, the empty tables of
+    [`variance_noise_bias!`](@ref), which only the separate path fills; and `kernel`, the empty
+    kernel of [`correlation_hac_lags!`](@ref), which only the separate path under HAC fills.
 
 # Related
 
   - [`mahalanobis_regime_bias!`](@ref)
   - [`variance_noise_bias!`](@ref)
+  - [`correlation_hac_lags!`](@ref)
 """
 function regime_bias_store(::MahalanobisTarget, decay::Number, ::Type)
     return (;
@@ -1152,7 +1271,7 @@ function regime_bias_store(::MahalanobisTarget, decay::Number, ::Type)
                                     Tuple{Vector{typeof(decay)}, Vector{typeof(decay)},
                                           Vector{typeof(decay)}, Vector{typeof(decay)},
                                           Int}}}(), kappa = typeof(decay)[],
-            spread = typeof(decay)[])
+            spread = typeof(decay)[], kernel = typeof(decay)[])
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1199,19 +1318,27 @@ Where:
 
 At 12 assets, a half-life of 10 and a correlation half-life of 20, ``\\kappa = 1.0347``, and the
 power of the ratio is 0.9981 for `FirstMomentRegimeAdjusted` and 0.9963 for `LogRegimeAdjusted`;
-at two HAC lags, 1.0694, 0.9964 and 0.9928. Against the true factor of the separate path, measured
+at two HAC lags, where the tables at `cor_decay` read the kernel of
+[`correlation_hac_lags!`](@ref), 1.0762, 0.9960 and 0.9921. Against the true factor of the
+separate path, measured
 in the steady state over 64 seeds, the three methods then read 1.0018, 1.0018 and 1.0017 at
 ``R = I``, where the spread had put them at 1.0018, 0.9999 and 0.9980. At 4 assets and half-lives
 of 5 and 40 the power leaves 0.02 % and 0.06 % of a gap of 1.5 % and 3.0 %. It holds the noise of
 the variances with the correlation fixed. The noise of ``\\hat{R}`` amplifies the spread, the data
 that the two estimates share reduces it, and the rule that divides each correlation row by a
-volatility moves it. Without HAC the three cancel at ``R = I``. At two lags, where each row divides
-by the volatility before its update, the power carries about 1.6 times the spread at ``R = I``, so
-`FirstMomentRegimeAdjusted` and `LogRegimeAdjusted` read 0.14 % and 0.26 % above
-`RootMeanSquaredAdjusted`. The spread grows with the correlation of the assets, which the power
-does not read: at an equicorrelation of 0.8 it carries 42 % of it, so the methods read 0.9969,
-0.9943 and 0.9917. Under HAC the mean reads 2.7 % to 4.1 % low at two lags, and 1.1 % to 3.0 %
-high where each row divides by the volatility after its update (`hac_vol_before = false`).
+volatility moves it. Without HAC the three cancel at ``R = I``. The spread grows with the
+correlation of the assets, which the power does not read: at an equicorrelation of 0.8 it carries
+42 % of it, so the methods read 0.9969, 0.9943 and 0.9917.
+
+Under HAC each row divides by the volatility before its update, which damps the lagged terms of
+the row, and the tables at `cor_decay` read the kernel of [`hac_row_kernel`](@ref) that holds the
+damping. At two lags the methods then read 1.0076, 1.0078 and 1.0077 at ``R = I``, and 1.0049,
+0.9993 and 0.9931 at an equicorrelation of 0.8. Over 4 to 24 assets, half-lives of 5 to 20,
+correlation half-lives of 20 and 40 and one to four lags the mean reads 0.2 % to 2.2 % high at
+``R = I``, where the Bartlett kernel read 0.8 % to 9.5 % low; the rest grows with the count of
+assets and of lags. Where each row divides by the volatility after its update
+(`hac_vol_before = false`), the tables keep the Bartlett kernel, and the mean reads 1.1 % to
+3.0 % high at two lags.
 
 The factor does not read the correlation of the assets. With ``h_{i} = \\sqrt{Q_{ii} / \\hat{V}_{i}}``
 the statistic splits exactly as
@@ -1240,6 +1367,7 @@ three-factor model, which reads 0.9947 for the mean.
   - [`regime_bias_store`](@ref)
   - [`regime_bias_table`](@ref)
   - [`mahalanobis_regime_bias!`](@ref)
+  - [`correlation_hac_lags!`](@ref)
   - [`regime_target_statistic`](@ref)
 """
 function variance_noise_bias!(store::NamedTuple, ce::RegimeAdjustedExpWeightedCovariance,
@@ -1251,12 +1379,13 @@ function variance_noise_bias!(store::NamedTuple, ce::RegimeAdjustedExpWeightedCo
     Ksat = ceil(Int, log(eps(eltype(kappa))) / log(max(ce.decay, ce.cor_decay)))
     if K > length(kappa) && length(kappa) < Ksat
         len = min(max(2 * K, 64), Ksat)
-        (tv, mv), (tc, mc) = map((ce.decay, ce.cor_decay)) do decay
+        hacs = (ce.hac_lags, correlation_hac_lags!(store, ce))
+        (tv, mv), (tc, mc) = map((ce.decay, ce.cor_decay), hacs) do decay, hac
             map((RootMeanSquaredAdjusted(), ce.regime_method)) do method
-                if isnothing(ce.hac_lags)
+                if isnothing(hac)
                     regime_bias_table(method, decay, len)
                 else
-                    regime_bias_table(method, decay, len, ce.hac_lags)
+                    regime_bias_table(method, decay, len, hac)
                 end
             end
         end

@@ -1029,8 +1029,9 @@ larger count. A fit over ``T`` rows thus makes the table once or a few times, an
     which names the moment, or the table of the moments of one term.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations in the estimate.
-  - `hac_lags::Option{<:Integer}`: Count of HAC lags of the estimate, whose table
-    [`regime_bias_table`](@ref) computes from its banded weight matrix, or `nothing`.
+  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags of the estimate, or the
+    weight of each lag, whose table [`regime_bias_table`](@ref) computes from its banded weight
+    matrix, or `nothing`.
 
 # Returns
 
@@ -1043,7 +1044,8 @@ larger count. A fit over ``T`` rows thus makes the table once or a few times, an
 """
 function regime_bias!(bias::AbstractVector,
                       method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
-                      decay::Number, K::Integer, hac_lags::Option{<:Integer} = nothing)
+                      decay::Number, K::Integer,
+                      hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing)
     Ksat = ceil(Int, log(eps(eltype(eltype(bias)))) / log(decay))
     if K > length(bias) && length(bias) < Ksat
         n = min(max(2 * K, 64), Ksat)
@@ -1107,7 +1109,8 @@ Without the correction every observation above `min_obs` is scored.
   - `n::Integer`: Count of directions that the statistic reads.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations in the estimate.
-  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
+  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+    `nothing`.
 
 # Returns
 
@@ -1121,7 +1124,7 @@ Without the correction every observation above `min_obs` is scored.
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
 """
 function regime_bias_open(debias::Bool, n::Integer, decay::Number, K::Integer,
-                          hac_lags::Option{<:Integer})
+                          hac_lags::Option{<:Union{<:Integer, <:VecNum}})
     return !debias ||
            K > n + 3 && (isnothing(hac_lags) ||
                          exp_weight_cross_sum(decay, decay, K, hac_lags) * (n + 1) < one(decay))

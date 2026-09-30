@@ -25,8 +25,6 @@ regime_bias_state
 safe_regime_cholesky
 mahalanobis_bias
 mahalanobis_bias_sums
-hac_log_det_slopes
-hac_ldl_taylor_row!
 taylor_mul
 taylor_div
 gap_fill_value(::RegimeAdjustedExpWeightedCovariance)

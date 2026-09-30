@@ -1230,7 +1230,7 @@ a child issue of map #1375; #1439 then added the spread of each method (the test
                                               regime_target = PO.MahalanobisTarget(),
                                               regime_method = RMS)
     # For the mean the factor is the ratio of the two exact tables, plain or HAC, and one on one
-    # decay.
+    # decay. Under HAC the table at `cor_decay` reads the kernel of the damped rows (#1445).
     for (ce, lags) in ((sep, nothing),
                        (RegimeAdjustedExpWeightedCovariance(; decay = lam, cor_decay = lamc, hac_lags = 2,
                                                             regime_target = PO.MahalanobisTarget(),
@@ -1238,7 +1238,8 @@ a child issue of map #1375; #1439 then added the spread of each method (the test
         store = PO.regime_bias_store(PO.MahalanobisTarget(), lamc, Float64)
         for K in (5, 40, 3000)
             tv = PO.regime_bias!(Float64[], RMS, lam, K, lags)
-            tc = PO.regime_bias!(Float64[], RMS, lamc, K, lags)
+            tc = PO.regime_bias!(Float64[], RMS, lamc, K,
+                                 PO.correlation_hac_lags!(store, ce))
             @test PO.variance_noise_bias!(store, ce, K, 12) ≈ tv / tc rtol = 1e-14
         end
     end
@@ -1276,12 +1277,14 @@ a child issue of map #1375; #1439 then added the spread of each method (the test
     @test all(m -> 0.98 < m < 1.02, mults)
     # The per-method term of #1439 brings Log to 0.0042 of RMS on this seed, from 0.0079.
     @test mults[1] - mults[3] < 0.006
-    # At two lags, measured on this seed: 0.9743, and 1.0337 where each row divides by the
+    # At two lags, measured on this seed: 1.0111, and 1.0337 where each row divides by the
     # volatility after its update (`hac_vol_before = false`, #1448). Eight seeds gave
-    # 0.9659 ± 0.0050, and 1.0260 ± 0.0059 with the rule after the update, where the factor at
-    # `cor_decay` alone gave 1.0898; the rest is #1445. Before #1438 the factor at `cor_decay` was
-    # the mean's fixed point, 1.8 % too large, and the eight seeds gave 1.0184.
-    @test 0.94 < multiplier(RMS; hac_lags = 2, min_obs = 17) < 1.02
+    # 1.0009 ± 0.0040, 1.0006 ± 0.0040 and 1.0001 ± 0.0039 for the three methods, where the
+    # Bartlett kernel at `cor_decay` gave 0.9659 ± 0.0050 for RMS (#1445), and 1.0260 ± 0.0059 with
+    # the rule after the update, where the factor at `cor_decay` alone gave 1.0898. Before #1438 the
+    # factor at `cor_decay` was the mean's fixed point, 1.8 % too large, and the eight seeds gave
+    # 1.0184.
+    @test 0.99 < multiplier(RMS; hac_lags = 2, min_obs = 17) < 1.03
 
     # The state of the separate path fills the table, and a copy keeps its own.
     st = partial_fit!(RegimeAdjustedExpWeightedCovariance(; base...,
@@ -1314,9 +1317,11 @@ terms, and one for the mean. The maintainer ruled on #1439 that this term lands 
         end
     end
     for lags in (nothing, 2)
-        tv, tc = table(RMS, lam, lags), table(RMS, lamc, lags)
+        # Under HAC the tables at `cor_decay` read the kernel of the damped rows (#1445).
+        kc = isnothing(lags) ? nothing : PO.hac_row_kernel(lam, lags)
+        tv, tc = table(RMS, lam, lags), table(RMS, lamc, kc)
         for m in (RMS, FM, LG)
-            mv, mc = table(m, lam, lags), table(m, lamc, lags)
+            mv, mc = table(m, lam, lags), table(m, lamc, kc)
             for K in (5, 40, 3000), n in (1, 12)
                 store = PO.regime_bias_store(PO.MahalanobisTarget(), lamc, Float64)
                 spread = (mv[K] / tv[K]) / (mc[K] / tc[K])
@@ -1339,14 +1344,15 @@ terms, and one for the mean. The maintainer ruled on #1439 that this term lands 
     end
 
     # At 12 assets, a half-life of 10 and a correlation half-life of 20 the power of the ratio is
-    # 0.9981 and 0.9963 in the steady state, and 0.9964 and 0.9928 at two lags. Against the true
+    # 0.9981 and 0.9963 in the steady state, and 0.9960 and 0.9921 at two lags on the kernel of the
+    # damped rows (0.9964 and 0.9928 on the Bartlett kernel before #1445). Against the true
     # factor of the block, measured without return noise over 64 seeds at `R = I`, the three
     # methods then read 1.0018, 1.0018 and 1.0017, from 1.0018, 0.9999 and 0.9980.
     # The table of the ratio belongs to the method of the state, so each method takes a store.
     steady(m, lags) = PO.variance_noise_bias!(PO.regime_bias_store(PO.MahalanobisTarget(),
                                                                    lamc, Float64),
                                               sep(m, lags), 10^5, 12)
-    for (lags, fm, lg) in ((nothing, 0.9981, 0.9963), (2, 0.9964, 0.9928))
+    for (lags, fm, lg) in ((nothing, 0.9981, 0.9963), (2, 0.9960, 0.9921))
         @test steady(FM, lags) / steady(RMS, lags) ≈ fm atol = 1e-4
         @test steady(LG, lags) / steady(RMS, lags) ≈ lg atol = 1e-4
     end
@@ -1548,4 +1554,121 @@ is `x_t² ≥ 0`, and the rule after the update stays (#1440).
     Z = randn(StableRNG(1448), 20_000, 2) * cholesky([1 0.3; 0.3 1]).U
     @test guard_rows(true, Z) == 0
     @test guard_rows(false, Z) > 100
+end
+
+#=
+Issue #1445. Under the rule before the update, row `p` divides `x_{p-l}` by `σ_{p-1}`, and
+`V_{p-1}` already holds `x_{p-l}²` and the HAC products of `x_{p-l}`. So each lagged term of the
+row is damped, and correlated with the returns near it, while its mean product with `x_p` stays
+zero: the correlation carries less noise than the Bartlett kernel of `cor_decay` assumes, and the
+factor over-corrected by 0.8 % to 9.5 % at `R = I`. Regressed on the returns divided by their own
+volatility within `2L` of its row, each damped term gives a raw HAC kernel of width `2L`, which the
+tables at `cor_decay` read (ADR 0190).
+=#
+@testset "under HAC the separate path reads the kernel of its damped rows" begin
+    lam, lamc = 2.0^(-1 / 10), 2.0^(-1 / 20)
+    RMS, FM, LG = PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted(),
+                  PO.LogRegimeAdjusted()
+    # A count of lags names the Bartlett weights and a vector is its own weights, so the tables,
+    # the slopes and the cross sum agree bit for bit.
+    k2 = PO.hac_lag_weights(2, 1.0)
+    @test k2 == [1 - 1 / 3, 1 - 2 / 3] && isempty(PO.hac_lag_weights(nothing, 1.0))
+    @test PO.hac_lag_weights(k2, 1.0) === k2
+    for m in (RMS, FM, LG)
+        @test PO.regime_bias_table(m, lamc, 300, 2) ==
+              PO.regime_bias_table(m, lamc, 300, k2)
+    end
+    @test PO.hac_log_det_slopes(lam, 200, 3.0, 2) ==
+          PO.hac_log_det_slopes(lam, 200, 3.0, k2)
+    @test PO.exp_weight_cross_sum(lam, lamc, 40, 2) ==
+          PO.exp_weight_cross_sum(lam, lamc, 40, PO.hac_lag_weights(2, lam * lamc))
+
+    # The kernel against its definition: on a chain of 2 × 10⁶ rows, regress each damped term
+    # `x_{p-l} / σ_{p-1}` on `y_{p-d} = x_{p-d} / σ_{p-d-1}`, and add the residual in quadrature.
+    # Measured 4e-4 at a half-life of 5, where the damping moves the kernel by 0.1 from Bartlett.
+    function chain_kernel(lam, L, T, rng)
+        w = [1 - l / (L + 1) for l in 1:L]
+        xs, Vh = zeros(2L), ones(2L + 1)
+        G, B, iv = zeros(L), zeros(L, 2L), 0.0
+        for t in 1:T
+            x = randn(rng)
+            if t > 500
+                for l in 1:L
+                    yt = xs[l] / sqrt(Vh[1])
+                    G[l] += yt^2
+                    B[l, :] .+= yt .* xs ./ sqrt.(Vh[2:end])
+                end
+                iv += 1 / Vh[1]
+            end
+            h = x^2 + 2 * sum(w[l] * x * xs[l] for l in 1:L)
+            Vh[2:end] .= Vh[1:(end - 1)]
+            Vh[1] = lam * Vh[1] + (1 - lam) * h
+            xs[2:end] .= xs[1:(end - 1)]
+            xs[1] = x
+        end
+        G ./= iv
+        B ./= iv
+        k = vec(sum(w .* B; dims = 1))
+        for l in 1:L
+            k[l] = sign(k[l]) * sqrt(k[l]^2 + w[l]^2 * max(G[l] - sum(abs2, B[l, :]), 0))
+        end
+        return k
+    end
+    d5 = 2.0^(-1 / 5)
+    k5 = PO.hac_row_kernel(d5, 2)
+    @test isapprox(k5, chain_kernel(d5, 2, 2_000_000, StableRNG(1445)); atol = 2e-3)
+    @test k5[1] < 0.6 && k5[2] < 0.3 && k5[3] < 0
+    # At a half-life of 10 and two lags the kernel is 0.613, 0.290, −0.022 and −0.003.
+    @test isapprox(PO.hac_row_kernel(lam, 2), [0.6131, 0.2898, -0.0223, -0.0030];
+                   atol = 1e-4)
+    @test PO.hac_row_kernel(2.0f0^(-1.0f0 / 10), 2) isa Vector{Float32}
+
+    # The tables at `cor_decay` read the kernel on the separate path under HAC with the rule before
+    # the update, once for each state, and the Bartlett weights elsewhere.
+    sep(b; extra...) = RegimeAdjustedExpWeightedCovariance(; decay = lam, cor_decay = lamc,
+                                                           hac_lags = 2, hac_vol_before = b,
+                                                           regime_method = RMS,
+                                                           regime_target = PO.MahalanobisTarget(),
+                                                           centred = true, min_obs = 1,
+                                                           extra...)
+    store = PO.regime_bias_store(PO.MahalanobisTarget(), lamc, Float64)
+    kern = PO.correlation_hac_lags!(store, sep(true))
+    @test kern == PO.hac_row_kernel(lam, 2) &&
+          PO.correlation_hac_lags!(store, sep(true)) === kern
+    for ce in (sep(false), sep(true; hac_lags = nothing), sep(true; cor_decay = nothing))
+        @test PO.correlation_hac_lags!(PO.regime_bias_store(PO.MahalanobisTarget(), lamc,
+                                                            Float64), ce) === ce.hac_lags
+    end
+
+    # Against the true factor of the block, measured without return noise at 12 assets and
+    # `R = I`: 1.0085 ± 0.0015 over 8 seeds of 20 000 rows (1.0076 over 32 seeds of 50 000), where
+    # the Bartlett kernel of the rule after the update read 0.9717 (0.9709). Over 4 to 24 assets,
+    # half-lives of 5 to 20, correlation half-lives of 20 and 40 and one to four lags the kernel
+    # reads 0.2 % to 2.2 % high at `R = I`, and −2.6 % to +3.4 % at every correlation, from 0.8 % to
+    # 10.2 % low. Four seeds keep the test short; the gap is more than ten standard errors.
+    function block_truth(ce, n, seeds, rows; burn = 1000)
+        vals = map(seeds) do s
+            X = randn(StableRNG(s), burn + rows + 1, n)
+            acc, cnt = 0.0, 0
+            PO.regime_adjusted_covariance_pass!(ce, X, 1, nothing, nothing) do i, cache
+                if burn < i
+                    C = PO.regime_covariance_block(cache, ce, 1:n)
+                    acc += tr(inv(cholesky(Symmetric(C)))) / n
+                    cnt += 1
+                end
+                return nothing
+            end
+            return acc / cnt
+        end
+        return mean(vals)
+    end
+    function factor(ce, n)
+        st = PO.regime_bias_state(ce, Float64)
+        return PO.mahalanobis_regime_bias!(st.nodes, RMS, lamc, 10^5, n,
+                                           PO.correlation_hac_lags!(st, ce)) *
+               PO.variance_noise_bias!(st, ce, 10^5, n)
+    end
+    truth = block_truth(sep(true), 12, 1445:1448, 12_000)
+    @test 0.995 < truth / factor(sep(true), 12) < 1.025
+    @test truth / factor(sep(false), 12) < 0.985
 end
