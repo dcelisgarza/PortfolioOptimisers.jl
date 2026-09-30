@@ -270,9 +270,10 @@ at every row, so for it a time-varying Panel Field is sample, not fold context. 
 `AssetPanel` is not buffered: it is fold context, not sample" now holds only for a prior whose tree
 reads no panel.
 
-**Decision.** `SampleBufferState` gains a panel slot beside the factor returns and the masks, under
-the same offset, count and cap. The first append fixes whether it records a panel, as for the factor
-returns. The prior's buffer owns the panel once, and the Fold Context reads it back through
+**Decision.** `SampleBufferState` gains a slot for the Panel Fields beside the factor returns and the
+masks, under the same count and cap. The slot holds the rows of the valid region alone, so the
+offset does not index it. The first append fixes whether it records the Panel Fields, as for the
+factor returns. The prior's buffer owns the panel once, and the Fold Context reads it back through
 `prior_returns_buffer`. The online step passes the estimation mask to every prior whose route honours
 it, and the Panel Fields to a prior that records the panel. The fold of every prior takes the form
 `partial_fit!(pe, rd::ReturnsResult)`.

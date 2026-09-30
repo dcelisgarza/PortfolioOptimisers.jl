@@ -1,15 +1,15 @@
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reads the active mask of the Asset Panel that a step carries to the prior, and refuses what the step cannot carry.
+Reads the active mask of the Asset Panel that a step carries to an exact fold that is not a prior, and refuses what that fold cannot carry.
 
-A [`ReturnsResult`](@ref) with no panel, or with a static one, gives no mask, because the fold context pins a static panel. A time-varying panel that holds masks alone, which is the shape the ingestion layer writes, gives its active mask, and the prior folds the mask into its buffer beside the rows. This function refuses a time-varying panel that holds Panel Fields. The rows of a time-varying field are sample, and the buffers of the step hold numbers alone, so the step has no place to keep a categorical or a tensor field, and `optimise(opt)` with no returns could not rebuild the panel.
+The step of a covariance estimator in [`covariance_forecast_evaluation`](@ref) and the step of an online portfolio selection read the mask through this function. A prior does not: it folds through [`partial_fit!`](@ref) over the `ReturnsResult`, whose route decides what the step honours. A [`ReturnsResult`](@ref) with no panel, or with a static one, gives no mask, because the fold context pins a static panel. A time-varying panel that holds masks alone, which is the shape the ingestion layer writes, gives its active mask, and the fold records the mask beside the rows. This function refuses a time-varying panel that holds Panel Fields, because these folds read none and hold numbers alone.
 
-The estimation mask does not travel the step. The exact folds of the moment layer take an active mask and no estimation mask, so a step whose estimation universe is narrower than its active universe would fit the wrong universe without a word. The step refuses such a panel with an `ArgumentError`.
+The estimation mask does not travel these folds. The exact folds of the moment layer take an active mask and no estimation mask, so a step whose estimation universe is narrower than its active universe would fit the wrong universe without a word. The function refuses such a panel with an `ArgumentError`.
 
 # Algorithm
 
- 1. Refuse `rd` when it holds an implied-volatility surface.
+ 1. Refuse `rd` without returns, and `rd` with an implied-volatility surface, with [`assert_prior_fold_returns`](@ref).
  2. Return `nothing` when `rd` holds no panel, or when its panel is static.
  3. Refuse a time-varying panel that holds a Panel Field.
  4. Refuse a time-varying panel whose estimation mask differs from its active mask.
@@ -21,7 +21,7 @@ The estimation mask does not travel the step. The exact folds of the moment laye
 
 # Validation
 
-  - `rd.iv` is `nothing`. An `ArgumentError` is thrown otherwise, because the step of a prior takes no implied-volatility surface.
+  - The rules of [`assert_prior_fold_returns`](@ref).
   - A time-varying `rd.pnl` holds no Panel Field. An `ArgumentError` is thrown otherwise.
   - A time-varying `rd.pnl` has an estimation mask equal to its active mask. An `ArgumentError` is thrown otherwise.
 
@@ -36,14 +36,13 @@ The estimation mask does not travel the step. The exact folds of the moment laye
   - [`AssetPanel`](@ref)
 """
 function step_active_mask(rd::ReturnsResult)
-    @argcheck(isnothing(rd.iv),
-              ArgumentError("the online step takes no implied-volatility surface: a prior's `partial_fit!` folds the returns and the factors alone, so a step carrying `iv` would fold a covariance that reads the surface without it and read out an answer a batch fit would not give. Drop `iv` from `rd`, or fit in batch."))
+    assert_prior_fold_returns(rd)
     pnl = rd.pnl
     if isnothing(pnl) || panel_is_static(pnl)
         return nothing
     end
     @argcheck(isempty(pnl.pf),
-              ArgumentError("the online step carries a time-varying Asset Panel through its masks alone, and this one holds $(length(pnl.pf)) Panel Field(s): a time-varying field's rows are sample, and the buffers of the step hold numbers, so the step has nowhere to keep them and `optimise(opt)` with no returns could not rebuild the panel. Drop the fields from the panel handed to the step, or fit in batch."))
+              ArgumentError("the online step carries a time-varying Asset Panel through its masks alone, and this one holds $(length(pnl.pf)) Panel Field(s): this fold reads no Panel Field and records none, so the step has nowhere to keep them and a call with no returns could not rebuild the panel. Drop the fields from the panel handed to the step, or fit in batch."))
     @argcheck(pnl.emsk == pnl.amsk,
               ArgumentError("the estimation mask does not travel the online step: the exact folds of the moment layer take an active mask and no estimation mask, so an estimation universe narrower than the active one cannot be honoured online. This panel's `emsk` differs from its `amsk` at $(count(pnl.emsk .!= pnl.amsk)) cell(s). Pass the active mask as both, or fit in batch."))
     return pnl.amsk
@@ -55,16 +54,13 @@ end
 
 Forwards the observations of `rd` to the prior, in the arity of the prior's own step.
 
-This is the one forward that the step of an optimiser makes. An optimiser forwards each observation to its prior and to nothing else. `optimise(opt)` with no returns fits every other member in batch, from the fold context it rebuilds. The step unpacks `rd` as [`prior`](@ref) unpacks it in batch: `rd.X` and `rd.F` pass unchanged, and the active mask of a time-varying panel passes as the `active_mask` keyword. The tree of the prior decides what to do with `F`, as its batch function does.
+This is the one forward that the step of an optimiser makes. An optimiser forwards each observation to its prior and to nothing else. `optimise(opt)` with no returns fits every other member in batch, from the fold context it rebuilds. The step folds `rd` through [`partial_fit!`](@ref) over the `ReturnsResult`, which reads it as [`prior`](@ref) reads it in batch. The route of the prior decides what the step honours. A refit honours the estimation mask and records the Panel Fields of a prior that reads them. The carry of [`EmpiricalPrior`](@ref) refuses an estimation mask that differs from the active mask, and each route refuses a Panel Field that its prior does not read. The tree of the prior decides what to do with `F`, as its batch function does.
 
 A prior that is already an [`AbstractPriorResult`](@ref) has no state to fold into. It is batch configuration, and an optimiser that holds one runs `optimise(opt, rd)`. This function also refuses a [`TimeDependent`](@ref) schedule on the prior. A schedule swaps the estimator that carries the state, and a member that never saw the folded rows cannot take them over.
 
 # Algorithm
 
- 1. Refuse `rd` when it has no `X`.
- 2. Refuse `rd` when it has no `F` and the tree of `pe` requires one, through [`needs_factor_returns`](@ref).
- 3. Read the active mask `amsk` with [`step_active_mask`](@ref).
- 4. Fold `rd.X` and `rd.F` into `pe` with [`partial_fit!`](@ref), passing `amsk` as `active_mask` when it is not `nothing`.
+ 1. Fold `rd` into `pe` with [`partial_fit!`](@ref) over the `ReturnsResult`, which refuses by route what the prior cannot honour.
 
 # Arguments
 
@@ -74,9 +70,7 @@ A prior that is already an [`AbstractPriorResult`](@ref) has no state to fold in
 # Validation
 
   - `pe` is an [`AbstractPriorEstimator`](@ref). An `ArgumentError` is thrown for a prior result or a schedule.
-  - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
-  - `rd.F` is not `nothing` when `needs_factor_returns(pe) === true`. An `IsNothingError` is thrown otherwise.
-  - Everything [`step_active_mask`](@ref) refuses.
+  - Everything [`partial_fit!`](@ref) of the prior over `rd` refuses.
 
 # Returns
 
@@ -85,17 +79,13 @@ A prior that is already an [`AbstractPriorResult`](@ref) has no state to fold in
 # Related
 
   - [`partial_fit!`](@ref)
-  - [`step_active_mask`](@ref)
+  - [`reads_panel_fields`](@ref)
   - [`needs_factor_returns`](@ref)
   - [`prior`](@ref)
   - [`assert_online_entry`](@ref): refuses a schedule on the prior before the warm-up of the fold loop.
 """
 function fold_prior(pe::AbstractPriorEstimator, rd::ReturnsResult)
-    @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    assert_factor_returns(pe, rd.F)
-    amsk = step_active_mask(rd)
-    kw = isnothing(amsk) ? (;) : (; active_mask = amsk)
-    return partial_fit!(pe, rd.X, rd.F; kw...)
+    return partial_fit!(pe, rd)
 end
 function fold_prior(pe::AbstractPriorResult, ::ReturnsResult)
     return throw(ArgumentError("`pe` holds a fitted `$(typeof(pe))`, which has no state to fold an observation into: a prior result is batch configuration. Hand the optimiser the prior estimator to take the online step, or run `optimise(opt, rd)`."))

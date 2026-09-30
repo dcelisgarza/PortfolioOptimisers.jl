@@ -849,23 +849,20 @@ function resolve_forecast_weights(w::VecVecNum, a::VecInt, sa::MatNum, N::Intege
 end
 """
     partial_fit!(ce::AbstractCovarianceEstimator, rd::ReturnsResult)
-    partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
 
-Fold the observations of the returns data `rd` into a covariance estimator, or into a prior.
+Fold the observations of the returns data `rd` into a covariance estimator.
 
-This is the `ReturnsResult` arity that [`online_folds`](@ref), the online arm of the fold loop, calls for the two kinds of estimator that [`covariance_forecast_evaluation`](@ref) threads through it. A prior folds through [`fold_prior`](@ref), the same forward that the step of an optimiser makes. A covariance estimator folds `rd.X` in its own arity. When the Asset Panel varies in time, the method reads its active mask through [`step_active_mask`](@ref) and passes it as the `active_mask` keyword. That verb also refuses a mask that the step cannot carry.
+This is the `ReturnsResult` arity that [`online_folds`](@ref), the online arm of the fold loop, calls for the two kinds of estimator that [`covariance_forecast_evaluation`](@ref) threads through it. A prior has a `ReturnsResult` arity of its own, [`partial_fit!`](@ref) over a `ReturnsResult`, which is the fold of every prior and the forward that the step of an optimiser makes. A covariance estimator folds `rd.X` in its own arity. When the Asset Panel varies in time, the method reads its active mask through [`step_active_mask`](@ref) and passes it as the `active_mask` keyword. That verb also refuses a mask that the step cannot carry.
 
 # Algorithm
 
- 1. For a prior, return [`fold_prior`](@ref)`(pe, rd)`. The steps below are for a covariance estimator.
- 2. Check that `rd.X` is not `nothing`.
- 3. Read the active mask of the step through [`step_active_mask`](@ref), giving `amsk`.
- 4. Fold `rd.X` into `ce` through `partial_fit!(ce, rd.X)`, with `active_mask = amsk` when `amsk` is not `nothing`.
+ 1. Check that `rd.X` is not `nothing`.
+ 2. Read the active mask of the step through [`step_active_mask`](@ref), giving `amsk`.
+ 3. Fold `rd.X` into `ce` through `partial_fit!(ce, rd.X)`, with `active_mask = amsk` when `amsk` is not `nothing`.
 
 # Arguments
 
   - $(arg_dict[:ce])
-  - $(arg_dict[:pe])
   - `rd`: The returns data to fold, `observations × assets`.
 
 # Validation
@@ -875,11 +872,10 @@ This is the `ReturnsResult` arity that [`online_folds`](@ref), the online arm of
 
 # Returns
 
-  - `est`: The estimator, with the observations folded into its state.
+  - `ce`: The estimator, with the observations folded into its state.
 
 # Related
 
-  - [`fold_prior`](@ref)
   - [`step_active_mask`](@ref)
   - [`online_folds`](@ref)
   - [`covariance_forecast_evaluation`](@ref)
@@ -892,9 +888,6 @@ function partial_fit!(ce::AbstractCovarianceEstimator, rd::ReturnsResult)
     else
         partial_fit!(ce, rd.X; active_mask = amsk)
     end
-end
-function partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
-    return fold_prior(pe, rd)
 end
 """
     is_time_dependent(est::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator, <:Online})

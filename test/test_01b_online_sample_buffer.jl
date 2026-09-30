@@ -673,3 +673,101 @@ the same per-observation nature and the same silent failure.
         @test keys(po.sample_buffer_kwargs(merged)) == (:active_mask,)
     end
 end
+# Issue #1467 (ADR 0193): the buffer holds the Panel Fields of a time-varying Asset Panel in a
+# slot `P`, for a prior whose tree reads them. `P` covers the valid region alone, so `n` and
+# the cap index it and `off` does not. The fixture holds one field of each kind, so each
+# check covers the three kinds of Panel Field.
+@testset "The sample buffer carries the Panel Fields" begin
+    using Test, PortfolioOptimisers, StableRNGs
+    po = PortfolioOptimisers
+    rng = StableRNG(1467)
+    T, N, w = 12, 3, 4
+    Y = randn(rng, T, N)
+    M = trues(T, N)
+    M[1:3, 2] .= false
+    Em = copy(M)
+    Em[1:5, 3] .= false
+    pnl = AssetPanel(;
+                     pf = [NumericPanelField(; name = "cap", vals = randn(rng, T, N)),
+                           CategoricalPanelField(; name = "sector", levels = ["A", "B"],
+                                                 codes = rand(rng, 1:2, T, N)),
+                           TensorPanelField(; name = "expo", axis = "factor",
+                                            labels = ["f1", "f2"],
+                                            vals = randn(rng, T, N, 2))], amsk = M,
+                     emsk = Em)
+    fields_of(r, c = :) = po.port_opt_view(pnl, r, c).pf
+    values_of(P) = [po.panel_field_array(f) for f in P]
+    function blk(state, r; P = fields_of(r))
+        return partial_fit!(state, Y[r, :]; active_mask = M[r, :],
+                            estimation_mask = Em[r, :], panel_fields = P)
+    end
+    masked(state, r) = partial_fit!(state, Y[r, :]; active_mask = M[r, :],
+                                    estimation_mask = Em[r, :])
+
+    @testset "Append and read back" begin
+        s = blk(blk(po.SampleBufferState(), 1:5), 6:T)
+        @test isequal(values_of(s.P), values_of(fields_of(1:T)))
+        # The rebuilt panel holds the Panel Fields and both masks, and each mask is a copy.
+        rp = po.sample_buffer_panel(s)
+        @test isequal(values_of(rp.pf), values_of(pnl.pf))
+        @test rp.amsk == M && rp.emsk == Em
+        @test !(rp.amsk isa SubArray)
+        # A buffer that records no Panel Field rebuilds no panel.
+        @test isnothing(po.sample_buffer_panel(masked(po.SampleBufferState(), 1:T)))
+        # An empty block leaves the buffer as it was.
+        @test partial_fit!(s, Y[1:0, :]; active_mask = M[1:0, :],
+                           estimation_mask = Em[1:0, :], panel_fields = fields_of(1:1)) ===
+              s
+    end
+    @testset "The cap keeps the last rows of the Panel Fields" begin
+        # The buffer keeps part of its rows, none of its rows, and a block longer than the cap
+        # is truncated before the seed.
+        sc = blk(blk(po.SampleBufferState(; max_history = w), 1:5), 6:7)
+        @test isequal(values_of(sc.P), values_of(fields_of(4:7)))
+        sc2 = blk(sc, 8:11)
+        @test isequal(values_of(sc2.P), values_of(fields_of(8:11)))
+        sl = blk(po.SampleBufferState(; max_history = w), 1:T)
+        @test isequal(values_of(sl.P), values_of(fields_of((T - w + 1):T)))
+        @test isequal(po.sample_buffer(sl), Y[(T - w + 1):T, :])
+    end
+    @testset "The mixture and a bad block are refused" begin
+        with = blk(po.SampleBufferState(), 1:5)
+        without = masked(po.SampleBufferState(), 1:5)
+        @test_throws ArgumentError masked(with, 6:7)
+        @test_throws ArgumentError blk(without, 6:7)
+        # A later block with other Panel Fields does not join the rows of the buffer.
+        @test_throws ArgumentError blk(with, 6:7; P = fields_of(6:7)[1:2])
+        # Panel Fields belong to a time-varying panel, which carries both masks.
+        @test_throws ArgumentError partial_fit!(po.SampleBufferState(), Y[1:2, :];
+                                                active_mask = M[1:2, :],
+                                                panel_fields = fields_of(1:2))
+        @test_throws DimensionMismatch blk(po.SampleBufferState(), 1:2; P = fields_of(1:3))
+        @test_throws DimensionMismatch blk(po.SampleBufferState(), 1:2;
+                                           P = [NumericPanelField(; name = "cap",
+                                                                  vals = ones(N))])
+        @test_throws IsEmptyError blk(po.SampleBufferState(), 1:2;
+                                      P = po.AbstractPanelField[])
+        # The keyword constructor checks that `P` covers the valid region.
+        ok = po.SampleBufferState(; n = 2, X = Y[1:2, :], A = M[1:2, :], E = Em[1:2, :],
+                                  P = fields_of(1:2))
+        @test isequal(values_of(ok.P), values_of(fields_of(1:2)))
+        @test_throws DimensionMismatch po.SampleBufferState(; n = 2, X = Y[1:3, :],
+                                                            P = fields_of(1:3))
+    end
+    @testset "merge_states, copy and port_opt_view" begin
+        a = blk(po.SampleBufferState(), 1:5)
+        b = blk(po.SampleBufferState(), 6:T)
+        @test isequal(values_of(po.merge_states(a, b).P), values_of(fields_of(1:T)))
+        ac = blk(po.SampleBufferState(; max_history = w), 1:5)
+        bc = blk(po.SampleBufferState(; max_history = w), 6:7)
+        @test isequal(values_of(po.merge_states(ac, bc).P), values_of(fields_of(4:7)))
+        @test_throws ArgumentError po.merge_states(a, masked(po.SampleBufferState(), 6:T))
+        # The copy shares the Panel Fields, because nothing writes into them.
+        s = po.merge_states(a, b)
+        @test copy(s).P === s.P
+        # The asset view views each Panel Field over the selected assets.
+        v = po.port_opt_view(s, [1, 3])
+        @test isequal(values_of(v.P), values_of(fields_of(1:T, [1, 3])))
+        @test isnothing(po.port_opt_view(po.SampleBufferState(), [1]).P)
+    end
+end

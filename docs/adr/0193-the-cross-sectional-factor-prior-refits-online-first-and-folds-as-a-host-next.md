@@ -63,10 +63,13 @@ tenth to the EW moments, which already fold exactly.
 
 ### The Sample Buffer holds the panel
 
-`SampleBufferState` gains a panel slot beside the factor returns and the masks, under the same
-offset, count and cap. The first append fixes whether it records a panel. A per-type predicate,
-recursive through an embedded prior, says whether the tree of a prior reads the panel. The prior's
-buffer owns the panel once, and the Fold Context reads it back, as it reads the factor returns.
+`SampleBufferState` gains a slot for the Panel Fields beside the factor returns and the masks,
+under the same count and cap. The masks stay in their own slots. The slot holds the rows of the
+valid region alone, so the offset does not index it, and an append joins the rows with `vcat` of
+two Asset Panels. The first append fixes whether it records the Panel Fields. A per-type predicate,
+`reads_panel_fields`, recursive through an embedded prior, says whether the tree of a prior reads
+them. The prior's buffer owns the panel once, and the Fold Context reads it back, as it reads the
+factor returns.
 
 ### The step decides its two refusals by route
 

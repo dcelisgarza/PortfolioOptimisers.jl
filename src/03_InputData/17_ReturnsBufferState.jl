@@ -483,13 +483,13 @@ end
 
 Rebuilds the [`ReturnsResult`](@ref) that the observations folded so far describe.
 
-The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer that holds the returns, which is the prior's buffer, or the state's own `X` when the head holds no prior. The state holds every other column and the pinned context. The one exception is the factor column of a prior whose tree reads it, which `rows` holds. Every array of the result is a new copy and not a view, because the next fold writes into the buffers and can reallocate them, and a `ReturnsResult` that held a view would then change in the hands of its caller.
+The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer that holds the returns, which is the prior's buffer, or the state's own `X` when the head holds no prior. The state holds every other column and the pinned context. The one exception is the factor column of a prior whose tree reads it, which `rows` holds. Every array of the result is a new copy and not a view, because the next fold writes into the buffers and can reallocate them, and a `ReturnsResult` that held a view would then change in the hands of its caller. The Panel Fields are the one exception. Nothing writes into the arrays of a panel, and a fold makes new arrays when it appends, so the result shares them with `rows`.
 
 # Algorithm
 
  1. Read `n` with [`context_count`](@ref), and refuse a state whose count differs from the count of `rows`.
  2. Copy the valid rows of `rows` into `X`.
- 3. When `rows` records an active mask, rebuild a time-varying [`AssetPanel`](@ref) from it. Its estimation mask is the one that `rows` records or, when `rows` records none, a copy of the active mask. The online step records no estimation mask, so the second case is the usual one. When `rows` records no active mask, take the static panel that the state pinned, or `nothing`.
+ 3. When `rows` records an active mask, rebuild a time-varying [`AssetPanel`](@ref) from it. Its estimation mask is the one that `rows` records or, when `rows` records none, a copy of the active mask. The step of a refit prior records both masks, and the carry of [`EmpiricalPrior`](@ref) and a head with no prior record the active mask alone. Its Panel Fields are the ones that `rows` records, which it records for a prior that reads them, and none otherwise. When `rows` records no active mask, take the static panel that the state pinned, or `nothing`.
  4. Take `F` from the state when the state keeps the factor column, and from [`factor_buffer`](@ref) of `rows` otherwise.
  5. Copy `B`, `E` and `ts` from the state, carry the pinned `ne`, and build the `ReturnsResult`.
 
@@ -504,7 +504,7 @@ The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer th
 
 # Returns
 
-  - `rd::ReturnsResult`: The rebuilt returns data. Field by field, it is equal to the `ReturnsResult` that a batch fit over the same observations reads, with two exceptions. A time-varying panel comes back with an estimation mask equal to its active mask and with no Panel Field, and `iv` and `ivpa` come back as `nothing`. An optimiser with a prior refuses a step that carries any of these, and a head with no prior reads none of them.
+  - `rd::ReturnsResult`: The rebuilt returns data. Field by field, it is equal to the `ReturnsResult` that a batch fit over the same observations reads, with two exceptions. A time-varying panel comes back with the parts that the route of the prior recorded: both masks and the Panel Fields for a refit prior that reads them, and the active mask alone on the carry or with no prior. `iv` and `ivpa` come back as `nothing`. An optimiser with a prior refuses a step that carries a part its route cannot record, and a head with no prior reads none of them.
 
 # Related
 
@@ -524,7 +524,7 @@ function returns_result(state::ReturnsBufferState, rows::SampleBufferState)
     pnl = if haskey(msk, :active_mask)
         amsk = Matrix(msk.active_mask)
         emsk = haskey(msk, :estimation_mask) ? Matrix(msk.estimation_mask) : copy(amsk)
-        AssetPanel(; amsk = amsk, emsk = emsk)
+        AssetPanel(; pf = something(rows.P, AbstractPanelField[]), amsk = amsk, emsk = emsk)
     else
         state.pnl
     end

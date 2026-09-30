@@ -49,7 +49,7 @@ commit = "ebcacfda95"
 "src/01_Base/12_NormError.jl" = { code = 107, doc = 316, comment = 0, blank = 131, total = 554 }
 "src/01_Base/13_KappaLog.jl" = { code = 3, doc = 36, comment = 0, blank = 18, total = 57 }
 "src/01_Base/14_PartialFit.jl" = { code = 66, doc = 224, comment = 2, blank = 128, total = 420 }
-"src/01_Base/15_Online.jl" = { code = 455, doc = 943, comment = 9, blank = 470, total = 1877 }
+"src/01_Base/15_Online.jl" = { code = 467, doc = 960, comment = 9, blank = 472, total = 1908 }
 "src/01_Base/16_CoveragePolicy.jl" = { code = 226, doc = 534, comment = 0, blank = 244, total = 1004 }
 "src/02_Tools/01_Operators.jl" = { code = 26, doc = 253, comment = 0, blank = 89, total = 368 }
 "src/02_Tools/02_ArrayViews.jl" = { code = 94, doc = 346, comment = 0, blank = 154, total = 594 }
@@ -74,9 +74,9 @@ commit = "ebcacfda95"
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { code = 483, doc = 732, comment = 0, blank = 346, total = 1561 }
 "src/03_InputData/15_FeatureSelector.jl" = { code = 208, doc = 342, comment = 0, blank = 163, total = 713 }
 "src/03_InputData/16_PanelDataFrame.jl" = { code = 140, doc = 272, comment = 0, blank = 125, total = 537 }
-"src/03_InputData/17_ReturnsBufferState.jl" = { code = 222, doc = 345, comment = 3, blank = 165, total = 735 }
+"src/03_InputData/17_ReturnsBufferState.jl" = { code = 237, doc = 353, comment = 3, blank = 165, total = 758 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { code = 324, doc = 378, comment = 15, blank = 195, total = 912 }
-"src/03_InputData/19_AssetPanelConcat.jl" = { code = 97, doc = 161, comment = 2, blank = 85, total = 345 }
+"src/03_InputData/19_AssetPanelConcat.jl" = { code = 163, doc = 287, comment = 6, blank = 154, total = 610 }
 "src/03_InputData/20_PanelFieldValues.jl" = { code = 50, doc = 116, comment = 0, blank = 53, total = 219 }
 "src/03_InputData/21_AssetPanelSummary.jl" = { code = 211, doc = 408, comment = 0, blank = 202, total = 821 }
 "src/03_InputData/22_PanelRoundTrip.jl" = { code = 273, doc = 506, comment = 0, blank = 256, total = 1035 }
@@ -238,7 +238,7 @@ commit = "ebcacfda95"
 "src/10_Prior/09_AssetPanelEstimators.jl" = { code = 117, doc = 422, comment = 14, blank = 190, total = 743 }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { code = 404, doc = 779, comment = 0, blank = 356, total = 1539 }
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { code = 193, doc = 287, comment = 27, blank = 80, total = 587 }
-"src/10_Prior/12_PriorPartialFit.jl" = { code = 232, doc = 567, comment = 20, blank = 278, total = 1097 }
+"src/10_Prior/12_PriorPartialFit.jl" = { code = 332, doc = 785, comment = 20, blank = 394, total = 1531 }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { code = 37, doc = 112, comment = 1, blank = 46, total = 196 }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { code = 90, doc = 163, comment = 13, blank = 48, total = 314 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 320, doc = 1074, comment = 5, blank = 515, total = 1914 }
@@ -305,7 +305,7 @@ commit = "ebcacfda95"
 "src/17_Optimisation/02_CrossValidation/10_GridSearchCrossValidation.jl" = { code = 101, doc = 184, comment = 22, blank = 54, total = 361 }
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { code = 34, doc = 39, comment = 0, blank = 18, total = 91 }
 "src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { code = 74, doc = 162, comment = 5, blank = 70, total = 311 }
-"src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { code = 389, doc = 584, comment = 7, blank = 219, total = 1199 }
+"src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { code = 392, doc = 580, comment = 7, blank = 220, total = 1199 }
 "src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { code = 194, doc = 367, comment = 4, blank = 120, total = 685 }
 "src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { code = 155, doc = 272, comment = 2, blank = 127, total = 556 }
 "src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl" = { code = 279, doc = 616, comment = 7, blank = 258, total = 1160 }
@@ -372,7 +372,7 @@ commit = "ebcacfda95"
 "src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { code = 245, doc = 354, comment = 25, blank = 119, total = 743 }
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { code = 151, doc = 239, comment = 16, blank = 90, total = 496 }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { code = 42, doc = 61, comment = 4, blank = 20, total = 127 }
-"src/17_Optimisation/09_OnlineOptimisation.jl" = { code = 238, doc = 373, comment = 3, blank = 187, total = 801 }
+"src/17_Optimisation/09_OnlineOptimisation.jl" = { code = 233, doc = 368, comment = 3, blank = 187, total = 791 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { code = 375, doc = 1018, comment = 10, blank = 424, total = 1827 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { code = 318, doc = 798, comment = 5, blank = 294, total = 1415 }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { code = 312, doc = 489, comment = 8, blank = 211, total = 1020 }

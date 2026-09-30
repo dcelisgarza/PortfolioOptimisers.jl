@@ -343,3 +343,268 @@ end
 function panel_mask_vcat(ms::AbstractVector)
     return reduce(vcat, ms)
 end
+"""
+    panel_fields_panel(pf::AbstractVector{<:AbstractPanelField}) -> AssetPanel
+
+Makes the time-varying Asset Panel that carries the Panel Fields of a sample buffer, so that the checks and the `vcat` of an [`AssetPanel`](@ref) apply to them.
+
+A [`SampleBufferState`](@ref) keeps its masks in `A` and `E`, and the Panel Fields alone in `P`. The masks of this panel are two [`AllTrueMask`](@ref) arrays, which store no cell. They are not the masks of the buffer, and no caller reads them. The constructor of the panel checks that the Panel Fields share one observation axis and one asset axis, and that their names are unique.
+
+# Algorithm
+
+ 1. Refuse an empty vector, and a vector whose first Panel Field is static.
+ 2. Make the `AssetPanel` of the Panel Fields and of two `AllTrueMask` arrays over their axes.
+
+# Arguments
+
+  - `pf`: The Panel Fields.
+
+# Validation
+
+  - `pf` is not empty. An `IsEmptyError` is thrown otherwise.
+  - Each Panel Field is time-varying. A `DimensionMismatch` is thrown otherwise.
+  - The rules of the [`AssetPanel`](@ref) constructor.
+
+# Returns
+
+  - `pnl::AssetPanel`: The time-varying panel of the Panel Fields.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`AllTrueMask`](@ref)
+  - [`panel_fields_append`](@ref)
+"""
+function panel_fields_panel(pf::AbstractVector{<:AbstractPanelField})
+    @argcheck(!isempty(pf),
+              IsEmptyError("a sample buffer records the Panel Fields of a time-varying Asset Panel, and this vector holds none. Pass `nothing` for a fold with no Panel Field."))
+    ax = panel_field_axes(first(pf))
+    @argcheck(length(ax) == 2,
+              DimensionMismatch("a sample buffer records Panel Fields row by row, so each one carries an observation axis, and \"$(first(pf).name)\" is static, of shape $ax. Lift it onto the observations with `panel_field_lift`, or leave it out of the fold."))
+    #! The two axes are read as sizes, not as entries of `ax`: the type of `ax` does not
+    #! state its length, and JET reports an index into a tuple that can be empty.
+    A = panel_field_array(first(pf))
+    T, N = size(A, 1), size(A, 2)
+    return AssetPanel(; pf = pf, amsk = AllTrueMask(T, N), emsk = AllTrueMask(T, N))
+end
+"""
+    assert_buffer_panel_shape(X::AbstractMatrix, n::Integer, P::Nothing) -> nothing
+    assert_buffer_panel_shape(X::AbstractMatrix, n::Integer, P::AbstractVector{<:AbstractPanelField}) -> nothing
+
+Refuses Panel Fields that do not cover the valid region of a sample buffer.
+
+The keyword constructor of [`SampleBufferState`](@ref) calls it. `P` holds the valid region alone, so its observation axis has `n` rows, and its asset axis is the width of `X`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `P` is `nothing`: return.
+ 2. Make the panel of `P` with [`panel_fields_panel`](@ref), and refuse axes that are not `(n, size(X, 2))`.
+
+# Arguments
+
+  - `X`: Backing matrix of the buffer.
+  - `n`: Number of observations in the valid region.
+  - `P`: The Panel Fields of the buffer, or `nothing`.
+
+# Validation
+
+  - The rules of [`panel_fields_panel`](@ref).
+  - The axes of `P` are `(n, size(X, 2))`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`panel_fields_panel`](@ref)
+"""
+function assert_buffer_panel_shape(::AbstractMatrix, ::Integer, ::Nothing)
+    return nothing
+end
+function assert_buffer_panel_shape(X::AbstractMatrix, n::Integer,
+                                   P::AbstractVector{<:AbstractPanelField})
+    ax = panel_axes(panel_fields_panel(P))
+    @argcheck(ax == (n, size(X, 2)),
+              DimensionMismatch("the Panel Fields of a sample buffer cover its valid region, so they are $((n, size(X, 2))) observations × assets, got $ax."))
+    return nothing
+end
+"""
+    assert_buffer_panel_block(Xo::AbstractMatrix, Ao, Eo, Po::Nothing) -> nothing
+    assert_buffer_panel_block(Xo::AbstractMatrix, Ao, Eo, Po::AbstractVector{<:AbstractPanelField}) -> nothing
+
+Refuses Panel Fields that do not make a time-varying Asset Panel over a block of a sample buffer.
+
+The block arm of [`partial_fit!`](@ref) for a [`SampleBufferState`](@ref) calls it before it records a row. The Panel Fields of a block and the masks of the block are one time-varying [`AssetPanel`](@ref), so they need both masks, and they share the observations and the assets of the block.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `Po` is `nothing`: return.
+ 2. Make the panel of `Po` with [`panel_fields_panel`](@ref), and refuse axes that are not the size of `Xo`.
+ 3. Refuse a block that gives Panel Fields without both masks.
+
+# Arguments
+
+  - `Xo`: The oriented block.
+  - `Ao`: The oriented active mask of the block, or `nothing`.
+  - `Eo`: The oriented estimation mask of the block, or `nothing`.
+  - `Po`: The Panel Fields of the block, or `nothing`.
+
+# Validation
+
+  - The rules of [`panel_fields_panel`](@ref).
+  - The axes of `Po` are `size(Xo)`. A `DimensionMismatch` is thrown otherwise.
+  - `Ao` and `Eo` are not `nothing` when `Po` is not `nothing`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`panel_fields_panel`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function assert_buffer_panel_block(::AbstractMatrix, ::Any, ::Any, ::Nothing)
+    return nothing
+end
+function assert_buffer_panel_block(Xo::AbstractMatrix, Ao, Eo,
+                                   Po::AbstractVector{<:AbstractPanelField})
+    ax = panel_axes(panel_fields_panel(Po))
+    @argcheck(ax == size(Xo),
+              DimensionMismatch("the Panel Fields of a fold describe the observations and the assets of its block, so they are $(size(Xo)) observations × assets, got $ax."))
+    @argcheck(!isnothing(Ao) && !isnothing(Eo),
+              ArgumentError("the Panel Fields of a fold belong to a time-varying Asset Panel, which carries both masks, and this fold gives $(isnothing(Ao) ? "no active mask" : "no estimation mask"). Fold the Panel Fields with the `amsk` and the `emsk` of their panel."))
+    return nothing
+end
+"""
+    panel_fields_view(P::Nothing, i, j) -> nothing
+    panel_fields_view(P::AbstractVector{<:AbstractPanelField}, i, j) -> Vector{AbstractPanelField}
+
+Views each Panel Field of a sample buffer over the observations `i` and the assets `j`, and passes Panel Fields that are not there through.
+
+The block arm of [`partial_fit!`](@ref) for a [`SampleBufferState`](@ref) takes the rows that a cap keeps with it, and [`port_opt_view`](@ref) of the buffer takes the selected assets with it. It passes no asset names to [`panel_field_view`](@ref), so a tensor Panel Field keeps its whole label axis.
+
+# Arguments
+
+  - `P`: The Panel Fields, or `nothing`.
+  - `i`: Observation index.
+  - `j`: Asset index.
+
+# Returns
+
+  - `P′`: The viewed Panel Fields, or `nothing`.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`panel_field_view`](@ref)
+"""
+function panel_fields_view(::Nothing, ::Any, ::Any)
+    return nothing
+end
+function panel_fields_view(P::AbstractVector{<:AbstractPanelField}, i, j)
+    return AbstractPanelField[panel_field_view(f, i, j, nothing) for f in P]
+end
+"""
+    panel_fields_append(P::Nothing, Po::Nothing, n::Integer) -> nothing
+    panel_fields_append(P::AbstractVector{<:AbstractPanelField}, Po::AbstractVector{<:AbstractPanelField}, n::Integer) -> AbstractVector
+
+Joins the Panel Fields of a sample buffer to the Panel Fields of a block, and keeps the last `n` rows.
+
+The block arm of [`partial_fit!`](@ref) and [`merge_states`](@ref) for a [`SampleBufferState`](@ref) call it. `n` is the number of observations of the buffer after the append, so the cap has already set it. The rows of `Po` are always kept, because a cap truncates a block before the append. `vcat` of two Asset Panels joins the rows, so it checks that the two lists hold the same Panel Fields.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `P` and `Po` are `nothing`: return `nothing`.
+ 2. Make the panel of each list with [`panel_fields_panel`](@ref), and check that the two can join with [`assert_panel_concat`](@ref).
+ 3. Set `keep = n - tₒ`, where `tₒ` is the number of rows of `Po`. Return `Po` when `keep` is zero.
+ 4. When `keep` is less than the number of rows of `P`, view the last `keep` rows of `P`.
+ 5. Join the kept rows and `Po` with `vcat`, and return the Panel Fields of the result.
+
+# Arguments
+
+  - `P`: The Panel Fields of the buffer, or `nothing`.
+  - `Po`: The Panel Fields of the block, or `nothing`.
+  - `n`: The number of observations of the buffer after the append.
+
+# Validation
+
+  - The rules of [`panel_fields_panel`](@ref) and of [`assert_panel_concat`](@ref).
+
+# Returns
+
+  - `P′`: The Panel Fields of the last `n` observations, or `nothing`.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`Base.vcat(a::AssetPanel, bs::AssetPanel...)`](@ref)
+  - [`panel_fields_view`](@ref)
+"""
+function panel_fields_append(::Nothing, ::Nothing, ::Integer)
+    return nothing
+end
+function panel_fields_append(P::AbstractVector{<:AbstractPanelField},
+                             Po::AbstractVector{<:AbstractPanelField}, n::Integer)
+    b = panel_fields_panel(Po)
+    assert_panel_concat(panel_fields_panel(P), b, 2)
+    tp = size(panel_field_array(first(P)), 1)
+    keep = n - size(panel_field_array(first(Po)), 1)
+    if iszero(keep)
+        return Po
+    end
+    Pk = keep < tp ? panel_fields_view(P, (tp - keep + 1):tp, :) : P
+    return vcat(panel_fields_panel(Pk), b).pf
+end
+"""
+    sample_buffer_panel(state::SampleBufferState) -> Option{<:AssetPanel}
+
+Rebuilds the time-varying Asset Panel of the observations a sample buffer holds, or gives `nothing` when the buffer records no Panel Field.
+
+The read-out of a refit prior and [`returns_result`](@ref) call it. A buffer that records Panel Fields records both masks too, so the panel has its Panel Fields and both of its masks. The masks are copies of the valid region, because a later fold writes into the backing masks. The Panel Fields are the Panel Fields of the buffer, because nothing writes into them.
+
+# Algorithm
+
+ 1. Return `nothing` when `state.P` is `nothing`.
+ 2. Copy the masks `A` and `E` over the valid region into two `Matrix{Bool}`.
+ 3. Make the `AssetPanel` of `state.P` and the two masks.
+
+# Arguments
+
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `pnl::Option{<:AssetPanel}`: The panel of the rows of the buffer, or `nothing`.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`sample_buffer_kwargs`](@ref)
+  - [`returns_result`](@ref)
+  - [`reads_panel_fields`](@ref)
+"""
+function sample_buffer_panel(state::SampleBufferState)
+    return sample_buffer_panel(state.P, state)
+end
+function sample_buffer_panel(::Nothing, ::SampleBufferState)
+    return nothing
+end
+function sample_buffer_panel(P::AbstractVector{<:AbstractPanelField},
+                             state::SampleBufferState)
+    rows = (state.off + 1):(state.off + state.n)
+    #! A buffer that records `P` records both masks, which the fold checks. The assertions
+    #! state it to the compiler, so the constructor meets two concrete masks.
+    return AssetPanel(; pf = P,
+                      amsk = Matrix{Bool}(view(state.A::AbstractMatrix{Bool}, rows, :)),
+                      emsk = Matrix{Bool}(view(state.E::AbstractMatrix{Bool}, rows, :)))
+end

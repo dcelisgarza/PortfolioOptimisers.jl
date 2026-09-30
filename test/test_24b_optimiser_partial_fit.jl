@@ -11,6 +11,26 @@ with batch per family.
 The fixture is synthetic, because the identities are structural and a solver run over eight
 assets is what keeps the JuMP families cheap.
 =#
+# A prior of a caller's own that refits from a buffer and reads a Panel Field (#1467). Its
+# covariance moves with the field, so the weights of an optimiser over it show whether the
+# read-out received the Panel Fields.
+struct PanelStepProbe{T} <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_A
+    cache::T
+end
+function PanelStepProbe(; cache = nothing)
+    return PanelStepProbe(cache)
+end
+function PortfolioOptimisers.reads_panel_fields(::PanelStepProbe)
+    return true
+end
+function PortfolioOptimisers.prior(::PanelStepProbe, X::PortfolioOptimisers.MatNum,
+                                   ::Union{Nothing, <:PortfolioOptimisers.MatNum} = nothing,
+                                   pnl::Union{Nothing, <:PortfolioOptimisers.AssetPanel} = nothing;
+                                   dims::Int = 1, kwargs...)
+    v = vec(Statistics.mean(panel_field(pnl, "cap").vals; dims = 1))
+    return LowOrderPrior(; X = Matrix(X), mu = vec(Statistics.mean(X; dims = 1)),
+                         sigma = Statistics.cov(X) + LinearAlgebra.Diagonal(v .^ 2))
+end
 @testset "Optimiser partial fit: the step folds, the read-out runs the batch path" begin
     using Test, PortfolioOptimisers, Clarabel, StableRNGs, Statistics, Dates, LinearAlgebra
     po = PortfolioOptimisers
@@ -226,6 +246,27 @@ assets is what keeps the JuMP families cheap.
         rds = ReturnsResult(; nx = nx, X = X, pnl = spnl)
         o = step(EqualWeighted(), rds, 20)
         @test po.returns_result(o).pnl.pf[1].vals == spnl.pf[1].vals
+        # A refit prior that reads the panel records its Panel Fields and both masks, and
+        # `optimise(opt)` with no returns rebuilds the panel from them (#1467).
+        emsk = copy(amsk)
+        emsk[1:40, 2] .= false
+        cap = NumericPanelField(; name = "cap", vals = 1 .+ rand(rng, T, N))
+        rdp = ReturnsResult(; nx = nx, X = X,
+                            pnl = AssetPanel(; pf = [cap], amsk = amsk, emsk = emsk))
+        for t in (35, 100)
+            o = step(po.update_online_estimator(InverseVolatility(;
+                                                                  pe = po.Online(PanelStepProbe()))),
+                     rdp, t)
+            b = rows(rdp, 1:t)
+            rp = po.returns_result(o)
+            @test isequal(only(rp.pnl.pf).vals, only(b.pnl.pf).vals)
+            @test rp.pnl.amsk == b.pnl.amsk && rp.pnl.emsk == b.pnl.emsk
+            # The read-out reads a view of the buffer and the batch fit reads a matrix, so the
+            # weights can differ in the last bit.
+            @test isapprox(optimise(o).w,
+                           optimise(InverseVolatility(; pe = PanelStepProbe()), b).w;
+                           rtol = 1e-12)
+        end
     end
 
     @testset "What the step refuses, by name" begin

@@ -303,7 +303,7 @@ Under a [`SampleBufferState`](@ref):
 
 ```math
 \\begin{align}
-\\mathcal{P}_T &= \\mathcal{P}(\\mathbf{X}_{T-m+1:T},\\, \\mathbf{F}_{T-m+1:T})\\,, \\\\
+\\mathcal{P}_T &= \\mathcal{P}(\\mathbf{X}_{T-m+1:T},\\, \\mathbf{F}_{T-m+1:T},\\, \\mathcal{A}_{T-m+1:T})\\,, \\\\
 m &= \\min(T,\\, M)\\,.
 \\end{align}
 ```
@@ -314,6 +314,7 @@ Where:
   - $(math_dict[:P_batch_prior])
   - ``\\mathbf{X}_{a:b}``: Rows ``a`` to ``b`` of the returns matrix of the folded observations.
   - ``\\mathbf{F}_{a:b}``: Rows ``a`` to ``b`` of the factor returns matrix of the folded factor observations, absent when the fold recorded none.
+  - ``\\mathcal{A}_{a:b}``: The Asset Panel of rows ``a`` to ``b``, with the folded Panel Fields and both folded masks, absent when the fold recorded no Panel Field.
   - ``m``: Number of rows that the buffer holds.
   - ``M``: Cap on the buffer, the `max_history` of the wrapping [`Online`](@ref), and ``\\infty`` when it is `nothing`.
   - $(math_dict[:T])
@@ -321,7 +322,7 @@ Where:
 # Algorithm
 
  1. Read the state out of `pe.cache` with [`partial_fit_cache`](@ref).
- 2. Dispatch on the type of the state. Under a [`SampleBufferState`](@ref), run the batch verb over the [`sample_buffer`](@ref) and the [`factor_buffer`](@ref) of the state, with the masks that [`sample_buffer_kwargs`](@ref) reads and the caller's keyword arguments.
+ 2. Dispatch on the type of the state. Under a [`SampleBufferState`](@ref), run the batch verb over the [`sample_buffer`](@ref) and the [`factor_buffer`](@ref) of the state with [`buffer_prior`](@ref), which gives the masks and the Panel Fields that the buffer records, and the caller's keyword arguments.
 
 # Arguments
 
@@ -344,13 +345,55 @@ Where:
   - [`Online`](@ref)
   - [`partial_fit_cache`](@ref)
   - [`factor_buffer`](@ref)
+  - [`sample_buffer_panel`](@ref)
 """
 function prior(pe::AbstractPriorEstimator; kwargs...)
     return prior(pe, partial_fit_cache(pe); kwargs...)
 end
 function prior(pe::AbstractPriorEstimator, state::SampleBufferState; kwargs...)
+    return buffer_prior(pe, state, sample_buffer_panel(state); kwargs...)
+end
+"""
+    buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, pnl::Nothing; kwargs...)
+    buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, pnl::AssetPanel; kwargs...)
+
+Runs the batch verb of a prior over the rows of its sample buffer, with the masks as keywords or inside the rebuilt Asset Panel.
+
+This is the read-out of the refit route. A buffer that records no Panel Field gives its masks as the keywords that [`sample_buffer_kwargs`](@ref) reads, as a matrix call of the batch verb takes them. A buffer that records Panel Fields gives the panel that [`sample_buffer_panel`](@ref) rebuilds as the third positional argument, as `prior(pe, rd)` gives `rd.pnl`. That panel holds both masks, so the call gives no mask keyword.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `pnl` is `nothing`: call `prior(pe, X, F; masks..., kwargs...)` over the rows of the buffer.
+ 2. `pnl` is an Asset Panel: call `prior(pe, X, F, pnl; kwargs...)` over the rows of the buffer.
+
+# Arguments
+
+  - `pe`: Prior estimator whose `cache` holds `state`.
+  - `state`: The buffer to read.
+  - `pnl`: The panel of the rows of the buffer, or `nothing`.
+  - `kwargs...`: Additional keyword arguments, forwarded to the batch verb.
+
+# Returns
+
+  - `pr::AbstractPriorResult`: The batch fit over the rows of the buffer.
+
+# Related
+
+  - [`prior`](@ref)
+  - [`sample_buffer_panel`](@ref)
+  - [`sample_buffer_kwargs`](@ref)
+  - [`SampleBufferState`](@ref)
+"""
+function buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, ::Nothing;
+                      kwargs...)
     return prior(pe, sample_buffer(state), factor_buffer(state);
                  sample_buffer_kwargs(state)..., kwargs...)
+end
+function buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, pnl::AssetPanel;
+                      kwargs...)
+    return prior(pe, sample_buffer(state), factor_buffer(state), pnl; kwargs...)
 end
 """
     needs_factor_returns(pe::AbstractHiLoOrderPriorEstimator_F) -> true
@@ -485,6 +528,55 @@ function combine_factor_answers(answers)
     end
 end
 """
+    reads_panel_fields(pe::AbstractPriorEstimator) -> false
+    reads_panel_fields(pe::CrossSectionalFactorPrior) -> true
+    reads_panel_fields(pe::Nothing) -> false
+    reads_panel_fields(pe::Online)
+    reads_panel_fields(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
+                                 MeucciEntropyPoolingPrior, EntropyPoolingPrior})
+    reads_panel_fields(pe::OpinionPoolingPrior)
+
+Answers whether the fit of a prior reads the Panel Fields of its Asset Panel, from its estimator tree.
+
+Every prior receives the Asset Panel, but most read its masks alone. A [`CrossSectionalFactorPrior`](@ref) computes its factors from the Panel Fields at each row, so for it a time-varying Panel Field is sample. The online step reads this predicate. It gives the Panel Fields to the buffer of a prior whose tree reads them, and it refuses them for any other prior. The buffer then records them, and the read-out rebuilds the panel.
+
+Each outer estimator of the library that embeds a prior passes the panel to it, and never reads a Panel Field itself. So each one recurses into the prior it embeds, as [`needs_factor_returns`](@ref) does. [`OpinionPoolingPrior`](@ref) answers `true` when any prior it holds reads them. An [`Online`](@ref) answers for the estimator it wraps. The answer is a `Bool`, because no prior reads the Panel Fields as an option. A caller's own prior that reads them must define a method that answers `true`.
+
+# Arguments
+
+  - `pe`: The prior estimator, the wrapper around one, or `nothing`.
+
+# Returns
+
+  - `reads::Bool`: `true` when the tree holds a prior that reads the Panel Fields.
+
+# Related
+
+  - [`needs_factor_returns`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function reads_panel_fields(::AbstractPriorEstimator)
+    return false
+end
+function reads_panel_fields(::CrossSectionalFactorPrior)
+    return true
+end
+function reads_panel_fields(::Nothing)
+    return false
+end
+function reads_panel_fields(pe::Online)
+    return reads_panel_fields(pe.est)
+end
+function reads_panel_fields(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior,
+                                      <:MeucciEntropyPoolingPrior, <:EntropyPoolingPrior})
+    return reads_panel_fields(pe.pe)
+end
+function reads_panel_fields(pe::OpinionPoolingPrior)
+    return any(reads_panel_fields, (pe.pe1, pe.pe2, pe.pes...))
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses a missing factor matrix at a check at entry whose prior tree requires one.
@@ -587,6 +679,176 @@ function partial_fit!(pe::AbstractPriorEstimator, X::VecNum_MatNum,
     # `rebuild_estimator`, not `Accessors.@reset`, for the reason the generic buffering arm
     # gives: every prior that buffers declares forwarded properties, which `@reset` refuses.
     return rebuild_estimator(pe, (; cache = state))
+end
+"""
+    partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
+
+Folds the observations of a [`ReturnsResult`](@ref) into a prior. This is the fold of every prior.
+
+It mirrors `prior(pe, rd)`. It reads the returns, the factor returns and both masks of `rd`, and the Panel Fields of `rd.pnl` when the tree of the prior reads them. The online step of an optimiser folds its prior through this method. The matrix form, `partial_fit!(pe, X, F; active_mask, estimation_mask)`, stays for a prior that reads no Panel Field.
+
+The type of the prior selects the route, and each route states what it can honour. This method is the refit route, which every prior that carries a [`SampleBufferState`](@ref) takes. The buffer records what the batch fit reads, so the route honours all of it:
+
+  - The estimation mask, beside the active mask. No panel, or a static panel, gives no mask.
+  - The Panel Fields, when [`reads_panel_fields`](@ref) answers `true`. The buffer records them, and the read-out gives the batch verb the panel that [`sample_buffer_panel`](@ref) rebuilds. For any other prior a Panel Field is refused by name, because the buffer has no slot that the prior reads.
+
+The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact folds take no estimation mask. [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) forward `rd` to the prior they embed.
+
+# Algorithm
+
+ 1. Refuse `rd` without returns, and `rd` with an implied-volatility surface, with [`assert_prior_fold_returns`](@ref).
+ 2. Apply the answer of [`needs_factor_returns`](@ref) to `rd.F` with [`fold_factor_argument`](@ref).
+ 3. Read the buffer out of `pe.cache` with [`assert_sample_buffer`](@ref).
+ 4. Read the masks and the Panel Fields of `rd.pnl` with [`refit_step_kwargs`](@ref). Fold `rd.X`, the factor returns and those keywords into the buffer through the block method of [`partial_fit!`](@ref).
+ 5. Rebuild the prior with its `cache` set to the new buffer, and return it.
+
+# Arguments
+
+  - `pe`: The prior whose buffer the method folds forward.
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - The rules of [`assert_prior_fold_returns`](@ref).
+  - `rd.F` is not `nothing` when `needs_factor_returns(pe) === true`. An `IsNothingError` is thrown otherwise.
+  - `pe` carries a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
+  - The rules of [`refit_step_kwargs`](@ref).
+  - Every condition that the fold of the buffer checks.
+
+# Returns
+
+  - `pe`: The prior, with its `cache` field set to the buffer after the last observation.
+
+# Related
+
+  - [`prior`](@ref)
+  - [`reads_panel_fields`](@ref)
+  - [`refit_step_kwargs`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`sample_buffer_panel`](@ref)
+  - [`Online`](@ref)
+"""
+function partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
+    assert_prior_fold_returns(rd)
+    F = fold_factor_argument(needs_factor_returns(pe), pe, rd.F)
+    state = partial_fit!(assert_sample_buffer(pe), rd.X, F;
+                         refit_step_kwargs(pe, rd.pnl)...)
+    return rebuild_estimator(pe, (; cache = state))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses returns data that the fold of a prior cannot take.
+
+Each form of [`partial_fit!`](@ref) of a prior over a [`ReturnsResult`](@ref) calls it first, and so does [`step_active_mask`](@ref). A fold records the returns, the factor returns, the masks and the Panel Fields. An implied-volatility surface has no slot in any state. A fold that took it would fold a covariance that reads the surface without it, and it would read out an answer that a batch fit does not give.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
+  - `rd.iv` is `nothing`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`step_active_mask`](@ref)
+"""
+function assert_prior_fold_returns(rd::ReturnsResult)
+    @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
+    @argcheck(isnothing(rd.iv),
+              ArgumentError("the online step takes no implied-volatility surface: a prior's `partial_fit!` folds the returns and the factors alone, so a step carrying `iv` would fold a covariance that reads the surface without it and read out an answer a batch fit would not give. Drop `iv` from `rd`, or fit in batch."))
+    return nothing
+end
+"""
+    refit_step_kwargs(pe::AbstractPriorEstimator, pnl::Nothing) -> NamedTuple
+    refit_step_kwargs(pe::AbstractPriorEstimator, pnl::AssetPanel{<:Any, Nothing, Nothing}) -> NamedTuple
+    refit_step_kwargs(pe::AbstractPriorEstimator, pnl::AssetPanel) -> NamedTuple
+
+Reads the keywords that the refit route of a prior folds from an Asset Panel: both masks, and the Panel Fields when the prior reads them.
+
+The refit honours everything that the batch fit reads from the panel, because its buffer records it. No panel and a static panel give no keyword. A static panel has no observation axis, so it gives no row to record.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `pnl` is `nothing` or static: return an empty `NamedTuple`.
+ 2. `pnl` is time-varying: take `active_mask = pnl.amsk` and `estimation_mask = pnl.emsk`. Add `panel_fields = pnl.pf` when [`step_panel_fields`](@ref) answers `true`.
+
+# Arguments
+
+  - `pe`: The prior.
+  - `pnl`: The Asset Panel of the step, or `nothing`.
+
+# Validation
+
+  - The rules of [`step_panel_fields`](@ref).
+
+# Returns
+
+  - `kwargs::NamedTuple`: The keywords of the fold of the buffer.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`step_panel_fields`](@ref)
+  - [`reads_panel_fields`](@ref)
+"""
+function refit_step_kwargs(::AbstractPriorEstimator, ::Nothing)
+    return (;)
+end
+function refit_step_kwargs(::AbstractPriorEstimator, ::AssetPanel{<:Any, Nothing, Nothing})
+    return (;)
+end
+function refit_step_kwargs(pe::AbstractPriorEstimator, pnl::AssetPanel)
+    kw = (; active_mask = pnl.amsk, estimation_mask = pnl.emsk)
+    if step_panel_fields(pe, pnl, "the refit of `$(nameof(typeof(pe)))`")
+        return (; kw..., panel_fields = pnl.pf)
+    end
+    return kw
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Answers whether a step gives Panel Fields to the fold of a prior, and refuses Panel Fields that the prior does not read.
+
+A buffer records the Panel Fields only for a prior whose tree reads them, as [`reads_panel_fields`](@ref) answers. For any other prior the buffer has no slot that the prior reads. So the step cannot keep the Panel Fields, and `optimise(opt)` with no returns cannot rebuild them. The refusal names the route of the prior.
+
+# Arguments
+
+  - `pe`: The prior.
+  - `pnl`: The time-varying Asset Panel of the step.
+  - `route`: The name of the route, for the message.
+
+# Validation
+
+  - `pnl.pf` is empty, or `reads_panel_fields(pe)` is `true`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `gives::Bool`: `true` when `pnl` holds Panel Fields and the prior reads them.
+
+# Related
+
+  - [`reads_panel_fields`](@ref)
+  - [`refit_step_kwargs`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function step_panel_fields(pe::AbstractPriorEstimator, pnl::AssetPanel,
+                           route::AbstractString)::Bool
+    if isempty(pnl.pf)
+        return false
+    end
+    @argcheck(reads_panel_fields(pe),
+              ArgumentError("$route reads no Panel Field, and this Asset Panel holds $(length(pnl.pf)) Panel Field(s). A prior's buffer records the Panel Fields only when its estimator tree reads them, so the step has nowhere to keep these, and `optimise(opt)` with no returns could not rebuild the panel. Drop the fields from the panel handed to the step, or fit in batch."))
+    return true
 end
 """
     fold_factor_argument(needs::Bool, pe::AbstractPriorEstimator, F::Option{<:VecNum_MatNum})
@@ -768,6 +1030,134 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
     pe = Accessors.@reset pe.me = fold_member(pe.me, Xl; dims = 1, kwargs...)
     pe = Accessors.@reset pe.ce = fold_member(pe.ce, Xl; dims = 1, kwargs...)
     return Accessors.@reset pe.cache = fold_carry(pe.cache, X; dims = 1, kwargs...)
+end
+"""
+    partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                    <:Option{<:PriorCarryState}}, rd::ReturnsResult)
+
+Folds the observations of a [`ReturnsResult`](@ref) into an [`EmpiricalPrior`](@ref) on its carry route.
+
+This is the carry form of the fold of every prior, [`partial_fit!`](@ref) over a `ReturnsResult`. The carry folds `pe.me` and `pe.ce` exactly, and the exact folds of the moment layer take an active mask and no estimation mask. So the route cannot honour an estimation mask that differs from the active mask, and it refuses one by name. The refit route honours it: wrap the prior in [`Online`](@ref). The prior reads no Panel Field, so a Panel Field is refused as the refit route refuses it for such a prior.
+
+# Algorithm
+
+ 1. Refuse `rd` without returns, and `rd` with an implied-volatility surface, with [`assert_prior_fold_returns`](@ref).
+ 2. Refuse the Panel Fields and an estimation mask that differs from the active mask with [`assert_carry_step_panel`](@ref).
+ 3. Fold `rd.X` with the active mask that [`step_active_kwargs`](@ref) reads through the matrix form of the carry.
+
+# Arguments
+
+  - `pe`: Empirical prior estimator on its carry route.
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - The rules of [`assert_prior_fold_returns`](@ref) and of [`assert_carry_step_panel`](@ref).
+  - Every condition that the matrix form of the carry checks.
+
+# Returns
+
+  - `pe`: The estimator, with its members folded and its `cache` field rebound.
+
+# Related
+
+  - [`EmpiricalPrior`](@ref)
+  - [`PriorCarryState`](@ref)
+  - [`assert_carry_step_panel`](@ref)
+  - [`step_active_kwargs`](@ref)
+"""
+function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                         <:Option{<:PriorCarryState}}, rd::ReturnsResult)
+    assert_prior_fold_returns(rd)
+    assert_carry_step_panel(pe, rd.pnl)
+    return partial_fit!(pe, rd.X; step_active_kwargs(rd.pnl)...)
+end
+"""
+    assert_carry_step_panel(pe::EmpiricalPrior, pnl::Nothing) -> nothing
+    assert_carry_step_panel(pe::EmpiricalPrior, pnl::AssetPanel{<:Any, Nothing, Nothing}) -> nothing
+    assert_carry_step_panel(pe::EmpiricalPrior, pnl::AssetPanel) -> nothing
+
+Refuses the parts of a time-varying Asset Panel that the carry of an [`EmpiricalPrior`](@ref) cannot honour.
+
+The carry folds its moments exactly, and those folds take the active mask alone. So the route refuses an estimation mask that differs from the active mask, and it names the route and the refit that honours it. The prior reads no Panel Field, so [`step_panel_fields`](@ref) refuses a panel that holds one.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `pnl` is `nothing` or static: return.
+ 2. `pnl` is time-varying: refuse its Panel Fields with [`step_panel_fields`](@ref). Refuse an `emsk` that differs from `amsk`, and count the cells that differ.
+
+# Arguments
+
+  - `pe`: Empirical prior estimator on its carry route.
+  - `pnl`: The Asset Panel of the step, or `nothing`.
+
+# Validation
+
+  - The rules of [`step_panel_fields`](@ref).
+  - `pnl.emsk == pnl.amsk`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`step_panel_fields`](@ref)
+  - [`Online`](@ref)
+"""
+function assert_carry_step_panel(::EmpiricalPrior, ::Nothing)
+    return nothing
+end
+function assert_carry_step_panel(::EmpiricalPrior, ::AssetPanel{<:Any, Nothing, Nothing})
+    return nothing
+end
+function assert_carry_step_panel(pe::EmpiricalPrior, pnl::AssetPanel)
+    route = "the carry of `EmpiricalPrior`"
+    step_panel_fields(pe, pnl, route)
+    @argcheck(pnl.emsk == pnl.amsk,
+              ArgumentError("$route folds its moments exactly, and the exact folds of the moment layer take an active mask and no estimation mask, so this route cannot honour an estimation universe narrower than the active one. This panel's `emsk` differs from its `amsk` at $(count(pnl.emsk .!= pnl.amsk)) cell(s). Wrap the prior in `Online` to refit it, which honours the estimation mask, pass the active mask as both, or fit in batch."))
+    return nothing
+end
+"""
+    step_active_kwargs(pnl::Nothing) -> NamedTuple
+    step_active_kwargs(pnl::AssetPanel{<:Any, Nothing, Nothing}) -> NamedTuple
+    step_active_kwargs(pnl::AssetPanel) -> NamedTuple
+
+Reads the active mask of the Asset Panel of a step, as the keyword that an exact fold takes.
+
+The carry of an [`EmpiricalPrior`](@ref) and the co-moment members of a [`HighOrderPriorEstimator`](@ref) fold exactly, and their folds take the active mask alone. No panel and a static panel give no keyword.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `pnl` is `nothing` or static: return an empty `NamedTuple`.
+ 2. `pnl` is time-varying: return `(; active_mask = pnl.amsk)`.
+
+# Arguments
+
+  - `pnl`: The Asset Panel of the step, or `nothing`.
+
+# Returns
+
+  - `kwargs::NamedTuple`: The active mask keyword, or no keyword.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`refit_step_kwargs`](@ref)
+"""
+function step_active_kwargs(::Nothing)
+    return (;)
+end
+function step_active_kwargs(::AssetPanel{<:Any, Nothing, Nothing})
+    return (;)
+end
+function step_active_kwargs(pnl::AssetPanel)
+    return (; active_mask = pnl.amsk)
 end
 """
     prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
@@ -1008,6 +1398,50 @@ The estimator keeps no buffer, for the reason that [`HighOrderPriorEstimator`](@
 function partial_fit!(pe::BlackLittermanPrior, X::VecNum_MatNum,
                       F::Option{<:VecNum_MatNum} = nothing; kwargs...)
     return rebuild_estimator(pe, (; pe = partial_fit!(pe.pe, X, F; kwargs...)))
+end
+"""
+    partial_fit!(pe::HighOrderPriorEstimator, rd::ReturnsResult)
+    partial_fit!(pe::BlackLittermanPrior, rd::ReturnsResult)
+
+Folds the observations of a [`ReturnsResult`](@ref) into a prior that embeds another prior, by forwarding `rd` to it.
+
+This is the host form of the fold of every prior, [`partial_fit!`](@ref) over a `ReturnsResult`. A host keeps no rows. Its embedded prior keeps them, so the route of the embedded prior decides what the step honours: the estimation mask and the Panel Fields reach it unchanged, and it refuses what its route cannot honour. A [`HighOrderPriorEstimator`](@ref) also folds `pe.kte` and `pe.ske` through [`fold_member`](@ref). Those folds are exact, and they take the active mask alone, which [`step_active_kwargs`](@ref) reads.
+
+# Algorithm
+
+ 1. Fold `pe.pe` with `rd` through [`partial_fit!`](@ref).
+ 2. For a `HighOrderPriorEstimator`, fold `pe.kte` and `pe.ske` with `rd.X` and the active mask of `rd.pnl` through [`fold_member`](@ref).
+ 3. Rebuild the estimator with its folded members with `rebuild_estimator`, and return it.
+
+# Arguments
+
+  - `pe`: The host prior.
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - Every condition that the fold of `pe.pe` over `rd` checks.
+
+# Returns
+
+  - `pe`: The estimator, with its members folded.
+
+# Related
+
+  - [`HighOrderPriorEstimator`](@ref)
+  - [`BlackLittermanPrior`](@ref)
+  - [`fold_member`](@ref)
+  - [`step_active_kwargs`](@ref)
+"""
+function partial_fit!(pe::HighOrderPriorEstimator, rd::ReturnsResult)
+    kw = step_active_kwargs(rd.pnl)
+    return rebuild_estimator(pe,
+                             (; pe = partial_fit!(pe.pe, rd),
+                              kte = fold_member(pe.kte, rd.X; kw...),
+                              ske = fold_member(pe.ske, rd.X; kw...)))
+end
+function partial_fit!(pe::BlackLittermanPrior, rd::ReturnsResult)
+    return rebuild_estimator(pe, (; pe = partial_fit!(pe.pe, rd)))
 end
 """
     prior(pe::BlackLittermanPrior; strict::Bool = false, kwargs...)

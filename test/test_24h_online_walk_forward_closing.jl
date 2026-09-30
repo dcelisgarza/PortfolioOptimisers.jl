@@ -5,9 +5,9 @@ online step.
 One walk-forward runs end to end over a synthetic panel whose universe moves inside the
 window, and the online run reaches the batch expanding-window run fold for fold. The six
 points of the ticket are the six testsets. The panel is #677's draw from the generator of
-`test06c_setup.jl`, carried through its returns and its active mask: the step refuses the
-full panel by name, twice, and the first testset pins both refusals as the stated edge of the
-map (#1007). The universe moves because the prior carries a `CoveragePolicy` (#866, #977); a
+`test06c_setup.jl`, carried through its returns and its active mask: the carry route of the
+step refuses the full panel by name, twice, and the first testset pins both refusals as the
+stated edge of that route (#1007, #1467). The universe moves because the prior carries a `CoveragePolicy` (#866, #977); a
 plain prior over an expanding window from row 1 reduces to a Coverage Universe that never
 admits a late listing, in batch and online alike, and the second testset pins that too.
 
@@ -83,10 +83,10 @@ end
     @test [findlast(view(ONL_AMSK, :, j)) for j in 1:N] ==
           [300, 300, 300, 252, 300, 291, 300, 264]
     @test all(isequal.(isfinite.(ONL_RD.X), ONL_AMSK))
-    # The two panels the step refuses, each by name (#1007). The generator's panel carries
-    # twenty-one time-varying Panel Fields, whose rows are sample the buffers cannot hold;
-    # and its estimation mask is narrower than its active mask, which the exact folds of the
-    # moment layer take no keyword for.
+    # The two panels the carry route refuses, each by name and route (#1007, #1467). The
+    # generator's panel carries twenty-one time-varying Panel Fields, which an
+    # `EmpiricalPrior` never reads; and its estimation mask is narrower than its active mask,
+    # which the exact folds of the moment layer take no keyword for.
     mr = MeanRisk(; opt = onl_jump(ONL_PE))
     err = try
         cross_val_predict(mr, ONL_PANEL.rd, ONL_ONLINE)
@@ -95,7 +95,7 @@ end
         e
     end
     @test isa(err, ArgumentError)
-    @test occursin("time-varying Asset Panel through its masks alone", err.msg)
+    @test occursin("the carry of `EmpiricalPrior` reads no Panel Field", err.msg)
     @test occursin("21 Panel Field(s)", err.msg)
     narrow = ReturnsResult(; nx = ONL_RD.nx, X = ONL_RD.X, ts = ONL_RD.ts,
                            pnl = AssetPanel(; amsk = ONL_AMSK,
@@ -111,7 +111,7 @@ end
         e
     end
     @test isa(err, ArgumentError)
-    @test occursin("the estimation mask does not travel the online step", err.msg)
+    @test occursin("the carry of `EmpiricalPrior` folds its moments exactly", err.msg)
     @test occursin("$narrow_cells cell(s)", err.msg)
     # The batch loop takes both panels. The refusals are the step's, not the walk-forward's.
     @test length(cross_val_predict(mr, ONL_PANEL.rd, ONL_BATCH).pred) == length(ONL_TRAIN)
