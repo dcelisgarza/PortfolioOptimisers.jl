@@ -117,6 +117,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :reso => "`reso`: Outer optimisation results.",#
                  :opti => "`opti`: Inner optimiser.",#
                  :opto => "`opto`: Outer optimiser.",#
+                 :pcol => "`pcol`: Rule of the panel collapse, an [`AbstractPanelCollapseAlgorithm`](@ref). It states how the collapse of the Asset Panel onto the sub-portfolios weighs a member at an observation where the member is outside the universe. [`RenormaliseActive`](@ref) divides by the weight of the active members, and [`InactiveAsCash`](@ref) reads the missing weight as cash with a zero feature.",#
                  # Cross-validation.
                  :n_folds => "`n`: Number of folds.",#
                  :n_test_folds => "`n_test_folds`: Number of folds held out for testing in each combination. The remaining `n_folds - n_test_folds` folds train.",#

@@ -526,6 +526,7 @@ $(DocStringExtensions.FIELDS)
         brt::Bool = false,
         x_src::Symbol = :prior,
         strict::Bool = false,
+        pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> NestedClustered
 
@@ -641,6 +642,10 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     strict
     """
+    $(field_dict[:pcol])
+    """
+    pcol
+    """
     $(field_dict[:cache_opt])
     """
     @fprop cache
@@ -650,7 +655,8 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                              cv::Option{<:OptimisationCrossValidation},
                              wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
                              fb::TDO_Option{<:OptE_Opt}, brt::Bool, x_src::Symbol,
-                             strict::Bool, cache::Option{<:ReturnsBufferState})
+                             strict::Bool, pcol::AbstractPanelCollapseAlgorithm,
+                             cache::Option{<:ReturnsBufferState})
         assert_source_selector(x_src, :x_src)
         assert_nearest_optimiser_schedule(opti, :opti, cv, :NestedClustered)
         assert_no_nearest_bind_optimiser_schedule(opto, :opto, :NestedClustered)
@@ -672,25 +678,13 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         end
         assert_time_dependent_substitution(NestedClustered,
                                            (; pe, cle, wb, fees, sets, opti, opto, cv, wf,
-                                            ex, fb, brt, x_src, strict),
+                                            ex, fb, brt, x_src, strict, pcol),
                                            nested_clustered_td_defaults())
         return new{typeof(pe), typeof(cle), typeof(wb), typeof(fees), typeof(sets),
                    typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
-                   typeof(fb), typeof(brt), typeof(x_src), typeof(strict), typeof(cache)}(pe,
-                                                                                          cle,
-                                                                                          wb,
-                                                                                          fees,
-                                                                                          sets,
-                                                                                          opti,
-                                                                                          opto,
-                                                                                          cv,
-                                                                                          wf,
-                                                                                          ex,
-                                                                                          fb,
-                                                                                          brt,
-                                                                                          x_src,
-                                                                                          strict,
-                                                                                          cache)
+                   typeof(fb), typeof(brt), typeof(x_src), typeof(strict), typeof(pcol),
+                   typeof(cache)}(pe, cle, wb, fees, sets, opti, opto, cv, wf, ex, fb, brt,
+                                  x_src, strict, pcol, cache)
     end
 end
 function NestedClustered(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
@@ -703,9 +697,10 @@ function NestedClustered(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
                          x_src::Symbol = :prior, strict::Bool = false,
+                         pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
                          cache::Option{<:ReturnsBufferState} = nothing)
     return NestedClustered(pe, cle, wb, fees, sets, opti, opto, cv, wf, ex, fb, brt, x_src,
-                           strict, cache)
+                           strict, pcol, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -841,7 +836,8 @@ function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,
                            opti = opti, opto = opto, cv = nco.cv, wf = nco.wf, ex = nco.ex,
                            fb = view_child(nco.fb, i, X), brt = nco.brt, x_src = nco.x_src,
-                           strict = nco.strict, cache = port_opt_view(nco.cache, i))
+                           strict = nco.strict, pcol = nco.pcol,
+                           cache = port_opt_view(nco.cache, i))
 end
 function non_investable_universe(nco::NestedClustered, ni::VecStr)::NestedClustered
     return rebuild_estimator(nco, (; sets = non_investable_sets(nco.sets, ni)))

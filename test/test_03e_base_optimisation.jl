@@ -304,14 +304,18 @@ end
         W = PO.synthetic_asset_weights([0.5 0.0; 0.5 1.0; 0.0 0.0])
         @test PO.collapse_panel_numeric([1.0, 2.0, 4.0], W) ≈ [1.5, 2.0]
         # A mask collapses as its support, and a categorical mask repeats over the levels.
-        @test PO.collapse_categorical_mask(BitVector([true, false, false]), W, 3) ==
-              Bool[1 1 1; 0 0 0]
-        cm = PO.collapse_categorical_mask(BitMatrix([true false false; false true false]),
-                                          W, 2)
+        @test PO.collapse_categorical_mask(BitVector([true, false, false]), W, 3,
+                                           nothing) == Bool[1 1 1; 0 0 0]
+        om = BitMatrix([true false false; false true false])
+        cm = PO.collapse_categorical_mask(om, W, 2, trues(2, 3))
         @test size(cm) == (2, 2, 2)
         @test cm[:, :, 1] == Bool[1 0; 1 1]
         @test cm[:, :, 2] == cm[:, :, 1]
-        @test isnothing(PO.collapse_categorical_mask(nothing, W, 2))
+        # An observed member that is inactive does not count.
+        cmi = PO.collapse_categorical_mask(om, W, 2,
+                                           BitMatrix([true true true; true false true]))
+        @test cmi[:, :, 1] == Bool[1 0; 0 0]
+        @test isnothing(PO.collapse_categorical_mask(nothing, W, 2, nothing))
     end
 
     @testset "the investable view of a result" begin

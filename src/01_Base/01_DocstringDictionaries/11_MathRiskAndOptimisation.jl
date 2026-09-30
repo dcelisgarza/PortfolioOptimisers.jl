@@ -165,6 +165,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :K_sub => "``K``: Sub-portfolio count of a meta-optimiser, which is also the number of synthetic assets of its outer problem.",#
                  :W_inner => "``\\mathbf{W}``: Inner weight matrix `assets × sub-portfolios`. Column ``k`` holds the weights of sub-portfolio ``k`` over all ``N`` assets, and zero at an asset outside the sub-portfolio.",#
                  :W_tilde_syn => "``\\tilde{\\mathbf{W}}``: Normalised inner weight matrix, ``\\tilde{W}_{ik} = |W_{ik}| / \\sum_{j=1}^{N} |W_{jk}|``. A column of zeros stays a column of zeros.",#
+                 :m_active_panel => "``m_{ti}``: Active mask of the Asset Panel, ``1`` when asset ``i`` is in the universe at observation ``t`` and ``0`` otherwise.",#
                  :v_outer => "``\\boldsymbol{v}``: Outer weight vector, the weights that the outer optimiser gives the ``K`` synthetic assets.",#
                  :s_k_comb => "``s_k``: Combination Weight of sub-portfolio ``k``.",#
                  :c_k_comb => "``c_k``: Coefficient of sub-portfolio ``k`` in the combination.",#

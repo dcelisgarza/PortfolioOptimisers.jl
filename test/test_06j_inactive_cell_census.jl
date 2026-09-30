@@ -24,10 +24,13 @@ Each name on the first list has a case below or an exemption that states why no 
 answer. Each type on the second list has a case. A new consumer fails the census until it gets
 one, so it is checked the day it lands.
 
-One consumer reads the inactive cells and waits on its build; its case is `@test_broken`, and the
-issue it names holds the reproduction: the panel collapse of a meta-optimiser (#1451).
 `FeatureDistance` reads each asset and each pair at its own active rows since #1454 (the
-decision of #1450), and its cases cover each collapse and each rule for an empty pair.
+decision of #1450), and its cases cover each collapse and each rule for an empty pair. The panel
+collapse of a meta-optimiser weighs the active members of each observation since #1456 (the
+decision of #1451). Its cases run under each rule, on the fixture and on a second one that adds
+a lifted field, a square field, the implied volatilities and a clock for the cross-validated path.
+The poison also reaches `iv` at each inactive cell, and `ivpa` at each asset that is inactive at
+the last row, the row at which the collapse reads it.
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 
@@ -63,11 +66,18 @@ function census_poison_field(f::TensorPanelField, amsk)
                             census_poison_cells!(Array(f.vals), amsk, Returns(1e6)),
                             census_poison_mask(f.omsk, amsk))
 end
+census_poison_rates(::Nothing, ::Any) = nothing
+function census_poison_rates(iv::AbstractMatrix, amsk)
+    return census_poison_cells!(Array(iv), amsk, Returns(1e6))
+end
+census_poison_rates(ivpa::AbstractVector, amsk) = ifelse.(amsk[end, :], ivpa, 1e6)
 function census_poison(rd::ReturnsResult)
     pnl = rd.pnl
     pf = [census_poison_field(f, pnl.amsk) for f in pnl.pf]
     return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = rd.B,
-                         ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
+                         ne = rd.ne, E = rd.E, ts = rd.ts,
+                         iv = census_poison_rates(rd.iv, pnl.amsk),
+                         ivpa = census_poison_rates(rd.ivpa, pnl.amsk),
                          pnl = AssetPanel(pf, pnl.amsk, pnl.emsk))
 end
 
@@ -218,6 +228,27 @@ function census_fixture()
           TensorPanelField(; name = "loadings", axis = "factor", labels = ["x", "y"],
                            vals = randn(rng, T, N, 2)))
     rdc = ReturnsResult(; nx = rd.nx, X = rd.X, ne = rd.ne, E = rd.E,
+                        pnl = AssetPanel(pf, pnl.amsk, pnl.emsk))
+    return rdc, census_poison(rdc)
+end
+# The fixture of the panel collapse: the census fixture with a static input lifted over the
+# observations, a square field whose labels are the asset names, the implied volatilities, and
+# a clock, which the cross-validated path needs to find the rows of each fold.
+function census_collapse_fixture(rd::ReturnsResult)
+    pnl = rd.pnl
+    T, N = size(rd.X)
+    rng = StableRNG(1456)
+    pf = CENSUS_PO.AbstractPanelField[pnl.pf;
+                                      NumericPanelField(; name = "lift",
+                                                        vals = CENSUS_PO.RepeatedLeading(rand(rng,
+                                                                                              N),
+                                                                                         T));
+                                      TensorPanelField(; name = "adjacency", axis = "asset",
+                                                       labels = rd.nx,
+                                                       vals = rand(rng, T, N, N))]
+    ts = CENSUS_PO.Dates.Date(2020, 1, 1) .+ CENSUS_PO.Dates.Day.(0:(T - 1))
+    rdc = ReturnsResult(; nx = rd.nx, X = rd.X, ne = rd.ne, E = rd.E, ts = ts,
+                        iv = 0.1 .+ rand(rng, T, N), ivpa = 0.5 .+ rand(rng, N),
                         pnl = AssetPanel(pf, pnl.amsk, pnl.emsk))
     return rdc, census_poison(rdc)
 end
@@ -423,13 +454,43 @@ end
                  r -> CENSUS_PO.feature_readable_mask(fd(StackObservations(;
                                                                            pair = DropFewerRows())),
                                                       nothing, gap_view(r)))])
-    # Each case whose consumer reads an inactive cell, and the issue that holds the decision.
-    broken = Any[((:collapse_asset_panel,), "the panel of a meta-optimiser (#1451)",
-                  r -> CENSUS_PO.collapse_asset_panel(r.pnl,
-                                                      [fill(1 / 6, 6) zeros(6);
-                                                       zeros(6) fill(1 / 6, 6)], r.nx))]
+    # The panel collapse of a meta-optimiser weighs the active members of each observation
+    # (#1456). The census fixture holds numeric, categorical and rectangular tensor fields; the
+    # collapse fixture adds a lifted field, a square field and the implied volatilities. Two
+    # sub-portfolios hold assets 1 to 6 and 7 to 12, so the first loses asset 2 before it lists,
+    # asset 3 after it delists and asset 4 in its gap. The third holds asset 2 alone, so it is
+    # inactive on rows 1 to 20. The first cluster of the cross-validated case holds assets 2 and
+    # 3, of which one alone is active on rows 1 to 20 and on rows 61 to 80.
+    Wc = [fill(1 / 6, 6) zeros(6) [0.0; 1.0; zeros(4)]; zeros(6) fill(1 / 6, 6) zeros(6)]
+    pcols = (RenormaliseActive(), InactiveAsCash())
+    for alg in pcols
+        push!(cases,
+              ((:collapse_asset_panel,), "the panel of a meta-optimiser under $(alg)",
+               r -> CENSUS_PO.collapse_asset_panel(r.pnl, Wc, r.nx, alg)))
+    end
+    rdk, rdkp = census_collapse_fixture(rd)
+    ucl = CENSUS_PO.ClusterUniverse([[2, 3], [1; 4:12]])
+    cvg1456 = CoveragePolicy()
+    pe1456 = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg1456),
+                            ce = Covariance(; cvg = cvg1456))
+    # The predictions read the returns alone, which the poison leaves as they are, so one set
+    # serves the clean and the poisoned fixture.
+    preds1456 = [cross_val_predict(InverseVolatility(; pe = pe1456), rdk, KFold(; n = 4);
+                                   cols = cl, ex = CENSUS_PO.FLoops.SequentialEx())
+                 for cl in ucl.cls]
+    collapse_cases = Any[]
+    for alg in pcols
+        append!(collapse_cases,
+                Any[((:collapse_asset_panel,), "a lifted and a square field under $(alg)",
+                     r -> CENSUS_PO.collapse_asset_panel(r.pnl, Wc, r.nx, alg)),
+                    ((), "iv and ivpa of the outer problem under $(alg)",
+                     r -> CENSUS_PO.prepare_outer_rd(r, Wc, alg)[3:5]),
+                    ((), "the cross-validated path under $(alg)",
+                     r -> (o = CENSUS_PO.rebuild_returns_result(r, preds1456, ucl, alg);
+                           (o.pnl, o.iv, o.ivpa)))])
+    end
     @testset "The census names each consumer once" begin
-        covered = Set{Symbol}(n for c in [cases; broken] for n in c[1])
+        covered = Set{Symbol}(n for c in [cases; collapse_cases] for n in c[1])
         sig = panel_signature_census()
         @test isempty(setdiff(sig, covered, keys(CENSUS_EXEMPT)))
         @test isempty(setdiff(keys(CENSUS_EXEMPT), sig))
@@ -439,7 +500,7 @@ end
     @testset "$(join(names, ", ")): $(label)" for (names, label, f) in cases
         @test census_equal(f(rd), f(rdp))
     end
-    @testset "$(join(names, ", ")): $(label)" for (names, label, f) in broken
-        @test_broken census_equal(f(rd), f(rdp))
+    @testset "$(join(names, ", ")): $(label)" for (names, label, f) in collapse_cases
+        @test census_equal(f(rdk), f(rdkp))
     end
 end

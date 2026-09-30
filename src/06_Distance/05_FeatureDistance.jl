@@ -205,6 +205,36 @@ Abstract supertype for the rules that name the row [`LastObservation`](@ref) rea
 
 A time-varying Asset Panel lists and delists assets, so an asset can be inactive at the last row of the window. A rule states which row of the window the collapse reads for each asset. It is the `alg` field of [`LastObservation`](@ref).
 
+# Interfaces
+
+To add a rule, subtype `AbstractLastObservationAlgorithm` and implement the two methods below.
+
+## `collapse_rows`
+
+  - `collapse_rows(alg::MyRule, pnl::AssetPanel) -> Union{UnitRange{Int}, Colon}`: The rows of the panel that the stack of the Feature Matrix holds for the rule.
+
+### Arguments
+
+  - `alg`: The concrete subtype instance.
+  - `pnl`: The Asset Panel the Feature Matrix is stacked from.
+
+### Returns
+
+  - A range of observations, or `Colon()` for every row.
+
+## `feature_readable`
+
+  - `feature_readable(alg::MyRule, A::AbstractMatrix{Bool}) -> BitVector`: Whether the rule can read each asset of the window.
+
+### Arguments
+
+  - `alg`: The concrete subtype instance.
+  - `A`: The active mask of the window, `observations × assets`.
+
+### Returns
+
+  - One entry per asset, `true` where the rule reads the asset.
+
 # Related
 
   - [`LastRow`](@ref)
@@ -380,6 +410,26 @@ $(DocStringExtensions.TYPEDEF)
 Abstract supertype for the rules that give the distance of a pair of assets with no shared active row.
 
 [`AggregateDistances`](@ref) and [`StackObservations`](@ref) read each pair of assets at the rows at which both assets are active. Two assets whose active rows do not meet have no such row, so the collapse has nothing to read for the pair. A rule states what the collapse does then. It is the `pair` field of the two collapses.
+
+# Interfaces
+
+To add a rule, subtype `AbstractEmptyPairAlgorithm` and implement the method below. A rule that drops an asset at the entry of a fit also adds a method of `drop_empty_pairs!`, whose fallback keeps every asset.
+
+## `empty_pair_distance!`
+
+  - `empty_pair_distance!(D::MatNum, pair::MyRule, E::AbstractVector, de::FeatureDistance, win::NamedTuple) -> MatNum`: Writes the distance of each empty pair in `E` into `D`, or refuses.
+
+### Arguments
+
+  - `D`: The distance matrix, `assets × assets`, written in place at each pair of `E`.
+  - `pair`: The concrete subtype instance.
+  - `E`: The empty pairs, `(i, j)` with `i < j`.
+  - `de`: The feature distance estimator.
+  - `win`: The window, a `NamedTuple` of `Z`, `dims`, `A` and `nx`.
+
+### Returns
+
+  - `D`, with a distance at each pair of `E`.
 
 # Related
 

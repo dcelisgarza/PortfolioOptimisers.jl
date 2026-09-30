@@ -848,6 +848,12 @@ Wrap and compose other optimisers, using Cross-Validation to estimate inner out-
 **Sub-Portfolio**
 The unit a meta-optimiser solves one inner problem for, and one asset of the synthetic universe its outer optimiser allocates over. NCO's sub-portfolios are cluster index sets; Stacking's are its inner optimisers.
 
+**Panel Collapse**
+The Asset Panel of the outer problem of a meta-optimiser: each Panel Field of the inner panel, and `iv` and `ivpa`, collapsed onto the sub-portfolios with the normalised inner weights (`collapse_asset_panel`, `prepare_outer_rd`), which divide out the gross exposure of each sub-portfolio.
+At each observation it weighs only the members that are active there, and the rule in the `pcol` field of `NestedClustered` and `Stacking` states what the weight of an inactive member becomes: `RenormaliseActive()`, the default, divides by the weight of the active members, so each value stays a convex combination; `InactiveAsCash()` reads the missing weight as cash with a zero feature, as the outer returns do (ADR 0192).
+A sub-portfolio is active where one member with weight is, on the fold-less and the cross-validated path alike.
+*Avoid*: reading the value of an inactive member as part of the feature of a sub-portfolio. It holds a fill value, a zero or a stale value (ADR 0102).
+
 ### 4.6 Cross-Validation
 
 Used for hyperparameter tuning and for out-of-sample evaluation, and to supply inner out-of-sample returns to meta-optimisers. The axes are **optimisation vs non-optimisation** and **sequential (time-aware) vs non-sequential**. Schemes:

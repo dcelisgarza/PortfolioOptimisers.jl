@@ -286,6 +286,7 @@ $(DocStringExtensions.FIELDS)
         fb::TDO_Option{<:OptE_Opt} = nothing,
         brt::Bool = false,
         strict::Bool = false,
+        pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> Stacking
 
@@ -399,6 +400,10 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     strict
     """
+    $(field_dict[:pcol])
+    """
+    pcol
+    """
     $(field_dict[:cache_opt])
     """
     @fprop cache
@@ -408,7 +413,8 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                       opti::Union{<:VecOptE_Opt_TD, <:TD_VecOptE_Opt}, opto::OptE_TD,
                       cv::Option{<:OptimisationCrossValidation}, wf::TD{<:WeightFinaliser},
                       ex::FLoops.Transducers.Executor, fb::TDO_Option{<:OptE_Opt},
-                      brt::Bool, strict::Bool, cache::Option{<:ReturnsBufferState})
+                      brt::Bool, strict::Bool, pcol::AbstractPanelCollapseAlgorithm,
+                      cache::Option{<:ReturnsBufferState})
         if isa(opti, TimeDependent)
             @argcheck(opti.bind !== :nearest,
                       ArgumentError("opti of Stacking cannot hold a `bind = :nearest` schedule at the field level: Stacking's inner cross-validation is entered per candidate (`cross_val_predict(opti[k], …)`), so the fold loop is handed the elements, never the field — and a per-fold candidate vector would change the number and identity of the returns-proxy columns opto sees. Schedule individual elements instead (`opti = [static, TimeDependent(…, :nearest; default = …)]`), or use `bind = :outermost` to vary the whole vector with the fold loop that reaches the Stacking."))
@@ -440,14 +446,25 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         end
         assert_time_dependent_substitution(Stacking,
                                            (; pe, wb, fees, sets, scale, opti, opto, cv, wf,
-                                            ex, fb, brt, strict), stacking_td_defaults())
+                                            ex, fb, brt, strict, pcol),
+                                           stacking_td_defaults())
         return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
                    typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
-                   typeof(fb), typeof(brt), typeof(strict), typeof(cache)}(pe, wb, fees,
-                                                                           sets, scale,
-                                                                           opti, opto, cv,
-                                                                           wf, ex, fb, brt,
-                                                                           strict, cache)
+                   typeof(fb), typeof(brt), typeof(strict), typeof(pcol), typeof(cache)}(pe,
+                                                                                         wb,
+                                                                                         fees,
+                                                                                         sets,
+                                                                                         scale,
+                                                                                         opti,
+                                                                                         opto,
+                                                                                         cv,
+                                                                                         wf,
+                                                                                         ex,
+                                                                                         fb,
+                                                                                         brt,
+                                                                                         strict,
+                                                                                         pcol,
+                                                                                         cache)
     end
 end
 function Stacking(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
@@ -461,9 +478,10 @@ function Stacking(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                   fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
                   strict::Bool = false,
+                  pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
                   cache::Option{<:ReturnsBufferState} = nothing)::Stacking
     return Stacking(pe, wb, fees, sets, scale, narrow_optimiser_vector(opti), opto, cv, wf,
-                    ex, fb, brt, strict, cache)
+                    ex, fb, brt, strict, pcol, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -666,7 +684,7 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
     return Stacking(; pe = pe, wb = wb, fees = fees, sets = sets, scale = st.scale,
                     opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex,
                     fb = view_child(st.fb, i, X), brt = st.brt, strict = st.strict,
-                    cache = port_opt_view(st.cache, i))
+                    pcol = st.pcol, cache = port_opt_view(st.cache, i))
 end
 function non_investable_universe(st::Stacking, ni::VecStr)::Stacking
     return rebuild_estimator(st, (; sets = non_investable_sets(st.sets, ni)))

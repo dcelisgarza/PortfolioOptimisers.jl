@@ -105,7 +105,7 @@ end
         else
             rectpanel([string("c", k) for k in axes(Z, ndims(Z))], Z)
         end
-        c = PO.collapse_asset_panel(pnl, W, sq ? nx : nothing)
+        c = PO.collapse_asset_panel(pnl, W, sq ? nx : nothing, RenormaliseActive())
         return PO.panel_field(c, sq ? "prox" : "beta").vals
     end
 
@@ -133,12 +133,12 @@ end
         @test Cs ≈ transpose(saw(Wl)) * Zsq * saw(Wl)
         # The square case is *derived* from the labels, not re-declared, and renaming them
         # after the synthetic assets is what keeps the predicate true one level up.
-        csq = PO.collapse_asset_panel(sqpanel(nx, Zsq), Wl, nx)
+        csq = PO.collapse_asset_panel(sqpanel(nx, Zsq), Wl, nx, RenormaliseActive())
         fsq = PO.panel_field(csq, "prox")
         @test fsq.labels == ["_$i" for i in 1:k]
         @test isnothing(fsq.groups)
         @test features_are_assets(fsq, ["_$i" for i in 1:k])
-        crect = PO.collapse_asset_panel(rectpanel(nf, Zr), Wl, nx)
+        crect = PO.collapse_asset_panel(rectpanel(nf, Zr), Wl, nx, RenormaliseActive())
         @test !features_are_assets(PO.panel_field(crect, "beta"), ["_$i" for i in 1:k])
 
         # Time-varying: the same arithmetic per observation, observation axis leading.
@@ -155,7 +155,7 @@ end
 
         # A numeric Panel Field stays numeric, and contracts on its one axis.
         num = asset_panel([NumericPanelInput(; name = "mcap", vals = Zr[:, 1])])
-        cnum = PO.collapse_asset_panel(num, Wl, nx)
+        cnum = PO.collapse_asset_panel(num, Wl, nx, RenormaliseActive())
         @test isa(PO.panel_field(cnum, "mcap"), NumericPanelField)
         @test PO.panel_field(cnum, "mcap").vals ≈ transpose(saw(Wl)) * Zr[:, 1]
 
@@ -165,7 +165,7 @@ end
         lvl = ["Fin", "Tech"]
         codes = [1, 2, 1, 2, 1, 2, 1, 2]
         cat = asset_panel([CategoricalPanelInput(; name = "sector", vals = lvl[codes])])
-        ccat = PO.collapse_asset_panel(cat, Wl, nx)
+        ccat = PO.collapse_asset_panel(cat, Wl, nx, RenormaliseActive())
         fcat = PO.panel_field(ccat, "sector")
         @test isa(fcat, TensorPanelField)
         @test fcat.axis == "level"
@@ -189,7 +189,7 @@ end
         @test PO.collapse_panel_mask(m, saw(Wz)) == [true false true; true false true]
 
         # An absent panel stays absent.
-        @test isnothing(PO.collapse_asset_panel(nothing, Wl, nx))
+        @test isnothing(PO.collapse_asset_panel(nothing, Wl, nx, RenormaliseActive()))
     end
 
     @testset "The collapse is convex, not an un-normalised sum" begin
@@ -256,20 +256,20 @@ end
 
     @testset "prepare_outer_rd collapses, and its arity break is loud" begin
         wi = Wlev
-        nb, B, iv, ivpa, pnl, Xb = PO.prepare_outer_rd(rd_r, wi)
+        nb, B, iv, ivpa, pnl, Xb = PO.prepare_outer_rd(rd_r, wi, RenormaliseActive())
         @test PO.panel_feature_names(pnl) == panel_feature_matrix(rd_r.pnl)[1]
         @test panel_feature_matrix(pnl)[2] ≈ collapse(Zr, false, wi)
         @test size(Xb) == (T, k)
 
         # The square carrier renames its label axis after the synthetic assets, which is
         # what keeps the square case true for the result built from it.
-        _, _, _, _, pnl_s, _ = PO.prepare_outer_rd(rd_sq, wi)
+        _, _, _, _, pnl_s, _ = PO.prepare_outer_rd(rd_sq, wi, RenormaliseActive())
         fs = PO.panel_field(pnl_s, "prox")
         @test fs.labels == ["_$i" for i in 1:k]
         @test features_are_assets(fs, ["_$i" for i in 1:k])
         @test fs.vals ≈ collapse(Zsq, true, wi)
 
-        _, _, _, _, pnl_3, _ = PO.prepare_outer_rd(rd_3d, wi)
+        _, _, _, _, pnl_3, _ = PO.prepare_outer_rd(rd_3d, wi, RenormaliseActive())
         @test PO.panel_feature_names(pnl_3) == nf
         @test size(panel_feature_matrix(pnl_3)[2]) == (T, k, K)
 
@@ -279,7 +279,8 @@ end
         Julia's destructuring discards trailing values without complaint, so appending it
         would have let a stale overload keep building a feature-less result in silence.
         =#
-        stale_nb, stale_B, stale_iv, stale_ivpa, stale_X = PO.prepare_outer_rd(rd_r, wi)
+        stale_nb, stale_B, stale_iv, stale_ivpa, stale_X = PO.prepare_outer_rd(rd_r, wi,
+                                                                               RenormaliseActive())
         @test isa(stale_X, AssetPanel)
         @test !isa(stale_X, AbstractMatrix)
     end
@@ -478,14 +479,15 @@ end
                 ((preds_st, PO.FullUniverse()), (preds_nc, PO.ClusterUniverse(cls)))
                 Ws = [PO.fold_weight_matrix(predictions, u, f, N)
                       for f in eachindex(test_idx)]
-                rdo = PO.rebuild_returns_result(rd, predictions, u)
+                rdo = PO.rebuild_returns_result(rd, predictions, u, RenormaliseActive())
                 @test size(panel_feature_matrix(rdo.pnl)[2], 1) == size(rdo.X, 1) == T
                 @test size(panel_feature_matrix(rdo.pnl)[2], 2) == length(rdo.nx)
                 @test any(f -> PO.features_are_assets(f, rdo.nx), rdo.pnl.pf) == sq
                 r = 0
                 for (f, rows) in enumerate(test_idx)
                     _, _, _, _, pnl_e, _ = PO.prepare_outer_rd(PO.port_opt_view(rd, rows,
-                                                                                :), Ws[f])
+                                                                                :), Ws[f],
+                                                               RenormaliseActive())
                     nz_e, Z_e = panel_feature_matrix(pnl_e)
                     blk = panel_feature_matrix(rdo.pnl)[2][(r + 1):(r + length(rows)), :, :]
                     # A static source has no observation axis of its own, so the non-`cv`
@@ -521,7 +523,8 @@ end
                        for o in (plain_hrp(), herc())]
         Ws = [PO.fold_weight_matrix(predictions, PO.FullUniverse(), f, N)
               for f in eachindex(test_idx)]
-        rdo = PO.rebuild_returns_result(rd_3d, predictions, PO.FullUniverse())
+        rdo = PO.rebuild_returns_result(rd_3d, predictions, PO.FullUniverse(),
+                                        RenormaliseActive())
         # The folds cover fewer rows than the clock has, which is the point: a cumulative
         # count would have started at row 1 and run out before the last fold.
         @test size(panel_feature_matrix(rdo.pnl)[2], 1) == sum(length, test_idx) < T
@@ -549,7 +552,8 @@ end
         preds = [PO.cross_val_predict(o, rd_3d_nots, cv; ex = seq)
                  for o in (plain_hrp(), herc())]
         e = try
-            PO.rebuild_returns_result(rd_3d_nots, preds, PO.FullUniverse())
+            PO.rebuild_returns_result(rd_3d_nots, preds, PO.FullUniverse(),
+                                      RenormaliseActive())
         catch err
             err
         end
@@ -563,7 +567,8 @@ end
         preds_r = [PO.cross_val_predict(o, rd_r_nots, cv; ex = seq)
                    for o in (plain_hrp(), herc())]
         @test size(panel_feature_matrix(PO.rebuild_returns_result(rd_r_nots, preds_r,
-                                                                  PO.FullUniverse()).pnl)[2]) ==
+                                                                  PO.FullUniverse(),
+                                                                  RenormaliseActive()).pnl)[2]) ==
               (T, 2, K)
 
         # Recovering by time is only sound on a uniquely-keyed axis, so `ReturnsResult`
@@ -583,13 +588,150 @@ end
         p3 = PO.cross_val_predict(plain_hrp(), rd_r, KFold(; n = 3); ex = seq)
         p4 = PO.cross_val_predict(plain_hrp(), rd_r, KFold(; n = 4); ex = seq)
         @test_throws DimensionMismatch PO.rebuild_returns_result(rd_r, [p3, p4],
-                                                                 PO.FullUniverse())
+                                                                 PO.FullUniverse(),
+                                                                 RenormaliseActive())
 
         # Same number of folds, different rows in them.
         pw = PO.cross_val_predict(plain_hrp(), rd_r, IndexWalkForward(60, 63); ex = seq)
         pk = PO.cross_val_predict(plain_hrp(), rd_r, KFold(; n = length(pw.pred)); ex = seq)
         @test_throws DimensionMismatch PO.rebuild_returns_result(rd_r, [pw, pk],
-                                                                 PO.FullUniverse())
+                                                                 PO.FullUniverse(),
+                                                                 RenormaliseActive())
+    end
+
+    @testset "The collapse weighs the active members of each observation" begin
+        #=
+        #1456 built the rule #1451 decided. Three assets over three observations: asset 2 is
+        inactive at rows 2 and 3, asset 1 at row 3, and each inactive cell holds `99`, a
+        value with no meaning. The inner weights normalise to `W̃ = [0.5 0; 0.25 1; 0.25 0]`,
+        so sub-portfolio 2 holds asset 2 alone and has no active member at rows 2 and 3.
+        Every expected number below is worked by hand from those weights.
+        =#
+        nx3 = ["a", "b", "c"]
+        m = Bool[1 1 1; 1 0 1; 0 0 1]
+        e = Bool[1 0 0; 1 0 1; 0 0 1]
+        a = [1.0 2.0 3.0; 4.0 99.0 6.0; 99.0 99.0 8.0]
+        o = trues(3, 3)
+        o[2, 1] = false
+        o[3, 3] = false
+        codes = [1 2 2; 1 1 2; 2 1 2]
+        S = reshape(Float64.(1:27), 3, 3, 3)
+        pnl = AssetPanel(;
+                         pf = [NumericPanelField(; name = "a", vals = a, omsk = o),
+                               NumericPanelField(; name = "lift",
+                                                 vals = PO.RepeatedLeading([10.0, 20.0,
+                                                                            30.0], 3)),
+                               CategoricalPanelField(; name = "c", levels = ["x", "y"],
+                                                     codes = codes),
+                               TensorPanelField(; name = "s", axis = "asset", labels = nx3,
+                                                vals = S)], amsk = m, emsk = e)
+        Wi = [2.0 0.0; 1.0 1.0; 1.0 0.0]
+        rdh = ReturnsResult(; nx = nx3, X = [0.01 0.02 0.03; 0.0 0.0 0.01; 0.0 0.0 0.02],
+                            iv = a, ivpa = [1.0, 2.0, 3.0], pnl = pnl)
+        vals(c, name) = PO.panel_field(c, name).vals
+        cr = PO.collapse_asset_panel(pnl, Wi, nx3, RenormaliseActive())
+        cc = PO.collapse_asset_panel(pnl, Wi, nx3, InactiveAsCash())
+        # A numeric field: row 1 has every member active and keeps the plain collapse. Row 2
+        # divides by the active weight 0.75 under the default and not under the cash rule.
+        @test vals(cr, "a") ≈ [1.75 2.0; 14 / 3 0.0; 8.0 0.0]
+        @test vals(cc, "a") ≈ [1.75 2.0; 3.5 0.0; 2.0 0.0]
+        # A static input lifted over the observations collapses row by row, so it varies.
+        @test vals(cr, "lift") ≈ [17.5 20.0; 50 / 3 0.0; 30.0 0.0]
+        @test vals(cc, "lift") ≈ [17.5 20.0; 12.5 0.0; 7.5 0.0]
+        # The membership fractions of a categorical field sum to one under the default.
+        @test vals(cr, "c")[:, 1, :] ≈ [0.5 0.5; 2 / 3 1 / 3; 0.0 1.0]
+        @test vals(cr, "c")[:, 2, :] ≈ [0.0 1.0; 0.0 0.0; 0.0 0.0]
+        @test vals(cc, "c")[:, 1, :] ≈ [0.5 0.5; 0.5 0.25; 0.0 0.25]
+        # A square field restricts both axes: S°_t = D_tᵀ S_t D_t.
+        Wt = [0.5 0.0; 0.25 1.0; 0.25 0.0]
+        for (c, renorm) in ((cr, true), (cc, false)), t in 1:3
+            D = Wt .* m[t, :]
+            s = sum(D; dims = 1)
+            if renorm
+                D = D ./ map(x -> iszero(x) ? 1.0 : x, s)
+            end
+            @test vals(c, "s")[t, :, :] ≈ transpose(D) * S[t, :, :] * D
+        end
+        # The universe masks keep their rule, and a sub-portfolio with no active member is
+        # inactive. The observed mask counts a member that is active and observed.
+        for c in (cr, cc)
+            @test c.amsk == Bool[1 1; 1 0; 1 0]
+            @test c.emsk == Bool[1 0; 1 0; 1 0]
+            @test PO.panel_field(c, "a").omsk == Bool[1 1; 1 0; 0 0]
+        end
+        # `iv` takes the rule row by row, and `ivpa` the members active at the last row.
+        _, _, ivr, ivpar, _, _ = PO.prepare_outer_rd(rdh, Wi, RenormaliseActive())
+        _, _, ivc, ivpac, _, _ = PO.prepare_outer_rd(rdh, Wi, InactiveAsCash())
+        @test ivr ≈ vals(cr, "a")
+        @test ivc ≈ vals(cc, "a")
+        @test ivpar ≈ [3.0, 0.0]
+        @test ivpac ≈ [0.75, 0.0]
+        # A static panel has no inactive member, so both rules give the plain collapse.
+        sp = asset_panel([NumericPanelInput(; name = "a", vals = [1.0, 2.0, 3.0])])
+        @test vals(PO.collapse_asset_panel(sp, Wi, nx3, RenormaliseActive()), "a") ==
+              vals(PO.collapse_asset_panel(sp, Wi, nx3, InactiveAsCash()), "a") ==
+              transpose(Wt) * [1.0, 2.0, 3.0]
+        # The meta-optimisers hold the rule, and a view keeps it.
+        ew = EqualWeighted()
+        nco = NestedClustered(; opti = ew, opto = ew, pcol = InactiveAsCash())
+        st = Stacking(; opti = [ew, ew], opto = ew, pcol = InactiveAsCash())
+        @test NestedClustered(; opti = ew, opto = ew).pcol === RenormaliseActive()
+        @test Stacking(; opti = [ew, ew], opto = ew).pcol === RenormaliseActive()
+        @test PO.port_opt_view(nco, 1:2, rdh.X).pcol === InactiveAsCash()
+        @test PO.port_opt_view(st, 1:2, rdh.X).pcol === InactiveAsCash()
+        @test_throws TypeError NestedClustered(; opti = ew, opto = ew, pcol = :cash)
+    end
+
+    @testset "The cross-validated path keeps the collapsed masks and rates" begin
+        #=
+        The folds stack the collapse of each fold, masks included, so a sub-portfolio is
+        inactive on the same rows on both paths, and `iv` and `ivpa` take the rule as on the
+        fold-less path. Asset 1 lists at row 61 and makes a cluster of its own, and a prior
+        under a Coverage Policy keeps it, so its sub-portfolio is inactive on rows 1 to 60.
+        =#
+        m = trues(T, N)
+        m[1:60, 1] .= false
+        Xm = copy(X)
+        Xm[1:60, 1] .= NaN
+        rdm = ReturnsResult(; nx = nx, X = Xm, ts = ts,
+                            iv = 0.1 .+ 0.2 .* rand(StableRNG(8), T, N),
+                            ivpa = collect(1.0:N),
+                            pnl = AssetPanel(;
+                                             pf = [NumericPanelField(; name = "z",
+                                                                     vals = Z3[:, :, 1])],
+                                             amsk = m, emsk = m))
+        cvg = CoveragePolicy()
+        pec = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg),
+                             ce = Covariance(; cvg = cvg))
+        cls = [[1], collect(2:N)]
+        u = PO.ClusterUniverse(cls)
+        preds = [PO.cross_val_predict(InverseVolatility(; pe = pec), rdm, KFold(; n = 4);
+                                      cols = cl, ex = seq) for cl in cls]
+        rows = PO.fold_row_indices(rdm, preds[1].pred)
+        for alg in (RenormaliseActive(), InactiveAsCash())
+            ro = PO.rebuild_returns_result(rdm, preds, u, alg)
+            @test findall(.!ro.pnl.amsk[:, 1]) == 1:60
+            @test all(ro.pnl.amsk[:, 2])
+            @test ro.pnl.emsk == ro.pnl.amsk
+            @test all(iszero, ro.iv[1:60, 1])
+            r = 0
+            for (f, rw) in enumerate(rows)
+                W = PO.fold_weight_matrix(preds, u, f, N)
+                _, _, iv_e, ivpa_e, pnl_e, _ = PO.prepare_outer_rd(PO.port_opt_view(rdm, rw,
+                                                                                    :), W,
+                                                                   alg)
+                blk = (r + 1):(r + length(rw))
+                @test ro.pnl.amsk[blk, :] == pnl_e.amsk
+                @test ro.pnl.emsk[blk, :] == pnl_e.emsk
+                @test ro.iv[blk, :] ≈ iv_e
+                @test PO.panel_field(ro.pnl, "z").vals[blk, :] ≈
+                      PO.panel_field(pnl_e, "z").vals
+                if f == length(rows)
+                    @test ro.ivpa ≈ ivpa_e
+                end
+                r += length(rw)
+            end
+        end
     end
 
     @testset "The transport carrier is gone" begin
