@@ -358,7 +358,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits one external regression model per observation across the assets.
 
-The cross-sectional weights reach the model as observation weights, through [`factory`](@ref) and the target's own `kwargs`, so any target the library carries — a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref) — runs here unchanged. Unlike [`CrossSectionalLinearRegression`](@ref), the fit **refuses** an observation with no eligible asset, because an external model has no cross-section to read.
+The cross-sectional weights reach the model as observation weights, through [`factory`](@ref) and the target's own `kwargs`, so any target the library carries — a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref) — runs here unchanged. A caller's own target runs here too, when it states the methods of the `# Interfaces` section of [`AbstractRegressionTarget`](@ref). A target with no weight method is refused, because its fit would ignore the cross-sectional weights. Unlike [`CrossSectionalLinearRegression`](@ref), the fit **refuses** an observation with no eligible asset, because an external model has no cross-section to read.
 
 # Algorithm
 
@@ -570,6 +570,7 @@ Return the factor returns of one observation, through the member's own solve.
 # Validation
 
   - Under [`CrossSectionalTargetRegression`](@ref), `!isempty(y)`. An external target has no cross-section to fit when no asset is eligible, and the `ArgumentError` names the observation.
+  - Under [`CrossSectionalTargetRegression`](@ref), the target has a `factory(tgt, w)` method that carries the weights, else [`factory(::AbstractRegressionTarget, ::ObsWeights)`](@ref) throws an `ArgumentError`.
 
 # Returns
 

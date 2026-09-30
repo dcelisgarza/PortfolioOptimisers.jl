@@ -307,7 +307,7 @@ end
                 :AbstractPhylogenyConstraintEstimator, :AbstractPhylogenyConstraintResult,
                 :AbstractPhylogenyResult, :AbstractPipelineEstimator,
                 :AbstractPipelineResult, :AbstractPredictionResult,
-                :AbstractRegressionTarget, :AbstractRegularisationEstimator,
+                :AbstractRegularisationEstimator,
                 :AbstractRelativisticValueatRiskViewFormulation, :AbstractResult,
                 :AbstractReturnForecastResult, :AbstractRiskSeriesAlgorithm,
                 :AbstractSearchCrossValidationEstimator, :AbstractSeparationAlgorithm,

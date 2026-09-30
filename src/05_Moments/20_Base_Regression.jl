@@ -427,11 +427,101 @@ Abstract supertype for all regression target types.
 
 All concrete and/or abstract types representing regression targets (such as linear or generalised linear models) should be subtypes of `AbstractRegressionTarget`.
 
+A target is the model a regression estimator fits, and the library ships two: [`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref). Any other model that fits under observation weights and exposes its coefficients runs as a target, for example a robust M-estimator the caller writes on top of `StatsAPI`. The library ships no such model: the route below is the contract.
+
+# Interfaces
+
+In order to implement a new regression target that works seamlessly with [`CrossSectionalTargetRegression`](@ref) and [`TargetReturnForecast`](@ref), subtype `AbstractRegressionTarget` with all necessary parameters as part of the struct, and implement the following methods. [`CrossSectionalTargetRegression`](@ref) reads `factory`, `StatsAPI.fit` and `StatsAPI.coef`. [`TargetReturnForecast`](@ref) reads `StatsAPI.fit` and `StatsAPI.predict`. A time-series regression estimator reads more of the fitted model, for example [`StepwiseRegression`](@ref) reads the score its criterion names.
+
+## `factory`
+
+  - `factory(tgt::MyRegressionTarget, w::StatsBase.AbstractWeights) -> MyRegressionTarget`: Return a target that carries the observation weights `w` into its fit.
+
+The cross-sectional regression fits every observation under its cross-sectional weights, so it calls this method on each observation. A target with no such method is refused by [`factory(::AbstractRegressionTarget, ::ObsWeights)`](@ref), because the fit would otherwise ignore the weights. A target that must also accept a [`DynamicAbstractWeights`](@ref) resolves it against the design with [`get_observation_weights`](@ref) at the fit, as [`LinearModel`](@ref) does.
+
+### Arguments
+
+  - `tgt`: The new regression target.
+  - `w`: Observation weights, one per row of the design the target is fitted to.
+
+### Returns
+
+  - `tgt::MyRegressionTarget`: Target whose fit weighs row `i` by `w[i]`.
+
+## `StatsAPI.fit`
+
+  - `StatsAPI.fit(tgt::MyRegressionTarget, A::MatNum, y::VecNum) -> MyRegressionFit`: Fit the target to the design `A` and the response `y`.
+
+### Arguments
+
+  - `tgt`: The new regression target.
+  - `A`: Design matrix, `samples × regressors`. The library adds no intercept column: the caller's estimator states the intercept.
+  - `y`: Response vector, one entry per row of `A`.
+
+### Returns
+
+  - `m::MyRegressionFit`: Fitted model.
+
+## `StatsAPI.coef`
+
+  - `StatsAPI.coef(m::MyRegressionFit) -> VecNum`: Return the fitted coefficients.
+
+### Arguments
+
+  - `m`: Fitted model that `StatsAPI.fit` returns.
+
+### Returns
+
+  - `b::VecNum`: Coefficients, one per column of the design.
+
+## `StatsAPI.predict`
+
+  - `StatsAPI.predict(m::MyRegressionFit, A::MatNum) -> VecNum`: Return the fitted response on a new design.
+
+### Arguments
+
+  - `m`: Fitted model that `StatsAPI.fit` returns.
+  - `A`: Design matrix, `samples × regressors`, with the columns of the fit.
+
+### Returns
+
+  - `yhat::VecNum`: Predicted response, one entry per row of `A`.
+
 # Related
 
   - [`AbstractRegressionAlgorithm`](@ref)
+  - [`LinearModel`](@ref)
+  - [`GeneralisedLinearModel`](@ref)
+  - [`CrossSectionalTargetRegression`](@ref)
+  - [`TargetReturnForecast`](@ref)
+  - [`factory`](@ref)
 """
 abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
+"""
+    factory(tgt::AbstractRegressionTarget, w::ObsWeights)
+
+Refuse a regression target that has no method to carry observation weights into its fit.
+
+A target that states no `factory(tgt, w)` method of its own would otherwise fall to the generic [`factory`](@ref), which returns it unchanged, and its fit would ignore the weights. Only a call that carries weights reaches this method, so a target fitted without weights, as [`TargetReturnForecast`](@ref) fits it, needs no weight method.
+
+# Arguments
+
+  - `tgt`: Regression target with no weight method of its own.
+  - $(arg_dict[:ow])
+
+# Validation
+
+  - The call always throws an `ArgumentError` that names the method `tgt` lacks. The `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states that method.
+
+# Related
+
+  - [`AbstractRegressionTarget`](@ref)
+  - [`CrossSectionalTargetRegression`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(tgt::AbstractRegressionTarget, w::ObsWeights)
+    return throw(ArgumentError("$(nameof(typeof(tgt))) has no method factory(::$(nameof(typeof(tgt))), ::$(nameof(typeof(w)))), so its fit cannot carry the observation weights. Define PortfolioOptimisers.factory(tgt::$(nameof(typeof(tgt))), w::StatsBase.AbstractWeights) to return a target whose fit weighs each row by w, as the # Interfaces section of AbstractRegressionTarget states"))
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -1421,3 +1511,6 @@ public AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEs
 # verbs an extension must implement, whose concrete methods live under
 # src/11_UncertaintySets/09_OrthogonalUncertaintySets.jl -- the same split #1137 already used.
 public AbstractOrthogonalityMetric, orthogonality_weights, cs_diagnostic_weights
+# The `# Interfaces`-marked type of #1397 (ADR 0154): a caller's own regression target. The
+# verbs its section names are `factory`, which is exported, and three `StatsAPI` verbs.
+public AbstractRegressionTarget

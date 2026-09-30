@@ -1355,6 +1355,146 @@ end
     end
 end
 
+#=
+A caller's own regression target (#1397). A Huber M-estimator fitted by iteratively reweighted
+least squares, written on top of `StatsAPI` as the `# Interfaces` section of
+`AbstractRegressionTarget` states: `factory` carries the observation weights, `fit` returns a
+model, and `coef` and `predict` read it. The threshold `delta` is in the units of the response,
+so the fit needs no scale estimate. The library ships no such target.
+=#
+struct HuberTestTarget{T, W} <: PortfolioOptimisers.AbstractRegressionTarget
+    delta::T
+    w::W
+end
+HuberTestTarget(delta) = HuberTestTarget(delta, nothing)
+struct HuberTestFit{V}
+    coef::V
+end
+function PortfolioOptimisers.factory(tgt::HuberTestTarget, w::StatsBase.AbstractWeights)
+    return HuberTestTarget(tgt.delta, w)
+end
+# The derivative of the Huber loss: the residual inside the threshold, clamped outside it.
+huber_test_psi(r, delta) = clamp(r, -delta, delta)
+function PortfolioOptimisers.StatsAPI.fit(tgt::HuberTestTarget, A::AbstractMatrix,
+                                          y::AbstractVector)
+    w = isnothing(tgt.w) ? ones(length(y)) : collect(tgt.w)
+    sw = sqrt.(w)
+    b = (sw .* A) \ (sw .* y)
+    for _ in 1:1000
+        r = y - A * b
+        # The IRLS weight of a residual is psi(r) / r: one inside the threshold.
+        u = [abs(ri) <= tgt.delta ? 1.0 : tgt.delta / abs(ri) for ri in r]
+        su = sqrt.(w .* u)
+        bn = (su .* A) \ (su .* y)
+        done = maximum(abs, bn - b) <= 1e-15 * (1 + maximum(abs, b))
+        b = bn
+        done && break
+    end
+    return HuberTestFit(b)
+end
+PortfolioOptimisers.StatsAPI.coef(m::HuberTestFit) = m.coef
+PortfolioOptimisers.StatsAPI.predict(m::HuberTestFit, A::AbstractMatrix) = A * m.coef
+# A least-squares target that states no weight method.
+struct UnweightedTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+function PortfolioOptimisers.StatsAPI.fit(::UnweightedTestTarget, A::AbstractMatrix,
+                                          y::AbstractVector)
+    return HuberTestFit(A \ y)
+end
+
+@testset "A caller's own regression target runs through both cross-sectional consumers" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1397)
+    T, N, K = 3, 15, 2
+    Z = randn(rng, T, N, K)
+    beta = randn(rng, T, K)
+    X = permutedims(reduce(hcat, Z[t, :, :] * beta[t, :] for t in 1:T)) .+
+        0.01 * randn(rng, T, N)
+    # One gross outlier per observation, so the Huber threshold binds.
+    X[:, 1] .+= 1.0
+    W = 1.0 .+ rand(rng, T, N)
+
+    @testset "The regression fits the target under the cross-sectional weights" begin
+        # An infinite threshold makes the Huber fit a weighted least squares, so it equals the
+        # closed form of the library, and differs from the unweighted fit. A target whose
+        # weights were dropped would give the unweighted fit.
+        f_inf = cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                          tgt = HuberTestTarget(Inf)),
+                                           Z, X, W).f
+        f_wls = cross_sectional_regression(CrossSectionalLinearRegression(), Z, X, W).f
+        f_ols = cross_sectional_regression(CrossSectionalLinearRegression(), Z, X,
+                                           ones(T, N)).f
+        # Measured: the two agree exactly, and the weights move the fit by 6.6%.
+        @test f_inf ≈ f_wls rtol = 1e-12
+        @test !isapprox(f_wls, f_ols; rtol = 1e-3)
+        # A finite threshold: the residuals solve the weighted Huber score equation of each
+        # observation, sum_i w_ti psi(eps_ti) z_ti = 0, and not the unweighted one.
+        delta = 0.02
+        csr = cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                        tgt = HuberTestTarget(delta)),
+                                         Z, X, W)
+        @test isa(csr, CrossSectionalRegression)
+        for t in 1:T
+            psi = huber_test_psi.(csr.eps[t, :], delta)
+            A = Z[t, :, :]
+            scale = sum(W[t, :] .* abs.(psi) .* sum(abs, A; dims = 2))
+            # Measured: at most 1.3e-14 of the scale weighted, and at least 1.8e-2 unweighted.
+            @test maximum(abs, A' * (W[t, :] .* psi)) <= 1e-12 * scale
+            @test maximum(abs, A' * psi) > 1e-3 * scale
+            # The outlier sits outside the threshold, so the fit clamps it.
+            @test abs(csr.eps[t, 1]) > delta
+        end
+        # The robust fit sits nearer the factor returns the panel was built from.
+        @test norm(csr.f - beta) < norm(f_wls - beta)
+    end
+
+    @testset "A target with no weight method is refused where weights reach it" begin
+        cre = CrossSectionalTargetRegression(; tgt = UnweightedTestTarget())
+        @test_throws ArgumentError cross_sectional_regression(cre, Z, X, W)
+        # The message names the method the target lacks.
+        missing_method = "factory(::UnweightedTestTarget, ::AnalyticWeights)"
+        @test_throws missing_method cross_sectional_regression(cre, Z, X, W)
+        @test_throws ArgumentError factory(UnweightedTestTarget(),
+                                           StatsBase.aweights(ones(3)))
+        # A call with no weights reaches the generic factory, which returns the target.
+        @test factory(UnweightedTestTarget()) === UnweightedTestTarget()
+        # A target that states the method keeps it.
+        w = StatsBase.aweights([1.0, 2.0])
+        @test factory(HuberTestTarget(0.5), w).w === w
+    end
+
+    @testset "The forecast fits the target without weights, and reads its predict" begin
+        a = [1.0 2.0 3.0; 2.0 1.0 4.0; 3.0 2.0 1.0; 1.0 4.0 2.0]
+        b = [4.0 1.0 2.0; 1.0 3.0 2.0; 2.0 1.0 3.0; 3.0 2.0 1.0]
+        eps = [0.01 -0.02 0.03; -0.01 0.02 0.01; 0.02 0.01 -0.03; 0.00 0.03 0.02]
+        vs = [0.04 0.09 0.01; 0.02 0.05 0.03; 0.06 0.01 0.02; 0.03 0.04 0.05]
+        rd, csfm, ds = forecast_fit_panel(a, b, eps, vs)
+        kw = (; scores = ds, target_outlier = nothing, calibrate = false)
+        mu_ols = return_forecast(TargetReturnForecast(; kw...), rd, csfm).mu
+        # The forecast needs no weight method: the unweighted target runs, and so does the
+        # Huber target at an infinite threshold, and both equal least squares.
+        for tgt in (UnweightedTestTarget(), HuberTestTarget(Inf))
+            rf = return_forecast(TargetReturnForecast(; kw..., tgt = tgt), rd, csfm)
+            @test isa(rf.model, HuberTestFit)
+            # Measured: 4.0e-16.
+            @test rf.mu ≈ mu_ols rtol = 1e-12
+        end
+        # A finite threshold: the coefficients solve the unweighted Huber score equation of
+        # the pooled samples, and the forecast is the target's own predict on the latest row.
+        delta = 0.015
+        rf = return_forecast(TargetReturnForecast(; kw..., tgt = HuberTestTarget(delta)),
+                             rd, csfm)
+        Sf = [vec(transpose(a[1:3, :])) vec(transpose(b[1:3, :]))]
+        yf = vec(transpose(eps[2:4, :]))
+        coef = PO.StatsAPI.coef(rf.model)
+        psi = huber_test_psi.(yf - Sf * coef, delta)
+        # Measured: 5.6e-15 of the scale, with three of the nine samples clamped.
+        @test maximum(abs, Sf' * psi) <= 1e-12 * sum(abs.(psi) .* sum(abs, Sf; dims = 2))
+        @test any(>(delta), abs.(yf - Sf * coef))
+        @test !isapprox(rf.mu, mu_ols; rtol = 1e-3)
+        @test rf.mu ≈ [a[4, :] b[4, :]] * coef rtol = 1e-12
+    end
+end
+
 @testset "The two fitted members reproduce the reference implementation" begin
     sp = synthetic_asset_panel(; n_assets = 20, n_observations = 60, n_industries = 4,
                                late_listing_proba = 0.3, delisting_proba = 0.3,
