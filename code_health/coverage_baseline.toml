@@ -71,12 +71,13 @@ commit = "8610300"
 "src/03_InputData/13_Base_AssetSelection.jl" = { lines = 17, misses = 0 }
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { lines = 308, misses = 0 }
 "src/03_InputData/15_FeatureSelector.jl" = { lines = 127, misses = 0 }
-"src/03_InputData/16_PanelDataFrame.jl" = { lines = 97, misses = 0 }
+"src/03_InputData/16_PanelDataFrame.jl" = { lines = 98, misses = 0 }
 "src/03_InputData/17_ReturnsBufferState.jl" = { lines = 93, misses = 0 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { lines = 186, misses = 0 }
 "src/03_InputData/19_AssetPanelConcat.jl" = { lines = 57, misses = 0 }
 "src/03_InputData/20_PanelFieldValues.jl" = { lines = 30, misses = 0 }
 "src/03_InputData/21_AssetPanelSummary.jl" = { lines = 130, misses = 0 }
+"src/03_InputData/22_PanelRoundTrip.jl" = { lines = 179, misses = 0 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { lines = 26, misses = 0 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { lines = 80, misses = 0 }
 "src/04_MatrixProcessing/03_Detone.jl" = { lines = 30, misses = 0 }

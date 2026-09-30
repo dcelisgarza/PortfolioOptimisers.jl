@@ -84,6 +84,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/19_AssetPanelConcat.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/20_PanelFieldValues.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/21_AssetPanelSummary.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/22_PanelRoundTrip.jl" = { raw = 1, reviewed = 1 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { raw = 16, reviewed = 16 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { raw = 1, reviewed = 1 }
 "src/04_MatrixProcessing/03_Detone.jl" = { raw = 0, reviewed = 0 }
@@ -477,6 +478,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/19_AssetPanelConcat.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/20_PanelFieldValues.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/21_AssetPanelSummary.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/22_PanelRoundTrip.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/03_Detone.jl" = { raw = 0, reviewed = 0 }

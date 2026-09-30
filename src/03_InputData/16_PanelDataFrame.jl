@@ -433,7 +433,13 @@ end
 
 Convert an [`AssetPanel`](@ref) to a `DataFrames.DataFrame`.
 
-The library has no file format for a panel. To save, plot or share a panel, convert it to a table with this function, and write the table with a package that reads a `DataFrame`, for example CSV.jl or Arrow.jl.
+The library has no file format for a panel. To save, plot or share a panel, convert it to a table with this function, and write the table with a package that reads a `DataFrame`, for example CSV.jl or Arrow.jl. To read the panel back, write its manifest from [`panel_manifest`](@ref) beside the table, and give both tables to [`asset_panel`](@ref), the inverse of this function. The long layout drops the cells outside the universe, and the wide layout keeps every cell:
+
+```julia
+CSV.write(\"panel.csv\", panel_dataframe(pnl; nx, ts, layout = :wide))
+CSV.write(\"manifest.csv\", panel_manifest(pnl; nx, ts))
+pnl2 = asset_panel(DataFrame(CSV.File(\"panel.csv\")), DataFrame(CSV.File(\"manifest.csv\")))
+```
 
 The panel holds no asset names and no observation labels, because the `PricesResult` or the `ReturnsResult` that holds the panel names them. So the caller gives them in `nx` and `ts`. When one of them is `nothing`, the table names each entry by its position on the axis.
 
@@ -448,7 +454,7 @@ In both layouts a tensor Panel Field gives one column per trailing-axis label, w
 # Algorithm
 
  1. Check `layout`.
- 2. Name the axes. The asset names are `nx`, or the positions `"1"`, `"2"`, … when `nx` is `nothing`. The observation labels are `ts`, or the positions `1`, `2`, … when `ts` is `nothing` or the panel is static. Check each length against the axes of the panel.
+ 2. Name the axes with [`panel_frame_axes`](@ref). The asset names are `nx`, or the positions `"1"`, `"2"`, … when `nx` is `nothing`. The observation labels are `ts`, or the positions `1`, `2`, … when `ts` is `nothing` or the panel is static. Check each length against the axes of the panel.
  3. Find the positions of the selected assets with [`panel_frame_assets`](@ref).
  4. `fields` is one string: write that Panel Field with [`panel_frame_field`](@ref), and return the table.
  5. Otherwise find the Panel Fields with [`panel_frame_fields`](@ref), and write them with [`panel_frame_long`](@ref) or [`panel_frame_wide`](@ref).
@@ -498,8 +504,11 @@ julia> panel_dataframe(pnl; nx = [\"A\", \"B\", \"C\"])
 # Related
 
   - [`AssetPanel`](@ref)
+  - [`asset_panel`](@ref)
+  - [`panel_manifest`](@ref)
   - [`panel_field`](@ref)
   - [`panel_feature_matrix`](@ref)
+  - [`panel_frame_axes`](@ref)
   - [`panel_frame_field`](@ref)
   - [`panel_frame_long`](@ref)
   - [`panel_frame_wide`](@ref)
@@ -511,17 +520,7 @@ function panel_dataframe(pnl::AssetPanel; nx::Option{<:VecStr} = nothing,
                          assets = nothing, layout::Symbol = :long, decode::Bool = true)
     @argcheck(layout in (:long, :wide),
               ArgumentError("`layout` is `:long`, one row per (observation, asset), or `:wide`, one column per (Panel Field column, asset). Got layout => :$(layout)"))
-    ax = panel_axes(pnl)
-    nxa = isnothing(nx) ? string.(1:ax[end]) : nx
-    @argcheck(length(nxa) == ax[end],
-              DimensionMismatch("`nx` names the assets of the panel's universe, so it is as long as the panel's asset axis, got length(nx) = $(length(nxa)) and $(ax[end]) assets"))
-    tsa = if isnothing(ts) || isone(length(ax))
-        1:ax[1]
-    else
-        ts
-    end
-    @argcheck(isone(length(ax)) || length(tsa) == ax[1],
-              DimensionMismatch("`ts` labels the observations of a time-varying panel, so it is as long as the panel's observation axis, got length(ts) = $(length(tsa)) and $(ax[1]) observations"))
+    nxa, tsa = panel_frame_axes(pnl, nx, ts)
     j = panel_frame_assets(nxa, assets)
     nxj = [String(a) for a in view(nxa, j)]
     if isa(fields, AbstractString)

@@ -168,6 +168,8 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :panel_frame_fields => "a step of panel_dataframe",
                                            :panel_frame_long => "a step of panel_dataframe",
                                            :panel_frame_wide => "a step of panel_dataframe",
+                                           :panel_frame_axes => "names the axes",
+                                           :panel_manifest => "reads the names, the kinds and the levels, and no cell value",
                                            # A report whose share of all cells counts every cell by design; its other
                                            # numbers are the cases of describe and panel_info_levels below.
                                            :panel_info => "a report of every cell",

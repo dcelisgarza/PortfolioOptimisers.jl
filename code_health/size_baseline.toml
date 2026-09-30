@@ -73,12 +73,13 @@ commit = "ebcacfda95"
 "src/03_InputData/13_Base_AssetSelection.jl" = { code = 30, doc = 95, comment = 0, blank = 55, total = 180 }
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { code = 483, doc = 732, comment = 0, blank = 346, total = 1561 }
 "src/03_InputData/15_FeatureSelector.jl" = { code = 208, doc = 342, comment = 0, blank = 163, total = 713 }
-"src/03_InputData/16_PanelDataFrame.jl" = { code = 150, doc = 264, comment = 0, blank = 124, total = 538 }
+"src/03_InputData/16_PanelDataFrame.jl" = { code = 140, doc = 272, comment = 0, blank = 125, total = 537 }
 "src/03_InputData/17_ReturnsBufferState.jl" = { code = 222, doc = 345, comment = 3, blank = 165, total = 735 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { code = 324, doc = 378, comment = 15, blank = 195, total = 912 }
 "src/03_InputData/19_AssetPanelConcat.jl" = { code = 97, doc = 161, comment = 2, blank = 85, total = 345 }
 "src/03_InputData/20_PanelFieldValues.jl" = { code = 50, doc = 116, comment = 0, blank = 53, total = 219 }
 "src/03_InputData/21_AssetPanelSummary.jl" = { code = 211, doc = 408, comment = 0, blank = 202, total = 821 }
+"src/03_InputData/22_PanelRoundTrip.jl" = { code = 273, doc = 506, comment = 0, blank = 256, total = 1035 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { code = 60, doc = 196, comment = 2, blank = 94, total = 352 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { code = 136, doc = 534, comment = 34, blank = 195, total = 899 }
 "src/04_MatrixProcessing/03_Detone.jl" = { code = 48, doc = 188, comment = 0, blank = 81, total = 317 }
