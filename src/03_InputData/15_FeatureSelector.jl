@@ -1,4 +1,69 @@
 """
+$(DocStringExtensions.TYPEDEF)
+
+Selects the labels of a tensor Panel Field whose group is one name, as the right side of a Feature Selector entry.
+
+The entry `"exposures" => LabelGroup("momentum")` selects every label of the tensor Panel Field `"exposures"` whose group is `"momentum"`, one column per label, in the order of the labels. The groups of a factor exposure tensor are its Factor Families, so this entry selects one family. Two groups take two entries. A string on the right side of an entry already names one label, so a group needs its own type.
+
+A group that the Panel Field does not hold, and a Panel Field that carries no groups, resolve against nothing. The entry is then dropped with a warning, or refused under `strict = true`, as an unknown label is.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    LabelGroup(group::AbstractString) -> LabelGroup
+    LabelGroup(; group::AbstractString) -> LabelGroup
+
+## Validation
+
+  - `!isempty(group)`. Raises an [`IsEmptyError`](@ref).
+
+# Examples
+
+```jldoctest
+julia> f = TensorPanelField(; name = \"exposures\", axis = \"factor\",
+                            labels = [\"mom_12\", \"value\", \"mom_6\"],
+                            groups = [\"momentum\", \"value\", \"momentum\"],
+                            vals = [1.0 2.0 3.0; 4.0 5.0 6.0]);
+
+julia> pnl = AssetPanel(; pf = [f]);
+
+julia> feature_matrix(pnl, [\"exposures\" => LabelGroup(\"momentum\")])
+2×2 Matrix{Float64}:
+ 1.0  3.0
+ 4.0  6.0
+
+julia> feature_labels(pnl, [\"exposures\" => LabelGroup(\"momentum\")])
+2-element Vector{Pair{String, String}}:
+ \"exposures\" => \"mom_12\"
+ \"exposures\" => \"mom_6\"
+```
+
+# Related
+
+  - [`TensorPanelField`](@ref)
+  - [`feature_matrix`](@ref)
+  - [`feature_labels`](@ref)
+  - [`select_fields`](@ref)
+  - [`panel_group_columns!`](@ref)
+"""
+@concrete struct LabelGroup <: AbstractAlgorithm
+    """
+    The group that the entry selects, one of the entries of the `groups` of a tensor Panel Field.
+    """
+    group
+    function LabelGroup(group::AbstractString)
+        @argcheck(!isempty(group),
+                  IsEmptyError("the group of a LabelGroup cannot be empty: it names one entry of the `groups` of a tensor Panel Field"))
+        return new{typeof(group)}(group)
+    end
+end
+function LabelGroup(; group::AbstractString)
+    return LabelGroup(group)
+end
+"""
     panel_field_keys(f::NumericPanelField) -> Vector{String}
     panel_field_keys(f::CategoricalPanelField) -> VecStr
     panel_field_keys(f::TensorPanelField) -> VecStr
@@ -171,18 +236,112 @@ function panel_key_column!(cols::AbstractVector{Tuple{Int, Int, Symbol}}, k::Int
     return nothing
 end
 """
+    panel_group_columns!(cols::AbstractVector{Tuple{Int, Int, Symbol}}, k::Integer, f::AbstractPanelField, lg::LabelGroup, strict::Bool) -> nothing
+
+Push the value columns of every label in one group of a tensor Panel Field onto a resolved Feature Selector.
+
+# Algorithm
+
+ 1. Read the groups of the Panel Field. A numeric or a categorical Panel Field has none, and a tensor Panel Field can carry none.
+ 2. When there are no groups, hand the message to [`strict_diagnostic`](@ref), which throws under `strict` and warns and drops otherwise.
+ 3. Find the labels whose group is `lg.group`. When there is none, hand the message to [`strict_diagnostic`](@ref), with the nearest group from [`did_you_mean`](@ref).
+ 4. Push the value column of each such label, in the order of the labels.
+
+# Arguments
+
+  - `cols`: The resolved columns so far, pushed onto in place.
+  - `k`: The Panel Field's position in the panel.
+  - `f`: The Panel Field.
+  - `lg`: The group to select. See [`LabelGroup`](@ref).
+  - $(field_dict[:fdstrict])
+
+# Returns
+
+  - `nothing`. `cols` carries the result.
+
+# Related
+
+  - [`LabelGroup`](@ref)
+  - [`select_fields_push!`](@ref)
+  - [`panel_key_column!`](@ref)
+  - [`strict_diagnostic`](@ref)
+  - [`TensorPanelField`](@ref)
+"""
+function panel_group_columns!(cols::AbstractVector{Tuple{Int, Int, Symbol}}, k::Integer,
+                              f::AbstractPanelField, lg::LabelGroup, strict::Bool)::Nothing
+    groups = isa(f, TensorPanelField) ? f.groups : nothing
+    if isnothing(groups)
+        strict_diagnostic("`sel` pairs the Panel Field \"$(f.name)\" with the group `$(lg.group)`, but the field carries no groups. Only a tensor Panel Field built with `groups` has them. Under `strict = false` the entry is dropped.",
+                          strict)
+        return nothing
+    end
+    ls = findall(==(lg.group), groups)
+    if isempty(ls)
+        pool = unique(groups)
+        strict_diagnostic("`sel` pairs the Panel Field \"$(f.name)\" with the group `$(lg.group)`, which is not one of its $(length(pool)) group(s): $(join(pool, ", ")). Under `strict = false` the entry is dropped." *
+                          did_you_mean(lg.group, pool), strict)
+    end
+    for l in ls
+        push!(cols, (Int(k), Int(l), :vals))
+    end
+    return nothing
+end
+"""
+    selector_value_ok(v) -> Bool
+
+Check the right side of a paired Feature Selector entry, whose left side names a Panel Field.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A `Symbol` is admitted when it is `:observed`.
+ 2. A string, one level or label, is admitted when it is not empty.
+ 3. A [`LabelGroup`](@ref) is admitted when its group is a non-empty string. The check reads the field, because a call of the generated positional constructor skips the check of the typed one.
+ 4. A vector of strings is admitted when it is not empty, holds no empty key and repeats none.
+ 5. Anything else is refused.
+
+# Arguments
+
+  - `v`: The right side of the pair.
+
+# Returns
+
+  - `ok::Bool`: Whether the right side takes an admitted form.
+
+# Related
+
+  - [`assert_selector_entry`](@ref)
+  - [`LabelGroup`](@ref)
+"""
+function selector_value_ok(::Any)
+    return false
+end
+function selector_value_ok(v::Symbol)
+    return v === :observed
+end
+function selector_value_ok(v::AbstractString)
+    return !isempty(v)
+end
+function selector_value_ok(v::LabelGroup)
+    return isa(v.group, AbstractString) && !isempty(v.group)
+end
+function selector_value_ok(v::AbstractVector{<:AbstractString})
+    return !isempty(v) && all(!isempty, v) && allunique(v)
+end
+"""
     assert_selector_entry(entry) -> nothing
 
-Check that one Feature Selector entry takes one of the four forms the grammar admits.
+Check that one Feature Selector entry takes one of the five forms the grammar admits.
 
-The four forms are a Panel Field name, a name paired with the levels or labels it keeps, a name paired with one level or label, and a name paired with `:observed`. No entry is a column position. Every field, level and label of an Asset Panel carries a name, so an integer has nothing to index.
+The five forms are a Panel Field name, a name paired with the levels or labels it keeps, a name paired with one level or label, a name paired with a [`LabelGroup`](@ref), and a name paired with `:observed`. No entry is a column position. Every field, level and label of an Asset Panel carries a name, so an integer has nothing to index.
 
 The check refuses an empty name, and a paired vector that is empty, holds an empty key or repeats a key. Each of those resolves to no column or to a doubled column, and the selector exists to prevent both.
 
 # Algorithm
 
  1. A string: check that it is not empty.
- 2. A pair whose first element is a non-empty string: check its second element. A `Symbol` is `:observed`, a string is non-empty, and a vector of strings is non-empty, holds no empty key and repeats none.
+ 2. A pair whose first element is a non-empty string: check its second element with [`selector_value_ok`](@ref).
  3. Refuse anything else.
 
 # Arguments
@@ -191,7 +350,7 @@ The check refuses an empty name, and a paired vector that is empty, holds an emp
 
 # Validation
 
-  - `entry` takes one of the four forms. Raises an `ArgumentError`.
+  - `entry` takes one of the five forms. Raises an `ArgumentError`.
 
 # Returns
 
@@ -200,34 +359,26 @@ The check refuses an empty name, and a paired vector that is empty, holds an emp
 # Related
 
   - [`assert_feature_selector`](@ref)
+  - [`selector_value_ok`](@ref)
   - [`select_fields`](@ref)
 """
 function assert_selector_entry(entry)::Nothing
     ok = if isa(entry, AbstractString)
         !isempty(entry)
     elseif isa(entry, Pair) && isa(first(entry), AbstractString) && !isempty(first(entry))
-        v = last(entry)
-        if isa(v, Symbol)
-            v === :observed
-        elseif isa(v, AbstractString)
-            !isempty(v)
-        elseif isa(v, AbstractVector{<:AbstractString})
-            !isempty(v) && all(!isempty, v) && allunique(v)
-        else
-            false
-        end
+        selector_value_ok(last(entry))
     else
         false
     end
     @argcheck(ok,
-              ArgumentError("a `sel` entry is a Panel Field name, a name paired with the levels or labels it keeps, a name paired with one level or label, or a name paired with `:observed`. A name is non-empty, and a paired vector is non-empty, holds no empty key and repeats none. Got\nentry => $(entry)"))
+              ArgumentError("a `sel` entry is a Panel Field name, a name paired with the levels or labels it keeps, a name paired with one level or label, a name paired with a LabelGroup, or a name paired with `:observed`. A name is non-empty, and a paired vector is non-empty, holds no empty key and repeats none. Got\nentry => $(entry)"))
     return nothing
 end
 """
     assert_feature_selector(sel::Nothing) -> nothing
     assert_feature_selector(sel::AbstractVector) -> nothing
 
-Check that a Feature Selector is a non-empty vector of distinct entries, each in one of the four admitted forms.
+Check that a Feature Selector is a non-empty vector of distinct entries, each in one of the five admitted forms.
 
 The check refuses an empty `sel` and does not read it as every Panel Field. `nothing` already says that, and a selection that widens to the whole panel without a message is the failure this selector exists to prevent. The check refuses a repeated entry because it doubles the contribution of its column to every distance.
 
@@ -284,7 +435,8 @@ Resolve one Feature Selector entry against an [`AssetPanel`](@ref)'s Panel Field
  3. A bare name expands to the Panel Field's value columns, through [`panel_value_columns!`](@ref).
  4. A name paired with a `Symbol` claims the Panel Field's one observed-mask column.
  5. A name paired with one key claims that key's column, through [`panel_key_column!`](@ref).
- 6. A name paired with a vector of keys claims one column per key, in the order the vector writes them.
+ 6. A name paired with a [`LabelGroup`](@ref) claims the column of every label in that group, through [`panel_group_columns!`](@ref).
+ 7. A name paired with a vector of keys claims one column per key, in the order the vector writes them.
 
 # Arguments
 
@@ -303,6 +455,7 @@ Resolve one Feature Selector entry against an [`AssetPanel`](@ref)'s Panel Field
   - [`select_fields`](@ref)
   - [`panel_value_columns!`](@ref)
   - [`panel_key_column!`](@ref)
+  - [`panel_group_columns!`](@ref)
   - [`panel_selector_msg`](@ref)
   - [`strict_diagnostic`](@ref)
 """
@@ -321,6 +474,8 @@ function select_fields_push!(cols::AbstractVector{Tuple{Int, Int, Symbol}}, pnl:
         push!(cols, (Int(k), 0, :observed))
     elseif isa(last(entry), AbstractString)
         panel_key_column!(cols, k, f, last(entry), strict)
+    elseif isa(last(entry), LabelGroup)
+        panel_group_columns!(cols, k, f, last(entry), strict)
     else
         for key in last(entry)
             panel_key_column!(cols, k, f, key, strict)
@@ -389,7 +544,7 @@ function select_fields(pnl::AssetPanel, sel, strict::Bool)
         select_fields_push!(cols, pnl, entry, pool, strict)
     end
     @argcheck(allunique(cols),
-              ArgumentError("two entries of `sel` resolve to one column of the Feature Matrix, which doubles that column's contribution to every distance. A bare Panel Field name already claims every one of its value columns, so pairing the same name with one of its levels or labels repeats a column. Got\nsel => $(sel)"))
+              ArgumentError("two entries of `sel` resolve to one column of the Feature Matrix, which doubles that column's contribution to every distance. A bare Panel Field name already claims every one of its value columns, so pairing the same name with one of its levels or labels repeats a column, and a label entry repeats a column of a LabelGroup entry that holds the label. Got\nsel => $(sel)"))
     @argcheck(!isempty(cols),
               IsEmptyError("`sel` selected no column of the Asset Panel: every entry resolved against nothing and was dropped. Set `strict = true` to see which entry, or correct `sel`."))
     return cols
@@ -710,4 +865,4 @@ The distance kernel never calls this function. It reads the matrix alone, so a p
 function feature_labels(pnl::AssetPanel, sel = nothing; strict::Bool = false)
     return [panel_column_label(pnl, col) for col in select_fields(pnl, sel, strict)]
 end
-export feature_matrix, feature_labels
+export LabelGroup, feature_matrix, feature_labels

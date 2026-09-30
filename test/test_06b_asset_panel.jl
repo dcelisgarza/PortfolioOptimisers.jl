@@ -739,6 +739,93 @@ end
           [1.0 2.0; 5.0 6.0]
     @test isnothing(prices_to_returns(PricesToReturns(), prs).pnl.amsk)
 end
+@testset "A view selects observations by timestamp and assets and factors by name (#1402)" begin
+    ts = [Dates.Date(2024, 1, 2), Dates.Date(2024, 1, 3), Dates.Date(2024, 1, 5),
+          Dates.Date(2024, 1, 8)]
+    nx = ["AAPL", "MSFT", "XOM"]
+    pnl = asset_panel([NumericPanelInput(; name = "mcap", vals = reshape(1.0:12.0, 4, 3))];
+                      amsk = trues(4, 3),
+                      emsk = [true false true; true true true;
+                              false true true; true true false])
+    rd = ReturnsResult(; nx = nx, X = reshape(0.01:0.01:0.12, 4, 3), nf = ["mkt", "smb"],
+                       F = reshape(0.1:0.1:0.8, 4, 2), B = reshape(0.5:0.5:6.0, 4, 3),
+                       nb = nx, ts = ts, pnl = pnl)
+    # A name or a timestamp is a spelling of a position, so every such view equals the view
+    # by position, field for field and in the order the caller gives.
+    function same_view(a, b)
+        return a.nx == b.nx &&
+               a.X == b.X &&
+               a.nf == b.nf &&
+               a.F == b.F &&
+               a.B == b.B &&
+               a.nb == b.nb &&
+               a.ts == b.ts &&
+               a.pnl.amsk == b.pnl.amsk &&
+               a.pnl.emsk == b.pnl.emsk &&
+               PortfolioOptimisers.panel_field(a.pnl, "mcap").vals ==
+               PortfolioOptimisers.panel_field(b.pnl, "mcap").vals
+    end
+    PV = PortfolioOptimisers.port_opt_view
+    @test same_view(PV(rd, ["XOM", "AAPL"]), PV(rd, [3, 1]))
+    @test same_view(PV(rd, ts[[2, 4]], ["MSFT"]), PV(rd, [2, 4], [2]))
+    @test same_view(PV(rd, :, ["MSFT", "XOM"], ["smb"]), PV(rd, :, [2, 3], [2]))
+    # A calendar range selects the observations the returns hold, in clock order, as the
+    # timestamp view of a PricesResult does; order and repeats of the timestamps do not
+    # matter, and a timestamp off the clock selects no row.
+    @test same_view(PV(rd, Dates.Date(2024, 1, 3):Dates.Day(1):Dates.Date(2024, 1, 7), :),
+                    PV(rd, [2, 3], :))
+    @test same_view(PV(rd, [ts[4], Dates.Date(2023, 12, 31), ts[1], ts[4]], :),
+                    PV(rd, [1, 4], :))
+    # A DateTime selects the Date at the same instant, because the two compare equal.
+    @test same_view(PV(rd, [Dates.DateTime(2024, 1, 5)], :), PV(rd, [3], :))
+    # Positions, ranges and colons pass through unchanged.
+    @test same_view(PV(rd, 2:3, 1:2, :), PV(rd, [2, 3], [1, 2]))
+
+    # A name that selects nothing is refused rather than dropped: a dropped ticker would
+    # shrink the universe with no error.
+    err = @test_throws ArgumentError PV(rd, ["AAPL", "APPL"])
+    @test occursin("APPL", err.value.msg) && occursin("did you mean `AAPL`", err.value.msg)
+    @test_throws ArgumentError PV(rd, :, ["MSFT", "IBM"])
+    @test_throws ArgumentError PV(rd, :, :, ["hml"])
+    # A timestamp window that holds no observation is empty, which the carrier refuses.
+    @test_throws IsEmptyError PV(rd, [Dates.Date(2023, 1, 1)], :)
+    # Each index keeps its axis: a timestamp never selects an asset, and a name never selects
+    # an observation, so the reversed index order of the two methods cannot pass silently.
+    err = @test_throws ArgumentError PV(rd, ts[1:2])
+    @test occursin("observation index", err.value.msg)
+    err = @test_throws ArgumentError PV(rd, ["AAPL"], :)
+    @test occursin("second index", err.value.msg)
+    # A carrier with no names or no timestamps has nothing to match. Asset returns always
+    # carry their names, so only a carrier of factor returns alone has no asset names.
+    fonly = ReturnsResult(; nf = ["mkt", "smb"], F = rd.F)
+    err = @test_throws ArgumentError PV(fonly, :, ["AAPL"])
+    @test occursin("no asset names", err.value.msg)
+    bare = ReturnsResult(; nx = nx, X = rd.X)
+    err = @test_throws ArgumentError PV(bare, ts[1:2], :)
+    @test occursin("no timestamps", err.value.msg)
+    @test_throws ArgumentError PV(bare, :, :, ["mkt"])
+
+    P = TimeSeries.TimeArray(ts, reshape(100.0:111.0, 4, 3), Symbol.(nx))
+    ppnl = asset_panel([NumericPanelInput(; name = "mcap", vals = reshape(1.0:12.0, 4, 3))];
+                       amsk = trues(4, 3), emsk = trues(4, 3))
+    pr = PricesResult(; X = P,
+                      B = TimeSeries.TimeArray(ts, reshape(1.0:12.0, 4, 3), Symbol.(nx)),
+                      pnl = ppnl)
+    function same_prices(a, b)
+        return values(a.X) == values(b.X) &&
+               TimeSeries.colnames(a.X) == TimeSeries.colnames(b.X) &&
+               TimeSeries.timestamp(a.X) == TimeSeries.timestamp(b.X) &&
+               values(a.B) == values(b.B) &&
+               PortfolioOptimisers.panel_field(a.pnl, "mcap").vals ==
+               PortfolioOptimisers.panel_field(b.pnl, "mcap").vals
+    end
+    @test same_prices(PV(pr, ts[2:3], ["XOM", "AAPL"]), PV(pr, ts[2:3], [3, 1]))
+    @test same_prices(PV(pr, 2:3, ["MSFT"]), PV(pr, 2:3, [2]))
+    @test same_prices(PV(pr, :, ["MSFT"]), PV(pr, :, [2]))
+    err = @test_throws ArgumentError PV(pr, :, ["MSFT", "MSTF"])
+    @test occursin("MSTF", err.value.msg)
+    @test_throws ArgumentError PV(pr, ts[2:3], ts[2:3])
+end
 @testset "The panel's numeric type comes from its values (#910)" begin
     # A field resolves in the type its own cells carry, so a Float32 panel stays Float32
     # and a blank-carrying Union{Missing, Float64} field still resolves in Float64.

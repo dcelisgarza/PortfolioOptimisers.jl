@@ -599,6 +599,71 @@ const PO = PortfolioOptimisers
             @test occursin(":observed", err.value.msg)
             @test !occursin("0 label", err.value.msg)
         end
+
+        @testset "a LabelGroup entry selects the labels of one group (#1402)" begin
+            # Groups interleave with the labels, so the selection must follow the label
+            # order and not gather the group's labels from one block.
+            tg = TensorPanelField(; name = "expo", axis = "factor",
+                                  labels = ["mom12", "val", "mom6", "size"],
+                                  groups = ["momentum", "value", "momentum", "size"],
+                                  vals = [1.0 2.0 3.0 4.0; 5.0 6.0 7.0 8.0;
+                                          9.0 10.0 11.0 12.0])
+            tpnl = AssetPanel(; pf = [gnum, gcat, gten, tg])
+            mom = ["expo" => LabelGroup("momentum")]
+            @test feature_labels(tpnl, mom) == ["expo" => "mom12", "expo" => "mom6"]
+            @test feature_matrix(tpnl, mom) ==
+                  feature_matrix(tpnl, ["expo" => ["mom12", "mom6"]])
+            @test feature_matrix(tpnl, mom) == tg.vals[:, tg.groups .== "momentum"]
+            # The labels are a selector that rebuilds the matrix.
+            @test feature_matrix(tpnl, feature_labels(tpnl, mom)) ==
+                  feature_matrix(tpnl, mom)
+            # Two groups take two entries, in the order sel writes them, beside other forms.
+            sel = ["expo" => LabelGroup("size"), "mcap", "expo" => LabelGroup("momentum")]
+            @test feature_labels(tpnl, sel) ==
+                  ["expo" => "size", "mcap", "expo" => "mom12", "expo" => "mom6"]
+            @test feature_matrix(tpnl, sel) ==
+                  [4.0 1.0 1.0 3.0; 8.0 2.0 5.0 7.0; 12.0 3.0 9.0 11.0]
+            # The time-varying shape selects the same labels on every observation, and the
+            # documented slice of the values by group is the same array.
+            tv = TensorPanelField(; name = "expo", axis = "factor", labels = tg.labels,
+                                  groups = tg.groups,
+                                  vals = reshape(collect(1.0:24.0), 2, 3, 4))
+            tvp = AssetPanel(; pf = [tv], amsk = trues(2, 3), emsk = trues(2, 3))
+            @test feature_matrix(tvp, mom) == tv.vals[:, :, tv.groups .== "momentum"]
+            @test feature_matrix(tvp, mom; rows = [2]) ==
+                  tv.vals[2:2, :, tv.groups .== "momentum"]
+            # The routed distance reads the same columns as the label list.
+            @test FeatureDistance(; sel = mom).sel == mom
+
+            # Construction refuses an empty group, and the entry check refuses a group the
+            # generated constructor let through without its check.
+            @test_throws IsEmptyError LabelGroup("")
+            @test LabelGroup(; group = "momentum") == LabelGroup("momentum")
+            @test_throws ArgumentError FeatureDistance(; sel = ["expo" => LabelGroup(1)])
+            # A group and a label entry that hold one label double its column.
+            @test_throws ArgumentError feature_matrix(tpnl, [mom; "expo" => "mom6"])
+            @test_throws ArgumentError feature_matrix(tpnl, ["expo"; mom])
+
+            # A group the field does not hold warns and drops, or throws under strict, with
+            # the nearest group as a suggestion.
+            @test (@test_logs (:warn,) feature_labels(tpnl,
+                                                      ["expo" => LabelGroup("zzz"), "mcap"])) ==
+                  ["mcap"]
+            err = @test_throws ArgumentError feature_matrix(tpnl,
+                                                            ["expo" =>
+                                                                 LabelGroup("momentm")];
+                                                            strict = true)
+            @test occursin("did you mean `momentum`", err.value.msg)
+            # A field with no groups resolves no group: a numeric field, a categorical field,
+            # and a tensor field built without groups.
+            for name in ("mcap", "sector", "beta")
+                err = @test_throws ArgumentError feature_matrix(tpnl,
+                                                                [name =>
+                                                                     LabelGroup("momentum")];
+                                                                strict = true)
+                @test occursin("carries no groups", err.value.msg)
+            end
+        end
     end
 end
 @testset "The routed FeatureDistance units against their docstrings" begin

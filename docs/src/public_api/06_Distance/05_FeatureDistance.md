@@ -15,6 +15,7 @@ StackObservations
 FeatureDistance
 feature_matrix
 feature_labels
+LabelGroup
 ```
 
 ## References

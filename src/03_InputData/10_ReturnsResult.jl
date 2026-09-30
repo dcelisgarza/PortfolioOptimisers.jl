@@ -366,19 +366,25 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref). It restr
 
 # Algorithm
 
- 1. View the asset names `nx` at `i` with [`nothing_scalar_array_view`](@ref).
- 2. View the asset returns as `view(rd.X, :, i)`. Axis 2 is the assets, and every observation is kept.
- 3. When `B` is a matrix, it holds one column per asset, so view `nb` at `i` and view `B` as `view(rd.B, :, i)`. When `B` is a vector or `nothing`, `nb` and `B` pass through unchanged.
- 4. View the implied volatilities as `view(rd.iv, :, i)`, and the adjustment `ivpa` at `i`.
- 5. View the [`AssetPanel`](@ref) `pnl` with [`asset_panel_view`](@ref) at `i` on the asset axis, and give it the asset names `rd.nx`. The observation index is a `Colon`, so a time-varying panel keeps every observation. The view slices the values of every Panel Field and both universe masks on the asset axis. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). The label axis of every other field holds features, and an asset view does not change it.
- 6. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F`, the Exogenous Series `ne` and `E`, and the timestamps `ts` pass through unchanged, because none of them has an asset axis.
+ 1. Resolve the asset names of `i` to positions in `nx` with [`label_positions`](@ref). Positions, a range and a `Colon` pass through.
+ 2. View the asset names `nx` at `i` with [`nothing_scalar_array_view`](@ref).
+ 3. View the asset returns as `view(rd.X, :, i)`. Axis 2 is the assets, and every observation is kept.
+ 4. When `B` is a matrix, it holds one column per asset, so view `nb` at `i` and view `B` as `view(rd.B, :, i)`. When `B` is a vector or `nothing`, `nb` and `B` pass through unchanged.
+ 5. View the implied volatilities as `view(rd.iv, :, i)`, and the adjustment `ivpa` at `i`.
+ 6. View the [`AssetPanel`](@ref) `pnl` with [`asset_panel_view`](@ref) at `i` on the asset axis, and give it the asset names `rd.nx`. The observation index is a `Colon`, so a time-varying panel keeps every observation. The view slices the values of every Panel Field and both universe masks on the asset axis. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). The label axis of every other field holds features, and an asset view does not change it.
+ 7. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F`, the Exogenous Series `ne` and `E`, and the timestamps `ts` pass through unchanged, because none of them has an asset axis.
 
 Each field that is `nothing` stays `nothing`. No step copies data.
 
 # Arguments
 
   - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
-  - `i`: Indices of the assets to view.
+  - `i`: The assets to view: integer positions, a range, a `Colon`, or a vector of asset names.
+
+# Validation
+
+  - Every asset name of `i` is in `nx`, and `nx` is not `nothing`. Raises an `ArgumentError`. See [`label_positions`](@ref).
+  - `i` is not a vector of timestamps, because this method selects assets. Raises an `ArgumentError`.
 
 # Returns
 
@@ -416,6 +422,13 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┼ nothing
    pnl ┴ nothing
+
+julia> PortfolioOptimisers.port_opt_view(rd, [\"B\"]).X == [0.2; 0.4;;]
+true
+
+julia> PortfolioOptimisers.port_opt_view(rd, [\"C\"])
+ERROR: ArgumentError: the view selects the assets by name, and 1 name(s) are not among the 2 asset names of the input data: C. A view refuses a name that it cannot find, because a dropped name gives a smaller universe with no error.
+[...]
 ```
 
 # Related
@@ -444,22 +457,29 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
 
 # Algorithm
 
- 1. View the asset names `nx` at `j` with [`nothing_scalar_array_view`](@ref).
- 2. View the asset returns as `view(rd.X, i, j)`. Axis 1 is the observations, and axis 2 is the assets.
- 3. View the factor names `nf` at `k`. When `k` is a `Colon`, `nf` passes through. View the factor returns as `view(rd.F, i, k)`.
- 4. When `B` is a matrix, it holds one column per asset, so view `nb` at `j` and view `B` as `view(rd.B, i, j)`. When `B` is a vector, every asset shares it, so view it as `view(rd.B, i)` and pass `nb` through.
- 5. View the Exogenous Series as `view(rd.E, i, :)`, and pass its names `ne` through. View the timestamps `ts` at `i`, the implied volatilities as `view(rd.iv, i, j)`, and the adjustment `ivpa` at `j`.
- 6. View the [`AssetPanel`](@ref) `pnl` with [`asset_panel_view`](@ref) at the observations `i` and the assets `j`, and give it the asset names `rd.nx`. The view slices both axes of every Panel Field and of both universe masks. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). A static panel has no observation axis and ignores `i`, as a scalar `ivpa` ignores `j`.
- 7. Rebuild the [`ReturnsResult`](@ref).
+ 1. Resolve the timestamps of `i` to positions in `ts` with [`timestamp_positions`](@ref), and the names of `j` and `k` to positions in `nx` and `nf` with [`label_positions`](@ref). Positions, a range and a `Colon` pass through.
+ 2. View the asset names `nx` at `j` with [`nothing_scalar_array_view`](@ref).
+ 3. View the asset returns as `view(rd.X, i, j)`. Axis 1 is the observations, and axis 2 is the assets.
+ 4. View the factor names `nf` at `k`. When `k` is a `Colon`, `nf` passes through. View the factor returns as `view(rd.F, i, k)`.
+ 5. When `B` is a matrix, it holds one column per asset, so view `nb` at `j` and view `B` as `view(rd.B, i, j)`. When `B` is a vector, every asset shares it, so view it as `view(rd.B, i)` and pass `nb` through.
+ 6. View the Exogenous Series as `view(rd.E, i, :)`, and pass its names `ne` through. View the timestamps `ts` at `i`, the implied volatilities as `view(rd.iv, i, j)`, and the adjustment `ivpa` at `j`.
+ 7. View the [`AssetPanel`](@ref) `pnl` with [`asset_panel_view`](@ref) at the observations `i` and the assets `j`, and give it the asset names `rd.nx`. The view slices both axes of every Panel Field and of both universe masks. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). A static panel has no observation axis and ignores `i`, as a scalar `ivpa` ignores `j`.
+ 8. Rebuild the [`ReturnsResult`](@ref).
 
 Each field that is `nothing` stays `nothing`. No step copies data.
 
 # Arguments
 
   - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
-  - `i`: Index or indices of the observation(s) to view.
-  - `j`: Index or indices of the assets to view.
-  - `k`: Index or indices of the factors to view.
+  - `i`: The observations to view: integer positions, a range, a `Colon`, or a vector of timestamps. A timestamp that `ts` does not hold selects no row, and the rows keep their clock order, as in the timestamp view of a [`PricesResult`](@ref).
+  - `j`: The assets to view: integer positions, a range, a `Colon`, or a vector of asset names.
+  - `k`: The factors to view: integer positions, a range, a `Colon`, or a vector of factor names.
+
+# Validation
+
+  - `ts` is not `nothing` when `i` holds timestamps, and `i` holds no names. Raises an `ArgumentError`. See [`timestamp_positions`](@ref).
+  - Every name of `j` is in `nx`, and every name of `k` is in `nf`. Raises an `ArgumentError`. See [`label_positions`](@ref).
+  - A window that keeps no observation or no asset raises the `IsEmptyError` of the [`ReturnsResult`](@ref) constructor.
 
 # Returns
 
@@ -498,6 +518,25 @@ ReturnsResult
     iv ┼ nothing
   ivpa ┼ nothing
    pnl ┴ nothing
+```
+
+The observations can be selected by timestamp, and the assets and the factors by name. A calendar range keeps the observations that the returns hold.
+
+```jldoctest
+julia> using Dates
+
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; 0.3 0.4; 0.5 0.6],
+                          ts = [Date(2024, 1, 2), Date(2024, 1, 3), Date(2024, 1, 5)]);
+
+julia> sub = PortfolioOptimisers.port_opt_view(rd, Date(2024, 1, 3):Day(1):Date(2024, 1, 6), [\"B\"]);
+
+julia> sub.ts
+2-element view(::Vector{Date}, [2, 3]) with eltype Date:
+ 2024-01-03
+ 2024-01-05
+
+julia> sub.X == [0.4; 0.6;;]
+true
 ```
 
 # Related
@@ -547,6 +586,7 @@ Fallback that throws for a [`ReturnsResult`](@ref) call whose shape matches no s
   - [`ReturnsResult`](@ref)
 """
 function port_opt_view(rd::ReturnsResult, i)
+    i = label_positions(rd.nx, i, "asset")
     nx = nothing_scalar_array_view(rd.nx, i)
     X = isnothing(rd.X) ? nothing : view(rd.X, :, i)
     nb = !isa(rd.B, MatNum) ? rd.nb : nothing_scalar_array_view(rd.nb, i)
@@ -558,6 +598,9 @@ function port_opt_view(rd::ReturnsResult, i)
                          E = rd.E, ts = rd.ts, iv = iv, ivpa = ivpa, pnl = pnl)
 end
 function port_opt_view(rd::ReturnsResult, i, j, k = :)
+    i = timestamp_positions(rd.ts, i)
+    j = label_positions(rd.nx, j, "asset")
+    k = label_positions(rd.nf, k, "factor")
     nx = nothing_scalar_array_view(rd.nx, j)
     X = isnothing(rd.X) ? rd.X : view(rd.X, i, j)
     nf = isnothing(rd.nf) || isa(k, Colon) ? rd.nf : view(rd.nf, k)

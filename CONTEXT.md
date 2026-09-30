@@ -133,7 +133,7 @@ The time-varying form holds the observation rows its consumer reads, not every r
 *Avoid*: reading it as a stored quantity. No `PricesResult` or `ReturnsResult` holds a Feature Matrix; an Asset Panel holds Panel Fields, and the matrix is derived from them. Also Characteristic (see **Characteristic Vector**, §3.9); and reading "feature" as *factor*, which is a return series.
 
 **Feature Selector**
-The statement on a Feature Distance of which Panel Fields the Feature Matrix stacks. An entry names one field, or one field with the levels or labels it keeps, or one field's observed mask. A bare field name means the field's values alone; an absent selector means every field's values. An entry that names nothing the panel holds is dropped with a warning, or refused under `strict`.
+The statement on a Feature Distance of which Panel Fields the Feature Matrix stacks. An entry names one field, or one field with the levels or labels it keeps, or one tensor field with one group of its labels (`LabelGroup`, a Factor Family on an exposure tensor), or one field's observed mask. A bare field name means the field's values alone; an absent selector means every field's values. An entry that names nothing the panel holds is dropped with a warning, or refused under `strict`.
 *Avoid*: reading an entry as a column position; every column has a name. And a taxonomy key, which is the name of a categorical Panel Field, not a second namespace.
 
 **Asset Panel Estimator**

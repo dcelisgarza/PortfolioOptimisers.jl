@@ -371,6 +371,8 @@ A Panel Field whose trailing axis carries its own labels, and optionally its own
 
 A factor exposure tensor is this kind: its trailing axis is the factors, and its groups are the Factor Families. It contributes one column per label to a derived Feature Matrix, named `"<field>=<label>"`.
 
+A Feature Selector entry `name => LabelGroup(g)` selects the labels of one group, see [`LabelGroup`](@ref). The values of one group are a slice of the trailing axis, `selectdim(f.vals, ndims(f.vals), f.groups .== g)`, which is `f.vals[:, :, f.groups .== g]` on a time-varying field and `f.vals[:, f.groups .== g]` on a static one. No function wraps the slice.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -392,12 +394,32 @@ $(DocStringExtensions.FIELDS)
   - `size(vals, ndims(vals)) == length(labels)`. Raises a `DimensionMismatch`.
   - `size(omsk) == size(vals)` when `omsk` is given. Raises a `DimensionMismatch`.
 
+# Examples
+
+```jldoctest
+julia> f = TensorPanelField(; name = \"exposures\", axis = \"factor\",
+                            labels = [\"mom_12\", \"value\", \"mom_6\"],
+                            groups = [\"momentum\", \"value\", \"momentum\"],
+                            vals = reshape(collect(1.0:12.0), 2, 2, 3));
+
+julia> f.vals[:, :, f.groups .== \"momentum\"]
+2×2×2 Array{Float64, 3}:
+[:, :, 1] =
+ 1.0  3.0
+ 2.0  4.0
+
+[:, :, 2] =
+  9.0  11.0
+ 10.0  12.0
+```
+
 # Related
 
   - [`AbstractPanelField`](@ref)
   - [`NumericPanelField`](@ref)
   - [`CategoricalPanelField`](@ref)
   - [`AssetPanel`](@ref)
+  - [`LabelGroup`](@ref)
   - [`assert_panel_labels`](@ref)
   - [`Option`](@ref)
   - [`VecStr`](@ref)
