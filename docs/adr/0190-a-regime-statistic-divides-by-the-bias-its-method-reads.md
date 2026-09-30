@@ -182,18 +182,31 @@ the correlation at `cor_decay`, and the factor at `cor_decay` holds the noise of
 `cor_decay`. At `R = I` and equal weights `R̂` is independent of the variances, so the diagonal
 enters through `E[1/Q]` alone: the factor is multiplied by
 `κ = E_decay[1/Q] / E_cor_decay[1/Q]`, the ratio of the two exact tables, plain or HAC
-(`variance_noise_bias!`). The maintainer ruled that the one `κ` serves the three methods: the
-noise of the variances averages over the assets, so it moves the statistic through its mean, and
-the per-method scalar ratios (1.026 and 1.017) correct too little. At 12 assets, a half-life of 10
-and a correlation half-life of 20 the squared multipliers become 0.9975, 0.9952 and 0.9927 over
-8 seeds, from 1.0321, 1.0297 and 1.0272, and RMS reads 1.026 at two HAC lags, from 1.090 (1.018 before #1438 gave the factor at
-`cor_decay` its recursion under HAC). The true factor of the block, measured without return
-noise over 64 seeds, is within 0.3 % of the corrected one at correlations of zero, of a random
-factor model and of 0.8, and 1.7 % to 2.3 % above it at two HAC lags. The rest has three parts
-of the next order, which #1439 holds: the Schur complement that the inverse
-reads down-weights the newest rows (−0.22 %, −0.92 % at two lags, with a closed form), the
-correlation of the assets (a second-order term), and the division of each correlation row by the
-volatility after its own update (+0.41 %, +4.0 % at two lags, no model yet).
+(`variance_noise_bias!`). The noise of the variances averages over the assets, so it moves the
+statistic mainly through its mean, and the per-method scalar ratios (1.026 and 1.017) correct too
+little at 12 assets. **It also spreads the statistic** (#1439), which lowers the root and the log.
+At one asset the block is the variance alone and the exact factor is the method's own table at
+`decay`, which is `κ` times the ratio `ρ_λ / ρ_λc` of the method's moment to the mean's at the two
+decays. On a sphere of `n` independent terms the second-order change of the root and the log is
+`3 / (n + 2)` of the change at one asset, so the factor is `κ (ρ_λ / ρ_λc)^(3 / (n + 2))`: exact
+at one asset, one for the mean, and `κ` alone as `n` grows. At 12 assets, a half-life of 10 and a
+correlation half-life of 20 the power is 0.9981 and 0.9963 (0.9964 and 0.9928 at two lags), and
+the squared multipliers become 0.9975, 0.9970 and 0.9964 over 8 seeds, from 1.0321, 1.0297 and
+1.0272 at `cor_decay` alone and 0.9975, 0.9952 and 0.9927 with one `κ`; RMS reads 1.026 at two
+HAC lags, from 1.090. Against the true factor of the block, measured without return noise over 64
+seeds, the three methods read 1.0018, 1.0018 and 1.0017 at `R = I`, 0.9972, 0.9966 and 0.9958 on
+a random factor model, and 0.9969, 0.9943 and 0.9917 at an equicorrelation of 0.8; at two lags
+RMS reads 1.022 to 1.031. The power holds the noise of the variances with the correlation fixed:
+on 4 assets and half-lives of 5 and 40 it leaves 0.02 % and 0.06 % of a gap of 1.5 % and 3.0 %.
+In the full path the noise of `R̂` amplifies the spread, the data the two estimates share reduces
+it, and the division of each correlation row by the volatility after its own update adds to it;
+without HAC they cancel at `R = I`, at two lags the power carries about three quarters of the
+spread, and at an equicorrelation of 0.8 it carries 42 %. The maintainer ruled on #1439 that the
+term lands at this strength, because the mean at a correlated `R` needs the noise of `V̂_i / Q_ii`
+together with its coupling to the correlation (#1447): the bias of the standardised correlation
+and a compensating rise in its noise are of one order there, and a fix of `R = I` alone makes the
+correlated cases worse. The mean under HAC, where the row rule adds +3.9 %, waits on the question
+whether the HAC rows divide by the volatility before or after their update (#1444, #1445).
 
 **The gate is `K > n + 3`, where the variance of the statistic is finite.** At `n = 1` an estimate
 of four observations or fewer is not scored. The gate reads the count of each asset, so a young
@@ -212,10 +225,10 @@ observations, such as 12 assets at a half-life of 5, is never scored.
   states `debias = false`.
 - The default inverse-volatility direction keeps the next order of its excess, about `9 s₂²`,
   which the docstring of its statistic states with the warm-up rows.
-- **One limit remains, and a child issue of map #1375 holds it.** On the separate correlation
-  path the Mahalanobis factor keeps the parts of the next order: within 0.3 % without HAC, and
-  under-corrected at two lags (#1439), where #1438 changed the factor at `cor_decay` that the
-  measure of #1439 read.
+- **Two limits remain, and child issues of map #1375 hold them.** On the separate correlation
+  path the Mahalanobis factor does not read the correlation of the assets: without HAC the three
+  methods read 0.9917 to 1.0018 of the truth (#1447), and at two lags RMS reads 1.022 to 1.031
+  (#1445, after the question of the HAC row rule, #1444).
 - The Mahalanobis nodes under HAC cost 0.3 s to 1.5 s for each count of assets at half-lives up
   to 40, and up to 3.7 s at a half-life of 250 and five lags.
 - The FirstMoment and Log calibrations of `DiagonalTarget` assumed a `χ²(n)` sum. Before this
@@ -277,5 +290,16 @@ observations, such as 12 assets at a half-life of 5, is never scored.
 - **For the Mahalanobis target under HAC, a hard cut or a continuation from the cut in the
   recursion** (#1438). The first puts a pole into each level and the second is not the transform
   of a law, and both give factors that are not finite near the gate.
+- **On the separate path, one `κ` for the three methods** (#1437). It holds the mean alone, and
+  left FirstMoment and Log 0.19 % and 0.38 % below RMS at `R = I`, and 1.5 % and 3.0 % at 4
+  assets and half-lives of 5 and 40.
+- **On the separate path, the linear term `1 − 3Δσ² / (n + 2)` and `1 − 6Δσ² / (n + 2)`**, with
+  `Δσ²` the difference of the relative variances of `1 / σ̂` at the two decays (#1439). It has the
+  same second order as the power, but it is not exact at one asset, and it over-corrects at 4
+  assets and half-lives of 5 and 40.
+- **On the separate path, the plain mean at `R = I` from a one-asset deterministic equivalent**
+  (#1439). It is within 0.005 % of the truth at `R = I`, but the correlated cases move from about
+  −0.3 % to −0.5 % for RMS, because the part it removes offsets the part that the correlation
+  adds (#1447).
 - **A keyword on each target.** `DiagonalTarget` would carry a field that a geodesic shrinkage
   ignores, and the scalar estimator would need a keyword of its own anyway.

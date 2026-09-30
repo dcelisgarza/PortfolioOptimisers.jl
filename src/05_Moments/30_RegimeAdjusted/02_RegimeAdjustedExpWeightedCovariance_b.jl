@@ -1182,11 +1182,11 @@ estimated block that the regime method reads, where `ce.debias` is `true`.
     [`regime_bias_open`](@ref) refuses it. Else read the decay of the correlation structure:
     `cor_decay` on the separate path, else `decay`. Find the factor of `ce.regime_method` with
     [`mahalanobis_regime_bias!`](@ref), on the plain weights or, with a HAC adjustment, on the
-    banded weight matrix.
+    banded weight matrix, times the factor of [`variance_noise_bias!`](@ref), which carries the
+    noise of the variance at `decay` on the separate path and is one elsewhere.
  2. Compute the squared distance with [`regime_statistic`](@ref), and return `nothing` where the
     block does not factorise.
- 3. Divide the statistic by the factor. On the separate path, also divide it by the factor of
-    [`variance_noise_bias!`](@ref), which carries the noise of the variance at `decay`.
+ 3. Divide the statistic by the factor.
 
 # Arguments
 
@@ -1221,7 +1221,7 @@ function regime_target_statistic(target::MahalanobisTarget,
         nothing
     else
         mahalanobis_regime_bias!(cache.bias.nodes, ce.regime_method, decay, K, n,
-                                 ce.hac_lags)
+                                 ce.hac_lags) * variance_noise_bias!(cache.bias, ce, K, n)
     end
     if isnothing(b)
         return nothing
@@ -1229,7 +1229,7 @@ function regime_target_statistic(target::MahalanobisTarget,
     stats = regime_statistic(target, X[idx], regime_covariance_block(cache, ce, idx), idx,
                              ce.min_val)
 
-    return isnothing(stats) ? nothing : stats / b / variance_noise_bias!(cache.bias, ce, K)
+    return isnothing(stats) ? nothing : stats / b
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -1126,7 +1126,7 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Makes the empty store of the Mahalanobis bias factor: its interpolation nodes, keyed by the count
-of assets, and the table of the variance factor of the separate correlation path.
+of assets, and the two tables of the variance factor of the separate correlation path.
 
 # Arguments
 
@@ -1137,7 +1137,7 @@ of assets, and the table of the variance factor of the separate correlation path
 # Returns
 
   - `bias::NamedTuple`: `nodes`, an empty dictionary from a count of assets to the nodes of
-    [`mahalanobis_bias_nodes`](@ref); and `kappa`, the empty table of
+    [`mahalanobis_bias_nodes`](@ref); and `kappa` and `spread`, the empty tables of
     [`variance_noise_bias!`](@ref), which only the separate path fills.
 
 # Related
@@ -1151,54 +1151,77 @@ function regime_bias_store(::MahalanobisTarget, decay::Number, ::Type)
                          NamedTuple{(:sigma, :bw, :ratio, :exact, :start),
                                     Tuple{Vector{typeof(decay)}, Vector{typeof(decay)},
                                           Vector{typeof(decay)}, Vector{typeof(decay)},
-                                          Int}}}(), kappa = typeof(decay)[])
+                                          Int}}}(), kappa = typeof(decay)[],
+            spread = typeof(decay)[])
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the factor by which the noise of the variance at `decay` moves the bias of the squared
-Mahalanobis distance on the separate correlation path, and grows the table of the state where the
-count is past its end.
+Mahalanobis distance on the separate correlation path, and grows the tables of the state where the
+count is past their end.
 
 On the separate path the block is ``\\hat{C} = D \\hat{R} D``, with the volatilities ``D`` from the
 variance at `decay` and the correlation ``\\hat{R}`` from the recursion at `cor_decay`. The factor
 of [`mahalanobis_regime_bias!`](@ref) at `cor_decay` is the bias of an estimate whose diagonal
 carries the noise of `cor_decay`. At ``R = I`` the statistic is
 ``\\sum_{i} (\\hat{R}^{-1})_{ii} / \\hat{V}_{i}``, and at equal weights ``\\hat{R}`` is independent of
-the variances, so the diagonal enters through ``\\mathbb{E}[1/Q]`` alone: the factor is the ratio
-of that moment at the two decays, from the exact tables of [`regime_bias_table`](@ref), plain or
-HAC. The one factor serves the three regime methods: the noise of the variances averages over the
-assets, so it moves the statistic through its mean.
+the variances, so the diagonal enters the mean through ``\\mathbb{E}[1/Q]`` alone: ``\\kappa`` is the
+ratio of that moment at the two decays, from the exact tables of [`regime_bias_table`](@ref), plain
+or HAC.
+
+The noisier variance also spreads the statistic, which lowers the root and the log that
+`FirstMomentRegimeAdjusted` and `LogRegimeAdjusted` read. The spread is the sum over the assets of
+the noise of each ``1 / \\hat{V}_{i}``, so it averages over the assets. At one asset the block is
+the variance alone, and the exact factor is the method's own table at `decay`; the ratio ``\\rho``
+of the method's moment to the mean's carries that step. For ``n`` assets, the second-order change
+of the root and the log of a quadratic form whose ``n`` terms carry independent noise is
+``3 / (n + 2)`` of the change at one asset, exactly on a sphere, so the power is ``3 / (n + 2)``. It
+is one at one asset, and the factor tends to ``\\kappa`` alone as the count of assets grows. For
+`RootMeanSquaredAdjusted`, ``\\rho = 1``.
 
 # Mathematical definition
 
 ```math
-\\kappa_{K} = \\frac{\\mathbb{E}_{\\lambda}\\left[Q_{K}^{-1}\\right]}{\\mathbb{E}_{\\lambda_{c}}\\left[Q_{K}^{-1}\\right]}\\,.
+\\begin{align}
+f_{K,n} &= \\kappa_{K} \\left(\\frac{\\rho_{\\lambda,K}}{\\rho_{\\lambda_{c},K}}\\right)^{3 / (n + 2)}\\,, \\qquad
+\\kappa_{K} = \\frac{\\mathbb{E}_{\\lambda}\\left[Q_{K}^{-1}\\right]}{\\mathbb{E}_{\\lambda_{c}}\\left[Q_{K}^{-1}\\right]}\\,, \\qquad
+\\rho_{\\lambda,K} = \\frac{m_{\\lambda}(Q_{K})}{\\mathbb{E}_{\\lambda}\\left[Q_{K}^{-1}\\right]}\\,.
+\\end{align}
 ```
 
 Where:
 
   - ``Q_{K}``: An estimated variance of ``K`` observations over the true one.
   - ``\\lambda``, ``\\lambda_{c}``: `decay` and `cor_decay`.
+  - ``m_{\\lambda}``: The moment of ``Q^{-1}`` that the regime method reads, its table at ``\\lambda``.
+  - ``n``: Count of assets that contribute to the statistic.
 
-At 12 assets, a half-life of 10 and a correlation half-life of 20, ``\\kappa = 1.0347``, and
-1.0694 at two HAC lags. Against the true factor of the separate path, measured in the steady state
-over 64 seeds, the product with the factor at `cor_decay` is within 0.3 % without HAC, at a
-correlation of zero, at the correlation of a random factor model and at an equicorrelation of 0.8;
-at two HAC lags it is 1.7 % to 2.3 % below. The rest has three parts of the next order: the
-Schur complement that the inverse reads down-weights the newest rows, which the variance at
-`decay` reads most; the correlation of the assets; and the division of each row of the correlation
-recursion by the volatility after its own update.
+At 12 assets, a half-life of 10 and a correlation half-life of 20, ``\\kappa = 1.0347``, and the
+power of the ratio is 0.9981 for `FirstMomentRegimeAdjusted` and 0.9963 for `LogRegimeAdjusted`;
+at two HAC lags, 1.0694, 0.9964 and 0.9928. Against the true factor of the separate path, measured
+in the steady state over 64 seeds, the three methods then read 1.0018, 1.0018 and 1.0017 at
+``R = I``, where the spread had put them at 1.0018, 0.9999 and 0.9980. At 4 assets and half-lives
+of 5 and 40 the power leaves 0.02 % and 0.06 % of a gap of 1.5 % and 3.0 %. It holds the noise of
+the variances with the correlation fixed. The noise of ``\\hat{R}`` amplifies the spread, the data
+that the two estimates share reduces it, and the division of each correlation row by the volatility
+after its own update adds to it. Without HAC the three cancel at ``R = I``; at two lags the power
+carries about three quarters of the spread. The spread grows with the correlation of the assets,
+which the power does not read: at an equicorrelation of 0.8 it carries 42 % of it, so the methods read
+0.9969, 0.9943 and 0.9917. The mean keeps parts of the next order, within 0.3 % without HAC and
+up to 3.1 % high at two lags, where the division of each correlation row by the volatility after
+its own update dominates.
 
 # Arguments
 
-  - `store::NamedTuple`: Store of the state, whose table `kappa` grows (mutated).
+  - `store::NamedTuple`: Store of the state, whose tables `kappa` and `spread` grow (mutated).
   - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
   - `K::Integer`: Count of observations in the estimate.
+  - `n::Integer`: Count of assets that contribute to the statistic.
 
 # Returns
 
-  - `kappa::Number`: The factor at `K`, one where the estimator runs one decay.
+  - `factor::Number`: The factor at `K`, one where the estimator runs one decay.
 
 # Related
 
@@ -1208,46 +1231,29 @@ recursion by the volatility after its own update.
   - [`regime_target_statistic`](@ref)
 """
 function variance_noise_bias!(store::NamedTuple, ce::RegimeAdjustedExpWeightedCovariance,
-                              K::Integer)
+                              K::Integer, n::Integer)
     if !has_separate_cor_decay(ce)
         return one(ce.decay)
     end
-    kappa = store.kappa
+    (; kappa, spread) = store
     Ksat = ceil(Int, log(eps(eltype(kappa))) / log(max(ce.decay, ce.cor_decay)))
     if K > length(kappa) && length(kappa) < Ksat
-        n = min(max(2 * K, 64), Ksat)
-        tv, tc = map((ce.decay, ce.cor_decay)) do decay
-            if isnothing(ce.hac_lags)
-                regime_bias_table(RootMeanSquaredAdjusted(), decay, n)
-            else
-                regime_bias_table(RootMeanSquaredAdjusted(), decay, n, ce.hac_lags)
+        len = min(max(2 * K, 64), Ksat)
+        (tv, mv), (tc, mc) = map((ce.decay, ce.cor_decay)) do decay
+            map((RootMeanSquaredAdjusted(), ce.regime_method)) do method
+                if isnothing(ce.hac_lags)
+                    regime_bias_table(method, decay, len)
+                else
+                    regime_bias_table(method, decay, len, ce.hac_lags)
+                end
             end
         end
-        resize!(kappa, n)
+        resize!(kappa, len)
+        resize!(spread, len)
         kappa .= tv ./ tc
+        spread .= (mv ./ tv) ./ (mc ./ tc)
     end
+    k = min(K, length(kappa))
 
-    return kappa[min(K, length(kappa))]
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Returns one, the variance factor of a state that takes no bias correction.
-
-# Arguments
-
-  - `::Nothing`: The store of a state whose estimator has `debias = false` or no regime method.
-  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
-  - `::Integer`: Ignored count of observations.
-
-# Returns
-
-  - `one(ce.decay)`.
-
-# Related
-
-  - [`variance_noise_bias!`](@ref)
-"""
-function variance_noise_bias!(::Nothing, ce::RegimeAdjustedExpWeightedCovariance, ::Integer)
-    return one(ce.decay)
+    return kappa[k] * spread[k]^(3 // (n + 2))
 end

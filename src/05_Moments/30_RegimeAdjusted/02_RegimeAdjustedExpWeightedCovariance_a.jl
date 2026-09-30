@@ -114,17 +114,15 @@ can then be about ``10^{12}``, and that one value holds the regime state for man
 
 The factor assumes one shared history of returns, and the weights of the recursion. On iid
 Normal returns at 12 assets and a half-life of 10, the squared multiplier of each of the three
-methods is then 1.000 within 0.002. A HAC estimate reads the fixed point of the mean on the
-spectrum of its banded weight matrix, for every method, and skips a block with too few effective
-observations: at two lags, 12 assets and a half-life of 10 the squared multiplier of
-`RootMeanSquaredAdjusted` is 0.981 over 8 seeds, from 2.48 raw, which is the error of the
-deterministic equivalent on an estimate with half the degrees of freedom. The mean factor
-over-corrects the other two methods there: `FirstMomentRegimeAdjusted` reads 0.952 and
-`LogRegimeAdjusted` 0.920. On the separate
+methods is then 1.000 within 0.002. A HAC estimate reads the same recursion on the spectrum of
+its banded weight matrix, and skips a block with too few effective observations: at two lags, 12
+assets and a half-life of 10 the three methods read 1.0035, 1.0031 and 1.0023 within 0.004 over
+8 seeds, from 0.984, 0.952 and 0.920 with the fixed point of the mean. On the separate
 correlation path the factor reads `cor_decay`, and [`variance_noise_bias!`](@ref) adds the
-noise of the variance at `decay`: at a correlation half-life of 20 the three methods read 0.998,
-0.995 and 0.993 over 8 seeds, from 1.032, 1.030 and 1.027 at `cor_decay` alone, and
-`RootMeanSquaredAdjusted` reads 1.018 at two lags, from 1.090.
+noise of the variance at `decay`, to the mean and to the spread of each method: at a correlation
+half-life of 20 the three methods read 0.998, 0.997 and 0.996 over 8 seeds, from 1.032, 1.030
+and 1.027 at `cor_decay` alone, and `RootMeanSquaredAdjusted` reads 1.026 at two lags, from
+1.090.
 
 # Related
 

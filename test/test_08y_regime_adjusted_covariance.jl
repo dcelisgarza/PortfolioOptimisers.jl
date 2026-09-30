@@ -1220,40 +1220,42 @@ statistic 3 % too large, and 9 % at two HAC lags. At `R = I` and equal weights t
 independent of the variances, so the diagonal enters through `E[1/Q]` alone, and
 `variance_noise_bias!` multiplies the factor by the ratio of that moment at the two decays. The
 maintainer ruled that the one factor serves the three methods, and that the next-order parts go to
-a child issue of map #1375.
+a child issue of map #1375; #1439 then added the spread of each method (the testset below).
 =#
 @testset "the separate path divides by the noise of its variance" begin
     lam, lamc = 2.0^(-1 / 10), 2.0^(-1 / 20)
     RMS = PO.RootMeanSquaredAdjusted()
     sep = RegimeAdjustedExpWeightedCovariance(; decay = lam, cor_decay = lamc,
-                                              regime_target = PO.MahalanobisTarget())
-    # The factor is the ratio of the two exact tables, plain or HAC, and one on one decay or
-    # without the correction.
+                                              regime_target = PO.MahalanobisTarget(),
+                                              regime_method = RMS)
+    # For the mean the factor is the ratio of the two exact tables, plain or HAC, and one on one
+    # decay.
     for (ce, lags) in ((sep, nothing),
                        (RegimeAdjustedExpWeightedCovariance(; decay = lam, cor_decay = lamc, hac_lags = 2,
-                                                            regime_target = PO.MahalanobisTarget()), 2))
+                                                            regime_target = PO.MahalanobisTarget(),
+                                                            regime_method = RMS), 2))
         store = PO.regime_bias_store(PO.MahalanobisTarget(), lamc, Float64)
         for K in (5, 40, 3000)
             tv = PO.regime_bias!(Float64[], RMS, lam, K, lags)
             tc = PO.regime_bias!(Float64[], RMS, lamc, K, lags)
-            @test PO.variance_noise_bias!(store, ce, K) ≈ tv / tc rtol = 1e-14
+            @test PO.variance_noise_bias!(store, ce, K, 12) ≈ tv / tc rtol = 1e-14
         end
     end
     store = PO.regime_bias_store(PO.MahalanobisTarget(), lamc, Float64)
     one_decay = RegimeAdjustedExpWeightedCovariance(; decay = lam,
                                                     regime_target = PO.MahalanobisTarget())
-    @test PO.variance_noise_bias!(store, one_decay, 40) == 1 && isempty(store.kappa)
-    @test PO.variance_noise_bias!(nothing, sep, 40) == 1
+    @test PO.variance_noise_bias!(store, one_decay, 40, 12) == 1 && isempty(store.kappa)
     # At 12 assets, a half-life of 10 and a correlation half-life of 20 the steady-state factor
     # is 1.0347, and 1.0694 at two lags.
-    @test PO.variance_noise_bias!(store, sep, 10^5) ≈ 1.0347 atol = 1e-4
+    @test PO.variance_noise_bias!(store, sep, 10^5, 12) ≈ 1.0347 atol = 1e-4
 
     # On iid Normal returns the squared multiplier is one when the statistic is correct.
-    # Measured on this seed: 1.0036, 1.0004 and 0.9957. Eight seeds gave 0.9975 ± 0.0013,
-    # 0.9952 ± 0.0007 and 0.9927 ± 0.0012, where the factor at `cor_decay` alone gave 1.0321,
-    # 1.0297 and 1.0272; the true factor of the block, measured without return noise over 64
-    # seeds, is within 0.3 % of the corrected one at correlations of 0, of a random factor model
-    # and of 0.8.
+    # Measured on this seed: 1.0036, 1.0023 and 0.9994, and 1.0036, 1.0004 and 0.9957 before the
+    # per-method term of #1439. Eight seeds gave 0.9975 ± 0.0013, 0.9970 ± 0.0007 and
+    # 0.9964 ± 0.0012, from 0.9975, 0.9952 and 0.9927 with one factor for the three methods and
+    # 1.0321, 1.0297 and 1.0272 with the factor at `cor_decay` alone; the true factor of the
+    # block, measured without return noise over 64 seeds, is within 0.9 % of the corrected one at
+    # correlations of 0, of a random factor model and of 0.8 (#1447).
     rng = StableRNG(1437)
     na, nr = 12, 12000
     A = randn(rng, na, na)
@@ -1269,12 +1271,13 @@ a child issue of map #1375.
                                                   regime_method = nothing)
         return mean(cov(on, R) ./ cov(off, R))
     end
-    for m in (RMS, PO.FirstMomentRegimeAdjusted(), PO.LogRegimeAdjusted())
-        @test 0.98 < multiplier(m) < 1.02
-    end
+    mults = map(multiplier, (RMS, PO.FirstMomentRegimeAdjusted(), PO.LogRegimeAdjusted()))
+    @test all(m -> 0.98 < m < 1.02, mults)
+    # The per-method term of #1439 brings Log to 0.0042 of RMS on this seed, from 0.0079.
+    @test mults[1] - mults[3] < 0.006
     # At two lags, measured on this seed: 1.0337, and about 1.098 with the factor at `cor_decay`
     # alone. Eight seeds gave 1.0260 ± 0.0059, where the factor at `cor_decay` alone gave 1.0898;
-    # the rest is #1439. Before #1438 the factor at `cor_decay` was the mean's fixed point, 1.8 %
+    # the rest is #1445. Before #1438 the factor at `cor_decay` was the mean's fixed point, 1.8 %
     # too large, and the eight seeds gave 1.0184.
     @test 0.97 < multiplier(RMS; hac_lags = 2, min_obs = 17) < 1.05
 
@@ -1283,6 +1286,75 @@ a child issue of map #1375.
                                                           regime_target = PO.MahalanobisTarget()),
                       R[1:60, :]).cache
     @test !isempty(st.bias.kappa) && copy(st).bias.kappa !== st.bias.kappa
+end
+
+#=
+Issue #1439. The noisier variance at `decay` also spreads the statistic, which lowers the root and
+the log that `FirstMomentRegimeAdjusted` and `LogRegimeAdjusted` read. At one asset the block is the
+variance alone, so the exact factor is the method's own table at `decay`. The factor of the
+separate path multiplies `κ` by the ratio of the method's moment to the mean's at the two decays,
+to the power `3 / (n + 2)`: exact at one asset, of the second order on a sphere of `n` independent
+terms, and one for the mean. The maintainer ruled on #1439 that this term lands at its strength at
+`R = I`, and that the mean at a correlated `R` and under HAC go to child issues of map #1375.
+=#
+@testset "the separate path divides each method by the spread of its variance" begin
+    lam, lamc = 2.0^(-1 / 10), 2.0^(-1 / 20)
+    RMS, FM, LG = PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted(),
+                  PO.LogRegimeAdjusted()
+    sep(m, lags) = RegimeAdjustedExpWeightedCovariance(; decay = lam, cor_decay = lamc,
+                                                       hac_lags = lags, regime_method = m,
+                                                       regime_target = PO.MahalanobisTarget())
+    function table(m, d, lags)
+        return if isnothing(lags)
+            PO.regime_bias_table(m, d, 3000)
+        else
+            PO.regime_bias_table(m, d, 3000, lags)
+        end
+    end
+    for lags in (nothing, 2)
+        tv, tc = table(RMS, lam, lags), table(RMS, lamc, lags)
+        for m in (RMS, FM, LG)
+            mv, mc = table(m, lam, lags), table(m, lamc, lags)
+            for K in (5, 40, 3000), n in (1, 12)
+                store = PO.regime_bias_store(PO.MahalanobisTarget(), lamc, Float64)
+                spread = (mv[K] / tv[K]) / (mc[K] / tc[K])
+                @test PO.variance_noise_bias!(store, sep(m, lags), K, n) ≈
+                      tv[K] / tc[K] * spread^(3 / (n + 2)) rtol = 1e-14
+            end
+        end
+        # The mean does not read the count of assets.
+        store = PO.regime_bias_store(PO.MahalanobisTarget(), lamc, Float64)
+        @test PO.variance_noise_bias!(store, sep(RMS, lags), 40, 1) ==
+              PO.variance_noise_bias!(store, sep(RMS, lags), 40, 12)
+    end
+
+    # At one asset the factor at `cor_decay` times this factor is the method's table at `decay`.
+    for m in (RMS, FM, LG)
+        store = PO.regime_bias_store(PO.MahalanobisTarget(), lamc, Float64)
+        b = PO.mahalanobis_regime_bias!(store.nodes, m, lamc, 40, 1, nothing)
+        @test b * PO.variance_noise_bias!(store, sep(m, nothing), 40, 1) ≈
+              PO.regime_bias_table(m, lam, 40)[40] rtol = 1e-9
+    end
+
+    # At 12 assets, a half-life of 10 and a correlation half-life of 20 the power of the ratio is
+    # 0.9981 and 0.9963 in the steady state, and 0.9964 and 0.9928 at two lags. Against the true
+    # factor of the block, measured without return noise over 64 seeds at `R = I`, the three
+    # methods then read 1.0018, 1.0018 and 1.0017, from 1.0018, 0.9999 and 0.9980.
+    # The table of the ratio belongs to the method of the state, so each method takes a store.
+    steady(m, lags) = PO.variance_noise_bias!(PO.regime_bias_store(PO.MahalanobisTarget(),
+                                                                   lamc, Float64),
+                                              sep(m, lags), 10^5, 12)
+    for (lags, fm, lg) in ((nothing, 0.9981, 0.9963), (2, 0.9964, 0.9928))
+        @test steady(FM, lags) / steady(RMS, lags) ≈ fm atol = 1e-4
+        @test steady(LG, lags) / steady(RMS, lags) ≈ lg atol = 1e-4
+    end
+
+    # A `Float32` state keeps its type.
+    ce32 = RegimeAdjustedExpWeightedCovariance(; decay = 2.0f0^(-1.0f0 / 10),
+                                               cor_decay = 2.0f0^(-1.0f0 / 20),
+                                               regime_target = PO.MahalanobisTarget())
+    store32 = PO.regime_bias_store(PO.MahalanobisTarget(), ce32.cor_decay, Float32)
+    @test PO.variance_noise_bias!(store32, ce32, 40, 12) isa Float32
 end
 
 #=
