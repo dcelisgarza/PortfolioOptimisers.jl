@@ -1195,6 +1195,17 @@ end
                        kwargs...) -> FactorAttributionResult
     factor_attribution(pred::MultiPeriodPredictionResult, pr::AbstractPriorResult;
                        kwargs...) -> FactorAttributionResult
+    factor_attribution(w::VecNum, B::MatNum, F::MatNum, d::VecNum_MatNum;
+                       mu_f::Option{<:VecNum} = nothing, b::Option{<:VecNum} = nothing,
+                       sigma::Option{<:MatNum} = nothing, mu::Option{<:VecNum} = nothing,
+                       fam::Option{<:VecStr} = nothing, assets::Bool = false,
+                       ppy::Number = 1, strict::Bool = false) -> FactorAttributionResult
+    factor_attribution(W::VecNum_MatNum, B::MatNum_Arr3Num, f::MatNum, eps::MatNum,
+                       ret::VecNum; lag::Integer = B isa Arr3Num ? 1 : 0,
+                       rw::Option{<:MatNum} = nothing, vs::Option{<:MatNum} = nothing,
+                       fcb::Option{<:FactorFamilyBasis} = nothing, observed::Integer = 0,
+                       fam::Option{<:VecStr} = nothing, assets::Bool = false,
+                       se::Bool = false, ppy::Number = 1) -> FactorAttributionResult
     factor_attribution(args..., window::Integer; step::Integer = 1,
                        kwargs...) -> Vector{<:FactorAttributionResult}
 
@@ -1202,7 +1213,9 @@ Decompose a portfolio's volatility and mean return over the factors of a factor 
 
 The verb reads the weights and the factor model block, and returns one [`FactorAttributionResult`](@ref). The predicted methods take no return series and decompose the moments the optimiser saw. The realised methods take one, and decompose the history the portfolio actually produced. Each realised method has a rolling twin that takes a positional `window` and returns one Result per window.
 
-**The predicted totals come from the prior result, not from the model.** `pr.mu` and `pr.sigma` are what the optimiser saw and what [`expected_return`](@ref) and [`expected_risk`](@ref) report, so they are the totals. A wrapping prior replaces them while it forwards the block unchanged, so the model no longer reproduces them, and the two gaps `dot(w, pr.mu - M * fpr.mu - b)` and `dot(w, (pr.sigma - M * F * M' - D) * w) / sigma_P` land in the unattributed remainder. The remainder is therefore present on the predicted side too, and it is at rounding level on a plain fit.
+**The bare arrays are the bottom level, and a prior method unpacks the prior result into them.** A caller who holds a factor model as arrays, a vendor risk model for example, attributes with no fitted object. `factor_attribution(w, pr)` is the bare-array method on `pr.rr.M`, `pr.fpr.sigma`, the idiosyncratic covariance of the block, `pr.fpr.mu`, `pr.rr.b`, `pr.sigma`, `pr.mu` and the family labels of the block, so the two methods answer the same numbers. Without `sigma` and `mu` the model is the total, and the unattributed remainder is an exact zero. The realised bare-array method reads the histories on one observation axis, untrimmed, and aligns them itself: the returns of observation `t` pair with the exposures of observation `t - lag`. `lag` defaults to one for an exposure history, and to zero for a static matrix, which describes every observation. A prior method reads each of these arrays off the block.
+
+**The predicted totals of a prior method come from the prior result, not from the model.** `pr.mu` and `pr.sigma` are what the optimiser saw and what [`expected_return`](@ref) and [`expected_risk`](@ref) report, so they are the totals. A wrapping prior replaces them while it forwards the block unchanged, so the model no longer reproduces them, and the two gaps `dot(w, pr.mu - M * fpr.mu - b)` and `dot(w, (pr.sigma - M * F * M' - D) * w) / sigma_P` land in the unattributed remainder. The remainder is therefore present on the predicted side too, and it is at rounding level on a plain fit.
 
 **Every source of unexplained return lands in the remainder, and no guard reports it.** On the realised side the identity per observation is `portfolio return = systematic + idiosyncratic + unattributed`, and the remainder holds the per-observation intercept share `b_t * sum(w)`, the fees, the cash, the weight drift inside a period and the exposure lag. A large `pct_var` on the remainder means the model does not explain the portfolio, and the reader draws that conclusion.
 
@@ -1292,6 +1305,21 @@ The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\
   - `rd`: Returns result carrying the asset returns.
   - `ret`: Net portfolio return series.
   - `pred`: Multi-period prediction result whose folds give the weight history.
+  - `B`: Loadings, `assets × factors`, or on the realised side the exposure history, `observations × assets × factors`. A `NaN` row marks an asset the model does not state.
+  - `F`: Factor covariance, `factors × factors`.
+  - `d`: Idiosyncratic variances, `assets`, or the idiosyncratic covariance, `assets × assets`.
+  - `mu_f`: Expected factor returns, or `nothing` for zeros.
+  - `b`: Factor-orthogonal expected return of each asset, or `nothing` for zeros.
+  - `sigma`: Asset covariance the total variance reads, or `nothing` for the model's own.
+  - `mu`: Expected asset returns the total mean reads, or `nothing` for the model's own.
+  - `fam`: Family label of each factor, or `nothing` for no family axis.
+  - `f`: Factor returns, `observations × factors`.
+  - `eps`: Idiosyncratic returns, `observations × assets`, `NaN` at a pair the model does not decompose.
+  - `lag`: Number of observations by which the exposures lag the returns.
+  - `rw`: Regression weight history, `observations × assets`, which `se = true` reads, or `nothing`.
+  - `vs`: Idiosyncratic variance history, `observations × assets`, which `se = true` reads, or `nothing`.
+  - `fcb`: Family re-basis the regression was written in, or `nothing`.
+  - `observed`: Number of observed factors, the last columns of `f`. The fit takes their returns as given, so they leave the standard errors.
   - `fees`: Fees the net series is formed against.
   - `window`: Size of the rolling window, in observations.
   - `step`: Stride between two consecutive windows.
@@ -1303,6 +1331,8 @@ The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\
 # Validation
 
   - `pr` carries a factor model block, else the `IsNothingError` of [`assert_prior_regression`](@ref) is raised.
+  - The factor covariance and the expected factor returns are finite, else an `IsNonFiniteError` is raised.
+  - `f` and `eps` carry the same observations, an exposure history carries them too, `ret` carries at least as many, and `0 <= lag` is below their number, else a `DimensionMismatch` or a `DomainError` is raised.
   - `ppy > 0`, else a `DomainError` is raised.
   - Every weight at a non-investable asset is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
   - Every held `(observation, asset)` pair of `X` is finite, else a warning names the pairs, or an `ArgumentError` names them under `strict`.
@@ -1328,35 +1358,292 @@ The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\
   - [`plot_attribution_mu_vs_vol`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
-function factor_attribution(w::VecNum, pr::AbstractPriorResult; assets::Bool = false,
-                            ppy::Number = 1, strict::Bool = false)::FactorAttributionResult
+function factor_attribution(w::VecNum, B::MatNum, F::MatNum, d::VecNum_MatNum;
+                            assets::Bool = false, ppy::Number = 1, strict::Bool = false,
+                            kwargs...)::FactorAttributionResult
+    return predicted_attribution(w, attribution_array_model(B, F, d; kwargs...);
+                                 assets = assets, ppy = ppy, strict = strict)
+end
+function factor_attribution(w::VecNum, pr::AbstractPriorResult;
+                            kwargs...)::FactorAttributionResult
     blk = attribution_prior_block(pr)
     rr, fpr = blk.rr, blk.fpr
-    imsk = investable_mask(pr)
+    return factor_attribution(w, rr.M, fpr.sigma, attribution_idiosyncratic_covariance(rr);
+                              mu_f = fpr.mu, b = rr.b, sigma = pr.sigma, mu = pr.mu,
+                              fam = attribution_families(rr), kwargs...)
+end
+function factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing;
+                            kwargs...)::FactorAttributionResult
+    _, w, pr = result_investable_view(res, pr)
+    return factor_attribution(w, pr; kwargs...)
+end
+"""
+    attribution_block_arrays(rr::AbstractLoadingsRegressionResult, pr::AbstractPriorResult)
+        -> NamedTuple
+
+Return a factor model block as the bare arrays a realised attribution reads.
+
+The block states its histories through the reads of [`factor_attribution`](@ref), and this function takes each of them once, so a prior method and the bare-array method hand [`attribution_align`](@ref) the same fields.
+
+# Arguments
+
+  - `rr`: The factor model block.
+  - `pr`: The prior result the block travels on, which carries the two return series of a block that stores none.
+
+# Returns
+
+  - `blk::NamedTuple`: The fields `B`, `f`, `eps`, `lag`, `rw`, `vs`, `fcb`, `no` and `fam`, from [`attribution_exposures`](@ref), [`attribution_factor_returns`](@ref), [`attribution_idiosyncratic_returns`](@ref), [`attribution_lag`](@ref), [`attribution_regression_weights`](@ref), [`attribution_idiosyncratic_variances`](@ref), [`attribution_family_basis`](@ref), [`attribution_observed_count`](@ref) and [`attribution_families`](@ref).
+
+# Related
+
+  - [`attribution_align`](@ref)
+  - [`attribution_array_block`](@ref)
+"""
+function attribution_block_arrays(rr::AbstractLoadingsRegressionResult,
+                                  pr::AbstractPriorResult)
+    return (; B = attribution_exposures(rr), f = attribution_factor_returns(rr, pr),
+            eps = attribution_idiosyncratic_returns(rr, pr), lag = attribution_lag(rr),
+            rw = attribution_regression_weights(rr),
+            vs = attribution_idiosyncratic_variances(rr),
+            fcb = attribution_family_basis(rr), no = attribution_observed_count(rr),
+            fam = attribution_families(rr))
+end
+"""
+    attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
+                            lag::Integer = B isa Arr3Num ? 1 : 0,
+                            rw::Option{<:MatNum} = nothing, vs::Option{<:MatNum} = nothing,
+                            fcb::Option{<:FactorFamilyBasis} = nothing,
+                            observed::Integer = 0, fam::Option{<:VecStr} = nothing)
+        -> NamedTuple
+
+Return the bare arrays of a realised attribution as the block [`attribution_align`](@ref) reads.
+
+The exposures, the factor returns and the idiosyncratic returns are the model, so they are positional. A static loadings matrix describes every observation, so its lag defaults to zero, and an exposure history lags the returns by one observation by default.
+
+# Arguments
+
+  - `B`: Loadings, `assets × factors`, or the exposure history, `observations × assets × factors`.
+  - `f`: Factor returns, `observations × factors`.
+  - `eps`: Idiosyncratic returns, `observations × assets`.
+  - `lag`: Number of observations by which the exposures lag the returns.
+  - `rw`: Regression weight history, or `nothing`.
+  - `vs`: Idiosyncratic variance history, or `nothing`.
+  - `fcb`: Family re-basis the regression was written in, or `nothing`.
+  - `observed`: Number of observed factors, the last columns of `f`.
+  - `fam`: Family label of each factor, or `nothing`.
+
+# Returns
+
+  - `blk::NamedTuple`: The fields of [`attribution_block_arrays`](@ref).
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_block_arrays`](@ref)
+"""
+function attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
+                                 lag::Integer = B isa Arr3Num ? 1 : 0,
+                                 rw::Option{<:MatNum} = nothing,
+                                 vs::Option{<:MatNum} = nothing,
+                                 fcb::Option{<:FactorFamilyBasis} = nothing,
+                                 observed::Integer = 0, fam::Option{<:VecStr} = nothing)
+    return (; B = B, f = f, eps = eps, lag = lag, rw = rw, vs = vs, fcb = fcb,
+            no = observed, fam = fam)
+end
+"""
+    attribution_array_model(B::MatNum, F::MatNum, d::VecNum_MatNum;
+                            mu_f::Option{<:VecNum} = nothing, b::Option{<:VecNum} = nothing,
+                            sigma::Option{<:MatNum} = nothing, mu::Option{<:VecNum} = nothing,
+                            fam::Option{<:VecStr} = nothing) -> NamedTuple
+
+Return the factor model a predicted attribution reads, from bare arrays.
+
+The loadings, the factor covariance and the idiosyncratic block are the model, so they are positional. The two means default to zero, as a model that states no premium and no orthogonal mean. The two totals `sigma` and `mu` default to `nothing`, and the model then closes the total on its own.
+
+# Arguments
+
+  - `B`: Loadings, `assets × factors`.
+  - `F`: Factor covariance, `factors × factors`.
+  - `d`: Idiosyncratic variances, or the idiosyncratic covariance.
+  - `mu_f`: Expected factor returns, or `nothing` for zeros.
+  - `b`: Factor-orthogonal expected return of each asset, or `nothing` for zeros.
+  - `sigma`: Asset covariance the total variance reads, or `nothing`.
+  - `mu`: Expected asset returns the total mean reads, or `nothing`.
+  - `fam`: Family label of each factor, or `nothing`.
+
+# Returns
+
+  - `mdl::NamedTuple`: The fields `M`, `F`, `d`, `mu_f`, `b`, `sigma`, `mu` and `fam`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`predicted_attribution`](@ref)
+"""
+function attribution_array_model(B::MatNum, F::MatNum, d::VecNum_MatNum;
+                                 mu_f::Option{<:VecNum} = nothing,
+                                 b::Option{<:VecNum} = nothing,
+                                 sigma::Option{<:MatNum} = nothing,
+                                 mu::Option{<:VecNum} = nothing,
+                                 fam::Option{<:VecStr} = nothing)
+    return (; M = B, F = F, d = d, mu_f = something(mu_f, zeros(eltype(F), size(F, 1))),
+            b = something(b, zeros(eltype(B), size(B, 1))), sigma = sigma, mu = mu,
+            fam = fam)
+end
+"""
+    attribution_array_mask(mdl::NamedTuple) -> Option{BitVector}
+
+Return the assets a predicted attribution can decompose, or `nothing` when it can decompose every asset.
+
+An asset is decomposable when the model states it: its loadings, its idiosyncratic variance and its factor-orthogonal mean are finite, and so are its total mean and variance when the caller gives them. The last two are the rule of [`investable_mask`](@ref), so on the arrays of a prior result the mask is the Investable Mask whenever the block states every investable asset.
+
+# Arguments
+
+  - `mdl`: The factor model, from [`attribution_array_model`](@ref).
+
+# Returns
+
+  - `imsk::Option{BitVector}`: `true` at every decomposable asset, or `nothing` when every asset is decomposable.
+
+# Related
+
+  - [`predicted_attribution`](@ref)
+  - [`investable_mask`](@ref)
+"""
+function attribution_array_mask(mdl::NamedTuple)
+    D = attribution_idiosyncratic_matrix(mdl.d)
+    imsk = vec(all(isfinite, mdl.M; dims = 2)) .& isfinite.(LinearAlgebra.diag(D)) .&
+           isfinite.(mdl.b) .& isfinite.(LinearAlgebra.diag(something(mdl.sigma, D))) .&
+           isfinite.(something(mdl.mu, mdl.b))
+    return all(imsk) ? nothing : imsk
+end
+"""
+    attribution_predicted_total(anchor::Nothing, imsk, w, sys::Number, idio::Number)
+    attribution_predicted_total(sigma::MatNum, imsk, w, sys::Number, idio::Number)
+    attribution_predicted_total(mu::VecNum, imsk, w, sys::Number, idio::Number)
+
+Return the total of a predicted moment and its gap to the model.
+
+Without an anchor the model is the total, so the gap is an exact zero and no round-off lands in the remainder. A covariance anchors the variance through its quadratic form, and a vector of expected returns anchors the mean through its linear form. The rows of an asset the model does not state are zero in the anchor, as they are in the components.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+t &= \\begin{cases} s + i & \\text{without an anchor}\\,, \\\\ \\boldsymbol{w}^{\\intercal} \\mathbf{\\Sigma} \\boldsymbol{w} & \\text{for a covariance}\\,, \\\\ \\boldsymbol{w}^{\\intercal} \\boldsymbol{\\mu} & \\text{for expected returns}\\,, \\end{cases} \\\\
+u &= \\begin{cases} 0 & \\text{without an anchor}\\,, \\\\ t - s - i & \\text{otherwise}\\,. \\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``s``, ``i``: Systematic and idiosyncratic part of the moment.
+  - ``t``, ``u``: Total and unattributed part of the moment.
+  - ``\\mathbf{\\Sigma}``: Asset covariance of the anchor, ``N \\times N``, with every non-finite entry and every row of an asset the model does not state set to zero.
+  - ``\\boldsymbol{\\mu}``: Expected asset returns of the anchor, ``N \\times 1``, zeroed alike.
+  - $(math_dict[:w_port])
+  - $(math_dict[:N])
+
+# Arguments
+
+  - `anchor`, `sigma`, `mu`: The anchor, or `nothing`.
+  - `imsk`: The decomposable assets, or `nothing`.
+  - `w`: Portfolio weights.
+  - `sys`: The systematic part.
+  - `idio`: The idiosyncratic part.
+
+# Returns
+
+  - `total::Number`: The total.
+  - `gap::Number`: The unattributed part.
+
+# Related
+
+  - [`predicted_attribution`](@ref)
+"""
+function attribution_predicted_total(::Nothing, ::Option{BitVector}, ::VecNum, sys::Number,
+                                     idio::Number)
+    total = sys + idio
+    return (; total = total, gap = zero(total))
+end
+function attribution_predicted_total(sigma::MatNum, imsk::Option{BitVector}, w::VecNum,
+                                     sys::Number, idio::Number)
+    total = LinearAlgebra.dot(w,
+                              attribution_investable_block(attribution_finite(sigma), imsk),
+                              w)
+    return (; total = total, gap = total - sys - idio)
+end
+function attribution_predicted_total(mu::VecNum, imsk::Option{BitVector}, w::VecNum,
+                                     sys::Number, idio::Number)
+    total = LinearAlgebra.dot(w, attribution_investable_rows(attribution_finite(mu), imsk))
+    return (; total = total, gap = total - sys - idio)
+end
+"""
+    predicted_attribution(w::VecNum, mdl::NamedTuple; assets::Bool = false, ppy::Number = 1,
+                          strict::Bool = false) -> FactorAttributionResult
+
+Decompose the predicted moments of a portfolio over the factors of a factor model.
+
+Every predicted method of [`factor_attribution`](@ref) calls this function, the bare-array method and the prior method alike, so the two answer the same numbers on the same arrays. [`factor_attribution`](@ref) states the decomposition.
+
+# Algorithm
+
+ 1. Find the decomposable assets `imsk` with [`attribution_array_mask`](@ref), and report a holding outside them through [`attribution_investable_diagnostic`](@ref).
+ 2. Zero the non-finite entries of the loadings `M`, the orthogonal mean `bp` and the idiosyncratic covariance `D`, and their rows of an asset outside `imsk`.
+ 3. Form the portfolio exposure `bexp`, its product `Fb` with the factor covariance, and the systematic and idiosyncratic variances and means.
+ 4. Take the totals and the two gaps from the anchors with [`attribution_predicted_total`](@ref).
+ 5. Build the four components, the factor axis, the family axis and, when `assets = true`, the asset axis, each scaled by `ppy`.
+
+# Arguments
+
+  - `w`: Portfolio weights.
+  - `mdl`: The factor model, from [`attribution_array_model`](@ref).
+  - `assets`: Whether to fill the asset axis and the asset-by-factor matrices.
+  - `ppy`: Periods per year the numbers are scaled to.
+  - `strict`: Whether a holding in an asset the model does not state raises rather than warns.
+
+# Validation
+
+  - The factor covariance and the expected factor returns are finite, else an `IsNonFiniteError` is raised.
+  - Every weight at an asset the model does not state is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
+  - The portfolio variance is positive, and `ppy > 0`, else a `DomainError` is raised.
+
+# Returns
+
+  - `fa::FactorAttributionResult`: The attribution.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_array_model`](@ref)
+  - [`predicted_attribution_assets`](@ref)
+"""
+function predicted_attribution(w::VecNum, mdl::NamedTuple; assets::Bool = false,
+                               ppy::Number = 1,
+                               strict::Bool = false)::FactorAttributionResult
+    F, mu_f = mdl.F, mdl.mu_f
+    @argcheck(all(isfinite, F) & all(isfinite, mu_f),
+              IsNonFiniteError("the factor covariance and the expected factor returns describe every factor of the model, so every entry of them must be finite."))
+    imsk = attribution_array_mask(mdl)
     attribution_investable_diagnostic(w, imsk, strict)
-    M = attribution_investable_rows(attribution_finite(rr.M), imsk)
-    F = fpr.sigma
-    mu_f = fpr.mu
-    bp = attribution_investable_rows(attribution_finite(rr.b), imsk)
-    # A non-investable asset can carry a finite mean and finite covariances beside a `NaN`
-    # variance (#1384), so the totals zero its whole row as the components do.
-    sigma = attribution_investable_block(attribution_finite(pr.sigma), imsk)
-    mu = attribution_investable_rows(attribution_finite(pr.mu), imsk)
-    D = attribution_idiosyncratic_matrix(attribution_investable_block(attribution_finite(attribution_idiosyncratic_covariance(rr)),
+    M = attribution_investable_rows(attribution_finite(mdl.M), imsk)
+    bp = attribution_investable_rows(attribution_finite(mdl.b), imsk)
+    D = attribution_idiosyncratic_matrix(attribution_investable_block(attribution_finite(mdl.d),
                                                                       imsk))
     bexp = transpose(M) * w
     Fb = F * bexp
     sys_var = LinearAlgebra.dot(bexp, Fb)
     idio_var = LinearAlgebra.dot(w, D, w)
-    total_var = LinearAlgebra.dot(w, sigma, w)
+    tv = attribution_predicted_total(mdl.sigma, imsk, w, sys_var, idio_var)
+    total_var = tv.total
     @argcheck(total_var > zero(total_var),
               DomainError(total_var,
-                          "the portfolio variance w' * pr.sigma * w must be positive for an attribution to divide by its square root"))
+                          "the portfolio variance must be positive for an attribution to divide by its square root"))
     sigma_p = sqrt(total_var)
     sc = attribution_scale(ppy, sigma_p)
     sys_mu = LinearAlgebra.dot(bexp, mu_f)
     idio_mu = LinearAlgebra.dot(w, bp)
-    total_mu = LinearAlgebra.dot(w, mu)
+    tm = attribution_predicted_total(mdl.mu, imsk, w, sys_mu, idio_mu)
     nan = convert(typeof(sigma_p), NaN)
     sys = AttributionComponent(sqrt(max(sys_var, zero(sys_var))) * sc.s2,
                                sys_var / sigma_p * sc.s2, sys_var / total_var,
@@ -1366,30 +1653,23 @@ function factor_attribution(w::VecNum, pr::AbstractPriorResult; assets::Bool = f
                                 idio_var / sigma_p * sc.s2, idio_var / total_var,
                                 idio_mu * sc.s1,
                                 sqrt(max(idio_var, zero(idio_var))) / sigma_p, nothing)
-    gap_var = total_var - sys_var - idio_var
-    unattr = AttributionComponent(nan, gap_var / sigma_p * sc.s2, gap_var / total_var,
-                                  (total_mu - sys_mu - idio_mu) * sc.s1, nan, nothing)
+    unattr = AttributionComponent(nan, tv.gap / sigma_p * sc.s2, tv.gap / total_var,
+                                  tm.gap * sc.s1, nan, nothing)
     total = AttributionComponent(sigma_p * sc.s2, sigma_p * sc.s2, one(total_var),
-                                 total_mu * sc.s1, one(total_var), nothing)
+                                 tm.total * sc.s1, one(total_var), nothing)
     f_vol = sqrt.(max.(LinearAlgebra.diag(F), zero(eltype(F))))
     fbd = AttributionBreakdown(nothing, bexp, nothing, f_vol .* sc.s2,
                                [attribution_safe_corr(Fb[k], f_vol[k], sigma_p)
                                 for k in eachindex(Fb)], bexp .* Fb ./ sigma_p .* sc.s2,
                                bexp .* Fb ./ total_var, mu_f .* sc.s1,
                                bexp .* mu_f .* sc.s1, nothing)
-    fmbd = attribution_family_axis(attribution_families(rr), fbd, nothing, nothing)
+    fmbd = attribution_family_axis(mdl.fam, fbd, nothing, nothing)
     abd, afc = predicted_attribution_assets(assets, w,
                                             (; M = M, F = F, mu_f = mu_f, D = D, bp = bp,
-                                             Mr = rr.M, bpr = rr.b,
-                                             er = attribution_idiosyncratic_covariance(rr)),
-                                            Fb, sigma_p, sc)
+                                             Mr = mdl.M, bpr = mdl.b, er = mdl.d), Fb,
+                                            sigma_p, sc)
     return FactorAttributionResult(sys, idio, unattr, total, fbd, fmbd, abd, afc, false,
                                    ppy)
-end
-function factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing;
-                            kwargs...)::FactorAttributionResult
-    _, w, pr = result_investable_view(res, pr)
-    return factor_attribution(w, pr; kwargs...)
 end
 """
     predicted_attribution_assets(assets::Bool, w, mdl::NamedTuple, Fb, sigma_p, sc)

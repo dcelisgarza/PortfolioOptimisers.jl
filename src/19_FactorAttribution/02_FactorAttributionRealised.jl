@@ -97,8 +97,11 @@ end
 """
     attribution_align(rr::AbstractLoadingsRegressionResult, pr::AbstractPriorResult,
                       T::Integer)
+    attribution_align(blk::NamedTuple, T::Integer)
 
 Return the lag-aligned history a realised factor attribution reads off a factor model block.
+
+The first method reads the block into bare arrays with [`attribution_block_arrays`](@ref). The second aligns bare arrays, which the bare-array method of [`factor_attribution`](@ref) passes directly, so the two paths share one alignment.
 
 The fit of observation `t` regresses the returns of `t` on the exposures of `t - lag`, so the exposures are trimmed at the tail and every return-like history at the head. A block whose exposures do not move keeps its one matrix, because a static slice needs no alignment.
 
@@ -107,7 +110,7 @@ A fit that warmed up on the first observations keeps fewer than the caller's ser
 # Algorithm
 
  1. Read the exposure lag `lag`, the factor returns `f` and the idiosyncratic returns `eps` off the block, and the number of block observations `Tb`.
- 2. Check that the caller's series is at least as long as the block, and that the block is longer than the lag.
+ 2. Check that `eps` carries the observations of `f`, that the caller's series is at least as long as the block, and that the lag is non-negative and below the length of the block.
  3. Take the block rows `brows = lag + 1:Tb`, whose returns an exposure explains, and the caller's rows `rows`, the last `Tb - lag` of its `T`. Aligned observation `j` therefore reads the exposures of block row `j`, the returns of block row `j + lag`, and the caller's row `T - Tb + lag + j`.
  4. Trim the exposure history by `lag` at its tail. A static loadings matrix is kept as it is.
  5. Take the rows `brows` of `f`, of `eps`, of the regression weights `rw` and of the idiosyncratic variances `vs`.
@@ -119,11 +122,14 @@ A fit that warmed up on the first observations keeps fewer than the caller's ser
 
   - `rr`: The factor model block.
   - `pr`: The prior result the block travels on, which carries the two return series of a block that stores none.
+  - `blk`: The block as bare arrays, from [`attribution_block_arrays`](@ref) or [`attribution_array_block`](@ref).
   - `T`: The number of observations the caller's return series carries.
 
 # Validation
 
+  - The idiosyncratic returns carry the observations of the factor returns, else a `DimensionMismatch` is raised.
   - The caller's series carries at least as many observations as the block, else a `DimensionMismatch` is raised.
+  - The exposure lag is non-negative, else a `DomainError` is raised.
   - The block carries more observations than the exposure lag, else a `DimensionMismatch` is raised.
 
 # Returns
@@ -146,24 +152,26 @@ A fit that warmed up on the first observations keeps fewer than the caller's ser
 """
 function attribution_align(rr::AbstractLoadingsRegressionResult, pr::AbstractPriorResult,
                            T::Integer)
-    lag = attribution_lag(rr)
-    f = attribution_factor_returns(rr, pr)
-    eps = attribution_idiosyncratic_returns(rr, pr)
+    return attribution_align(attribution_block_arrays(rr, pr), T)
+end
+function attribution_align(blk::NamedTuple, T::Integer)
+    lag, f = blk.lag, blk.f
     Tb = size(f, 1)
+    @argcheck(size(blk.eps, 1) == Tb,
+              DimensionMismatch("the idiosyncratic returns ($(size(blk.eps, 1)) observations) must carry the observations of the factor returns ($Tb observations)"))
     @argcheck(T >= Tb,
               DimensionMismatch("the return series ($T observations) must carry at least as many observations as the factor model block ($Tb observations)"))
+    @argcheck(lag >= zero(lag), DomainError(lag, "the exposure lag must be non-negative"))
     @argcheck(Tb > lag,
               DimensionMismatch("the factor model block ($Tb observations) must carry more observations than the exposure lag ($lag)"))
     brows = (lag + 1):Tb
     rows = (T - Tb + lag + 1):T
-    za = attribution_zero_inactive(attribution_trim_exposures(attribution_exposures(rr),
-                                                              lag), eps[brows, :])
-    rw = attribution_trim_rows(attribution_regression_weights(rr), brows)
-    vs = attribution_trim_rows(attribution_idiosyncratic_variances(rr), brows)
-    fcb = attribution_trim_basis(attribution_family_basis(rr), Tb - lag)
+    za = attribution_zero_inactive(attribution_trim_exposures(blk.B, lag),
+                                   blk.eps[brows, :])
     return (; B = za.B, f = attribution_finite(f[brows, :]), eps = za.eps, act = za.act,
-            rw = attribution_finite_rows(rw), vs = vs, fcb = fcb, rows = rows,
-            no = attribution_observed_count(rr))
+            rw = attribution_finite_rows(attribution_trim_rows(blk.rw, brows)),
+            vs = attribution_trim_rows(blk.vs, brows),
+            fcb = attribution_trim_basis(blk.fcb, Tb - lag), rows = rows, no = blk.no)
 end
 """
     attribution_trim_exposures(B::MatNum, lag::Integer)
@@ -225,6 +233,10 @@ Where:
   - `B`: The static loadings, `assets × factors`, or the exposure history, `observations × assets × factors`.
   - `eps`: The idiosyncratic returns, `observations × assets`.
 
+# Validation
+
+  - An exposure history carries the observations of `eps`, else a `DimensionMismatch` is raised.
+
 # Returns
 
   - `B`: The exposures, zero at every inactive pair. A static matrix stays static when its inactive pairs are whole assets.
@@ -246,6 +258,8 @@ function attribution_zero_inactive(B::MatNum, eps::MatNum)
     return attribution_zero_inactive(attribution_broadcast_exposures(B, size(eps, 1)), eps)
 end
 function attribution_zero_inactive(B::Arr3Num, eps::MatNum)
+    @argcheck(size(B, 1) == size(eps, 1),
+              DimensionMismatch("the exposure history ($(size(B, 1)) observations after the lag) must carry the observations of the idiosyncratic returns ($(size(eps, 1)) observations after the lag)"))
     act = [isfinite(eps[t, i]) && all(isfinite, view(B, t, i, :))
            for t in axes(eps, 1), i in axes(eps, 2)]
     Bz = similar(B)
@@ -1479,23 +1493,28 @@ end
                                assets::Bool = false, se::Bool = false, ppy::Number = 1,
                                strict::Bool = false)
         -> FactorAttributionResult
+    attribution_realised_entry(W::VecNum_MatNum, blk::NamedTuple, ret::VecNum;
+                               assets::Bool = false, se::Bool = false, ppy::Number = 1)
+        -> FactorAttributionResult
 
 Align a factor model block against a realised return series and decompose it.
 
-Every realised method of [`factor_attribution`](@ref) that is not rolling forms its net return series and its weights, then calls this function.
+Every realised method of [`factor_attribution`](@ref) that is not rolling forms its net return series and its weights, then calls this function. A prior method reaches the second method through the first, and the bare-array method calls the second directly.
 
 # Algorithm
 
  1. Read the factor model block `rr` off `pr`.
  2. Report a holding in a non-investable asset through [`attribution_investable_diagnostic`](@ref), which warns, or raises under `strict`.
- 3. Refuse a non-finite entry of `ret` through [`attribution_finite_series`](@ref).
- 4. Align the block against the `length(ret)` observations of the caller, giving `al`.
- 5. Decompose the rows `al.rows` of `ret`, and of `W` when it is a history, with [`realised_attribution`](@ref).
+ 3. Read the block into bare arrays `blk` with [`attribution_block_arrays`](@ref).
+ 4. Refuse a non-finite entry of `ret` through [`attribution_finite_series`](@ref).
+ 5. Align `blk` against the `length(ret)` observations of the caller, giving `al`.
+ 6. Decompose the rows `al.rows` of `ret`, and of `W` when it is a history, with [`realised_attribution`](@ref).
 
 # Arguments
 
   - `W`: The constant weights, or the weight history.
   - `pr`: Prior result carrying the factor model block.
+  - `blk`: The block as bare arrays.
   - `ret`: The net portfolio return series.
   - `assets`: Whether to fill the asset axis and the asset-by-factor matrices.
   - `se`: Whether to fill the standard errors of the mean return contributions.
@@ -1521,37 +1540,48 @@ Every realised method of [`factor_attribution`](@ref) that is not rolling forms 
   - [`realised_attribution`](@ref)
 """
 function attribution_realised_entry(W::VecNum_MatNum, pr::AbstractPriorResult, ret::VecNum;
-                                    assets::Bool = false, se::Bool = false, ppy::Number = 1,
-                                    strict::Bool = false)::FactorAttributionResult
+                                    strict::Bool = false,
+                                    kwargs...)::FactorAttributionResult
     rr = attribution_prior_block(pr).rr
     attribution_investable_diagnostic(W, pr, strict)
+    return attribution_realised_entry(W, attribution_block_arrays(rr, pr), ret; kwargs...)
+end
+function attribution_realised_entry(W::VecNum_MatNum, blk::NamedTuple, ret::VecNum;
+                                    assets::Bool = false, se::Bool = false,
+                                    ppy::Number = 1)::FactorAttributionResult
     attribution_finite_series(ret)
-    al = attribution_align(rr, pr, length(ret))
+    al = attribution_align(blk, length(ret))
     return realised_attribution(attribution_window_weights(W, al.rows), view(ret, al.rows),
-                                al, attribution_families(rr), assets, se, ppy)
+                                al, blk.fam, assets, se, ppy)
 end
 """
     attribution_rolling_entry(W::VecNum_MatNum, pr::AbstractPriorResult, ret::VecNum,
                               window::Integer; step::Integer = 1, assets::Bool = false,
                               se::Bool = false, ppy::Number = 1, strict::Bool = false)
         -> Vector{<:FactorAttributionResult}
+    attribution_rolling_entry(W::VecNum_MatNum, blk::NamedTuple, ret::VecNum,
+                              window::Integer; step::Integer = 1, assets::Bool = false,
+                              se::Bool = false, ppy::Number = 1)
+        -> Vector{<:FactorAttributionResult}
 
 Align a factor model block against a realised return series and roll the decomposition.
 
-Every rolling method of [`factor_attribution`](@ref) forms its net return series and its weights, then calls this function.
+Every rolling method of [`factor_attribution`](@ref) forms its net return series and its weights, then calls this function. A prior method reaches the second method through the first, and the bare-array method calls the second directly.
 
 # Algorithm
 
  1. Read the factor model block `rr` off `pr`.
  2. Report a holding in a non-investable asset through [`attribution_investable_diagnostic`](@ref), which warns, or raises under `strict`.
- 3. Refuse a non-finite entry of `ret` through [`attribution_finite_series`](@ref).
- 4. Align the block against the `length(ret)` observations of the caller, giving `al`.
- 5. Roll the decomposition over the windows of the rows `al.rows` with [`attribution_rolling`](@ref), which checks `window` and `step` against the aligned length.
+ 3. Read the block into bare arrays `blk` with [`attribution_block_arrays`](@ref).
+ 4. Refuse a non-finite entry of `ret` through [`attribution_finite_series`](@ref).
+ 5. Align `blk` against the `length(ret)` observations of the caller, giving `al`.
+ 6. Roll the decomposition over the windows of the rows `al.rows` with [`attribution_rolling`](@ref), which checks `window` and `step` against the aligned length.
 
 # Arguments
 
   - `W`: The constant weights, or the weight history.
   - `pr`: Prior result carrying the factor model block.
+  - `blk`: The block as bare arrays.
   - `ret`: The net portfolio return series.
   - `window`: Size of the rolling window, in observations.
   - `step`: Stride between two consecutive windows.
@@ -1580,14 +1610,19 @@ Every rolling method of [`factor_attribution`](@ref) forms its net return series
   - [`attribution_rolling`](@ref)
 """
 function attribution_rolling_entry(W::VecNum_MatNum, pr::AbstractPriorResult, ret::VecNum,
-                                   window::Integer; step::Integer = 1, assets::Bool = false,
-                                   se::Bool = false, ppy::Number = 1, strict::Bool = false)
+                                   window::Integer; strict::Bool = false, kwargs...)
     rr = attribution_prior_block(pr).rr
     attribution_investable_diagnostic(W, pr, strict)
+    return attribution_rolling_entry(W, attribution_block_arrays(rr, pr), ret, window;
+                                     kwargs...)
+end
+function attribution_rolling_entry(W::VecNum_MatNum, blk::NamedTuple, ret::VecNum,
+                                   window::Integer; step::Integer = 1, assets::Bool = false,
+                                   se::Bool = false, ppy::Number = 1)
     attribution_finite_series(ret)
-    al = attribution_align(rr, pr, length(ret))
+    al = attribution_align(blk, length(ret))
     return attribution_rolling(attribution_window_weights(W, al.rows), ret[al.rows], al,
-                               attribution_families(rr), assets, se, ppy, window, step)
+                               blk.fam, assets, se, ppy, window, step)
 end
 """
     attribution_net_returns(w::VecNum, X::MatNum, fees::Option{<:Fees}, strict::Bool)
@@ -1707,6 +1742,20 @@ function factor_attribution(pred::MultiPeriodPredictionResult, pr::AbstractPrior
                             window::Integer; kwargs...)
     W, ret = attribution_prediction_history(pred)
     return attribution_rolling_entry(W, pr, ret, window; kwargs...)
+end
+function factor_attribution(W::VecNum_MatNum, B::MatNum_Arr3Num, f::MatNum, eps::MatNum,
+                            ret::VecNum; assets::Bool = false, se::Bool = false,
+                            ppy::Number = 1, kwargs...)::FactorAttributionResult
+    return attribution_realised_entry(W, attribution_array_block(B, f, eps; kwargs...), ret;
+                                      assets = assets, se = se, ppy = ppy)
+end
+function factor_attribution(W::VecNum_MatNum, B::MatNum_Arr3Num, f::MatNum, eps::MatNum,
+                            ret::VecNum, window::Integer; step::Integer = 1,
+                            assets::Bool = false, se::Bool = false, ppy::Number = 1,
+                            kwargs...)
+    return attribution_rolling_entry(W, attribution_array_block(B, f, eps; kwargs...), ret,
+                                     window; step = step, assets = assets, se = se,
+                                     ppy = ppy)
 end
 """
     attribution_prediction_history(pred::MultiPeriodPredictionResult)

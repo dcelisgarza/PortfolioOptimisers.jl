@@ -382,8 +382,8 @@ commit = "ebcacfda95"
 "src/17_Optimisation/10_OnlinePortfolioSelection/13_SparsePortfolioAlgorithms.jl" = { code = 101, doc = 234, comment = 1, blank = 86, total = 422 }
 "src/17_Optimisation/11_ProjectionWeightFinalisers.jl" = { code = 85, doc = 207, comment = 13, blank = 101, total = 406 }
 "src/18_ExpectedReturns.jl" = { code = 339, doc = 933, comment = 50, blank = 330, total = 1652 }
-"src/19_FactorAttribution/01_FactorAttribution.jl" = { code = 313, doc = 814, comment = 5, blank = 326, total = 1458 }
-"src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { code = 441, doc = 860, comment = 2, blank = 384, total = 1687 }
+"src/19_FactorAttribution/01_FactorAttribution.jl" = { code = 391, doc = 992, comment = 8, blank = 392, total = 1783 }
+"src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { code = 499, doc = 929, comment = 4, blank = 405, total = 1837 }
 "src/20_AssetSelection.jl" = { code = 312, doc = 766, comment = 0, blank = 370, total = 1448 }
 "src/21_Pipeline/01_Base_Pipeline.jl" = { code = 154, doc = 347, comment = 0, blank = 151, total = 652 }
 "src/21_Pipeline/02_StepExecution.jl" = { code = 197, doc = 201, comment = 2, blank = 106, total = 506 }

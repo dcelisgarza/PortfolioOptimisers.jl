@@ -52,8 +52,11 @@ on the predicted side and 6.2e-14 on the realised side, except the cells below.
     the labels of the first window, so a window whose order changes carries the wrong labels
     (`RollSeFam`, windows 4 and 5). Ours sorts every window by label.
 
-The time-series route (`PredTs`, `RealTs`) names no family, so the oracle's family axis over
-families a caller gives is the bare-array build of #1404.
+The time-series route (`PredTs`, `RealTs`) names no family. The bare-array methods (#1404) take
+the family labels from the caller, and `PredTsFam` and `RealTsFam` pin them on that route. A case
+whose name carries `Arr` is the bare-array method on the arrays of the block, read against the
+stored file of the case without the tag. Without the totals of the prior the model closes the total,
+so the predicted remainder is an exact zero where the oracle states none.
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 include(joinpath(@__DIR__, "parity_grid.jl"))
@@ -146,6 +149,19 @@ function fa_ts_prior(; n_assets::Integer = 8, n_factors::Integer = 3,
     return prior(FactorPrior(), rd), rd
 end
 
+# The arrays the predicted side reads off a block, and those the realised side reads, positional
+# and keyword, as the bare-array methods take them.
+function fa_pred_arrays(pr)
+    PO = PortfolioOptimisers
+    return (pr.rr.M, pr.fpr.sigma, PO.attribution_idiosyncratic_covariance(pr.rr)),
+           (; mu_f = pr.fpr.mu, b = pr.rr.b, fam = PO.attribution_families(pr.rr))
+end
+function fa_real_arrays(pr)
+    b = PortfolioOptimisers.attribution_block_arrays(pr.rr, pr)
+    return (b.B, b.f, b.eps),
+           (; lag = b.lag, rw = b.rw, vs = b.vs, fcb = b.fcb, observed = b.no, fam = b.fam)
+end
+
 @testset "Factor attribution at parity with the oracle (#1388)" begin
     PO = PortfolioOptimisers
     rd = grid_fixture(parity_small_panel())
@@ -161,7 +177,7 @@ end
                                             min_obs = 1)
     fit(; kw...) = prior(CrossSectionalFactorPrior(; factors = base, minra = 5,
                                                    pe = GRID_PE, ve = GRID_VE, kw...), rd)
-    load(c, o) = parity_load(FA_UNIT, c, o)
+    load(c, o) = parity_load(FA_UNIT, replace(c, "Arr" => ""), o)
     cmp(a, b, name; kw...) = parity_compare(a, b; name = name, kw...).ok
     prb = fit()
     wb = fa_inv_weights(prb)
@@ -224,6 +240,30 @@ end
     cases["PredTs"] = (fa_pack(factor_attribution(wt, prt; assets = true)), prt)
     cases["RealTs"] = (fa_pack(factor_attribution(wt, prt, rdt.X; assets = true)), prt, wt,
                        PO.attribution_net_returns(wt, rdt.X, nothing, false))
+    # The bare-array methods on the arrays of the block (#1404). The predicted side takes no
+    # totals, so the model is the total, as the oracle states it.
+    wf = fa_clean_weights(cases["PredFam"][2], X)
+    quiet() do
+        for (c, w, kw) in
+            (("PredBase", wb, (;)), ("PredPpy", wc, (; ppy = 252)), ("PredFam", wf, (;)),
+             ("PredTs", wt, (;)))
+            p = cases[c][2]
+            a, o = fa_pred_arrays(p)
+            cases[replace(c, "Pred" => "PredArr")] = (fa_pack(factor_attribution(w, a...;
+                                                                                 o...,
+                                                                                 assets = true,
+                                                                                 kw...)), p)
+        end
+    end
+    # The time-series route with families the caller gives.
+    fam_ts = ["style", "macro", "style"]
+    a, o = fa_pred_arrays(prt)
+    cases["PredArrTsFam"] = (fa_pack(factor_attribution(wt, a...; o..., fam = fam_ts,
+                                                        assets = true)), prt)
+    a, o = fa_real_arrays(prt)
+    rett = cases["RealTs"][4]
+    cases["RealArrTsFam"] = (fa_pack(factor_attribution(wt, a..., rett; o..., fam = fam_ts,
+                                                        assets = true)), prt, wt, rett)
 
     # The components: the systematic, the idiosyncratic and the total rows cell by cell. A
     # standard error the oracle states where ours is `NaN`, or differs, is a verdict of its own.
@@ -244,6 +284,8 @@ end
             # the model, at rounding level on a plain fit, and it closes the total.
             @test all(isnan, orc[rem, :])
             @test all(abs.(our[rem, 3]) .< 1e-11)
+            # Without the totals of the prior the model is the total.
+            startswith(c, "PredArr") && @test all(iszero, our[rem, 2:4])
             @test our[1, 2] + our[2, 2] + our[3, 2] ≈ our[4, 2] rtol = 1e-14
             @test our[1, 4] + our[2, 4] + our[3, 4] ≈ our[4, 4] rtol = 1e-14
         else
@@ -322,7 +364,7 @@ end
             @test isapprox(our[:, 5], m.corr; nans = true, rtol = 1e-12)
             @test cmp(our[m.full, 3:5], orc[m.full, 3:5], "$(c) standalone, active")
             @test !isapprox(our[.!m.full, 4], orc[.!m.full, 4]; nans = true)
-        elseif c == "RealTs" || c == "PredTs"
+        elseif occursin("Ts", c)
             @test cmp(our[:, 3:5], orc[:, 3:5], "$(c) standalone")
         end
     end
@@ -384,6 +426,80 @@ end
         @test fh.fbd.exposure ≈ fz.fbd.exposure rtol = 1e-14
         @test_throws ArgumentError factor_attribution(wh, prb; strict = true)
         @test_throws ArgumentError factor_attribution(wb, prb, X; strict = true)
+    end
+
+    @testset "A prior method is the bare-array method on the arrays of its block (#1404)" begin
+        # The predicted side reads the totals of the prior too.
+        for (c, w, kw) in
+            (("PredBase", wb, (;)), ("PredPpy", wc, (; ppy = 252)), ("PredFam", wf, (;)),
+             ("PredTs", wt, (;)))
+            p = cases[c][2]
+            a, o = fa_pred_arrays(p)
+            our = quiet() do
+                return fa_pack(factor_attribution(w, a...; o..., sigma = p.sigma, mu = p.mu,
+                                                  assets = true, kw...))
+            end
+            @test isequal(our, cases[c][1])
+        end
+        # `kw` is the keywords, then the window of a rolling case.
+        function arr_real(W, p, ret, kw...)
+            a, o = fa_real_arrays(p)
+            return quiet() do
+                return fa_pack(factor_attribution(W, a..., ret, kw[2:end]...; o...,
+                                                  kw[1]...))
+            end
+        end
+        for (c, kw) in (("RealBase", ((; assets = true),)),
+                        ("RealPpy", ((; assets = true, ppy = 252),)),
+                        ("RealHist", ((; assets = true),)), ("RealTs", ((; assets = true),)),
+                        ("RollBase", ((; assets = true, step = 5), 30)),
+                        ("RollHist", ((; assets = true, step = 7), 30)))
+            @test isequal(arr_real(cases[c][3], cases[c][2], cases[c][4], kw...),
+                          cases[c][1])
+        end
+        for c in ("SeWarmup", "SeFull", "SeFam", "SeFamTwo", "SeRankDef", "SeCurrency",
+                  "SeMacro", "RollSeFam")
+            p = cases[c][2]
+            w = fa_clean_weights(p, X)
+            kw = c == "RollSeFam" ? ((; se = true, step = 9), 40) : ((; se = true),)
+            @test isequal(arr_real(w, p, net(w), kw...), cases[c][1])
+        end
+    end
+
+    @testset "The bare-array methods: shapes, lags and refusals (#1404)" begin
+        B, F, d = fa_pred_arrays(prt)[1]
+        o = fa_pred_arrays(prt)[2]
+        # The idiosyncratic block is a vector of variances or a covariance.
+        fv = factor_attribution(wt, B, F, d; o...)
+        fm = factor_attribution(wt, B, F, Matrix(Diagonal(d)); o...)
+        @test fm.total.vol ≈ fv.total.vol rtol = 1e-15
+        @test fm.idio.vol_contrib ≈ fv.idio.vol_contrib rtol = 1e-15
+        # Two means of zero are the defaults.
+        f0 = factor_attribution(wt, B, F, d)
+        @test iszero(f0.total.mu_contrib) && f0.total.vol == fv.total.vol
+        @test_throws PO.IsNonFiniteError factor_attribution(wt, B, fill(NaN, size(F)), d)
+        # A holding the arrays do not state warns, or raises under `strict`.
+        Bn = copy(B)
+        Bn[1, :] .= NaN
+        @test_logs (:warn,) match_mode = :any factor_attribution(wt, Bn, F, d)
+        @test_throws ArgumentError factor_attribution(wt, Bn, F, d; strict = true)
+        # A static matrix describes every observation, so its lag defaults to zero, and an
+        # exposure history lags the returns by one observation by default.
+        (Br, f, eps), _ = fa_real_arrays(prt)
+        ret = cases["RealTs"][4]
+        r0 = factor_attribution(wt, Br, f, eps, ret)
+        @test isequal(fa_pack(r0),
+                      fa_pack(factor_attribution(wt, Br, f, eps, ret; lag = 0)))
+        T = size(f, 1)
+        Bh = stack(fill(Br, T); dims = 1)
+        @test isequal(fa_pack(factor_attribution(wt, Bh, f, eps, ret)),
+                      fa_pack(factor_attribution(wt, Bh, f, eps, ret; lag = 1)))
+        @test !isequal(fa_pack(factor_attribution(wt, Bh, f, eps, ret)), fa_pack(r0))
+        @test length(factor_attribution(wt, Br, f, eps, ret, 30; step = 10)) ==
+              length(30:10:T)
+        @test_throws DomainError factor_attribution(wt, Br, f, eps, ret; lag = -1)
+        @test_throws DimensionMismatch factor_attribution(wt, Br, f, eps[2:end, :], ret)
+        @test_throws DimensionMismatch factor_attribution(wt, Bh[2:end, :, :], f, eps, ret)
     end
 
     @testset "A Scenario Cap leaves the realised attribution of a re-based fit (#1422)" begin
