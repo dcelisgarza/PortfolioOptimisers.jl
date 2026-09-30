@@ -208,6 +208,22 @@ and a compensating rise in its noise are of one order there, and a fix of `R = I
 correlated cases worse. The mean under HAC, where the row rule adds +3.9 %, waits on the question
 whether the HAC rows divide by the volatility before or after their update (#1444, #1445).
 
+**Without HAC the factor does not read the correlation of the assets, and this is a documented
+limit** (the maintainer ruled so on #1447). With `h_i = √(Q_ii / V̂_i)` the statistic splits
+exactly as `tr(Ĉ⁻¹ R) = Σ_i h_i² (Q⁻¹ R)_ii − ½ Σ_ij (Q⁻¹)_ij R_ij (h_i − h_j)²`. On rows that are not
+standardised the mean of the first sum does not read `R` (the part of `r̃_i = R^{−1/2} e_i` off
+the direction of column `i` is odd under a sign flip of the other directions), so every effect of
+`R` is a sum over pairs. The library standardises each row, which is not a congruence, and both
+sums then move with `R`: at 12 assets, half-lives of 10 and 20 and an equicorrelation of 0.8, the
+first by −1.66 % (the standardisation biases each correlation down by `0.012 ρ (1 − ρ²)`) and the
+second by +1.17 %, net −0.49 %. The mean-field value, which keeps the exact means of `Q⁻¹`, `h²` and
+`(h_i − h_j)²` and drops their covariance, moves by +0.89 % over the same step: the covariance of
+the two noises moves 2.8 times the net effect, with the opposite sign. A fix therefore needs each
+sum to about 2.5 %, from the joint law of two correlated volatility chains and the pair's own
+Schur complement, which no expansion in the noise of the variances reaches. Over six correlations
+the three methods read 0.9897 to 1.0018 of the truth, and a three-factor model with a `γ` of 1.95
+reads lower on the mean (0.9947) than every equicorrelation, so no function of `γ` alone holds it.
+
 **The gate is `K > n + 3`, where the variance of the statistic is finite.** At `n = 1` an estimate
 of four observations or fewer is not scored. The gate reads the count of each asset, so a young
 asset leaves the statistic as it does below `min_obs`. Under HAC the effective count
@@ -225,10 +241,10 @@ observations, such as 12 assets at a half-life of 5, is never scored.
   states `debias = false`.
 - The default inverse-volatility direction keeps the next order of its excess, about `9 s₂²`,
   which the docstring of its statistic states with the warm-up rows.
-- **Two limits remain, and child issues of map #1375 hold them.** On the separate correlation
-  path the Mahalanobis factor does not read the correlation of the assets: without HAC the three
-  methods read 0.9917 to 1.0018 of the truth (#1447), and at two lags RMS reads 1.022 to 1.031
-  (#1445, after the question of the HAC row rule, #1444).
+- **Two limits remain.** On the separate correlation path the Mahalanobis factor does not read the
+  correlation of the assets: without HAC the three methods read 0.9897 to 1.0018 of the truth, a
+  documented limit (#1447); at two lags RMS reads 1.022 to 1.031, which a child issue of map #1375
+  holds (#1445, after the question of the HAC row rule, #1444).
 - The Mahalanobis nodes under HAC cost 0.3 s to 1.5 s for each count of assets at half-lives up
   to 40, and up to 3.7 s at a half-life of 250 and five lags.
 - The FirstMoment and Log calibrations of `DiagonalTarget` assumed a `χ²(n)` sum. Before this
@@ -301,5 +317,10 @@ observations, such as 12 assets at a half-life of 5, is never scored.
   (#1439). It is within 0.005 % of the truth at `R = I`, but the correlated cases move from about
   −0.3 % to −0.5 % for RMS, because the part it removes offsets the part that the correlation
   adds (#1447).
+- **On the separate path, a second-order expansion in the noise of `ln(V̂_i / Q_ii)` with its
+  coupling to `Q`** (#1447). The coupling is not a correction to the expansion: without it the
+  mean moves the wrong way with `R`, and on rows that are not standardised the pair term is 21 %
+  below the product of its means at an equicorrelation of 0.8. A term in `γ` alone cannot hold a
+  factor model and an equicorrelation at once.
 - **A keyword on each target.** `DiagonalTarget` would carry a field that a geodesic shrinkage
   ignores, and the scalar estimator would need a keyword of its own anyway.

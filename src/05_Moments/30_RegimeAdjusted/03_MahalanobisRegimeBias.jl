@@ -1208,9 +1208,19 @@ that the two estimates share reduces it, and the division of each correlation ro
 after its own update adds to it. Without HAC the three cancel at ``R = I``; at two lags the power
 carries about three quarters of the spread. The spread grows with the correlation of the assets,
 which the power does not read: at an equicorrelation of 0.8 it carries 42 % of it, so the methods read
-0.9969, 0.9943 and 0.9917. The mean keeps parts of the next order, within 0.3 % without HAC and
-up to 3.1 % high at two lags, where the division of each correlation row by the volatility after
-its own update dominates.
+0.9969, 0.9943 and 0.9917. Under HAC the mean reads up to 3.1 % high at two lags, where the division
+of each correlation row by the volatility after its own update dominates.
+
+The factor does not read the correlation of the assets. With ``h_{i} = \\sqrt{Q_{ii} / \\hat{V}_{i}}``
+the statistic splits exactly as
+``\\sum_{i} h_{i}^{2} (Q^{-1} R)_{ii} - \\frac{1}{2} \\sum_{i,j} (Q^{-1})_{ij} R_{ij} (h_{i} - h_{j})^{2}``.
+Where the correlation rows are not standardised, the mean of the first sum does not read ``R``.
+The standardisation moves both sums with ``R``, by amounts that nearly cancel: at an
+equicorrelation of 0.8 the first falls by 1.66 % and the second rises by 1.17 %. The coupling of the
+noise of ``Q^{-1}`` with the noise of ``h`` carries most of each change, and no expansion in the
+noise of the variances holds it to the accuracy that the small difference needs. Without HAC the
+three methods read 0.9897 to 1.0018 of the truth over equicorrelations from 0 to 0.9 and a
+three-factor model, which reads 0.9947 for the mean.
 
 # Arguments
 
