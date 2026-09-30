@@ -4050,6 +4050,203 @@ The columns carry several units, so the axis is labelled `Value` and read group 
   - [`ForecastEvaluationResult`](@ref)
 """
 function plot_forecast_evaluation_summary end
+"""
+    plot_covariance_calibration(
+        cfer::CovarianceForecastEvaluationResult;
+        window::Integer = 50,
+        diagnostics = (:mahalanobis, :diagonal, :bias),
+        kwargs...
+    ) -> Plot
+    plot_covariance_calibration(
+        cfers::AbstractVector{<:CovarianceForecastEvaluationResult};
+        names = nothing,
+        window::Integer = 50,
+        diagnostics = (:mahalanobis, :diagonal, :bias),
+        kwargs...
+    ) -> Plot
+
+Plot the rolling calibration of a covariance forecast: the Mahalanobis ratio, the diagonal ratio and the bias statistic over a window of steps, with a reference line at one.
+
+Each series is the statistic of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. The two ratios are means weighted by the degrees of freedom of each step, as in the summary, and the bias statistic is the sample standard deviation of the standardised returns. So a window as wide as the run ends at the value of the summary. A step with no active asset adds nothing to a window. The first ``W - 1`` points, and a window with no scored step, are `NaN` and drawn blank. The bias statistic needs two scored steps in its window. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
+
+An evaluation with one test portfolio draws the bias statistic of that portfolio. An evaluation with several draws the median over the portfolios, with a band from the fifth to the ninety-fifth percentile, which are the percentiles the summary gives.
+
+The vector method is the comparison. It draws each diagnostic of each evaluation on the dates of that evaluation. A series is labelled by the name of its evaluation when one diagnostic is drawn, and by the name and the diagnostic otherwise.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{m}^{W}_t &= \\frac{\\sum_{s \\in S_t} \\nu_s\\, m_s}{\\sum_{s \\in S_t} \\nu_s}\\,, \\quad \\bar{d}^{W}_t = \\frac{\\sum_{s \\in S_t} \\nu'_s\\, \\bar{d}_s}{\\sum_{s \\in S_t} \\nu'_s}\\,, \\\\
+B^{W}_t &= \\sqrt{\\frac{1}{\\lvert S_t \\rvert - 1} \\sum_{s \\in S_t} \\left(b_s - \\bar{b}_t\\right)^2}\\,, \\quad \\bar{b}_t = \\frac{1}{\\lvert S_t \\rvert} \\sum_{s \\in S_t} b_s\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:W_roll])
+  - ``S_t``: The steps of ``t - W + 1, \\ldots, t`` with at least one active asset.
+  - ``m_s``: Mahalanobis ratio of step ``s``.
+  - ``\\nu_s``: Degrees of freedom of the Mahalanobis statistic of step ``s`` under a Gaussian null, from [`target_dof`](@ref).
+  - ``\\bar{d}_s``: Mean of the diagonal ratio over the active assets of step ``s``, from [`covariance_diagonal_mean`](@ref).
+  - ``\\nu'_s``: Degrees of freedom of the ratio of one asset at step ``s`` under a Gaussian null, from [`target_step_dof`](@ref).
+  - ``b_s``: Standardised return of a test portfolio at step ``s``.
+  - ``\\bar{m}^{W}_t``, ``\\bar{d}^{W}_t``, ``B^{W}_t``: Point ``t`` of the Mahalanobis, the diagonal and the bias series.
+
+# Arguments
+
+  - `cfer`: The evaluation to draw, from [`covariance_forecast_evaluation`](@ref).
+  - `cfers`: The evaluations to overlay, at least one, from [`covariance_forecast_evaluation`](@ref).
+  - `names`: One name per evaluation, or `nothing` for the names that [`covariance_forecast_names`](@ref) gives.
+  - `window`: Number of steps in the window.
+  - `diagnostics`: The series to draw, at least one of `:mahalanobis`, `:diagonal` and `:bias`.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - ``W`` lies in `1:length(cfer.dates)` for every evaluation drawn. A `DomainError` is thrown otherwise.
+  - `diagnostics` is not empty, and each entry is `:mahalanobis`, `:diagonal` or `:bias`. A `DomainError` is thrown otherwise.
+  - The vector method: `cfers` is not empty, else an `IsEmptyError` is thrown, and the rules of [`covariance_forecast_names`](@ref).
+
+# Returns
+
+  - `plt::Plots.Plot`: A line plot with one series per diagnostic and evaluation, and the reference line.
+
+# Related
+
+  - [`covariance_forecast_evaluation`](@ref)
+  - [`covariance_forecast_summary`](@ref)
+  - [`plot_covariance_qlike`](@ref)
+  - [`plot_covariance_exceedance`](@ref)
+  - [`CovarianceForecastEvaluationResult`](@ref)
+"""
+function plot_covariance_calibration end
+"""
+    plot_covariance_qlike(
+        cfer::CovarianceForecastEvaluationResult;
+        window::Integer = 50,
+        kwargs...
+    ) -> Plot
+    plot_covariance_qlike(
+        cfers::AbstractVector{<:CovarianceForecastEvaluationResult};
+        names = nothing,
+        window::Integer = 50,
+        kwargs...
+    ) -> Plot
+
+Plot the rolling mean of the QLIKE loss of the variance of the test portfolios of a covariance forecast.
+
+Each series is the mean portfolio QLIKE of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. So a window as wide as the run ends at the value of the summary. A step with no active asset adds nothing to a window. The first ``W - 1`` points, and a window with no scored step, are `NaN` and drawn blank. Lower is better, and only the difference between two forecasts is a reading, so the figure draws no reference line. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
+
+An evaluation with one test portfolio draws the loss of that portfolio. An evaluation with several draws the median over the portfolios, with a band from the fifth to the ninety-fifth percentile.
+
+The vector method is the comparison. It draws one series per evaluation, on the dates of that evaluation, labelled by its name.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{L}^{W}_t &= \\frac{1}{\\lvert S_t \\rvert} \\sum_{s \\in S_t} L^{\\mathrm{P}}_s\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:W_roll])
+  - ``S_t``: The steps of ``t - W + 1, \\ldots, t`` with at least one active asset.
+  - ``L^{\\mathrm{P}}_s``: QLIKE loss of the variance of a test portfolio at step ``s``, from [`covariance_forecast_step`](@ref).
+  - ``\\bar{L}^{W}_t``: Point ``t`` of the series.
+
+# Arguments
+
+  - `cfer`: The evaluation to draw, from [`covariance_forecast_evaluation`](@ref).
+  - `cfers`: The evaluations to overlay, at least one, from [`covariance_forecast_evaluation`](@ref).
+  - `names`: One name per evaluation, or `nothing` for the names that [`covariance_forecast_names`](@ref) gives.
+  - `window`: Number of steps in the window.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - ``W`` lies in `1:length(cfer.dates)` for every evaluation drawn. A `DomainError` is thrown otherwise.
+  - The vector method: `cfers` is not empty, else an `IsEmptyError` is thrown, and the rules of [`covariance_forecast_names`](@ref).
+
+# Returns
+
+  - `plt::Plots.Plot`: A line plot with one series per evaluation.
+
+# Related
+
+  - [`covariance_forecast_evaluation`](@ref)
+  - [`covariance_forecast_summary`](@ref)
+  - [`covariance_forecast_compare`](@ref)
+  - [`plot_covariance_calibration`](@ref)
+  - [`CovarianceForecastEvaluationResult`](@ref)
+"""
+function plot_covariance_qlike end
+"""
+    plot_covariance_exceedance(
+        cfer::CovarianceForecastEvaluationResult;
+        levels = (0.95, 0.99),
+        window::Integer = 50,
+        kwargs...
+    ) -> Plot
+    plot_covariance_exceedance(
+        cfers::AbstractVector{<:CovarianceForecastEvaluationResult};
+        names = nothing,
+        levels = (0.95,),
+        window::Integer = 50,
+        kwargs...
+    ) -> Plot
+
+Plot the rolling rate at which the Mahalanobis statistic of a covariance forecast exceeds the chi-squared quantile of each level, with a dashed line at the target rate of each level.
+
+Each series is the exceedance rate of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. So a window as wide as the run ends at the value of the summary. [`covariance_exceedance`](@ref) states the statistic and its threshold. A step with no active asset adds nothing to a window. The first ``W - 1`` points, and a window with no scored step, are `NaN` and drawn blank. The rate is ``1 - q`` under a Gaussian null, and it rises with heavy tails as well as with a forecast that is wrong, so it compares two forecasts better than it tests one. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
+
+The vector method is the comparison. It draws one series per evaluation and level, on the dates of that evaluation. A series is labelled by the name of its evaluation when one level is drawn, and by the name and the level otherwise. Its default draws one level, so that a figure of four forecasts carries four series and not eight.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{e}^{W}_t &= \\frac{1}{\\lvert S_t \\rvert} \\sum_{s \\in S_t} e_s\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:W_roll])
+  - ``S_t``: The steps of ``t - W + 1, \\ldots, t`` with at least one active asset.
+  - ``e_s``: Exceedance indicator of step ``s`` at a level, from [`covariance_exceedance`](@ref).
+  - ``\\bar{e}^{W}_t``: Point ``t`` of the series of that level.
+
+# Arguments
+
+  - `cfer`: The evaluation to draw, from [`covariance_forecast_evaluation`](@ref).
+  - `cfers`: The evaluations to overlay, at least one, from [`covariance_forecast_evaluation`](@ref).
+  - `names`: One name per evaluation, or `nothing` for the names that [`covariance_forecast_names`](@ref) gives.
+  - `levels`: Confidence levels of the chi-squared quantiles, at least one.
+  - `window`: Number of steps in the window.
+  - `kwargs...`: Additional keyword arguments passed to the plotting backend.
+
+# Validation
+
+  - ``W`` lies in `1:length(cfer.dates)` for every evaluation drawn. A `DomainError` is thrown otherwise.
+  - `levels` is not empty, and every level lies in `(0, 1)`. A `DomainError` is thrown otherwise.
+  - The vector method: `cfers` is not empty, else an `IsEmptyError` is thrown, and the rules of [`covariance_forecast_names`](@ref).
+
+# Returns
+
+  - `plt::Plots.Plot`: A line plot with one series per level and evaluation, and a dashed line at each target rate.
+
+# Related
+
+  - [`covariance_exceedance`](@ref)
+  - [`covariance_forecast_evaluation`](@ref)
+  - [`covariance_forecast_summary`](@ref)
+  - [`plot_covariance_calibration`](@ref)
+  - [`CovarianceForecastEvaluationResult`](@ref)
+"""
+function plot_covariance_exceedance end
 export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_composition,
        plot_stacked_bar_composition, plot_stacked_area_composition, plot_dendrogram,
        plot_clusters, plot_drawdowns, plot_risk_contribution, plot_factor_risk_contribution,
@@ -4073,4 +4270,5 @@ export plot_portfolio_cumulative_returns, plot_asset_cumulative_returns, plot_co
        plot_forecast_quantile_returns, plot_forecast_calibration,
        plot_forecast_ic_by_holding_period, plot_forecast_portfolio_by_holding_period,
        plot_forecast_ic_decay, plot_forecast_portfolio_decay,
-       plot_forecast_factor_correlation, plot_forecast_evaluation_summary
+       plot_forecast_factor_correlation, plot_forecast_evaluation_summary,
+       plot_covariance_calibration, plot_covariance_qlike, plot_covariance_exceedance

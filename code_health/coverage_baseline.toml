@@ -19,6 +19,7 @@ commit = "8610300"
 "ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl" = { lines = 60, misses = 11 }
 "ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { lines = 199, misses = 0 }
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { lines = 170, misses = 0 }
+"ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { lines = 139, misses = 0 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { lines = 8, misses = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { lines = 8, misses = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { lines = 0, misses = 0 }
@@ -297,7 +298,7 @@ commit = "8610300"
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { lines = 16, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { lines = 28, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { lines = 166, misses = 0 }
-"src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { lines = 105, misses = 0 }
+"src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { lines = 123, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { lines = 91, misses = 0 }
 "src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl" = { lines = 19, misses = 0 }
 "src/17_Optimisation/03_NaiveOptimisation.jl" = { lines = 99, misses = 0 }

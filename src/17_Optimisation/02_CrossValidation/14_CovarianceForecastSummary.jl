@@ -228,9 +228,7 @@ function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastE
     @argcheck(all(q -> zero(q) < q < one(q), levels),
               DomainError(levels, "every level must lie in (0, 1)"))
     n = length(cfers)
-    nms = isnothing(names) ? ["forecast_$(i)" for i in 1:n] : names
-    @argcheck(length(nms) == n,
-              DimensionMismatch("`names` has $(length(nms)) entries and `cfers` $(n) evaluations."))
+    nms = covariance_forecast_names(names, n)
     z = Distributions.cquantile(Distributions.Normal(), alpha / 2)
     Tf = promote_type(eltype(cfers[1].mahalanobis_ratio), typeof(z))
     mm = Vector{Tf}(undef, n)
@@ -256,7 +254,6 @@ function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastE
     ex = Matrix{Tf}(undef, n, length(levels))
     ns = Vector{Int}(undef, n)
     np = Vector{Int}(undef, n)
-    dbar = Vector{Tf}(undef, 0)
     for (i, cfer) in enumerate(cfers)
         k = findall(>(0), cfer.n_valid)
         @argcheck(!isempty(k),
@@ -264,8 +261,7 @@ function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastE
         m = cfer.mahalanobis_ratio[k]
         dof = target_dof.(Ref(cfer.target), cfer.n_valid[k], cfer.horizon[k])
         sdof = target_step_dof.(Ref(cfer.target), cfer.horizon[k])
-        map!(t -> Statistics.mean(filter(isfinite, view(cfer.diagonal_ratio, t, :))),
-             resize!(dbar, length(k)), k)
+        dbar = covariance_diagonal_mean(cfer)[k]
         mm[i] = LinearAlgebra.dot(dof, m) / sum(dof)
         mmed[i] = Statistics.median(m)
         m5[i] = summary_quantile(m, 0.05)
@@ -290,10 +286,8 @@ function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastE
         fr[i] = Statistics.mean(view(cfer.frobenius, k))
         pql[i] = Statistics.median(vec(Statistics.mean(view(cfer.portfolio_qlike, k, :);
                                                        dims = 1)))
-        stat = dof .* m
         for (j, q) in enumerate(levels)
-            thr = Distributions.quantile.(Distributions.Chisq.(dof), q)
-            ex[i, j] = Statistics.mean(k -> stat[k] > thr[k], eachindex(stat, thr))
+            ex[i, j] = Statistics.mean(view(covariance_exceedance(cfer, q), k))
         end
         ns[i] = length(m)
         np[i] = size(cfer.standardised_return, 2)
@@ -330,6 +324,116 @@ function summary_quantile(x::VecNum, p::Number)
     # and no type is chosen here.
     i = findfirst(isnan, x)
     return isnothing(i) ? Statistics.quantile(x, p) : x[i]
+end
+"""
+    covariance_forecast_names(names::Nothing, n::Integer)
+    covariance_forecast_names(names::AbstractVector, n::Integer)
+
+Name each covariance forecast evaluation of a summary or of a figure.
+
+[`covariance_forecast_summary`](@ref) and the comparison figures of [`plot_covariance_calibration`](@ref), [`plot_covariance_qlike`](@ref) and [`plot_covariance_exceedance`](@ref) read the names from this function. So a figure labels each evaluation with the name that the summary gives it. `nothing` gives `"forecast_1"`, `"forecast_2"`, and so on.
+
+# Arguments
+
+  - `names`: A name per evaluation, or `nothing`.
+  - `n`: The number of evaluations.
+
+# Validation
+
+  - `names` has `n` entries when given. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `nms::AbstractVector`: One name per evaluation.
+
+# Related
+
+  - [`covariance_forecast_summary`](@ref)
+  - [`plot_covariance_calibration`](@ref)
+"""
+function covariance_forecast_names(::Nothing, n::Integer)
+    return ["forecast_$(i)" for i in 1:n]
+end
+function covariance_forecast_names(names::AbstractVector, n::Integer)
+    @argcheck(length(names) == n,
+              DimensionMismatch("`names` has $(length(names)) entries and `cfers` $(n) evaluations."))
+    return names
+end
+"""
+    covariance_diagonal_mean(cfer::CovarianceForecastEvaluationResult)
+
+Mean of the diagonal ratio over the active assets of each step of a covariance forecast evaluation.
+
+The diagonal ratio of an asset that was not active at a step is `NaN`, so the mean reads the finite entries of the row alone. A step with no active asset has no finite entry, and its mean is `NaN`. [`covariance_forecast_summary`](@ref) reads the mean of the scored steps, and [`plot_covariance_calibration`](@ref) reads its rolling form.
+
+# Arguments
+
+  - `cfer`: The evaluation, from [`covariance_forecast_evaluation`](@ref).
+
+# Returns
+
+  - `dbar::VecNum`: The mean of the diagonal ratio, one entry per step.
+
+# Related
+
+  - [`CovarianceForecastEvaluationResult`](@ref)
+  - [`covariance_forecast_summary`](@ref)
+  - [`plot_covariance_calibration`](@ref)
+"""
+function covariance_diagonal_mean(cfer::CovarianceForecastEvaluationResult)
+    d = cfer.diagonal_ratio
+    return [Statistics.mean(filter(isfinite, view(d, t, :))) for t in axes(d, 1)]
+end
+"""
+    covariance_exceedance(cfer::CovarianceForecastEvaluationResult, q::Real)
+
+Whether the Mahalanobis statistic of each step of a covariance forecast evaluation exceeds the chi-squared quantile of level `q`.
+
+The Mahalanobis statistic of a step is its ratio times its degrees of freedom, which [`target_dof`](@ref) finds from the target, the active count and the horizon. Under a Gaussian null with no gap in the test window it is chi-squared on those degrees of freedom, so it exceeds the quantile at a rate of ``1 - q``. [`covariance_forecast_summary`](@ref) reads the mean over the scored steps, and [`plot_covariance_exceedance`](@ref) reads its rolling form.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+e_t &= \\mathbb{1}\\left[\\nu_t\\, m_t > \\chi^2_{\\nu_t}(q)\\right]\\,, \\quad \\nu_t = \\operatorname{dof}(N_t, h_t)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``e_t``: Exceedance indicator of step ``t``.
+  - ``\\nu_t``: Degrees of freedom of the Mahalanobis statistic of step ``t`` under a Gaussian null.
+  - ``m_t``: Mahalanobis ratio of step ``t``.
+  - ``\\chi^2_{\\nu}(q)``: Quantile at level ``q`` of the chi-squared distribution with ``\\nu`` degrees of freedom.
+  - ``N_t``: Number of active assets at step ``t``.
+  - $(math_dict[:h_step])
+
+# Arguments
+
+  - `cfer`: The evaluation, from [`covariance_forecast_evaluation`](@ref).
+  - `q`: The confidence level of the quantile.
+
+# Returns
+
+  - `e::VecNum`: One entry per step, `1` where the statistic exceeds the quantile, `0` where it does not, and `NaN` at a step with no active asset.
+
+# Related
+
+  - [`target_dof`](@ref)
+  - [`covariance_forecast_summary`](@ref)
+  - [`plot_covariance_exceedance`](@ref)
+"""
+function covariance_exceedance(cfer::CovarianceForecastEvaluationResult, q::Real)
+    # An unscored step carries a `NaN` ratio, and that `NaN` is its indicator, so the copy
+    # keeps it and the scored steps are written over.
+    e = copy(cfer.mahalanobis_ratio)
+    k = findall(>(0), cfer.n_valid)
+    @views begin
+        nu = target_dof.(Ref(cfer.target), cfer.n_valid[k], cfer.horizon[k])
+        thr = Distributions.quantile.(Distributions.Chisq.(nu), q)
+        e[k] .= ifelse.(nu .* e[k] .> thr, one(eltype(e)), zero(eltype(e)))
+    end
+    return e
 end
 """
 $(DocStringExtensions.TYPEDEF)

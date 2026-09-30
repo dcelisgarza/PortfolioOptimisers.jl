@@ -49,5 +49,6 @@ include("09_CrossValidationPlots.jl")
 include("10_FrontierPlots.jl")
 include("11_FactorDiagnosticsPlots.jl")
 include("12_ForecastEvaluationPlots.jl")
+include("13_CovarianceForecastPlots.jl")
 
 end

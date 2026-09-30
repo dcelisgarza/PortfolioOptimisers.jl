@@ -1538,6 +1538,13 @@ const CATALOGUE = [Section("Core abstractions",
                                    Cap(:plot_forecast_cumulative_ic,
                                        :plot_forecast_cumulative_returns;
                                        label = "Several forecasts on one plot, one series per evaluation over the dates they share, through the vector methods of [`plot_forecast_cumulative_ic`](@ref) and [`plot_forecast_cumulative_returns`](@ref)")]),
+                            Group("Covariance forecast evaluation",
+                                  [Cap(:plot_covariance_calibration),
+                                   Cap(:plot_covariance_qlike),
+                                   Cap(:plot_covariance_exceedance),
+                                   Cap(:plot_covariance_calibration, :plot_covariance_qlike,
+                                       :plot_covariance_exceedance;
+                                       label = "Several covariance forecasts on one plot, one series per evaluation, through the vector method of each figure")]),
                             Group("Phylogeny", [Cap(:plot_network), Cap(:plot_centrality)]),
                             Group("Cross validation",
                                   [Cap(:plot_cv_scores), Cap(:plot_cv_dashboard)]),

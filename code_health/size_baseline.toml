@@ -21,7 +21,8 @@ commit = "ebcacfda95"
 "ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl" = { code = 147, doc = 0, comment = 13, blank = 2, total = 162 }
 "ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { code = 439, doc = 0, comment = 40, blank = 3, total = 482 }
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { code = 431, doc = 0, comment = 34, blank = 0, total = 465 }
-"ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { code = 40, doc = 0, comment = 8, blank = 5, total = 53 }
+"ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { code = 249, doc = 0, comment = 23, blank = 0, total = 272 }
+"ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { code = 41, doc = 0, comment = 8, blank = 5, total = 54 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { code = 17, doc = 125, comment = 0, blank = 44, total = 186 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { code = 176, doc = 0, comment = 21, blank = 0, total = 197 }
 "src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { code = 126, doc = 0, comment = 14, blank = 0, total = 140 }
@@ -300,7 +301,7 @@ commit = "ebcacfda95"
 "src/17_Optimisation/02_CrossValidation/11_RandomisedSearchCrossValidation.jl" = { code = 34, doc = 39, comment = 0, blank = 18, total = 91 }
 "src/17_Optimisation/02_CrossValidation/12_OnlineFoldLoop.jl" = { code = 74, doc = 162, comment = 5, blank = 70, total = 311 }
 "src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl" = { code = 389, doc = 584, comment = 7, blank = 219, total = 1199 }
-"src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { code = 174, doc = 310, comment = 2, blank = 90, total = 576 }
+"src/17_Optimisation/02_CrossValidation/14_CovarianceForecastSummary.jl" = { code = 194, doc = 367, comment = 4, blank = 120, total = 685 }
 "src/17_Optimisation/02_CrossValidation/15_Resume.jl" = { code = 155, doc = 272, comment = 2, blank = 127, total = 556 }
 "src/17_Optimisation/02_CrossValidation/16_LogWealthRegret.jl" = { code = 279, doc = 616, comment = 7, blank = 258, total = 1160 }
 "src/17_Optimisation/03_NaiveOptimisation.jl" = { code = 457, doc = 835, comment = 48, blank = 258, total = 1598 }
@@ -391,6 +392,6 @@ commit = "ebcacfda95"
 "src/21_Pipeline/04_PredictionCV.jl" = { code = 195, doc = 215, comment = 2, blank = 108, total = 520 }
 "src/21_Pipeline/05_SearchCrossValidation.jl" = { code = 161, doc = 105, comment = 24, blank = 52, total = 342 }
 "src/21_Pipeline/06_OnlinePipeline.jl" = { code = 389, doc = 476, comment = 0, blank = 226, total = 1091 }
-"src/22_Plotting.jl" = { code = 158, doc = 2801, comment = 111, blank = 943, total = 4013 }
+"src/22_Plotting.jl" = { code = 162, doc = 3011, comment = 111, blank = 990, total = 4274 }
 "src/23_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
 "src/PortfolioOptimisers.jl" = { code = 407, doc = 3, comment = 29, blank = 5, total = 444 }
