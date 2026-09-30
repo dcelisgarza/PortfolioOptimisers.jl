@@ -1180,9 +1180,9 @@ estimated block that the regime method reads, where `ce.debias` is `true`.
  1. Where `ce.debias` is `false`, the factor is one. Else take ``K``, the smallest count of
     observations among the contributing assets, and return `nothing` where
     [`regime_bias_open`](@ref) refuses it. Else read the decay of the correlation structure:
-    `cor_decay` on the separate path, else `decay`. Without a HAC adjustment, find the factor of
-    `ce.regime_method` with [`mahalanobis_regime_bias!`](@ref). With one, find the factor of the
-    mean with [`mahalanobis_bias`](@ref) on the banded weight matrix, for every method.
+    `cor_decay` on the separate path, else `decay`. Find the factor of `ce.regime_method` with
+    [`mahalanobis_regime_bias!`](@ref), on the plain weights or, with a HAC adjustment, on the
+    banded weight matrix.
  2. Compute the squared distance with [`regime_statistic`](@ref), and return `nothing` where the
     block does not factorise.
  3. Divide the statistic by the factor. On the separate path, also divide it by the factor of
@@ -1219,10 +1219,9 @@ function regime_target_statistic(target::MahalanobisTarget,
         one(ce.decay)
     elseif !regime_bias_open(true, n, decay, K, ce.hac_lags)
         nothing
-    elseif isnothing(ce.hac_lags)
-        mahalanobis_regime_bias!(cache.bias.nodes, ce.regime_method, decay, K, n)
     else
-        mahalanobis_bias(decay, K, n, ce.hac_lags)
+        mahalanobis_regime_bias!(cache.bias.nodes, ce.regime_method, decay, K, n,
+                                 ce.hac_lags)
     end
     if isnothing(b)
         return nothing

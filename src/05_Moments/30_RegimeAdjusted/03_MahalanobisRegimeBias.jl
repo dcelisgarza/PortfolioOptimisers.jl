@@ -91,8 +91,9 @@ by about ``1 - \\ln(\\omega) / 2``.
 # Returns
 
   - `grid::NamedTuple`: The step `h`, the grid `sg`, the node points `nodes`, the steps `su` of the
-    integral, the pair stencils, the output grid `so` of [`regime_bias_table`](@ref), and the
-    lattice `xf` on which `g` and ``\\rho_{0}`` are tabulated.
+    integral, the pair stencils, the output grid `so` of [`regime_bias_table`](@ref), the
+    lattice `xf` on which `g` and ``\\rho_{0}`` are tabulated, the bounds `geo` of the grid, and
+    `cut = nothing`, which [`mahalanobis_level_bias`](@ref) replaces where the transform is cut.
 
 # Related
 
@@ -123,7 +124,7 @@ function mahalanobis_bias_grid(decay::Number)
     end
     ho = o / 10
     so = exp.(range(-60 * o, 50 * o; step = ho))
-    return (; h, sc, sg, NG, nodes, su, xf, pairs, ho,
+    return (; h, sc, sg, NG, nodes, su, xf, pairs, ho, geo, cut = nothing,
             junction = stencil_table(s -> chebyshev_stencil(sc, s)[1], view(sg, 1:5)),
             Qjunction = stencil_table(s -> chebyshev_stencil(sc, s)[2], view(sg, 1:5)),
             Qcheb = stencil_table(s -> chebyshev_stencil(sc, s)[2], cheb),
@@ -269,6 +270,24 @@ exact at one asset and at equal weights, where the spectrum is not random, and o
 weights at 12 assets and a half-life of 10 the three factors are 5e-4 to 7e-4 below a Monte Carlo
 of a million draws, against 0.55 %, 2.5 % and 4.5 % above it for the factor of the mean alone.
 
+A HAC estimate is ``Z^{\\top} A Z`` with the banded weight matrix ``A`` of
+[`regime_bias_table`](@ref), so it has the law of a plain estimate whose weights are the
+eigenvalues ``\\mu`` of ``A``, and the recursion starts from ``D_{0}(s) = \\ln \\det(I + s A)``.
+``A`` has negative eigenvalues, so ``D_{0}`` is real only below the first zero of the
+determinant, and no moment of ``R`` is finite: the Schur complement has a positive density at
+zero. The transform is cut at the maximum ``s^{*}`` of ``D_{0}``, where ``\\rho_{0} = 0``, as the
+table of one direction is. For the recursion, [`mahalanobis_cut!`](@ref) continues ``D_{0}`` as
+the transform of its saturated weights, so the recursion runs as on the plain weights, and
+[`mahalanobis_transform`](@ref) cuts the last transform at ``s^{*}``. The factor is then exact at
+one asset on that cut and where ``A`` is positive definite. At 12 assets, a half-life of 10 and
+two lags the three factors are 1.2e-3, 8e-4 and 3e-4 below a Monte Carlo of 4 million draws of the
+HAC estimate itself, against 1.8 %, 5.3 % and 8.9 % above it for the factor of the mean. Where the
+effective count of observations is near the gate the recursion is 0.2 % to 0.7 % below the Monte
+Carlo, with or without HAC: at 3.6 effective observations and three assets the plain weights give
+0.9 % and 0.6 %, and the HAC weights 0.7 % and 0.3 %. The first scored rows of five assets at a
+half-life of 5 and one lag, where 4e-4 of draws are not positive definite, read 0.3 % and 0.03 %
+below it.
+
 # Mathematical definition
 
 ```math
@@ -277,27 +296,32 @@ D_{0}(s) &= \\sum_{j} \\ln(1 + s w_{j})\\,, \\qquad \\rho_{k} = D_{k}'\\,, \\qqu
 \\rho_{k+1}(s) &= \\rho_{k}(s) + \\frac{1}{2} \\int_{0}^{\\infty}
 e^{-(D_{k}(s + u) - D_{k}(s)) / 2}\\, \\bigl(\\rho_{k}(s + u) - \\rho_{k}(s)\\bigr)\\,
 \\frac{\\mathrm{d}u}{u}\\,, \\\\
-\\mathbb{E}\\bigl[e^{-t S}\\bigr] &\\approx e^{-D_{n-1}(2 t) / 2}\\,.
+\\mathbb{E}\\bigl[e^{-t S}\\bigr] &\\approx e^{-D_{n-1}(2 t) / 2}\\,, \\qquad 2 t \\leq s^{*}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``w_{j}``: Normalised weight of the observation ``j`` steps before the newest.
+  - ``w_{j}``: Normalised weight of the observation ``j`` steps before the newest, or the
+    eigenvalue ``\\mu_{j}`` of ``A`` with a HAC adjustment.
   - ``D_{k}``: Log-determinant of the Laplace transform after ``k`` directions are removed.
+  - ``s^{*}``: The cut, ``\\infty`` without a HAC adjustment or where ``A`` is positive definite.
+    The recursion reads ``D_{0}`` with the continuation of [`mahalanobis_cut!`](@ref).
 
 # Algorithm
 
- 1. Tabulate ``\\sum_{j} \\ln(1 + s \\lambda^{j})`` and its derivative on the lattice, adding one
-    observation at a time, and keep a copy at each count of `Ks`.
+ 1. Tabulate ``D_{0}`` and its derivative on the lattice for the weights ``\\lambda^{j}``, or for
+    the banded matrix ``A / c``, with [`mahalanobis_lattice`](@ref), and keep a copy at each count
+    of `Ks`.
  2. For each count, round the normalisation ``c = (1 - \\lambda) / (1 - \\lambda^{K})`` to the
     lattice, ``\\tilde{c} = e^{m h_{f}}``, so the weights ``\\tilde{c} \\lambda^{j}`` read the
     lattice without interpolation.
- 3. Run the recursion for ``n - 1`` levels on the removed part ``q_{k} = \\rho_{0} - \\rho_{k}``,
+ 3. Where the count has a cut, continue the lattice with [`mahalanobis_cut!`](@ref).
+ 4. Run the recursion for ``n - 1`` levels on the removed part ``q_{k} = \\rho_{0} - \\rho_{k}``,
     with the trapezoid rule on ``\\ln u``. The result at ``s`` reads ``q_{k}`` only on
     ``[s, \\infty)``, so an error moves only toward smaller ``s``.
- 4. Read the factor of the method off the transform with [`regime_bias_factor`](@ref), and scale
-    it by ``\\tilde{c} / c``.
+ 5. Read the factor of the method off the transform of [`mahalanobis_transform`](@ref) with
+    [`regime_bias_factor`](@ref), and scale it by ``\\tilde{c} / c``.
 
 # Arguments
 
@@ -305,6 +329,7 @@ Where:
   - `decay::Number`: Decay of the weights.
   - `Ks::AbstractVector{<:Integer}`: Counts of observations, each above `n + 1`.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
+  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
 
 # Returns
 
@@ -314,19 +339,81 @@ Where:
 
   - [`mahalanobis_bias_nodes`](@ref)
   - [`mahalanobis_bias_grid`](@ref)
+  - [`mahalanobis_lattice`](@ref)
+  - [`mahalanobis_cut!`](@ref)
+  - [`mahalanobis_transform`](@ref)
   - [`regime_bias_factor`](@ref)
   - [`MahalanobisTarget`](@ref)
 """
 function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
-                                Ks::AbstractVector{<:Integer}, n::Integer)
+                                Ks::AbstractVector{<:Integer}, n::Integer,
+                                hac_lags::Option{<:Integer} = nothing)
     grid = mahalanobis_bias_grid(decay)
-    xf = grid.xf
-    hf = step(xf)
+    hf = step(grid.xf)
+    G, Rh, peaks = mahalanobis_lattice(decay, Ks, grid.xf, hac_lags)
+    T = eltype(G)
+    NN = length(grid.nodes)
+    dg = Matrix{T}(undef, NN, length(grid.su))
+    dr = similar(dg)
+    v = zeros(T, 8 + grid.NG)
+    e = zeros(T, 10 + grid.NG)
+    bufs = (zeros(T, NN), zeros(T, NN), zeros(T, NN))
+    return map(eachindex(Ks)) do i
+        c = (one(decay) - decay) / (one(decay) - decay^Ks[i])
+        m = round(Int, log(c) / hf)
+        shift = (m, exp(m * hf))
+        gh = view(G, :, i)
+        rh = view(Rh, :, i)
+        cut = mahalanobis_cut!(gh, rh, grid.xf, shift[2], peaks[i])
+        mahalanobis_pair_differences!(dg, dr, grid, gh, rh, shift)
+        fill!(v, zero(T))
+        for _ in 1:(n - 1)
+            mahalanobis_level_step!(v, e, bufs, dg, dr, grid)
+        end
+        mahalanobis_q_integral!(e, v, grid)
+        so, L = mahalanobis_transform(merge(grid, (; cut)), gh, e, m)
+        return regime_bias_factor(method, so, L, one(c), grid.ho) * shift[2] / c
+    end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Tabulates the log-determinant ``g`` of the Laplace transform of one direction and its derivative
+``\\rho_{0}`` on the lattice of [`mahalanobis_bias_grid`](@ref), at each count of `Ks`, before the
+normalisation of the weights.
+
+Without a HAC adjustment the weights are ``\\lambda^{j}``, so ``g(s) = \\sum_{j} \\ln(1 + s \\lambda^{j})``
+and ``\\rho_{0}(s) = \\sum_{j} \\lambda^{j} / (1 + s \\lambda^{j})``, and the table adds one
+observation at a time. The weights are positive, so no count has a cut.
+
+With one, [`hac_log_det_path!`](@ref) gives ``g(s) = \\ln \\det(I + s B)`` for the banded matrix
+``B = A / c`` at every count, one lattice point at a time, and [`hac_log_det_peak`](@ref) finds
+the cut of each count. A point past the first zero of the determinant holds ``g = \\infty``.
+
+# Arguments
+
+  - `decay::Number`: Decay of the weights.
+  - `Ks::AbstractVector{<:Integer}`: Counts of observations.
+  - `xf::AbstractRange`: Lattice of ``\\ln s``.
+  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
+
+# Returns
+
+  - `(G, Rh, peaks)::Tuple`: ``g`` and ``\\rho_{0}`` with one column for each count, and for each
+    count the peak of [`hac_log_det_peak`](@ref), or `nothing` where the transform takes no cut.
+
+# Related
+
+  - [`mahalanobis_level_bias`](@ref)
+  - [`hac_log_det_path!`](@ref)
+  - [`hac_log_det_peak`](@ref)
+"""
+function mahalanobis_lattice(decay::Number, Ks::AbstractVector{<:Integer},
+                             xf::AbstractRange, ::Nothing)
     ef = exp.(xf)
-    T = eltype(ef)
     ghat = zero(ef)
     rhat = zero(ef)
-    G = Matrix{T}(undef, length(ef), length(Ks))
+    G = Matrix{eltype(ef)}(undef, length(ef), length(Ks))
     Rh = similar(G)
     lam = one(decay)
     j = 0
@@ -340,36 +427,330 @@ function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
         G[:, i] .= ghat
         Rh[:, i] .= rhat
     end
-    NN = length(grid.nodes)
-    dg = Matrix{T}(undef, NN, length(grid.su))
-    dr = similar(dg)
-    v = zeros(T, 8 + grid.NG)
-    e = zeros(T, 10 + grid.NG)
-    bufs = (zeros(T, NN), zeros(T, NN), zeros(T, NN))
-    return map(eachindex(Ks)) do i
-        c = (one(decay) - decay) / (one(decay) - decay^Ks[i])
-        m = round(Int, log(c) / hf)
-        ct = exp(m * hf)
-        gh = view(G, :, i)
-        rh = view(Rh, :, i)
-        for a in 1:NN
-            gn = stencil_dot(grid.fnodes[a], gh, m)
-            rn = ct * stencil_dot(grid.fnodes[a], rh, m)
-            for b in axes(dg, 2)
-                st = grid.pairs[a, b][3]
-                dg[a, b] = stencil_dot(st, gh, m) - gn
-                dr[a, b] = ct * stencil_dot(st, rh, m) - rn
-            end
+
+    return G, Rh, fill(nothing, length(Ks))
+end
+function mahalanobis_lattice(decay::Number, Ks::AbstractVector{<:Integer},
+                             xf::AbstractRange, hac_lags::Integer)
+    ef = exp.(xf)
+    G = Matrix{eltype(ef)}(undef, length(ef), length(Ks))
+    Rh = similar(G)
+    g = Vector{eltype(ef)}(undef, maximum(Ks))
+    r = similar(g)
+    for p in eachindex(ef)
+        hac_log_det_path!(g, r, ef[p], decay, hac_lags)
+        for i in eachindex(Ks)
+            G[p, i] = g[Ks[i]]
+            Rh[p, i] = r[Ks[i]]
         end
-        fill!(v, zero(T))
-        for _ in 1:(n - 1)
-            mahalanobis_level_step!(v, e, bufs, dg, dr, grid)
-        end
-        mahalanobis_q_integral!(e, v, grid)
-        L = [exp(-(stencil_dot(grid.fout[a], gh, m) - stencil_dot(grid.Qout[a], e)) / 2)
-             for a in eachindex(grid.so)]
-        return regime_bias_factor(method, grid.so, L, one(c), grid.ho) * ct / c
     end
+    peaks = map(i -> hac_log_det_peak(view(G, :, i), view(Rh, :, i), xf, decay, Ks[i],
+                                      hac_lags), eachindex(Ks))
+
+    return G, Rh, peaks
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes ``\\ln \\det(I + s B)`` and its derivative in ``s`` at one point, for each count of
+observations up to the length of `g`, where ``B`` is the banded matrix ``A / c`` of
+[`regime_bias_table`](@ref).
+
+The rows of the banded LDLᵀ factorisation of [`hac_ldl_taylor_row!`](@ref) carry each pivot with
+its derivative, so ``\\ln \\det`` is the sum of the logs of the pivots, and its derivative the sum
+of ``d_{m}' / d_{m}``. ``B`` at one count is the leading block of ``B`` at the next, so a pivot
+that is not positive marks that count and every larger one. At zero lags the buffers keep one
+row, which no lag reads, so the path is that of the plain weights.
+
+# Arguments
+
+  - `g::VecNum`: Output: ``\\ln \\det(I + s B)`` at each count, ``\\infty`` past the first pivot
+    that is not positive (mutated).
+  - `r::VecNum`: Output: the derivative at each count, zero where `g` is ``\\infty`` (mutated).
+  - `s::Number`: Point of the lattice.
+  - `decay::Number`: Decay of the weights.
+  - `hac_lags::Integer`: Count of HAC lags.
+
+# Returns
+
+  - `(g, r)::Tuple{<:VecNum, <:VecNum}`: The filled vectors.
+
+# Related
+
+  - [`mahalanobis_lattice`](@ref)
+  - [`hac_ldl_taylor_row!`](@ref)
+"""
+function hac_log_det_path!(g::VecNum, r::VecNum, s::Number, decay::Number,
+                           hac_lags::Integer)
+    z = ntuple(_ -> zero(s), 3)
+    Lb = max(hac_lags, 1)
+    buf = (; l = fill(z, Lb, Lb), d = fill(z, Lb), row = fill(z, Lb))
+    lam = one(decay)
+    gk = zero(s)
+    rk = zero(s)
+    for m in eachindex(g, r)
+        dn = hac_ldl_taylor_row!(buf, s * lam, lam, decay, min(hac_lags, m - 1))
+        if !(dn[1] > zero(dn[1]))
+            g[m:end] .= convert(eltype(g), Inf)
+            r[m:end] .= zero(eltype(r))
+            break
+        end
+        gk += log(dn[1])
+        rk += dn[2] / dn[1]
+        g[m] = gk
+        r[m] = rk
+        lam *= decay
+    end
+
+    return g, r
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Finds the cut of the HAC transform of one count, the point ``\\sigma^{*}`` where
+``\\ln \\det(I + \\sigma B)`` has its maximum, and the value there.
+
+The derivative ``\\rho_{0}`` falls in ``\\sigma``, and it falls to ``-\\infty`` at the first zero of
+the determinant where ``B`` has a negative eigenvalue. The lattice brackets its zero, and a
+bisection on the exact derivative of [`hac_log_det_slopes`](@ref) finds it. A shift of the cut by
+one sixteenth in ``\\ln \\sigma`` moves the factor of the first moment by 0.3 % at two assets, a
+half-life of 5 and five lags, so the step of the lattice is too coarse. The value at the cut is the
+lattice value below it plus the integral of the exact derivative, by the 4-point Gauss–Legendre
+rule.
+
+# Arguments
+
+  - `gh::VecNum`: ``\\ln \\det(I + \\sigma B)`` on the lattice, ``\\infty`` past the zero of the
+    determinant.
+  - `rh::VecNum`: Its derivative on the lattice.
+  - `xf::AbstractRange`: Lattice of ``\\ln \\sigma``.
+  - `decay::Number`: Decay of the weights.
+  - `K::Integer`: Count of observations.
+  - `hac_lags::Integer`: Count of HAC lags.
+
+# Returns
+
+  - `peak::Option{<:Tuple{<:Number, <:Number}}`: ``(\\sigma^{*}, \\ln \\det(I + \\sigma^{*} B))``, or
+    `nothing` where the derivative is positive on the whole lattice, because ``B`` is positive
+    definite.
+
+# Related
+
+  - [`mahalanobis_lattice`](@ref)
+  - [`mahalanobis_cut!`](@ref)
+  - [`hac_log_det_slopes`](@ref)
+"""
+function hac_log_det_peak(gh::VecNum, rh::VecNum, xf::AbstractRange, decay::Number,
+                          K::Integer, hac_lags::Integer)
+    p = findfirst(i -> !(rh[i] > zero(rh[i])) || isinf(gh[i]), eachindex(gh, rh))
+    if isnothing(p)
+        return nothing
+    end
+    c = (one(decay) - decay) / (one(decay) - decay^K)
+    function slope(sigma)
+        sl = hac_log_det_slopes(decay, K, sigma / c, hac_lags)
+        return isnothing(sl) ? -one(sigma) : sl[1] / c
+    end
+    a = exp(xf[p - 1])
+    lo, hi = a, exp(xf[p])
+    for _ in 1:64
+        mid = (lo + hi) / 2
+        if slope(mid) > zero(mid)
+            lo = mid
+        else
+            hi = mid
+        end
+    end
+    rule = gauss_legendre_rule(one(a))
+
+    return lo,
+           gh[p - 1] +
+           (lo - a) / 2 * sum(((t, wt),) -> wt * slope(a + (lo - a) * (1 + t) / 2), rule)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the nodes and weights of the 4-point Gauss–Legendre rule on ``[-1, 1]``, in the number
+type of `o`.
+
+# Arguments
+
+  - `o::Number`: One, in the number type of the rule.
+
+# Returns
+
+  - `rule::NTuple{4, <:Tuple{<:Number, <:Number}}`: The pair of node and weight of each point.
+
+# Related
+
+  - [`mahalanobis_q_integral!`](@ref)
+  - [`hac_log_det_peak`](@ref)
+"""
+function gauss_legendre_rule(o::Number)
+    a = sqrt(3 * o / 7 - 2 * o / 7 * sqrt(6 * o / 5))
+    b = sqrt(3 * o / 7 + 2 * o / 7 * sqrt(6 * o / 5))
+    return ((-b, (18 - sqrt(30 * o)) / 36), (-a, (18 + sqrt(30 * o)) / 36),
+            (a, (18 + sqrt(30 * o)) / 36), (b, (18 - sqrt(30 * o)) / 36))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Continues the lattice of one count past the peak of its saturated count, and returns the cut and
+the lattice that the last transform reads.
+
+A Laplace transform of a positive variable is log-convex, so ``\\rho_{0}`` falls and stays
+positive. With negative eigenvalues ``\\rho_{0}`` falls to zero at the cut ``\\sigma^{*}`` and to
+``-\\infty`` at the first zero of the determinant, so no continuation from ``\\sigma^{*}`` is the
+transform of a law, and the level recursion is not stable on one. The saturated count
+``\\sigma \\rho_{0}(\\sigma)`` counts the weights with ``\\sigma \\mu \\gg 1``: it rises to ``K`` for a
+positive spectrum, and the negative eigenvalues pull it down before ``\\sigma^{*}``. Past its
+maximum ``N_{m}`` at ``\\sigma_{m}`` the lattice takes ``\\rho_{0} = N_{m} / \\sigma``, the transform of
+``N_{m}`` saturated weights. The value and the slope of the count agree at ``\\sigma_{m}``, so the
+join is smooth, ``\\rho_{0}`` falls and stays positive, and the recursion runs on the whole grid, as
+it does on the plain weights. The last transform reads the true ``g`` up to ``\\sigma^{*}``, so the
+factor stays exact at one asset. A hard cut, where the transform is zero past ``\\sigma^{*}``, puts
+a pole ``k / (s^{*} - s)`` into the level ``k``, and a continuation from ``\\sigma^{*}`` makes
+``\\rho_{0}`` rise: the grid holds neither, and both give factors that are not finite near the
+gate.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+N_{m} &= \\max_{\\sigma \\leq \\sigma^{*}} \\sigma \\rho_{0}(\\sigma)\\,, \\qquad g(\\sigma) = g(\\sigma_{m}) + N_{m} \\ln\\frac{\\sigma}{\\sigma_{m}}\\,, \\qquad \\rho_{0}(\\sigma) = \\frac{N_{m}}{\\sigma}\\,, \\qquad \\sigma > \\sigma_{m}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\sigma``: Point of the lattice, before the normalisation.
+  - ``\\sigma_{m}``: The point of the lattice where the saturated count is largest.
+  - ``\\sigma^{*}``: The peak of [`hac_log_det_peak`](@ref), and ``s^{*} = \\sigma^{*} / \\tilde{c}``.
+
+# Arguments
+
+  - `gh::VecNum`: ``g`` on the lattice (mutated past ``\\sigma_{m}``).
+  - `rh::VecNum`: ``\\rho_{0}`` on the lattice (mutated past ``\\sigma_{m}``).
+  - `xf::AbstractRange`: Lattice of ``\\ln \\sigma``.
+  - `ct::Number`: The normalisation ``\\tilde{c}`` of the lattice.
+  - `peak::Option{<:Tuple{<:Number, <:Number}}`: The peak of [`hac_log_det_peak`](@ref), or
+    `nothing`.
+
+# Returns
+
+  - `cut::Option{<:NamedTuple}`: `nothing` where `peak` is `nothing`. Else the cut ``s^{*}`` as
+    `sstar`, and as `gt` the true ``g`` up to ``\\sigma^{*}``, with ``g(\\sigma^{*})`` past it.
+
+# Related
+
+  - [`mahalanobis_level_bias`](@ref)
+  - [`hac_log_det_peak`](@ref)
+  - [`mahalanobis_transform`](@ref)
+"""
+function mahalanobis_cut!(::VecNum, ::VecNum, ::AbstractRange, ::Number, ::Nothing)
+    return nothing
+end
+function mahalanobis_cut!(gh::VecNum, rh::VecNum, xf::AbstractRange, ct::Number,
+                          peak::Tuple)
+    sigma, gs = peak
+    p = searchsortedlast(xf, log(sigma))
+    gt = copy(gh)
+    gt[(p + 1):end] .= gs
+    pm = argmax(q -> exp(xf[q]) * rh[q], firstindex(xf):p)
+    nm = exp(xf[pm]) * rh[pm]
+    for q in (pm + 1):lastindex(xf)
+        gh[q] = gh[pm] + nm * (xf[q] - xf[pm])
+        rh[q] = nm / exp(xf[q])
+    end
+
+    return (; sstar = sigma / ct, gt)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Fills the differences of ``g`` and of ``\\rho_{0}`` between each node ``s`` and each point
+``s + u`` of the level recursion, for one count of observations.
+
+# Arguments
+
+  - `dg::MatNum`: Output: ``g(s + u) - g(s)`` for each node and step (mutated).
+  - `dr::MatNum`: Output: ``\\rho_{0}(s + u) - \\rho_{0}(s)`` for each node and step (mutated).
+  - `grid::NamedTuple`: Grids of [`mahalanobis_bias_grid`](@ref).
+  - `gh::VecNum`: ``g`` on the lattice.
+  - `rh::VecNum`: ``\\rho_{0}`` on the lattice.
+  - `shift::Tuple{<:Integer, <:Number}`: The shift ``m`` of the lattice and the normalisation
+    ``\\tilde{c}``.
+
+# Returns
+
+  - `(dg, dr)::Tuple{<:MatNum, <:MatNum}`: The filled matrices.
+
+# Related
+
+  - [`mahalanobis_level_bias`](@ref)
+"""
+function mahalanobis_pair_differences!(dg::MatNum, dr::MatNum, grid::NamedTuple, gh::VecNum,
+                                       rh::VecNum, shift::Tuple)
+    m, ct = shift
+    for a in eachindex(grid.fnodes)
+        gn = stencil_dot(grid.fnodes[a], gh, m)
+        rn = ct * stencil_dot(grid.fnodes[a], rh, m)
+        for b in axes(dg, 2)
+            st = grid.pairs[a, b][3]
+            dg[a, b] = stencil_dot(st, gh, m) - gn
+            dr[a, b] = ct * stencil_dot(st, rh, m) - rn
+        end
+    end
+
+    return dg, dr
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Evaluates the Laplace transform ``e^{-D_{n-1}(s) / 2}`` of the last level on the output grid of
+[`mahalanobis_bias_grid`](@ref).
+
+Without a cut the grid is the output grid. With one, the grid moves by less than half a step so
+that one point falls on ``s^{*}``. That point takes the weight one half of a closed trapezoid, and
+every point past it takes zero, so the cut adds no error of the first order in the step. Below
+the cut the transform reads the true ``g`` of the cut, not the continuation that the recursion
+read.
+
+# Arguments
+
+  - `grid::NamedTuple`: Grids of [`mahalanobis_bias_grid`](@ref), with the cut of the count.
+  - `gh::VecNum`: ``g`` on the lattice, which the transform reads without a cut.
+  - `e::VecNum`: Integral of the removed part, from [`mahalanobis_q_integral!`](@ref).
+  - `m::Integer`: Shift of the lattice.
+
+# Returns
+
+  - `(so, L)::Tuple{<:VecNum, <:VecNum}`: The grid and the transform on it.
+
+# Related
+
+  - [`mahalanobis_level_bias`](@ref)
+  - [`regime_bias_factor`](@ref)
+"""
+function mahalanobis_transform(grid::NamedTuple, gh::VecNum, e::VecNum, m::Integer)
+    if isnothing(grid.cut)
+        return grid.so,
+               [exp(-(stencil_dot(grid.fout[a], gh, m) - stencil_dot(grid.Qout[a], e)) / 2)
+                for a in eachindex(grid.so)]
+    end
+    xf = grid.xf
+    ls = log(grid.cut.sstar)
+    k = clamp(round(Int, (ls - log(first(grid.so))) / grid.ho), 0, length(grid.so) - 1)
+    so = grid.so .* exp(ls - log(grid.so[k + 1]))
+    L = zero(so)
+    for a in 1:(k + 1)
+        st = lagrange_stencil(first(xf), step(xf), length(xf), log(so[a]))
+        L[a] = exp(-(stencil_dot(st, grid.cut.gt, m) -
+                     stencil_dot(mahalanobis_integral_stencil(so[a], grid.geo), e)) / 2)
+    end
+    L[k + 1] /= 2
+
+    return so, L
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -463,11 +844,7 @@ grid.
 """
 function mahalanobis_q_integral!(e::VecNum, v::VecNum, grid::NamedTuple)
     NG, h, sg = grid.NG, grid.h, grid.sg
-    o = one(h)
-    a = sqrt(3 * o / 7 - 2 * o / 7 * sqrt(6 * o / 5))
-    b = sqrt(3 * o / 7 + 2 * o / 7 * sqrt(6 * o / 5))
-    gl = ((-b, (18 - sqrt(30 * o)) / 36), (-a, (18 + sqrt(30 * o)) / 36),
-          (a, (18 + sqrt(30 * o)) / 36), (b, (18 - sqrt(30 * o)) / 36))
+    gl = gauss_legendre_rule(one(h))
     xlo = log(sg[1])
     for l in 1:8
         e[l] = v[l]
@@ -554,6 +931,44 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Returns the first count of observations that the Mahalanobis statistic scores, where the
+interpolation of [`mahalanobis_bias_nodes`](@ref) starts.
+
+Without a HAC adjustment that is `n + 4`. With one, [`regime_bias_open`](@ref) also asks that the
+effective count ``1 / \\operatorname{tr}(A^{2})`` pass `n + 1`, which the banded weight matrix
+reaches later: at 12 assets, a half-life of 10 and two lags, at 54 observations. The search stops
+at [`mahalanobis_bias_saturation`](@ref).
+
+# Arguments
+
+  - `decay::Number`: Decay of the weights.
+  - `n::Integer`: Count of assets that contribute to the statistic.
+  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
+
+# Returns
+
+  - `K1::Int`: The count.
+
+# Related
+
+  - [`mahalanobis_bias_nodes`](@ref)
+  - [`regime_bias_open`](@ref)
+"""
+function mahalanobis_bias_start(::Number, n::Integer, ::Nothing)
+    return n + 4
+end
+function mahalanobis_bias_start(decay::Number, n::Integer, hac_lags::Integer)
+    K = n + 4
+    Ksat = mahalanobis_bias_saturation(decay, n)
+    while K < Ksat && !regime_bias_open(true, n, decay, K, hac_lags)
+        K += 1
+    end
+
+    return K
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Computes the nodes of the interpolation of the Mahalanobis bias factor over the count of
 observations, at one count of assets.
 
@@ -564,39 +979,54 @@ count where ``\\lambda^{K}`` falls below the machine epsilon. Sixteen Chebyshev�
 half-lives from 2 to 250 and from 5 to 30 assets. The nodes cost about 0.3 s at 12 assets and
 0.65 s at 30 assets, once for each count of assets that a fit meets.
 
+With a HAC adjustment the first count, [`mahalanobis_bias_start`](@ref), is where the gate opens,
+and there the factor is steep: a HAC estimate has about half the effective observations of a plain
+one. The ratio to the law of the plain fixed point, whose pole at ``K = n + 1`` is the pole of the
+factor, then varies too fast near the gate for a polynomial in ``\\lambda^{K}`` at a long
+half-life: sixteen points left ``7 \\times 10^{-3}`` at a half-life of 250. So the first 32
+counts take the factor of the recursion itself, and sixteen points interpolate the rest. Over one to
+five lags and 2 to 12 assets that is within ``10^{-9}`` at half-lives of 5, 10 and 40, and within
+``5 \\times 10^{-6}`` at a half-life of 250. The nodes cost 0.3 s to 1.5 s at half-lives up to 40,
+and up to 3.7 s at a half-life of 250, five lags and 12 assets.
+
 # Arguments
 
   - `method::RegimeAdjustedMethod`: Regime adjustment method, which names the moment.
   - `decay::Number`: Decay of the weights.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
+  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
 
 # Returns
 
   - `nodes::NamedTuple`: `sigma`, the nodes ``\\lambda^{K - n - 4}``; `bw`, their barycentric
-    weights; and `ratio`, the ratio at each node.
+    weights; `ratio`, the ratio at each node; `exact`, the factor at each count from `start` that
+    the interpolation does not serve, empty without HAC; and `start`, the first count.
 
 # Related
 
   - [`mahalanobis_regime_bias!`](@ref)
   - [`mahalanobis_level_bias`](@ref)
+  - [`mahalanobis_bias_start`](@ref)
   - [`inverse_wishart_bias`](@ref)
 """
-function mahalanobis_bias_nodes(method::RegimeAdjustedMethod, decay::Number, n::Integer)
-    K1 = n + 4
-    Ksat = mahalanobis_bias_saturation(decay, n)
+function mahalanobis_bias_nodes(method::RegimeAdjustedMethod, decay::Number, n::Integer,
+                                hac_lags::Option{<:Integer} = nothing)
+    start = mahalanobis_bias_start(decay, n, hac_lags)
+    Ksat = max(mahalanobis_bias_saturation(decay, n), start)
+    K1 = min(start + (isnothing(hac_lags) ? 0 : 32), Ksat)
     Ks = unique([if t <= decay^(Ksat - K1)
                      Ksat
                  else
                      clamp(round(Int, K1 + log(t) / log(decay)), K1, Ksat)
                  end
                  for t in (1 .- cos.(pi .* (0:15) ./ 15 .* one(decay))) ./ 2])
-    f = mahalanobis_level_bias(method, decay, Ks, n)
-    sigma = decay .^ (Ks .- K1)
-    ratio = f ./
+    f = mahalanobis_level_bias(method, decay, vcat(Ks, start:(K1 - 1)), n, hac_lags)
+    sigma = decay .^ (Ks .- (n + 4))
+    ratio = view(f, eachindex(Ks)) ./
             [inverse_wishart_bias(method, mahalanobis_bias(decay, K, n), n) for K in Ks]
     bw = [inv(prod(sigma[a] - sigma[b] for b in eachindex(sigma) if b != a;
                    init = one(decay))) for a in eachindex(sigma)]
-    return (; sigma, bw, ratio)
+    return (; sigma, bw, ratio, exact = f[(length(Ks) + 1):end], start)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -609,13 +1039,15 @@ interpolation the first time the state meets a count of assets.
   - `store::AbstractDict`: Nodes of the state, by count of assets (mutated where a count is new).
   - `method::RegimeAdjustedMethod`: Regime adjustment method, which names the moment.
   - `decay::Number`: Decay of the weights.
-  - `K::Integer`: Count of observations in the estimate, above `n + 3`.
+  - `K::Integer`: Count of observations in the estimate, that [`regime_bias_open`](@ref) scores.
   - `n::Integer`: Count of assets that contribute to the statistic.
+  - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
 
 # Returns
 
-  - `factor::Number`: [`inverse_wishart_bias`](@ref) at `K`, times the interpolated ratio. A
-    count past [`mahalanobis_bias_saturation`](@ref) reads the saturation count.
+  - `factor::Number`: The factor of the recursion where the nodes hold it. Else
+    [`inverse_wishart_bias`](@ref) at `K`, times the interpolated ratio. A count past
+    [`mahalanobis_bias_saturation`](@ref) reads the saturation count.
 
 # Related
 
@@ -624,8 +1056,13 @@ interpolation the first time the state meets a count of assets.
   - [`MahalanobisTarget`](@ref)
 """
 function mahalanobis_regime_bias!(store::AbstractDict, method::RegimeAdjustedMethod,
-                                  decay::Number, K::Integer, n::Integer)
-    nodes = get!(() -> mahalanobis_bias_nodes(method, decay, n), store, n)
+                                  decay::Number, K::Integer, n::Integer,
+                                  hac_lags::Option{<:Integer} = nothing)
+    nodes = get!(() -> mahalanobis_bias_nodes(method, decay, n, hac_lags), store, n)
+    i = K - nodes.start + 1
+    if i in eachindex(nodes.exact)
+        return nodes.exact[i]
+    end
     K = min(K, mahalanobis_bias_saturation(decay, n))
     x = decay^(K - n - 4)
     a = findfirst(==(x), nodes.sigma)
@@ -711,9 +1148,10 @@ of assets, and the table of the variance factor of the separate correlation path
 function regime_bias_store(::MahalanobisTarget, decay::Number, ::Type)
     return (;
             nodes = Dict{Int,
-                         NamedTuple{(:sigma, :bw, :ratio),
-                                    NTuple{3, Vector{typeof(decay)}}}}(),
-            kappa = typeof(decay)[])
+                         NamedTuple{(:sigma, :bw, :ratio, :exact, :start),
+                                    Tuple{Vector{typeof(decay)}, Vector{typeof(decay)},
+                                          Vector{typeof(decay)}, Vector{typeof(decay)},
+                                          Int}}}(), kappa = typeof(decay)[])
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

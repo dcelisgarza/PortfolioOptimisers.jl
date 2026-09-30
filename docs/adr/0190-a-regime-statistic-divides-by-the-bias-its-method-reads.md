@@ -154,8 +154,27 @@ methods (they were 0.994, 0.975 and 0.956). The recursion runs in its differenti
 is stable: an error at `s` flows only toward smaller `s`. It runs at 16 counts of observations,
 and the ratio to the inverse-Wishart law of mean `b` interpolates the other counts to 1e-6. The
 state keeps the nodes for each count of assets, at 0.3 s for 12 assets. The measure is on #1431.
-Under HAC the target keeps the fixed point of the mean on the spectrum of `A` for every method:
-the recursion reads `ln(1 + s μ)` over the spectrum, and `A` has negative eigenvalues (#1438).
+
+**Under HAC the recursion runs on the spectrum of the banded weight matrix (#1438).** A HAC
+estimate is `Z'AZ`, so the recursion starts from `D₀(s) = ln det(I + sA)`, tabulated on its lattice
+by the banded LDLᵀ of #1433 with the derivative carried through each pivot. `A` has negative
+eigenvalues, so no moment of `R` is finite, and the transform is cut at the maximum `s*` of `D₀`,
+as the table of one direction is; a bisection on the exact slope places it, because a shift of one
+sixteenth in `ln s` moves a factor by 0.3 % near the gate. The recursion cannot read `D₀` past
+`s*` as it stands. Two continuations failed: a hard cut, where the transform is zero past `s*`,
+puts a pole `k / (s* − s)` into the level `k`, and a continuation from `s*` makes `ρ₀` rise, which
+no Laplace transform of a positive law does. Both give factors that are not finite near the gate.
+The recursion reads `D₀` continued past the peak of its saturated count `σ ρ₀(σ)` as the transform
+of those saturated weights, `ρ₀ = N_m / σ`, which falls and joins with one derivative, and the last
+transform reads the true `D₀` up to `s*` and stops there. The factor is exact at one asset on that
+cut and where `A` is positive definite, and at no lag it is the plain factor to 2e-14. At 12
+assets, a half-life of 10 and two lags, the three factors are 1.2e-3, 8e-4 and 3e-4 below a Monte
+Carlo of four million draws of the HAC estimate itself, where the mean's fixed point was 1.8 %,
+5.3 % and 8.9 % above; near the gate they are 0.2 % to 0.7 % below it, as the plain recursion is
+at the same effective count. The squared multipliers become 1.0035, 1.0031 and 1.0023 within
+0.004 over 8 seeds, from 0.984, 0.952 and 0.920. Near the gate a HAC factor is steep, so the first
+32 counts after it take the recursion itself, and sixteen nodes past them interpolate the ratio to
+the law of the plain fixed point, within 1e-9 at half-lives up to 40 and 5e-6 at 250.
 
 **On the separate correlation path the Mahalanobis factor also carries the noise of the variance
 at `decay`** (#1437). The block is `D R̂ D`, with `D` from the variance at `decay` and `R̂` from
@@ -167,7 +186,8 @@ enters through `E[1/Q]` alone: the factor is multiplied by
 noise of the variances averages over the assets, so it moves the statistic through its mean, and
 the per-method scalar ratios (1.026 and 1.017) correct too little. At 12 assets, a half-life of 10
 and a correlation half-life of 20 the squared multipliers become 0.9975, 0.9952 and 0.9927 over
-8 seeds, from 1.0321, 1.0297 and 1.0272, and RMS reads 1.018 at two HAC lags, from 1.090. The true factor of the block, measured without return
+8 seeds, from 1.0321, 1.0297 and 1.0272, and RMS reads 1.026 at two HAC lags, from 1.090 (1.018 before #1438 gave the factor at
+`cor_decay` its recursion under HAC). The true factor of the block, measured without return
 noise over 64 seeds, is within 0.3 % of the corrected one at correlations of zero, of a random
 factor model and of 0.8, and 1.7 % to 2.3 % above it at two HAC lags. The rest has three parts
 of the next order, which #1439 holds: the Schur complement that the inverse
@@ -192,12 +212,12 @@ observations, such as 12 assets at a half-life of 5, is never scored.
   states `debias = false`.
 - The default inverse-volatility direction keeps the next order of its excess, about `9 s₂²`,
   which the docstring of its statistic states with the warm-up rows.
-- **Two limits remain, and child issues of map #1375 hold them.**
-  - Under HAC `MahalanobisTarget` keeps the fixed point of the mean for every method, so it
-    over-corrects FirstMoment and Log there: 0.952 and 0.920 at two lags (#1438). #1431 gave each
-    method its own moment without HAC.
-  - On the separate correlation path the Mahalanobis factor keeps the parts of the next order:
-    within 0.3 % without HAC, and 1.7 % to 2.3 % under-corrected at two lags (#1439).
+- **One limit remains, and a child issue of map #1375 holds it.** On the separate correlation
+  path the Mahalanobis factor keeps the parts of the next order: within 0.3 % without HAC, and
+  under-corrected at two lags (#1439), where #1438 changed the factor at `cor_decay` that the
+  measure of #1439 read.
+- The Mahalanobis nodes under HAC cost 0.3 s to 1.5 s for each count of assets at half-lives up
+  to 40, and up to 3.7 s at a half-life of 250 and five lags.
 - The FirstMoment and Log calibrations of `DiagonalTarget` assumed a `χ²(n)` sum. Before this
   decision the Jensen bias hid part of that error; after it, correlated assets read 0.941 and 0.962.
   #1432 divides the sum by the factor of its law, and #1434 makes that law read the noise of each
@@ -251,5 +271,11 @@ observations, such as 12 assets at a half-life of 5, is never scored.
 - **For the Mahalanobis target, a first-order (Marchenko–Pastur) log-determinant in the Laplace
   transform.** It is exact at both limits, but 0.34 % high at 12 assets. Its error is the
   finite-size term that the recursion over directions carries exactly.
+- **For the Mahalanobis target under HAC, the mean's factor times the ratio of the method's
+  moment to the mean from the plain recursion at the effective count `1 / tr(A²)`** (#1438,
+  fix 2). It is cheap, but it is exact in no limit.
+- **For the Mahalanobis target under HAC, a hard cut or a continuation from the cut in the
+  recursion** (#1438). The first puts a pole into each level and the second is not the transform
+  of a law, and both give factors that are not finite near the gate.
 - **A keyword on each target.** `DiagonalTarget` would carry a field that a geodesic shrinkage
   ignores, and the scalar estimator would need a keyword of its own anyway.

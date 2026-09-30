@@ -1111,7 +1111,9 @@ and `hac_floor = true` keeps it (ADR 0190).
     fixed = PO.PortfolioTarget(; w = fill(1 / na, na))
     # Measured on this seed: scalar 1.000 (RMS) and 0.987 (first moment), 1.147 raw, and 0.837
     # with the floor, which the factor then over-corrects; the equal-weight direction 1.013, from
-    # 1.162 raw; Mahalanobis 0.988, from 2.49 raw. Over 8 seeds: 1.002, 1.003, 1.015 and 0.981.
+    # 1.162 raw; Mahalanobis 1.007, from 2.49 raw, since #1438 gave it the recursion on the
+    # spectrum of `A` (0.988 with the mean's fixed point). Over 8 seeds: 1.002, 1.003, 1.015 and
+    # 1.000 (0.981 before #1438).
     RMS, FM = PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted()
     for method in (RMS, FM)
         @test 0.97 < variance_multiplier(method) < 1.03
@@ -1270,10 +1272,10 @@ a child issue of map #1375.
     for m in (RMS, PO.FirstMomentRegimeAdjusted(), PO.LogRegimeAdjusted())
         @test 0.98 < multiplier(m) < 1.02
     end
-    # At two lags the factor is the mean fixed point for every method, so RMS is the case this
-    # issue corrects. Measured on this seed: 1.0267, and about 1.098 with
-    # the factor at `cor_decay` alone. Eight seeds gave 1.0184 ± 0.0054, where the
-    # factor at `cor_decay` alone gave 1.0898; the rest is #1439.
+    # At two lags, measured on this seed: 1.0337, and about 1.098 with the factor at `cor_decay`
+    # alone. Eight seeds gave 1.0260 ± 0.0059, where the factor at `cor_decay` alone gave 1.0898;
+    # the rest is #1439. Before #1438 the factor at `cor_decay` was the mean's fixed point, 1.8 %
+    # too large, and the eight seeds gave 1.0184.
     @test 0.97 < multiplier(RMS; hac_lags = 2, min_obs = 17) < 1.05
 
     # The state of the separate path fills the table, and a copy keeps its own.
@@ -1281,4 +1283,119 @@ a child issue of map #1375.
                                                           regime_target = PO.MahalanobisTarget()),
                       R[1:60, :]).cache
     @test !isempty(st.bias.kappa) && copy(st).bias.kappa !== st.bias.kappa
+end
+
+#=
+Issue #1438. A HAC estimate is `Z'AZ` with the banded weight matrix `A` of #1433, so the level
+recursion of #1431 holds on the spectrum of `A`, from `D₀(s) = ln det(I + sA)`. `A` has negative
+eigenvalues, so the transform is cut at the maximum `s*` of `D₀`, as the table of one direction is.
+The recursion reads `D₀` continued past the peak of its saturated count `σ ρ₀(σ)` as the transform
+of the saturated weights, and the last transform reads the true `D₀` up to `s*`. Before this issue
+the HAC path divided every method by the mean's fixed point, 1.8 %, 5.3 % and 8.9 % above the
+three factors at 12 assets, a half-life of 10 and two lags. The first 32 counts after the gate take
+the recursion itself, and the interpolation serves the rest (ADR 0190).
+=#
+@testset "under HAC the Mahalanobis statistic divides by the bias its method reads" begin
+    methods = (PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted(),
+               PO.LogRegimeAdjusted())
+    lam = 2.0^(-1 / 10)
+    function hac_B(lam, L, K)
+        B = diagm(lam .^ (0:(K - 1)))
+        for i in 1:L, j in 0:(K - i - 1)
+            B[j + 1, j + i + 1] = B[j + i + 1, j + 1] = lam^j * (1 - i / (L + 1))
+        end
+        return B
+    end
+    # At no lag the banded path is the plain one: the logs of the pivots against `log1p`
+    # (measured 2e-14).
+    for m in methods
+        @test isapprox(PO.mahalanobis_level_bias(m, lam, [16, 400], 12, 0),
+                       PO.mahalanobis_level_bias(m, lam, [16, 400], 12); rtol = 1e-12)
+    end
+    # At one asset the factor is the table of one direction on the same cut, and at five
+    # observations `A` is positive definite and nothing is cut (measured 7e-12).
+    for m in methods, (d, K, L) in ((lam, 200, 2), (2.0^(-1 / 40), 200, 5), (lam, 5, 1))
+        @test isapprox(PO.mahalanobis_level_bias(m, d, [K], 1, L)[1],
+                       PO.regime_bias_table(m, d, K, L)[K]; rtol = 1e-10)
+    end
+
+    # The peak: the slope of the log-determinant is zero there, and its value is the log-determinant
+    # of the eigenvalues.
+    K = 300
+    d5 = 2.0^(-1 / 5)
+    grid = PO.mahalanobis_bias_grid(d5)
+    G, Rh, peaks = PO.mahalanobis_lattice(d5, [K], grid.xf, 5)
+    sigma, gs = peaks[1]
+    c = (1 - d5) / (1 - d5^K)
+    mu = eigvals(Symmetric(hac_B(d5, 5, K)))
+    @test abs(PO.hac_log_det_slopes(d5, K, sigma / c, 5)[1] / c) <
+          1e-9 * sum(abs.(mu) ./ abs.(1 .+ sigma .* mu))
+    @test isapprox(gs, sum(log1p.(sigma .* mu)); rtol = 1e-10)
+    # The continuation keeps the true lattice up to the cut for the last transform, and the lattice
+    # of the recursion falls as `N / σ` past the peak of the saturated count.
+    gh, rh = G[:, 1], Rh[:, 1]
+    cut = PO.mahalanobis_cut!(gh, rh, grid.xf, 1.0, peaks[1])
+    p = searchsortedlast(grid.xf, log(sigma))
+    @test cut.sstar == sigma && cut.gt[1:p] == G[1:p, 1] && all(==(gs), cut.gt[(p + 1):end])
+    sat = exp.(grid.xf) .* rh
+    pm = argmax(sat[1:p])
+    @test all(>(0), rh) && all(x -> x ≈ sat[pm], sat[pm:end])
+    @test isnothing(PO.mahalanobis_cut!(gh, rh, grid.xf, 1.0, nothing))
+
+    # A Monte Carlo of four million draws of the Schur complement of the HAC estimate itself, at 12
+    # assets, a half-life of 10, two lags and 520 observations, gave 2.4777, 2.3958 and 2.3165,
+    # each with a standard error of 5e-4. The recursion is 1.2e-3, 8e-4 and 3e-4 below, and the
+    # mean's fixed point 1.8 % above the first.
+    f = [PO.mahalanobis_level_bias(m, lam, [520], 12, 2)[1] for m in methods]
+    for (fi, mc) in zip(f, (2.4777, 2.3958, 2.3165))
+        @test isapprox(fi, mc; rtol = 2e-3)
+    end
+    @test f[1] > f[2] > f[3]
+    @test PO.mahalanobis_bias(lam, 520, 12, 2) > 1.015 * f[1]
+    # Near the gate, at five assets, a half-life of 5, one lag and 12 observations, where 4e-4 of
+    # draws are not positive definite, the Monte Carlo gave 2.9710 and 2.5881; the recursion is
+    # 0.25 % and 0.03 % below. A hard cut gave infinite factors here, and at 390 observations and a
+    # half-life of 40.
+    for (m, mc) in zip(methods[2:3], (2.9710, 2.5881))
+        @test isapprox(PO.mahalanobis_level_bias(m, d5, [12], 5, 1)[1], mc; rtol = 5e-3)
+    end
+    @test all(isfinite,
+              PO.mahalanobis_level_bias(methods[2], 2.0^(-1 / 40), [380, 390], 12, 1))
+
+    # The nodes start where the gate opens, and the first 32 counts take the recursion itself.
+    @test PO.mahalanobis_bias_start(lam, 12, 2) == 54
+    @test PO.mahalanobis_bias_start(lam, 12, nothing) == 16
+    for (m, d, n, L) in ((methods[1], 2.0^(-1 / 40), 5, 1), (methods[2], lam, 12, 2),
+                         (methods[3], 2.0^(-1 / 250), 2, 2))
+        store = PO.regime_bias_store(PO.MahalanobisTarget(), d, Float64).nodes
+        K1 = PO.mahalanobis_bias_start(d, n, L)
+        Ks = [K1, K1 + 3, K1 + 31, K1 + 32, K1 + 45, 3 * K1 + 100]
+        @test isapprox([PO.mahalanobis_regime_bias!(store, m, d, K, n, L) for K in Ks],
+                       PO.mahalanobis_level_bias(m, d, Ks, n, L); rtol = 1e-5)
+        @test store[n].start == K1 && length(store[n].exact) == 32
+    end
+    plain = PO.regime_bias_store(PO.MahalanobisTarget(), lam, Float64).nodes
+    PO.mahalanobis_regime_bias!(plain, methods[1], lam, 30, 12)
+    @test isempty(plain[12].exact) && plain[12].start == 16
+
+    # On iid Normal returns the squared multiplier is one when the statistic is correct. Eight
+    # seeds gave 1.0035 ± 0.0039, 1.0031 ± 0.0038 and 1.0023 ± 0.0040, where the mean's fixed point
+    # gave 0.984, 0.952 and 0.920.
+    rng = StableRNG(1438)
+    na, nr = 12, 12000
+    A = randn(rng, na, na)
+    U = cholesky(Symmetric(A * transpose(A) / na + Diagonal(rand(rng, na)))).U
+    R = randn(rng, nr, na) * U .* 0.01
+    base = (; decay = lam, min_obs = 5, regime_lohi_mult = nothing, hac_lags = 2,
+            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centred = true)
+    function multiplier(method)
+        on = RegimeAdjustedExpWeightedCovariance(; base...,
+                                                 regime_target = PO.MahalanobisTarget(),
+                                                 regime_method = method)
+        off = RegimeAdjustedExpWeightedCovariance(; base..., regime_method = nothing)
+        return mean(cov(on, R) ./ cov(off, R))
+    end
+    for m in methods
+        @test 0.98 < multiplier(m) < 1.02
+    end
 end
