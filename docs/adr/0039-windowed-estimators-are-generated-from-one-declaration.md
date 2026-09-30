@@ -157,3 +157,16 @@ caught the summary-line bug fixed in §3.
 **The review's candidate 1 is now closed**, but not as it was written. Anyone re-reading it
 should read this ADR first: the headline refactor was infeasible, the line count was
 documentation, and the win was synchronisation.
+
+## Amendment (2026-09-30): a window follows one of two rules on the online seam
+
+[#1409](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1409) found that a windowed
+estimator keeps the last `w` rows of every fit, so on the online seam its window rolls. The oracle
+cuts the rows of the first fit alone and then folds every row. The two agree in a batch fit.
+
+**Decision.** The windowed estimators gain a field that holds the window rule. The rolling window is
+the default. The seed window cuts only the rows of the first fit, and it needs an inner estimator that
+folds exactly, held by a host that folds; a refit refuses it by name.
+[ADR 0193](0193-the-cross-sectional-factor-prior-refits-online-first-and-folds-as-a-host-next.md)
+holds the names, and [#1469](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1469)
+builds it. The field is one more line of the one declaration that this ADR records.

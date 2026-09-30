@@ -261,3 +261,21 @@ rule in its prose and in step 2 of its `# Algorithm`.
 **Rejected: keep `pr.X` and document the difference.** The previous docstring did this. It made
 the read-out differ from the batch method, which reads the caller's matrix, and from itself: the
 co-moments that fold read every row, and the co-moments that do not fold read a subset of the rows.
+
+## Amendment (2026-09-30): a time-varying Asset Panel is sample, and the prior's buffer owns it
+
+[#1409](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1409) put the
+Cross-Sectional Factor Prior on the online seam. That prior builds its factors from the Panel Fields
+at every row, so for it a time-varying Panel Field is sample, not fold context. The sentence "The
+`AssetPanel` is not buffered: it is fold context, not sample" now holds only for a prior whose tree
+reads no panel.
+
+**Decision.** `SampleBufferState` gains a panel slot beside the factor returns and the masks, under
+the same offset, count and cap. The first append fixes whether it records a panel, as for the factor
+returns. The prior's buffer owns the panel once, and the Fold Context reads it back through
+`prior_returns_buffer`. The online step passes the estimation mask to every prior whose route honours
+it, and the Panel Fields to a prior that records the panel. The fold of every prior takes the form
+`partial_fit!(pe, rd::ReturnsResult)`.
+[ADR 0193](0193-the-cross-sectional-factor-prior-refits-online-first-and-folds-as-a-host-next.md)
+holds the rest of the decision, and
+[#1467](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1467) builds it.
