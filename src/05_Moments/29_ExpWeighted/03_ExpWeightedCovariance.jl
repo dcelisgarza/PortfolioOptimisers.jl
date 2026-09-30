@@ -9,6 +9,8 @@ A matrix whose entries each read their own observations need not be positive sem
 
 A young asset that stays investable has a cost for the prior. A prior fitted with this estimator fills the rows that the asset lacks with zeros through [`scenario_fill`](@ref), because every consumer of a Prior Result reads its returns matrix. A scenario-based measure then reads a zero return where the asset had none, and it understates the risk of that asset over those rows. The covariance stays the estimate that this recursion made from the rows it saw. The fill is silent at or below the `fill_limit` field of the fitting prior, which is a share of the observations of that asset. Above the limit it warns, and under `strict` it refuses every fill. `fill_limit` defaults to `nothing`, and this family has no `CoveragePolicy` to derive a limit from, so the prior names every fill.
 
+The estimator has no window of its own. [`WindowedCovariance`](@ref) is its window: the wrapper keeps the last `window` observations of the returns and of the active mask, and the recursion starts cold at the first of them. The example below fits the covariance of an [`EmpiricalPrior`](@ref) on the last 500 observations.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -72,10 +74,16 @@ true
 
 julia> ce.min_obs
 40
+
+julia> pe = EmpiricalPrior(; ce = WindowedCovariance(; ce = ce, window = 500));
+
+julia> pe.ce.window
+500
 ```
 
 # Related
 
+  - [`WindowedCovariance`](@ref)
   - [`AbstractCovarianceEstimator`](@ref)
   - [`ExpWeightedCovarianceState`](@ref)
   - [`ExpWeightedExpectedReturns`](@ref)

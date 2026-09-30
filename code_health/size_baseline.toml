@@ -80,7 +80,7 @@ commit = "ebcacfda95"
 "src/04_MatrixProcessing/03_Detone.jl" = { code = 48, doc = 188, comment = 0, blank = 81, total = 317 }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { code = 149, doc = 486, comment = 8, blank = 187, total = 830 }
 "src/04_MatrixProcessing/05_MatrixSquareRoot.jl" = { code = 61, doc = 182, comment = 1, blank = 81, total = 325 }
-"src/05_Moments/01_Base_Moments.jl" = { code = 482, doc = 1117, comment = 9, blank = 468, total = 2076 }
+"src/05_Moments/01_Base_Moments.jl" = { code = 487, doc = 1073, comment = 11, blank = 454, total = 2025 }
 "src/05_Moments/02_SimpleExpectedReturns.jl" = { code = 172, doc = 435, comment = 2, blank = 192, total = 801 }
 "src/05_Moments/03_Covariance.jl" = { code = 360, doc = 892, comment = 5, blank = 367, total = 1624 }
 "src/05_Moments/04_SimpleVariance.jl" = { code = 285, doc = 758, comment = 2, blank = 304, total = 1349 }
@@ -110,15 +110,16 @@ commit = "ebcacfda95"
 "src/05_Moments/24_AbstractCovarianceVariance.jl" = { code = 33, doc = 218, comment = 0, blank = 100, total = 351 }
 "src/05_Moments/25_StandardDeviationExpectedReturns.jl" = { code = 31, doc = 160, comment = 0, blank = 66, total = 257 }
 "src/05_Moments/26_Windowed/01_WindowedExpectedReturns.jl" = { code = 13, doc = 0, comment = 0, blank = 0, total = 13 }
-"src/05_Moments/26_Windowed/02_WindowedCovariance.jl" = { code = 29, doc = 0, comment = 0, blank = 0, total = 29 }
-"src/05_Moments/26_Windowed/03_WindowedVariance.jl" = { code = 23, doc = 0, comment = 0, blank = 0, total = 23 }
+"src/05_Moments/26_Windowed/02_WindowedCovariance.jl" = { code = 37, doc = 38, comment = 0, blank = 21, total = 96 }
+"src/05_Moments/26_Windowed/03_WindowedVariance.jl" = { code = 31, doc = 38, comment = 0, blank = 21, total = 90 }
 "src/05_Moments/26_Windowed/04_WindowedCoskewness.jl" = { code = 25, doc = 0, comment = 0, blank = 0, total = 25 }
 "src/05_Moments/26_Windowed/05_WindowedCokurtosis.jl" = { code = 25, doc = 0, comment = 0, blank = 0, total = 25 }
+"src/05_Moments/26_Windowed/06_WindowedPreamble.jl" = { code = 76, doc = 209, comment = 0, blank = 91, total = 376 }
 "src/05_Moments/27_MedianExpectedReturns.jl" = { code = 28, doc = 102, comment = 0, blank = 48, total = 178 }
 "src/05_Moments/28_CustomValueExpectedReturns.jl" = { code = 50, doc = 161, comment = 0, blank = 75, total = 286 }
-"src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { code = 143, doc = 397, comment = 5, blank = 187, total = 732 }
-"src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { code = 196, doc = 486, comment = 4, blank = 217, total = 903 }
-"src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { code = 218, doc = 581, comment = 7, blank = 265, total = 1071 }
+"src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { code = 143, doc = 402, comment = 5, blank = 190, total = 740 }
+"src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { code = 196, doc = 492, comment = 4, blank = 221, total = 913 }
+"src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { code = 243, doc = 627, comment = 8, blank = 287, total = 1165 }
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { code = 403, doc = 909, comment = 7, blank = 358, total = 1677 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { code = 488, doc = 786, comment = 6, blank = 321, total = 1601 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { code = 139, doc = 487, comment = 1, blank = 200, total = 827 }
@@ -391,4 +392,4 @@ commit = "ebcacfda95"
 "src/21_Pipeline/06_OnlinePipeline.jl" = { code = 389, doc = 476, comment = 0, blank = 226, total = 1091 }
 "src/22_Plotting.jl" = { code = 158, doc = 2801, comment = 111, blank = 943, total = 4013 }
 "src/23_Aliases.jl" = { code = 267, doc = 591, comment = 25, blank = 161, total = 1044 }
-"src/PortfolioOptimisers.jl" = { code = 404, doc = 3, comment = 29, blank = 5, total = 441 }
+"src/PortfolioOptimisers.jl" = { code = 407, doc = 3, comment = 29, blank = 5, total = 444 }

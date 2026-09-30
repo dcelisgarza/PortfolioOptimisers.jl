@@ -7,6 +7,8 @@ The recursion starts at zero, so a newly listed asset starts from a cold state, 
 
 A young asset stays investable, and the returns matrix of the prior carries the cost. A prior fitted with this estimator fills the rows that the asset was missing with zero through [`scenario_fill`](@ref), because every consumer of a Prior Result reads its returns matrix. A scenario-based measure then reads a zero return where the asset had none, so it understates the risk of that asset over those rows. The variance stays the estimate that this recursion made from the rows it saw. The fill is silent up to the `fill_limit` field of the fitting prior, a share of the asset's own observations. Above that share it warns, and `strict` refuses any fill. `fill_limit` defaults to `nothing`, and this family carries no `CoveragePolicy` to derive a limit from, so every fill warns.
 
+The estimator has no window of its own. [`WindowedVariance`](@ref) is its window: the wrapper keeps the last `window` observations of the returns and of the active mask, and the recursion starts cold at the first of them. In a variance series, row `t` keeps the window that ends at `t`. The example below puts the windowed estimator in the variance slot of a [`CrossSectionalFactorPrior`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -78,10 +80,18 @@ true
 
 julia> ce.min_obs
 40
+
+julia> ve = WindowedVariance(; ve = ce, window = 500);
+
+julia> pe = CrossSectionalFactorPrior(; factors = [\"market\" => ConstantExposure()], ve = ve);
+
+julia> pe.ve.window
+500
 ```
 
 # Related
 
+  - [`WindowedVariance`](@ref)
   - [`AbstractVarianceEstimator`](@ref)
   - [`ExpWeightedVarianceState`](@ref)
   - [`ExpWeightedExpectedReturns`](@ref)

@@ -1310,114 +1310,6 @@ function demean_returns(X::MatNum, me::AbstractExpectedReturnsEstimator; dims::I
                         mean = nothing, kwargs...)
     return X .- weighted_centre(X, me, nothing; dims = dims, mean = mean, kwargs...)
 end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Shared preamble for windowed moment estimators (matrix input).
-
-Whenever a window is given — an `Int`, which resolves to a range, or an explicit index
-vector — `iv` is subset to the same rows, or columns when `dims = 2`, so it stays aligned
-with the windowed returns. Only `window = nothing`, which resolves to a `Colon`, leaves `iv`
-unchanged.
-
-# Algorithm
-
- 1. Resolve `window` with [`get_window`](@ref), giving `win`. `nothing` resolves to a `Colon`, an `Int` to the range of the last `window` observations, and an index vector passes through.
- 2. Apply `win` to `X` and rebind the observation weights to it with [`moment_window_and_weights`](@ref), giving the windowed `X` and `w_new`.
- 3. Build `inner`, a copy of `est` that carries `w_new`, with [`factory`](@ref).
- 4. When `iv` is given and `win` is an index vector, subset `iv` to the same rows, or to the same columns when `dims == 2`. A `Colon` leaves `iv` unchanged, so the full-data case never copies it.
- 5. Return `inner`, the windowed `X`, and `iv`.
-
-# Arguments
-
-  - `est`: Wrapped moment estimator to be cloned with updated weights.
-  - `w`: Optional observation weights applied after windowing.
-  - `window`: Window specification — `nothing` (full data), an `Int` (last `window`
-    observations), or a `VecInt` of explicit row/column indices.
-  - `X`: Data matrix of asset returns.
-  - `iv`: Optional instrument variable matrix; subsetted to the window when `window` is a
-    `VecInt`.
-  - `dims`: Observation dimension — 1 for rows (default), 2 for columns. Checked by
-    [`assert_dims`](@ref), so every generated windowed method rejects an out-of-range `dims`
-    instead of silently resolving a one-observation window.
-  - `kwargs...`: Passed through to [`moment_window_and_weights`](@ref).
-
-# Validation
-
-  - $(val_dict[:dims])
-
-# Returns
-
-  - `(inner, X, iv)`: Weight-updated estimator, windowed returns matrix, and (possibly
-    subsetted) instrument variable matrix.
-
-# Related
-
-  - [`get_window`](@ref)
-  - [`moment_window_and_weights`](@ref)
-  - [`factory`](@ref)
-  - [`@windowed_estimator`](@ref)
-  - [`WindowedExpectedReturns`](@ref)
-  - [`WindowedCovariance`](@ref)
-  - [`WindowedVariance`](@ref)
-  - [`WindowedCoskewness`](@ref)
-  - [`WindowedCokurtosis`](@ref)
-"""
-function windowed_preamble(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt},
-                           X::MatNum; iv::Option{<:MatNum} = nothing, dims::Int = 1,
-                           kwargs...)
-    assert_dims(dims)
-    win = get_window(window, X, dims)
-    X, w_new = moment_window_and_weights(X, w, win; dims = dims, kwargs...)
-    inner = factory(est, w_new)
-    if !isnothing(iv) && isa(win, VecInt)
-        iv = isone(dims) ? view(iv, win, :) : view(iv, :, win)
-    end
-    return inner, X, iv
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Shared preamble for windowed moment estimators (vector input).
-
-This method takes no `dims`, because a vector carries one axis, and no `iv`, because no
-vector generic of the family declares one.
-
-# Algorithm
-
- 1. Resolve `window` with [`get_window`](@ref), giving `win`. `nothing` resolves to a `Colon`, an `Int` to the range of the last `window` observations, and an index vector passes through.
- 2. Apply `win` to `X` and rebind the observation weights to it with [`moment_window_and_weights`](@ref), giving the windowed `X` and `w_new`.
- 3. Build `inner`, a copy of `est` that carries `w_new`, with [`factory`](@ref).
- 4. Return `inner` and the windowed `X`.
-
-# Arguments
-
-  - `est`: Wrapped moment estimator to be cloned with updated weights.
-  - `w`: Optional observation weights applied after windowing.
-  - `window`: Window specification — `nothing` (full data), an `Int` (last `window`
-    observations), or a `VecInt` of explicit indices.
-  - `X`: Data vector of returns.
-
-# Returns
-
-  - `(inner, X)`: Weight-updated estimator and windowed returns vector.
-
-# Related
-
-  - [`get_window`](@ref)
-  - [`moment_window_and_weights`](@ref)
-  - [`factory`](@ref)
-  - [`@windowed_estimator`](@ref)
-  - [`WindowedVariance`](@ref)
-"""
-function windowed_preamble(est, w::Option{<:ObsWeights}, window::Option{<:Int_VecInt},
-                           X::VecNum)
-    win = get_window(window, X)
-    X, w_new = moment_window_and_weights(X, w, win)
-    inner = factory(est, w_new)
-    return inner, X
-end
-
 # ---------------------------------------------------------------------------
 # @windowed_estimator — one declaration per windowed moment estimator (ADR 0039)
 # ---------------------------------------------------------------------------
@@ -1438,8 +1330,8 @@ const WINDOWED_ESTIMATOR_KEYS = (:noun, :forward, :doctest)
     WINDOWED_ESTIMATOR_INPUTS
 
 Input types a [`@windowed_estimator`](@ref) `forward` entry may declare. `MatNum` generates
-the matrix forwarder (threading `dims` and `iv` through [`windowed_preamble`](@ref)),
-`VecNum` the vector forwarder.
+the matrix forwarder (threading `dims` and `iv` through [`windowed_preamble`](@ref)) and the
+Asset Panel forwarder of the same generic, `VecNum` the vector forwarder.
 
 # Related
 
@@ -1660,14 +1552,15 @@ Render the `generic(field::Name, X::Input)` reference used to cross-link one gen
 forwarding method from the type's and its siblings' `# Related` sections.
 
 Keyword arguments are deliberately omitted: Documenter resolves an `@ref` by positional
-method signature, and the two positional types already identify the method uniquely.
+method signature, and the positional types already identify the method uniquely. The panel
+method carries a third positional argument, `pnl::Option{<:AssetPanel}`, after `X::MatNum`.
 
 # Arguments
 
   - `gen`: The forwarded generic.
   - `field::Symbol`: Name of the inner estimator's field, which is also the argument name of the generated method.
   - `name::Symbol`: Name of the windowed estimator type.
-  - `input::Symbol`: Input type of the generated method, `:MatNum` or `:VecNum`.
+  - `input::Symbol`: Input kind of the generated method, `:MatNum`, `:VecNum` or `:AssetPanel`.
 
 # Returns
 
@@ -1678,7 +1571,50 @@ method signature, and the two positional types already identify the method uniqu
   - [`@windowed_estimator`](@ref)
 """
 function windowed_method_ref(gen, field::Symbol, name::Symbol, input::Symbol)
-    return "[`$(gen)($(field)::$(name), X::$(input))`](@ref)"
+    args = input === :AssetPanel ? "X::MatNum, pnl::Option{<:AssetPanel}" : "X::$(input)"
+    return "[`$(gen)($(field)::$(name), $(args))`](@ref)"
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Render the signature line of the docstring of one generated forwarding method.
+
+# Algorithm
+
+ 1. For the vector input, return `gen(field::Name, X::VecNum)`, with `; mean = nothing` when `has_mean` is set.
+ 2. Otherwise open `gen(field::Name, X::MatNum`, add `pnl::Option{<:AssetPanel}` for the panel input, and add the keywords: `dims`, then `mean` when `has_mean` is set, then `iv` for the matrix input alone, then `kwargs...`. The panel method takes `iv` in `kwargs...`.
+
+# Arguments
+
+  - `gen`: The forwarded generic.
+  - `field::Symbol`: Name of the inner estimator's field, which is also the argument name of the generated method.
+  - `name::Symbol`: Name of the windowed estimator type.
+  - `input::Symbol`: Input kind of the generated method, `:MatNum`, `:VecNum` or `:AssetPanel`.
+  - `has_mean::Bool`: Whether the method declares a `mean` keyword.
+
+# Returns
+
+  - `sig::String`: The indented signature line.
+
+# Related
+
+  - [`windowed_method_doc`](@ref)
+  - [`windowed_method_def`](@ref)
+"""
+function windowed_method_sig(gen, field::Symbol, name::Symbol, input::Symbol,
+                             has_mean::Bool)
+    if input === :VecNum
+        return "    $(gen)($(field)::$(name), X::VecNum" *
+               (has_mean ? "; mean = nothing" : "") *
+               ")"
+    end
+    pnl = input === :AssetPanel
+    return "    $(gen)($(field)::$(name), X::MatNum" *
+           (pnl ? ", pnl::Option{<:AssetPanel}" : "") *
+           "; dims::Int = 1, " *
+           (has_mean ? "mean = nothing, " : "") *
+           (pnl ? "" : "iv::Option{<:MatNum} = nothing, ") *
+           "kwargs...)"
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1691,21 +1627,22 @@ a hand-written `\$(arg_dict[:dims])` would be.
 
 # Algorithm
 
- 1. Build the signature line `sig` from `gen`, `field`, `name` and `input`. The matrix signature carries `dims`, `iv` and `kwargs...`; the vector signature carries neither. `mean` joins either one when `has_mean` is set.
- 2. Open `parts` with `sig`, the summary sentences, the two steps of the generated method's own algorithm, and the arguments heading with its two prose bullets. The summary names the generic and not the type's noun, because `std` on a `WindowedVariance` computes a standard deviation and not a variance.
- 3. For the matrix input, push the `arg_dict[:dims]` lookup as a live expression.
- 4. When `has_mean` is set, push the `mean` bullet.
- 5. For the matrix input, push the `arg_dict[:oiv]` lookup and the `kwargs...` bullet.
- 6. Push the returns heading, then one live `ret_dict` lookup per entry of `ret_keys`.
- 7. Push the related heading, the type, every entry of `siblings`, and [`windowed_preamble`](@ref).
- 8. Return `parts` wrapped in `Expr(:string, ...)`, so every lookup stays live.
+ 1. Build the signature line `sig` with [`windowed_method_sig`](@ref). The matrix signature carries `dims`, `iv` and `kwargs...`; the vector signature carries neither. The panel signature carries `pnl` after `X`, and takes `iv` in `kwargs...`. `mean` joins any of them when `has_mean` is set.
+ 2. Open `parts` with `sig`, the summary sentences, the steps of the generated method's own algorithm, and the arguments heading with its two prose bullets. The panel method has one more step, the cut of the panel. The summary names the generic and not the type's noun, because `std` on a `WindowedVariance` computes a standard deviation and not a variance.
+ 3. For the panel input, push the `arg_dict[:pnl_moment]` lookup as a live expression.
+ 4. For the matrix and panel inputs, push the `arg_dict[:dims]` lookup.
+ 5. When `has_mean` is set, push the `mean` bullet.
+ 6. For the matrix and panel inputs, push the `arg_dict[:oiv]` lookup and the `kwargs...` bullet.
+ 7. Push the returns heading, then one live `ret_dict` lookup per entry of `ret_keys`.
+ 8. Push the related heading, the type, every entry of `siblings`, and [`windowed_preamble`](@ref).
+ 9. Return `parts` wrapped in `Expr(:string, ...)`, so every lookup stays live.
 
 # Arguments
 
   - `gen`: The forwarded generic.
   - `field::Symbol`: Name of the inner estimator's field, which is also the argument name of the generated method.
   - `name::Symbol`: Name of the windowed estimator type.
-  - `input::Symbol`: Input type of the generated method, `:MatNum` or `:VecNum`.
+  - `input::Symbol`: Input kind of the generated method, `:MatNum`, `:VecNum` or `:AssetPanel`.
   - `has_mean::Bool`: Whether the method declares a `mean` keyword.
   - `ret_keys::Vector{Symbol}`: The [`ret_dict`](@ref) keys documenting the return values.
   - `noun::AbstractString`: Capitalised noun phrase naming the moment, which drives the generated prose.
@@ -1723,20 +1660,17 @@ function windowed_method_doc(gen, field::Symbol, name::Symbol, input::Symbol,
                              has_mean::Bool, ret_keys::Vector{Symbol}, noun::AbstractString,
                              siblings::Vector{String})
     lc = lowercasefirst(noun)
-    is_mat = input === :MatNum
-    sig = if is_mat
-        "    $(gen)($(field)::$(name), X::MatNum; dims::Int = 1, " *
-        (has_mean ? "mean = nothing, " : "") *
-        "iv::Option{<:MatNum} = nothing, kwargs...)"
-    else
-        "    $(gen)($(field)::$(name), X::VecNum" *
-        (has_mean ? "; mean = nothing" : "") *
-        ")"
-    end
+    is_mat = input !== :VecNum
+    is_pnl = input === :AssetPanel
+    n0 = Int(is_pnl)
+    sig = windowed_method_sig(gen, field, name, input, has_mean)
     # The summary names the *generic*, not the type's noun: `std` on a WindowedVariance
     # computes a standard deviation, not a variance.
     parts = Any["\n", sig,
-                "\n\nCompute `$(gen)` over a rolling or indexed observation window ($(is_mat ? "matrix" : "vector") input).\n\nThis method selects a window of observations from `X` (and applies observation weights if specified), then delegates to the underlying $(lc) estimator.\n\n# Algorithm\n\n 1. Resolve the window and the observation weights with [`windowed_preamble`](@ref), giving `inner`, a copy of `$(field).$(field)` that carries the windowed weights, together with the windowed `X`$(is_mat ? " and the windowed `iv`" : "").\n 2. Call `$(gen)` on `inner` and the windowed `X`, and return its result. The inner estimator alone decides the value, so the window and the weights are the whole of this method's contribution.\n\n# Arguments\n\n  - `$(field)`: Windowed $(lc) estimator.\n  - `X`: Data $(is_mat ? "matrix of asset returns (observations × assets)" : "vector of returns").\n"]
+                "\n\nCompute `$(gen)` over a rolling or indexed observation window ($(is_pnl ? "Asset Panel" : is_mat ? "matrix" : "vector") input).\n\nThis method selects a window of observations from `X` (and applies observation weights if specified), then delegates to the underlying $(lc) estimator.$(is_pnl ? " It cuts the Asset Panel to the same observations and passes it on, so a mask-aware inner estimator reads the active mask of the window, and a plain one reduces to the Coverage Universe of the window." : "")\n\n# Algorithm\n\n$(is_pnl ? " 1. Cut `pnl` to the observations of the window with [`windowed_panel`](@ref).\n" : "") $(1 + n0). Resolve the window and the observation weights with [`windowed_preamble`](@ref), giving `inner`, a copy of `$(field).$(field)` that carries the windowed weights, together with the windowed `X`$(is_mat ? ", the windowed `iv`, and the `active_mask` and `estimation_mask` keywords cut to the window" : "").\n $(2 + n0). Call `$(gen)` on `inner` and the windowed `X`$(is_pnl ? " and `pnl`" : ""), and return its result. The inner estimator alone decides the value, so the window and the weights are the whole of this method's contribution.\n\n# Arguments\n\n  - `$(field)`: Windowed $(lc) estimator.\n  - `X`: Data $(is_mat ? "matrix of asset returns (observations × assets)" : "vector of returns").\n"]
+    if is_pnl
+        push!(parts, "  - ", :(arg_dict[:pnl_moment]), "\n")
+    end
     if is_mat
         push!(parts, "  - ", :(arg_dict[:dims]), "\n")
     end
@@ -1744,9 +1678,12 @@ function windowed_method_doc(gen, field::Symbol, name::Symbol, input::Symbol,
         push!(parts,
               "  - `mean`: Optional pre-computed mean passed to the underlying estimator.\n")
     end
-    if is_mat
+    if is_pnl
+        push!(parts,
+              "  - `kwargs...`: Additional keyword arguments passed to the underlying estimator. The `iv`, `active_mask` and `estimation_mask` keywords are cut to the window.\n")
+    elseif is_mat
         push!(parts, "  - ", :(arg_dict[:oiv]),
-              "\n  - `kwargs...`: Additional keyword arguments passed to the underlying estimator.\n")
+              "\n  - `kwargs...`: Additional keyword arguments passed to the underlying estimator. The `active_mask` and `estimation_mask` keywords are cut to the window.\n")
     end
     push!(parts, "\n# Returns\n")
     for k in ret_keys
@@ -1768,17 +1705,19 @@ then delegate to the inner estimator's own method.
 # Algorithm
 
  1. Build the three field accesses the body reads: `field.field`, the inner estimator; `field.w`, the observation weights; and `field.window`, the window specification.
- 2. Build the keyword list of the signature. The matrix method takes `dims`, then `mean` when `has_mean` is set, then `iv` and `kwargs...`. The vector method takes `mean` alone, and only when `has_mean` is set.
- 3. Build the matching keyword list of the delegated call. It carries the same names, each forwarded by value, and the `iv` it forwards is the windowed one.
- 4. Build the body: one call to [`windowed_preamble`](@ref) that binds `inner` and the windowed `X`, and `iv` too for the matrix method, then a `return` of `gen` applied to `inner` and that `X`.
- 5. Return the whole `Expr(:function, ...)`.
+ 2. For the vector input, build a method that takes `mean` alone, and only when `has_mean` is set. Its body binds `inner` and the windowed `X` with [`windowed_preamble`](@ref), and returns `gen` of the two. Return it.
+ 3. Build the keyword list of the signature: `dims`, then `mean` when `has_mean` is set, then `iv` and `kwargs...`. The panel method names no `iv`: it arrives in `kwargs...`, as in the panel methods of the moment verbs, and the preamble binds it there.
+ 4. Build the matching keyword list of the delegated call. It carries the same names, each forwarded by value. The `iv` it forwards is the windowed one, and the keywords are `kw`, with the two universe masks cut to the window.
+ 5. For the panel input, the positional arguments are `field`, `X` and `pnl`, and the body opens with the cut of `pnl` to the window by [`windowed_panel`](@ref). For the matrix input, they are `field` and `X`.
+ 6. Build the body: one call to [`windowed_preamble`](@ref) that binds `inner`, the windowed `X`, `iv` and `kw`, then a `return` of `gen` applied to `inner`, that `X`, and the cut `pnl` for the panel input.
+ 7. Return the whole `Expr(:function, ...)`.
 
 # Arguments
 
   - `gen`: The forwarded generic.
   - `field::Symbol`: Name of the inner estimator's field, which is also the argument name of the generated method.
   - `name::Symbol`: Name of the windowed estimator type.
-  - `input::Symbol`: Input type of the generated method, `:MatNum` or `:VecNum`.
+  - `input::Symbol`: Input kind of the generated method, `:MatNum`, `:VecNum` or `:AssetPanel`.
   - `has_mean::Bool`: Whether the method declares a `mean` keyword.
 
 # Returns
@@ -1795,32 +1734,41 @@ function windowed_method_def(gen, field::Symbol, name::Symbol, input::Symbol,
     inner = Expr(:., field, QuoteNode(field))
     w = Expr(:., field, QuoteNode(:w))
     window = Expr(:., field, QuoteNode(:window))
-    return if input === :MatNum
-        kws = Any[Expr(:kw, :(dims::Int), 1)]
-        if has_mean
-            push!(kws, Expr(:kw, :mean, nothing))
-        end
-        push!(kws, Expr(:kw, :(iv::Option{<:MatNum}), nothing), :(kwargs...))
-        call = Any[:(dims = dims)]
-        if has_mean
-            push!(call, :(mean = mean))
-        end
-        push!(call, :(iv = iv), :(kwargs...))
-        Expr(:function, Expr(:call, gen, Expr(:parameters, kws...), self, :(X::MatNum)),
-             quote
-                 inner, X, iv = windowed_preamble($inner, $w, $window, X; iv = iv,
-                                                  dims = dims, kwargs...)
-                 return $(Expr(:call, gen, Expr(:parameters, call...), :inner, :X))
-             end)
-    else
+    if input === :VecNum
         kws = has_mean ? Any[Expr(:kw, :mean, nothing)] : Any[]
         call = has_mean ? Any[:(mean = mean)] : Any[]
-        Expr(:function, Expr(:call, gen, Expr(:parameters, kws...), self, :(X::VecNum)),
-             quote
-                 inner, X = windowed_preamble($inner, $w, $window, X)
-                 return $(Expr(:call, gen, Expr(:parameters, call...), :inner, :X))
-             end)
+        return Expr(:function,
+                    Expr(:call, gen, Expr(:parameters, kws...), self, :(X::VecNum)),
+                    quote
+                        inner, X = windowed_preamble($inner, $w, $window, X)
+                        return $(Expr(:call, gen, Expr(:parameters, call...), :inner, :X))
+                    end)
     end
+    kws = Any[Expr(:kw, :(dims::Int), 1)]
+    call = Any[:(dims = dims)]
+    if has_mean
+        push!(kws, Expr(:kw, :mean, nothing))
+        push!(call, :(mean = mean))
+    end
+    push!(call, :(iv = iv), :(kw...))
+    # The panel method takes `iv` in `kwargs...`, as the panel methods of the moment verbs do,
+    # and cuts the panel before `X` is rebound to the window.
+    args, cargs, cut, pre = if input === :AssetPanel
+        push!(kws, :(kwargs...))
+        Any[self, :(X::MatNum), :(pnl::Option{<:AssetPanel})], Any[:inner, :X, :pnl],
+        :(pnl = windowed_panel(pnl, get_window($window, X, dims))),
+        :(windowed_preamble($inner, $w, $window, X; dims = dims, kwargs...))
+    else
+        push!(kws, Expr(:kw, :(iv::Option{<:MatNum}), nothing), :(kwargs...))
+        Any[self, :(X::MatNum)], Any[:inner, :X], nothing,
+        :(windowed_preamble($inner, $w, $window, X; iv = iv, dims = dims, kwargs...))
+    end
+    return Expr(:function, Expr(:call, gen, Expr(:parameters, kws...), args...),
+                quote
+                    $cut
+                    inner, X, iv, kw = $pre
+                    return $(Expr(:call, gen, Expr(:parameters, call...), cargs...))
+                end)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1890,8 +1838,8 @@ estimator's semantics untouched.
 
 One invocation emits the whole family member — the [`@propagatable`](@ref) `@concrete`
 struct (inner estimator tagged `@fprop @vprop`, `w` tagged `@wprop`, plus `window`), both
-constructors with their validation, one forwarding method per `forward` entry, the `export`,
-and every docstring.
+constructors with their validation, one forwarding method per `forward` entry, one Asset
+Panel method beside each matrix entry, the `export`, and every docstring.
 
 Five nominal types exist rather than one parametric `Windowed{E}` because each answers a
 different generic and must subtype a different abstract estimator — `AbstractCovarianceEstimator`,
@@ -1920,7 +1868,7 @@ rejected at macro-expansion time with a [`did_you_mean`](@ref) suggestion.
 
  1. Read `name` and `super` from the header.
  2. Walk the body once. The one `field::Type = default` line goes to [`windowed_parse_field`](@ref), which returns `field`, `ftype` and `default`. The `noun`, `forward` and `doctest` lines bind their values. Any other key raises.
- 3. Parse every entry of `forward` with [`windowed_parse_forward`](@ref), giving `specs`.
+ 3. Parse every entry of `forward` with [`windowed_parse_forward`](@ref), giving `specs`. Append one `:AssetPanel` copy of each `MatNum` entry, so every matrix generic also gets its Asset Panel method.
  4. Render one cross-reference per entry of `specs` with [`windowed_method_ref`](@ref), giving `refs`.
  5. For each entry of `specs`, build one documented forwarding method: [`windowed_method_doc`](@ref) writes its docstring, and [`windowed_method_def`](@ref) writes its body. Each method's `# Related` section lists the `refs` of its siblings and not its own.
  6. Build `structexpr`, the `@concrete` struct. It declares the inner estimator tagged `@fprop @vprop`, `w` tagged `@wprop`, and `window`, each with its live [`field_dict`](@ref) lookup, and the inner constructor that validates `w` and `window`.
@@ -2019,6 +1967,7 @@ macro windowed_estimator(head, body)
         windowed_estimator_error("`forward` must declare at least one generic.")
     end
     specs = [windowed_parse_forward(f) for f in forward]
+    append!(specs, [(g, :AssetPanel, m, k) for (g, i, m, k) in specs if i === :MatNum])
     refs = [windowed_method_ref(gen, field, name, input) for (gen, input, _, _) in specs]
     defs = Any[]
     siblings = String[]
