@@ -1246,6 +1246,7 @@ $(DocStringExtensions.FIELDS)
   - `est` is not a cross-validation scheme, because the function constructor of a scheme builds its Online Scheme. An `ArgumentError` naming the constructors is thrown otherwise.
   - `est` is not an [`OnlinePortfolioSelection`](@ref) head, because a refit of a head is a batch walk-forward, and the library runs both settings of the wrapper in other forms. An `ArgumentError` naming those forms is thrown otherwise.
   - `est` has a `cache` field. An `ArgumentError` is thrown otherwise.
+  - No field of the tree of `est` holds a windowed estimator under [`SeedWindow`](@ref), because the wrapper refits the tree at each step, and a refit has no first fit to remember. [`seed_window_path`](@ref) finds the field, and an `ArgumentError` that names it is thrown otherwise.
   - `max_history > 0` when it is not `nothing`. A `DomainError` is thrown otherwise.
 
 # Examples
@@ -1288,6 +1289,9 @@ Online
                     max_history::Option{<:Integer} = nothing)
         @argcheck(hasfield(typeof(est), :cache),
                   ArgumentError("`$(typeof(est))` has no `cache` field, so it has nowhere to carry a sample buffer and cannot be wrapped in `Online`."))
+        path = seed_window_path(est)
+        @argcheck(isnothing(path),
+                  ArgumentError("`$(typeof(est).name.name)` holds a `SeedWindow` at `$(path)`, and `Online` refits the estimator over its buffer at each step. A refit has no first fit to remember, so it cannot keep the window of the first fit alone. Fold the estimator without `Online` in a host that folds, such as `EmpiricalPrior`, or set the rule to `RollingWindow()`."))
         if !isnothing(max_history)
             @argcheck(max_history > zero(max_history),
                       DomainError(max_history, "max_history must be positive"))
@@ -1592,6 +1596,121 @@ function online_wrapper_path(::Any)
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the window rule of a windowed moment estimator, the rule that says which observations its window keeps on the online seam.
+
+A windowed estimator, such as [`WindowedCovariance`](@ref), fits its inner estimator on a window of observations. In a batch fit every rule keeps the same window, the last `window` observations. The rules differ when the estimator receives its observations one block at a time.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. The windowed estimators hold it in their `rule` field, and the methods that fold them dispatch on its type. A new rule needs its own fold methods for the five windowed estimators.
+
+# Related
+
+  - [`RollingWindow`](@ref)
+  - [`SeedWindow`](@ref)
+  - [`WindowedExpectedReturns`](@ref)
+  - [`WindowedCovariance`](@ref)
+  - [`WindowedVariance`](@ref)
+  - [`WindowedCoskewness`](@ref)
+  - [`WindowedCokurtosis`](@ref)
+"""
+abstract type AbstractWindowRule <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Keeps the last observations of the window at every fit, so the window rolls with each new observation. This is the default rule.
+
+The estimator does not fold. On the online seam, a host that carries the observations, such as the carry of [`EmpiricalPrior`](@ref), refits it over the carried rows at each read, and the window of each refit ends at the last row. So the read-out after any stream of blocks equals the batch fit over every row received.
+
+# Constructors
+
+    RollingWindow() -> RollingWindow
+
+# Examples
+
+```jldoctest
+julia> RollingWindow()
+RollingWindow()
+```
+
+# Related
+
+  - [`AbstractWindowRule`](@ref)
+  - [`SeedWindow`](@ref)
+"""
+struct RollingWindow <: AbstractWindowRule end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Keeps the last observations of the window at the first fit alone. After the first fit, the inner estimator folds every new observation, and no observation leaves the estimate.
+
+In a batch fit the rule keeps the same window as [`RollingWindow`](@ref). On the online seam the estimator folds. Its first fold cuts the first block to the window, folds the rows that remain into the inner estimator, and returns the estimator with `window = nothing`, so each later fold passes every row. The read-out after a stream of blocks is then the fit over the window of the first block, continued by the fold of every later row, and it equals no batch fit.
+
+The rule needs an inner estimator that folds exactly, such as [`ExpWeightedCovariance`](@ref), and a host that folds, such as the carry of [`EmpiricalPrior`](@ref). [`Online`](@ref) refuses it, because the wrapper refits its estimator at each step, and a refit has no first fit to remember.
+
+# Constructors
+
+    SeedWindow() -> SeedWindow
+
+# Examples
+
+```jldoctest
+julia> SeedWindow()
+SeedWindow()
+```
+
+# Related
+
+  - [`AbstractWindowRule`](@ref)
+  - [`RollingWindow`](@ref)
+  - [`seed_window_path`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+struct SeedWindow <: AbstractWindowRule end
+"""
+    seed_window_path(est)
+    seed_window_path(::Any)
+
+Names the first field of an estimator tree that holds a windowed estimator under [`SeedWindow`](@ref), or answers `nothing`.
+
+The constructor of [`Online`](@ref) uses this walk to refuse a seed window, because the wrapper refits its estimator at each step. The walk is the walk of [`online_wrapper_path`](@ref), and the answer is the dotted path from the root to the `rule` field, such as `"ce.rule"` for the covariance member of a prior. A windowed estimator under a seed window answers `"rule"` through its own method. A value that is not an estimator answers `nothing`.
+
+# Algorithm
+
+ 1. Walk the fields of [`estimator_fields`](@ref) in order, and find the path in each field with this function.
+ 2. Answer the first path found, with the field name and a dot before it.
+ 3. Answer `nothing` when no field gives a path.
+
+# Arguments
+
+  - `est`: The estimator, or any value a field holds.
+
+# Returns
+
+  - `path::Option{<:String}`: The dotted path of the first seed window found, or `nothing`.
+
+# Related
+
+  - [`SeedWindow`](@ref)
+  - [`Online`](@ref)
+  - [`online_wrapper_path`](@ref)
+  - [`estimator_fields`](@ref)
+"""
+function seed_window_path(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+    for f in estimator_fields(est)
+        path = seed_window_path(getfield(est, f))
+        if !isnothing(path)
+            return string(f, ".", path)
+        end
+    end
+    return nothing
+end
+function seed_window_path(::Any)
+    return nothing
+end
+"""
     assert_batch_entry(est, entry::AbstractString)
 
 Refuses an estimator that holds an [`Online`](@ref) at the entry of a batch fit, with an error that names the path of the wrapper.
@@ -1754,5 +1873,5 @@ In order to implement a new programme set, subtype `AbstractProgrammeAllocationS
 """
 abstract type AbstractProgrammeAllocationSet <: AbstractAllocationSet end
 
-export Online
+export Online, RollingWindow, SeedWindow
 public AbstractProgrammeAllocationSet, risk_constraint_solver

@@ -187,3 +187,225 @@ end
     @test isequal(fit(WindowedVariance(; ve = ve, window = 1000), wa).rr.rw,
                   fit(ve, wa).rr.rw)
 end
+
+#=
+The window rule of a windowed estimator (#1469, ADR 0193, amendment of ADR 0039).
+
+A `RollingWindow`, the default, keeps the last rows of every fit, so on the online seam its host
+refits it over the carried rows and the window ends at the last row. A `SeedWindow` keeps the last
+rows of the first fit alone: its first fold cuts the block, folds it into the inner estimator, and
+spends the window, so every later fold passes every row. That is the oracle's rule for the window
+of its EW moments, and the stored files pin it over a stream of batches inside the prior.
+=#
+const SW_DECAY = 2.0^(-1 / 10)
+sw_blocks(e) = [(e[b] + 1):e[b + 1] for b in 1:(length(e) - 1)]
+function sw_fold(est, X, r; active_mask = nothing)
+    if length(r) == 1
+        m = isnothing(active_mask) ? (;) : (; active_mask = vec(active_mask))
+        return partial_fit!(est, X[r[1], :]; m...)
+    end
+    m = isnothing(active_mask) ? (;) : (; active_mask = active_mask)
+    return partial_fit!(est, X[r, :]; m...)
+end
+
+@testset "The two window rules agree in a batch fit" begin
+    X, amsk, pnl = windowed_panel_fixture()
+    me = ExpWeightedExpectedReturns(; decay = WM_DECAY, min_obs = 1)
+    ce = ExpWeightedCovariance(; decay = WM_DECAY, min_obs = 1)
+    ve = ExpWeightedVariance(; decay = WM_DECAY, min_obs = 1)
+    @test WindowedExpectedReturns().rule === RollingWindow()
+    @test WindowedCovariance().rule === RollingWindow()
+    @test WindowedVariance().rule === RollingWindow()
+    @test WindowedCoskewness().rule === RollingWindow()
+    @test WindowedCokurtosis().rule === RollingWindow()
+    cases = [(mean, rule -> WindowedExpectedReturns(; me = me, window = 40, rule = rule)),
+             (cov, rule -> WindowedCovariance(; ce = ce, window = 40, rule = rule)),
+             (var, rule -> WindowedVariance(; ve = ve, window = 40, rule = rule)),
+             (coskewness, rule -> WindowedCoskewness(; window = 40, rule = rule)),
+             (cokurtosis, rule -> WindowedCokurtosis(; window = 40, rule = rule))]
+    for (f, make) in cases
+        @test isequal(f(make(SeedWindow()), X, pnl), f(make(RollingWindow()), X, pnl))
+    end
+    # A plain co-moment refuses a gapped matrix, so the mask keyword reaches the three
+    # mask-aware inner estimators alone.
+    for (f, make) in cases[1:3]
+        @test isequal(f(make(SeedWindow()), X; active_mask = amsk),
+                      f(make(RollingWindow()), X; active_mask = amsk))
+    end
+end
+
+@testset "A rolling window refits over the carried rows on the online seam" begin
+    X = 0.01 .* randn(StableRNG(1469), 90, 4)
+    me = WindowedExpectedReturns(; me = ExpWeightedExpectedReturns(; decay = SW_DECAY),
+                                 window = 30)
+    ce = WindowedCovariance(; ce = ExpWeightedCovariance(; decay = SW_DECAY), window = 30)
+    pe = EmpiricalPrior(; me = me, ce = ce)
+    # A rolling wrapper does not fold, so the carry of the prior refits it, and every read-out
+    # equals the batch fit over every row received.
+    @test !PortfolioOptimisers.supports_partial_fit(me)
+    for r in sw_blocks([0, 40, 47, 48, 90])
+        pe = sw_fold(pe, X, r)
+        t = last(r)
+        pr = prior(pe)
+        @test isequal(pr.mu, vec(mean(me, X[1:t, :])))
+        @test isequal(pr.sigma, cov(ce, X[1:t, :]))
+        @test pe.me.window == 30
+    end
+end
+
+@testset "A seed window folds every row after the window of the first fit" begin
+    fx = parity_small_panel()
+    X, am = fx.rd.X, fx.rd.pnl.amsk
+    T, N = size(X)
+    mi = ExpWeightedExpectedReturns(; decay = SW_DECAY, min_obs = 5)
+    ci = ExpWeightedCovariance(; decay = SW_DECAY, min_obs = 5, centred = true)
+    vi = ExpWeightedVariance(; decay = SW_DECAY, min_obs = 5, centred = true)
+    # The read-out after a stream is the batch fit of the inner estimator over the window of
+    # the first block and every later row, the rows `s:t`. The fold and the batch fit run the
+    # same recursion, so the two are equal.
+    for (edges, n) in
+        (([0, 45, 52, 53, 66, T], 30), (vcat([0, 40], 41:T), 12), ([0, 45, T], 100))
+        me = WindowedExpectedReturns(; me = mi, window = n, rule = SeedWindow())
+        ce = WindowedCovariance(; ce = ci, window = n, rule = SeedWindow())
+        vw = WindowedVariance(; ve = vi, window = n, rule = SeedWindow())
+        pe = EmpiricalPrior(; me = me, ce = ce)
+        s = max(1, edges[2] - n + 1)
+        for r in sw_blocks(edges)
+            pe = sw_fold(pe, X, r; active_mask = am[r, :])
+            vw = sw_fold(vw, X, r; active_mask = am[r, :])
+            t = last(r)
+            pr = prior(pe)
+            @test isequal(pr.mu, vec(mean(mi, X[s:t, :]; active_mask = am[s:t, :])))
+            @test isequal(pr.sigma, cov(ci, X[s:t, :]; active_mask = am[s:t, :]))
+            @test isequal(vec(var(vw)), vec(var(vi, X[s:t, :]; active_mask = am[s:t, :])))
+        end
+        # The first fold spends the window and keeps the rule.
+        @test isnothing(pe.me.window) && isnothing(pe.ce.window) && isnothing(vw.window)
+        @test pe.ce.rule === SeedWindow()
+    end
+    # `dims = 2` folds the columns, and an index-vector window cuts the first block by index.
+    ce = WindowedCovariance(; ce = ci, window = 30, rule = SeedWindow())
+    @test isequal(cov(partial_fit!(ce, permutedims(X); dims = 2,
+                                   active_mask = permutedims(am))),
+                  cov(partial_fit!(ce, X; active_mask = am)))
+    idx = [3, 10, 20, 44, 45]
+    ci2 = partial_fit!(WindowedCovariance(; ce = ci, window = idx, rule = SeedWindow()),
+                       X[1:45, :]; active_mask = am[1:45, :])
+    ci2 = partial_fit!(ci2, X[46:T, :]; active_mask = am[46:T, :])
+    rows = vcat(idx, 46:T)
+    @test isequal(cov(ci2), cov(ci, X[rows, :]; active_mask = am[rows, :]))
+end
+
+@testset "A seed window on the higher moments and in a high order prior" begin
+    X = 0.01 .* randn(StableRNG(14690), 60, 3)
+    ske = WindowedCoskewness(; window = 20, rule = SeedWindow())
+    kte = WindowedCokurtosis(; window = 20, rule = SeedWindow())
+    me = WindowedExpectedReturns(; window = 20, rule = SeedWindow())
+    ce = WindowedCovariance(; ce = Covariance(), window = 20, rule = SeedWindow())
+    pe = HighOrderPriorEstimator(; pe = EmpiricalPrior(; me = me, ce = ce), ske = ske,
+                                 kte = kte)
+    for r in sw_blocks([0, 30, 31, 60])
+        pe = sw_fold(pe, X, r)
+    end
+    pr = prior(pe)
+    rows = 11:60
+    sk, V = coskewness(Coskewness(), X[rows, :])
+    @test isapprox(pr.sk, sk; rtol = 1e-12)
+    @test isapprox(pr.V, V; rtol = 1e-12)
+    @test isapprox(pr.kt, cokurtosis(Cokurtosis(), X[rows, :]); rtol = 1e-12)
+    @test isapprox(pr.pr.mu, vec(mean(SimpleExpectedReturns(), X[rows, :])); rtol = 1e-12)
+    @test isapprox(pr.pr.sigma, cov(Covariance(), X[rows, :]); rtol = 1e-12)
+    # The one-argument reads forward to the inner estimator.
+    sk1, V1 = coskewness(partial_fit!(ske, X))
+    sk2, V2 = coskewness(Coskewness(), X[41:60, :])
+    @test isapprox(sk1, sk2; rtol = 1e-12) && isapprox(V1, V2; rtol = 1e-12)
+    @test isapprox(cokurtosis(partial_fit!(kte, X)), cokurtosis(Cokurtosis(), X[41:60, :]);
+                   rtol = 1e-12)
+    # Found by #1469: a high order prior read `pe.ske.mp`, which a windowed coskewness does not
+    # hold, so its batch fit raised a `FieldError`. It reads the processor of the inner
+    # estimator now, which builds `V`.
+    hb = prior(HighOrderPriorEstimator(; ske = WindowedCoskewness(; window = 20)), X)
+    sk0, V0 = coskewness(Coskewness(), X[41:60, :])
+    @test hb.skmp === Coskewness().mp
+    @test isapprox(hb.sk, sk0; rtol = 1e-12) && isapprox(hb.V, V0; rtol = 1e-12)
+    @test PortfolioOptimisers.coskewness_processor(WindowedCoskewness()) === Coskewness().mp
+end
+
+@testset "A refit and a fold that cannot honour it refuse a seed window" begin
+    X = 0.01 .* randn(StableRNG(14691), 40, 3)
+    seed(ce) = WindowedCovariance(; ce = ce, window = 10, rule = SeedWindow())
+    ew = ExpWeightedCovariance(; decay = SW_DECAY)
+    # `Online` refits its estimator at each step, and a refit has no first fit to remember.
+    err = try
+        Online(EmpiricalPrior(; ce = seed(ew)))
+    catch e
+        e
+    end
+    @test err isa ArgumentError && occursin("`ce.rule`", err.msg)
+    me = WindowedExpectedReturns(; me = ExpWeightedExpectedReturns(), rule = SeedWindow())
+    @test_throws ArgumentError Online(EmpiricalPrior(; me = me))
+    @test PortfolioOptimisers.seed_window_path(EmpiricalPrior(; me = me)) == "me.rule"
+    @test isnothing(PortfolioOptimisers.seed_window_path(EmpiricalPrior()))
+    @test Online(EmpiricalPrior(; ce = WindowedCovariance(; ce = ew))) isa Online
+    # A fold refuses observation weights and an inner estimator that does not fold.
+    wtd = WindowedCovariance(; ce = ew, w = StatsBase.eweights(40, 0.1),
+                             rule = SeedWindow())
+    @test_throws ArgumentError partial_fit!(wtd, X)
+    semi = seed(Covariance(; alg = SemiMoment()))
+    @test PortfolioOptimisers.supports_partial_fit(semi)
+    @test_throws ArgumentError partial_fit!(EmpiricalPrior(; ce = semi), X)
+end
+
+@testset "A seed window at parity with the oracle over a stream of batches" begin
+    # The oracle's empirical prior, its EW mean and covariance under a window, folded over
+    # a stream of batches, and its EW variance folded beside it. Row `b` of each stored file is
+    # the read-out after batch `b`. The covariance compares raw states: the library divides
+    # each pair by the weight that the pair holds (ADR 0181, #1420), so the raw state of the
+    # oracle is its output times `w * w'`, with `w` the root of the diagonal weights, and the
+    # oracle runs without its projection to a positive definite matrix. Under a horizon only the diagonal of `sigma` reads no
+    # pair weight. Measured: mu 1.9e-16 scaled, raw covariance 4.9e-16 scaled, variance
+    # 3.9e-16, horizon mu 7.3e-15 scaled and horizon diagonal 6.3e-16.
+    fx = parity_small_panel()
+    X, am = fx.rd.X, fx.rd.pnl.amsk
+    T, N = size(X)
+    streams = Dict("Blocks" => [0, 45, 52, 53, 66, T], "Rows" => vcat([0, 40], 41:T))
+    load(c, k) = parity_load("SeedWindow", c, k)
+    @testset "$(c)" for (c, n, centred, h, st) in
+                        (("W30Blocks", 30, true, nothing, "Blocks"),
+                         ("W12Blocks", 12, true, nothing, "Blocks"),
+                         ("W30BlocksUnc", 30, false, nothing, "Blocks"),
+                         ("W30Rows", 30, true, nothing, "Rows"),
+                         ("W100Blocks", 100, true, nothing, "Blocks"),
+                         ("W30BlocksH5", 30, true, 5, "Blocks"))
+        mi = ExpWeightedExpectedReturns(; decay = SW_DECAY, min_obs = 5)
+        ci = ExpWeightedCovariance(; decay = SW_DECAY, min_obs = 5, centred = centred)
+        vi = ExpWeightedVariance(; decay = SW_DECAY, min_obs = 5, centred = centred)
+        me = WindowedExpectedReturns(; me = mi, window = n, rule = SeedWindow())
+        ce = WindowedCovariance(; ce = ci, window = n, rule = SeedWindow())
+        vw = WindowedVariance(; ve = vi, window = n, rule = SeedWindow())
+        pe = if isnothing(h)
+            EmpiricalPrior(; me = me, ce = ce)
+        else
+            EmpiricalPrior(; me = me, ce = ce, horizon = h)
+        end
+        M, C, V = load(c, "MuSeries"), load(c, "CovSeries"), load(c, "VarSeries")
+        for (b, r) in enumerate(sw_blocks(streams[st]))
+            pe = sw_fold(pe, X, r; active_mask = am[r, :])
+            vw = sw_fold(vw, X, r; active_mask = am[r, :])
+            pr = prior(pe)
+            Ob = C[((b - 1) * N + 1):(b * N), :]
+            @test parity_compare(pr.mu, M[b, :]; scale = :array, name = "$c mu $b").ok
+            @test parity_compare(vec(var(vw)), V[b, :]; name = "$c var $b").ok
+            if isnothing(h)
+                s = pe.ce.ce.cache
+                f = findall(isfinite, LinearAlgebra.diag(Ob))
+                w = sqrt.(LinearAlgebra.diag(s.weight))
+                @test parity_compare(s.covariance[f, f], (Ob .* (w * transpose(w)))[f, f];
+                                     scale = :array, name = "$c raw cov $b").ok
+            else
+                @test parity_compare(LinearAlgebra.diag(pr.sigma), LinearAlgebra.diag(Ob);
+                                     name = "$c diag sigma $b").ok
+            end
+        end
+    end
+end

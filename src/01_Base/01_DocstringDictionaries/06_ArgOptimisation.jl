@@ -47,6 +47,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :pnl_prior => "`pnl`: Optional [`AssetPanel`](@ref), the panel that the returns data held. A wrapping prior forwards it unchanged, so that it can compose an estimator that is fitted on a panel. An estimator that reads no panel ignores it.",
                  :pnl_moment => "`pnl`: Optional [`AssetPanel`](@ref), whose active mask the Coverage Universe of the fit is derived from. `nothing` makes the rule finiteness alone.",
                  :window => "`window`: Observation window. An integer selects the last `window` observations, and a vector of indices selects those observations.",
+                 :window_rule => "`rule`: [`AbstractWindowRule`](@ref) that says which observations the window keeps on the online seam. [`RollingWindow`](@ref) keeps the window at every fit, and [`SeedWindow`](@ref) keeps it at the first fit alone.",
                  # Frontier.
                  :N_fr => "`N`: Number of sweep points on the efficient frontier. The sweep solves the model `N` times, at `N` evenly spaced bound values.",#
                  :factor_fr => "`factor`: Multiplier applied to both ends of the sweep span after `bound` has transformed them. It carries a formulation's own correction factor, such as the `inv(1 / (T - ddof))` of a second-moment bound.",#

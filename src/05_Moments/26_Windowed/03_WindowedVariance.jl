@@ -14,7 +14,8 @@
              │           w ┼ nothing
              │   corrected ┴ Bool: true
            w ┼ nothing
-      window ┴ nothing
+      window ┼ nothing
+        rule ┴ RollingWindow()
     """
 end
 function variance_count(ve::WindowedVariance, X::MatNum)

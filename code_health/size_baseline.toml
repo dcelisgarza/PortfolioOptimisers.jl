@@ -28,7 +28,7 @@ commit = "ebcacfda95"
 "src/01_Base/01_DocstringDictionaries/03_ArgPriorsAndUncertaintySets.jl" = { code = 126, doc = 0, comment = 14, blank = 0, total = 140 }
 "src/01_Base/01_DocstringDictionaries/04_ArgPhylogenyAndConstraints.jl" = { code = 97, doc = 0, comment = 18, blank = 0, total = 115 }
 "src/01_Base/01_DocstringDictionaries/05_ArgRiskMeasuresAndCosts.jl" = { code = 111, doc = 0, comment = 24, blank = 0, total = 135 }
-"src/01_Base/01_DocstringDictionaries/06_ArgOptimisation.jl" = { code = 239, doc = 0, comment = 24, blank = 0, total = 263 }
+"src/01_Base/01_DocstringDictionaries/06_ArgOptimisation.jl" = { code = 243, doc = 0, comment = 24, blank = 0, total = 267 }
 "src/01_Base/01_DocstringDictionaries/07_FieldDict.jl" = { code = 3, doc = 0, comment = 2, blank = 0, total = 5 }
 "src/01_Base/01_DocstringDictionaries/08_ValidationsAndReturns.jl" = { code = 88, doc = 0, comment = 4, blank = 0, total = 92 }
 "src/01_Base/01_DocstringDictionaries/09_MathDataAndMoments.jl" = { code = 199, doc = 0, comment = 59, blank = 0, total = 258 }
@@ -49,7 +49,7 @@ commit = "ebcacfda95"
 "src/01_Base/12_NormError.jl" = { code = 107, doc = 316, comment = 0, blank = 131, total = 554 }
 "src/01_Base/13_KappaLog.jl" = { code = 3, doc = 36, comment = 0, blank = 18, total = 57 }
 "src/01_Base/14_PartialFit.jl" = { code = 66, doc = 224, comment = 2, blank = 128, total = 420 }
-"src/01_Base/15_Online.jl" = { code = 437, doc = 875, comment = 8, blank = 437, total = 1757 }
+"src/01_Base/15_Online.jl" = { code = 455, doc = 943, comment = 9, blank = 470, total = 1877 }
 "src/01_Base/16_CoveragePolicy.jl" = { code = 226, doc = 534, comment = 0, blank = 244, total = 1004 }
 "src/02_Tools/01_Operators.jl" = { code = 26, doc = 253, comment = 0, blank = 89, total = 368 }
 "src/02_Tools/02_ArrayViews.jl" = { code = 94, doc = 346, comment = 0, blank = 154, total = 594 }
@@ -85,7 +85,7 @@ commit = "ebcacfda95"
 "src/04_MatrixProcessing/03_Detone.jl" = { code = 48, doc = 188, comment = 0, blank = 81, total = 317 }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { code = 149, doc = 486, comment = 8, blank = 187, total = 830 }
 "src/04_MatrixProcessing/05_MatrixSquareRoot.jl" = { code = 61, doc = 182, comment = 1, blank = 81, total = 325 }
-"src/05_Moments/01_Base_Moments.jl" = { code = 487, doc = 1073, comment = 11, blank = 454, total = 2025 }
+"src/05_Moments/01_Base_Moments.jl" = { code = 491, doc = 1073, comment = 11, blank = 454, total = 2029 }
 "src/05_Moments/02_SimpleExpectedReturns.jl" = { code = 172, doc = 435, comment = 2, blank = 192, total = 801 }
 "src/05_Moments/03_Covariance.jl" = { code = 360, doc = 892, comment = 5, blank = 367, total = 1624 }
 "src/05_Moments/04_SimpleVariance.jl" = { code = 285, doc = 758, comment = 2, blank = 304, total = 1349 }
@@ -114,12 +114,12 @@ commit = "ebcacfda95"
 "src/05_Moments/23_CorrelationCovariance.jl" = { code = 20, doc = 90, comment = 0, blank = 48, total = 158 }
 "src/05_Moments/24_AbstractCovarianceVariance.jl" = { code = 33, doc = 218, comment = 0, blank = 100, total = 351 }
 "src/05_Moments/25_StandardDeviationExpectedReturns.jl" = { code = 31, doc = 160, comment = 0, blank = 66, total = 257 }
-"src/05_Moments/26_Windowed/01_WindowedExpectedReturns.jl" = { code = 13, doc = 0, comment = 0, blank = 0, total = 13 }
-"src/05_Moments/26_Windowed/02_WindowedCovariance.jl" = { code = 37, doc = 38, comment = 0, blank = 21, total = 96 }
-"src/05_Moments/26_Windowed/03_WindowedVariance.jl" = { code = 31, doc = 38, comment = 0, blank = 21, total = 90 }
-"src/05_Moments/26_Windowed/04_WindowedCoskewness.jl" = { code = 25, doc = 0, comment = 0, blank = 0, total = 25 }
-"src/05_Moments/26_Windowed/05_WindowedCokurtosis.jl" = { code = 25, doc = 0, comment = 0, blank = 0, total = 25 }
-"src/05_Moments/26_Windowed/06_WindowedPreamble.jl" = { code = 76, doc = 209, comment = 0, blank = 91, total = 376 }
+"src/05_Moments/26_Windowed/01_WindowedExpectedReturns.jl" = { code = 14, doc = 0, comment = 0, blank = 0, total = 14 }
+"src/05_Moments/26_Windowed/02_WindowedCovariance.jl" = { code = 38, doc = 38, comment = 0, blank = 21, total = 97 }
+"src/05_Moments/26_Windowed/03_WindowedVariance.jl" = { code = 32, doc = 38, comment = 0, blank = 21, total = 91 }
+"src/05_Moments/26_Windowed/04_WindowedCoskewness.jl" = { code = 26, doc = 0, comment = 0, blank = 0, total = 26 }
+"src/05_Moments/26_Windowed/05_WindowedCokurtosis.jl" = { code = 26, doc = 0, comment = 0, blank = 0, total = 26 }
+"src/05_Moments/26_Windowed/06_WindowedPreamble.jl" = { code = 120, doc = 340, comment = 1, blank = 163, total = 624 }
 "src/05_Moments/27_MedianExpectedReturns.jl" = { code = 28, doc = 102, comment = 0, blank = 48, total = 178 }
 "src/05_Moments/28_CustomValueExpectedReturns.jl" = { code = 50, doc = 161, comment = 0, blank = 75, total = 286 }
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { code = 143, doc = 402, comment = 5, blank = 190, total = 740 }
@@ -234,7 +234,7 @@ commit = "ebcacfda95"
 "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.jl" = { code = 461, doc = 600, comment = 21, blank = 231, total = 1313 }
 "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_c.jl" = { code = 251, doc = 301, comment = 50, blank = 92, total = 694 }
 "src/10_Prior/07_OpinionPoolingPrior.jl" = { code = 102, doc = 341, comment = 21, blank = 129, total = 593 }
-"src/10_Prior/08_HighOrderFactorPriorEstimator.jl" = { code = 190, doc = 299, comment = 54, blank = 93, total = 636 }
+"src/10_Prior/08_HighOrderFactorPriorEstimator.jl" = { code = 193, doc = 300, comment = 56, blank = 93, total = 642 }
 "src/10_Prior/09_AssetPanelEstimators.jl" = { code = 117, doc = 422, comment = 14, blank = 190, total = 743 }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { code = 404, doc = 779, comment = 0, blank = 356, total = 1539 }
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { code = 193, doc = 287, comment = 27, blank = 80, total = 587 }
@@ -255,7 +255,7 @@ commit = "ebcacfda95"
 "src/13_Fees.jl" = { code = 442, doc = 1341, comment = 9, blank = 538, total = 2330 }
 "src/14_NetReturnsDrawdowns.jl" = { code = 493, doc = 1326, comment = 15, blank = 598, total = 2432 }
 "src/15_Tracking.jl" = { code = 71, doc = 455, comment = 0, blank = 181, total = 707 }
-"src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { code = 430, doc = 1363, comment = 18, blank = 653, total = 2464 }
+"src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { code = 433, doc = 1367, comment = 18, blank = 653, total = 2471 }
 "src/16_RiskMeasures/02_Variance.jl" = { code = 254, doc = 636, comment = 20, blank = 231, total = 1141 }
 "src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { code = 295, doc = 918, comment = 5, blank = 353, total = 1571 }
 "src/16_RiskMeasures/04_Kurtosis.jl" = { code = 160, doc = 219, comment = 3, blank = 78, total = 460 }

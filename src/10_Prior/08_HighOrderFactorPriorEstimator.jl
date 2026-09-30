@@ -593,7 +593,8 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
         end
     end
     if !isnothing(f_sk)
-        posterior_V = negative_spectral_coskewness(posterior_sk, posterior_X, pe.ske.mp)
+        posterior_V = negative_spectral_coskewness(posterior_sk, posterior_X,
+                                                   coskewness_processor(pe.ske))
     end
     # The expansion, the second half of the contract. Every asset-side co-moment goes back
     # into a `NaN` frame of the full width through the same [`expand_moment`](@ref) the
@@ -617,11 +618,13 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
         nothing
     else
         HighOrderPrior(; pr = pr.fpr, kt = f_kt, D2 = f_D2, L2 = f_L2, S2 = f_S2, sk = f_sk,
-                       V = f_V, skmp = isnothing(f_sk) ? nothing : pe.ske.mp)
+                       V = f_V,
+                       skmp = isnothing(f_sk) ? nothing : coskewness_processor(pe.ske))
     end
     hop = HighOrderPrior(; pr = pr, kt = posterior_kt, D2 = D2, L2 = L2, S2 = S2,
                          sk = posterior_sk, V = posterior_V,
-                         skmp = isnothing(f_sk) ? nothing : pe.ske.mp, fpr = fpr)
+                         skmp = isnothing(f_sk) ? nothing : coskewness_processor(pe.ske),
+                         fpr = fpr)
     # The posterior co-moments run through this estimator's own `ske` and `kte`, so a policy
     # set on the low order alone narrows the Investable Mask here exactly as it does for a
     # plain high order prior. The fit is the one place that says so.

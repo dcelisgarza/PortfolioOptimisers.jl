@@ -518,7 +518,8 @@ end
         @test pe.show_fields(EmpiricalPrior(; max_scenarios = 10)) ==
               (:ce, :me, :horizon, :fill_limit, :max_scenarios)
         @test pe.show_fields(PortfolioOptimisersCovariance()) == (:ce, :mp)
-        @test pe.show_fields(FactorPrior()) == (:pe, :mp, :re, :ve, :rsd)
+        # `mtx_sqrt` holds the square root algorithm since #1410.
+        @test pe.show_fields(FactorPrior()) == (:pe, :mp, :re, :ve, :rsd, :mtx_sqrt)
         blv = pe.BlackLittermanViews(; P = [1.0 zeros(1, 5)], Q = [0.01])
         for est in (EmpiricalPrior(), PortfolioOptimisersCovariance(), FactorPrior(),
                     EntropyPoolingPrior(), OpinionPoolingPrior(; pes = [EntropyPoolingPrior()]),

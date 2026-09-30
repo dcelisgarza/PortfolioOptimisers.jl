@@ -189,6 +189,7 @@ The difference between Implied Volatility and realised volatility, typically pos
 **Windowed Estimator**
 A moment estimator restricting an inner moment estimator to a sub-window of the observations, then delegating. Windowing decides *which observations are seen*, never how the moment is computed from them.
 Its window follows one of two rules, and the two agree in a batch fit. A **Rolling Window**, the default, keeps the last observations of every fit, so on the online seam it refits over a window that moves. A **Seed Window** cuts only the observations of the first fit, and the inner estimator then folds every later observation. A Seed Window needs an inner estimator that folds exactly, held by a host that folds; a refit has no first fit to remember and refuses it. ADR 0193.
+*Avoid*: reading a Seed Window as a state of the Windowed Estimator. Its first fold spends the window: it returns the estimator with `window = nothing`, and the inner estimator holds the state of the fold. #1469.
 
 ### 3.1 Expected Returns (Moments)
 

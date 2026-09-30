@@ -374,3 +374,251 @@ function windowed_variance_series(est, w::Option{<:ObsWeights},
     end
     return isone(dims) ? val : permutedims(val)
 end
+"""
+    const SeedWindowed = Union{<:WindowedExpectedReturns{<:Any, <:Any, <:Any, <:SeedWindow},
+                               <:WindowedCovariance{<:Any, <:Any, <:Any, <:SeedWindow},
+                               <:WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow},
+                               <:WindowedCoskewness{<:Any, <:Any, <:Any, <:SeedWindow},
+                               <:WindowedCokurtosis{<:Any, <:Any, <:Any, <:SeedWindow}}
+
+The windowed estimators under a [`SeedWindow`](@ref), the ones that fold.
+
+The last type parameter of a windowed estimator is the type of its `rule` field, so the alias selects the rule by dispatch. A windowed estimator under a [`RollingWindow`](@ref) is not in it, and it does not fold.
+
+# Related
+
+  - [`SeedWindow`](@ref)
+  - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+const SeedWindowed = Union{<:WindowedExpectedReturns{<:Any, <:Any, <:Any, <:SeedWindow},
+                           <:WindowedCovariance{<:Any, <:Any, <:Any, <:SeedWindow},
+                           <:WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow},
+                           <:WindowedCoskewness{<:Any, <:Any, <:Any, <:SeedWindow},
+                           <:WindowedCokurtosis{<:Any, <:Any, <:Any, <:SeedWindow}}
+"""
+    partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)
+    partial_fit!(est::SeedWindowed, x::VecNum; kwargs...)
+
+Fold a block of observations into a windowed estimator under a [`SeedWindow`](@ref).
+
+The first fold cuts the block to the window, as a batch fit does, and folds the rows that remain into the inner estimator. It returns the estimator with `window = nothing`, so the window is spent, and each later fold passes every row to the inner estimator. The estimator holds no state of its own: its inner estimator holds the state of the fold, and the spent window records that the first fold happened.
+
+The vector method folds one observation as a matrix of one row. So a first fold of one observation keeps it when the window keeps the last row.
+
+# Algorithm
+
+ 1. Read the inner estimator, the first field that the declaration of the type sets, giving `inner`.
+ 2. Resolve the window against the block with [`get_window`](@ref), giving `win`. After the first fold the window is `nothing`, and `win` is a `Colon`.
+ 3. Cut the block with [`windowed_rows`](@ref), and cut the `active_mask` and `estimation_mask` keywords with [`windowed_keywords`](@ref).
+ 4. Fold the cut block into `inner` with [`partial_fit!`](@ref).
+ 5. Return the estimator with the folded `inner` and `window = nothing`.
+
+# Arguments
+
+  - `est`: Windowed estimator under a seed window.
+  - $(arg_dict[:X])
+  - `x::VecNum`: One observation, with one entry per asset.
+  - $(arg_dict[:dims])
+  - `kwargs...`: Keywords passed to the fold of the inner estimator. The two universe masks are cut to the window.
+
+# Validation
+
+  - `est.w` is `nothing`, because a weight vector reweights every past observation when a new one arrives. An `ArgumentError` is thrown otherwise.
+  - The inner estimator folds, by [`supports_partial_fit`](@ref). An `ArgumentError` is thrown otherwise.
+  - $(val_dict[:dims])
+
+# Returns
+
+  - `est`: The windowed estimator, with its inner estimator folded and its window spent.
+
+# Related
+
+  - [`SeedWindow`](@ref)
+  - [`SeedWindowed`](@ref)
+  - [`windowed_preamble`](@ref)
+  - [`EmpiricalPrior`](@ref)
+"""
+function partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)
+    # The declaration of every windowed type sets the inner estimator as the first field.
+    inner = getfield(est, 1)
+    @argcheck(isnothing(est.w),
+              ArgumentError("`$(typeof(est).name.name)` under a `SeedWindow` holds observation weights, and the fold cannot honour them: a weight vector reweights every past observation when a new one arrives. Set `w = nothing`, or fit the estimator in batch."))
+    @argcheck(supports_partial_fit(inner),
+              ArgumentError("`$(typeof(est).name.name)` under a `SeedWindow` folds its inner estimator, and `$(typeof(inner).name.name)` does not fold. Use an inner estimator that folds, such as `ExpWeightedCovariance`, or set the rule to `RollingWindow()`, so that the host refits the estimator over its carried rows."))
+    assert_dims(dims)
+    win = get_window(est.window, X, dims)
+    inner = partial_fit!(inner, windowed_rows(X, win, dims); dims = dims,
+                         windowed_keywords(win, dims; kwargs...)...)
+    return typeof(est).name.wrapper(inner, est.w, nothing, est.rule)
+end
+function partial_fit!(est::SeedWindowed, x::VecNum; kwargs...)
+    kw = map(v -> isa(v, AbstractVector{Bool}) ? permutedims(v) : v, values(kwargs))
+    return partial_fit!(est, permutedims(x); dims = 1, kw...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Answers that a windowed estimator under a [`SeedWindow`](@ref) folds.
+
+A host that carries the observations, such as the carry of [`EmpiricalPrior`](@ref), folds each member that folds, and refits the others over its rows. A seed window must fold, because a refit keeps the rolling window. So the answer is `true` whatever the inner estimator, and the fold refuses an inner estimator that does not fold with an error that names it, not a silent refit.
+
+# Arguments
+
+  - `est`: Windowed estimator under a seed window.
+
+# Returns
+
+  - `true`.
+
+# Related
+
+  - [`supports_partial_fit`](@ref)
+  - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function supports_partial_fit(::SeedWindowed)
+    return true
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Names the `rule` field of a windowed estimator under a [`SeedWindow`](@ref), the end of the walk of [`seed_window_path`](@ref).
+
+# Arguments
+
+  - `est`: Windowed estimator under a seed window.
+
+# Returns
+
+  - `path::String`: `"rule"`.
+
+# Related
+
+  - [`seed_window_path`](@ref)
+  - [`Online`](@ref)
+"""
+function seed_window_path(::SeedWindowed)
+    return "rule"
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Read the expected returns out of the fold of a windowed estimator under a [`SeedWindow`](@ref).
+
+The inner estimator holds the state of the fold, so the method reads it there.
+
+# Arguments
+
+  - `me`: Windowed expected returns estimator under a seed window.
+  - `kwargs...`: Keywords passed to the read of the inner estimator.
+
+# Returns
+
+  - $(ret_dict[:mu])
+
+# Related
+
+  - [`WindowedExpectedReturns`](@ref)
+  - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.mean(me::WindowedExpectedReturns{<:Any, <:Any, <:Any, <:SeedWindow};
+                         kwargs...)
+    return Statistics.mean(me.me; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Read the covariance out of the fold of a windowed estimator under a [`SeedWindow`](@ref).
+
+The inner estimator holds the state of the fold, so the method reads it there.
+
+# Arguments
+
+  - `ce`: Windowed covariance estimator under a seed window.
+  - `kwargs...`: Keywords passed to the read of the inner estimator.
+
+# Returns
+
+  - $(ret_dict[:sigma])
+
+# Related
+
+  - [`WindowedCovariance`](@ref)
+  - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.cov(ce::WindowedCovariance{<:Any, <:Any, <:Any, <:SeedWindow};
+                        kwargs...)
+    return Statistics.cov(ce.ce; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Read the variance out of the fold of a windowed estimator under a [`SeedWindow`](@ref).
+
+The inner estimator holds the state of the fold, so the method reads it there.
+
+# Arguments
+
+  - `ve`: Windowed variance estimator under a seed window.
+  - `kwargs...`: Keywords passed to the read of the inner estimator.
+
+# Returns
+
+  - $(ret_dict[:vararr])
+
+# Related
+
+  - [`WindowedVariance`](@ref)
+  - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function Statistics.var(ve::WindowedVariance{<:Any, <:Any, <:Any, <:SeedWindow}; kwargs...)
+    return Statistics.var(ve.ve; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Read the coskewness out of the fold of a windowed estimator under a [`SeedWindow`](@ref).
+
+The inner estimator holds the state of the fold, so the method reads it there.
+
+# Arguments
+
+  - `ske`: Windowed coskewness estimator under a seed window.
+  - `kwargs...`: Keywords passed to the read of the inner estimator.
+
+# Returns
+
+  - $(ret_dict[:cskew])
+  - $(ret_dict[:cskewV])
+
+# Related
+
+  - [`WindowedCoskewness`](@ref)
+  - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function coskewness(ske::WindowedCoskewness{<:Any, <:Any, <:Any, <:SeedWindow}; kwargs...)
+    return coskewness(ske.ske; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Read the cokurtosis out of the fold of a windowed estimator under a [`SeedWindow`](@ref).
+
+The inner estimator holds the state of the fold, so the method reads it there.
+
+# Arguments
+
+  - `kte`: Windowed cokurtosis estimator under a seed window.
+  - `kwargs...`: Keywords passed to the read of the inner estimator.
+
+# Returns
+
+  - $(ret_dict[:kte])
+
+# Related
+
+  - [`WindowedCokurtosis`](@ref)
+  - [`partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)`](@ref)
+"""
+function cokurtosis(kte::WindowedCokurtosis{<:Any, <:Any, <:Any, <:SeedWindow}; kwargs...)
+    return cokurtosis(kte.kte; kwargs...)
+end

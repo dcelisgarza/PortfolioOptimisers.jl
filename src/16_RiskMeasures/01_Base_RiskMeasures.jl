@@ -1720,26 +1720,33 @@ function fit_deferred_quantity(dq::CoskewnessEstimator, pr::AbstractPriorResult;
 end
 """
     coskewness_processor(ske::CoskewnessEstimator)
+    coskewness_processor(ske::Coskewness)
+    coskewness_processor(ske::WindowedCoskewness)
 
 Return the matrix-processing estimator that a [`CoskewnessEstimator`](@ref) uses to build `V`, or `nothing` when the estimator names none.
 
 `V = negative_spectral_coskewness(sk, X, mp)`, so building `V` always names a processor. When a coskewness estimator stands in a [`NegativeSkewness`](@ref) `sk` slot, **that** estimator's processor is the one that built the `V` it hands back, and the measure records it in place of its own `mp` so that a later rebuild uses the same one. This mirrors [`HighOrderPrior`](@ref)'s `skmp`.
 
-The [`CoskewnessEstimator`](@ref) interface does not require an `mp` field, so the default answers `nothing` and the measure keeps the processor it already holds. Declare a method for an estimator that names one.
+The [`CoskewnessEstimator`](@ref) interface does not require an `mp` field, so the default answers `nothing` and the measure keeps the processor it already holds. Declare a method for an estimator that names one. A [`WindowedCoskewness`](@ref) answers the processor of its inner estimator, which builds its `V`.
 
 # Related
 
   - [`CoskewnessEstimator`](@ref)
   - [`Coskewness`](@ref)
+  - [`WindowedCoskewness`](@ref)
   - [`NegativeSkewness`](@ref)
   - [`fit_deferred_quantity`](@ref)
   - [`negative_spectral_coskewness`](@ref)
+  - [`HighOrderPrior`](@ref)
 """
 function coskewness_processor(::CoskewnessEstimator)
     return nothing
 end
 function coskewness_processor(ske::Coskewness)
     return ske.mp
+end
+function coskewness_processor(ske::WindowedCoskewness)
+    return coskewness_processor(ske.ske)
 end
 """
     deferred_centre(dq, pr::AbstractPriorResult)

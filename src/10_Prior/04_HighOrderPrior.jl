@@ -778,7 +778,7 @@ Where:
  3. Compute the square cokurtosis `kt` with `pe.kte`. A `nothing` estimator gives a `nothing` moment.
  4. Compute the coskewness `sk` and its negative spectral form `V` with `pe.ske`. A `nothing` estimator gives `nothing` for both.
  5. Build the structure matrices at the asset count `size(pr.X, 2)` with [`dup_elim_sum_matrices`](@ref). Take all three when steps 3 and 4 both produced a moment, take `L2` and `S2` alone when step 3 produced one and step 4 did not, and take none otherwise. `D2` serves `sk` and the pair `L2`, `S2` serves `kt`, which is why the second case leaves `D2` as `nothing`.
- 6. Assemble the [`HighOrderPrior`](@ref) through its keyword constructor, carrying `pe.ske.mp` as `skmp` when step 4 produced an `sk`. Every `@argcheck` of the constructor runs on the shapes steps 3 to 5 produced.
+ 6. Assemble the [`HighOrderPrior`](@ref) through its keyword constructor, carrying the processor of `pe.ske` from [`coskewness_processor`](@ref) as `skmp` when step 4 produced an `sk`. Every `@argcheck` of the constructor runs on the shapes steps 3 to 5 produced.
 
 # Arguments
 
@@ -827,7 +827,7 @@ The tail of every [`HighOrderPriorEstimator`](@ref) fit, written once: the batch
 # Algorithm
 
  1. Build `D2`, `L2` and `S2` where both co-moments are present, and `L2` and `S2` alone where only the cokurtosis is.
- 2. Assemble the [`HighOrderPrior`](@ref), carrying `pe.ske.mp` where a coskewness tensor was fitted.
+ 2. Assemble the [`HighOrderPrior`](@ref), carrying the processor of `pe.ske` from [`coskewness_processor`](@ref) where a coskewness tensor was fitted.
  3. Refuse a prior result whose blocks do not agree on the Coverage Universe, with [`assert_matched_coverage`](@ref).
 
 # Arguments
@@ -864,7 +864,7 @@ function assemble_high_order_prior(pe::HighOrderPriorEstimator, pr::AbstractPrio
         L2, S2 = dup_elim_sum_matrices(size(pr.X, 2))[2:3]
     end
     hop = HighOrderPrior(; pr = pr, kt = kt, D2 = D2, L2 = L2, S2 = S2, sk = sk, V = V,
-                         skmp = isnothing(sk) ? nothing : pe.ske.mp)
+                         skmp = isnothing(sk) ? nothing : coskewness_processor(pe.ske))
     assert_matched_coverage(hop)
     return hop
 end

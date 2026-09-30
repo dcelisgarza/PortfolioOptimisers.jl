@@ -41,5 +41,7 @@ PortfolioOptimisers.update_online_estimator
 PortfolioOptimisers.estimator_fields
 PortfolioOptimisers.online_entry_state
 PortfolioOptimisers.online_wrapper_path
+PortfolioOptimisers.AbstractWindowRule
+PortfolioOptimisers.seed_window_path
 PortfolioOptimisers.assert_batch_entry
 ```

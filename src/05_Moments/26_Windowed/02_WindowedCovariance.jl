@@ -24,7 +24,8 @@
              │      │     alg ┼ nothing
              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
            w ┼ nothing
-      window ┴ nothing
+      window ┼ nothing
+        rule ┴ RollingWindow()
     """
 end
 """
