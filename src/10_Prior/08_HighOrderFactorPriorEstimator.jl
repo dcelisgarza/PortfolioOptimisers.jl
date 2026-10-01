@@ -255,11 +255,13 @@ HighOrderFactorPriorEstimator
       │            │     alg ┼ nothing
       │            │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
       │         re ┼ StepwiseRegression
-      │            │   crit ┼ PValue
-      │            │        │   t ┴ Float64: 0.05
-      │            │    alg ┼ ForwardSelection()
-      │            │    tgt ┼ LinearModel
-      │            │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │            │       crit ┼ PValue
+      │            │            │   t ┴ Float64: 0.05
+      │            │        alg ┼ ForwardSelection()
+      │            │        tgt ┼ LinearModel
+      │            │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │            │     choice ┼ BatchChoice()
+      │            │   included ┴ nothing
       │         ve ┼ SimpleVariance
       │            │          me ┼ SimpleExpectedReturns
       │            │             │   w ┴ nothing

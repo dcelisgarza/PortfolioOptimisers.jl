@@ -511,7 +511,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/19_Cokurtosis.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/20_Base_Regression.jl" = { raw = 6, reviewed = 6 }
 "src/05_Moments/21_TimeSeriesRegression/01_StepwiseRegression.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl" = { raw = 1, reviewed = 1 }
 "src/05_Moments/22_ImpliedVolatility.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/23_CorrelationCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/24_AbstractCovarianceVariance.jl" = { raw = 0, reviewed = 0 }

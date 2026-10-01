@@ -121,6 +121,26 @@ after the Descriptor warm-up. The step runs the part of the fit that the choice 
 buffer, so the member that it writes is the member that the call with no data of that step drops. In the carry fold, a batch choice
 that moves refits every past date, and a pinned choice is recorded in the carry state.
 
+### The selection regressions of a factor prior
+
+- `StepwiseRegression` holds the factor set of each asset in `included`, one entry per asset, and
+  a fit runs no search for an asset whose entry is set. The search of one asset reads only its own
+  column and the factor returns, so the step pins every asset whose column of the buffer is finite,
+  and an asset that the fit does not cover yet pins at the first fit that covers it. The field is on
+  the asset axis, so a view slices it, and each prior views the regression to the assets that it
+  fits.
+- `DimensionReductionRegression` holds its components in `proj`, as weights of the original factors.
+  The pin keeps the standardisation scale of the first fit inside those weights, because the
+  components are combinations of the original factors and a new scale moves them. The mean is not
+  pinned: a constant shift of the components changes only the intercept of the fit, which the
+  recovery rebuilds from the mean of the rows that it fits.
+- The first fit is the first step whose buffer holds two rows, the fewest that both regressions
+  accept.
+- One hook runs after the fold of every refitting prior. It pins the regression of `FactorPrior`,
+  `FactorBlackLittermanPrior` and `AugmentedBlackLittermanPrior`, and it reaches a factor prior
+  inside a prior that embeds it, because that prior refits from its own buffer and never steps the
+  embedded one.
+
 ### The carry fold carries only the rows that the Descriptors read
 
 Each Descriptor states its look-back: an `Integer`, or `nothing` for a recursion from the first row.

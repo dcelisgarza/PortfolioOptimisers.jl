@@ -1609,6 +1609,34 @@ function regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult
     @argcheck(!isnothing(rd.F), IsNothingError)
     return regression(re, rd.X, rd.F)
 end
+"""
+    pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, X::MatNum, F::MatNum)
+
+Returns a regression estimator unchanged, because it has no choice to pin.
+
+The online step of a prior that fits a regression calls [`pin_regression_choice`](@ref) after the fold, over the rows of its buffer. A regression that makes a choice over every observation, such as the factor set of [`StepwiseRegression`](@ref) or the components of [`DimensionReductionRegression`](@ref), has a method of its own under a [`PinnedChoice`](@ref), which writes the choice of the first fit into its configuration. This method answers every other regression, and a regression under [`BatchChoice`](@ref).
+
+# Arguments
+
+  - `re`: Regression estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:F])
+
+# Returns
+
+  - `re::AbstractTimeSeriesRegressionEstimator`: The input estimator, unchanged.
+
+# Related
+
+  - [`StepwiseRegression`](@ref)
+  - [`DimensionReductionRegression`](@ref)
+  - [`PinnedChoice`](@ref)
+  - [`pin_prior_choice`](@ref)
+"""
+function pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, ::MatNum,
+                               ::MatNum)
+    return re
+end
 
 export regression, Regression, LinearModel, GeneralisedLinearModel, BenchmarkWeightMetric,
        RegressionWeightMetric, InverseIdiosyncraticVarianceMetric, IdentityMetric

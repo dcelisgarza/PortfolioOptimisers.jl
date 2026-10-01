@@ -229,11 +229,13 @@ AugmentedBlackLittermanPrior
                │     alg ┼ nothing
                │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
             re ┼ StepwiseRegression
-               │   crit ┼ PValue
-               │        │   t ┴ Float64: 0.05
-               │    alg ┼ ForwardSelection()
-               │    tgt ┼ LinearModel
-               │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+               │       crit ┼ PValue
+               │            │   t ┴ Float64: 0.05
+               │        alg ┼ ForwardSelection()
+               │        tgt ┼ LinearModel
+               │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
+               │     choice ┼ BatchChoice()
+               │   included ┴ nothing
        a_views ┼ LinearConstraintEstimator
                │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
                │   key ┴ nothing
@@ -452,7 +454,7 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
  4. Fit `pe.a_pe` on `X`, giving `a_prior`.
  5. Derive the Investable Mask and the reduced asset view universe with [`investable_views`](@ref), refuse a precomputed asset view matrix over a gapped universe with [`assert_bl_precomputed_universe`](@ref), and view `a_prior` at the mask with [`investable_prior`](@ref). `N` is the reduced asset count from here on.
  6. Fit `pe.f_pe` on `F`, giving `f_prior`.
- 7. Regress the reduced `X` — [`reduce_columns`](@ref) at the mask — on `F` with [`factor_reconstruction`](@ref) under `pe.re`, giving `rr` and the reconstructed returns `posterior_X`, both on the reduced asset axis.
+ 7. Regress the reduced `X` — [`reduce_columns`](@ref) at the mask — on `F` with [`factor_reconstruction`](@ref) under `pe.re` viewed to the same mask with [`coverage_regression`](@ref), giving `rr` and the reconstructed returns `posterior_X`, both on the reduced asset axis.
  8. Assemble the asset views with [`bl_preroll`](@ref) at the default `:xkey`, over the reduced asset prior covariance, and the factor views at `:tfkey`, over the factor prior covariance. Either half can be emptied, and [`bl_view_block`](@ref) then gives that half no row rather than collapsing the stack — the joint posterior is still conditioned by whatever the other half kept. Only the asset half can be emptied by a *departure*: a factor axis holds no asset name. When **both** halves empty there is nothing left to condition on, and step 12 takes the joint prior.
  9. Build ``\\boldsymbol{\\Sigma}_{aug}``, whose off-diagonal blocks are the model-implied cross-covariance ``\\mathbf{M}\\boldsymbol{\\Sigma}_f`` and its transpose.
 10. Stack ``\\mathbf{P}_{aug}`` block-diagonally, ``\\boldsymbol{q}_{aug}`` and ``\\boldsymbol{\\Omega}_{aug}`` to match, the asset rows above the factor rows.
@@ -511,7 +513,8 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     # Black litterman on the factors. Only the reconstruction is shared with `FactorPrior`:
     # the asset moments here come out of the augmented system, not out of a lift. It runs on
     # the reduced returns, so `M` and `b` land on the same axis as `a_prior_sigma`.
-    rr, posterior_X = factor_reconstruction(pe.re, reduce_columns(X, imsk), F)
+    rr, posterior_X = factor_reconstruction(coverage_regression(pe.re, imsk),
+                                            reduce_columns(X, imsk), F)
     (; b, M) = rr
     dt = eltype(posterior_X)
     T = size(X, 1)

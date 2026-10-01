@@ -637,7 +637,8 @@ A prior that reads Panel Fields, as [`reads_panel_fields`](@ref) answers, refuse
  1. Refuse a prior that reads Panel Fields. Answer [`needs_factor_returns`](@ref) for the tree, and apply the answer to `F` with [`fold_factor_argument`](@ref), giving the `F` that the buffer records.
  2. Read the buffer out of `pe.cache` with [`assert_sample_buffer`](@ref), giving `state`.
  3. Fold a matrix, its factor block and its masks into `state` through the block method of [`partial_fit!`](@ref), or a vector, its factor observation and its masks through the single-observation method.
- 4. Rebuild the prior with its `cache` set to the new `state`, and return it.
+ 4. Rebuild the prior with its `cache` set to the new `state`.
+ 5. Apply the Choice Rule of the regression of the prior over the rows of `state` with [`pin_prior_choice`](@ref), and return the prior.
 
 # Arguments
 
@@ -684,7 +685,8 @@ function partial_fit!(pe::AbstractPriorEstimator, X::VecNum_MatNum,
     end
     # `rebuild_estimator`, not `Accessors.@reset`, for the reason the generic buffering arm
     # gives: every prior that buffers declares forwarded properties, which `@reset` refuses.
-    return rebuild_estimator(pe, (; cache = state))
+    return pin_prior_choice(rebuild_estimator(pe, (; cache = state)), sample_buffer(state),
+                            factor_buffer(state))
 end
 """
     partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
@@ -735,13 +737,13 @@ end
 
 Takes the step of the refit route of a prior: the fold of [`refit_prior_fold`](@ref), and the work a prior adds around it.
 
-A prior that adds no work folds `rd` with [`refit_prior_fold`](@ref). A [`CrossSectionalFactorPrior`](@ref) refuses an observed factor first, with [`assert_cross_sectional_online_factors`](@ref), because the buffer records no Exogenous Series. It applies its Choice Rule after the fold, with [`cross_sectional_pin_choice`](@ref). The step is a function of its own, and not a method of [`partial_fit!`](@ref), so every method of that verb that reads a family state narrows the `cache` of its estimator, and a buffer reaches this route alone.
+A prior that adds no work of its own folds `rd` with [`refit_prior_fold`](@ref), and applies the Choice Rule of a regression that it fits with [`pin_prior_choice`](@ref). A [`CrossSectionalFactorPrior`](@ref) refuses an observed factor first, with [`assert_cross_sectional_online_factors`](@ref), because the buffer records no Exogenous Series. It applies its Choice Rule after the fold, with [`cross_sectional_pin_choice`](@ref). The step is a function of its own, and not a method of [`partial_fit!`](@ref), so every method of that verb that reads a family state narrows the `cache` of its estimator, and a buffer reaches this route alone.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. Any prior: fold `rd` with [`refit_prior_fold`](@ref).
+ 1. Any prior: fold `rd` with [`refit_prior_fold`](@ref), and apply [`pin_prior_choice`](@ref) over the rows of the buffer.
  2. A [`CrossSectionalFactorPrior`](@ref): refuse an observed factor, fold `rd` with [`refit_prior_fold`](@ref), and pin the dropped members under a [`PinnedChoice`](@ref).
 
 # Arguments
@@ -761,10 +763,75 @@ The method that Julia selects is the algorithm.
 
   - [`partial_fit!`](@ref)
   - [`refit_prior_fold`](@ref)
+  - [`pin_prior_choice`](@ref)
   - [`cross_sectional_pin_choice`](@ref)
 """
 function refit_prior_step(pe::AbstractPriorEstimator, rd::ReturnsResult)
-    return refit_prior_fold(pe, rd)
+    pe = refit_prior_fold(pe, rd)
+    state = pe.cache
+    return pin_prior_choice(pe, sample_buffer(state), factor_buffer(state))
+end
+"""
+    pin_prior_choice(pe::AbstractPriorEstimator, X, F)
+    pin_prior_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
+                               <:AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum)
+    pin_prior_choice(pe::Union{<:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator,
+                               <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
+                               <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, X, F)
+    pin_prior_choice(pe::OpinionPoolingPrior, X, F)
+
+Applies the Choice Rule of each regression that a prior fits, after an online step of the refit route.
+
+A [`StepwiseRegression`](@ref) or a [`DimensionReductionRegression`](@ref) under a [`PinnedChoice`](@ref) keeps the choice of its first fit. The step holds no state for it: it writes the choice into the configuration of the regression, with [`pin_regression_choice`](@ref), over the rows of the buffer. A prior that embeds another prior fits the embedded prior on the same returns and factor returns, so the method passes the same rows to it. A prior with no regression in its tree returns unchanged.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Any other prior, or `F` that is `nothing`: return `pe`.
+ 2. A prior that fits `pe.re` on the returns: apply [`pin_regression_choice`](@ref) to `pe.re`, and rebuild `pe` with the answer when it differs.
+ 3. A prior that embeds a prior in `pe.pe`: apply this function to `pe.pe`, and rebuild `pe` with the answer when it differs.
+ 4. An [`OpinionPoolingPrior`](@ref): apply this function to each prior of `pe.pes`, and rebuild `pe` with the answers when one differs.
+
+# Arguments
+
+  - `pe`: The prior after the fold of the step.
+  - `X`: The returns of the rows of the buffer, `observations × assets`.
+  - `F`: The factor returns of the rows of the buffer, `observations × factors`, or `nothing`.
+
+# Validation
+
+  - The rules of [`pin_regression_choice`](@ref).
+
+# Returns
+
+  - `pe::AbstractPriorEstimator`: The prior that the step returns.
+
+# Related
+
+  - [`pin_regression_choice`](@ref)
+  - [`refit_prior_step`](@ref)
+  - [`PinnedChoice`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function pin_prior_choice(pe::AbstractPriorEstimator, ::Any, ::Any)
+    return pe
+end
+function pin_prior_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
+                                    <:AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum)
+    re = pin_regression_choice(pe.re, X, F)
+    return re === pe.re ? pe : rebuild_estimator(pe, (; re = re))
+end
+function pin_prior_choice(pe::Union{<:HighOrderPriorEstimator,
+                                    <:HighOrderFactorPriorEstimator, <:BlackLittermanPrior,
+                                    <:BayesianBlackLittermanPrior, <:EntropyPoolingPrior,
+                                    <:MeucciEntropyPoolingPrior}, X, F)
+    inner = pin_prior_choice(pe.pe, X, F)
+    return inner === pe.pe ? pe : rebuild_estimator(pe, (; pe = inner))
+end
+function pin_prior_choice(pe::OpinionPoolingPrior, X, F)
+    pes = [pin_prior_choice(p, X, F) for p in pe.pes]
+    return all(splat(===), zip(pes, pe.pes)) ? pe : rebuild_estimator(pe, (; pes = pes))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

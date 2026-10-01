@@ -83,11 +83,13 @@ FactorPrior
            │     alg ┼ nothing
            │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
         re ┼ StepwiseRegression
-           │   crit ┼ PValue
-           │        │   t ┴ Float64: 0.05
-           │    alg ┼ ForwardSelection()
-           │    tgt ┼ LinearModel
-           │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+           │       crit ┼ PValue
+           │            │   t ┴ Float64: 0.05
+           │        alg ┼ ForwardSelection()
+           │        tgt ┼ LinearModel
+           │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
+           │     choice ┼ BatchChoice()
+           │   included ┴ nothing
         ve ┼ SimpleVariance
            │          me ┼ SimpleExpectedReturns
            │             │   w ┴ nothing
@@ -233,6 +235,42 @@ function factor_reconstruction(re::AbstractTimeSeriesRegressionEstimator, X::Mat
                                F::MatNum)
     rr = regression(re, X, F)
     return rr, F * transpose(rr.M) .+ transpose(rr.b)
+end
+"""
+    coverage_regression(re::AbstractTimeSeriesRegressionEstimator, cmsk::Nothing)
+    coverage_regression(re::AbstractTimeSeriesRegressionEstimator, cmsk::BitVector)
+
+Views a regression estimator to the assets that a factor prior gives to its fit.
+
+[`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) fit the regression on the columns of the returns that a mask keeps. A regression can hold one value per asset, such as the factor set of each asset in `included` of a [`StepwiseRegression`](@ref). That value must describe the same columns as the returns that the fit reads, so the prior views the regression with the same mask.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `cmsk` is `nothing`: every asset is in the fit, so return `re`.
+ 2. `cmsk` is a mask: return [`port_opt_view`](@ref) of `re` at `findall(cmsk)`.
+
+# Arguments
+
+  - $(arg_dict[:re])
+  - `cmsk`: The mask of the assets in the fit, or `nothing`.
+
+# Returns
+
+  - `re::AbstractTimeSeriesRegressionEstimator`: The regression on the assets in the fit.
+
+# Related
+
+  - [`factor_reconstruction`](@ref)
+  - [`coverage_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function coverage_regression(re::AbstractTimeSeriesRegressionEstimator, ::Nothing)
+    return re
+end
+function coverage_regression(re::AbstractTimeSeriesRegressionEstimator, cmsk::BitVector)
+    return port_opt_view(re, findall(cmsk))
 end
 """
     factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
@@ -485,7 +523,7 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
 
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
  2. Fit the wrapped prior `pe.pe` on `F`, giving `f_prior`, the factor-axis prior result. `strict` reaches it, because `pe.pe` admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
- 3. Fit the loadings and rebuild the asset returns with [`factor_reconstruction`](@ref), giving `rr` and `posterior_X`.
+ 3. Fit the loadings and rebuild the asset returns with [`factor_reconstruction`](@ref), giving `rr` and `posterior_X`. The regression is `pe.re` viewed to the Coverage Universe with [`coverage_regression`](@ref).
  4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`.
  5. Write `esigma`, `edof` and `ediv` onto `rr` with [`set_idiosyncratic_covariance`](@ref). Under `pe.rsd = true` the fields hold the residual variances the lift measured and their counts, and under `pe.rsd = false` `esigma` and `ediv` hold `nothing`, because the lift added no residual block.
  6. Assemble a [`LowOrderPrior`](@ref) over `posterior_X`, with the oriented `X` under `o_X`, the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the regression result under `rr`, and `f_prior` itself under `fpr`. No `Z` is carried; the composition note of [`FactorPrior`](@ref) says why.
@@ -529,7 +567,7 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
     # `strict` reaches the wrapped prior: `pe.pe` admits `BlackLittermanPrior` and
     # `EntropyPoolingPrior`, both of which resolve view names against a universe and honour it.
     f_prior = prior(pe.pe, F; strict = strict)
-    rr, posterior_X = factor_reconstruction(pe.re, Xc, F)
+    rr, posterior_X = factor_reconstruction(coverage_regression(pe.re, cmsk), Xc, F)
     (; mu, sigma, chol, esigma, edof, ediv) = factor_lift(pe.mp, pe.ve, pe.rsd, rr,
                                                           f_prior.mu, f_prior.sigma, Xc,
                                                           posterior_X;

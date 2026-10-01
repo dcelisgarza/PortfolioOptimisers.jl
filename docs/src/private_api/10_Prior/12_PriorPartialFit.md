@@ -19,6 +19,7 @@ PortfolioOptimisers.assert_factor_returns
 PortfolioOptimisers.assert_prior_fold_returns
 PortfolioOptimisers.refit_prior_step
 PortfolioOptimisers.refit_prior_fold
+PortfolioOptimisers.pin_prior_choice
 PortfolioOptimisers.refit_step_kwargs
 PortfolioOptimisers.step_panel_fields
 PortfolioOptimisers.fold_factor_argument

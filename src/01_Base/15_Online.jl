@@ -1705,7 +1705,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the Choice Rule of an estimator, the rule that says how a choice that a fit makes over its whole sample behaves on the online seam.
 
-Some fits make a choice that reads every observation, such as the dropped member of a Factor Family in [`CrossSectionalFactorPrior`](@ref). In a batch fit every rule makes the same choice. The rules differ when the estimator receives its observations one block at a time.
+Some fits make a choice that reads every observation, such as the dropped member of a Factor Family in [`CrossSectionalFactorPrior`](@ref), the factor set of each asset in [`StepwiseRegression`](@ref), or the components of [`DimensionReductionRegression`](@ref). In a batch fit every rule makes the same choice. The rules differ when the estimator receives its observations one block at a time.
 
 # Interfaces
 
@@ -1716,6 +1716,8 @@ A rule is a marker for dispatch, and it holds no data. An estimator that makes s
   - [`BatchChoice`](@ref)
   - [`PinnedChoice`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
+  - [`StepwiseRegression`](@ref)
+  - [`DimensionReductionRegression`](@ref)
 """
 abstract type AbstractChoiceRule <: AbstractAlgorithm end
 """
@@ -1747,7 +1749,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Keeps the choice of the first fit. After the first fit, every later fit reads the same choice.
 
-In a batch fit the rule makes the same choice as [`BatchChoice`](@ref). On the online seam the rule holds no state. After the first step whose rows the fit accepts, the step writes the choice into the configuration of the estimator that it returns, for example the name of the dropped member of each Factor Family into the `families` of a [`CrossSectionalFactorPrior`](@ref). Each later step then reads that name. The read-out after a stream of blocks equals the batch fit over the same rows under the choice of the first fit, which differs from a batch fit when the choice of the whole sample moves.
+In a batch fit the rule makes the same choice as [`BatchChoice`](@ref). On the online seam the rule holds no state. After the first step whose rows the fit accepts, the step writes the choice into the configuration of the estimator that it returns, for example the name of the dropped member of each Factor Family into the `families` of a [`CrossSectionalFactorPrior`](@ref), the factor set of each asset into `included` of a [`StepwiseRegression`](@ref), or the components into `proj` of a [`DimensionReductionRegression`](@ref). Each later step then reads that choice. The read-out after a stream of blocks equals the batch fit over the same rows under the choice of the first fit, which differs from a batch fit when the choice of the whole sample moves.
 
 # Constructors
 

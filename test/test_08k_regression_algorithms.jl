@@ -508,6 +508,10 @@ end
         end
         @test roundtrip(DimensionReductionRegression()) < 1e-14
         @test roundtrip(factory(DimensionReductionRegression(), w)) < 1e-14
+        # A probabilistic PCA predicts its posterior mean, `C⁻¹ Wᵀ x`, not the projection on
+        # the left singular vectors of `W`. The recovery mapped back through those vectors,
+        # and on this sample its prediction missed the reduced-space fit by 4.5 (#1472).
+        @test roundtrip(DimensionReductionRegression(; drtgt = PPCA())) < 1e-14
 
         # Standardise unweighted and fit weighted -- issue #398's shape -- and the two paths
         # part. The scale is what binds them, not the fit.

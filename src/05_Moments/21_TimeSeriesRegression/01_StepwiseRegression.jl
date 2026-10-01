@@ -96,6 +96,8 @@ Estimates a loadings matrix by selecting a factor subset per asset, one factor a
 
 `crit` scores a candidate model, `alg` sets the direction the factor set moves in, and `tgt` fits it. Each asset gets its own subset, so a factor a given asset never selected carries an exact zero in that row of the loadings matrix.
 
+The search reads every observation, so a fit over more observations can choose another factor set. `included` fixes the factor set of each asset, and the fit then runs no search for that asset. `choice` states whether the online step of a prior that fits this regression writes the factor set of the first fit into `included`. A batch fit gives the same answer under both rules.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -106,7 +108,9 @@ $(DocStringExtensions.FIELDS)
         crit::Union{Symbol, MinMaxValStepwiseRegressionCriterion,
                     AbstractStepwiseRegressionCriterion} = PValue(),
         alg::AbstractStepwiseRegressionAlgorithm = ForwardSelection(),
-        tgt::AbstractRegressionTarget = LinearModel()
+        tgt::AbstractRegressionTarget = LinearModel(),
+        choice::AbstractChoiceRule = BatchChoice(),
+        included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}} = nothing
     ) -> StepwiseRegression
 
 Keywords correspond to the struct's fields.
@@ -116,6 +120,7 @@ Keywords correspond to the struct's fields.
   - If `crit` is a `Symbol`, `crit in STEPWISE_REGRESSION_CRITERIA`. The constructor stores `Val(crit)`.
   - If `crit` is `Val(:adjr2)`, `tgt` is a [`GeneralisedLinearModel`](@ref) and `tgt.variant` is set, `tgt.variant in ADJUSTED_PSEUDO_R2_VARIANTS`.
   - If `tgt` is a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref) and `tgt.kwargs` carries a `weights` entry, it must be an `ObsWeights` and, when it is a vector, `!isempty(tgt.kwargs.weights)`. A caller's own target is not checked here: the fit reads its weights through its own `factory` and `StatsAPI.fit` methods, and the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states the methods the fit reads.
+  - The rules of [`assert_stepwise_included`](@ref) for `included` alone. An entry can be empty: the asset then gets an intercept-only model.
 
 ## Propagated parameters
 
@@ -123,16 +128,24 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `tgt`: Recursively updated via [`factory`](@ref).
 
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+
+  - `included`: The factor sets of the selected assets.
+
 # Examples
 
 ```jldoctest
 julia> StepwiseRegression()
 StepwiseRegression
-  crit ┼ PValue
-       │   t ┴ Float64: 0.05
-   alg ┼ ForwardSelection()
-   tgt ┼ LinearModel
-       │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      crit ┼ PValue
+           │   t ┴ Float64: 0.05
+       alg ┼ ForwardSelection()
+       tgt ┼ LinearModel
+           │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    choice ┼ BatchChoice()
+  included ┴ nothing
 ```
 
 # Related
@@ -142,6 +155,7 @@ StepwiseRegression
   - [`AbstractRegressionTarget`](@ref)
   - [`Regression`](@ref)
   - [`DimensionReductionRegression`](@ref)
+  - [`PinnedChoice`](@ref)
   - [`factory`](@ref)
 
 # References
@@ -162,10 +176,19 @@ StepwiseRegression
     $(field_dict[:retgt])
     """
     @fprop tgt
+    """
+    Choice Rule of the factor set of each asset. Under [`BatchChoice`](@ref), the default, each fit searches again over every observation. Under [`PinnedChoice`](@ref), the online step of a prior that fits this regression writes the factor set of the first fit of each asset into `included` of the estimator that it returns. The two agree in a batch fit.
+    """
+    choice
+    """
+    Factor set of each asset, one entry per column of the returns, or `nothing`. An entry holds the indices of the factors that the fit of that asset uses, in the order that the search added them, and the fit runs no search for that asset. An entry of `nothing` makes the fit search for that asset.
+    """
+    @vprop included
     function StepwiseRegression(crit::Union{MinMaxValStepwiseRegressionCriterion,
                                             AbstractStepwiseRegressionCriterion},
                                 alg::AbstractStepwiseRegressionAlgorithm,
-                                tgt::AbstractRegressionTarget)
+                                tgt::AbstractRegressionTarget, choice::AbstractChoiceRule,
+                                included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}})
         if isa(crit, Val{:adjr2}) &&
            isa(tgt, GeneralisedLinearModel) &&
            !isnothing(tgt.variant)
@@ -180,20 +203,24 @@ StepwiseRegression
                 @argcheck(!isempty(tgt.kwargs.weights), IsEmptyError)
             end
         end
-        return new{typeof(crit), typeof(alg), typeof(tgt)}(crit, alg, tgt)
+        assert_stepwise_included(included)
+        return new{typeof(crit), typeof(alg), typeof(tgt), typeof(choice),
+                   typeof(included)}(crit, alg, tgt, choice, included)
     end
 end
 function StepwiseRegression(;
                             crit::Union{Symbol, MinMaxValStepwiseRegressionCriterion,
                                         AbstractStepwiseRegressionCriterion} = PValue(),
                             alg::AbstractStepwiseRegressionAlgorithm = ForwardSelection(),
-                            tgt::AbstractRegressionTarget = LinearModel())::StepwiseRegression
+                            tgt::AbstractRegressionTarget = LinearModel(),
+                            choice::AbstractChoiceRule = BatchChoice(),
+                            included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}} = nothing)::StepwiseRegression
     if isa(crit, Symbol)
         @argcheck(crit in STEPWISE_REGRESSION_CRITERIA,
                   "crit must be one of $STEPWISE_REGRESSION_CRITERIA. Got\ncrit => $crit")
         crit = Val(crit)
     end
-    return StepwiseRegression(crit, alg, tgt)
+    return StepwiseRegression(crit, alg, tgt, choice, included)
 end
 """
     add_best_factor_after_pval_failure!(tgt::AbstractRegressionTarget,
@@ -606,18 +633,111 @@ function _regression(re::StepwiseRegression{<:MinMaxValStepwiseRegressionCriteri
     return included
 end
 """
+    assert_stepwise_included(included::Nothing)
+    assert_stepwise_included(included::AbstractVector)
+    assert_stepwise_included(included::Nothing, X::MatNum, F::MatNum)
+    assert_stepwise_included(included::AbstractVector, X::MatNum, F::MatNum)
+
+Checks the factor sets that the `included` field of a [`StepwiseRegression`](@ref) holds.
+
+The one-argument form is the check of the constructor, which sees no data. The three-argument form is the check of the fit, which compares the field with the returns and the factor returns.
+
+# Algorithm
+
+The method that Julia selects is the algorithm. `included` of `nothing` passes both forms.
+
+# Arguments
+
+  - `included`: The factor sets, one entry per asset, or `nothing`.
+  - $(arg_dict[:X])
+  - $(arg_dict[:F])
+
+# Validation
+
+  - One argument: `!isempty(included)`, which raises an `IsEmptyError`, and each entry is `nothing` or a vector of positive factor indices with no repeated index, which raises a `DomainError`.
+  - Three arguments: `length(included) == size(X, 2)`, and every index of each entry is at most `size(F, 2)`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`StepwiseRegression`](@ref)
+  - [`regression`](@ref)
+  - [`pin_regression_choice`](@ref)
+"""
+function assert_stepwise_included(::Nothing)::Nothing
+    return nothing
+end
+function assert_stepwise_included(included::AbstractVector)::Nothing
+    @argcheck(!isempty(included), IsEmptyError)
+    @argcheck(all(s -> isnothing(s) || (allunique(s) && all(>(0), s)), included),
+              DomainError(included,
+                          "each entry of included must be nothing, or a vector of positive factor indices with no repeated index. Got\nincluded => $included"))
+    return nothing
+end
+function assert_stepwise_included(::Nothing, ::MatNum, ::MatNum)::Nothing
+    return nothing
+end
+function assert_stepwise_included(included::AbstractVector, X::MatNum, F::MatNum)::Nothing
+    @argcheck(length(included) == size(X, 2) &&
+              all(s -> isnothing(s) || all(<=(size(F, 2)), s), included),
+              DimensionMismatch("included holds one factor set per asset, and each index names a column of F. Got\nlength(included) => $(length(included))\nsize(X, 2) => $(size(X, 2))\nsize(F, 2) => $(size(F, 2))"))
+    return nothing
+end
+"""
+    stepwise_factor_set(re::StepwiseRegression, x::VecNum, F::MatNum, i::Integer)
+
+Returns the factor set of one asset: the set that `re.included` fixes, or the set that the stepwise search selects.
+
+# Algorithm
+
+ 1. Take entry `i` of `re.included`. Return it when it is not `nothing`.
+ 2. Otherwise run the stepwise search of `re` on `x`, giving `included`. This is also the path when `re.included` is `nothing`.
+ 3. Warn, naming the asset, when `included` is empty. The asset then gets an intercept-only model, and its row of the loadings matrix is all zeros.
+ 4. Return `included`.
+
+# Arguments
+
+  - `re`: Stepwise regression estimator.
+  - `x`: Returns of asset `i`, `observations × 1`.
+  - $(arg_dict[:F])
+  - `i`: Index of the asset, which names it in the warning.
+
+# Returns
+
+  - `included::AbstractVector{<:Integer}`: Indices of the factors of the asset, in the order of the search.
+
+# Related
+
+  - [`StepwiseRegression`](@ref)
+  - [`regression`](@ref)
+"""
+function stepwise_factor_set(re::StepwiseRegression, x::VecNum, F::MatNum, i::Integer)
+    pinned = isnothing(re.included) ? nothing : re.included[i]
+    if !isnothing(pinned)
+        return pinned
+    end
+    included = _regression(re, x, F)
+    if isempty(included)
+        @warn("Asset $i: the stepwise search selected no factor. The asset gets an intercept-only model, and its row of the loadings matrix is all zeros.")
+    end
+    return included
+end
+"""
     regression(re::StepwiseRegression, X::MatNum, F::MatNum)
 
 Runs one stepwise search per asset and assembles the loadings matrix from the fits.
 
-Each asset takes its own search, so the searches see one another only through the buffer they write into.
+Each asset takes its own search, so the searches see one another only through the buffer they write into. An asset whose entry of `re.included` holds a factor set takes that set, and no search.
 
 # Algorithm
 
  1. Allocate `rr`, a dense `assets × (factors + 1)` buffer of zeros. A factor an asset never selected keeps its zero.
  2. For each asset `i`, do steps 3 to 5.
- 3. Run the stepwise search of `re` on column `i` of `X`, giving `included`.
- 4. Fit `re.tgt` to an intercept column and the columns `included` of `F`, and read its coefficients, giving `params`. Warn, naming the asset, and fit the intercept column alone when `included` is empty.
+ 3. Take the factor set of asset `i` with [`stepwise_factor_set`](@ref), giving `included`.
+ 4. Fit `re.tgt` to an intercept column and the columns `included` of `F`, and read its coefficients, giving `params`. Fit the intercept column alone when `included` is empty.
  5. Write `params[1]` into `rr[i, 1]`, and the remaining coefficients into the columns of `rr` that `included` names, in the order `included` holds them.
  6. Write the number of observations less the number of columns of the fit of step 4 into `edof[i]`, the degrees of freedom that the fit left in the residuals of the asset.
  7. Build a [`Regression`](@ref) from the first column of `rr`, its remaining columns, and `edof`.
@@ -627,6 +747,10 @@ Each asset takes its own search, so the searches see one another only through th
   - `re`: Stepwise regression estimator that supplies the criterion, the algorithm and the regression target.
   - $(arg_dict[:X])
   - $(arg_dict[:F])
+
+# Validation
+
+  - The rules of [`assert_stepwise_included`](@ref) for `re.included`, `X` and `F`.
 
 # Returns
 
@@ -648,16 +772,14 @@ Each asset takes its own search, so the searches see one another only through th
   - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.2-4.3.
 """
 function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
+    assert_stepwise_included(re.included, X, F)
     cols = size(F, 2) + 1
     N, rows = size(X)
     ovec = range(one(eltype(F)), one(eltype(F)); length = N)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)
     edof = Vector{Int}(undef, rows)
     for i in axes(rr, 1)
-        included = _regression(re, view(X, :, i), F)
-        if isempty(included)
-            @warn("Asset $i: the stepwise search selected no factor. The asset gets an intercept-only model, and its row of the loadings matrix is all zeros.")
-        end
+        included = stepwise_factor_set(re, view(X, :, i), F, i)
         x1 = !isempty(included) ? [ovec view(F, :, included)] : reshape(ovec, :, 1)
         fri = StatsAPI.fit(re.tgt, x1, view(X, :, i))
         params = StatsAPI.coef(fri)
@@ -666,6 +788,59 @@ function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
         edof[i] = N - size(x1, 2)
     end
     return Regression(; b = view(rr, :, 1), M = view(rr, :, 2:cols), edof = edof)
+end
+"""
+    pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice},
+                          X::MatNum, F::MatNum)
+
+Writes the factor set of the first fit of each asset into `included` of a stepwise regression under a [`PinnedChoice`](@ref).
+
+The online step of a prior calls it after the fold, over the rows of the buffer of the prior. The search of one asset reads only the column of that asset and `F`, so the factor set that it writes is the set that the fit over the same rows takes, whatever other assets the prior gives to that fit. An asset whose column holds a value that is not finite is not covered by the fit, so it keeps `nothing`, and a later step writes its set at the first fit that covers it. Under [`BatchChoice`](@ref) the generic method returns `re` unchanged.
+
+# Algorithm
+
+ 1. Return `re` when `F` holds fewer than two rows. The regression refuses one row, so no fit is made yet.
+ 2. Check `re.included` with [`assert_stepwise_included`](@ref). Copy it into a vector of one entry per column of `X`, giving `included`. A field of `nothing` gives a vector of `nothing`.
+ 3. For each asset `j` whose entry is `nothing` and whose column of `X` is finite, run the stepwise search of `re` on that column, and write the result into entry `j`.
+ 4. Return `re` rebuilt with `included`.
+
+# Arguments
+
+  - `re`: Stepwise regression estimator under a [`PinnedChoice`](@ref).
+  - $(arg_dict[:X])
+  - $(arg_dict[:F])
+
+# Validation
+
+  - The rules of [`assert_stepwise_included`](@ref) for `re.included`, `X` and `F`.
+
+# Returns
+
+  - `re::StepwiseRegression`: The regression with the factor set of each covered asset in `included`.
+
+# Related
+
+  - [`StepwiseRegression`](@ref)
+  - [`PinnedChoice`](@ref)
+  - [`pin_prior_choice`](@ref)
+"""
+function pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice},
+                               X::MatNum, F::MatNum)
+    if size(F, 1) < 2
+        return re
+    end
+    assert_stepwise_included(re.included, X, F)
+    included = Vector{Union{Nothing, Vector{Int}}}(nothing, size(X, 2))
+    if !isnothing(re.included)
+        included .= re.included
+    end
+    for j in axes(X, 2)
+        x = view(X, :, j)
+        if isnothing(included[j]) && all(isfinite, x)
+            included[j] = _regression(re, x, F)
+        end
+    end
+    return rebuild_estimator(re, (; included = included))
 end
 
 export PValue, ForwardSelection, BackwardElimination, StepwiseRegression
