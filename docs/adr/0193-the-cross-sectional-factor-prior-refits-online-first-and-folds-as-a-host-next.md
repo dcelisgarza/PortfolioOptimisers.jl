@@ -21,6 +21,9 @@ standard of the map is that the library never has less capability than the oracl
 - The online step passes an active mask alone to the prior. It refuses every Panel Field and every
   estimation mask that differs from the active mask, for every prior. But the generic refit of a
   prior already takes an estimation mask.
+- The Fold Context of an optimiser keeps the Exogenous Series, because no prior kept it. The
+  call with no data of a prior passes no Exogenous Series to the batch verb, so an observed factor
+  of the Cross-Sectional Factor Prior had no series to read on the online step.
 - The windowed wrappers
   ([ADR 0039](0039-windowed-estimators-are-generated-from-one-declaration.md)) keep the last `w`
   rows of every fit, so on the online seam their window rolls.
@@ -53,10 +56,8 @@ tenth to the EW moments, which already fold exactly.
 1. **The refit.** The prior gains `cache`. `Online(CrossSectionalFactorPrior(…); max_history)` refits
    over a Sample Buffer, and its call with no data equals the batch fit over the buffer's rows, exactly. It
    costs one batch fit at each step, and `max_history` bounds it. A prior with no buffer refuses
-   the step by name. The buffer records no Exogenous Series, so the refit refuses an observed
-   factor by name until
-   [#1476](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1476) decides where the
-   step keeps that series.
+   the step by name. The buffer records the Exogenous Series when the tree of the prior reads it,
+   so an observed factor takes the step (see below).
 2. **The carry fold.** An unwrapped prior seeds a carry state of its own, as `EmpiricalPrior` does, and
    applies the rule of ADR 0136: a carry folds what folds and refits the rest. At each step it computes
    the exposures of the new rows from the carried panel, runs the regression on the new dates only,
@@ -77,6 +78,29 @@ two Asset Panels. The first append fixes whether it records the Panel Fields. A 
 `reads_panel_fields`, recursive through an embedded prior, says whether the tree of a prior reads
 them. The prior's buffer owns the panel once, and the Fold Context reads it back, as it reads the
 factor returns.
+
+### The prior's state holds the Exogenous Series
+
+[#1476](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1476) decided this section.
+The Exogenous Series follows the ruling for the panel: it is sample of the prior, so the prior's
+state owns it once, and the Fold Context reads it back.
+
+- A per-type predicate, `reads_exogenous_series`, recursive through the factor list and through an
+  embedded prior, says whether the tree of a prior reads the series. It answers `true` for every
+  member that reads `E`: the observed members and an estimated Descriptor that reads a series, such
+  as `EWMacroSensitivity`.
+- The state keeps every column of the series and its names, not only the columns that the tree
+  names. The Fold Context then holds no copy, and it rebuilds the whole `ReturnsResult` from the
+  prior's state, as it does for the factor returns.
+- `SampleBufferState` renames its estimation mask from `E` to `M`, and `E` and `ne` hold the
+  Exogenous Series, so `E` means one thing on the whole online seam.
+- A step of a tree that reads the series must bring it. The first step pins `ne`. A non-finite value
+  is refused only on the rows that the fit reads, as ADR 0184 states.
+- The carry fold derives each new row of the net returns `Xl`, and of the returns net of the
+  observed members that read no returns, one time, and carries the rows beside `X`. It also carries
+  the series over its window and the observed returns of every fitted row. It never derives a row
+  again, because the batch fit derives the first `lag` rows of the sample from the exposure of the
+  same row, and a window that derives them again from its own first rows gives other values.
 
 ### The step decides its two refusals by route
 
@@ -159,6 +183,15 @@ keeps every row under it. The output is exact in every case.
 - **A new state type for the panel, or the panel in the Fold Context.** Rejected. A second state type
   needs a second read-back path. A panel in the Fold Context leaves a prior that folds alone, outside
   an optimiser, with no panel.
+- **The Exogenous Series in the Fold Context alone, passed to the call with no data.** Rejected. It
+  is smaller, but a prior that folds alone cannot read an observed factor, and the carry needs the
+  new rows of the series at each step. The same argument rejected the panel in the Fold Context.
+- **The series as an argument of the call with no data.** Rejected. The caller must keep the whole
+  history, and the call with no data no longer equals the batch fit by itself.
+- **Only the named columns of the series in the prior's state.** Rejected. The Fold Context must
+  then keep a second copy, or join two parts of the series again in the order of `ne`.
+- **A refit only for an observed factor.** Rejected. Each step then costs one batch fit, and the
+  oracle folds its currency factors.
 - **A start-row window.** Rejected. It is exact in a refit, but the caller must know the offset of the
   rows that the moment member gets, which the Descriptor warm-up, the lag trim and a cap all move.
 - **A pinned choice by default.** Rejected. It breaks the identity of the online call with no data and the batch
@@ -174,7 +207,11 @@ keeps every row under it. The output is exact in every case.
   (the Seed Window), [#1470](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1470)
   (the Descriptor look-back), [#1471](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1471)
   (the carry fold) and [#1472](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1472)
-  (the Choice Rule on the selection regressions of `FactorPrior`).
+  (the Choice Rule on the selection regressions of `FactorPrior`),
+  [#1478](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1478) (the refit records
+  the Exogenous Series) and
+  [#1479](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1479) (the carry fold
+  takes an observed factor).
 - ADR 0136 and ADR 0039 carry amendments that point here.
 - A pinned choice and a seed window are two routes on which the online call with no data equals no batch fit.
   Each is documented, and each is tested against the oracle.
