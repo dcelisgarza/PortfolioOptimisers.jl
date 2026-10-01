@@ -692,7 +692,43 @@ The type of the prior selects the route, and each route states what it can honou
   - The estimation mask, beside the active mask. No panel, or a static panel, gives no mask.
   - The Panel Fields, when [`reads_panel_fields`](@ref) answers `true`. The buffer records them, and the read-out gives the batch verb the panel that [`sample_buffer_panel`](@ref) rebuilds. For any other prior a Panel Field is refused by name, because the buffer has no slot that the prior reads.
 
-The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact folds take no estimation mask. [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) forward `rd` to the prior they embed.
+The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact folds take no estimation mask. [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) forward `rd` to the prior they embed. [`CrossSectionalFactorPrior`](@ref) has a method of its own, which refuses a prior with no buffer and applies its Choice Rule after the fold.
+
+# Algorithm
+
+ 1. Fold `rd` into the buffer with [`refit_prior_fold`](@ref).
+
+# Arguments
+
+  - `pe`: The prior whose buffer the method folds forward.
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - The rules of [`refit_prior_fold`](@ref).
+
+# Returns
+
+  - `pe`: The prior, with its `cache` field set to the buffer after the last observation.
+
+# Related
+
+  - [`prior`](@ref)
+  - [`reads_panel_fields`](@ref)
+  - [`refit_prior_fold`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`sample_buffer_panel`](@ref)
+  - [`Online`](@ref)
+"""
+function partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
+    return refit_prior_fold(pe, rd)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Folds the observations of a [`ReturnsResult`](@ref) into the sample buffer of a prior. This is the refit route of [`partial_fit!`](@ref).
+
+The generic method of [`partial_fit!`](@ref) over a `ReturnsResult` is this function. A prior with a step of its own, such as [`CrossSectionalFactorPrior`](@ref), calls it for the fold and adds its own work around it.
 
 # Algorithm
 
@@ -704,7 +740,7 @@ The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact
 
 # Arguments
 
-  - `pe`: The prior whose buffer the method folds forward.
+  - `pe`: The prior whose buffer the function folds forward.
   - $(arg_dict[:rd])
 
 # Validation
@@ -721,14 +757,11 @@ The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact
 
 # Related
 
-  - [`prior`](@ref)
-  - [`reads_panel_fields`](@ref)
+  - [`partial_fit!`](@ref)
   - [`refit_step_kwargs`](@ref)
   - [`SampleBufferState`](@ref)
-  - [`sample_buffer_panel`](@ref)
-  - [`Online`](@ref)
 """
-function partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
+function refit_prior_fold(pe::AbstractPriorEstimator, rd::ReturnsResult)
     assert_prior_fold_returns(rd)
     F = fold_factor_argument(needs_factor_returns(pe), pe, rd.F)
     state = partial_fit!(assert_sample_buffer(pe), rd.X, F;

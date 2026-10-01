@@ -1,5 +1,5 @@
 ```@meta
-Description = "Cross-Sectional Factor Prior, public API of PortfolioOptimisers.jl: CrossSectionalFactorPrior, prior."
+Description = "Cross-Sectional Factor Prior, public API of PortfolioOptimisers.jl: CrossSectionalFactorPrior, prior, partial_fit!."
 ```
 
 # Cross-Sectional Factor Prior
@@ -10,4 +10,5 @@ A cross-sectional factor prior fits a factor model at each observation from the 
 CrossSectionalFactorPrior
 prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
 prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
+PortfolioOptimisers.partial_fit!(pe::CrossSectionalFactorPrior, rd::ReturnsResult)
 ```

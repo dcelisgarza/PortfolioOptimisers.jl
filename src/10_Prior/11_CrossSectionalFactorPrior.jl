@@ -9,6 +9,8 @@ The factor list can also hold observed factors, whose returns the caller observe
 
 The warm-ups of a fit add up, so a caller who sizes a window must sum three of them rather than take the longest. The longest warm-up of the Descriptors sets the first observation of the factor-return history, and `lag` adds `lag` observations to it. `pe` then warms up over that history, and `ve` over the idiosyncratic returns beside it. The default `pe` and the default `ve` each need 40 observations, their `min_obs`, so a default fit needs 40 observations after the Descriptor warm-up and the lag. A window that covers the Descriptors alone can leave `pe` too few observations to state a factor covariance, and the fit then refuses with a message that names the cause. Cross-validation meets this most often. A fold gives the estimator its own rows alone, so the Descriptors warm up again in every fold, and a rolling train window never grows past the warm-up. Size the train window against the sum of the three warm-ups.
 
+On the online seam the prior refits. [`Online`](@ref) seeds its `cache` with a sample buffer, and each step of [`partial_fit!`](@ref) records the returns, both masks and the Panel Fields. The read-out `prior(pe)` is the batch fit over the rows of the buffer, and a `max_history` on the wrapper bounds them. A prior with no buffer refuses the step, and so does a prior with an observed factor, because the buffer does not record the Exogenous Series. The automatic choice of a dropped member reads every row, so `choice` states whether each fit chooses again or the first fit pins it.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -33,7 +35,9 @@ $(DocStringExtensions.FIELDS)
                               lambda::Real = 1.0, c::Real = 1.0,
                               lx::Option{<:AbstractString} = nothing,
                               mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
-                              ex::FLoops.Transducers.Executor = ThreadedEx()) -> CrossSectionalFactorPrior
+                              ex::FLoops.Transducers.Executor = ThreadedEx(),
+                              choice::AbstractChoiceRule = BatchChoice(),
+                              cache::Option{<:AbstractPartialFitState} = nothing) -> CrossSectionalFactorPrior
 
 Keywords correspond to the struct's fields. `factors`, `neutralise` and `families` also take a dictionary, and the constructor collects each one into a vector of Pairs.
 
@@ -96,6 +100,8 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
   - [`cross_sectional_local_returns`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
+  - [`Online`](@ref)
+  - [`AbstractChoiceRule`](@ref)
 """
 @propagatable @concrete struct CrossSectionalFactorPrior <: AbstractLowOrderPriorEstimator_A
     """
@@ -186,6 +192,14 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     $(field_dict[:ex]) It computes the Factor Exposures of one dependency layer, whose members read no exposure of each other. Each member writes its own columns of the exposure history, so every executor gives the same prior. The regression runs under the executor of `cre`, and a Return Forecast under the executor of its own Descriptor Scores.
     """
     ex
+    """
+    Choice Rule of the dropped member of each Factor Family whose member is `nothing` in `families`. Under [`BatchChoice`](@ref), the default, each fit chooses again over every observation. Under [`PinnedChoice`](@ref), the online step writes the choice of the first fit into `families` of the estimator that it returns. The two agree in a batch fit.
+    """
+    choice
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function CrossSectionalFactorPrior(factors::AbstractVector{<:Pair},
                                        neutralise::Option{<:AbstractVector{<:Pair}},
                                        families::Option{<:AbstractVector{<:Pair}},
@@ -201,7 +215,9 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        rfe::Option{<:AbstractReturnForecastEstimator},
                                        lambda::Real, c::Real, lx::Option{<:AbstractString},
                                        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
-                                       ex::FLoops.Transducers.Executor)
+                                       ex::FLoops.Transducers.Executor,
+                                       choice::AbstractChoiceRule,
+                                       cache::Option{<:AbstractPartialFitState})
         assert_closed_unit_interval(th, :th)
         assert_finite(bp, :bp)
         assert_nonneg(bp, :bp)
@@ -226,9 +242,20 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                    typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(f_mp), typeof(mp),
                    typeof(th), typeof(bp), typeof(mcap), typeof(bw), typeof(lag),
                    typeof(minra), typeof(rfe), typeof(lambda), typeof(c), typeof(lx),
-                   typeof(mtx_sqrt), typeof(ex)}(factors, neutralise, families, cre, wa, pe,
-                                                 ve, ce, f_mp, mp, th, bp, mcap, bw, lag,
-                                                 minra, rfe, lambda, c, lx, mtx_sqrt, ex)
+                   typeof(mtx_sqrt), typeof(ex), typeof(choice), typeof(cache)}(factors,
+                                                                                neutralise,
+                                                                                families,
+                                                                                cre, wa, pe,
+                                                                                ve, ce,
+                                                                                f_mp, mp,
+                                                                                th, bp,
+                                                                                mcap, bw,
+                                                                                lag, minra,
+                                                                                rfe, lambda,
+                                                                                c, lx,
+                                                                                mtx_sqrt,
+                                                                                ex, choice,
+                                                                                cache)
     end
 end
 function CrossSectionalFactorPrior(; factors::Dict_VecPair,
@@ -254,12 +281,14 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    lambda::Real = 1.0, c::Real = 1.0,
                                    lx::Option{<:AbstractString} = nothing,
                                    mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
-                                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::CrossSectionalFactorPrior
+                                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                                   choice::AbstractChoiceRule = BatchChoice(),
+                                   cache::Option{<:AbstractPartialFitState} = nothing)::CrossSectionalFactorPrior
     return CrossSectionalFactorPrior(cross_sectional_prior_pairs(factors, :factors),
                                      cross_sectional_prior_option(neutralise, :neutralise),
                                      cross_sectional_prior_option(families, :families), cre,
                                      wa, pe, ve, ce, f_mp, mp, th, bp, mcap, bw, lag, minra,
-                                     rfe, lambda, c, lx, mtx_sqrt, ex)
+                                     rfe, lambda, c, lx, mtx_sqrt, ex, choice, cache)
 end
 """
     cross_sectional_prior_option(x::Nothing, sym::Sym_Str) -> nothing
@@ -348,7 +377,7 @@ The prior states an entry exactly when the model determines it. An asset of ``\\
  1. Orient `X`, `F` and `E` by `dims`, rebuild the returns data that the Descriptors read, from `X`, `F`, `ne`, `E`, `pnl`, `iv` and `ivpa`, and take the two universe masks off `pnl` with [`cross_sectional_panel_masks`](@ref). Split the factor list into estimated and observed members with [`cross_sectional_factor_partition`](@ref).
  2. Build the benchmark weights `BW` with [`cross_sectional_cap_weights`](@ref), over the assets of the estimation universe whose return and market capitalisation are finite, and write them onto a copy of the Asset Panel with [`cross_sectional_benchmark_returns`](@ref). The universe and the warm-up read `X`, or the named net returns under `lx`, so a gap in an observed series does not move them. A benchmark power of zero reads no market capitalisation.
  3. Read the observed factors from the copy with [`cross_sectional_observed`](@ref), so an observed member that wraps a [`CompositeExposure`](@ref) reads the benchmark weights. Take the returns the regression reads, `Xl`, with [`cross_sectional_local_returns`](@ref). Build every estimated Factor Exposure with [`cross_sectional_exposure_history`](@ref), one dependency layer after another and the members of a layer under `ex`, giving `Ms`, `nf` and `fam`. Under observed factors the estimated members read `Xl` in place of `X`, so a Descriptor of the returns measures the returns the regression explains. The first `pe.lag` rows of the derived `Xl` have no lagged exposure, so the derivation takes the exposure of the same observation there. An observed member cannot read `Xl`, because `Xl` is derived from its exposures. So the observed members that can read returns read `X` net of the observed members that read none, as [`cross_sectional_observed`](@ref) states.
- 4. Drop the leading observations the Descriptors warm up over, with [`cross_sectional_warmup`](@ref) on the estimated and the observed exposures together, giving the rows `rw`.
+ 4. Drop the leading observations the Descriptors warm up over, with [`cross_sectional_warmup`](@ref) on the estimated and the observed exposures together, giving the rows `rw`. [`cross_sectional_exposure_stage`](@ref) runs steps 1 to 4.
  5. Neutralise the exposures with [`cross_sectional_neutralise!`](@ref), under the benchmark weights and the prior's own regression estimator.
  6. Build the Factor Family Basis `fb` with [`cross_sectional_family_basis`](@ref), and reduce the exposures through it.
  7. Lag the reduced exposures and the market capitalisation by `pe.lag`, giving `Zl` and `mcl`. Trim the observed factors to the fitted observations with [`cross_sectional_observed_block`](@ref), which refuses a non-finite observed return among them. Take the eligibility mask `msk` of the fit with [`cross_sectional_eligible`](@ref) on `Xl`, and drop from it every pair whose lagged market capitalisation is not finite.
@@ -414,51 +443,8 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     X, F, E = dims_oriented(dims, X, F, E)
     @argcheck(!isnothing(pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and the panel is nothing. Call prior(pe, rd) with a ReturnsResult whose `pnl` is the one asset_panel returns, or hand the panel to this method as its third positional argument."))
-    # Every Descriptor of the fit reads its Panel Fields off the returns data, so the
-    # returns data is rebuilt here rather than demanded from the caller: the panel is the
-    # one field of it a wrapping prior can forward, and no verb of the fit reads `nx`,
-    # `ts`, `nb` or `B`.
-    #
-    # A `ReturnsResult` holds names for its returns, and neither a matrix nor a panel
-    # states any, so the names are the column numbers. They are read nowhere. Their length
-    # is: it is the asset axis `check_asset_panel` binds the panel to, which is the check
-    # this rebuild is worth making.
-    rd = ReturnsResult(; nx = string.(1:size(X, 2)), X = X,
-                       nf = isnothing(F) ? nothing : string.(1:size(F, 2)), F = F, ne = ne,
-                       E = E, iv = iv, ivpa = ivpa, pnl = pnl)
-    amsk, emsk = cross_sectional_panel_masks(pnl)
-    (; est, obs) = cross_sectional_factor_partition(pe.factors)
-    # The warm-up and the benchmark universe read the returns the caller stated: `X`, or the
-    # named net returns. The derived net returns hold the observed returns, so a gap in an
-    # observed series over the warm-up would otherwise move it. Neither reads the observed
-    # factors, so the benchmark weights are written before any member reads the panel: an
-    # observed member that wraps a composite reads them too.
-    Xu = isnothing(pe.lx) ? X : descriptor_field_values(rd, pe.lx)
-    mcap = if cross_sectional_needs_market_cap(pe.bp, pe.wa)
-        descriptor_field_values(rd, pe.mcap)
-    else
-        nothing
-    end
-    bmsk = isfinite.(Xu) .& emsk
-    cross_sectional_cap_finite!(bmsk, mcap)
-    BW = cross_sectional_cap_weights(pe.bp, mcap, bmsk)
-    rdb = cross_sectional_benchmark_returns(rd, pe.bw, BW)
-    cc = cross_sectional_observed(obs, rdb, pe.lag)
-    Xl = cross_sectional_local_returns(pe.lx, cc, X, rdb, pe.lag)
-    # The estimated members read the returns the regression explains. Under observed factors
-    # those are the net returns, so a Descriptor of the returns measures the move of an asset
-    # net of its currency, and not the move of the currency it holds.
-    rde = if isnothing(cc)
-        rdb
-    else
-        ReturnsResult(; nx = rdb.nx, X = Xl, nf = rdb.nf, F = rdb.F, ne = rdb.ne, E = rdb.E,
-                      iv = rdb.iv, ivpa = rdb.ivpa, pnl = rdb.pnl)
-    end
-    (; Ms, nf, fam) = cross_sectional_exposure_history(est, rde, pe.ex)
-    # An observed member warms up too: one that wraps a Descriptor gives no exposure over the
-    # warm-up of the Descriptor, and its derived net return is then not finite.
-    Mo = isnothing(cc) ? Ms : cat(Ms, cc.Z; dims = 3)
-    rw = (cross_sectional_warmup(Xu, Mo, emsk) + 1):size(X, 1)
+    st = cross_sectional_exposure_stage(pe, X, F, pnl; ne = ne, E = E, iv = iv, ivpa = ivpa)
+    (; amsk, emsk, mcap, BW, cc, Xl, rde, Ms, nf, fam, rw) = st
     Msw = Ms[rw, :, :]
     Xw = X[rw, :]
     Xlw = Xl[rw, :]
@@ -572,6 +558,104 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
                          kld = f_pr.kld, ow = f_pr.ow, rr = rr, fpr = fpr)
 end
 """
+    cross_sectional_exposure_stage(pe::CrossSectionalFactorPrior, X::MatNum,
+                                   F::Option{<:MatNum}, pnl::AssetPanel;
+                                   ne::Option{<:VecStr} = nothing,
+                                   E::Option{<:MatNum} = nothing,
+                                   iv::Option{<:MatNum} = nothing,
+                                   ivpa::Option{<:Num_VecNum} = nothing) -> NamedTuple
+
+Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that read the whole history: the benchmark weights, the observed factors, the returns that the regression reads, the exposure history, and the rows after the Descriptor warm-up.
+
+The returns-matrix method of [`prior`](@ref) and the online step under a [`PinnedChoice`](@ref) both read these steps. So the choice that the step pins is the choice that the fit over the same rows makes.
+
+# Algorithm
+
+ 1. Rebuild the returns data that the Descriptors read, from `X`, `F`, `ne`, `E`, `pnl`, `iv` and `ivpa`, and take the two universe masks off `pnl` with [`cross_sectional_panel_masks`](@ref). Split the factor list into estimated and observed members with [`cross_sectional_factor_partition`](@ref).
+ 2. Build the benchmark weights `BW` with [`cross_sectional_cap_weights`](@ref), over the assets of the estimation universe whose return and market capitalisation are finite, and write them onto a copy of the Asset Panel with [`cross_sectional_benchmark_returns`](@ref). The universe and the warm-up read `X`, or the named net returns under `pe.lx`.
+ 3. Read the observed factors with [`cross_sectional_observed`](@ref), take the returns the regression reads, `Xl`, with [`cross_sectional_local_returns`](@ref), and build every estimated Factor Exposure with [`cross_sectional_exposure_history`](@ref).
+ 4. Take the rows `rw` after the Descriptor warm-up with [`cross_sectional_warmup`](@ref), on the estimated and the observed exposures together.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - $(arg_dict[:X]) It holds one observation per row.
+  - $(arg_dict[:F]) The steps do not read it. They write it onto the rebuilt returns data.
+  - `pnl`: Time-varying Asset Panel of the rows of `X`.
+  - `ne`: Names of the Exogenous Series.
+  - `E`: The Exogenous Series, one observation per row. The observed factors read their returns from it.
+  - `iv`: Implied volatilities, written onto the rebuilt returns data.
+  - `ivpa`: Implied-volatility risk-premium adjustment, written onto the rebuilt returns data.
+
+# Validation
+
+  - The rules of every verb the algorithm names.
+
+# Returns
+
+  - `st::NamedTuple`: The fields `amsk` and `emsk`, the active mask and the estimation mask; `mcap`, the market capitalisation or `nothing`; `BW`, the benchmark weights; `cc`, the observed factors or `nothing`; `Xl`, the returns the regression reads; `rde`, the returns data that the estimated members read; `Ms`, `nf` and `fam`, the exposure history of the estimated factors with their names and Factor Family labels; and `rw`, the rows after the warm-up.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`prior`](@ref)
+  - [`cross_sectional_pinned_families`](@ref)
+"""
+function cross_sectional_exposure_stage(pe::CrossSectionalFactorPrior, X::MatNum,
+                                        F::Option{<:MatNum}, pnl::AssetPanel;
+                                        ne::Option{<:VecStr} = nothing,
+                                        E::Option{<:MatNum} = nothing,
+                                        iv::Option{<:MatNum} = nothing,
+                                        ivpa::Option{<:Num_VecNum} = nothing)
+    # Every Descriptor of the fit reads its Panel Fields off the returns data, so the
+    # returns data is rebuilt here rather than demanded from the caller: the panel is the
+    # one field of it a wrapping prior can forward, and no verb of the fit reads `nx`,
+    # `ts`, `nb` or `B`.
+    #
+    # A `ReturnsResult` holds names for its returns, and neither a matrix nor a panel
+    # states any, so the names are the column numbers. They are read nowhere. Their length
+    # is: it is the asset axis `check_asset_panel` binds the panel to, which is the check
+    # this rebuild is worth making.
+    rd = ReturnsResult(; nx = string.(1:size(X, 2)), X = X,
+                       nf = isnothing(F) ? nothing : string.(1:size(F, 2)), F = F, ne = ne,
+                       E = E, iv = iv, ivpa = ivpa, pnl = pnl)
+    amsk, emsk = cross_sectional_panel_masks(pnl)
+    (; est, obs) = cross_sectional_factor_partition(pe.factors)
+    # The warm-up and the benchmark universe read the returns the caller stated: `X`, or the
+    # named net returns. The derived net returns hold the observed returns, so a gap in an
+    # observed series over the warm-up would otherwise move it. Neither reads the observed
+    # factors, so the benchmark weights are written before any member reads the panel: an
+    # observed member that wraps a composite reads them too.
+    Xu = isnothing(pe.lx) ? X : descriptor_field_values(rd, pe.lx)
+    mcap = if cross_sectional_needs_market_cap(pe.bp, pe.wa)
+        descriptor_field_values(rd, pe.mcap)
+    else
+        nothing
+    end
+    bmsk = isfinite.(Xu) .& emsk
+    cross_sectional_cap_finite!(bmsk, mcap)
+    BW = cross_sectional_cap_weights(pe.bp, mcap, bmsk)
+    rdb = cross_sectional_benchmark_returns(rd, pe.bw, BW)
+    cc = cross_sectional_observed(obs, rdb, pe.lag)
+    Xl = cross_sectional_local_returns(pe.lx, cc, X, rdb, pe.lag)
+    # The estimated members read the returns the regression explains. Under observed factors
+    # those are the net returns, so a Descriptor of the returns measures the move of an asset
+    # net of its currency, and not the move of the currency it holds.
+    rde = if isnothing(cc)
+        rdb
+    else
+        ReturnsResult(; nx = rdb.nx, X = Xl, nf = rdb.nf, F = rdb.F, ne = rdb.ne, E = rdb.E,
+                      iv = rdb.iv, ivpa = rdb.ivpa, pnl = rdb.pnl)
+    end
+    (; Ms, nf, fam) = cross_sectional_exposure_history(est, rde, pe.ex)
+    # An observed member warms up too: one that wraps a Descriptor gives no exposure over the
+    # warm-up of the Descriptor, and its derived net return is then not finite.
+    Mo = isnothing(cc) ? Ms : cat(Ms, cc.Z; dims = 3)
+    rw = (cross_sectional_warmup(Xu, Mo, emsk) + 1):size(X, 1)
+    return (; amsk = amsk, emsk = emsk, mcap = mcap, BW = BW, cc = cc, Xl = Xl, rde = rde,
+            Ms = Ms, nf = nf, fam = fam, rw = rw)
+end
+"""
     prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...) -> LowOrderPrior
 
 Fit a Cross-Sectional Factor Prior from a [`ReturnsResult`](@ref).
@@ -612,6 +696,154 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
     return prior(pe, rd.X, rd.F, rd.pnl; ne = rd.ne, E = rd.E, iv = rd.iv, ivpa = rd.ivpa,
                  kwargs..., dims = 1)
+end
+"""
+    partial_fit!(pe::CrossSectionalFactorPrior, rd::ReturnsResult)
+    partial_fit!(pe::CrossSectionalFactorPrior, X::VecNum_MatNum, F::Option{<:VecNum_MatNum} = nothing; kwargs...)
+
+Folds the observations of a [`ReturnsResult`](@ref) into a Cross-Sectional Factor Prior, which refits over a sample buffer.
+
+The prior has no fold of its own yet, so it takes the online step as a refit. [`Online`](@ref) seeds its `cache` with a [`SampleBufferState`](@ref), and each step records the returns, both masks and the Panel Fields of `rd.pnl` in it. The read-out `prior(pe)` runs the batch fit over the rows of the buffer, so it equals `prior(pe, rd)` over the same rows. A `max_history` on the wrapper bounds the rows, and so the cost of each read-out.
+
+Under a [`PinnedChoice`](@ref), the step also writes the choice of the first fit into `families`, with [`cross_sectional_pinned_families`](@ref).
+
+The matrix form refuses, because it carries no Asset Panel, and the prior reads its Factor Exposures off one.
+
+# Algorithm
+
+ 1. Refuse a prior whose `cache` holds no [`SampleBufferState`](@ref), and a prior with an observed factor, which reads the Exogenous Series that the buffer does not record.
+ 2. Fold `rd` into the buffer with [`refit_prior_fold`](@ref).
+ 3. Under a [`PinnedChoice`](@ref), pin the dropped members with [`cross_sectional_pinned_families`](@ref).
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - $(arg_dict[:rd]) Its `pnl` is a time-varying Asset Panel.
+
+# Validation
+
+  - `pe.cache` holds a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
+  - `pe.factors` holds no [`AbstractObservedExposureEstimator`](@ref). An `ArgumentError` is thrown otherwise.
+  - The rules of [`refit_prior_fold`](@ref).
+  - The matrix form always throws an `ArgumentError`.
+
+# Returns
+
+  - `pe::CrossSectionalFactorPrior`: The prior, with its `cache` field set to the buffer after the last observation, and under a pinned choice its `families` pinned.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`Online`](@ref)
+  - [`prior`](@ref)
+  - [`refit_prior_fold`](@ref)
+  - [`cross_sectional_pinned_families`](@ref)
+  - [`AbstractChoiceRule`](@ref)
+"""
+function partial_fit!(pe::CrossSectionalFactorPrior, rd::ReturnsResult)
+    @argcheck(isa(pe.cache, SampleBufferState),
+              ArgumentError("a Cross-Sectional Factor Prior takes the online step only as a refit over a sample buffer, and this one carries none. Wrap it in `Online`, for example `Online(CrossSectionalFactorPrior(; factors); max_history = 500)`, and resolve the wrapper with `update_online_estimator` before the first step. The prior has no fold of its own yet."))
+    @argcheck(!any(p -> isa(last(p), AbstractObservedExposureEstimator), pe.factors),
+              ArgumentError("the refit of a Cross-Sectional Factor Prior does not record the Exogenous Series that an observed factor reads, so its read-out could not rebuild the returns of the observed factors. Drop the observed members from factors to take the online step, or fit in batch."))
+    return cross_sectional_pin_choice(pe.choice, refit_prior_fold(pe, rd))
+end
+function partial_fit!(::CrossSectionalFactorPrior, ::VecNum_MatNum,
+                      ::Option{<:VecNum_MatNum} = nothing; kwargs...)
+    return throw(ArgumentError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and the matrix form of `partial_fit!` carries none. Fold a `ReturnsResult` whose `pnl` is a time-varying Asset Panel with `partial_fit!(pe, rd)`."))
+end
+"""
+    cross_sectional_pin_choice(choice::BatchChoice, pe::CrossSectionalFactorPrior) -> CrossSectionalFactorPrior
+    cross_sectional_pin_choice(choice::PinnedChoice, pe::CrossSectionalFactorPrior) -> CrossSectionalFactorPrior
+
+Applies the Choice Rule of a Cross-Sectional Factor Prior after an online step.
+
+A batch choice chooses again at each read-out, so the step returns `pe` unchanged. A pinned choice writes the dropped member of each Factor Family into `families`, once the buffer holds the rows of a first fit.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. [`BatchChoice`](@ref): return `pe`.
+ 2. [`PinnedChoice`](@ref): take the families with [`cross_sectional_pinned_families`](@ref). Return `pe` when it answers `nothing`, and otherwise `pe` rebuilt with those families.
+
+# Arguments
+
+  - `choice`: The Choice Rule of `pe`.
+  - `pe`: The prior after the fold of the step.
+
+# Validation
+
+  - The rules of [`cross_sectional_pinned_families`](@ref).
+
+# Returns
+
+  - `pe::CrossSectionalFactorPrior`: The prior that the step returns.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`cross_sectional_pinned_families`](@ref)
+"""
+function cross_sectional_pin_choice(::BatchChoice, pe::CrossSectionalFactorPrior)
+    return pe
+end
+function cross_sectional_pin_choice(::PinnedChoice, pe::CrossSectionalFactorPrior)
+    families = cross_sectional_pinned_families(pe)
+    return isnothing(families) ? pe : rebuild_estimator(pe, (; families = families))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the Factor Families of a Cross-Sectional Factor Prior with the dropped member of each one named, as the fit over the rows of its buffer chooses it, or `nothing` when there is nothing to pin yet.
+
+This is the step of a [`PinnedChoice`](@ref). It runs the steps of the fit that the choice reads, with [`cross_sectional_exposure_stage`](@ref), the Neutralisation and [`factor_family_basis`](@ref), over the rows of the buffer. So the name it writes is the member that the read-out after the same step drops, and every later read-out drops it too.
+
+# Algorithm
+
+ 1. Answer `nothing` when `pe.families` is `nothing`, or names the dropped member of every family. Nothing is left to pin.
+ 2. Answer `nothing` when the buffer records no Asset Panel. The read-out refuses that buffer, so no fit is made.
+ 3. Run [`cross_sectional_exposure_stage`](@ref) over the rows of the buffer. Answer `nothing` when fewer than `pe.lag + 2` rows remain after the Descriptor warm-up, because the fit refuses them, so no first fit is made yet.
+ 4. Neutralise the exposures after the warm-up with [`cross_sectional_neutralise!`](@ref), and build the Factor Family Basis with [`factor_family_basis`](@ref).
+ 5. Name the dropped member of each family in the order of `pe.families`.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator whose `cache` holds a [`SampleBufferState`](@ref).
+
+# Validation
+
+  - The rules of every verb the algorithm names.
+
+# Returns
+
+  - `families::Option{<:Vector{<:Pair}}`: Pairs of `family label => dropped member`, or `nothing`.
+
+# Related
+
+  - [`cross_sectional_pin_choice`](@ref)
+  - [`PinnedChoice`](@ref)
+  - [`factor_family_basis`](@ref)
+"""
+function cross_sectional_pinned_families(pe::CrossSectionalFactorPrior)
+    if isnothing(pe.families) || all(p -> !isnothing(last(p)), pe.families)
+        return nothing
+    end
+    state = pe.cache
+    pnl = sample_buffer_panel(state)
+    if isnothing(pnl)
+        return nothing
+    end
+    (; BW, Ms, nf, fam, rw) = cross_sectional_exposure_stage(pe, sample_buffer(state),
+                                                             nothing, pnl)
+    if length(rw) - pe.lag < 2
+        return nothing
+    end
+    Msw = Ms[rw, :, :]
+    bww = BW[rw, :]
+    cross_sectional_neutralise!(pe.neutralise, Msw, pe.cre, bww, nf, fam)
+    fcb = factor_family_basis(pe.families, Msw, bww, nf, fam)
+    return map(j -> first(pe.families[j]) => nf[fcb.fi[j][fcb.di[j]]],
+               eachindex(pe.families))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -701,6 +933,31 @@ The fit puts the observed factors after the estimated factors, so the axis decla
 function cross_sectional_axis_pairs(factors::AbstractVector{<:Pair})
     (; est, obs) = cross_sectional_factor_partition(factors)
     return vcat(est, obs)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`CrossSectionalFactorPrior`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for. Set `set_show_nothing_fields!(:CrossSectionalFactorPrior, true)` to render it.
+
+# Arguments
+
+  - `::CrossSectionalFactorPrior`: Prior estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, every field but `cache`.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+function show_fields(::CrossSectionalFactorPrior)
+    return (:factors, :neutralise, :families, :cre, :wa, :pe, :ve, :ce, :f_mp, :mp, :th,
+            :bp, :mcap, :bw, :lag, :minra, :rfe, :lambda, :c, :lx, :mtx_sqrt, :ex, :choice)
 end
 function factor_residual_config(::CrossSectionalFactorPrior)
     # The declaration names a variance estimator that a consumer re-runs on the

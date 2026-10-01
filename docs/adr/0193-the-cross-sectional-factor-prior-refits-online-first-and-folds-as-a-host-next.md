@@ -52,7 +52,11 @@ tenth to the EW moments, which already fold exactly.
 
 1. **The refit.** The prior gains `cache`. `Online(CrossSectionalFactorPrior(…); max_history)` refits
    over a Sample Buffer, and its read-out equals the batch fit over the buffer's rows, exactly. It
-   costs one batch fit at each step, and `max_history` bounds it.
+   costs one batch fit at each step, and `max_history` bounds it. A prior with no buffer refuses
+   the step by name. The buffer records no Exogenous Series, so the refit refuses an observed
+   factor by name until
+   [#1476](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1476) decides where the
+   step keeps that series.
 2. **The host fold.** An unwrapped prior seeds a carry state of its own, as `EmpiricalPrior` does, and
    applies the rule of ADR 0136: a host folds what folds and refits the rest. At each step it computes
    the exposures of the new rows from the carried panel, runs the regression on the new dates only,
@@ -108,7 +112,10 @@ A Choice Rule is a pair of library-wide singleton types under one abstract type:
 The field sits on the estimator that makes the choice: `CrossSectionalFactorPrior` for the dropped
 member of each family, `StepwiseRegression` for its factor set, and `DimensionReductionRegression` for
 its projection. A refit honours a pinned choice with no state: after the first fit, the step writes
-the choice into the configuration of the estimator that it returns. In the host fold, a batch choice
+the choice into the configuration of the estimator that it returns. The first fit is the first step
+whose buffer the batch fit accepts, which for the Cross-Sectional Factor Prior is `lag + 2` rows
+after the Descriptor warm-up. The step runs the part of the fit that the choice reads over the
+buffer, so the member that it writes is the member that the read-out of that step drops. In the host fold, a batch choice
 that moves refits every past date, and a pinned choice is recorded in the carry state.
 
 ### The host fold carries only the rows that the Descriptors read

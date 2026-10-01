@@ -1701,6 +1701,72 @@ SeedWindow()
 """
 struct SeedWindow <: AbstractWindowRule end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the Choice Rule of an estimator, the rule that says how a choice that a fit makes over its whole sample behaves on the online seam.
+
+Some fits make a choice that reads every observation, such as the dropped member of a Factor Family in [`CrossSectionalFactorPrior`](@ref). In a batch fit every rule makes the same choice. The rules differ when the estimator receives its observations one block at a time.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. An estimator that makes such a choice holds the rule in its `choice` field. The step of its online fold dispatches on the type of the rule. A new rule needs its own method of that step for each estimator that holds it.
+
+# Related
+
+  - [`BatchChoice`](@ref)
+  - [`PinnedChoice`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+abstract type AbstractChoiceRule <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Makes the choice again over every observation at each fit. This is the default rule.
+
+On the online seam a refit reads every row of its buffer, so the choice can move from one step to the next, and the read-out after any stream of blocks equals the batch fit over the same rows.
+
+# Constructors
+
+    BatchChoice() -> BatchChoice
+
+# Examples
+
+```jldoctest
+julia> BatchChoice()
+BatchChoice()
+```
+
+# Related
+
+  - [`AbstractChoiceRule`](@ref)
+  - [`PinnedChoice`](@ref)
+"""
+struct BatchChoice <: AbstractChoiceRule end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Keeps the choice of the first fit. After the first fit, every later fit reads the same choice.
+
+In a batch fit the rule makes the same choice as [`BatchChoice`](@ref). On the online seam the rule holds no state. After the first step whose rows the fit accepts, the step writes the choice into the configuration of the estimator that it returns, for example the name of the dropped member of each Factor Family into the `families` of a [`CrossSectionalFactorPrior`](@ref). Each later step then reads that name. The read-out after a stream of blocks equals the batch fit over the same rows under the choice of the first fit, which differs from a batch fit when the choice of the whole sample moves.
+
+# Constructors
+
+    PinnedChoice() -> PinnedChoice
+
+# Examples
+
+```jldoctest
+julia> PinnedChoice()
+PinnedChoice()
+```
+
+# Related
+
+  - [`AbstractChoiceRule`](@ref)
+  - [`BatchChoice`](@ref)
+"""
+struct PinnedChoice <: AbstractChoiceRule end
+"""
     seed_window_path(est)
     seed_window_path(::Any)
 
@@ -1904,5 +1970,5 @@ In order to implement a new programme set, subtype `AbstractProgrammeAllocationS
 """
 abstract type AbstractProgrammeAllocationSet <: AbstractAllocationSet end
 
-export Online, RollingWindow, SeedWindow
+export Online, RollingWindow, SeedWindow, BatchChoice, PinnedChoice
 public AbstractProgrammeAllocationSet, risk_constraint_solver

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Online, public API of PortfolioOptimisers.jl: Online, RollingWindow, SeedWindow, AbstractAllocationSet, AbstractProgrammeAllocationSet, partial_fit!, …"
+Description = "Online, public API of PortfolioOptimisers.jl: Online, RollingWindow, SeedWindow, BatchChoice, PinnedChoice, AbstractAllocationSet, …"
 ```
 
 # Online
@@ -14,6 +14,8 @@ The page also has the supertypes of the allocation sets. An allocation set is th
 Online
 RollingWindow
 SeedWindow
+BatchChoice
+PinnedChoice
 PortfolioOptimisers.AbstractAllocationSet
 PortfolioOptimisers.AbstractProgrammeAllocationSet
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, X::PortfolioOptimisers.MatNum, F::PortfolioOptimisers.Option{<:PortfolioOptimisers.MatNum} = nothing; dims::Int = 1)
