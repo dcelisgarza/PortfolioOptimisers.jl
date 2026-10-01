@@ -1,10 +1,10 @@
 #=
-The Cross-Sectional Factor Prior on the online seam (#1468, map #1375, ADR 0193).
+The Cross-Sectional Factor Prior on the online step (#1468, map #1375, ADR 0193).
 
 The prior refits over a sample buffer that records the returns, both masks and the Panel Fields,
-so its read-out equals the batch fit over the rows of the buffer. Its Choice Rule says how the
+so its call with no data equals the batch fit over the rows of the buffer. Its Choice Rule says how the
 automatic dropped member of a Factor Family behaves on that seam: `BatchChoice()` chooses again at
-each read-out, and `PinnedChoice()` keeps the choice of the first fit.
+each call with no data, and `PinnedChoice()` keeps the choice of the first fit.
 
 Every `Parity_CrossSectionalFactorPrior_Online*` file is an output of the oracle's online update
 over one stream of batches, rows 1-90, 91-170 and 171-250 of the exchange that
@@ -23,7 +23,7 @@ is its batch fit over the rows seen so far. The two cases are the grid configura
 include(joinpath(@__DIR__, "parity_harness.jl"))
 include(joinpath(@__DIR__, "parity_grid.jl"))
 
-@testset "The Cross-Sectional Factor Prior on the online seam (#1468)" begin
+@testset "The Cross-Sectional Factor Prior on the online step (#1468)" begin
     po = PortfolioOptimisers
     fx = parity_large_panel()
     rd = grid_fixture(fx)
@@ -31,7 +31,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     edges = (0, 90, 170, 250)
     rows(r, i) = po.port_opt_view(r, i, :)
     online(est; kwargs...) = po.update_online_estimator(Online(est; kwargs...))
-    # The prior after each step of the stream, and its read-out.
+    # The prior after each step of the stream, and its call with no data.
     function stream(pe)
         e = online(pe)
         out = []
@@ -65,7 +65,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             @test isequal(pr.mu, b.mu) && isequal(pr.sigma, b.sigma)
             @test isequal(pr.fpr.X, b.fpr.X) && isequal(pr.rr.M, b.rr.M)
         end
-        # A cap windows the whole fit: the read-out is the batch fit over the last rows.
+        # A cap windows the whole fit: the call with no data is the batch fit over the last rows.
         e = online(CrossSectionalFactorPrior(; style...); max_history = 120)
         for k in 1:3
             e = partial_fit!(e, rows(rd, (edges[k] + 1):edges[k + 1]))
@@ -81,7 +81,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     end
 
     @testset "On the online step of an optimiser" begin
-        # The step forwards each block to the prior, and the read-out of the optimiser reads
+        # The step forwards each block to the prior, and the call with no data of the optimiser reads
         # the prior out of its buffer. A time-varying panel with Panel Fields and a narrower
         # estimation universe reaches the prior, and the weights equal the batch weights.
         for choice in (BatchChoice(), PinnedChoice())
@@ -106,15 +106,15 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             pp = batch(CrossSectionalFactorPrior(; style..., choice = PinnedChoice()), k)
             @test isequal(pp.sigma, sbatch[k].sigma) && isequal(pp.mu, sbatch[k].mu)
         end
-        # A batch choice chooses again at each read-out, and leaves `families` alone.
+        # A batch choice chooses again at each call with no data, and leaves `families` alone.
         @test [dropped(x.pr) for x in sb] == [["style1"], ["style2"], ["style2"]]
         @test all(x -> x.pe.families == ["style" => nothing], sb)
         # A pinned choice writes the choice of the first fit into `families`, and every
-        # later read-out drops it.
+        # later call with no data drops it.
         @test all(x -> x.pe.families == ["style" => "style1"], sp)
         @test [dropped(x.pr) for x in sp] == [["style1"], ["style1"], ["style1"]]
         @test isequal(sp[1].pr.sigma, sb[1].pr.sigma)
-        # Pinned, the read-out is the batch fit with the member stated.
+        # Pinned, the call with no data is the batch fit with the member stated.
         stated = CrossSectionalFactorPrior(; style..., families = ["style" => "style1"])
         @test isequal(sp[3].pr.sigma, batch(stated, 3).sigma)
         # The choice moves on this stream, so the two rules differ after the first step.
@@ -144,9 +144,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
 
     @testset "Refusals" begin
         pe = CrossSectionalFactorPrior(; style...)
-        m = message(() -> partial_fit!(pe, rows(rd, 1:90)))
-        @test occursin("takes the online step only as a refit over a sample buffer", m)
-        @test occursin("Wrap it in `Online`", m)
+        # An unwrapped prior takes the other route, the carry fold of #1471, which
+        # test_12zb_parity_cs_prior_carry_fold.jl tests.
+        @test isa(partial_fit!(pe, rows(rd, 1:90)).cache, po.CrossSectionalCarryState)
         ccy = CrossSectionalFactorPrior(; grid_config("Currency", rd)...)
         m = message(() -> partial_fit!(online(ccy), rows(rd, 1:90)))
         @test occursin("does not record the Exogenous Series that an observed factor reads",
@@ -187,7 +187,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         # Deliberate difference: the batch choice is the oracle's batch fit over the rows
         # seen so far, not its online update. The automatic dropped member is a function of
         # the whole sample: the member with the largest sum of absolute benchmark-weighted
-        # exposures. Under the batch choice the read-out is the same function of the same
+        # exposures. Under the batch choice the call with no data is the same function of the same
         # rows as the batch fit, whatever the split of the stream. The factor returns of the
         # full basis are the same under either member, but the factor prior fits the reduced
         # factor returns, whose time-varying ratios depend on the member, so its moments move

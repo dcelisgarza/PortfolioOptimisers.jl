@@ -411,8 +411,7 @@ Row `t` reads the variance series at row `t - 1`, so an entry never carries the 
 # Algorithm
 
  1. Take the variance series of `eps` through [`variance_series`](@ref).
- 2. Fill the result with `NaN`, which is what row `1` and every pair outside `mask` keep. Both blend components then normalise over the same universe.
- 3. Write the reciprocal of row `t - 1` of the series into every eligible pair of row `t`, for every later observation.
+ 2. Lag and invert the series through [`cross_sectional_lagged_inverse`](@ref).
 
 # Arguments
 
@@ -455,10 +454,45 @@ function cross_sectional_lagged_inverse_variance(ve::AbstractCovarianceEstimator
     @argcheck(!isempty(eps), IsEmptyError("eps cannot be empty"))
     @argcheck(size(eps) == size(mask),
               DimensionMismatch("eps ($(size(eps, 1))×$(size(eps, 2))) must match mask ($(size(mask, 1))×$(size(mask, 2)))"))
-    V = variance_series(ve, eps; dims = 1, kwargs...)
+    return cross_sectional_lagged_inverse(variance_series(ve, eps; dims = 1, kwargs...),
+                                          mask)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the lagged inverse of a variance series.
+
+Row `t` reads row `t - 1` of the series. Row `1` is `NaN`, because no variance precedes it. [`cross_sectional_lagged_inverse_variance`](@ref) reads the series of a residual matrix through it. The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads the series of its folded variance through it, with the last row of the previous step as row `1`.
+
+# Algorithm
+
+ 1. Fill the result with `NaN`, which is what row `1` and every pair outside `mask` keep. Both blend components then normalise over the same universe.
+ 2. Write the reciprocal of row `t - 1` of the series into every eligible pair of row `t`, for every later observation.
+
+# Arguments
+
+  - `V::MatNum`: Variance series `observations × assets`.
+  - `mask::AbstractMatrix{Bool}`: Eligibility mask `observations × assets`.
+
+# Validation
+
+  - `size(V) == size(mask)`.
+
+# Returns
+
+  - `IV::Matrix{<:Number}`: Inverse variances `observations × assets`, `NaN` in row `1` and outside `mask`.
+
+# Related
+
+  - [`cross_sectional_lagged_inverse_variance`](@ref)
+  - [`cs_weights_blend`](@ref)
+"""
+function cross_sectional_lagged_inverse(V::MatNum, mask::AbstractMatrix{Bool})::MatNum
+    @argcheck(size(V) == size(mask),
+              DimensionMismatch("V ($(size(V, 1))×$(size(V, 2))) must match mask ($(size(mask, 1))×$(size(mask, 2)))"))
     Tf = real(eltype(V))
-    IV = fill(Tf(NaN), size(eps))
-    for t in 2:size(eps, 1), i in axes(eps, 2)
+    IV = fill(Tf(NaN), size(V))
+    for t in 2:size(V, 1), i in axes(V, 2)
         if mask[t, i]
             IV[t, i] = inv(V[t - 1, i])
         end
@@ -599,12 +633,7 @@ The verb takes the first-pass weights and residuals as arguments rather than rea
 # Algorithm
 
  1. Take the lagged inverse variances through [`cross_sectional_lagged_inverse_variance`](@ref).
- 2. Clamp them to the cross-sectional quantiles through [`cross_sectional_winsorise!`](@ref).
- 3. Cap and normalise them through [`cross_sectional_median_cap!`](@ref), which also names the observations that carry an estimate.
- 4. Normalise the first-pass weights over the same universe.
- 5. Write zero over every entry that is still `NaN`, so a missing entry does not contribute.
- 6. Write the normalised first-pass weights into every observation that carries no estimate.
- 7. Blend the two components by `alg.lambda`, and write zero outside `mask`.
+ 2. Blend them with the first-pass weights through [`cs_weights_blend`](@ref).
 
 # Arguments
 
@@ -658,7 +687,50 @@ function cs_weights_refine(alg::BlendedInverseVarianceWeights, W0::MatNum, eps::
               DimensionMismatch("W0 ($(size(W0, 1))×$(size(W0, 2))) must match eps ($(size(eps, 1))×$(size(eps, 2)))"))
     @argcheck(all(isfinite, W0), IsNonFiniteError("all entries of W0 must be finite"))
     @argcheck(all(x -> x >= zero(x), W0), DomainError(W0, "all entries of W0 must be >= 0"))
-    IV = cross_sectional_lagged_inverse_variance(ve, eps, mask; kwargs...)
+    return cs_weights_blend(alg, W0,
+                            cross_sectional_lagged_inverse_variance(ve, eps, mask;
+                                                                    kwargs...), mask)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Blend the first-pass weights with lagged inverse variances into the second-pass weights.
+
+[`cs_weights_refine`](@ref) runs it on the inverse variances of its residuals. The carry fold of a [`CrossSectionalFactorPrior`](@ref) runs it on the inverse variances of the new observations, which it reads from its folded variance. Each observation is blended on its own row, so the two calls give the same row.
+
+# Algorithm
+
+ 1. Clamp `IV` to the cross-sectional quantiles through [`cross_sectional_winsorise!`](@ref).
+ 2. Cap and normalise it through [`cross_sectional_median_cap!`](@ref), which also names the observations that carry an estimate.
+ 3. Normalise the first-pass weights over the same universe.
+ 4. Write zero over every entry that is still `NaN`, so a missing entry does not contribute.
+ 5. Write the normalised first-pass weights into every observation that carries no estimate.
+ 6. Blend the two components by `alg.lambda`, and write zero outside `mask`.
+
+# Arguments
+
+  - `alg`: Cross-sectional weight policy.
+  - `W0::MatNum`: First-pass weights `observations × assets`.
+  - `IV::Matrix{<:Number}`: Lagged inverse variances `observations × assets`, changed in place.
+  - `mask::AbstractMatrix{Bool}`: Eligibility mask `observations × assets`.
+
+# Validation
+
+  - `size(W0) == size(IV)`.
+
+# Returns
+
+  - `W1::Matrix{<:Number}`: Second-pass weights `observations × assets`, zero outside `mask`.
+
+# Related
+
+  - [`cs_weights_refine`](@ref)
+  - [`cross_sectional_lagged_inverse`](@ref)
+"""
+function cs_weights_blend(alg::BlendedInverseVarianceWeights, W0::MatNum,
+                          IV::Matrix{<:Number}, mask::AbstractMatrix{Bool})::MatNum
+    @argcheck(size(W0) == size(IV),
+              DimensionMismatch("W0 ($(size(W0, 1))×$(size(W0, 2))) must match IV ($(size(IV, 1))×$(size(IV, 2)))"))
     cross_sectional_winsorise!(IV, W0, alg.wins)
     ready = cross_sectional_median_cap!(IV, alg.ratio)
     Tf = promote_type(eltype(IV), real(eltype(W0)), typeof(alg.lambda))

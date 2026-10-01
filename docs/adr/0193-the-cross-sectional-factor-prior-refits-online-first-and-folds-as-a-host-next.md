@@ -2,7 +2,7 @@
 status: accepted
 ---
 
-# The Cross-Sectional Factor Prior refits on the online seam first and folds as a host next
+# The Cross-Sectional Factor Prior refits on the online seam first and folds as a carry next
 
 ## Context
 
@@ -48,20 +48,23 @@ tenth to the EW moments, which already fold exactly.
 
 ## Decision
 
-### A refit first, a host fold next
+### A refit first, a carry fold next
 
 1. **The refit.** The prior gains `cache`. `Online(CrossSectionalFactorPrior(…); max_history)` refits
-   over a Sample Buffer, and its read-out equals the batch fit over the buffer's rows, exactly. It
+   over a Sample Buffer, and its call with no data equals the batch fit over the buffer's rows, exactly. It
    costs one batch fit at each step, and `max_history` bounds it. A prior with no buffer refuses
    the step by name. The buffer records no Exogenous Series, so the refit refuses an observed
    factor by name until
    [#1476](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1476) decides where the
    step keeps that series.
-2. **The host fold.** An unwrapped prior seeds a carry state of its own, as `EmpiricalPrior` does, and
-   applies the rule of ADR 0136: a host folds what folds and refits the rest. At each step it computes
+2. **The carry fold.** An unwrapped prior seeds a carry state of its own, as `EmpiricalPrior` does, and
+   applies the rule of ADR 0136: a carry folds what folds and refits the rest. At each step it computes
    the exposures of the new rows from the carried panel, runs the regression on the new dates only,
    and folds `pe`, `ve` and `ce`. The return forecast and the idiosyncratic correlation refit from the
-   carried rows.
+   carried rows. A member that does not fold refits over the carried histories: a factor prior that
+   is not an `EmpiricalPrior` at each call with no data, and a variance estimator that does not fold, such as
+   a rolling window, by a fit of every carried observation at each step. The call with no data builds the
+   result with the code of the batch fit, so the two routes differ only in how they reach its inputs.
 3. The folds of the Descriptors and of the return forecast are not specified yet. They can come one
    family at a time.
 
@@ -106,7 +109,7 @@ A Choice Rule is a pair of library-wide singleton types under one abstract type:
 
 | Rule | Meaning |
 | --- | --- |
-| `BatchChoice()` | The default. The fit chooses again over every row, so the online read-out equals the batch fit. |
+| `BatchChoice()` | The default. The fit chooses again over every row, so the online call with no data equals the batch fit. |
 | `PinnedChoice()` | The choice of the first fit is kept. The oracle's rule for the dropped member. |
 
 The field sits on the estimator that makes the choice: `CrossSectionalFactorPrior` for the dropped
@@ -115,19 +118,21 @@ its projection. A refit honours a pinned choice with no state: after the first f
 the choice into the configuration of the estimator that it returns. The first fit is the first step
 whose buffer the batch fit accepts, which for the Cross-Sectional Factor Prior is `lag + 2` rows
 after the Descriptor warm-up. The step runs the part of the fit that the choice reads over the
-buffer, so the member that it writes is the member that the read-out of that step drops. In the host fold, a batch choice
+buffer, so the member that it writes is the member that the call with no data of that step drops. In the carry fold, a batch choice
 that moves refits every past date, and a pinned choice is recorded in the carry state.
 
-### The host fold carries only the rows that the Descriptors read
+### The carry fold carries only the rows that the Descriptors read
 
 Each Descriptor states its look-back: an `Integer`, or `nothing` for a recursion from the first row.
 The carry keeps the last `look-back + lag` panel rows when every look-back is finite, and every row
-otherwise. The output is exact in both cases.
+otherwise. A Return Forecast that reads the panel keeps a value at every fitted observation in its
+Result, and it aligns the fitted observations with the last rows of its returns data, so the carry
+keeps every row under it. The output is exact in every case.
 
 ## Considered options
 
 - **The full fold of the oracle, now.** Rejected for now. It gives an O(1) step, but it needs about
-  fifteen Descriptor states and the lag buffers before any caller can take a step. The host fold
+  fifteen Descriptor states and the lag buffers before any caller can take a step. The carry fold
   removes about 60 % of the cost with a small part of that build, and the Descriptor folds stay open.
 - **A refit only.** Rejected. It reaches every output, but a daily walk-forward over ten years costs
   about one hour at 500 assets.
@@ -136,7 +141,7 @@ otherwise. The output is exact in both cases.
   an optimiser, with no panel.
 - **A start-row window.** Rejected. It is exact in a refit, but the caller must know the offset of the
   rows that the moment member gets, which the Descriptor warm-up, the lag trim and a cap all move.
-- **A pinned choice by default.** Rejected. It breaks the identity of the online read-out and the batch
+- **A pinned choice by default.** Rejected. It breaks the identity of the online call with no data and the batch
   fit when the choice moves. It stays one keyword away.
 - **A cap on the carried panel.** Rejected. It is not exact with an EW Descriptor.
 
@@ -148,8 +153,8 @@ otherwise. The output is exact in both cases.
   refit and the Choice Rule), [#1469](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1469)
   (the Seed Window), [#1470](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1470)
   (the Descriptor look-back), [#1471](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1471)
-  (the host fold) and [#1472](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1472)
+  (the carry fold) and [#1472](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1472)
   (the Choice Rule on the selection regressions of `FactorPrior`).
 - ADR 0136 and ADR 0039 carry amendments that point here.
-- A pinned choice and a seed window are two routes on which the online read-out equals no batch fit.
+- A pinned choice and a seed window are two routes on which the online call with no data equals no batch fit.
   Each is documented, and each is tested against the oracle.

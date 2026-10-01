@@ -37,6 +37,11 @@ The observations a member keeps verbatim, non-finite entries included, in the Pa
 A refit buffer records factor returns beside its rows when the fold carries them; whether a member reads them is a fact of its estimator tree — required, never read, or *take what is given* — not of the type of the estimator that holds the member. ADR 0106, ADR 0136.
 A refit buffer also records a time-varying Asset Panel beside its rows, both masks and every Panel Field, when its member reads the panel. A time-varying Panel Field is sample, not fold context, so the buffer of the prior owns it once and the Fold Context reads it back, as it reads the factor returns. An estimation mask then travels the online step to every prior whose route honours it. ADR 0136 amended, ADR 0193.
 A Pipeline under `Online` buffers its **input data**, because its refit is the whole workflow's batch fit and that fit starts from the input; no member below it folds, so the rows are held once. ADR 0142.
+
+**Carry Fold**
+The online route of an estimator that folds what folds and refits the rest over the rows it carries, the rule of ADR 0136. The Cross-Sectional Factor Prior folds as a carry when no `Online` wraps it: a new observation changes no past exposure, regression or idiosyncratic variance, so each step computes them for the new observations alone, folds the factor prior and the idiosyncratic variance, and refits the Return Forecast and the idiosyncratic correlation at the call with no data. It carries the panel rows that its Descriptors read, or every row when one of them, or a Return Forecast that reads the panel, has no finite look-back. ADR 0193, #1471.
+A whole-sample choice that moves, a Batch Choice of a dropped member or a factor that comes alive, makes the step fit every carried observation again, so the call with no data equals the batch fit. A Pinned Choice and a Seed Window keep a value of the first fit, so under either one the call with no data equals no batch fit.
+*Avoid*: reading it as a refit; it fits no past observation again unless a whole-sample choice moves or a member does not fold.
 A scheme under `Online` buffers nothing: the same word there declares an Online Scheme, and the loop steps instead of refitting. ADR 0167.
 
 **Scenario Cap**
@@ -45,7 +50,7 @@ The number of observations a fold-and-carry Prior Estimator keeps in its Result'
 *Avoid*: reading it as `max_history`, the `Online` wrapper's cap, which windows the whole fit and does have a batch equal. Both may be set on one estimator, and they nest.
 
 **Choice Rule**
-How a choice that a fit makes over its whole sample behaves on the online seam: the dropped member of a Factor Family, the factor set of a stepwise regression, the projection of a dimension-reduction regression. A **Batch Choice** chooses again over every observation at each fit, so the online read-out equals the batch fit over the same rows; it is the default. A **Pinned Choice** keeps the choice of the first fit, so the basis of a fold stays fixed and each step stays cheap. The two agree in a batch fit. The rule is a field of the estimator that makes the choice. ADR 0193.
+How a choice that a fit makes over its whole sample behaves on the online step: the dropped member of a Factor Family, the factor set of a stepwise regression, the projection of a dimension-reduction regression. A **Batch Choice** chooses again over every observation at each fit, so the online call with no data equals the batch fit over the same rows; it is the default. A **Pinned Choice** keeps the choice of the first fit, so the basis of a fold stays fixed and each step stays cheap. The two agree in a batch fit. The rule is a field of the estimator that makes the choice. ADR 0193.
 *Avoid*: reading a Pinned Choice as a state; a refit honours it by naming the chosen member in its configuration after the first fit.
 
 **Fold Context**
@@ -188,7 +193,7 @@ The difference between Implied Volatility and realised volatility, typically pos
 
 **Windowed Estimator**
 A moment estimator restricting an inner moment estimator to a sub-window of the observations, then delegating. Windowing decides *which observations are seen*, never how the moment is computed from them.
-Its window follows one of two rules, and the two agree in a batch fit. A **Rolling Window**, the default, keeps the last observations of every fit, so on the online seam it refits over a window that moves. A **Seed Window** cuts only the observations of the first fit, and the inner estimator then folds every later observation. A Seed Window needs an inner estimator that folds exactly, held by a host that folds; a refit has no first fit to remember and refuses it. ADR 0193.
+Its window follows one of two rules, and the two agree in a batch fit. A **Rolling Window**, the default, keeps the last observations of every fit, so on the online step it refits over a window that moves. A **Seed Window** cuts only the observations of the first fit, and the inner estimator then folds every later observation. A Seed Window needs an inner estimator that folds exactly, held by a host that folds; a refit has no first fit to remember and refuses it. ADR 0193.
 *Avoid*: reading a Seed Window as a state of the Windowed Estimator. Its first fold spends the window: it returns the estimator with `window = nothing`, and the inner estimator holds the state of the fold. #1469.
 
 ### 3.1 Expected Returns (Moments)

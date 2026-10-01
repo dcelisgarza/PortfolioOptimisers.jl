@@ -1,0 +1,32 @@
+```@meta
+Description = "Cross-Sectional Prior Fold, private API of PortfolioOptimisers.jl: CrossSectionalCarryState, cross_sectional_carry_with, Base.copy, …"
+```
+
+# Cross-Sectional Prior Fold: private API
+
+```@docs
+PortfolioOptimisers.CrossSectionalCarryState
+PortfolioOptimisers.cross_sectional_carry_with
+Base.copy(x::PortfolioOptimisers.CrossSectionalCarryState)
+PortfolioOptimisers.cross_sectional_forecast_reads_panel
+PortfolioOptimisers.cross_sectional_carry_rows
+PortfolioOptimisers.cross_sectional_window_append
+PortfolioOptimisers.cross_sectional_window_trim
+PortfolioOptimisers.cross_sectional_fold_variance
+PortfolioOptimisers.cross_sectional_fold_factors
+PortfolioOptimisers.cross_sectional_factor_prior
+PortfolioOptimisers.cross_sectional_fold_regression
+PortfolioOptimisers.cross_sectional_previous_variance
+PortfolioOptimisers.cross_sectional_fold_pass
+PortfolioOptimisers.assert_cross_sectional_no_intercept
+PortfolioOptimisers.cross_sectional_fold_mark
+PortfolioOptimisers.cross_sectional_fold_append
+PortfolioOptimisers.cross_sectional_dropped_names
+PortfolioOptimisers.cross_sectional_fold_choice
+PortfolioOptimisers.cross_sectional_fold_sums
+PortfolioOptimisers.cross_sectional_fold_rows
+PortfolioOptimisers.cross_sectional_fold_refit
+PortfolioOptimisers.cross_sectional_fold_step
+PortfolioOptimisers.cross_sectional_fold_histories
+PortfolioOptimisers.cross_sectional_carry_fold
+```

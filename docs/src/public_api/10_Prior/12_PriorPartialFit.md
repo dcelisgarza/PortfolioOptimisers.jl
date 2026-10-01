@@ -10,6 +10,8 @@ A prior that updates its moments exactly carries a [`PortfolioOptimisers.PriorCa
 
 A prior that stores the observations updates each member that has an incremental fit, and refits each member that has none over its own rows. You write the same estimator as for a batch fit.
 
+A [`CrossSectionalFactorPrior`](@ref) that [`Online`](@ref) does not wrap carries a [`PortfolioOptimisers.CrossSectionalCarryState`](@ref). A new observation changes no past exposure, regression or idiosyncratic variance, so each update computes them for the new observations alone, and its factor prior and idiosyncratic variance update exactly.
+
 `partial_fit!(pe, rd)` updates a prior from a [`ReturnsResult`](@ref), as `prior(pe, rd)` fits it. It reads the returns, the factor returns and the two masks of the panel of `rd`. It also reads the per-asset data of that panel when the prior reads them, as [`PortfolioOptimisers.reads_panel_fields`](@ref) answers. A prior with no exact update stores all of these, so it takes a narrower estimation universe and the per-asset data. A prior that updates its moments exactly takes the active mask alone, so it refuses an estimation mask that differs from the active mask.
 
 ```@docs

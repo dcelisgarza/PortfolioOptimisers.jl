@@ -546,86 +546,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Regress each observation on the factors that are not empty, and give every Empty Factor a return of zero.
-
-A factor is empty when its exposure is zero at every pair of positive weight, which are the pairs that the regression reads. A sub-universe with no asset in one level of a one-hot factor leaves the factor of that level empty, and a meta-optimiser gives its sub-problems such sub-universes. The data then state nothing about the return of the factor. The function regresses on the other factors and writes a zero return, so the answer does not depend on how the solve algorithm of `cre` treats a rank-deficient design.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathcal{E} &= \\left\\{k : B_{tik} = 0 \\ \\forall (t, i) : u_{ti} > 0\\right\\}\\,, \\\\
-f_{tk} &= 0\\,, \\quad k \\in \\mathcal{E}\\,,\\ t = 1, \\ldots, T\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathcal{E}``: Empty Factors.
-  - $(math_dict[:B_tik_cs])
-  - $(math_dict[:u_ti_cs])
-  - $(math_dict[:f_t_att])
-  - $(math_dict[:T])
-
-A zero column of the design adds nothing to the fit, so the returns of the other factors are the returns of the regression on every factor. The minimum-norm solution of that regression gives the same zero to an Empty Factor.
-
-# Algorithm
-
- 1. Take the pairs of positive weight with [`cross_sectional_design_mask`](@ref), giving `act`.
- 2. Mark each factor whose exposure is not zero at a pair of `act`, giving `lv`.
- 3. If every factor is in `lv`, regress on `Z` with [`cross_sectional_regression`](@ref) and return.
- 4. Otherwise, regress on the columns of `Z` at `lv`, giving `csl`. Write its factor returns into the columns at `lv` of a zero matrix `f`, and keep its residuals, its counts and its intercept.
-
-# Arguments
-
-  - `cre`: Cross-sectional regression estimator.
-  - `Z`: Exposure tensor `observations × assets × factors`.
-  - `X`: Asset returns matrix `observations × assets`.
-  - `W`: Cross-sectional weights matrix `observations × assets`.
-
-# Validation
-
-  - At least one factor is not empty. Raises an `ArgumentError`.
-  - The rules of [`cross_sectional_design_mask`](@ref) and of [`cross_sectional_regression`](@ref).
-
-# Returns
-
-  - `csr::CrossSectionalRegression`: The regression on every factor of `Z`.
-  - `lv::BitVector`: `true` at each factor that is not empty.
-
-# Related
-
-  - [`cross_sectional_regression`](@ref)
-  - [`cross_sectional_factor_moments`](@ref)
-  - [`CrossSectionalFactorPrior`](@ref)
-"""
-function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEstimator,
-                                         Z::Arr3Num, X::MatNum, W::MatNum)
-    act = findall(cross_sectional_design_mask(Z, X, W))
-    lv = BitVector([any(c -> !iszero(Z[c[1], c[2], k]), act) for k in axes(Z, 3)])
-    @argcheck(any(lv),
-              ArgumentError("every one of the $(size(Z, 3)) factors is empty: no factor has a nonzero exposure at an (observation, asset) pair of positive weight, so the regression has nothing to fit. Widen the eligible cross-section, or give factors that the assets load on."))
-    if all(lv)
-        return (; csr = cross_sectional_regression(cre, Z, X, W), lv = lv)
-    end
-    csl = cross_sectional_regression(cre, Z[:, :, lv], X, W)
-    f = zeros(eltype(csl.f), size(csl.f, 1), size(Z, 3))
-    f[:, lv] = csl.f
-    return (;
-            csr = CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n, b = csl.b,
-                                           h1 = csl.h1), lv = lv)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Fit the factor prior of a Cross-Sectional Factor Prior on the factors that are not empty, and give every Empty Factor no mean and no variance.
 
 An Empty Factor has a return of zero at every fitted observation, from [`cross_sectional_live_regression`](@ref). A covariance estimator that turns the covariance into a correlation divides by the zero volatility of such a factor, and gives `NaN`. So the function fits `pe` and processes the covariance with `f_mp` on the other factors only. It then puts the answer on the whole factor axis, with a zero return in every scenario, a zero mean, and a zero row and column of the covariance at each Empty Factor. When no factor is empty, the moments are those that `pe` states over `f`.
 
+The method over `pr` takes the factor prior already fitted on the factors that are not empty. The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads its folded factor prior out and gives the result to it, so both routes process and expand the moments with one code.
+
 # Algorithm
 
  1. Take the columns of `f` at `lv`, giving `fl`. When every factor is in `lv`, `fl` is `f`.
- 2. Fit `pe` on `fl`, giving `pr`.
+ 2. Fit `pe` on `fl`, giving `pr`. The method over `pr` starts at step 3.
  3. Refuse a non-finite moment of `pr` with [`assert_cross_sectional_factor_moments`](@ref).
  4. Process the covariance of `pr` in place with `f_mp`, over `fl`.
  5. When every factor is in `lv`, return the scenarios, the mean and the covariance of `pr`. Otherwise, write them into the columns at `lv` of a zero scenario matrix `X`, the entries at `lv` of a zero mean `mu`, and the block at `lv` of a zero covariance `sigma`.
@@ -633,6 +563,7 @@ An Empty Factor has a return of zero at every fitted observation, from [`cross_s
 # Arguments
 
   - `pe`: The factor prior estimator.
+  - `pr`: The factor prior that `pe` states over the columns of `f` at `lv`.
   - `f_mp`: Matrix processing estimator of the factor covariance.
   - `f`: The factor returns, `observations × factors`.
   - `lv`: `true` at each factor that is not empty.
@@ -642,6 +573,7 @@ An Empty Factor has a return of zero at every fitted observation, from [`cross_s
 # Validation
 
   - `lv` has one entry per column of `f`. Raises a `DimensionMismatch`.
+  - The covariance of `pr` is a new matrix, because step 4 processes it in place.
   - The rules of [`assert_cross_sectional_factor_moments`](@ref).
 
 # Returns
@@ -663,9 +595,16 @@ function cross_sectional_factor_moments(pe::AbstractLowOrderPriorEstimator_A_AF,
                                         kwargs...)
     @argcheck(length(lv) == size(f, 2),
               DimensionMismatch("lv ($(length(lv))) must have one entry per column of f ($(size(f, 2)))"))
+    return cross_sectional_factor_moments(prior(pe, all(lv) ? f : f[:, lv];
+                                                strict = strict), f_mp, f, lv; kwargs...)
+end
+function cross_sectional_factor_moments(pr::LowOrderPrior,
+                                        f_mp::AbstractMatrixProcessingEstimator, f::MatNum,
+                                        lv::AbstractVector{Bool}; kwargs...)
+    @argcheck(length(lv) == size(f, 2),
+              DimensionMismatch("lv ($(length(lv))) must have one entry per column of f ($(size(f, 2)))"))
     live = all(lv)
     fl = live ? f : f[:, lv]
-    pr = prior(pe, fl; strict = strict)
     assert_cross_sectional_factor_moments(pr.mu, pr.sigma, size(f, 1))
     matrix_processing!(f_mp, pr.sigma, fl; kwargs...)
     if live
