@@ -378,5 +378,5 @@ fill under either.
 - The dendrogram, the entropy-pooling view resolvers and the meta-optimisers read the invented cells
   and are unchanged. The notice is what says so, and a repair to any of them is a later decision
   with the census in hand.
-- `CONTEXT.md` gains the **Held Gap** entry, and the **Precomputed-returns contract** entry states
+- `GLOSSARY.md` gains the **Held Gap** entry, and the **Precomputed-returns contract** entry states
   the finiteness rule.

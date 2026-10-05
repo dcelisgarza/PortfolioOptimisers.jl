@@ -206,7 +206,7 @@ on the map, and neither is built.
   `fold_loop`'s batch arms and from the twelve `optimise(opt, rd)` doors of the hosts that hold a
   prior. The walk is type-decided and folds to `nothing` on a wrapper-free tree, so a batch fit
   pays nothing it can measure.
-- `CONTEXT.md` gains **Fold Fit**.
+- `GLOSSARY.md` gains **Fold Fit**.
 
 ## Amendment (2026-09-21)
 

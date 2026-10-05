@@ -381,7 +381,7 @@ Run the invariant model-assembly sequence shared by all single-JuMP-model optimi
 Executes the constraint-builder pipeline — from `set_linear_weight_constraints!` through
 `add_custom_constraint!` — that sits between the per-optimiser *head* (weight variables)
 and *tail* (objective + solve). The head must have populated Model State (`w`/`k` variables)
-before calling this function. See `Model Assembly` in `CONTEXT.md` and
+before calling this function. See `Model Assembly` in `GLOSSARY.md` and
 `0008-jump-model-assembly.md`.
 
 The tail of the sequence is [`assert_frontier_sweep_cap`](@ref): both frontier registries are

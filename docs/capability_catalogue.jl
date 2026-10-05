@@ -156,7 +156,7 @@ choice.
 `choice_surface_names` in `docs/generate_capability_catalogue.jl` states the coverage rule. A
 concrete type that the package declares is a choice when it is a leaf `AbstractEstimator`, a
 leaf `AbstractAlgorithm`, a leaf `AbstractCovarianceEstimator`, or an export under its own
-name, and it is not a Result and not an error (CONTEXT.md § 1). A type that the library
+name, and it is not a Result and not an error (GLOSSARY.md § 1). A type that the library
 constructs for itself is not a choice. So an entry here states a fact of the domain, and it
 does not open a gap in the check.
 

@@ -1,7 +1,7 @@
 # Literature acronym aliases — each is a `const` pointing at the canonical long-form type.
 # These are exported so callers who know the acronym can discover and use it directly via
 # autocomplete without having to look up the full spelling.  Each alias is unambiguous in
-# CONTEXT.md; ambiguous abbreviations (e.g. MAD ↔ Mean vs Median)
+# GLOSSARY.md; ambiguous abbreviations (e.g. MAD ↔ Mean vs Median)
 # are intentionally omitted.
 
 # ── Clustering / hierarchical optimisers ──────────────────────────────────────

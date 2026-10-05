@@ -390,7 +390,7 @@ end
         @test count_of("The largest difference over every fold is zero.", "verdict") == 0
     end
 
-    @testset "the glossary list is read off CONTEXT.md" begin
+    @testset "the glossary list is read off GLOSSARY.md" begin
         terms = P.glossary_terms(; root = root)
         @test "Coverage Universe" in terms
         @test "Asset Panel" in terms

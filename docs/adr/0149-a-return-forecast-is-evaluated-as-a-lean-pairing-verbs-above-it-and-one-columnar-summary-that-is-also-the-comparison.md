@@ -238,7 +238,7 @@ fifteen parameters has a home, tabulated in #932's resolution.
 Seventeen names are exported from `src/08_Moments/45_ReturnForecasts/07`–`14`: the three targets,
 the two Results, `forecast_evaluation`, `forecast_history`, and the ten level-2 verbs and
 summaries; eleven `plot_forecast_*` figures from the extension. `AbstractForecastTarget` is not
-exported. `CONTEXT.md` defines **Forecast Evaluation**, **Forward Target** and **Forecast
+exported. `GLOSSARY.md` defines **Forecast Evaluation**, **Forward Target** and **Forecast
 Calibration**. Example `7_putting_it_together/07_Forecast_Evaluation.jl` is the page that walks the
 reading order.
 

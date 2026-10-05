@@ -199,7 +199,7 @@ inverse paths. `JET.yml` carries a `paths:` filter and is exposed; `Complexity.y
 is not. Separately, a fork contributor cannot re-run a check, so a transient failure needs a new
 push from them or a re-run by a maintainer.
 
-**The vocabulary stays out of `CONTEXT.md`**, for the reason ADRs 0071, 0072 and 0073 all gave. That
+**The vocabulary stays out of `GLOSSARY.md`**, for the reason ADRs 0071, 0072 and 0073 all gave. That
 file's preamble scopes it to the library's domain, and a published artifact is repository process.
 
 **"Published Baseline" and "Remedial Baseline" were considered and rejected.** "Published Baseline"

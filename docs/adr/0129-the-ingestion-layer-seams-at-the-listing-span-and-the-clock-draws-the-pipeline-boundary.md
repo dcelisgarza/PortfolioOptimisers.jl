@@ -232,7 +232,7 @@ collapse are `PriceIngestion`; the active mask is `listing_span` and the estimat
 `TrainTestSplit`, which the layer does not own; and the elementwise map is owned by nothing, which
 *The value-only side of the rule mints nothing* states and argues.
 
-`CONTEXT.md` mints **Listing Span** and **Span Rule**, and amends **Asset Panel** — its
+`GLOSSARY.md` mints **Listing Span** and **Span Rule**, and amends **Asset Panel** — its
 point-in-time shape is now stated by the two masks, with Panel Fields as optional payload rather
 than as the panel's defining content.
 

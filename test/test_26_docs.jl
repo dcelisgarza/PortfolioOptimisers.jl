@@ -88,7 +88,7 @@ function -- cannot host.
         @testset "every choice is catalogued" begin
             # `choice_surface_names` comes from the generator this file includes, so
             # the coverage rule is stated once and the docs build cannot disagree
-            # with the test. It is the Choice Surface of CONTEXT.md § 1: every
+            # with the test. It is the Choice Surface of GLOSSARY.md § 1: every
             # concrete type the package declares that is a leaf estimator, a leaf
             # algorithm, a leaf covariance estimator, or an export under its own
             # name, less the Results and the errors, which a caller receives
@@ -761,7 +761,7 @@ The CONTENT of a subsection. Nothing compares the model keys a docstring names w
 the body registers, and nothing reads a `## Relaxation` at all -- an inexact encoding is a
 fact about the mathematics, not a token. ADR 0081 records the key census as the largest build
 of this area and leaves it in the map's *Not yet specified*. `## Relaxation` holds by review,
-in the sense of `STANDARDS.md`.
+in the sense of `CODING_STANDARDS.md`.
 =#
 @testset "Swept file section completeness" begin
     using Test, TOML
@@ -1310,7 +1310,7 @@ in the sense of `STANDARDS.md`.
 
     The FAMILY half of the rule -- siblings of one leaf abstract supertype state a shared
     quantity in the same form -- is not gated here or anywhere. An equation's form is not a
-    token. It holds by review, in the sense of `STANDARDS.md`.
+    token. It holds by review, in the sense of `CODING_STANDARDS.md`.
 
     ---------------------------------------------------------------------- the two checks
 

@@ -6,7 +6,7 @@ applyTo: 'src/**/*.jl, ext/**/*.jl, docs/**/*.md'
 
 ## How to read this file
 
-This file is the Authority for docstrings, in the sense of [`STANDARDS.md`](../../STANDARDS.md). It carries the rules, and it names where to read a real docstring. It holds no worked docstring of its own: a copy inside a standards file drifts away from the code, and a pointer cannot.
+This file is the Authority for docstrings, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md). It carries the rules, and it names where to read a real docstring. It holds no worked docstring of its own: a copy inside a standards file drifts away from the code, and a pointer cannot.
 
 Three kinds of block appear below.
 
@@ -61,12 +61,12 @@ The prose of a docstring follows ASD-STE100, Simplified Technical English, as th
 
 **Scope.** The Scope of [The prose passes `/unslop`](#the-prose-passes-unslop): the docstrings of `src/**/*.jl` and `ext/**/*.jl`, and the dictionary values of [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/) that they interpolate. The rule reads the prose alone. It does not read a code span, an identifier, a `jldoctest` block, a LaTeX expression, a heading that a template of this file fixes, or a `# References` bullet.
 
-**The words of `CONTEXT.md` are approved.** A term that [`CONTEXT.md`](../../CONTEXT.md) defines is an approved technical name, and a verb that it defines is an approved technical verb. The exception holds when the dictionary of the specification does not contain the word, and when the dictionary gives the word a different meaning or a different part of speech.
+**The words of `GLOSSARY.md` are approved.** A term that [`GLOSSARY.md`](../../GLOSSARY.md) defines is an approved technical name, and a verb that it defines is an approved technical verb. The exception holds when the dictionary of the specification does not contain the word, and when the dictionary gives the word a different meaning or a different part of speech.
 
 - Use the glossary term with the meaning that the glossary gives it, and with no other meaning. In a docstring, the words Prior, Result and Estimator have the glossary meaning only.
 - Do not use a word that the glossary lists under *Avoid*, even when the dictionary of the specification approves it.
 - The exception covers the glossary words only. Every other word follows the dictionary, or the rules of the specification for technical names and technical verbs. The name of a published method is a technical name.
-- Do not coin a domain term in a docstring. Add the term to `CONTEXT.md` in the same change, and then use it.
+- Do not coin a domain term in a docstring. Add the term to `GLOSSARY.md` in the same change, and then use it.
 
 **The rules that a docstring breaks most often.** This list is a digest. It does not replace the specification.
 
@@ -92,7 +92,7 @@ The prose of a docstring follows ASD-STE100, Simplified Technical English, as th
 - The `/unslop` pass and this rule both apply to the same prose. One rewrite can satisfy both.
 - A dictionary value is one text with many users. Rewrite it once, in its dictionary.
 
-**The Gate.** None. No parser in the repository reads the dictionary of the specification, so the rule holds by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md).
+**The Gate.** None. No parser in the repository reads the dictionary of the specification, so the rule holds by review, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md).
 
 ## Markdown Guidelines
 
@@ -219,7 +219,7 @@ A docstring documents the released unit, not the discussion that produced it. **
 The rule's Scope is every page a library user reaches without opening `docs/adr/`, not `src/**/*.jl`, `ext/**/*.jl` and `docs/**/*.md` alone: the same clause governs the `Prose` text in [`docs/capability_catalogue.jl`](../../docs/capability_catalogue.jl), and the rendered prose and admonitions of the Literate sources that build the example and user-guide pages, `examples/**/*.jl` and `user_guide/*.jl`. It also governs error text: the message of a `throw`, an `error`, an error constructor such as `ArgumentError(…)`, an `@argcheck` or an `@assert` under `src/` and `ext/`, and a `const` remedy string whose name ends in `_remedy` or `_message`. An error message reaches the user through the REPL, so it is as user-facing as a page. ADRs are written for a contributor deciding what to build next, not for someone calling the finished function — an ADR number means nothing to that reader and sends them looking for a file that is not part of the package.
 
 - **State the fact, not its provenance.** Write the rule, the bound, or the defect the way a reader with no repository access needs it — what holds, what fails, and why — instead of pointing at the ticket that established it. `The clamp is a necessary and sufficient condition on the template.` stands on its own; `This closes #494 and #500.` sends the reader to a page the docstring does not need.
-- **A decision belongs in `docs/adr/`.** Link an ADR from another ADR, from `STANDARDS.md`, or from `CONTEXT.md` — never from a docstring, an example, a user-guide page or the Capability Catalogue.
+- **A decision belongs in `docs/adr/`.** Link an ADR from another ADR, from `CODING_STANDARDS.md`, or from `GLOSSARY.md` — never from a docstring, an example, a user-guide page or the Capability Catalogue.
 - **`# References` cites only a published external source**, through `ref_dict`. A GitHub issue or pull request is neither published nor external in that sense, and gets no bullet there either.
 - **The contributor guide is the exception.** `docs/src/contribute/` and `docs/adr/` are written for a contributor, not a library user, and may cite an ADR, an issue or a PR freely.
 
@@ -236,13 +236,13 @@ A reader who meets a source in a docstring must be able to open that source. So 
 - **Do not refer to a work as "the paper", "the article", "the source paper" or "the authors".** Repeat the citation. Put a locator before the citation: `Equation 27 of [key](@cite)`.
 - **State what the library takes from the work, and then what it adds.** First say which part of the work the unit makes: `Each rule makes one target of [schaferstrimmer2005](@cite).` Then state a generalisation or a new method in a different sentence.
 - **Tell an implementer what to supply, not where it comes from.** Write ``subtype it with the parameters of the rule and a `proj` field``. Do not write `with the paper's parameters`: the reader of an abstract type has no paper.
-- **Define each word that an argument or a field description uses.** Use a word of [`CONTEXT.md`](../../CONTEXT.md) or a word that the docstring defines. A private name for a value, such as "the carrier of the rule", tells the reader nothing about the value. The words for the mechanism of the code that [`julia-prose.instructions.md`](julia-prose.instructions.md) lists, such as "carrier", "seam", "host", "read-out" and "door", never appear. Name the argument, the type or the function instead: "`rd`", "the [`ReturnsResult`](@ref)", "`optimise(opt)` with no data", "[`investable_fees_view`](@ref)". The rule holds on an error message too.
+- **Define each word that an argument or a field description uses.** Use a word of [`GLOSSARY.md`](../../GLOSSARY.md) or a word that the docstring defines. A private name for a value, such as "the carrier of the rule", tells the reader nothing about the value. The words for the mechanism of the code that [`julia-prose.instructions.md`](julia-prose.instructions.md) lists, such as "carrier", "seam", "host", "read-out" and "door", never appear. Name the argument, the type or the function instead: "`rd`", "the [`ReturnsResult`](@ref)", "`optimise(opt)` with no data", "[`investable_fees_view`](@ref)". The rule holds on an error message too.
 - **Do not cite in the first sentence of a type docstring.** The Capability Catalogue copies that sentence to a page that has no bibliography. Name the method in the first sentence, and cite its source in the second sentence.
 - **Every work that the prose cites has a bullet in `# References` of the same docstring.** A private unit can cite. Its page under `docs/src/private_api/` then carries the bibliography block that [The `# References` Section](#the--references-section) states.
 
 A method that has the name of a person, such as the Weiszfeld iteration or Welford's recursion, is a technical name. The name is not a citation, and the rule does not read it.
 
-**The Gate.** [`test/test_74_source_citation_census.jl`](../../test/test_74_source_citation_census.jl) reads the literal text of each docstring under `src/` and `ext/`, field docstrings included, and each value in the docstring dictionaries. It fails on the words "paper", "article", "co-author" and "the authors", and on a name with a capital letter that a year in parentheses follows. The same census reads every string literal under `src/` and `ext/`, messages included, and fails on a word of the `mechanism` pattern of `code_health/prose.jl`. The census does not find an author list that has no year, or a private name for a value that the pattern does not list. Those two hold by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md). `test/test_26_docs.jl` checks that the key of each `[key](@cite)` and `[key](@citet)` is in `docs/src/References.bib`.
+**The Gate.** [`test/test_74_source_citation_census.jl`](../../test/test_74_source_citation_census.jl) reads the literal text of each docstring under `src/` and `ext/`, field docstrings included, and each value in the docstring dictionaries. It fails on the words "paper", "article", "co-author" and "the authors", and on a name with a capital letter that a year in parentheses follows. The same census reads every string literal under `src/` and `ext/`, messages included, and fails on a word of the `mechanism` pattern of `code_health/prose.jl`. The census does not find an author list that has no year, or a private name for a value that the pattern does not list. Those two hold by review, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md). `test/test_26_docs.jl` checks that the key of each `[key](@cite)` and `[key](@citet)` is in `docs/src/References.bib`.
 
 ---
 
@@ -263,7 +263,7 @@ The prose of a docstring reads as a person wrote it for a reader. The `unslop` s
 
 **How to apply it.** Invoke `/unslop` on the file. When the skill cannot be invoked, read its rules and apply them by hand. Rewrite the prose, keep the meaning, and end with the skill's self-audit, "What makes this obviously AI generated?". A pass changes prose alone: a line of code, a `jldoctest` block and its output, a LaTeX expression and an interpolated key stay as they are.
 
-**The Gate.** None. The rules that matter most, such as rules 27, 28 and 32, are judgements that no parser reads, so the rule holds by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md). A file whose sweep-manifest row reads `swept = true` owes the pass, and the file's sweep ticket carries it.
+**The Gate.** None. The rules that matter most, such as rules 27, 28 and 32, are judgements that no parser reads, so the rule holds by review, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md). A file whose sweep-manifest row reads `swept = true` owes the pass, and the file's sweep ticket carries it.
 
 ---
 
@@ -713,7 +713,7 @@ The section states the mathematics and nothing else. It **names no identifier fr
 - CUT — `vals`, `vecs`, `corr0`. Each names a local of the body.
 - KEEP — *the two `alpha` weights sum to one on the diagonal, so the reconstruction preserves it in exact arithmetic*. That is a consequence of the definition, and it holds whatever the body does.
 
-An implementation fact is not a token, so no parser finds one. This rule is **unenforced**: it holds by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md). That is a known state and not a hidden one.
+An implementation fact is not a token, so no parser finds one. This rule is **unenforced**: it holds by review, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md). That is a known state and not a hidden one.
 
 ### LaTeX conventions
 
@@ -809,7 +809,7 @@ The second reads the table itself, and reds when two keys open with one definiti
 
 The Family is the leaf-most abstract supertype, never a generic root. `RiskMeasure` and `AbstractResult` span many files and their members share no notation, so neither is a Family in this sense.
 
-An equation's form is not a token, so no parser finds a breach. This rule is **unenforced**: it holds by review, in the sense of [`STANDARDS.md`](../../STANDARDS.md). That is a known state and not a hidden one.
+An equation's form is not a token, so no parser finds a breach. This rule is **unenforced**: it holds by review, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md). That is a known state and not a hidden one.
 
 ---
 

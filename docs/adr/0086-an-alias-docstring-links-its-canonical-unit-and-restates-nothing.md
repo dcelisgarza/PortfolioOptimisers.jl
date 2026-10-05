@@ -16,7 +16,7 @@ acronym alias such as `HRP` needs `# Related`. Nothing in the tree does either.
 `.github/instructions/julia-source-code.instructions.md` § *Union Type Aliases and Dispatch Groups*
 carried the only written statement: a union alias is documented "explaining which types it groups
 and why". That is a rule about content, and it says nothing about sections. It also sat in a file
-that is not the Authority for docstrings, which is the drift `STANDARDS.md` § *Changing a standard*
+that is not the Authority for docstrings, which is the drift `CODING_STANDARDS.md` § *Changing a standard*
 forbids.
 
 ### The measurement
@@ -62,7 +62,7 @@ only the alias, and a docstring that states nothing sends that reader away.
 
 **An alias docstring links its canonical unit and restates nothing.** The reader gets one click,
 not a copy. The Authority is `.github/instructions/julia-docstrings.instructions.md` §
-*Section Structure for Aliases*, and `STANDARDS.md` routes an alias docstring to it.
+*Section Structure for Aliases*, and `CODING_STANDARDS.md` routes an alias docstring to it.
 
 **1. Three kinds, and the sections each carries.**
 

@@ -90,7 +90,7 @@ without committing to its stability.
 
 This decision fixes the rule; it does not run it. None of the 94 still-private `# Interfaces`-
 marked abstract types, nor their named verbs, gain a `public` declaration in this ticket. Applying
-the rule is a shared infrastructure ticket — the census below, plus the STANDARDS.md row — followed
+the rule is a shared infrastructure ticket — the census below, plus the CODING_STANDARDS.md row — followed
 by one promotion ticket per top-level `src/`/`ext/` directory, mirroring the shape the mirror-tree
 migration itself used ([#1101](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1101)
 → #1102–#1118): each directory ticket promotes every `# Interfaces`-marked type it holds and moves
@@ -109,9 +109,9 @@ decision only fixes that the gate must exist.
 
 ## Consequences
 
-- `STANDARDS.md` gains a row: subject = a private name's promotion to `public`, authority = this
+- `CODING_STANDARDS.md` gains a row: subject = a private name's promotion to `public`, authority = this
   ADR, gate = the new census file, not yet created.
-- The infrastructure ticket owes the census and the STANDARDS.md row it gates. Each directory
+- The infrastructure ticket owes the census and the CODING_STANDARDS.md row it gates. Each directory
   ticket it unblocks owes, per abstract type it promotes: the `public` declaration on the type and
   every verb its `# Interfaces` section names, and the mirror-tree page updates the promotion moves
   entries on.

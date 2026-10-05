@@ -184,4 +184,4 @@ two Results overlap by a fold the caller must drop, and a naive `vcat` double-co
   host generically. A failed last fold threads `NaN` weights as the loop does today, which is
   [#1021](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1021)'s.
 - The build is [#1025](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1025).
-- `CONTEXT.md` gains **Resume**, and **Fold Fit** says the loop starts cold *or resumes*.
+- `GLOSSARY.md` gains **Resume**, and **Fold Fit** says the loop starts cold *or resumes*.

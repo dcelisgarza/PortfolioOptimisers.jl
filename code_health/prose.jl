@@ -581,18 +581,18 @@ function emoji_count(line::AbstractString)
     return n
 end
 
-# --- the glossary of CONTEXT.md --------------------------------------------
+# --- the glossary of GLOSSARY.md --------------------------------------------
 
 """
     glossary_terms(; root = REPO_ROOT) -> Vector{String}
 
-The multi-word bold terms of `CONTEXT.md` in their capitalised form, longest first. The census
+The multi-word bold terms of `GLOSSARY.md` in their capitalised form, longest first. The census
 reads them off that file rather than holding a copy, so the list never goes stale. A term counts
 only when every word of it starts with a capital: `Coverage Universe` is the glossary's name for
 the concept, and `Black-Litterman family` is a proper noun with an ordinary word after it.
 """
 function glossary_terms(; root::AbstractString = REPO_ROOT)
-    path = joinpath(root, "CONTEXT.md")
+    path = joinpath(root, "GLOSSARY.md")
     if !(isfile(path))
         return String[]
     end

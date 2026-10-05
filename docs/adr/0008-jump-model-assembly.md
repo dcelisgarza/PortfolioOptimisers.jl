@@ -49,7 +49,7 @@ the same object, wrapped in a [`NearOptimalSetup`](../../src/17_Optimisation/05_
 This builds on the Model State interface of [ADR 0004](0004-typed-jump-model-state.md): that
 ADR gave the data the builders share a named interface; this ADR gives the *ordering* of the
 builders a named interface. The two are complementary — `Model State` is the data, `Model
-Assembly` is the sequence (see `CONTEXT.md`).
+Assembly` is the sequence (see `GLOSSARY.md`).
 
 ## Decision
 

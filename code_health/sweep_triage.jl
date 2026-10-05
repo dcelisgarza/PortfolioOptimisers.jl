@@ -248,7 +248,7 @@ tickets that were filed before it existed.
 It names the map, the Authority of each rule the sweeper touches, and the glossary **directly**.
 Before it existed the only route was one long hop: this body pointed at #404, and #404 named the
 four files inside five thousand words. Three of the six open sweep tickets measured on 2026-08-24
-named an Authority, and none named `STANDARDS.md`.
+named an Authority, and none named `CODING_STANDARDS.md`.
 
 The block is constant text, so it costs the job no judgement, and it is never machine-read. #404
 keeps the rules of this effort alone; every rule of the tree itself lives at one of these four
@@ -259,13 +259,13 @@ const ROUTING = """
 
 Read before you start:
 
-- `STANDARDS.md` — which file owns the rule you are about to apply, and which check holds it.
+- `CODING_STANDARDS.md` — which file owns the rule you are about to apply, and which check holds it.
 - `.github/instructions/julia-docstrings.instructions.md` — the Authority for a docstring rule.
 - `.github/instructions/julia-source-code.instructions.md` — the Authority for a rule about code
   under `src/` and `ext/`.
-- `CONTEXT.md` — the domain vocabulary. Use its words, and add a word you introduce.
+- `GLOSSARY.md` — the domain vocabulary. Use its words, and add a word you introduce.
 
-`STANDARDS.md` is the map. Open it first when you do not know which file governs the change.
+`CODING_STANDARDS.md` is the map. Open it first when you do not know which file governs the change.
 """
 
 function title_of(c::Candidate)

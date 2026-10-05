@@ -67,7 +67,7 @@ The top level closes its gaps: `01_Base/`, `02_Tools.jl`, `03_InputData/`, `04_M
 gathers, and no line of any moved file changes except a comment or a docstring that names a
 sibling by path.
 
-**Two files are renamed for the glossary.** `CONTEXT.md` names the concept *Asset Selector*, so
+**Two files are renamed for the glossary.** `GLOSSARY.md` names the concept *Asset Selector*, so
 `src/24_Preselection.jl` becomes `src/20_AssetSelection.jl`, the name its page already carried, and
 `src/03_InputData/13_AssetSelection.jl`, which holds the root `AbstractAssetSelector` and the
 fit/apply seam, becomes `13_Base_AssetSelection.jl` under the `Base_` convention of every other
@@ -98,7 +98,7 @@ name, and nothing is positional.
   `coverage_baseline.toml`, `size_baseline.toml`, `jet_baseline.toml` and the exemptions of
   `rulings.toml` keep every number under the new path, re-sorted as a refresh writes them.
 - Every reference under `src/`, `test/`, `code_health/`, `docs/src/api/`, `docs/src/contribute/`,
-  `user_guide/`, `examples/`, `research/`, `.github/`, `STANDARDS.md` and `.lychee.toml` names the
+  `user_guide/`, `examples/`, `research/`, `.github/`, `CODING_STANDARDS.md` and `.lychee.toml` names the
   new path. In `docs/adr/` only a link target moves; **an ADR that names an old path in prose keeps
   it**, as ADRs 0104 and 0147 settled, and the two dead links ADR 0042's amendment retains stay as
   written.

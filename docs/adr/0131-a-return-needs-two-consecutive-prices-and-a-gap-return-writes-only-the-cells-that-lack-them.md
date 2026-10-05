@@ -157,7 +157,7 @@ ADR 0129 rules a clock-changing hyperparameter unsearchable in principle.
 
 ## Consequences
 
-`CONTEXT.md` mints **Gap Return**, and tightens the *Avoid* line on **Listing Span**, which said the
+`GLOSSARY.md` mints **Gap Return**, and tightens the *Avoid* line on **Listing Span**, which said the
 projection is where the padding convention is resolved without saying how.
 
 `AbstractGapReturnAlgorithm` is unexported, as the library's abstract types are. `CatchUpGapReturn`

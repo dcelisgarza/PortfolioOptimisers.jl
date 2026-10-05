@@ -183,7 +183,7 @@ a refit per fold passes the estimator.
 - `src/10_Prior/` gains `AbstractSyntheticDataEstimator`, `AbstractSyntheticDataResult`,
   `AbstractVineCopulaResult`, `VineCopulaEstimator`, `SyntheticDataPrior`, `SimulationResult`, the
   verbs `synthetic_data` and `simulate`; the extension gains `VineCopulaResult` and the methods.
-- `CONTEXT.md` gains **Synthetic-Data Generator**, **Synthetic-Data Prior** and **Simulation
+- `GLOSSARY.md` gains **Synthetic-Data Generator**, **Synthetic-Data Prior** and **Simulation
   Result** under §3.6; the Stress Statement term is #1087's.
 - The build tickets [#1090](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1090),
   [#1091](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1091) and

@@ -84,7 +84,7 @@ the shape, so it moves under the root that names what it is.
 
 - `CLAUDE.md` names this ADR beside the rule, so a reader who meets the rule meets its one
   exception at the same time.
-- `CONTEXT.md` gains the two terms the seam introduces: Partial Fit State, and the merge of two
+- `GLOSSARY.md` gains the two terms the seam introduces: Partial Fit State, and the merge of two
   states.
 - A new state struct owes exactly two methods, `merge_states` and `Base.copy`, and the interface
   section of the `AbstractPartialFitState` docstring states both. The merge is the fold when the

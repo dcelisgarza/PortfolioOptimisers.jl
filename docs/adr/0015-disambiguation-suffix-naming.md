@@ -109,6 +109,6 @@ confusable in. There is no `TurnoverRiskMeasureEstimator`.
 
 `EqualRisk` → `EqualRisk` and `RiskRatioRiskMeasure` → `RiskRatio` are already
 done. Remaining: rename `NonOptimisationRiskRatioRiskMeasure` → `NonOptimisationRiskRatio`
-(type, constructors, exports, tests, docs, and the `CONTEXT.md` §5 entry). Hard rename, no
+(type, constructors, exports, tests, docs, and the `GLOSSARY.md` §5 entry). Hard rename, no
 alias, under a `Breaking:` commit. The `Estimator`/`Result` names are already compliant and
 need no change.

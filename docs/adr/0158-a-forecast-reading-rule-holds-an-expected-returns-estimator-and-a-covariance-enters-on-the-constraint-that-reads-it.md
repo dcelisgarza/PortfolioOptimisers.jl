@@ -246,7 +246,7 @@ not over returns.
 
 ## Consequences
 
-- `CONTEXT.md` gains *Price Relative Forecast*; *Expected Returns Estimator* lists
+- `GLOSSARY.md` gains *Price Relative Forecast*; *Expected Returns Estimator* lists
   `PriceLevelExpectedReturns` and `PriorExpectedReturns`; *Online Selection Rule* and the roster
   name `ForecastReversion` with `MovingAverageReversion` and `RobustMedianReversion` as
   constructors.

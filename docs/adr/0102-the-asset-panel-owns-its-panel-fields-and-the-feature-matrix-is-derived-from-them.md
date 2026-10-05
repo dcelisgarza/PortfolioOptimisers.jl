@@ -177,7 +177,7 @@ bridge serves it.
 
 `pnl` follows the library's abbreviated-type-word pattern (`alg`, `opt`, `sim`, `sel`). The strict
 initialism `ap` was considered; `pnl` reads as *panel* and is what map #643's readers already say
-at about 54 sites. `CONTEXT.md` rules out the profit-and-loss reading.
+at about 54 sites. `GLOSSARY.md` rules out the profit-and-loss reading.
 
 ### A blank never reaches a carrier
 

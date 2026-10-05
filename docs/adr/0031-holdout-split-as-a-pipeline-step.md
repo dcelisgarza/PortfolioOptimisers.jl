@@ -110,6 +110,6 @@ one would force a prices-fed pipeline to convert before it could split.
   empty test set.
 - `fit_predict(pipe, data)` changes meaning for a split-bearing pipeline: out-of-sample rather
   than in-sample. Pipelines without a split are unaffected.
-- New concepts `Holdout Split` and `Embargo` are in `CONTEXT.md`.
+- New concepts `Holdout Split` and `Embargo` are in `GLOSSARY.md`.
 - `docs/paper/paper.jl` continues to work unchanged: it uses the one `safe_index` branch that
   was already correct.

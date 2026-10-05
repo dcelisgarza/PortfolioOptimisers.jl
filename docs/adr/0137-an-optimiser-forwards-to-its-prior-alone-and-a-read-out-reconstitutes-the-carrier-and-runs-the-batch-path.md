@@ -223,6 +223,6 @@ An optimiser's read-out is therefore one of two kinds, and which one is the fami
 The rule that an optimiser forwards the observation to its prior and to nothing else is unchanged
 where a prior is held: a recursive head that reads a forecast off a prior forwards the observation
 to that prior *and* folds its own recursion, and everything else it holds still takes its
-ordinary batch treatment at read-out. The sentence in `CONTEXT.md`'s *Fold Context* entry that
+ordinary batch treatment at read-out. The sentence in `GLOSSARY.md`'s *Fold Context* entry that
 nothing above the prior takes a step of its own now names the recursion as the one thing that
 does.

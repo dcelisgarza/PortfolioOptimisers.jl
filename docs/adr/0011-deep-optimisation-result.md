@@ -19,7 +19,7 @@ The estimator side already solved the analogous problem: shared JuMP configurati
 `JuMPOptimiser <: BaseJuMPOptimisationEstimator` struct (a *separate, non-invokable* branch off
 `BaseOptimisationEstimator`), embedded as field `.opt` in each concrete optimiser, while the
 optimisers themselves subtype `RiskJuMPOptimisationEstimator <: JuMPOptimisationEstimator`. See
-`JuMPOptimiser`, `RiskJuMPOptimisationEstimator` and `[[factory]]` in `CONTEXT.md`.
+`JuMPOptimiser`, `RiskJuMPOptimisationEstimator` and `[[factory]]` in `GLOSSARY.md`.
 
 ## Decision
 

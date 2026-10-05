@@ -49,7 +49,7 @@ pass-through `k_ucs(type::Number, args...) = type`. `AbstractUncertaintyEpsAlgor
 
 **No ambiguity set becomes a type. A radius slot admits the rule that computes it.**
 
-The domain noun is an **Ambiguity Set** (`CONTEXT.md` section 3.9), and it names a *reading* of
+The domain noun is an **Ambiguity Set** (`GLOSSARY.md` section 3.9), and it names a *reading* of
 existing machinery rather than an object. An Uncertainty Set stays what it was: a neighbourhood of a
 mean vector or a covariance matrix, that a caller constructs and passes. Nothing is added to
 `src/14_UncertaintySets/`.
@@ -184,7 +184,7 @@ rule that needs the whole Prior does not fit it without a change.
 ## Consequences
 
 - **A caller can say which ambiguity they mean, and the library computes the size.** The three
-    families keep their distinct meanings in prose and in `CONTEXT.md` without three distinct types.
+    families keep their distinct meanings in prose and in `GLOSSARY.md` without three distinct types.
 - **The abstract hierarchy breaks.** Two supertypes are re-parented. The package is pre-1.0 and
     the map's charter permits it; the aliases callers actually write are unchanged.
 - **Validation stays where it is.** Because Factory rebuilds through the keyword constructor, no

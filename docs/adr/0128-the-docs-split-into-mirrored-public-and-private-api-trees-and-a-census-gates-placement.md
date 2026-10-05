@@ -100,7 +100,7 @@ concern, not this gate's.
 - `docs/src/api/` is retired once migration completes; `docs/src/public_api/` and
   `docs/src/private_api/` are the only API tree from then on. Until migration finishes, only the
   pages already moved are gated — the rest carry no placement guarantee yet.
-- `STANDARDS.md` gains a row: subject = an `@docs` entry's mirror-tree placement, authority = this
+- `CODING_STANDARDS.md` gains a row: subject = an `@docs` entry's mirror-tree placement, authority = this
   ADR, gate = the new census file. `test/test_46_standards_citation_census.jl` requires that row to
   name a file that resolves.
 - `make.jl`'s API-page discovery must walk two roots and build two top-level navigation groups,
@@ -177,7 +177,7 @@ census.
 
 - The migration writes, for each mirror page, the H1 suffix on the private side and the
   derived `Description`, through `docs/page_metadata.jl`.
-- `STANDARDS.md` routes "a docs page's `<title>` or its description" to this amendment, with
+- `CODING_STANDARDS.md` routes "a docs page's `<title>` or its description" to this amendment, with
   `docs/page_metadata.jl` as the derivation and the page-metadata census as the gate.
 - A hand-written page added to the site owes a `Description` from its first commit, because
   the census is absolute over the page classes it walks.

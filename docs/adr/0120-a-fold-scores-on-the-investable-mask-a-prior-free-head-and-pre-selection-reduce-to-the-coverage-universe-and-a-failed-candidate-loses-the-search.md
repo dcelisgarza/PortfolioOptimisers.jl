@@ -147,7 +147,7 @@ Under an expanding window it never joins, unless a mask-aware estimator carries 
   [#856](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/856).
 - ADR 0115's last section and ADR 0118's first section are rewritten in place, because neither
   reached `main`.
-- `CONTEXT.md` gains the three doors on the **Coverage Universe** entry, and the **Investable
+- `GLOSSARY.md` gains the three doors on the **Coverage Universe** entry, and the **Investable
   Mask** and **Held Gap** entries state the fold's view.
 - A seeded `MultipleRandomised` split gives different indices from the released one.
 - The two prior-free heads read the panel's active mask, so a stale finite price during an

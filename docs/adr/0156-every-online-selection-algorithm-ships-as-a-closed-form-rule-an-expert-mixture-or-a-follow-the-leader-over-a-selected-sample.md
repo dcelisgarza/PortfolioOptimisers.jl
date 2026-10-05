@@ -113,7 +113,7 @@ arms run the same solves on the same rows.
 A rule struct is named by **the paper's own name for the algorithm, in full words and British
 spelling; a leading "Online" is dropped because the family says it; a trailing "Optimisation" or
 "System" is dropped because the head says it; "Portfolio" stays where the paper names the
-portfolio.** The acronym goes in the docstring and in `CONTEXT.md`, never in a type name. The
+portfolio.** The acronym goes in the docstring and in `GLOSSARY.md`, never in a type name. The
 rule gives the table above; the one name it costs recognisability is `NewtonStep` for `ONS`,
 accepted. Where two papers share one update and neither names the mechanism, the struct is named
 for the mechanism and each paper's name is a **constructor** of it, as `UniversalPortfolio`
@@ -134,7 +134,7 @@ rule under a different forecast on its `me` slot, spelled by
 ### The survey taxonomy is a docs grouping
 
 Benchmark, follow-the-winner, follow-the-loser, pattern-matching and meta-learning are section
-headings in the user guide and the Capability Catalogue, and a column of the `CONTEXT.md`
+headings in the user guide and the Capability Catalogue, and a column of the `GLOSSARY.md`
 roster. They are not abstract types: nothing dispatches on them, and the mixture and the Newton
 weighting each straddle two. The type tree under `AbstractOnlinePortfolioSelectionAlgorithm` is
 flat, plus `AbstractSampleSelector` for the `sel` slot and one small abstract type per variant
@@ -177,10 +177,10 @@ slot, because a slot needs a bound.
 
 ## Consequences
 
-- ADR 0155 is rewritten in the two sentences named above; `CONTEXT.md`'s *Online Portfolio
+- ADR 0155 is rewritten in the two sentences named above; `GLOSSARY.md`'s *Online Portfolio
   Selection*, *Online Update* and *Recursion Read-out* entries lose "solves no programme" and
   "no column buffer" in the same sense.
-- `CONTEXT.md` §4.1 gains the roster — name, acronym, family, set — and the terms *Expert
+- `GLOSSARY.md` §4.1 gains the roster — name, acronym, family, set — and the terms *Expert
   Mixture*, *Sample Selector* and *Online Selection Rule*.
 - The state ticket must admit a rule carrier that is a window or a prefix of rows; ADR 0158
   spells `OLMAR-2` and `TCO-2` and merges the two reversion structs into `ForecastReversion`; a rule whose update is

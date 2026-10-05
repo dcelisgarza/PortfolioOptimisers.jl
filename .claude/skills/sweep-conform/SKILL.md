@@ -106,4 +106,4 @@ The check is a convenience, never an Authority. Each rule it reports is owned el
 | the swept standard | `.github/instructions/julia-docstrings.instructions.md` | `test/test_26_docs.jl` |
 | the reopened map and the sub-issue | ADR 0084 | `.github/workflows/Sweep.yml` |
 
-`STANDARDS.md` routes any subject the table does not carry.
+`CODING_STANDARDS.md` routes any subject the table does not carry.

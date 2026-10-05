@@ -72,7 +72,7 @@ reopened rather than replaced because
 each already names its files, its reference set, and the traps its sweeper found, and a new ticket
 would copy all of that or lose it.
 
-**7. There is no Gate.** The row in `STANDARDS.md` reads `none — unenforced`. The rule holds by
+**7. There is no Gate.** The row in `CODING_STANDARDS.md` reads `none — unenforced`. The rule holds by
 review, in the sense of that file, and the sweep ticket is the record that the review happened.
 
 ## Considered options

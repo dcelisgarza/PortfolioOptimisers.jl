@@ -219,7 +219,7 @@ forecast against a proxy for a moment the forecast does not estimate.
   alongside `AbstractForecastTarget`'s three members; the abstract root is not exported.
 - `forecast_location` is a new verb with a method per family that carries a location and a
   fallback that reads the window; a caller's `AbstractCovarianceEstimator` gets the fallback.
-- `CONTEXT.md` gains **Covariance Forecast Evaluation** and **Realised Target**, and the *Avoid*
+- `GLOSSARY.md` gains **Covariance Forecast Evaluation** and **Realised Target**, and the *Avoid*
   line of **Forecast Calibration** names the covariance case.
 - The reference's raw ratios differ from the library's by the centring term; a parity test
   states it.

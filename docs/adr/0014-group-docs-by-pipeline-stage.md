@@ -9,7 +9,7 @@ status: accepted
 The docs have two narrative halves besides the API reference: a **User Guide**
 (`user_guide/`, one monolithic `01_Basic_Optimisation.jl`, ~45 KB) positioned as a fast,
 skimmable tour, and **Examples** (`examples/`, 11 files `01`–`11`) positioned as in-depth
-single-feature walkthroughs. `CONTEXT.md` frames the package as a pipeline
+single-feature walkthroughs. `GLOSSARY.md` frames the package as a pipeline
 `data → moments → prior → optimisation → post-processing` plus cross-cutting abstractions.
 
 Both halves are assembled by `docs/make.jl`'s `generate_files`, which **globs a flat
@@ -40,12 +40,12 @@ Three forces had to be reconciled:
 - **Scale.** "Tour every optimiser in the guide **and** give each its own deep example", plus
   filling the family gaps, roughly doubles the example count to ~30. A flat scroll of 30
   numbered files is not navigable.
-- **The spine already exists.** `CONTEXT.md`'s pipeline order is the natural grouping for both
+- **The spine already exists.** `GLOSSARY.md`'s pipeline order is the natural grouping for both
   halves, and the API nav already demonstrates nested grouping in this `make.jl`.
 
 ## Decision
 
-Restructure both narrative halves around the `CONTEXT.md` pipeline spine, realised as
+Restructure both narrative halves around the `GLOSSARY.md` pipeline spine, realised as
 **subdirectories per group**, and rewrite `generate_files` to recurse and emit nested
 Documenter pages (the same nested shape the API section already uses).
 
@@ -213,7 +213,7 @@ Each shape closes with the mandatory plot, the "When to reach for this" callout,
   move with them.
 - **More pages to write and maintain** (~19 new examples + 5 new guide pages). The per-group
   findings issues double as the work tracker for this expansion.
-- **`CONTEXT.md` is unaffected** — this is a docs-structure decision, not a glossary change;
+- **`GLOSSARY.md` is unaffected** — this is a docs-structure decision, not a glossary change;
   no new domain terms were introduced (the plan uses existing glossary vocabulary
   throughout).
 - **The graphify graph already indexes the guide/example concept layer** (added in the same

@@ -60,7 +60,7 @@ Three mechanisms bear directly on the question, and all three were measured on `
 Two facts constrain what a policy may promise. `fit_preprocessing(sel::AbstractAssetSelector, rd)`
 calls `coverage_reduction(rd)` **before** `select_assets`, so a selector is handed a window whose
 every column is 100% complete by construction. And `coverage_mask` reads finiteness and the active
-mask and **never** the estimation mask, which `CONTEXT.md` states outright.
+mask and **never** the estimation mask, which `GLOSSARY.md` states outright.
 
 ## Decision
 
@@ -259,7 +259,7 @@ no `bound` field is added to `PriceGapFill` to hold the alternative.
 
 ## Consequences
 
-`CONTEXT.md` mints **Universe Policy** and **Held Price**, and the *Avoid* line on Held Price
+`GLOSSARY.md` mints **Universe Policy** and **Held Price**, and the *Avoid* line on Held Price
 separates it from `gap_fill_value`.
 
 ADR 0129 is rewritten in place rather than amended: its decision has not reached `main`, so no
@@ -292,7 +292,7 @@ asset stays non-finite and the Asset Panel keeps it out of the weights, which is
 text could not make while the imputer was filling it. That page's prose about the conversion
 silently dropping assets is stale under ADR 0133 and is rewritten in the same change.
 
-**`CONTEXT.md` needs nothing.** It never named `Imputer`, and its **Held Price** entry already
+**`GLOSSARY.md` needs nothing.** It never named `Imputer`, and its **Held Price** entry already
 speaks of *the* fill in the singular and states the Listing Span bound as that fill's property. The
 removal makes the entry true rather than aspirational.
 

@@ -423,7 +423,7 @@ uniform start holds for one period only under equal price relatives.
   the two new geometries. ADR 0161's Result gains `path_length` and `cumulative`, and its
   comparator section names the splitter. ADR 0163's constructor line becomes
   `ExpertMixture(; experts, alg, eset, proj, grad, p0)`.
-- `CONTEXT.md` gains *Mirror Descent*, *Learning-Rate Schedule*, *Gradient Predictor*, *Gradient
+- `GLOSSARY.md` gains *Mirror Descent*, *Learning-Rate Schedule*, *Gradient Predictor*, *Gradient
   Point*, *Risk Loss*, *Hindsight Split*; *Projection Geometry* gains the three maps; *Expert
   Mixture* the two slots; *Online Selection Rule* the fourth set; the roster line moves the names.
 - Five build tickets graduate: `MirrorDescent` with its geometries and schedules, blocked by the

@@ -317,7 +317,7 @@ Four facts, found on the way and recorded here rather than left to be found agai
   read-out is a batch fit over `w` rows at every fold. The refused configuration folded one block
   into the owner's state at `O(1)` and was exact against nothing; the surviving one costs `O(w)`
   and equals the rolling batch walk-forward.
-- `CONTEXT.md`: *Pipeline* states its online form, *Fold Context* names the Pipeline as a holder,
+- `GLOSSARY.md`: *Pipeline* states its online form, *Fold Context* names the Pipeline as a holder,
   and *Sample Buffer* names the input-carrier buffer `Online(pipe)` seeds.
 - Built by [#1022](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1022) in
   `src/03_InputData/18_PreprocessingPartialFit.jl` and `src/25_Pipeline/06_OnlinePipeline.jl`,

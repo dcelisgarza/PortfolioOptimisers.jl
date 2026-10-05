@@ -133,4 +133,4 @@ change.)
   honest. If it is removed, the complexity reappears across ~650 sites (deletion
   test passes).
 - "Model State" is added to the glossary as a one-line concept; it is implementation,
-  so it stays out of the domain detail in CONTEXT.md.
+  so it stays out of the domain detail in GLOSSARY.md.

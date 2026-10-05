@@ -176,6 +176,6 @@ Declaration Macro's key is recorded green on arrival, because no threshold measu
 files** — the Unmeasured Path list and the Expansion Bound — on top of the threshold configuration
 and the exemption list that #342 handed it.
 
-**The vocabulary stays out of `CONTEXT.md`.** That file's preamble scopes it to the library's
+**The vocabulary stays out of `GLOSSARY.md`.** That file's preamble scopes it to the library's
 domain, and these nouns belong to the tooling, for the reason
 [ADR 0071](0071-a-dismissed-jet-report-is-keyed-by-file-kind-and-message.md) gave.

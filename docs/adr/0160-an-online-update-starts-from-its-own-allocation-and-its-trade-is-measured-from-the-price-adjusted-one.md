@@ -34,7 +34,7 @@ measured on `dev` at `4591c0c6b1` shaped the decision.
   ran on the threaded estimator, and the batch Causal Pass has no loop at all. Anything the loop
   wrote into the recursion would make the batch fit over the folded rows and the online read-out
   disagree, and ADR 0157 holds them exactly equal at every `test_size`.
-- **The Previous-Weights Source changes what turnover measures and nothing else.** `CONTEXT.md`
+- **The Previous-Weights Source changes what turnover measures and nothing else.** `GLOSSARY.md`
   says so, and no optimiser's decision reads it: `previous_weights` (`01_Base_CrossValidation.jl`)
   is read by `Turnover`, `TurnoverEstimator`, the tracking constraints, a `PreviousWeights`
   fallback and the turnover fee, through `factory`.
@@ -190,7 +190,7 @@ folds in parallel otherwise.
 ## Consequences
 
 - ADR 0159 is rewritten in place at the two sentences named above.
-- `CONTEXT.md` gains *Price-Adjusted Allocation*; *Previous-Weights Source*, *Weight Drift* and
+- `GLOSSARY.md` gains *Price-Adjusted Allocation*; *Previous-Weights Source*, *Weight Drift* and
   *Held Step* say what they mean for the family.
 - The head's first build,
   [#1161](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1161), owes: `fees` on
