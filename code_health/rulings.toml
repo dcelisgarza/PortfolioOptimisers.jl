@@ -858,7 +858,7 @@ rationale = "a-slice-the-result-keeps"
 [[perf_dismissal]]
 file = "src/10_Prior/15_CrossSectionalPriorFold.jl"
 rule = "slice_copy"
-definition = "prior"
+definition = "cross_sectional_carry_append"
 code = "st.Z[end, :, :]"
 rationale = "a-slice-the-result-keeps"
 

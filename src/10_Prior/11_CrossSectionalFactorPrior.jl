@@ -725,7 +725,7 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
                                           vcat(lv, trues(size(ca.f, 2) - length(lv)));
                                           strict = strict, kwargs...)
     fit = (; csr = csr, W = W, vs = vs, cnt = variance_count(pe.ve, csr.eps), amr = amr,
-           bwr = bwr, Xo = Xw[r, :], r = r)
+           bwr = bwr, Xo = Xw[r, :], r = r, hist = nothing)
     return cross_sectional_assemble(pe, f_pr, ca, fit, rde; kwargs...)
 end
 """
@@ -741,7 +741,7 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
  1. Record the degrees of freedom and the divisor of each variance with [`cross_sectional_variance_counts`](@ref), from the count `cnt`.
  2. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`. Take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation.
  3. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, and a zero `b`. Under a family re-basis, expand the factor returns onto the raw axis with [`cross_sectional_expand`](@ref), each row with the basis of its lagged exposures, and store them in `fr`.
- 4. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref) on `rde`, giving the spanned coefficients `g`, the unscaled orthogonal part `ap`, and the history when a slot answers `true` to [`reads_forecast_history`](@ref).
+ 4. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref) on `rde`, giving the spanned coefficients `g`, the unscaled orthogonal part `ap`, and the history when a slot answers `true` to [`reads_forecast_history`](@ref). The history extends the rows `hist` of `fit` when the carry fold carries them.
  5. Resolve the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` with [`cross_sectional_calibration`](@ref), against the factor moments `f_pr` and the block `csfm`.
  6. Write `b = c ap`, the Return Forecast Result and the resolved `lambda` and `c` onto the block with [`cross_sectional_forecast_block`](@ref), giving `rr`. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref) under the resolved `lambda`, and keep the mean of the observed factors, giving `f_mu`.
  7. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref).
@@ -754,7 +754,7 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
   - `pe`: Cross-Sectional Factor Prior estimator.
   - `f_pr`: The factor moments that [`cross_sectional_factor_moments`](@ref) states over the combined reduced factor returns.
   - `ca`: The estimated factors with the observed factors appended, from [`cross_sectional_observed_append`](@ref).
-  - `fit`: The fitted observations: `csr`, the regression; `W`, its weights; `vs`, the idiosyncratic variance history; `cnt`, the answer of [`variance_count`](@ref) on the residuals; `amr`, the active mask; `bwr`, the benchmark weights; `Xo`, the base-currency returns; and `r`, the fitted rows among the rows after the Descriptor warm-up.
+  - `fit`: The fitted observations: `csr`, the regression; `W`, its weights; `vs`, the idiosyncratic variance history; `cnt`, the answer of [`variance_count`](@ref) on the residuals; `amr`, the active mask; `bwr`, the benchmark weights; `Xo`, the base-currency returns; `r`, the fitted rows among the rows after the Descriptor warm-up; and `hist`, the rows of the Return Forecast history that the carry fold carries, or `nothing`.
   - `rde`: The returns data that the estimated members read, which the Return Forecast reads.
   - `kwargs...`: Additional keyword arguments passed to [`cross_sectional_lift`](@ref).
 
@@ -808,7 +808,7 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
     # The split comes first and the scale after it, because a rule in `c` reads the unscaled
     # orthogonal part.
     reads = reads_forecast_history(pe.lambda) || reads_forecast_history(pe.c)
-    sp = cross_sectional_return_forecast(pe.rfe, rde, csfm, pe.cre, reads)
+    sp = cross_sectional_return_forecast(pe.rfe, rde, csfm, pe.cre, reads, fit.hist)
     (; lambda, c) = cross_sectional_calibration(pe, f_pr, csfm, sp)
     rr = cross_sectional_forecast_block(csfm, sp, lambda, c)
     # The forecast spans the estimated factors alone, so the blend reaches their mean and

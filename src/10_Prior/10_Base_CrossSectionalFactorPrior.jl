@@ -1604,11 +1604,11 @@ end
     cross_sectional_return_forecast(rfe::Nothing, rd::ReturnsResult,
                                     csfm::CrossSectionalFactorModel,
                                     cre::AbstractCrossSectionalRegressionEstimator,
-                                    reads::Bool) -> NamedTuple
+                                    reads::Bool, H::Option{<:MatNum}) -> NamedTuple
     cross_sectional_return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
                                     csfm::CrossSectionalFactorModel,
                                     cre::AbstractCrossSectionalRegressionEstimator,
-                                    reads::Bool) -> NamedTuple
+                                    reads::Bool, H::Option{<:MatNum}) -> NamedTuple
 
 Fit the Return Forecast of a [`CrossSectionalFactorPrior`](@ref), and split it against the latest Factor Exposures.
 
@@ -1618,7 +1618,7 @@ The split is unscaled. The Orthogonal Forecast Scale `c` can be a rule that read
 
  1. Fit `rfe` on the coverage universe through [`return_forecast`](@ref), giving `rf`. `rd` holds every observation, so the Descriptors of the forecast warm up over every observation of the panel. [`return_forecast_rows`](@ref) finds the block as a suffix of `rd` by its size.
  2. Split `rf.mu` against the latest exposures of the estimated factors with [`cross_sectional_alpha_split`](@ref), giving `g` and `ap`. The observed factors are the trailing columns of `L`, and the split leaves them out, so `g` has one entry per column of `csr.f`.
- 3. When `reads` is `true`, make the Return Forecast history once with [`forecast_history`](@ref), giving `hist`. Otherwise `hist` is `nothing`.
+ 3. When `reads` is `true`, take the Return Forecast history once with [`cross_sectional_forecast_history`](@ref) from `rf`, giving `hist`. Otherwise `hist` is `nothing`.
 
 # Arguments
 
@@ -1627,10 +1627,11 @@ The split is unscaled. The Orthogonal Forecast Scale `c` can be a rule that read
   - `csfm`: The factor-model block, built with a zero `b` and no Return Forecast.
   - `cre`: Cross-Sectional Regression Estimator of the split.
   - `reads`: Whether a slot of the prior reads the Return Forecast history, as [`reads_forecast_history`](@ref) answers.
+  - `H`: The rows of the Return Forecast history that the carry fold carries, or `nothing` when the history is made here.
 
 # Validation
 
-  - The rules of [`return_forecast`](@ref), of [`cross_sectional_alpha_split`](@ref) and, when `reads` is `true`, of [`forecast_history`](@ref).
+  - The rules of [`return_forecast`](@ref), of [`cross_sectional_alpha_split`](@ref) and, when `reads` is `true`, of [`cross_sectional_forecast_history`](@ref).
 
 # Returns
 
@@ -1651,20 +1652,20 @@ The split is unscaled. The Orthogonal Forecast Scale `c` can be a rule that read
 function cross_sectional_return_forecast(::Nothing, ::ReturnsResult,
                                          ::CrossSectionalFactorModel,
                                          ::AbstractCrossSectionalRegressionEstimator,
-                                         ::Bool)
+                                         ::Bool, ::Option{<:MatNum})
     return (; rf = nothing, g = nothing, ap = nothing, hist = nothing)
 end
 function cross_sectional_return_forecast(rfe::AbstractReturnForecastEstimator,
                                          rd::ReturnsResult, csfm::CrossSectionalFactorModel,
                                          cre::AbstractCrossSectionalRegressionEstimator,
-                                         reads::Bool)
+                                         reads::Bool, H::Option{<:MatNum})
     rf = return_forecast(rfe, rd, csfm)
     rw = csfm.rw
     #! The observed factors are the trailing columns of `L`, and the fit observes their
     #! returns, so the forecast splits against the loadings the regression estimated.
     L = view(csfm.L, :, 1:size(csfm.csr.f, 2))
     (; g, ap) = cross_sectional_alpha_split(cre, rf.mu, L, @view(rw[size(rw, 1), :]))
-    hist = reads ? forecast_history(rfe, rd, csfm) : nothing
+    hist = reads ? cross_sectional_forecast_history(rf, rfe, rd, csfm, H) : nothing
     return (; rf = rf, g = g, ap = ap, hist = hist)
 end
 """

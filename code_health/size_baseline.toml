@@ -243,6 +243,7 @@ commit = "ebcacfda95"
 "src/10_Prior/13_PriorExpectedReturns.jl" = { code = 37, doc = 112, comment = 1, blank = 46, total = 196 }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { code = 90, doc = 163, comment = 13, blank = 48, total = 314 }
 "src/10_Prior/15_CrossSectionalPriorFold.jl" = { code = 405, doc = 516, comment = 5, blank = 245, total = 1171 }
+"src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { code = 47, doc = 68, comment = 2, blank = 38, total = 155 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 320, doc = 1074, comment = 5, blank = 515, total = 1914 }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { code = 65, doc = 269, comment = 2, blank = 94, total = 430 }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { code = 335, doc = 1008, comment = 2, blank = 374, total = 1719 }

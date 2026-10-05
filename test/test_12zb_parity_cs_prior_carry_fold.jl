@@ -25,10 +25,39 @@ A prior whose tree reads the Exogenous Series folds on the carry route too (#147
 buffer and the carried rows hold the series, and the state derives each row of the returns net of
 the observed factors one time. Its pinned choice under currency factors is checked against the
 `OnlineCurrencyStyle_Fold*` files of test_12za.
+
+A slot that reads the Return Forecast history makes the state carry it (#1484): each step fits the
+member once for each new observation, and the history and the resolved `lambda` and `c` equal those
+of the batch fit over the same rows.
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 include(joinpath(@__DIR__, "parity_grid.jl"))
 include(joinpath(@__DIR__, "test06c_setup.jl"))
+
+# Test-local rules of `lambda` and `c` that read the Return Forecast history (#1484). Each records
+# the history it got, and its number moves with every row of it.
+struct CarryHistoryShrinkage <:
+       PortfolioOptimisers.AbstractSpannedShrinkageCalibrationAlgorithm
+    seen::Vector{Any}
+end
+CarryHistoryShrinkage() = CarryHistoryShrinkage(Any[])
+PortfolioOptimisers.reads_forecast_history(::CarryHistoryShrinkage) = true
+function (r::CarryHistoryShrinkage)(key, pr, w, slv, ctx)
+    h = ctx.cs.hist
+    push!(r.seen, copy(h))
+    return 1 / (1 + sum(abs, filter(isfinite, h)))
+end
+struct CarryHistoryScale <:
+       PortfolioOptimisers.AbstractOrthogonalForecastScaleCalibrationAlgorithm
+    seen::Vector{Any}
+end
+CarryHistoryScale() = CarryHistoryScale(Any[])
+PortfolioOptimisers.reads_forecast_history(::CarryHistoryScale) = true
+function (r::CarryHistoryScale)(key, pr, w, slv, ctx)
+    h = ctx.cs.hist
+    push!(r.seen, copy(h))
+    return mean(abs, filter(isfinite, h)) * 100
+end
 
 @testset "The carry fold of the Cross-Sectional Factor Prior (#1471)" begin
     po = PortfolioOptimisers
@@ -119,6 +148,64 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
             push!(cs, x.pr.rr.c)
         end
         @test allunique(cs)
+    end
+
+    @testset "The state carries the Return Forecast history (#1484)" begin
+        # A member that publishes no history is fitted again at each block row. The state
+        # carries those rows, so a step fits the member once for each new observation, and
+        # the history equals the one the batch fit makes over the same rows.
+        function history_case(cfg, e)
+            rl, rc = CarryHistoryShrinkage(), CarryHistoryScale()
+            bl, bc = CarryHistoryShrinkage(), CarryHistoryScale()
+            pc = CrossSectionalFactorPrior(; cfg..., lambda = rl, c = rc)
+            pb = CrossSectionalFactorPrior(; cfg..., lambda = bl, c = bc)
+            xs = stream(pc, rd, e)
+            for (k, x) in enumerate(xs)
+                b = batch(pb, k, rd, e)
+                @test x.pr.rr.lambda == b.rr.lambda
+                @test x.pr.rr.c == b.rr.c
+                @test agrees(x.pr, b)
+                @test same(rl.seen[k], bl.seen[k])
+                @test same(rc.seen[k], bc.seen[k])
+                @test same(rl.seen[k], rc.seen[k])
+            end
+            return (; xs = xs, seen = rl.seen)
+        end
+        target = grid_config("FcTarget", rd)
+        # Blocks of rows, then one observation at a time.
+        for e in (edges, (0, 90, 91, 92, 93))
+            (; xs, seen) = history_case(target, e)
+            for (k, x) in enumerate(xs)
+                H = x.pe.cache.hist
+                # Every block row but the last, which the call with no data appends.
+                @test size(H, 1) == size(seen[k], 1) - 1
+                @test same(H, seen[k][1:(end - 1), :])
+                # A step that fits the new observations alone keeps the carried rows.
+                if k > 1
+                    Hp = xs[k - 1].pe.cache.hist
+                    @test same(H[1:size(Hp, 1), :], Hp)
+                end
+            end
+            @test allunique([x.pr.rr.lambda for x in xs])
+        end
+        # A batch choice that moves fits every observation again, and makes every row again.
+        # Measured: the move at the second step changes the old rows by up to 1.9e-17, so a
+        # carry that kept them would not equal the batch fit.
+        (; xs) = history_case((; target..., families = ["style" => nothing]), edges)
+        @test [only(x.pe.cache.families).second for x in xs] ==
+              ["style1", "style2", "style2"]
+        H1, H2 = xs[1].pe.cache.hist, xs[2].pe.cache.hist
+        @test !same(H1, H2[1:size(H1, 1), :])
+        # A member that publishes its history carries no row: the call with no data reads the
+        # history of the Result it fits.
+        (; xs) = history_case(grid_config("FcEW", rd), edges)
+        @test all(x -> isnothing(x.pe.cache.hist), xs)
+        @test !PortfolioOptimisers.cross_sectional_carries_history(CrossSectionalFactorPrior(;
+                                                                                             grid_config("FcEW",
+                                                                                                         rd)...,
+                                                                                             c = CarryHistoryScale()))
+        # A prior whose slots read no history carries none.
+        @test isnothing(last(stream(CrossSectionalFactorPrior(; target...))).pe.cache.hist)
     end
 
     @testset "The carried panel rows" begin
