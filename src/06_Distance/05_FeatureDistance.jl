@@ -1750,3 +1750,4 @@ end
 export AngularDist, MeanCollapse, MedianCollapse, LastObservation, AggregateFeatures,
        AggregateDistances, StackObservations, FeatureDistance, LastRow, LastActiveRow,
        RefusePair, DropFewerRows, FeatureFallback
+public AbstractLastObservationAlgorithm, AbstractEmptyPairAlgorithm, collapse_rows

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Descriptor Scores, public API of PortfolioOptimisers.jl: EstimationMaskWeights, BlockRegressionWeights, DescriptorScores, descriptor_scores."
+Description = "Descriptor Scores, public API of PortfolioOptimisers.jl: AbstractNeutralisationWeights, EstimationMaskWeights, BlockRegressionWeights, DescriptorScores, …"
 ```
 
 # [Descriptor Scores](@id api-descriptor-scores)
@@ -7,6 +7,7 @@ Description = "Descriptor Scores, public API of PortfolioOptimisers.jl: Estimati
 ## Types
 
 ```@docs
+AbstractNeutralisationWeights
 EstimationMaskWeights
 BlockRegressionWeights
 DescriptorScores

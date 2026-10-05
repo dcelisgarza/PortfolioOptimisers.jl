@@ -1,14 +1,8 @@
 ```@meta
-Description = "Descriptor Scores, private API of PortfolioOptimisers.jl: AbstractNeutralisationWeights, neutralisation_base_weights, assert_neutralisation_names, …"
+Description = "Descriptor Scores, private API of PortfolioOptimisers.jl: neutralisation_base_weights, assert_neutralisation_names, descriptor_scores_axis, …"
 ```
 
 # Descriptor Scores: private API
-
-## Types
-
-```@docs
-AbstractNeutralisationWeights
-```
 
 ## Functions
 

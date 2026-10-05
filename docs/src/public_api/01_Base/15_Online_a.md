@@ -1,5 +1,5 @@
 ```@meta
-Description = "Online (a), public API of PortfolioOptimisers.jl: Online, RollingWindow, SeedWindow, BatchChoice, PinnedChoice, partial_fit!, port_opt_view, merge_states."
+Description = "Online (a), public API of PortfolioOptimisers.jl: Online, AbstractWindowRule, RollingWindow, SeedWindow, AbstractChoiceRule, BatchChoice, PinnedChoice, …"
 ```
 
 # Online (a)
@@ -10,8 +10,10 @@ Some estimators have no exact incremental fit. Such an estimator stores the obse
 
 ```@docs
 Online
+PortfolioOptimisers.AbstractWindowRule
 RollingWindow
 SeedWindow
+PortfolioOptimisers.AbstractChoiceRule
 BatchChoice
 PinnedChoice
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, X::PortfolioOptimisers.MatNum, F::PortfolioOptimisers.Option{<:PortfolioOptimisers.MatNum} = nothing; dims::Int = 1)

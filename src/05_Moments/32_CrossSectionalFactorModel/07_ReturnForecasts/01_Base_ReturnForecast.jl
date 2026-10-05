@@ -918,3 +918,4 @@ end
 
 export return_forecast, IdiosyncraticReturnUnit, IdiosyncraticSharpeUnit,
        ScoreNeutralisation, OrthogonalPartCalibration, UnadjustedForecast
+public AbstractOrthogonalForecastFit

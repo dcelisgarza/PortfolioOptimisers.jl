@@ -697,3 +697,4 @@ function collapse_rate(a::VecNum, W::MatNum, m::AbstractMatrix{Bool},
 end
 
 export RenormaliseActive, InactiveAsCash
+public AbstractPanelCollapseAlgorithm, active_weight_divisor

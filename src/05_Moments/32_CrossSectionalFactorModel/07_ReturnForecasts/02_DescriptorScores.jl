@@ -486,3 +486,4 @@ function descriptor_scores(ds::DescriptorScores, rd::ReturnsResult,
 end
 
 export DescriptorScores, descriptor_scores, EstimationMaskWeights, BlockRegressionWeights
+public AbstractNeutralisationWeights

@@ -121,3 +121,28 @@ decision only fixes that the gate must exist.
 - This decision leaves ADR 0128's foreign-owned class untouched: `Base.copy`, `Base.vcat`, and
   every other foreign-owned method that ADR already classifies stay governed by it. Widening that
   class is still a separate, one-at-a-time maintainer call.
+
+## Amendment (2026-10-05)
+
+[Issue #1489](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1489) asked whether a
+`public` declaration needs the maintainer's approval, as an export did. Two sessions read the old
+rule of `CLAUDE.md` two ways: one waited for an answer, and one left `test_66` red on purpose.
+
+The maintainer decided that a declaration of an unambiguously user-facing name needs no approval:
+
+- A name that users are meant to extend is `public`: an abstract type they subtype, and a verb that
+  a subtype implements.
+- A name that users are meant to use directly is exported.
+- The maintainer decides only a case where it is ambiguous whether users extend or use the name.
+
+This changes two statements of the decision above. A `# Interfaces` section is still a sufficient
+signal of an extension point, but it is no longer the only one: a verb that a rule implements is
+`public` when its section names it in prose, as `drop_empty_pairs!` is. And a directory ticket no
+longer confirms each promoted type with the maintainer, because a family whose concrete members are
+exported is unambiguously an extension point. The rule lives in `CLAUDE.md` § *Design rules*.
+
+The first application declared seven families `public`, with their verbs, that `test_66` listed on
+[#1475](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1475):
+`AbstractLastObservationAlgorithm`, `AbstractEmptyPairAlgorithm`,
+`AbstractPanelCollapseAlgorithm`, `AbstractWindowRule`, `AbstractChoiceRule`,
+`AbstractNeutralisationWeights` and `AbstractOrthogonalForecastFit`.

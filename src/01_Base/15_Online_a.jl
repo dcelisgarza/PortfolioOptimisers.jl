@@ -2004,3 +2004,4 @@ function assert_batch_entry(est, entry::AbstractString)
 end
 
 export Online, RollingWindow, SeedWindow, BatchChoice, PinnedChoice
+public AbstractWindowRule, AbstractChoiceRule

@@ -1,12 +1,11 @@
 ```@meta
-Description = "Feature distance active rows, private API of PortfolioOptimisers.jl: active_window, feature_readable, feature_asset_labels, assert_feature_readable, …"
+Description = "Feature distance active rows, private API of PortfolioOptimisers.jl: active_window, feature_asset_labels, assert_feature_readable, unreadable_message, …"
 ```
 
 # [Feature distance active rows: private API](@id private-api-feature-distance-active-rows)
 
 ```@docs
 active_window
-feature_readable
 feature_asset_labels
 assert_feature_readable
 unreadable_message
@@ -16,7 +15,6 @@ active_weights
 pair_distance
 stack_metric
 stack_rescale
-empty_pair_distance!
 fallback_features
 resolve_empty_pairs!
 active_feature_distance
@@ -26,6 +24,5 @@ feature_readable_mask
 compose_readable_mask
 entry_activity
 empty_pair_rule
-drop_empty_pairs!
 first_empty_pair
 ```

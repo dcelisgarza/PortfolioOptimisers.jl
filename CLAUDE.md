@@ -110,13 +110,21 @@ before you merge so you lower the number that is current.
   permitted is stated by
   [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md),
   which owns that rule.
-- **Never export an abstract type unless explicitly told to.** All but a handful of the abstract
-  types in `src/` are unexported, so unexported is the convention. An open family, a sibling family
-  that exports its supertype, and an existing API-page entry are none of them a reason to add one in
-  passing — an export is public API, and widening it is the maintainer's call. Ask instead.
-  `test/test_43_exported_abstract_type_census.jl` gates the rule against the allow-list in that
-  file, so an export is a deliberate edit to that list. **Do not restate the count here or
-  anywhere else.** It has moved four times, and each written copy went stale where it stood.
+- **A user-facing name is declared without approval (#1489).** A name that users are meant to
+  extend is `public`: an abstract type they subtype, and a verb that a subtype implements. A name
+  that users are meant to use directly is exported: a type they construct, a function they call.
+  When a name is unambiguously one of the two, declare it in the change that adds it. Ask the
+  maintainer only when it is ambiguous whether users extend or use the name at all.
+  - An `# Interfaces` section marks an extension point (ADR 0154), so its type and the verbs it
+    names are `public`. A family whose concrete members are exported is an extension point.
+  - An abstract type is extended, not used, so it is `public`, not exported. Export one only when
+    users plainly write it by name in their own code, and ask when that is not plain.
+  - Internal machinery stays undeclared. A name that only the library calls is neither.
+
+  `test/test_43_exported_abstract_type_census.jl` holds every exported and every `public` abstract
+  type on an allow-list, so a declared abstract type is an edit to that list in the same change.
+  **Do not restate the count here or anywhere else.** It has moved four times, and each written
+  copy went stale where it stood.
 
 ## Defects you find
 

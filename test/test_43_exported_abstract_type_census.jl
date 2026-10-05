@@ -17,8 +17,15 @@
 
     This census closes that hole. Every exported abstract type must appear in the
     allow-list below, so an export becomes a deliberate edit to this file and never an
-    accident. An export is public API: adding an entry is the maintainer's call, not a
+    accident. An export is public API: adding an entry was the maintainer's call, not a
     decision made in passing while landing a feature.
+
+    Issue #1489 (2026-10-05) changed who makes that call. `CLAUDE.md` § *Design rules* now
+    declares a name without approval when it is unambiguously user-facing: `public` when
+    users extend it, exported when users use it directly. An abstract type is extended, so
+    it is `public` and goes on `allowed_public` below. The census still names every entry,
+    so a declaration stays a deliberate edit, and an ambiguous case still goes to the
+    maintainer.
 
     The list held seven names when the census was written. `TimeDependentCallable` and
     `TimeDependentOptimiserCallable` left it on 2026-08-19, when the time-dependent callable
@@ -64,6 +71,10 @@
     `AbstractOrthogonalForecastScaleCalibrationAlgorithm`, and the two families of the fields of
     their rules, `AbstractForecastErrorAlgorithm` and `AbstractForecastScaleWarmUpAlgorithm`,
     joined with their first rules on 2026-10-05 (issue #1483, the maintainer's ruling).
+    Seven families whose concrete members were already exported joined the same day under
+    the rule of #1489: `AbstractLastObservationAlgorithm`, `AbstractEmptyPairAlgorithm`,
+    `AbstractPanelCollapseAlgorithm`, `AbstractWindowRule`, `AbstractChoiceRule`,
+    `AbstractNeutralisationWeights` and `AbstractOrthogonalForecastFit`.
     They are held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
@@ -144,7 +155,11 @@
                           :AbstractReturnsPreprocessingResult, :AbstractReturnsResult,
                           :AbstractAssetSelector, :SubPortfolioUniverse,
                           :AbstractPricesResult, :AbstractPhylogenyFeatureAlgorithm,
-                          :AbstractCollateralAlgorithm, :SchurComplementAlgorithm])
+                          :AbstractCollateralAlgorithm, :SchurComplementAlgorithm,
+                          :AbstractLastObservationAlgorithm, :AbstractEmptyPairAlgorithm,
+                          :AbstractPanelCollapseAlgorithm, :AbstractWindowRule,
+                          :AbstractChoiceRule, :AbstractNeutralisationWeights,
+                          :AbstractOrthogonalForecastFit])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&

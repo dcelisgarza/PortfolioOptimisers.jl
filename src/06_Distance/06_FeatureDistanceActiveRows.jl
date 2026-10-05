@@ -728,3 +728,5 @@ function first_empty_pair(keep::BitVector, A::AbstractMatrix{Bool})
     end
     return nothing
 end
+
+public feature_readable, empty_pair_distance!, drop_empty_pairs!
