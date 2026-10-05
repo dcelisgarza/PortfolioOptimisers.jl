@@ -1,5 +1,6 @@
 # Every hook runs at commit time unless it names its stages. The pre-push type is installed for the
-# gate-stamps guard alone, and without this line every hook below would run again on each push.
+# gate-stamps guard alone, and without this line every hook below would run again on each push. A
+# hook whose own manifest names its stages ignores this line, so such a hook names them here too.
 default_stages: [pre-commit]
 default_install_hook_types: [pre-commit, pre-push]
 repos:
@@ -35,8 +36,12 @@ repos:
       - id: pretty-format-json
         args: [--autofix, --indent=2]
         exclude: ^docs/paper/main-jlyfish\.json$
+      # These two name their own stages, pre-push among them, and a hook's own stages override
+      # default_stages. A fix at push time would fail the push, so they run at commit time alone.
       - id: trailing-whitespace
+        stages: [pre-commit]
       - id: end-of-file-fixer
+        stages: [pre-commit]
         exclude: ^docs/paper/main-jlyfish\.json$
       - id: check-merge-conflict
         args: [--assume-in-merge]
