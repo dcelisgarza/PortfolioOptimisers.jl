@@ -301,7 +301,9 @@ Every duty the sweep places on one file, in the order a person meets them.
     row the `bindings` list must match too, which catches a unit REPLACED one for one (#1065).
  3. The row's `map` is a child map that `[map]` lists, and the `swept` flag is a Bool.
  4. A swept row carries `algorithm`, which `test/test_26_docs.jl` holds as a floor, and `bindings`,
-    which `test/test_45_sweep_census.jl` compares. An unswept row carries neither.
+    which `test/test_45_sweep_census.jl` compares. An unswept row carries neither. The measured
+    `# Algorithm` count may not fall below the floor, and a printed row carries the measured count,
+    never the recorded one (#1491).
  5. The file has a coverage row, or it is new and enters under ADR 0082's rule.
  6. A file under `src/` is `include`d by `src/PortfolioOptimisers.jl` exactly once.
  7. The child map is open, and a sub-issue names the path. Both need the tracker.
@@ -337,12 +339,18 @@ function check_file(path, rows, map_names, coverage, entry, tracker, exempted, s
 
     bindings = CodeHealth.documented_bindings(joinpath(CodeHealth.REPO_ROOT, path))
     swept = row["swept"] === true
+    # The count `test/test_26_docs.jl` holds as a floor, measured by the same function. A row
+    # printed with the recorded count would hide a section the addition brought (#1491).
+    algorithm = if swept
+        CodeHealth.algorithm_sections(joinpath(CodeHealth.REPO_ROOT, path))
+    else
+        nothing
+    end
     if !(row["units"] == measured)
         push!(fs,
               Finding(:fail,
                       "the unit count moved: $(row["units"]) -> $measured. Record it:",
-                      [row_line(path, row["map"], measured, row["swept"];
-                                algorithm = get(row, "algorithm", nothing),
+                      [row_line(path, row["map"], measured, row["swept"]; algorithm,
                                 bindings = swept ? bindings : nothing);
                        if swept
                            SWEPT_ADDITION
@@ -356,8 +364,7 @@ function check_file(path, rows, map_names, coverage, entry, tracker, exempted, s
               Finding(:fail,
                       "the unit set moved under a swept row: $measured unit(s), and not the ones " *
                       "the row records. Record the new list:",
-                      [row_line(path, row["map"], measured, true;
-                                algorithm = get(row, "algorithm", nothing), bindings);
+                      [row_line(path, row["map"], measured, true; algorithm, bindings);
                        SWEPT_ADDITION]))
     else
         push!(fs, Finding(:ok, "the row is current: $measured unit(s), map $(row["map"])."))
@@ -373,29 +380,44 @@ function check_file(path, rows, map_names, coverage, entry, tracker, exempted, s
         push!(fs,
               Finding(:fail, "`swept` is not a Bool, so a later gate reads it as true."))
     end
+    if swept && haskey(row, "algorithm") && algorithm < row["algorithm"]
+        push!(fs,
+              Finding(:fail,
+                      "the `# Algorithm` count fell: $(row["algorithm"]) -> $algorithm.",
+                      ["`test/test_26_docs.jl` holds the recorded count as a floor. Restore the",
+                       "section, or lower the count in the commit that removes it:",
+                       row_line(path, row["map"], measured, true; algorithm, bindings)]))
+    end
     if swept && !(haskey(row, "algorithm"))
         push!(fs,
               Finding(:fail, "the row reads `swept = true` and carries no `algorithm` key.",
-                      ["`test/test_26_docs.jl` holds that count as a floor and demands the key."]))
+                      ["`test/test_26_docs.jl` holds that count as a floor and demands the key:",
+                       row_line(path, row["map"], measured, true; algorithm, bindings)]))
     elseif swept && !(haskey(row, "bindings"))
         push!(fs,
               Finding(:fail, "the row reads `swept = true` and carries no `bindings` list.",
                       ["`test/test_45_sweep_census.jl` compares that list and demands it:",
-                       row_line(path, row["map"], measured, true;
-                                algorithm = row["algorithm"], bindings)]))
+                       row_line(path, row["map"], measured, true; algorithm, bindings)]))
     elseif !swept && haskey(row, "bindings")
         push!(fs,
               Finding(:fail, "the row reads `swept = false` and carries a `bindings` list.",
                       ["Only a swept row records one. `test/test_45_sweep_census.jl` refuses it:",
                        row_line(path, row["map"], measured, false)]))
     elseif swept
+        raise = if algorithm > row["algorithm"]
+            ["The measured count is above the floor. Raise the floor in this commit:",
+             row_line(path, row["map"], measured, true; algorithm, bindings)]
+        else
+            String[]
+        end
         push!(fs,
               Finding(:note,
                       "this file is SWEPT, so the addition meets the swept standard now.",
-                      ["`# Algorithm` floor: $(row["algorithm"]). A new unit that carries the",
-                       "section raises it, in this commit. No `# Details` section, a `Where:`",
-                       "bullet interpolates `math_dict`, and a dispatch alias carries",
-                       "`# Related`. `test/test_26_docs.jl` holds all four."]))
+                      vcat(["`# Algorithm` floor: $(row["algorithm"]), measured: $algorithm.",
+                            "A new unit that carries the section raises it, in this commit. No",
+                            "`# Details` section, a `Where:` bullet interpolates `math_dict`, and a",
+                            "dispatch alias carries `# Related`. `test/test_26_docs.jl` holds all four."],
+                           raise)))
     end
 
     cov = get(coverage, path, nothing)

@@ -818,12 +818,10 @@ in the sense of `CODING_STANDARDS.md`.
     # `test_47_alias_and_module_census.jl` read one reader.
     docstring_text = CH.docstring_text
 
-    # Julia strips the indentation of a `"""` block, so a section heading sits at column 0.
-    # The count, not the flag, is the primitive: one string block can document several
-    # methods, separated by horizontal rules, and then carries one heading per method that
-    # holds the section. `port_opt_view` in `src/03_InputData/10_ReturnsResult.jl` is such a
-    # block.
-    count_section(text, name) = count(==(string("# ", name)), rstrip.(split(text, '\n')))
+    # The count of `# name` headings, not the flag, is the primitive, and it is
+    # `CodeHealth`'s, so the `# Algorithm` floor below and `code_health/sweep_check.jl` read
+    # one reader.
+    count_section = CH.count_section
     has_section(text, name) = count_section(text, name) > 0
     has_subsection(text, name) = count(==(string("## ", name)),
                                        rstrip.(split(text, '\n'))) > 0
@@ -970,8 +968,9 @@ in the sense of `CODING_STANDARDS.md`.
         fallen = Tuple{String, Int, Int}[]
         for f in swept
             haskey(rows[f], "algorithm") || continue
-            _, texts, _ = scan(joinpath(ROOT, f))
-            measured = count(t -> has_section(t, "Algorithm"), texts)
+            # `CodeHealth.algorithm_sections` is the one measure, and
+            # `code_health/sweep_check.jl` prints the same number before the commit (#1491).
+            measured = CH.algorithm_sections(joinpath(ROOT, f))
             measured < rows[f]["algorithm"] &&
                 push!(fallen, (f, rows[f]["algorithm"], measured))
         end

@@ -661,6 +661,49 @@ function documented_bindings(path::AbstractString; root = REPO_ROOT)
 end
 
 """
+    count_section(text, name) -> Int
+
+The count of top-level `# name` headings in the docstring prose `text`.
+
+Julia strips the indentation of a `\"\"\"` block, so a section heading sits at column 0. The count,
+not the flag, is the primitive: one string block can document several methods, separated by
+horizontal rules, and then carries one heading per method that holds the section. `port_opt_view`
+in `src/03_InputData/10_ReturnsResult.jl` is such a block.
+"""
+function count_section(text::AbstractString, name::AbstractString)
+    return count(==(string("# ", name)), rstrip.(split(text, '\n')))
+end
+
+"""
+    algorithm_sections(path; root = REPO_ROOT) -> Int
+
+The count of the file's documented units whose docstring carries a `# Algorithm` section. It is
+the `algorithm` key of a swept `code_health/sweep_manifest.toml` row.
+
+**This is the one definition.** `test/test_26_docs.jl` holds the recorded count as a floor, and
+`code_health/sweep_check.jl` measures the same number before the commit. Both call this function,
+so the two readings cannot drift. Issue #1491: the check printed the recorded count, and a session
+counted the sections by hand.
+
+A docstring counts once however many headings it holds. A docstring whose target names nothing,
+by [`definition_name`](@ref), does not count: the floor reads the units a reader names, as the
+other section checks of `test/test_26_docs.jl` do.
+"""
+function algorithm_sections(path::AbstractString; root = REPO_ROOT)
+    n = 0
+    walk_ast(parse_file(path; root)) do node
+        if isdocstring(node) &&
+           length(node.args) >= 4 &&
+           !isempty(definition_name(node.args[4])) &&
+           count_section(docstring_text(node), "Algorithm") > 0
+            (n += 1)
+        end
+        return nothing
+    end
+    return n
+end
+
+"""
     unit_name(e) -> String
 
 The binding a documented unit's definition declares, for [`documented_bindings`](@ref). It is

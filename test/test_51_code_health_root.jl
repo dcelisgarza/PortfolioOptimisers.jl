@@ -162,6 +162,23 @@ quietly(f) = withenv(f, "GITHUB_ACTIONS" => nothing, "GITHUB_STEP_SUMMARY" => no
             @test CH.documented_bindings("docs/Twice.jl"; root = dir) ==
                   ["<anonymous>", "Fixture", "f", "f"]
 
+            # The `algorithm` floor of a swept row: one per named unit whose docstring holds
+            # the heading, however many it holds. An interpolated docstring still counts, a
+            # `## Algorithm` subsection and an indented line do not, and a target that names
+            # nothing does not (#1491).
+            write(joinpath(dir, "docs", "Sections.jl"),
+                  join(["\"\"\"", "a", "", "# Algorithm", "", "x", "", "# Algorithm",
+                        "\"\"\"", "f(x) = x", "\"\"\"", "b \$(1)", "", "# Algorithm",
+                        "\"\"\"", "g(x) = x", "\"\"\"", "c", "", "## Algorithm",
+                        "    # Algorithm", "\"\"\"", "h(x) = x", "\"\"\"", "d", "",
+                        "# Algorithm", "\"\"\"", "(1, 2)"], "\n") * "\n")
+            @test CH.algorithm_sections("docs/Sections.jl"; root = dir) == 2
+            @test CH.algorithm_sections("src/Quiet.jl"; root = dir) == 0
+            @test CH.count_section("a\n\n# Algorithm \n\n# Algorithm\n", "Algorithm") == 2
+            # The tracked-file test below lists every file of the tree, and this one is not
+            # part of the fixture it expects.
+            rm(joinpath(dir, "docs", "Sections.jl"))
+
             # `declaring` is a parameter for the same reason `root` is: a fixture tree holds no
             # `src/01_Base.jl`, so a hard-coded list would admit the live checkout alone.
             @test CH.declared_macros("src/Declares.jl"; root = dir) ==
