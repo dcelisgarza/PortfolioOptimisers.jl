@@ -1072,7 +1072,7 @@ An unwrapped prior follows the rule of the carry fold: it folds what folds and r
 
 # Algorithm
 
- 1. Refuse an observed factor with [`assert_cross_sectional_online_factors`](@ref).
+ 1. Refuse a prior whose tree reads the Exogenous Series with [`assert_cross_sectional_online_factors`](@ref).
  2. Seed an empty [`CrossSectionalCarryState`](@ref) when `pe.cache` is `nothing`.
  3. Fold `rd` with [`cross_sectional_carry_fold`](@ref), and rebuild the prior with the state it returns.
 

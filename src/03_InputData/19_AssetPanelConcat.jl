@@ -575,7 +575,7 @@ The read-out of a refit prior and [`returns_result`](@ref) call it. A buffer tha
 # Algorithm
 
  1. Return `nothing` when `state.P` is `nothing`.
- 2. Copy the masks `A` and `E` over the valid region into two `Matrix{Bool}`.
+ 2. Copy the masks `A` and `M` over the valid region into two `Matrix{Bool}`.
  3. Make the `AssetPanel` of `state.P` and the two masks.
 
 # Arguments
@@ -606,5 +606,5 @@ function sample_buffer_panel(P::AbstractVector{<:AbstractPanelField},
     #! state it to the compiler, so the constructor meets two concrete masks.
     return AssetPanel(; pf = P,
                       amsk = Matrix{Bool}(view(state.A::AbstractMatrix{Bool}, rows, :)),
-                      emsk = Matrix{Bool}(view(state.E::AbstractMatrix{Bool}, rows, :)))
+                      emsk = Matrix{Bool}(view(state.M::AbstractMatrix{Bool}, rows, :)))
 end

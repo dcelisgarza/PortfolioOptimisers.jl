@@ -804,7 +804,7 @@ For a prior owner:
 
  1. Fold `rd` into the prior through [`fold_prior`](@ref), giving `pe`. This goes first, because the context takes its cap from the buffer that the prior seeds, as the context of an optimiser does ([`fold_returns`](@ref)).
  2. Read the buffer of the prior through [`prior_returns_buffer`](@ref), giving `rows`.
- 3. Set `own_factors` when [`needs_factor_returns`](@ref) answers `false` for `pe`. The context keeps the factor columns only then, so the rebuilt `ReturnsResult` holds each factor column once.
+ 3. Set `own_factors` when [`needs_factor_returns`](@ref) answers `false` for `pe`. The context keeps the factor columns only then, so the rebuilt `ReturnsResult` holds each factor column once. Set `own_exogenous` when [`reads_exogenous_series`](@ref) answers `false` for `pe`, on the same terms for the Exogenous Series.
  4. Fold `rd` into the context of the Pipeline through [`fold_context`](@ref) under the cap `rows.max_history`, giving `cache`.
  5. Return `pe` and `cache`.
 
@@ -824,7 +824,9 @@ function fold_pipeline_owner(pe::AbstractPriorEstimator,
     pe = fold_prior(pe, rd)
     rows = prior_returns_buffer(pe)
     own_factors = needs_factor_returns(pe) === false
-    return pe, fold_context(cache, rd, rows.max_history, false, own_factors)
+    return pe,
+           fold_context(cache, rd, rows.max_history, false, own_factors,
+                        !reads_exogenous_series(pe))
 end
 function fold_pipeline_owner(opt::OptimisationEstimator, ::Nothing, rd::ReturnsResult)
     return partial_fit!(opt, rd), nothing

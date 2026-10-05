@@ -88,14 +88,22 @@ state owns it once, and the Fold Context reads it back.
 - A per-type predicate, `reads_exogenous_series`, recursive through the factor list and through an
   embedded prior, says whether the tree of a prior reads the series. It answers `true` for every
   member that reads `E`: the observed members and an estimated Descriptor that reads a series, such
-  as `EWMacroSensitivity`.
+  as `EWMacroSensitivity`. It also recurses through the Descriptor scores of the Return Forecast
+  Estimator, which can hold such a Descriptor.
 - The state keeps every column of the series and its names, not only the columns that the tree
   names. The Fold Context then holds no copy, and it rebuilds the whole `ReturnsResult` from the
   prior's state, as it does for the factor returns.
 - `SampleBufferState` renames its estimation mask from `E` to `M`, and `E` and `ne` hold the
   Exogenous Series, so `E` means one thing on the whole online seam.
 - A step of a tree that reads the series must bring it. The first step pins `ne`. A non-finite value
-  is refused only on the rows that the fit reads, as ADR 0184 states.
+  is refused only on the rows that the fit reads, as ADR 0184 states. The step records such a value,
+  and the call with no data refuses it when the fit reads its row, so a later cap can drop it.
+- The refit route is built
+  ([#1478](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1478)). Its call with no
+  data equals the batch fit over the buffer's rows, bit for bit, with `CurrencyExposure`,
+  `ObservedExposure` and `EWMacroSensitivity`, and its pinned choice under currency factors is at
+  parity with the oracle's online update. Until the carry fold records the series, the carry refuses
+  every tree for which `reads_exogenous_series` answers `true`, a macro sensitivity included.
 - The carry fold derives each new row of the net returns `Xl`, and of the returns net of the
   observed members that read no returns, one time, and carries the rows beside `X`. It also carries
   the series over its window and the observed returns of every fitted row. It never derives a row

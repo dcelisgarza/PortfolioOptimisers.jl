@@ -101,7 +101,7 @@ Folds the observations of `rd` into the fold context of an optimiser, and seeds 
 # Algorithm
 
  1. Take `cache` as the context `state`. When `cache` is `nothing`, seed an empty [`ReturnsBufferState`](@ref) with the cap `max_history` instead.
- 2. Fold `rd` into `state` with [`partial_fit!`](@ref), under `own_returns` and `own_factors`.
+ 2. Fold `rd` into `state` with [`partial_fit!`](@ref), under `own_returns`, `own_factors` and `own_exogenous`.
 
 # Arguments
 
@@ -110,6 +110,7 @@ Folds the observations of `rd` into the fold context of an optimiser, and seeds 
   - `max_history`: The cap of a new context. It is the cap of the buffer that holds the returns, so the context and that buffer drop the same rows.
   - `own_returns`: Whether the context keeps the returns itself. It is `true` for a head that holds no prior.
   - `own_factors`: Whether the context keeps the factor column itself. It is `true` for a head that holds no prior, and for an optimiser whose prior never reads factor returns.
+  - `own_exogenous`: Whether the context keeps the Exogenous Series itself. It is `true` for a head that holds no prior, and for an optimiser whose prior never reads the series.
 
 # Validation
 
@@ -125,9 +126,11 @@ Folds the observations of `rd` into the fold context of an optimiser, and seeds 
   - [`partial_fit!`](@ref)
 """
 function fold_context(cache::Option{<:ReturnsBufferState}, rd::ReturnsResult,
-                      max_history::Option{<:Integer}, own_returns::Bool, own_factors::Bool)
+                      max_history::Option{<:Integer}, own_returns::Bool, own_factors::Bool,
+                      own_exogenous::Bool)
     state = isnothing(cache) ? ReturnsBufferState(; max_history = max_history) : cache
-    return partial_fit!(state, rd; own_returns = own_returns, own_factors = own_factors)
+    return partial_fit!(state, rd; own_returns = own_returns, own_factors = own_factors,
+                        own_exogenous = own_exogenous)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -136,13 +139,13 @@ Takes the step of an optimiser that holds a prior and a fold context. It forward
 
 The prior folds first, because the context takes its cap from the buffer of the prior. The `max_history` of an [`Online`](@ref) wrapper caps the rows of the prior, and the context must drop the same rows at the same step, so the [`ReturnsResult`](@ref) that `optimise(opt)` with no returns rebuilds matches the rows of the prior.
 
-One place holds `F`. The context keeps the factor column only when the tree of the prior never reads it, that is, when [`needs_factor_returns`](@ref) answers `false`. Otherwise the buffer of the prior records it, and `optimise(opt)` with no returns reads it back through [`prior_returns_buffer`](@ref), as it reads the returns.
+One place holds `F`. The context keeps the factor column only when the tree of the prior never reads it, that is, when [`needs_factor_returns`](@ref) answers `false`. Otherwise the buffer of the prior records it, and `optimise(opt)` with no returns reads it back through [`prior_returns_buffer`](@ref), as it reads the returns. One place holds the Exogenous Series on the same terms. The context keeps it only when [`reads_exogenous_series`](@ref) answers `false`, and the buffer of the prior records it otherwise.
 
 # Algorithm
 
  1. Fold `rd` into `opt.pe` with [`fold_prior`](@ref), giving the folded prior `pe`.
  2. Read the buffer `rows` of `pe` with [`prior_returns_buffer`](@ref).
- 3. Set `own_factors` to `true` when `needs_factor_returns(pe) === false`.
+ 3. Set `own_factors` to `true` when `needs_factor_returns(pe) === false`, and `own_exogenous` to `true` when `reads_exogenous_series(pe)` is `false`.
  4. Fold `rd` into `opt.cache` with [`fold_context`](@ref), under the cap `rows.max_history`, giving `cache`. The context never keeps the returns.
  5. Rebuild `opt` with `pe` and `cache`.
 
@@ -165,12 +168,14 @@ One place holds `F`. The context keeps the factor column only when the tree of t
   - [`fold_context`](@ref)
   - [`prior_returns_buffer`](@ref)
   - [`needs_factor_returns`](@ref)
+  - [`reads_exogenous_series`](@ref)
 """
 function fold_returns(opt, rd::ReturnsResult)
     pe = fold_prior(opt.pe, rd)
     rows = prior_returns_buffer(pe)
     own_factors = needs_factor_returns(pe) === false
-    cache = fold_context(opt.cache, rd, rows.max_history, false, own_factors)
+    cache = fold_context(opt.cache, rd, rows.max_history, false, own_factors,
+                         !reads_exogenous_series(pe))
     return rebuild_estimator(opt, (; pe = pe, cache = cache))
 end
 """
@@ -241,7 +246,8 @@ function partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted,
     max_history = isnothing(opt.cache) ? nothing : opt.cache.max_history
     return rebuild_estimator(opt,
                              (;
-                              cache = fold_context(opt.cache, rd, max_history, true, true)))
+                              cache = fold_context(opt.cache, rd, max_history, true, true,
+                                                   true)))
 end
 function partial_fit!(opt::PreviousWeights, ::ReturnsResult)
     return opt

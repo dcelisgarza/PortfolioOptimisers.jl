@@ -366,7 +366,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds the observations of a [`ReturnsResult`](@ref) into a [`ReturnsBufferState`](@ref).
 
-The step of the state itself. The optimiser decides once which columns the state owns. `own_returns` is `true` only for a head that holds no prior, and a state whose prior keeps the rows appends no `X` and no mask. `own_factors` is `false` when the prior's tree reads `F`. The prior's buffer then records the factor column, and its own first-append rule refuses a column that comes and goes, so this state does not keep `F` and does not check its presence.
+The step of the state itself. The optimiser decides once which columns the state owns. `own_returns` is `true` only for a head that holds no prior, and a state whose prior keeps the rows appends no `X` and no mask. `own_factors` is `false` when the prior's tree reads `F`. The prior's buffer then records the factor column, and its own first-append rule refuses a column that comes and goes, so this state does not keep `F` and does not check its presence. `own_exogenous` is `false` when the prior's tree reads the Exogenous Series. The prior's buffer then records every column of the series and its names, so this state keeps neither `E` nor `ne`, and the buffer pins the names.
 
 A head that holds no prior keeps the active mask of a time-varying panel and nothing else of that panel. The estimation mask, the Panel Fields and the implied volatility do not reach the state, and no such head reads them. An optimiser with a prior refuses returns data that holds any of them, in [`fold_prior`](@ref).
 
@@ -374,11 +374,11 @@ A head that holds no prior keeps the active mask of a time-varying panel and not
 
  1. Refuse an `rd` with no returns.
  2. Read `n`, the number of observations the state holds, and `pnl`, which is the panel when it is static and `nothing` when it is time-varying.
- 3. On the first step, when `n` is zero and no names are pinned, pin `nx`, `nf`, `nb`, `ne` and `pnl`.
+ 3. On the first step, when `n` is zero and no names are pinned, pin `nx`, `nf`, `nb` and `pnl`, and pin `ne` when the state owns the series.
  4. On every later step, refuse an `rd` whose names or static panel differ from the pinned ones, and an `rd` that adds or drops a column the state owns.
  5. When the state owns the rows, append `X` with [`fold_column_masked`](@ref), with the active mask of a time-varying panel.
- 6. When the state owns the factor column, append `F` with [`fold_column`](@ref).
- 7. Append `B`, `E` and `ts` with [`fold_column`](@ref), and return the new state.
+ 6. When the state owns the factor column, append `F` with [`fold_column`](@ref). When it owns the series, append `E` with [`fold_column`](@ref).
+ 7. Append `B` and `ts` with [`fold_column`](@ref), and return the new state.
 
 # Arguments
 
@@ -386,6 +386,7 @@ A head that holds no prior keeps the active mask of a time-varying panel and not
   - `rd`: The returns data of one or more observations, `observations × assets`.
   - `own_returns`: Whether the state keeps the returns. It is `true` for a head that holds no prior, and `false` otherwise.
   - `own_factors`: Whether the state keeps the factor column. It is `true` for a head that holds no prior and for an optimiser whose prior's tree never reads `F`, and `false` otherwise.
+  - `own_exogenous`: Whether the state keeps the Exogenous Series and its names. It is `true` for a head that holds no prior and for an optimiser whose prior's tree never reads the series, and `false` otherwise.
 
 # Validation
 
@@ -407,27 +408,31 @@ A head that holds no prior keeps the active mask of a time-varying panel and not
   - [`fold_prior`](@ref)
 """
 function partial_fit!(state::ReturnsBufferState, rd::ReturnsResult;
-                      own_returns::Bool = false, own_factors::Bool = true)
+                      own_returns::Bool = false, own_factors::Bool = true,
+                      own_exogenous::Bool = true)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     n = context_count(state)
     static = isnothing(rd.pnl) || panel_is_static(rd.pnl)
     pnl = static ? rd.pnl : nothing
     if iszero(n) && isnothing(state.nx)
         state = ReturnsBufferState(; nx = rd.nx, X = state.X, nf = rd.nf, F = state.F,
-                                   nb = rd.nb, B = state.B, ne = rd.ne, E = state.E,
+                                   nb = rd.nb, B = state.B,
+                                   ne = own_exogenous ? rd.ne : nothing, E = state.E,
                                    ts = state.ts, pnl = pnl,
                                    max_history = state.max_history)
     else
         assert_pinned_context(state.nx, rd.nx, :nx)
         assert_pinned_context(state.nf, rd.nf, :nf)
         assert_pinned_context(state.nb, rd.nb, :nb)
-        assert_pinned_context(state.ne, rd.ne, :ne)
         assert_pinned_context(state.pnl, pnl, :pnl)
         if own_factors
             assert_column_presence(state.F, rd.F, :F)
         end
+        if own_exogenous
+            assert_pinned_context(state.ne, rd.ne, :ne)
+            assert_column_presence(state.E, rd.E, :E)
+        end
         assert_column_presence(state.B, rd.B, :B)
-        assert_column_presence(state.E, rd.E, :E)
         assert_column_presence(state.ts, rd.ts, :ts)
     end
     X = if own_returns
@@ -437,10 +442,10 @@ function partial_fit!(state::ReturnsBufferState, rd::ReturnsResult;
         state.X
     end
     F = own_factors ? fold_column(state.F, rd.F, state.max_history) : state.F
+    E = own_exogenous ? fold_column(state.E, rd.E, state.max_history) : state.E
     return ReturnsBufferState(; nx = state.nx, X = X, nf = state.nf, F = F, nb = state.nb,
                               B = fold_column(state.B, rd.B, state.max_history),
-                              ne = state.ne,
-                              E = fold_column(state.E, rd.E, state.max_history),
+                              ne = state.ne, E = E,
                               ts = fold_column(state.ts, rd.ts, state.max_history),
                               pnl = state.pnl, max_history = state.max_history)
 end
@@ -483,15 +488,15 @@ end
 
 Rebuilds the [`ReturnsResult`](@ref) that the observations folded so far describe.
 
-The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer that holds the returns, which is the prior's buffer, or the state's own `X` when the head holds no prior. The state holds every other column and the pinned context. The one exception is the factor column of a prior whose tree reads it, which `rows` holds. Every array of the result is a new copy and not a view, because the next fold writes into the buffers and can reallocate them, and a `ReturnsResult` that held a view would then change in the hands of its caller. The Panel Fields are the one exception. Nothing writes into the arrays of a panel, and a fold makes new arrays when it appends, so the result shares them with `rows`.
+The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer that holds the returns, which is the prior's buffer, or the state's own `X` when the head holds no prior. The state holds every other column and the pinned context. The two exceptions are the factor column of a prior whose tree reads it, and the Exogenous Series with its names of a prior whose tree reads it, which `rows` holds. Every array of the result is a new copy and not a view, because the next fold writes into the buffers and can reallocate them, and a `ReturnsResult` that held a view would then change in the hands of its caller. The Panel Fields are the one exception. Nothing writes into the arrays of a panel, and a fold makes new arrays when it appends, so the result shares them with `rows`.
 
 # Algorithm
 
  1. Read `n` with [`context_count`](@ref), and refuse a state whose count differs from the count of `rows`.
  2. Copy the valid rows of `rows` into `X`.
  3. When `rows` records an active mask, rebuild a time-varying [`AssetPanel`](@ref) from it. Its estimation mask is the one that `rows` records or, when `rows` records none, a copy of the active mask. The step of a refit prior records both masks, and the carry of [`EmpiricalPrior`](@ref) and a head with no prior record the active mask alone. Its Panel Fields are the ones that `rows` records, which it records for a prior that reads them, and none otherwise. When `rows` records no active mask, take the static panel that the state pinned, or `nothing`.
- 4. Take `F` from the state when the state keeps the factor column, and from [`factor_buffer`](@ref) of `rows` otherwise.
- 5. Copy `B`, `E` and `ts` from the state, carry the pinned `ne`, and build the `ReturnsResult`.
+ 4. Take `F` from the state when the state keeps the factor column, and from [`factor_buffer`](@ref) of `rows` otherwise. Take `ne` and `E` from the state when the state keeps the series, and from [`exogenous_buffer_kwargs`](@ref) of `rows` otherwise.
+ 5. Copy `B` and `ts` from the state, and build the `ReturnsResult`.
 
 # Arguments
 
@@ -514,6 +519,7 @@ The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer th
   - [`sample_buffer`](@ref)
   - [`sample_buffer_kwargs`](@ref)
   - [`factor_buffer`](@ref)
+  - [`exogenous_buffer_kwargs`](@ref)
 """
 function returns_result(state::ReturnsBufferState, rows::SampleBufferState)
     n = context_count(state)
@@ -529,10 +535,11 @@ function returns_result(state::ReturnsBufferState, rows::SampleBufferState)
         state.pnl
     end
     F = isnothing(state.F) ? column_matrix(factor_buffer(rows)) : column_matrix(state.F)
+    ex = isnothing(state.E) ? exogenous_buffer_kwargs(rows) : (; ne = state.ne, E = state.E)
     return ReturnsResult(; nx = state.nx, X = X, nf = state.nf, F = F, nb = state.nb,
-                         B = column_matrix(state.B), ne = state.ne,
-                         E = column_matrix(state.E), ts = column_matrix(state.ts),
-                         pnl = pnl)
+                         B = column_matrix(state.B), ne = get(ex, :ne, nothing),
+                         E = column_matrix(get(ex, :E, nothing)),
+                         ts = column_matrix(state.ts), pnl = pnl)
 end
 """
     column_matrix(buffer::Nothing)

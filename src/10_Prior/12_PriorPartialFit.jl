@@ -304,7 +304,7 @@ Under a [`SampleBufferState`](@ref):
 
 ```math
 \\begin{align}
-\\mathcal{P}_T &= \\mathcal{P}(\\mathbf{X}_{T-m+1:T},\\, \\mathbf{F}_{T-m+1:T},\\, \\mathcal{A}_{T-m+1:T})\\,, \\\\
+\\mathcal{P}_T &= \\mathcal{P}(\\mathbf{X}_{T-m+1:T},\\, \\mathbf{F}_{T-m+1:T},\\, \\mathbf{E}_{T-m+1:T},\\, \\mathcal{A}_{T-m+1:T})\\,, \\\\
 m &= \\min(T,\\, M)\\,.
 \\end{align}
 ```
@@ -315,6 +315,7 @@ Where:
   - $(math_dict[:P_batch_prior])
   - ``\\mathbf{X}_{a:b}``: Rows ``a`` to ``b`` of the returns matrix of the folded observations.
   - ``\\mathbf{F}_{a:b}``: Rows ``a`` to ``b`` of the factor returns matrix of the folded factor observations, absent when the fold recorded none.
+  - ``\\mathbf{E}_{a:b}``: Rows ``a`` to ``b`` of the folded Exogenous Series, absent when the fold recorded none.
   - ``\\mathcal{A}_{a:b}``: The Asset Panel of rows ``a`` to ``b``, with the folded Panel Fields and both folded masks, absent when the fold recorded no Panel Field.
   - ``m``: Number of rows that the buffer holds.
   - ``M``: Cap on the buffer, the `max_history` of the wrapping [`Online`](@ref), and ``\\infty`` when it is `nothing`.
@@ -323,7 +324,7 @@ Where:
 # Algorithm
 
  1. Read the state out of `pe.cache` with [`partial_fit_cache`](@ref).
- 2. Dispatch on the type of the state. Under a [`SampleBufferState`](@ref), run the batch verb over the [`sample_buffer`](@ref) and the [`factor_buffer`](@ref) of the state with [`buffer_prior`](@ref), which gives the masks and the Panel Fields that the buffer records, and the caller's keyword arguments.
+ 2. Dispatch on the type of the state. Under a [`SampleBufferState`](@ref), run the batch verb over the [`sample_buffer`](@ref) and the [`factor_buffer`](@ref) of the state with [`buffer_prior`](@ref), which gives the masks, the Panel Fields and the Exogenous Series that the buffer records, and the caller's keyword arguments.
 
 # Arguments
 
@@ -358,16 +359,16 @@ end
     buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, pnl::Nothing; kwargs...)
     buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, pnl::AssetPanel; kwargs...)
 
-Runs the batch verb of a prior over the rows of its sample buffer, with the masks as keywords or inside the rebuilt Asset Panel.
+Runs the batch verb of a prior over the rows of its sample buffer, with the masks as keywords or inside the rebuilt Asset Panel, and with the Exogenous Series that the buffer records.
 
-This is the call with no data of the refit route. A buffer that records no Panel Field gives its masks as the keywords that [`sample_buffer_kwargs`](@ref) reads, as a matrix call of the batch verb takes them. A buffer that records Panel Fields gives the panel that [`sample_buffer_panel`](@ref) rebuilds as the third positional argument, as `prior(pe, rd)` gives `rd.pnl`. That panel holds both masks, so the call gives no mask keyword.
+This is the call with no data of the refit route. A buffer that records no Panel Field gives its masks as the keywords that [`sample_buffer_kwargs`](@ref) reads, as a matrix call of the batch verb takes them. A buffer that records Panel Fields gives the panel that [`sample_buffer_panel`](@ref) rebuilds as the third positional argument, as `prior(pe, rd)` gives `rd.pnl`. That panel holds both masks, so the call gives no mask keyword. A buffer that records the Exogenous Series gives `ne` and `E` as the keywords that [`exogenous_buffer_kwargs`](@ref) reads, as `prior(pe, rd)` gives `rd.ne` and `rd.E`.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `pnl` is `nothing`: call `prior(pe, X, F; masks..., kwargs...)` over the rows of the buffer.
- 2. `pnl` is an Asset Panel: call `prior(pe, X, F, pnl; kwargs...)` over the rows of the buffer.
+ 1. `pnl` is `nothing`: call `prior(pe, X, F; masks..., series..., kwargs...)` over the rows of the buffer.
+ 2. `pnl` is an Asset Panel: call `prior(pe, X, F, pnl; series..., kwargs...)` over the rows of the buffer.
 
 # Arguments
 
@@ -385,16 +386,19 @@ The method that Julia selects is the algorithm.
   - [`prior`](@ref)
   - [`sample_buffer_panel`](@ref)
   - [`sample_buffer_kwargs`](@ref)
+  - [`exogenous_buffer_kwargs`](@ref)
   - [`SampleBufferState`](@ref)
 """
 function buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, ::Nothing;
                       kwargs...)
     return prior(pe, sample_buffer(state), factor_buffer(state);
-                 sample_buffer_kwargs(state)..., kwargs...)
+                 sample_buffer_kwargs(state)..., exogenous_buffer_kwargs(state)...,
+                 kwargs...)
 end
 function buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, pnl::AssetPanel;
                       kwargs...)
-    return prior(pe, sample_buffer(state), factor_buffer(state), pnl; kwargs...)
+    return prior(pe, sample_buffer(state), factor_buffer(state), pnl;
+                 exogenous_buffer_kwargs(state)..., kwargs...)
 end
 """
     needs_factor_returns(pe::AbstractHiLoOrderPriorEstimator_F) -> true
@@ -578,6 +582,81 @@ function reads_panel_fields(pe::OpinionPoolingPrior)
     return any(reads_panel_fields, (pe.pe1, pe.pe2, pe.pes...))
 end
 """
+    reads_exogenous_series(est::AbstractEstimator) -> false
+    reads_exogenous_series(est::Nothing) -> false
+    reads_exogenous_series(ests::AbstractVector) -> Bool
+    reads_exogenous_series(xe::Union{CurrencyExposure, ObservedExposure}) -> true
+    reads_exogenous_series(de::EWMacroSensitivity) -> Bool
+    reads_exogenous_series(xe::CompositeExposure) -> Bool
+    reads_exogenous_series(ds::DescriptorScores) -> Bool
+    reads_exogenous_series(rfe::Union{FixedWeightedReturnForecast, ExpWeightedReturnForecast,
+                                      TargetReturnForecast}) -> Bool
+    reads_exogenous_series(pe::CrossSectionalFactorPrior) -> Bool
+    reads_exogenous_series(pe::Online) -> Bool
+    reads_exogenous_series(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
+                                     MeucciEntropyPoolingPrior, EntropyPoolingPrior}) -> Bool
+    reads_exogenous_series(pe::OpinionPoolingPrior) -> Bool
+
+Answers whether the fit of an estimator reads the Exogenous Series `rd.E`, from its estimator tree.
+
+A prior that reads the series needs it at every fitted row, so for it the series is sample and not fold context. The refit route of the online step reads this predicate. It gives the series to the buffer of a prior whose tree reads it, and refuses a step of such a prior that brings no series. The buffer then records every column of the series, and the Fold Context reads the series back from it.
+
+The predicate is per type, so a member that reads the series answers for itself, whatever abstract type it has. An observed member, [`CurrencyExposure`](@ref) or [`ObservedExposure`](@ref), reads the return of its factor from the series. An [`EWMacroSensitivity`](@ref) that names a column in `series` reads its reference return from the series, and one with `series = nothing` reads none. A member that holds Descriptors answers for them, and so does a Return Forecast Estimator through its [`DescriptorScores`](@ref). A [`CrossSectionalFactorPrior`](@ref) answers for its factor list and its Return Forecast Estimator. Each outer prior answers for the prior it embeds, as [`reads_panel_fields`](@ref) does, and an [`Online`](@ref) answers for the estimator it wraps. A caller's own member that reads the series must define a method that answers `true`.
+
+# Arguments
+
+  - `est`: An estimator of the tree, or `nothing`.
+  - `ests`: A vector of estimators.
+
+# Returns
+
+  - `reads::Bool`: `true` when the tree holds a member that reads the Exogenous Series.
+
+# Related
+
+  - [`reads_panel_fields`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`exogenous_step_kwargs`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
+function reads_exogenous_series(::AbstractEstimator)
+    return false
+end
+function reads_exogenous_series(::Nothing)
+    return false
+end
+function reads_exogenous_series(ests::AbstractVector)
+    return any(reads_exogenous_series, ests)
+end
+function reads_exogenous_series(::Union{<:CurrencyExposure, <:ObservedExposure})
+    return true
+end
+function reads_exogenous_series(de::EWMacroSensitivity)
+    return !isnothing(de.series)
+end
+function reads_exogenous_series(xe::Union{<:CompositeExposure, <:DescriptorScores})
+    return reads_exogenous_series(xe.descriptors)
+end
+function reads_exogenous_series(rfe::Union{<:FixedWeightedReturnForecast,
+                                           <:ExpWeightedReturnForecast,
+                                           <:TargetReturnForecast})
+    return reads_exogenous_series(rfe.scores)
+end
+function reads_exogenous_series(pe::CrossSectionalFactorPrior)
+    return reads_exogenous_series(map(last, pe.factors)) || reads_exogenous_series(pe.rfe)
+end
+function reads_exogenous_series(pe::Online)
+    return reads_exogenous_series(pe.est)
+end
+function reads_exogenous_series(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior,
+                                          <:MeucciEntropyPoolingPrior,
+                                          <:EntropyPoolingPrior})
+    return reads_exogenous_series(pe.pe)
+end
+function reads_exogenous_series(pe::OpinionPoolingPrior)
+    return any(reads_exogenous_series, (pe.pe1, pe.pe2, pe.pes...))
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses a missing factor matrix at a check at entry whose prior tree requires one.
@@ -699,8 +778,9 @@ The type of the prior selects the route, and each route states what it can honou
 
   - The estimation mask, beside the active mask. No panel, or a static panel, gives no mask.
   - The Panel Fields, when [`reads_panel_fields`](@ref) answers `true`. The buffer records them, and the call with no data gives the batch verb the panel that [`sample_buffer_panel`](@ref) rebuilds. For any other prior a Panel Field is refused by name, because the buffer has no slot that the prior reads.
+  - The Exogenous Series, when [`reads_exogenous_series`](@ref) answers `true`. The buffer records every column of it with its names, and the call with no data gives them to the batch verb. For any other prior the Fold Context keeps the series, and the prior's buffer records none.
 
-The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact folds take no estimation mask. [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) forward `rd` to the prior they embed. [`CrossSectionalFactorPrior`](@ref) has a method of its own, which refuses a prior with no buffer and applies its Choice Rule after the fold.
+The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact folds take no estimation mask. [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) forward `rd` to the prior they embed. [`CrossSectionalFactorPrior`](@ref) has a method of its own, which takes the carry fold when the prior has no buffer and applies its Choice Rule after the fold of a refit.
 
 # Algorithm
 
@@ -737,14 +817,14 @@ end
 
 Takes the step of the refit route of a prior: the fold of [`refit_prior_fold`](@ref), and the work a prior adds around it.
 
-A prior that adds no work of its own folds `rd` with [`refit_prior_fold`](@ref), and applies the Choice Rule of a regression that it fits with [`pin_prior_choice`](@ref). A [`CrossSectionalFactorPrior`](@ref) refuses an observed factor first, with [`assert_cross_sectional_online_factors`](@ref), because the buffer records no Exogenous Series. It applies its Choice Rule after the fold, with [`cross_sectional_pin_choice`](@ref). The step is a function of its own, and not a method of [`partial_fit!`](@ref), so every method of that verb that reads a family state narrows the `cache` of its estimator, and a buffer reaches this route alone.
+A prior that adds no work of its own folds `rd` with [`refit_prior_fold`](@ref), and applies the Choice Rule of a regression that it fits with [`pin_prior_choice`](@ref). A [`CrossSectionalFactorPrior`](@ref) applies its Choice Rule after the fold, with [`cross_sectional_pin_choice`](@ref). The step is a function of its own, and not a method of [`partial_fit!`](@ref), so every method of that verb that reads a family state narrows the `cache` of its estimator, and a buffer reaches this route alone.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. Any prior: fold `rd` with [`refit_prior_fold`](@ref), and apply [`pin_prior_choice`](@ref) over the rows of the buffer.
- 2. A [`CrossSectionalFactorPrior`](@ref): refuse an observed factor, fold `rd` with [`refit_prior_fold`](@ref), and pin the dropped members under a [`PinnedChoice`](@ref).
+ 2. A [`CrossSectionalFactorPrior`](@ref): fold `rd` with [`refit_prior_fold`](@ref), and pin the dropped members under a [`PinnedChoice`](@ref).
 
 # Arguments
 
@@ -753,7 +833,7 @@ The method that Julia selects is the algorithm.
 
 # Validation
 
-  - The rules of [`refit_prior_fold`](@ref), and for a Cross-Sectional Factor Prior those of [`assert_cross_sectional_online_factors`](@ref) and [`cross_sectional_pinned_families`](@ref).
+  - The rules of [`refit_prior_fold`](@ref), and for a Cross-Sectional Factor Prior those of [`cross_sectional_pinned_families`](@ref).
 
 # Returns
 
@@ -845,7 +925,7 @@ The generic method of [`partial_fit!`](@ref) over a `ReturnsResult` is this func
  1. Refuse `rd` without returns, and `rd` with an implied-volatility surface, with [`assert_prior_fold_returns`](@ref).
  2. Apply the answer of [`needs_factor_returns`](@ref) to `rd.F` with [`fold_factor_argument`](@ref).
  3. Read the buffer out of `pe.cache` with [`assert_sample_buffer`](@ref).
- 4. Read the masks and the Panel Fields of `rd.pnl` with [`refit_step_kwargs`](@ref). Fold `rd.X`, the factor returns and those keywords into the buffer through the block method of [`partial_fit!`](@ref).
+ 4. Read the masks and the Panel Fields of `rd.pnl` with [`refit_step_kwargs`](@ref), and the Exogenous Series of `rd` with [`exogenous_step_kwargs`](@ref). Fold `rd.X`, the factor returns and those keywords into the buffer through the block method of [`partial_fit!`](@ref).
  5. Rebuild the prior with its `cache` set to the new buffer, and return it.
 
 # Arguments
@@ -858,7 +938,7 @@ The generic method of [`partial_fit!`](@ref) over a `ReturnsResult` is this func
   - The rules of [`assert_prior_fold_returns`](@ref).
   - `rd.F` is not `nothing` when `needs_factor_returns(pe) === true`. An `IsNothingError` is thrown otherwise.
   - `pe` carries a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
-  - The rules of [`refit_step_kwargs`](@ref).
+  - The rules of [`refit_step_kwargs`](@ref) and [`exogenous_step_kwargs`](@ref).
   - Every condition that the fold of the buffer checks.
 
 # Returns
@@ -869,13 +949,14 @@ The generic method of [`partial_fit!`](@ref) over a `ReturnsResult` is this func
 
   - [`partial_fit!`](@ref)
   - [`refit_step_kwargs`](@ref)
+  - [`exogenous_step_kwargs`](@ref)
   - [`SampleBufferState`](@ref)
 """
 function refit_prior_fold(pe::AbstractPriorEstimator, rd::ReturnsResult)
     assert_prior_fold_returns(rd)
     F = fold_factor_argument(needs_factor_returns(pe), pe, rd.F)
     state = partial_fit!(assert_sample_buffer(pe), rd.X, F;
-                         refit_step_kwargs(pe, rd.pnl)...)
+                         refit_step_kwargs(pe, rd.pnl)..., exogenous_step_kwargs(pe, rd)...)
     return rebuild_estimator(pe, (; cache = state))
 end
 """
@@ -956,6 +1037,40 @@ function refit_step_kwargs(pe::AbstractPriorEstimator, pnl::AssetPanel)
         return (; kw..., panel_fields = pnl.pf)
     end
     return kw
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reads the keywords that the refit route of a prior folds from the Exogenous Series of a step, and refuses a step that brings no series to a prior that reads it.
+
+A prior whose tree reads the series, as [`reads_exogenous_series`](@ref) answers, owns it on the online step. Its buffer records every column of `rd.E` and the names `rd.ne`, and the first step fixes the names. A step that brings no series would leave the buffer with rows that the fit cannot read, so it is refused. A prior that reads no series gives no keyword, and the Fold Context keeps the series. A non-finite value of the series is not refused here. The fit refuses it on the rows that it reads, as ADR 0184 states, and a later cap can drop such a row.
+
+# Arguments
+
+  - `pe`: The prior.
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - `rd.E` is not `nothing` when `reads_exogenous_series(pe)` is `true`. An `IsNothingError` is thrown otherwise.
+
+# Returns
+
+  - `kwargs::NamedTuple`: `ne` and `E` of `rd` when the prior reads the series, and an empty `NamedTuple` otherwise.
+
+# Related
+
+  - [`reads_exogenous_series`](@ref)
+  - [`refit_prior_fold`](@ref)
+  - [`SampleBufferState`](@ref)
+"""
+function exogenous_step_kwargs(pe::AbstractPriorEstimator, rd::ReturnsResult)
+    if !reads_exogenous_series(pe)
+        return (;)
+    end
+    @argcheck(!isnothing(rd.E),
+              IsNothingError("the estimator tree of `$(nameof(typeof(pe)))` reads the Exogenous Series, which its buffer records at every step, and this step carries no `rd.E`. Give every step the series, with one column per name that the first step fixed."))
+    return (; ne = rd.ne, E = rd.E)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

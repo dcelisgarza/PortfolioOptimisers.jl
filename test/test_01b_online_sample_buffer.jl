@@ -465,7 +465,7 @@ end
                                       active_mask = trues(size(Y, 2)))
         end
         @test po.sample_buffer_kwargs(one_by_one.cache).active_mask == trues(size(Y))
-        @test isnothing(wrapped.cache.E)
+        @test isnothing(wrapped.cache.M)
         # The estimation mask is carried on the same terms, and only the two regime-adjusted
         # families read it.
         regime = partial_fit!(po.update_online_estimator(Online(RegimeAdjustedExpWeightedCovariance())),
@@ -626,7 +626,7 @@ the same per-observation nature and the same silent failure.
         @test_throws DimensionMismatch po.SampleBufferState(; n = 1, X = zeros(1, 2),
                                                             A = trues(1, 3))
         @test_throws DimensionMismatch po.SampleBufferState(; n = 1, X = zeros(1, 2),
-                                                            E = trues(2, 2))
+                                                            M = trues(2, 2))
     end
     @testset "Every channel carries the masks" begin
         # `dims = 2` orients the masks with the observations.
@@ -748,7 +748,7 @@ end
         @test_throws IsEmptyError blk(po.SampleBufferState(), 1:2;
                                       P = po.AbstractPanelField[])
         # The keyword constructor checks that `P` covers the valid region.
-        ok = po.SampleBufferState(; n = 2, X = Y[1:2, :], A = M[1:2, :], E = Em[1:2, :],
+        ok = po.SampleBufferState(; n = 2, X = Y[1:2, :], A = M[1:2, :], M = Em[1:2, :],
                                   P = fields_of(1:2))
         @test isequal(values_of(ok.P), values_of(fields_of(1:2)))
         @test_throws DimensionMismatch po.SampleBufferState(; n = 2, X = Y[1:3, :],
@@ -769,5 +769,72 @@ end
         v = po.port_opt_view(s, [1, 3])
         @test isequal(values_of(v.P), values_of(fields_of(1:T, [1, 3])))
         @test isnothing(po.port_opt_view(po.SampleBufferState(), [1]).P)
+    end
+end
+
+@testset "The sample buffer carries the Exogenous Series (#1478)" begin
+    po = PortfolioOptimisers
+    rng = StableRNG(1478)
+    T, N, K = 9, 3, 2
+    Y = randn(rng, T, N)
+    S = randn(rng, T, K)
+    ne = ["EUR", "MACRO"]
+    blk(st, r; names = ne) = partial_fit!(st, Y[r, :]; ne = names, E = S[r, :])
+    rows(st) = po.exogenous_buffer_kwargs(st)
+    @testset "Append, cap and read back" begin
+        st = blk(blk(po.SampleBufferState(), 1:4), 5:T)
+        @test rows(st).ne == ne && isequal(rows(st).E, S)
+        # The series rows drop with the rows that a cap drops, through growth and compaction.
+        st = po.SampleBufferState(; max_history = 3)
+        for t in 1:T
+            st = blk(st, t:t)
+        end
+        @test isequal(rows(st).E, S[(T - 2):T, :]) &&
+              isequal(po.sample_buffer(st), Y[(T - 2):T, :])
+        # A block longer than the cap keeps its last rows.
+        @test isequal(rows(blk(po.SampleBufferState(; max_history = 2), 1:T)).E,
+                      S[(T - 1):T, :])
+        # One observation folds through the block form, and `dims = 2` transposes the series.
+        st = partial_fit!(po.SampleBufferState(), Y[1, :]; ne = ne, E = S[1, :])
+        @test isequal(rows(st).E, S[1:1, :])
+        st = partial_fit!(po.SampleBufferState(), permutedims(Y[1:3, :]); dims = 2, ne = ne,
+                          E = permutedims(S[1:3, :]))
+        @test isequal(rows(st).E, S[1:3, :])
+        # A buffer with no series reads out no keyword.
+        @test rows(partial_fit!(po.SampleBufferState(), Y)) == (;)
+    end
+    @testset "Refusals" begin
+        st = blk(po.SampleBufferState(), 1:4)
+        @test_throws ArgumentError partial_fit!(st, Y[5:6, :])
+        @test_throws ArgumentError blk(st, 5:6; names = ["EUR", "JPY"])
+        @test_throws ArgumentError blk(partial_fit!(po.SampleBufferState(), Y[1:2, :]), 3:4)
+        @test_throws ArgumentError partial_fit!(po.SampleBufferState(), Y[1:2, :];
+                                                E = S[1:2, :])
+        @test_throws ArgumentError partial_fit!(po.SampleBufferState(), Y[1:2, :]; ne = ne)
+        @test_throws DimensionMismatch partial_fit!(po.SampleBufferState(), Y[1:2, :];
+                                                    ne = ne, E = S[1:3, :])
+        @test_throws DimensionMismatch partial_fit!(po.SampleBufferState(), Y[1:2, :];
+                                                    ne = ["EUR"], E = S[1:2, :])
+        @test_throws DimensionMismatch po.SampleBufferState(; n = 2, X = Y[1:2, :], ne = ne,
+                                                            E = S[1:3, :])
+        @test_throws ArgumentError po.SampleBufferState(; n = 2, X = Y[1:2, :], ne = ne)
+    end
+    @testset "merge_states, copy and port_opt_view" begin
+        a = blk(po.SampleBufferState(), 1:4)
+        b = blk(po.SampleBufferState(), 5:T)
+        @test isequal(rows(po.merge_states(a, b)).E, S)
+        ac = blk(po.SampleBufferState(; max_history = 3), 1:4)
+        bc = blk(po.SampleBufferState(; max_history = 3), 5:6)
+        @test isequal(rows(po.merge_states(ac, bc)).E, S[4:6, :])
+        @test_throws ArgumentError po.merge_states(a,
+                                                   partial_fit!(po.SampleBufferState(), Y))
+        @test_throws ArgumentError po.merge_states(a,
+                                                   blk(po.SampleBufferState(), 5:T;
+                                                       names = ["EUR", "JPY"]))
+        # The copy owns its series backing; the view keeps every series column.
+        c = copy(a)
+        @test c.E !== a.E && isequal(rows(c).E, rows(a).E) && c.ne == ne
+        v = po.port_opt_view(a, [1, 3])
+        @test size(po.sample_buffer(v)) == (4, 2) && isequal(rows(v).E, S[1:4, :])
     end
 end

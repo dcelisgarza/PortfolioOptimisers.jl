@@ -19,6 +19,12 @@ is its batch fit over the rows seen so far. The two cases are the grid configura
     the first batch, and its batch fit over 170 and 250 rows drops `style2`.
   - `Industry`: `FamOne`. Every fit drops `industry=Software`, so `Fold` and `Prefix` agree, and
     only `Fold` is stored.
+  - `CurrencyStyle` (#1478): `Currency` with `families = ["style" => nothing]`. The oracle's update
+    reads the Currency Excess Returns of each batch, and it pins `style1` as in `Style`. Only `Fold`
+    is stored.
+
+The refit records the Exogenous Series that an observed factor or a macro sensitivity reads
+(#1478, ADR 0193), so those priors take the online step too.
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 include(joinpath(@__DIR__, "parity_grid.jl"))
@@ -147,12 +153,107 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         # An unwrapped prior takes the other route, the carry fold of #1471, which
         # test_12zb_parity_cs_prior_carry_fold.jl tests.
         @test isa(partial_fit!(pe, rows(rd, 1:90)).cache, po.CrossSectionalCarryState)
-        ccy = CrossSectionalFactorPrior(; grid_config("Currency", rd)...)
-        m = message(() -> partial_fit!(online(ccy), rows(rd, 1:90)))
-        @test occursin("does not record the Exogenous Series that an observed factor reads",
-                       m)
         m = message(() -> partial_fit!(online(pe), rd.X))
         @test occursin("the matrix form of `partial_fit!` carries none", m)
+    end
+
+    @testset "The refit records the Exogenous Series (#1478)" begin
+        # An observed factor reads its return from the Exogenous Series, and an
+        # `EWMacroSensitivity` that names a series reads its reference return there. The
+        # buffer records every column of the series, so each of the three refits with no data
+        # equals the batch fit over the same rows, bit for bit.
+        base = grid_config("Base", rd)
+        msens = "msens" => CompositeExposure(;
+                                             descriptors = [EWMacroSensitivity(; series = "MACRO",
+                                                                               half_life = 10)],
+                                             outlier = nothing, scoring = nothing, family = "msens")
+        cfgs = (; Currency = grid_config("Currency", rd), Macro = grid_config("Macro", rd),
+                Sensitivity = (; base..., factors = [base.factors; msens]))
+        for (name, cfg) in pairs(cfgs)
+            pe = CrossSectionalFactorPrior(; cfg...)
+            @test po.reads_exogenous_series(pe)
+            out = stream(pe)
+            for k in 1:3
+                b = batch(pe, k)
+                @test isequal(out[k].pr.mu, b.mu) && isequal(out[k].pr.sigma, b.sigma)
+                @test isequal(out[k].pr.fpr.X, b.fpr.X)
+            end
+            st = out[3].pe.cache
+            @test st.ne == rd.ne && isequal(po.exogenous_buffer_kwargs(st).E, rd.E)
+            # A cap windows the series with the rows.
+            e = online(pe; max_history = 120)
+            for k in 1:3
+                e = partial_fit!(e, rows(rd, (edges[k] + 1):edges[k + 1]))
+            end
+            @test isequal(prior(e).sigma, prior(pe, rows(rd, 131:250)).sigma)
+        end
+        # The predicate answers per type, through the factor list, the Return Forecast
+        # Estimator and the wrapper. A macro sensitivity that names no series reads none.
+        @test !po.reads_exogenous_series(CrossSectionalFactorPrior(; style...))
+        @test !po.reads_exogenous_series(EWMacroSensitivity())
+        @test po.reads_exogenous_series(Online(CrossSectionalFactorPrior(; base...,
+                                                                         factors = [base.factors;
+                                                                                    msens])))
+        ds = DescriptorScores(; descriptors = [EWMacroSensitivity(; series = "MACRO")])
+        @test po.reads_exogenous_series(CrossSectionalFactorPrior(; style...,
+                                                                  rfe = FixedWeightedReturnForecast(;
+                                                                                                    scores = ds,
+                                                                                                    scale = 0.02)))
+        # The same prior inside an optimiser: the prior's buffer owns the series, the Fold
+        # Context keeps no copy and reads it back, and the weights equal the batch weights.
+        ccy = CrossSectionalFactorPrior(; grid_config("Currency", rd)...)
+        o = po.update_online_estimator(InverseVolatility(; pe = Online(ccy)))
+        for k in 1:3
+            o = partial_fit!(o, rows(rd, (edges[k] + 1):edges[k + 1]))
+        end
+        @test isnothing(o.cache.E) && isnothing(o.cache.ne)
+        bo, brd = po.batch_from_state(o)
+        @test brd.ne == rd.ne && isequal(brd.E, rd.E)
+        @test isequal(bo.pe.sigma, prior(ccy, rd).sigma)
+        @test isequal(optimise(o).w, optimise(InverseVolatility(; pe = ccy), rd).w)
+        # A prior that reads no series leaves it to the Fold Context.
+        o = po.update_online_estimator(InverseVolatility(;
+                                                         pe = Online(CrossSectionalFactorPrior(;
+                                                                                               style...))))
+        o = partial_fit!(o, rows(rd, 1:90))
+        @test isnothing(o.pe.cache.E) && o.cache.ne == rd.ne
+        @test isequal(po.batch_from_state(o)[2].E, rd.E[1:90, :])
+        # Refusals. A step with no series, and a step with other names.
+        nor = ReturnsResult(; nx = rd.nx, X = rd.X, pnl = rd.pnl)
+        m = message(() -> partial_fit!(online(ccy), rows(nor, 1:90)))
+        @test occursin("this step carries no `rd.E`", m)
+        e = partial_fit!(online(ccy), rows(rd, 1:90))
+        m = message(() -> partial_fit!(e, rows(nor, 91:170)))
+        @test occursin("this step carries no `rd.E`", m)
+        ren = ReturnsResult(; nx = rd.nx, X = rd.X, ne = [rd.ne[1:(end - 1)]; "OTHER"],
+                            E = rd.E, pnl = rd.pnl)
+        m = message(() -> partial_fit!(e, rows(ren, 91:170)))
+        @test occursin("a later block must carry the same names", m)
+        # A non-finite value is refused on a row that the fit reads, and accepted on a row
+        # that it does not: row 1 has no lagged exposure, so the regression never reads it.
+        for (row, refused) in ((200, true), (1, false))
+            E = copy(rd.E)
+            E[row, 1] = NaN
+            rn = ReturnsResult(; nx = rd.nx, X = rd.X, ne = rd.ne, E = E, pnl = rd.pnl)
+            e = online(ccy)
+            for k in 1:3
+                e = partial_fit!(e, rows(rn, (edges[k] + 1):edges[k + 1]))
+            end
+            if refused
+                @test_throws IsNonFiniteError prior(e)
+                @test_throws IsNonFiniteError prior(ccy, rn)
+            else
+                @test isequal(prior(e).sigma, prior(ccy, rn).sigma)
+            end
+        end
+        # The carry fold does not record the series yet, so it refuses a tree that reads it,
+        # a macro sensitivity included.
+        for cfg in (cfgs.Currency, cfgs.Sensitivity)
+            m = message(() -> partial_fit!(CrossSectionalFactorPrior(; cfg...),
+                                           rows(rd, 1:90)))
+            @test occursin("the carry fold of a Cross-Sectional Factor Prior does not record the Exogenous Series",
+                           m)
+        end
     end
 
     @testset "Parity with the oracle's online update" begin
@@ -184,6 +285,16 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         # sigma maxscaled 6.5e-13, factor returns maxscaled 2.9e-15 on `Industry`.
         check(sp, "Style", "Fold")
         check(ip, "Industry", "Fold")
+        # The pinned choice under currency factors (#1478): the buffer records the Exogenous
+        # Series, and the update pins `style1` over the first batch while the batch fit over
+        # 170 and 250 rows drops `style2`. Measured over the three steps: mu maxrel 2.3e-13,
+        # sigma maxscaled 4.2e-13, factor returns maxscaled 4.5e-16.
+        cpe = CrossSectionalFactorPrior(; grid_config("Currency", rd)...,
+                                        families = ["style" => nothing],
+                                        choice = PinnedChoice())
+        cp = stream(cpe)
+        @test all(x -> x.pe.families == ["style" => "style1"], cp)
+        check(cp, "CurrencyStyle", "Fold")
         # Deliberate difference: the batch choice is the oracle's batch fit over the rows
         # seen so far, not its online update. The automatic dropped member is a function of
         # the whole sample: the member with the largest sum of absolute benchmark-weighted

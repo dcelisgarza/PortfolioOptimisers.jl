@@ -49,7 +49,8 @@ commit = "ebcacfda95"
 "src/01_Base/12_NormError.jl" = { code = 107, doc = 316, comment = 0, blank = 131, total = 554 }
 "src/01_Base/13_KappaLog.jl" = { code = 3, doc = 36, comment = 0, blank = 18, total = 57 }
 "src/01_Base/14_PartialFit.jl" = { code = 66, doc = 224, comment = 2, blank = 128, total = 420 }
-"src/01_Base/15_Online.jl" = { code = 467, doc = 960, comment = 9, blank = 472, total = 1908 }
+"src/01_Base/15_Online_a.jl" = { code = 498, doc = 1014, comment = 7, blank = 487, total = 2006 }
+"src/01_Base/15_Online_b.jl" = { code = 21, doc = 64, comment = 2, blank = 39, total = 126 }
 "src/01_Base/16_CoveragePolicy.jl" = { code = 226, doc = 534, comment = 0, blank = 244, total = 1004 }
 "src/02_Tools/01_Operators.jl" = { code = 26, doc = 253, comment = 0, blank = 89, total = 368 }
 "src/02_Tools/02_ArrayViews.jl" = { code = 94, doc = 346, comment = 0, blank = 154, total = 594 }

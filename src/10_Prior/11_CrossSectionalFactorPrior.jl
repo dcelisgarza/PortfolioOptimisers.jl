@@ -9,7 +9,7 @@ The factor list can also hold observed factors, whose returns the caller observe
 
 The warm-ups of a fit add up, so a caller who sizes a window must sum three of them rather than take the longest. The longest warm-up of the Descriptors sets the first observation of the factor-return history, and `lag` adds `lag` observations to it. `pe` then warms up over that history, and `ve` over the idiosyncratic returns beside it. The default `pe` and the default `ve` each need 40 observations, their `min_obs`, so a default fit needs 40 observations after the Descriptor warm-up and the lag. A window that covers the Descriptors alone can leave `pe` too few observations to state a factor covariance, and the fit then refuses with a message that names the cause. Cross-validation meets this most often. A fold gives the estimator its own rows alone, so the Descriptors warm up again in every fold, and a rolling train window never grows past the warm-up. Size the train window against the sum of the three warm-ups.
 
-On the online step the prior takes one of two routes. Unwrapped, it folds as a carry: its first step of [`partial_fit!`](@ref) seeds a [`CrossSectionalCarryState`](@ref), and each step computes the exposures, the regression and the idiosyncratic variance of the new observations alone. Wrapped in [`Online`](@ref), it refits: each step records the returns, both masks and the Panel Fields in a sample buffer, the call with no data `prior(pe)` is the batch fit over the rows of the buffer, and a `max_history` on the wrapper bounds them. A prior with an observed factor refuses the step, because neither route records the Exogenous Series. The automatic choice of a dropped member reads every row, so `choice` states whether each fit chooses again or the first fit pins it.
+On the online step the prior takes one of two routes. Unwrapped, it folds as a carry: its first step of [`partial_fit!`](@ref) seeds a [`CrossSectionalCarryState`](@ref), and each step computes the exposures, the regression and the idiosyncratic variance of the new observations alone. Wrapped in [`Online`](@ref), it refits: each step records the returns, both masks and the Panel Fields in a sample buffer, the call with no data `prior(pe)` is the batch fit over the rows of the buffer, and a `max_history` on the wrapper bounds them. When a member reads the Exogenous Series, as [`reads_exogenous_series`](@ref) answers, the buffer records every column of the series too, so an observed factor takes the refit. The carry fold does not record the series yet, so it refuses such a prior. The automatic choice of a dropped member reads every row, so `choice` states whether each fit chooses again or the first fit pins it.
 
 # Fields
 
@@ -802,9 +802,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses a Cross-Sectional Factor Prior with an observed factor on the online step.
+Refuses a Cross-Sectional Factor Prior whose tree reads the Exogenous Series on the carry fold.
 
-An observed factor reads its returns from the Exogenous Series, and neither route of the online step records them, so a call with no data could not rebuild the returns of the observed factors. The refit route and the carry fold both call it first.
+An observed factor reads its returns from the Exogenous Series, and so does an [`EWMacroSensitivity`](@ref) that names a column of it. The carry fold does not record the series yet, so a call with no data could not rebuild what those members read. The refit route records it, so it does not call this function. The check reads [`reads_exogenous_series`](@ref), which answers per type, so a Descriptor that reads the series is refused with the observed members.
 
 # Arguments
 
@@ -812,7 +812,7 @@ An observed factor reads its returns from the Exogenous Series, and neither rout
 
 # Validation
 
-  - `pe.factors` holds no [`AbstractObservedExposureEstimator`](@ref). An `ArgumentError` is thrown otherwise.
+  - `reads_exogenous_series(pe)` is `false`. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -820,16 +820,15 @@ An observed factor reads its returns from the Exogenous Series, and neither rout
 
 # Related
 
-  - [`refit_prior_step`](@ref)
+  - [`reads_exogenous_series`](@ref)
   - [`cross_sectional_carry_fold`](@ref)
 """
 function assert_cross_sectional_online_factors(pe::CrossSectionalFactorPrior)::Nothing
-    @argcheck(!any(p -> isa(last(p), AbstractObservedExposureEstimator), pe.factors),
-              ArgumentError("the online step of a Cross-Sectional Factor Prior does not record the Exogenous Series that an observed factor reads, so its call with no data could not rebuild the returns of the observed factors. Drop the observed members from factors to take the online step, or fit in batch."))
+    @argcheck(!reads_exogenous_series(pe),
+              ArgumentError("the carry fold of a Cross-Sectional Factor Prior does not record the Exogenous Series that an observed factor or a macro sensitivity reads, so its call with no data could not rebuild what they read. Wrap the prior in `Online` to take the refit route, which records the series, or fit in batch."))
     return nothing
 end
 function refit_prior_step(pe::CrossSectionalFactorPrior, rd::ReturnsResult)
-    assert_cross_sectional_online_factors(pe)
     return cross_sectional_pin_choice(pe.choice, refit_prior_fold(pe, rd))
 end
 """
@@ -883,7 +882,7 @@ This is the step of a [`PinnedChoice`](@ref). It runs the steps of the fit that 
 
  1. Answer `nothing` when `pe.families` is `nothing`, or names the dropped member of every family. Nothing is left to pin.
  2. Answer `nothing` when the buffer records no Asset Panel. The call with no data refuses that buffer, so no fit is made.
- 3. Run [`cross_sectional_exposure_stage`](@ref) over the rows of the buffer. Answer `nothing` when fewer than `pe.lag + 2` rows remain after the Descriptor warm-up, because the fit refuses them, so no first fit is made yet.
+ 3. Run [`cross_sectional_exposure_stage`](@ref) over the rows of the buffer, with the Exogenous Series that the buffer records. Answer `nothing` when fewer than `pe.lag + 2` rows remain after the Descriptor warm-up, because the fit refuses them, so no first fit is made yet.
  4. Neutralise the exposures after the warm-up with [`cross_sectional_neutralise!`](@ref), and build the Factor Family Basis with [`factor_family_basis`](@ref).
  5. Name the dropped member of each family in the order of `pe.families`.
 
@@ -915,7 +914,8 @@ function cross_sectional_pinned_families(pe::CrossSectionalFactorPrior)
         return nothing
     end
     (; BW, Ms, nf, fam, rw) = cross_sectional_exposure_stage(pe, sample_buffer(state),
-                                                             nothing, pnl)
+                                                             nothing, pnl;
+                                                             exogenous_buffer_kwargs(state)...)
     if length(rw) - pe.lag < 2
         return nothing
     end

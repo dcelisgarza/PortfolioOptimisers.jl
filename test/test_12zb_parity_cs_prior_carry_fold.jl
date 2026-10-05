@@ -275,7 +275,7 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @test occursin("cannot merge two states fitted on disjoint blocks", m)
         ccy = CrossSectionalFactorPrior(; grid_config("Currency", rd)...)
         m = message(() -> partial_fit!(ccy, rows(rd, 1:90)))
-        @test occursin("does not record the Exogenous Series that an observed factor reads",
+        @test occursin("does not record the Exogenous Series that an observed factor or a macro sensitivity reads",
                        m)
         @test occursin("the matrix form of `partial_fit!` carries none",
                        message(() -> partial_fit!(pe, rd.X)))

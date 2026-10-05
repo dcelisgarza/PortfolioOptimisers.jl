@@ -5,13 +5,15 @@ Carries the observations an estimator keeps when its estimate has no exact incre
 
 This is the buffer of the [`partial_fit!`](@ref) interface. It is a state like any other. It lives in the `cache` field of the estimator, it copies, it slices by asset, and [`obs_weights_view`](@ref) drops it. It holds the observations verbatim, `NaN` included. So the call with no data over the buffer gives the answer of a batch fit over the same rows, and the two have the same Coverage Universe by construction.
 
-The buffer also holds the per-observation masks verbatim. A [`CoveragePolicy`](@ref) reads two facts from an active mask that the rows alone do not carry. A cell that is finite but inactive is excluded, and an asset that is active at one observation and inactive at the next is a delisting, not a holiday. A buffer that kept the rows and dropped the mask would give a different answer from the batch fit, with no warning. `A` is the active mask, and `E` is the estimation mask that the two regime-adjusted families read. Each is a backing matrix of the shape of `X`, or `nothing`. So a wrapped estimator folded under a policy gives the batch fit over the same window, as it does without a policy.
+The buffer also holds the per-observation masks verbatim. A [`CoveragePolicy`](@ref) reads two facts from an active mask that the rows alone do not carry. A cell that is finite but inactive is excluded, and an asset that is active at one observation and inactive at the next is a delisting, not a holiday. A buffer that kept the rows and dropped the mask would give a different answer from the batch fit, with no warning. `A` is the active mask, and `M` is the estimation mask that the two regime-adjusted families read. Each is a backing matrix of the shape of `X`, or `nothing`. So a wrapped estimator folded under a policy gives the batch fit over the same window, as it does without a policy.
 
 The buffer holds the factor observations on the same terms. A prior whose batch verb is `prior(pe, X, F)` regresses the asset returns on the factor returns, so its refit reads two matrices whose `t`-th rows are contemporaneous. `F` is the second matrix, a backing matrix of `capacity × factors`, or `nothing`. The same `off` and `n` index `F` and `X`, so the rows stay contemporaneous by construction. [`needs_factor_returns`](@ref) answers whether a fit reads `F`. That is a fact of the estimator tree, and the buffer records what the fold gives it. There is one buffer type, and a cap drops the factor rows with the other rows.
 
-The buffer holds the Panel Fields of a time-varying [`AssetPanel`](@ref) on the same terms, for a prior whose estimator tree reads them. [`reads_panel_fields`](@ref) answers whether a tree reads them. Such a prior computes its factors from the Panel Fields at each row, so for it a Panel Field is sample and not fold context. `P` is the vector of the Panel Fields over the valid region alone. The same `n` and the same cap index `P`, and `off` does not. An append joins the rows with `vcat` of two Asset Panels, so it copies the rows that the buffer holds and costs `O(n)`. A refit reads every row at each step, so this cost is smaller than the cost of its read-out. A panel is a Result and nothing writes into its arrays, so the buffer holds the Panel Fields by reference, and a copy of the buffer shares them. A time-varying panel carries both masks, so a buffer that records `P` records `A` and `E` too.
+The buffer holds the Panel Fields of a time-varying [`AssetPanel`](@ref) on the same terms, for a prior whose estimator tree reads them. [`reads_panel_fields`](@ref) answers whether a tree reads them. Such a prior computes its factors from the Panel Fields at each row, so for it a Panel Field is sample and not fold context. `P` is the vector of the Panel Fields over the valid region alone. The same `n` and the same cap index `P`, and `off` does not. An append joins the rows with `vcat` of two Asset Panels, so it copies the rows that the buffer holds and costs `O(n)`. A refit reads every row at each step, so this cost is smaller than the cost of its read-out. A panel is a Result and nothing writes into its arrays, so the buffer holds the Panel Fields by reference, and a copy of the buffer shares them. A time-varying panel carries both masks, so a buffer that records `P` records `A` and `M` too.
 
-The first append fixes whether the buffer records a mask, whether it records factor rows and whether it records Panel Fields, as it fixes the width and the element type. A later fold that disagrees is refused with an error that names the disagreement, in both directions. A buffer that holds no observations records nothing about them, so the next fold seeds it again from its block.
+The buffer holds the Exogenous Series on the same terms, for a prior whose estimator tree reads it. [`reads_exogenous_series`](@ref) answers whether a tree reads it. An observed factor reads its return from the series by name, so for such a prior the series is sample and not fold context. `E` is a backing matrix of `capacity × series`, and `ne` holds the name of each column. The buffer keeps every column, not only the columns that the tree names, so the Fold Context keeps no copy. The same `off` and `n` index `E` and `X`. So `E` means the Exogenous Series on the whole online seam, as it does on a [`ReturnsResult`](@ref).
+
+The first append fixes whether the buffer records a mask, whether it records factor rows, whether it records the Exogenous Series and whether it records Panel Fields, as it fixes the width and the element type. It also fixes the names of the series. A later fold that disagrees is refused with an error that names the disagreement, in both directions. A buffer that holds no observations records nothing about them, so the next fold seeds it again from its block.
 
 An estimator whose `cache` holds this buffer is a refit. It has no recursion of its own, and its call with no data runs the batch verb over the rows of the buffer. [`Online`](@ref) seeds the buffer, and a wrapped estimator takes this route also when its statistic has an exact update. A fold-and-carry prior keeps its observations in one of these buffers too, inside a [`PriorCarryState`](@ref). That prior folds its moments exactly. It keeps the rows because [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, and its buffer has no cap. `max_history` is the window of a refit. A capped buffer holds the last `max_history` observations, and the call with no data gives the batch fit over them.
 
@@ -28,13 +30,15 @@ $(DocStringExtensions.FIELDS)
         off::Integer = 0,
         X::MatNum = Matrix{Float64}(undef, 0, 0),
         A::Option{<:AbstractMatrix{<:Bool}} = nothing,
-        E::Option{<:AbstractMatrix{<:Bool}} = nothing,
+        M::Option{<:AbstractMatrix{<:Bool}} = nothing,
         F::Option{<:MatNum} = nothing,
+        ne::Option{<:VecStr} = nothing,
+        E::Option{<:MatNum} = nothing,
         P::Option{<:AbstractVector} = nothing,
         max_history::Option{<:Integer} = nothing
     ) -> SampleBufferState
 
-Keywords correspond to the struct's fields. The default is the empty seed that [`Online`](@ref) builds. It carries the cap and no observations. The first append replaces every backing matrix, so the width, the element type, the masks, the factor rows and the Panel Fields come from the observations of that append.
+Keywords correspond to the struct's fields. The default is the empty seed that [`Online`](@ref) builds. It carries the cap and no observations. The first append replaces every backing matrix, so the width, the element type, the masks, the factor rows, the Exogenous Series and the Panel Fields come from the observations of that append.
 
 ## Validation
 
@@ -43,8 +47,9 @@ Keywords correspond to the struct's fields. The default is the empty seed that [
   - `off + n <= size(X, 1)`. A `DimensionMismatch` is thrown otherwise.
   - `max_history > 0` when it is not `nothing`. A `DomainError` is thrown otherwise.
   - `n <= max_history` when `max_history` is not `nothing`. A `DimensionMismatch` is thrown otherwise.
-  - `A` and `E`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
+  - `A` and `M`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
   - `F`, when it is not `nothing`, has as many rows as `X`. A `DimensionMismatch` is thrown otherwise.
+  - The rules of [`assert_buffer_series_shape`](@ref) hold for `ne` and `E`.
   - `P`, when it is not `nothing`, holds time-varying Panel Fields over `n` observations and the assets of `X`. The rules of [`assert_buffer_panel_shape`](@ref) apply.
 
 ## View parameters
@@ -53,8 +58,9 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
 
   - `X`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `A`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `E`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `M`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `F`: Copied unchanged, because the selection indexes assets and this backing describes factors.
+  - `ne`, `E`: Copied unchanged, because the selection indexes assets and the Exogenous Series belongs to no asset.
   - `P`: Each Panel Field viewed over the selected assets with [`panel_fields_view`](@ref).
 
 A buffer that holds no observations views to the empty seed with the same cap.
@@ -68,8 +74,10 @@ PortfolioOptimisers.SampleBufferState
           off ┼ Int64: 0
             X ┼ 0×0 Matrix{Float64}
             A ┼ nothing
-            E ┼ nothing
+            M ┼ nothing
             F ┼ nothing
+           ne ┼ nothing
+            E ┼ nothing
             P ┼ nothing
   max_history ┴ Int64: 2
 ```
@@ -87,7 +95,9 @@ PortfolioOptimisers.SampleBufferState
   - [`CoveragePolicy`](@ref)
   - [`needs_factor_returns`](@ref)
   - [`reads_panel_fields`](@ref)
+  - [`reads_exogenous_series`](@ref)
   - [`sample_buffer_panel`](@ref)
+  - [`exogenous_buffer_kwargs`](@ref)
 """
 @concrete struct SampleBufferState <: AbstractPartialFitState
     """
@@ -107,13 +117,21 @@ PortfolioOptimisers.SampleBufferState
     """
     A
     """
-    $(field_dict[:pf_buffer_E])
+    $(field_dict[:pf_buffer_M])
     """
-    E
+    M
     """
     Backing matrix of the factor observations, `capacity × factors`, or `nothing` when the fold carries none. The same `off` and `n` index it and `X`. The first append that carries it fixes its width and its element type.
     """
     F
+    """
+    Names of the columns of `E`, or `nothing` when the fold carries no Exogenous Series. The first append that carries the series fixes them.
+    """
+    ne
+    """
+    Backing matrix of the Exogenous Series, `capacity × series`, or `nothing` when the fold carries none. The same `off` and `n` index it and `X`. It holds every column of the series that the fold receives.
+    """
+    E
     """
     The Panel Fields of the observations, or `nothing` when the fold carries none. Each is a time-varying Panel Field over the valid region alone, so `n` and the cap index it and `off` does not. The first append that carries them fixes their names and their kinds.
     """
@@ -126,15 +144,17 @@ end
 function SampleBufferState(; n::Integer = 0, off::Integer = 0,
                            X::MatNum = Matrix{Float64}(undef, 0, 0),
                            A::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                           E::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                           F::Option{<:MatNum} = nothing,
+                           M::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                           F::Option{<:MatNum} = nothing, ne::Option{<:VecStr} = nothing,
+                           E::Option{<:MatNum} = nothing,
                            P::Option{<:AbstractVector} = nothing,
                            max_history::Option{<:Integer} = nothing)::SampleBufferState
     assert_sample_buffer_state(n, off, X, max_history)
-    assert_buffer_mask_shape(X, A, E)
+    assert_buffer_mask_shape(X, A, M)
     assert_buffer_factor_shape(X, F)
+    assert_buffer_series_shape(X, ne, E)
     assert_buffer_panel_shape(X, n, P)
-    return SampleBufferState(n, off, X, A, E, F, P, max_history)
+    return SampleBufferState(n, off, X, A, M, F, ne, E, P, max_history)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -201,11 +221,11 @@ A mask that a buffer holds matches its observations cell for cell, and a mask th
 
   - `X`: The observations the masks belong to.
   - `A`: The active mask, or `nothing`.
-  - `E`: The estimation mask, or `nothing`.
+  - `M`: The estimation mask, or `nothing`.
 
 # Validation
 
-  - `A` and `E`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
+  - `A` and `M`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -218,14 +238,14 @@ A mask that a buffer holds matches its observations cell for cell, and a mask th
   - [`CoveragePolicy`](@ref)
 """
 function assert_buffer_mask_shape(X::AbstractMatrix, A::Option{<:AbstractMatrix{<:Bool}},
-                                  E::Option{<:AbstractMatrix{<:Bool}})
+                                  M::Option{<:AbstractMatrix{<:Bool}})
     if !isnothing(A)
         @argcheck(size(A) == size(X),
                   DimensionMismatch("size(X) ($(size(X))) must match size(active_mask) ($(size(A)))"))
     end
-    if !isnothing(E)
-        @argcheck(size(E) == size(X),
-                  DimensionMismatch("size(X) ($(size(X))) must match size(estimation_mask) ($(size(E)))"))
+    if !isnothing(M)
+        @argcheck(size(M) == size(X),
+                  DimensionMismatch("size(X) ($(size(X))) must match size(estimation_mask) ($(size(M)))"))
     end
     return nothing
 end
@@ -264,6 +284,52 @@ function assert_buffer_factor_shape(X::AbstractMatrix, F::Option{<:AbstractMatri
     if !isnothing(F)
         @argcheck(size(F, 1) == size(X, 1),
                   DimensionMismatch("size(X, 1) ($(size(X, 1))) must match size(F, 1) ($(size(F, 1))): a factor observation is contemporaneous with the asset observation of the same row."))
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses an Exogenous Series whose rows are not the rows of the observations it belongs to, or whose names do not name its columns.
+
+A row of the series is contemporaneous with the asset observation of the same row, as a factor row is. The names travel with the series, so the two are both absent or both present, and there is one name for each column.
+
+# Algorithm
+
+ 1. Refuse names without a series, and a series without names.
+ 2. Skip a series that is `nothing`.
+ 3. Refuse a series whose row count is not `size(X, 1)`, and names whose count is not the column count of the series.
+
+# Arguments
+
+  - `X`: The observations the series belongs to.
+  - `ne`: The names of the series, or `nothing`.
+  - `E`: The series, `observations × series`, or `nothing`.
+
+# Validation
+
+  - `ne` and `E` are both `nothing`, or neither is. An `ArgumentError` is thrown otherwise.
+  - `E`, when it is not `nothing`, has as many rows as `X`, and `length(ne) == size(E, 2)`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`reads_exogenous_series`](@ref)
+"""
+function assert_buffer_series_shape(X::AbstractMatrix, ne::Option{<:VecStr},
+                                    E::Option{<:AbstractMatrix})
+    @argcheck(isnothing(ne) == isnothing(E),
+              ArgumentError("the names of the Exogenous Series travel with the series, so `ne` and `E` are both `nothing` or neither is, but `ne` is $(isnothing(ne) ? "" : "not ")`nothing` and `E` is $(isnothing(E) ? "" : "not ")`nothing`."))
+    if !isnothing(E)
+        @argcheck(size(E, 1) == size(X, 1),
+                  DimensionMismatch("size(X, 1) ($(size(X, 1))) must match size(E, 1) ($(size(E, 1))): a row of the Exogenous Series is contemporaneous with the asset observation of the same row."))
+        @argcheck(length(ne) == size(E, 2),
+                  DimensionMismatch("`ne` names each column of the Exogenous Series, but it holds $(length(ne)) name(s) and `E` has $(size(E, 2)) column(s)."))
     end
     return nothing
 end
@@ -360,13 +426,13 @@ Reads the per-observation masks a sample buffer holds, as the keywords a batch v
 function sample_buffer_kwargs(state::SampleBufferState)
     rows = (state.off + 1):(state.off + state.n)
     A = buffer_rows_view(state.A, rows)
-    E = buffer_rows_view(state.E, rows)
+    M = buffer_rows_view(state.M, rows)
     return if isnothing(A)
-        isnothing(E) ? (;) : (; estimation_mask = E)
-    elseif isnothing(E)
+        isnothing(M) ? (;) : (; estimation_mask = M)
+    elseif isnothing(M)
         (; active_mask = A)
     else
-        (; active_mask = A, estimation_mask = E)
+        (; active_mask = A, estimation_mask = M)
     end
 end
 """
@@ -394,6 +460,36 @@ This is the third function that reads the buffer out, with [`sample_buffer`](@re
 """
 function factor_buffer(state::SampleBufferState)
     return buffer_rows_view(state.F, (state.off + 1):(state.off + state.n))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reads the Exogenous Series a sample buffer holds, as the keywords a batch verb takes.
+
+This is the fourth function that reads the buffer out. The call with no data of a refit splats these keywords into the batch verb, as `prior(pe, rd)` passes `rd.ne` and `rd.E`. The Fold Context reads them too, when the prior owns the series. Each row of `E` is contemporaneous with the row of [`sample_buffer`](@ref) of the same index, because the same `off` and `n` index the two backings. A buffer that records no series gives an empty set of keywords. The branch reads a field of concrete type, so the compiler resolves it.
+
+# Arguments
+
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `kwargs::NamedTuple`: `ne` and `E`, the names and a view of the valid region of the series, or an empty `NamedTuple`.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`sample_buffer`](@ref)
+  - [`factor_buffer`](@ref)
+  - [`reads_exogenous_series`](@ref)
+"""
+function exogenous_buffer_kwargs(state::SampleBufferState)
+    return if isnothing(state.E)
+        (;)
+    else
+        (; ne = state.ne,
+         E = buffer_rows_view(state.E, (state.off + 1):(state.off + state.n)))
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -467,7 +563,7 @@ A carry calls this function inside its own [`partial_fit!`](@ref) method. The ca
   - $(arg_dict[:X])
   - `F`: Factor observations to fold, oriented as `X` is, or `nothing`.
   - $(arg_dict[:dims])
-  - `kwargs...`: The `active_mask` and `estimation_mask` of the fold, forwarded to [`partial_fit!`](@ref).
+  - `kwargs...`: The `active_mask`, the `estimation_mask` and the Exogenous Series `ne` and `E` of the fold, forwarded to [`partial_fit!`](@ref).
 
 # Returns
 
@@ -494,21 +590,21 @@ Folds every observation of a block into a [`SampleBufferState`](@ref).
 
 This is the block arm of the [`partial_fit!`](@ref) interface, and all of the fold of the buffer. The single-observation arm reshapes its argument and calls this arm. A cap truncates the incoming rows before the copy, so the fold never copies the whole of a block longer than the cap. [`reserve_sample_buffer`](@ref) grows the backing matrices, and its docstring states why an append costs amortised `O(1)`.
 
-The masks, the factor rows and the Panel Fields stay with their rows through each step: the orientation, the truncation, the growth and the copy. The first append fixes whether the buffer records a mask, whether it records factor rows and whether it records Panel Fields, as it fixes the width and the element type. [`assert_buffer_presence_agreement`](@ref) refuses a later fold that disagrees. A buffer that knows the activity of some of its rows and not of others answers neither question. A buffer with factor rows for some observations and not for others describes no regression. A buffer that holds no observations has nothing to disagree with, so the fold seeds it again from the block.
+The masks, the factor rows, the Exogenous Series and the Panel Fields stay with their rows through each step: the orientation, the truncation, the growth and the copy. The first append fixes whether the buffer records a mask, whether it records factor rows, whether it records the Exogenous Series and whether it records Panel Fields, as it fixes the width and the element type. It also fixes the names of the series. [`assert_buffer_presence_agreement`](@ref) refuses a later fold that disagrees. A buffer that knows the activity of some of its rows and not of others answers neither question. A buffer with factor rows for some observations and not for others describes no regression. A buffer that holds no observations has nothing to disagree with, so the fold seeds it again from the block.
 
 The Panel Fields are observations first whatever `dims` is, as the Panel Fields of an [`AssetPanel`](@ref) always are. They keep the rows of the buffer that the cap keeps, and [`panel_fields_append`](@ref) joins them to the rows of the block.
 
 # Algorithm
 
- 1. Orient `X`, the masks and `F` to `observations × assets` and `observations × factors`. Transpose them when `dims == 2`.
- 2. Refuse a mask that does not have the shape of the block, and a factor block whose row count is not the row count of the block.
+ 1. Orient `X`, the masks, `F` and `E` to `observations × assets`, `observations × factors` and `observations × series`. Transpose them when `dims == 2`.
+ 2. Refuse a mask that does not have the shape of the block, a factor block whose row count is not the row count of the block, and a series that [`assert_buffer_series_shape`](@ref) refuses.
  3. Return the state unchanged when the block is empty.
  4. Refuse Panel Fields that do not make a time-varying Asset Panel with the masks of the block, over the observations and the assets of the block.
- 5. When a cap is set, truncate the incoming rows, their masks, their factor rows and their Panel Fields to the last `max_history` of them.
- 6. When the buffer holds no observations, seed it from the block with [`seed_sample_buffer`](@ref) and return it. The seed fixes the width, the element type, the masks, the factor rows and the Panel Fields.
- 7. Refuse a block whose width is not the fixed width. Refuse masks, factor rows or Panel Fields that are absent where the buffer records them or present where it does not, and factor rows of a different width.
+ 5. When a cap is set, truncate the incoming rows, their masks, their factor rows, their series and their Panel Fields to the last `max_history` of them.
+ 6. When the buffer holds no observations, seed it from the block with [`seed_sample_buffer`](@ref) and return it. The seed fixes the width, the element type, the masks, the factor rows, the series with its names, and the Panel Fields.
+ 7. Refuse a block whose width is not the fixed width. Refuse masks, factor rows, a series or Panel Fields that are absent where the buffer records them or present where it does not, factor rows of a different width, and a series under other names with [`assert_buffer_series_names`](@ref).
  8. Make room for the block with [`reserve_sample_buffer`](@ref), which drops the rows that the cap pushes out and grows the backing matrices.
- 9. Copy the block, its masks and its factor rows after the valid region. Join the Panel Fields that the buffer keeps to the Panel Fields of the block with [`panel_fields_append`](@ref), and rebind `P` and `n` with `Accessors.@reset`.
+ 9. Copy the block, its masks, its factor rows and its series after the valid region. Join the Panel Fields that the buffer keeps to the Panel Fields of the block with [`panel_fields_append`](@ref), and rebind `P` and `n` with `Accessors.@reset`.
 
 # Arguments
 
@@ -518,6 +614,8 @@ The Panel Fields are observations first whatever `dims` is, as the Panel Fields 
   - $(arg_dict[:dims])
   - $(arg_dict[:pf_active_mask])
   - $(arg_dict[:pf_estimation_mask])
+  - `ne`: The names of the Exogenous Series of the block, or `nothing`.
+  - `E`: The Exogenous Series of the block, oriented as `X` is, or `nothing`.
   - `panel_fields`: The time-varying Panel Fields of the block, observations first, or `nothing`.
 
 # Validation
@@ -526,8 +624,9 @@ The Panel Fields are observations first whatever `dims` is, as the Panel Fields 
   - `X` has the width the first append fixed. A `DimensionMismatch` is thrown otherwise.
   - `active_mask` and `estimation_mask`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
   - `F`, when it is not `nothing`, has as many rows as `X`, and the width that the first append with factor rows fixed. A `DimensionMismatch` is thrown otherwise.
+  - `ne` and `E` obey the rules of [`assert_buffer_series_shape`](@ref), and `ne` equals the names that the first append with a series fixed. An `ArgumentError` is thrown otherwise.
   - `panel_fields`, when it is not `nothing`, obeys the rules of [`assert_buffer_panel_block`](@ref), and it holds the Panel Fields that the first append with Panel Fields fixed, as `vcat` of two Asset Panels states them.
-  - A buffer that holds observations receives the masks that it records, and it receives factor rows and Panel Fields if and only if it records them. An `ArgumentError` is thrown otherwise.
+  - A buffer that holds observations receives the masks that it records, and it receives factor rows, a series and Panel Fields if and only if it records them. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -547,44 +646,50 @@ function partial_fit!(state::SampleBufferState, X::MatNum, F::Option{<:MatNum} =
                       dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                       estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                      ne::Option{<:VecStr} = nothing, E::Option{<:MatNum} = nothing,
                       panel_fields::Option{<:AbstractVector} = nothing)
-    Xo, Ao, Eo, Fo = dims_oriented(dims, X, active_mask, estimation_mask, F)
-    assert_buffer_mask_shape(Xo, Ao, Eo)
+    Xo, Ao, Mo, Fo, Eo = dims_oriented(dims, X, active_mask, estimation_mask, F, E)
+    assert_buffer_mask_shape(Xo, Ao, Mo)
     assert_buffer_factor_shape(Xo, Fo)
+    assert_buffer_series_shape(Xo, ne, Eo)
     t = size(Xo, 1)
     if iszero(t)
         return state
     end
-    assert_buffer_panel_block(Xo, Ao, Eo, panel_fields)
+    assert_buffer_panel_block(Xo, Ao, Mo, panel_fields)
     Po = panel_fields
     w = state.max_history
     if !isnothing(w) && t > w
         rows = (t - w + 1):t
         Xo = view(Xo, rows, :)
         Ao = buffer_rows_view(Ao, rows)
-        Eo = buffer_rows_view(Eo, rows)
+        Mo = buffer_rows_view(Mo, rows)
         Fo = buffer_rows_view(Fo, rows)
+        Eo = buffer_rows_view(Eo, rows)
         Po = panel_fields_view(Po, rows, :)
         t = w
     end
     if iszero(state.n)
-        return seed_sample_buffer(state, Xo, Ao, Eo, Fo, Po)
+        return seed_sample_buffer(state, Xo, Ao, Mo, Fo, ne, Eo, Po)
     end
     N = size(Xo, 2)
     B = state.X
     @argcheck(size(B, 2) == N,
               DimensionMismatch("the width of a sample buffer is fixed by its first append, but the buffer describes $(size(B, 2)) assets and the block has $N columns."))
     assert_buffer_presence_agreement(state.A, Ao, "active_mask")
-    assert_buffer_presence_agreement(state.E, Eo, "estimation_mask")
+    assert_buffer_presence_agreement(state.M, Mo, "estimation_mask")
     assert_buffer_presence_agreement(state.F, Fo, "factor returns")
+    assert_buffer_presence_agreement(state.E, Eo, "Exogenous Series")
     assert_buffer_presence_agreement(state.P, Po, "Panel Fields")
     assert_buffer_factor_width(state.F, Fo)
+    assert_buffer_series_names(state.ne, ne)
     state = reserve_sample_buffer(state, t)
     rows = (state.off + state.n + 1):(state.off + state.n + t)
     copyto!(view(state.X, rows, :), Xo)
     copy_buffer_rows!(state.A, rows, Ao)
-    copy_buffer_rows!(state.E, rows, Eo)
+    copy_buffer_rows!(state.M, rows, Mo)
     copy_buffer_rows!(state.F, rows, Fo)
+    copy_buffer_rows!(state.E, rows, Eo)
     state = Accessors.@reset state.P = panel_fields_append(state.P, Po, state.n + t)
     return Accessors.@reset state.n = state.n + t
 end
@@ -624,11 +729,46 @@ function assert_buffer_factor_width(B::AbstractMatrix, Fo::AbstractMatrix)
     return nothing
 end
 """
+    assert_buffer_series_names(ne::Nothing, neo) -> Nothing
+    assert_buffer_series_names(ne::VecStr, neo::VecStr) -> Nothing
+
+Refuses an Exogenous Series whose names are not the names the first append fixed.
+
+A consumer reads a column of the series by its name, so a buffer whose columns change their names between two rows gives a column with two meanings. The first append that carries the series fixes the names, as [`ReturnsBufferState`](@ref) pins them. [`assert_buffer_presence_agreement`](@ref) runs first, so the `nothing` method runs only when the block carries no series either.
+
+# Arguments
+
+  - `ne`: The names the buffer records, or `nothing`.
+  - `neo`: The names of the incoming block, or `nothing`.
+
+# Validation
+
+  - `neo == ne` when the buffer records a series. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`merge_states`](@ref)
+"""
+function assert_buffer_series_names(::Nothing, ::Any)
+    return nothing
+end
+function assert_buffer_series_names(ne::VecStr, neo::VecStr)
+    @argcheck(ne == neo,
+              ArgumentError("the first append fixes the names of the Exogenous Series of a sample buffer, and a consumer reads a column by its name, so a later block must carry the same names. The buffer records $(ne) and the block carries $(neo). Fold the whole run with one set of names, or seed a fresh buffer."))
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses a fold whose masks, factor rows or Panel Fields disagree with what the buffer records.
+Refuses a fold whose masks, factor rows, Exogenous Series or Panel Fields disagree with what the buffer records.
 
-This is the mixture rule of the buffer. It refuses the fold, because neither way to resolve the mixture gives a correct answer. A buffer that dropped an incoming mask would fit a held gap that the policy excludes, and it would read each delisting as a holiday. The mask exists to prevent that wrong answer. A buffer that made up a mask for its earlier rows would state an activity that it never saw. The same rule holds for the factor rows. A buffer with factor rows for some observations and not for others describes no regression, and the buffer cannot make up the missing rows. A prior that reads the Panel Fields computes its factors from them at every row, so a buffer that holds them for some rows and not for others gives it no complete panel. So the first append fixes what a buffer records, and a caller that wants a change starts a new buffer.
+This is the mixture rule of the buffer. It refuses the fold, because neither way to resolve the mixture gives a correct answer. A buffer that dropped an incoming mask would fit a held gap that the policy excludes, and it would read each delisting as a holiday. The mask exists to prevent that wrong answer. A buffer that made up a mask for its earlier rows would state an activity that it never saw. The same rule holds for the factor rows. A buffer with factor rows for some observations and not for others describes no regression, and the buffer cannot make up the missing rows. A prior that reads the Panel Fields computes its factors from them at every row, so a buffer that holds them for some rows and not for others gives it no complete panel. The same holds for the Exogenous Series that an observed factor reads at every fitted row. So the first append fixes what a buffer records, and a caller that wants a change starts a new buffer.
 
 # Arguments
 
@@ -661,14 +801,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Fills a buffer that holds no observations from a block, which fixes the width, the element type, the masks, the factor rows and the Panel Fields.
+Fills a buffer that holds no observations from a block, which fixes the width, the element type, the masks, the factor rows, the Exogenous Series and the Panel Fields.
 
 [`partial_fit!`](@ref) calls it for the first append, and for each append to a buffer that holds no observations. Each backing matrix is an exact fit for the block, so a buffer that is folded once and read once allocates no spare row. Each array comes from `similar` on the argument that it holds, so the function chooses no element type. The Panel Fields are not copied, because nothing writes into the arrays of a panel.
 
 # Algorithm
 
- 1. Replace `X`, `A`, `E` and `F` with copies of the block, its masks and its factor rows, made by [`seed_buffer_array`](@ref).
- 2. Replace `P` with the Panel Fields of the block.
+ 1. Replace `X`, `A`, `M`, `F` and `E` with copies of the block, its masks, its factor rows and its series, made by [`seed_buffer_array`](@ref).
+ 2. Replace `ne` with the names of the series, and `P` with the Panel Fields of the block.
  3. Set `off` to zero and `n` to the row count of the block.
 
 # Arguments
@@ -676,13 +816,15 @@ Fills a buffer that holds no observations from a block, which fixes the width, t
   - `state`: The buffer to fill. It holds no observations.
   - `Xo`: The oriented block.
   - `Ao`: The oriented active mask of the block, or `nothing`.
-  - `Eo`: The oriented estimation mask of the block, or `nothing`.
+  - `Mo`: The oriented estimation mask of the block, or `nothing`.
   - `Fo`: The oriented factor rows of the block, or `nothing`.
+  - `ne`: The names of the series of the block, or `nothing`.
+  - `Eo`: The oriented Exogenous Series of the block, or `nothing`.
   - `Po`: The Panel Fields of the block, or `nothing`.
 
 # Returns
 
-  - `state::SampleBufferState`: The buffer holding the block, its masks, its factor rows and its Panel Fields.
+  - `state::SampleBufferState`: The buffer holding the block, its masks, its factor rows, its series and its Panel Fields.
 
 # Related
 
@@ -692,12 +834,15 @@ Fills a buffer that holds no observations from a block, which fixes the width, t
 """
 function seed_sample_buffer(state::SampleBufferState, Xo::MatNum,
                             Ao::Option{<:AbstractMatrix{<:Bool}},
-                            Eo::Option{<:AbstractMatrix{<:Bool}}, Fo::Option{<:MatNum},
+                            Mo::Option{<:AbstractMatrix{<:Bool}}, Fo::Option{<:MatNum},
+                            ne::Option{<:VecStr}, Eo::Option{<:MatNum},
                             Po::Option{<:AbstractVector})
     state = Accessors.@reset state.X = seed_buffer_array(Xo)
     state = Accessors.@reset state.A = seed_buffer_array(Ao)
-    state = Accessors.@reset state.E = seed_buffer_array(Eo)
+    state = Accessors.@reset state.M = seed_buffer_array(Mo)
     state = Accessors.@reset state.F = seed_buffer_array(Fo)
+    state = Accessors.@reset state.ne = ne
+    state = Accessors.@reset state.E = seed_buffer_array(Eo)
     state = Accessors.@reset state.P = Po
     state = Accessors.@reset state.off = 0
     return Accessors.@reset state.n = size(Xo, 1)
@@ -766,14 +911,14 @@ Makes room for `t` further observations in a [`SampleBufferState`](@ref), and re
 
 This is the growth part of the fold of the buffer. It writes no observation. It drops the rows that the cap pushes out, moves the valid region to the front of the backing matrices, and allocates larger matrices when the front does not have enough room.
 
-These steps make an append cost amortised `O(1)`. A drop moves `off` and copies no row, so a capped buffer pays nothing for the observation that it drops. The masks and the factor rows of that observation drop with it, because the same `off` and `n` index them. A compaction in place happens only when the valid region and the block fill at most half of the backing matrix. So it copies at most half of the matrix, and at least half of the matrix is free after the append. A growth at least doubles the capacity until the clamp at twice the cap stops it, and it copies fewer rows than the old capacity. So all the growths of a buffer copy fewer rows than its last capacity. A block longer than twice the capacity grows the matrix to fit the valid region and the block, and the next growth doubles it. A capped buffer never holds more than twice its cap, so a cap of `w` costs at most `2w` rows.
+These steps make an append cost amortised `O(1)`. A drop moves `off` and copies no row, so a capped buffer pays nothing for the observation that it drops. The masks, the factor rows and the series of that observation drop with it, because the same `off` and `n` index them. A compaction in place happens only when the valid region and the block fill at most half of the backing matrix. So it copies at most half of the matrix, and at least half of the matrix is free after the append. A growth at least doubles the capacity until the clamp at twice the cap stops it, and it copies fewer rows than the old capacity. So all the growths of a buffer copy fewer rows than its last capacity. A block longer than twice the capacity grows the matrix to fit the valid region and the block, and the next growth doubles it. A capped buffer never holds more than twice its cap, so a cap of `w` costs at most `2w` rows.
 
 # Algorithm
 
  1. Drop the oldest observations the cap pushes out, by moving `off` forward and `n` back.
  2. Return when the valid region and the block already fit inside the backing matrix.
  3. Take a capacity of twice the current one, or of the room needed if that is larger, when the valid region and the block would fill more than half of the current one. Clamp it to twice the cap when a cap is set.
- 4. Compact the observations, each mask and the factor rows the buffer records to that capacity with [`compact_buffer_array`](@ref), which allocates only when the capacity changes, and set `off` to zero.
+ 4. Compact the observations, each mask, the factor rows and the series the buffer records to that capacity with [`compact_buffer_array`](@ref), which allocates only when the capacity changes, and set `off` to zero.
 
 # Arguments
 
@@ -815,8 +960,9 @@ function reserve_sample_buffer(state::SampleBufferState, t::Integer)
     end
     state = Accessors.@reset state.X = compact_buffer_array(B, off, n, newcap)
     state = Accessors.@reset state.A = compact_buffer_array(state.A, off, n, newcap)
-    state = Accessors.@reset state.E = compact_buffer_array(state.E, off, n, newcap)
+    state = Accessors.@reset state.M = compact_buffer_array(state.M, off, n, newcap)
     state = Accessors.@reset state.F = compact_buffer_array(state.F, off, n, newcap)
+    state = Accessors.@reset state.E = compact_buffer_array(state.E, off, n, newcap)
     return Accessors.@reset state.off = 0
 end
 """
@@ -825,7 +971,7 @@ end
 
 Moves the valid region of one backing matrix to the front, allocating a matrix of `newcap` rows when the capacity changes.
 
-This is the array part of [`reserve_sample_buffer`](@ref). The buffer carries four backing matrices with one index, and this function compacts each of them. A copy in place with an increasing row index is safe, because the destination row `i` is never after the source row `off + i`. So the loop reads each source row before a write can reach it.
+This is the array part of [`reserve_sample_buffer`](@ref). The buffer carries five backing matrices with one index, and this function compacts each of them. A copy in place with an increasing row index is safe, because the destination row `i` is never after the source row `off + i`. So the loop reads each source row before a write can reach it.
 
 # Algorithm
 
@@ -863,7 +1009,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds one observation into a [`SampleBufferState`](@ref).
 
-This is the single-observation arm of the [`partial_fit!`](@ref) interface. It reshapes the observation into a one-row block with no copy, and it folds the block through the block arm. It reshapes the masks and the factor observation in the same way, so one observation with a policy or with factors folds through the code of the block.
+This is the single-observation arm of the [`partial_fit!`](@ref) interface. It reshapes the observation into a one-row block with no copy, and it folds the block through the block arm. It reshapes the masks, the factor observation and the observation of the Exogenous Series in the same way, so one observation with a policy, with factors or with a series folds through the code of the block.
 
 # Arguments
 
@@ -872,6 +1018,8 @@ This is the single-observation arm of the [`partial_fit!`](@ref) interface. It r
   - `f`: The contemporaneous factor observation, whose entries are the factors, or `nothing`.
   - `active_mask`: The active mask of the observation, one entry per asset, or `nothing`.
   - `estimation_mask`: The estimation mask of the observation, one entry per asset, or `nothing`.
+  - `ne`: The names of the Exogenous Series, or `nothing`.
+  - `E`: The observation of the Exogenous Series, one entry per series, or `nothing`.
 
 # Validation
 
@@ -891,10 +1039,12 @@ This is the single-observation arm of the [`partial_fit!`](@ref) interface. It r
 """
 function partial_fit!(state::SampleBufferState, x::VecNum, f::Option{<:VecNum} = nothing;
                       active_mask::Option{<:AbstractVector{<:Bool}} = nothing,
-                      estimation_mask::Option{<:AbstractVector{<:Bool}} = nothing)
+                      estimation_mask::Option{<:AbstractVector{<:Bool}} = nothing,
+                      ne::Option{<:VecStr} = nothing, E::Option{<:VecNum} = nothing)
     return partial_fit!(state, observation_row(x), observation_row(f);
                         active_mask = observation_row(active_mask),
-                        estimation_mask = observation_row(estimation_mask))
+                        estimation_mask = observation_row(estimation_mask), ne = ne,
+                        E = observation_row(E))
 end
 """
     observation_row(m::Nothing) -> Nothing
@@ -928,7 +1078,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds two [`SampleBufferState`](@ref) fitted on disjoint blocks into the buffer of the concatenated block.
 
-The merge is a concatenation, and it is exact. A buffer holds its observations verbatim, so the buffer of two blocks holds the rows of the first block followed by the rows of the second. When a cap is set, the result keeps the last `max_history` rows of the concatenation. The masks, the factor rows and the Panel Fields concatenate with their rows. Two buffers that disagree about what they record are refused, for the reason that [`assert_buffer_presence_agreement`](@ref) states for a fold. A buffer that holds no observations records nothing, so the merge returns a copy of the other buffer.
+The merge is a concatenation, and it is exact. A buffer holds its observations verbatim, so the buffer of two blocks holds the rows of the first block followed by the rows of the second. When a cap is set, the result keeps the last `max_history` rows of the concatenation. The masks, the factor rows, the Exogenous Series and the Panel Fields concatenate with their rows. Two buffers that disagree about what they record, or that name their series differently, are refused, for the reason that [`assert_buffer_presence_agreement`](@ref) states for a fold. A buffer that holds no observations records nothing, so the merge returns a copy of the other buffer.
 
 The method does not call [`assert_mergeable_states`](@ref). That check compares every array field on every axis. The backing matrix of a buffer has the observation axis as well as the asset axis, so the check refuses two buffers over the same assets with different numbers of observations. This method checks the cap, the width, the masks and the factor rows itself.
 
@@ -937,8 +1087,8 @@ The method does not call [`assert_mergeable_states`](@ref). That check compares 
  1. Refuse two buffers of different caps.
  2. Return a copy of the other buffer when one buffer holds no observations.
  3. Refuse two buffers of different widths.
- 4. Refuse two buffers that do not record the same masks, that disagree about factor rows or Panel Fields, or whose factor rows have different widths.
- 5. Concatenate the valid region of the first with the valid region of the second, and each mask and the factor rows with their own.
+ 4. Refuse two buffers that do not record the same masks, that disagree about factor rows, a series or Panel Fields, whose factor rows have different widths, or whose series have different names.
+ 5. Concatenate the valid region of the first with the valid region of the second, and each mask, the factor rows and the series with their own.
  6. Keep the last `max_history` rows when a cap is set.
  7. Join the Panel Fields of the two buffers over the rows that the result keeps, with [`panel_fields_append`](@ref).
 
@@ -951,7 +1101,7 @@ The method does not call [`assert_mergeable_states`](@ref). That check compares 
 
   - `a` and `b` carry the same cap. An `ArgumentError` is thrown otherwise.
   - `a` and `b` describe the same number of assets, when both hold observations. A `DimensionMismatch` is thrown otherwise.
-  - `a` and `b` record the same masks, both record factor rows or neither does, and both record Panel Fields or neither does, when both hold observations. An `ArgumentError` is thrown otherwise.
+  - `a` and `b` record the same masks, both record factor rows or neither does, both record a series under the same names or neither does, and both record Panel Fields or neither does, when both hold observations. An `ArgumentError` is thrown otherwise.
   - `a` and `b` describe the same number of factors, when they record factor rows. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
@@ -979,26 +1129,30 @@ function merge_states(a::SampleBufferState, b::SampleBufferState)
     @argcheck(size(Xa, 2) == size(Xb, 2),
               DimensionMismatch("two sample buffers over different numbers of assets cannot be merged, but `a` describes $(size(Xa, 2)) assets and `b` describes $(size(Xb, 2))."))
     assert_buffer_presence_agreement(a.A, b.A, "active_mask")
-    assert_buffer_presence_agreement(a.E, b.E, "estimation_mask")
+    assert_buffer_presence_agreement(a.M, b.M, "estimation_mask")
     assert_buffer_presence_agreement(a.F, b.F, "factor returns")
+    assert_buffer_presence_agreement(a.E, b.E, "Exogenous Series")
     assert_buffer_presence_agreement(a.P, b.P, "Panel Fields")
     assert_buffer_factor_width(a.F, b.F)
+    assert_buffer_series_names(a.ne, b.ne)
     ra = (a.off + 1):(a.off + a.n)
     rb = (b.off + 1):(b.off + b.n)
     X = vcat(Xa, Xb)
     A = merge_buffer_array(buffer_rows_view(a.A, ra), buffer_rows_view(b.A, rb))
-    E = merge_buffer_array(buffer_rows_view(a.E, ra), buffer_rows_view(b.E, rb))
+    M = merge_buffer_array(buffer_rows_view(a.M, ra), buffer_rows_view(b.M, rb))
     F = merge_buffer_array(buffer_rows_view(a.F, ra), buffer_rows_view(b.F, rb))
+    E = merge_buffer_array(buffer_rows_view(a.E, ra), buffer_rows_view(b.E, rb))
     t = size(X, 1)
     if !isnothing(w) && t > w
         rows = (t - w + 1):t
         X = X[rows, :]
         A = trim_merged_array(A, rows)
-        E = trim_merged_array(E, rows)
+        M = trim_merged_array(M, rows)
         F = trim_merged_array(F, rows)
+        E = trim_merged_array(E, rows)
         t = w
     end
-    return SampleBufferState(t, 0, X, A, E, F, panel_fields_append(a.P, b.P, t), w)
+    return SampleBufferState(t, 0, X, A, M, F, a.ne, E, panel_fields_append(a.P, b.P, t), w)
 end
 """
     merge_buffer_array(Ma::Nothing, Mb::Nothing) -> Nothing
@@ -1061,7 +1215,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies a [`SampleBufferState`](@ref), so the copy shares no array with the original.
 
-This is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. It copies each backing matrix whole, spare capacity included. So the copy appends on the same terms as the original, and the same `off` and `n` index the masks, the factor rows and the observations. The copy shares the Panel Fields with the original. Nothing writes into the arrays of a panel, and an append makes new arrays.
+This is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. It copies each backing matrix whole, spare capacity included. So the copy appends on the same terms as the original, and the same `off` and `n` index the masks, the factor rows, the series and the observations. The copy shares the Panel Fields and the names of the series with the original. Nothing writes into the arrays of a panel or into the names, and an append makes new arrays.
 
 # Arguments
 
@@ -1079,8 +1233,8 @@ This is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, wh
 """
 function Base.copy(x::SampleBufferState)
     return SampleBufferState(x.n, x.off, copy(x.X), copy_buffer_array(x.A),
-                             copy_buffer_array(x.E), copy_buffer_array(x.F), x.P,
-                             x.max_history)
+                             copy_buffer_array(x.M), copy_buffer_array(x.F), x.ne,
+                             copy_buffer_array(x.E), x.P, x.max_history)
 end
 """
     copy_buffer_array(M::Nothing) -> Nothing
@@ -1088,7 +1242,7 @@ end
 
 Copies one backing matrix of a buffer, and passes a matrix that is not there through.
 
-This is the `nothing` case of `copy` for the two masks and the factor rows. [`Base.copy`](@ref) and [`port_opt_view`](@ref) use it to copy each optional field in one line.
+This is the `nothing` case of `copy` for the two masks, the factor rows and the series. [`Base.copy`](@ref) and [`port_opt_view`](@ref) use it to copy each optional field in one line.
 
 # Arguments
 
@@ -1114,12 +1268,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Slices a [`SampleBufferState`](@ref) to the selected assets.
 
-A buffer holds its observations verbatim, so the slice of the buffer is the buffer of the sliced universe, column for column. The observation axis does not change. The masks are per cell, so they slice on the asset axis by the same indices. The factor rows are copied and not sliced, because the selection indexes assets, a factor is not an asset, and a fit over a subset of the universe reads the same factors. The Panel Fields are viewed over the selected assets and not copied, because nothing writes into the arrays of a panel. A tensor Panel Field keeps its whole label axis, because the buffer holds no asset names to find the square case with. The slice copies by index and does not take a `view`. A later [`partial_fit!`](@ref) on the viewed estimator writes into its backing matrices, and with a view it would change the buffer of the original estimator. A buffer that holds no observations has no width to slice, so its view is the empty seed with the same cap.
+A buffer holds its observations verbatim, so the slice of the buffer is the buffer of the sliced universe, column for column. The observation axis does not change. The masks are per cell, so they slice on the asset axis by the same indices. The factor rows and the Exogenous Series are copied and not sliced, because the selection indexes assets, a factor and a series belong to no asset, and a fit over a subset of the universe reads the same factors and the same series. The Panel Fields are viewed over the selected assets and not copied, because nothing writes into the arrays of a panel. A tensor Panel Field keeps its whole label axis, because the buffer holds no asset names to find the square case with. The slice copies by index and does not take a `view`. A later [`partial_fit!`](@ref) on the viewed estimator writes into its backing matrices, and with a view it would change the buffer of the original estimator. A buffer that holds no observations has no width to slice, so its view is the empty seed with the same cap.
 
 # Algorithm
 
  1. Return the empty seed with the same cap when the buffer holds no observations.
- 2. Copy the columns `i` of `X` and of each mask, copy `F` whole, and view each Panel Field over the columns `i`.
+ 2. Copy the columns `i` of `X` and of each mask, copy `F` and `E` whole, and view each Panel Field over the columns `i`.
 
 # Arguments
 
@@ -1142,8 +1296,9 @@ function port_opt_view(x::SampleBufferState, i, args...)
         return SampleBufferState(; max_history = x.max_history)
     end
     return SampleBufferState(x.n, x.off, x.X[:, i], slice_buffer_mask(x.A, i),
-                             slice_buffer_mask(x.E, i), copy_buffer_array(x.F),
-                             panel_fields_view(x.P, :, i), x.max_history)
+                             slice_buffer_mask(x.M, i), copy_buffer_array(x.F), x.ne,
+                             copy_buffer_array(x.E), panel_fields_view(x.P, :, i),
+                             x.max_history)
 end
 """
     slice_buffer_mask(M::Nothing, i) -> Nothing
@@ -1847,130 +2002,5 @@ function assert_batch_entry(est, entry::AbstractString)
               ArgumentError("`$(typeof(est).name.name)` enters $(entry) holding an `Online` at `$(path)`, and a batch fit cannot resolve it: `Online` declares the sample buffer the fold loop's online arm seeds at its warm-up and folds the wrapped estimator's rows into, and nothing else seeds one, so the wrapper would reach the batch verb unresolved. Run the estimator through an Online Scheme — `OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit` — or set `$(path)` to the estimator it wraps and let the batch fit refit it from its rows."))
     return nothing
 end
-"""
-    supports_partial_fit(est) -> Bool
-
-Answers whether [`partial_fit!`](@ref) folds this estimator.
-
-An outer estimator that carries the observations asks each of its members. This is the rule for an estimator with mixed members. The outer estimator folds each member that folds, and it runs the batch verb over its own rows for each member that does not. So a caller writes the same estimator as in batch, with no wrapper at the call site, and no member carries a second copy of the sample.
-
-The default is the buffering route. An estimator folds when it carries a [`SampleBufferState`](@ref), which [`Online`](@ref) seeds. A family with an exact fold of its own adds a method that returns `true`, beside that fold, under the same type bound without the `cache` parameter. An estimator of that family folds exactly when its bound matches, and by buffering when a wrapper seeded a buffer. A configuration that a family refuses adds no method, and it takes the default. The `SemiMoment` arms are such a configuration, because their clip moves when the mean moves. For them, the default is `true` only when a wrapper gave the estimator a buffer.
-
-The predicate reads a type and a field, never a method table. A read of the dispatch would count a refusal as a fold, because a refusal is a method too, and the members that refuse are the members that must buffer.
-
-# Arguments
-
-  - `est`: The estimator to ask about.
-
-# Returns
-
-  - `folds::Bool`: `true` when [`partial_fit!`](@ref) folds this estimator.
-
-# Related
-
-  - [`partial_fit!`](@ref)
-  - [`SampleBufferState`](@ref)
-  - [`Online`](@ref)
-  - [`HighOrderPriorEstimator`](@ref)
-"""
-function supports_partial_fit(est::Union{<:AbstractEstimator,
-                                         <:StatsBase.CovarianceEstimator})
-    return hasfield(typeof(est), :cache) && isa(getfield(est, :cache), SampleBufferState)
-end
-function supports_partial_fit(::Nothing)
-    # A member that the outer estimator does not hold folds vacuously: there is nothing to
-    # fold and nothing to refit, so the call with no data skips it either way.
-    return true
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Builds the empty state an [`Online`](@ref) seeds into the estimator it wraps.
-
-One sample buffer works for each estimator that refits, so the seed needs no knowledge of the type. A prior whose batch verb reads a factor matrix beside the returns records the factor rows in the same buffer, and [`needs_factor_returns`](@ref) decides whether its fold receives them. An estimator whose state is not a sample buffer has a method of its own that returns the state that its call with no data reads. A prior-less optimiser head is such an estimator, because its state is a fold context. Nothing else about the wrapper changes.
-
-The function takes the estimator and not its type, so a family that sizes its seed from a field can read that field.
-
-# Arguments
-
-  - `est`: The estimator the wrapper wraps, read for its type.
-  - `max_history`: The wrapper's cap, carried into the state.
-
-# Returns
-
-  - `state::AbstractPartialFitState`: The empty state to seed, carrying the cap and no observations.
-
-# Related
-
-  - [`Online`](@ref)
-  - [`SampleBufferState`](@ref)
-  - [`update_online_estimator`](@ref)
-"""
-function online_state_seed(::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
-                           max_history::Option{<:Integer})
-    return SampleBufferState(; max_history = max_history)
-end
-function update_online_estimator(o::Online)
-    est = rebuild_estimator(o.est, (; cache = online_state_seed(o.est, o.max_history)))
-    return update_online_estimator(est)
-end
-function update_online_estimator(::Online{<:CrossValidationEstimator})
-    return throw(ArgumentError("`Online` on a scheme is an Online Scheme, and it reached the warm-up in an estimator slot: a scheme seeds no sample buffer, because it is the `cv` argument of `cross_val_predict`, not a field of the estimator that runs through it."))
-end
-
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for the Allocation Set of an online portfolio selection head, the set that contains each allocation of the recursion.
-
-The head is [`OnlinePortfolioSelection`](@ref), and it holds the set in its `set` field. The budget is one on each set, so `⟨w, x⟩` is the wealth factor that the formula of each rule assumes. Cash is an asset with price relative one, and the rule allocates it like any other asset.
-
-# Interfaces
-
-In order to implement a new set kind, subtype `AbstractAllocationSet` with its constraint objects as part of the struct, and implement:
-
-  - `resolve_allocation_set(set::AbstractAllocationSet, N::Integer, strict::Bool, datatype::DataType) -> AbstractAllocationSet`: The set with every estimator resolved to a value over the `N` assets, which the projection then reads.
-  - `project(proj::AbstractProjectionGeometry, set::AbstractAllocationSet, q::AbstractVector, w::AbstractVector) -> AbstractVector`: The projection onto the resolved set, for every geometry the set admits.
-  - `rows_needed(set::AbstractAllocationSet) -> Union{Nothing, Integer}`: The number of rows the set's constraints read at a step, `0` for a set that reads none.
-
-## Arguments
-
-  - `set`: The set.
-  - `N`: The number of assets of the universe the set is resolved over.
-  - `strict`: Whether an unknown name in a set is an error.
-  - `datatype`: The element type a scalar bound is expanded in.
-
-## Returns
-
-  - `set::AbstractAllocationSet`: The resolved set.
-
-# Related
-
-  - [`BoundedAllocationSet`](@ref)
-  - [`project`](@ref)
-  - [`AbstractProjectionGeometry`](@ref)
-"""
-abstract type AbstractAllocationSet <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for an Allocation Set whose projection is a programme, a bare JuMP model that holds the constraints of the set.
-
-The programme lets the set own a risk constraint that the shared risk-measure builders write, as a [`RiskConstraintOwner`](@ref) beside the JuMP optimisers.
-
-# Interfaces
-
-In order to implement a new programme set, subtype `AbstractProgrammeAllocationSet`, implement everything [`AbstractAllocationSet`](@ref) asks for, and implement:
-
-  - `risk_constraint_solver(set::AbstractProgrammeAllocationSet)`: The solver a Deferred Quantity of the set's risk measure is resolved against.
-
-# Related
-
-  - [`AbstractAllocationSet`](@ref)
-  - [`RiskConstraintOwner`](@ref)
-  - [`risk_constraint_solver`](@ref)
-"""
-abstract type AbstractProgrammeAllocationSet <: AbstractAllocationSet end
 
 export Online, RollingWindow, SeedWindow, BatchChoice, PinnedChoice
-public AbstractProgrammeAllocationSet, risk_constraint_solver
