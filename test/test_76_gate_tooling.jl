@@ -14,6 +14,9 @@ Each session wrote its own driver for one test file, and one of those drivers le
   - `code_health/gate_stamp.sh` records the merge-base a gate measured, and its `check` is the
     pre-push guard of `.pre-commit-config.yaml`.
   - `test/run_files.jl` runs named test files after the preamble and counts each one.
+  - `docs/doctest_files.jl` runs the doctests of the docstrings that named source files hold. The
+    test checks its selection on a fixture module. The doctest run itself needs Documenter, which
+    the test environment does not hold.
 
 The git fixtures are small repositories in a temporary directory. CI runs on Ubuntu, where `git`
 and `bash` are present. The loads sit OUTSIDE the `@testset`, for the reason
@@ -25,6 +28,10 @@ end
 
 module DriverSeam
 include(joinpath(@__DIR__, "run_files.jl"))
+end
+
+module DocFilesSeam
+include(joinpath(@__DIR__, "..", "docs", "doctest_files.jl"))
 end
 
 using Test
@@ -283,5 +290,66 @@ end
               "        - function f(x)\n        3     y = x\n        0     z = 1\n" *
               "        - end\n")
         @test RF.coverage_lines(cov) == (2, [3])
+    end
+
+    @testset "doctest_files selects the docstrings of the named files" begin
+        DF = DocFilesSeam.DoctestFiles
+        dir = mktempdir()
+        a = joinpath(dir, "a.jl")
+        b = joinpath(dir, "sub", "b.jl")
+        block = "```jldoctest\njulia> 1 + 1\n2\n```"
+        put(dir, "a.jl", """
+            "f of an Int.\n\n$block\n"
+            f(x::Int) = x
+            "S.\n\n$block\n\n$block\n"
+            struct S end
+            """)
+        put(dir, "sub/b.jl", """
+            "f of a Float64.\n\n$block\n"
+            f(x::Float64) = x
+            "g, with no block."
+            g() = 0
+            """)
+        fixture = Module(:DocFixture)
+        Base.include(fixture, a)
+        Base.include(fixture, b)
+        binding(name) = Base.Docs.Binding(fixture, name)
+
+        # A binding documented in two files keeps the methods of the named file alone.
+        scope, docstrings, blocks, files = DF.scope_module(fixture, [a])
+        meta = Base.Docs.meta(scope)
+        @test Set(keys(meta)) == Set([binding(:f), binding(:S)])
+        @test meta[binding(:f)].order == [Tuple{Int}]
+        @test (docstrings, blocks, files) == (2, 3, Set([realpath(a)]))
+        # The meta of the fixture is left as it was.
+        @test length(Base.Docs.meta(fixture)[binding(:f)].order) == 2
+
+        # A directory names every file below it.
+        scope, docstrings, blocks, files = DF.scope_module(fixture, [joinpath(dir, "sub")])
+        @test Set(keys(Base.Docs.meta(scope))) == Set([binding(:f), binding(:g)])
+        @test (docstrings, blocks, files) == (2, 1, Set([realpath(b)]))
+        @test DF.in_scope(b, [joinpath(dir, "sub", "..", "sub")])
+        @test !(DF.in_scope(a, [joinpath(dir, "sub")]))
+        @test !(DF.in_scope(joinpath(dir, "gone.jl"), [dir]))
+        # A directory whose name is a prefix of another does not reach into it.
+        put(dir, "subway/c.jl", "c = 0\n")
+        @test !(DF.in_scope(joinpath(dir, "subway", "c.jl"), [joinpath(dir, "sub")]))
+
+        c = DF.parse_command(["--fix", a, a])
+        @test (c.paths, c.fix) == ([a], true)
+        for bad in (["--against"], ["--bogus"], [joinpath(dir, "gone.jl")])
+            @test_throws ErrorException DF.parse_command(bad)
+        end
+        repo, _, _, _ = fixture_repo()
+        c = DF.parse_command(["--against", "trunk"]; root = repo)
+        @test c.paths == [joinpath(repo, "src/a/new.jl"), joinpath(repo, "src/a/one.jl")]
+
+        # The setup is the text of the CI job, without its last call.
+        setup = DF.workflow_setup()
+        @test occursin("DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup", setup)
+        @test occursin("set_show_nothing_fields!(true)", setup)
+        @test !(occursin("doctest(PortfolioOptimisers)", setup))
+        @test_throws ErrorException DF.workflow_setup("jobs: {}\n")
+        @test_throws ErrorException DF.workflow_setup("- name: Run doctest\n  run: julia --project=docs -e 'x = 1'\n")
     end
 end

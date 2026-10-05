@@ -111,6 +111,8 @@ measured the old tree. Pay the cheap work first and the slow gates once, on the 
 1. Run the targeted tests bare, with `run_in_background`, through the driver. It wakes you when it
    ends, and `--done` leaves the verdict in a file:
    `julia -t 1 --project=test test/run_files.jl --done=<path> test_X.jl test_Y.jl`.
+   Check the doctests of your files the same way:
+   `julia -t 1 --project=docs docs/doctest_files.jl --against origin/dev`.
 2. `git fetch origin dev`. If `git log --oneline HEAD..origin/dev` is not empty, rebase now.
 3. Format the files you changed: `pre-commit run julia-formatter --files <changed .jl>`. The hook
    runs it at commit time anyway, and a reformat moves the line counts the size gate reads.
