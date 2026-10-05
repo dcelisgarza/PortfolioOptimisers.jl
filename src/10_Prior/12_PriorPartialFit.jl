@@ -1043,7 +1043,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the keywords that the refit route of a prior folds from the Exogenous Series of a step, and refuses a step that brings no series to a prior that reads it.
 
-A prior whose tree reads the series, as [`reads_exogenous_series`](@ref) answers, owns it on the online step. Its buffer records every column of `rd.E` and the names `rd.ne`, and the first step fixes the names. A step that brings no series would leave the buffer with rows that the fit cannot read, so it is refused. A prior that reads no series gives no keyword, and the Fold Context keeps the series. A non-finite value of the series is not refused here. The fit refuses it on the rows that it reads, as ADR 0184 states, and a later cap can drop such a row.
+A prior whose tree reads the series, as [`reads_exogenous_series`](@ref) answers, owns it on the online step. Its buffer records every column of `rd.E` and the names `rd.ne`, and the first step fixes the names. A step that brings no series would leave the buffer with rows that the fit cannot read, so it is refused. A prior that reads no series gives no keyword, and the Fold Context keeps the series. A non-finite value of the series is not refused here. The fit refuses it on the rows that it reads, and a later cap can drop such a row.
 
 # Arguments
 
