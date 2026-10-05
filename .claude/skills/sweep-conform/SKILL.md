@@ -89,6 +89,7 @@ prose that passes `/unslop`.
 `test/test_26_docs.jl` holds the first four and no gate holds the pass, which holds by review. The
 test also holds the row's `algorithm` count as a floor. Raise
 that count in the same commit when the new unit carries the section.
+A swept file also carries no performance trap, the fifth condition of #404 (ADR 0175).
 
 **A new file has no coverage row yet.** The gate ratchets `misses` per file, so a file with no row
 enters at zero misses. Write the tests, or write the Coverage Exemption with its rationale.
