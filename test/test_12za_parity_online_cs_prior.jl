@@ -246,14 +246,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                 @test isequal(prior(e).sigma, prior(ccy, rn).sigma)
             end
         end
-        # The carry fold does not record the series yet, so it refuses a tree that reads it,
-        # a macro sensitivity included.
-        for cfg in (cfgs.Currency, cfgs.Sensitivity)
-            m = message(() -> partial_fit!(CrossSectionalFactorPrior(; cfg...),
-                                           rows(rd, 1:90)))
-            @test occursin("the carry fold of a Cross-Sectional Factor Prior does not record the Exogenous Series",
-                           m)
-        end
+        # The carry fold records the series too (#1479), and test_12zb tests it.
+        @test isa(partial_fit!(CrossSectionalFactorPrior(; cfgs.Currency...),
+                               rows(rd, 1:90)).cache, po.CrossSectionalCarryState)
     end
 
     @testset "Parity with the oracle's online update" begin

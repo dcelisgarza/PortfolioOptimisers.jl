@@ -462,7 +462,8 @@ function assert_cross_sectional_observed_families(factors::AbstractVector{<:Pair
     return nothing
 end
 """
-    cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult, lag::Integer)
+    cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult, lag::Integer,
+                             kept::Option{<:MatNum} = nothing, g0::Integer = 0)
         -> Option{<:NamedTuple}
 
 Read the observed factors of a [`CrossSectionalFactorPrior`](@ref) off the returns data: their exposures, their names, their families and their returns.
@@ -470,6 +471,8 @@ Read the observed factors of a [`CrossSectionalFactorPrior`](@ref) off the retur
 A prior with no observed factor gets `nothing`. Otherwise each member gives its exposures and names, with [`factor_exposure`](@ref) and [`exposure_axis_names`](@ref), and the column of the Exogenous Series of each of its factors, with [`observed_series`](@ref).
 
 The members are read in two stages, as [`observed_reads_returns`](@ref) sorts them. The members that read no returns, such as [`CurrencyExposure`](@ref), read `rd`. The members that can read returns read a copy of `rd` whose `X` is net of the factors of the first stage, derived with [`cross_sectional_local_returns`](@ref). So a Descriptor of the returns inside an [`ObservedExposure`](@ref) measures the local move of an asset, as the estimated members do, and never the net returns its own factor enters. The copy is derived also when `lx` names a Panel Field of net returns, because that field is net of every observed factor, the member's own among them. When one stage is empty, every member reads `rd`.
+
+The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads the rows that it carries and the rows of a step. It gives the derived rows of the carried rows in `kept`, and the number of observations before the first row of `rd` in `g0`. So the function derives the rows of the step alone, as the batch fit derives them.
 
 # Algorithm
 
@@ -484,6 +487,8 @@ The members are read in two stages, as [`observed_reads_returns`](@ref) sorts th
   - `obs`: The Pairs of the observed factors, from [`cross_sectional_factor_partition`](@ref).
   - $(arg_dict[:rd]) It carries the Asset Panel and the Exogenous Series.
   - `lag`: Number of observations by which the exposures lag the returns.
+  - `kept`: The returns net of the first stage at the first rows of `rd`, which a carry fold carries, or `nothing`. The function derives the rows after them.
+  - `g0`: Number of observations before the first row of `rd`.
 
 # Validation
 
@@ -493,7 +498,7 @@ The members are read in two stages, as [`observed_reads_returns`](@ref) sorts th
 
 # Returns
 
-  - `cc::Option{<:NamedTuple}`: `nothing`, or `(; Z, R, lv, nf, fam)`: the exposures `observations × assets × factors`, the observed returns `observations × factors` over every observation of `rd`, the series names, the factor names and the family labels.
+  - `cc::Option{<:NamedTuple}`: `nothing`, or `(; Z, R, lv, nf, fam, Xn)`: the exposures `observations × assets × factors`, the observed returns `observations × factors` over every observation of `rd`, the series names, the factor names, the family labels, and the returns net of the first stage that the second stage read, or `nothing` when step 3 derived none.
 
 # Related
 
@@ -505,7 +510,8 @@ The members are read in two stages, as [`observed_reads_returns`](@ref) sorts th
   - [`ReturnsResult`](@ref)
 """
 function cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult,
-                                  lag::Integer)
+                                  lag::Integer, kept::Option{<:MatNum} = nothing,
+                                  g0::Integer = 0)
     if isempty(obs)
         return nothing
     end
@@ -524,22 +530,23 @@ function cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult
     for k in findall(!, rr)
         ms[k] = member(obs[k], rd)
     end
-    rdn = if any(rr) && !all(rr)
-        # The members that can read returns read the returns net of the members that read
-        # none, so a Descriptor of the returns measures the local move of an asset, and no
-        # member reads net returns that its own factor enters.
-        c1 = cross_sectional_observed_stack(ms[.!rr], rd)
-        ReturnsResult(; nx = rd.nx,
-                      X = cross_sectional_local_returns(nothing, c1, rd.X, rd, lag),
-                      nf = rd.nf, F = rd.F, nb = rd.nb, B = rd.B, ne = rd.ne, E = rd.E,
-                      ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa, pnl = rd.pnl)
-    else
-        rd
+    # The members that can read returns read the returns net of the members that read none,
+    # so a Descriptor of the returns measures the local move of an asset, and no member reads
+    # net returns that its own factor enters.
+    Xn = nothing
+    rdn = rd
+    if any(rr) && !all(rr)
+        Xn = cross_sectional_local_returns(nothing,
+                                           cross_sectional_observed_stack(ms[.!rr], rd), rd.X,
+                                           rd, lag, kept, g0)
+        rdn = ReturnsResult(; nx = rd.nx, X = Xn, nf = rd.nf, F = rd.F, nb = rd.nb,
+                            B = rd.B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv,
+                            ivpa = rd.ivpa, pnl = rd.pnl)
     end
     for k in findall(rr)
         ms[k] = member(obs[k], rdn)
     end
-    return cross_sectional_observed_stack(ms, rd)
+    return merge(cross_sectional_observed_stack(ms, rd), (; Xn = Xn))
 end
 """
     cross_sectional_observed_stack(ms::AbstractVector, rd::ReturnsResult) -> NamedTuple
@@ -587,11 +594,15 @@ function cross_sectional_observed_stack(ms::AbstractVector, rd::ReturnsResult)
 end
 """
     cross_sectional_local_returns(lx::Nothing, cc::Nothing, X::MatNum, rd::ReturnsResult,
-                                  lag::Integer) -> MatNum
+                                  lag::Integer, kept::Option{<:MatNum} = nothing,
+                                  g0::Integer = 0) -> MatNum
     cross_sectional_local_returns(lx::Nothing, cc::NamedTuple, X::MatNum, rd::ReturnsResult,
-                                  lag::Integer) -> Matrix{<:Real}
+                                  lag::Integer, kept::Option{<:MatNum} = nothing,
+                                  g0::Integer = 0) -> Matrix{<:Real}
     cross_sectional_local_returns(lx::AbstractString, cc::NamedTuple, X::MatNum,
-                                  rd::ReturnsResult, lag::Integer) -> Matrix{<:Real}
+                                  rd::ReturnsResult, lag::Integer,
+                                  kept::Option{<:MatNum} = nothing,
+                                  g0::Integer = 0) -> Matrix{<:Real}
 
 Return the returns a Cross-Sectional Factor Prior regresses on its estimated exposures: the returns net of its observed factors.
 
@@ -615,9 +626,13 @@ Where:
   - ``s``: The observation whose exposure the derivation removes.
   - $(math_dict[:ell_lag_cs])
 
+The index ``t`` counts the observations from the first observation of the sample.
+
 The exposures lag the returns, so the derivation removes each observed return through the exposure of ``t - \\ell``, which is the exposure the model loads for observation ``t``. The lagged combined exposures then reproduce `X` exactly. The sum runs over the non-zero exposures, so a non-finite return of a currency the asset does not hold does not reach it. An asset whose exposure is `NaN`, because it is inactive or carries no currency label, gets a `NaN` net return, and it leaves the regression of that observation. The first ``\\ell`` observations have no lagged exposure, so the derivation takes the exposure of the same observation there. The fit never regresses them, but the estimated members read them: a Descriptor of the returns reads the net returns, and a row with no finite return leaves the market return undefined.
 
 Under Currency Factors and simple returns the identity of the local return is not exact: the base-currency return of an asset also holds the cross term of its local return and the exchange-rate return, see [`currency_excess_index`](@ref), and the derived net return keeps it.
+
+The carry fold of a [`CrossSectionalFactorPrior`](@ref) gives the rows that it carries and the rows of a step. A window that derived its first rows again would take the exposure of the same row there, and the batch fit took the exposure of the row ``\\ell`` observations before. So the carry gives the derived rows of its carried rows in `kept`, and the number of observations before the first row of `X` in `g0`. The function copies `kept` and derives the rows after it.
 
 # Arguments
 
@@ -626,6 +641,8 @@ Under Currency Factors and simple returns the identity of the local return is no
   - `X`: Asset returns, `observations × assets`.
   - $(arg_dict[:rd]) The named method reads the Panel Field off its Asset Panel.
   - `lag`: Number of observations by which the exposures lag the returns.
+  - `kept`: The derived rows of the first rows of `X`, or `nothing`. Only the derived method reads it, because a Panel Field gives each row from its own row.
+  - `g0`: Number of observations before the first row of `X`.
 
 # Validation
 
@@ -642,16 +659,22 @@ Under Currency Factors and simple returns the identity of the local return is no
   - [`currency_excess_index`](@ref)
 """
 function cross_sectional_local_returns(::Nothing, ::Nothing, X::MatNum, ::ReturnsResult,
-                                       ::Integer)
+                                       ::Integer, ::Option{<:MatNum} = nothing,
+                                       ::Integer = 0)
     return X
 end
 function cross_sectional_local_returns(::Nothing, cc::NamedTuple, X::MatNum,
-                                       ::ReturnsResult, lag::Integer)
+                                       ::ReturnsResult, lag::Integer,
+                                       kept::Option{<:MatNum} = nothing, g0::Integer = 0)
     (; Z, R) = cc
     Xl = similar(X, promote_type(eltype(X), eltype(Z), eltype(R)))
-    for t in axes(X, 1), i in axes(X, 2)
+    # The carried rows are copied, and an absent `kept` copies zero rows.
+    K = something(kept, view(X, 1:0, :))
+    k = size(K, 1)
+    Xl[1:k, :] .= K
+    for t in (k + 1):size(X, 1), i in axes(X, 2)
         x = X[t, i]
-        s = t > lag ? t - lag : t
+        s = g0 + t > lag ? t - lag : t
         for c in axes(Z, 3)
             z = Z[s, i, c]
             if !iszero(z)
@@ -663,12 +686,13 @@ function cross_sectional_local_returns(::Nothing, cc::NamedTuple, X::MatNum,
     return Xl
 end
 function cross_sectional_local_returns(lx::AbstractString, ::NamedTuple, ::MatNum,
-                                       rd::ReturnsResult, ::Integer)
+                                       rd::ReturnsResult, ::Integer,
+                                       ::Option{<:MatNum} = nothing, ::Integer = 0)
     return descriptor_field_values(rd, lx)
 end
 """
-    cross_sectional_observed_block(cc::Nothing, rw, r) -> nothing
-    cross_sectional_observed_block(cc::NamedTuple, rw, r) -> NamedTuple
+    cross_sectional_observed_block(cc::Nothing, rw, r, o::Integer = 0) -> nothing
+    cross_sectional_observed_block(cc::NamedTuple, rw, r, o::Integer = 0) -> NamedTuple
 
 Trim the observed factors to the observations a fit reads, and refuse a non-finite observed return among them.
 
@@ -679,6 +703,7 @@ The Descriptor warm-up and the exposure lag consume the first observations, and 
   - `cc`: The observed factors [`cross_sectional_observed`](@ref) read, or `nothing`.
   - `rw`: The observations left after the Descriptor warm-up, as rows of the returns data.
   - `r`: The fitted observations, as an index into `rw`.
+  - `o`: Number of observations of the returns data before the first row of `cc`, which the message adds to the row that it names. The carry fold carries the observations after the warm-up alone.
 
 # Validation
 
@@ -694,16 +719,16 @@ The Descriptor warm-up and the exposure lag consume the first observations, and 
   - [`cross_sectional_observed_append`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-function cross_sectional_observed_block(::Nothing, ::Any, ::Any)
+function cross_sectional_observed_block(::Nothing, ::Any, ::Any, ::Integer = 0)
     return nothing
 end
-function cross_sectional_observed_block(cc::NamedTuple, rw, r)
+function cross_sectional_observed_block(cc::NamedTuple, rw, r, o::Integer = 0)
     rows = rw[r]
     R = cc.R[rows, :]
     bad = [c for c in axes(R, 2) if !all(isfinite, view(R, :, c))]
     if !isempty(bad)
         t = findfirst(t -> !all(isfinite, view(R, t, :)), axes(R, 1))
-        throw(IsNonFiniteError("the observed factor returns must be finite on every observation the fit reads, and the series $(unique(cc.lv[bad])) are not, first at observation $(rows[t]) of the returns data. A gap in the observations the Descriptor warm-up and the exposure lag consume is accepted, because the fit reads none of them."))
+        throw(IsNonFiniteError("the observed factor returns must be finite on every observation the fit reads, and the series $(unique(cc.lv[bad])) are not, first at observation $(o + rows[t]) of the returns data. A gap in the observations the Descriptor warm-up and the exposure lag consume is accepted, because the fit reads none of them."))
     end
     return (; R = R, Zr = cc.Z[rows, :, :], Zt = cc.Z[rows[end], :, :], nf = cc.nf,
             fam = cc.fam)

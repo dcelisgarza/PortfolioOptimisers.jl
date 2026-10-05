@@ -20,6 +20,11 @@ vertically, as the `Online*` files of test_12za do: one row of `mu`, one 40 x 40
 or the factor returns of every row fitted so far. The cases are `SeedStyle` (`Base` with
 `families = ["style" => nothing]`) and `SeedIndustry` (`FamOne`). The pinned choice with no window
 is checked against the `Online*Fold*` files of test_12za.
+
+A prior whose tree reads the Exogenous Series folds on the carry route too (#1479, ADR 0193): the
+buffer and the carried rows hold the series, and the state derives each row of the returns net of
+the observed factors one time. Its pinned choice under currency factors is checked against the
+`OnlineCurrencyStyle_Fold*` files of test_12za.
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 include(joinpath(@__DIR__, "parity_grid.jl"))
@@ -214,6 +219,13 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         # sigma maxscaled 6.5e-13, factor returns maxscaled 2.9e-15 on `Industry`.
         check(pinned(style), "OnlineStyle", "Fold")
         check(pinned(industry), "OnlineIndustry", "Fold")
+        # Currency factors on the carry route (#1479). The oracle's online update reads the
+        # Currency Excess Returns of each batch, and it pins `style1` as in `Style`. Measured
+        # over the three steps: mu maxrel 2.3e-13, sigma maxscaled 4.2e-13, factor returns
+        # maxscaled 4.5e-16.
+        cp = pinned((; grid_config("Currency", rd)..., families = ["style" => nothing]))
+        @test all(x -> x.pe.cache.families == ["style" => "style1"], cp)
+        check(cp, "OnlineCurrencyStyle", "Fold")
         # A seed window on the factor prior cuts the factor returns of the first fit to the
         # last 60, and every later step folds every row, as the oracle's does. Measured: mu
         # maxrel 7.2e-15, sigma maxscaled 3.7e-13, factor returns maxscaled 6.7e-16 on `Style`;
@@ -261,6 +273,121 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @test agrees(prior(e1), p1) && agrees(prior(e2), batch(pe, 2))
     end
 
+    @testset "An observed factor (#1479)" begin
+        # The carry derives each row of the returns net of the observed factors one time, from
+        # the observed exposures of the row `lag` observations before it, and carries the row.
+        # The batch fit derives the first `lag` rows of the sample from the exposure of the same
+        # row, so a window that derived its first rows again would give other values.
+        base = grid_config("Base", rd)
+        ccy = grid_config("Currency", rd)
+        msens = "msens" => CompositeExposure(;
+                                             descriptors = [EWMacroSensitivity(; series = "MACRO",
+                                                                               half_life = 10)],
+                                             outlier = nothing, scoring = nothing, family = "msens")
+        # An observed member over a Descriptor of the returns reads the returns net of the
+        # Currency Factors, a second derived series.
+        rev = "rev" => ObservedExposure(;
+                                        xe = CompositeExposure(; descriptors = [Reversal()],
+                                                               outlier = nothing, scoring = nothing,
+                                                               family = "rev"), series = "MACRO",
+                                        family = "rev")
+        mixed = (; ccy..., factors = [ccy.factors; rev])
+        rfr = FixedWeightedReturnForecast(;
+                                          scores = DescriptorScores(;
+                                                                    descriptors = [Reversal()]),
+                                          scale = 0.02)
+        wv = WindowedVariance(;
+                              ve = ExpWeightedVariance(; decay = 2.0^(-1 / 20),
+                                                       min_obs = 5), window = 60)
+        exact = (; Currency = ccy, CurrencyLx = grid_config("CurrencyLx", rd),
+                 Macro = grid_config("Macro", rd),
+                 Sensitivity = (; base..., factors = [base.factors; msens]),
+                 MixedForecast = (; mixed..., rfe = rfr),
+                 Entropy = (; ccy..., pe = EntropyPoolingPrior(; pe = GRID_PE)),
+                 Rolling = (; ccy..., ve = wv))
+        # Measured: every case gives a difference of exactly zero at each step. The forecast
+        # reads the net returns of every row, so the carry keeps every row and every derived row.
+        for cfg in exact
+            pe = CrossSectionalFactorPrior(; cfg...)
+            @test po.reads_exogenous_series(pe)
+            @test all(((k, x),) -> agrees(x.pr, batch(pe, k)), enumerate(stream(pe)))
+        end
+        # The `Reversal` exposure reads its last 21 rows, so the carry keeps 22 rows, and a
+        # rolling return over the cut rows is a difference of cumulative sums from another first
+        # row (#1470). Measured over the three steps, relative to the largest entry: mu 4.6e-16,
+        # sigma 4.3e-16, factor returns 1.8e-16; under `lag = 2`, 1.4e-16, 3.1e-16 and 1.8e-16.
+        @test po.cross_sectional_carry_rows(CrossSectionalFactorPrior(; mixed...)) == 22
+        for cfg in (mixed, (; mixed..., lag = 2))
+            pe = CrossSectionalFactorPrior(; cfg...)
+            for (k, x) in enumerate(stream(pe))
+                b = batch(pe, k)
+                @test relerr(x.pr.mu, b.mu) < 1e-12 &&
+                      relerr(x.pr.sigma, b.sigma) < 1e-12 &&
+                      relerr(x.pr.fpr.X, b.fpr.X) < 1e-12
+                @test isequal(isnan.(x.pr.sigma), isnan.(b.sigma))
+            end
+        end
+        # A macro sensitivity is a recursion from the first row and states no look-back, so the
+        # carry keeps every row.
+        @test isnothing(po.cross_sectional_carry_rows(CrossSectionalFactorPrior(;
+                                                                                exact.Sensitivity...)))
+        # One observation at a time after the first fit.
+        pe = CrossSectionalFactorPrior(; ccy...)
+        e = (0, 90, 91, 92, 93, 250)
+        @test all(((k, x),) -> agrees(x.pr, batch(pe, k, rd, e)),
+                  enumerate(stream(pe, rd, e)))
+        # The window carries the series and the derived rows of its two rows, and the buffer
+        # records every column of the series.
+        st = last(stream(pe)).pe.cache
+        @test st.win.ne == rd.ne && isequal(st.win.E, rd.E[249:250, :])
+        @test size(st.der.Xl, 1) == 2 && isnothing(st.der.Xn)
+        @test isequal(po.exogenous_buffer_kwargs(po.returns_buffer(st)).E, rd.E)
+        # On the online step of an optimiser the prior's buffer owns the series, and the Fold
+        # Context reads it back.
+        o = po.update_online_estimator(InverseVolatility(; pe = pe))
+        for k in 1:3
+            o = partial_fit!(o, rows(rd, (edges[k] + 1):edges[k + 1]))
+        end
+        @test isa(o.pe.cache, po.CrossSectionalCarryState) && isnothing(o.cache.E)
+        bo, brd = po.batch_from_state(o)
+        @test brd.ne == rd.ne && isequal(brd.E, rd.E)
+        @test agrees(bo.pe, batch(pe, 3))
+        @test optimise(o).w == optimise(InverseVolatility(; pe = pe), rd).w
+        # A step with no series, and a step with other names.
+        nor = ReturnsResult(; nx = rd.nx, X = rd.X, pnl = rd.pnl)
+        @test occursin("this step carries no `rd.E`",
+                       message(() -> partial_fit!(pe, rows(nor, 1:90))))
+        e1 = partial_fit!(pe, rows(rd, 1:90))
+        @test occursin("this step carries no `rd.E`",
+                       message(() -> partial_fit!(e1, rows(nor, 91:170))))
+        ren = ReturnsResult(; nx = rd.nx, X = rd.X, ne = [rd.ne[1:(end - 1)]; "OTHER"],
+                            E = rd.E, pnl = rd.pnl)
+        @test occursin("a later block must carry the same names",
+                       message(() -> partial_fit!(e1, rows(ren, 91:170))))
+        # The carry keeps every fitted row, so the step that fits a row refuses a non-finite
+        # observed return on it, as the batch fit does. Row 1 has no lagged exposure, so the
+        # regression never reads it, and the value is accepted.
+        for (row, refused) in ((200, true), (1, false))
+            E = copy(rd.E)
+            E[row, 1] = NaN
+            rn = ReturnsResult(; nx = rd.nx, X = rd.X, ne = rd.ne, E = E, pnl = rd.pnl)
+            if refused
+                e2 = partial_fit!(partial_fit!(pe, rows(rn, 1:90)), rows(rn, 91:170))
+                err = try
+                    partial_fit!(e2, rows(rn, 171:250))
+                catch x
+                    x
+                end
+                @test isa(err, IsNonFiniteError)
+                @test occursin("first at observation 200 of the returns data",
+                               sprint(showerror, err))
+                @test_throws IsNonFiniteError batch(pe, 3, rn)
+            else
+                @test agrees(last(stream(pe, rn)).pr, batch(pe, 3, rn))
+            end
+        end
+    end
+
     @testset "Refusals" begin
         pe = CrossSectionalFactorPrior(; style...)
         m = message(() -> prior(partial_fit!(pe, rows(rd, 1:2))))
@@ -273,10 +400,6 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @test occursin("not a slice of the ones it carries", m)
         m = message(() -> po.merge_states(e.cache, partial_fit!(pe, rows(rd, 91:170)).cache))
         @test occursin("cannot merge two states fitted on disjoint blocks", m)
-        ccy = CrossSectionalFactorPrior(; grid_config("Currency", rd)...)
-        m = message(() -> partial_fit!(ccy, rows(rd, 1:90)))
-        @test occursin("does not record the Exogenous Series that an observed factor or a macro sensitivity reads",
-                       m)
         @test occursin("the matrix form of `partial_fit!` carries none",
                        message(() -> partial_fit!(pe, rd.X)))
     end

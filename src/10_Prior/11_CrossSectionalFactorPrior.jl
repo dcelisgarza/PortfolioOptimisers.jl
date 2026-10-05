@@ -618,9 +618,8 @@ The returns-matrix method of [`prior`](@ref) and the online step under a [`Pinne
 
 # Algorithm
 
- 1. Rebuild the returns data, take the two universe masks and build the benchmark weights `BW` with [`cross_sectional_benchmark_stage`](@ref). Split the factor list into estimated and observed members with [`cross_sectional_factor_partition`](@ref).
- 2. Read the observed factors with [`cross_sectional_observed`](@ref), take the returns the regression reads, `Xl`, with [`cross_sectional_local_returns`](@ref), and build every estimated Factor Exposure with [`cross_sectional_exposure_history`](@ref).
- 3. Take the rows `rw` after the Descriptor warm-up with [`cross_sectional_warmup`](@ref), on the estimated and the observed exposures together.
+ 1. Run the steps that give a value per observation with [`cross_sectional_exposure_series`](@ref): the benchmark weights, the observed factors, the returns the regression reads and the exposure history.
+ 2. Take the rows `rw` after the Descriptor warm-up with [`cross_sectional_warmup`](@ref), on the estimated and the observed exposures together.
 
 # Arguments
 
@@ -639,13 +638,14 @@ The returns-matrix method of [`prior`](@ref) and the online step under a [`Pinne
 
 # Returns
 
-  - `st::NamedTuple`: The fields `amsk` and `emsk`, the active mask and the estimation mask; `mcap`, the market capitalisation or `nothing`; `BW`, the benchmark weights; `cc`, the observed factors or `nothing`; `Xl`, the returns the regression reads; `rde`, the returns data that the estimated members read; `Ms`, `nf` and `fam`, the exposure history of the estimated factors with their names and Factor Family labels; and `rw`, the rows after the warm-up.
+  - `st::NamedTuple`: The fields of [`cross_sectional_exposure_series`](@ref), and `rw`, the rows after the warm-up.
 
 # Related
 
   - [`CrossSectionalFactorPrior`](@ref)
   - [`prior`](@ref)
   - [`cross_sectional_pinned_families`](@ref)
+  - [`cross_sectional_exposure_series`](@ref)
 """
 function cross_sectional_exposure_stage(pe::CrossSectionalFactorPrior, X::MatNum,
                                         F::Option{<:MatNum}, pnl::AssetPanel;
@@ -653,16 +653,78 @@ function cross_sectional_exposure_stage(pe::CrossSectionalFactorPrior, X::MatNum
                                         E::Option{<:MatNum} = nothing,
                                         iv::Option{<:MatNum} = nothing,
                                         ivpa::Option{<:Num_VecNum} = nothing)
+    st = cross_sectional_exposure_series(pe, X, F, pnl; ne = ne, E = E, iv = iv,
+                                         ivpa = ivpa)
+    # An observed member warms up too: one that wraps a Descriptor gives no exposure over the
+    # warm-up of the Descriptor, and its derived net return is then not finite.
+    Mo = isnothing(st.cc) ? st.Ms : cat(st.Ms, st.cc.Z; dims = 3)
+    rw = (cross_sectional_warmup(st.Xu, Mo, st.emsk) + 1):size(X, 1)
+    return merge(st, (; rw = rw))
+end
+"""
+    cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNum,
+                                    F::Option{<:MatNum}, pnl::AssetPanel;
+                                    ne::Option{<:VecStr} = nothing,
+                                    E::Option{<:MatNum} = nothing,
+                                    iv::Option{<:MatNum} = nothing,
+                                    ivpa::Option{<:Num_VecNum} = nothing,
+                                    kept::Option{<:NamedTuple} = nothing,
+                                    g0::Integer = 0) -> NamedTuple
+
+Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that give a value per observation: the benchmark weights, the observed factors, the returns that the regression reads, and the exposure history.
+
+[`cross_sectional_exposure_stage`](@ref) runs it over every observation, and then drops the Descriptor warm-up. The carry fold runs it over the rows that it carries and the rows of a step. The returns net of the observed factors are derived series: the batch fit derives each row from the observed exposures of the row `pe.lag` observations before it, and the first `pe.lag` rows of the sample from the exposure of the same row. So the carry gives the derived rows of its carried rows in `kept`, and the function derives the rows of the step alone.
+
+# Algorithm
+
+ 1. Rebuild the returns data, take the two universe masks and build the benchmark weights `BW` with [`cross_sectional_benchmark_stage`](@ref). Split the factor list into estimated and observed members with [`cross_sectional_factor_partition`](@ref).
+ 2. Read the observed factors with [`cross_sectional_observed`](@ref), and take the returns the regression reads, `Xl`, with [`cross_sectional_local_returns`](@ref). Both copy the rows of `kept` and derive the rows after them.
+ 3. Build every estimated Factor Exposure with [`cross_sectional_exposure_history`](@ref), on the returns data `rde` whose returns are `Xl`. Under observed factors those are the net returns, so a Descriptor of the returns measures the move of an asset net of its currency, and not the move of the currency it holds.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - $(arg_dict[:X]) It holds one observation per row.
+  - $(arg_dict[:F]) The steps do not read it. They write it onto the rebuilt returns data.
+  - `pnl`: Time-varying Asset Panel of the rows of `X`.
+  - `ne`: Names of the Exogenous Series.
+  - `E`: The Exogenous Series, one observation per row. The observed factors read their returns from it.
+  - `iv`: Implied volatilities, written onto the rebuilt returns data.
+  - `ivpa`: Implied-volatility risk-premium adjustment, written onto the rebuilt returns data.
+  - `kept`: The derived rows of the first rows of `X`, `(; Xn, Xl)` as the field `der` of a [`CrossSectionalCarryState`](@ref) holds them, or `nothing`.
+  - `g0`: Number of observations before the first row of `X`.
+
+# Validation
+
+  - The rules of every verb the algorithm names.
+
+# Returns
+
+  - `st::NamedTuple`: The fields `amsk` and `emsk`, the active mask and the estimation mask; `mcap`, the market capitalisation or `nothing`; `BW`, the benchmark weights; `Xu`, the returns that the universe and the warm-up read; `cc`, the observed factors or `nothing`; `Xl`, the returns the regression reads; `rde`, the returns data that the estimated members read; and `Ms`, `nf` and `fam`, the exposure history of the estimated factors with their names and Factor Family labels.
+
+# Related
+
+  - [`cross_sectional_exposure_stage`](@ref)
+  - [`cross_sectional_observed`](@ref)
+  - [`cross_sectional_local_returns`](@ref)
+  - [`CrossSectionalCarryState`](@ref)
+"""
+function cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNum,
+                                         F::Option{<:MatNum}, pnl::AssetPanel;
+                                         ne::Option{<:VecStr} = nothing,
+                                         E::Option{<:MatNum} = nothing,
+                                         iv::Option{<:MatNum} = nothing,
+                                         ivpa::Option{<:Num_VecNum} = nothing,
+                                         kept::Option{<:NamedTuple} = nothing,
+                                         g0::Integer = 0)
     (; amsk, emsk, mcap, BW, rdb, Xu) = cross_sectional_benchmark_stage(pe, X, F, pnl;
                                                                         ne = ne, E = E,
                                                                         iv = iv,
                                                                         ivpa = ivpa)
     (; est, obs) = cross_sectional_factor_partition(pe.factors)
-    cc = cross_sectional_observed(obs, rdb, pe.lag)
-    Xl = cross_sectional_local_returns(pe.lx, cc, X, rdb, pe.lag)
-    # The estimated members read the returns the regression explains. Under observed factors
-    # those are the net returns, so a Descriptor of the returns measures the move of an asset
-    # net of its currency, and not the move of the currency it holds.
+    cc = cross_sectional_observed(obs, rdb, pe.lag, isnothing(kept) ? nothing : kept.Xn, g0)
+    Xl = cross_sectional_local_returns(pe.lx, cc, X, rdb, pe.lag,
+                                       isnothing(kept) ? nothing : kept.Xl, g0)
     rde = if isnothing(cc)
         rdb
     else
@@ -670,12 +732,8 @@ function cross_sectional_exposure_stage(pe::CrossSectionalFactorPrior, X::MatNum
                       iv = rdb.iv, ivpa = rdb.ivpa, pnl = rdb.pnl)
     end
     (; Ms, nf, fam) = cross_sectional_exposure_history(est, rde, pe.ex)
-    # An observed member warms up too: one that wraps a Descriptor gives no exposure over the
-    # warm-up of the Descriptor, and its derived net return is then not finite.
-    Mo = isnothing(cc) ? Ms : cat(Ms, cc.Z; dims = 3)
-    rw = (cross_sectional_warmup(Xu, Mo, emsk) + 1):size(X, 1)
-    return (; amsk = amsk, emsk = emsk, mcap = mcap, BW = BW, cc = cc, Xl = Xl, rde = rde,
-            Ms = Ms, nf = nf, fam = fam, rw = rw)
+    return (; amsk = amsk, emsk = emsk, mcap = mcap, BW = BW, Xu = Xu, cc = cc, Xl = Xl,
+            rde = rde, Ms = Ms, nf = nf, fam = fam)
 end
 """
     cross_sectional_benchmark_stage(pe::CrossSectionalFactorPrior, X::MatNum,
@@ -798,35 +856,6 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
     return prior(pe, rd.X, rd.F, rd.pnl; ne = rd.ne, E = rd.E, iv = rd.iv, ivpa = rd.ivpa,
                  kwargs..., dims = 1)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Refuses a Cross-Sectional Factor Prior whose tree reads the Exogenous Series on the carry fold.
-
-An observed factor reads its returns from the Exogenous Series, and so does an [`EWMacroSensitivity`](@ref) that names a column of it. The carry fold does not record the series yet, so a call with no data could not rebuild what those members read. The refit route records it, so it does not call this function. The check reads [`reads_exogenous_series`](@ref), which answers per type, so a Descriptor that reads the series is refused with the observed members.
-
-# Arguments
-
-  - `pe`: Cross-Sectional Factor Prior estimator.
-
-# Validation
-
-  - `reads_exogenous_series(pe)` is `false`. An `ArgumentError` is thrown otherwise.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`reads_exogenous_series`](@ref)
-  - [`cross_sectional_carry_fold`](@ref)
-"""
-function assert_cross_sectional_online_factors(pe::CrossSectionalFactorPrior)::Nothing
-    @argcheck(!reads_exogenous_series(pe),
-              ArgumentError("the carry fold of a Cross-Sectional Factor Prior does not record the Exogenous Series that an observed factor or a macro sensitivity reads, so its call with no data could not rebuild what they read. Wrap the prior in `Online` to take the refit route, which records the series, or fit in batch."))
-    return nothing
 end
 function refit_prior_step(pe::CrossSectionalFactorPrior, rd::ReturnsResult)
     return cross_sectional_pin_choice(pe.choice, refit_prior_fold(pe, rd))

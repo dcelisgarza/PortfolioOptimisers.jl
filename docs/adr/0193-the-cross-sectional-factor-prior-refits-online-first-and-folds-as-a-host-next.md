@@ -102,13 +102,21 @@ state owns it once, and the Fold Context reads it back.
   ([#1478](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1478)). Its call with no
   data equals the batch fit over the buffer's rows, bit for bit, with `CurrencyExposure`,
   `ObservedExposure` and `EWMacroSensitivity`, and its pinned choice under currency factors is at
-  parity with the oracle's online update. Until the carry fold records the series, the carry refuses
-  every tree for which `reads_exogenous_series` answers `true`, a macro sensitivity included.
+  parity with the oracle's online update.
 - The carry fold derives each new row of the net returns `Xl`, and of the returns net of the
   observed members that read no returns, one time, and carries the rows beside `X`. It also carries
   the series over its window and the observed returns of every fitted row. It never derives a row
   again, because the batch fit derives the first `lag` rows of the sample from the exposure of the
   same row, and a window that derives them again from its own first rows gives other values.
+- The carry fold is built
+  ([#1479](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1479)). Its buffer records
+  the series as the refit's buffer does, so the Fold Context of an optimiser reads it back. Its call
+  with no data equals the batch fit over the same rows, bit for bit, with `CurrencyExposure`,
+  `ObservedExposure` and `EWMacroSensitivity`, and its pinned choice under currency factors is at
+  parity with the oracle's online update. The carry keeps every fitted row, so a step refuses a
+  non-finite observed return on a row that it fits, before the regression, as the batch fit does.
+  An `EWMacroSensitivity` states no look-back, so the carry keeps every panel row under it, which is
+  exact for a recursion from the first row.
 
 ### The step decides its two refusals by route
 

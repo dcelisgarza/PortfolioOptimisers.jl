@@ -599,7 +599,7 @@ end
 
 Answers whether the fit of an estimator reads the Exogenous Series `rd.E`, from its estimator tree.
 
-A prior that reads the series needs it at every fitted row, so for it the series is sample and not fold context. The refit route of the online step reads this predicate. It gives the series to the buffer of a prior whose tree reads it, and refuses a step of such a prior that brings no series. The buffer then records every column of the series, and the Fold Context reads the series back from it.
+A prior that reads the series needs it at every fitted row, so for it the series is sample and not fold context. The refit route of the online step and the carry fold of a [`CrossSectionalFactorPrior`](@ref) read this predicate. Each gives the series to the buffer of a prior whose tree reads it, and refuses a step of such a prior that brings no series. The buffer then records every column of the series, and the Fold Context reads the series back from it.
 
 The predicate is per type, so a member that reads the series answers for itself, whatever abstract type it has. An observed member, [`CurrencyExposure`](@ref) or [`ObservedExposure`](@ref), reads the return of its factor from the series. An [`EWMacroSensitivity`](@ref) that names a column in `series` reads its reference return from the series, and one with `series = nothing` reads none. A member that holds Descriptors answers for them, and so does a Return Forecast Estimator through its [`DescriptorScores`](@ref). A [`CrossSectionalFactorPrior`](@ref) answers for its factor list and its Return Forecast Estimator. Each outer prior answers for the prior it embeds, as [`reads_panel_fields`](@ref) does, and an [`Online`](@ref) answers for the estimator it wraps. A caller's own member that reads the series must define a method that answers `true`.
 
@@ -1041,7 +1041,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reads the keywords that the refit route of a prior folds from the Exogenous Series of a step, and refuses a step that brings no series to a prior that reads it.
+Reads the keywords that the refit route of a prior, and the carry fold of a [`CrossSectionalFactorPrior`](@ref), fold from the Exogenous Series of a step, and refuses a step that brings no series to a prior that reads it.
 
 A prior whose tree reads the series, as [`reads_exogenous_series`](@ref) answers, owns it on the online step. Its buffer records every column of `rd.E` and the names `rd.ne`, and the first step fixes the names. A step that brings no series would leave the buffer with rows that the fit cannot read, so it is refused. A prior that reads no series gives no keyword, and the Fold Context keeps the series. A non-finite value of the series is not refused here. The fit refuses it on the rows that it reads, and a later cap can drop such a row.
 

@@ -7,6 +7,8 @@ A [`CrossSectionalFactorPrior`](@ref) with no `cache` seeds this state at its fi
 
 Two choices read every fitted observation: the automatic dropped member of a Factor Family under a [`BatchChoice`](@ref), and the mark of the Empty Factors. When a step moves either one, the step fits every carried observation again.
 
+A prior whose tree reads the Exogenous Series, as [`reads_exogenous_series`](@ref) answers, folds an observed factor too. The buffer and the carried rows hold the series. The returns net of the observed factors are derived series: the batch fit derives each row from the observed exposures of the row `lag` observations before it, and the first `lag` rows of the sample from the exposure of the same row. So the state derives each row one time, and carries it.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -14,9 +16,10 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     CrossSectionalCarryState(; buf::SampleBufferState = SampleBufferState(),
-                             win::Option{<:ReturnsResult} = nothing, nf = nothing,
-                             fam = nothing, Ms = nothing, X = nothing, bw = nothing,
-                             mcap = nothing, amsk = nothing, emsk = nothing, sums = nothing,
+                             win::Option{<:ReturnsResult} = nothing, der = nothing,
+                             nf = nothing, fam = nothing, Ms = nothing, X = nothing,
+                             Xl = nothing, obs = nothing, bw = nothing, mcap = nothing,
+                             amsk = nothing, emsk = nothing, sums = nothing,
                              families = nothing, fcb = nothing, Z = nothing, csr = nothing,
                              lv1 = nothing, lv = nothing, W = nothing, vs = nothing,
                              ve = nothing, ve1 = nothing, pe = nothing,
@@ -34,13 +37,17 @@ Keywords correspond to the struct's fields, and every field but `buf` defaults t
 """
 @concrete struct CrossSectionalCarryState <: AbstractPartialFitState
     """
-    Buffer of every folded observation: the returns and both masks. The online step of an optimiser rebuilds its returns data from it with [`returns_buffer`](@ref).
+    Buffer of every folded observation: the returns, both masks, and the Exogenous Series when the prior reads it. The online step of an optimiser rebuilds its returns data from it with [`returns_buffer`](@ref).
     """
     buf
     """
-    The carried rows of the Asset Panel, as a [`ReturnsResult`](@ref) of the returns and the panel, or `nothing` before the first step. It holds the last rows that the Factor Exposures of a new observation read, as [`cross_sectional_carry_rows`](@ref) states, or every row.
+    The carried rows of the Asset Panel, as a [`ReturnsResult`](@ref) of the returns, the panel, and the Exogenous Series when the prior reads it, or `nothing` before the first step. It holds the last rows that the Factor Exposures of a new observation read, as [`cross_sectional_carry_rows`](@ref) states, or every row.
     """
     win
+    """
+    The derived series of the carried rows, `(; Xn, Xl)`, or `nothing` without an observed factor. `Xn` holds the returns net of the observed members that read no returns, which the other observed members read, or `nothing` when no member needs them. `Xl` holds the returns net of every observed factor, which the estimated members read.
+    """
+    der
     """
     Names of the raw factor axis, or `nothing` before the first step.
     """
@@ -57,6 +64,14 @@ Keywords correspond to the struct's fields, and every field but `buf` defaults t
     Returns of every observation after the warm-up, `observations × assets`.
     """
     X
+    """
+    Returns net of the observed factors of every observation after the warm-up, which the regression reads, or `nothing` without an observed factor, when the regression reads `X`.
+    """
+    Xl
+    """
+    Observed factors of every observation after the warm-up, `(; Z, R, lv, nf, fam)` as [`cross_sectional_observed`](@ref) states them, or `nothing` without an observed factor. The factor prior reads the observed returns `R` beside the factor returns of the regression.
+    """
+    obs
     """
     Benchmark weights of every observation after the warm-up.
     """
@@ -127,16 +142,17 @@ Keywords correspond to the struct's fields, and every field but `buf` defaults t
     seed
 end
 function CrossSectionalCarryState(; buf::SampleBufferState = SampleBufferState(),
-                                  win::Option{<:ReturnsResult} = nothing, nf = nothing,
-                                  fam = nothing, Ms = nothing, X = nothing, bw = nothing,
-                                  mcap = nothing, amsk = nothing, emsk = nothing,
-                                  sums = nothing, families = nothing, fcb = nothing,
-                                  Z = nothing, csr = nothing, lv1 = nothing, lv = nothing,
-                                  W = nothing, vs = nothing, ve = nothing, ve1 = nothing,
-                                  pe = nothing, seed::Integer = 0)::CrossSectionalCarryState
-    return CrossSectionalCarryState(buf, win, nf, fam, Ms, X, bw, mcap, amsk, emsk, sums,
-                                    families, fcb, Z, csr, lv1, lv, W, vs, ve, ve1, pe,
-                                    seed)
+                                  win::Option{<:ReturnsResult} = nothing, der = nothing,
+                                  nf = nothing, fam = nothing, Ms = nothing, X = nothing,
+                                  Xl = nothing, obs = nothing, bw = nothing, mcap = nothing,
+                                  amsk = nothing, emsk = nothing, sums = nothing,
+                                  families = nothing, fcb = nothing, Z = nothing,
+                                  csr = nothing, lv1 = nothing, lv = nothing, W = nothing,
+                                  vs = nothing, ve = nothing, ve1 = nothing, pe = nothing,
+                                  seed::Integer = 0)::CrossSectionalCarryState
+    return CrossSectionalCarryState(buf, win, der, nf, fam, Ms, X, Xl, obs, bw, mcap, amsk,
+                                    emsk, sums, families, fcb, Z, csr, lv1, lv, W, vs, ve,
+                                    ve1, pe, seed)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -300,34 +316,38 @@ Appends the observations of a step to the carried panel rows, and returns the ro
 
   - `win`: The carried rows, or `nothing` before the first step.
   - `rd`: The returns data of the step.
+  - `xk`: The Exogenous Series of the step, `(; ne, E)` as [`exogenous_step_kwargs`](@ref) answers when the prior reads it, or an empty `NamedTuple`.
 
 # Returns
 
-  - `rd::ReturnsResult`: The carried rows followed by the rows of the step, with the returns and the Asset Panel alone.
+  - `rd::ReturnsResult`: The carried rows followed by the rows of the step, with the returns, the Asset Panel and the series of `xk` alone.
 
 # Related
 
   - [`cross_sectional_carry_fold`](@ref)
 """
-function cross_sectional_window_append(::Nothing, rd::ReturnsResult)
-    return ReturnsResult(; nx = rd.nx, X = rd.X, pnl = rd.pnl)
+function cross_sectional_window_append(::Nothing, rd::ReturnsResult, xk::NamedTuple)
+    return ReturnsResult(; nx = rd.nx, X = rd.X, pnl = rd.pnl, xk...)
 end
-function cross_sectional_window_append(win::ReturnsResult, rd::ReturnsResult)
-    return ReturnsResult(; nx = rd.nx, X = vcat(win.X, rd.X), pnl = vcat(win.pnl, rd.pnl))
+function cross_sectional_window_append(win::ReturnsResult, rd::ReturnsResult,
+                                       xk::NamedTuple)
+    return ReturnsResult(; nx = rd.nx, X = vcat(win.X, rd.X), pnl = vcat(win.pnl, rd.pnl),
+                         ne = win.ne,
+                         E = cross_sectional_fold_append(win.E, get(xk, :E, nothing)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Keeps the last `n` rows of the panel rows of a step, or every row when `n` is `nothing`.
+Keeps the last `n` rows of the panel rows of a step, or of their derived series, or every row when `n` is `nothing`.
 
 # Arguments
 
-  - `rd`: The panel rows.
+  - `rd`: The panel rows, a matrix of rows, the derived series `(; Xn, Xl)` of the rows, or `nothing`.
   - `n`: The number of rows to keep, or `nothing`.
 
 # Returns
 
-  - `rd::ReturnsResult`: The rows that the state carries.
+  - `rd`: The rows that the state carries, of the type of the input.
 
 # Related
 
@@ -339,6 +359,19 @@ end
 function cross_sectional_window_trim(rd::ReturnsResult, n::Integer)
     T = size(rd.X, 1)
     return T <= n ? rd : port_opt_view(rd, (T - n + 1):T, :)
+end
+function cross_sectional_window_trim(::Nothing, ::Any)
+    return nothing
+end
+function cross_sectional_window_trim(A::AbstractMatrix, ::Nothing)
+    return A
+end
+function cross_sectional_window_trim(A::AbstractMatrix, n::Integer)
+    T = size(A, 1)
+    return T <= n ? A : A[(T - n + 1):T, :]
+end
+function cross_sectional_window_trim(der::NamedTuple, n::Option{<:Integer})
+    return map(A -> cross_sectional_window_trim(A, n), der)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -646,7 +679,7 @@ Appends the rows of a block to a history, or starts the history with them.
 # Arguments
 
   - `a`: The history, or `nothing`.
-  - `b`: The rows of the block.
+  - `b`: The rows of the block. The observed factors `(; Z, R, lv, nf, fam)` of a block append their exposures and their returns, and keep the names of `a`.
 
 # Returns
 
@@ -673,6 +706,41 @@ function cross_sectional_fold_append(a::CrossSectionalRegression,
                                      b::CrossSectionalRegression)
     return CrossSectionalRegression(; f = vcat(a.f, b.f), eps = vcat(a.eps, b.eps),
                                     n = vcat(a.n, b.n), b = nothing, h1 = vcat(a.h1, b.h1))
+end
+function cross_sectional_fold_append(a::NamedTuple, b::NamedTuple)
+    return (; Z = cat(a.Z, b.Z; dims = 1), R = vcat(a.R, b.R), lv = a.lv, nf = a.nf,
+            fam = a.fam)
+end
+"""
+    cross_sectional_fold_factor_returns(f::MatNum, lv::AbstractVector{Bool}, cb::Nothing)
+    cross_sectional_fold_factor_returns(f::MatNum, lv::AbstractVector{Bool},
+                                        cb::NamedTuple)
+
+Returns the factor returns of a block that the factor prior of the carry fold folds: the factor returns of the regression on the factors that are not empty, and the observed returns after them.
+
+The batch fit appends the observed factors after the estimated ones with [`cross_sectional_observed_append`](@ref), and fits the factor prior on the factors that are not empty, so the columns are in the same order.
+
+# Arguments
+
+  - `f`: The factor returns of the regression of the block, on the reduced axis.
+  - `lv`: The mark of the factors that are not empty.
+  - `cb`: The observed factors of the block from [`cross_sectional_observed_block`](@ref), or `nothing`.
+
+# Returns
+
+  - `f::Matrix`: The factor returns that the factor prior folds.
+
+# Related
+
+  - [`cross_sectional_fold_factors`](@ref)
+  - [`cross_sectional_carry_fold`](@ref)
+"""
+function cross_sectional_fold_factor_returns(f::MatNum, lv::AbstractVector{Bool}, ::Nothing)
+    return f[:, lv]
+end
+function cross_sectional_fold_factor_returns(f::MatNum, lv::AbstractVector{Bool},
+                                             cb::NamedTuple)
+    return hcat(f[:, lv], cb.R)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -782,12 +850,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Computes the neutralised Factor Exposures of the new observations of a step, and drops the rows of the Descriptor warm-up.
 
-The exposures of an observation read the last [`lookback`](@ref) rows of the panel, so the rows that the state carries give the exposures of the batch fit.
+The exposures of an observation read the last [`lookback`](@ref) rows of the panel, so the rows that the state carries give the exposures of the batch fit. The derived series of an observation read the observed exposures of the row `pe.lag` observations before it, which the carried rows hold too.
 
 # Algorithm
 
- 1. Build the benchmark weights of the rows with [`cross_sectional_benchmark_stage`](@ref), and the exposures of the estimated factors with [`cross_sectional_exposure_history`](@ref).
- 2. Take the last `n` rows. Before the warm-up ends, drop the rows before the first one with an eligible asset, as [`cross_sectional_warmup`](@ref) does.
+ 1. Run [`cross_sectional_exposure_series`](@ref) over the rows, with the derived series of the carried rows that the state holds. It gives the benchmark weights, the observed factors, the returns net of them and the exposures of the estimated factors, and it derives the rows of the step alone.
+ 2. Take the last `n` rows. Before the warm-up ends, drop the rows before the first one with an eligible asset on the estimated and the observed exposures together, as [`cross_sectional_warmup`](@ref) does.
  3. Neutralise the exposures of the rows that remain with [`cross_sectional_neutralise!`](@ref).
 
 # Arguments
@@ -796,10 +864,11 @@ The exposures of an observation read the last [`lookback`](@ref) rows of the pan
   - `st`: The state before the step.
   - `win`: The carried rows followed by the rows of the step.
   - `n`: Number of rows of the step.
+  - `g0`: Number of observations before the first row of `win`.
 
 # Returns
 
-  - `rows::NamedTuple`: `nf` and `fam`, the raw factor axis, and the rows after the warm-up: `Ms`, `X`, `bw`, `mcap`, `amsk` and `emsk`.
+  - `rows::NamedTuple`: `nf` and `fam`, the raw factor axis; the rows after the warm-up: `Ms`, `X`, `Xl`, `obs`, `bw`, `mcap`, `amsk` and `emsk`, with `Xl` and `obs` `nothing` without an observed factor; and `der`, the derived series of every row of `win`, or `nothing`.
 
 # Related
 
@@ -808,15 +877,20 @@ The exposures of an observation read the last [`lookback`](@ref) rows of the pan
 """
 function cross_sectional_fold_rows(pe::CrossSectionalFactorPrior,
                                    st::CrossSectionalCarryState, win::ReturnsResult,
-                                   n::Integer)
-    (; amsk, emsk, mcap, BW, rdb, Xu) = cross_sectional_benchmark_stage(pe, win.X, nothing,
-                                                                        win.pnl)
-    (; est) = cross_sectional_factor_partition(pe.factors)
-    (; Ms, nf, fam) = cross_sectional_exposure_history(est, rdb, pe.ex)
+                                   n::Integer, g0::Integer)
+    (; amsk, emsk, mcap, BW, Xu, cc, Xl, Ms, nf, fam) = cross_sectional_exposure_series(pe,
+                                                                                        win.X,
+                                                                                        nothing,
+                                                                                        win.pnl;
+                                                                                        ne = win.ne,
+                                                                                        E = win.E,
+                                                                                        kept = st.der,
+                                                                                        g0 = g0)
     T = size(win.X, 1)
     q = (T - n + 1):T
     if isnothing(st.Ms)
-        elig = cross_sectional_eligible(Xu[q, :], Ms[q, :, :], emsk[q, :])
+        Mo = isnothing(cc) ? Ms[q, :, :] : cat(Ms[q, :, :], cc.Z[q, :, :]; dims = 3)
+        elig = cross_sectional_eligible(Xu[q, :], Mo, emsk[q, :])
         q = q[something(findfirst(any, eachrow(elig)), length(q) + 1):end]
     end
     Msn = Ms[q, :, :]
@@ -824,8 +898,15 @@ function cross_sectional_fold_rows(pe::CrossSectionalFactorPrior,
     if !isempty(q)
         cross_sectional_neutralise!(pe.neutralise, Msn, pe.cre, bwn, nf, fam)
     end
-    return (; nf = nf, fam = fam, Ms = Msn, X = win.X[q, :], bw = bwn,
-            mcap = cross_sectional_rows(mcap, q), amsk = amsk[q, :], emsk = emsk[q, :])
+    obs = if isnothing(cc)
+        nothing
+    else
+        (; Z = cc.Z[q, :, :], R = cc.R[q, :], lv = cc.lv, nf = cc.nf, fam = cc.fam)
+    end
+    return (; nf = nf, fam = fam, Ms = Msn, X = win.X[q, :],
+            Xl = isnothing(cc) ? nothing : Xl[q, :], obs = obs, bw = bwn,
+            mcap = cross_sectional_rows(mcap, q), amsk = amsk[q, :], emsk = emsk[q, :],
+            der = isnothing(cc) ? nothing : (; Xn = cc.Xn, Xl = Xl))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -837,8 +918,9 @@ This is the first fit, and the fit after a step that moves the automatic choice 
 # Algorithm
 
  1. Build the Factor Family Basis of every observation with [`cross_sectional_family_basis`](@ref), under `families`, or under the families of `pe` at the first fit, and name its dropped members with [`cross_sectional_dropped_names`](@ref).
- 2. Run the regression passes over every fitted observation with [`cross_sectional_fold_regression`](@ref).
- 3. Fold `ve` over the residuals with [`cross_sectional_fold_variance`](@ref), and the factor prior over the factor returns with [`cross_sectional_fold_factors`](@ref).
+ 2. Take the observed factors of every fitted observation with [`cross_sectional_observed_block`](@ref), which refuses a non-finite observed return.
+ 3. Run the regression passes over every fitted observation with [`cross_sectional_fold_regression`](@ref), on the returns net of the observed factors.
+ 4. Fold `ve` over the residuals with [`cross_sectional_fold_variance`](@ref), and the factor prior over the factor returns of [`cross_sectional_fold_factor_returns`](@ref) with [`cross_sectional_fold_factors`](@ref).
 
 # Arguments
 
@@ -865,13 +947,14 @@ function cross_sectional_fold_refit(pe::CrossSectionalFactorPrior,
     Tf = size(st.Ms, 1)
     D = Tf - pe.lag
     d = (pe.lag + 1):Tf
-    blk = (; Zl = fb.Ms[1:D, :, :], Xr = st.X[d, :], em = st.emsk[d, :], am = st.amsk[d, :],
-           mcl = cross_sectional_rows(st.mcap, 1:D))
+    cb = cross_sectional_observed_block(st.obs, 1:Tf, d, st.buf.n - Tf)
+    blk = (; Zl = fb.Ms[1:D, :, :], Xr = something(st.Xl, st.X)[d, :], em = st.emsk[d, :],
+           am = st.amsk[d, :], mcl = cross_sectional_rows(st.mcap, 1:D))
     reg = cross_sectional_fold_regression(pe, blk,
                                           (; lv1 = nothing, lv = nothing, ve1 = nothing,
                                            seed = seed))
     (; V, ve) = cross_sectional_fold_variance(pe.ve, reg.csr.eps, blk.em, blk.am, seed)
-    f = reg.csr.f[:, reg.lv]
+    f = cross_sectional_fold_factor_returns(reg.csr.f, reg.lv, cb)
     pf = cross_sectional_fold_factors(pe.pe, view(f, 1:seed, :))
     if seed < D
         pf = cross_sectional_fold_factors(pf, view(f, (seed + 1):D, :))
@@ -896,9 +979,10 @@ Each output of a fitted observation reads no later observation, so the step fits
 # Algorithm
 
  1. Reduce the exposures of the new observations with [`cross_sectional_family_basis`](@ref) under `families`, and lag them behind the reduced exposures of the last `lag` observations.
- 2. Run the regression passes over the new observations with [`cross_sectional_fold_regression`](@ref), under the marks of the fitted observations.
- 3. Fold `ve` over the new residuals with [`cross_sectional_fold_variance`](@ref), and the factor prior over the new factor returns with [`cross_sectional_fold_factors`](@ref).
- 4. Append every output to the state with [`cross_sectional_fold_append`](@ref).
+ 2. Take the observed factors of the new observations with [`cross_sectional_observed_block`](@ref), which refuses a non-finite observed return.
+ 3. Run the regression passes over the new observations with [`cross_sectional_fold_regression`](@ref), under the marks of the fitted observations, on the returns net of the observed factors.
+ 4. Fold `ve` over the new residuals with [`cross_sectional_fold_variance`](@ref), and the factor prior over the new factor returns of [`cross_sectional_fold_factor_returns`](@ref) with [`cross_sectional_fold_factors`](@ref).
+ 5. Append every output to the state with [`cross_sectional_fold_append`](@ref).
 
 # Arguments
 
@@ -923,8 +1007,9 @@ function cross_sectional_fold_step(pe::CrossSectionalFactorPrior,
     q = (Tf - m + 1):Tf
     fb = cross_sectional_family_basis(families, st.Ms[q, :, :], st.bw[q, :], st.nf, st.fam)
     Zc = cat(st.Z, fb.Ms; dims = 1)
-    blk = (; Zl = Zc[1:m, :, :], Xr = st.X[q, :], em = st.emsk[q, :], am = st.amsk[q, :],
-           mcl = cross_sectional_rows(st.mcap, q .- pe.lag))
+    cb = cross_sectional_observed_block(st.obs, 1:Tf, q, st.buf.n - Tf)
+    blk = (; Zl = Zc[1:m, :, :], Xr = something(st.Xl, st.X)[q, :], em = st.emsk[q, :],
+           am = st.amsk[q, :], mcl = cross_sectional_rows(st.mcap, q .- pe.lag))
     reg = cross_sectional_fold_regression(pe, blk,
                                           (; lv1 = st.lv1, lv = st.lv, ve1 = st.ve1,
                                            seed = 0))
@@ -932,7 +1017,9 @@ function cross_sectional_fold_step(pe::CrossSectionalFactorPrior,
         return nothing
     end
     (; V, ve) = cross_sectional_fold_variance(st.ve, reg.csr.eps, blk.em, blk.am, 0)
-    pf = cross_sectional_fold_factors(st.pe, reg.csr.f[:, reg.lv])
+    pf = cross_sectional_fold_factors(st.pe,
+                                      cross_sectional_fold_factor_returns(reg.csr.f, reg.lv,
+                                                                          cb))
     return cross_sectional_carry_with(st,
                                       (; fcb = cross_sectional_fold_append(st.fcb, fb.fcb),
                                        Z = Zc[(m + 1):end, :, :],
@@ -968,6 +1055,8 @@ function cross_sectional_fold_histories(pe::CrossSectionalFactorPrior,
                                       (; nf = rows.nf, fam = rows.fam,
                                        Ms = cross_sectional_fold_append(st.Ms, rows.Ms),
                                        X = cross_sectional_fold_append(st.X, rows.X),
+                                       Xl = cross_sectional_fold_append(st.Xl, rows.Xl),
+                                       obs = cross_sectional_fold_append(st.obs, rows.obs),
                                        bw = cross_sectional_fold_append(st.bw, rows.bw),
                                        mcap = cross_sectional_fold_append(st.mcap,
                                                                           rows.mcap),
@@ -984,13 +1073,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds the observations of a [`ReturnsResult`](@ref) into the carry fold of a Cross-Sectional Factor Prior.
 
-This is the step of a prior that carries a [`CrossSectionalCarryState`](@ref). It applies the rule of the carry fold: the exposures, the regression and the idiosyncratic variance of a new observation read no later observation, so the step computes them for the new observations alone.
+This is the step of a prior that carries a [`CrossSectionalCarryState`](@ref). It applies the rule of the carry fold: the exposures, the observed factors, the returns net of them, the regression and the idiosyncratic variance of a new observation read no later observation, so the step computes them for the new observations alone.
 
 # Algorithm
 
- 1. Refuse returns data that no fold takes with [`assert_prior_fold_returns`](@ref), and a panel that is absent or static.
- 2. Append the returns and both masks to the buffer `buf`. Append the rows of the step to the carried panel rows with [`cross_sectional_window_append`](@ref).
- 3. Compute the neutralised exposures of the new observations after the warm-up with [`cross_sectional_fold_rows`](@ref), and append them to the histories with [`cross_sectional_fold_histories`](@ref). Keep the panel rows that [`cross_sectional_carry_rows`](@ref) names.
+ 1. Refuse returns data that no fold takes with [`assert_prior_fold_returns`](@ref), and a panel that is absent or static. Take the Exogenous Series of the step with [`exogenous_step_kwargs`](@ref), which refuses a step with no series when the prior reads it.
+ 2. Append the rows of the step and their series to the carried panel rows with [`cross_sectional_window_append`](@ref).
+ 3. Compute the neutralised exposures, the observed factors and the derived series of the new observations with [`cross_sectional_fold_rows`](@ref), and append the rows after the warm-up to the histories with [`cross_sectional_fold_histories`](@ref). Append the returns, both masks and the series to the buffer `buf`. Keep the panel rows and their derived series that [`cross_sectional_carry_rows`](@ref) names.
  4. Before the first fit, fit every observation with [`cross_sectional_fold_refit`](@ref) once `lag + 2` observations follow the warm-up, as the batch fit needs.
  5. After it, apply the Choice Rule with [`cross_sectional_fold_choice`](@ref). When the choice moves, fit every observation again with [`cross_sectional_fold_refit`](@ref). Otherwise fit the new observations with [`cross_sectional_fold_step`](@ref), and fit every observation again when it answers `nothing`. A variance estimator `pe.ve` that does not fold, as [`supports_partial_fit`](@ref) answers, carries no state, so every step fits every observation again.
 
@@ -1004,6 +1093,7 @@ This is the step of a prior that carries a [`CrossSectionalCarryState`](@ref). I
 
   - The rules of [`assert_prior_fold_returns`](@ref).
   - `rd.pnl` is a time-varying Asset Panel. An `ArgumentError` is thrown otherwise.
+  - The rules of [`exogenous_step_kwargs`](@ref) and of the block method of [`partial_fit!`](@ref) for a [`SampleBufferState`](@ref): a prior that reads the Exogenous Series gets it at every step, under the names of the first step.
   - The rules of every verb the algorithm names.
 
 # Returns
@@ -1022,17 +1112,20 @@ function cross_sectional_carry_fold(pe::CrossSectionalFactorPrior,
     pnl = rd.pnl
     @argcheck(!isnothing(pnl) && !panel_is_static(pnl),
               ArgumentError("a Cross-Sectional Factor Prior reads its Factor Exposures off a time-varying Asset Panel, and the step carries $(isnothing(pnl) ? "no panel" : "a static panel"). Fold a ReturnsResult whose `pnl` is the one asset_panel returns."))
-    win = cross_sectional_window_append(st.win, rd)
-    rows = cross_sectional_fold_rows(pe, st, win, size(rd.X, 1))
+    xk = exogenous_step_kwargs(pe, rd)
+    win = cross_sectional_window_append(st.win, rd, xk)
+    rows = cross_sectional_fold_rows(pe, st, win, size(rd.X, 1),
+                                     st.buf.n + size(rd.X, 1) - size(win.X, 1))
     m = size(rows.Ms, 1)
     st = cross_sectional_fold_histories(pe, st, rows)
+    n = cross_sectional_carry_rows(pe)
     st = cross_sectional_carry_with(st,
                                     (;
                                      buf = partial_fit!(st.buf, rd.X;
                                                         active_mask = pnl.amsk,
-                                                        estimation_mask = pnl.emsk),
-                                     win = cross_sectional_window_trim(win,
-                                                                       cross_sectional_carry_rows(pe))))
+                                                        estimation_mask = pnl.emsk, xk...),
+                                     win = cross_sectional_window_trim(win, n),
+                                     der = cross_sectional_window_trim(rows.der, n)))
     Tf = isnothing(st.Ms) ? 0 : size(st.Ms, 1)
     if isnothing(st.csr)
         return if Tf - pe.lag < 2
@@ -1066,15 +1159,14 @@ end
 
 Folds the observations of a [`ReturnsResult`](@ref) into a Cross-Sectional Factor Prior on its carry route.
 
-An unwrapped prior follows the rule of the carry fold: it folds what folds and refits the rest. Its first step seeds a [`CrossSectionalCarryState`](@ref), as the carry of [`EmpiricalPrior`](@ref) seeds its own state. Each step computes the Factor Exposures of the new observations from the carried panel rows, runs the regression on the new observations alone, and folds the idiosyncratic variance and the factor prior. [`cross_sectional_carry_fold`](@ref) states the step. The call with no data `prior(pe)` equals the batch fit over the folded observations up to rounding, until a [`SeedWindow`](@ref) or a [`PinnedChoice`](@ref) keeps a value of the first fit. A pinned choice is recorded in the state, and `families` stays as the caller wrote it.
+An unwrapped prior follows the rule of the carry fold: it folds what folds and refits the rest. Its first step seeds a [`CrossSectionalCarryState`](@ref), as the carry of [`EmpiricalPrior`](@ref) seeds its own state. Each step computes the Factor Exposures and the observed factors of the new observations from the carried panel rows, runs the regression on the new observations alone, and folds the idiosyncratic variance and the factor prior. A prior whose tree reads the Exogenous Series, as [`reads_exogenous_series`](@ref) answers, records it, so each step must bring it. [`cross_sectional_carry_fold`](@ref) states the step. The call with no data `prior(pe)` equals the batch fit over the folded observations up to rounding, until a [`SeedWindow`](@ref) or a [`PinnedChoice`](@ref) keeps a value of the first fit. A pinned choice is recorded in the state, and `families` stays as the caller wrote it.
 
 [`Online`](@ref) seeds the `cache` with a [`SampleBufferState`](@ref) instead, and the prior refits through the generic method of `partial_fit!` and [`refit_prior_step`](@ref). The method narrows `cache` to the state of the carry fold, so a buffer reaches that route. The matrix form refuses through the generic method, because a matrix carries no Asset Panel, and the prior reads its Factor Exposures off one.
 
 # Algorithm
 
- 1. Refuse a prior whose tree reads the Exogenous Series with [`assert_cross_sectional_online_factors`](@ref).
- 2. Seed an empty [`CrossSectionalCarryState`](@ref) when `pe.cache` is `nothing`.
- 3. Fold `rd` with [`cross_sectional_carry_fold`](@ref), and rebuild the prior with the state it returns.
+ 1. Seed an empty [`CrossSectionalCarryState`](@ref) when `pe.cache` is `nothing`.
+ 2. Fold `rd` with [`cross_sectional_carry_fold`](@ref), and rebuild the prior with the state it returns.
 
 # Arguments
 
@@ -1083,7 +1175,7 @@ An unwrapped prior follows the rule of the carry fold: it folds what folds and r
 
 # Validation
 
-  - The rules of [`assert_cross_sectional_online_factors`](@ref) and of [`cross_sectional_carry_fold`](@ref).
+  - The rules of [`cross_sectional_carry_fold`](@ref).
 
 # Returns
 
@@ -1106,7 +1198,6 @@ function partial_fit!(pe::CrossSectionalFactorPrior{<:Any, <:Any, <:Any, <:Any, 
                                                     <:Any, <:Any, <:Any,
                                                     <:Option{<:CrossSectionalCarryState}},
                       rd::ReturnsResult)
-    assert_cross_sectional_online_factors(pe)
     st = isnothing(pe.cache) ? CrossSectionalCarryState() : pe.cache
     return rebuild_estimator(pe, (; cache = cross_sectional_carry_fold(pe, st, rd)))
 end
@@ -1120,10 +1211,10 @@ The call with no data builds the Prior Result with [`cross_sectional_assemble`](
 # Algorithm
 
  1. Refuse a state that has not made its first fit.
- 2. Append no observed factor to the fitted factors with [`cross_sectional_observed_append`](@ref), giving the raw exposures of the fitted observations and the reduced loadings of the last one.
- 3. Read the factor prior with [`cross_sectional_factor_prior`](@ref), and process and expand its moments with [`cross_sectional_factor_moments`](@ref).
+ 2. Take the observed factors of the fitted observations with [`cross_sectional_observed_block`](@ref), and append them to the fitted factors with [`cross_sectional_observed_append`](@ref), giving the raw exposures of the fitted observations and the reduced loadings of the last one.
+ 3. Read the factor prior with [`cross_sectional_factor_prior`](@ref) over the factor returns of the factors that are not empty and the observed returns, and process and expand its moments with [`cross_sectional_factor_moments`](@ref). An Observed Factor is never empty.
  4. Count the residuals of each asset with [`variance_count`](@ref) on the folded `ve`.
- 5. Take the returns data of the Return Forecast: the carried panel rows, with the benchmark weights of [`cross_sectional_benchmark_stage`](@ref) when [`cross_sectional_forecast_reads_panel`](@ref) answers `true`.
+ 5. Take the returns data of the Return Forecast with [`cross_sectional_carry_forecast_returns`](@ref).
  6. Build the result with [`cross_sectional_assemble`](@ref).
 
 # Arguments
@@ -1155,17 +1246,50 @@ function prior(pe::CrossSectionalFactorPrior, st::CrossSectionalCarryState;
               ArgumentError("the carry fold of this Cross-Sectional Factor Prior holds $Tf observation(s) after the Descriptor warm-up, and a fit needs at least lag + 2 = $(pe.lag + 2) of them. Fold more observations before the call with no data."))
     r = (pe.lag + 1):Tf
     csr = st.csr
-    ca = cross_sectional_observed_append(nothing, csr.f, st.Z[end, :, :], st.Ms[r, :, :],
-                                         st.nf, st.fam, st.fcb)
-    pr = cross_sectional_factor_prior(st.pe, all(st.lv) ? csr.f : csr.f[:, st.lv];
-                                      strict = strict)
-    f_pr = cross_sectional_factor_moments(pr, pe.f_mp, ca.f, st.lv; kwargs...)
+    cb = cross_sectional_observed_block(st.obs, 1:Tf, r, st.buf.n - Tf)
+    ca = cross_sectional_observed_append(cb, csr.f, st.Z[end, :, :], st.Ms[r, :, :], st.nf,
+                                         st.fam, st.fcb)
+    lv = vcat(st.lv, trues(size(ca.f, 2) - length(st.lv)))
+    pr = cross_sectional_factor_prior(st.pe, all(lv) ? ca.f : ca.f[:, lv]; strict = strict)
+    f_pr = cross_sectional_factor_moments(pr, pe.f_mp, ca.f, lv; kwargs...)
     fit = (; csr = csr, W = st.W, vs = st.vs, cnt = variance_count(st.ve, csr.eps),
            amr = st.amsk[r, :], bwr = st.bw[r, :], Xo = st.X[r, :], r = r)
-    rde = if cross_sectional_forecast_reads_panel(pe.rfe)
-        cross_sectional_benchmark_stage(pe, st.win.X, nothing, st.win.pnl).rdb
-    else
-        st.win
+    return cross_sectional_assemble(pe, f_pr, ca, fit,
+                                    cross_sectional_carry_forecast_returns(pe, st);
+                                    kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the returns data that the Return Forecast of the carry fold of a Cross-Sectional Factor Prior reads at the call with no data.
+
+The batch fit gives the forecast the returns data that the estimated members read: the returns with the benchmark weights on the panel, and under observed factors the returns net of them. A forecast that reads the panel makes the state carry every row, so the carried rows and their derived series give that returns data. Any other forecast reads no row, and gets the carried rows.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - `st`: The state of its carry fold.
+
+# Returns
+
+  - `rd::ReturnsResult`: The returns data of the forecast.
+
+# Related
+
+  - [`cross_sectional_forecast_reads_panel`](@ref)
+  - [`cross_sectional_benchmark_stage`](@ref)
+  - [`cross_sectional_exposure_series`](@ref)
+"""
+function cross_sectional_carry_forecast_returns(pe::CrossSectionalFactorPrior,
+                                                st::CrossSectionalCarryState)
+    if !cross_sectional_forecast_reads_panel(pe.rfe)
+        return st.win
     end
-    return cross_sectional_assemble(pe, f_pr, ca, fit, rde; kwargs...)
+    (; rdb) = cross_sectional_benchmark_stage(pe, st.win.X, nothing, st.win.pnl;
+                                              ne = st.win.ne, E = st.win.E)
+    return if isnothing(st.der)
+        rdb
+    else
+        ReturnsResult(; nx = rdb.nx, X = st.der.Xl, ne = rdb.ne, E = rdb.E, pnl = rdb.pnl)
+    end
 end
