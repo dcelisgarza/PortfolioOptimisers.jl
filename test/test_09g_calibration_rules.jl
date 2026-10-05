@@ -109,8 +109,11 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
     @test isa(CalibrationContext().series, ReturnsSeries)
     @test isnothing(CalibrationContext().alpha)
     @test isnothing(CalibrationContext().p)
-    @test isa(CalibrationContext(-1, AbsoluteDrawdownSeries(), 2).series,
+    @test isa(CalibrationContext(-1, AbsoluteDrawdownSeries(), 2, nothing).series,
               AbsoluteDrawdownSeries)
+    # `cs` belongs to the Cross-Sectional Factor Prior, so a site that names none leaves it
+    # unset.
+    @test isnothing(CalibrationContext().cs)
 
     # `kmin` is a count of order statistics, so a rule that states none is refused at
     # construction. It is a check on the rule's OWN parameter, and not on the parameter the

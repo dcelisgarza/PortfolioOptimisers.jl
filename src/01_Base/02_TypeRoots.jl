@@ -372,5 +372,35 @@ function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                   <:AbstractResult}, i::Int)
     return i == 1 ? obj : throw(BoundsError(obj, i))
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Computes a calibrated quantity from the data a prior result carries, so that the quantity refits whenever the sample moves.
+
+The quantity is a tail probability, a deformation parameter, an ambiguity radius, an Esfahani-Kuhn tail weight, a norm ceiling, a Spanned Shrinkage or an Orthogonal Forecast Scale. The root lives with the other roots, because the slots of a [`CrossSectionalFactorPrior`](@ref) are bound before the calibration rules load.
+
+All concrete subtypes should subtype one of the families under this root rather than the root itself, and `# Related` names them. A plain number in place of a rule is the quantity itself, exactly as it is today.
+
+A rule is named for the **method** it runs, and carries the name of the quantity as a suffix only where the bare method word is already claimed. [`ScenarioCount`](@ref), [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref) and [`EffectiveAssetFloor`](@ref) name a method and stop there. Five names carry the quantity, and each of the five earns it. [`RateSignificance`](@ref) and [`RateRadius`](@ref) are one method over two quantities, so neither may hold the bare word `Rate`, and [`DimensionalRateRadius`](@ref) carries that same stem under a prefix. [`ConcentrationRadius`](@ref) and [`DualNormRadius`](@ref) are each named after a mathematical object, so the bare word would name the object rather than the rule.
+
+A rule states a default for every keyword it can, so a bare call constructs. Two rules state none, because the quantity the keyword takes is the whole content of the rule and no value suits every sample. [`ScenarioCount`](@ref) and [`EntropyBudget`](@ref) are those two. The keyword of each stands at `nothing`, which is not a value of the quantity, so a bare call is refused with a message that names the quantity, the reason there is no default, and a value to start from.
+
+A rule states the **method** and nothing else. The **slot** states the quantity: `alpha` names the lower tail, `kappa` names the deformation parameter, `r` names an ambiguity radius and `l2c` names a norm ceiling. So the caller writes the rule alone, and each slot's `Num_` bound names the one family that has a reading in that slot. A rule of another family is refused at construction, by the bound.
+
+A **Calibration Rule** is not a [`DeferredQuantity`](@ref), and the two mechanisms stay parallel end to end. A Deferred Quantity is *fitted* and the quantity is read off the fit; a rule fits nothing, and reads the sample size and the moments the prior result already carries. A rule also sees the effective observation weights, which [`resolve_slot`](@ref) does not carry. So a rule resolves through [`resolve_calibration_slot`](@ref), is declared through [`calibration_slots`](@ref), and is refused at a value-level entry point by [`assert_calibrated_slots`](@ref).
+
+# Related
+
+  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
+  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
+  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
+  - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
+  - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
+  - [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref)
+  - [`AbstractOrthogonalForecastScaleCalibrationAlgorithm`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`DeferredQuantity`](@ref)
+"""
+abstract type AbstractCalibrationAlgorithm <: AbstractAlgorithm end
 public AbstractPartialFitState, DynamicAbstractWeights, AbstractOptimisationEstimator,
        OptimisationEstimator, NonFiniteAllocationOptimisationEstimator

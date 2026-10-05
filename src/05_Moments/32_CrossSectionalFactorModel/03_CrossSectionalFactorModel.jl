@@ -415,7 +415,9 @@ $(DocStringExtensions.FIELDS)
         lag::Option{<:Integer} = nothing,
         rf::Option{<:AbstractReturnForecastResult} = nothing,
         fx::Option{<:MatNum} = nothing,
-        fr::Option{<:MatNum} = nothing
+        fr::Option{<:MatNum} = nothing,
+        lambda::Option{<:Number} = nothing,
+        c::Option{<:Number} = nothing
     ) -> CrossSectionalFactorModel
 
 Keywords correspond to the struct's fields.
@@ -449,7 +451,7 @@ Keywords correspond to the struct's fields.
   - `esigma` is sliced by [`idiosyncratic_covariance_view`](@ref), on one axis or on both.
   - `edof` and `ediv` are sliced on their only axis, which is the asset axis.
   - `rf` is viewed by its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
-  - `nf`, `fam`, `fcb`, `lag`, `fx` and `fr` pass through unchanged. Each is indexed by factor, or by nothing at all, and neither follows an asset selection.
+  - `nf`, `fam`, `fcb`, `lag`, `fx`, `fr`, `lambda` and `c` pass through unchanged. Each is indexed by factor, or by nothing at all, and neither follows an asset selection.
 
 # Examples
 
@@ -474,7 +476,9 @@ CrossSectionalFactorModel
      lag ┼ Int64: 1
       rf ┼ nothing
       fx ┼ nothing
-      fr ┴ nothing
+      fr ┼ nothing
+  lambda ┼ nothing
+       c ┴ nothing
 ```
 
 # Related
@@ -559,6 +563,14 @@ CrossSectionalFactorModel
     Factor returns on the raw factor axis, `observations × factors`, on the rows of `csr.f` and with one column per column of `M`, or `nothing`. A block with a family re-basis carries it, and a block with none leaves it `nothing`, because its raw axis is the axis of [`cross_sectional_factor_returns`](@ref). The fit states the factor returns in the reduced basis of row `t - lag`, and `fcb` holds the basis of the rows of the block alone, so it cannot expand the first `lag` rows. The prior expands every row with the basis of its own history, and a consumer that needs a dropped factor's return, for example [`factor_model_summary`](@ref) and [`factor_attribution`](@ref), reads it here.
     """
     fr
+    """
+    Spanned Shrinkage the prior resolved, or `nothing` when the block was not built by a prior. A rule in the slot and a stated number are recorded alike, so a caller reads back the number the mean used.
+    """
+    lambda
+    """
+    Orthogonal Forecast Scale the prior resolved, or `nothing` when the block was not built by a prior. `b` is this scale times the unscaled orthogonal part of the Return Forecast.
+    """
+    c
     function CrossSectionalFactorModel(M::MatNum, L::Option{<:MatNum}, b::VecNum,
                                        csr::Option{<:CrossSectionalRegression},
                                        Ms::Option{<:Arr3Num}, vs::Option{<:MatNum},
@@ -569,7 +581,8 @@ CrossSectionalFactorModel
                                        fcb::Option{<:AbstractFactorFamilyBasis},
                                        lag::Option{<:Integer},
                                        rf::Option{<:AbstractReturnForecastResult},
-                                       fx::Option{<:MatNum}, fr::Option{<:MatNum})
+                                       fx::Option{<:MatNum}, fr::Option{<:MatNum},
+                                       lambda::Option{<:Number}, c::Option{<:Number})
         @argcheck(!isempty(M), IsEmptyError("M cannot be empty"))
         @argcheck(!isempty(b), IsEmptyError("b cannot be empty"))
         N = size(M, 1)
@@ -619,8 +632,11 @@ CrossSectionalFactorModel
         return new{typeof(M), typeof(L), typeof(b), typeof(csr), typeof(Ms), typeof(vs),
                    typeof(esigma), typeof(edof), typeof(ediv), typeof(rw), typeof(bw),
                    typeof(nf), typeof(fam), typeof(fcb), typeof(lag), typeof(rf),
-                   typeof(fx), typeof(fr)}(M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw,
-                                           nf, fam, fcb, lag, rf, fx, fr)
+                   typeof(fx), typeof(fr), typeof(lambda), typeof(c)}(M, L, b, csr, Ms, vs,
+                                                                      esigma, edof, ediv,
+                                                                      rw, bw, nf, fam, fcb,
+                                                                      lag, rf, fx, fr,
+                                                                      lambda, c)
     end
 end
 function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b::VecNum,
@@ -638,9 +654,11 @@ function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b
                                    lag::Option{<:Integer} = nothing,
                                    rf::Option{<:AbstractReturnForecastResult} = nothing,
                                    fx::Option{<:MatNum} = nothing,
-                                   fr::Option{<:MatNum} = nothing)::CrossSectionalFactorModel
+                                   fr::Option{<:MatNum} = nothing,
+                                   lambda::Option{<:Number} = nothing,
+                                   c::Option{<:Number} = nothing)::CrossSectionalFactorModel
     return CrossSectionalFactorModel(M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw, nf,
-                                     fam, fcb, lag, rf, fx, fr)
+                                     fam, fcb, lag, rf, fx, fr, lambda, c)
 end
 """
     cross_sectional_factor_returns(csfm::CrossSectionalFactorModel) -> MatNum
@@ -751,7 +769,8 @@ end
 # `Nothing` specialisation needs a rule (see [`@forward_properties`](@ref)'s `swap`).
 @forward_properties CrossSectionalFactorModel{<:Any, Nothing, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                              <:Any, <:Any, <:Any, <:Any, <:Any} begin
+                                              <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any} begin
     swap(L, M)
 end
 """
@@ -872,7 +891,8 @@ function port_opt_view(csfm::CrossSectionalFactorModel, i,
                                          nothing
                                      else
                                          port_opt_view(rf, i, args...)
-                                     end, fx = csfm.fx, fr = csfm.fr)
+                                     end, fx = csfm.fx, fr = csfm.fr, lambda = csfm.lambda,
+                                     c = csfm.c)
 end
 """
     regression(csfm::CrossSectionalFactorModel, args...)

@@ -102,6 +102,25 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         end
     end
 
+    @testset "A Calibration Rule resolves at each step (#1481)" begin
+        # A rule that reads the number of fitted observations moves at each step. The carry
+        # resolves it at the call with no data, as the batch fit over the same rows does.
+        nobs(k, p, w, s, x) = size(x.cs.csfm.vs, 1) / 1000
+        half(k, p, w, s, x) = 0.5
+        pe = CrossSectionalFactorPrior(;
+                                       merge(grid_config("FcFixed", rd),
+                                             (; lambda = half, c = nobs))...)
+        cs = Float64[]
+        for (k, x) in enumerate(stream(pe))
+            b = batch(pe, k)
+            @test x.pr.rr.c == b.rr.c == size(b.rr.vs, 1) / 1000
+            @test x.pr.rr.lambda == 0.5
+            @test agrees(x.pr, b)
+            push!(cs, x.pr.rr.c)
+        end
+        @test allunique(cs)
+    end
+
     @testset "The carried panel rows" begin
         # The Passthrough exposures read one row and the lag is one, so two rows are kept.
         pe = CrossSectionalFactorPrior(; style...)

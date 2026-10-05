@@ -1,11 +1,10 @@
 ```@meta
-Description = "Calibration Rules, private API of PortfolioOptimisers.jl: AbstractCalibrationAlgorithm, Num_SigCal, Num_DefCal, AbstractCalibrationSeries, …"
+Description = "Calibration Rules, private API of PortfolioOptimisers.jl: Num_SigCal, Num_DefCal, AbstractCalibrationSeries, AbstractDrawdownSeries, Num_AmbRadCal, …"
 ```
 
 # Calibration Rules: private API
 
 ```@docs
-AbstractCalibrationAlgorithm
 Num_SigCal
 Num_DefCal
 AbstractCalibrationSeries

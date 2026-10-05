@@ -217,8 +217,16 @@ A folding statistic may carry a memory beside its vector — the last `memory_ro
 - **PriorExpectedReturns**: the adapter that reads a Prior's mean as an expected-returns vector, so any `me` slot may hold a Prior; refuses a Prior that needs factor returns, because the expected-returns interface carries none. ADR 0158.
 
 **Return Forecast**
-A per-asset prediction of the next period's idiosyncratic return, supplied by the caller or fitted from Descriptor Scores, which a Prior splits against its latest Factor Exposures into a spanned part that blends into the factor mean and an orthogonal part that enters its mean vector under a confidence.
+A per-asset prediction of the next period's idiosyncratic return, supplied by the caller or fitted from Descriptor Scores, which a Prior splits against its latest Factor Exposures into a spanned part that blends into the factor mean and an orthogonal part that enters its mean vector under a scale.
 *Avoid*: `alpha` (§5), which is the Significance Level of a tail; and Expected Returns (above), which is a moment estimated from the sample.
+
+**Spanned Shrinkage**
+The weight in `[0, 1]` that a Cross-Sectional Factor Prior gives its fitted factor mean against the spanned part of its Return Forecast. A value of one keeps the fitted factor mean, and a value of zero takes the spanned part alone. It is a Calibration Slot (§3.9), so a Calibration Rule can compute it from the fit.
+*Avoid*: Orthogonal Forecast Scale (below), which scales the other part of the forecast.
+
+**Orthogonal Forecast Scale**
+The scale in `[0, ∞)` that multiplies the part of the Return Forecast that the latest Factor Exposures do not span, before that part enters the mean vector. A value of zero drops the part, and a value above one scales it up. It is a Calibration Slot (§3.9), so a Calibration Rule can compute it from the fit.
+*Avoid*: Spanned Shrinkage (above), which blends the other part of the forecast; and `orthogonal_scaling` of the orthogonal uncertainty sets, which scales a penalty and not a forecast.
 
 **Return Forecast Estimator**
 A producer of a Return Forecast, from Descriptor Scores and the factor-model block of the Prior it serves, or from a stated vector. It scores its Descriptors over the whole history of the `ReturnsResult` and reads the block on the block's own rows, which are the last rows of the `ReturnsResult`, so its Result is on the block's axis.
@@ -559,10 +567,11 @@ The upper bound on a norm of the weight vector, in a constraint rather than in t
 
 **Calibration Rule**
 A value in a slot that computes its own number from the Prior instead of stating one, resolved by Factory on the clustering route and by the risk-constraint route inside a JuMP build, so the containing type's constructor validates the result. Both routes hand the rule the same effective solver. A stated number holds the quantity still across a refit; a rule holds whatever the rule is defined in terms of still, and lets the quantity move. A rule is named for the method it runs, and carries the name of the quantity as a suffix only where the bare method word is already claimed by another rule or by a mathematical object. A rule states a default for every keyword it can, so a bare call constructs; the two rules whose keyword is the whole content of the rule state none, and each refuses a bare call with a message that names the quantity. ADR 0095 owns both lists.
+A Cross-Sectional Factor Prior resolves its own two slots inside its fit, after the split of its Return Forecast, so each fit, refit and online step moves them.
 *Avoid*: Radius Calibration (above), which is one specific conversion rather than the mechanism.
 
 **Calibration Slot**
-The field that holds a Calibration Rule, and the thing that names the quantity: the Significance Level of one end of the distribution, the Deformation Parameter (§5) of one end, the Ambiguity Radius, the Esfahani-Kuhn tail weight, or the Norm Ceiling. The slot's type bound names the one rule family that computes its quantity, so a rule of another family is refused at construction. The bound also admits a plain function of the rule's five arguments, which is the case that has no type: a function names no family, so the slot's own name is what states the quantity there. `LpRegularisation.val` is the one slot that names two quantities, and it is the one slot that admits no plain function. A caller therefore writes the rule alone, and the slot stores what the caller wrote. ADR 0095 owns the mechanism.
+The field that holds a Calibration Rule, and the thing that names the quantity: the Significance Level of one end of the distribution, the Deformation Parameter (§5) of one end, the Ambiguity Radius, the Esfahani-Kuhn tail weight, the Norm Ceiling, the Spanned Shrinkage (§3.1), or the Orthogonal Forecast Scale (§3.1). The slot's type bound names the one rule family that computes its quantity, so a rule of another family is refused at construction. The bound also admits a plain function of the rule's five arguments, which is the case that has no type: a function names no family, so the slot's own name is what states the quantity there. `LpRegularisation.val` is the one slot that names two quantities, and it is the one slot that admits no plain function. A caller therefore writes the rule alone, and the slot stores what the caller wrote. ADR 0095 owns the mechanism.
 *Avoid*: Calibration Rule (above), which is what a slot holds rather than the field that holds it.
 
 **Travelling Pair**
@@ -573,7 +582,7 @@ The series of the sample that a Calibration Rule reads: the returns, the absolut
 *Avoid*: Travelling Pair (above), which is a pair of slots rather than a property of the owner.
 
 **Calibration Context**
-The record of what a calibration site knows that the slot's key does not: the Significance Level of a sibling slot, the Calibration Series (above) the slot owner prices, and the norm order of the constraint or of the penalty the quantity stands in. It is the sixth argument of the resolver and the fifth of every Calibration Rule, so a rule reads the fields it needs and one that reads none names the type and ignores it. No rule holds a field for any of the three: each belongs to the site, and a rule cannot know which site it reached, so there is nothing on the rule to overwrite. A caller who runs a rule outside a measure builds the context the site would have built.
+The record of what a calibration site knows that the slot's key does not: the Significance Level of a sibling slot, the Calibration Series (above) the slot owner prices, and the norm order of the constraint or of the penalty the quantity stands in. A Cross-Sectional Factor Prior also states the two parts of its Return Forecast, its factor-model block and, when a rule asks for it, the forecast history. It is the sixth argument of the resolver and the fifth of every Calibration Rule, so a rule reads the fields it needs and one that reads none names the type and ignores it. No rule holds a field for any of them: each belongs to the site, and a rule cannot know which site it reached, so there is nothing on the rule to overwrite. A caller who runs a rule outside a measure builds the context the site would have built.
 *Avoid*: Travelling Pair (above), which is the ordering between two slots rather than the record the order produces.
 
 ## 4. Optimisation

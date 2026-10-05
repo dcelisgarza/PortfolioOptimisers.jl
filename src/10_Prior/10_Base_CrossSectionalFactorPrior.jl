@@ -1546,7 +1546,7 @@ Where:
   - $(math_dict[:B_T_cs])
   - $(math_dict[:K])
 
-The orthogonal part is ``\\boldsymbol{\\alpha} - \\mathbf{B}_{T} \\boldsymbol{g}`` and not the residual of the regression, so the intercept stays in it: the weighted mean of ``\\alpha^{\\perp}_{i}`` over ``\\mathcal{V}`` is ``c``. The split then adds up. The prior's expected return is ``\\mathbf{B}_{T} (\\lambda \\boldsymbol{\\mu}_{f} + (1 - \\lambda) \\boldsymbol{g}) + c_{\\alpha} \\boldsymbol{\\alpha}^{\\perp}``, which is ``\\boldsymbol{\\alpha}`` at ``\\lambda = 0`` and ``c_{\\alpha} = 1``, whatever the intercept. Without an intercept, ``\\mathbf{B}_{T,\\,\\mathcal{V}}^{\\intercal} \\mathbf{U} \\boldsymbol{\\alpha}^{\\perp}_{\\mathcal{V}} = \\boldsymbol{0}``, with ``\\mathbf{U}`` the diagonal matrix of the weights ``u_{i}``. The symbols ``\\lambda``, ``c_{\\alpha}`` and ``\\boldsymbol{\\mu}_{f}`` are the shrinkage, the confidence and the factor mean of [`CrossSectionalFactorPrior`](@ref).
+The orthogonal part is ``\\boldsymbol{\\alpha} - \\mathbf{B}_{T} \\boldsymbol{g}`` and not the residual of the regression, so the intercept stays in it: the weighted mean of ``\\alpha^{\\perp}_{i}`` over ``\\mathcal{V}`` is ``c``. The split then adds up. The prior's expected return is ``\\mathbf{B}_{T} (\\lambda \\boldsymbol{\\mu}_{f} + (1 - \\lambda) \\boldsymbol{g}) + c_{\\alpha} \\boldsymbol{\\alpha}^{\\perp}``, which is ``\\boldsymbol{\\alpha}`` at ``\\lambda = 0`` and ``c_{\\alpha} = 1``, whatever the intercept. Without an intercept, ``\\mathbf{B}_{T,\\,\\mathcal{V}}^{\\intercal} \\mathbf{U} \\boldsymbol{\\alpha}^{\\perp}_{\\mathcal{V}} = \\boldsymbol{0}``, with ``\\mathbf{U}`` the diagonal matrix of the weights ``u_{i}``. The symbols ``\\lambda``, ``c_{\\alpha}`` and ``\\boldsymbol{\\mu}_{f}`` are the Spanned Shrinkage, the Orthogonal Forecast Scale and the factor mean of [`CrossSectionalFactorPrior`](@ref).
 
 # Algorithm
 
@@ -1604,35 +1604,21 @@ end
     cross_sectional_return_forecast(rfe::Nothing, rd::ReturnsResult,
                                     csfm::CrossSectionalFactorModel,
                                     cre::AbstractCrossSectionalRegressionEstimator,
-                                    c::Real) -> NamedTuple
+                                    reads::Bool) -> NamedTuple
     cross_sectional_return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
                                     csfm::CrossSectionalFactorModel,
                                     cre::AbstractCrossSectionalRegressionEstimator,
-                                    c::Real) -> NamedTuple
+                                    reads::Bool) -> NamedTuple
 
-Fit the Return Forecast of a [`CrossSectionalFactorPrior`](@ref), and write its split onto the factor-model block.
+Fit the Return Forecast of a [`CrossSectionalFactorPrior`](@ref), and split it against the latest Factor Exposures.
 
-A prior that states no Return Forecast Estimator takes the method over `Nothing`. That method returns the block with the zero `b` that it carries, and a `g` of `nothing`, so the factor mean does not change.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\boldsymbol{b} &= c_{\\alpha} \\, \\boldsymbol{\\alpha}^{\\perp}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{b}``: Intercept of the block, one entry per asset.
-  - ``c_{\\alpha}``: Confidence in the orthogonal part of the forecast.
-  - $(math_dict[:alpha_perp]) [`cross_sectional_alpha_split`](@ref) states it.
+The split is unscaled. The Orthogonal Forecast Scale `c` can be a rule that reads the unscaled orthogonal part, so [`cross_sectional_calibration`](@ref) resolves `c` after this function, and [`cross_sectional_forecast_block`](@ref) then scales the part. A prior that states no Return Forecast Estimator takes the method over `Nothing`, which returns `nothing` in each entry, so the factor mean and the zero `b` do not change.
 
 # Algorithm
 
  1. Fit `rfe` on the coverage universe through [`return_forecast`](@ref), giving `rf`. `rd` holds every observation, so the Descriptors of the forecast warm up over every observation of the panel. [`return_forecast_rows`](@ref) finds the block as a suffix of `rd` by its size.
  2. Split `rf.mu` against the latest exposures of the estimated factors with [`cross_sectional_alpha_split`](@ref), giving `g` and `ap`. The observed factors are the trailing columns of `L`, and the split leaves them out, so `g` has one entry per column of `csr.f`.
- 3. Rebuild the block with `b = c * ap` and with `rf` in its field `rf`. Read `L` with `getfield`. The property `L` of [`CrossSectionalFactorModel`](@ref) gives `M` when `L` is unset, and the rebuilt block would then hold `M` as a set `L`.
+ 3. When `reads` is `true`, make the Return Forecast history once with [`forecast_history`](@ref), giving `hist`. Otherwise `hist` is `nothing`.
 
 # Arguments
 
@@ -1640,48 +1626,46 @@ Where:
   - $(arg_dict[:rd]) It is the full returns data that the estimated members of the prior read, and the block is a suffix of it. Under observed factors its `X` holds the returns net of them.
   - `csfm`: The factor-model block, built with a zero `b` and no Return Forecast.
   - `cre`: Cross-Sectional Regression Estimator of the split.
-  - `c`: Confidence in the orthogonal part of the forecast.
+  - `reads`: Whether a slot of the prior reads the Return Forecast history, as [`reads_forecast_history`](@ref) answers.
 
 # Validation
 
-  - The rules of [`return_forecast`](@ref) and of [`cross_sectional_alpha_split`](@ref).
+  - The rules of [`return_forecast`](@ref), of [`cross_sectional_alpha_split`](@ref) and, when `reads` is `true`, of [`forecast_history`](@ref).
 
 # Returns
 
-  - `rr::CrossSectionalFactorModel`: The block, with `b` and `rf` set.
-  - `g::Option{<:VecNum}`: The spanned coefficients, or `nothing` when the prior states no estimator.
+  - `rf::Option{<:AbstractReturnForecastResult}`: The Return Forecast Result, or `nothing`.
+  - `g::Option{<:VecNum}`: The spanned coefficients, or `nothing`.
+  - `ap::Option{<:VecNum}`: The unscaled orthogonal part, one entry per asset, or `nothing`.
+  - `hist::Option{<:MatNum}`: The Return Forecast history, `observations × assets`, or `nothing`.
 
 # Related
 
   - [`CrossSectionalFactorPrior`](@ref)
   - [`cross_sectional_alpha_split`](@ref)
+  - [`cross_sectional_calibration`](@ref)
+  - [`cross_sectional_forecast_block`](@ref)
   - [`cross_sectional_forecast_mu`](@ref)
   - [`return_forecast`](@ref)
 """
 function cross_sectional_return_forecast(::Nothing, ::ReturnsResult,
-                                         csfm::CrossSectionalFactorModel,
+                                         ::CrossSectionalFactorModel,
                                          ::AbstractCrossSectionalRegressionEstimator,
-                                         ::Real)
-    return (; rr = csfm, g = nothing)
+                                         ::Bool)
+    return (; rf = nothing, g = nothing, ap = nothing, hist = nothing)
 end
 function cross_sectional_return_forecast(rfe::AbstractReturnForecastEstimator,
                                          rd::ReturnsResult, csfm::CrossSectionalFactorModel,
                                          cre::AbstractCrossSectionalRegressionEstimator,
-                                         c::Real)
+                                         reads::Bool)
     rf = return_forecast(rfe, rd, csfm)
     rw = csfm.rw
     #! The observed factors are the trailing columns of `L`, and the fit observes their
     #! returns, so the forecast splits against the loadings the regression estimated.
     L = view(csfm.L, :, 1:size(csfm.csr.f, 2))
     (; g, ap) = cross_sectional_alpha_split(cre, rf.mu, L, @view(rw[size(rw, 1), :]))
-    return (;
-            rr = CrossSectionalFactorModel(; M = csfm.M, L = getfield(csfm, :L), b = c * ap,
-                                           csr = csfm.csr, Ms = csfm.Ms, vs = csfm.vs,
-                                           esigma = csfm.esigma, edof = csfm.edof,
-                                           ediv = csfm.ediv, rw = rw, bw = csfm.bw,
-                                           nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,
-                                           lag = csfm.lag, rf = rf, fx = csfm.fx,
-                                           fr = csfm.fr), g = g)
+    hist = reads ? forecast_history(rfe, rd, csfm) : nothing
+    return (; rf = rf, g = g, ap = ap, hist = hist)
 end
 """
     cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::Nothing) -> VecNum

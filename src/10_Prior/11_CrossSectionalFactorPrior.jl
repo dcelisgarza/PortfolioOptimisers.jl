@@ -1,6 +1,215 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
+Computes the Spanned Shrinkage, the `lambda` of a Cross-Sectional Factor Prior, from the fit.
+
+The Spanned Shrinkage blends the expected factor returns of the nested factor prior with the spanned coefficients `g` of the Return Forecast, and it lies in `[0, 1]`. A rule of this family stands in the `lambda` slot of [`CrossSectionalFactorPrior`](@ref), and [`Num_SpanShrinkCal`](@ref) is the bound of that slot, so a rule of another family is refused at construction.
+
+A rule is called as `alg(key, pr, w, slv, ctx)`, as [`resolve_calibration_slot`](@ref) states, and returns the shrinkage. `pr` is the prior that the nested factor prior states on the reduced factor axis, `w` is its observation weights, `slv` is `nothing`, and `ctx` is a [`CalibrationContext`](@ref) whose `cs` carries the spanned coefficients `g`, the unscaled orthogonal part `ap`, the block `csfm` and the history `hist`. The prior refuses a returned number outside `[0, 1]`. A rule that reads the Return Forecast history answers `true` to [`reads_forecast_history`](@ref).
+
+# Related
+
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`AbstractOrthogonalForecastScaleCalibrationAlgorithm`](@ref)
+  - [`Num_SpanShrinkCal`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_calibration`](@ref)
+"""
+abstract type AbstractSpannedShrinkageCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Computes the Orthogonal Forecast Scale, the `c` of a Cross-Sectional Factor Prior, from the fit.
+
+The Orthogonal Forecast Scale multiplies the part of the Return Forecast that the latest Factor Exposures do not span, and it lies in `[0, ∞)`. A rule of this family stands in the `c` slot of [`CrossSectionalFactorPrior`](@ref), and [`Num_OrthFcScaleCal`](@ref) is the bound of that slot, so a rule of another family is refused at construction.
+
+A rule is called on the same terms as a rule of [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref), and returns the scale. The prior refuses a returned number that is negative or not finite.
+
+# Related
+
+  - [`AbstractCalibrationAlgorithm`](@ref)
+  - [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref)
+  - [`Num_OrthFcScaleCal`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_calibration`](@ref)
+"""
+abstract type AbstractOrthogonalForecastScaleCalibrationAlgorithm <:
+              AbstractCalibrationAlgorithm end
+"""
+    const Num_SpanShrinkCal = Union{<:AbstractSpannedShrinkageCalibrationAlgorithm,
+                                    <:Function, <:Number}
+
+Field bound for the Spanned Shrinkage slot: the shrinkage itself, a rule of the family, or a plain function of the same five arguments.
+
+The bound names one family, so a rule of the Orthogonal Forecast Scale family in the `lambda` slot is refused at construction. A function carries no family, so the name of the slot states the quantity there, as for [`Num_SigCal`](@ref).
+
+# Related
+
+  - [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref)
+  - [`Num_OrthFcScaleCal`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+const Num_SpanShrinkCal = Union{<:AbstractSpannedShrinkageCalibrationAlgorithm, <:Function,
+                                <:Number}
+"""
+    const Num_OrthFcScaleCal = Union{<:AbstractOrthogonalForecastScaleCalibrationAlgorithm,
+                                     <:Function, <:Number}
+
+Field bound for the Orthogonal Forecast Scale slot: the scale itself, a rule of the family, or a plain function of the same five arguments. It is the counterpart of [`Num_SpanShrinkCal`](@ref), and carries its reading unchanged.
+
+# Related
+
+  - [`AbstractOrthogonalForecastScaleCalibrationAlgorithm`](@ref)
+  - [`Num_SpanShrinkCal`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+const Num_OrthFcScaleCal = Union{<:AbstractOrthogonalForecastScaleCalibrationAlgorithm,
+                                 <:Function, <:Number}
+"""
+    reads_forecast_history(rule) -> Bool
+
+Answer whether the occupant of a slot of a Cross-Sectional Factor Prior reads the Return Forecast history.
+
+A member that computes no history fits the Return Forecast again at each observation to make one, so the prior makes the history only when a slot asks for it, and it makes it once for both slots. [`forecast_history`](@ref) makes it, and the [`CalibrationContext`](@ref) carries it in `cs.hist`. The default answers `false`, so a stated number and a plain function never get the history. A rule type that reads it adds a method that answers `true`.
+
+# Arguments
+
+  - `rule`: The occupant of the slot.
+
+# Returns
+
+  - `flag::Bool`: Whether the occupant reads the Return Forecast history.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.reads_forecast_history(0.5)
+false
+```
+
+# Related
+
+  - [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref)
+  - [`AbstractOrthogonalForecastScaleCalibrationAlgorithm`](@ref)
+  - [`assert_forecast_history_rule`](@ref)
+  - [`forecast_history`](@ref)
+"""
+function reads_forecast_history(::Any)
+    return false
+end
+"""
+    assert_forecast_history_rule(slot, rfe::Nothing, key::Symbol)
+    assert_forecast_history_rule(slot, rfe::CustomValueReturnForecast, key::Symbol)
+    assert_forecast_history_rule(slot, rfe::AbstractReturnForecastEstimator, key::Symbol)
+
+Refuse a rule that reads the Return Forecast history in a slot of a Cross-Sectional Factor Prior whose forecast has no history.
+
+The constructor of [`CrossSectionalFactorPrior`](@ref) calls it on `lambda` and on `c`, so the refusal fires where the caller wrote the rule and not at the fit. A prior that states no Return Forecast Estimator has no forecast, and a [`CustomValueReturnForecast`](@ref) states one cross-section and fits none, so neither has a history. Every other member has one, and its method returns at once.
+
+# Arguments
+
+  - `slot`: The occupant of the slot.
+  - `rfe`: The Return Forecast Estimator of the prior, or `nothing`.
+  - `key`: Name of the slot, for the message.
+
+# Validation
+
+  - [`reads_forecast_history`](@ref) answers `false` for `slot` when `rfe` is `nothing` or a [`CustomValueReturnForecast`](@ref). Raises an `ArgumentError` that names the slot and the forecast.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`reads_forecast_history`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`forecast_history`](@ref)
+"""
+function assert_forecast_history_rule(slot, ::Nothing, key::Symbol)
+    @argcheck(!reads_forecast_history(slot),
+              ArgumentError("`$key` holds a rule, a `$(nameof(typeof(slot)))`, that reads the Return Forecast history, and `rfe` is `nothing`, so the prior has no Return Forecast and no history. State a Return Forecast Estimator in `rfe`, or put a rule that reads no history in `$key`."))
+    return nothing
+end
+function assert_forecast_history_rule(slot, ::CustomValueReturnForecast, key::Symbol)
+    @argcheck(!reads_forecast_history(slot),
+              ArgumentError("`$key` holds a rule, a `$(nameof(typeof(slot)))`, that reads the Return Forecast history, and `rfe` is a `CustomValueReturnForecast`, which states one cross-section and fits none, so no history of it exists. State a fitted Return Forecast Estimator in `rfe`, or put a rule that reads no history in `$key`."))
+    return nothing
+end
+function assert_forecast_history_rule(::Any, ::AbstractReturnForecastEstimator, ::Symbol)
+    return nothing
+end
+"""
+    assert_spanned_shrinkage(lambda::Number)
+    assert_spanned_shrinkage(lambda)
+
+Refuse a Spanned Shrinkage outside `[0, 1]`.
+
+The constructor of [`CrossSectionalFactorPrior`](@ref) calls it on the occupant of `lambda`, and [`cross_sectional_calibration`](@ref) calls it on the number a rule returns. A rule is checked once it is resolved, so the method for an occupant that is not a number returns at once.
+
+# Arguments
+
+  - `lambda`: The Spanned Shrinkage, or the rule that computes it.
+
+# Validation
+
+  - A number lies in `[0, 1]`, by [`assert_closed_unit_interval`](@ref). Raises a `DomainError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_orthogonal_forecast_scale`](@ref)
+  - [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function assert_spanned_shrinkage(lambda::Number)
+    assert_closed_unit_interval(lambda, :lambda)
+    return nothing
+end
+function assert_spanned_shrinkage(::Any)
+    return nothing
+end
+"""
+    assert_orthogonal_forecast_scale(c::Number)
+    assert_orthogonal_forecast_scale(c)
+
+Refuse an Orthogonal Forecast Scale that is negative or not finite.
+
+The scale multiplies the part of the Return Forecast that the factors do not span, so it lies in `[0, ∞)`, and a value above one is a valid scale. The constructor of [`CrossSectionalFactorPrior`](@ref) calls it on the occupant of `c`, and [`cross_sectional_calibration`](@ref) calls it on the number a rule returns. A rule is checked once it is resolved, so the method for an occupant that is not a number returns at once.
+
+# Arguments
+
+  - `c`: The Orthogonal Forecast Scale, or the rule that computes it.
+
+# Validation
+
+  - A number is finite, by [`assert_finite`](@ref). Raises a `DomainError`.
+  - A number is `>= 0`, by [`assert_nonneg`](@ref). Raises a `DomainError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_spanned_shrinkage`](@ref)
+  - [`AbstractOrthogonalForecastScaleCalibrationAlgorithm`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function assert_orthogonal_forecast_scale(c::Number)
+    assert_finite(c, :c)
+    assert_nonneg(c, :c)
+    return nothing
+end
+function assert_orthogonal_forecast_scale(::Any)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Estimates a point-in-time cross-sectional factor model from an Asset Panel, and lifts it onto the assets.
 
 The estimator reads per-asset Panel Fields, builds a Factor Exposure from each one, regresses the returns of every observation on the lagged exposures across the assets, and returns the asset moments beside a [`CrossSectionalFactorModel`](@ref) block. It is the cross-sectional counterpart of [`FactorPrior`](@ref), which regresses the returns of each asset on a factor-return series over time.
@@ -9,7 +218,9 @@ The factor list can also hold observed factors, whose returns the caller observe
 
 The warm-ups of a fit add up, so a caller who sizes a window must sum three of them rather than take the longest. The longest warm-up of the Descriptors sets the first observation of the factor-return history, and `lag` adds `lag` observations to it. `pe` then warms up over that history, and `ve` over the idiosyncratic returns beside it. The default `pe` and the default `ve` each need 40 observations, their `min_obs`, so a default fit needs 40 observations after the Descriptor warm-up and the lag. A window that covers the Descriptors alone can leave `pe` too few observations to state a factor covariance, and the fit then refuses with a message that names the cause. Cross-validation meets this most often. A fold gives the estimator its own rows alone, so the Descriptors warm up again in every fold, and a rolling train window never grows past the warm-up. Size the train window against the sum of the three warm-ups.
 
-On the online step the prior takes one of two routes. Unwrapped, it folds as a carry: its first step of [`partial_fit!`](@ref) seeds a [`CrossSectionalCarryState`](@ref), and each step computes the exposures, the regression and the idiosyncratic variance of the new observations alone. Wrapped in [`Online`](@ref), it refits: each step records the returns, both masks and the Panel Fields in a sample buffer, the call with no data `prior(pe)` is the batch fit over the rows of the buffer, and a `max_history` on the wrapper bounds them. When a member reads the Exogenous Series, as [`reads_exogenous_series`](@ref) answers, the buffer records every column of the series too, so an observed factor takes the refit. The carry fold does not record the series yet, so it refuses such a prior. The automatic choice of a dropped member reads every row, so `choice` states whether each fit chooses again or the first fit pins it.
+On the online step the prior takes one of two routes. Unwrapped, it folds as a carry: its first step of [`partial_fit!`](@ref) seeds a [`CrossSectionalCarryState`](@ref), and each step computes the exposures, the regression and the idiosyncratic variance of the new observations alone. Wrapped in [`Online`](@ref), it refits: each step records the returns, both masks and the Panel Fields in a sample buffer, the call with no data `prior(pe)` is the batch fit over the rows of the buffer, and a `max_history` on the wrapper bounds them. When a member reads the Exogenous Series, as [`reads_exogenous_series`](@ref) answers, the buffer records every column of the series too, so an observed factor takes the refit. The carry fold records the series of the rows it carries, so an observed factor takes the carry too. The automatic choice of a dropped member reads every row, so `choice` states whether each fit chooses again or the first fit pins it.
+
+`lambda` and `c` are Calibration Slots. Each holds a number, or a rule that computes the number from the fit: `lambda` takes a rule of [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref), and `c` takes a rule of [`AbstractOrthogonalForecastScaleCalibrationAlgorithm`](@ref). Each fit, each refit and each online step resolves the rules with [`cross_sectional_calibration`](@ref), after the split of the Return Forecast and before the mean. The block records the resolved numbers in its fields `lambda` and `c`.
 
 # Fields
 
@@ -32,7 +243,8 @@ $(DocStringExtensions.FIELDS)
                               bw::AbstractString = "benchmark_weights", lag::Integer = 1,
                               minra::Option{<:Integer} = nothing,
                               rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
-                              lambda::Real = 1.0, c::Real = 1.0,
+                              lambda::Num_SpanShrinkCal = 1.0,
+                              c::Num_OrthFcScaleCal = 1.0,
                               lx::Option{<:AbstractString} = nothing,
                               mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
                               ex::FLoops.Transducers.Executor = ThreadedEx(),
@@ -53,7 +265,9 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
   - Every factor whose Exposure Estimator reads benchmark weights names `bw` in its own `bw`, as [`assert_cross_sectional_benchmark_field`](@ref) states.
   - `lag` is `> 0`.
   - `minra`, when it is stated, is `> 0`.
-  - `lambda` and `c` lie in `[0, 1]`.
+  - A stated `lambda` lies in `[0, 1]`, by [`assert_spanned_shrinkage`](@ref).
+  - A stated `c` is finite and `>= 0`, by [`assert_orthogonal_forecast_scale`](@ref).
+  - A rule in `lambda` or in `c` that reads the Return Forecast history needs a fitted `rfe`, as [`assert_forecast_history_rule`](@ref) states. A rule of the wrong family is refused by the bound of the slot. The number a rule returns is checked when the prior resolves it.
 
 ## Propagated parameters
 
@@ -174,11 +388,11 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     @fprop rfe
     """
-    Shrinkage of the expected factor returns towards the spanned part of the Return Forecast, in `[0, 1]`. A value of one keeps the fitted factor mean, and a value of zero takes the spanned forecast alone. With no Return Forecast Estimator the spanned part is zero, so the value shrinks the factor mean towards zero.
+    Spanned Shrinkage of the expected factor returns towards the spanned part of the Return Forecast, in `[0, 1]`, or a rule that computes it. A value of one keeps the fitted factor mean, and a value of zero takes the spanned forecast alone. With no Return Forecast Estimator the spanned part is zero, so the value shrinks the factor mean towards zero. The bound is [`Num_SpanShrinkCal`](@ref).
     """
     lambda
     """
-    Confidence in the orthogonal part of the Return Forecast, in `[0, 1]`. It scales the part of the forecast the factors do not span, which the block carries in `b`. A value of zero discards it where it is finite. An asset whose forecast is not finite carries `NaN` in `b` whatever `c` is, because `0 * NaN` is `NaN`, so the prior states no expected return for it and it leaves the Investable Mask. A forecast that is not finite at every asset splits into two zero parts, and changes no moment.
+    Orthogonal Forecast Scale of the Return Forecast, in `[0, ∞)`, or a rule that computes it. It scales the part of the forecast the factors do not span, which the block carries in `b`. A value of zero discards it where it is finite, and a value above one scales it up. The bound is [`Num_OrthFcScaleCal`](@ref). An asset whose forecast is not finite carries `NaN` in `b` whatever `c` is, because `0 * NaN` is `NaN`, so the prior states no expected return for it and it leaves the Investable Mask. A forecast that is not finite at every asset splits into two zero parts, and changes no moment.
     """
     c
     """
@@ -214,7 +428,8 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        bp::Real, mcap::AbstractString, bw::AbstractString,
                                        lag::Integer, minra::Option{<:Integer},
                                        rfe::Option{<:AbstractReturnForecastEstimator},
-                                       lambda::Real, c::Real, lx::Option{<:AbstractString},
+                                       lambda::Num_SpanShrinkCal, c::Num_OrthFcScaleCal,
+                                       lx::Option{<:AbstractString},
                                        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
                                        ex::FLoops.Transducers.Executor,
                                        choice::AbstractChoiceRule,
@@ -237,8 +452,10 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         if !isnothing(minra)
             assert_gt0(minra, :minra)
         end
-        assert_closed_unit_interval(lambda, :lambda)
-        assert_closed_unit_interval(c, :c)
+        assert_spanned_shrinkage(lambda)
+        assert_orthogonal_forecast_scale(c)
+        assert_forecast_history_rule(lambda, rfe, :lambda)
+        assert_forecast_history_rule(c, rfe, :c)
         return new{typeof(factors), typeof(neutralise), typeof(families), typeof(cre),
                    typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(f_mp), typeof(mp),
                    typeof(th), typeof(bp), typeof(mcap), typeof(bw), typeof(lag),
@@ -279,7 +496,8 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    bw::AbstractString = "benchmark_weights",
                                    lag::Integer = 1, minra::Option{<:Integer} = nothing,
                                    rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
-                                   lambda::Real = 1.0, c::Real = 1.0,
+                                   lambda::Num_SpanShrinkCal = 1.0,
+                                   c::Num_OrthFcScaleCal = 1.0,
                                    lx::Option{<:AbstractString} = nothing,
                                    mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
@@ -290,6 +508,11 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                      cross_sectional_prior_option(families, :families), cre,
                                      wa, pe, ve, ce, f_mp, mp, th, bp, mcap, bw, lag, minra,
                                      rfe, lambda, c, lx, mtx_sqrt, ex, choice, cache)
+end
+# `lambda` and `c` are the two Calibration Slots of the prior. The prior resolves them itself,
+# inside `cross_sectional_assemble`, so the declaration serves the two `assert_` walks alone.
+function calibration_slots(pe::CrossSectionalFactorPrior)
+    return (; lambda = pe.lambda, c = pe.c)
 end
 """
     cross_sectional_prior_option(x::Nothing, sym::Sym_Str) -> nothing
@@ -360,8 +583,8 @@ Where:
   - $(math_dict[:alpha_t_fc]) The weight of an asset whose forecast or whose exposures are not finite is zero in the fit of ``\\boldsymbol{g}``.
   - ``\\hat{\\boldsymbol{\\mu}}_{f}``, ``\\hat{\\mathbf{\\Sigma}}_{f}``: Expected factor returns and factor covariance that the nested factor prior states over the factor returns ``\\boldsymbol{f}_{t}``.
   - ``\\tilde{\\boldsymbol{\\mu}}_{f}``: Blended expected factor returns, ``K \\times 1``.
-  - ``\\lambda \\in [0, 1]``: Shrinkage of the expected factor returns towards ``\\boldsymbol{g}``.
-  - ``c \\in [0, 1]``: Confidence in the part of the Return Forecast that the latest exposures do not span.
+  - ``\\lambda \\in [0, 1]``: Spanned Shrinkage of the expected factor returns towards ``\\boldsymbol{g}``. A rule in the slot gives the number it returns.
+  - ``c \\in [0, \\infty)``: Orthogonal Forecast Scale, the scale of the part of the Return Forecast that the latest exposures do not span. A rule in the slot gives the number it returns.
   - $(math_dict[:mu_er])
   - ``\\mathbf{\\Sigma}``: Asset covariance matrix, ``N \\times N``.
   - $(math_dict[:D_orth])
@@ -386,7 +609,7 @@ The prior states an entry exactly when the model determines it. An asset of ``\\
  9. Take the idiosyncratic variance history `vs` with [`variance_series`](@ref), under the active mask and the estimation mask of the fitted observations. An estimator that reads the masks resets an asset that the active mask turns off, and measures its regime over the estimation universe alone. An estimator that reads no mask ignores them. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`, and take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation. Record the degrees of freedom and the divisor of each variance with [`variance_count`](@ref) and [`cross_sectional_variance_counts`](@ref).
 10. Append the observed factors after the estimated ones with [`cross_sectional_observed_append`](@ref): the observed returns after the factor returns, the observed exposures after the loadings and the exposure history, the names and the family labels, and pass-through factors on the Factor Family Basis. Fit `pe.pe` on the combined reduced factor returns of the factors that are not empty with [`cross_sectional_factor_moments`](@ref), giving `f_pr`, which refuses a non-finite factor moment and processes the factor covariance under `pe.f_mp`, the matrix processing estimator of the factor axis and not the asset one. An Observed Factor is never empty. The method passes `strict` to `pe.pe`, as [`FactorPrior`](@ref) does, because the slot admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe. [`cross_sectional_assemble`](@ref) runs the standardisation and the counts of step 9 and the steps 11 to 17, and the call with no data of the carry fold runs it too.
 11. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, a zero `b`, and the observed returns in `fx`. Under a family re-basis, expand the combined factor returns onto the raw axis with [`cross_sectional_expand`](@ref), each row with the basis of its lagged exposures, and store them in `fr`.
-12. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the full returns data that the estimated members read, so that a Descriptor of the forecast warms up over every observation the panel has, giving the block `rr` with the orthogonal part in `b` and the Result in `rf`. Under observed factors the forecast thus reads `Xl`, and it forecasts the net return of each asset, which the split measures against loadings of the same returns. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref), and keep the mean of the observed factors, giving `f_mu`.
+12. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the full returns data that the estimated members read, so that a Descriptor of the forecast warms up over every observation the panel has, giving the spanned coefficients `g` and the unscaled orthogonal part `ap`. Under observed factors the forecast thus reads `Xl`, and it forecasts the net return of each asset, which the split measures against loadings of the same returns. Resolve `lambda` and `c` with [`cross_sectional_calibration`](@ref), and write `b = c ap`, the Result and the two numbers onto the block `rr` with [`cross_sectional_forecast_block`](@ref). Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref), and keep the mean of the observed factors, giving `f_mu`.
 13. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named. Its factor returns are `fr`, or the combined factor returns when no family is constrained.
 14. Take the investable assets `idx` with [`cross_sectional_investable`](@ref).
 15. Rebuild the asset return scenarios `Xs` with [`cross_sectional_scenarios`](@ref).
@@ -518,11 +741,13 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
  1. Record the degrees of freedom and the divisor of each variance with [`cross_sectional_variance_counts`](@ref), from the count `cnt`.
  2. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`. Take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation.
  3. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, and a zero `b`. Under a family re-basis, expand the factor returns onto the raw axis with [`cross_sectional_expand`](@ref), each row with the basis of its lagged exposures, and store them in `fr`.
- 4. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref) on `rde`, giving the block `rr` with the orthogonal part in `b`. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref), and keep the mean of the observed factors, giving `f_mu`.
- 5. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref).
- 6. Take the investable assets `idx` with [`cross_sectional_investable`](@ref), and rebuild the asset return scenarios `Xs` with [`cross_sectional_scenarios`](@ref).
- 7. Lift the reduced factor distribution onto the assets with [`cross_sectional_lift`](@ref), and add `b` to the expected return it answers.
- 8. Assemble a [`LowOrderPrior`](@ref) over `Xs`, with the base-currency returns of the scenario rows under `o_X`, the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the block under `rr`, and the expanded factor prior under `fpr`.
+ 4. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref) on `rde`, giving the spanned coefficients `g`, the unscaled orthogonal part `ap`, and the history when a slot answers `true` to [`reads_forecast_history`](@ref).
+ 5. Resolve the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` with [`cross_sectional_calibration`](@ref), against the factor moments `f_pr` and the block `csfm`.
+ 6. Write `b = c ap`, the Return Forecast Result and the resolved `lambda` and `c` onto the block with [`cross_sectional_forecast_block`](@ref), giving `rr`. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref) under the resolved `lambda`, and keep the mean of the observed factors, giving `f_mu`.
+ 7. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref).
+ 8. Take the investable assets `idx` with [`cross_sectional_investable`](@ref), and rebuild the asset return scenarios `Xs` with [`cross_sectional_scenarios`](@ref).
+ 9. Lift the reduced factor distribution onto the assets with [`cross_sectional_lift`](@ref), and add `b` to the expected return it answers.
+10. Assemble a [`LowOrderPrior`](@ref) over `Xs`, with the base-currency returns of the scenario rows under `o_X`, the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the block under `rr`, and the expanded factor prior under `fpr`.
 
 # Arguments
 
@@ -536,7 +761,7 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
 # Validation
 
   - At least one asset is investable at the latest observation. Raises an [`IsEmptyError`](@ref).
-  - The rules of every verb the algorithm names.
+  - The rules of every verb the algorithm names. A resolved `lambda` lies in `[0, 1]`, and a resolved `c` is finite and `>= 0`.
 
 # Returns
 
@@ -580,11 +805,16 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
                                      lag = pe.lag, fx = ca.fx, fr = fr)
     # The forecast reads the returns the estimated members read, so under observed factors it
     # forecasts the net return, which the split measures against loadings of the same returns.
-    (; rr, g) = cross_sectional_return_forecast(pe.rfe, rde, csfm, pe.cre, pe.c)
+    # The split comes first and the scale after it, because a rule in `c` reads the unscaled
+    # orthogonal part.
+    reads = reads_forecast_history(pe.lambda) || reads_forecast_history(pe.c)
+    sp = cross_sectional_return_forecast(pe.rfe, rde, csfm, pe.cre, reads)
+    (; lambda, c) = cross_sectional_calibration(pe, f_pr, csfm, sp)
+    rr = cross_sectional_forecast_block(csfm, sp, lambda, c)
     # The forecast spans the estimated factors alone, so the blend reaches their mean and
     # the mean of each observed factor is the one the factor prior states.
     Ke = size(csr.f, 2)
-    f_mu = @views vcat(cross_sectional_forecast_mu(pe.lambda, f_pr.mu[1:Ke], g),
+    f_mu = @views vcat(cross_sectional_forecast_mu(lambda, f_pr.mu[1:Ke], sp.g),
                        f_pr.mu[(Ke + 1):end])
     ex = cross_sectional_expand(ca.fcb, r, f_mu, f_pr.sigma)
     ev = vs[end, :]
@@ -603,6 +833,115 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
     return LowOrderPrior(; X = Xs, o_X = Xo[rs, :], mu = lift.mu + rr.b, sigma = lift.sigma,
                          chol = lift.chol, w = f_pr.w, ens = f_pr.ens, kld = f_pr.kld,
                          ow = f_pr.ow, rr = rr, fpr = fpr)
+end
+"""
+    cross_sectional_calibration(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
+                                csfm::CrossSectionalFactorModel, sp::NamedTuple) -> NamedTuple
+
+Resolves the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` of a [`CrossSectionalFactorPrior`](@ref) against its fit.
+
+[`cross_sectional_assemble`](@ref) calls it after the split of the Return Forecast and before the mean, so the batch fit, the refit and each online step of the carry fold resolve the two slots alike. A stated number passes through [`resolve_calibration_slot`](@ref) unchanged, and the range check then applies to it as to the number of a rule.
+
+# Algorithm
+
+ 1. Put the factor moments `f_pr` into a [`LowOrderPrior`](@ref) `pr`, on the reduced factor axis of the estimated factors and the observed factors.
+ 2. Build a [`CalibrationContext`](@ref) whose `cs` holds the spanned coefficients `g`, the unscaled orthogonal part `ap` and the history `hist` of `sp`, and the block `csfm`.
+ 3. Resolve `pe.lambda` under the key `:lambda` and `pe.c` under the key `:c` with [`resolve_calibration_slot`](@ref), against `pr`, its observation weights `pr.w`, no solver, and the context.
+ 4. Refuse a resolved `lambda` outside `[0, 1]` with [`assert_spanned_shrinkage`](@ref), and a resolved `c` that is negative or not finite with [`assert_orthogonal_forecast_scale`](@ref).
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - `f_pr`: The factor moments that [`cross_sectional_factor_moments`](@ref) states over the combined reduced factor returns.
+  - `csfm`: The factor-model block, with a zero `b` and no Return Forecast.
+  - `sp`: The split of the Return Forecast, `(; rf, g, ap, hist)`, as [`cross_sectional_return_forecast`](@ref) states it.
+
+# Validation
+
+  - Each slot resolves to a number. Raises a `TypeError` otherwise.
+  - The rules of [`assert_spanned_shrinkage`](@ref) and [`assert_orthogonal_forecast_scale`](@ref) on the resolved numbers.
+
+# Returns
+
+  - `lambda::Number`: The resolved Spanned Shrinkage.
+  - `c::Number`: The resolved Orthogonal Forecast Scale.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_assemble`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`CalibrationContext`](@ref)
+  - [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref)
+  - [`AbstractOrthogonalForecastScaleCalibrationAlgorithm`](@ref)
+"""
+function cross_sectional_calibration(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
+                                     csfm::CrossSectionalFactorModel, sp::NamedTuple)
+    pr = LowOrderPrior(; X = f_pr.X, mu = f_pr.mu, sigma = f_pr.sigma, w = f_pr.w,
+                       ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow)
+    ctx = CalibrationContext(; cs = (; g = sp.g, ap = sp.ap, csfm = csfm, hist = sp.hist))
+    lambda = resolve_calibration_slot(pe.lambda, :lambda, pr, pr.w, nothing, ctx)
+    c = resolve_calibration_slot(pe.c, :c, pr, pr.w, nothing, ctx)
+    assert_spanned_shrinkage(lambda::Number)
+    assert_orthogonal_forecast_scale(c::Number)
+    return (; lambda = lambda, c = c)
+end
+"""
+    cross_sectional_forecast_block(csfm::CrossSectionalFactorModel, sp::NamedTuple,
+                                   lambda::Number, c::Number) -> CrossSectionalFactorModel
+
+Write the scaled orthogonal part of the Return Forecast, the Return Forecast Result and the resolved Calibration Slots onto the block of a [`CrossSectionalFactorPrior`](@ref).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{b} &= c_{\\alpha} \\, \\boldsymbol{\\alpha}^{\\perp}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{b}``: Factor-orthogonal expected return of the block, one entry per asset.
+  - ``c_{\\alpha}``: Orthogonal Forecast Scale, the resolved `c`.
+  - $(math_dict[:alpha_perp]) [`cross_sectional_alpha_split`](@ref) states it.
+
+# Algorithm
+
+ 1. Take `b = c * sp.ap`, or the zero `b` of `csfm` when the prior states no Return Forecast Estimator.
+ 2. Rebuild the block with `b`, with `sp.rf` in its field `rf`, and with `lambda` and `c` in its fields of the same names. Read `L` with `getfield`. The property `L` of [`CrossSectionalFactorModel`](@ref) gives `M` when `L` is unset, and the rebuilt block would then hold `M` as a set `L`.
+
+# Arguments
+
+  - `csfm`: The factor-model block, built with a zero `b` and no Return Forecast.
+  - `sp`: The split of the Return Forecast, `(; rf, g, ap, hist)`, as [`cross_sectional_return_forecast`](@ref) states it.
+  - `lambda`: The resolved Spanned Shrinkage.
+  - `c`: The resolved Orthogonal Forecast Scale.
+
+# Validation
+
+  - The rules of [`CrossSectionalFactorModel`](@ref).
+
+# Returns
+
+  - `rr::CrossSectionalFactorModel`: The block, with `b`, `rf`, `lambda` and `c` set.
+
+# Related
+
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_return_forecast`](@ref)
+  - [`cross_sectional_calibration`](@ref)
+"""
+function cross_sectional_forecast_block(csfm::CrossSectionalFactorModel, sp::NamedTuple,
+                                        lambda::Number, c::Number)
+    b = isnothing(sp.ap) ? csfm.b : c * sp.ap
+    return CrossSectionalFactorModel(; M = csfm.M, L = getfield(csfm, :L), b = b,
+                                     csr = csfm.csr, Ms = csfm.Ms, vs = csfm.vs,
+                                     esigma = csfm.esigma, edof = csfm.edof,
+                                     ediv = csfm.ediv, rw = csfm.rw, bw = csfm.bw,
+                                     nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,
+                                     lag = csfm.lag, rf = sp.rf, fx = csfm.fx, fr = csfm.fr,
+                                     lambda = lambda, c = c)
 end
 """
     cross_sectional_exposure_stage(pe::CrossSectionalFactorPrior, X::MatNum,

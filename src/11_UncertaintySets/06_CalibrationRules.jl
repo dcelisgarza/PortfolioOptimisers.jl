@@ -1,32 +1,6 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes a calibrated quantity — a tail probability, a deformation parameter, an ambiguity radius, an Esfahani-Kuhn tail weight or a norm ceiling — from the data a prior result carries, so that the quantity refits whenever the sample moves.
-
-All concrete subtypes should subtype one of the families under this root rather than the root itself, and `# Related` names them. A plain number in place of a rule is the quantity itself, exactly as it is today.
-
-A rule is named for the **method** it runs, and carries the name of the quantity as a suffix only where the bare method word is already claimed. [`ScenarioCount`](@ref), [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref) and [`EffectiveAssetFloor`](@ref) name a method and stop there. Five names carry the quantity, and each of the five earns it. [`RateSignificance`](@ref) and [`RateRadius`](@ref) are one method over two quantities, so neither may hold the bare word `Rate`, and [`DimensionalRateRadius`](@ref) carries that same stem under a prefix. [`ConcentrationRadius`](@ref) and [`DualNormRadius`](@ref) are each named after a mathematical object, so the bare word would name the object rather than the rule.
-
-A rule states a default for every keyword it can, so a bare call constructs. Two rules state none, because the quantity the keyword takes is the whole content of the rule and no value suits every sample. [`ScenarioCount`](@ref) and [`EntropyBudget`](@ref) are those two. The keyword of each stands at `nothing`, which is not a value of the quantity, so a bare call is refused with a message that names the quantity, the reason there is no default, and a value to start from.
-
-A rule states the **method** and nothing else. The **slot** states the quantity: `alpha` names the lower tail, `kappa` names the deformation parameter, `r` names an ambiguity radius and `l2c` names a norm ceiling. So the caller writes the rule alone, and each slot's `Num_` bound names the one family that has a reading in that slot. A rule of another family is refused at construction, by the bound.
-
-A **Calibration Rule** is not a [`DeferredQuantity`](@ref), and the two mechanisms stay parallel end to end. A Deferred Quantity is *fitted* and the quantity is read off the fit; a rule fits nothing, and reads the sample size and the moments the prior result already carries. A rule also sees the effective observation weights, which [`resolve_slot`](@ref) does not carry. So a rule resolves through [`resolve_calibration_slot`](@ref), is declared through [`calibration_slots`](@ref), and is refused at a value-level entry point by [`assert_calibrated_slots`](@ref).
-
-# Related
-
-  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
-  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
-  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
-  - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
-  - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`DeferredQuantity`](@ref)
-"""
-abstract type AbstractCalibrationAlgorithm <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Computes a significance level, the tail probability that an `alpha` or a `beta` slot holds.
 
 All concrete subtypes should subtype `AbstractSignificanceCalibrationAlgorithm`, and should be **callable**, because [`resolve_calibration_slot`](@ref) runs a rule by calling it. A plain `Function` of the same five arguments is therefore a rule as well, and needs no type at all. [`Num_SigCal`](@ref) is the bound of every significance slot, and it names this family. So a deformation rule in a significance slot is refused at construction, and the same rule serves the lower tail and the upper tail, because the slot names the end.
@@ -512,17 +486,20 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries what a calibration site knows and the slot's key does not, from [`resolve_calibration_slot`](@ref) into the rule it runs.
 
-A rule is run by calling it, as `alg(key, pr, w, slv, ctx)`. `key` names the **slot** and not the quantity: `:kappa` serves both [`RelativisticValueatRisk`](@ref) and [`RelativisticDrawdownatRisk`](@ref), and those two price different series. Three quantities a rule may read are therefore properties of the site rather than of the key, and this type is how the site states them.
+A rule is run by calling it, as `alg(key, pr, w, slv, ctx)`. `key` names the **slot** and not the quantity: `:kappa` serves both [`RelativisticValueatRisk`](@ref) and [`RelativisticDrawdownatRisk`](@ref), and those two price different series. The quantities below are therefore properties of the site rather than of the key, and this type is how the site states them.
 
-| Field    | The site that states it                                  | The rules that read it                                                                                                                                                 |
-|:-------- |:-------------------------------------------------------- |:---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alpha`  | the slot owner, off a **sibling slot** it resolved first | [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref)                                                                  |
-| `series` | the slot owner, through [`calibration_series`](@ref)     | [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`ConcentrationRadius`](@ref), [`DimensionalRateRadius`](@ref), [`DualNormRadius`](@ref), [`TailTermParity`](@ref) |
-| `p`      | the constraint or the penalty the quantity stands in     | [`EffectiveAssetFloor`](@ref), [`DualNormRadius`](@ref)                                                                                                                |
+| Field    | The site that states it                                                       | The rules that read it                                                                                                                                                 |
+|:-------- |:----------------------------------------------------------------------------- |:---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alpha`  | the slot owner, off a **sibling slot** it resolved first                      | [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref)                                                                  |
+| `series` | the slot owner, through [`calibration_series`](@ref)                          | [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`ConcentrationRadius`](@ref), [`DimensionalRateRadius`](@ref), [`DualNormRadius`](@ref), [`TailTermParity`](@ref) |
+| `p`      | the constraint or the penalty the quantity stands in                          | [`EffectiveAssetFloor`](@ref), [`DualNormRadius`](@ref)                                                                                                                |
+| `cs`     | a [`CrossSectionalFactorPrior`](@ref), after the split of its Return Forecast | a rule of [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref) or of [`AbstractOrthogonalForecastScaleCalibrationAlgorithm`](@ref)                                   |
 
-**No rule holds a field for any of the three.** Each belongs to the site, and a rule cannot know which site it reached, so there is no value on the rule for a site to overwrite and no precedence between the two to state. A caller who runs a rule outside a measure builds the context the site would have built, and that context is the only place the three are ever written.
+**No rule holds a field for any of them.** Each belongs to the site, and a rule cannot know which site it reached, so there is no value on the rule for a site to overwrite and no precedence between the two to state. A caller who runs a rule outside a measure builds the context the site would have built, and that context is the only place these quantities are ever written.
 
-The default is the context a site with nothing to say hands over: no sibling significance level, no norm order, and the [`ReturnsSeries`](@ref) that [`calibration_series`](@ref) answers for every owner that names no other. A rule that needs a field the default leaves at `nothing` refuses, and its message names the field it wanted.
+**`cs` comes from the Cross-Sectional Factor Prior alone.** Its Spanned Shrinkage `lambda` and its Orthogonal Forecast Scale `c` resolve inside [`prior`](@ref), after the Return Forecast is split and before the mean is formed. The prior states `cs = (; g, ap, csfm, hist)`: the spanned coefficients `g`, the unscaled orthogonal part `ap`, the factor-model block `csfm` and the Return Forecast history `hist`. The block carries the idiosyncratic variance history `vs` and the regression weights `rw`, so a rule reads them off `csfm`. The block holds a zero `b` and no Return Forecast, because the scale is not resolved yet. No other site states `cs`.
+
+The default is the context a site with nothing to say hands over: no sibling significance level, no norm order, no `cs`, and the [`ReturnsSeries`](@ref) that [`calibration_series`](@ref) answers for every owner that names no other. A rule that needs a field the default leaves at `nothing` refuses, and its message names the field it wanted.
 
 **The order between two slots of one owner is what makes `alpha` reachable.** A deformation rule reads the significance level of a sibling slot, so the owner's own [`resolve_deferred_quantities`](@ref) method resolves `alpha` first and puts the number in the context of the slot that reads it. No derivation can find that order, which is the reason the resolution is written per type.
 
@@ -535,7 +512,8 @@ $(DocStringExtensions.FIELDS)
     CalibrationContext(;
         alpha::Option{<:Number} = nothing,
         series::AbstractCalibrationSeries = ReturnsSeries(),
-        p::Option{<:Number} = nothing
+        p::Option{<:Number} = nothing,
+        cs::Option{<:NamedTuple} = nothing
     ) -> CalibrationContext
 
 Keywords correspond to the struct's fields. Every field defaults to the state a site that names nothing hands over.
@@ -548,6 +526,7 @@ Keywords correspond to the struct's fields. Every field defaults to the state a 
   - [`calibration_series`](@ref)
   - [`calibration_slots`](@ref)
   - [`ReturnsSeries`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
 """
 @concrete struct CalibrationContext <: AbstractResult
     """
@@ -562,15 +541,21 @@ Keywords correspond to the struct's fields. Every field defaults to the state a 
     $(field_dict[:cal_ctx_p])
     """
     p
+    """
+    $(field_dict[:cal_ctx_cs])
+    """
+    cs
     function CalibrationContext(alpha::Option{<:Number}, series::AbstractCalibrationSeries,
-                                p::Option{<:Number})
-        return new{typeof(alpha), typeof(series), typeof(p)}(alpha, series, p)
+                                p::Option{<:Number}, cs::Option{<:NamedTuple})
+        return new{typeof(alpha), typeof(series), typeof(p), typeof(cs)}(alpha, series, p,
+                                                                         cs)
     end
 end
 function CalibrationContext(; alpha::Option{<:Number} = nothing,
                             series::AbstractCalibrationSeries = ReturnsSeries(),
-                            p::Option{<:Number} = nothing)
-    return CalibrationContext(alpha, series, p)
+                            p::Option{<:Number} = nothing,
+                            cs::Option{<:NamedTuple} = nothing)
+    return CalibrationContext(alpha, series, p, cs)
 end
 """
     resolve_calibration_slot(slot, key::Symbol, pr::AbstractPriorResult, w, slv = nothing,

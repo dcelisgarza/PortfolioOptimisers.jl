@@ -948,6 +948,160 @@ end
     end
 end
 
+# Test-local rules of the two families of `lambda` and `c` (issue #1481). No rule of either family
+# ships yet, so the tests state their own. Each returns a stated number and records what the
+# prior handed it, so a test reads back the key, the factor moments and the context.
+struct CsfpProbeShrinkage <:
+       PortfolioOptimisers.AbstractSpannedShrinkageCalibrationAlgorithm
+    v::Float64
+    seen::Vector{Any}
+end
+CsfpProbeShrinkage(v) = CsfpProbeShrinkage(v, Any[])
+function (r::CsfpProbeShrinkage)(key, pr, w, slv, ctx)
+    push!(r.seen, (; key = key, pr = pr, w = w, slv = slv, ctx = ctx))
+    return r.v
+end
+struct CsfpProbeScale <:
+       PortfolioOptimisers.AbstractOrthogonalForecastScaleCalibrationAlgorithm
+    v::Float64
+    seen::Vector{Any}
+end
+CsfpProbeScale(v) = CsfpProbeScale(v, Any[])
+function (r::CsfpProbeScale)(key, pr, w, slv, ctx)
+    push!(r.seen, (; key = key, pr = pr, w = w, slv = slv, ctx = ctx))
+    return r.v
+end
+# A rule that reads the Return Forecast history declares it through the trait.
+struct CsfpProbeHistoryScale <:
+       PortfolioOptimisers.AbstractOrthogonalForecastScaleCalibrationAlgorithm
+    seen::Vector{Any}
+end
+CsfpProbeHistoryScale() = CsfpProbeHistoryScale(Any[])
+PortfolioOptimisers.reads_forecast_history(::CsfpProbeHistoryScale) = true
+function (r::CsfpProbeHistoryScale)(key, pr, w, slv, ctx)
+    push!(r.seen, ctx.cs.hist)
+    return 1.0
+end
+
+@testset "lambda and c are Calibration Slots" begin
+    PO = PortfolioOptimisers
+    rd, factors = csfp_reference_case()
+    rfe = FixedWeightedReturnForecast(;
+                                      scores = DescriptorScores(;
+                                                                descriptors = [Passthrough(;
+                                                                                           field = "signal")],
+                                                                outlier = nothing,
+                                                                scoring = nothing),
+                                      scale = 0.02)
+    csfp(; kwargs...) = CrossSectionalFactorPrior(; factors = factors,
+                                                  pe = EmpiricalPrior(), rfe = rfe,
+                                                  kwargs...)
+    @testset "The defaults are the stated numbers, and the block records them" begin
+        pe = csfp()
+        @test pe.lambda == 1.0
+        @test pe.c == 1.0
+        @test PO.calibration_slots(pe) == (; lambda = 1.0, c = 1.0)
+        pr = prior(pe, rd)
+        @test pr.rr.lambda == 1.0
+        @test pr.rr.c == 1.0
+        # A prior with no Return Forecast records the two numbers too.
+        pr0 = prior(CrossSectionalFactorPrior(; factors = factors, lambda = 0.25), rd)
+        @test pr0.rr.lambda == 0.25
+        @test pr0.rr.c == 1.0
+    end
+    @testset "A rule of each family and a plain function reach mu and the block" begin
+        ref = prior(csfp(; lambda = 0.3, c = 1.5), rd)
+        rl = CsfpProbeShrinkage(0.3)
+        rc = CsfpProbeScale(1.5)
+        pr = prior(csfp(; lambda = rl, c = rc), rd)
+        # The rule returns the stated number, so the fit is the fit of that number, bit for
+        # bit, and the block records the number the mean used.
+        @test isequal(pr.mu, ref.mu)
+        @test isequal(pr.rr.b, ref.rr.b)
+        @test pr.rr.lambda == 0.3
+        @test pr.rr.c == 1.5
+        @test length(rl.seen) == 1
+        @test length(rc.seen) == 1
+        sl = only(rl.seen)
+        sc = only(rc.seen)
+        @test sl.key === :lambda
+        @test sc.key === :c
+        # The rule reads the factor moments of the nested factor prior, on the reduced factor
+        # axis, its observation weights, no solver, and the fit of the prior in `ctx.cs`.
+        @test isa(sl.pr, LowOrderPrior)
+        # `fpr.mu` is the factor mean after the blend, so the factor mean the rule reads is the
+        # one a fit at `lambda = 1` states. No family is constrained, so the two axes agree.
+        @test sl.pr.mu == prior(csfp(; lambda = 1.0, c = 1.5), rd).fpr.mu
+        @test sl.w === sl.pr.w
+        @test isnothing(sl.slv)
+        @test sl.ctx.cs.g == sc.ctx.cs.g
+        @test length(sl.ctx.cs.g) == size(pr.rr.csr.f, 2)
+        # The orthogonal part reaches the rule unscaled, and the block holds it scaled.
+        @test isequal(1.5 * sc.ctx.cs.ap, pr.rr.b)
+        @test isa(sc.ctx.cs.csfm, CrossSectionalFactorModel)
+        @test iszero(sc.ctx.cs.csfm.b)
+        # The variance history holds `NaN` in its warm-up rows.
+        @test isequal(sc.ctx.cs.csfm.vs, pr.rr.vs)
+        @test isequal(sc.ctx.cs.csfm.rw, pr.rr.rw)
+        @test isnothing(sc.ctx.cs.hist)
+        # A plain function of the same five arguments is a rule as well.
+        prf = prior(csfp(; lambda = (k, p, w, s, x) -> 0.3, c = (k, p, w, s, x) -> 1.5), rd)
+        @test isequal(prf.mu, ref.mu)
+        @test prf.rr.lambda == 0.3
+        @test prf.rr.c == 1.5
+    end
+    @testset "A rule of the other family, or of another quantity, is refused by the bound" begin
+        @test_throws TypeError csfp(; lambda = CsfpProbeScale(0.5))
+        @test_throws TypeError csfp(; c = CsfpProbeShrinkage(0.5))
+        @test_throws TypeError csfp(; lambda = RateSignificance())
+        @test_throws TypeError csfp(; c = RateSignificance())
+    end
+    @testset "c is a scale in [0, Inf), and lambda stays in [0, 1]" begin
+        @test csfp(; c = 1.5).c == 1.5
+        @test_throws DomainError csfp(; c = -0.1)
+        @test_throws DomainError csfp(; c = Inf)
+        @test_throws DomainError csfp(; c = NaN)
+        @test_throws DomainError csfp(; lambda = 1.5)
+        @test_throws DomainError csfp(; lambda = -0.1)
+        # A rule is checked once it is resolved, so a number out of range is refused at the
+        # fit, by the same check a stated number meets.
+        @test_throws DomainError prior(csfp(; c = CsfpProbeScale(-0.2)), rd)
+        @test_throws DomainError prior(csfp(; c = (k, p, w, s, x) -> Inf), rd)
+        @test_throws DomainError prior(csfp(; lambda = CsfpProbeShrinkage(1.2)), rd)
+        # A rule must resolve to a number.
+        @test_throws TypeError prior(csfp(; lambda = (k, p, w, s, x) -> nothing), rd)
+        # A scale above one scales the orthogonal part up.
+        pr1 = prior(csfp(; c = 1.0), rd)
+        pr2 = prior(csfp(; c = 2.0), rd)
+        @test isapprox(pr2.rr.b, 2 * pr1.rr.b; rtol = 1e-15)
+    end
+    @testset "A rule that reads the Return Forecast history" begin
+        @test !PO.reads_forecast_history(0.5)
+        @test !PO.reads_forecast_history((k, p, w, s, x) -> 0.5)
+        @test !PO.reads_forecast_history(CsfpProbeScale(0.5))
+        @test PO.reads_forecast_history(CsfpProbeHistoryScale())
+        # No Return Forecast, or a stated one, has no history, so the rule is refused where
+        # the caller wrote it.
+        @test_throws ArgumentError CrossSectionalFactorPrior(; factors = factors,
+                                                             c = CsfpProbeHistoryScale())
+        @test_throws ArgumentError CrossSectionalFactorPrior(; factors = factors,
+                                                             rfe = CustomValueReturnForecast(;
+                                                                                             mu = zeros(3)),
+                                                             c = CsfpProbeHistoryScale())
+        # A fitted forecast has one, and the rule gets it in the context. A member that
+        # carries its own history answers with it.
+        rh = CsfpProbeHistoryScale()
+        pr = prior(csfp(; c = rh), rd)
+        @test length(rh.seen) == 1
+        @test only(rh.seen) == pr.rr.rf.hist
+        # A slot that reads the history hands it to the other slot as well, because the prior
+        # makes it once.
+        rl = CsfpProbeShrinkage(1.0)
+        prior(csfp(; lambda = rl, c = CsfpProbeHistoryScale()), rd)
+        @test only(rl.seen).ctx.cs.hist == pr.rr.rf.hist
+    end
+end
+
 @testset "The fit recovers the model the synthetic panel was drawn from" begin
     PO = PortfolioOptimisers
     res = csfp_panel(; n_assets = 150, n_observations = 500, seed = 725_002)

@@ -1,12 +1,22 @@
 ```@meta
-Description = "Cross-Sectional Factor Prior, private API of PortfolioOptimisers.jl: cross_sectional_prior_option, cross_sectional_assemble, cross_sectional_exposure_stage, …"
+Description = "Cross-Sectional Factor Prior, private API of PortfolioOptimisers.jl: AbstractSpannedShrinkageCalibrationAlgorithm, …"
 ```
 
 # Cross-Sectional Factor Prior: private API
 
 ```@docs
+PortfolioOptimisers.AbstractSpannedShrinkageCalibrationAlgorithm
+PortfolioOptimisers.AbstractOrthogonalForecastScaleCalibrationAlgorithm
+PortfolioOptimisers.Num_SpanShrinkCal
+PortfolioOptimisers.Num_OrthFcScaleCal
+PortfolioOptimisers.reads_forecast_history
+PortfolioOptimisers.assert_forecast_history_rule
+PortfolioOptimisers.assert_spanned_shrinkage
+PortfolioOptimisers.assert_orthogonal_forecast_scale
 PortfolioOptimisers.cross_sectional_prior_option
 PortfolioOptimisers.cross_sectional_assemble
+PortfolioOptimisers.cross_sectional_calibration
+PortfolioOptimisers.cross_sectional_forecast_block
 PortfolioOptimisers.cross_sectional_exposure_stage
 PortfolioOptimisers.cross_sectional_exposure_series
 PortfolioOptimisers.cross_sectional_benchmark_stage
