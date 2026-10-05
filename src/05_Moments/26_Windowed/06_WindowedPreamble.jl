@@ -444,7 +444,7 @@ function partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)
     @argcheck(isnothing(est.w),
               ArgumentError("`$(typeof(est).name.name)` under a `SeedWindow` holds observation weights, and the fold cannot honour them: a weight vector reweights every past observation when a new one arrives. Set `w = nothing`, or fit the estimator in batch."))
     @argcheck(supports_partial_fit(inner),
-              ArgumentError("`$(typeof(est).name.name)` under a `SeedWindow` folds its inner estimator, and `$(typeof(inner).name.name)` does not fold. Use an inner estimator that folds, such as `ExpWeightedCovariance`, or set the rule to `RollingWindow()`, so that the host refits the estimator over its carried rows."))
+              ArgumentError("`$(typeof(est).name.name)` under a `SeedWindow` folds its inner estimator, and `$(typeof(inner).name.name)` does not fold. Use an inner estimator that folds, such as `ExpWeightedCovariance`, or set the rule to `RollingWindow()`, so that a prior that carries the observations refits the estimator over its carried rows."))
     assert_dims(dims)
     win = get_window(est.window, X, dims)
     inner = partial_fit!(inner, windowed_rows(X, win, dims); dims = dims,
@@ -453,14 +453,14 @@ function partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)
 end
 function partial_fit!(est::SeedWindowed, x::VecNum; kwargs...)
     kw = map(v -> isa(v, AbstractVector{Bool}) ? permutedims(v) : v, values(kwargs))
-    return partial_fit!(est, permutedims(x); dims = 1, kw...)
+    return partial_fit!(est, permutedims(x)::MatNum; dims = 1, kw...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Answers that a windowed estimator under a [`SeedWindow`](@ref) folds.
 
-A host that carries the observations, such as the carry of [`EmpiricalPrior`](@ref), folds each member that folds, and refits the others over its rows. A seed window must fold, because a refit keeps the rolling window. So the answer is `true` whatever the inner estimator, and the fold refuses an inner estimator that does not fold with an error that names it, not a silent refit.
+A prior that carries the observations, such as the carry of [`EmpiricalPrior`](@ref), folds each member that folds, and refits the others over its rows. A seed window must fold, because a refit keeps the rolling window. So the answer is `true` whatever the inner estimator, and the fold refuses an inner estimator that does not fold with an error that names it, not a silent refit.
 
 # Arguments
 

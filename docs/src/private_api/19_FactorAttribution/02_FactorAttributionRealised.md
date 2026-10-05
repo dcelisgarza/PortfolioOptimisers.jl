@@ -10,6 +10,7 @@ attribution_weights
 attribution_cov
 attribution_align
 attribution_trim_exposures
+attribution_zero_inactive
 attribution_trim_rows
 attribution_trim_basis
 attribution_finite_rows
@@ -19,6 +20,7 @@ attribution_window_basis
 attribution_window_weights
 attribution_weight_moments
 realised_attribution
+attribution_remainder
 attribution_series_component
 attribution_family_spread
 attribution_no_errors

@@ -255,18 +255,17 @@ function attribution_zero_inactive(B::MatNum, eps::MatNum)
         return (; B = ifelse.(live, B, zero(eltype(B))),
                 eps = ifelse.(act, eps, zero(eltype(eps))), act = act)
     end
-    return attribution_zero_inactive(attribution_broadcast_exposures(B, size(eps, 1)), eps)
+    # Some observation zeroes a live asset, so the exposures become a history: `B` at every
+    # observation, zero where the pair is inactive.
+    return (; B = ifelse.(act, reshape(B, 1, size(B)...), zero(eltype(B))),
+            eps = ifelse.(act, eps, zero(eltype(eps))), act = act)
 end
 function attribution_zero_inactive(B::Arr3Num, eps::MatNum)
     @argcheck(size(B, 1) == size(eps, 1),
               DimensionMismatch("the exposure history ($(size(B, 1)) observations after the lag) must carry the observations of the idiosyncratic returns ($(size(eps, 1)) observations after the lag)"))
-    act = [isfinite(eps[t, i]) && all(isfinite, view(B, t, i, :))
-           for t in axes(eps, 1), i in axes(eps, 2)]
-    Bz = similar(B)
-    for k in axes(B, 3), i in axes(B, 2), t in axes(B, 1)
-        Bz[t, i, k] = act[t, i] ? B[t, i, k] : zero(eltype(B))
-    end
-    return (; B = Bz, eps = ifelse.(act, eps, zero(eltype(eps))), act = act)
+    act = isfinite.(eps) .& dropdims(all(isfinite, B; dims = 3); dims = 3)
+    return (; B = ifelse.(act, B, zero(eltype(B))),
+            eps = ifelse.(act, eps, zero(eltype(eps))), act = act)
 end
 """
     attribution_trim_rows(A::Nothing, rows)
@@ -898,8 +897,7 @@ function attribution_standard_errors(g::MatNum, al::NamedTuple, fam::Option{<:Ve
     se(v) = s1 * sqrt(max(zero(v), v)) / T
     # An active pair of the regression reads its variance, `NaN` when unknown; any other pair
     # reads none, so its `NaN` must not reach the product `0 * NaN`.
-    s2 = [al.act[t, i] && !iszero(rw[t, i]) ? vs[t, i] : zero(vs[t, i])
-          for t in axes(vs, 1), i in axes(vs, 2)]
+    s2 = ifelse.(al.act .& .!iszero.(rw), vs, zero.(vs))
     V = [attribution_sandwich(view(red.B, t, :, :), view(rw, t, :), view(s2, t, :), keep)
          for t in 1:T]
     sys = se(sum(LinearAlgebra.dot(view(red.g, t, keep), V[t], view(red.g, t, keep))

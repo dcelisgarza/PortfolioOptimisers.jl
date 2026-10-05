@@ -570,7 +570,7 @@ end
 
 Rebuilds the time-varying Asset Panel of the observations a sample buffer holds, or gives `nothing` when the buffer records no Panel Field.
 
-The read-out of a refit prior and [`returns_result`](@ref) call it. A buffer that records Panel Fields records both masks too, so the panel has its Panel Fields and both of its masks. The masks are copies of the valid region, because a later fold writes into the backing masks. The Panel Fields are the Panel Fields of the buffer, because nothing writes into them.
+The call with no data of a refit prior and [`returns_result`](@ref) call it. A buffer that records Panel Fields records both masks too, so the panel has its Panel Fields and both of its masks. The masks are copies of the valid region, because a later fold writes into the backing masks. The Panel Fields are the Panel Fields of the buffer, because nothing writes into them.
 
 # Algorithm
 

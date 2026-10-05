@@ -21,6 +21,7 @@ get_regime_state(method::FirstMomentRegimeAdjusted, target::RegimeAdjustedTarget
 get_regime_state(method::LogRegimeAdjusted, target::RegimeAdjustedTarget, stats::VecNum, n::Integer, min_val::Number)
 regime_statistic
 hac_outer_product!
+pair_weighted_correlation
 update_var_cor!
 bias_corrected_covariance
 regime_covariance_block

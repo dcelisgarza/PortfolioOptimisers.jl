@@ -127,7 +127,9 @@ end
     L = ridge(A)
     o = load("Mirror")
     off = [i != CartesianIndex(5, 5) for i in CartesianIndices(L)]
-    @test L[off] == o[off]
+    # Bit-equal on the development host. Another host's BLAS moves the last bits, so the
+    # check reads the parity tolerance and not `==`.
+    @test parity_compare(L[off], o[off]; scale = :array, name = "Mirror chol").ok
     S = (A + A') / 2
     s = Statistics.mean(abs, diag(S))
     lam = 1e-12 * s
@@ -160,7 +162,8 @@ end
     @test_throws PosDefException prior(mirror(nothing), rd)
     pr = prior(mirror(RidgeCholeskySquareRoot()), rd)
     load(o) = parity_load("CrossSectionalFactorPrior", "Mirror", o)
-    @test pr.fpr.sigma == parity_load("MatrixSquareRoot", "Mirror", "Input")
+    @test parity_compare(pr.fpr.sigma, parity_load("MatrixSquareRoot", "Mirror", "Input");
+                         scale = :array, name = "Mirror factor sigma").ok
     # Measured maxrel 8.8e-15, 2.2e-15 and 1.6e-15, and maxscaled 3.0e-13 on `sigma`.
     @test parity_compare(pr.mu, vec(load("Mu")); name = "Mirror mu").ok
     @test parity_compare(pr.sigma, load("Sigma"); scale = :array, name = "Mirror sigma").ok

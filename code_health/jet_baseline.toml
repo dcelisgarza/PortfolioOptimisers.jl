@@ -101,7 +101,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/05_Gerber/03_GerberIQCovariance_b.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/06_DistanceCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/07_LowerTailDependenceCovariance.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/08_RankCovariance.jl" = { raw = 9, reviewed = 9 }
+"src/05_Moments/08_RankCovariance.jl" = { raw = 10, reviewed = 10 }
 "src/05_Moments/09_Histogram.jl" = { raw = 2, reviewed = 2 }
 "src/05_Moments/10_MutualInfoCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/11_DenoiseCovariance.jl" = { raw = 0, reviewed = 0 }

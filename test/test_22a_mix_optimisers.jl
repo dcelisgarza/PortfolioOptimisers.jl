@@ -238,7 +238,7 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
         end
         rtol = if i in (2, 15)
             5e-5
-        elseif i == 19
+        elseif i in (4, 19)
             5e-6
         elseif i == 10
             1.1

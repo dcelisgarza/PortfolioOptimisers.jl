@@ -1287,12 +1287,12 @@ LowOrderPrior
         @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
-        imsk = isfinite.(mu) .& isfinite.(LinearAlgebra.diag(sigma))
-        @argcheck(all(isfinite, view(sigma, imsk, imsk)),
-                  IsNonFiniteError("sigma of investible assets must only contain finite values"))
         assert_matrix_issquare(sigma, :sigma)
         @argcheck(size(X, 2) == length(mu) == size(sigma, 1),
                   DimensionMismatch("size(X, 2) ($(size(X, 2))), length(mu) ($(length(mu))), and size(sigma, 1) ($(size(sigma, 1))) must all match"))
+        imsk = isfinite.(mu) .& isfinite.(LinearAlgebra.diag(sigma))
+        @argcheck(all(isfinite, view(sigma, imsk, imsk)),
+                  IsNonFiniteError("sigma of investible assets must only contain finite values"))
         assert_nonempty_nonneg_finite_val(w, :w)
         if isa(w, StatsBase.AbstractWeights)
             @argcheck(length(w) == size(X, 1),
@@ -1307,11 +1307,9 @@ LowOrderPrior
         # `rr` and `fpr` are the factor block. The block is validated as a whole here and
         # only against this asset axis: everything internal to it — its own `mu`/`sigma`
         # shapes, and its own `w` against its own `X` — is its own constructor's job.
-        rr_is_nothing = isnothing(rr)
-        fpr_is_nothing = isnothing(fpr)
-        @argcheck(rr_is_nothing == fpr_is_nothing,
-                  ArgumentError("rr and fpr are the factor block and must be provided together or not at all, isnothing(rr) = $(rr_is_nothing), isnothing(fpr) = $(fpr_is_nothing)"))
-        if !rr_is_nothing
+        @argcheck(isnothing(rr) == isnothing(fpr),
+                  ArgumentError("rr and fpr are the factor block and must be provided together or not at all, isnothing(rr) = $(isnothing(rr)), isnothing(fpr) = $(isnothing(fpr))"))
+        if !isnothing(rr)
             @argcheck(size(rr.M, 2) == length(fpr.mu) == size(fpr.sigma, 1),
                       DimensionMismatch("size(rr.M, 2) = $(size(rr.M, 2)), length(fpr.mu) = $(length(fpr.mu)), and size(fpr.sigma, 1) = $(size(fpr.sigma, 1)) must all match"))
             @argcheck(size(rr.M, 1) == length(mu),
@@ -1333,7 +1331,7 @@ LowOrderPrior
                       ArgumentError("o_X is X itself, so this prior result has no original distinct from the one it asserts. Pass o_X = nothing, which is what every consumer reads as \"X is the original\""))
             @argcheck(size(o_X) == size(X),
                       DimensionMismatch("size(o_X) ($(size(o_X))) must match size(X) ($(size(X))): the original and the matrix this prior result asserts describe the same observations and the same assets"))
-            @argcheck(!rr_is_nothing,
+            @argcheck(!isnothing(rr),
                       IsNothingError("o_X says X is not the caller's matrix, but rr === nothing, so this prior result does not record what produced X. Every estimator that overwrites X projects a factor prior through regression loadings and carries them in rr"))
         end
         if !isnothing(chol)

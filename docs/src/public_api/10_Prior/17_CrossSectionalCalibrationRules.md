@@ -4,7 +4,7 @@ Description = "Cross-Sectional Calibration Rules, public API of PortfolioOptimis
 
 # Cross-Sectional Calibration Rules
 
-The rules that compute the two Calibration Slots of a [`CrossSectionalFactorPrior`](@ref) from its fit. A rule of the Spanned Shrinkage stands in `lambda`, and a rule of the Orthogonal Forecast Scale stands in `c`. [`PrecisionBlend`](@ref) is the default of `lambda`, and `c` stays one unless the caller states [`ForecastCalibrationSlope`](@ref).
+The rules that compute the two calibration slots of a [`CrossSectionalFactorPrior`](@ref) from its fit. A rule of the spanned shrinkage stands in `lambda`, and a rule of the orthogonal forecast scale stands in `c`. [`PrecisionBlend`](@ref) is the default of `lambda`, and `c` stays one unless the caller states [`ForecastCalibrationSlope`](@ref).
 
 ```@docs
 PrecisionBlend

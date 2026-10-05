@@ -149,8 +149,8 @@ using Dates, Statistics
         cls = [[1, 2], [3, 4]]
         res = [optimise(EqualWeighted(), PO.port_opt_view(rd, cl)) for cl in cls]
         W = [0.5 0.0; 0.5 0.0; 0.0 0.5; 0.0 0.5]
-        rdo = PO.predict_outer_returns(nothing, nothing, PO.ClusterUniverse(cls), rd, pr,
-                                       nothing, W, res)
+        rdo = PO.predict_outer_returns(nothing, (; pcol = PO.RenormaliseActive()),
+                                       PO.ClusterUniverse(cls), rd, pr, nothing, W, res)
         @test rdo.E === Ed
         @test rdo.ne == ["u"]
         # A prediction and its multi-period stack carry E.

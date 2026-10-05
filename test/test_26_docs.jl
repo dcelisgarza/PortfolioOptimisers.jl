@@ -492,6 +492,24 @@ nothing raises `@error "File exists but no references were collected"` in
         end
         @test sort!(at_random) == String[]
     end
+
+    #=
+    The same check fails the build on a docstring that no `@docs` block lists at all. The
+    testset above reads only the bindings that a page lists, so it is blind to that case.
+    Seven bindings were in it until #1475, and the Docs build failed on the fifteen links to
+    them. A binding is listed when an entry of any page names it, by its bare name or with a
+    signature; the testset above judges an entry with a signature.
+    =#
+    @testset "every documented binding is listed on a page" begin
+        listed = Set{Symbol}()
+        for p in files_under(DOCS, ".md"), name in docs_block_names(read(p, String))
+            ex = Meta.parse(name; raise = false)
+            sym = leaf_name(isa(ex, Expr) && ex.head === :call ? ex.args[1] : ex)
+            isa(sym, Symbol) && push!(listed, sym)
+        end
+        unlisted = sort!([string(b) for b in keys(Base.Docs.meta(PO)) if !(b.var in listed)])
+        @test unlisted == String[]
+    end
 end
 
 #=
@@ -1025,7 +1043,7 @@ in the sense of `CODING_STANDARDS.md`.
     edit and not a silent one.
     =#
     @testset "# Details is abolished" begin
-        DETAILS_TOTAL = 22
+        DETAILS_TOTAL = 21
 
         @testset "a swept file carries no # Details section" begin
             offenders = Tuple{String, Int}[]

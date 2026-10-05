@@ -26,6 +26,13 @@ our default `ties = :average` (#1332, Better since #1381). The stored oracle ran
 replaced by the midrank, so it isolates everything else. `TiesOrdinal` ran with a stable ordinal
 rank, which `ties = :ordinal` reproduces: the oracle's rule stays one keyword away.
 
+THE FORECAST IS STORED. `Alpha` holds the forecast that the oracle scored, once for each member
+(`Base` the fixed member, `EW` and `Refit`), and a case edits it as it edits its own. The test
+compares the forecast of this process with it at `rtol = 1e-12` of its largest entry (measured
+8.3e-16 of it under the flags below), and then scores the stored one. A
+process under `--check-bounds=yes`, as `Pkg.test` runs, sums in another order: its forecast moves by
+an ulp, a tie of the winsoriser breaks, and a rank or a calibration bin moves with it (#1475).
+
 THE TWO DIFFERENCES THAT ADR 0149 RULES.
 
   1. The t-statistic. The oracle scales the ratio by the root of the date count wherever it reads
@@ -97,6 +104,12 @@ end
                                 step = step)
         end
         alpha = edit(copy(alpha))
+        # The forecast the oracle scored, stored once for each member.
+        stored = edit(parity_load("ForecastEvaluation",
+                                  (; fixed = "Base", ew = "EW", target = "Refit")[member],
+                                  "Alpha"))
+        @test parity_compare(alpha, stored; scale = :array, name = "$(member) alpha").ok
+        alpha = stored
         amsk = rd.pnl.amsk[rows, :]
         # A weight outside the active universe is missing, as the oracle's panel needs it.
         W = if weighted

@@ -90,7 +90,8 @@ entries_ro(res) = Set(keys(JuMP.object_dictionary(res.model)))
     nb0 = NormBallUncertaintySet(; kappa = 1.5, L = zeros(N_ro, 0), p = 3,
                                  class = MuUncertaintySetClass())
     res = solve_ro(MaximumUtility(), (; ret = ArithmeticReturn(; ucs = nb0)))
-    @test value(res.model[:ret]) == dot(pr_ro.mu, res.w)
+    # JuMP sums the affine term in another order than `dot`, so the two can differ by an ulp.
+    @test isapprox(value(res.model[:ret]), dot(pr_ro.mu, res.w); rtol = 1e-14)
     @test !(:x_nbucs_w_1 in entries_ro(res))
 end
 
@@ -249,7 +250,8 @@ end
                              settings = JuMPReturnsSettings(; rte = false, lb = 2 * lb))]
     res = solve_ro(MinimumRisk(), (; ret = rets))
     @test length(res.model[:ret_vec]) == 1
-    @test value(res.model[:ret]) == dot(pr_ro.mu, res.w)
+    # JuMP sums the affine term in another order than `dot`, so the two can differ by an ulp.
+    @test isapprox(value(res.model[:ret]), dot(pr_ro.mu, res.w); rtol = 1e-14)
     @test isapprox(2 * dot(pr_ro.mu, res.w), 2 * lb; atol = 1e-10)
     # Several terms sum at their own scale, and one term drops its scale.
     rets = [ArithmeticReturn(; settings = JuMPReturnsSettings(; scale = 0.25)),

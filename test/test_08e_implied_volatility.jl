@@ -558,13 +558,14 @@ end
                       iv = iv) == base
         end
         #=
-        A zero implied volatility. `cov` cannot answer it: the covariance it builds is
-        singular, and the posdef step forms a correlation from a zero diagonal entry. `cor`
-        can, because that covariance is never built.
+        A zero implied volatility. The covariance that `cov` builds is singular, and a zero
+        variance has a zero row and column in a PSD matrix, so the posdef step keeps that row
+        and repairs the others (#1429). `cor` never builds that covariance.
         =#
         iv0 = copy(iv)
         iv0[end, 3] = 0
-        @test_throws ArgumentError cov(cep, X; iv = iv0, ivpa = 1.2)
+        s0 = cov(cep, X; iv = iv0, ivpa = 1.2)
+        @test iszero(s0[3, :]) && iszero(s0[:, 3]) && all(isfinite, s0)
         @test cor(cep, X; iv = iv0, ivpa = 1.2) == base
         #=
         The model still runs, which is why the discarded call is kept rather than deleted.

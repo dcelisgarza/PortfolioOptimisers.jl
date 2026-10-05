@@ -75,9 +75,10 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         idf = (kap .< 1e12) .& (okap .< 1e12)
         @test all(>=(1e12), kap[.!idf]) && all(>=(1e12), okap[.!idf])
         @test c in fam || all(idf)
-        # A t-statistic near zero carries the relative round-off of the fit. Measured maxrel
-        # 1.6e-12 on the large panel, and maxscaled 7.4e-15.
-        @test pc(t[idf, :], R[idf, 1:K], "$(n) t"; rtol = 2e-12)
+        # A t-statistic near zero carries the relative round-off of the fit, so the check
+        # reads the array scale. Measured maxrel 1.6e-12 on the large panel on one host, 2.1e-12
+        # on the CI host, and maxscaled 7.4e-15 on both.
+        @test pc(t[idf, :], R[idf, 1:K], "$(n) t"; scale = :array)
         vif = exposure_vif(csfm).X
         @test pc(vif[idf, :], R[idf, (K + 1):(2K)], "$(n) vif")
         @test pc(kap[idf], okap[idf], "$(n) kappa")

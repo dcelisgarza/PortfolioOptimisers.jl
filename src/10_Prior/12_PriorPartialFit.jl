@@ -777,7 +777,7 @@ It mirrors `prior(pe, rd)`. It reads the returns, the factor returns and both ma
 The type of the prior selects the route, and each route states what it can honour. This method is the refit route, which every prior that carries a [`SampleBufferState`](@ref) takes. The buffer records what the batch fit reads, so the route honours all of it:
 
   - The estimation mask, beside the active mask. No panel, or a static panel, gives no mask.
-  - The Panel Fields, when [`reads_panel_fields`](@ref) answers `true`. The buffer records them, and the call with no data gives the batch verb the panel that [`sample_buffer_panel`](@ref) rebuilds. For any other prior a Panel Field is refused by name, because the buffer has no slot that the prior reads.
+  - The Panel Fields, when [`reads_panel_fields`](@ref) answers `true`. The buffer records them, and the call with no data gives the batch verb the panel that [`sample_buffer_panel`](@ref) rebuilds. For any other prior the call refuses a Panel Field with an error that names it, because the buffer has no slot that the prior reads.
   - The Exogenous Series, when [`reads_exogenous_series`](@ref) answers `true`. The buffer records every column of it with its names, and the call with no data gives them to the batch verb. For any other prior the Fold Context keeps the series, and the prior's buffer records none.
 
 The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact folds take no estimation mask. [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) forward `rd` to the prior they embed. [`CrossSectionalFactorPrior`](@ref) has a method of its own, which takes the carry fold when the prior has no buffer and applies its Choice Rule after the fold of a refit.
