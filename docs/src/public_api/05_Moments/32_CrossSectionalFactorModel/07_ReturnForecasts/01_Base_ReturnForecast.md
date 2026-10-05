@@ -10,6 +10,9 @@ Description = "Base Return Forecast, public API of PortfolioOptimisers.jl: Abstr
 AbstractReturnForecastEstimator
 IdiosyncraticReturnUnit
 IdiosyncraticSharpeUnit
+ScoreNeutralisation
+OrthogonalPartCalibration
+UnadjustedForecast
 ```
 
 ## Functions

@@ -106,8 +106,8 @@ The row of a block observation `t` is the forecast of the member fitted on the r
 
  1. Return `st` unchanged when the state carries no history, as [`cross_sectional_carries_history`](@ref) answers.
  2. Keep the carried rows when `keep` is `true`, and none otherwise.
- 3. Build the block of the fitted observations from the state, with [`cross_sectional_carry_append`](@ref) and the returns data of [`cross_sectional_carry_forecast_returns`](@ref). The member reads no idiosyncratic covariance, so the block carries none.
- 4. Fit the member at each block row after the kept rows and before the last, on the returns data and the block that [`forecast_history_block`](@ref) cuts to that row.
+ 3. Build the block of the fitted observations from the state, with [`cross_sectional_carry_append`](@ref) and the returns data of [`cross_sectional_carry_forecast_returns`](@ref). The member reads no idiosyncratic covariance, so the block carries none. Take the member of the Orthogonal Forecast Fit `pe.ofit` with [`orthogonal_forecast_member`](@ref), the member whose history the batch fit reads.
+ 4. Fit that member at each block row after the kept rows and before the last, on the returns data and the block that [`forecast_history_block`](@ref) cuts to that row.
  5. Append the new rows to the kept rows.
 
 # Arguments
@@ -142,12 +142,15 @@ function cross_sectional_carry_history(pe::CrossSectionalFactorPrior,
                                      b = zeros(real(eltype(st.vs)), size(st.X, 2)),
                                      csr = st.csr, Ms = ca.Ms, vs = st.vs, rw = st.W,
                                      bw = st.bw[r, :], nf = ca.nf, fam = ca.fam,
-                                     lag = pe.lag)
+                                     lag = pe.lag, fx = ca.fx)
     rows = return_forecast_rows(rd, csfm)
+    # The rows are the history of the member that the batch fit reads under its Orthogonal
+    # Forecast Fit, so the carried rows and the appended one come from the same member.
+    rfo = orthogonal_forecast_member(pe.ofit, pe.rfe, csfm)
     k = isnothing(H) ? 0 : size(H, 1)
     # The fit of `forecast_history_refit` at block row `tb`. A fit holds two block rows at
     # least, and a step after it brings one new row at least, so a row is always new.
-    new = [return_forecast(pe.rfe, port_opt_view(rd, 1:rows[tb], :),
+    new = [return_forecast(rfo, port_opt_view(rd, 1:rows[tb], :),
                            forecast_history_block(csfm, tb)).mu
            for tb in (k + 1):(length(rows) - 1)]
     R = permutedims(reduce(hcat, new))

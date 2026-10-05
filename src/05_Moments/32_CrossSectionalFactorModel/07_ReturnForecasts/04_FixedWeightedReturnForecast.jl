@@ -191,6 +191,7 @@ FixedWeightedReturnForecast
                │   descriptors ┼ 1-element Vector{Passthrough}
                │               │ Passthrough ⋯
                │    neutralise ┼ nothing
+               │            nw ┼ EstimationMaskWeights()
                │           cre ┼ CrossSectionalLinearRegression
                │               │         alg ┼ PseudoInverseFallback()
                │               │   intercept ┼ Bool: false

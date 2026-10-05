@@ -228,11 +228,15 @@ The weight in `[0, 1]` that a Cross-Sectional Factor Prior gives its fitted fact
 The scale in `[0, ∞)` that multiplies the part of the Return Forecast that the latest Factor Exposures do not span, before that part enters the mean vector. A value of zero drops the part, and a value above one scales it up. It is a Calibration Slot (§3.9), so a Calibration Rule can compute it from the fit.
 *Avoid*: Spanned Shrinkage (above), which blends the other part of the forecast; and `orthogonal_scaling` of the orthogonal uncertainty sets, which scales a penalty and not a forecast.
 
+**Orthogonal Forecast Fit**
+The rule by which a Cross-Sectional Factor Prior makes the orthogonal part of a fitted Return Forecast carry the scale of its fit. A fitted member regresses the forward idiosyncratic return, which the regression makes orthogonal to the Factor Exposures, so the part of its forecast that they do not span is under-scaled. The default neutralises the Descriptor Scores of such a member against every estimated factor before the fit; another rule fits the calibration slope on the orthogonal part, and a third reads the member as it stands.
+*Avoid*: Orthogonal Forecast Scale (above), which multiplies the part after this rule has acted, and which a caller states or a Calibration Rule computes.
+
 **Return Forecast Estimator**
 A producer of a Return Forecast, from Descriptor Scores and the factor-model block of the Prior it serves, or from a stated vector. It scores its Descriptors over the whole history of the `ReturnsResult` and reads the block on the block's own rows, which are the last rows of the `ReturnsResult`, so its Result is on the block's axis.
 
 **Descriptor Scores**
-The cross-sectional scores of a set of Descriptors: each winsorised and standardised per observation, regressed out against named Factor Exposures under the estimation mask, and standardised again. The recipe every fitted Return Forecast Estimator starts from.
+The cross-sectional scores of a set of Descriptors: each winsorised and standardised per observation, regressed out against named Factor Exposures under the estimation mask or the regression weights of the factor-model block, and standardised again under the same weights. The recipe every fitted Return Forecast Estimator starts from.
 *Avoid*: Factor Exposure (§3.4), which is scored under the benchmark weights and names a factor of the model.
 
 **Forecast Unit**
@@ -326,7 +330,7 @@ A set of factors carrying one benchmark-weighted zero-sum constraint, so exactly
 *Avoid*: the bare word "family", which names a group of Estimator types everywhere else in this glossary.
 
 **Neutralisation**
-The replacement of one Factor Exposure by its residual after a benchmark-weighted regression across the assets on the exposures of other factors, re-standardised, so the factor carries none of the targets' tilt.
+The replacement of one Factor Exposure, or one Descriptor score, by its residual after a weighted regression across the assets on the exposures of other factors, re-standardised, so it carries none of the targets' tilt. Its owner states the weights: the benchmark weights for a Factor Exposure, and the estimation mask or the regression weights of the block for a Descriptor score.
 *Avoid*: orthogonalisation, which is the same operation under another name; Detoning (§3.5), which removes principal components from a correlation matrix.
 
 **Factor Family Basis**

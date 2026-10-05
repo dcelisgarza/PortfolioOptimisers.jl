@@ -19,4 +19,6 @@ target_forecast_latest
 target_forecast_latest_variances
 target_forecast_multiplier
 target_forecast_coefficient
+target_forecast_orthogonal_coefficient
+target_forecast_orthogonal_rows
 ```

@@ -94,6 +94,7 @@ TargetReturnForecast
                  │   descriptors ┼ 1-element Vector{Passthrough}
                  │               │ Passthrough ⋯
                  │    neutralise ┼ nothing
+                 │            nw ┼ EstimationMaskWeights()
                  │           cre ┼ CrossSectionalLinearRegression
                  │               │         alg ┼ PseudoInverseFallback()
                  │               │   intercept ┼ Bool: false
@@ -237,12 +238,18 @@ function TargetReturnForecast(; scores::DescriptorScores,
                                 target_scoring, calibrate, scale, decay, min_obs, cv, unit,
                                 intercept)
 end
+function fits_idiosyncratic_target(::TargetReturnForecast)::Bool
+    return true
+end
+function calibrates_orthogonal_part(rfe::TargetReturnForecast)::Bool
+    return rfe.calibrate
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Result type produced by [`TargetReturnForecast`](@ref).
 
-Beside the two reads [`AbstractReturnForecastResult`](@ref) states, it carries the fitted model and the calibration coefficient. A reader can inspect the combination the target fitted and the coefficient that puts the prediction into return units. `hist` is `nothing`, because the member computes no history.
+Beside the two reads [`AbstractReturnForecastResult`](@ref) states, it carries the fitted model and the calibration coefficient. A reader can inspect the combination the target fitted and the coefficient that puts the prediction into return units. `hist` is `nothing`, because the member computes no history. When the caller asks for it, the Result also carries the calibration coefficient of the orthogonal part of the prediction.
 
 # Fields
 
@@ -271,15 +278,23 @@ $(DocStringExtensions.TYPEDFIELDS)
     The calibration coefficient. It is `NaN` when the member does not calibrate, when it fits no model, and while the calibration is in its warm-up.
     """
     calib
-    function TargetReturnForecastResult(mu::VecNum, model, calib::Number)
+    """
+    The calibration coefficient of the orthogonal part of the prediction, `κ⊥`, when the caller asks for it through the four-argument method of [`return_forecast`](@ref), and `nothing` otherwise. It is `NaN` where `calib` is, and while its own regression is in its warm-up.
+    """
+    ocalib
+    function TargetReturnForecastResult(mu::VecNum, model, calib::Number,
+                                        ocalib::Option{<:Number})
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
-        return new{typeof(mu), Nothing, typeof(model), typeof(calib)}(mu, nothing, model,
-                                                                      calib)
+        return new{typeof(mu), Nothing, typeof(model), typeof(calib), typeof(ocalib)}(mu,
+                                                                                      nothing,
+                                                                                      model,
+                                                                                      calib,
+                                                                                      ocalib)
     end
 end
-function TargetReturnForecastResult(; mu::VecNum, model = nothing,
-                                    calib::Number = NaN)::TargetReturnForecastResult
-    return TargetReturnForecastResult(mu, model, calib)
+function TargetReturnForecastResult(; mu::VecNum, model = nothing, calib::Number = NaN,
+                                    ocalib::Option{<:Number} = nothing)::TargetReturnForecastResult
+    return TargetReturnForecastResult(mu, model, calib, ocalib)
 end
 """
     target_forecast_variances(unit::IdiosyncraticReturnUnit,
@@ -727,9 +742,12 @@ function target_forecast_alignment(whole_history::Bool, S::Arr3Num, eps::MatNum,
 end
 """
     return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
-                    csfm::CrossSectionalFactorModel) -> TargetReturnForecastResult
+                    csfm::CrossSectionalFactorModel,
+                    cre::Option{<:AbstractCrossSectionalRegressionEstimator} = nothing) -> TargetReturnForecastResult
 
 Fit a Return Forecast with a regression target over every observation and asset at once.
+
+The four-argument method also fits the calibration coefficient `κ⊥` of the orthogonal part of the prediction. [`OrthogonalPartCalibration`](@ref) of [`CrossSectionalFactorPrior`](@ref) asks for it, and the three-argument method, which a standalone caller and every other rule read, never pays for it.
 
 # Algorithm
 
@@ -738,7 +756,7 @@ Fit a Return Forecast with a regression target over every observation and asset 
  3. Take the forward mean target `fwd` through [`forward_mean_returns`](@ref). Convert it to the Forecast Unit through [`forecast_unit_target`](@ref), and pass it through `target_outlier` and then `target_scoring`, giving `y`.
  4. Count the observations whose target has matured, all but the last `lag + horizon - 1`, giving `nt`. Flatten them into one sample per `(observation, asset)` pair through [`target_forecast_samples`](@ref), giving `Sf`, `yf` and `ok`.
  5. Fit the regression target on the valid samples through [`target_forecast_fit`](@ref), giving `model`.
- 6. Compute the calibration coefficient `calib` through [`target_forecast_coefficient`](@ref). A row before the block has no idiosyncratic variance, so it can enter the fit and never enters the calibration.
+ 6. Compute the calibration coefficient `calib` and the uncalibrated prediction `P` of the matured observations through [`target_forecast_coefficient`](@ref). A row before the block has no idiosyncratic variance, so it can enter the fit and never enters the calibration. When `cre` is given, compute `κ⊥` from `P` through [`target_forecast_orthogonal_coefficient`](@ref).
  7. Predict the latest observation through [`target_forecast_latest`](@ref) and convert the row to return units, giving `P`.
  8. Multiply `P` by `scale` and by the multiplier of [`target_forecast_multiplier`](@ref), giving `mu`.
 
@@ -747,14 +765,16 @@ Fit a Return Forecast with a regression target over every observation and asset 
   - `rfe`: Target Return Forecast Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
   - `csfm`: The fitted factor-model block. It must carry the cross-sectional fit, its histories state the block's rows, and it must carry the idiosyncratic variance history under a calibration or under [`IdiosyncraticSharpeUnit`](@ref).
+  - `cre`: Cross-Sectional Regression Estimator that splits each row of the prediction for `κ⊥`, or `nothing` to fit no `κ⊥`.
 
 # Validation
 
   - The rules of [`descriptor_scores`](@ref), of [`forecast_idiosyncratic_returns`](@ref) and of [`target_forecast_variances`](@ref).
+  - When `cre` is given, the rules of [`target_forecast_orthogonal_rows`](@ref).
 
 # Returns
 
-  - `rf::TargetReturnForecastResult`: The fitted forecast, the model and the calibration coefficient.
+  - `rf::TargetReturnForecastResult`: The fitted forecast, the model, the calibration coefficient and, when `cre` is given, `κ⊥`.
 
 # Related
 
@@ -767,7 +787,8 @@ Fit a Return Forecast with a regression target over every observation and asset 
   - [`forecast_return_units`](@ref)
 """
 function return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
-                         csfm::CrossSectionalFactorModel)::TargetReturnForecastResult
+                         csfm::CrossSectionalFactorModel,
+                         cre::Option{<:AbstractCrossSectionalRegressionEstimator} = nothing)::TargetReturnForecastResult
     ds = rfe.scores
     (; S, rows) = descriptor_scores(ds, rd, csfm)
     al = target_forecast_alignment(rfe.whole_history, S,
@@ -791,14 +812,18 @@ function return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
     nt = max(size(Sa, 1) - (rfe.lag + rfe.horizon - 1), 0)
     Sf, yf, ok = target_forecast_samples(Sa, y, emsk, nt)
     model = target_forecast_fit(rfe, Sf, yf, ok)
-    calib = target_forecast_coefficient(rfe, model, Sf, yf, ok, fwd, vs, emsk, nt)
+    cf = target_forecast_coefficient(rfe, model, Sf, yf, ok, fwd, vs, emsk, nt)
+    # Under `whole_history` the rows of `P` are the rows of the returns data, and the block
+    # starts at `first(rows)`. Otherwise they are the rows of the block.
+    ocalib = target_forecast_orthogonal_coefficient(cre, cf.P, fwd, vs, emsk, rfe, csfm,
+                                                    rfe.whole_history ? first(rows) - 1 : 0)
     P = forecast_return_units(rfe.unit, target_forecast_latest(model, Sa),
                               target_forecast_latest_variances(vs))
     return TargetReturnForecastResult(;
                                       mu = vec(rfe.scale .*
                                                target_forecast_multiplier(rfe.calibrate,
-                                                                          calib) .* P),
-                                      model = model, calib = calib)
+                                                                          cf.calib) .* P),
+                                      model = model, calib = cf.calib, ocalib = ocalib)
 end
 """
     target_forecast_multiplier(calibrate::Bool, calib::Number) -> Number
@@ -827,11 +852,11 @@ end
 """
     target_forecast_coefficient(rfe::TargetReturnForecast, model, Sf::MatNum, yf::VecNum,
                                 ok::AbstractVector{Bool}, fwd::MatNum,
-                                vs::Option{<:MatNum}, w::MatNum, nt::Integer) -> Real
+                                vs::Option{<:MatNum}, w::MatNum, nt::Integer) -> NamedTuple
 
-Return the calibration coefficient of a [`TargetReturnForecast`](@ref), or `NaN`.
+Return the calibration coefficient of a [`TargetReturnForecast`](@ref), or `NaN`, and the uncalibrated prediction it was fitted on.
 
-This function alone decides whether the calibration runs. A member that does not calibrate, and a member that fits no model, each return `NaN` and predict nothing. The `NaN` takes the type of the flattened design and of the forward returns.
+This function alone decides whether the calibration runs. A member that does not calibrate, and a member that fits no model, each return `NaN` and predict nothing. The `NaN` takes the type of the flattened design and of the forward returns. The prediction is returned beside the coefficient, so [`target_forecast_orthogonal_coefficient`](@ref) reads the same out-of-fold prediction and runs no second cross-validation.
 
 # Arguments
 
@@ -848,23 +873,165 @@ This function alone decides whether the calibration runs. A member that does not
 # Returns
 
   - `calib::Real`: The calibration coefficient, or `NaN`.
+  - `P::Option{<:MatNum}`: The uncalibrated prediction in return units, `matured observations × assets`, or `nothing` when the calibration does not run.
 
 # Related
 
   - [`TargetReturnForecast`](@ref)
   - [`target_forecast_calibration`](@ref)
   - [`target_forecast_uncalibrated`](@ref)
+  - [`target_forecast_orthogonal_coefficient`](@ref)
 """
 function target_forecast_coefficient(rfe::TargetReturnForecast, model, Sf::MatNum,
                                      yf::VecNum, ok::AbstractVector{Bool}, fwd::MatNum,
-                                     vs::Option{<:MatNum}, w::MatNum, nt::Integer)::Real
+                                     vs::Option{<:MatNum}, w::MatNum, nt::Integer)
     if !rfe.calibrate || isnothing(model) || isnothing(vs)
-        return promote_type(real(eltype(Sf)), real(eltype(fwd)))(NaN)
+        return (; calib = promote_type(real(eltype(Sf)), real(eltype(fwd)))(NaN),
+                P = nothing)
     end
     p = target_forecast_uncalibrated(rfe.cv, rfe, model, Sf, yf, ok)
     P = forecast_return_units(rfe.unit, target_forecast_scatter(p, nt, size(w, 2)),
                               view(vs, 1:nt, :))
-    return target_forecast_calibration(P, fwd, vs, w, rfe.decay, rfe.min_obs)
+    return (; calib = target_forecast_calibration(P, fwd, vs, w, rfe.decay, rfe.min_obs),
+            P = P)
+end
+"""
+    target_forecast_orthogonal_coefficient(cre::Nothing, P::Option{<:MatNum}, fwd::MatNum,
+                                           vs::Option{<:MatNum}, w::MatNum,
+                                           rfe::TargetReturnForecast,
+                                           csfm::CrossSectionalFactorModel,
+                                           off::Integer) -> Nothing
+    target_forecast_orthogonal_coefficient(cre::AbstractCrossSectionalRegressionEstimator,
+                                           P::Option{<:MatNum}, fwd::MatNum,
+                                           vs::Option{<:MatNum}, w::MatNum,
+                                           rfe::TargetReturnForecast,
+                                           csfm::CrossSectionalFactorModel,
+                                           off::Integer) -> Real
+
+Fit the calibration coefficient `κ⊥` of the orthogonal part of the prediction of a [`TargetReturnForecast`](@ref).
+
+The member regresses the forward idiosyncratic return, which the cross-sectional fit of the block makes orthogonal to the Factor Exposures. So the part of the prediction that the exposures span predicts nothing of it, and `κ` of the whole prediction under-scales the orthogonal part by the share of its variance. `κ⊥` is the same regression on the orthogonal part alone, so it is the scale of that part.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{p}^{\\perp}_{t} &= \\boldsymbol{p}_{t} - \\mathbf{B}_{t} \\boldsymbol{g}_{t}\\,, \\\\
+\\kappa_{\\perp} &= \\frac{C^{\\perp}_{n}}{(1 + \\varrho) A^{\\perp}_{n}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{p}_{t}``: The uncalibrated prediction of observation ``t``, out of fold under a cross-validation estimator.
+  - ``\\mathbf{B}_{t}``: The exposures of the estimated factors at observation ``t`` of the block.
+  - ``\\boldsymbol{g}_{t}``: Coefficients of the regression of ``\\boldsymbol{p}_{t}`` on ``\\mathbf{B}_{t}`` under the regression weights of observation ``t`` of the block, as [`cross_sectional_alpha_split`](@ref) fits them.
+  - ``A^{\\perp}_{n}``, ``C^{\\perp}_{n}``, ``\\varrho``: The accumulators and the ridge of [`TargetReturnForecast`](@ref), on ``\\boldsymbol{p}^{\\perp}_{t}`` in place of ``\\boldsymbol{p}_{t}``.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `nothing`: the caller asks for no `κ⊥`, so return `nothing`.
+ 2. A Cross-Sectional Regression Estimator: return `NaN` when the calibration did not run. Otherwise split each row of `P` with [`target_forecast_orthogonal_rows`](@ref), and run [`target_forecast_calibration`](@ref) on the orthogonal parts.
+
+# Arguments
+
+  - `cre`: Cross-Sectional Regression Estimator of the split, or `nothing`.
+  - `P`: The uncalibrated prediction, `matured observations × assets`, or `nothing` when the calibration did not run.
+  - `fwd`: Forward mean idiosyncratic returns, `observations × assets`.
+  - `vs`: Idiosyncratic variance history, or `nothing`.
+  - `w`: Cross-sectional weights, `observations × assets`.
+  - `rfe`: Target Return Forecast Estimator, whose `decay` and `min_obs` the regression reads.
+  - `csfm`: The fitted factor-model block.
+  - `off`: Number of rows of `P` before the first row of the block.
+
+# Validation
+
+  - The rules of [`target_forecast_orthogonal_rows`](@ref).
+
+# Returns
+
+  - `ocalib::Option{<:Real}`: `κ⊥`, `NaN` while it is in its warm-up, or `nothing`.
+
+# Related
+
+  - [`TargetReturnForecast`](@ref)
+  - [`OrthogonalPartCalibration`](@ref)
+  - [`target_forecast_coefficient`](@ref)
+  - [`target_forecast_calibration`](@ref)
+"""
+function target_forecast_orthogonal_coefficient(::Nothing, ::Option{<:MatNum}, ::MatNum,
+                                                ::Option{<:MatNum}, ::MatNum,
+                                                ::TargetReturnForecast,
+                                                ::CrossSectionalFactorModel,
+                                                ::Integer)::Nothing
+    return nothing
+end
+function target_forecast_orthogonal_coefficient(cre::AbstractCrossSectionalRegressionEstimator,
+                                                P::Option{<:MatNum}, fwd::MatNum,
+                                                vs::Option{<:MatNum}, w::MatNum,
+                                                rfe::TargetReturnForecast,
+                                                csfm::CrossSectionalFactorModel,
+                                                off::Integer)::Real
+    if isnothing(P) || isnothing(vs)
+        return real(eltype(fwd))(NaN)
+    end
+    return target_forecast_calibration(target_forecast_orthogonal_rows(cre, P, csfm, off),
+                                       fwd, vs, w, rfe.decay, rfe.min_obs)
+end
+"""
+    target_forecast_orthogonal_rows(cre::AbstractCrossSectionalRegressionEstimator,
+                                    P::MatNum, csfm::CrossSectionalFactorModel,
+                                    off::Integer) -> Matrix{<:Real}
+
+Split each row of the uncalibrated prediction of a [`TargetReturnForecast`](@ref) against the exposures of its own observation, and keep the orthogonal part.
+
+Row `t` of `P` is observation `t - off` of the block. It splits against the exposures of the estimated factors of that observation, under the regression weights of that observation, through [`cross_sectional_alpha_split`](@ref), which is the split that [`CrossSectionalFactorPrior`](@ref) runs at the latest observation. A row outside the block has no exposure, and a row with no finite prediction has nothing to split, so each of them stays `NaN`.
+
+# Arguments
+
+  - `cre`: Cross-Sectional Regression Estimator of the split.
+  - `P`: The uncalibrated prediction, `rows × assets`.
+  - `csfm`: The fitted factor-model block.
+  - `off`: Number of rows of `P` before the first row of the block.
+
+# Validation
+
+  - `csfm.Ms` and `csfm.rw` are given. Raises an [`IsNothingError`](@ref).
+  - The rules of [`cross_sectional_alpha_split`](@ref).
+
+# Returns
+
+  - `Q::Matrix{<:Real}`: The orthogonal part of each row, `rows × assets`, `NaN` where the row has no split.
+
+# Related
+
+  - [`target_forecast_orthogonal_coefficient`](@ref)
+  - [`cross_sectional_alpha_split`](@ref)
+  - [`estimated_factor_columns`](@ref)
+"""
+function target_forecast_orthogonal_rows(cre::AbstractCrossSectionalRegressionEstimator,
+                                         P::MatNum, csfm::CrossSectionalFactorModel,
+                                         off::Integer)::Matrix{<:Real}
+    Ms = csfm.Ms
+    rw = csfm.rw
+    @argcheck(!isnothing(Ms),
+              IsNothingError("the calibration of the orthogonal part splits each row of the prediction against the exposures of its observation, and the block carries no exposure history in Ms"))
+    @argcheck(!isnothing(rw),
+              IsNothingError("the calibration of the orthogonal part splits each row of the prediction under the regression weights of its observation, and the block carries no regression weight history in rw"))
+    est = estimated_factor_columns(csfm)
+    Tf = real(eltype(P))
+    Q = fill(Tf(NaN), size(P))
+    for t in axes(P, 1)
+        tb = t - off
+        if !(1 <= tb <= size(Ms, 1)) || !any(isfinite, view(P, t, :))
+            continue
+        end
+        Q[t, :] = cross_sectional_alpha_split(cre, view(P, t, :), view(Ms, tb, :, est),
+                                              view(rw, tb, :)).ap
+    end
+    return Q
 end
 
 export TargetReturnForecast, TargetReturnForecastResult

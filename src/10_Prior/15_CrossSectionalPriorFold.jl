@@ -1238,7 +1238,7 @@ function partial_fit!(pe::CrossSectionalFactorPrior{<:Any, <:Any, <:Any, <:Any, 
                                                     <:Any, <:Any, <:Any, <:Any, <:Any,
                                                     <:Any, <:Any, <:Any, <:Any, <:Any,
                                                     <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                    <:Any, <:Any, <:Any,
+                                                    <:Any, <:Any, <:Any, <:Any,
                                                     <:Option{<:CrossSectionalCarryState}},
                       rd::ReturnsResult)
     st = isnothing(pe.cache) ? CrossSectionalCarryState() : pe.cache

@@ -120,18 +120,22 @@ function grid_config(name::AbstractString, rd::ReturnsResult)
          rfe = FixedWeightedReturnForecast(; scores = ds, scale = 0.2,
                                            unit = IdiosyncraticSharpeUnit()))
     elseif name == "FcEW"
-        (; kw..., fc..., rfe = ExpWeightedReturnForecast(; scores = ds, half_life = 10.0))
+        # A fitted member: the oracle reads it as it stands, so the case states the oracle's
+        # Orthogonal Forecast Fit (#1486). The library's default neutralises its scores.
+        (; kw..., fc..., ofit = UnadjustedForecast(),
+         rfe = ExpWeightedReturnForecast(; scores = ds, half_life = 10.0))
     elseif name == "FcTarget"
         # Both sides calibrate the target member on the out-of-fold predictions of a 5-fold
         # split by default (#1418). The oracle fits no intercept here.
-        (; kw..., fc..., rfe = TargetReturnForecast(; scores = ds, half_life = 10.0))
+        (; kw..., fc..., ofit = UnadjustedForecast(),
+         rfe = TargetReturnForecast(; scores = ds, half_life = 10.0))
     elseif name == "FcTargetIntercept"
         # The oracle's default target member, which fits an intercept (#1419).
-        (; kw..., fc...,
+        (; kw..., fc..., ofit = UnadjustedForecast(),
          rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, intercept = true))
     elseif name == "FcTargetRaw"
         # The same, uncalibrated, so the fitted model alone is compared.
-        (; kw..., fc...,
+        (; kw..., fc..., ofit = UnadjustedForecast(),
          rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, intercept = true,
                                     calibrate = false))
     elseif name == "FcCustom"

@@ -308,6 +308,7 @@ ExpWeightedReturnForecast
             │   descriptors ┼ 1-element Vector{Passthrough}
             │               │ Passthrough ⋯
             │    neutralise ┼ nothing
+            │            nw ┼ EstimationMaskWeights()
             │           cre ┼ CrossSectionalLinearRegression
             │               │         alg ┼ PseudoInverseFallback()
             │               │   intercept ┼ Bool: false
@@ -406,6 +407,9 @@ function ExpWeightedReturnForecast(; scores::DescriptorScores, half_life::Real =
                                    unit::AbstractForecastUnit = IdiosyncraticReturnUnit())::ExpWeightedReturnForecast
     return ExpWeightedReturnForecast(scores, decay, min_obs, ridge, horizon, lag, scale,
                                      normalise, unit)
+end
+function fits_idiosyncratic_target(::ExpWeightedReturnForecast)::Bool
+    return true
 end
 """
 $(DocStringExtensions.TYPEDEF)

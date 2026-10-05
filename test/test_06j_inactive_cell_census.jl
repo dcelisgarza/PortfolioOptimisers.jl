@@ -198,6 +198,17 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :windowed_series_row => "a step of variance_series on a windowed estimator",
                                            :windowed_variance_series => "a step of variance_series on a windowed estimator",
                                            :prior_forecast_location => "a step of forecast_location on a prior",
+                                           # Steps of the fit of the Cross-Sectional Factor Prior, whose `prior` has a case below.
+                                           :cross_sectional_benchmark_stage => "a step of prior on a CrossSectionalFactorPrior",
+                                           :cross_sectional_exposure_series => "a step of prior on a CrossSectionalFactorPrior",
+                                           :cross_sectional_exposure_stage => "a step of prior on a CrossSectionalFactorPrior",
+                                           # The online step of a prior: it moves the cells of a step into a buffer or a carry,
+                                           # and the call with no data runs the batch prior that a case covers.
+                                           :buffer_prior => "the batch prior over the rows of a sample buffer",
+                                           :refit_step_kwargs => "passes the masks and the Panel Fields of a step to the refit",
+                                           :step_active_kwargs => "passes the active mask of a step",
+                                           :step_panel_fields => "passes or refuses the Panel Fields of a step",
+                                           :assert_carry_step_panel => "a check of the masks and the fields that a carry honours",
                                            :ep_prior => "passes the panel to the prior it wraps",
                                            # The stack of the Feature Matrix returns the stored cells, and FeatureDistance reads
                                            # it beside the active mask.

@@ -208,6 +208,41 @@ function assert_orthogonal_forecast_scale(::Any)
     return nothing
 end
 """
+    assert_orthogonal_forecast_fit(ofit::AbstractOrthogonalForecastFit, rfe)
+    assert_orthogonal_forecast_fit(ofit::OrthogonalPartCalibration, rfe)
+
+Refuse an Orthogonal Forecast Fit that the Return Forecast Estimator of a Cross-Sectional Factor Prior cannot run.
+
+The constructor of [`CrossSectionalFactorPrior`](@ref) calls it on `ofit` and `rfe`, so the refusal fires where the caller wrote the rule and not at the fit. [`OrthogonalPartCalibration`](@ref) fits `κ⊥` in the calibration of the member, so it needs a member that answers `true` to [`calibrates_orthogonal_part`](@ref). Every other rule runs with every member, and its method returns at once.
+
+# Arguments
+
+  - `ofit`: The Orthogonal Forecast Fit of the prior.
+  - `rfe`: The Return Forecast Estimator of the prior, or `nothing`.
+
+# Validation
+
+  - Under [`OrthogonalPartCalibration`](@ref), [`calibrates_orthogonal_part`](@ref) answers `true` for `rfe`. Raises an `ArgumentError` that names the default rule and the rule of the forecast history.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`AbstractOrthogonalForecastFit`](@ref)
+  - [`calibrates_orthogonal_part`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function assert_orthogonal_forecast_fit(::AbstractOrthogonalForecastFit, ::Any)
+    return nothing
+end
+function assert_orthogonal_forecast_fit(::OrthogonalPartCalibration, rfe)
+    @argcheck(calibrates_orthogonal_part(rfe),
+              ArgumentError("`ofit` is OrthogonalPartCalibration(), which fits the calibration slope of the orthogonal part in the calibration of the Return Forecast, and `rfe`, a `$(nameof(typeof(rfe)))`, has no such calibration. Only a TargetReturnForecast with calibrate = true has one, or a caller's member that answers true to calibrates_orthogonal_part. Use the default ScoreNeutralisation(), which repairs every fitted member, or put a rule in `c` that fits the slope on the Return Forecast history, ForecastCalibrationSlope."))
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Estimates a point-in-time cross-sectional factor model from an Asset Panel, and lifts it onto the assets.
@@ -219,6 +254,8 @@ The factor list can also hold observed factors, whose returns the caller observe
 The warm-ups of a fit add up, so a caller who sizes a window must sum three of them rather than take the longest. The longest warm-up of the Descriptors sets the first observation of the factor-return history, and `lag` adds `lag` observations to it. `pe` then warms up over that history, and `ve` over the idiosyncratic returns beside it. The default `pe` and the default `ve` each need 40 observations, their `min_obs`, so a default fit needs 40 observations after the Descriptor warm-up and the lag. A window that covers the Descriptors alone can leave `pe` too few observations to state a factor covariance, and the fit then refuses with a message that names the cause. Cross-validation meets this most often. A fold gives the estimator its own rows alone, so the Descriptors warm up again in every fold, and a rolling train window never grows past the warm-up. Size the train window against the sum of the three warm-ups.
 
 On the online step the prior takes one of two routes. Unwrapped, it folds as a carry: its first step of [`partial_fit!`](@ref) seeds a [`CrossSectionalCarryState`](@ref), and each step computes the exposures, the regression and the idiosyncratic variance of the new observations alone. Wrapped in [`Online`](@ref), it refits: each step records the returns, both masks and the Panel Fields in a sample buffer, the call with no data `prior(pe)` is the batch fit over the rows of the buffer, and a `max_history` on the wrapper bounds them. When a member reads the Exogenous Series, as [`reads_exogenous_series`](@ref) answers, the buffer records every column of the series too, so an observed factor takes the refit. The carry fold records the series of the rows it carries, so an observed factor takes the carry too. The automatic choice of a dropped member reads every row, so `choice` states whether each fit chooses again or the first fit pins it.
+
+`ofit` is the Orthogonal Forecast Fit. A fitted Return Forecast regresses the forward idiosyncratic return, which the regression makes orthogonal to the Factor Exposures, so the part of its forecast that the exposures do not span is under-scaled. The default [`ScoreNeutralisation`](@ref) neutralises the scores of such a member against every estimated factor of the block before the fit, [`OrthogonalPartCalibration`](@ref) scales the orthogonal part by a slope fitted on it, and [`UnadjustedForecast`](@ref) reads the member as it stands.
 
 `lambda` and `c` are Calibration Slots. Each holds a number, or a rule that computes the number from the fit: `lambda` takes a rule of [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref), and `c` takes a rule of [`AbstractOrthogonalForecastScaleCalibrationAlgorithm`](@ref). Each fit, each refit and each online step resolves the rules with [`cross_sectional_calibration`](@ref), after the split of the Return Forecast and before the mean. The block records the resolved numbers in its fields `lambda` and `c`.
 
@@ -245,6 +282,7 @@ $(DocStringExtensions.FIELDS)
                               rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
                               lambda::Num_SpanShrinkCal = 1.0,
                               c::Num_OrthFcScaleCal = 1.0,
+                              ofit::AbstractOrthogonalForecastFit = ScoreNeutralisation(),
                               lx::Option{<:AbstractString} = nothing,
                               mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
                               ex::FLoops.Transducers.Executor = ThreadedEx(),
@@ -268,6 +306,7 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
   - A stated `lambda` lies in `[0, 1]`, by [`assert_spanned_shrinkage`](@ref).
   - A stated `c` is finite and `>= 0`, by [`assert_orthogonal_forecast_scale`](@ref).
   - A rule in `lambda` or in `c` that reads the Return Forecast history needs a fitted `rfe`, as [`assert_forecast_history_rule`](@ref) states. A rule of the wrong family is refused by the bound of the slot. The number a rule returns is checked when the prior resolves it.
+  - [`OrthogonalPartCalibration`](@ref) in `ofit` needs a member that can fit the slope of the orthogonal part, as [`assert_orthogonal_forecast_fit`](@ref) states.
 
 ## Propagated parameters
 
@@ -396,6 +435,10 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     c
     """
+    Orthogonal Forecast Fit, the rule that makes the orthogonal part of a fitted Return Forecast carry the scale of its fit. [`ScoreNeutralisation`](@ref), the default, neutralises the scores of a member that answers `true` to [`fits_idiosyncratic_target`](@ref) against every estimated factor of the block, under the regression weights of the block, before the fit. [`OrthogonalPartCalibration`](@ref) fits the calibration slope of [`TargetReturnForecast`](@ref) on the orthogonal part of its prediction too, and scales the orthogonal part by the ratio of the two slopes. [`UnadjustedForecast`](@ref) reads the member as it stands. The rule acts before `c`, which multiplies the part that it gives.
+    """
+    ofit
+    """
     Name of a numeric Panel Field of the returns net of the observed factors, or `nothing` to derive them as `X - Z_obs * r_obs`. The regression reads the named field unchanged. Under Currency Factors the net returns are the local returns. A caller names a field when some asset has no currency label, which the derived path gives a `NaN` net return, or when their own local returns are not `X - Z_obs * r_obs`, which includes every panel of simple returns because of the cross term, see [`currency_excess_index`](@ref).
     """
     lx
@@ -429,6 +472,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        lag::Integer, minra::Option{<:Integer},
                                        rfe::Option{<:AbstractReturnForecastEstimator},
                                        lambda::Num_SpanShrinkCal, c::Num_OrthFcScaleCal,
+                                       ofit::AbstractOrthogonalForecastFit,
                                        lx::Option{<:AbstractString},
                                        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
                                        ex::FLoops.Transducers.Executor,
@@ -456,24 +500,36 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         assert_orthogonal_forecast_scale(c)
         assert_forecast_history_rule(lambda, rfe, :lambda)
         assert_forecast_history_rule(c, rfe, :c)
+        assert_orthogonal_forecast_fit(ofit, rfe)
         return new{typeof(factors), typeof(neutralise), typeof(families), typeof(cre),
                    typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(f_mp), typeof(mp),
                    typeof(th), typeof(bp), typeof(mcap), typeof(bw), typeof(lag),
-                   typeof(minra), typeof(rfe), typeof(lambda), typeof(c), typeof(lx),
-                   typeof(mtx_sqrt), typeof(ex), typeof(choice), typeof(cache)}(factors,
-                                                                                neutralise,
-                                                                                families,
-                                                                                cre, wa, pe,
-                                                                                ve, ce,
-                                                                                f_mp, mp,
-                                                                                th, bp,
-                                                                                mcap, bw,
-                                                                                lag, minra,
-                                                                                rfe, lambda,
-                                                                                c, lx,
-                                                                                mtx_sqrt,
-                                                                                ex, choice,
-                                                                                cache)
+                   typeof(minra), typeof(rfe), typeof(lambda), typeof(c), typeof(ofit),
+                   typeof(lx), typeof(mtx_sqrt), typeof(ex), typeof(choice), typeof(cache)}(factors,
+                                                                                            neutralise,
+                                                                                            families,
+                                                                                            cre,
+                                                                                            wa,
+                                                                                            pe,
+                                                                                            ve,
+                                                                                            ce,
+                                                                                            f_mp,
+                                                                                            mp,
+                                                                                            th,
+                                                                                            bp,
+                                                                                            mcap,
+                                                                                            bw,
+                                                                                            lag,
+                                                                                            minra,
+                                                                                            rfe,
+                                                                                            lambda,
+                                                                                            c,
+                                                                                            ofit,
+                                                                                            lx,
+                                                                                            mtx_sqrt,
+                                                                                            ex,
+                                                                                            choice,
+                                                                                            cache)
     end
 end
 function CrossSectionalFactorPrior(; factors::Dict_VecPair,
@@ -498,6 +554,7 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
                                    lambda::Num_SpanShrinkCal = 1.0,
                                    c::Num_OrthFcScaleCal = 1.0,
+                                   ofit::AbstractOrthogonalForecastFit = ScoreNeutralisation(),
                                    lx::Option{<:AbstractString} = nothing,
                                    mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
@@ -507,7 +564,7 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                      cross_sectional_prior_option(neutralise, :neutralise),
                                      cross_sectional_prior_option(families, :families), cre,
                                      wa, pe, ve, ce, f_mp, mp, th, bp, mcap, bw, lag, minra,
-                                     rfe, lambda, c, lx, mtx_sqrt, ex, choice, cache)
+                                     rfe, lambda, c, ofit, lx, mtx_sqrt, ex, choice, cache)
 end
 # `lambda` and `c` are the two Calibration Slots of the prior. The prior resolves them itself,
 # inside `cross_sectional_assemble`, so the declaration serves the two `assert_` walks alone.
@@ -741,7 +798,7 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
  1. Record the degrees of freedom and the divisor of each variance with [`cross_sectional_variance_counts`](@ref), from the count `cnt`.
  2. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`. Take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation.
  3. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, and a zero `b`. Under a family re-basis, expand the factor returns onto the raw axis with [`cross_sectional_expand`](@ref), each row with the basis of its lagged exposures, and store them in `fr`.
- 4. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref) on `rde`, giving the spanned coefficients `g`, the unscaled orthogonal part `ap`, and the history when a slot answers `true` to [`reads_forecast_history`](@ref). The history extends the rows `hist` of `fit` when the carry fold carries them.
+ 4. Fit the Return Forecast under the Orthogonal Forecast Fit `pe.ofit` with [`cross_sectional_return_forecast`](@ref) on `rde`, giving the spanned coefficients `g`, the orthogonal part `ap` before `c`, and the history when a slot answers `true` to [`reads_forecast_history`](@ref). The history extends the rows `hist` of `fit` when the carry fold carries them.
  5. Resolve the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` with [`cross_sectional_calibration`](@ref), against the factor moments `f_pr` and the block `csfm`.
  6. Write `b = c ap`, the Return Forecast Result and the resolved `lambda` and `c` onto the block with [`cross_sectional_forecast_block`](@ref), giving `rr`. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref) under the resolved `lambda`, and keep the mean of the observed factors, giving `f_mu`.
  7. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref).
@@ -808,7 +865,8 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
     # The split comes first and the scale after it, because a rule in `c` reads the unscaled
     # orthogonal part.
     reads = reads_forecast_history(pe.lambda) || reads_forecast_history(pe.c)
-    sp = cross_sectional_return_forecast(pe.rfe, rde, csfm, pe.cre, reads, fit.hist)
+    sp = cross_sectional_return_forecast(pe.ofit, pe.rfe, rde, csfm, pe.cre, reads,
+                                         fit.hist)
     (; lambda, c) = cross_sectional_calibration(pe, f_pr, csfm, sp)
     rr = cross_sectional_forecast_block(csfm, sp, lambda, c)
     # The forecast spans the estimated factors alone, so the blend reaches their mean and
@@ -1406,7 +1464,8 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 """
 function show_fields(::CrossSectionalFactorPrior)
     return (:factors, :neutralise, :families, :cre, :wa, :pe, :ve, :ce, :f_mp, :mp, :th,
-            :bp, :mcap, :bw, :lag, :minra, :rfe, :lambda, :c, :lx, :mtx_sqrt, :ex, :choice)
+            :bp, :mcap, :bw, :lag, :minra, :rfe, :lambda, :c, :ofit, :lx, :mtx_sqrt, :ex,
+            :choice)
 end
 function factor_residual_config(::CrossSectionalFactorPrior)
     # The declaration names a variance estimator that a consumer re-runs on the
