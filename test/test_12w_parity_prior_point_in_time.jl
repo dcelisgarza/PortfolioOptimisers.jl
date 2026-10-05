@@ -37,7 +37,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                                                                                      1.6)))
     ve = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false,
                                            regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
-    est(; kw...) = CrossSectionalFactorPrior(; factors = factors, pe = pe, ve = ve, kw...)
+    est(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = factors, pe = pe,
+                                             ve = ve, kw...)
     load(c, o) = parity_load("CrossSectionalFactorPrior", c, o)
     loadv(c, o) = vec(load(c, o))
     flat(Ms) = reshape(permutedims(Ms, (1, 3, 2)), size(Ms, 1), :)
@@ -266,8 +267,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                             pnl = AssetPanel(pf, rv.pnl.amsk, rv.pnl.emsk))
         fi = ["industry" => OneHotExposure(; field = "industry", family = "industry"),
               "style1" => mpass("style1"), "style2" => mpass("style2")]
-        e(; kw...) = CrossSectionalFactorPrior(; factors = fi, pe = pe, ve = ve, minra = 5,
-                                               kw...)
+        e(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = fi, pe = pe, ve = ve,
+                                               minra = 5, kw...)
         pr = prior(e(), rv)
         p3 = prior(e(), rv3)
         j = findfirst(==("industry=Utilities"), pr.rr.nf)

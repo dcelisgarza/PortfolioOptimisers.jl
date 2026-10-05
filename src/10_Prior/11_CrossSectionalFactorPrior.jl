@@ -5,7 +5,31 @@ Computes the Spanned Shrinkage, the `lambda` of a Cross-Sectional Factor Prior, 
 
 The Spanned Shrinkage blends the expected factor returns of the nested factor prior with the spanned coefficients `g` of the Return Forecast, and it lies in `[0, 1]`. A rule of this family stands in the `lambda` slot of [`CrossSectionalFactorPrior`](@ref), and [`Num_SpanShrinkCal`](@ref) is the bound of that slot, so a rule of another family is refused at construction.
 
-A rule is called as `alg(key, pr, w, slv, ctx)`, as [`resolve_calibration_slot`](@ref) states, and returns the shrinkage. `pr` is the prior that the nested factor prior states on the reduced factor axis, `w` is its observation weights, `slv` is `nothing`, and `ctx` is a [`CalibrationContext`](@ref) whose `cs` carries the spanned coefficients `g`, the unscaled orthogonal part `ap`, the block `csfm` and the history `hist`. The prior refuses a returned number outside `[0, 1]`. A rule that reads the Return Forecast history answers `true` to [`reads_forecast_history`](@ref).
+A rule is called as `alg(key, pr, w, slv, ctx)`, as [`resolve_calibration_slot`](@ref) states, and returns the shrinkage. The prior refuses a returned number outside `[0, 1]`.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractSpannedShrinkageCalibrationAlgorithm` and implement the following methods:
+
+## The functor
+
+  - `(alg::AbstractSpannedShrinkageCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv, ctx::CalibrationContext) -> Number`: Returns the Spanned Shrinkage.
+
+### Arguments
+
+  - `key`: Name of the slot that is being resolved, `:lambda`.
+  - `pr`: The factor moments of the nested factor prior, on the reduced factor axis of the estimated factors and the observed factors.
+  - `w`: The observation weights of `pr`, or `nothing`.
+  - `slv`: `nothing`.
+  - `ctx`: A [`CalibrationContext`](@ref) whose `cs` carries the fit of the prior.
+
+### Returns
+
+  - `lambda::Number`: The Spanned Shrinkage, in `[0, 1]`.
+
+## `reads_forecast_history`
+
+  - `reads_forecast_history(alg::MySpannedShrinkage) -> Bool`: Returns `true` when the rule reads `ctx.cs.hist`. Add it only for a rule that reads the history, because the default answers `false`.
 
 # Related
 
@@ -14,6 +38,8 @@ A rule is called as `alg(key, pr, w, slv, ctx)`, as [`resolve_calibration_slot`]
   - [`Num_SpanShrinkCal`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
   - [`cross_sectional_calibration`](@ref)
+  - [`PrecisionBlend`](@ref): the default rule of the slot.
+  - [`SteinShrinkage`](@ref): the family's rule that reads the intensity of a shrunk expected-returns estimator.
 """
 abstract type AbstractSpannedShrinkageCalibrationAlgorithm <: AbstractCalibrationAlgorithm end
 """
@@ -25,6 +51,30 @@ The Orthogonal Forecast Scale multiplies the part of the Return Forecast that th
 
 A rule is called on the same terms as a rule of [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref), and returns the scale. The prior refuses a returned number that is negative or not finite.
 
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractOrthogonalForecastScaleCalibrationAlgorithm` and implement the following methods:
+
+## The functor
+
+  - `(alg::AbstractOrthogonalForecastScaleCalibrationAlgorithm)(key::Symbol, pr::AbstractPriorResult, w, slv, ctx::CalibrationContext) -> Number`: Returns the Orthogonal Forecast Scale.
+
+### Arguments
+
+  - `key`: Name of the slot that is being resolved, `:c`.
+  - `pr`: The factor moments of the nested factor prior, on the reduced factor axis of the estimated factors and the observed factors.
+  - `w`: The observation weights of `pr`, or `nothing`.
+  - `slv`: `nothing`.
+  - `ctx`: A [`CalibrationContext`](@ref) whose `cs` carries the fit of the prior.
+
+### Returns
+
+  - `c::Number`: The Orthogonal Forecast Scale, finite and `>= 0`.
+
+## `reads_forecast_history`
+
+  - `reads_forecast_history(alg::MyOrthogonalForecastScale) -> Bool`: Returns `true` when the rule reads `ctx.cs.hist`. Add it only for a rule that reads the history, because the default answers `false`.
+
 # Related
 
   - [`AbstractCalibrationAlgorithm`](@ref)
@@ -32,6 +82,7 @@ A rule is called on the same terms as a rule of [`AbstractSpannedShrinkageCalibr
   - [`Num_OrthFcScaleCal`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
   - [`cross_sectional_calibration`](@ref)
+  - [`ForecastCalibrationSlope`](@ref): the family's rule that reads the calibration slope of the orthogonal forecast.
 """
 abstract type AbstractOrthogonalForecastScaleCalibrationAlgorithm <:
               AbstractCalibrationAlgorithm end
@@ -280,7 +331,7 @@ $(DocStringExtensions.FIELDS)
                               bw::AbstractString = "benchmark_weights", lag::Integer = 1,
                               minra::Option{<:Integer} = nothing,
                               rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
-                              lambda::Num_SpanShrinkCal = 1.0,
+                              lambda::Num_SpanShrinkCal = PrecisionBlend(),
                               c::Num_OrthFcScaleCal = 1.0,
                               ofit::AbstractOrthogonalForecastFit = ScoreNeutralisation(),
                               lx::Option{<:AbstractString} = nothing,
@@ -427,7 +478,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     @fprop rfe
     """
-    Spanned Shrinkage of the expected factor returns towards the spanned part of the Return Forecast, in `[0, 1]`, or a rule that computes it. A value of one keeps the fitted factor mean, and a value of zero takes the spanned forecast alone. With no Return Forecast Estimator the spanned part is zero, so the value shrinks the factor mean towards zero. The bound is [`Num_SpanShrinkCal`](@ref).
+    Spanned Shrinkage of the expected factor returns towards the spanned part of the Return Forecast, in `[0, 1]`, or a rule that computes it. A value of one keeps the fitted factor mean, and a value of zero takes the spanned forecast alone. With no Return Forecast Estimator the spanned part is zero, so the value shrinks the factor mean towards zero. The bound is [`Num_SpanShrinkCal`](@ref). The default is [`PrecisionBlend`](@ref), which weighs the factor mean and the spanned part by the error of each.
     """
     lambda
     """
@@ -552,7 +603,7 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    bw::AbstractString = "benchmark_weights",
                                    lag::Integer = 1, minra::Option{<:Integer} = nothing,
                                    rfe::Option{<:AbstractReturnForecastEstimator} = nothing,
-                                   lambda::Num_SpanShrinkCal = 1.0,
+                                   lambda::Num_SpanShrinkCal = PrecisionBlend(),
                                    c::Num_OrthFcScaleCal = 1.0,
                                    ofit::AbstractOrthogonalForecastFit = ScoreNeutralisation(),
                                    lx::Option{<:AbstractString} = nothing,
@@ -903,7 +954,7 @@ Resolves the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` of
 # Algorithm
 
  1. Put the factor moments `f_pr` into a [`LowOrderPrior`](@ref) `pr`, on the reduced factor axis of the estimated factors and the observed factors.
- 2. Build a [`CalibrationContext`](@ref) whose `cs` holds the spanned coefficients `g`, the unscaled orthogonal part `ap` and the history `hist` of `sp`, and the block `csfm`.
+ 2. Build a [`CalibrationContext`](@ref) whose `cs` holds the spanned coefficients `g`, the unscaled orthogonal part `ap` and the history `hist` of `sp`, the block `csfm`, and the Cross-Sectional Regression Estimator `cre` of the prior, which splits a row of the history.
  3. Resolve `pe.lambda` under the key `:lambda` and `pe.c` under the key `:c` with [`resolve_calibration_slot`](@ref), against `pr`, its observation weights `pr.w`, no solver, and the context.
  4. Refuse a resolved `lambda` outside `[0, 1]` with [`assert_spanned_shrinkage`](@ref), and a resolved `c` that is negative or not finite with [`assert_orthogonal_forecast_scale`](@ref).
 
@@ -937,7 +988,9 @@ function cross_sectional_calibration(pe::CrossSectionalFactorPrior, f_pr::NamedT
                                      csfm::CrossSectionalFactorModel, sp::NamedTuple)
     pr = LowOrderPrior(; X = f_pr.X, mu = f_pr.mu, sigma = f_pr.sigma, w = f_pr.w,
                        ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow)
-    ctx = CalibrationContext(; cs = (; g = sp.g, ap = sp.ap, csfm = csfm, hist = sp.hist))
+    ctx = CalibrationContext(;
+                             cs = (; g = sp.g, ap = sp.ap, csfm = csfm, hist = sp.hist,
+                                   cre = pe.cre))
     lambda = resolve_calibration_slot(pe.lambda, :lambda, pr, pr.w, nothing, ctx)
     c = resolve_calibration_slot(pe.c, :c, pr, pr.w, nothing, ctx)
     assert_spanned_shrinkage(lambda::Number)
@@ -1623,3 +1676,5 @@ function lookback(pe::CrossSectionalFactorPrior)::Option{<:Integer}
 end
 
 export CrossSectionalFactorPrior
+public AbstractSpannedShrinkageCalibrationAlgorithm,
+       AbstractOrthogonalForecastScaleCalibrationAlgorithm, reads_forecast_history

@@ -117,7 +117,7 @@ end
                    CompositeExposure(; descriptors = [LogMarketCap()], family = "style"),
                "value" =>
                    CompositeExposure(; descriptors = [BookToPrice()], family = "style")]
-    prp = prior(CrossSectionalFactorPrior(; factors = factors), rdp)
+    prp = prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors), rdp)
     msk = PO.investable_mask(prp)
     @test count(msk) < length(msk)
     nnf = count(i -> !all(isfinite, view(prp.rr.L, i, :)), axes(prp.rr.L, 1))
@@ -163,7 +163,7 @@ end
     # Under a family re-basis `L` is narrower than `M`, and the labels follow the reduced
     # axis: the dropped member of the constrained family is absent, and the rest keep their
     # names.
-    prf = PO.port_opt_view(prior(CrossSectionalFactorPrior(; factors = factors,
+    prf = PO.port_opt_view(prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                                            families = ["industry" =>
                                                                            nothing]), rdp),
                            idx)
@@ -176,7 +176,9 @@ end
 
     # The routed path: the optimiser reduces the prior before the kernel runs, so the
     # producer never meets the unreduced block, and no weight lands outside the mask.
-    opt = HierarchicalOptimiser(; pe = CrossSectionalFactorPrior(; factors = factors),
+    opt = HierarchicalOptimiser(;
+                                pe = CrossSectionalFactorPrior(; lambda = 1,
+                                                               factors = factors),
                                 cle = ClustersEstimator(;
                                                         de = FeatureDistance(;
                                                                              ape = RegressionPanel())))

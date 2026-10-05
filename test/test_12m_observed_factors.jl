@@ -41,7 +41,7 @@ function obs_pass(field, family)
                              outlier = nothing, scoring = nothing, family = family)
 end
 function obs_prior(; kwargs...)
-    return CrossSectionalFactorPrior(;
+    return CrossSectionalFactorPrior(; lambda = 1,
                                      factors = ["beta" => obs_pass("beta", "market"),
                                                 "currency" => CurrencyExposure()], bp = 0,
                                      wa = MarketCapWeights(; p = 0), minra = 3, kwargs...)
@@ -107,7 +107,7 @@ end
                           emsk = trues(T, N))
         rd = ReturnsResult(; nx = ["a$i" for i in 1:N], X = X, ne = ["EUR", "USD"], E = R,
                            pnl = pnl)
-        pe = CrossSectionalFactorPrior(;
+        pe = CrossSectionalFactorPrior(; lambda = 1,
                                        factors = ["market" => ConstantExposure(),
                                                   "ind_1" => obs_pass("ind_1", "industry"),
                                                   "ind_2" => obs_pass("ind_2", "industry"),
@@ -198,13 +198,13 @@ end
             @test occursin("[\"EUR\"]", err.msg) && occursin("observation 6", err.msg)
         end
         # A family holds estimated factors or observed ones.
-        @test_throws ArgumentError CrossSectionalFactorPrior(;
+        @test_throws ArgumentError CrossSectionalFactorPrior(; lambda = 1,
                                                              factors = ["beta" =>
                                                                             obs_pass("beta",
                                                                                      "currency"),
                                                                         "currency" =>
                                                                             CurrencyExposure()])
-        @test_throws ArgumentError CrossSectionalFactorPrior(;
+        @test_throws ArgumentError CrossSectionalFactorPrior(; lambda = 1,
                                                              factors = ["beta" =>
                                                                             obs_pass("beta",
                                                                                      "market"),
@@ -213,10 +213,10 @@ end
                                                              families = ["currency" =>
                                                                              nothing])
         # A label no estimated member claims is free, "currency" included.
-        @test CrossSectionalFactorPrior(;
+        @test CrossSectionalFactorPrior(; lambda = 1,
                                         factors = ["beta" => obs_pass("beta", "currency")]) isa
               CrossSectionalFactorPrior
-        @test_throws ArgumentError CrossSectionalFactorPrior(;
+        @test_throws ArgumentError CrossSectionalFactorPrior(; lambda = 1,
                                                              factors = ["beta" =>
                                                                             obs_pass("beta",
                                                                                      "market")],
@@ -236,7 +236,7 @@ end
                                                                          family = "x"),
                                                     series = "x")
         # An observed member that wraps a member of many factors is refused at the fit.
-        pe = CrossSectionalFactorPrior(;
+        pe = CrossSectionalFactorPrior(; lambda = 1,
                                        factors = ["beta" => obs_pass("beta", "market"),
                                                   "ccy" => ObservedExposure(;
                                                                             xe = OneHotExposure(;

@@ -123,8 +123,9 @@ function parity_neutralise_prior(; neutralise = nothing,
                                                                  debias = false,
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
-    return CrossSectionalFactorPrior(; factors = factors, neutralise = neutralise,
-                                     minra = 5, pe = pe, ve = PARITY_VE)
+    return CrossSectionalFactorPrior(; lambda = 1, factors = factors,
+                                     neutralise = neutralise, minra = 5, pe = pe,
+                                     ve = PARITY_VE)
 end
 
 @testset "Parity: the cross-sectional transforms, the Factor Exposures and the Neutralisation (#1381)" begin

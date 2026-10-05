@@ -51,8 +51,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                                                                                      1.6)))
     ve = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false,
                                            regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
-    fit(rd; kw...) = prior(CrossSectionalFactorPrior(; factors = factors, pe = pe, ve = ve,
-                                                     kw...), rd)
+    fit(rd; kw...) = prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
+                                                     pe = pe, ve = ve, kw...), rd)
     desc = [Passthrough(; field = "net_income_ttm"), Passthrough(; field = "sales_ttm"),
             EWMomentum(; half_life = 5, skip = 3)]
     std2 = CrossSectionalStandardiser(; min_group_size = 2)

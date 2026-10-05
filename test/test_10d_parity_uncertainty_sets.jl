@@ -40,7 +40,8 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                                                                                      1.6)))
     ve = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false,
                                            regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
-    est(; kw...) = CrossSectionalFactorPrior(; factors = factors, pe = pe, ve = ve, kw...)
+    est(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = factors, pe = pe,
+                                             ve = ve, kw...)
     load(u, c, o) = parity_load(u, c, o)
     loadv(u, c, o) = vec(load(u, c, o))
     prs = prior(est(; minra = 5), parity_small_panel().rd)

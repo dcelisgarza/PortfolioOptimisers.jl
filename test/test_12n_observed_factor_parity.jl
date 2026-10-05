@@ -94,8 +94,8 @@ end
                                                             (("Plain", nothing),
                                                              ("Family",
                                                               ["industry" => nothing]))
-        pr = prior(CrossSectionalFactorPrior(; factors = factors, families = fam,
-                                             pe = EmpiricalPrior()), fx.rd)
+        pr = prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
+                                             families = fam, pe = EmpiricalPrior()), fx.rd)
         F = ccy_asset("$(nm)FactorReturns")
         @test size(pr.fpr.X) == size(F) == (119, 8)
         # Measured cell by cell, Plain and Family: maxrel 9.5e-13 and 3.2e-13 (factor
@@ -121,8 +121,9 @@ end
                                                                       ["industry" =>
                                                                            nothing]))
         # The defaults, with the oracle's raw regime statistic (#1428).
-        pr = prior(CrossSectionalFactorPrior(; factors = factors, families = fam,
-                                             pe = PARITY_PE, ve = PARITY_VE), fx.rd)
+        pr = prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
+                                             families = fam, pe = PARITY_PE,
+                                             ve = PARITY_VE), fx.rd)
         @test pr.fpr.mu ≈ vec(ccy_asset("$(nm)DefaultFactorMu")) rtol = 1e-12
         @test pr.fpr.sigma ≈ ccy_asset("$(nm)DefaultFactorCov") rtol = 1e-12
         @test pr.mu ≈ vec(ccy_asset("$(nm)DefaultMu")) rtol = 1e-12
@@ -154,7 +155,7 @@ end
     # Every cluster and every subset estimates its own factors. The factors here are
     # continuous styles and a market intercept, and the testsets of #1372 at the end of the
     # file fit industry factors, which a cluster can leave empty.
-    pe = CrossSectionalFactorPrior(;
+    pe = CrossSectionalFactorPrior(; lambda = 1,
                                    factors = ["style1" => ccy_pass("style1", "style"),
                                               "style2" => ccy_pass("style2", "style"),
                                               "market" => ConstantExposure(),
@@ -219,7 +220,8 @@ end
             ("RankDeficiencyRefusal",
              CrossSectionalLinearRegression(; alg = RankDeficiencyRefusal())))
     @testset "An Empty Factor has no return, mean or variance, $(nm)" for (nm, cre) in cres
-        pr = prior(CrossSectionalFactorPrior(; factors = fac3, cre = cre, minra = 5), rd2)
+        pr = prior(CrossSectionalFactorPrior(; lambda = 1, factors = fac3, cre = cre,
+                                             minra = 5), rd2)
         # The empty factors keep their place on every axis of the factor model.
         @test pr.rr.nf == ["ind1", "ind2", "ind3", "style1"]
         @test all(iszero, pr.fpr.X[:, [1, 3]])
@@ -228,8 +230,8 @@ end
         @test all(isfinite, pr.mu) && all(isfinite, pr.sigma) && all(isfinite, pr.chol)
         # An empty factor adds nothing to the fit, so the prior equals the one fitted on the
         # other factors alone.
-        prl = prior(CrossSectionalFactorPrior(; factors = fac3[[2, 4]], cre = cre,
-                                              minra = 5), rd2)
+        prl = prior(CrossSectionalFactorPrior(; lambda = 1, factors = fac3[[2, 4]],
+                                              cre = cre, minra = 5), rd2)
         @test pr.fpr.X[:, [2, 4]] == prl.fpr.X
         @test pr.fpr.mu[[2, 4]] == prl.fpr.mu
         @test pr.fpr.sigma[[2, 4], [2, 4]] == prl.fpr.sigma
@@ -239,7 +241,7 @@ end
     end
 
     @testset "An Empty Factor inside a constrained Factor Family" begin
-        pr = prior(CrossSectionalFactorPrior(; factors = fac3,
+        pr = prior(CrossSectionalFactorPrior(; lambda = 1, factors = fac3,
                                              families = ["industry" => nothing], minra = 5),
                    rd2)
         @test length(pr.rr.nf) == 4
@@ -281,7 +283,7 @@ end
     end
 
     @testset "A NestedClustered over the industry factors fits every cluster (#1372)" begin
-        pei = CrossSectionalFactorPrior(; factors = fac3, minra = 3)
+        pei = CrossSectionalFactorPrior(; lambda = 1, factors = fac3, minra = 3)
         innr = MeanRisk(; opt = JuMPOptimiser(; pe = pei, slv = slv))
         res = optimise(NestedClustered(; pe = pei, opti = innr, opto = EqualWeighted()),
                        fx.rd)
@@ -362,7 +364,7 @@ end
 @testset "A macro-sensitivity factor at parity with a stored oracle (#1365)" begin
     @testset "An estimated macro factor" begin
         rd = mac_fixture()
-        pr = prior(CrossSectionalFactorPrior(; factors = mac_factors(),
+        pr = prior(CrossSectionalFactorPrior(; lambda = 1, factors = mac_factors(),
                                              pe = EmpiricalPrior(), ve = PARITY_VE), rd)
         @test pr.rr.nf == ["ind1", "ind2", "ind3", "style1", "style2", "macro"]
         F = mac_asset("PlainFactorReturns")
@@ -378,7 +380,8 @@ end
         # sensitivity measures the local move of an asset and not the currency it holds.
         rd = mac_fixture(; ccy = true)
         # The defaults, with the oracle's raw regime statistic (#1428).
-        pr = prior(CrossSectionalFactorPrior(; factors = mac_factors(; ccy = true),
+        pr = prior(CrossSectionalFactorPrior(; lambda = 1,
+                                             factors = mac_factors(; ccy = true),
                                              pe = PARITY_PE, ve = PARITY_VE), rd)
         @test pr.rr.nf[6:end] == ["macro", "currency=EUR", "currency=JPY", "currency=USD"]
         @test pr.fpr.mu ≈ vec(mac_asset("CurrencyDefaultFactorMu")) rtol = 1e-12
@@ -388,7 +391,8 @@ end
         @test pr.sigma ≈ mac_asset("CurrencyDefaultSigma") rtol = 1e-12
         # A Panel Field of the same local returns under `lx` gives the same fit, because the
         # derived net returns take the exposure of the same observation on the first rows.
-        pl = prior(CrossSectionalFactorPrior(; factors = mac_factors(; ccy = true),
+        pl = prior(CrossSectionalFactorPrior(; lambda = 1,
+                                             factors = mac_factors(; ccy = true),
                                              pe = PARITY_PE, ve = PARITY_VE, lx = "local"),
                    rd)
         @test pl.mu ≈ pr.mu rtol = 1e-12
@@ -418,7 +422,7 @@ end
         for (f, nf) in
             ((vcat(fs, [fx]), ["currency=EUR", "currency=JPY", "currency=USD", "fx"]),
              (vcat([fx], fs), ["fx", "currency=EUR", "currency=JPY", "currency=USD"]))
-            pr = prior(CrossSectionalFactorPrior(; factors = f), rd)
+            pr = prior(CrossSectionalFactorPrior(; lambda = 1, factors = f), rd)
             @test pr.rr.nf[6:end] == nf
             k = findfirst(==("fx"), pr.rr.nf)
             @test pr.rr.M[:, k] ≈ ml rtol = 1e-12

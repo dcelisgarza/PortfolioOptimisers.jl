@@ -152,7 +152,7 @@ end
              "macro2" =>
                  ObservedExposure(; xe = grid_pass("macro_beta"; family = "macro2"),
                                   series = "MACRO2", family = "macro2")]
-        return CrossSectionalFactorPrior(; cfg..., factors = f,
+        return CrossSectionalFactorPrior(; lambda = 1, cfg..., factors = f,
                                          f_mp = MatrixProcessing(; pdm = nothing),
                                          mtx_sqrt = mtx_sqrt)
     end

@@ -173,5 +173,5 @@ function grid_config(name::AbstractString, rd::ReturnsResult)
     return cfg
 end
 function grid_prior(name::AbstractString, rd::ReturnsResult)
-    return CrossSectionalFactorPrior(; grid_config(name, rd)...)
+    return CrossSectionalFactorPrior(; lambda = 1, grid_config(name, rd)...)
 end

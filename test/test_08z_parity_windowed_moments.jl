@@ -171,7 +171,8 @@ end
     factors = ["market" => ConstantExposure(), "style1" => mpass("style1"),
                "style2" => mpass("style2")]
     ve = ExpWeightedVariance(; decay = 2.0^(-1 / 10), min_obs = 5, centred = true)
-    fit(v, wa = MarketCapWeights()) = prior(CrossSectionalFactorPrior(; factors = factors,
+    fit(v, wa = MarketCapWeights()) = prior(CrossSectionalFactorPrior(; lambda = 1,
+                                                                      factors = factors,
                                                                       minra = 5, wa = wa,
                                                                       ve = v), fx.rd)
     base = fit(ve)

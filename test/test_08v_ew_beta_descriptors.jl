@@ -668,7 +668,7 @@ end
         L = factor_exposure(xe, rdb)
         @test isequal(L, descriptor(EWMacroSensitivity(; half_life = 5), rd; ref = ref))
         for f in (xe, ObservedExposure(; xe = xe, series = "FX"))
-            pe = CrossSectionalFactorPrior(;
+            pe = CrossSectionalFactorPrior(; lambda = 1,
                                            factors = ["market" => ConstantExposure(),
                                                       "fx" => f], minra = 3, bp = 0,
                                            wa = MarketCapWeights(; p = 0))

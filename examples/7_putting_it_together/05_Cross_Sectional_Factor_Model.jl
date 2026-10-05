@@ -156,7 +156,9 @@ Three further parts of the specification change the answer.
 `rfe` supplies an alpha forecast. It scores the `signal` field, which no exposure uses. The prior
 splits the forecast into the part the factors span and the part they do not. `lambda` shrinks the
 fitted factor mean towards the spanned part, and at `lambda = 1.0` the prior keeps the fitted
-factor mean. `c` scales the part the factors do not span. That part lands in `rr.b`, and it is
+factor mean. This example states `lambda = 1.0`. The default is `PrecisionBlend()`, a rule that
+computes `lambda` from the fit and gives more weight to the estimate with the smaller error.
+`c` scales the part the factors do not span. That part lands in `rr.b`, and it is
 what the orthogonal sets of section 4 act on.
 =#
 

@@ -59,11 +59,12 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     end
     style = (; grid_config("Base", rd)..., families = ["style" => nothing])
     industry = grid_config("FamOne", rd)
-    sb = stream(CrossSectionalFactorPrior(; style...))
-    sp = stream(CrossSectionalFactorPrior(; style..., choice = PinnedChoice()))
-    ib = stream(CrossSectionalFactorPrior(; industry...))
-    ip = stream(CrossSectionalFactorPrior(; industry..., choice = PinnedChoice()))
-    sbatch = [batch(CrossSectionalFactorPrior(; style...), k) for k in 1:3]
+    sb = stream(CrossSectionalFactorPrior(; lambda = 1, style...))
+    sp = stream(CrossSectionalFactorPrior(; lambda = 1, style..., choice = PinnedChoice()))
+    ib = stream(CrossSectionalFactorPrior(; lambda = 1, industry...))
+    ip = stream(CrossSectionalFactorPrior(; lambda = 1, industry...,
+                                          choice = PinnedChoice()))
+    sbatch = [batch(CrossSectionalFactorPrior(; lambda = 1, style...), k) for k in 1:3]
 
     @testset "The refit equals the batch fit over the same rows" begin
         for k in 1:3
@@ -72,11 +73,11 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             @test isequal(pr.fpr.X, b.fpr.X) && isequal(pr.rr.M, b.rr.M)
         end
         # A cap windows the whole fit: the call with no data is the batch fit over the last rows.
-        e = online(CrossSectionalFactorPrior(; style...); max_history = 120)
+        e = online(CrossSectionalFactorPrior(; lambda = 1, style...); max_history = 120)
         for k in 1:3
             e = partial_fit!(e, rows(rd, (edges[k] + 1):edges[k + 1]))
         end
-        b = prior(CrossSectionalFactorPrior(; style...), rows(rd, 131:250))
+        b = prior(CrossSectionalFactorPrior(; lambda = 1, style...), rows(rd, 131:250))
         @test isequal(prior(e).mu, b.mu) && isequal(prior(e).sigma, b.sigma)
         # A view of a stepped prior slices its buffer to the selected assets.
         v = po.port_opt_view(sb[1].pe, 1:20)
@@ -91,7 +92,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         # the prior out of its buffer. A time-varying panel with Panel Fields and a narrower
         # estimation universe reaches the prior, and the weights equal the batch weights.
         for choice in (BatchChoice(), PinnedChoice())
-            pe = CrossSectionalFactorPrior(; style..., choice = choice)
+            pe = CrossSectionalFactorPrior(; lambda = 1, style..., choice = choice)
             o = po.update_online_estimator(InverseVolatility(; pe = Online(pe)))
             for k in 1:3
                 o = partial_fit!(o, rows(rd, (edges[k] + 1):edges[k + 1]))
@@ -109,7 +110,8 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     @testset "The Choice Rule" begin
         # In a batch fit the two rules agree.
         for k in 1:3
-            pp = batch(CrossSectionalFactorPrior(; style..., choice = PinnedChoice()), k)
+            pp = batch(CrossSectionalFactorPrior(; lambda = 1, style...,
+                                                 choice = PinnedChoice()), k)
             @test isequal(pp.sigma, sbatch[k].sigma) && isequal(pp.mu, sbatch[k].mu)
         end
         # A batch choice chooses again at each call with no data, and leaves `families` alone.
@@ -121,13 +123,15 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         @test [dropped(x.pr) for x in sp] == [["style1"], ["style1"], ["style1"]]
         @test isequal(sp[1].pr.sigma, sb[1].pr.sigma)
         # Pinned, the call with no data is the batch fit with the member stated.
-        stated = CrossSectionalFactorPrior(; style..., families = ["style" => "style1"])
+        stated = CrossSectionalFactorPrior(; lambda = 1, style...,
+                                           families = ["style" => "style1"])
         @test isequal(sp[3].pr.sigma, batch(stated, 3).sigma)
         # The choice moves on this stream, so the two rules differ after the first step.
         @test maximum(abs, filter(isfinite, sp[3].pr.sigma - sb[3].pr.sigma)) > 1e-6
         # A first block that the fit refuses pins nothing. The next block pins the choice of
         # the fit over every row the buffer holds, the first fit.
-        e = online(CrossSectionalFactorPrior(; style..., choice = PinnedChoice()))
+        e = online(CrossSectionalFactorPrior(; lambda = 1, style...,
+                                             choice = PinnedChoice()))
         e = partial_fit!(e, rows(rd, 1:2))
         @test e.families == ["style" => nothing]
         @test_throws ArgumentError prior(e)
@@ -135,12 +139,13 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         @test e.families == ["style" => "style1"]
         @test isequal(prior(e).sigma, sp[1].pr.sigma)
         # A stated member is not pinned again, and the step leaves `families` as it is.
-        e = online(CrossSectionalFactorPrior(; style..., choice = PinnedChoice(),
+        e = online(CrossSectionalFactorPrior(; lambda = 1, style...,
+                                             choice = PinnedChoice(),
                                              families = ["style" => "style2"]))
         e = partial_fit!(e, rows(rd, 1:90))
         @test e.families == ["style" => "style2"]
         # So does a prior with no constrained family.
-        e = online(CrossSectionalFactorPrior(; grid_config("Base", rd)...,
+        e = online(CrossSectionalFactorPrior(; lambda = 1, grid_config("Base", rd)...,
                                              choice = PinnedChoice()))
         @test isnothing(partial_fit!(e, rows(rd, 1:90)).families)
         # The industry choice does not move, so the two rules agree at every step.
@@ -149,7 +154,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     end
 
     @testset "Refusals" begin
-        pe = CrossSectionalFactorPrior(; style...)
+        pe = CrossSectionalFactorPrior(; lambda = 1, style...)
         # An unwrapped prior takes the other route, the carry fold of #1471, which
         # test_12zb_parity_cs_prior_carry_fold.jl tests.
         @test isa(partial_fit!(pe, rows(rd, 1:90)).cache, po.CrossSectionalCarryState)
@@ -170,7 +175,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         cfgs = (; Currency = grid_config("Currency", rd), Macro = grid_config("Macro", rd),
                 Sensitivity = (; base..., factors = [base.factors; msens]))
         for (name, cfg) in pairs(cfgs)
-            pe = CrossSectionalFactorPrior(; cfg...)
+            pe = CrossSectionalFactorPrior(; lambda = 1, cfg...)
             @test po.reads_exogenous_series(pe)
             out = stream(pe)
             for k in 1:3
@@ -189,19 +194,20 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         end
         # The predicate answers per type, through the factor list, the Return Forecast
         # Estimator and the wrapper. A macro sensitivity that names no series reads none.
-        @test !po.reads_exogenous_series(CrossSectionalFactorPrior(; style...))
+        @test !po.reads_exogenous_series(CrossSectionalFactorPrior(; lambda = 1, style...))
         @test !po.reads_exogenous_series(EWMacroSensitivity())
-        @test po.reads_exogenous_series(Online(CrossSectionalFactorPrior(; base...,
+        @test po.reads_exogenous_series(Online(CrossSectionalFactorPrior(; lambda = 1,
+                                                                         base...,
                                                                          factors = [base.factors;
                                                                                     msens])))
         ds = DescriptorScores(; descriptors = [EWMacroSensitivity(; series = "MACRO")])
-        @test po.reads_exogenous_series(CrossSectionalFactorPrior(; style...,
+        @test po.reads_exogenous_series(CrossSectionalFactorPrior(; lambda = 1, style...,
                                                                   rfe = FixedWeightedReturnForecast(;
                                                                                                     scores = ds,
                                                                                                     scale = 0.02)))
         # The same prior inside an optimiser: the prior's buffer owns the series, the Fold
         # Context keeps no copy and reads it back, and the weights equal the batch weights.
-        ccy = CrossSectionalFactorPrior(; grid_config("Currency", rd)...)
+        ccy = CrossSectionalFactorPrior(; lambda = 1, grid_config("Currency", rd)...)
         o = po.update_online_estimator(InverseVolatility(; pe = Online(ccy)))
         for k in 1:3
             o = partial_fit!(o, rows(rd, (edges[k] + 1):edges[k + 1]))
@@ -214,6 +220,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         # A prior that reads no series leaves it to the Fold Context.
         o = po.update_online_estimator(InverseVolatility(;
                                                          pe = Online(CrossSectionalFactorPrior(;
+                                                                                               lambda = 1,
                                                                                                style...))))
         o = partial_fit!(o, rows(rd, 1:90))
         @test isnothing(o.pe.cache.E) && o.cache.ne == rd.ne
@@ -247,7 +254,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             end
         end
         # The carry fold records the series too (#1479), and test_12zb tests it.
-        @test isa(partial_fit!(CrossSectionalFactorPrior(; cfgs.Currency...),
+        @test isa(partial_fit!(CrossSectionalFactorPrior(; lambda = 1, cfgs.Currency...),
                                rows(rd, 1:90)).cache, po.CrossSectionalCarryState)
     end
 
@@ -284,7 +291,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         # Series, and the update pins `style1` over the first batch while the batch fit over
         # 170 and 250 rows drops `style2`. Measured over the three steps: mu maxrel 2.3e-13,
         # sigma maxscaled 4.2e-13, factor returns maxscaled 4.5e-16.
-        cpe = CrossSectionalFactorPrior(; grid_config("Currency", rd)...,
+        cpe = CrossSectionalFactorPrior(; lambda = 1, grid_config("Currency", rd)...,
                                         families = ["style" => nothing],
                                         choice = PinnedChoice())
         cp = stream(cpe)

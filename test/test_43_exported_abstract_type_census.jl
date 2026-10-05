@@ -59,7 +59,11 @@
     `AbstractPricesResult`, `AbstractPhylogenyFeatureAlgorithm`, `AbstractCollateralAlgorithm`
     and `SchurComplementAlgorithm` joined on 2026-09-26 (PR #1204), after #1012, #848, #1337
     and #881 wrote their `# Interfaces` sections. `AbstractObservedExposureEstimator` joined
-    with its `# Interfaces` section on 2026-09-28 (issue #1368).
+    with its `# Interfaces` section on 2026-09-28 (issue #1368). The two Calibration Slot
+    families of `CrossSectionalFactorPrior`, `AbstractSpannedShrinkageCalibrationAlgorithm` and
+    `AbstractOrthogonalForecastScaleCalibrationAlgorithm`, and the two families of the fields of
+    their rules, `AbstractForecastErrorAlgorithm` and `AbstractForecastScaleWarmUpAlgorithm`,
+    joined with their first rules on 2026-10-05 (issue #1483, the maintainer's ruling).
     They are held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
@@ -76,6 +80,10 @@
                           :AbstractDescriptorEstimator, :AbstractDetoneEstimator,
                           :AbstractEstimatorValueAlgorithm,
                           :AbstractExpectedReturnsEstimator, :AbstractExposureEstimator,
+                          :AbstractForecastErrorAlgorithm,
+                          :AbstractForecastScaleWarmUpAlgorithm,
+                          :AbstractOrthogonalForecastScaleCalibrationAlgorithm,
+                          :AbstractSpannedShrinkageCalibrationAlgorithm,
                           :AbstractObservedExposureEstimator, :AbstractForecastTarget,
                           :AbstractGapReturnAlgorithm, :AbstractGradientPredictor,
                           :AbstractGradientTransform, :AbstractLearningRateSchedule,

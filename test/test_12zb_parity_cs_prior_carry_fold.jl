@@ -118,13 +118,13 @@ end
         for name in
             ("Base", "Lag2", "Blend", "Neutralised", "FamStated", "FamTwo", "FcFixed",
              "FcCustom")
-            pe = CrossSectionalFactorPrior(; grid_config(name, rd)...)
+            pe = CrossSectionalFactorPrior(; lambda = 1, grid_config(name, rd)...)
             for (k, x) in enumerate(stream(pe))
                 @test agrees(x.pr, batch(pe, k))
             end
         end
         # One observation at a time after the first fit.
-        pe = CrossSectionalFactorPrior(; style...)
+        pe = CrossSectionalFactorPrior(; lambda = 1, style...)
         e = (0, 90, 91, 92, 93, 250)
         for (k, x) in enumerate(stream(pe, rd, e))
             @test agrees(x.pr, batch(pe, k, rd, e))
@@ -136,7 +136,7 @@ end
         # resolves it at the call with no data, as the batch fit over the same rows does.
         nobs(k, p, w, s, x) = size(x.cs.csfm.vs, 1) / 1000
         half(k, p, w, s, x) = 0.5
-        pe = CrossSectionalFactorPrior(;
+        pe = CrossSectionalFactorPrior(; lambda = 1,
                                        merge(grid_config("FcFixed", rd),
                                              (; lambda = half, c = nobs))...)
         cs = Float64[]
@@ -206,20 +206,34 @@ end
                                                                                              c = CarryHistoryScale()))
         # A prior whose slots read no history carries none.
         @test isnothing(last(stream(CrossSectionalFactorPrior(; target...))).pe.cache.hist)
+        # The shipped rules that read the history split each carried row against the exposures
+        # and the weights of its row, so they resolve on the carry fold as on the batch fit.
+        rules = (; lambda = PrecisionBlend(; err = ForecastHistoryError()),
+                 c = ForecastCalibrationSlope(; wu = ThresholdWarmUp(; min_obs = 2)))
+        for cfg in (target, (; target..., families = ["style" => nothing]))
+            pr_rules = CrossSectionalFactorPrior(; cfg..., rules...)
+            for (k, x) in enumerate(stream(pr_rules))
+                b = batch(pr_rules, k)
+                @test x.pr.rr.lambda == b.rr.lambda
+                @test x.pr.rr.c == b.rr.c
+                @test 0 <= x.pr.rr.lambda <= 1
+                @test x.pr.rr.c != 1
+            end
+        end
     end
 
     @testset "The carried panel rows" begin
         # The Passthrough exposures read one row and the lag is one, so two rows are kept.
-        pe = CrossSectionalFactorPrior(; style...)
+        pe = CrossSectionalFactorPrior(; lambda = 1, style...)
         x = last(stream(pe))
         @test po.cross_sectional_carry_rows(pe) == 2 == size(x.pe.cache.win.X, 1)
         @test size(po.sample_buffer(po.returns_buffer(x.pe.cache))) == size(rd.X)
         # A Return Forecast that reads the panel keeps every row, a custom one keeps the
         # rows of the exposures.
-        fixed = CrossSectionalFactorPrior(; grid_config("FcFixed", rd)...)
+        fixed = CrossSectionalFactorPrior(; lambda = 1, grid_config("FcFixed", rd)...)
         @test isnothing(po.cross_sectional_carry_rows(fixed))
         @test size(last(stream(fixed)).pe.cache.win.X, 1) == 250
-        @test po.cross_sectional_carry_rows(CrossSectionalFactorPrior(;
+        @test po.cross_sectional_carry_rows(CrossSectionalFactorPrior(; lambda = 1,
                                                                       grid_config("FcCustom",
                                                                                   rd)...)) ==
               2
@@ -238,7 +252,7 @@ end
         # its call with no data, so the two messages differ there.
         e = (0, 10, 40, 41, 80, 81, 120, 160)
         for (factors, kept) in ((bounded, 22), (ew, 160))
-            pe = CrossSectionalFactorPrior(; factors = factors,
+            pe = CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                            families = ["industry" => nothing], minra = 5,
                                            pe = GRID_PE, ve = GRID_VE)
             for (k, x) in enumerate(stream(pe, syn, e))
@@ -264,22 +278,25 @@ end
 
     @testset "The Choice Rule" begin
         # A batch choice that moves fits every observation again, and equals the batch fit.
-        sb = stream(CrossSectionalFactorPrior(; style...))
+        sb = stream(CrossSectionalFactorPrior(; lambda = 1, style...))
         @test [dropped(x.pr) for x in sb] == [["style1"], ["style2"], ["style2"]]
-        @test all(k -> agrees(sb[k].pr, batch(CrossSectionalFactorPrior(; style...), k)),
+        @test all(k -> agrees(sb[k].pr,
+                              batch(CrossSectionalFactorPrior(; lambda = 1, style...), k)),
                   1:3)
         # A pinned choice is recorded in the state, and `families` stays as it is. Its
         # call with no data is the batch fit with the member stated.
-        sp = stream(CrossSectionalFactorPrior(; style..., choice = PinnedChoice()))
+        sp = stream(CrossSectionalFactorPrior(; lambda = 1, style...,
+                                              choice = PinnedChoice()))
         @test all(x -> x.pe.families == ["style" => nothing], sp)
         @test all(x -> x.pe.cache.families == ["style" => "style1"], sp)
-        stated = CrossSectionalFactorPrior(; style..., families = ["style" => "style1"])
+        stated = CrossSectionalFactorPrior(; lambda = 1, style...,
+                                           families = ["style" => "style1"])
         @test all(k -> agrees(sp[k].pr, batch(stated, k)), 1:3)
         # A factor that is empty at the first fit and comes alive fits every observation
         # again.
         rdz = deepcopy(rd)
         po.panel_field(rdz.pnl, "style1").vals[1:120, :] .= 0.0
-        pe = CrossSectionalFactorPrior(; grid_config("Base", rdz)...)
+        pe = CrossSectionalFactorPrior(; lambda = 1, grid_config("Base", rdz)...)
         sz = stream(pe, rdz)
         @test [x.pe.cache.lv for x in sz] == [[true, false, true], trues(3), trues(3)]
         @test all(k -> agrees(sz[k].pr, batch(pe, k, rdz)), 1:3)
@@ -292,11 +309,12 @@ end
                               ve = ExpWeightedVariance(; decay = 2.0^(-1 / 20),
                                                        min_obs = 5), window = 60)
         for cfg in (style, grid_config("Blend", rd))
-            pe = CrossSectionalFactorPrior(; cfg..., ve = wv)
+            pe = CrossSectionalFactorPrior(; lambda = 1, cfg..., ve = wv)
             @test all(((k, x),) -> agrees(x.pr, batch(pe, k)), enumerate(stream(pe)))
         end
         # A factor prior that does not fold refits over the carried factor returns.
-        pe = CrossSectionalFactorPrior(; style..., pe = EntropyPoolingPrior(; pe = GRID_PE))
+        pe = CrossSectionalFactorPrior(; lambda = 1, style...,
+                                       pe = EntropyPoolingPrior(; pe = GRID_PE))
         sx = stream(pe)
         @test all(x -> isa(x.pe.cache.pe, EntropyPoolingPrior), sx)
         @test all(k -> agrees(sx[k].pr, batch(pe, k)), 1:3)
@@ -318,7 +336,8 @@ end
                 r0 += n
             end
         end
-        pinned(cfg) = stream(CrossSectionalFactorPrior(; cfg..., choice = PinnedChoice()))
+        pinned(cfg) = stream(CrossSectionalFactorPrior(; lambda = 1, cfg...,
+                                                       choice = PinnedChoice()))
         # The pinned choice reproduces the oracle's online update, which pins the dropped
         # member at its first call. Measured over the three steps: mu maxrel 1.7e-14, sigma
         # maxscaled 4.2e-13, factor returns maxscaled 6.7e-16 on `Style`; mu maxrel 5.3e-13,
@@ -356,13 +375,13 @@ end
         check(pinned((; industry..., pe = seed)), "CarrySeedIndustry", "Fold")
         # The first fit is the batch fit, and the window of the first fit alone moves the
         # later calls with no data away from it: sigma by 19 % of its largest entry at the last step.
-        spe = CrossSectionalFactorPrior(; style..., pe = seed)
+        spe = CrossSectionalFactorPrior(; lambda = 1, style..., pe = seed)
         @test agrees(ss[1].pr, batch(spe, 1))
         @test relerr(ss[3].pr.sigma, batch(spe, 3).sigma) > 0.1
     end
 
     @testset "On the online step of an optimiser" begin
-        pe = CrossSectionalFactorPrior(; style...)
+        pe = CrossSectionalFactorPrior(; lambda = 1, style...)
         o = po.update_online_estimator(InverseVolatility(; pe = pe))
         for k in 1:3
             o = partial_fit!(o, rows(rd, (edges[k] + 1):edges[k + 1]))
@@ -414,7 +433,7 @@ end
         # Measured: every case gives a difference of exactly zero at each step. The forecast
         # reads the net returns of every row, so the carry keeps every row and every derived row.
         for cfg in exact
-            pe = CrossSectionalFactorPrior(; cfg...)
+            pe = CrossSectionalFactorPrior(; lambda = 1, cfg...)
             @test po.reads_exogenous_series(pe)
             @test all(((k, x),) -> agrees(x.pr, batch(pe, k)), enumerate(stream(pe)))
         end
@@ -422,9 +441,10 @@ end
         # rolling return over the cut rows is a difference of cumulative sums from another first
         # row (#1470). Measured over the three steps, relative to the largest entry: mu 4.6e-16,
         # sigma 4.3e-16, factor returns 1.8e-16; under `lag = 2`, 1.4e-16, 3.1e-16 and 1.8e-16.
-        @test po.cross_sectional_carry_rows(CrossSectionalFactorPrior(; mixed...)) == 22
+        @test po.cross_sectional_carry_rows(CrossSectionalFactorPrior(; lambda = 1,
+                                                                      mixed...)) == 22
         for cfg in (mixed, (; mixed..., lag = 2))
-            pe = CrossSectionalFactorPrior(; cfg...)
+            pe = CrossSectionalFactorPrior(; lambda = 1, cfg...)
             for (k, x) in enumerate(stream(pe))
                 b = batch(pe, k)
                 @test relerr(x.pr.mu, b.mu) < 1e-12 &&
@@ -436,9 +456,10 @@ end
         # A macro sensitivity is a recursion from the first row and states no look-back, so the
         # carry keeps every row.
         @test isnothing(po.cross_sectional_carry_rows(CrossSectionalFactorPrior(;
+                                                                                lambda = 1,
                                                                                 exact.Sensitivity...)))
         # One observation at a time after the first fit.
-        pe = CrossSectionalFactorPrior(; ccy...)
+        pe = CrossSectionalFactorPrior(; lambda = 1, ccy...)
         e = (0, 90, 91, 92, 93, 250)
         @test all(((k, x),) -> agrees(x.pr, batch(pe, k, rd, e)),
                   enumerate(stream(pe, rd, e)))
@@ -495,7 +516,7 @@ end
     end
 
     @testset "Refusals" begin
-        pe = CrossSectionalFactorPrior(; style...)
+        pe = CrossSectionalFactorPrior(; lambda = 1, style...)
         m = message(() -> prior(partial_fit!(pe, rows(rd, 1:2))))
         @test occursin("holds 2 observation(s) after the Descriptor warm-up", m)
         @test occursin("lag + 2 = 3", m)

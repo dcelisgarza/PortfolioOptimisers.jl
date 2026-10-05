@@ -849,7 +849,7 @@ end
                                                                F = randn(rng, T, 1)))
     end
     @testset "reads_panel_fields answers from the tree" begin
-        @test po.reads_panel_fields(CrossSectionalFactorPrior(;
+        @test po.reads_panel_fields(CrossSectionalFactorPrior(; lambda = 1,
                                                               factors = ["market" =>
                                                                              ConstantExposure()]))
         @test !po.reads_panel_fields(EmpiricalPrior())

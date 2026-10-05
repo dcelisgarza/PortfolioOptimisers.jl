@@ -1,15 +1,12 @@
 ```@meta
-Description = "Cross-Sectional Factor Prior, private API of PortfolioOptimisers.jl: AbstractSpannedShrinkageCalibrationAlgorithm, …"
+Description = "Cross-Sectional Factor Prior, private API of PortfolioOptimisers.jl: Num_SpanShrinkCal, Num_OrthFcScaleCal, assert_forecast_history_rule, …"
 ```
 
 # Cross-Sectional Factor Prior: private API
 
 ```@docs
-PortfolioOptimisers.AbstractSpannedShrinkageCalibrationAlgorithm
-PortfolioOptimisers.AbstractOrthogonalForecastScaleCalibrationAlgorithm
 PortfolioOptimisers.Num_SpanShrinkCal
 PortfolioOptimisers.Num_OrthFcScaleCal
-PortfolioOptimisers.reads_forecast_history
 PortfolioOptimisers.assert_forecast_history_rule
 PortfolioOptimisers.assert_spanned_shrinkage
 PortfolioOptimisers.assert_orthogonal_forecast_scale

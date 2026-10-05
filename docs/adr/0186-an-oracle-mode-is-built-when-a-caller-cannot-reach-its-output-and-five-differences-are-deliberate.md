@@ -2,7 +2,7 @@
 status: accepted
 ---
 
-# An oracle mode is built when a caller cannot reach its output, and four differences are deliberate
+# An oracle mode is built when a caller cannot reach its output, and five differences are deliberate
 
 ## Context
 
@@ -36,6 +36,7 @@ keyword away.
 | An inactive-cell policy stored on each field: `NaN`, zero, or the value left as it is | Fields stay finite, and every consumer reads the masks. A read of a field takes the policy as an argument, so the caller chooses it for each read. | ADR 0102 rules that a numeric field's values stay finite. Every computed output keeps the oracle's capability: the descriptors write `NaN` on an inactive cell, and the weights are built over the estimation universe. The one view the oracle gives, a field with its inactive cells blanked, becomes a read, not a stored state. |
 | A warning when the regime half-life exceeds 138 observations | The `regime_decay` docstring states the threshold `2^(-1/138)` and its effect | The rule of #1282: the docstring states the condition, and the measure does not change its behaviour. The numbers are the same; only the message at run time differs. |
 | An integer `cv`, which means K-fold with that many folds | `cv = KFold(; n)` | No field or verb of the library takes an integer as a short form for an estimator. |
+| A Spanned Shrinkage `lambda` of one, which keeps the fitted factor mean | `lambda = PrecisionBlend()` is the default, and `lambda = 1` gives the oracle's mean. Every stored parity case of the Cross-Sectional Factor Prior states `lambda = 1`. | The precision blend weighs the factor mean and the spanned part of the Return Forecast by the error of each. On the known truth of [#1480](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1480) and [#1482](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1482) it had a smaller `Σ⁻¹` error of the mean than `lambda = 1` in every cell, and with no Return Forecast it shrinks the factor mean towards zero, the largest gain measured (83.9 to 16.7 at 20 factors and 60 rows). [#1483](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1483) built it. The Orthogonal Forecast Scale `c` keeps the oracle's `1`, because its rule reads a history that costs minutes to make. |
 
 The oracle's history cap on its prior truncates the stored histories and the scenarios, and leaves
 the moments folded over every observation. The library reaches the scenario cap through

@@ -175,7 +175,7 @@ end
     ve1 = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false,
                                             regime_lohi_mult = (0.7, 1.6), min_val = 1e-12,
                                             min_obs = 1)
-    fit(; kw...) = prior(CrossSectionalFactorPrior(; factors = base, minra = 5,
+    fit(; kw...) = prior(CrossSectionalFactorPrior(; lambda = 1, factors = base, minra = 5,
                                                    pe = GRID_PE, ve = GRID_VE, kw...), rd)
     load(c, o) = parity_load(FA_UNIT, replace(c, "Arr" => ""), o)
     cmp(a, b, name; kw...) = parity_compare(a, b; name = name, kw...).ok

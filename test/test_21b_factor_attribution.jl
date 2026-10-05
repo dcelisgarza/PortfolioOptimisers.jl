@@ -56,7 +56,8 @@ function fa_prior(; n_assets::Integer = 20, n_observations::Integer = 60,
                   n_industries::Integer = 3, seed::Integer = 782_001, kwargs...)
     rd = synthetic_asset_panel(; n_assets = n_assets, n_observations = n_observations,
                                n_industries = n_industries, rng = StableRNG(seed)).rd
-    pe = CrossSectionalFactorPrior(; factors = fa_factors(), minra = 5, kwargs...)
+    pe = CrossSectionalFactorPrior(; lambda = 1, factors = fa_factors(), minra = 5,
+                                   kwargs...)
     return prior(pe, rd), rd
 end
 

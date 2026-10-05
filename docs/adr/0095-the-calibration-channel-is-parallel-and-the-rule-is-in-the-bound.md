@@ -491,9 +491,9 @@ terms as the five families above.
 
 One shared family "a weight in `[0, 1]`" was refused: it names a range, not a quantity, so a rule
 in the wrong slot would construct. "Orthogonal Scale" alone was refused because
-`orthogonal_scaling` of the orthogonal uncertainty sets already names a different scale. No rule of
-either family ships yet, so the two families carry no `# Interfaces` section and no `public`
-declaration. The ticket that adds the first rules adds both, under ADR 0154.
+`orthogonal_scaling` of the orthogonal uncertainty sets already names a different scale. The first
+rules of the two families gave each family an `# Interfaces` section and a `public` declaration,
+under ADR 0154, and `reads_forecast_history` is public with them.
 
 **The root moved.** The prior's struct bound needs the two families at definition, and
 `src/11_UncertaintySets/` loads after `src/10_Prior/`. So `AbstractCalibrationAlgorithm` now lives
@@ -516,9 +516,11 @@ split now returns the unscaled `α⊥`, and `b = c α⊥` is formed after `c` is
 - `pr`: the factor moments of the nested factor prior as a `LowOrderPrior`, on the reduced factor
   axis, so it reads `mu`, `sigma`, `ens` and `w`;
 - `w = pr.w` and `slv = nothing`;
-- a `CalibrationContext` with one new field, `cs = (; g, ap, csfm, hist)`: the spanned coefficients
-  `g`, the unscaled `α⊥` as `ap`, the block `csfm` with a zero `b`, which carries the idiosyncratic
-  variance history `vs` and the regression weights `rw`, and the Return Forecast history `hist`.
+- a `CalibrationContext` with one new field, `cs = (; g, ap, csfm, hist, cre)`: the spanned
+  coefficients `g`, the unscaled `α⊥` as `ap`, the block `csfm` with a zero `b`, which carries the
+  idiosyncratic variance history `vs` and the regression weights `rw`, the Return Forecast history
+  `hist`, and the Cross-Sectional Regression Estimator `cre` of the prior, with which a rule splits
+  a row of the history as the prior splits the latest forecast.
 
 The ticket listed the six quantities as fields of their own. The block already carries `vs` and
 `rw`, so the context does not copy them. The other four travel in one field because the context
@@ -538,3 +540,27 @@ cannot compute the number again and reads it there.
 The prior declares both slots in `calibration_slots`, so the two `assert_` walks read them. It
 resolves them itself, as `JuMPOptimiser` resolves its four norm slots at their site, so no
 `resolve_calibration_slots` method is derived for it.
+
+**The rules.** The grilling of
+[#1482](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1482) chose them, and
+[#1483](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1483) built them in
+`src/10_Prior/17_CrossSectionalCalibrationRules.jl`. Every variation of a rule is a field type with
+one default.
+
+| Rule | Family | Default | Variations |
+| :--- | :--- | :--- | :--- |
+| `PrecisionBlend` | Spanned Shrinkage | the default of `lambda` | `err = CurrentForecastError()` reads the latest `g`; `ForecastHistoryError()` reads the history |
+| `SteinShrinkage` | Spanned Shrinkage | opt-in | `alg` is any `AbstractShrunkExpectedReturnsAlgorithm`, `BayesStein()` by default |
+| `ForecastCalibrationSlope` | Orthogonal Forecast Scale | opt-in, `c` stays `1` | `wu = ThresholdWarmUp(; min_obs = 252)`, `PlugInWarmUp()`, `PositivePartWarmUp()`; `target = 1` |
+
+`SteinShrinkage` carries the quantity in its name, because `BayesStein` and `JamesStein` name
+algorithms of `ShrunkExpectedReturns`, and it joins the table of names that earn the quantity.
+`PrecisionBlend` and `ForecastCalibrationSlope` name a method and stop there. `fb` was not taken for
+the number a slope falls back to, because it names the fallback chain of an optimiser, so that
+field is `target`.
+
+A Spanned Shrinkage rule reads the factor covariance of the estimated factors through its
+pseudo-inverse, and counts its rank as the dimension `K`. A market factor beside a full one-hot
+industry block makes that covariance singular, because the market exposure is the sum of the
+industry exposures, and the fitted factor returns and `g` both lie in the range of the covariance.
+An inverse there gives a meaningless weight.

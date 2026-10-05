@@ -139,7 +139,7 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
     @testset "Both verbs read the axis off the estimator, and both are exported" begin
         # Issue #1059: a caller who writes a factor mandate in a pipeline step holds the
         # estimator, not its Pairs, so the estimator method forwards `pe.factors`.
-        pe = CrossSectionalFactorPrior(; factors = factors)
+        pe = CrossSectionalFactorPrior(; lambda = 1, factors = factors)
         # The names resolve unqualified, so the pipeline example can call them.
         @test :cross_sectional_factor_axis in names(PortfolioOptimisers)
         @test :cross_sectional_factor_sets in names(PortfolioOptimisers)

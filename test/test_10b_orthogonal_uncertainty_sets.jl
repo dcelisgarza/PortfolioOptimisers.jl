@@ -1122,7 +1122,7 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @testset "A cross-sectional fit charges each asset its share of the spend" begin
             rdp = synthetic_asset_panel(; n_assets = 40, n_observations = 200,
                                         n_industries = 3, rng = StableRNG(725_001)).rd
-            pe = CrossSectionalFactorPrior(;
+            pe = CrossSectionalFactorPrior(; lambda = 1,
                                            factors = ["market" => ConstantExposure(),
                                                       "industry" => OneHotExposure(;
                                                                                    field = "industry",
@@ -1179,7 +1179,7 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         # the fixture.
         rdp = synthetic_asset_panel(; n_assets = 40, n_observations = 200, n_industries = 3,
                                     rng = StableRNG(725_001)).rd
-        pe = CrossSectionalFactorPrior(;
+        pe = CrossSectionalFactorPrior(; lambda = 1,
                                        factors = ["market" => ConstantExposure(),
                                                   "industry" =>
                                                       OneHotExposure(; field = "industry",

@@ -122,35 +122,38 @@ end
                "momentum" => CompositeExposure(; descriptors = [RollingMomentum()]),
                "value" => CompositeExposure(; descriptors = [BookToPrice()])]
     @testset "The factors plus the lag" begin
-        @test PO.lookback(CrossSectionalFactorPrior(; factors = factors)) === 274
-        @test PO.lookback(CrossSectionalFactorPrior(; factors = factors, lag = 5)) === 278
-        @test PO.lookback(CrossSectionalFactorPrior(;
+        @test PO.lookback(CrossSectionalFactorPrior(; lambda = 1, factors = factors)) ===
+              274
+        @test PO.lookback(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
+                                                    lag = 5)) === 278
+        @test PO.lookback(CrossSectionalFactorPrior(; lambda = 1,
                                                     factors = ["market" =>
                                                                    ConstantExposure()])) ===
               2
     end
     @testset "An unbounded factor makes the prior unbounded" begin
         ew = vcat(factors, ["beta" => CompositeExposure(; descriptors = [EWMarketBeta()])])
-        @test isnothing(PO.lookback(CrossSectionalFactorPrior(; factors = ew)))
+        @test isnothing(PO.lookback(CrossSectionalFactorPrior(; lambda = 1, factors = ew)))
     end
     @testset "The Return Forecast counts when it reads further back" begin
         long = DescriptorScores(; descriptors = [RollingLogReturn(; window = 400)])
         short = DescriptorScores(; descriptors = [Reversal()])
-        @test PO.lookback(CrossSectionalFactorPrior(; factors = factors,
+        @test PO.lookback(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                                     rfe = FixedWeightedReturnForecast(;
                                                                                       scores = long,
                                                                                       scale = 1.0))) ===
               400
-        @test PO.lookback(CrossSectionalFactorPrior(; factors = factors,
+        @test PO.lookback(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                                     rfe = FixedWeightedReturnForecast(;
                                                                                       scores = short,
                                                                                       scale = 1.0))) ===
               274
-        @test PO.lookback(CrossSectionalFactorPrior(; factors = factors,
+        @test PO.lookback(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                                     rfe = CustomValueReturnForecast(;
                                                                                     mu = [0.1]))) ===
               274
-        @test isnothing(PO.lookback(CrossSectionalFactorPrior(; factors = factors,
+        @test isnothing(PO.lookback(CrossSectionalFactorPrior(; lambda = 1,
+                                                              factors = factors,
                                                               rfe = ExpWeightedReturnForecast(;
                                                                                               scores = short))))
     end

@@ -32,8 +32,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
 
     @testset "$(c)" for (c, wa) in (("MasksOnePass", MarketCapWeights()),
                                     ("MasksTwoPass", BlendedInverseVarianceWeights(; lambda = 0.5)))
-        pr = prior(CrossSectionalFactorPrior(; factors = factors, minra = 5, wa = wa,
-                                             pe = pe, ve = PARITY_VE), fx.rd)
+        pr = prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors, minra = 5,
+                                             wa = wa, pe = pe, ve = PARITY_VE), fx.rd)
         # The variance resets when the asset delists, and warms up again after it lists, so
         # the non-finite cells of the relisted asset match. The regime statistic reads the
         # estimation universe alone. Measured maxrel 1.5e-15.

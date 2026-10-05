@@ -249,6 +249,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/15_CrossSectionalPriorFold.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { raw = 0, reviewed = 0 }
@@ -648,6 +649,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/15_CrossSectionalPriorFold.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { raw = 0, reviewed = 0 }

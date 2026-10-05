@@ -150,7 +150,7 @@ end
             sc(f) = CompositeExposure(; descriptors = [Passthrough(; field = f)],
                                       family = "style", bw = "bench_w")
             cfg = grid_config("ScoredBp05", rd)
-            pr = prior(CrossSectionalFactorPrior(; cfg..., bw = "bench_w",
+            pr = prior(CrossSectionalFactorPrior(; lambda = 1, cfg..., bw = "bench_w",
                                                  factors = ["market" => ConstantExposure(),
                                                             "style1" => sc("style1"),
                                                             "style2" => sc("style2")]), rd)
@@ -158,7 +158,7 @@ end
             @test isequal(pr.mu, p0.mu) && isequal(pr.sigma, p0.sigma)
             @test isequal(pr.rr.bw, p0.rr.bw) && isequal(pr.rr.M, p0.rr.M)
             # A member that reads another field is refused.
-            @test_throws ArgumentError prior(CrossSectionalFactorPrior(; cfg...,
+            @test_throws ArgumentError prior(CrossSectionalFactorPrior(; lambda = 1, cfg...,
                                                                        bw = "bench_w"), rd)
         end
         @testset "The Factor Family Basis of $(c)" for c in

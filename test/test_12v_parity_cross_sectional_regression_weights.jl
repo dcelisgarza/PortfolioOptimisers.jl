@@ -419,8 +419,8 @@ end
                                         "WeightsBlend05Cap10" =>
                                             BlendedInverseVarianceWeights(; p = 1.0, lambda = 0.5),
                                         "WeightsCap10" => MarketCapWeights(; p = 1.0))
-            pr = prior(CrossSectionalFactorPrior(; factors = factors, minra = 5, wa = wa,
-                                                 pe = pe, ve = ve), fx.rd)
+            pr = prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors, minra = 5,
+                                                 wa = wa, pe = pe, ve = ve), fx.rd)
             # Measured maxrel 4.5e-14, 1.2e-15, 1.9e-15 and 3.9e-14 at most.
             @test parity_compare(pr.rr.csr.f, load(c, "FactorReturns"); name = "$(c) f").ok
             @test parity_compare(pr.rr.rw, load(c, "RegressionWeights"); name = "$(c) rw").ok
@@ -445,7 +445,8 @@ end
         # the Panel Field, which runs before the prior reads it.
         fx = parity_small_panel()
         only(filter(f -> f.name == "market_cap", fx.rd.pnl.pf)).vals[46, 8] = NaN
-        pr = prior(CrossSectionalFactorPrior(; factors = ["market" => ConstantExposure()],
+        pr = prior(CrossSectionalFactorPrior(; lambda = 1,
+                                             factors = ["market" => ConstantExposure()],
                                              minra = 5,
                                              wa = BlendedInverseVarianceWeights(;
                                                                                 lambda = 0.5)),

@@ -279,8 +279,8 @@ end
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centred = true))
     ve = RegimeAdjustedExpWeightedVariance(; centred = true, min_val = 0.0)
-    cspe(; kw...) = CrossSectionalFactorPrior(; factors = factors, pe = pe, ve = ve,
-                                              minra = 5, kw...)
+    cspe(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = factors, pe = pe,
+                                              ve = ve, minra = 5, kw...)
     fit(r; kw...) = prior(cspe(; kw...), r)
     scores = DescriptorScores(;
                               descriptors = [Passthrough(; field = "net_income_ttm"),
@@ -354,7 +354,7 @@ end
                                                            scoring = nothing, bw = "bench"),
                                     series = "MACRO", family = "macro"))),
                 ((:DerivedExposure, :prior), "a derived exposure inside the prior",
-                 r -> prior(CrossSectionalFactorPrior(;
+                 r -> prior(CrossSectionalFactorPrior(; lambda = 1,
                                                       factors = ["market" =>
                                                                      ConstantExposure(),
                                                                  "c1" => pass("style1"),

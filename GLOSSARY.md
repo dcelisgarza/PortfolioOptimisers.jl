@@ -222,10 +222,12 @@ A per-asset prediction of the next period's idiosyncratic return, supplied by th
 
 **Spanned Shrinkage**
 The weight in `[0, 1]` that a Cross-Sectional Factor Prior gives its fitted factor mean against the spanned part of its Return Forecast. A value of one keeps the fitted factor mean, and a value of zero takes the spanned part alone. It is a Calibration Slot (§3.9), so a Calibration Rule can compute it from the fit.
+Its default is the precision blend, a rule that weighs the fitted factor mean and the spanned part by the error of each, so with no Return Forecast it shrinks the factor mean towards zero.
 *Avoid*: Orthogonal Forecast Scale (below), which scales the other part of the forecast.
 
 **Orthogonal Forecast Scale**
 The scale in `[0, ∞)` that multiplies the part of the Return Forecast that the latest Factor Exposures do not span, before that part enters the mean vector. A value of zero drops the part, and a value above one scales it up. It is a Calibration Slot (§3.9), so a Calibration Rule can compute it from the fit.
+Its default is one. The calibration slope of the orthogonal part on the next idiosyncratic return is the opt-in rule, because it reads the Return Forecast history.
 *Avoid*: Spanned Shrinkage (above), which blends the other part of the forecast; and `orthogonal_scaling` of the orthogonal uncertainty sets, which scales a penalty and not a forecast.
 
 **Orthogonal Forecast Fit**

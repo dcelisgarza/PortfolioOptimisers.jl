@@ -243,6 +243,7 @@ commit = "ebcacfda95"
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 11, cog_sum = 5, arg_sum = 17, macros = [] }
 "src/10_Prior/15_CrossSectionalPriorFold.jl" = { cyc = 9, cog = 14, arg = 5, cyc_sum = 78, cog_sum = 55, arg_sum = 104, macros = [] }
 "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { cyc = 5, cog = 7, arg = 3, cyc_sum = 13, cog_sum = 12, arg_sum = 5, macros = [] }
+"src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 47, cog_sum = 28, arg_sum = 82, macros = [] }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 63, cog_sum = 30, arg_sum = 92, macros = [] }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 11, cog_sum = 4, arg_sum = 34, macros = [] }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 33, cog_sum = 8, arg_sum = 114, macros = [] }
