@@ -1,12 +1,14 @@
 ---
 name: sweep-conform
-description: "Make an addition under src/ or ext/ conform to the sweep of #404 before the commit — the manifest row, the unit count, the child map, the coverage entry, the include line, and the two tracker steps no Julia test can reach. Use after adding or changing any file under src/ or ext/, and before committing."
+description: "Make an addition under src/ or ext/ conform to the sweep of #404 before the commit — the manifest row, the unit count, the child map, the coverage entry, the include line, the gate baseline rows, the size headroom, and the two tracker steps no Julia test can reach — then land the branch in the order that survives a busy dev. Use after adding or changing any file under src/ or ext/, before committing, and before pushing to dev."
 ---
 
 # Conforming to the sweep
 
-Run this before you commit an addition under `src/` or `ext/`. It reports every duty the sweep
-places on the files your branch touches, and it prints the exact line to paste for each one.
+Run this before you commit an addition under `src/` or `ext/`, and again right after the first
+edit to a file you will grow: it prints the room left under the size ceiling. It reports every duty
+the sweep places on the files your branch touches, and it prints the exact line to paste for each
+one.
 
 ```bash
 julia --project=code_health code_health/sweep_check.jl --fetch
@@ -80,6 +82,13 @@ order the file needs. `test/test_47_alias_and_module_census.jl` demands exactly 
 
 **`no open sweep issue names this path`.** Step 4 is outstanding. The same skill does it.
 
+**`no row in the … baseline(s)`.** A new file owes a row in the size, complexity, perf and JET
+baselines, and each gate fails without it. Stage the file first: a gate measures only what
+`git ls-files` names. Then run the printed `refresh --files <path>` commands, JET last.
+
+**`size: N code lines, over the ceiling`.** The size ratchet will fail. Split the file now. A
+`[note]` with less than 50 lines to spare means: plan the split before you add the units.
+
 ## Two things the check reports as notes, and you must still do
 
 **A file whose row reads `swept = true` is held to the swept standard now.** Its addition owes a
@@ -94,6 +103,28 @@ A swept file also carries no performance trap, the fifth condition of #404 (ADR 
 **A new file has no coverage row yet.** The gate ratchets `misses` per file, so a file with no row
 enters at zero misses. Write the tests, or write the Coverage Exemption with its rationale.
 
+## Land the branch
+
+Sibling tickets land on `dev` while your gates run, and a rebase invalidates every gate that
+measured the old tree. Pay the cheap work first and the slow gates once, on the tree you will push:
+
+1. Run the targeted tests bare, with `run_in_background`, through the driver. It wakes you when it
+   ends, and `--done` leaves the verdict in a file:
+   `julia -t 1 --project=test test/run_files.jl --done=<path> test_X.jl test_Y.jl`.
+2. `git fetch origin dev`. If `git log --oneline HEAD..origin/dev` is not empty, rebase now.
+3. Format the files you changed: `pre-commit run julia-formatter --files <changed .jl>`. The hook
+   runs it at commit time anyway, and a reformat moves the line counts the size gate reads.
+4. Run `sweep_check.jl --fetch`, then the fast gates scoped to your files:
+   `julia --project=code_health code_health/<gate>.jl check --against origin/dev` for size,
+   complexity, perf and expansion. A scoped run names the foreign rows and does not fail on them.
+5. Run `test_26` and the doctests (the `run-doctests` skill), then JET last, scoped the same way.
+6. Commit, fetch, and rebase again if `dev` moved. Push with `git push origin HEAD:dev`.
+
+Each gate and each test file records a stamp of the tree it measured. The pre-push hook refuses
+the push when `dev` moved, after a gate ran, in a file or a `src/` directory your branch changes,
+and it names each such gate. Re-run only those. `code_health/gate_stamp.sh list` shows the stamps,
+and `drop <gate>` forgets one the change cannot reach.
+
 ## Where the rules live
 
 The check is a convenience, never an Authority. Each rule it reports is owned elsewhere:
@@ -105,5 +136,8 @@ The check is a convenience, never an Authority. Each rule it reports is owned el
 | the `include` line | `test/test_47_alias_and_module_census.jl` | the same file |
 | the swept standard | `.github/instructions/julia-docstrings.instructions.md` | `test/test_26_docs.jl` |
 | the reopened map and the sub-issue | ADR 0084 | `.github/workflows/Sweep.yml` |
+| a row in each gate baseline | ADR 0074 | `code_health/<gate>.jl check` |
+| the size ceiling | ADR 0101 | `code_health/size.jl check` |
+| a gate measured the pushed tree | `code_health/gate_stamp.sh` | the `gate-stamps` pre-push hook |
 
 `CODING_STANDARDS.md` routes any subject the table does not carry.

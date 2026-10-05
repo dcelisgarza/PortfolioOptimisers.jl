@@ -48,14 +48,17 @@ before you merge so you lower the number that is current.
 
 ## Running Julia
 
-- **Go through the kaimon MCP tools**, not `julia` on Bash. `ex(e="…")` evaluates in a REPL the
-  user shares live. Start a REPL for your own worktree with `start_session(project_path=…)`, and
-  pass its session key to every `ex` call. A REPL that another session opened is not yours to
-  restart.
+- **Go through the kaimon MCP tools** to explore and probe, not `julia` on Bash. `ex(e="…")`
+  evaluates in a REPL the user shares live. Start a REPL for your own worktree with
+  `start_session(project_path=…)`, and pass its session key to every `ex` call. A REPL that another
+  session opened is not yours to restart. Test files, doctests and the `code_health/` gates run in
+  a fresh bare process instead.
 - **Single-threaded**: `julia -t 1`, `BLAS.set_num_threads(1)`. Never kick off the full test suite
   or a docs build — those are the maintainer's to run.
-- Run **targeted** `test_*.jl` files for the area you changed. `test/runtests.jl` supplies a shared
-  `init_code` preamble; reproduce it if you include a test file directly.
+- Run **targeted** `test_*.jl` files for the area you changed with
+  `julia -t 1 --project=test test/run_files.jl --done=<path> test_X.jl …`, as a background Bash
+  command. It runs each file after the `init_code` preamble of `test/runtests.jl`,
+  prints one `RESULT` line per file, and writes the verdict to `<path>` when it ends.
 - On a Revise world-age warning, **restart the session and cold-load**. If a session wedges, shut it
   down and start a new one rather than fighting it.
 

@@ -251,6 +251,7 @@ function size_rises(recorded, measured, limit::Integer)
             push!(out, CodeHealth.Rise("", f, "code", cap, new["code"]))
         end
     end
+    filter!(r -> CodeHealth.scoped(r.key), out)
     return sort!(out; by = r -> r.key)
 end
 

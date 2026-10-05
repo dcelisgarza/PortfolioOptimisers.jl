@@ -9,9 +9,10 @@
 #
 # It takes the files a branch added or changed under `src/` and `ext/`, and reports every duty the
 # sweep places on them: the manifest row, the unit count, the child map, the coverage entry, the
-# `include` line, and — when the tracker is read — the state of the child map and whether a sub-issue
-# already names the path. It prints the exact line to paste and the exact command to run for each
-# failure, and it exits non-zero when one stands.
+# `include` line, a row in each gate baseline, the room left under the size ceiling, and — when the
+# tracker is read — the state of the child map and whether a sub-issue already names the path. It
+# prints the exact line to paste and the exact command to run for each failure, and it exits
+# non-zero when one stands.
 #
 # **It measures. It writes nothing, and it touches no tracker.** `code_health/sweep_triage.jl`
 # plans and `code_health/sweep_issues.sh` applies; this one only says what is owed.
@@ -24,6 +25,8 @@
 #   the coverage entry                      ADR 0082, `code_health/coverage.jl`
 #   the `include` line                      `test/test_47_alias_and_module_census.jl`
 #   the `algorithm` floor of a swept row    `test/test_26_docs.jl`
+#   a row in each gate baseline             ADR 0074, `code_health/<gate>.jl check`
+#   the size ceiling                        ADR 0101, `code_health/size.jl check`
 #   the sub-issue and the reopened map      ADR 0084, `code_health/sweep_triage.jl`
 #
 # So a green run here is not a green build. It is the four steps of `CLAUDE.md` § *Functionality you
@@ -69,8 +72,8 @@ end
 """
     changed_files(base) -> Vector{String}, String
 
-Every file in scope that this branch touches: the ones that differ from `base`, the ones staged or
-edited in the working tree, and the untracked ones.
+Every file in scope that this branch touches: the ones it changed since its merge-base with `base`,
+the ones staged or edited in the working tree, and the untracked ones.
 
 The untracked half is the reason this cannot be a `git diff` alone. **A brand-new file is exactly
 the case the sweep is aimed at**, and until it is added it appears in no diff at all.
@@ -89,11 +92,87 @@ function changed_files(base::AbstractString)
     if !(ok)
         ref = "HEAD"
     end
-    files = String[]
-    append!(files, git_lines(`git diff --name-only $ref --`))
-    append!(files, git_lines(`git diff --name-only --cached $ref --`))
-    append!(files, git_lines(`git ls-files --others --exclude-standard -- '*.jl'`))
-    return sort!(unique!(filter!(in_scope, files))), ref
+    # `branch_files` diffs from the merge-base. A sibling commit that landed on `base` after this
+    # branch started is not a change of this branch, and a diff against `base` itself names it.
+    return filter!(in_scope, CodeHealth.branch_files(ref)), ref
+end
+
+# --- the gate baselines ----------------------------------------------------
+
+# `size.jl` owns the count of code lines and the ceiling, so the headroom printed here is the number
+# the size ratchet reads. It shares the one `CodeHealth` module this script included.
+module SizeGate
+include(joinpath(@__DIR__, "size.jl"))
+end
+
+"""
+    GATE_BASELINES
+
+The generated baselines that name every file in scope. ADR 0074's set equality fails a gate whose
+baseline has no row for a file, and a new file owes a row in each. CI meets them one gate at a
+time, and JET last, so the check names them all before the first gate runs.
+"""
+const GATE_BASELINES = ["size" => "size_baseline.toml",
+                        "complexity" => "complexity_baseline.toml",
+                        "perf" => "perf_baseline.toml", "jet" => "jet_baseline.toml"]
+
+"""
+    gate_rows(name, table) -> Vector{Dict}
+
+The row tables of one parsed baseline: `[file]`, or `[run.<run>.file]` for every run of JET.
+"""
+function gate_rows(name::AbstractString, table)
+    if name == "jet"
+        return [get(r, "file", Dict{String, Any}())
+                for r in values(get(table, "run", Dict()))]
+    end
+    return [get(table, "file", Dict{String, Any}())]
+end
+
+"""
+The headroom under which a file's size is a note rather than an all-clear: a split planned before
+the edit costs less than a split found after the tests ran.
+"""
+const SIZE_MARGIN = 50
+
+"""
+    check_gates(path, baselines, limit) -> Vector{Finding}
+
+The duties the code-health gates place on one file: a row in each of [`GATE_BASELINES`](@ref), and
+code lines at or under the ceiling of the size ratchet. The size line always prints, with the
+headroom, so a branch that will add units to the file sees the room it has before it writes them.
+"""
+function check_gates(path, baselines, limit::Integer)
+    fs = Finding[]
+    missing_in = [name
+                  for (name, table) in baselines
+                  if any(rows -> !(haskey(rows, path)), gate_rows(name, table))]
+    if !(isempty(missing_in))
+        # A gate measures the files `git ls-files` names, so an untracked file gets no row from a
+        # refresh. Stage it first.
+        push!(fs,
+              Finding(:fail,
+                      "no row in the $(join(missing_in, ", ")) baseline(s). Stage the file " *
+                      "(`git add $path`), then record each row, JET last:",
+                      ["julia --project=code_health code_health/$name.jl refresh --files $path"
+                       for name in missing_in]))
+    end
+    code = SizeGate.line_counts(joinpath(CodeHealth.REPO_ROOT, path))["code"]
+    size_row = get(only(gate_rows("size", Dict(baselines)["size"])), path, nothing)
+    cap = SizeGate.ceiling(size_row, limit)
+    if code > cap
+        push!(fs,
+              Finding(:fail,
+                      "size: $code code lines, over the ceiling of $cap. The size ratchet fails.",
+                      ["Split the file, and give the new file its own manifest and baseline rows."]))
+    elseif cap - code < SIZE_MARGIN
+        push!(fs,
+              Finding(:note, "size: $code of $cap code lines, $(cap - code) to spare.",
+                      ["Plan the split before you add units, not after the tests."]))
+    else
+        push!(fs, Finding(:ok, "size: $code of $cap code lines, $(cap - code) to spare."))
+    end
+    return fs
 end
 
 # --- the tracker, when it was read -----------------------------------------
@@ -540,9 +619,13 @@ function main(args)
         return 0
     end
 
+    baselines = [name => CodeHealth.read_toml(joinpath(CodeHealth.DIR, file))
+                 for (name, file) in GATE_BASELINES]
+    limit = SizeGate.code_limit(CodeHealth.read_rulings())
     failures = 0
     for f in scope
         fs = check_file(f, rows, map_names, coverage, entry, tracker, exempted, opts.all)
+        append!(fs, check_gates(f, baselines, limit))
         failures += count(x -> x.level === :fail, fs)
         print_findings(stdout, f, fs)
     end
@@ -561,6 +644,8 @@ function main(args)
     println("  4. Open one sub-issue of that child map for the addition.")
     println("\nA row that reads `swept = true` owes steps 1 and 2 only. Its new units meet the")
     println("swept standard in the same commit (ADR 0148).")
+    println("\nA new file also owes a row in the size, complexity, perf and JET baselines, and every")
+    println("file stays under the ceiling of the size ratchet. Each `[fail]` above names the command.")
     println("\nSteps 3 and 4:  julia --project=code_health code_health/sweep_triage.jl \\")
     println("                  --fetch --file <path>")
     println("                code_health/sweep_issues.sh apply")

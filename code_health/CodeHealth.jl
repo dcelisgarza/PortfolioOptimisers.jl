@@ -969,7 +969,8 @@ end
 
 ADR 0076's pass rule, applied per key and per metric. The comparison is never per total, so a fall
 in one file cannot pay for a rise in another. Keys absent from either side are the business of
-ADR 0074's set equality and are skipped here.
+ADR 0074's set equality and are skipped here. A rise outside the [`GateScope`](@ref) of a scoped
+run is counted as foreign and dropped.
 """
 function rises(recorded, measured, metrics; group::AbstractString = "")
     out = Rise[]
@@ -984,6 +985,7 @@ function rises(recorded, measured, metrics; group::AbstractString = "")
             end
         end
     end
+    filter!(r -> scoped(r.key), out)
     return sort!(out; by = r -> (r.group, r.key, r.metric))
 end
 
@@ -993,12 +995,13 @@ end
     set_differences(expected, recorded) -> (missing_rows, dead_rows)
 
 ADR 0074's rule. `missing_rows` are in-scope keys the generated file does not name, and `dead_rows`
-are rows that name nothing. Both are the same failure, and the gate never invents a number.
+are rows that name nothing. Both are the same failure, and the gate never invents a number. A row
+outside the [`GateScope`](@ref) of a scoped run is counted as foreign and dropped from both.
 """
 function set_differences(expected, recorded)
     exp_set, rec_set = Set(expected), Set(recorded)
-    return sort!(collect(setdiff(exp_set, rec_set))),
-           sort!(collect(setdiff(rec_set, exp_set)))
+    return sort!(filter!(scoped, collect(setdiff(exp_set, rec_set)))),
+           sort!(filter!(scoped, collect(setdiff(rec_set, exp_set))))
 end
 
 """
@@ -1142,32 +1145,235 @@ function routes(; dismissal::Bool)
     return String(take!(io))
 end
 
+# --- the branch scope ------------------------------------------------------
+
+"""
+    GateScope
+
+The rows one run of a gate answers for. `files` is `nothing` for the whole tree, which is the
+default and the only value CI uses. `--against <ref>` or `--files <path>...` sets it to the files a
+branch touches, and [`rises`](@ref) and [`set_differences`](@ref) then keep a row only when its key
+is in the set. Every row they drop is named in `foreign`.
+
+A key outside [`MEASURED_ROOTS`](@ref), such as a macro name of `code_health/expansion.jl`, is
+always in scope. A scoped run never hides a row it cannot attribute to a file.
+
+The scope serves a branch on a busy map, where a baseline lags `origin/dev` and a plain `check`
+reports rows that other commits raised. It is not a verdict. A rise in a file the branch did not
+touch can still be the branch's own: a JET report moves to a caller in another file, and a
+Declaration Macro raises the files that call it. So a scoped run prints every foreign row by name,
+and the plain `check` on CI stays the gate.
+"""
+mutable struct GateScope
+    files::Union{Nothing, Set{String}}
+    foreign::Set{String}
+end
+
+"""
+The scope of the running script. Each entry script is one process with one command line, so one
+value serves it. [`run_script`](@ref) sets it before it measures.
+"""
+const SCOPE = GateScope(nothing, Set{String}())
+
+"""
+    scoped(key) -> Bool
+
+Whether a row keyed by `key` is in the [`GateScope`](@ref). A row outside it is recorded in
+`SCOPE.foreign`.
+"""
+function scoped(key::AbstractString)
+    if SCOPE.files === nothing || !(in_scope(key)) || key in SCOPE.files
+        return true
+    end
+    push!(SCOPE.foreign, key)
+    return false
+end
+
+"""
+    set_scope!(files)
+
+Set the [`GateScope`](@ref) to `files`, or to the whole tree when `files` is `nothing`, and forget
+the foreign rows of an earlier run.
+"""
+function set_scope!(files)
+    SCOPE.files = files === nothing ? nothing : Set{String}(files)
+    empty!(SCOPE.foreign)
+    return SCOPE
+end
+
+"""
+    branch_files(ref; root = REPO_ROOT) -> Vector{String}
+
+Every path the branch changes against `ref`: the commits since the merge-base, the staged and
+unstaged edits, and the untracked files. A deleted or renamed file is named by its old path too.
+
+The diff starts at the merge-base, not at `ref`. A sibling ticket that lands on `origin/dev` after
+this branch started moves `ref`, and a diff against `ref` itself names every file the sibling
+changed as a change of this branch.
+"""
+function branch_files(ref::AbstractString; root = REPO_ROOT)
+    lines(c) = String.(filter!(!isempty, split(read(Cmd(c; dir = root), String), '\n')))
+    base = only(lines(`git merge-base $ref HEAD`))
+    files = String[]
+    append!(files, lines(`git diff --name-only --no-renames $base --`))
+    append!(files, lines(`git diff --name-only --no-renames --cached $base --`))
+    append!(files, lines(`git ls-files --others --exclude-standard`))
+    return sort!(unique!(files))
+end
+
+"""
+    ROW_RE
+
+The key of one row of a generated baseline: a quoted path at the start of the line. Every
+generated file writes one row to one line, under a section header such as `[file]` or
+`[run.main.file]`.
+"""
+const ROW_RE = r"^\"([^\"]+)\" = "
+
+"""
+    keep_foreign_rows(new_text, old_text) -> String
+
+The refresh of a scoped run. Each row of `new_text` outside the [`GateScope`](@ref) takes its
+line from `old_text` under the same section, so the refresh records the branch's rows and leaves
+every other row as the baseline had it. A foreign row that `old_text` does not hold keeps its new
+line, because ADR 0074's set equality needs a row for every file in scope. A row of `old_text` whose
+file is gone is dropped for the same reason.
+"""
+function keep_foreign_rows(new_text::AbstractString, old_text::AbstractString)
+    old = Dict{Tuple{String, String}, String}()
+    section = ""
+    for line in split(old_text, '\n')
+        if startswith(line, "[")
+            section = line
+        elseif (m = match(ROW_RE, line)) !== nothing
+            old[(section, m[1])] = line
+        end
+    end
+    out = String[]
+    section = ""
+    for line in split(new_text, '\n')
+        if startswith(line, "[")
+            section = line
+        elseif (m = match(ROW_RE, line)) !== nothing &&
+               !(SCOPE.files === nothing || !(in_scope(m[1])) || m[1] in SCOPE.files)
+            line = get(old, (section, m[1]), line)
+        end
+        push!(out, line)
+    end
+    return join(out, '\n')
+end
+
+"""
+    print_foreign(io = stdout)
+
+Name the rows a scoped run dropped. Silence would read as a clean tree, and the plain `check`
+still fails on these rows.
+"""
+function print_foreign(io::IO = stdout)
+    if SCOPE.files === nothing
+        return nothing
+    end
+    println(io, "Scoped to ", length(SCOPE.files), " file(s) this branch touches.")
+    if !(isempty(SCOPE.foreign))
+        println(io, length(SCOPE.foreign),
+                " row(s) outside that scope also differ from the baseline, and a plain `check` reports them:")
+        for f in sort!(collect(SCOPE.foreign))
+            println(io, "  ", f)
+        end
+    end
+    return nothing
+end
+
+"""
+    record_gate(name; root = REPO_ROOT)
+
+Record that the gate of the baseline `name` measured this tree, for the push guard of
+`code_health/gate_stamp.sh`. The guard refuses a push when `origin/dev` changed a file of the
+branch after a gate measured it, because that gate measured a tree nobody will ship.
+
+The stamp is a convenience of a local worktree. A failure to write it, on CI or with no `git`,
+must never turn a gate red, so it is ignored.
+"""
+function record_gate(name::AbstractString; root = REPO_ROOT)
+    gate = replace(first(splitext(basename(name))), r"_(baseline|bound)$" => "")
+    try
+        cmd = Cmd(`bash $(joinpath(DIR, "gate_stamp.sh")) record $gate`; dir = root)
+        run(pipeline(cmd; stdout = devnull, stderr = devnull))
+    catch
+    end
+    return nothing
+end
+
 # --- the command line ------------------------------------------------------
 
+"""
+    Command
+
+One command line of an entry script. `against` is the ref of `--against`, and `files` the paths of
+`--files`. At most one of the two is set, and neither is set for a run over the whole tree.
+"""
 struct Command
     verb::Symbol
     accept_rise::Bool
+    against::Union{Nothing, String}
+    files::Union{Nothing, Vector{String}}
 end
 
+Command(verb::Symbol, accept_rise::Bool) = Command(verb, accept_rise, nothing, nothing)
+
+const USAGE = """
+usage: <tool>.jl check | refresh | refresh --accept-rise
+       ... [--against <ref> | --files <path>...]
+
+  --against <ref>      answer only for the files this branch changes since its merge-base with
+                       <ref>, such as origin/dev. Every other row is named and does not fail.
+  --files <path>...    answer only for the paths named.
+
+A scoped refresh records the rows in scope and keeps every other row as the baseline has it."""
+
 function parse_command(args)
-    usage = "usage: <tool>.jl check | refresh | refresh --accept-rise"
-    if isempty(args)
-        error(usage)
+    if isempty(args) || !(args[1] in ("check", "refresh"))
+        error(USAGE)
     end
-    verb = args[1]
-    if verb == "check"
-        if !(length(args) == 1)
-            error(usage)
-        end
-        return Command(:check, false)
-    elseif verb == "refresh"
-        if length(args) == 1
-            return Command(:refresh, false)
-        elseif length(args) == 2 && args[2] == "--accept-rise"
-            return Command(:refresh, true)
+    verb = Symbol(args[1])
+    accept_rise, against, files = false, nothing, nothing
+    i = 2
+    while i <= length(args)
+        a = args[i]
+        if a == "--accept-rise" && verb === :refresh && !accept_rise
+            accept_rise = true
+            i += 1
+        elseif a == "--against" &&
+               against === nothing &&
+               files === nothing &&
+               i < length(args)
+            against = args[i + 1]
+            i += 2
+        elseif a == "--files" && against === nothing && files === nothing
+            j = something(findnext(x -> startswith(x, "--"), args, i + 1), length(args) + 1)
+            files = String.(args[(i + 1):(j - 1)])
+            if isempty(files)
+                error(USAGE)
+            end
+            i = j
+        else
+            error(USAGE)
         end
     end
-    return error(usage)
+    return Command(verb, accept_rise, against, files)
+end
+
+"""
+    command_scope(cmd; root = REPO_ROOT) -> Union{Nothing, Vector{String}}
+
+The files a command answers for: the branch's files for `--against`, the named paths for
+`--files`, and `nothing` for the whole tree.
+"""
+function command_scope(cmd::Command; root = REPO_ROOT)
+    if cmd.against !== nothing
+        return branch_files(cmd.against; root)
+    end
+    return cmd.files
 end
 
 """
@@ -1194,16 +1400,29 @@ The one flow the three entry scripts share.
 the refresh would write, or throws `RefreshRefused`. `verify(measurement, recorded)` returns the
 failure text of a check, empty when the check is green, and a flag saying whether provenance
 matched. A provenance mismatch publishes nothing, because the numbers came from the wrong tools.
+
+`--against <ref>` and `--files <path>...` set the [`GateScope`](@ref) before the measurement, and
+every run records a gate stamp with [`record_gate`](@ref) after it.
 """
 function run_script(args; name::AbstractString, measure, verify, render, publish)
     cmd = parse_command(args)
+    set_scope!(command_scope(cmd))
     path = joinpath(DIR, name)
     recorded = read_toml(path)
     measurement = measure()
+    record_gate(name)
+    # A scoped refresh keeps every foreign row as the baseline has it. The whole-tree refresh
+    # writes the text as rendered.
+    function scoped_text(text)
+        if isfile(path) && SCOPE.files !== nothing
+            return keep_foreign_rows(text, read(path, String))
+        end
+        return text
+    end
     if cmd.verb === :refresh
         local text
         try
-            text = render(measurement, recorded, cmd.accept_rise)
+            text = scoped_text(render(measurement, recorded, cmd.accept_rise))
         catch e
             # A refused refresh is an ordinary answer, not a crash. ADR 0073 fixes the text, and a
             # Julia stacktrace on top of it would bury the one line that says what to do.
@@ -1215,9 +1434,11 @@ function run_script(args; name::AbstractString, measure, verify, render, publish
         end
         write(path, text)
         println("Refreshed code_health/", name, ".")
+        print_foreign()
         return 0
     end
     failures, provenance_ok = verify(measurement, recorded)
+    print_foreign()
     if isempty(failures)
         publish(measurement)
         return 0
@@ -1227,7 +1448,7 @@ function run_script(args; name::AbstractString, measure, verify, render, publish
     end
     if provenance_ok
         try
-            write_artifact(name, render(measurement, recorded, true))
+            write_artifact(name, scoped_text(render(measurement, recorded, true)))
         catch e
             if !(e isa RefreshRefused)
                 rethrow()

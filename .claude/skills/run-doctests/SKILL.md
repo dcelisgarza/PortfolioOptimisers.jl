@@ -23,6 +23,10 @@ julia --project=docs -e '
   doctest(PortfolioOptimisers)'
 ```
 
+- When the run passes in a worktree, record its stamp for the pre-push guard:
+  `bash code_health/gate_stamp.sh record doctest`. The guard then names the doctests when `dev`
+  moves under them before the push.
+
 - The shipped default of `set_show_nothing_fields!` is `false`, which hides a field that holds
   `nothing` at the REPL. The doctests set it to `true` in both places, so a rendered docstring shows
   the complete type. A doctest run without the two `true` calls fails on every block that prints a
