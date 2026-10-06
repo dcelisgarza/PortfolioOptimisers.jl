@@ -163,9 +163,10 @@ commit = "8610300"
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { lines = 58, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { lines = 95, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { lines = 339, misses = 0 }
-"src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { lines = 319, misses = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { lines = 195, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { lines = 159, misses = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { lines = 182, misses = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC.jl" = { lines = 130, misses = 0 }
 "src/05_Moments/33_CoverageUniverse.jl" = { lines = 143, misses = 0 }
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { lines = 175, misses = 0 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { lines = 212, misses = 0 }

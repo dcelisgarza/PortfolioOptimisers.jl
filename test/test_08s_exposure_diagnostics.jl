@@ -668,10 +668,88 @@ end
     csr = CrossSectionalRegression(; f = f, eps = eps, n = fill(N, T))
     blk = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
                                     lag = 1, fx = fx)
-    B, R, _ = PO.exposure_ic_data(blk, false)
+    B, R, _ = PO.exposure_ic_data(blk, nothing, false)
     F = hcat(f, fx)
     for t in 2:T
         @test R[t, :] ≈ Ms[t - 1, :, :] * F[t, :] + eps[t, :]
     end
     @test size(exposure_ic(blk).X) == (T - 1, 3)
+    # The returns the reconstruction gives back, observed part included, score every factor
+    # as the reconstruction does (#1524).
+    rd = ReturnsResult(; nx = string.(1:N), X = R)
+    @test isequal(exposure_ic(blk, rd).X, exposure_ic(blk).X)
+end
+
+@testset "The information coefficient over the returns data scores each factor alone (#1524)" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1_524)
+    T, N, K = 10, 6, 4
+    Ms = randn(rng, T, N, K)
+    f = 0.02 * randn(rng, T, K)
+    eps = 0.01 * randn(rng, T, N)
+    rw = abs.(randn(rng, T, N)) .+ 0.1
+    # The fourth factor is finite on two assets alone.
+    Ms[:, 3:6, 4] .= NaN
+    csr = CrossSectionalRegression(; f = f, eps = eps, n = fill(N, T))
+    csfm = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+                                     rw = rw, lag = 1)
+    csr3 = CrossSectionalRegression(; f = f[:, 1:3], eps = eps, n = fill(N, T))
+    csfm3 = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N), csr = csr3,
+                                      Ms = Ms[:, :, 1:3], rw = rw, lag = 1)
+    # The reconstruction reads the sparse factor, so four assets of six lose their return,
+    # and no factor keeps the three assets a coefficient needs.
+    @test all(isnan, exposure_ic(csfm).X)
+    # The returns of the three dense factors. Their first row has no lagged exposure, and
+    # no score reads it, because a score reads the returns after its observation.
+    _, R3, _ = PO.exposure_ic_data(csfm3, nothing, false)
+    rd3 = ReturnsResult(; nx = string.(1:N), X = R3)
+    ic = exposure_ic(csfm, rd3)
+    @test size(ic.X) == (T - 1, K)
+    @test ic.nf == csfm.nf
+    @test isequal(ic.X[:, 1:3], exposure_ic(csfm3).X)
+    @test all(isfinite, ic.X[:, 1:2])
+    @test isequal(exposure_ic(csfm, rd3; rank = false).X[:, 1:3],
+                  exposure_ic(csfm3; rank = false).X)
+    # Two assets are too few for a coefficient of the sparse factor itself.
+    @test all(isnan, ic.X[:, 4])
+    # On the dense block, the returns the reconstruction gives back score as it does.
+    @test isequal(exposure_ic(csfm3, rd3).X, exposure_ic(csfm3).X)
+    # The summary derives its lags from the window on both forms.
+    @test isequal(exposure_ic_summary(csfm, rd3; horizon = 2).t_stat[1:3],
+                  exposure_ic_summary(csfm3; horizon = 2).t_stat)
+
+    # A block that records the position of each row reads those rows of the returns data.
+    pos = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N), csr = csr3,
+                                    Ms = Ms[:, :, 1:3], rw = rw, lag = 1,
+                                    idx = collect(3:(T + 2)))
+    rdp = ReturnsResult(; nx = string.(1:N), X = vcat(randn(rng, 2, N), R3))
+    @test isequal(exposure_ic(pos, rdp).X, exposure_ic(csfm3).X)
+    # The returns data form reads no fit.
+    no_fit = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N),
+                                       Ms = Ms[:, :, 1:3], rw = rw, lag = 1)
+    @test_throws PO.IsNothingError exposure_ic(no_fit)
+    @test isequal(exposure_ic(no_fit, rd3).X, exposure_ic(csfm3).X)
+
+    # The reconstruction starts at row `lag` of the block. The returns data has every row,
+    # so it scores the rows before that too.
+    lag2 = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N), csr = csr3,
+                                     Ms = Ms[:, :, 1:3], rw = rw, lag = 2)
+    R = 0.01 * randn(rng, T, N)
+    rdr = ReturnsResult(; nx = string.(1:N), X = R)
+    @test size(exposure_ic(lag2).X) == (T - 2, 3)
+    @test isequal(exposure_ic(lag2, rdr).X, exposure_ic(Ms[:, :, 1:3], R))
+    @test isequal(exposure_ic(lag2, rdr; rank = false, horizon = 2).X,
+                  exposure_ic(Ms[:, :, 1:3], R, rw; rank = false, horizon = 2))
+
+    # The refusals name what is missing.
+    @test_throws PO.IsNothingError exposure_ic(csfm,
+                                               ReturnsResult(; nf = ["a"],
+                                                             F = randn(rng, T, 1)))
+    @test_throws PO.IsNothingError exposure_ic(CrossSectionalFactorModel(; M = Ms[T, :, :],
+                                                                         b = zeros(N)), rdr)
+    @test_throws DimensionMismatch exposure_ic(csfm,
+                                               ReturnsResult(; nx = string.(1:N),
+                                                             X = R[1:(T - 1), :]))
+    @test_throws DimensionMismatch PO.exposure_ic_returns(1:3, R, T)
+    @test_throws BoundsError PO.exposure_ic_returns(collect(2:(T + 1)), R, T)
 end

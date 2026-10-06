@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.1"
 julia_syntax = "1.0.2"
-commit = "ebcacfda95"
+commit = "e11eeec482"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -166,9 +166,10 @@ commit = "ebcacfda95"
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { code = 92, doc = 202, comment = 0, blank = 91, total = 385 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { code = 248, doc = 447, comment = 7, blank = 150, total = 852 }
 "src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { code = 493, doc = 796, comment = 12, blank = 365, total = 1666 }
-"src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { code = 463, doc = 647, comment = 6, blank = 292, total = 1408 }
+"src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { code = 297, doc = 430, comment = 6, blank = 194, total = 927 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 235, doc = 471, comment = 8, blank = 203, total = 917 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { code = 237, doc = 485, comment = 0, blank = 215, total = 937 }
+"src/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC.jl" = { code = 216, doc = 313, comment = 0, blank = 128, total = 657 }
 "src/05_Moments/33_CoverageUniverse.jl" = { code = 411, doc = 763, comment = 0, blank = 351, total = 1525 }
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { code = 373, doc = 787, comment = 6, blank = 339, total = 1505 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { code = 356, doc = 604, comment = 9, blank = 228, total = 1197 }

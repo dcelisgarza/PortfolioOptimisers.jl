@@ -319,6 +319,12 @@ metric = "arg"
 rationale = "keyword-constructor-arity"
 
 [[exemption]]
+path = "src/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC.jl"
+definition = "exposure_ic_factor_summary"
+metric = "cyc"
+rationale = "a-definition-a-file-split-moved-unchanged"
+
+[[exemption]]
 path = "src/10_Prior/01_Base_Prior.jl"
 definition = "LowOrderPrior"
 metric = "arg"

@@ -211,8 +211,9 @@ function run_coverage(dir::AbstractString, rest::Vector{String})
     end
     cmd = `$(Base.julia_cmd()) -t 1 --project=$(Base.active_project()) --code-coverage=@$dir $(@__FILE__) $rest`
     p = run(ignorestatus(cmd); wait = false)
-    wait(p)
+    # A process that has exited has no PID to read, so read it before the wait.
     pid = getpid(p)
+    wait(p)
     for (root, _, files) in walkdir(dir)
         for f in sort(files)
             m = match(r"^(.+\.jl)\.(\d+)\.cov$", f)
