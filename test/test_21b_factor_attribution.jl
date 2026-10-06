@@ -985,6 +985,75 @@ end
     end
 end
 
+@testset "Every cross-validation scheme matches its folds to the block by their row key" begin
+    PO = PortfolioOptimisers
+    pr, rd = fa_prior()
+    # The same panel with no timestamps, so the folds match the block by position alone.
+    rdn = ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, pnl = rd.pnl)
+    gap(a, b) = maximum(abs,
+                        [a.total.vol - b.total.vol;
+                         a.sys.vol_contrib - b.sys.vol_contrib;
+                         a.idio.vol_contrib - b.idio.vol_contrib;
+                         a.sys.mu_contrib - b.sys.mu_contrib;
+                         a.fbd.vol_contrib - b.fbd.vol_contrib])
+    # The one call on a path against the bare-array route over the data rows its folds name.
+    # Data row `t` is block row `t - 1`, its exposures are those of the row before, and rows 1
+    # and 2 have none, so the bare route starts at row 3.
+    function path_gap(mp, prr)
+        blk = PO.attribution_block_arrays(prr.rr, prr)
+        W, ret = PO.attribution_prediction_history(mp)
+        rows = reduce(vcat, p.idx for p in mp.pred)
+        k = findall(>=(3), rows)
+        br = rows[k] .- 1
+        ref = factor_attribution(W[k, :], blk.B[br .- blk.lag, :, :], blk.f[br, :],
+                                 blk.eps[br, :], ret[k]; lag = 0, fam = blk.fam)
+        return gap(factor_attribution(mp, prr), ref)
+    end
+    opt = EqualWeighted()
+    mr = MultipleRandomised(IndexWalkForward(15, 10); n_subsets = 2, subset_size = 8,
+                            window_size = 50, seed = 1)
+    cvs = (KFold(; n = 3), IndexWalkForward(20, 10), HindsightSplit())
+    @testset "A single path, $(nameof(typeof(cv))), timestamps $(!isnothing(data.ts))" for cv in
+                                                                                           cvs,
+                                                                                           data in
+                                                                                           (rd,
+                                                                                            rdn)
+
+        mp = cross_val_predict(opt, data, cv)
+        # Measured: a difference of exactly zero.
+        @test path_gap(mp, pr) == 0
+    end
+    @testset "Each combinatorial path, timestamps $(!isnothing(data.ts))" for data in
+                                                                              (rd, rdn)
+        pop = cross_val_predict(opt, data,
+                                CombinatorialCrossValidation(; n_folds = 4,
+                                                             n_test_folds = 2))
+        @test all(p -> path_gap(p, pr) == 0, pop.pred)
+        # The population method attributes each path, one entry per path.
+        fas = factor_attribution(pop, pr)
+        @test length(fas) == length(pop.pred)
+        @test [f.total.vol for f in fas] ==
+              [factor_attribution(p, pr).total.vol for p in pop.pred]
+        @test length.(factor_attribution(pop, pr, 10)) ==
+              [length(factor_attribution(p, pr, 10)) for p in pop.pred]
+    end
+    @testset "Each randomised path against a prior on its own assets, timestamps $(!isnothing(data.ts))" for data in
+                                                                                                             (rd,
+                                                                                                              rdn)
+        pop = cross_val_predict(opt, data, mr)
+        pe = CrossSectionalFactorPrior(; lambda = 1, factors = fa_factors(), minra = 5)
+        for p in pop.pred
+            c = [findfirst(==(n), data.nx) for n in p.pred[1].rd.nx]
+            prs = prior(pe, PO.port_opt_view(data, :, c))
+            # The subset prior covers every row of the data, so the folds match it by row.
+            @test prs.rr.idx == 2:size(data.X, 1)
+            @test path_gap(p, prs) == 0
+        end
+        # A path holds 8 of the 20 assets, so the prior of the whole universe refuses it.
+        @test_throws DimensionMismatch factor_attribution(pop, pr)
+    end
+end
+
 @testset "The investable zeroing helpers of the predicted side" begin
     PO = PortfolioOptimisers
     imsk = BitVector([true, false, true])
@@ -1038,6 +1107,22 @@ end
         @test_throws ArgumentError factor_attribution(bad, pr, rd.X; strict = true)
         @test_throws ArgumentError factor_attribution(W, pr, ret; strict = true)
         @test_throws ArgumentError factor_attribution(W, pr, ret, 30; strict = true)
+    end
+    @testset "Weights over another universe are refused before any read of them" begin
+        # Eight weights against a prior of twenty assets: each prior route refuses with the
+        # two counts, rather than failing on an index of the mask or of the returns.
+        w8 = fill(1 / 8, 8)
+        T = size(rd.X, 1)
+        W8 = repeat(transpose(w8), T)
+        ret = randn(StableRNG(782_010), T) ./ 100
+        for f in (() -> factor_attribution(w8, pr), () -> factor_attribution(w8, pr, rd.X),
+                  () -> factor_attribution(w8, pr, rd.X, 10),
+                  () -> factor_attribution(W8, pr, ret),
+                  () -> factor_attribution(W8, pr, ret, 10))
+            @test_throws "the weights hold 8 assets, and the factor model describes 20" f()
+        end
+        @test_throws DimensionMismatch PO.assert_attribution_assets(W8, 20)
+        @test isnothing(PO.assert_attribution_assets(w, length(w)))
     end
     @testset "A held observation with no return is zeroed with a warning, and refused under strict" begin
         t = 7

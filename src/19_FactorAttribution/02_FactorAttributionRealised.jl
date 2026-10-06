@@ -1503,7 +1503,7 @@ Every realised method of [`factor_attribution`](@ref) that is not rolling forms 
 # Algorithm
 
  1. Read the factor model block `rr` off `pr`.
- 2. Report a holding in a non-investable asset through [`attribution_investable_diagnostic`](@ref), which warns, or raises under `strict`.
+ 2. Refuse weights over another universe, and report a holding in a non-investable asset, through [`attribution_investable_diagnostic`](@ref), which warns, or raises under `strict`.
  3. Read the block into bare arrays `blk` with [`attribution_block_arrays`](@ref).
  4. Refuse a non-finite entry of `ret` through [`attribution_finite_series`](@ref).
  5. Align `blk` against the `length(ret)` observations of the caller with [`attribution_key_align`](@ref), by the row key `key` of `ret` when the block shares it, giving `al`.
@@ -1523,6 +1523,7 @@ Every realised method of [`factor_attribution`](@ref) that is not rolling forms 
 
 # Validation
 
+  - The weights hold one entry for each asset of `pr`, else a `DimensionMismatch` is raised.
   - Every weight at a non-investable asset is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
   - `ret` is finite throughout, else an `IsNonFiniteError` naming the observations is raised.
   - The rules of [`attribution_key_align`](@ref).
@@ -1572,7 +1573,7 @@ Every rolling method of [`factor_attribution`](@ref) forms its net return series
 # Algorithm
 
  1. Read the factor model block `rr` off `pr`.
- 2. Report a holding in a non-investable asset through [`attribution_investable_diagnostic`](@ref), which warns, or raises under `strict`.
+ 2. Refuse weights over another universe, and report a holding in a non-investable asset, through [`attribution_investable_diagnostic`](@ref), which warns, or raises under `strict`.
  3. Read the block into bare arrays `blk` with [`attribution_block_arrays`](@ref).
  4. Refuse a non-finite entry of `ret` through [`attribution_finite_series`](@ref).
  5. Align `blk` against the `length(ret)` observations of the caller with [`attribution_key_align`](@ref), by the row key `key` of `ret` when the block shares it, giving `al`.
@@ -1594,6 +1595,7 @@ Every rolling method of [`factor_attribution`](@ref) forms its net return series
 
 # Validation
 
+  - The weights hold one entry for each asset of `pr`, else a `DimensionMismatch` is raised.
   - Every weight at a non-investable asset is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
   - `ret` is finite throughout, else an `IsNonFiniteError` naming the observations is raised.
   - The rules of [`attribution_key_align`](@ref).
@@ -1689,12 +1691,14 @@ end
 function factor_attribution(w::VecNum, pr::AbstractPriorResult, X::MatNum,
                             fees::Option{<:Fees} = nothing; strict::Bool = false,
                             kwargs...)::FactorAttributionResult
+    assert_attribution_assets(w, length(pr.mu))
     return attribution_realised_entry(w, pr, attribution_net_returns(w, X, fees, strict);
                                       strict = strict, kwargs...)
 end
 function factor_attribution(w::VecNum, pr::AbstractPriorResult, X::MatNum,
                             fees::Option{<:Fees}, window::Integer; strict::Bool = false,
                             kwargs...)
+    assert_attribution_assets(w, length(pr.mu))
     return attribution_rolling_entry(w, pr, attribution_net_returns(w, X, fees, strict),
                                      window; strict = strict, kwargs...)
 end

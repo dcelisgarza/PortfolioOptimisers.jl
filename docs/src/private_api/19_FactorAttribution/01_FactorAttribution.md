@@ -20,6 +20,7 @@ assert_attribution_field
 assert_attribution_prior_field
 attribution_finite
 attribution_investable_diagnostic
+assert_attribution_assets
 attribution_investable_rows
 attribution_investable_block
 attribution_prior_block

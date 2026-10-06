@@ -64,6 +64,12 @@ A block of another type, `Regression`, records no key. It keeps the tail rule.
   `ε_121` and `B_120`. A rule that cuts the block to the test rows before it applies the lag
   removes `B_120` and loses the row, although the row is inside the factor-model window.
 - On the rows that both rules keep, the two agree.
+- The key reaches every scheme whose folds the indexed `predict` makes: `KFold`, the
+  walk-forwards, `HindsightSplit`, each path of `CombinatorialCrossValidation` and of
+  `MultipleRandomised`, an online run and its `Resume`, and the rows of a
+  `BudgetedHindsightPath`. A population of paths takes one attribution per path. A path of
+  `MultipleRandomised` holds a subset of the assets, so it is attributed against a prior fitted
+  on the same subset, and weights over another universe are refused with a `DimensionMismatch`.
 - `CrossSectionalFactorModel` and `PredictionResult` each carry one more type parameter, after the
   existing ones, so a dispatch that names a prefix of the parameters is unchanged.
 - The cost is one integer vector, a range on the batch fit, on each block, the timestamps of the

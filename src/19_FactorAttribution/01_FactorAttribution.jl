@@ -811,9 +811,10 @@ A walk-forward produces a weight history that holds a non-investable asset. A pr
 
 # Algorithm
 
- 1. Read the investable mask `imsk` off `pr`. An absent mask means that every asset is investable, and the verb returns.
- 2. Find the non-investable assets that carry a non-zero weight, in the vector or at any observation of the history, giving `held`.
- 3. When `held` is not empty, warn naming it, or raise under `strict`, through [`strict_diagnostic`](@ref).
+ 1. Refuse weights that do not hold one entry for each asset of `pr` through [`assert_attribution_assets`](@ref), so the mask is never read at an index it lacks.
+ 2. Read the investable mask `imsk` off `pr`. An absent mask means that every asset is investable, and the verb returns.
+ 3. Find the non-investable assets that carry a non-zero weight, in the vector or at any observation of the history, giving `held`.
+ 4. When `held` is not empty, warn naming it, or raise under `strict`, through [`strict_diagnostic`](@ref).
 
 # Arguments
 
@@ -823,6 +824,7 @@ A walk-forward produces a weight history that holds a non-investable asset. A pr
 
 # Validation
 
+  - `w` holds one entry for each asset of `pr`, else a `DimensionMismatch` is raised.
   - Every weight at a non-investable asset is zero, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`.
 
 # Returns
@@ -832,12 +834,14 @@ A walk-forward produces a weight history that holds a non-investable asset. A pr
 # Related
 
   - [`factor_attribution`](@ref)
+  - [`assert_attribution_assets`](@ref)
   - [`strict_diagnostic`](@ref)
   - [`investable_mask`](@ref)
   - [`attribution_finite`](@ref)
 """
 function attribution_investable_diagnostic(w::VecNum_MatNum, pr::AbstractPriorResult,
                                            strict::Bool)::Nothing
+    assert_attribution_assets(w, length(pr.mu))
     return attribution_investable_diagnostic(w, investable_mask(pr), strict)
 end
 function attribution_investable_diagnostic(::VecNum_MatNum, ::Nothing, ::Bool)::Nothing
@@ -860,6 +864,37 @@ function attribution_investable_diagnostic(held::AbstractVector{<:Integer},
     end
     strict_diagnostic("a factor attribution cannot decompose a holding in an asset the prior could not estimate. Assets $(held) are not investable, and $(holder). Their contributions are zeroed, so the systematic and idiosyncratic components describe the portfolio without them, and on the realised side their return lands in the unattributed remainder. Pass `strict = true` to refuse instead, reduce the weights to the investable universe, or refit the prior over a history that covers these assets.",
                       strict)
+    return nothing
+end
+"""
+    assert_attribution_assets(W::VecNum_MatNum, N::Integer)
+
+Refuse weights that do not hold one entry for each asset of the factor model.
+
+The decomposition reads the weight of asset `i` against row `i` of the loadings, so the weights and the model must describe one universe. A path of [`MultipleRandomised`](@ref) holds a subset of the assets, so its weights describe fewer assets than a prior fitted on the whole universe. The check runs before any read of the weights, so the refusal names the two counts rather than an index the arithmetic would fail on.
+
+# Arguments
+
+  - `W`: The constant weights, or the weight history, `observations × assets`.
+  - `N`: The number of assets of the factor model.
+
+# Validation
+
+  - The weights hold `N` assets, else a `DimensionMismatch` naming both counts is raised.
+
+# Returns
+
+  - Nothing is returned.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_investable_diagnostic`](@ref)
+"""
+function assert_attribution_assets(W::VecNum_MatNum, N::Integer)::Nothing
+    n = size(W, ndims(W))
+    @argcheck(n == N,
+              DimensionMismatch("the weights hold $n assets, and the factor model describes $N. A factor attribution reads both on one universe. A path of `MultipleRandomised` holds a subset of the assets: attribute it against a prior fitted on the same subset, `prior(pe, port_opt_view(rd, :, cols))`."))
     return nothing
 end
 """
@@ -1224,6 +1259,8 @@ end
                        kwargs...) -> FactorAttributionResult
     factor_attribution(pred::MultiPeriodPredictionResult, pr::AbstractPriorResult;
                        kwargs...) -> FactorAttributionResult
+    factor_attribution(ppred::PopulationPredictionResult, pr::AbstractPriorResult,
+                       args...; kwargs...) -> Vector
     factor_attribution(w::VecNum, B::MatNum, F::MatNum, d::VecNum_MatNum;
                        mu_f::Option{<:VecNum} = nothing, b::Option{<:VecNum} = nothing,
                        sigma::Option{<:MatNum} = nothing, mu::Option{<:VecNum} = nothing,
@@ -1244,7 +1281,7 @@ The verb reads the weights and the factor model block, and returns one [`FactorA
 
 **The bare arrays are the bottom level, and a prior method unpacks the prior result into them.** A caller who holds a factor model as arrays, a vendor risk model for example, attributes with no fitted object. `factor_attribution(w, pr)` is the bare-array method on `pr.rr.M`, `pr.fpr.sigma`, the idiosyncratic covariance of the block, `pr.fpr.mu`, `pr.rr.b`, `pr.sigma`, `pr.mu` and the family labels of the block, so the two methods answer the same numbers. Without `sigma` and `mu` the model is the total, and the unattributed remainder is an exact zero. The realised bare-array method reads the histories on one observation axis, untrimmed, and aligns them itself: the returns of observation `t` pair with the exposures of observation `t - lag`. `lag` defaults to one for an exposure history, and to zero for a static matrix, which describes every observation. A prior method reads each of these arrays off the block.
 
-**A cross-validation is matched to the block row by row.** The series of a walk-forward covers the test rows of its folds, and the prior result usually covers the whole sample, so the two do not end on the same row. Each fold records its rows, the positions `idx` of a [`PredictionResult`](@ref) and the timestamps of its `rd.ts`, and a [`CrossSectionalFactorModel`](@ref) records the rows its fit covers. The method matches the two by timestamp when both carry timestamps, and by position otherwise. The positions agree only when the prior read the returns data that the cross-validation split. The method aligns the exposures of the whole block before it cuts the block to the matched rows, so the first test row keeps the exposures of the row before it. The test rows before the first row the block decomposes, or after its last row, are left out. A block that records no rows, or a series that carries no key it shares, is lined up at the tail as a single series is.
+**A cross-validation is matched to the block row by row.** The series of a walk-forward covers the test rows of its folds, and the prior result usually covers the whole sample, so the two do not end on the same row. Each fold records its rows, the positions `idx` of a [`PredictionResult`](@ref) and the timestamps of its `rd.ts`, and a [`CrossSectionalFactorModel`](@ref) records the rows its fit covers. The method matches the two by timestamp when both carry timestamps, and by position otherwise. The positions agree only when the prior read the returns data that the cross-validation split. The method aligns the exposures of the whole block before it cuts the block to the matched rows, so the first test row keeps the exposures of the row before it. The test rows before the first row the block decomposes, or after its last row, are left out. A block that records no rows, or a series that carries no key it shares, is lined up at the tail as a single series is. A [`CombinatorialCrossValidation`](@ref) or a [`MultipleRandomised`](@ref) produces a population of paths, and the method over a [`PopulationPredictionResult`](@ref) attributes each path in this way. A path of [`MultipleRandomised`](@ref) holds a subset of the assets, so it is attributed against a prior fitted on the same subset.
 
 **The predicted totals of a prior method come from the prior result, not from the model.** `pr.mu` and `pr.sigma` are what the optimiser saw and what [`expected_return`](@ref) and [`expected_risk`](@ref) report, so they are the totals. A wrapping prior replaces them while it forwards the block unchanged, so the model no longer reproduces them, and the two gaps `dot(w, pr.mu - M * fpr.mu - b)` and `dot(w, (pr.sigma - M * F * M' - D) * w) / sigma_P` land in the unattributed remainder. The remainder is therefore present on the predicted side too, and it is at rounding level on a plain fit.
 
@@ -1336,6 +1373,8 @@ The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\
   - `rd`: Returns result carrying the asset returns.
   - `ret`: Net portfolio return series.
   - `pred`: Multi-period prediction result whose folds give the weight history, the return series and the row key of each observation.
+  - `ppred`: Population prediction result, whose paths are each attributed as a `pred`.
+  - `args`: The positional `window` of a rolling attribution, or nothing.
   - `B`: Loadings, `assets × factors`, or on the realised side the exposure history, `observations × assets × factors`. A `NaN` row marks an asset the model does not state.
   - `F`: Factor covariance, `factors × factors`.
   - `d`: Idiosyncratic variances, `assets`, or the idiosyncratic covariance, `assets × assets`.
@@ -1365,6 +1404,7 @@ The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\
   - The factor covariance and the expected factor returns are finite, else an `IsNonFiniteError` is raised.
   - `f` and `eps` carry the same observations, an exposure history carries them too, `ret` carries at least as many, and `0 <= lag` is below their number, else a `DimensionMismatch` or a `DomainError` is raised. A `pred` whose folds share a row key with the block needs no length: at least one test row is a row the block decomposes, and no test row between two of them is missing from the block, else a `DimensionMismatch` or an `ArgumentError` is raised.
   - `ppy > 0`, else a `DomainError` is raised.
+  - The weights hold one entry for each asset of `pr`, else a `DimensionMismatch` is raised.
   - Every weight at a non-investable asset is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
   - Every held `(observation, asset)` pair of `X` is finite, else a warning names the pairs, or an `ArgumentError` names them under `strict`.
   - `ret` is finite throughout, else an `IsNonFiniteError` naming the observations is raised.
@@ -1376,7 +1416,7 @@ The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\
 
 # Returns
 
-  - `fa::FactorAttributionResult`: The attribution, or a vector of them from a rolling method.
+  - `fa::FactorAttributionResult`: The attribution, or a vector of them from a rolling method. A population gives one entry per path.
 
 # Related
 
@@ -1407,6 +1447,10 @@ function factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR} = nothi
                             kwargs...)::FactorAttributionResult
     _, w, pr = result_investable_view(res, pr)
     return factor_attribution(w, pr; kwargs...)
+end
+function factor_attribution(ppred::PopulationPredictionResult, pr::AbstractPriorResult,
+                            args...; kwargs...)
+    return [factor_attribution(p, pr, args...; kwargs...) for p in ppred.pred]
 end
 """
     attribution_block_arrays(rr::AbstractLoadingsRegressionResult, pr::AbstractPriorResult)
@@ -1619,7 +1663,7 @@ Every predicted method of [`factor_attribution`](@ref) calls this function, the 
 
 # Algorithm
 
- 1. Find the decomposable assets `imsk` with [`attribution_array_mask`](@ref), and report a holding outside them through [`attribution_investable_diagnostic`](@ref).
+ 1. Refuse weights over another universe through [`assert_attribution_assets`](@ref). Find the decomposable assets `imsk` with [`attribution_array_mask`](@ref), and report a holding outside them through [`attribution_investable_diagnostic`](@ref).
  2. Zero the non-finite entries of the loadings `M`, the orthogonal mean `bp` and the idiosyncratic covariance `D`, and their rows of an asset outside `imsk`.
  3. Form the portfolio exposure `bexp`, its product `Fb` with the factor covariance, and the systematic and idiosyncratic variances and means.
  4. Take the totals and the two gaps from the anchors with [`attribution_predicted_total`](@ref).
@@ -1636,6 +1680,7 @@ Every predicted method of [`factor_attribution`](@ref) calls this function, the 
 # Validation
 
   - The factor covariance and the expected factor returns are finite, else an `IsNonFiniteError` is raised.
+  - `w` holds one entry for each row of the loadings, else a `DimensionMismatch` is raised.
   - Every weight at an asset the model does not state is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
   - The portfolio variance is positive, and `ppy > 0`, else a `DomainError` is raised.
 
@@ -1655,6 +1700,7 @@ function predicted_attribution(w::VecNum, mdl::NamedTuple; assets::Bool = false,
     F, mu_f = mdl.F, mdl.mu_f
     @argcheck(all(isfinite, F) & all(isfinite, mu_f),
               IsNonFiniteError("the factor covariance and the expected factor returns describe every factor of the model, so every entry of them must be finite."))
+    assert_attribution_assets(w, size(mdl.M, 1))
     imsk = attribution_array_mask(mdl)
     attribution_investable_diagnostic(w, imsk, strict)
     M = attribution_investable_rows(attribution_finite(mdl.M), imsk)

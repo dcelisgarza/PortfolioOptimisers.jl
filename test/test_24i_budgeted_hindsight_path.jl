@@ -30,6 +30,9 @@ be-the-leader's own path length, which is the gap the issue measured.
         @test all(isa(p.res, po.NaiveOptimisationResult) for p in bp.pred)
         @test all(isa(p.res.retcode, OptimisationSuccess) for p in bp.pred)
         @test all(isnothing(p.hw) for p in bp.pred)
+        # Each fold records its row, as a fold of a cross-validation records its test rows,
+        # so a realised attribution of the path matches it to the block by position.
+        @test [p.idx for p in bp.pred] == [1:1, 2:2, 3:3]
         u = path_weights(bp)
         @test all(isapprox(sum(ui), 1; atol = 1e-6) for ui in u)
         @test all(all(>=(-1e-6), ui) for ui in u)

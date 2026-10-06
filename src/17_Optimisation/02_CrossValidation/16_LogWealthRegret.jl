@@ -1141,6 +1141,8 @@ end
 
 One fold of a budgeted path's prediction result: row `t`'s allocation as a [`NaiveOptimisationResult`](@ref) on the resolved bounds, predicted over row `t` of `rd` alone.
 
+The fold is predicted at the test rows `t:t`, so it records the position `t`, as a fold of a cross-validation records its test rows. A realised [`factor_attribution`](@ref) of the path then matches each fold to the row of the factor model block by that position.
+
 A row with a gap carries its Investable Mask, so `predict` views the row and the weights at the mask and never reads the gap. A row with no gap carries `nothing`, as a fit on the full universe does.
 
 # Related
@@ -1153,7 +1155,7 @@ function path_row_fold(res::BudgetedHindsightPathResult, rd::ReturnsResult, t::I
     wt = isnothing(mt) ? res.w[t, :] : res.w[t, mt]
     return predict(NaiveOptimisationResult(; pr = nothing, wb = res.wb,
                                            retcode = res.retcode, w = wt, imsk = mt,
-                                           fb = nothing), port_opt_view(rd, t:t, :))
+                                           fb = nothing), rd, t:t)
 end
 
 export log_wealth_regret, LogWealthRegretResult, BudgetedHindsightPath,
