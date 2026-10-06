@@ -277,13 +277,15 @@ function factory(p::Pipeline, w::VecNum)
     return Pipeline(p.names, map(est -> pipeline_step_factory(est, w), p.steps), p.cache)
 end
 """
-    cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CombinatorialCrossValidation; ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
+    cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CombCVER; ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
 
 Run combinatorial cross-validation over a [`Pipeline`](@ref) on price-level or returns-level data.
 
 Each split fits the whole pipeline on its training rows and predicts each of its test groups. [`sort_predictions`](@ref) then puts the predictions of the test groups into the paths of the scheme, as the combinatorial loop of an optimiser does. A schedule step resolves for each split against the [`TimeDependentContext`](@ref) of the split, before `fit` runs.
 
 The training rows of a split can be non-contiguous, because a test group that the split holds out can sit between them. On returns-level data, each fold fits on returns that the data holds, and the method adds no approximation. On price-level data, [`PricesToReturns`](@ref) converts the training prices of the fold, and it makes one return across each gap. That return spans the prices from the last row before the gap to the first row after it. So a training window in `b` blocks holds `b - 1` returns that span a gap. The test groups are contiguous, so no prediction holds such a return. Use [`MultipleRandomised`](@ref) for contiguous training rows on price-level data.
+
+`cv` is the scheme or its split, a [`CombinatorialCrossValidationResult`](@ref) from `split(cv, data)`. A split result runs the folds it holds, and evaluates them with the defaults of [`fold_evaluation`](@ref), as the direct route does.
 
 `ex` is the FLoops executor of the splits. The method accepts every other keyword, such as the `id` of the single-path method, and ignores it.
 
@@ -304,8 +306,7 @@ The training rows of a split can be non-contiguous, because a test group that th
   - [`CombinatorialCrossValidation`](@ref)
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
 """
-function cross_val_predict(pipe::Pipeline, data::Prices_RR,
-                           cv::CombinatorialCrossValidation;
+function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CombCVER;
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
     assert_pipeline_entry(pipe, cv)
     cv_res = split(cv, data)
@@ -368,11 +369,13 @@ function pipeline_path_fit_and_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, 
                                        id = path_id, opt = est)
 end
 """
-    cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MultipleRandomised; ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
+    cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MRCVR; ex = FLoops.ThreadedEx(), kwargs...) -> PopulationPredictionResult
 
 Run asset-resampling cross-validation, [`MultipleRandomised`](@ref), over a [`Pipeline`](@ref) on price-level or returns-level data.
 
 Each path is an inner walk-forward over a random subset of the assets. The subset applies to the input data as a view through [`pipeline_asset_view`](@ref), and the pipeline fits again on the subset. So the pipeline never selects from its fitted universe. The scheme draws assets and not rows, so each window of observations stays contiguous. Unlike combinatorial cross-validation, the method adds no approximation on price-level data.
+
+`cv` is the scheme or its split, a [`MultipleRandomisedResult`](@ref) from `split(cv, data)`. A split result runs the paths and the asset subsets it holds, and evaluates them with the defaults of [`fold_evaluation`](@ref), as the direct route does.
 
 `ex` is the FLoops executor of the paths, and of the folds in each path. The method accepts every other keyword and ignores it. [`pipeline_cross_val_predict`](@ref) holds the steps.
 
@@ -387,12 +390,12 @@ Each path is an inner walk-forward over a random subset of the assets. The subse
   - [`pipeline_asset_view`](@ref)
   - [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CVER)`](@ref)
 """
-function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MultipleRandomised;
+function cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MRCVR;
                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(), kwargs...)
     return pipeline_cross_val_predict(pipe, data, cv; ex = ex)
 end
 """
-    pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::MultipleRandomised; ex = FLoops.ThreadedEx())
+    pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::MRCVR; ex = FLoops.ThreadedEx(), id = nothing)
     pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::CVER; ex = FLoops.ThreadedEx(), id = nothing)
 
 Run the body of the `cross_val_predict` methods of a Pipeline, for a [`Pipeline`](@ref), for `Online(pipe)` and for `Resume(res)`.
@@ -402,7 +405,7 @@ Run the body of the `cross_val_predict` methods of a Pipeline, for a [`Pipeline`
  1. Check the entry with [`assert_pipeline_entry`](@ref).
  2. Split `data` with `cv`, giving `train_idx` and `test_idx`, and refuse shuffled folds with [`assert_unshuffled_folds`](@ref).
  3. Read the evaluation keywords of `cv` with [`fold_evaluation`](@ref), and the drift of the held weights with [`held_weights_drift`](@ref), giving `hwd`.
- 4. For [`MultipleRandomised`](@ref), put the `(train, test, asset)` tuples of the folds into one vector for each path, giving `dict`. Run each path with [`pipeline_path_fit_and_predict`](@ref) through [`parallel_folds`](@ref), and return the paths as a [`PopulationPredictionResult`](@ref).
+ 4. For [`MultipleRandomised`](@ref), put the `(train, test, asset)` tuples of the folds into one vector for each path, giving `dict`. Run each path with [`pipeline_path_fit_and_predict`](@ref) through [`parallel_folds`](@ref), and return the paths as a [`PopulationPredictionResult`](@ref). Each path carries its own `id`, so the method ignores `id`. It accepts `id` because the `Online(pipe)` and `Resume(res)` methods for [`CVER`](@ref) pass it, and they forward this scheme to this method.
  5. For a scheme with contiguous test rows, run the folds through [`fold_loop`](@ref). Each fold fits with [`pipeline_fold_fit`](@ref) and predicts its test rows. The online arm of the loop resolves `Online(pipe)` at its warm-up, and passes the pipeline from each fold to the next. Return the predictions as a [`MultiPeriodPredictionResult`](@ref) with `id` and the estimator that the online arm threaded.
 
 # Validation
@@ -415,9 +418,9 @@ Run the body of the `cross_val_predict` methods of a Pipeline, for a [`Pipeline`
   - [`cross_val_predict(o::Online{<:Pipeline}, data::Prices_RR, cv::CVER)`](@ref)
   - [`Pipeline_OnlPipe`](@ref)
 """
-function pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR,
-                                    cv::MultipleRandomised;
-                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+function pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv::MRCVR;
+                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                                    id = nothing)
     assert_pipeline_entry(pipe, cv)
     cv_res = split(cv, data)
     (; train_idx, test_idx, asset_idx, path_ids) = cv_res
@@ -452,6 +455,8 @@ Run cross-validated prediction over a whole [`Pipeline`](@ref), and return a [`M
 | [`KFold`](@ref) / walk-forward ([`CVER`](@ref)) | [`MultiPeriodPredictionResult`](@ref) | one series, one prediction per fold |
 | [`CombinatorialCrossValidation`](@ref)          | [`PopulationPredictionResult`](@ref)  | a per-path collection               |
 | [`MultipleRandomised`](@ref)                    | [`PopulationPredictionResult`](@ref)  | a per-path collection               |
+
+A split result of either multi-path scheme, from `split(cv, data)`, returns the same type as its scheme ([`CombCVER`](@ref), [`MRCVR`](@ref)).
 
 The combinatorial scheme and the asset-resampling scheme have their own methods, and both take price-level or returns-level data. See [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::CombinatorialCrossValidation)`](@ref) and [`cross_val_predict(pipe::Pipeline, data::Prices_RR, cv::MultipleRandomised)`](@ref). The rest of this docstring is about the method for the contiguous, single-path schemes, [`KFold`](@ref) and the walk-forwards.
 

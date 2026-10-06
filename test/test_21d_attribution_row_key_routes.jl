@@ -161,7 +161,10 @@ PortfolioOptimisers.keeps_observations(::RowKeyLyingDropResult) = true
                                                                                    "Hindsight" =>
                                                                                        hs,
                                                                                    "Combinatorial" =>
-                                                                                       ccv)
+                                                                                       ccv,
+                                                                                   "Combinatorial split" =>
+                                                                                       split(ccv,
+                                                                                             rd))
         pipe = Pipeline(; steps = ("prior" => est(), "opt" => InverseVolatility()))
         pp = cross_val_predict(pipe, rd, cv)
         dp = cross_val_predict(InverseVolatility(; pe = est()), rd, cv)
@@ -177,13 +180,20 @@ PortfolioOptimisers.keeps_observations(::RowKeyLyingDropResult) = true
         mr = MultipleRandomised(IndexWalkForward(60, 30); n_subsets = 2, subset_size = 8,
                                 window_size = 150, seed = 1)
         pipe = Pipeline(; steps = ("prior" => pe5(), "opt" => InverseVolatility()))
-        pp = cross_val_predict(pipe, rd, mr)
-        dp = cross_val_predict(InverseVolatility(; pe = pe5()), rd, mr)
-        for (a, b) in zip(pp.pred, dp.pred)
-            c = [findfirst(==(n), rd.nx) for n in a.pred[1].rd.nx]
-            prs = prior(pe5(), PO.port_opt_view(rd, :, c))
-            @test [p.idx for p in a.pred] == [p.idx for p in b.pred]
-            @test same_attribution(factor_attribution(a, prs), factor_attribution(b, prs))
+        # The split of the scheme takes the same route (#1496). It fell to the single-path
+        # method, which joined the paths into one series over every asset.
+        for cv in (mr, split(mr, rd))
+            pp = cross_val_predict(pipe, rd, cv)
+            dp = cross_val_predict(InverseVolatility(; pe = pe5()), rd, cv)
+            @test pp isa PopulationPredictionResult && length(pp.pred) == 2
+            for (a, b) in zip(pp.pred, dp.pred)
+                c = [findfirst(==(n), rd.nx) for n in a.pred[1].rd.nx]
+                @test length(c) == 8 && all(p -> p.rd.nx == a.pred[1].rd.nx, a.pred)
+                prs = prior(pe5(), PO.port_opt_view(rd, :, c))
+                @test [p.idx for p in a.pred] == [p.idx for p in b.pred]
+                @test same_attribution(factor_attribution(a, prs),
+                                       factor_attribution(b, prs))
+            end
         end
     end
 
