@@ -1338,8 +1338,8 @@ function cross_sectional_expand(fcb::FactorFamilyBasis, r, mu::VecNum, sigma::Ma
     return (; mu = expand_factor_mu(now, mu), sigma = expand_factor_covariance(now, sigma))
 end
 """
-    cross_sectional_residual_block(esigma::VecNum, idx, mtx_sqrt = nothing) -> NamedTuple
-    cross_sectional_residual_block(esigma::MatNum, idx, mtx_sqrt = nothing) -> NamedTuple
+    cross_sectional_residual_block(esigma::VecNum, idx, mtx_sqrt = EigenFallbackSquareRoot()) -> NamedTuple
+    cross_sectional_residual_block(esigma::MatNum, idx, mtx_sqrt = EigenFallbackSquareRoot()) -> NamedTuple
 
 Return the idiosyncratic block of the asset covariance and a square root of it.
 
@@ -1358,7 +1358,7 @@ The idiosyncratic covariance is a vector of variances or a full matrix, and each
 
 Where:
 
-  - ``\\operatorname{sqrt}``: The square root that [`matrix_square_root`](@ref) takes under `mtx_sqrt`, the lower Cholesky factor by default.
+  - ``\\operatorname{sqrt}``: The square root that [`matrix_square_root`](@ref) takes under `mtx_sqrt`. By default it is the lower Cholesky factor of a positive definite matrix, and the eigen square root of a singular one.
   - $(math_dict[:R_idio])
   - $(math_dict[:D_orth])
   - $(math_dict[:I_inv])
@@ -1391,7 +1391,7 @@ function cross_sectional_residual_block(esigma::VecNum, idx::AbstractVector{<:In
     return (; D = LinearAlgebra.diagm(d), R = LinearAlgebra.diagm(sqrt.(d)))
 end
 function cross_sectional_residual_block(esigma::MatNum, idx::AbstractVector{<:Integer},
-                                        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+                                        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     D = esigma[idx, idx]
     return (; D = D, R = Matrix(matrix_square_root(mtx_sqrt, D)))
 end
@@ -1420,7 +1420,7 @@ Where:
   - ``\\mathbf{\\Sigma}``: Asset covariance.
   - ``\\mathbf{C}``: Low-rank square root of the asset covariance, ``(K + \\lvert \\mathcal{I} \\rvert) \\times N`` over the full asset universe.
   - ``\\mathbf{B}_{T,\\,\\mathcal{S}}``, ``\\mathbf{B}_{T,\\,\\mathcal{I}}``: The rows of ``\\mathbf{B}_{T}`` at the assets of ``\\mathcal{S}`` and of ``\\mathcal{I}``.
-  - ``\\operatorname{chol}``: The square root that [`matrix_square_root`](@ref) takes under `mtx_sqrt`, the lower Cholesky factor by default. Of a factor covariance with a zero row and column, which an Empty Factor carries, it is the square root of the block of the other factors, with a zero row and column at the Empty Factor.
+  - ``\\operatorname{chol}``: The square root that [`matrix_square_root`](@ref) takes under `mtx_sqrt`. By default it is the lower Cholesky factor of a positive definite matrix, and the eigen square root of a singular one. Of a factor covariance with a zero row and column, which an Empty Factor carries, it is the square root of the block of the other factors, with a zero row and column at the Empty Factor.
   - $(math_dict[:B_T_cs])
   - $(math_dict[:mu_f_patt])
   - $(math_dict[:F_patt])
@@ -1474,7 +1474,7 @@ The answer states an entry exactly when the model determines it. An asset of ``\
 function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
                               f_mu::VecNum, f_sigma::MatNum, esigma::VecNum_MatNum,
                               idx::AbstractVector{<:Integer}, Xs::MatNum;
-                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
+                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                               kwargs...)
     @argcheck(size(L, 2) == length(f_mu) == size(f_sigma, 1),
               DimensionMismatch("L ($(size(L, 2)) columns), f_mu ($(length(f_mu))) and f_sigma ($(size(f_sigma, 1)) rows) must agree on the factor axis"))

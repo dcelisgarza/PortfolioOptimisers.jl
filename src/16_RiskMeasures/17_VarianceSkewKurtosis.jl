@@ -584,7 +584,7 @@ VarianceSkewKurtosis
            │       alg1 ┼ FullMoment()
            │       alg2 ┼ SOCRiskExpr()
            │         pe ┼ nothing
-           │   mtx_sqrt ┴ nothing
+           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
         pe ┴ nothing
 ```
 

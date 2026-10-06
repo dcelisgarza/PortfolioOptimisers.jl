@@ -1,16 +1,16 @@
 #=
 The square root of a covariance at every site that took a bare Cholesky factor or the fixed eigen
 factor `covariance_factor` (#1410, after #1396). Each estimator that owns such a site carries the
-field `mtx_sqrt`. Its default keeps what the estimator took before: the plain Cholesky factor, or
-the eigen square root for `Variance`, `StandardDeviation`, `DistributionValueatRisk`,
-`UncertaintySetVariance` and `NegativeSkewness`.
+field `mtx_sqrt`, and every one defaults to the eigen square root (#1506). On a positive definite
+matrix that is the plain Cholesky factor, so the default changes no value where the plain factor
+succeeds.
 
 THE MATRIX. Every case takes a matrix whose last row and column are zero, so its plain Cholesky
 factor fails at the last pivot on exact zeros, and no rounding decides the case. The one
 exception is the norm ball of a `NormalUncertaintySet` with `pdm = nothing`, whose asymptotic
 covariance of the covariance has rank `N(N+1)/2` of `N^2` by construction.
 
-THE CHECK. Under `nothing` the site raises `PosDefException`, as before. Under the eigen and the
+THE CHECK. Under `nothing` the site raises `PosDefException`. Under the eigen and the
 ridge algorithms the model solves, and the value of its cone is the risk of the returned weights
 under the singular matrix itself.
 =#
@@ -47,7 +47,6 @@ end
     @test UncertaintySetVariance().mtx_sqrt === EigenFallbackSquareRoot()
     w = fill(1 / N_ms, N_ms)
     W = w * transpose(w)
-    @test_throws PosDefException PO.ucs_variance(e0, S_ms, w)
     @test_throws PosDefException PO.ucs_variance(e0, S_ms, w, nothing)
     for alg in algs_ms
         # The eigen square root is exact, and the ridge moves the value by its ridge alone.
@@ -74,20 +73,22 @@ end
         # A variance rebuilt for a sub-problem keeps the algorithm.
         @test PO.no_bounds_risk_measure(r).mtx_sqrt === alg
     end
-    # The converter reads the ellipsoid's matrix through the same algorithm.
-    @test_throws PosDefException NormBallUncertaintySet(e0)
-    nb = NormBallUncertaintySet(e0, EigenFallbackSquareRoot())
+    # The converter reads the ellipsoid's matrix through the same algorithm, the eigen square
+    # root by default.
+    @test_throws PosDefException NormBallUncertaintySet(e0, nothing)
+    nb = NormBallUncertaintySet(e0)
     @test maximum(abs, nb.L * nb.L' - Om) < 1e-15
 end
 
 @testset "The ellipsoid of an ArithmeticReturn" begin
     Smu = zero_last(S_ms ./ 150)
     em = EllipsoidalUncertaintySet(; sigma = Smu, k = 2.0, class = MuUncertaintySetClass())
-    @test ArithmeticReturn().mtx_sqrt === nothing
+    @test ArithmeticReturn().mtx_sqrt === EigenFallbackSquareRoot()
     solve(ret) = optimise(MeanRisk(; r = Variance(), obj = MaximumUtility(),
                                    opt = JuMPOptimiser(; pe = pr_ms, slv = slv_ms,
                                                        ret = ret)), rd_ms)
-    @test_throws PosDefException solve(ArithmeticReturn(; ucs = em))
+    @test_throws PosDefException solve(ArithmeticReturn(; ucs = em, mtx_sqrt = nothing))
+    @test isa(solve(ArithmeticReturn(; ucs = em)).retcode, OptimisationSuccess)
     for alg in algs_ms
         ret = ArithmeticReturn(; ucs = em, mtx_sqrt = alg)
         res = solve(ret)
@@ -105,6 +106,8 @@ end
     prs = PO.LowOrderPrior(; X = X_ms, mu = pr_ms.mu, sigma = Ss)
     rrb(alg) = RelaxedRiskBudgeting(; opt = JuMPOptimiser(; pe = prs, slv = slv_ms),
                                     mtx_sqrt = alg)
+    @test RelaxedRiskBudgeting(; opt = JuMPOptimiser(; pe = prs, slv = slv_ms)).mtx_sqrt ===
+          EigenFallbackSquareRoot()
     @test rrb(nothing).mtx_sqrt === nothing
     @test_throws PosDefException optimise(rrb(nothing), rd_ms)
     for alg in algs_ms
@@ -124,8 +127,16 @@ end
     kt = sum(kron(Xc[t, :], Xc[t, :]) * transpose(kron(Xc[t, :], Xc[t, :])) for t in 1:T) /
          T
     solve(r) = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt_ms), rd_ms)
-    @test Kurtosis().mtx_sqrt === nothing
-    @test_throws PosDefException solve(Kurtosis(; kt = kt))
+    @test Kurtosis().mtx_sqrt === EigenFallbackSquareRoot()
+    @test_throws PosDefException solve(Kurtosis(; kt = kt, mtx_sqrt = nothing))
+    @test isa(solve(Kurtosis(; kt = kt)).retcode, OptimisationSuccess)
+    # A positive definite co-kurtosis: the default is the plain Cholesky factor.
+    Xp = X_ms .- mean(X_ms; dims = 1)
+    ktp = sum(kron(Xp[t, :], Xp[t, :]) * transpose(kron(Xp[t, :], Xp[t, :])) for t in 1:T) /
+          T
+    Sp = PO.dup_elim_sum_matrices(N_ms)[3]
+    @test isposdef(Symmetric(Sp * ktp * transpose(Sp)))
+    @test solve(Kurtosis(; kt = ktp)).w == solve(Kurtosis(; kt = ktp, mtx_sqrt = nothing)).w
     for alg in algs_ms
         res = solve(Kurtosis(; kt = kt, mtx_sqrt = alg))
         @test isa(res.retcode, OptimisationSuccess)
@@ -152,8 +163,33 @@ end
                                                                           diagonal = false,
                                                                           mtx_sqrt = alg))
     end
-    @test NormBallUncertaintySetAlgorithm().mtx_sqrt === nothing
+    @test NormBallUncertaintySetAlgorithm().mtx_sqrt === EigenFallbackSquareRoot()
     @test_throws PosDefException PO.ucs(ue(nothing), rd_ms)
+    # The default reads the singular matrix, as the explicit eigen policy does.
+    @test PO.ucs(NormalUncertaintySet(; pdm = nothing, rng = StableRNG(1), n_sim = 100,
+                                      alg = NormBallUncertaintySetAlgorithm(;
+                                                                            diagonal = false)),
+                 rd_ms)[2].L == PO.ucs(ue(EigenFallbackSquareRoot()), rd_ms)[2].L
+    # A normal radius solves with the map, so the eigen square root of a singular matrix
+    # refuses it, as the field states. The ridge gives a map of full rank.
+    function uk(alg)
+        return NormalUncertaintySet(; pdm = nothing, rng = StableRNG(1), n_sim = 100,
+                                    alg = NormBallUncertaintySetAlgorithm(;
+                                                                          method = NormalKUncertaintyAlgorithm(),
+                                                                          diagonal = false,
+                                                                          mtx_sqrt = alg))
+    end
+    @test_throws SingularException PO.ucs(uk(EigenFallbackSquareRoot()), rd_ms)
+    @test isfinite(PO.ucs(uk(RidgeCholeskySquareRoot()), rd_ms)[2].kappa)
+    # With the repair on, the matrix is positive definite, and the default is the plain factor.
+    function ur(alg)
+        return NormalUncertaintySet(; rng = StableRNG(1), n_sim = 100,
+                                    alg = NormBallUncertaintySetAlgorithm(;
+                                                                          diagonal = false,
+                                                                          mtx_sqrt = alg))
+    end
+    @test PO.ucs(ur(EigenFallbackSquareRoot()), rd_ms)[2].L ==
+          PO.ucs(ur(nothing), rd_ms)[2].L
     T = size(X_ms, 1)
     Sss = PO.sigma_asymptotic_cov(nothing, PO.mu_asymptotic_cov(nothing, S_ms, T), S_ms, T)
     # The covariance of the covariance has rank N(N+1)/2 of N^2 before any repair.

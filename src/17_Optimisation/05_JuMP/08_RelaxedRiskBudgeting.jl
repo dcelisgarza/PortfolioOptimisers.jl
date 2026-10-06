@@ -129,7 +129,7 @@ $(DocStringExtensions.FIELDS)
         wi::TD_Option{<:VecNum} = nothing,
         alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
-        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot()
     ) -> RelaxedRiskBudgeting
 
 Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the budgeting algorithm (and with it the risk budget), warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `wi` and `fb`). The relaxation variant `alg` and the square-root algorithm `mtx_sqrt` are formulation control and stay static.
@@ -284,7 +284,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     @fprop fb
     """
-    Square-root algorithm of the covariance matrix that the cones read, when the prior carries no `chol`, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm.
+    Square-root algorithm of the covariance matrix that the cones read, when the prior carries no `chol`, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. The default takes the square root of the eigendecomposition of a singular positive semidefinite matrix. [`matrix_square_root`](@ref) states each algorithm.
     """
     mtx_sqrt
     function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::TD{<:RiskBudgetingAlgorithm},
@@ -307,7 +307,7 @@ function RelaxedRiskBudgeting(; opt::JuMPOptimiser,
                               wi::TD_Option{<:VecNum} = nothing,
                               alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
                               fb::TDO_Option{<:OptE_Opt} = nothing,
-                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)::RelaxedRiskBudgeting
+                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::RelaxedRiskBudgeting
     return RelaxedRiskBudgeting(opt, rba, wi, alg, fb, mtx_sqrt)
 end
 function time_dependent_field_defaults(::RelaxedRiskBudgeting)::NamedTuple
@@ -432,7 +432,7 @@ function non_investable_universe(rrb::RelaxedRiskBudgeting,
 end
 """
     set_relaxed_risk_budgeting_alg_constraints!(alg, model, w, sigma, chol = nothing,
-                                                z = w, sigma_z = sigma, mtx_sqrt = nothing)
+                                                z = w, sigma_z = sigma, mtx_sqrt = EigenFallbackSquareRoot())
 
 Add algorithm-specific second-order cone constraints for Relaxed Risk Budgeting.
 
@@ -466,7 +466,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting
                                                      chol::Option{<:MatNum} = nothing,
                                                      z::VecJuMPScalar = w,
                                                      sigma_z::MatNum = sigma,
-                                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+                                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     sc = get_constraint_scale(model)
     psi = shared_get(model, :psi)
     G = isnothing(chol) ? transpose(matrix_square_root(mtx_sqrt, sigma)) : chol
@@ -479,7 +479,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBud
                                                      chol::Option{<:MatNum} = nothing,
                                                      z::VecJuMPScalar = w,
                                                      sigma_z::MatNum = sigma,
-                                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+                                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     sc = get_constraint_scale(model)
     psi = shared_get(model, :psi)
     G = isnothing(chol) ? transpose(matrix_square_root(mtx_sqrt, sigma)) : chol
@@ -500,7 +500,7 @@ function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRe
                                                      chol::Option{<:MatNum} = nothing,
                                                      z::VecJuMPScalar = w,
                                                      sigma_z::MatNum = sigma,
-                                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+                                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     sc = get_constraint_scale(model)
     psi = shared_get(model, :psi)
     G = isnothing(chol) ? transpose(matrix_square_root(mtx_sqrt, sigma)) : chol

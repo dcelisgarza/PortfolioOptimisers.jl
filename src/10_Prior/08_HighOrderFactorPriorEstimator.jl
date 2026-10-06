@@ -268,7 +268,7 @@ HighOrderFactorPriorEstimator
       │            │           w ┼ nothing
       │            │   corrected ┴ Bool: true
       │        rsd ┼ Bool: true
-      │   mtx_sqrt ┴ nothing
+      │   mtx_sqrt ┴ EigenFallbackSquareRoot()
   kte ┼ Cokurtosis
       │      me ┼ SimpleExpectedReturns
       │         │   w ┴ nothing

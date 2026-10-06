@@ -149,18 +149,19 @@ end
     rd = ReturnsResult(; nx = rd0.nx, X = rd0.X, ne = [rd0.ne; "MACRO2"],
                        E = hcat(rd0.E, -rd0.E[:, 4]), pnl = rd0.pnl)
     cfg = grid_config("Macro", rd)
-    function mirror(mtx_sqrt)
+    function mirror(; kwargs...)
         f = [cfg.factors;
              "macro2" =>
                  ObservedExposure(; xe = grid_pass("macro_beta"; family = "macro2"),
                                   series = "MACRO2", family = "macro2")]
         return CrossSectionalFactorPrior(; lambda = 1, cfg..., factors = f,
                                          f_mp = MatrixProcessing(; pdm = nothing),
-                                         mtx_sqrt = mtx_sqrt)
+                                         kwargs...)
     end
-    # The default keeps the Cholesky factor that refuses the singular factor covariance.
-    @test_throws PosDefException prior(mirror(nothing), rd)
-    pr = prior(mirror(RidgeCholeskySquareRoot()), rd)
+    # The plain Cholesky factor refuses the singular factor covariance.
+    @test_throws PosDefException prior(mirror(; mtx_sqrt = nothing), rd)
+    # The oracle's ridge is one keyword away.
+    pr = prior(mirror(; mtx_sqrt = RidgeCholeskySquareRoot()), rd)
     load(o) = parity_load("CrossSectionalFactorPrior", "Mirror", o)
     @test parity_compare(pr.fpr.sigma, parity_load("MatrixSquareRoot", "Mirror", "Input");
                          scale = :array, name = "Mirror factor sigma").ok
@@ -186,8 +187,9 @@ end
     # Measured maxrel 3.3e-16.
     @test parity_compare(diag(pr.chol[(K + 1):end, i]), vec(load("InvSqrtDiagonal"));
                          name = "Mirror sqrt diagonal").ok
-    # The eigen policy reproduces the covariance to rounding.
-    pe = prior(mirror(EigenFallbackSquareRoot()), rd)
+    # The default is the eigen policy, and it reproduces the covariance to rounding.
+    @test mirror().mtx_sqrt === EigenFallbackSquareRoot()
+    pe = prior(mirror(), rd)
     @test isapprox(transpose(pe.chol[:, i]) * pe.chol[:, i], pe.sigma[i, i]; rtol = 1e-12)
 end
 
@@ -198,17 +200,20 @@ end
     F = hcat(F, -F[:, 1])
     X = F[:, 1:3] * (0.5 .+ rand(rng, 3, 6)) .+ 0.005 .* randn(rng, 120, 6)
     mp = MatrixProcessing(; pdm = nothing)
-    function fp(mtx_sqrt)
+    function fp(; kwargs...)
         return FactorPrior(;
                            pe = EmpiricalPrior(;
                                                ce = PortfolioOptimisersCovariance(;
                                                                                   mp = mp)),
-                           mp = mp, mtx_sqrt = mtx_sqrt)
+                           mp = mp, kwargs...)
     end
-    @test FactorPrior().mtx_sqrt === nothing
-    @test_throws PosDefException prior(fp(nothing), X, F)
-    pr = prior(fp(RidgeCholeskySquareRoot()), X, F)
+    @test FactorPrior().mtx_sqrt === EigenFallbackSquareRoot()
+    @test_throws PosDefException prior(fp(; mtx_sqrt = nothing), X, F)
+    pr = prior(fp(; mtx_sqrt = RidgeCholeskySquareRoot()), X, F)
     @test isapprox(pr.chol' * pr.chol, pr.sigma; rtol = 1e-11)
-    pr = prior(fp(EigenFallbackSquareRoot()), X, F)
+    pr = prior(fp(), X, F)
     @test isapprox(pr.chol' * pr.chol, pr.sigma; rtol = 1e-14)
+    # On a positive definite factor covariance the default is the plain Cholesky factor.
+    pp = prior(fp(), X, F[:, 1:3])
+    @test pp.chol == prior(fp(; mtx_sqrt = nothing), X, F[:, 1:3]).chol
 end

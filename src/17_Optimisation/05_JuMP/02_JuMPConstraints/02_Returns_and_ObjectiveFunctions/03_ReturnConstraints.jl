@@ -683,7 +683,7 @@ function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::BoxUncertaintySe
 end
 """
     set_ucs_return_constraints!(model, i, ucs::EllipsoidalUncertaintySet, mu, settings,
-                                mtx_sqrt = nothing)
+                                mtx_sqrt = EigenFallbackSquareRoot())
 
 Build one term's ellipsoid-robust return expression.
 
@@ -744,7 +744,7 @@ $(val_dict[:relax])
 """
 function set_ucs_return_constraints!(model::JuMP.Model, i, ucs::EllipsoidalUncertaintySet,
                                      mu::Num_VecNum, settings::JuMPReturnsSettings,
-                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     sc = get_constraint_scale(model)
     w = get_w(model)
     mu = something(ucs.val, mu)

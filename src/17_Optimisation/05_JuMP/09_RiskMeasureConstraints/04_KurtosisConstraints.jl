@@ -25,7 +25,7 @@ algorithm gives the Cholesky factor.
   - [`set_risk_constraints!`](@ref)
 """
 function get_chol_or_Gkt_pm(model::JuMP.Model, pr::HighOrderPrior,
-                            mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+                            mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     if !shared_has(model, :Gkt)
         #=
         #! figure out how to add chol

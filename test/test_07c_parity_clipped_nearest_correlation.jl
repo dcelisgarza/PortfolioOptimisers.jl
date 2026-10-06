@@ -36,7 +36,7 @@ Julia versions of its compat bound share.
 | a constant asset | Better, #1429 |
 | a non-finite entry, a negative variance, an asymmetric input | the same refusals |
 | the symmetry test | Deliberate difference: it reads the correlation matrix, so it does not move with the units |
-| the last result that fails every acceptance | Deliberate difference: a warning, as every `posdef!` gives, where the oracle refuses |
+| the last result that fails every acceptance | Better: it is positive semidefinite to round-off, so it returns with no message where the oracle refuses it. A result that is not raises a `PosdefRepairError` (#1506) |
 
 Better: the alternating projections. The oracle stops after 100 iterations and refuses the input
 when the last iterate is not positive semidefinite to round-off. The iterate has a unit diagonal
@@ -147,10 +147,16 @@ end
     @test !PortfolioOptimisers.posdef_accepts(pdm.alg, p1412_in("Borderline"))
     # A zero variance is left to the zero-row rule of `posdef!`.
     @test !PortfolioOptimisers.posdef_accepts(pdm.alg, p1412_in("ZeroVariance"))
-    # The last result that fails every acceptance warns and is returned, as every `posdef!`
-    # does. An eigenvalue floor this far below the round-off of an 80 x 80 rebuild cannot hold.
+    # An eigenvalue floor this far below the round-off of an 80 x 80 rebuild cannot hold, so
+    # the last result fails every acceptance. The clip makes it positive semidefinite to
+    # round-off: measured smallest eigenvalue -1.7e-15 against the tolerance -3.9e-13, though
+    # it has no Cholesky factor. So it returns with no message, where the oracle refuses it.
     tiny = Posdef(; alg = ClippedNearestCorrelation(; tau = 1e-300))
     Xl = p1412_in("Large")
-    @test_logs (:warn, "Matrix could not be made positive definite.") match_mode = :any posdef(tiny,
-                                                                                               Xl)
+    Yl = @test_logs min_level = Logging.Warn posdef(tiny, Xl)
+    @test !issuccess(cholesky(Symmetric(Yl, :L); check = false))
+    l = eigvals(Symmetric(Yl, :L))
+    @test first(l) >= -length(l) * eps() * maximum(abs, l)
+    # A PSD result with a zero-variance row returns with no message.
+    @test_logs min_level = Logging.Warn posdef(pdm, p1412_in("ZeroVariance"))
 end

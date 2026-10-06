@@ -10,7 +10,7 @@ A square root ``\mathbf{L}`` of a covariance matrix ``\mathbf{\Sigma}`` satisfie
 - [`RidgeCholeskySquareRoot`](@ref) adds a small ridge to the diagonal, and grows it until the Cholesky factor exists.
 - [`EigenFallbackSquareRoot`](@ref) takes the square root of the eigendecomposition of a positive semidefinite matrix, with no ridge.
 
-Each estimator that takes a square root of a covariance holds the algorithm in its field `mtx_sqrt`: [`FactorPrior`](@ref), [`CrossSectionalFactorPrior`](@ref), [`UncertaintySetVariance`](@ref), [`ArithmeticReturn`](@ref), [`RelaxedRiskBudgeting`](@ref), [`Kurtosis`](@ref), [`NegativeSkewness`](@ref) and [`NormBallUncertaintySetAlgorithm`](@ref). The default of each is `nothing`, the plain Cholesky factor, except for [`NegativeSkewness`](@ref), whose matrix is often singular and whose default is [`EigenFallbackSquareRoot`](@ref).
+Each estimator that takes a square root of a covariance holds the algorithm in its field `mtx_sqrt`: [`FactorPrior`](@ref), [`CrossSectionalFactorPrior`](@ref), [`UncertaintySetVariance`](@ref), [`ArithmeticReturn`](@ref), [`RelaxedRiskBudgeting`](@ref), [`Kurtosis`](@ref), [`NegativeSkewness`](@ref) and [`NormBallUncertaintySetAlgorithm`](@ref). The default of each is [`EigenFallbackSquareRoot`](@ref): the plain Cholesky factor of a positive definite matrix, and the square root of the eigendecomposition of a singular positive semidefinite one. [`RidgeCholeskySquareRoot`](@ref) and `nothing`, the plain Cholesky factor that refuses a matrix that is not positive definite, are one keyword away.
 
 ```@docs
 AbstractMatrixSquareRootAlgorithm

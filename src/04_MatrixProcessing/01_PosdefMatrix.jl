@@ -127,7 +127,7 @@ Where:
  4. When `higham` is `true`, replace `C` with the last iterate of [`higham_alternating_projections`](@ref).
  5. Take the eigen decomposition of `C` once.
  6. For `tau` and then `10 * tau`: clip the eigenvalues, rebuild `Y`, scale its diagonal to one, scale it back to a covariance, symmetrise it, restore the variances, and return it when [`clipped_repair_holds`](@ref) accepts it.
- 7. Warn when the last result has no Cholesky factor, or when its smallest eigenvalue is below `-n * eps * max|λ|`. The last result is returned either way, as [`posdef!`](@ref) returns an unrepaired matrix.
+ 7. Return the last result when its smallest eigenvalue is at least `-n * eps * max|λ|`, and refuse it with a [`PosdefRepairError`](@ref) otherwise, as [`assert_posdef_repair`](@ref) states. A last result with no Cholesky factor is returned with no message when it passes this test.
 
 # Fields
 
@@ -285,7 +285,9 @@ In-place projection of a matrix to the nearest positive definite matrix using th
 
 For matrices without unit diagonal, the function converts them into correlation matrices i.e. matrices with unit diagonal, applies the algorithm, and rescales them back.
 
-A variance that is exactly zero belongs to a constant variable, and it keeps a zero row and column. The repair runs on the block of positive variances, so the result is positive semidefinite and not positive definite. No warning comes for the zero rows, because they are the correct answer.
+A variance that is exactly zero belongs to a constant variable, and it keeps a zero row and column. The repair runs on the block of positive variances, so the result is positive semidefinite and not positive definite. No message comes for the zero rows, because they are the correct answer.
+
+A repair whose result is positive semidefinite to round-off returns it with no message, singular or not. A repair whose result is not raises a [`PosdefRepairError`](@ref), as [`assert_posdef_repair`](@ref) states, so no consumer reads a matrix with a negative variance in some direction.
 
 # Mathematical definition
 
@@ -312,7 +314,7 @@ A zero variance has no correlation, so it cannot be standardised. The projection
 
  1. Check that `X` is square.
  2. Return `X` unchanged when [`posdef_accepts`](@ref) accepts it under `pdm.alg`. For an algorithm of `NearestCorrelationMatrix.jl` the test is `isposdef`, and [`ClippedNearestCorrelation`](@ref) brings its own test and its refusals.
- 3. Set the zero-variance rows and columns of `X` to zero with [`zero_variance_rows!`](@ref). When there is such a row, repair the block of positive variances with a recursive call, write the block back, and return `X`. The recursive call warns only when the block stays not positive definite. A matrix with a zero variance never passes the test of step 2, so this step is always reached for it.
+ 3. Set the zero-variance rows and columns of `X` to zero with [`zero_variance_rows!`](@ref). When there is such a row, repair the block of positive variances with a recursive call, write the block back, and return `X`. The recursive call refuses only a repaired block that is not positive semidefinite to round-off. A matrix with a zero variance never passes the test of step 2, so this step is always reached for it.
  4. Repair `X` with [`posdef_repair!`](@ref) under `pdm.alg` and the keyword arguments `pdm.kwargs`, and return `X`.
 
 # Arguments
@@ -328,6 +330,7 @@ A zero variance has no correlation, so it cannot be standardised. The projection
 
   - `X` is validated with [`assert_matrix_issquare`](@ref) before any other step.
   - [`ClippedNearestCorrelation`](@ref) refuses a non-finite entry, a negative variance and a matrix that is not symmetric, as [`posdef_accepts`](@ref) states.
+  - A repaired matrix is positive semidefinite to round-off, which raises a [`PosdefRepairError`](@ref) through [`posdef_repair!`](@ref).
 
 # Returns
 
@@ -381,7 +384,7 @@ function posdef!(pdm::Posdef, X::MatNum)
         return X
     end
     # A zero variance forces a zero row and column, so only the positive block is repaired.
-    # The recursive call warns when that block stays indefinite, never for the zero rows.
+    # The recursive call refuses a repaired block that is not PSD, never the zero rows.
     p = zero_variance_rows!(X, trues(size(X, 1)))
     if !all(p)
         block = X[p, p]
@@ -502,20 +505,24 @@ The method Julia selects on the type of `alg` is the algorithm.
  1. Any algorithm but [`ClippedNearestCorrelation`](@ref), which is an algorithm of `NearestCorrelationMatrix.jl`:
      1. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
      2. Project `X` onto the nearest correlation matrix with `NearestCorrelationMatrix.nearest_cor!`, under `alg` and `kwargs`.
-     3. Warn when the projected `X` is still not positive definite. `X` is returned either way, so the caller must check the result when it cannot tolerate an unrepaired matrix.
-     4. When step 1 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 1, so the original diagonal returns up to rounding.
+     3. When step 1 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 1, so the original diagonal returns up to rounding.
+     4. Check `X` with [`assert_posdef_repair`](@ref), and return it.
  2. [`ClippedNearestCorrelation`](@ref), whose `# Mathematical definition` states the formulas:
      1. Read the variances `v` and the standard deviations `s`, and standardise `X` into `C` with [`clipped_correlation`](@ref).
      2. When `alg.higham` is `true`, replace `C` with the result of [`higham_alternating_projections`](@ref).
      3. Take the eigen decomposition `E` of `C`.
      4. For `tau` equal to `alg.tau` and then `10 * alg.tau`: clip the eigenvalues of `E` at `tau` into `Y`, scale the diagonal of `Y` to one, write `S = Y .* s' .* s` symmetrised into `X`, set the diagonal of `X` to `v`, and return `X` when [`clipped_repair_holds`](@ref) accepts `X` and `Y`.
-     5. Warn when the last `X` has no Cholesky factor, or when its smallest eigenvalue is below `-n * eps * max|λ|`, and return `X`.
+     5. Check the last `X` with [`assert_posdef_repair`](@ref), and return it. The clip makes a positive semidefinite matrix, so a last `X` with no Cholesky factor passes when its smallest eigenvalue is a round-off below zero.
 
 # Arguments
 
   - `alg`: The algorithm of [`Posdef`](@ref).
   - $(arg_dict[:sigrhoX])
   - `kwargs...`: The keyword arguments of `NearestCorrelationMatrix.nearest_cor!`. [`ClippedNearestCorrelation`](@ref) reads none, and [`Posdef`](@ref) refuses them with it.
+
+# Validation
+
+  - The repaired `X` is positive semidefinite to round-off, which raises a [`PosdefRepairError`](@ref) through [`assert_posdef_repair`](@ref).
 
 # Returns
 
@@ -525,6 +532,7 @@ The method Julia selects on the type of `alg` is the algorithm.
 
   - [`posdef!`](@ref)
   - [`posdef_accepts`](@ref)
+  - [`assert_posdef_repair`](@ref)
   - [`ClippedNearestCorrelation`](@ref)
 """
 function posdef_repair!(alg, X::MatNum; kwargs...)
@@ -535,12 +543,10 @@ function posdef_repair!(alg, X::MatNum; kwargs...)
         StatsBase.cov2cor!(X, s)
     end
     NearestCorrelationMatrix.nearest_cor!(X, alg; kwargs...)
-    if !LinearAlgebra.isposdef(X)
-        @warn("Matrix could not be made positive definite.")
-    end
     if iscov
         StatsBase.cor2cov!(X, s)
     end
+    assert_posdef_repair(alg, X)
     return X
 end
 function posdef_repair!(alg::ClippedNearestCorrelation, X::MatNum; kwargs...)
@@ -563,12 +569,7 @@ function posdef_repair!(alg::ClippedNearestCorrelation, X::MatNum; kwargs...)
             return X
         end
     end
-    l = LinearAlgebra.eigvals(LinearAlgebra.Symmetric(X, :L))
-    chol = LinearAlgebra.cholesky(LinearAlgebra.Symmetric(X, :L); check = false)
-    if !(LinearAlgebra.issuccess(chol) &&
-         first(l) >= -length(l) * eps(eltype(l)) * maximum(abs, l))
-        @warn("Matrix could not be made positive definite.")
-    end
+    assert_posdef_repair(alg, X)
     return X
 end
 """
@@ -652,6 +653,65 @@ function clipped_repair_holds(alg::ClippedNearestCorrelation, X::MatNum, C::MatN
     return LinearAlgebra.issuccess(chol) &&
            LinearAlgebra.eigmin(LinearAlgebra.Symmetric(C, :L)) >= alg.tau / 2 &&
            LinearAlgebra.eigmin(LinearAlgebra.Symmetric(X, :L)) > 0
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Check that the result `X` of a repair under the algorithm `alg` of [`Posdef`](@ref) is positive semidefinite to round-off, and refuse it otherwise.
+
+Both methods of [`posdef_repair!`](@ref) end with this check. A singular result, such as a covariance with a perfectly correlated pair, passes it, so a repair that reaches a valid covariance returns with no message. The tolerance is the one that [`EigenFallbackSquareRoot`](@ref) applies before it takes the square root, so every result that passes has a square root under the default of `mtx_sqrt`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\lambda_{\\min}(\\mathbf{X}) &\\geq -N \\varepsilon \\max_{i} \\lvert \\lambda_{i} \\rvert\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\lambda_{\\min}(\\mathbf{X})``, ``\\lambda_{i}``: Smallest eigenvalue and ``i``-th eigenvalue of the lower triangle of `X`, read as a symmetric matrix.
+  - ``N``: Number of rows of `X`.
+  - $(math_dict[:eps_machine])
+
+# Algorithm
+
+ 1. Refuse `X` when an entry is not finite.
+ 2. Take the eigenvalues of the lower triangle of `X`, read as a symmetric matrix.
+ 3. Return `nothing` when the smallest eigenvalue is at least the tolerance of `# Mathematical definition`.
+ 4. Refuse `X` otherwise.
+
+# Arguments
+
+  - `alg`: The algorithm of [`Posdef`](@ref) that made `X`. The message names it.
+  - $(arg_dict[:sigrhoX])
+
+# Validation
+
+  - `all(isfinite, X)`, which raises a [`PosdefRepairError`](@ref).
+  - The inequality of `# Mathematical definition`, which raises a [`PosdefRepairError`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`posdef_repair!`](@ref)
+  - [`PosdefRepairError`](@ref)
+  - [`matrix_square_root`](@ref)
+"""
+function assert_posdef_repair(alg, X::MatNum)::Nothing
+    if !all(isfinite, X)
+        throw(PosdefRepairError("the repair of `$(alg)` must give a matrix whose entries are finite, but $(count(!isfinite, X)) of them are not"))
+    end
+    l = LinearAlgebra.eigvals(LinearAlgebra.Symmetric(X, :L))
+    tol = -length(l) * eps(eltype(l)) * maximum(abs, l)
+    if first(l) >= tol
+        return nothing
+    end
+    return throw(PosdefRepairError("the repair of `$(alg)` must give a matrix whose smallest eigenvalue is at least $(tol), but it is $(first(l))"))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

@@ -634,7 +634,7 @@ ExpectedReturn
            │            │     mic ┴ Bool: true
            │        ucs ┼ nothing
            │         mu ┼ nothing
-           │   mtx_sqrt ┴ nothing
+           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
 ```
 
 # Related
@@ -777,7 +777,7 @@ ExpectedReturnRiskRatio
            │            │     mic ┴ Bool: true
            │        ucs ┼ nothing
            │         mu ┼ nothing
-           │   mtx_sqrt ┴ nothing
+           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
         rk ┼ Variance
            │   settings ┼ RiskMeasureSettings
            │            │   scale ┼ Float64: 1.0

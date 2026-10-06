@@ -203,7 +203,7 @@ MeanRisk
       │           │            │     mic ┴ Bool: true
       │           │        ucs ┼ nothing
       │           │         mu ┼ nothing
-      │           │   mtx_sqrt ┴ nothing
+      │           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
       │       sca ┼ SumScalariser()
       │      ccnt ┼ nothing
       │      cobj ┼ nothing

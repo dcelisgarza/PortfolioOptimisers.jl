@@ -46,10 +46,10 @@ $(DocStringExtensions.FIELDS)
         val::Option{<:ArrNum} = nothing
     ) -> NormBallUncertaintySet
     NormBallUncertaintySet(ucs::EllipsoidalUncertaintySet,
-                           mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+                           mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
         -> NormBallUncertaintySet
 
-Keywords correspond to the struct's fields. The second constructor converts a built [`EllipsoidalUncertaintySet`](@ref) with one square root at construction time: `L = matrix_square_root(mtx_sqrt, ucs.sigma)`, `p = 2`, and `kappa`, `class` and `val` carried through from `k`, `class` and `val`. It is the route through which every estimator that emits an ellipsoid reaches this type. `mtx_sqrt = nothing` takes the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. At `p = 2` the set reads `L` only through ``\\mathbf{L}\\mathbf{L}^{\\intercal}``, so the eigen square root of a singular shape gives the same set as the ellipsoid.
+Keywords correspond to the struct's fields. The second constructor converts a built [`EllipsoidalUncertaintySet`](@ref) with one square root at construction time: `L = matrix_square_root(mtx_sqrt, ucs.sigma)`, `p = 2`, and `kappa`, `class` and `val` carried through from `k`, `class` and `val`. It is the route through which every estimator that emits an ellipsoid reaches this type. The default `mtx_sqrt = EigenFallbackSquareRoot()` takes the Cholesky factor where it exists, and the square root of the eigendecomposition of a singular positive semidefinite matrix otherwise. `mtx_sqrt = nothing` takes the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. At `p = 2` the set reads `L` only through ``\\mathbf{L}\\mathbf{L}^{\\intercal}``, so the eigen square root of a singular shape gives the same set as the ellipsoid.
 
 ## Validation
 
@@ -139,7 +139,7 @@ function NormBallUncertaintySet(; kappa::Number, L::MatNum, p::Number = 2,
     return NormBallUncertaintySet(kappa, L, p, class, val)
 end
 function NormBallUncertaintySet(ucs::EllipsoidalUncertaintySet,
-                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)::NormBallUncertaintySet
+                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::NormBallUncertaintySet
     return NormBallUncertaintySet(ucs.k, matrix_square_root(mtx_sqrt, ucs.sigma), 2,
                                   ucs.class, ucs.val)
 end
@@ -416,7 +416,7 @@ The map is square. It is of full column rank when `cov` reaches this method repa
 
 # Validation
 
-  - When `diagonal` is `false`, `cov` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`. The asymptotic covariance of a covariance, ``T (\\mathbf{I} + \\mathbf{K}) (\\mathbf{\\Sigma}_{\\mu} \\otimes \\mathbf{\\Sigma}_{\\mu})``, has rank ``N(N+1)/2`` of ``N^{2}``, so with `pdm = nothing` the plain Cholesky factor refuses it.
+  - When `diagonal` is `false`, `cov` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`. The asymptotic covariance of a covariance, ``T (\\mathbf{I} + \\mathbf{K}) (\\mathbf{\\Sigma}_{\\mu} \\otimes \\mathbf{\\Sigma}_{\\mu})``, has rank ``N(N+1)/2`` of ``N^{2}``, so with `pdm = nothing` the plain Cholesky factor refuses it, and the default eigen square root reads it.
 
 # Returns
 
@@ -430,7 +430,7 @@ The map is square. It is of full column rank when `cov` reaches this method repa
   - [`norm_ball_set`](@ref)
 """
 function norm_ball_factor(diagonal::Bool, cov::MatNum,
-                          mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+                          mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     return if diagonal
         LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(cov)))
     else

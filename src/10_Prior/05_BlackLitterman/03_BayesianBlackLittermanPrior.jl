@@ -150,7 +150,7 @@ BayesianBlackLittermanPrior
              │            │           w ┼ nothing
              │            │   corrected ┴ Bool: true
              │        rsd ┼ Bool: true
-             │   mtx_sqrt ┴ nothing
+             │   mtx_sqrt ┴ EigenFallbackSquareRoot()
         f_mp ┼ MatrixProcessing
              │     pdm ┼ Posdef
              │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton

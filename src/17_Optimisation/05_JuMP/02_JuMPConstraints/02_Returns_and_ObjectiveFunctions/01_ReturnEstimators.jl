@@ -210,7 +210,7 @@ $(DocStringExtensions.FIELDS)
         settings::JuMPReturnsSettings = JuMPReturnsSettings(),
         ucs::Option{<:UcSE_UcS} = nothing,
         mu::Option{<:ArithRetMu} = nothing,
-        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot()
     ) -> ArithmeticReturn
 
 Keywords correspond to the struct's fields.
@@ -251,7 +251,7 @@ Keywords correspond to the struct's fields.
     """
     mu
     """
-    Square-root algorithm of the matrix of an [`EllipsoidalUncertaintySet`](@ref) in `ucs`, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. The other sets read no square root.
+    Square-root algorithm of the matrix of an [`EllipsoidalUncertaintySet`](@ref) in `ucs`, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. The default takes the square root of the eigendecomposition of a singular positive semidefinite matrix. [`matrix_square_root`](@ref) states each algorithm. The other sets read no square root.
     """
     mtx_sqrt
     function ArithmeticReturn(settings::JuMPReturnsSettings, ucs::Option{<:UcSE_UcS},
@@ -282,7 +282,7 @@ end
 function ArithmeticReturn(; settings::JuMPReturnsSettings = JuMPReturnsSettings(),
                           ucs::Option{<:UcSE_UcS} = nothing,
                           mu::Option{<:ArithRetMu} = nothing,
-                          mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+                          mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     return ArithmeticReturn(settings, ucs, mu, mtx_sqrt)
 end
 """

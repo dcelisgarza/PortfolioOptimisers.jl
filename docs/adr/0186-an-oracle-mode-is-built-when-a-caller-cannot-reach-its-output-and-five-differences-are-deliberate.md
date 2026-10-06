@@ -32,7 +32,7 @@ keyword away.
 
 | Mode of the oracle | The library | Why |
 | --- | --- | --- |
-| A nearest-correlation repair by clipping the correlation eigenvalues at `1e-13`, with one retry at `1e-12` | `Posdef(Newton)` in `f_mp` and `mp` stays the default. The oracle's repair is `ClippedNearestCorrelation`, an algorithm that `Posdef` takes and that owns its acceptance test (#1412). It differs in three places: alternating projections that have not converged after `iter` iterations go on to the clip where the oracle refuses the input, a last result that fails every acceptance warns as every `posdef!` does, and the symmetry test reads the correlation matrix so that it does not move with the units. | Newton gives the nearest correlation matrix in the Frobenius norm. The oracle's clip is a cheaper approximation of it, and a caller who wants the oracle's numbers selects it. |
+| A nearest-correlation repair by clipping the correlation eigenvalues at `1e-13`, with one retry at `1e-12` | `Posdef(Newton)` in `f_mp` and `mp` stays the default. The oracle's repair is `ClippedNearestCorrelation`, an algorithm that `Posdef` takes and that owns its acceptance test (#1412). It differs in three places: alternating projections that have not converged after `iter` iterations go on to the clip where the oracle refuses the input, a last result that fails every acceptance is returned when it is positive semidefinite to round-off, where the oracle refuses it, and the symmetry test reads the correlation matrix so that it does not move with the units. | Newton gives the nearest correlation matrix in the Frobenius norm. The oracle's clip is a cheaper approximation of it, and a caller who wants the oracle's numbers selects it. |
 | An inactive-cell policy stored on each field: `NaN`, zero, or the value left as it is | Fields stay finite, and every consumer reads the masks. A read of a field takes the policy as an argument, so the caller chooses it for each read. | ADR 0102 rules that a numeric field's values stay finite. Every computed output keeps the oracle's capability: the descriptors write `NaN` on an inactive cell, and the weights are built over the estimation universe. The one view the oracle gives, a field with its inactive cells blanked, becomes a read, not a stored state. |
 | A warning when the regime half-life exceeds 138 observations | The `regime_decay` docstring states the threshold `2^(-1/138)` and its effect | The rule of #1282: the docstring states the condition, and the measure does not change its behaviour. The numbers are the same; only the message at run time differs. |
 | An integer `cv`, which means K-fold with that many folds | `cv = KFold(; n)` | No field or verb of the library takes an integer as a short form for an estimator. |
@@ -50,19 +50,40 @@ The library took the square root of a covariance by three unnamed policies: a ba
 throws, `covariance_factor` (a Cholesky, else an exact eigen square root of a positive semidefinite
 matrix), and `safe_regime_cholesky` (a Cholesky with a ridge that grows tenfold over three tries,
 which is the oracle's policy). An algorithm type now names the last two, and a field on
-`CrossSectionalFactorPrior` and `FactorPrior` selects one. The field defaults to `nothing`, which
-keeps the bare Cholesky that throws. With the default repair on, all three agree, because the
-matrix reaches the Cholesky positive definite. They differ only when a caller turns the repair off
-or the repair fails.
+`CrossSectionalFactorPrior` and `FactorPrior` selects one. The field defaults to
+`EigenFallbackSquareRoot()`, and `nothing` keeps the bare Cholesky that throws. With the default
+repair on, all three agree, because the matrix reaches the Cholesky positive definite. They differ
+only when a caller turns the repair off.
 
 Issue #1410 gave the field, named `mtx_sqrt`, to every estimator that takes a square root of a
 covariance, and removed `covariance_factor`, which `matrix_square_root` supersedes. The owners are
 the two factor priors, `Variance`, `StandardDeviation`, `DistributionValueatRisk`,
 `UncertaintySetVariance`, `ArithmeticReturn`, `RelaxedRiskBudgeting`, `Kurtosis`,
-`NegativeSkewness` and `NormBallUncertaintySetAlgorithm`. A default keeps what the site did before:
-`nothing` where it took the bare Cholesky, and `EigenFallbackSquareRoot()` where it took
-`covariance_factor` or `sqrt(V)`. A square root that feeds only a second-order cone needs
-`G' G = Σ`, so a singular positive semidefinite matrix is valid input there. Four sites keep a bare
+`NegativeSkewness` and `NormBallUncertaintySetAlgorithm`. Every one of them defaults to
+`EigenFallbackSquareRoot()`, and the oracle's ridge, `RidgeCholeskySquareRoot()`, and the bare
+Cholesky, `nothing`, are one keyword away. A square root that feeds only a second-order cone needs
+`G' G = Σ`, so a singular positive semidefinite matrix is valid input there.
+
+The eigen square root is the default because it is the only one of the three that is exact on
+every valid input. On a positive definite matrix it returns the plain lower Cholesky factor, so no
+value changes where the bare Cholesky succeeds. On a positive semidefinite matrix of lower rank it
+returns `V max(Λ, 0)^(1/2)`, and `L L' = Σ` holds to round-off. The ridge returns the root of a
+different matrix, `Σ + 1e-12 s I`. A bare Cholesky of a singular matrix succeeds only by
+round-off, so the pivot of the null direction carries no information. The eigen square root still
+refuses an indefinite matrix and a matrix that is not Hermitian, so it hides no data error.
+
+### A repair returns a positive semidefinite matrix or refuses
+
+Every repair of `Posdef` ends with one test: the smallest eigenvalue of the result is at least
+`-n eps max|λ|`, the tolerance of the eigen square root. A result that passes returns with no
+message, singular or not. A result that fails raises a `PosdefRepairError` that names the
+algorithm, the smallest eigenvalue and the tolerance. A repair returns a matrix that a consumer
+factorises or optimises over, and a matrix below the tolerance has a negative variance in some
+direction, so a warning before the return would leave the defect in the output. A message on a
+result that passes is noise: the Newton repair warned on the singular result of a zero-variance
+row, and the clip warned on a result whose smallest eigenvalue is a round-off below zero. The
+clip makes a positive semidefinite matrix by construction, so its refusal guards against round-off
+alone. Four sites keep a bare
 Cholesky with a documented refusal, because each needs an inverse, which a singular matrix does
 not have: the whitening of the radial tail calibration, the QLIKE of the covariance forecast
 evaluation, the geodesic shrinkage target, and the Gram matrix of `GramProjection`.

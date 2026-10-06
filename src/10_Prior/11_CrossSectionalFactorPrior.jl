@@ -337,7 +337,7 @@ $(DocStringExtensions.FIELDS)
                               c::Num_OrthFcScaleCal = 1.0,
                               ofit::AbstractOrthogonalForecastFit = ScoreNeutralisation(),
                               lx::Option{<:AbstractString} = nothing,
-                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
+                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                               ex::FLoops.Transducers.Executor = ThreadedEx(),
                               choice::AbstractChoiceRule = BatchChoice(),
                               cache::Option{<:AbstractPartialFitState} = nothing) -> CrossSectionalFactorPrior
@@ -609,7 +609,7 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    c::Num_OrthFcScaleCal = 1.0,
                                    ofit::AbstractOrthogonalForecastFit = ScoreNeutralisation(),
                                    lx::Option{<:AbstractString} = nothing,
-                                   mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
+                                   mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                    choice::AbstractChoiceRule = BatchChoice(),
                                    cache::Option{<:AbstractPartialFitState} = nothing)::CrossSectionalFactorPrior

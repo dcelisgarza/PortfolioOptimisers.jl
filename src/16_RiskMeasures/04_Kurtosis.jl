@@ -74,7 +74,7 @@ $(DocStringExtensions.FIELDS)
         alg1::AbstractMomentAlgorithm = FullMoment(),
         alg2::SecondMomentFormulation = SOCRiskExpr(),
         pe::Option{<:AbstractPriorEstimator} = nothing,
-        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
     ) -> Kurtosis
 
 Keywords correspond to the struct's fields.
@@ -133,7 +133,7 @@ Kurtosis
       alg1 ┼ FullMoment()
       alg2 ┼ SOCRiskExpr()
         pe ┼ nothing
-  mtx_sqrt ┴ nothing
+  mtx_sqrt ┴ EigenFallbackSquareRoot()
 ```
 
 # Related
@@ -189,7 +189,7 @@ Kurtosis
     """
     pe
     """
-    Square-root algorithm of the projected co-kurtosis matrix ``\\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal`` that the exact formulation reads, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. A sample co-kurtosis of ``T`` observations has rank at most ``T``, so the projected matrix is singular when ``N(N+1)/2 > T`` and no matrix processing repairs it. [`matrix_square_root`](@ref) states each algorithm. The approximate formulation reads no square root.
+    Square-root algorithm of the projected co-kurtosis matrix ``\\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal`` that the exact formulation reads, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. A sample co-kurtosis of ``T`` observations has rank at most ``T``, so the projected matrix is singular when ``N(N+1)/2 > T`` and no matrix processing repairs it. The default takes the square root of the eigendecomposition of such a matrix. [`matrix_square_root`](@ref) states each algorithm. The approximate formulation reads no square root.
     """
     mtx_sqrt
     function Kurtosis(settings::RiskMeasureSettings, w::Option{<:ObsWeights},
@@ -233,7 +233,7 @@ function Kurtosis(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   alg1::AbstractMomentAlgorithm = FullMoment(),
                   alg2::SecondMomentFormulation = SOCRiskExpr(),
                   pe::Option{<:AbstractPriorEstimator} = nothing,
-                  mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)::Kurtosis
+                  mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::Kurtosis
     return Kurtosis(settings, w, mu, kt, N, alg1, alg2, pe, mtx_sqrt)
 end
 """

@@ -928,7 +928,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
 end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncertaintySet,
                                 sigma::MatNum,
-                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing;
+                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot();
                                 prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     W = set_sdp_constraints!(model; prefix = prefix)

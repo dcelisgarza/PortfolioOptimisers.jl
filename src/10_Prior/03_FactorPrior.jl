@@ -17,7 +17,7 @@ $(DocStringExtensions.FIELDS)
         re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
         ve::AbstractVarianceEstimator = SimpleVariance(),
         rsd::Bool = true,
-        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> FactorPrior
 
@@ -96,7 +96,7 @@ FactorPrior
            │           w ┼ nothing
            │   corrected ┴ Bool: true
        rsd ┼ Bool: true
-  mtx_sqrt ┴ nothing
+  mtx_sqrt ┴ EigenFallbackSquareRoot()
 ```
 
 ## The incremental fit
@@ -167,7 +167,7 @@ function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(
                      mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                      re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
                      ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true,
-                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
+                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                      cache::Option{<:AbstractPartialFitState} = nothing)::FactorPrior
     return FactorPrior(pe, mp, re, ve, rsd, mtx_sqrt, cache)
 end
@@ -276,7 +276,7 @@ end
     factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
                 rsd::Bool, rr::AbstractLoadingsRegressionResult, f_mu::VecNum, f_sigma::MatNum,
                 X::MatNum, posterior_X::MatNum;
-                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
+                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                 kwargs...) -> NamedTuple
 
 Project factor moments onto the asset axis through the regression loadings.
@@ -304,7 +304,7 @@ Where:
   - ``\\mathbf{\\Sigma}_f``: ``K \\times K`` factor covariance matrix, `f_sigma`.
   - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal matrix of residual variances, present only when `rsd` is `true`.
 
-The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\mathbf{\\Sigma}_\\varepsilon^{1/2}]``, where ``\\mathbf{L}_f`` is the square root of ``\\mathbf{\\Sigma}_f`` that [`matrix_square_root`](@ref) takes under `mtx_sqrt`, the lower Cholesky factor by default. It is therefore ``(K + N) \\times N`` when `rsd` is `true`, and ``K \\times N`` when `rsd` is `false`, the residual block being absent from `chol` and from ``\\hat{\\mathbf{\\Sigma}}`` alike.
+The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\mathbf{\\Sigma}_\\varepsilon^{1/2}]``, where ``\\mathbf{L}_f`` is the square root of ``\\mathbf{\\Sigma}_f`` that [`matrix_square_root`](@ref) takes under `mtx_sqrt`. By default it is the lower Cholesky factor of a positive definite matrix, and the eigen square root of a singular one. It is therefore ``(K + N) \\times N`` when `rsd` is `true`, and ``K \\times N`` when `rsd` is `false`, the residual block being absent from `chol` and from ``\\hat{\\mathbf{\\Sigma}}`` alike.
 
 ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma}}`` holds **before** matrix processing, and that qualifier is load-bearing. `chol` is built from the `f_sigma` the caller passed, so step 4 of the algorithm rewrites `sigma` without rewriting `chol`. Under an `mp` that leaves the projected covariance where it found it — which the default [`MatrixProcessing`](@ref) does, its `pdm` being a no-op on a matrix that is already positive semi-definite — the two agree and the identity holds on the returned pair. Under an `mp` that denoises or detones, `sigma` moves and `chol` stays behind, so the identity holds against the unprocessed covariance alone. A consumer that needs a factor of the returned `sigma` must refactorise it.
 
@@ -349,7 +349,7 @@ The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\ma
 function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVarianceEstimator,
                      rsd::Bool, rr::AbstractLoadingsRegressionResult, f_mu::VecNum,
                      f_sigma::MatNum, X::MatNum, posterior_X::MatNum;
-                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing,
+                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                      kwargs...)
     (; b, M) = rr
     posterior_mu = M * f_mu + b

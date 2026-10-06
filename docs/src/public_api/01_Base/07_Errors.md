@@ -16,5 +16,6 @@ PropertyPathError
 ConflictingArgumentError
 ObservationWeightsError
 NonPositiveWealthError
+PosdefRepairError
 Base.showerror(io::IO, err::PortfolioOptimisersError)
 ```

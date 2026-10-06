@@ -1434,7 +1434,7 @@ $(DocStringExtensions.FIELDS)
         method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
         diagonal::Bool = true,
         p::Number = 2,
-        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot()
     ) -> NormBallUncertaintySetAlgorithm
 
 Keywords correspond to the struct's fields.
@@ -1452,7 +1452,7 @@ NormBallUncertaintySetAlgorithm
            │   ambient ┴ Bool: false
   diagonal ┼ Bool: true
          p ┼ Int64: 2
-  mtx_sqrt ┴ nothing
+  mtx_sqrt ┴ EigenFallbackSquareRoot()
 ```
 
 # Related
@@ -1484,7 +1484,7 @@ NormBallUncertaintySetAlgorithm
     """
     p
     """
-    Square-root algorithm of the full asymptotic covariance that gives the geometry map, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. The covariance of the covariance is singular by construction and positive definite only after the repair of `pdm`. A [`NormalKUncertaintyAlgorithm`](@ref) radius solves with the map, so it needs a map of full rank: a ridge gives one, and the eigen square root of a singular matrix does not. A diagonal shape reads no square root.
+    Square-root algorithm of the full asymptotic covariance that gives the geometry map, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. The covariance of the covariance is singular by construction and positive definite only after the repair of `pdm`. The default takes the square root of its eigendecomposition when the repair is off. A [`NormalKUncertaintyAlgorithm`](@ref) radius solves with the map, so it needs a map of full rank: a ridge gives one, and the eigen square root of a singular matrix does not, so that radius raises a `LinearAlgebra.SingularException`. A diagonal shape reads no square root.
     """
     mtx_sqrt
     function NormBallUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool, p::Number,
@@ -1498,7 +1498,7 @@ NormBallUncertaintySetAlgorithm
 end
 function NormBallUncertaintySetAlgorithm(; method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
                                          diagonal::Bool = true, p::Number = 2,
-                                         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)::NormBallUncertaintySetAlgorithm
+                                         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::NormBallUncertaintySetAlgorithm
     return NormBallUncertaintySetAlgorithm(method, diagonal, p, mtx_sqrt)
 end
 """

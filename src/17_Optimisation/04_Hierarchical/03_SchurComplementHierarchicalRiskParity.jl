@@ -983,7 +983,7 @@ This method takes a [`NonMonotonicSchurComplement`](@ref) bundle. The [`Monotoni
 
 # Validation
 
-  - With `params.flag` true, a repair that throws, for example on a negative diagonal entry, is rethrown as an `ArgumentError` that names `gamma`. A repair that only warns lets the recursion continue.
+  - With `params.flag` true, a repair that throws, for example on a negative diagonal entry, is rethrown as an `ArgumentError` that names `gamma`. A repair that returns a matrix that is positive semidefinite to round-off lets the recursion continue, and [`posdef!`](@ref) refuses every other result with a [`PosdefRepairError`](@ref), which is rethrown the same way.
 
 # Returns
 

@@ -301,13 +301,30 @@ end
                                                                                                                             (;
                                                                                                                              iterations = 0))
     end
-    @testset "Ticket 447: posdef! warns and returns the unrepaired matrix" begin
+    @testset "Ticket 1506: a repair refuses a result that is not PSD, and returns one that is" begin
+        # The stub leaves the indefinite matrix as it is, so the repair cannot return it.
         X = [1.0 2.0; 2.0 1.0]
         est = Posdef(; alg = Ticket447Stub(), kwargs = (; ensure_pd = false))
-        r = @test_logs (:warn, "Matrix could not be made positive definite.") posdef!(est,
-                                                                                      copy(X))
-        @test r == X
-        @test !LinearAlgebra.isposdef(r)
+        @test_throws PosdefRepairError posdef!(est, copy(X))
+        err = try
+            posdef!(est, copy(X))
+        catch e
+            e
+        end
+        # The message names the algorithm, the tolerance and the smallest eigenvalue, -1.
+        @test occursin("Ticket447Stub", err.msg)
+        @test occursin("but it is -1.0", err.msg)
+        @test_throws PosdefRepairError PortfolioOptimisers.assert_posdef_repair(Ticket447Stub(),
+                                                                                [1.0 NaN;
+                                                                                 NaN 1.0])
+        # A singular PSD result is a valid covariance, though `isposdef` is false on it. The
+        # stub returns its input, so the generic arm meets the singular result itself, as a
+        # correlation and as a covariance, and returns it with no message.
+        for S in ([1.0 1.0; 1.0 1.0], [4.0 2.0; 2.0 1.0])
+            @test !LinearAlgebra.isposdef(S)
+            r = @test_logs min_level = Logging.Warn posdef!(est, copy(S))
+            @test r == S
+        end
     end
     @testset "Ticket 1429: a zero variance keeps a zero row, and the rest is repaired" begin
         # A PSD matrix with a zero diagonal entry has a zero row and column (every 2x2 minor
@@ -338,12 +355,10 @@ end
         # The test is `iszero`: a tiny variance is positive and stays in the block.
         @test PortfolioOptimisers.zero_variance_rows!([1e-34 0.0; 0.0 1.0], trues(2)) ==
               [true, true]
-        # The warning still comes when the positive block stays indefinite.
+        # The refusal still comes when the positive block stays indefinite.
         est = Posdef(; alg = Ticket447Stub(), kwargs = (; ensure_pd = false))
         W = [1.0 0.0 2.0; 0.0 0.0 0.0; 2.0 0.0 1.0]
-        w = @test_logs (:warn, "Matrix could not be made positive definite.") posdef!(est,
-                                                                                      copy(W))
-        @test w == W
+        @test_throws PosdefRepairError posdef!(est, copy(W))
     end
     @testset "Ticket 1429: the block repair leaves a zero variance out of every step" begin
         # Denoise and Detone each convert to a correlation, so a zero variance broke them as it

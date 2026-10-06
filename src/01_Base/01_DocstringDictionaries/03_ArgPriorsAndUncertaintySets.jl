@@ -36,7 +36,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :f_views_conf => "`f_views_conf`: Factor views confidence estimator or result.",#
                  :rsd => "`rsd`: Whether to include residual variance in the posterior covariance.",#
                  :f_mp => "`f_mp`: Factor matrix processing estimator.",#
-                 :mtx_sqrt => "`mtx_sqrt`: Square-root algorithm of the factor covariance, and of a full idiosyncratic covariance, whose square roots make up `chol`, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm.",#
+                 :mtx_sqrt => "`mtx_sqrt`: Square-root algorithm of the factor covariance, and of a full idiosyncratic covariance, whose square roots make up `chol`. The default [`EigenFallbackSquareRoot`](@ref) takes the Cholesky factor where it exists, and the eigen square root of a singular positive semidefinite matrix otherwise. [`RidgeCholeskySquareRoot`](@ref) takes the Cholesky factor of the matrix with a small ridge added, and `nothing` takes the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm.",#
                  :re => "`re`: Regression estimator.",#
                  :pes => "`pes`: Vector of prior estimators.",#
                  :pe1 => "`pe1`: Pre-processing prior estimator.",#

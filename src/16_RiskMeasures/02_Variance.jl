@@ -868,7 +868,7 @@ function (r::UncertaintySetVariance)(w::VecNum)
 end
 """
     ucs_variance(ucs::AbstractUncertaintySetResult, sigma::MatNum, w::VecNum,
-                 mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+                 mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
 
 Compute the worst-case portfolio variance of the weights `w` over a fitted uncertainty set.
 
@@ -931,7 +931,7 @@ function ucs_variance(ucs::BoxUncertaintySet, ::Any, w::VecNum, ::Any = nothing)
            sum(ucs.lb[i] * max(-W[i], z) for i in eachindex(ucs.lb, W))
 end
 function ucs_variance(ucs::EllipsoidalUncertaintySet, sigma::MatNum, w::VecNum,
-                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     W = w * transpose(w)
     # The set names its own centre; `sigma` is the fallback (ADR 0050).
     sigma = something(ucs.val, sigma)
