@@ -322,6 +322,259 @@ function to_tree(a::Clustering.Hclust)
     return nd, d
 end
 """
+    join_leaf_orders!(tab::NamedTuple, A::AbstractVector{Int}, B::AbstractVector{Int},
+                      D::MatNum)
+
+Fill the least cost of each order of a merge from the least costs of the orders of its two children.
+
+A merge joins the child with the leaves `A` to the child with the leaves `B`. An order of the merge starts at a leaf `i` of `A` and stops at a leaf `j` of `B`. The cost of an order is the sum of the distances between its adjacent leaves.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+M(i, j) &= \\underset{k \\in A_i,\\, l \\in B_j}{\\min} M(i, k) + D_{kl} + M(l, j)\\,, \\\\
+M(j, i) &= M(i, j)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``M(i, j)``: the least cost of an order of the leaves below a merge that starts at leaf ``i`` and stops at leaf ``j``, with ``M(i, i) = 0`` for a leaf.
+  - ``A_i``: the leaves of ``A`` that can stop an order of ``A`` that starts at ``i``. For a child with one leaf it is ``\\{i\\}``. For a child that is a merge it holds the leaves on the other side of that merge from ``i``.
+  - ``B_j``: the leaves of ``B`` that can start an order of ``B`` that stops at ``j``, by the same rule.
+  - ``D_{kl}``: the distance between leaves ``k`` and ``l``.
+
+# Algorithm
+
+ 1. For each leaf `i` of `A` and `l` of `B`, find the least `tab.M[i, k] + D[k, l]` over the leaves `k` of `A` that can stop an order that starts at `i`, giving `T[i, l]` and its leaf `k`. Two leaves `i ≠ k` qualify when `tab.side` puts them on different sides of their child. The one leaf of a child with one leaf qualifies with itself.
+ 2. For each leaf `i` of `A` and `j` of `B`, find the least `T[i, l] + tab.M[l, j]` over the leaves `l` of `B` that qualify with `j` by the same rule, giving `tab.M[i, j]`.
+ 3. Write the same cost to `tab.M[j, i]`. Write the leaf `k` to `tab.S[i, j]` and the leaf `l` to `tab.S[j, i]`, so that the order from `i` to `j` is the order from `i` to `tab.S[i, j]`, followed by the order from `tab.S[j, i]` to `j`.
+
+The first least value wins a tie, so the result is deterministic.
+
+# Arguments
+
+  - `tab`: The tables of the dynamic programme. **Modified in place.**
+      + `M`: The least cost of each pair of end leaves, ``M(i, j)`` above.
+      + `S`: The leaf next to the split of each order, as step 3 states.
+      + `side`: The side of its child that holds each leaf, `1` for the left side and `2` for the right side.
+  - `A`, `B`: The leaves below the left child and below the right child of the merge.
+  - `D`: The distance matrix.
+
+# Returns
+
+  - `tab::NamedTuple`: The same tables, with the pairs of `A` and `B` filled.
+
+# Related
+
+  - [`optimal_leaf_order!`](@ref)
+"""
+function join_leaf_orders!(tab::NamedTuple, A::AbstractVector{Int}, B::AbstractVector{Int},
+                           D::MatNum)
+    (; M, S, side) = tab
+    T = similar(M, length(A), length(B))
+    K = zeros(Int, length(A), length(B))
+    for (b, l) in pairs(B), (a, i) in pairs(A), k in A
+        if (side[i] != side[k] || isone(length(A))) &&
+           (iszero(K[a, b]) || M[i, k] + D[k, l] < T[a, b])
+            T[a, b] = M[i, k] + D[k, l]
+            K[a, b] = k
+        end
+    end
+    for j in B, (a, i) in pairs(A)
+        best = 0
+        for (b, l) in pairs(B)
+            if (side[l] != side[j] || isone(length(B))) &&
+               (iszero(best) || T[a, b] + M[l, j] < M[i, j])
+                M[i, j] = T[a, b] + M[l, j]
+                best = b
+            end
+        end
+        M[j, i] = M[i, j]
+        S[i, j] = K[a, best]
+        S[j, i] = B[best]
+    end
+    return tab
+end
+"""
+    trace_leaf_order(S::AbstractMatrix{Int}, i::Int, j::Int)
+
+Rebuild the order from leaf `i` to leaf `j` from the split leaves that [`join_leaf_orders!`](@ref) wrote.
+
+# Algorithm
+
+ 1. Start a stack that holds the pair `(i, j)`.
+ 2. Take the last pair `(a, b)` from the stack. When `a == b`, put the leaf `a` at the end of `order`.
+ 3. Otherwise, put `(S[b, a], b)` and then `(a, S[a, b])` on the stack, so that the order from `a` to `S[a, b]` comes first.
+ 4. Repeat from step 2 until the stack is empty.
+
+The stack replaces a recursion, so a tree as deep as its count of leaves does not overflow the call stack.
+
+# Arguments
+
+  - `S`: The split leaves of each pair of end leaves.
+  - `i`, `j`: The first and the last leaf of the order.
+
+# Returns
+
+  - `order::Vector{Int}`: The leaves, in the order from `i` to `j`.
+
+# Related
+
+  - [`join_leaf_orders!`](@ref)
+  - [`optimal_leaf_order!`](@ref)
+"""
+function trace_leaf_order(S::AbstractMatrix{Int}, i::Int, j::Int)
+    order = Int[]
+    stack = [(i, j)]
+    while !isempty(stack)
+        a, b = pop!(stack)
+        if a == b
+            push!(order, a)
+        else
+            push!(stack, (S[b, a], b))
+            push!(stack, (a, S[a, b]))
+        end
+    end
+    return order
+end
+"""
+    optimal_leaf_order!(ml::AbstractVector{Int}, mr::AbstractVector{Int}, D::MatNum)
+
+Order the leaves of a dendrogram so that the sum of the distances between adjacent leaves is the least that the tree permits.
+
+A flip of the two children of a merge keeps the tree and reverses the leaves below that merge. This method is the exact dynamic programme of [barjoseph2001](@cite), and it finds the least sum over every combination of flips in ``O(N^3)`` time and ``O(N^2)`` memory. `Clustering.orderbranches_barjoseph!` makes a heuristic from the same source. It decides each merge once, from its four outermost leaves, so it can miss the least sum.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{\\pi}^{\\star} &= \\underset{\\boldsymbol{\\pi} \\in \\Pi(\\mathcal{T})}{\\arg\\min} \\sum_{t=1}^{N-1} D_{\\pi_t \\pi_{t+1}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\Pi(\\mathcal{T})``: the orders of the leaves that the dendrogram ``\\mathcal{T}`` permits, one for each combination of flips.
+  - ``\\pi_t``: the leaf at position ``t`` of the order ``\\boldsymbol{\\pi}``.
+  - ``D_{kl}``: the distance between leaves ``k`` and ``l``.
+  - ``N``: the number of leaves.
+
+# Algorithm
+
+ 1. Make the tables `tab`: the costs `M`, zero for each leaf alone; the split leaves `S`; and the sides `side`.
+ 2. Walk the merges in their order. For merge `v`, take the leaves `A` below `ml[v]` and `B` below `mr[v]`, and fill the costs of the pairs of `A` and `B` with [`join_leaf_orders!`](@ref). Then mark the leaves of `A` as side `1` and the leaves of `B` as side `2`.
+ 3. Take the pair `(i, j)` of the last merge with the least cost, with `i` below `ml[end]`.
+ 4. Rebuild the order from `i` to `j` with [`trace_leaf_order`](@ref), giving `order`.
+ 5. Swap `ml[v]` and `mr[v]` for each merge whose left child does not come first in `order`.
+
+# Arguments
+
+  - `ml`, `mr`: The left and the right child of each merge, in the form of `Clustering.hclust`. An entry `-i` is the leaf `i`, a positive entry `v` is the merge `v`, and a merge comes after its children. **Modified in place** by step 5.
+  - `D`: The distance matrix of the leaves.
+
+# Returns
+
+  - `order::Vector{Int}`: The leaves in the order that step 4 rebuilds. It is the leaf order of `Clustering.Hclust` for the merges that step 5 writes.
+
+# Related
+
+  - [`branch_ordered_hclust`](@ref)
+  - [`join_leaf_orders!`](@ref)
+  - [`trace_leaf_order`](@ref)
+
+# References
+
+  - $(ref_dict[:barjoseph2001])
+"""
+function optimal_leaf_order!(ml::AbstractVector{Int}, mr::AbstractVector{Int}, D::MatNum)
+    N = length(ml) + 1
+    tab = (; M = zeros(eltype(D), N, N), S = zeros(Int, N, N), side = zeros(Int, N))
+    leaves = Vector{Vector{Int}}(undef, length(ml))
+    A = B = [1]
+    for v in eachindex(ml, mr)
+        A = ml[v] < 0 ? [-ml[v]] : leaves[ml[v]]
+        B = mr[v] < 0 ? [-mr[v]] : leaves[mr[v]]
+        join_leaf_orders!(tab, A, B, D)
+        tab.side[A] .= 1
+        tab.side[B] .= 2
+        leaves[v] = vcat(A, B)
+    end
+    i, j = first(A), first(B)
+    for jb in B, ia in A
+        if tab.M[ia, jb] < tab.M[i, j]
+            i, j = ia, jb
+        end
+    end
+    order = trace_leaf_order(tab.S, i, j)
+    pos = invperm(order)
+    head = Vector{Int}(undef, length(ml))
+    for v in eachindex(ml, mr)
+        hl = ml[v] < 0 ? pos[-ml[v]] : head[ml[v]]
+        hr = mr[v] < 0 ? pos[-mr[v]] : head[mr[v]]
+        if hr < hl
+            ml[v], mr[v] = mr[v], ml[v]
+        end
+        head[v] = min(hl, hr)
+    end
+    return order
+end
+"""
+    branch_ordered_hclust(D::MatNum, linkage::Symbol, ::Val{:optimal})
+
+Cluster `D` with `Clustering.hclust`, and order its leaves with the least sum of the distances between adjacent leaves that the tree permits.
+
+# Algorithm
+
+ 1. Cluster `D` with `Clustering.hclust` under `linkage` and its branch order `:barjoseph`, giving `res`. The branch order flips merges and moves no merge, so the merges keep the order in which the linkage made them.
+ 2. Order the leaves of `res` with [`optimal_leaf_order!`](@ref) on the two columns of `res.merges` and on `D`, giving `order`.
+ 3. Return `Clustering.Hclust(res.merges, res.heights, order, res.linkage)`.
+
+# Arguments
+
+  - `D`: The distance matrix. The cost of an order is the sum of the entries of `D` itself, also when the linkage is `:ward`, which clusters the squares of `D`.
+  - `linkage`: The linkage of `Clustering.hclust`.
+
+# Returns
+
+  - `res::Clustering.Hclust`: The dendrogram, with the leaf order of least cost.
+
+# Related
+
+  - [`optimal_leaf_order!`](@ref)
+  - [`clusterise`](@ref)
+"""
+function branch_ordered_hclust(D::MatNum, linkage::Symbol, ::Val{:optimal})
+    res = Clustering.hclust(D; linkage = linkage, branchorder = :barjoseph)
+    order = optimal_leaf_order!(view(res.merges, :, 1), view(res.merges, :, 2), D)
+    return Clustering.Hclust(res.merges, res.heights, order, res.linkage)
+end
+"""
+    branch_ordered_hclust(D::MatNum, linkage::Symbol, ::Val{B}) where {B}
+
+Cluster `D` with `Clustering.hclust` under `linkage` and its own branch order `B`.
+
+`B = :barjoseph` gives the heuristic of `Clustering.orderbranches_barjoseph!`, and `B = :r` gives the order of the R function `hclust`. `Clustering.hclust` refuses any other value with an `ArgumentError`.
+
+# Arguments
+
+  - `D`: The distance matrix.
+  - `linkage`: The linkage of `Clustering.hclust`.
+
+# Returns
+
+  - `res::Clustering.Hclust`: The dendrogram.
+
+# Related
+
+  - [`branch_ordered_hclust`](@ref)
+  - [`clusterise`](@ref)
+"""
+function branch_ordered_hclust(D::MatNum, linkage::Symbol, ::Val{B}) where {B}
+    return Clustering.hclust(D; linkage = linkage, branchorder = B)
+end
+"""
     clusterise(cle::ClustersEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
                X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1,
                kwargs...)
@@ -333,7 +586,7 @@ Estimates the similarity and distance matrices from `X`, runs the linkage `cle.a
 # Algorithm
 
  1. Estimate the similarity matrix `S` and the distance matrix `D` from `X` with [`cor_and_dist`](@ref), under `cle.de` and `cle.ce`.
- 2. Cluster `D` with `Clustering.hclust` under the linkage `cle.alg.linkage` and the branch order `branchorder`, giving `res`, the dendrogram.
+ 2. Cluster `D` under the linkage `cle.alg.linkage` with [`branch_ordered_hclust`](@ref) on `Val(branchorder)`, giving `res`, the dendrogram.
  3. Choose the number of clusters with [`optimal_number_clusters`](@ref)`(cle.onc, res, D)`, giving `k`.
  4. Return `Clusters(; res = res, S = S, D = D, k = k)`. `P` is left as `nothing`, because the clustering ran on `D` itself.
 
@@ -357,7 +610,7 @@ Estimates the similarity and distance matrices from `X`, runs the linkage `cle.a
 function clusterise(cle::ClustersEstimator{<:Any, <:Any, <:HClustAlgorithm, <:Any},
                     X::MatNum; branchorder::Symbol = :optimal, dims::Int = 1, kwargs...)
     S, D = cor_and_dist(cle.de, cle.ce, X; dims = dims, kwargs...)
-    res = Clustering.hclust(D; linkage = cle.alg.linkage, branchorder = branchorder)
+    res = branch_ordered_hclust(D, cle.alg.linkage, Val(branchorder))
     k = optimal_number_clusters(cle.onc, res, D)
     return Clusters(; res = res, S = S, D = D, k = k)
 end

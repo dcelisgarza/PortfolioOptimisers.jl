@@ -186,7 +186,7 @@ end
     @test rk >= rk0
 
     # The variance is not monotonic in gamma. On this panel it falls to a turning point
-    # near 0.11, then rises.
+    # near 0.044, then rises. The heuristic leaf order put the turning point near 0.11.
     gs = range(; start = 0.0, stop = 0.20, length = 10)
     rks = [expected_risk(r,
                          optimise(SchurComplementHierarchicalRiskParity(;
@@ -196,7 +196,7 @@ end
                                                                         opt = opt)).w, pr)
            for g in gs]
     k = argmin(rks)
-    @test k == 6
+    @test k == 3
     @test issorted(rks[1:k]; rev = true)
     @test issorted(rks[k:end])
     # The monotonic search stops at the turning point, below every value of the scan.

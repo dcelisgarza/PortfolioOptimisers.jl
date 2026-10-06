@@ -109,3 +109,30 @@ rather than assert on it.
   that show neither routine attains the minimum on every fold.
 - `test/test_57b_reference_walk_forward_parity.jl` — the walk-forward parity that holds the leaf
   order equal and passes to `5.6e-17`.
+
+## Amendment (2026-10-06)
+
+The Context above says that `:optimal` runs a seriation and that `:barjoseph` is cheaper and gives a
+worse permutation. When this ADR was accepted, that was false. Clustering.jl maps `:optimal` and
+`:barjoseph` to the same function, `orderbranches_barjoseph!`, and its source comment calls the
+function a heuristic. It flips each merge once, from the four outermost leaves of the two children,
+so it misses the least sum of adjacent distances. On 300 random Ward trees of 5 to 9 leaves it
+missed the minimum on 185, by up to 3.48. The full-run parity ticket of map #1375 found it (#1494).
+
+**Decision.** The library now owns the meaning of the three names. It dispatches
+`Val(branchorder)` before Clustering.jl sees the keyword, so the `branchorder::Symbol` keyword of
+every caller stays as it was:
+
+| Name | Order |
+| --- | --- |
+| `:optimal` (default) | The exact optimal leaf ordering of Bar-Joseph, Gifford and Jaakkola (2001), by dynamic programme, in `O(n^3)` time and `O(n^2)` memory: `optimal_leaf_order!`. |
+| `:barjoseph` | Clustering.jl's heuristic, kept under its own name. |
+| `:r` | Clustering.jl's order of the R function `hclust`. |
+
+`branch_ordered_hclust` carries the dispatch for `HClustAlgorithm`, and `order_branches!` carries it
+for the merges of `DBHTs`. The cost of an order is the sum of the entries of the distance matrix
+that the caller passed, also under `:ward`, which clusters the squares of that matrix.
+
+The rule of this ADR does not change: HRP and Schur pin `:optimal`, which is now the order its
+Context describes. The merges and the cluster memberships do not change, so HERC, NCO, Stacking and
+SubsetResampling give the same weights under each name.

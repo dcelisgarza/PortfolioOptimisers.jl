@@ -35,9 +35,10 @@ The verdicts:
     matches each fold to the block by its row key. The oracle drops the first out-of-sample
     observation, whose exposure the full model holds; the library keeps it, and equals the
     oracle on the rows the oracle keeps.
-  - Defect on both sides (#1494): the "optimal" leaf ordering of HRP is not optimal on either
-    side, and the two orders differ. With the library's order, the oracle's bisection gives the
-    library's weights.
+  - Better (#1494): the library's leaf order is the exact optimal leaf ordering. The oracle's
+    "optimal" leaf ordering misses the least adjacent sum on its own tree and its own distance:
+    16.065, where an order of the same tree sums to 15.888. With the library's order, the
+    oracle's bisection gives the library's weights.
   - Better: the oracle refuses a `NestedClustersOptimization` over this prior, because its panel
     cannot be sliced by asset, and it has no subset-resampling optimiser. Each cluster and each
     subset of the library equals the oracle's `MeanRisk` on that sub-universe.
@@ -266,7 +267,7 @@ end
         res = optimise(hrp, rdh)
         hcv = cross_val_predict(hrp, rdh, wf)
         # Every stage but the leaf ordering is at parity: with the library's leaf order the
-        # oracle's bisection gives the library's weights. Measured 4.6e-13 relative at most,
+        # oracle's bisection gives the library's weights. Measured 3.0e-13 relative at most,
         # on the full fit and on each fold.
         Wou = load("Hrp", "OurOrderW")
         for (k, w) in enumerate((res.w, (p.res.w for p in hcv.pred)...))
@@ -276,9 +277,9 @@ end
         # clusters. The oracle sorts its merges by height.
         L = load("Hrp", "Linkage")
         @test maxabs(sort(res.clr.res.heights), sort(L[:, 3])) <= 1e-14
-        # Defect on both sides (#1494): neither "optimal" leaf ordering is optimal, and the
-        # orders differ, so the weights differ by up to 0.017. The library's adjacent sum is
-        # 15.921, the oracle's 16.065, and the exact minimum 15.888.
+        # Better (#1494): the library's order is the exact optimal leaf ordering, 15.888. The
+        # oracle's "optimal" order of the same tree sums to 16.065, so the orders differ, and
+        # so do the weights. The library's heuristic order summed to 15.921 before.
         D = res.clr.D
         adj(o) = sum(D[o[i], o[i + 1]] for i in 1:(length(o) - 1))
         lo = Int.(loadv("Hrp", "Leaves")) .+ 1

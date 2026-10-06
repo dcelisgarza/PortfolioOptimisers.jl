@@ -762,6 +762,8 @@ Beside the family, not in it: `BestConstantRebalancedPortfolio` · BCRP · bench
 
 **Branch order**
 The dendrogram's leaf permutation. It never changes the merge tree or the cluster memberships.
+`:optimal`, the default, is the exact optimal leaf ordering: of the orders the tree permits by flips of its merges, the one with the least sum of distances between adjacent leaves. `:barjoseph` is the greedy heuristic of Clustering.jl, which decides each merge once from its four outermost leaves; `:r` is the order of the R function `hclust`. Clustering.jl itself maps `:optimal` to the heuristic, so the library dispatches the name on `Val` before it reaches `hclust`. See ADR 0055.
+*Avoid*: reading `:optimal` in Clustering.jl's own documentation as this order.
 
 ### 4.3 JuMP-based
 
