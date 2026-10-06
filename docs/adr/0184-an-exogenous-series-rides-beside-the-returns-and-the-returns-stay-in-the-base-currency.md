@@ -94,7 +94,11 @@ currency can hold it. With log returns the split has no cross term.
    states its observed factors through `fx`, their returns on the rows of `csr.f`, and every
    consumer finds them as the trailing columns of both axes: attribution reports them as direct
    returns with no standard error, and the regression diagnostics read the design the regression
-   ran on.
+   ran on. Whether a factor is estimated in the cross-section or observed as a series is a property
+   of the structure of the model, not of a name. A rule by name would treat an observed oil or
+   rate factor as estimated wherever its label is not `currency`, so the oracle, which takes an
+   observed factor out of the attribution sandwich only under that label, attributes such a factor
+   wrongly. The prior is at parity on every case that the oracle supports (#1416, row R81).
 7. **The library builds a Currency Excess Index, and it converts no asset return.**
    `currency_excess_index` turns exchange rates, stated as base currency per unit of the currency,
    and cash total-return indices into one level series per currency:

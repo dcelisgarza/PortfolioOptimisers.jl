@@ -528,7 +528,7 @@
         end
     end
 
-    @testset "The drawdown peak includes the starting capital, and the reference's does not" begin
+    @testset "The drawdown peak includes the starting capital" begin
         # Found while pinning the walk-forward above, where the cost-heavy cases disagreed
         # on the maximum drawdown by `1.1e-2` while their return series agreed to `7e-6`.
         #
@@ -539,20 +539,13 @@
         # running peak with `init = one(eltype(X))`, and its additive twin with a zero, so a
         # series that opens down is already in drawdown at its first observation.
         #
-        # The reference seeds its peak at the **first observation** instead, so it reports
-        # zero drawdown there whatever the first return, and a portfolio that loses money
-        # from the first period and never recovers reports less than its true peak-to-trough
-        # loss. **This library is the one that matches the definition**, which is what the
-        # third assertion below pins: the by-definition computation, written out here with
-        # the starting capital prepended to the curve, reproduces `drawdowns` exactly and
-        # differs from the reference.
-        #
-        # The two agree whenever the series does rise above where it opened, because the
-        # starting capital then stops being the peak. That is why the walk-forward testset
-        # above asserts returns, which carry no such convention, and asserts no drawdown.
+        # The oracle seeded its peak at the first observation at the tag this file was
+        # measured at, so it understated this case by `1.1e-2`. At the tag on disk it seeds
+        # the peak at the starting capital too, and it gives `-0.10915360082646582` on the
+        # series below (#1416, row R73). The rule is now at parity.
 
-        # The first fold of the reference's own transaction-cost walk-forward. Its cost
-        # drags the curve under water on the first observation and it never recovers.
+        # The first fold of the oracle's own transaction-cost walk-forward. Its cost drags
+        # the curve under water on the first observation and it never recovers.
         r = [-0.011788105221992843, -0.0051264818462376655, 0.005458948749114548,
              -0.00755922174545086, 0.0006201259574699089, -0.011913393832684459,
              -0.0059727004038226846, -0.01222042003663268, -0.0010357568565395724,
@@ -570,17 +563,6 @@
         # The curve never recovers above its start, so the deepest drawdown is the deepest
         # cumulative loss itself.
         @test isapprox(minimum(drawdowns(r)), minimum(cr); atol = atol)
-
-        # The reference's peak starts at the first observation, so it reports a shallower
-        # drawdown: it never counts the opening loss.
-        theirs = minimum(cr .- accumulate(max, cr))
-        @test isapprox(theirs, -0.09769796250734987; atol = atol)
-        @test theirs > minimum(drawdowns(r))
-        # It understates by `1.1e-2` here. The shortfall is close to, but not exactly, the
-        # opening decline of `-0.0118`, because the curve does edge above its first value at
-        # the third observation before falling away, which lifts the reference's peak a
-        # little off that first value.
-        @test isapprox(minimum(drawdowns(r)) - theirs, -0.01145563831911596; atol = atol)
 
         # The two coincide once the series rises above where it opened.
         up = [0.01054, -0.00336, 0.00814]

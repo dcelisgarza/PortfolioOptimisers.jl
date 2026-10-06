@@ -143,6 +143,15 @@ The windowed wrappers gain a field that holds the window rule, as two singleton 
 The two agree in a batch fit. A seed window needs an inner estimator that folds exactly, held by a
 host that folds. A refit refuses it by name, because a refit has no first fit to remember.
 
+`RollingWindow()` is the default because it keeps the definition of a window: after `s` steps a
+seed window holds `w + s` rows, so it is no longer the window of `w` rows that it states, and the
+rolling window equals the batch fit over the same rows (#1416, row R28). `SeedWindow()` stays for
+the oracle's numbers and for its state of fixed size. On the idiosyncratic variance of the prior,
+the oracle folds one row at a time also at its first call, so its stated window never cuts
+anything (measured difference exactly 0). Ours cuts the first fit's block, because a window that a
+caller states must act. The oracle's output there is the inner variance with no window (#1416,
+row R104).
+
 ### A whole-sample choice follows one of two rules
 
 A Choice Rule is a pair of library-wide singleton types under one abstract type:

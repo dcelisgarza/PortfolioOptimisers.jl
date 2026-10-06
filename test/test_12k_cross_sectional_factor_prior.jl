@@ -1238,9 +1238,9 @@ end
                                            rd)
     end
     @testset "A factor prior that warms up over the factor returns" begin
-        # The reference implementation's own case: a factor prior whose covariance
-        # estimator carries a warm-up longer than the factor-return history left to it.
-        # It answers `NaN` rather than raising, so only a check on its answer catches it.
+        # A factor prior whose covariance estimator carries a warm-up longer than the
+        # factor-return history left to it. A bare estimator answers `NaN` rather than
+        # raising, so only a check on its answer catches it; the oracle refuses this case too.
         # These Factor Exposures warm up over nothing, so the whole window reaches the
         # factor prior and the refusal below is its warm-up alone, not the Descriptors'.
         rd = csfp_panel(; n_observations = 300).rd

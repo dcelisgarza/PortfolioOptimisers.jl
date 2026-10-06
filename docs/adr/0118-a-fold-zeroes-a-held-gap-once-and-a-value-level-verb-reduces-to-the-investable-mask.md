@@ -380,3 +380,18 @@ fill under either.
   with the census in hand.
 - `GLOSSARY.md` gains the **Held Gap** entry, and the **Precomputed-returns contract** entry states
   the finiteness rule.
+
+## Amendment (2026-10-06)
+
+([#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416), rows R84 and R103 of
+the parity audit of map #1375). The Decision above calls the matrix-wide share the oracle's
+denominator, and says that the oracle announces nothing. Both statements describe the oracle's
+portfolio return series, not its scenario fill. Its scenario fill fills the `NaN` cells of an
+investable column with zero and warns once for each asset whose own filled share is above a fixed
+`0.05`. Its share is per asset, as ours is, and it never refuses. This holds at every tag from
+v1.4.0 to the tag on disk.
+
+So the per-asset share of this ADR is the oracle's denominator, and `fill_limit = 0.05` gives the
+oracle's decision to warn or to stay silent. The differences that remain are ours alone: the limit
+derives from the coverage floor, the exponentially weighted family names every fill, and `strict`
+refuses any fill. The maintainer kept all three. The decision of this ADR does not change.

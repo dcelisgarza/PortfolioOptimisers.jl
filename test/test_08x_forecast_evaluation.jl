@@ -1720,14 +1720,13 @@ const FC_REF_SUMMARY = (; mean = 0.9835597986375235, std = 0.004192196953212379,
         @test s.t_stat[1] > 2 * sg.t_stat[1]
     end
 
-    @testset "The reference implementation's factor diagnostics are reproduced" begin
+    @testset "The oracle's factor diagnostics are reproduced" begin
         # The default of the verb is parity: the same kernel over the same axis answers
-        # the reference's column to the last bit, and the shared summary kernel its four
-        # figures. The one figure the port reads on its own terms is the hit rate, which
-        # counts a `NaN` row as a miss where the reference drops it from the denominator;
-        # ADR 0149 rules that a date the forecast could not rank is a miss, and this
-        # fixture scores every row, so the two agree here and the assertion says why.
-        # The reference masks the forecast by the estimation mask before it correlates,
+        # the oracle's column to the last bit, and the shared summary kernel its five
+        # figures. The hit rate leaves a `NaN` coefficient out of its denominator on both
+        # sides (ADR 0149); this fixture scores every row, so the last assertion states
+        # that no row is left out.
+        # The oracle masks the forecast by the estimation mask before it correlates,
         # and the pairing writes the forecast onto that mask once (#1074); the fixture
         # carries one active asset off the mask, so the pins would miss by up to `0.098`
         # in a cell were either side to read it.

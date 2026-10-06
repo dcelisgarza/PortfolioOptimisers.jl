@@ -36,11 +36,11 @@ The leaf-ordering divergence
 Both sides build the same dendrogram: the heights agree to `4.7e-13`, which is the precision
 the reference's numbers were exported at. They then order its branches differently on three of
 the four folds of the complete panel, and each ordering is a valid ordering of that same tree --
-one is reachable from the other by flipping internal nodes. The difference is upstream of this
-library, in the branch-ordering routine of the clustering package each side uses, and it moves
-an HRP weight by as much as `0.09`. It is recorded in issue #947 rather than papered over, and
-the parity of layer 2 is stated with the order pinned so that this file measures the allocation
-rather than the tie-break.
+one is reachable from the other by flipping internal nodes. Since #1494 the library's default
+`branchorder = :optimal` is the exact optimal leaf ordering, and the other side's routine is not
+optimal, so the two orders differ by design. The difference moves an HRP weight by as much as
+`0.09` (#947). The parity of layer 2 is stated with the order pinned, so that this file measures
+the allocation rather than the leaf order.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 using Clarabel, Clustering, Statistics, Dates

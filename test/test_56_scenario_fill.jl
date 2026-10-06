@@ -35,11 +35,12 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, StatsBase, Statistic
 # the result's `X`; every other prior wraps an inner prior estimator and synthesises its `X`,
 # so the fill is paid once, at the `EmpiricalPrior` at the bottom of the chain.
 #
-# The reference implementation gives no oracle for the share: it zero-fills its portfolio
-# return series at one line and announces nothing, so it has no fill limit and no denominator
-# to read off. The reference's own denominator -- filled entries over the entries of the whole
-# returns matrix -- is what ADR 0118 replaced, and it is pinned below as the context the
-# message reports rather than as the number that trips.
+# The oracle fills the same scenario cells with zero and warns once for each asset whose own
+# filled share is above a fixed `0.05`; it never refuses, so `fill_limit = 0.05` gives its
+# decision to warn or stay silent (#1416). It is silent only on its portfolio return series,
+# which it fills at one line. The matrix-wide share -- filled entries over the entries of the
+# whole returns matrix -- is pinned below as the context the message reports rather than as
+# the number that trips.
 
 const PO = PortfolioOptimisers
 

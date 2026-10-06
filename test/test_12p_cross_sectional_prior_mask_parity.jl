@@ -18,10 +18,10 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                                  outlier = nothing, scoring = nothing, family = "style")
     factors = ["market" => ConstantExposure(), "style1" => mpass("style1"),
                "style2" => mpass("style2")]
-    # The factor covariance clips its regime multiplier to (0.7, 1.6), as the oracle does by
-    # default. Our default does not clip, and the two-pass case is the first measured case
-    # where the clip binds: without it the factor covariance is 0.991 times the stored one.
-    # That default belongs to #1383; this file measures the masks.
+    # The factor covariance clips its regime multiplier to (0.7, 1.6), the default on both
+    # sides since #1383. The case states the clip because the two-pass case is the first
+    # measured case where it binds: without it the factor covariance is 0.991 times the stored
+    # one. This file measures the masks.
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
                         ce = RegimeAdjustedExpWeightedCovariance(; centred = true,
                                                                  debias = false,

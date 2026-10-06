@@ -411,3 +411,34 @@ The seam is two optional methods, so an extension written before this amendment 
 A blank inactive cell now gets the policy's `val` in place of a value carried into it. No active
 cell of the test fixtures changes: the change reaches an active cell only at a blank first cell of
 a relisting (forward) or a blank last cell before a delisting (backward).
+
+## Amendment (2026-10-06)
+
+([#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416), the last verdict of
+the parity audit of map #1375). Three rules of this ADR differ from the oracle. The maintainer
+kept each one, and this amendment states the mathematics behind it.
+
+**A read keeps the stored value of an inactive cell by default.** `panel_field_values` defaults to
+`inactive = nothing`, and the oracle stores `NaN` there. A cell holds two separate facts: the value
+of the field, and whether the asset is in the universe. The default read already shows a blank as
+`NaN` (`unobserved = NaN`), so an inactive cell that reads a finite value holds a value that the
+data held, for example the capitalisation of a firm before it enters the universe. A `NaN` there
+would state "missing" for a value that exists, and one `NaN` would then mean two things.
+`inactive = NaN` gives the oracle's view.
+
+**An estimation mask outside the active mask is refused.** The oracle intersects the two masks in
+silence. A cell that is estimable and outside the universe is a contradiction: the two masks come
+from different sources, or one is shifted by a row. A silent intersection would change the
+estimation sample with no message, so the refusal follows the rule that corrupt input refuses
+(ADR 0108, amendment of 2026-09-29). The oracle's result is `emsk .& amsk`.
+
+**An observation with no active asset is allowed.** The oracle refuses such a panel. The rows
+before the first listing, a holiday on which every asset is inactive, and a view on a
+sub-universe at a time when none of its assets is listed are valid input, so a refusal would
+refuse valid input. Every consumer keeps such a row unscored. The oracle's check is
+`all(any(pnl.amsk; dims = 2))`.
+
+An unfilled blank keeps the policy's `val` with `omsk = false`. #1416 found that two readers used
+that `val` as data: `feature_matrix` (and through it `FeatureDistance`) and the panel collapse of a
+meta-optimiser. A child task of map #1375 makes them read observed cells only, and adds a census
+that poisons the active unobserved cells, as `test_06j` poisons the inactive ones.

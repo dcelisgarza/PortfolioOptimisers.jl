@@ -82,6 +82,30 @@ wrapper dropped the active mask of an Asset Panel. So a census test (#1411) writ
 into every inactive cell and asserts that the answer of every consumer of an Asset Panel does not
 change. It gives the safety of the oracle's `NaN` with no cost at run time.
 
+### Three kept differences that no other record owns
+
+[#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416) gave a last verdict on
+every difference from the oracle. Three kept differences had no ADR, so their reasons are stated
+here.
+
+- **A windowed variance series rolls with the observation.** Row `t` of `variance_series` on a
+  windowed wrapper is the wrapper fitted on rows `max(1, t - w + 1):t`. The oracle's prior cuts its
+  window once, at a first call that holds one row, so its `window_size` has no effect there
+  (measured difference exactly 0). A window of `w` is the estimate over the last `w` rows, and the
+  oracle's own batch fit keeps that definition, so its prior contradicts its own documented
+  formula. The oracle's output is the unwrapped estimator in the variance slot.
+- **`ConstantExposure` is `NaN` on an inactive cell.** The exposure matrix `B_t` of an
+  observation is defined over the universe of that observation, so the model states no loading for
+  an asset outside it, the constant included. Every other exposure is `NaN` there, so a row is
+  either wholly in the model or wholly `NaN`, and the universe can be read off any column, also
+  off a model whose only exposure is the constant. No fitted value moves. The oracle's matrix is
+  `ifelse.(amsk, B, 1)` on the constant column.
+- **An attribution defaults to `ppy = 1` and `se = false`.** `ppy` only scales a report, and 1 is
+  the identity at every data frequency, where the oracle's 252 assumes daily data. A standard error
+  of a realised attribution needs the regression weights and the idiosyncratic variance at each
+  observation. A block with static loadings records neither, so `se = true` as the default would
+  refuse every `FactorPrior` block. `ppy = 252, se = true` gives every number of the oracle.
+
 ## Consequences
 
 - A measure ticket of map #1375 that finds a mode the oracle has and the library lacks applies the

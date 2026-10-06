@@ -6,8 +6,9 @@ Every stored case under `test/assets/Parity_CrossSectionalFactorPrior_<Case>_<Ou
 the oracle fit of a market factor and the two passthrough styles, on the panels of
 `parity_harness.jl`, which list late, delist, list again, skip a holiday and keep an asset outside
 the estimation universe. The factor covariance and the idiosyncratic variance are stated
-explicitly at the oracle's defaults, so a change of our own defaults (#1383) does not move these
-cases:
+explicitly, so a change of our own defaults does not move these cases. They take the oracle's
+clip and its centring. The idiosyncratic variance turns its floor off (`min_val = 0.0`), where
+both defaults floor at `1e-12`; that moves only a variance in `(0, 1e-12]`:
 
   - `PitSmall`: `parity_small_panel()`, `minra = 5`. `PitLarge`: `parity_large_panel()` at the
     default `minra`. The outputs are `mu`, `sigma`, the factor moments, the factor returns, the
