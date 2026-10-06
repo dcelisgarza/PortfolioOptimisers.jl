@@ -54,8 +54,26 @@ missing `ts` only where it is load-bearing.
    A test row between two matched rows that the block does not hold is refused, and so is a series
    that repeats a block row or does not keep its order.
 6. With no shared key, the method lines the series up at the tail, as before.
-
-A block of another type, `Regression`, records no key. It keeps the tail rule.
+7. **`Regression` carries the key too**
+   ([#1495](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1495)). Its loadings are
+   one fit over the sample, so the key names the observations of the prior result that holds it:
+   the rows of `pr.fpr.X` and of the reconstruction `pr.X`, which the attribution reads. The rd
+   entry of `FactorPrior` records the positions and `rd.ts`. Under a Scenario Cap of the factor
+   prior, the asset side keeps the same last rows as `F`, so the key is the last positions of the
+   data. Before this, a `FactorPrior` with a Scenario Cap refused to fit, because the two blocks
+   had different row counts. Another producer of a `Regression` records no key and keeps the tail
+   rule.
+8. **A Pipeline fold records its positions when every fitted step keeps the observations.** A step
+   states this with the public predicate `keeps_observations(fitted)`. The fallback is `false`,
+   which makes no promise, and the asset selectors answer `true`. A private mirror of
+   `apply_fitted_step` reads the data level: a step of the other level is an identity, so it keeps
+   them. The returns-data `predict` of a `PipelineResult` then records `test_idx`. The price-data
+   `predict` records no positions, because `PricesToReturns` drops the first price row. Price data
+   carries timestamps, and they name the rows instead.
+9. **A refit over a capped buffer records no positions.** The batch verb counts the positions from
+   the first row of the buffer, and a buffer that drops its oldest rows does not record how many
+   it dropped. A key of `2:120` on data rows `132:250` matched the wrong rows with no error. The
+   refit now removes the positions under a `max_history` cap and keeps the timestamps.
 
 ## Consequences
 
@@ -87,3 +105,10 @@ A block of another type, `Regression`, records no key. It keeps the tail rule.
   match the wrong rows with no error. Timestamps remove that risk where they exist.
 - **A full label array on every Result, always.** It pays the storage on every fit. A range costs
   two integers.
+- **A row count check for a Pipeline fold** (record `test_idx` when the window after the steps has
+  `length(test_idx)` rows). It reads a symptom, not a contract: a step that keeps the count but
+  shifts, resamples or reorders the rows passes the check, and the attribution then reads the
+  wrong rows with no error. The predicate fails safe, because a step that makes no promise gives
+  no positions.
+- **The key on `LowOrderPrior`**, so that every prior records its rows. It changes a core result
+  type and every reader of it, for one consumer. The block is what the attribution reads.

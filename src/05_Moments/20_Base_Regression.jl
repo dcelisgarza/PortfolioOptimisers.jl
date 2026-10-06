@@ -60,7 +60,9 @@ Regression
        b ┼ nothing
   esigma ┼ nothing
     edof ┼ nothing
-    ediv ┴ nothing
+    ediv ┼ nothing
+     idx ┼ nothing
+      ts ┴ nothing
 ```
 
 # Related
@@ -1328,6 +1330,8 @@ Holds the loadings matrix, the intercept vector, the reduced-basis loadings and 
 
 `edof` and `ediv` record how each idiosyncratic variance was measured, so a consumer that prices the sampling error of `esigma` reads the count off the block instead of guessing it. [`StepwiseRegression`](@ref) and [`DimensionReductionRegression`](@ref) write `edof` as the number of observations less the parameters that the fit of each asset spent, the intercept included. The prior that writes `esigma` restates `edof` in the effective count of its variance estimator and writes `ediv`, the divisor of each variance in that count, with [`variance_count`](@ref). A block built by hand, or measured by a variance estimator that states no count, leaves both unset. [`ResidualInflation`](@ref) reads both fields.
 
+`idx` and `ts` are the row key of the block. The loadings are one fit over the sample, so the block has no rows of its own: the key names the observations of the factor returns and the reconstruction of the prior result that carries the block. [`FactorPrior`](@ref) writes the key, and a block built by hand or by another prior leaves it unset. A realised [`factor_attribution`](@ref) of a cross-validation reads the key to find the observations of each fold.
+
 # Mathematical definition
 
 ```math
@@ -1358,7 +1362,9 @@ $(DocStringExtensions.FIELDS)
         b::Option{<:VecNum} = nothing,
         esigma::Option{<:VecNum_MatNum} = nothing,
         edof::Option{<:VecNum} = nothing,
-        ediv::Option{<:VecNum} = nothing
+        ediv::Option{<:VecNum} = nothing,
+        idx::Option{<:VecInt} = nothing,
+        ts::Option{<:VecDate} = nothing
     ) -> Regression
 
 Keywords correspond to the struct's fields.
@@ -1370,6 +1376,7 @@ Keywords correspond to the struct's fields.
   - If provided, `!isempty(L)`, and `size(L, 1) == size(M, 1)`.
   - If provided, `!isempty(esigma)`, and `esigma` carries `size(M, 1)` entries when it is a vector, or is square with `size(M, 1)` rows when it is a matrix.
   - If provided, `edof` and `ediv` each carry `size(M, 1)` entries.
+  - [`assert_row_key_part`](@ref) on `idx` and on `ts`. When both are provided, `length(ts) == length(idx)`.
 
 # Examples
 
@@ -1381,7 +1388,9 @@ Regression
        b ┼ Vector{Int64}: [1, 2]
   esigma ┼ Vector{Float64}: [0.1, 0.2]
     edof ┼ nothing
-    ediv ┴ nothing
+    ediv ┼ nothing
+     idx ┼ nothing
+      ts ┴ nothing
 ```
 
 # Related
@@ -1420,9 +1429,18 @@ Regression
     $(arg_dict[:ediv])
     """
     ediv
+    """
+    Position of each observation that the prior result describes, in the returns data that the prior read, or `nothing`. A Scenario Cap keeps the last observations alone, so the positions are then the last positions of the data.
+    """
+    idx
+    """
+    Timestamp of each observation that `idx` names, or `nothing` when the returns data that the prior read carries no timestamps. When the folds of a cross-validation carry timestamps too, a [`factor_attribution`](@ref) matches the two by timestamp, so a prior fitted on other returns data still finds its observations.
+    """
+    ts
     function Regression(M::MatNum, L::Option{<:MatNum}, b::Option{<:VecNum},
                         esigma::Option{<:VecNum_MatNum}, edof::Option{<:VecNum},
-                        ediv::Option{<:VecNum})
+                        ediv::Option{<:VecNum}, idx::Option{<:VecInt},
+                        ts::Option{<:VecDate})
         @argcheck(!isempty(M), IsEmptyError)
         if isa(b, VecNum)
             @argcheck(!isempty(b), IsEmptyError)
@@ -1435,16 +1453,21 @@ Regression
         assert_idiosyncratic_covariance(esigma, size(M, 1))
         assert_idiosyncratic_count(edof, size(M, 1), :edof)
         assert_idiosyncratic_count(ediv, size(M, 1), :ediv)
+        Tk = row_key_length(idx)
+        assert_row_key_part(idx, Tk, :idx)
+        assert_row_key_part(ts, Tk, :ts)
         return new{typeof(M), typeof(L), typeof(b), typeof(esigma), typeof(edof),
-                   typeof(ediv)}(M, L, b, esigma, edof, ediv)
+                   typeof(ediv), typeof(idx), typeof(ts)}(M, L, b, esigma, edof, ediv, idx,
+                                                          ts)
     end
 end
 function Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
                     b::Option{<:VecNum} = nothing,
                     esigma::Option{<:VecNum_MatNum} = nothing,
-                    edof::Option{<:VecNum} = nothing,
-                    ediv::Option{<:VecNum} = nothing)::Regression
-    return Regression(M, L, b, esigma, edof, ediv)
+                    edof::Option{<:VecNum} = nothing, ediv::Option{<:VecNum} = nothing,
+                    idx::Option{<:VecInt} = nothing,
+                    ts::Option{<:VecDate} = nothing)::Regression
+    return Regression(M, L, b, esigma, edof, ediv, idx, ts)
 end
 # When `L` is unset (`Nothing` type parameter), `:L` falls back to the loadings matrix `M`;
 # when `L` is a stored matrix the default field access already returns it, so only the
@@ -1467,7 +1490,7 @@ This function constructs a new `Regression` result, where the coefficient matrix
  4. Take an element view of `b` over `i` when step 1 found a vector, and `nothing` otherwise.
  5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape: a vector of variances is indexed once, and a full covariance is indexed on both axes.
  6. View `edof` and `ediv` with [`nothing_scalar_array_view`](@ref), which indexes a vector once and passes `nothing` through.
- 7. Build a new [`Regression`](@ref) from the six, which re-runs every guard of the constructor.
+ 7. Build a new [`Regression`](@ref) from the six, passing the row key `idx` and `ts` through, which re-runs every guard of the constructor. The key names observations, so it does not follow an asset selection.
 
 # Arguments
 
@@ -1488,7 +1511,9 @@ Regression
        b ┼ Vector{Int64}: [7, 8, 9]
   esigma ┼ nothing
     edof ┼ nothing
-    ediv ┴ nothing
+    ediv ┼ nothing
+     idx ┼ nothing
+      ts ┴ nothing
 
 julia> PortfolioOptimisers.port_opt_view(re, [1, 3])
 Regression
@@ -1497,7 +1522,9 @@ Regression
        b ┼ SubArray{Int64, 1, Vector{Int64}, Tuple{Vector{Int64}}, false}: [7, 9]
   esigma ┼ nothing
     edof ┼ nothing
-    ediv ┴ nothing
+    ediv ┼ nothing
+     idx ┼ nothing
+      ts ┴ nothing
 ```
 
 # Related
@@ -1515,13 +1542,14 @@ function port_opt_view(re::Regression, i, args...)::Regression
                       b = isnothing(b) ? nothing : view(b, i),
                       esigma = idiosyncratic_covariance_view(re.esigma, i),
                       edof = nothing_scalar_array_view(re.edof, i),
-                      ediv = nothing_scalar_array_view(re.ediv, i))
+                      ediv = nothing_scalar_array_view(re.ediv, i), idx = re.idx,
+                      ts = re.ts)
 end
 """
     set_idiosyncratic_covariance(re::Regression, esigma::Option{<:VecNum_MatNum},
                                  edof::Option{<:VecNum}, ediv::Option{<:VecNum})
 
-Return a [`Regression`](@ref) that carries `esigma`, `edof` and `ediv`, with every other field unchanged.
+Return a [`Regression`](@ref) that carries `esigma`, `edof` and `ediv`, with every other field unchanged, the row key included.
 
 A regression estimator fits loadings alone, so the block a fit returns carries no idiosyncratic covariance. The prior that lifts the factor moments measures the residual variances on the way, and it writes them here rather than making every consumer recompute them. It writes the counts of those variances beside them. [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) are the two callers, and each passes what [`factor_lift`](@ref) returned: the variances and their counts under `rsd = true`, and `nothing` for the variances and the divisors under `rsd = false`.
 
@@ -1548,7 +1576,36 @@ function set_idiosyncratic_covariance(re::Regression, esigma::Option{<:VecNum_Ma
                                       edof::Option{<:VecNum},
                                       ediv::Option{<:VecNum})::Regression
     return Regression(; M = re.M, L = getfield(re, :L), b = getfield(re, :b),
-                      esigma = esigma, edof = edof, ediv = ediv)
+                      esigma = esigma, edof = edof, ediv = ediv, idx = re.idx, ts = re.ts)
+end
+"""
+    set_row_key(re::Regression, idx::Option{<:VecInt}, ts::Option{<:VecDate})
+
+Return a [`Regression`](@ref) that carries the row key `idx` and `ts`, with every other field unchanged.
+
+A regression estimator fits loadings alone and knows nothing of the observations it read. [`FactorPrior`](@ref) writes the key after the fit, because it knows which observations its prior result describes. The method reads `L` and `b` with `getfield`, for the reason that [`set_idiosyncratic_covariance`](@ref) states.
+
+# Arguments
+
+  - `re`: The regression result to rewrite.
+  - `idx`: The position of each observation in the returns data that the prior read, or `nothing`.
+  - `ts`: The timestamp of each observation, or `nothing`.
+
+# Returns
+
+  - `re::Regression`: A new result carrying `idx` and `ts`, which re-runs every guard of the constructor.
+
+# Related
+
+  - [`Regression`](@ref)
+  - [`attribution_row_key`](@ref)
+  - [`set_idiosyncratic_covariance`](@ref)
+"""
+function set_row_key(re::Regression, idx::Option{<:VecInt},
+                     ts::Option{<:VecDate})::Regression
+    return Regression(; M = re.M, L = getfield(re, :L), b = getfield(re, :b),
+                      esigma = re.esigma, edof = re.edof, ediv = re.ediv, idx = idx,
+                      ts = ts)
 end
 """
     regression(re::Regression, args...)

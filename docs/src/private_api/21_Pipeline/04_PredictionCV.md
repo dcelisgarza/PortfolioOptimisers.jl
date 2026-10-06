@@ -37,3 +37,13 @@ PortfolioOptimisers.reset_time_dependent_step
 reset_time_dependent_estimator(p::Pipeline)
 PortfolioOptimisers.pipeline_step_factory
 ```
+
+## The rows of a pipeline fold
+
+A fold of returns data records its rows on its [`PredictionResult`](@ref) when every fitted step of the pipeline keeps the observations of the window. A realised [`factor_attribution`](@ref) of the cross-validation reads those rows to find the block rows of each fold. A preprocessing step states whether it keeps them with [`keeps_observations`](@ref).
+
+```@docs
+PortfolioOptimisers.fitted_step_keeps_observations
+PortfolioOptimisers.apply_fitted_steps_keeping
+PortfolioOptimisers.pipeline_fold_prediction
+```

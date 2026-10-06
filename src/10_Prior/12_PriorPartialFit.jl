@@ -325,6 +325,7 @@ Where:
 
  1. Read the state out of `pe.cache` with [`partial_fit_cache`](@ref).
  2. Dispatch on the type of the state. Under a [`SampleBufferState`](@ref), run the batch verb over the [`sample_buffer`](@ref) and the [`factor_buffer`](@ref) of the state with [`buffer_prior`](@ref), which gives the masks, the Panel Fields and the Exogenous Series that the buffer records, and the caller's keyword arguments.
+ 3. Under a [`SampleBufferState`](@ref), correct the row key of the factor model block with [`buffer_row_key`](@ref). The batch verb counts the positions from the first row of the buffer, and a capped buffer does not record how many rows it dropped.
 
 # Arguments
 
@@ -353,7 +354,79 @@ function prior(pe::AbstractPriorEstimator; kwargs...)
     return prior(pe, partial_fit_cache(pe); kwargs...)
 end
 function prior(pe::AbstractPriorEstimator, state::SampleBufferState; kwargs...)
-    return buffer_prior(pe, state, sample_buffer_panel(state); kwargs...)
+    pr = buffer_prior(pe, state, sample_buffer_panel(state); kwargs...)
+    return buffer_row_key(pr, state.max_history)
+end
+"""
+    buffer_row_key(pr::AbstractPriorResult, max_history::Nothing)
+    buffer_row_key(pr::LowOrderPrior, max_history::Integer)
+    buffer_row_key(pr::HighOrderPrior, max_history::Integer)
+
+Correct the row key of the factor model block of a prior that a sample buffer refitted.
+
+The batch verb counts the position of each row from the first row of the buffer. A buffer with no cap holds every folded observation, so these positions are the positions among the folded observations, as the carry fold of a [`CrossSectionalFactorPrior`](@ref) counts them. A capped buffer drops its oldest observations and does not record how many it dropped, so its positions are not the positions of the folded observations. The method then removes the positions from the block and keeps the timestamps. A realised [`factor_attribution`](@ref) of a cross-validation then lines the series up at the tail and does not match the wrong rows.
+
+# Arguments
+
+  - `pr`: The prior that the batch verb fitted over the rows of the buffer.
+  - `max_history`: The cap of the buffer, or `nothing`.
+
+# Returns
+
+  - `pr::AbstractPriorResult`: `pr` itself with no cap, and otherwise `pr` with a factor model block that carries no positions.
+
+# Related
+
+  - [`forget_row_positions`](@ref)
+  - [`attribution_row_key`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+"""
+function buffer_row_key(pr::AbstractPriorResult, ::Nothing)
+    return pr
+end
+function buffer_row_key(pr::LowOrderPrior, ::Integer)
+    # The positions are not part of the projection that `o_X` records, so `o_X` stays.
+    return forward_prior(pr; rr = forget_row_positions(pr.rr), o_X = pr.o_X)
+end
+function buffer_row_key(pr::HighOrderPrior, max_history::Integer)
+    return forward_prior(pr; pr = buffer_row_key(pr.pr, max_history))
+end
+"""
+    forget_row_positions(rr::Option{<:AbstractLoadingsRegressionResult})
+    forget_row_positions(rr::Regression)
+    forget_row_positions(rr::CrossSectionalFactorModel)
+
+Return a factor model block with no positions in its row key, and every other field unchanged.
+
+A block that records no row key, or no block at all, is returned as it is.
+
+# Arguments
+
+  - `rr`: The factor model block, or `nothing`.
+
+# Returns
+
+  - `rr`: The block with `idx = nothing`, or `rr` itself.
+
+# Related
+
+  - [`buffer_row_key`](@ref)
+  - [`set_row_key`](@ref)
+  - [`attribution_row_key`](@ref)
+"""
+function forget_row_positions(rr::Option{<:AbstractLoadingsRegressionResult})
+    return rr
+end
+function forget_row_positions(rr::Regression)
+    return set_row_key(rr, nothing, rr.ts)
+end
+function forget_row_positions(rr::CrossSectionalFactorModel)
+    # Every field is read with `getfield`, because the `swap(L, M)` property rule makes
+    # `rr.L` return `rr.M` when `L` is unset, and a rebuild from it would set `L`.
+    names = fieldnames(typeof(rr))
+    fields = NamedTuple{names}(map(k -> getfield(rr, k), names))
+    return CrossSectionalFactorModel(; fields..., idx = nothing)
 end
 """
     buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, pnl::Nothing; kwargs...)

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base asset selection, public API of PortfolioOptimisers.jl: AbstractAssetSelector, AssetSelectorResult, select_assets."
+Description = "Base asset selection, public API of PortfolioOptimisers.jl: AbstractAssetSelector, AssetSelectorResult, select_assets, keeps_observations."
 ```
 
 # [Base asset selection](@id api-base-asset-selection)
@@ -19,4 +19,5 @@ AssetSelectorResult
 
 ```@docs
 select_assets
+PortfolioOptimisers.keeps_observations(::AssetSelectorResult)
 ```

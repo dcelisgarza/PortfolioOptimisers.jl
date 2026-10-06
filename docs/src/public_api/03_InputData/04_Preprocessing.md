@@ -1,5 +1,5 @@
 ```@meta
-Description = "Preprocessing, public API of PortfolioOptimisers.jl: fit_preprocessing, apply_preprocessing, AbstractPreprocessingEstimator, …"
+Description = "Preprocessing, public API of PortfolioOptimisers.jl: fit_preprocessing, apply_preprocessing, keeps_observations, AbstractPreprocessingEstimator, …"
 ```
 
 # Preprocessing
@@ -13,6 +13,7 @@ A preprocessing estimator does not depend on a pipeline. A [`Pipeline`](@ref) ca
 ```@docs
 fit_preprocessing
 apply_preprocessing
+PortfolioOptimisers.keeps_observations(::Union{<:PortfolioOptimisers.AbstractPreprocessingEstimator, <:PortfolioOptimisers.AbstractPreprocessingResult})
 ```
 
 ## Types

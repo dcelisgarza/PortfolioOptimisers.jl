@@ -518,3 +518,124 @@ function pipeline_cross_val_predict(pipe::Pipeline_OnlPipe, data::Prices_RR, cv:
     return MultiPeriodPredictionResult(; pred = predictions, id = id, opt = est)
 end
 #! End: TimeDependent schedules as pipeline optimisation steps.
+"""
+    fitted_step_keeps_observations(fitted, data::Prices_RR) -> Bool
+
+Return `true` when one fitted step of a pipeline keeps every observation of a data window.
+
+It is the companion of [`apply_fitted_step`](@ref), and it reads the same data levels. A step whose data level is the level of `data` changes the window, so it keeps the observations exactly when [`keeps_observations`](@ref) says so. A preprocessing step of the other level, a [`PricesToReturns`](@ref) step on returns data, and the result of every other step, such as a prior or an optimisation result, return the window unchanged, so they keep the observations. A nested [`PipelineResult`](@ref) keeps them when each of its own steps does.
+
+# Arguments
+
+  - `fitted`: The fitted result of one step, from a [`PipelineResult`](@ref).
+  - `data`: The data window that the step receives.
+
+# Returns
+
+  - `flag::Bool`: `true` when the window that the step returns holds the observations of `data`, in the same order.
+
+# Related
+
+  - [`keeps_observations`](@ref)
+  - [`apply_fitted_step`](@ref)
+  - [`apply_fitted_steps_keeping`](@ref)
+"""
+function fitted_step_keeps_observations(::Any, ::Prices_RR)::Bool
+    return true
+end
+function fitted_step_keeps_observations(f::Union{<:AbstractPreprocessingEstimator,
+                                                 <:AbstractPreprocessingResult},
+                                        ::Prices_RR)::Bool
+    return keeps_observations(f)
+end
+function fitted_step_keeps_observations(::Union{<:AbstractPricesPreprocessingResult,
+                                                <:AbstractPricesPreprocessingEstimator,
+                                                <:PricesToReturns},
+                                        ::AbstractReturnsResult)::Bool
+    return true
+end
+function fitted_step_keeps_observations(::Union{<:AbstractReturnsPreprocessingResult,
+                                                <:AbstractReturnsPreprocessingEstimator},
+                                        ::AbstractPricesResult)::Bool
+    return true
+end
+function fitted_step_keeps_observations(f::PipelineResult, data::Prices_RR)::Bool
+    return last(apply_fitted_steps_keeping(f.results, data))
+end
+"""
+    apply_fitted_steps_keeping(results::Tuple, data::Prices_RR) -> (data′, kept::Bool)
+
+Apply the fitted steps of a pipeline to a data window, in step order, and say whether the window kept its observations.
+
+It is [`apply_fitted_steps`](@ref) with one more answer. The returns-data method of [`predict(res::PipelineResult, data::AbstractReturnsResult, window)`](@ref) reads `kept`, and the fold records its rows when it is `true`.
+
+# Algorithm
+
+ 1. Set `kept` to `true`.
+ 2. For each fitted result `f` in `results`, in step order, set `kept` to `false` when [`fitted_step_keeps_observations`](@ref) is `false` for `f` and the current `data`. Then replace `data` with `apply_fitted_step(f, data)`.
+ 3. Return the last `data` and `kept`.
+
+# Arguments
+
+  - `results`: The fitted result of each step, from a [`PipelineResult`](@ref).
+  - `data`: The data window.
+
+# Returns
+
+  - `data′`: The changed data window, as [`apply_fitted_steps`](@ref) returns it.
+  - `kept::Bool`: `true` when every step keeps the observations of the window.
+
+# Related
+
+  - [`apply_fitted_steps`](@ref)
+  - [`fitted_step_keeps_observations`](@ref)
+  - [`pipeline_fold_prediction`](@ref)
+"""
+function apply_fitted_steps_keeping(results::Tuple, data::Prices_RR)
+    kept = true
+    for f in results
+        kept = kept && fitted_step_keeps_observations(f, data)
+        data = apply_fitted_step(f, data)
+    end
+    return data, kept
+end
+"""
+    pipeline_fold_prediction(pred::PredictionResult, test_idx::Colon, kept::Bool)
+    pipeline_fold_prediction(pred::PredictionResult, test_idx::VecInt, kept::Bool)
+
+Record the rows of a pipeline fold on its prediction, when the fitted steps kept them.
+
+The weight-level [`predict`](@ref) of the optimisation result receives the window after the fitted steps, so it cannot know the rows of the window and records `idx = nothing`. When every step kept the observations, the rows of the window are `test_idx`, and the method records them. A realised [`factor_attribution`](@ref) of the cross-validation then finds the block rows of each fold by position. A whole-sample prediction, `test_idx = :`, records no rows, as the whole-sample `predict` of an optimisation result does.
+
+# Arguments
+
+  - `pred`: The prediction on the changed window.
+  - `test_idx`: The rows of the input data in the window, or `:`.
+  - `kept`: Whether the fitted steps kept every observation of the window, from [`apply_fitted_steps_keeping`](@ref).
+
+# Validation
+
+  - When `kept` is `true`, the prediction has one observation for each entry of `test_idx`. Raises a `DimensionMismatch`, because a step answered [`keeps_observations`](@ref) with `true` and changed the number of observations.
+
+# Returns
+
+  - `pred::PredictionResult`: `pred` with `idx = test_idx` when `kept` is `true`, and `pred` itself otherwise.
+
+# Related
+
+  - [`PredictionResult`](@ref)
+  - [`apply_fitted_steps_keeping`](@ref)
+  - [`keeps_observations`](@ref)
+"""
+function pipeline_fold_prediction(pred::PredictionResult, ::Colon, ::Bool)
+    return pred
+end
+function pipeline_fold_prediction(pred::PredictionResult, test_idx::VecInt, kept::Bool)
+    if !kept
+        return pred
+    end
+    T = size(pred.rd.X, 1)
+    @argcheck(T == length(test_idx),
+              DimensionMismatch("the fitted steps of the pipeline state that they keep every observation, but the window of $(length(test_idx)) observations became $T. A step whose keeps_observations method returns true must not drop, add or move an observation."))
+    return PredictionResult(; res = pred.res, rd = pred.rd, hw = pred.hw, idx = test_idx)
+end

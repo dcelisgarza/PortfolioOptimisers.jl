@@ -176,5 +176,28 @@ function apply_preprocessing(res::AssetSelectorResult, rd::AbstractReturnsResult
     end
     return port_opt_view(rd, idx)
 end
+"""
+    keeps_observations(res::AssetSelectorResult) -> true
+
+Return `true`, because an asset selection keeps every observation of the window.
+
+[`apply_preprocessing`](@ref) selects the columns of the fitted universe and leaves the observation axis as it is. So a [`Pipeline`](@ref) fold whose steps select assets still records its rows, and a realised [`factor_attribution`](@ref) of the cross-validation finds the block rows of each fold by position.
+
+# Arguments
+
+  - `res`: The fitted asset selection.
+
+# Returns
+
+  - `flag::Bool`: `true`.
+
+# Related
+
+  - [`keeps_observations`](@ref)
+  - [`AssetSelectorResult`](@ref)
+"""
+function keeps_observations(::AssetSelectorResult)::Bool
+    return true
+end
 export AssetSelectorResult
 public AbstractAssetSelector

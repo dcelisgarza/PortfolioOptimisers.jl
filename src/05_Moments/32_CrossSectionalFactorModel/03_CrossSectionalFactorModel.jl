@@ -357,6 +357,106 @@ function assert_return_forecast_assets(rf::AbstractReturnForecastResult,
     return nothing
 end
 """
+    assert_row_key_part(key::Nothing, T, sym::Symbol)
+    assert_row_key_part(key::VecInt, T::Option{<:Integer}, sym::Symbol)
+    assert_row_key_part(key::VecDate, T::Option{<:Integer}, sym::Symbol)
+
+Check one part of the row key of a factor model block.
+
+A row key names the observation of the returns data that each row of a factor model block describes. It has two parts: the position of each row in the returns data that the prior read, and the timestamp of each row. [`CrossSectionalFactorModel`](@ref) and [`Regression`](@ref) carry both parts, and each one checks them with this function. A [`factor_attribution`](@ref) of a cross-validation reads the key in the order of time, so each part must increase strictly.
+
+# Arguments
+
+  - `key`: The positions or the timestamps of the rows, or `nothing`.
+  - `T`: The number of rows that the key describes, or `nothing` when the block does not state it.
+  - `sym`: The name of the field that holds `key`, for the error message.
+
+# Validation
+
+  - [`assert_row_key_length`](@ref) on `key` and `T`.
+  - The entries of a vector of positions are positive and increase strictly. Raises an `ArgumentError`.
+  - The entries of a vector of timestamps increase strictly. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_cs_block_rows`](@ref)
+  - [`attribution_row_key`](@ref)
+"""
+function assert_row_key_part(::Nothing, ::Any, ::Symbol)::Nothing
+    return nothing
+end
+function assert_row_key_part(key::VecInt, T::Option{<:Integer}, sym::Symbol)::Nothing
+    assert_row_key_length(key, T, sym)
+    @argcheck(isempty(key) || (first(key) >= 1 && all(>(0), diff(key))),
+              ArgumentError("$sym must hold positive positions that increase strictly"))
+    return nothing
+end
+function assert_row_key_part(key::VecDate, T::Option{<:Integer}, sym::Symbol)::Nothing
+    assert_row_key_length(key, T, sym)
+    @argcheck(issorted(key; lt = <=), ArgumentError("$sym must increase strictly"))
+    return nothing
+end
+"""
+    assert_row_key_length(key::AbstractVector, T::Option{<:Integer}, sym::Symbol)
+
+Check that one part of a row key has one entry for each row that it describes.
+
+# Arguments
+
+  - `key`: The positions or the timestamps of the rows.
+  - `T`: The number of rows that the key describes, or `nothing` when the block does not state it.
+  - `sym`: The name of the field that holds `key`, for the error message.
+
+# Validation
+
+  - When `T` is an integer, `length(key) == T`. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_row_key_part`](@ref)
+"""
+function assert_row_key_length(key::AbstractVector, T::Option{<:Integer},
+                               sym::Symbol)::Nothing
+    @argcheck(isnothing(T) || length(key) == T,
+              DimensionMismatch("$sym ($(length(key))) must have one entry for each of the $T rows that the key describes"))
+    return nothing
+end
+"""
+    row_key_length(key::Nothing)
+    row_key_length(key::AbstractVector)
+
+Return the number of rows that one part of a row key describes, or `nothing` when the part is absent.
+
+A block that states no row count of its own, such as a [`Regression`](@ref), checks the timestamps of its key against the length of its positions. This function gives that length.
+
+# Arguments
+
+  - `key`: The positions or the timestamps of the rows, or `nothing`.
+
+# Returns
+
+  - `T::Option{<:Integer}`: `length(key)`, or `nothing`.
+
+# Related
+
+  - [`assert_row_key_part`](@ref)
+  - [`Regression`](@ref)
+"""
+function row_key_length(::Nothing)::Nothing
+    return nothing
+end
+function row_key_length(key::AbstractVector)::Int
+    return length(key)
+end
+"""
     assert_cs_block_rows(idx::Option{<:VecInt}, ts::Option{<:VecDate},
                          csr::Option{<:CrossSectionalRegression})
 
@@ -373,8 +473,7 @@ The row key names the observation of the returns data that each row of the block
 # Validation
 
   - When `idx` or `ts` is present, `csr` is present. Raises an `ArgumentError`.
-  - If provided, `length(idx) == size(csr.f, 1)`, and the entries of `idx` are positive and increase strictly. Raises a `DimensionMismatch` or an `ArgumentError`.
-  - If provided, `length(ts) == size(csr.f, 1)`, and the entries of `ts` increase strictly. Raises a `DimensionMismatch` or an `ArgumentError`.
+  - [`assert_row_key_part`](@ref) on `idx` and on `ts`, with the `size(csr.f, 1)` rows of the fit.
 
 # Returns
 
@@ -384,6 +483,7 @@ The row key names the observation of the returns data that each row of the block
 
   - [`CrossSectionalFactorModel`](@ref)
   - [`CrossSectionalRegression`](@ref)
+  - [`assert_row_key_part`](@ref)
 """
 function assert_cs_block_rows(idx::Option{<:VecInt}, ts::Option{<:VecDate},
                               csr::Option{<:CrossSectionalRegression})::Nothing
@@ -393,17 +493,8 @@ function assert_cs_block_rows(idx::Option{<:VecInt}, ts::Option{<:VecDate},
     @argcheck(!isnothing(csr),
               ArgumentError("idx and ts name the observation of each row of the fit, so a block that carries either one must carry csr"))
     Tb = size(csr.f, 1)
-    if !isnothing(idx)
-        @argcheck(length(idx) == Tb,
-                  DimensionMismatch("idx ($(length(idx))) must have one entry for each row of csr.f ($Tb)"))
-        @argcheck(isempty(idx) || (first(idx) >= 1 && all(>(0), diff(idx))),
-                  ArgumentError("idx must hold positive positions that increase strictly"))
-    end
-    if !isnothing(ts)
-        @argcheck(length(ts) == Tb,
-                  DimensionMismatch("ts ($(length(ts))) must have one entry for each row of csr.f ($Tb)"))
-        @argcheck(issorted(ts; lt = <=), ArgumentError("ts must increase strictly"))
-    end
+    assert_row_key_part(idx, Tb, :idx)
+    assert_row_key_part(ts, Tb, :ts)
     return nothing
 end
 """

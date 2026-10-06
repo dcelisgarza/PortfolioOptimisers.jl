@@ -17,6 +17,9 @@ assert_cs_history_obs
 assert_exposure_history
 assert_cs_regression_assets
 assert_return_forecast_assets
+assert_row_key_part
+assert_row_key_length
+row_key_length
 assert_cs_block_rows
 has_family_rebasis(csfm::CrossSectionalFactorModel)
 factor_axis_positions

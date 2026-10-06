@@ -492,7 +492,7 @@ function assert_factor_residual_config(pe::AbstractPriorEstimator, cfg)::Nothing
 end
 """
     prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} = nothing;
-          dims::Int = 1, strict::Bool = false, kwargs...)
+          dims::Int = 1, strict::Bool = false, ts::Option{<:VecDate} = nothing, kwargs...)
 
 Compute factor-based prior moments for asset returns using a factor model.
 
@@ -526,7 +526,9 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
  3. Fit the loadings and rebuild the asset returns with [`factor_reconstruction`](@ref), giving `rr` and `posterior_X`. The regression is `pe.re` viewed to the Coverage Universe with [`coverage_regression`](@ref).
  4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`.
  5. Write `esigma`, `edof` and `ediv` onto `rr` with [`set_idiosyncratic_covariance`](@ref). Under `pe.rsd = true` the fields hold the residual variances the lift measured and their counts, and under `pe.rsd = false` `esigma` and `ediv` hold `nothing`, because the lift added no residual block.
- 6. Assemble a [`LowOrderPrior`](@ref) over `posterior_X`, with the oriented `X` under `o_X`, the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the regression result under `rr`, and `f_prior` itself under `fpr`. No `Z` is carried; the composition note of [`FactorPrior`](@ref) says why.
+ 6. Take the rows `r` that `f_prior.X` carries: the last `size(f_prior.X, 1)` observations. A Scenario Cap of `pe.pe` keeps the last rows of `F` alone, and the asset side keeps the same rows, so the two blocks describe the same observations. With no cap, `r` is every observation. The moments of steps 2 to 4 are fitted over every observation, so the cut changes no moment.
+ 7. Write `r` and `ts[r]` onto `rr` as its row key with [`set_row_key`](@ref), or `nothing` for `ts` when `ts` is `nothing`.
+ 8. Assemble a [`LowOrderPrior`](@ref) over the rows `r` of `posterior_X`, with the rows `r` of the oriented `X` under `o_X`, both cut by [`scenario_window`](@ref), the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the regression result under `rr`, and `f_prior` itself under `fpr`. No `Z` is carried; the composition note of [`FactorPrior`](@ref) says why.
 
 # Arguments
 
@@ -536,11 +538,13 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
   - $(arg_dict[:pnl_prior]) The prior this estimator nests is fitted on the factors, whose axis no panel describes, so the panel stops here.
   - $(arg_dict[:dims])
   - $(arg_dict[:strict])
+  - $(arg_dict[:ts]) It has one entry for each observation of `X`, and the loadings result records the entries of the rows the prior result carries, or `nothing`. The method that takes a [`ReturnsResult`](@ref) passes `rd.ts`.
   - `kwargs...`: Additional keyword arguments passed to matrix processing and estimators.
 
 # Validation
 
   - `dims in (1, 2)`.
+  - If provided, `length(ts)` equals the number of observations of `X`. Raises a `DimensionMismatch`.
 
 # Returns
 
@@ -556,8 +560,12 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
   - [`prior`](@ref)
 """
 function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} = nothing;
-               dims::Int = 1, strict::Bool = false, kwargs...)
+               dims::Int = 1, strict::Bool = false, ts::Option{<:VecDate} = nothing,
+               kwargs...)
     X, F = dims_oriented(dims, X, F)
+    T = size(X, 1)
+    @argcheck(isnothing(ts) || length(ts) == T,
+              DimensionMismatch("ts ($(length(ts))) must have one entry for each of the $T observations of X"))
     # The regression is a per-asset fit, so it takes the Coverage Universe before it runs
     # rather than a frame after it: a stepwise search over a gapped column has no answer, and
     # `chol` is the factorisation of the block, not of the frame. Every block the result
@@ -578,6 +586,12 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
     # holds. The counts of the variances travel beside them, for a consumer that prices their
     # sampling error.
     rr = set_idiosyncratic_covariance(rr, esigma, edof, ediv)
+    # A Scenario Cap of the factor prior keeps the last rows of `F` alone, so the asset side
+    # keeps the same rows: the two blocks describe the same observations, and the row key
+    # names them. The moments above were fitted over every observation.
+    n = size(f_prior.X, 1)
+    r = (T - n + 1):T
+    rr = set_row_key(rr, r, nothing_scalar_array_getindex(ts, r))
     # No panel travels on a prior result at all: a Feature Matrix is derived from the Asset
     # Panel on the returns data, or built by a producer on the distance that reads the
     # loadings back off this result.
@@ -591,11 +605,53 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
     # existence and it is over the right observation axis. Its `ens`/`kld`/`ow` travel with it
     # — a weighting with no provenance cannot be interrogated (ADR 0046), and `ens` is what
     # sizes every uncertainty set built on this result.
-    return LowOrderPrior(; X = expand_columns(posterior_X, cmsk), o_X = X,
-                         mu = expand_vector(mu, cmsk), sigma = expand_moment(sigma, cmsk),
+    return LowOrderPrior(; X = expand_columns(scenario_window(n, posterior_X), cmsk),
+                         o_X = scenario_window(n, X), mu = expand_vector(mu, cmsk),
+                         sigma = expand_moment(sigma, cmsk),
                          chol = expand_columns(chol, cmsk), w = f_prior.w,
                          ens = f_prior.ens, kld = f_prior.kld, ow = f_prior.ow,
                          rr = expand_regression(rr, cmsk), fpr = f_prior)
+end
+"""
+    prior(pe::FactorPrior, rd::ReturnsResult; kwargs...) -> LowOrderPrior
+
+Fit a Factor Prior from a [`ReturnsResult`](@ref).
+
+The method passes the fields of `rd` to the returns-matrix method above, which runs the fit. The file defines this method instead of using [`prior(pe::AbstractPriorEstimator, rd::ReturnsResult)`](@ref), so that the timestamps `rd.ts` reach the fit, and the loadings result records the timestamp of each observation that the prior result carries.
+
+# Algorithm
+
+ 1. Check that `rd` carries asset returns and factor returns.
+ 2. Call the returns-matrix method with `rd.X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E` and `rd.ts` as keyword arguments alongside `kwargs`, and `dims = 1` last, because a `ReturnsResult` holds its observations along the rows.
+
+# Arguments
+
+  - `pe`: Factor prior estimator.
+  - $(arg_dict[:rd]) It must carry asset returns in `rd.X` and factor returns in `rd.F`.
+  - `kwargs...`: Additional keyword arguments passed to the returns-matrix method.
+
+# Validation
+
+  - `rd.X` is not `nothing`. Raises an [`IsNothingError`](@ref).
+  - `rd.F` is not `nothing`, through [`assert_factor_returns`](@ref).
+  - The rules of the returns-matrix method.
+
+# Returns
+
+  - `pr::LowOrderPrior`: The prior the returns-matrix method fitted.
+
+# Related
+
+  - [`FactorPrior`](@ref)
+  - [`prior`](@ref)
+  - [`ReturnsResult`](@ref)
+  - [`Regression`](@ref)
+"""
+function prior(pe::FactorPrior, rd::ReturnsResult; kwargs...)
+    @argcheck(!isnothing(rd.X), IsNothingError)
+    assert_factor_returns(pe, rd.F)
+    return prior(pe, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa, ne = rd.ne, E = rd.E,
+                 ts = rd.ts, kwargs..., dims = 1)
 end
 
 export FactorPrior

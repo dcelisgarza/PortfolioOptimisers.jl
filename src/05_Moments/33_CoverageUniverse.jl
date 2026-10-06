@@ -606,7 +606,7 @@ end
 
 Write a regression result fitted on the Coverage Universe back onto the full asset universe.
 
-A Prior Result has no mask field, so every block that it carries is on the full asset universe, and its regression result is one of those blocks. The loadings, the intercepts, the idiosyncratic covariance and the counts `edof` and `ediv` of that covariance are all per asset, so each expands along its asset axis. An asset outside the Coverage Universe reads zero in each count, through [`expand_count`](@ref).
+A Prior Result has no mask field, so every block that it carries is on the full asset universe, and its regression result is one of those blocks. The loadings, the intercepts, the idiosyncratic covariance and the counts `edof` and `ediv` of that covariance are all per asset, so each expands along its asset axis. An asset outside the Coverage Universe reads zero in each count, through [`expand_count`](@ref). The row key `idx` and `ts` names observations, not assets, so it passes through unchanged.
 
 The method reads `L` with `getfield`, as [`port_opt_view`](@ref) does. The property rule `swap(L, M)` makes `re.L` return `re.M` when `L` is `nothing`. A read through the property writes a copy of `M` into the `L` of the expanded result, and the result no longer shows that `L` is unset.
 
@@ -638,7 +638,7 @@ function expand_regression(re::Regression, cmsk::BitVector)
                       b = isnothing(b) ? nothing : expand_vector(b, cmsk),
                       esigma = expand_idiosyncratic_covariance(re.esigma, cmsk),
                       edof = expand_count(re.edof, cmsk),
-                      ediv = expand_count(re.ediv, cmsk))
+                      ediv = expand_count(re.ediv, cmsk), idx = re.idx, ts = re.ts)
 end
 """
     expand_idiosyncratic_covariance(esigma::Nothing, cmsk) -> nothing

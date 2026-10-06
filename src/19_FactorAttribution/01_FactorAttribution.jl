@@ -555,10 +555,11 @@ end
 """
     attribution_row_key(rr::AbstractLoadingsRegressionResult)
     attribution_row_key(rr::CrossSectionalFactorModel)
+    attribution_row_key(rr::Regression)
 
 Return the key that names the observation of each row of a factor model block.
 
-A realised [`factor_attribution`](@ref) of a cross-validation reads it to find the block rows of each fold. The key has two parts: `idx`, the position of each block row in the returns data that the prior read, and `ts`, the timestamp of each block row. A [`CrossSectionalFactorModel`](@ref) records both when its prior fits it. A block of another type records neither, so it answers `nothing` for each, and the attribution lines the series up with the block at their tail.
+A realised [`factor_attribution`](@ref) of a cross-validation reads it to find the block rows of each fold. The key has two parts: `idx`, the position of each block row in the returns data that the prior read, and `ts`, the timestamp of each block row. A [`CrossSectionalFactorModel`](@ref) records both when its prior fits it. A [`Regression`](@ref) records both when [`FactorPrior`](@ref) fits it, and its rows are the observations of the factor returns and the reconstruction of the prior result. A block of another type records neither, so it answers `nothing` for each, and the attribution lines the series up with the block at their tail.
 
 # Arguments
 
@@ -574,11 +575,12 @@ A realised [`factor_attribution`](@ref) of a cross-validation reads it to find t
   - [`factor_attribution`](@ref)
   - [`attribution_block_arrays`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
+  - [`Regression`](@ref)
 """
 function attribution_row_key(::AbstractLoadingsRegressionResult)
     return (; idx = nothing, ts = nothing)
 end
-function attribution_row_key(rr::CrossSectionalFactorModel)
+function attribution_row_key(rr::Union{<:CrossSectionalFactorModel, <:Regression})
     return (; idx = rr.idx, ts = rr.ts)
 end
 """
@@ -1281,7 +1283,7 @@ The verb reads the weights and the factor model block, and returns one [`FactorA
 
 **The bare arrays are the bottom level, and a prior method unpacks the prior result into them.** A caller who holds a factor model as arrays, a vendor risk model for example, attributes with no fitted object. `factor_attribution(w, pr)` is the bare-array method on `pr.rr.M`, `pr.fpr.sigma`, the idiosyncratic covariance of the block, `pr.fpr.mu`, `pr.rr.b`, `pr.sigma`, `pr.mu` and the family labels of the block, so the two methods answer the same numbers. Without `sigma` and `mu` the model is the total, and the unattributed remainder is an exact zero. The realised bare-array method reads the histories on one observation axis, untrimmed, and aligns them itself: the returns of observation `t` pair with the exposures of observation `t - lag`. `lag` defaults to one for an exposure history, and to zero for a static matrix, which describes every observation. A prior method reads each of these arrays off the block.
 
-**A cross-validation is matched to the block row by row.** The series of a walk-forward covers the test rows of its folds, and the prior result usually covers the whole sample, so the two do not end on the same row. Each fold records its rows, the positions `idx` of a [`PredictionResult`](@ref) and the timestamps of its `rd.ts`, and a [`CrossSectionalFactorModel`](@ref) records the rows its fit covers. The method matches the two by timestamp when both carry timestamps, and by position otherwise. The positions agree only when the prior read the returns data that the cross-validation split. The method aligns the exposures of the whole block before it cuts the block to the matched rows, so the first test row keeps the exposures of the row before it. The test rows before the first row the block decomposes, or after its last row, are left out. A block that records no rows, or a series that carries no key it shares, is lined up at the tail as a single series is. A [`CombinatorialCrossValidation`](@ref) or a [`MultipleRandomised`](@ref) produces a population of paths, and the method over a [`PopulationPredictionResult`](@ref) attributes each path in this way. A path of [`MultipleRandomised`](@ref) holds a subset of the assets, so it is attributed against a prior fitted on the same subset.
+**A cross-validation is matched to the block row by row.** The series of a walk-forward covers the test rows of its folds, and the prior result usually covers the whole sample, so the two do not end on the same row. Each fold records its rows, the positions `idx` of a [`PredictionResult`](@ref) and the timestamps of its `rd.ts`. A [`CrossSectionalFactorModel`](@ref) records the rows its fit covers, and a [`Regression`](@ref) records the observations of the prior result that [`FactorPrior`](@ref) fitted. A [`Pipeline`](@ref) fold records its positions only when every fitted step keeps the observations, see [`keeps_observations`](@ref). The method matches the two by timestamp when both carry timestamps, and by position otherwise. The positions agree only when the prior read the returns data that the cross-validation split. The method aligns the exposures of the whole block before it cuts the block to the matched rows, so the first test row keeps the exposures of the row before it. The test rows before the first row the block decomposes, or after its last row, are left out. A block that records no rows, or a series that carries no key it shares, is lined up at the tail as a single series is. A [`CombinatorialCrossValidation`](@ref) or a [`MultipleRandomised`](@ref) produces a population of paths, and the method over a [`PopulationPredictionResult`](@ref) attributes each path in this way. A path of [`MultipleRandomised`](@ref) holds a subset of the assets, so it is attributed against a prior fitted on the same subset.
 
 **The predicted totals of a prior method come from the prior result, not from the model.** `pr.mu` and `pr.sigma` are what the optimiser saw and what [`expected_return`](@ref) and [`expected_risk`](@ref) report, so they are the totals. A wrapping prior replaces them while it forwards the block unchanged, so the model no longer reproduces them, and the two gaps `dot(w, pr.mu - M * fpr.mu - b)` and `dot(w, (pr.sigma - M * F * M' - D) * w) / sigma_P` land in the unattributed remainder. The remainder is therefore present on the predicted side too, and it is at rounding level on a plain fit.
 

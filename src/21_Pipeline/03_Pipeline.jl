@@ -1133,7 +1133,7 @@ A vector of index vectors predicts on each window and returns one result per win
  2. Take the rows `test_idx` and the columns `cols` of `data` with [`port_opt_view`](@ref), giving the window. Returns data with `:` for both is the window as it is.
  3. Apply the fitted steps to the window with [`apply_fitted_steps`](@ref), giving `rd`. For price data, check that `rd` is returns data.
  4. Check the asset axis of `rd` with [`assert_universe_aligned`](@ref).
- 5. Return `predict(opt, rd)`, with the keyword arguments.
+ 5. Return `predict(opt, rd)`, with the keyword arguments. For returns data, apply the steps with [`apply_fitted_steps_keeping`](@ref) in step 3, and record `test_idx` on the prediction with [`pipeline_fold_prediction`](@ref) when every step keeps the observations, see [`keeps_observations`](@ref). Price data records no rows, because [`PricesToReturns`](@ref) drops the first price row, so the positions of the returns are not those of `test_idx`. Price data carries timestamps, and the timestamps name the rows instead.
 
 # Arguments
 
@@ -1203,11 +1203,12 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
     else
         port_opt_view(data, test_idx, cols)
     end
-    rd = apply_fitted_steps(res.results, rd)
+    rd, kept = apply_fitted_steps_keeping(res.results, rd)
     assert_universe_aligned(res, rd)
-    return StatsAPI.predict(opt, rd; wd = wd, hwd = hwd, fa = fa,
+    pred = StatsAPI.predict(opt, rd; wd = wd, hwd = hwd, fa = fa,
                             store_weight_path = store_weight_path, strict = strict,
                             w_prev = w_prev)
+    return pipeline_fold_prediction(pred, test_idx, kept)
 end
 function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
                           test_idxs::VecVecInt, cols = Colon(); kwargs...)

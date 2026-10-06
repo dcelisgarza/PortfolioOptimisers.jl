@@ -979,8 +979,11 @@ end
         blk = PO.attribution_block_arrays(pr.rr, pr)
         @test_throws DimensionMismatch PO.attribution_key_align(blk, 5,
                                                                 (; idx = 1:4, ts = nothing))
-        # A block of another type records no key.
-        @test PO.attribution_row_key(first(fa_ts_prior()).rr) ==
+        # A FactorPrior block records the positions of its observations (#1495), and a block
+        # built by hand records no key.
+        tsr = first(fa_ts_prior()).rr
+        @test PO.attribution_row_key(tsr) == (; idx = 1:90, ts = nothing)
+        @test PO.attribution_row_key(Regression(; M = tsr.M)) ==
               (; idx = nothing, ts = nothing)
     end
 end

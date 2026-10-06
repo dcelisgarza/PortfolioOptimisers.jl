@@ -26,7 +26,11 @@ To implement a new preprocessing estimator, subtype `AbstractPricesPreprocessing
 
   - `apply_preprocessing(fitted, data) -> data′`: Transform the window `data` with `fitted`, the object that `fit_preprocessing` returned.
 
-A subtype that does not implement a method gets the fallback of that method, which throws an `ArgumentError` that names the subtype.
+## `keeps_observations`
+
+  - `keeps_observations(fitted) -> Bool`: Optional. Return `true` when the transform keeps every observation of the window, in order. The fallback returns `false`.
+
+A subtype that does not implement `fit_preprocessing` or `apply_preprocessing` gets the fallback of that method, which throws an `ArgumentError` that names the subtype.
 
 # Related
 
@@ -84,6 +88,10 @@ To implement a new returns-level estimator, subtype `AbstractReturnsPreprocessin
 
   - `apply_preprocessing(res::MyReturnsPreprocessingResult, rd::AbstractReturnsResult) -> AbstractReturnsResult`: Transform the returns window `rd` with the fitted state of `res`.
 
+## `keeps_observations`
+
+  - `keeps_observations(fitted) -> Bool`: Optional. Return `true` when the transform keeps every observation of the window, in order. The fallback returns `false`.
+
 # Related
 
   - [`AbstractPreprocessingEstimator`](@ref)
@@ -107,6 +115,7 @@ A concrete result subtypes the data-level subtype that matches its estimator, [`
 To implement a new preprocessing result, subtype `AbstractPricesPreprocessingResult` or `AbstractReturnsPreprocessingResult`, and implement the following method:
 
   - `apply_preprocessing(res::MyPreprocessingResult, data) -> data′`: Transform the window `data` with the fitted state of `res`.
+  - `keeps_observations(res::MyPreprocessingResult) -> Bool`: Optional. Return `true` when the transform keeps every observation of the window, in order. The fallback returns `false`.
 
 # Related
 
@@ -149,6 +158,7 @@ A [`Pipeline`](@ref) applies a result of this type to the returns in its returns
 To implement a new returns-level result, subtype `AbstractReturnsPreprocessingResult` and implement the following method:
 
   - `apply_preprocessing(res::MyReturnsPreprocessingResult, rd::AbstractReturnsResult) -> AbstractReturnsResult`: Transform the returns window `rd` with the fitted state of `res`.
+  - `keeps_observations(res::MyReturnsPreprocessingResult) -> Bool`: Optional. Return `true` when the transform keeps every observation of the window, in order. The fallback returns `false`.
 
 # Related
 
@@ -251,7 +261,36 @@ function apply_preprocessing(fitted::Union{<:AbstractPreprocessingEstimator,
                                            <:AbstractPreprocessingResult}, data)
     return throw(ArgumentError("$(typeof(fitted)) subtypes AbstractPreprocessingEstimator or AbstractPreprocessingResult but does not implement apply_preprocessing. Extension authors: a preprocessing estimator must implement both halves of the interface, fit_preprocessing(est, data) -> fitted and apply_preprocessing(fitted, data) -> data′; a stateless estimator returns itself from fit_preprocessing and does the work here."))
 end
+"""
+    keeps_observations(fitted) -> Bool
+
+Return `true` when a fitted preprocessing object keeps every observation of a window that it transforms.
+
+A transform keeps the observations when the window it returns holds the observations of its input, in the same order. It can change the assets and the values. A [`Pipeline`](@ref) reads this answer when it predicts on a fold of returns data. When every fitted step keeps the observations, the fold records its rows on the [`PredictionResult`](@ref), and a realised [`factor_attribution`](@ref) of the cross-validation finds the block rows of each fold by position.
+
+The fallback returns `false`, which makes no promise. A fold whose steps make no promise records no rows, so the attribution matches it by timestamp, or lines it up at the tail. A wrong `true` makes the attribution read the wrong rows, so a fitted object returns `true` only when no window loses, adds or moves an observation. The asset selectors return `true`, because they select columns alone. [`PricesToReturns`](@ref) keeps the fallback, because it drops the first price row.
+
+# Arguments
+
+  - `fitted`: The object that [`fit_preprocessing`](@ref) returned, an [`AbstractPreprocessingResult`](@ref) or a stateless estimator.
+
+# Returns
+
+  - `flag::Bool`: `true` when the transform keeps every observation of the window in order, and `false` when it makes no such promise.
+
+# Related
+
+  - [`apply_preprocessing`](@ref)
+  - [`AbstractPreprocessingEstimator`](@ref)
+  - [`AbstractPreprocessingResult`](@ref)
+  - [`AbstractAssetSelector`](@ref)
+"""
+function keeps_observations(::Union{<:AbstractPreprocessingEstimator,
+                                    <:AbstractPreprocessingResult})::Bool
+    return false
+end
 export fit_preprocessing, apply_preprocessing
+public keeps_observations
 public AbstractPreprocessingEstimator, AbstractPricesPreprocessingEstimator,
        AbstractReturnsPreprocessingEstimator, AbstractPreprocessingResult,
        AbstractPricesPreprocessingResult, AbstractReturnsPreprocessingResult

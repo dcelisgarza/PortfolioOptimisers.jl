@@ -12,6 +12,8 @@ PortfolioOptimisers.prior_returns_buffer
 PortfolioOptimisers.fold_carry
 Base.copy(x::PortfolioOptimisers.PriorCarryState)
 PortfolioOptimisers.buffer_prior
+PortfolioOptimisers.buffer_row_key
+PortfolioOptimisers.forget_row_positions
 PortfolioOptimisers.needs_factor_returns
 PortfolioOptimisers.combine_factor_answers
 PortfolioOptimisers.reads_panel_fields
