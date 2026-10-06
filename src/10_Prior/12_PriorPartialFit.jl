@@ -835,9 +835,7 @@ function partial_fit!(pe::AbstractPriorEstimator, X::VecNum_MatNum,
         partial_fit!(state, X, F; active_mask = active_mask,
                      estimation_mask = estimation_mask)
     end
-    # `rebuild_estimator`, not `Accessors.@reset`, for the reason the generic buffering arm
-    # gives: every prior that buffers declares forwarded properties, which `@reset` refuses.
-    return pin_prior_choice(rebuild_estimator(pe, (; cache = state)), sample_buffer(state),
+    return pin_prior_choice(Accessors.@set(pe.cache = state), sample_buffer(state),
                             factor_buffer(state))
 end
 """
@@ -1602,7 +1600,7 @@ The estimator forwards the fold to `pe.pe` in every case, because that member ca
 
  1. Fold `pe.pe` with the observations and `F` through [`partial_fit!`](@ref).
  2. Fold `pe.kte` and `pe.ske` with the observations through [`fold_member`](@ref).
- 3. Rebuild the estimator with the three folded members with `rebuild_estimator`, and return it.
+ 3. Rebuild the estimator with the three folded members with `Accessors.setproperties`, and return it.
 
 # Arguments
 
@@ -1628,13 +1626,10 @@ The estimator forwards the fold to `pe.pe` in every case, because that member ca
 """
 function partial_fit!(pe::HighOrderPriorEstimator, X::VecNum_MatNum,
                       F::Option{<:VecNum_MatNum} = nothing; kwargs...)
-    # `rebuild_estimator`, not `Accessors.@reset`: this estimator declares forwarded
-    # properties, and `@reset` rebuilds a struct by reading every *property*, which on such
-    # a type is not the field list at all.
-    return rebuild_estimator(pe,
-                             (; pe = partial_fit!(pe.pe, X, F; kwargs...),
-                              kte = fold_member(pe.kte, X; kwargs...),
-                              ske = fold_member(pe.ske, X; kwargs...)))
+    return Accessors.setproperties(pe,
+                                   (; pe = partial_fit!(pe.pe, X, F; kwargs...),
+                                    kte = fold_member(pe.kte, X; kwargs...),
+                                    ske = fold_member(pe.ske, X; kwargs...)))
 end
 """
     prior(pe::HighOrderPriorEstimator; kwargs...)

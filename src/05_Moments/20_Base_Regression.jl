@@ -1553,7 +1553,7 @@ Return a [`Regression`](@ref) that carries `esigma`, `edof` and `ediv`, with eve
 
 A regression estimator fits loadings alone, so the block a fit returns carries no idiosyncratic covariance. The prior that lifts the factor moments measures the residual variances on the way, and it writes them here rather than making every consumer recompute them. It writes the counts of those variances beside them. [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) are the two callers, and each passes what [`factor_lift`](@ref) returned: the variances and their counts under `rsd = true`, and `nothing` for the variances and the divisors under `rsd = false`.
 
-`Accessors.@set` cannot do this. It reads the fields through property access, and the `swap(L, M)` rule of [`Regression`](@ref) makes `re.L` return `re.M` when `L` is unset, so the rebuilt result would carry a copy of `M` under `L` and `isnothing(getfield(re, :L))` would stop being true. This method reads `L` and `b` with `getfield` for that reason, as [`port_opt_view`](@ref) does.
+This method reads `L` and `b` with `getfield`, as [`port_opt_view`](@ref) does. The `swap(L, M)` rule of [`Regression`](@ref) makes `re.L` return `re.M` when `L` is unset, so a read through the property would write a copy of `M` under `L`, and `isnothing(getfield(re, :L))` would stop being true.
 
 # Arguments
 

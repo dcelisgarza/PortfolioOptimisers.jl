@@ -907,3 +907,102 @@ end
     @test occursin("cannot descend path `sol.w`", msg)
     @test occursin("intermediate `sol` is `nothing`", msg)
 end
+# `Accessors.@set` expands when the test set is lowered, before a `using` inside it runs.
+using Accessors: Accessors
+@testset "@forward_properties: Accessors rebuilds a decorated type through its keyword constructor" begin
+    using PortfolioOptimisers, Test
+    #=
+    Issue #1497. The macro generates `ConstructionBase.setproperties`, which `Accessors.set`
+    calls to rebuild each struct on a lens path. The default refuses a type whose
+    `propertynames` differ from its `fieldnames`. The method reads each field with
+    `getfield`, so a `swap` never writes its value into the field it hides, and it calls the
+    keyword constructor, so every guard runs again. A forwarded or computed name has no
+    storage, so a patch that names one is refused, with the path to set when one exists.
+    =#
+    mk = Module(:ForwardSetProbe)
+    Base.eval(mk, :(using PortfolioOptimisers: @forward_properties))
+    Base.eval(mk, quote
+                  Base.@kwdef struct KInner
+                      w::Any = 1
+                      z::Any = 2
+                  end
+                  struct KOuter
+                      pa::KInner
+                      sol::KInner
+                      n::Int
+                      function KOuter(; pa = KInner(), sol = KInner(), n = 0)
+                          n >= 0 || throw(DomainError(n, "n must be non-negative"))
+                          return new(pa, sol, n)
+                      end
+                  end
+                  @forward_properties KOuter begin
+                      forward(pa)
+                      alias(zz, sol.z)
+                      compute(cw, sol.w)
+                      compute(fn, x -> 42)
+                  end
+                  struct KNamed
+                      pa::KInner
+                      n::Int
+                      KNamed(; pa = KInner(), n = 0) = new(pa, n)
+                  end
+                  @forward_properties KNamed begin
+                      forward(pa, w)
+                  end
+                  struct KSwap{T}
+                      L::T
+                      M::Int
+                      KSwap(; L = nothing, M = 5) = new{typeof(L)}(L, M)
+                  end
+                  @forward_properties KSwap{Nothing} begin
+                      swap(L, M)
+                  end
+              end)
+    o = mk.KOuter(; n = 3)
+    # A field is patched, and the others keep their values.
+    o2 = Accessors.@set o.n = 4
+    @test o2.n == 4
+    @test o2.pa === o.pa
+    @test o2.sol === o.sol
+    # A lens through a field reaches the nested value.
+    o3 = Accessors.@set o.sol.z = 9
+    @test o3.zz == 9
+    # The keyword constructor runs, so its guard refuses a bad value.
+    @test_throws DomainError Accessors.@set o.n = -1
+    function set_error(f)
+        return try
+            f()
+            ""
+        catch err
+            sprint(showerror, err)
+        end
+    end
+    # Each forwarded name is refused, and the message names the path that holds it.
+    msg = set_error(() -> Accessors.@set o.w = 0)
+    @test occursin("`w` cannot be set on a `KOuter`", msg)
+    @test occursin("forwards from `pa.w`", msg)
+    @test occursin("Set `pa.w` of the `KOuter` instead", msg)
+    @test occursin("forwards from `sol.z`", set_error(() -> Accessors.@set o.zz = 0))
+    @test occursin("forwards from `sol.w`", set_error(() -> Accessors.@set o.cw = 0))
+    @test occursin("forwards from `pa.w`",
+                   set_error(() -> Accessors.@set mk.KNamed().w = 0))
+    # A name computed by a function has no path to set.
+    msg = set_error(() -> Accessors.@set o.fn = 0)
+    @test occursin("computes from its fields", msg)
+    @test occursin("(:pa, :sol, :n)", msg)
+    # A name that is neither a field nor a property is refused too.
+    @test occursin("neither a field nor a property",
+                   set_error(() -> Accessors.setproperties(o, (; bogus = 1))))
+    #=
+    `swap(L, M)` makes an unset `L` read as `M`. The rebuild reads `L` with `getfield`, so it
+    stays unset, and setting `L` stores it, which leaves the specialisation the rule covers.
+    =#
+    s = mk.KSwap()
+    @test s.L == 5
+    s2 = Accessors.@set s.M = 6
+    @test isnothing(getfield(s2, :L))
+    @test s2.L == 6
+    s3 = Accessors.@set s.L = 1.5
+    @test getfield(s3, :L) == 1.5
+    @test s3 isa mk.KSwap{Float64}
+end

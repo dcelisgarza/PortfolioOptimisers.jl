@@ -1382,11 +1382,7 @@ function partial_fit!(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEsti
     else
         partial_fit!(state, X; active_mask = active_mask, estimation_mask = estimation_mask)
     end
-    # `rebuild_estimator`, not `Accessors.@reset`: `@reset` rebuilds a struct by reading
-    # every *property*, and an estimator that declares forwarded properties has more
-    # properties than fields, so `@reset` refuses it outright. Every prior that buffers is
-    # such an estimator.
-    return rebuild_estimator(est, (; cache = state))
+    return Accessors.@set est.cache = state
 end
 """
 $(DocStringExtensions.TYPEDEF)

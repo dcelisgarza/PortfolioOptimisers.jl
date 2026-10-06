@@ -427,3 +427,85 @@ The fixture is the online fold loop's, because the identities are structural.
         end
     end
 end
+#=
+A search tunes a field of a prior with forwarded properties, issue #1497.
+
+`search_candidate` builds each candidate with `Accessors.set`, which rebuilds every struct on
+the lens path with `ConstructionBase.setproperties`. The default of that function refuses a
+type whose `propertynames` differ from its `fieldnames`, and `@forward_properties` adds
+forwarded names to nine priors, so each candidate failed before any fit. The macro now
+generates the method. Each candidate must score as the candidate built by hand with the
+keyword constructor, under the grid and the randomised search, directly, through a nested
+prior, and through a Pipeline.
+=#
+@testset "A search tunes a field of a prior with forwarded properties" begin
+    using Test, PortfolioOptimisers, StableRNGs, Accessors
+    po = PortfolioOptimisers
+    rng = StableRNG(1495)
+    F = 0.01 .* randn(rng, 250, 3)
+    X = F * (0.5 .+ rand(rng, 3, 10)) .+ 0.005 .* randn(rng, 250, 10)
+    rd = ReturnsResult(; nx = ["a$i" for i in 1:10], X = X, nf = ["f1", "f2", "f3"], F = F)
+    cv = IndexWalkForward(120, 40)
+    cvr = split(cv, rd)
+    r = ConditionalValueatRisk()
+    res_vals = [StepwiseRegression(), DimensionReductionRegression()]
+    pe_vals = [EmpiricalPrior(), EmpiricalPrior(; ce = PortfolioOptimisersCovariance())]
+    function scores_of(opt)
+        return [-expected_risk(r,
+                               po.fit_and_predict(opt, rd; train_idx = cvr.train_idx[j],
+                                                  test_idx = cvr.test_idx[j]))
+                for j in eachindex(cvr.train_idx)]
+    end
+    cases = (("pe.re", InverseVolatility(; pe = FactorPrior()), res_vals,
+              v -> InverseVolatility(; pe = FactorPrior(; re = v))),
+             ("pe.pe", InverseVolatility(; pe = FactorPrior()), pe_vals,
+              v -> InverseVolatility(; pe = FactorPrior(; pe = v))),
+             # Two decorated priors on one lens path.
+             ("pe.pe.re",
+              InverseVolatility(; pe = HighOrderPriorEstimator(; pe = FactorPrior())),
+              res_vals,
+              v -> InverseVolatility(;
+                                     pe = HighOrderPriorEstimator(;
+                                                                  pe = FactorPrior(;
+                                                                                   re = v)))))
+    for (lens, opt, vals, by_hand) in cases
+        res = search_cross_validation(opt,
+                                      GridSearchCrossValidation([lens => vals]; cv = cv,
+                                                                r = r), rd)
+        for (i, v) in enumerate(vals)
+            @test res.test_scores[:, i] == scores_of(by_hand(v))
+        end
+        rres = search_cross_validation(opt,
+                                       RandomisedSearchCrossValidation([lens => vals];
+                                                                       cv = cv, r = r,
+                                                                       n_iter = 2,
+                                                                       seed = 7), rd)
+        for (i, v) in enumerate(rres.val_grid)
+            @test rres.test_scores[:, i] == scores_of(by_hand(v[1]))
+        end
+    end
+    # A Pipeline reaches the prior through its step name.
+    pipe = Pipeline(; steps = ("prior" => FactorPrior(), "opt" => InverseVolatility()))
+    pres = search_cross_validation(pipe,
+                                   GridSearchCrossValidation(["prior.re" => res_vals];
+                                                             cv = cv, r = r), rd)
+    for (i, v) in enumerate(res_vals)
+        hand = Pipeline(;
+                        steps = ("prior" => FactorPrior(; re = v),
+                                 "opt" => InverseVolatility()))
+        @test pres.test_scores[:, i] == scores_of(hand)
+    end
+    # A forwarded name has no storage of its own, so a lens onto it is refused before any
+    # candidate is scored, and the message names the path that holds the value.
+    err = try
+        search_cross_validation(InverseVolatility(; pe = FactorPrior()),
+                                GridSearchCrossValidation(["pe.ce" => [Covariance()]];
+                                                          cv = cv, r = r), rd)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("forwards from `pe.ce`", sprint(showerror, err))
+    @test occursin("Set `pe.ce` of the `FactorPrior` instead", sprint(showerror, err))
+end
