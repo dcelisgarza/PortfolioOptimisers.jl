@@ -83,13 +83,15 @@ function Collect(description::AbstractString; top::Bool = false, kwargs...)
     return Collect(description, top, 0, 0, 0, 0)
 end
 
-function Test.record(ts::Collect, ::Test.Pass)
+# `@test_throws` returns what `record` returns, as `Test.DefaultTestSet` does, so a test can read
+# the exception off it.
+function Test.record(ts::Collect, r::Test.Pass)
     ts.pass += 1
-    return nothing
+    return r
 end
-function Test.record(ts::Collect, ::Test.Broken)
+function Test.record(ts::Collect, r::Test.Broken)
     ts.broken += 1
-    return nothing
+    return r
 end
 function Test.record(ts::Collect, r::Union{Test.Fail, Test.Error})
     if r isa Test.Fail
@@ -98,7 +100,7 @@ function Test.record(ts::Collect, r::Union{Test.Fail, Test.Error})
         ts.error += 1
     end
     println(OUT[], ts.description, ": ", r)
-    return nothing
+    return r
 end
 function Test.record(parent::Collect, child::Collect)
     parent.pass += child.pass

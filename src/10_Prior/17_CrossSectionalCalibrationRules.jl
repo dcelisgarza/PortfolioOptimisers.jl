@@ -263,7 +263,7 @@ The blend acts on the estimated factors alone, so the function keeps the leading
 \\begin{align}
 \\hat{\\mathbf{\\Sigma}}_{f} &= \\sum_{i} \\ell_{i} \\boldsymbol{u}_{i} \\boldsymbol{u}_{i}^{\\intercal}\\,, \\\\
 \\mathbf{W} &= \\left[ \\boldsymbol{u}_{i} / \\sqrt{\\ell_{i}} \\right]_{\\ell_{i} > \\tau}\\,, \\\\
-\\tau &= m \\, \\epsilon\\left(\\max_{i} \\ell_{i}\\right)\\,.
+\\tau &= \\sqrt{\\epsilon} \\max_{i} \\ell_{i}\\,.
 \\end{align}
 ```
 
@@ -272,9 +272,8 @@ Where:
   - ``\\hat{\\mathbf{\\Sigma}}_{f}``: Factor covariance of the nested factor prior, over the estimated factors.
   - ``\\ell_{i}``, ``\\boldsymbol{u}_{i}``: Eigenvalue ``i`` of the factor covariance and its eigenvector.
   - ``\\mathbf{W}``: The kept eigenvectors, each divided by the square root of its eigenvalue, so ``\\mathbf{W} \\mathbf{W}^{\\intercal}`` is the pseudo-inverse of the factor covariance.
-  - ``\\tau``: Threshold below which an eigenvalue is taken as zero.
-  - ``m``: Number of estimated factors.
-  - ``\\epsilon(x)``: Spacing of the floating-point numbers at ``x``.
+  - ``\\tau``: Threshold below which an eigenvalue is taken as zero. The zero eigenvalue of a singular factor covariance is round-off, and its size depends on the machine, so the threshold sits far above round-off: an eigenvalue that small carries no variance a sample can measure.
+  - ``\\epsilon``: Machine epsilon of the element type of the eigenvalues.
 
 # Arguments
 
@@ -301,7 +300,7 @@ function spanned_shrinkage_moments(pr::AbstractPriorResult, cs::NamedTuple,
     Ke = size(cs.csfm.csr.f, 2)
     E = LinearAlgebra.eigen(LinearAlgebra.Symmetric(pr.sigma[1:Ke, 1:Ke]))
     lmax = maximum(E.values)
-    keep = E.values .> Ke * eps(lmax)
+    keep = E.values .> sqrt(eps(eltype(E.values))) * lmax
     ev = E.values[keep]
     return (; mu = pr.mu[1:Ke], G = G, W = E.vectors[:, keep] ./ transpose(sqrt.(ev)),
             ev = ev, K = count(keep))

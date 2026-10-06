@@ -263,6 +263,9 @@ end
         write(path, """
               @testset "outer" begin
                   @test find_tol(1.0, 1.0) === nothing
+                  # `@test_throws` returns the result that `record` returns (#1475).
+                  r = @test_throws ErrorException error("x")
+                  @test r.value isa ErrorException
                   @testset "inner" begin
                       @test 1 == 1
                       @test 1 == 2
@@ -276,11 +279,11 @@ end
             return RF.run_file(path; code)
         end
         RF.OUT[] = stdout
-        @test (ts.pass, ts.fail, ts.error, ts.broken) == (2, 1, 1, 1)
+        @test (ts.pass, ts.fail, ts.error, ts.broken) == (4, 1, 1, 1)
         @test seconds >= 0
         @test RF.result_line(ts, 1.0) ==
-              "RESULT test_fixture.jl pass=2 fail=1 error=1 broken=1 seconds=1.0"
-        @test RF.done_line([ts]) == "DONE files=1 pass=2 fail=1 error=1 broken=1 status=red"
+              "RESULT test_fixture.jl pass=4 fail=1 error=1 broken=1 seconds=1.0"
+        @test RF.done_line([ts]) == "DONE files=1 pass=4 fail=1 error=1 broken=1 status=red"
         @test RF.resolve("test_76_gate_tooling.jl") ==
               joinpath(RF.TEST_DIR, "test_76_gate_tooling.jl")
         @test_throws ErrorException RF.resolve("test_no_such_file.jl")

@@ -310,6 +310,14 @@ end
     bs = prior(CrossSectionalFactorPrior(; factors = factors, pe = EmpiricalPrior(),
                                          rfe = rfe, lambda = SteinShrinkage()), rd)
     @test isapprox(bs.rr.lambda, 1 - (K + 2) / ((K + 2) + T * B); rtol = 1e-10)
+    # The zero eigenvalue of a singular factor covariance is round-off, and it fell on either
+    # side of `m * eps` by the CI host (#1475). The threshold `sqrt(eps)` of the largest drops
+    # an eigenvalue at 1e-12 of it and keeps one at 1e-7.
+    cs3 = (; csfm = (; csr = (; f = zeros(1, 3))))
+    for (v, k) in ((1e-12, 2), (1e-7, 3))
+        p3 = LowOrderPrior(; X = ones(2, 3), mu = zeros(3), sigma = diagm([1.0, 0.5, v]))
+        @test PO.spanned_shrinkage_moments(p3, cs3, zeros(3, 1)).K == k
+    end
 
     # With no Return Forecast the default shrinks the factor mean towards zero, under the moments
     # of the default factor prior.
