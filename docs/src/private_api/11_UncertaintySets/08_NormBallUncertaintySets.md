@@ -10,6 +10,7 @@ assert_norm_ball_val
 dual_norm_order
 norm_ball_factor
 norm_ball_deviation_factor
+norm_ball_coordinates
 k_norm_ball
 norm_ball_set
 norm_ball_deviation_set

@@ -1937,6 +1937,46 @@ end
             @test isapprox(diag(PortfolioOptimisers.norm_ball_deviation_factor(true, E730)),
                            sqrt.(vec(var(E730; dims = 1))))
         end
+        @testset "The normal radius applies the pseudo-inverse, and cuts only a singular square map" begin
+            # #1526: a square map went to an LU factorisation, which refuses a singular
+            # map. Every map that solved before still takes `L \ X'`, bit for bit.
+            S730 = cov(X730)
+            E730 = randn(StableRNG(5), 500, N730) * 1e-2
+            coords = PortfolioOptimisers.norm_ball_coordinates
+            for L in
+                (cholesky(S730).L, matrix_square_root(RidgeCholeskySquareRoot(), S730),
+                 PortfolioOptimisers.norm_ball_deviation_factor(false, E730),
+                 PortfolioOptimisers.norm_ball_deviation_factor(true, E730))
+                @test coords(L, E730) == L \ transpose(E730)
+            end
+            # A zero entry of a diagonal map gives a zero coordinate.
+            @test coords(Diagonal([0.5, 0.0, 0.25]), [1.0 2.0 3.0; 4.0 5.0 6.0]) ==
+                  [2.0 8.0; 0.0 0.0; 12.0 24.0]
+            # The eigen square root of a singular shape: the squared distances are the
+            # pseudo-inverse Mahalanobis distances under the cut `m eps` on the eigenvalues.
+            B = randn(StableRNG(6), N730, 3)
+            Ss = B * transpose(B)
+            Ls = matrix_square_root(EigenFallbackSquareRoot(), Ss)
+            @test !isa(Ls, LowerTriangular)
+            @test rank(Ls) == 3
+            Es = transpose(Ls * randn(StableRNG(7), N730, 200))
+            Zs = coords(Ls, Es)
+            @test size(Zs) == (3, 200)
+            Pinv = pinv(Ss; rtol = N730 * eps())
+            @test isapprox(vec(sum(abs2, Zs; dims = 1)),
+                           [dot(x, Pinv, x) for x in eachrow(Es)]; rtol = 1e-10)
+            km = NormalKUncertaintyAlgorithm()
+            @test isapprox(PortfolioOptimisers.k_norm_ball(km, 0.05, Es, Ls, 3),
+                           sqrt(quantile([dot(x, Pinv, x) for x in eachrow(Es)], 0.95));
+                           rtol = 1e-10)
+            # A deviation map with as many simulations as entries is square, and its rank
+            # is one less than its size.
+            Eq = randn(StableRNG(8), N730, N730)
+            Lq = PortfolioOptimisers.norm_ball_deviation_factor(false, Eq)
+            @test size(coords(Lq, Eq), 1) == N730 - 1
+            # A zero map keeps no direction, so every distance is zero.
+            @test PortfolioOptimisers.k_norm_ball(km, 0.05, Es, zeros(N730, N730), 0) == 0
+        end
         @testset "The Normal estimator emits the ellipsoid it would have built, factorised" begin
             for diagonal in (true, false),
                 method in (ChiSqKUncertaintyAlgorithm(), NormalKUncertaintyAlgorithm(),

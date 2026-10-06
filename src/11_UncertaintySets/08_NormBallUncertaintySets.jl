@@ -487,6 +487,62 @@ function norm_ball_deviation_factor(diagonal::Bool, X::MatNum)
     end
 end
 """
+    norm_ball_coordinates(L::Union{LinearAlgebra.LowerTriangular, LinearAlgebra.UpperTriangular}, X::MatNum)
+    norm_ball_coordinates(L::LinearAlgebra.Diagonal, X::MatNum)
+    norm_ball_coordinates(L::MatNum, X::MatNum)
+
+Ball coordinates of each sampled error under the pseudo-inverse of a geometry map, one column per error.
+
+**Only a map that can be singular pays for a rank decision.** A triangular map is a Cholesky factor, and the factorisation that made it found the shape positive definite, so a triangular solve is the pseudo-inverse. A map that is not square is the deviation map of [`norm_ball_deviation_factor`](@ref), and Julia solves it with a column-pivoted QR that returns the minimum-norm solution. A square dense map is the eigen square root of [`EigenFallbackSquareRoot`](@ref), which the library takes only when the shape has no Cholesky factor, or a square deviation map, whose rank is at most `size(L, 1) - 1`. A dense square map from a square-root algorithm of the caller takes the same route. On such a map Julia's `\\` takes an LU factorisation, which raises a `LinearAlgebra.SingularException` on a zero pivot and divides by a pivot of round-off size. So this method takes the singular value decomposition and drops each direction whose squared singular value is round-off.
+
+# Algorithm
+
+ 1. On a triangular map, and on a map that is not square, return `L \\ transpose(X)`.
+ 2. On a diagonal map with no zero entry, return `L \\ transpose(X)`. Otherwise divide each row of `transpose(X)` by its entry, and give a zero coordinate where the entry is zero, which is the pseudo-inverse of a diagonal map.
+ 3. On any other square map, take the singular value decomposition ``\\mathbf{L} = \\mathbf{U}\\mathbf{S}\\mathbf{V}^{\\intercal}``. Keep the ``r`` singular values ``s_{i}`` with ``s_{i}^{2} > m \\epsilon s_{1}^{2}``, where ``m`` is `size(L, 1)` and ``\\epsilon`` is the machine epsilon of the singular values. The squares ``s_{i}^{2}`` are the eigenvalues of ``\\mathbf{L}\\mathbf{L}^{\\intercal}``, so this is the tolerance under which [`matrix_square_root`](@ref) reads a negative eigenvalue of [`EigenFallbackSquareRoot`](@ref) as round-off of zero.
+ 4. Return ``\\mathbf{S}_{r}^{-1}\\mathbf{U}_{r}^{\\intercal}\\mathbf{X}^{\\intercal}``. A column is ``\\mathbf{L}^{+}\\mathbf{x}`` written in the first ``r`` right singular vectors, so it has the norm of ``\\mathbf{L}^{+}\\mathbf{x}`` and ``r`` entries. The squared column norms are ``\\mathbf{x}^{\\intercal}\\left(\\mathbf{L}\\mathbf{L}^{\\intercal}\\right)^{+}\\mathbf{x}`` under that cut. A zero map keeps no direction, and every coordinate column is empty.
+
+# Arguments
+
+  - `L`: Geometry map.
+  - `X`: Sample of estimation errors, one row per simulation.
+
+# Returns
+
+  - `Z::MatNum`: Ball coordinates, one column per row of `X`. Under step 3 it has ``r`` rows.
+
+# Related
+
+  - [`k_norm_ball`](@ref)
+  - [`norm_ball_factor`](@ref)
+  - [`norm_ball_deviation_factor`](@ref)
+  - [`EigenFallbackSquareRoot`](@ref)
+"""
+function norm_ball_coordinates(L::Union{LinearAlgebra.LowerTriangular,
+                                        LinearAlgebra.UpperTriangular}, X::MatNum)
+    return L \ transpose(X)
+end
+function norm_ball_coordinates(L::LinearAlgebra.Diagonal, X::MatNum)
+    d = L.diag
+    if all(!iszero, d)
+        return L \ transpose(X)
+    end
+    dinv = [iszero(di) ? zero(inv(oneunit(di))) : inv(di) for di in d]
+    return LinearAlgebra.Diagonal(dinv) * transpose(X)
+end
+function norm_ball_coordinates(L::MatNum, X::MatNum)
+    if size(L, 1) != size(L, 2)
+        return L \ transpose(X)
+    end
+    F = LinearAlgebra.svd(L)
+    T = eltype(F.S)
+    tol = size(L, 1) * eps(T) * abs2(maximum(F.S; init = zero(T)))
+    r = count(s -> abs2(s) > tol, F.S)
+    Z = transpose(view(F.U, :, 1:r)) * transpose(X)
+    Z ./= view(F.S, 1:r)
+    return Z
+end
+"""
     k_norm_ball(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, L::MatNum, ::Integer)
     k_norm_ball(::GeneralKUncertaintyAlgorithm, q::Number, args...)
     k_norm_ball(km::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, L::MatNum, df::Integer)
@@ -509,7 +565,7 @@ It is the norm-ball twin of [`k_ucs`](@ref), and the two differ on the two algor
 Where:
 
   - ``\\kappa``: Radius of the ball.
-  - ``\\mathbf{L}^{+}``: Moore-Penrose pseudo-inverse of the geometry map, applied by a least-squares solve.
+  - ``\\mathbf{L}^{+}``: Moore-Penrose pseudo-inverse of the geometry map. [`norm_ball_coordinates`](@ref) applies it, and on a singular square map it drops each direction whose squared singular value is at most ``m \\epsilon`` times the largest, where ``m`` is the row count of the map and ``\\epsilon`` is the machine epsilon.
   - ``\\mathbf{x}_{i}``: One sampled estimation error, the ``i``-th row of ``\\mathbf{X}``.
   - ``Q_{1-q}``: Empirical quantile at ``1 - q``.
   - ``\\mathrm{df}``: Degrees of freedom, the dimension of the ball.
@@ -519,7 +575,7 @@ Where:
 
 # Algorithm
 
- 1. On [`NormalKUncertaintyAlgorithm`](@ref), solve `L \\ transpose(X)`, giving one column of ball coordinates per sampled error. Julia returns the minimum-norm solution, which is the pseudo-inverse applied to each error.
+ 1. On [`NormalKUncertaintyAlgorithm`](@ref), take the ball coordinates of each sampled error with [`norm_ball_coordinates`](@ref), one column per error.
  2. Take the squared column norms, giving one squared distance per sample, and return the square root of their `1 - q` quantile.
  3. On [`ChiSqKUncertaintyAlgorithm`](@ref), return the square root of the `1 - q` chi-squared quantile at `df` degrees of freedom, or at `size(L, 1)` when `km.ambient` is `true`.
  4. On [`GeneralKUncertaintyAlgorithm`](@ref), return `sqrt((1 - q) / q)`, Cantelli's bound, which reads no geometry.
@@ -552,7 +608,7 @@ Where:
 """
 function k_norm_ball(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, L::MatNum,
                      ::Integer)
-    k_mus = vec(sum(abs2, L \ transpose(X); dims = 1))
+    k_mus = vec(sum(abs2, norm_ball_coordinates(L, X); dims = 1))
     return sqrt(Statistics.quantile(k_mus, one(q) - q; km.kwargs...))
 end
 function k_norm_ball(::GeneralKUncertaintyAlgorithm, q::Number, args...)

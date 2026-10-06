@@ -170,8 +170,9 @@ end
                                       alg = NormBallUncertaintySetAlgorithm(;
                                                                             diagonal = false)),
                  rd_ms)[2].L == PO.ucs(ue(EigenFallbackSquareRoot()), rd_ms)[2].L
-    # A normal radius solves with the map, so the eigen square root of a singular matrix
-    # refuses it, as the field states. The ridge gives a map of full rank.
+    # A normal radius applies the pseudo-inverse of the map, so it reads the eigen square
+    # root of a singular matrix (#1526). The ridge adds directions that no sampled error
+    # fills, so its radius is the same to the size of the ridge.
     function uk(alg)
         return NormalUncertaintySet(; pdm = nothing, rng = StableRNG(1), n_sim = 100,
                                     alg = NormBallUncertaintySetAlgorithm(;
@@ -179,8 +180,10 @@ end
                                                                           diagonal = false,
                                                                           mtx_sqrt = alg))
     end
-    @test_throws SingularException PO.ucs(uk(EigenFallbackSquareRoot()), rd_ms)
-    @test isfinite(PO.ucs(uk(RidgeCholeskySquareRoot()), rd_ms)[2].kappa)
+    k_eig = PO.ucs(uk(EigenFallbackSquareRoot()), rd_ms)[2].kappa
+    k_rdg = PO.ucs(uk(RidgeCholeskySquareRoot()), rd_ms)[2].kappa
+    @test isfinite(k_eig)
+    @test isapprox(k_eig, k_rdg; rtol = 1e-9)
     # With the repair on, the matrix is positive definite, and the default is the plain factor.
     function ur(alg)
         return NormalUncertaintySet(; rng = StableRNG(1), n_sim = 100,
