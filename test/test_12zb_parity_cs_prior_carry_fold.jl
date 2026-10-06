@@ -105,7 +105,8 @@ end
                same(x.rr.vs, b.rr.vs) &&
                same(x.rr.Ms, b.rr.Ms) &&
                same(x.rr.rw, b.rr.rw) &&
-               isequal(x.rr.edof, b.rr.edof)
+               isequal(x.rr.edof, b.rr.edof) &&
+               x.rr.idx == b.rr.idx
     end
     dropped(pr) = pr.rr.nf[po.dropped_factor_indices(pr.rr.fcb)]
     style = (; grid_config("Base", rd)..., families = ["style" => nothing])

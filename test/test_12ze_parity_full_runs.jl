@@ -31,9 +31,10 @@ The verdicts:
   - Parity: the full run, the walk-forward, the Pipeline route, every stage of HRP, and the
     walk-forward with Currency Factors.
   - Parity, with the differences that `test_21c` records: the predicted and realised attribution.
-  - Gap (#1493): `factor_attribution` of a walk-forward refuses a prior fitted on the full sample.
-    The bare-array route (#1404) reaches the answer. The oracle drops the first out-of-sample
-    observation, whose exposure the full model holds; the library route keeps it.
+  - Better (#1493): `factor_attribution` of a walk-forward on a prior fitted on the full sample
+    matches each fold to the block by its row key. The oracle drops the first out-of-sample
+    observation, whose exposure the full model holds; the library keeps it, and equals the
+    oracle on the rows the oracle keeps.
   - Defect on both sides (#1494): the "optimal" leaf ordering of HRP is not optimal on either
     side, and the two orders differ. With the library's order, the oracle's bisection gives the
     library's weights.
@@ -180,11 +181,12 @@ end
 
     @testset "The attribution of the walk-forward on the full factor model" begin
         cv = runs["Both"].cv
-        # Gap (#1493): the series of the folds is shorter than the block, and the block
-        # records no row positions to align it by.
-        @test_throws DimensionMismatch factor_attribution(cv, pr)
-        # The bare-array route (#1404) reaches the answer. Block row `j` is data row `j + 1`,
-        # and the exposures of a row are those of the row before.
+        # #1493: the block records the data rows of its fit, and each fold its test rows, so
+        # the attribution matches them by position.
+        @test pr.rr.idx == 2:250
+        @test [p.idx for p in cv.pred] == [121:160, 161:200, 201:240]
+        # The bare-array route (#1404) states the same answer. Block row `j` is data row
+        # `j + 1`, and the exposures of a row are those of the row before.
         blk = PO.attribution_block_arrays(pr.rr, pr)
         function wf_attr(W, ret, rows)
             br = rows .- 1
@@ -219,6 +221,13 @@ end
         # tolerance of the weights.
         W, r = PO.attribution_prediction_history(cv)
         @test maxabs(W, Wh) <= 5e-7 && maxabs(r, ret) <= 1e-7
+        # The one call on the walk-forward equals the bare route on its own series, row 121
+        # included. Measured: a difference of exactly zero.
+        fcv = fullrun_pack(factor_attribution(cv, pr; ppy = 252, se = true))
+        fref = fullrun_pack(wf_attr(W, r, 121:240))
+        for k in ("Components", "Factors", "Families")
+            @test isequal(fcv[k], fref[k])
+        end
     end
 
     @testset "The Pipeline route gives the weights of the direct route, $(c)" for (c, ub) in

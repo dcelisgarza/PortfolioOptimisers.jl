@@ -1064,6 +1064,7 @@ See §4.7: the discretisation of weights into whole shares within a cash budget.
 
 **Factor Attribution**
 The decomposition of a portfolio's volatility and return into a systematic part, an idiosyncratic part and an Unattributed Remainder, read off the factor-model block of a Prior Result and reported on three axes: by factor, by Factor Family and by asset. The **predicted** attribution reads the block's loadings, factor moments and idiosyncratic covariance. The **realised** attribution reads the factor-return, idiosyncratic-return and exposure histories against a realised net return series, and may roll over windows.
+The realised attribution of a cross-validation matches each fold to the block row by row: the block records the rows of the data its fit covers, and each fold its test rows, by timestamp when both carry timestamps and by position otherwise. The exposure lag is applied on the whole block before the block is cut to the fold rows, so the first test row keeps the exposures of the row before it. ADR 0195.
 *Avoid*: factor risk contribution (the Euler decomposition of any risk measure through a pseudo-inverse, which leaks idiosyncratic risk into the factors), risk attribution, performance attribution (Brinson).
 
 **Unattributed Remainder**

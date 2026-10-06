@@ -27,6 +27,7 @@ THREE FACTS SHAPE THE PROBES.
 This file probes only the rule this result states: `L` and `fcb` are present together or
 absent together.
 =#
+using Dates
 
 @testset "CrossSectionalFactorModel" begin
     # One fixture, written out rather than generated: 4 observations, 3 assets, 2 factors.
@@ -190,6 +191,29 @@ absent together.
         @test v.fam === fam
         @test v.fcb === fcb
         @test v.lag === 1
+    end
+
+    @testset "The row key names the observation of each fit row (#1493)" begin
+        PO = PortfolioOptimisers
+        ts = Dates.Date(2020, 1, 1) .+ Dates.Day.(1:4)
+        @test isnothing(full_model().idx) && isnothing(full_model().ts)
+        csfm = full_model(; idx = 3:6, ts = ts)
+        @test csfm.idx == 3:6 && csfm.ts == ts
+        # An asset view keeps the observation axis, and a time-cut cuts the key with it.
+        v = PO.port_opt_view(csfm, [3, 1])
+        @test v.idx === csfm.idx && v.ts === csfm.ts
+        h = PO.forecast_history_block(csfm, 2)
+        @test h.idx == 3:4 && h.ts == ts[1:2]
+        @test PO.attribution_row_key(csfm) == (; idx = 3:6, ts = ts)
+        # A key names the rows of the fit, so it needs one, with one entry for each row.
+        @test_throws ArgumentError CrossSectionalFactorModel(; M = M, b = b, idx = 1:4)
+        @test_throws ArgumentError CrossSectionalFactorModel(; M = M, b = b, ts = ts)
+        @test_throws DimensionMismatch full_model(; idx = 1:3)
+        @test_throws DimensionMismatch full_model(; ts = ts[1:3])
+        # Positions are positive and increase strictly, and so do timestamps.
+        @test_throws ArgumentError full_model(; idx = [1, 2, 2, 3])
+        @test_throws ArgumentError full_model(; idx = 0:3)
+        @test_throws ArgumentError full_model(; ts = reverse(ts))
     end
 
     @testset "The Return Forecast is cut on the asset axis, whatever member holds it" begin

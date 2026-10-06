@@ -13,7 +13,7 @@ The function keeps the per-asset summaries `b`, `esigma`, `edof` and `ediv` unch
  1. Cut the exposure history `Ms` to the rows `1:tb`, into `Mb`, when the block carries one.
  2. Take the last slice of `Mb` as the loadings `M`, or keep the loadings of the block when it carries no exposure history.
  3. Cut the factor returns `f`, the residuals `eps`, the counts `n` and the intercepts `b` of the cross-sectional fit `csr` to the rows `1:tb`.
- 4. Cut the variance history `vs`, the regression weight history `rw` and the benchmark weight history `bw` to the rows `1:tb`.
+ 4. Cut the variance history `vs`, the regression weight history `rw`, the benchmark weight history `bw`, and the row key `idx` and `ts`, to the rows `1:tb`.
  5. Build the block from these histories, with `b`, `esigma`, `edof`, `ediv`, `nf`, `fam` and `lag` unchanged, and with no `L`, `fcb`, `fx` or `rf`.
 
 # Arguments
@@ -62,7 +62,9 @@ function forecast_history_block(csfm::CrossSectionalFactorModel,
                                      ediv = csfm.ediv,
                                      rw = isnothing(rw) ? nothing : rw[1:tb, :],
                                      bw = isnothing(bw) ? nothing : bw[1:tb, :],
-                                     nf = csfm.nf, fam = csfm.fam, lag = csfm.lag)
+                                     nf = csfm.nf, fam = csfm.fam, lag = csfm.lag,
+                                     idx = nothing_scalar_array_getindex(csfm.idx, 1:tb),
+                                     ts = nothing_scalar_array_getindex(csfm.ts, 1:tb))
 end
 """
     forecast_history_refit(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,

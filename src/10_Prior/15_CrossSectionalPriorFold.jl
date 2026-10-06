@@ -1258,7 +1258,7 @@ The call with no data builds the Prior Result with [`cross_sectional_assemble`](
  3. Read the factor prior with [`cross_sectional_factor_prior`](@ref) over the factor returns of the factors that are not empty and the observed returns, and process and expand its moments with [`cross_sectional_factor_moments`](@ref). An Observed Factor is never empty.
  4. Count the residuals of each asset with [`variance_count`](@ref) on the folded `ve`.
  5. Take the returns data of the Return Forecast with [`cross_sectional_carry_forecast_returns`](@ref).
- 6. Build the result with [`cross_sectional_assemble`](@ref), with the Return Forecast history that the state carries.
+ 6. Build the result with [`cross_sectional_assemble`](@ref), with the Return Forecast history that the state carries. The block records the position of each fitted row among the folded observations, and no timestamp, because the buffer keeps none.
 
 # Arguments
 
@@ -1292,8 +1292,11 @@ function prior(pe::CrossSectionalFactorPrior, st::CrossSectionalCarryState;
     lv = vcat(st.lv, trues(size(ca.f, 2) - length(st.lv)))
     pr = cross_sectional_factor_prior(st.pe, all(lv) ? ca.f : ca.f[:, lv]; strict = strict)
     f_pr = cross_sectional_factor_moments(pr, pe.f_mp, ca.f, lv; kwargs...)
+    # The histories hold every observation after the warm-up, the last `Tf` of the `buf.n`
+    # the fold read, so the fitted rows sit at these positions of the folded returns.
     fit = (; csr = csr, W = st.W, vs = st.vs, cnt = variance_count(st.ve, csr.eps),
-           amr = st.amsk[r, :], bwr = st.bw[r, :], Xo = st.X[r, :], r = r, hist = st.hist)
+           amr = st.amsk[r, :], bwr = st.bw[r, :], Xo = st.X[r, :], r = r, hist = st.hist,
+           idx = (st.buf.n - Tf) .+ r, ts = nothing)
     return cross_sectional_assemble(pe, f_pr, ca, fit,
                                     cross_sectional_carry_forecast_returns(pe, st);
                                     kwargs...)

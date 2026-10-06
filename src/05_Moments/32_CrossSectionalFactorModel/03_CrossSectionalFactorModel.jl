@@ -357,6 +357,56 @@ function assert_return_forecast_assets(rf::AbstractReturnForecastResult,
     return nothing
 end
 """
+    assert_cs_block_rows(idx::Option{<:VecInt}, ts::Option{<:VecDate},
+                         csr::Option{<:CrossSectionalRegression})
+
+Check the row key of a [`CrossSectionalFactorModel`](@ref) against its fit.
+
+The row key names the observation of the returns data that each row of the block describes. `idx` holds the position of each row in the returns data that the prior read, and `ts` holds its timestamp. A key describes the rows of the fit, so a block that carries a key carries a fit, and the key has one entry for each row of the fit.
+
+# Arguments
+
+  - `idx`: Position of each block row in the returns data, or `nothing`.
+  - `ts`: Timestamp of each block row, or `nothing`.
+  - `csr`: The cross-sectional fit of the block, or `nothing`.
+
+# Validation
+
+  - When `idx` or `ts` is present, `csr` is present. Raises an `ArgumentError`.
+  - If provided, `length(idx) == size(csr.f, 1)`, and the entries of `idx` are positive and increase strictly. Raises a `DimensionMismatch` or an `ArgumentError`.
+  - If provided, `length(ts) == size(csr.f, 1)`, and the entries of `ts` increase strictly. Raises a `DimensionMismatch` or an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+"""
+function assert_cs_block_rows(idx::Option{<:VecInt}, ts::Option{<:VecDate},
+                              csr::Option{<:CrossSectionalRegression})::Nothing
+    if isnothing(idx) && isnothing(ts)
+        return nothing
+    end
+    @argcheck(!isnothing(csr),
+              ArgumentError("idx and ts name the observation of each row of the fit, so a block that carries either one must carry csr"))
+    Tb = size(csr.f, 1)
+    if !isnothing(idx)
+        @argcheck(length(idx) == Tb,
+                  DimensionMismatch("idx ($(length(idx))) must have one entry for each row of csr.f ($Tb)"))
+        @argcheck(isempty(idx) || (first(idx) >= 1 && all(>(0), diff(idx))),
+                  ArgumentError("idx must hold positive positions that increase strictly"))
+    end
+    if !isnothing(ts)
+        @argcheck(length(ts) == Tb,
+                  DimensionMismatch("ts ($(length(ts))) must have one entry for each row of csr.f ($Tb)"))
+        @argcheck(issorted(ts; lt = <=), ArgumentError("ts must increase strictly"))
+    end
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Holds the loadings, the factor-orthogonal expected return and the fitted history of a factor model fitted per observation across the assets.
@@ -417,7 +467,9 @@ $(DocStringExtensions.FIELDS)
         fx::Option{<:MatNum} = nothing,
         fr::Option{<:MatNum} = nothing,
         lambda::Option{<:Number} = nothing,
-        c::Option{<:Number} = nothing
+        c::Option{<:Number} = nothing,
+        idx::Option{<:VecInt} = nothing,
+        ts::Option{<:VecDate} = nothing
     ) -> CrossSectionalFactorModel
 
 Keywords correspond to the struct's fields.
@@ -439,6 +491,7 @@ Keywords correspond to the struct's fields.
   - If provided, `length(rf.mu) == size(M, 1)`, and `rf.hist` carries `size(M, 1)` columns when the member computes one.
   - If provided, `fx` passes [`assert_observed_factor_returns`](@ref): `csr` is given, `fx` has the rows of `csr.f`, and the two fill the column count of `L` (or of `M` when `L` is unset).
   - If provided, `fr` needs `fcb` and `csr`, and `size(fr) == (size(csr.f, 1), size(M, 2))`.
+  - The rules of [`assert_cs_block_rows`](@ref) on `idx` and `ts`.
 
 ## View parameters
 
@@ -451,7 +504,7 @@ Keywords correspond to the struct's fields.
   - `esigma` is sliced by [`idiosyncratic_covariance_view`](@ref), on one axis or on both.
   - `edof` and `ediv` are sliced on their only axis, which is the asset axis.
   - `rf` is viewed by its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
-  - `nf`, `fam`, `fcb`, `lag`, `fx`, `fr`, `lambda` and `c` pass through unchanged. Each is indexed by factor, or by nothing at all, and neither follows an asset selection.
+  - `nf`, `fam`, `fcb`, `lag`, `fx`, `fr`, `lambda`, `c`, `idx` and `ts` pass through unchanged. Each is indexed by factor, by observation, or by nothing at all, and none follows an asset selection.
 
 # Examples
 
@@ -478,7 +531,9 @@ CrossSectionalFactorModel
       fx ┼ nothing
       fr ┼ nothing
   lambda ┼ nothing
-       c ┴ nothing
+       c ┼ nothing
+     idx ┼ nothing
+      ts ┴ nothing
 ```
 
 # Related
@@ -571,6 +626,14 @@ CrossSectionalFactorModel
     Orthogonal Forecast Scale the prior resolved, or `nothing` when the block was not built by a prior. `b` is this scale times the unscaled orthogonal part of the Return Forecast.
     """
     c
+    """
+    Position of each row of the fit in the returns data that the prior read, or `nothing`. The fit drops the Descriptor warm-up and the exposure lag, so its first row is a later row of the data. A [`factor_attribution`](@ref) of a cross-validation reads it to find the rows of the block that each fold covers. A prior folded online counts the positions over every observation it folded.
+    """
+    idx
+    """
+    Timestamp of each row of the fit, or `nothing` when the returns data that the prior read carries no timestamps. When the folds of a cross-validation carry timestamps too, a [`factor_attribution`](@ref) matches the two by timestamp, so a prior fitted on other returns data still finds its rows.
+    """
+    ts
     function CrossSectionalFactorModel(M::MatNum, L::Option{<:MatNum}, b::VecNum,
                                        csr::Option{<:CrossSectionalRegression},
                                        Ms::Option{<:Arr3Num}, vs::Option{<:MatNum},
@@ -582,7 +645,8 @@ CrossSectionalFactorModel
                                        lag::Option{<:Integer},
                                        rf::Option{<:AbstractReturnForecastResult},
                                        fx::Option{<:MatNum}, fr::Option{<:MatNum},
-                                       lambda::Option{<:Number}, c::Option{<:Number})
+                                       lambda::Option{<:Number}, c::Option{<:Number},
+                                       idx::Option{<:VecInt}, ts::Option{<:VecDate})
         @argcheck(!isempty(M), IsEmptyError("M cannot be empty"))
         @argcheck(!isempty(b), IsEmptyError("b cannot be empty"))
         N = size(M, 1)
@@ -629,14 +693,13 @@ CrossSectionalFactorModel
         assert_cs_history_obs(trw, tbw, :rw, :bw)
         assert_cs_history_obs(trw, tvs, :rw, :vs)
         assert_cs_history_obs(tbw, tvs, :bw, :vs)
+        assert_cs_block_rows(idx, ts, csr)
         return new{typeof(M), typeof(L), typeof(b), typeof(csr), typeof(Ms), typeof(vs),
                    typeof(esigma), typeof(edof), typeof(ediv), typeof(rw), typeof(bw),
                    typeof(nf), typeof(fam), typeof(fcb), typeof(lag), typeof(rf),
-                   typeof(fx), typeof(fr), typeof(lambda), typeof(c)}(M, L, b, csr, Ms, vs,
-                                                                      esigma, edof, ediv,
-                                                                      rw, bw, nf, fam, fcb,
-                                                                      lag, rf, fx, fr,
-                                                                      lambda, c)
+                   typeof(fx), typeof(fr), typeof(lambda), typeof(c), typeof(idx),
+                   typeof(ts)}(M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw, nf, fam,
+                               fcb, lag, rf, fx, fr, lambda, c, idx, ts)
     end
 end
 function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b::VecNum,
@@ -656,9 +719,11 @@ function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b
                                    fx::Option{<:MatNum} = nothing,
                                    fr::Option{<:MatNum} = nothing,
                                    lambda::Option{<:Number} = nothing,
-                                   c::Option{<:Number} = nothing)::CrossSectionalFactorModel
+                                   c::Option{<:Number} = nothing,
+                                   idx::Option{<:VecInt} = nothing,
+                                   ts::Option{<:VecDate} = nothing)::CrossSectionalFactorModel
     return CrossSectionalFactorModel(M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw, nf,
-                                     fam, fcb, lag, rf, fx, fr, lambda, c)
+                                     fam, fcb, lag, rf, fx, fr, lambda, c, idx, ts)
 end
 """
     cross_sectional_factor_returns(csfm::CrossSectionalFactorModel) -> MatNum
@@ -826,7 +891,7 @@ Return a view of a [`CrossSectionalFactorModel`](@ref) result, selecting only th
  4. Take a view of `Ms` on its second axis, and of `vs`, `rw` and `bw` on their second axis, giving the histories of the selected assets.
  5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape, and view `edof` and `ediv` with [`nothing_scalar_array_view`](@ref).
  6. View the Return Forecast with its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
- 7. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `nf`, `fam`, `fcb`, `lag`, `fx` and `fr` through, which re-runs every guard of the constructor.
+ 7. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `nf`, `fam`, `fcb`, `lag`, `fx`, `fr`, `lambda`, `c`, `idx` and `ts` through, which re-runs every guard of the constructor.
 
 # Arguments
 
@@ -892,7 +957,7 @@ function port_opt_view(csfm::CrossSectionalFactorModel, i,
                                      else
                                          port_opt_view(rf, i, args...)
                                      end, fx = csfm.fx, fr = csfm.fr, lambda = csfm.lambda,
-                                     c = csfm.c)
+                                     c = csfm.c, idx = csfm.idx, ts = csfm.ts)
 end
 """
     regression(csfm::CrossSectionalFactorModel, args...)

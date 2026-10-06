@@ -553,6 +553,35 @@ function attribution_lag(::Regression)
     return 0
 end
 """
+    attribution_row_key(rr::AbstractLoadingsRegressionResult)
+    attribution_row_key(rr::CrossSectionalFactorModel)
+
+Return the key that names the observation of each row of a factor model block.
+
+A realised [`factor_attribution`](@ref) of a cross-validation reads it to find the block rows of each fold. The key has two parts: `idx`, the position of each block row in the returns data that the prior read, and `ts`, the timestamp of each block row. A [`CrossSectionalFactorModel`](@ref) records both when its prior fits it. A block of another type records neither, so it answers `nothing` for each, and the attribution lines the series up with the block at their tail.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+
+# Returns
+
+  - `idx::Option{<:VecInt}`: The position of each block row, or `nothing`.
+  - `ts::Option{<:VecDate}`: The timestamp of each block row, or `nothing`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_block_arrays`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function attribution_row_key(::AbstractLoadingsRegressionResult)
+    return (; idx = nothing, ts = nothing)
+end
+function attribution_row_key(rr::CrossSectionalFactorModel)
+    return (; idx = rr.idx, ts = rr.ts)
+end
+"""
     attribution_families(rr::AbstractLoadingsRegressionResult)
     attribution_families(rr::CrossSectionalFactorModel)
 
@@ -1215,6 +1244,8 @@ The verb reads the weights and the factor model block, and returns one [`FactorA
 
 **The bare arrays are the bottom level, and a prior method unpacks the prior result into them.** A caller who holds a factor model as arrays, a vendor risk model for example, attributes with no fitted object. `factor_attribution(w, pr)` is the bare-array method on `pr.rr.M`, `pr.fpr.sigma`, the idiosyncratic covariance of the block, `pr.fpr.mu`, `pr.rr.b`, `pr.sigma`, `pr.mu` and the family labels of the block, so the two methods answer the same numbers. Without `sigma` and `mu` the model is the total, and the unattributed remainder is an exact zero. The realised bare-array method reads the histories on one observation axis, untrimmed, and aligns them itself: the returns of observation `t` pair with the exposures of observation `t - lag`. `lag` defaults to one for an exposure history, and to zero for a static matrix, which describes every observation. A prior method reads each of these arrays off the block.
 
+**A cross-validation is matched to the block row by row.** The series of a walk-forward covers the test rows of its folds, and the prior result usually covers the whole sample, so the two do not end on the same row. Each fold records its rows, the positions `idx` of a [`PredictionResult`](@ref) and the timestamps of its `rd.ts`, and a [`CrossSectionalFactorModel`](@ref) records the rows its fit covers. The method matches the two by timestamp when both carry timestamps, and by position otherwise. The positions agree only when the prior read the returns data that the cross-validation split. The method aligns the exposures of the whole block before it cuts the block to the matched rows, so the first test row keeps the exposures of the row before it. The test rows before the first row the block decomposes, or after its last row, are left out. A block that records no rows, or a series that carries no key it shares, is lined up at the tail as a single series is.
+
 **The predicted totals of a prior method come from the prior result, not from the model.** `pr.mu` and `pr.sigma` are what the optimiser saw and what [`expected_return`](@ref) and [`expected_risk`](@ref) report, so they are the totals. A wrapping prior replaces them while it forwards the block unchanged, so the model no longer reproduces them, and the two gaps `dot(w, pr.mu - M * fpr.mu - b)` and `dot(w, (pr.sigma - M * F * M' - D) * w) / sigma_P` land in the unattributed remainder. The remainder is therefore present on the predicted side too, and it is at rounding level on a plain fit.
 
 **Every source of unexplained return lands in the remainder, and no guard reports it.** On the realised side the identity per observation is `portfolio return = systematic + idiosyncratic + unattributed`, and the remainder holds the per-observation intercept share `b_t * sum(w)`, the fees, the cash, the weight drift inside a period and the exposure lag. A large `pct_var` on the remainder means the model does not explain the portfolio, and the reader draws that conclusion.
@@ -1304,7 +1335,7 @@ The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\
   - `X`: Asset returns, `observations × assets`.
   - `rd`: Returns result carrying the asset returns.
   - `ret`: Net portfolio return series.
-  - `pred`: Multi-period prediction result whose folds give the weight history.
+  - `pred`: Multi-period prediction result whose folds give the weight history, the return series and the row key of each observation.
   - `B`: Loadings, `assets × factors`, or on the realised side the exposure history, `observations × assets × factors`. A `NaN` row marks an asset the model does not state.
   - `F`: Factor covariance, `factors × factors`.
   - `d`: Idiosyncratic variances, `assets`, or the idiosyncratic covariance, `assets × assets`.
@@ -1332,7 +1363,7 @@ The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\
 
   - `pr` carries a factor model block, else the `IsNothingError` of [`assert_prior_regression`](@ref) is raised.
   - The factor covariance and the expected factor returns are finite, else an `IsNonFiniteError` is raised.
-  - `f` and `eps` carry the same observations, an exposure history carries them too, `ret` carries at least as many, and `0 <= lag` is below their number, else a `DimensionMismatch` or a `DomainError` is raised.
+  - `f` and `eps` carry the same observations, an exposure history carries them too, `ret` carries at least as many, and `0 <= lag` is below their number, else a `DimensionMismatch` or a `DomainError` is raised. A `pred` whose folds share a row key with the block needs no length: at least one test row is a row the block decomposes, and no test row between two of them is missing from the block, else a `DimensionMismatch` or an `ArgumentError` is raised.
   - `ppy > 0`, else a `DomainError` is raised.
   - Every weight at a non-investable asset is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
   - Every held `(observation, asset)` pair of `X` is finite, else a warning names the pairs, or an `ArgumentError` names them under `strict`.
@@ -1392,7 +1423,7 @@ The block states its histories through the reads of [`factor_attribution`](@ref)
 
 # Returns
 
-  - `blk::NamedTuple`: The fields `B`, `f`, `eps`, `lag`, `rw`, `vs`, `fcb`, `no` and `fam`, from [`attribution_exposures`](@ref), [`attribution_factor_returns`](@ref), [`attribution_idiosyncratic_returns`](@ref), [`attribution_lag`](@ref), [`attribution_regression_weights`](@ref), [`attribution_idiosyncratic_variances`](@ref), [`attribution_family_basis`](@ref), [`attribution_observed_count`](@ref) and [`attribution_families`](@ref).
+  - `blk::NamedTuple`: The fields `B`, `f`, `eps`, `lag`, `rw`, `vs`, `fcb`, `no` and `fam`, from [`attribution_exposures`](@ref), [`attribution_factor_returns`](@ref), [`attribution_idiosyncratic_returns`](@ref), [`attribution_lag`](@ref), [`attribution_regression_weights`](@ref), [`attribution_idiosyncratic_variances`](@ref), [`attribution_family_basis`](@ref), [`attribution_observed_count`](@ref) and [`attribution_families`](@ref), and the fields `idx` and `ts` of [`attribution_row_key`](@ref).
 
 # Related
 
@@ -1406,7 +1437,7 @@ function attribution_block_arrays(rr::AbstractLoadingsRegressionResult,
             rw = attribution_regression_weights(rr),
             vs = attribution_idiosyncratic_variances(rr),
             fcb = attribution_family_basis(rr), no = attribution_observed_count(rr),
-            fam = attribution_families(rr))
+            fam = attribution_families(rr), attribution_row_key(rr)...)
 end
 """
     attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
@@ -1448,7 +1479,7 @@ function attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
                                  fcb::Option{<:FactorFamilyBasis} = nothing,
                                  observed::Integer = 0, fam::Option{<:VecStr} = nothing)
     return (; B = B, f = f, eps = eps, lag = lag, rw = rw, vs = vs, fcb = fcb,
-            no = observed, fam = fam)
+            no = observed, fam = fam, idx = nothing, ts = nothing)
 end
 """
     attribution_array_model(B::MatNum, F::MatNum, d::VecNum_MatNum;
@@ -1781,3 +1812,156 @@ end
 
 export AttributionComponent, AttributionBreakdown, AssetAttributionBreakdown,
        AssetFactorContribution, FactorAttributionResult, factor_attribution
+"""
+    attribution_key_align(blk::NamedTuple, T::Integer, key::Nothing)
+    attribution_key_align(blk::NamedTuple, T::Integer, key::NamedTuple)
+
+Return the lag-aligned history of a factor model block over the observations of a series that may name its rows.
+
+The series of a cross-validation names its rows, and its folds usually cover fewer rows than a prior fitted on the whole sample. A `key` of `nothing` names no row, so the function aligns the block at the tail with [`attribution_align`](@ref). A `key` with the fields `idx` and `ts` names the position and the timestamp of each observation of the series. [`attribution_key_pair`](@ref) picks the key that the block and the series both carry. The function then aligns the whole block, so each block row keeps the exposures of the row `lag` observations before it. Last, it cuts the aligned block with [`attribution_window`](@ref) to the rows that [`attribution_match_rows`](@ref) matches. The first observation of a fold that starts after the first block row therefore keeps its exposures, which a cut of the block before the alignment would lose. When the two carry no common key, the function aligns at the tail.
+
+# Arguments
+
+  - `blk`: The block as bare arrays, from [`attribution_block_arrays`](@ref) or [`attribution_array_block`](@ref).
+  - `T`: The number of observations the caller's return series carries.
+  - `key`: The position `idx` and the timestamp `ts` of each observation of the series, each `nothing` when the series does not carry it, or `nothing`.
+
+# Validation
+
+  - With a common key, the key of the series has `T` entries, else a `DimensionMismatch` is raised, and the rules of [`attribution_match_rows`](@ref) hold.
+  - The rules of [`attribution_align`](@ref).
+
+# Returns
+
+  - `al::NamedTuple`: The aligned history, as [`attribution_align`](@ref) states it. Its `rows` are the observations of the series that the block decomposes, and they are consecutive.
+
+# Related
+
+  - [`attribution_align`](@ref)
+  - [`attribution_key_pair`](@ref)
+  - [`attribution_match_rows`](@ref)
+  - [`factor_attribution`](@ref)
+"""
+function attribution_key_align(blk::NamedTuple, T::Integer, ::Nothing)
+    return attribution_align(blk, T)
+end
+function attribution_key_align(blk::NamedTuple, T::Integer, key::NamedTuple)
+    kp = attribution_key_pair(blk, key)
+    if isnothing(kp)
+        return attribution_align(blk, T)
+    end
+    @argcheck(length(kp.series) == T,
+              DimensionMismatch("the row key of the return series ($(length(kp.series)) entries) must have one entry for each observation of the series ($T)"))
+    al = attribution_align(blk, size(blk.f, 1))
+    m = attribution_match_rows(kp.block, kp.series, blk.lag)
+    return merge(attribution_window(al, m.arows), (; rows = m.rows))
+end
+"""
+    attribution_key_pair(blk::NamedTuple, key::NamedTuple)
+    attribution_key_pair(b::AbstractVector, s::AbstractVector)
+    attribution_key_pair(b::Option{<:AbstractVector}, s::Option{<:AbstractVector})
+
+Return the row keys of a factor model block and of a return series that the two share, or `nothing`.
+
+A timestamp names an observation in every returns data that holds it, so the function takes the timestamps when both carry them. A position names an observation in one returns data alone, so the function takes the positions only when one of the two carries no timestamps. The positions of the block are then positions in the returns data that the prior read, and those of the series are positions in the returns data that the cross-validation split. The two agree only when the prior read the returns data that the cross-validation split, and the function cannot check that.
+
+# Arguments
+
+  - `blk`: The block as bare arrays, with the fields `idx` and `ts` of [`attribution_row_key`](@ref).
+  - `key`: The position `idx` and the timestamp `ts` of each observation of the series, each `nothing` when the series does not carry it.
+  - `b`, `s`: One kind of key of the block and of the series, each `nothing` when its side does not carry it. The two methods over them pair the keys when both are present, and answer `nothing` otherwise.
+
+# Returns
+
+  - `kp::Option{<:NamedTuple}`: The key of the block under `block` and that of the series under `series`, or `nothing` when the two share no key.
+
+# Related
+
+  - [`attribution_align`](@ref)
+  - [`attribution_match_rows`](@ref)
+"""
+function attribution_key_pair(blk::NamedTuple, key::NamedTuple)
+    kp = attribution_key_pair(blk.ts, key.ts)
+    return isnothing(kp) ? attribution_key_pair(blk.idx, key.idx) : kp
+end
+function attribution_key_pair(b::AbstractVector, s::AbstractVector)
+    return (; block = b, series = s)
+end
+function attribution_key_pair(::Option{<:AbstractVector}, ::Option{<:AbstractVector})
+    return nothing
+end
+"""
+    attribution_match_rows(bk::AbstractVector, sk::AbstractVector, lag::Integer)
+
+Return the rows of a return series that a factor model block decomposes, and the aligned block row of each.
+
+Block row `t` of a fit with exposure lag `lag` decomposes its returns with the exposures of block row `t - lag`, so the first `lag` block rows decompose nothing. Aligned row `a` is block row `a + lag`. The function finds the aligned row whose key equals the key of each observation of the series. The observations before the first match and after the last match fall outside the block, as the observations of a fold before the first fitted row do, and the attribution leaves them out. Every observation between the two must match, because a gap inside the block is a fold whose rows the block does not hold.
+
+# Arguments
+
+  - `bk`: The key of each block row, positions or timestamps.
+  - `sk`: The key of each observation of the series, of the same kind as `bk`.
+  - `lag`: The exposure lag of the block.
+
+# Validation
+
+  - At least one observation of the series matches an aligned row. Raises a `DimensionMismatch`.
+  - Every observation between the first match and the last match matches an aligned row. Raises an `ArgumentError` that names the first unmatched observations.
+  - The matched aligned rows increase strictly, so the series repeats no observation and keeps the order of the block. Raises an `ArgumentError`.
+
+# Returns
+
+  - `rows::UnitRange{Int}`: The observations of the series that the block decomposes.
+  - `arows::Vector{Int}`: The aligned block row of each of them.
+
+# Related
+
+  - [`attribution_align`](@ref)
+  - [`attribution_key_pair`](@ref)
+"""
+function attribution_match_rows(bk::AbstractVector, sk::AbstractVector, lag::Integer)
+    Tb = length(bk)
+    pos = Dict(zip(view(bk, (lag + 1):Tb), 1:(Tb - lag)))
+    m = [get(pos, k, 0) for k in sk]
+    kept = findall(!iszero, m)
+    @argcheck(!isempty(kept),
+              DimensionMismatch("no observation of the return series is a row that the factor model block decomposes. The block decomposes $(Tb - lag) rows, those after its exposure lag of $lag. Fit the prior on returns data that covers the rows of the series."))
+    rows = first(kept):last(kept)
+    gaps = rows[iszero.(view(m, rows))]
+    @argcheck(isempty(gaps),
+              ArgumentError("observations $(first(gaps, 5)) of the return series lie between two rows of the factor model block, and the block holds no row for them. Fit the prior on the returns data that the cross-validation split, or drop those observations."))
+    arows = m[rows]
+    @argcheck(all(>(0), diff(arows)),
+              ArgumentError("the return series repeats a row of the factor model block, or does not keep its order. A realised attribution reads the observations in the order of time, so its folds must not overlap and must come in the order of time."))
+    return (; rows = rows, arows = arows)
+end
+"""
+    attribution_series_key(pred::MultiPeriodPredictionResult)
+
+Return the row key of the series that a cross-validation produced.
+
+The series is the folds stacked in order, as [`attribution_prediction_history`](@ref) stacks them, so its key is the keys of the folds stacked in the same order. A fold records its positions in `idx`, and the timestamps of its rows in `rd.ts`. The series carries positions only when every fold carries them, and timestamps only when every fold carries them, as `pred.mrd.ts` holds them.
+
+# Arguments
+
+  - `pred`: A multi-period prediction result.
+
+# Returns
+
+  - `idx::Option{<:VecInt}`: The position of each observation of the series in the returns data that the cross-validation split, or `nothing`.
+  - `ts::Option{<:VecDate}`: The timestamp of each observation of the series, or `nothing`.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_prediction_history`](@ref)
+  - [`PredictionResult`](@ref)
+"""
+function attribution_series_key(pred::MultiPeriodPredictionResult)
+    idx = if any(p -> isnothing(p.idx), pred.pred)
+        nothing
+    else
+        reduce(vcat, p.idx for p in pred.pred)
+    end
+    return (; idx = idx, ts = pred.mrd.ts)
+end

@@ -657,12 +657,14 @@ $(DocStringExtensions.TYPEDEF)
 Stores the result of a single cross-validation fold prediction. It pairs an optimisation
 result with the portfolio return series of the test period.
 
-The rows of the fold are not stored. `rd.ts` is the slice of the original clock that the fold
-covers, because [`port_opt_view`](@ref) slices it with the `test_idx` of the fold, so
-[`feature_row_indices`](@ref) finds the absolute rows by their timestamps.
-[`rebuild_returns_result`](@ref) is the consumer that needs them. The timestamps also stay
-correct on the combinatorial path, where the folds of a path come in split order and not in
-time order.
+A fold of a cross-validation records its rows in two keys. `idx` holds the `test_idx` of the
+fold, the positions of its rows in the returns data that the cross-validation split. `rd.ts`
+is the slice of the original clock that the fold covers, because [`port_opt_view`](@ref)
+slices it with the same `test_idx`, so [`feature_row_indices`](@ref) finds the absolute rows
+by their timestamps. [`rebuild_returns_result`](@ref) reads the timestamps. A realised
+[`factor_attribution`](@ref) reads the timestamps, or the positions when the data carries no
+timestamps. Both keys stay correct on the combinatorial path, where the folds of a path come
+in split order and not in time order.
 
 # Fields
 
@@ -673,10 +675,11 @@ $(DocStringExtensions.FIELDS)
     PredictionResult(;
         res::NonFiniteAllocationOptimisationResult,
         rd::PredictionReturnsResult,
-        hw::Option{<:HeldWeightsResult} = nothing
+        hw::Option{<:HeldWeightsResult} = nothing,
+        idx::Option{<:VecInt} = nothing
     ) -> PredictionResult
 
-Keywords correspond to the struct's fields. `res` and `rd` are required, because a fold prediction needs both. `hw` defaults to `nothing`, which is a fold that held its target weights on every observation.
+Keywords correspond to the struct's fields. `res` and `rd` are required, because a fold prediction needs both. `hw` defaults to `nothing`, which is a fold that held its target weights on every observation. `idx` defaults to `nothing`, which is a prediction made over returns data that no fold index selected.
 
 `hw` is present only when a Weight Drift or a Previous-Weights Source ran over the fold, and the fold-taking consumers dispatch on its type. It carries the asset returns of the fold, the weights the drift started from, the weights held after the last observation and the drift that made them. [`weight_path`](@ref) rebuilds the weight path from it.
 
@@ -704,15 +707,21 @@ Keywords correspond to the struct's fields. `res` and `rd` are required, because
     $(field_dict[:hw])
     """
     hw
+    """
+    Position of each observation of the fold in the returns data that the cross-validation split, the `test_idx` of the fold, or `nothing` when no fold index selected the observations.
+    """
+    idx
     function PredictionResult(res::NonFiniteAllocationOptimisationResult,
-                              rd::PredictionReturnsResult, hw::Option{<:HeldWeightsResult})
-        return new{typeof(res), typeof(rd), typeof(hw)}(res, rd, hw)
+                              rd::PredictionReturnsResult, hw::Option{<:HeldWeightsResult},
+                              idx::Option{<:VecInt})
+        return new{typeof(res), typeof(rd), typeof(hw), typeof(idx)}(res, rd, hw, idx)
     end
 end
 function PredictionResult(; res::NonFiniteAllocationOptimisationResult,
                           rd::PredictionReturnsResult,
-                          hw::Option{<:HeldWeightsResult} = nothing)::PredictionResult
-    return PredictionResult(res, rd, hw)
+                          hw::Option{<:HeldWeightsResult} = nothing,
+                          idx::Option{<:VecInt} = nothing)::PredictionResult
+    return PredictionResult(res, rd, hw, idx)
 end
 """
     previous_weights(pws::Any, prev::Nothing)
@@ -1821,117 +1830,6 @@ function held_start_weights(retcode::VecOptRetCode, w::VecVecNum, w_prev::VecVec
               DimensionMismatch("`length(w_prev) == length(w)` must hold.\nlength(w_prev) => $(length(w_prev))\nlength(w) => $(length(w))"))
     return [isa(rc, OptimisationSuccess) ? wi : wp
             for (rc, wi, wp) in zip(retcode, w, w_prev)]
-end
-"""
-    predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
-    predict(res, rd, test_idx, cols = :)
-    predict(res, rd, test_idxs::VecVecInt, cols = :)
-
-Apply an optimisation result `res` to returns data `rd` to produce a
-[`PredictionResult`](@ref) or a vector of prediction results.
-
-When `test_idx` is given, only the rows of `rd` that `test_idx` indexes, and the columns that
-`cols` selects, are used for the prediction.
-
-The fee holds no horizon. `charge_fees` receives the length of the series it charges, so a fold
-spreads a one-off cost over its own observations and the whole-sample method spreads it over the
-whole sample. `fees.fa` names the clock alone: a `nothing` or `FirstObservationFees` charges the
-two fixed terms on the first observation of the series, and an `AmortisedFees` spreads them
-evenly over it. The `fa` keyword **overrides** that clock for the series this method builds, and
-changes nothing that the result holds. A report can then charge a fixed fee as a fund saw it, while
-the optimiser prices the same fee as its own objective needs.
-
-A test window over a point-in-time universe holds two kinds of gap. The column of a
-non-investable asset has weight `0`, and the view at the Investable Mask removes it before
-anything reads it. A **Held Gap** is an `(observation, asset)` pair at which the weight is not
-zero and the return is missing, which an asset that delists **inside** the test window makes. The
-mask comes from the fit and cannot see it. Nothing is renormalised, so the missing weight is held
-in cash on that observation. Without a drift, the series of the fold is
-
-```text
-returns[t] == sum_i w_i * (isfinite(X[t, i]) ? X[t, i] : 0) - fee
-```
-
-with the fee taken over the whole weight vector. Under a drift, `w_i` is the weight of asset `i`
-on the weight path at observation `t`.
-
-A failed fold carries `NaN` weights, so its series is `NaN` and `res.w` and `rd.X` show the
-failure to a scorer. Under a drift the fold still held a book. [`held_start_weights`](@ref)
-starts the drift from the previous weights `w_prev`, member by member under a population, so the
-next fold reads that book. With no `w_prev`, which is fold 1 or a scheme whose folds are not a
-timeline, the record is `NaN` and nothing throws.
-
-# Algorithm
-
- 1. For the index methods, view the rows `test_idx` and the columns `cols` of `rd` with [`port_opt_view`](@ref).
- 2. View the weights and the window at the Investable Mask of `res` with [`investable_fold_view`](@ref). The fee of the result is on the investable universe already, and is not viewed.
- 3. Override the clock of the fee with `fa` through [`override_fee_amortisation`](@ref).
- 4. Set every non-finite entry of the window to zero with [`filter_held_gaps`](@ref), giving `Xf`. A Held Gap warns, or raises an `ArgumentError` under `strict`, through [`strict_diagnostic`](@ref).
- 5. Compute the net return series from the weights, `Xf`, the fee and `wd` with [`calc_net_returns`](@ref).
- 6. Choose the weights the drift starts from with [`held_start_weights`](@ref), from the return code, the weights and `w_prev` viewed at the mask.
- 7. Drift them over `Xf` under `hwd` with [`held_weights_result`](@ref), giving the record and the ruined members.
- 8. Warn about the ruined members with [`warn_ruined_members`](@ref), and mark them failed with [`mark_ruined_members`](@ref).
- 9. Collapse the data aligned to the series with [`reconstruct_rd`](@ref).
-10. Expand the record to the caller's universe with [`expand_held_weights`](@ref), because the turnover of the next fold reads it, and build the [`PredictionResult`](@ref).
-
-The method over `test_idxs` runs the method over one `test_idx` for each fold.
-
-# Arguments
-
-  - `res::NonFiniteAllocationOptimisationResult`: Fitted optimisation result.
-  - `rd::ReturnsResult`: Returns data for the prediction period.
-  - `test_idx`: Observation index or vector of observation indices for the test fold.
-  - `cols`: Column selector. Defaults to `:` (all assets).
-
-# Keyword Arguments
-
-  - `wd::Option{<:AbstractWeightDrift} = nothing`: The Weight Drift of the series, or `nothing` for a series formed from the target weights.
-  - `hwd::Option{<:AbstractWeightDrift} = wd`: The drift of the Held Weights record, or `nothing` for no record. The schemes pass [`held_weights_drift`](@ref)`(wd, pws)`, so a Previous-Weights Source records the held weights of a series that is not drifted.
-  - `fa::Option{<:AbstractFeeAmortisation} = nothing`: The clock the series charges the two fixed fee terms on, or `nothing` to inherit the clock the fee itself states.
-  - `store_weight_path::Bool = false`: Whether the record stores the weight path, in place of rebuilding it on demand.
-  - `strict::Bool = false`: Whether a Held Gap raises an `ArgumentError` rather than warning.
-  - `w_prev::Option{<:VecNum_VecVecNum} = nothing`: The previous weights the fold was handed, which a failed fold holds under a drift, or `nothing`.
-
-# Returns
-
-  - [`PredictionResult`](@ref) or vector of [`PredictionResult`](@ref).
-
-# Related
-
-  - [`fit_predict`](@ref)
-  - [`fit_and_predict`](@ref)
-  - [`PredictionResult`](@ref)
-  - [`MultiPeriodPredictionResult`](@ref)
-  - [`extract_fees`](@ref)
-  - [`override_fee_amortisation`](@ref)
-  - [`held_start_weights`](@ref)
-"""
-function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
-                          wd::Option{<:AbstractWeightDrift} = nothing,
-                          hwd::Option{<:AbstractWeightDrift} = wd,
-                          fa::Option{<:AbstractFeeAmortisation} = nothing,
-                          store_weight_path::Bool = false, strict::Bool = false,
-                          w_prev::Option{<:VecNum_VecVecNum} = nothing)
-    # The window is viewed at the Investable Mask first, so the column of an asset the fit
-    # found non-investable is never read, and the Held Gaps of the reduced window are
-    # zeroed once, before the series is formed and before a drift compounds on it. The
-    # fees are already on that universe, because the result carries what it solved on. The
-    # record expands back to the caller's universe on the way out, because the next fold's
-    # turnover reads its held weights.
-    imsk = result_investable_mask(res)
-    w, rdv, fees = investable_fold_view(imsk, res.w, rd, extract_fees(res, nothing))
-    # The clock the series is charged on is the caller's, not the fit's: `fa` overrides
-    # `fees.fa` here and reaches nothing the result carries, so `res.fees` still states
-    # what the optimiser priced. A `nothing` `fa` inherits and rebuilds no fee.
-    fees = override_fee_amortisation(fees, fa)
-    Xf = filter_held_gaps(w, rdv.X, strict; nx = rdv.nx)
-    X = calc_net_returns(w, Xf, fees, wd, rdv.ts)
-    w0 = held_start_weights(res.retcode, w, investable_weights_view(imsk, w_prev))
-    (hw, ruined) = held_weights_result(hwd, w0, Xf, store_weight_path, rdv.ts)
-    warn_ruined_members(wd, ruined, length(res.w))
-    res = mark_ruined_members(res, ruined)
-    rdv = reconstruct_rd(res, rdv, X, hw, w)
-    return PredictionResult(; res = res, rd = rdv, hw = expand_held_weights(imsk, hw))
 end
 
 export PredictionResult, MultiPeriodPredictionResult, PopulationPredictionResult,

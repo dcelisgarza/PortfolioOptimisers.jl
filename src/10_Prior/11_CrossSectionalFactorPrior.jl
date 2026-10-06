@@ -660,8 +660,8 @@ end
     prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = nothing,
           pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, ne::Option{<:VecStr} = nothing,
           E::Option{<:MatNum} = nothing, iv::Option{<:MatNum} = nothing,
-          ivpa::Option{<:Num_VecNum} = nothing, strict::Bool = false,
-          kwargs...) -> LowOrderPrior
+          ivpa::Option{<:Num_VecNum} = nothing, ts::Option{<:VecDate} = nothing,
+          strict::Bool = false, kwargs...) -> LowOrderPrior
 
 Fit a cross-sectional factor model on an Asset Panel, and return the asset prior it lifts.
 
@@ -718,7 +718,7 @@ The prior states an entry exactly when the model determines it. An asset of ``\\
  8. Regress each observation's `Xl` on its lagged reduced exposures with [`cross_sectional_live_regression`](@ref), giving `csr` and the mask `lv` of the factors that are not empty, under the weights `W` of [`cs_weights_initial`](@ref). Refuse a `csr` that carries an intercept with [`assert_cross_sectional_no_intercept`](@ref). When [`needs_second_pass`](@ref) answers `true`, refine the weights with [`cs_weights_refine`](@ref) and regress again. The refinement reads the idiosyncratic variance under the two universe masks, as step 9 does.
  9. Take the idiosyncratic variance history `vs` with [`variance_series`](@ref), under the active mask and the estimation mask of the fitted observations. An estimator that reads the masks resets an asset that the active mask turns off, and measures its regime over the estimation universe alone. An estimator that reads no mask ignores them. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`, and take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation. Record the degrees of freedom and the divisor of each variance with [`variance_count`](@ref) and [`cross_sectional_variance_counts`](@ref).
 10. Append the observed factors after the estimated ones with [`cross_sectional_observed_append`](@ref): the observed returns after the factor returns, the observed exposures after the loadings and the exposure history, the names and the family labels, and pass-through factors on the Factor Family Basis. Fit `pe.pe` on the combined reduced factor returns of the factors that are not empty with [`cross_sectional_factor_moments`](@ref), giving `f_pr`, which refuses a non-finite factor moment and processes the factor covariance under `pe.f_mp`, the matrix processing estimator of the factor axis and not the asset one. An Observed Factor is never empty. The method passes `strict` to `pe.pe`, as [`FactorPrior`](@ref) does, because the slot admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe. [`cross_sectional_assemble`](@ref) runs the standardisation and the counts of step 9 and the steps 11 to 17, and the call with no data of the carry fold runs it too.
-11. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, a zero `b`, and the observed returns in `fx`. Under a family re-basis, expand the combined factor returns onto the raw axis with [`cross_sectional_expand`](@ref), each row with the basis of its lagged exposures, and store them in `fr`.
+11. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, a zero `b`, and the observed returns in `fx`. Record the rows of `X` that the fit covers, `rw[r]`, in `idx`, and their timestamps in `ts` when `ts` is given. Under a family re-basis, expand the combined factor returns onto the raw axis with [`cross_sectional_expand`](@ref), each row with the basis of its lagged exposures, and store them in `fr`.
 12. Fit the Return Forecast with [`cross_sectional_return_forecast`](@ref), on the full returns data that the estimated members read, so that a Descriptor of the forecast warms up over every observation the panel has, giving the spanned coefficients `g` and the unscaled orthogonal part `ap`. Under observed factors the forecast thus reads `Xl`, and it forecasts the net return of each asset, which the split measures against loadings of the same returns. Resolve `lambda` and `c` with [`cross_sectional_calibration`](@ref), and write `b = c ap`, the Result and the two numbers onto the block `rr` with [`cross_sectional_forecast_block`](@ref). Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref), and keep the mean of the observed factors, giving `f_mu`.
 13. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), so `fpr` states the distribution of the factors the caller named. Its factor returns are `fr`, or the combined factor returns when no family is constrained.
 14. Take the investable assets `idx` with [`cross_sectional_investable`](@ref).
@@ -737,12 +737,14 @@ The prior states an entry exactly when the model determines it. An asset of ``\\
   - `E`: The Exogenous Series, oriented by `dims` as `X` is. The observed factors read their returns from it.
   - `iv`: Implied volatilities, written onto the rebuilt returns data.
   - `ivpa`: Implied-volatility risk-premium adjustment, written onto the rebuilt returns data.
+  - $(arg_dict[:ts]) It has one entry for each observation of `X`, and the block records the entries of the rows it fits, or `nothing`.
   - $(arg_dict[:strict]) It is forwarded to the nested factor prior `pe.pe`.
   - `kwargs...`: Additional keyword arguments passed to the verbs of the algorithm.
 
 # Validation
 
   - `pnl` is not `nothing`. Raises an [`IsNothingError`](@ref).
+  - If provided, `length(ts)` equals the number of observations of `X`. Raises a `DimensionMismatch`.
   - The Asset Panel is time-varying. Raises an `ArgumentError`.
   - The Asset Panel holds no Panel Field named `pe.bw`, because the fit writes its benchmark weights onto that name. Raises an `ArgumentError`.
   - The history is longer than the exposure lag. Raises an `ArgumentError`.
@@ -773,10 +775,12 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,
                ne::Option{<:VecStr} = nothing, E::Option{<:MatNum} = nothing,
                iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing,
-               strict::Bool = false, kwargs...)
+               ts::Option{<:VecDate} = nothing, strict::Bool = false, kwargs...)
     X, F, E = dims_oriented(dims, X, F, E)
     @argcheck(!isnothing(pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and the panel is nothing. Call prior(pe, rd) with a ReturnsResult whose `pnl` is the one asset_panel returns, or hand the panel to this method as its third positional argument."))
+    @argcheck(isnothing(ts) || length(ts) == size(X, 1),
+              DimensionMismatch("ts ($(length(something(ts, ())))) must have one entry for each observation of X ($(size(X, 1)))"))
     st = cross_sectional_exposure_stage(pe, X, F, pnl; ne = ne, E = E, iv = iv, ivpa = ivpa)
     (; amsk, emsk, mcap, BW, cc, Xl, rde, Ms, nf, fam, rw) = st
     Msw = Ms[rw, :, :]
@@ -835,7 +839,8 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
                                           vcat(lv, trues(size(ca.f, 2) - length(lv)));
                                           strict = strict, kwargs...)
     fit = (; csr = csr, W = W, vs = vs, cnt = variance_count(pe.ve, csr.eps), amr = amr,
-           bwr = bwr, Xo = Xw[r, :], r = r, hist = nothing)
+           bwr = bwr, Xo = Xw[r, :], r = r, hist = nothing, idx = rw[r],
+           ts = isnothing(ts) ? nothing : ts[rw[r]])
     return cross_sectional_assemble(pe, f_pr, ca, fit, rde; kwargs...)
 end
 """
@@ -864,7 +869,7 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
   - `pe`: Cross-Sectional Factor Prior estimator.
   - `f_pr`: The factor moments that [`cross_sectional_factor_moments`](@ref) states over the combined reduced factor returns.
   - `ca`: The estimated factors with the observed factors appended, from [`cross_sectional_observed_append`](@ref).
-  - `fit`: The fitted observations: `csr`, the regression; `W`, its weights; `vs`, the idiosyncratic variance history; `cnt`, the answer of [`variance_count`](@ref) on the residuals; `amr`, the active mask; `bwr`, the benchmark weights; `Xo`, the base-currency returns; `r`, the fitted rows among the rows after the Descriptor warm-up; and `hist`, the rows of the Return Forecast history that the carry fold carries, or `nothing`.
+  - `fit`: The fitted observations: `csr`, the regression; `W`, its weights; `vs`, the idiosyncratic variance history; `cnt`, the answer of [`variance_count`](@ref) on the residuals; `amr`, the active mask; `bwr`, the benchmark weights; `Xo`, the base-currency returns; `r`, the fitted rows among the rows after the Descriptor warm-up; `hist`, the rows of the Return Forecast history that the carry fold carries, or `nothing`; `idx`, the position of each fitted row in the returns data; and `ts`, the timestamp of each fitted row, or `nothing`.
   - `rde`: The returns data that the estimated members read, which the Return Forecast reads.
   - `kwargs...`: Additional keyword arguments passed to [`cross_sectional_lift`](@ref).
 
@@ -912,7 +917,8 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
                                      b = zeros(Tb, size(Xo, 2)), csr = csr, Ms = Msr,
                                      vs = vs, esigma = esigma, edof = edof, ediv = ediv,
                                      rw = W, bw = bwr, nf = ca.nf, fam = ca.fam, fcb = fnow,
-                                     lag = pe.lag, fx = ca.fx, fr = fr)
+                                     lag = pe.lag, fx = ca.fx, fr = fr, idx = fit.idx,
+                                     ts = fit.ts)
     # The forecast reads the returns the estimated members read, so under observed factors it
     # forecasts the net return, which the split measures against loadings of the same returns.
     # The split comes first and the scale after it, because a rule in `c` reads the unscaled
@@ -1054,7 +1060,7 @@ function cross_sectional_forecast_block(csfm::CrossSectionalFactorModel, sp::Nam
                                      ediv = csfm.ediv, rw = csfm.rw, bw = csfm.bw,
                                      nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,
                                      lag = csfm.lag, rf = sp.rf, fx = csfm.fx, fr = csfm.fr,
-                                     lambda = lambda, c = c)
+                                     lambda = lambda, c = c, idx = csfm.idx, ts = csfm.ts)
 end
 """
     cross_sectional_exposure_stage(pe::CrossSectionalFactorPrior, X::MatNum,
@@ -1277,7 +1283,7 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
 # Algorithm
 
  1. Check that `rd` carries asset returns.
- 2. Call the returns-matrix method with `rd.X`, `rd.F` and `rd.pnl`, forwarding `rd.ne`, `rd.E`, `rd.iv` and `rd.ivpa` as keyword arguments alongside `kwargs`, and `dims = 1` last, because a `ReturnsResult` holds its observations along the rows.
+ 2. Call the returns-matrix method with `rd.X`, `rd.F` and `rd.pnl`, forwarding `rd.ne`, `rd.E`, `rd.iv`, `rd.ivpa` and `rd.ts` as keyword arguments alongside `kwargs`, and `dims = 1` last, because a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
@@ -1307,7 +1313,7 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
     return prior(pe, rd.X, rd.F, rd.pnl; ne = rd.ne, E = rd.E, iv = rd.iv, ivpa = rd.ivpa,
-                 kwargs..., dims = 1)
+                 ts = rd.ts, kwargs..., dims = 1)
 end
 function refit_prior_step(pe::CrossSectionalFactorPrior, rd::ReturnsResult)
     return cross_sectional_pin_choice(pe.choice, refit_prior_fold(pe, rd))

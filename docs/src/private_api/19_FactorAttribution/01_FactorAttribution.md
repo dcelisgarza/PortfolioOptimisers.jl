@@ -11,6 +11,7 @@ attribution_factor_returns
 attribution_observed_count
 attribution_exposures
 attribution_lag
+attribution_row_key
 attribution_families
 attribution_family_basis
 attribution_regression_weights
@@ -34,4 +35,8 @@ attribution_array_mask
 attribution_predicted_total
 predicted_attribution
 predicted_attribution_assets
+attribution_key_align
+attribution_key_pair
+attribution_match_rows
+attribution_series_key
 ```

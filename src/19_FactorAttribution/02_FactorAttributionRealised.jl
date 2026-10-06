@@ -1492,7 +1492,8 @@ end
                                strict::Bool = false)
         -> FactorAttributionResult
     attribution_realised_entry(W::VecNum_MatNum, blk::NamedTuple, ret::VecNum;
-                               assets::Bool = false, se::Bool = false, ppy::Number = 1)
+                               assets::Bool = false, se::Bool = false, ppy::Number = 1,
+                               key::Option{<:NamedTuple} = nothing)
         -> FactorAttributionResult
 
 Align a factor model block against a realised return series and decompose it.
@@ -1505,7 +1506,7 @@ Every realised method of [`factor_attribution`](@ref) that is not rolling forms 
  2. Report a holding in a non-investable asset through [`attribution_investable_diagnostic`](@ref), which warns, or raises under `strict`.
  3. Read the block into bare arrays `blk` with [`attribution_block_arrays`](@ref).
  4. Refuse a non-finite entry of `ret` through [`attribution_finite_series`](@ref).
- 5. Align `blk` against the `length(ret)` observations of the caller, giving `al`.
+ 5. Align `blk` against the `length(ret)` observations of the caller with [`attribution_key_align`](@ref), by the row key `key` of `ret` when the block shares it, giving `al`.
  6. Decompose the rows `al.rows` of `ret`, and of `W` when it is a history, with [`realised_attribution`](@ref).
 
 # Arguments
@@ -1518,12 +1519,13 @@ Every realised method of [`factor_attribution`](@ref) that is not rolling forms 
   - `se`: Whether to fill the standard errors of the mean return contributions.
   - `ppy`: Periods per year the numbers are scaled to.
   - `strict`: Whether a holding in a non-investable asset raises rather than warns.
+  - `key`: The position `idx` and the timestamp `ts` of each observation of `ret`, or `nothing` when `ret` names no row.
 
 # Validation
 
   - Every weight at a non-investable asset is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
   - `ret` is finite throughout, else an `IsNonFiniteError` naming the observations is raised.
-  - `ret` carries at least as many observations as the block, and the block more than its exposure lag, else a `DimensionMismatch` is raised.
+  - The rules of [`attribution_key_align`](@ref).
   - The portfolio volatility is positive, and `ppy > 0`, else a `DomainError` is raised.
 
 # Returns
@@ -1545,10 +1547,10 @@ function attribution_realised_entry(W::VecNum_MatNum, pr::AbstractPriorResult, r
     return attribution_realised_entry(W, attribution_block_arrays(rr, pr), ret; kwargs...)
 end
 function attribution_realised_entry(W::VecNum_MatNum, blk::NamedTuple, ret::VecNum;
-                                    assets::Bool = false, se::Bool = false,
-                                    ppy::Number = 1)::FactorAttributionResult
+                                    assets::Bool = false, se::Bool = false, ppy::Number = 1,
+                                    key::Option{<:NamedTuple} = nothing)::FactorAttributionResult
     attribution_finite_series(ret)
-    al = attribution_align(blk, length(ret))
+    al = attribution_key_align(blk, length(ret), key)
     return realised_attribution(attribution_window_weights(W, al.rows), view(ret, al.rows),
                                 al, blk.fam, assets, se, ppy)
 end
@@ -1559,7 +1561,8 @@ end
         -> Vector{<:FactorAttributionResult}
     attribution_rolling_entry(W::VecNum_MatNum, blk::NamedTuple, ret::VecNum,
                               window::Integer; step::Integer = 1, assets::Bool = false,
-                              se::Bool = false, ppy::Number = 1)
+                              se::Bool = false, ppy::Number = 1,
+                              key::Option{<:NamedTuple} = nothing)
         -> Vector{<:FactorAttributionResult}
 
 Align a factor model block against a realised return series and roll the decomposition.
@@ -1572,7 +1575,7 @@ Every rolling method of [`factor_attribution`](@ref) forms its net return series
  2. Report a holding in a non-investable asset through [`attribution_investable_diagnostic`](@ref), which warns, or raises under `strict`.
  3. Read the block into bare arrays `blk` with [`attribution_block_arrays`](@ref).
  4. Refuse a non-finite entry of `ret` through [`attribution_finite_series`](@ref).
- 5. Align `blk` against the `length(ret)` observations of the caller, giving `al`.
+ 5. Align `blk` against the `length(ret)` observations of the caller with [`attribution_key_align`](@ref), by the row key `key` of `ret` when the block shares it, giving `al`.
  6. Roll the decomposition over the windows of the rows `al.rows` with [`attribution_rolling`](@ref), which checks `window` and `step` against the aligned length.
 
 # Arguments
@@ -1587,12 +1590,13 @@ Every rolling method of [`factor_attribution`](@ref) forms its net return series
   - `se`: Whether to fill the standard errors of the mean return contributions.
   - `ppy`: Periods per year the numbers are scaled to.
   - `strict`: Whether a holding in a non-investable asset raises rather than warns.
+  - `key`: The position `idx` and the timestamp `ts` of each observation of `ret`, or `nothing` when `ret` names no row.
 
 # Validation
 
   - Every weight at a non-investable asset is zero, else a warning names the assets, or an `ArgumentError` names them under `strict`.
   - `ret` is finite throughout, else an `IsNonFiniteError` naming the observations is raised.
-  - `ret` carries at least as many observations as the block, and the block more than its exposure lag, else a `DimensionMismatch` is raised.
+  - The rules of [`attribution_key_align`](@ref).
   - The portfolio volatility is positive, and `ppy > 0`, else a `DomainError` is raised.
   - `2 <= window <= T` over the aligned observations, else a `DomainError` is raised.
   - `step >= 1`, else a `DomainError` is raised.
@@ -1616,9 +1620,10 @@ function attribution_rolling_entry(W::VecNum_MatNum, pr::AbstractPriorResult, re
 end
 function attribution_rolling_entry(W::VecNum_MatNum, blk::NamedTuple, ret::VecNum,
                                    window::Integer; step::Integer = 1, assets::Bool = false,
-                                   se::Bool = false, ppy::Number = 1)
+                                   se::Bool = false, ppy::Number = 1,
+                                   key::Option{<:NamedTuple} = nothing)
     attribution_finite_series(ret)
-    al = attribution_align(blk, length(ret))
+    al = attribution_key_align(blk, length(ret), key)
     return attribution_rolling(attribution_window_weights(W, al.rows), ret[al.rows], al,
                                blk.fam, assets, se, ppy, window, step)
 end
@@ -1734,12 +1739,14 @@ end
 function factor_attribution(pred::MultiPeriodPredictionResult, pr::AbstractPriorResult;
                             kwargs...)::FactorAttributionResult
     W, ret = attribution_prediction_history(pred)
-    return attribution_realised_entry(W, pr, ret; kwargs...)
+    return attribution_realised_entry(W, pr, ret; key = attribution_series_key(pred),
+                                      kwargs...)
 end
 function factor_attribution(pred::MultiPeriodPredictionResult, pr::AbstractPriorResult,
                             window::Integer; kwargs...)
     W, ret = attribution_prediction_history(pred)
-    return attribution_rolling_entry(W, pr, ret, window; kwargs...)
+    return attribution_rolling_entry(W, pr, ret, window; key = attribution_series_key(pred),
+                                     kwargs...)
 end
 function factor_attribution(W::VecNum_MatNum, B::MatNum_Arr3Num, f::MatNum, eps::MatNum,
                             ret::VecNum; assets::Bool = false, se::Bool = false,

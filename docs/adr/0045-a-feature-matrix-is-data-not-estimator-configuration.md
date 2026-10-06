@@ -1200,3 +1200,15 @@ graded program.
 - `test/test_18k_constraints.jl` called `factor_universe` with four arguments where it takes
     five, so three `@test_throws` assertions were catching a `MethodError` instead of the
     exceptions they name.
+
+## Amendment (2026-10-06): a fold stores its positions as well
+
+The Decision above recovers a fold's rows from its timestamps and adds no fold provenance to
+`PredictionResult`. That still holds for the Feature Matrix. A realised `factor_attribution` of a
+cross-validation needs the rows of each fold too, and on returns data with no timestamps it has
+nothing to recover them from.
+[ADR 0195](0195-a-realised-attribution-of-a-cross-validation-matches-each-fold-to-the-block-by-a-row-key.md)
+therefore adds `idx`, the `test_idx` of the fold, to `PredictionResult`. The indexed `predict`
+records it, and the whole-sample `predict` records `nothing`. The timestamps stay the first key:
+the attribution matches by timestamp whenever both sides carry them, and by position otherwise.
+`fold_row_indices` is unchanged and still reads the timestamps.

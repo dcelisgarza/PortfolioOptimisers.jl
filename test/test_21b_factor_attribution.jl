@@ -903,6 +903,86 @@ end
         @test length(factor_attribution(mpred, pr, 30)) ==
               length(factor_attribution(w, pr, rd.X, 30))
     end
+    @testset "A cross-validation's folds are matched to the block by their row key (#1493)" begin
+        ret = fa_net_returns(w, pr, rd)
+        T = length(ret)
+        # The fit drops the first observation for the lag, and records the rows it covers.
+        @test pr.rr.idx == 2:T
+        @test pr.rr.ts == rd.ts[2:T]
+        function fold(r; idx = r, ts = rd.ts[r])
+            return PredictionResult(; res = res,
+                                    rd = PredictionReturnsResult(; nx = rd.nx,
+                                                                 X = collect(view(ret, r)),
+                                                                 ts = ts), idx = idx)
+        end
+        folds(rs; kw...) = MultiPeriodPredictionResult(;
+                                                       pred = [fold(r; kw...) for r in rs])
+        # Data row `t` is block row `t - 1`, and its exposures are those of the row before.
+        blk = PO.attribution_block_arrays(pr.rr, pr)
+        function bare(rows, args...)
+            br = rows .- 1
+            return factor_attribution(repeat(transpose(w), length(rows)),
+                                      blk.B[br .- blk.lag, :, :], blk.f[br, :],
+                                      blk.eps[br, :], ret[rows], args...; lag = 0,
+                                      fam = blk.fam)
+        end
+        gap(a, b) = maximum(abs,
+                            [a.total.vol - b.total.vol;
+                             a.sys.vol_contrib - b.sys.vol_contrib;
+                             a.idio.vol_contrib - b.idio.vol_contrib;
+                             a.sys.mu_contrib - b.sys.mu_contrib;
+                             a.fbd.vol_contrib - b.fbd.vol_contrib])
+        # Two folds that end ten rows before the block, which the tail rule refused. Each key
+        # finds the same rows: both keys, the positions alone, the timestamps alone.
+        rs = (21:40, 41:50)
+        ref = bare(21:50)
+        for m in (folds(rs), folds(rs; ts = nothing), folds(rs; idx = nothing))
+            @test gap(factor_attribution(m, pr), ref) <= 1e-15
+        end
+        @test length(factor_attribution(folds(rs), pr, 10)) == length(bare(21:50, 10))
+        # A series that names no row keeps the tail rule.
+        @test_throws DimensionMismatch factor_attribution(folds(rs; idx = nothing,
+                                                                ts = nothing), pr)
+        # Data rows 1 and 2 have no exposures in the block, so a fold that starts there
+        # leaves them out, and the attribution starts at row 3.
+        fa1 = factor_attribution(folds((1:20, 21:40)), pr)
+        @test gap(fa1, bare(3:40)) <= 1e-15
+        @test fa1.total.vol ≈ std(ret[3:40]) rtol = 1e-14
+        @test PO.attribution_series_key(folds(rs)).idx == 21:50
+        @test PO.attribution_series_key(folds(rs)).ts == rd.ts[21:50]
+        @test isnothing(PO.attribution_series_key(folds(rs; idx = nothing)).idx)
+        # A whole-sample prediction names no fold, so it records no position.
+        @test isnothing(predict(res, rd).idx)
+    end
+    @testset "The row match leaves out the edges and refuses a gap, a repeat and no overlap (#1493)" begin
+        # Under a lag of one the first key has no exposures, so the aligned keys are 2, 3, 5, 6.
+        bk = [1, 2, 3, 5, 6]
+        m = PO.attribution_match_rows(bk, [1, 2, 3], 1)
+        @test m.rows == 2:3 && m.arows == [1, 2]
+        m = PO.attribution_match_rows(bk, [5, 6, 7], 1)
+        @test m.rows == 1:2 && m.arows == [3, 4]
+        d = rd.ts[bk]
+        @test PO.attribution_match_rows(d, d[[3, 4]], 1).arows == [2, 3]
+        @test_throws DimensionMismatch PO.attribution_match_rows(bk, [7, 8], 1)
+        # Key 4 lies between two rows of the block, which holds no row for it.
+        @test_throws ArgumentError PO.attribution_match_rows(bk, [3, 4, 5], 1)
+        @test_throws ArgumentError PO.attribution_match_rows(bk, [3, 3], 1)
+        @test_throws ArgumentError PO.attribution_match_rows(bk, [5, 3], 1)
+        # The timestamps come first, the positions next, and no shared key gives nothing.
+        t = rd.ts[1:3]
+        @test PO.attribution_key_pair((; idx = 1:3, ts = t), (; idx = 4:6, ts = t)).block ==
+              t
+        @test PO.attribution_key_pair((; idx = 1:3, ts = nothing), (; idx = 4:6, ts = t)).block ==
+              1:3
+        @test isnothing(PO.attribution_key_pair((; idx = nothing, ts = nothing),
+                                                (; idx = 4:6, ts = t)))
+        blk = PO.attribution_block_arrays(pr.rr, pr)
+        @test_throws DimensionMismatch PO.attribution_key_align(blk, 5,
+                                                                (; idx = 1:4, ts = nothing))
+        # A block of another type records no key.
+        @test PO.attribution_row_key(first(fa_ts_prior()).rr) ==
+              (; idx = nothing, ts = nothing)
+    end
 end
 
 @testset "The investable zeroing helpers of the predicted side" begin
