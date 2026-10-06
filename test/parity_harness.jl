@@ -24,6 +24,9 @@ active panels, so each panel here holds the conditions they never see, at fixed 
 The returns follow a factor model: one industry factor, two lagged styles, the macro series with
 a loading for each asset, and the currency of the asset, which the base-currency return adds.
 
+`ccy_fixture` (40 × 120) is the fully active currency fixture of #1369, which the observed-factor
+tests share, with `ccy_pass` for a passthrough factor of one of its Panel Fields.
+
 **The exchange.** `parity_write` writes a `ReturnsResult` and its panel to a folder of CSV files,
 one row a line, written with `join`. A numeric cell outside the active mask, or not observed, is
 `NaN`, because the oracle refuses a finite value there. Under `filled = true` an active cell
@@ -144,6 +147,64 @@ function parity_panel(; T::Integer = 80, N::Integer = 12, seed::Integer = 1376)
 end
 parity_small_panel() = parity_panel(; T = 80, N = 12, seed = 1376)
 parity_large_panel() = parity_panel(; T = 250, N = 40, seed = 1377)
+
+"""
+    ccy_fixture(; T = 120, N = 40, seed = 927_001) -> NamedTuple
+
+Draw the currency fixture of #1369: a fully active panel of `N` assets over `T` observations,
+three industries, two styles and three currencies. The local returns follow the industries and
+the lagged styles, and the base-currency returns add the Currency Excess Return of the currency of
+each asset. Return `rd`, the `ReturnsResult` with its panel and the currency returns as the
+Exogenous Series, `R`, the currency returns, `codes`, the currency of each asset, and `ind`, its
+industry.
+"""
+function ccy_fixture(; T = 120, N = 40, seed = 927_001)
+    rng = StableRNG(seed)
+    ind = [mod(i - 1, 3) + 1 for i in 1:N]
+    codes = [mod(i, 3) + 1 for i in 1:N]
+    I3 = zeros(T, N, 3)
+    for i in 1:N
+        I3[:, i, ind[i]] .= 1.0
+    end
+    z(A) = (A .- mean(A; dims = 2)) ./ std(A; dims = 2, corrected = false)
+    s1 = z(randn(rng, T, N) .+ randn(rng, 1, N) .* 3)
+    s2 = z(randn(rng, T, N) .+ randn(rng, 1, N) .* 3)
+    mcap = exp.(randn(rng, 1, N) .* 0.8 .+ 0.05 .* cumsum(randn(rng, T, N); dims = 1))
+    fi = 0.01 .* randn(rng, T, 3)
+    fs = 0.004 .* randn(rng, T, 2)
+    loc = zeros(T, N)
+    for t in 2:T, i in 1:N
+        loc[t, i] = fi[t, ind[i]] +
+                    s1[t - 1, i] * fs[t, 1] +
+                    s2[t - 1, i] * fs[t, 2] +
+                    0.01 * randn(rng)
+    end
+    loc[1, :] .= 0.01 .* randn(rng, N)
+    R = 0.005 .* randn(rng, T, 3)
+    X = copy(loc)
+    for t in 1:T, i in 1:N
+        X[t, i] += R[t, codes[i]]
+    end
+    lv = ["EUR", "JPY", "USD"]
+    pf = [NumericPanelInput(; name = "market_cap", vals = mcap),
+          NumericPanelInput(; name = "style1", vals = s1),
+          NumericPanelInput(; name = "style2", vals = s2),
+          [NumericPanelInput(; name = "ind$k", vals = I3[:, :, k]) for k in 1:3]...,
+          CategoricalPanelInput(; name = "currency",
+                                vals = repeat(permutedims(lv[codes]), T))]
+    pnl = asset_panel(pf; amsk = trues(T, N), emsk = trues(T, N))
+    rd = ReturnsResult(; nx = ["a$i" for i in 0:(N - 1)], X = X, ne = lv, E = R, pnl = pnl)
+    return (; rd, R, codes, ind)
+end
+"""
+    ccy_pass(field, family) -> CompositeExposure
+
+A factor that passes the Panel Field `field` through, unscored and untrimmed, in `family`.
+"""
+function ccy_pass(field, family)
+    return CompositeExposure(; descriptors = [Passthrough(; field = field)],
+                             outlier = nothing, scoring = nothing, family = family)
+end
 
 function parity_write_rows(path::AbstractString, A::AbstractMatrix)
     open(path, "w") do io

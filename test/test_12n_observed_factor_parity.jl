@@ -33,48 +33,6 @@ mean and `mu`. The oracle forecasts the local returns, and so does the prior.
 using Statistics, Clarabel
 include(joinpath(@__DIR__, "parity_harness.jl"))
 
-function ccy_fixture(; T = 120, N = 40, seed = 927_001)
-    rng = StableRNG(seed)
-    ind = [mod(i - 1, 3) + 1 for i in 1:N]
-    codes = [mod(i, 3) + 1 for i in 1:N]
-    I3 = zeros(T, N, 3)
-    for i in 1:N
-        I3[:, i, ind[i]] .= 1.0
-    end
-    z(A) = (A .- mean(A; dims = 2)) ./ std(A; dims = 2, corrected = false)
-    s1 = z(randn(rng, T, N) .+ randn(rng, 1, N) .* 3)
-    s2 = z(randn(rng, T, N) .+ randn(rng, 1, N) .* 3)
-    mcap = exp.(randn(rng, 1, N) .* 0.8 .+ 0.05 .* cumsum(randn(rng, T, N); dims = 1))
-    fi = 0.01 .* randn(rng, T, 3)
-    fs = 0.004 .* randn(rng, T, 2)
-    loc = zeros(T, N)
-    for t in 2:T, i in 1:N
-        loc[t, i] = fi[t, ind[i]] +
-                    s1[t - 1, i] * fs[t, 1] +
-                    s2[t - 1, i] * fs[t, 2] +
-                    0.01 * randn(rng)
-    end
-    loc[1, :] .= 0.01 .* randn(rng, N)
-    R = 0.005 .* randn(rng, T, 3)
-    X = copy(loc)
-    for t in 1:T, i in 1:N
-        X[t, i] += R[t, codes[i]]
-    end
-    lv = ["EUR", "JPY", "USD"]
-    pf = [NumericPanelInput(; name = "market_cap", vals = mcap),
-          NumericPanelInput(; name = "style1", vals = s1),
-          NumericPanelInput(; name = "style2", vals = s2),
-          [NumericPanelInput(; name = "ind$k", vals = I3[:, :, k]) for k in 1:3]...,
-          CategoricalPanelInput(; name = "currency",
-                                vals = repeat(permutedims(lv[codes]), T))]
-    pnl = asset_panel(pf; amsk = trues(T, N), emsk = trues(T, N))
-    rd = ReturnsResult(; nx = ["a$i" for i in 0:(N - 1)], X = X, ne = lv, E = R, pnl = pnl)
-    return (; rd, R, codes, ind)
-end
-function ccy_pass(field, family)
-    return CompositeExposure(; descriptors = [Passthrough(; field = field)],
-                             outlier = nothing, scoring = nothing, family = family)
-end
 function ccy_asset(name)
     return Matrix(CSV.read(joinpath(@__DIR__, "assets",
                                     "CrossSectionalFactorPriorCurrency$(name).csv.gz"),
