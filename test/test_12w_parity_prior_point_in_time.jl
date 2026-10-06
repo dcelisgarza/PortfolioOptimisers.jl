@@ -208,6 +208,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # Defect fixed: a factor prior with a Scenario Cap carries its last rows alone, and
         # the factor returns and the original returns kept every row, so the result refused
         # the pair. They now keep the rows the scenarios keep, and the moments do not move.
+        # This is the route of the oracle's history cap that the docstring of
+        # `CrossSectionalFactorPrior` names (#1408).
         cap = EmpiricalPrior(; me = pe.me, ce = pe.ce, max_scenarios = 30)
         pc = prior(est(; minra = 5, pe = cap), fxs.rd)
         @test size(pc.X, 1) == size(pc.fpr.X, 1) == size(pc.o_X, 1) == 30

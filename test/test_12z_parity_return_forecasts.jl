@@ -22,7 +22,9 @@ one row of the case tables below:
 
 The `Default` cases state no keyword but the Descriptors, the scale and the half-life, so they pin
 our defaults against the oracle's: an out-of-fold calibration on five folds, and a forecast from
-the first observation that advances the state (#1386).
+the first observation that advances the state (#1386). The oracle's integer `cv = 3` gives the
+stored `Hz3` output bit for bit, so `KFold(; n = 3)` is the route of the integer short form, as
+the `cv` docstring of `TargetReturnForecast` states (#1408).
 
 A score, a residual of a Neutralisation and a forecast are sums whose small cells come from a
 cancellation, so every matrix and every forecast compares against its largest entry

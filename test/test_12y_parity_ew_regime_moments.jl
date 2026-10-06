@@ -383,4 +383,18 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
             end
         end
     end
+
+    @testset "A long regime half-life is documented, not warned (#1408)" begin
+        # The oracle warns above a regime half-life of 138 observations. The `regime_decay`
+        # docstring states the condition as the decay `2^(-1/138) ≈ 0.99499`, and the
+        # estimators compute the same recursion past it with no warning (the rule of #1282).
+        @test round(exp2(-1 / 138); digits = 5) == 0.99499
+        @test round(Int, PortfolioOptimisers.decay_half_life(0.99499)) == 138
+        for (E, f) in ((RegimeAdjustedExpWeightedVariance, var),
+                       (RegimeAdjustedExpWeightedCovariance, cov))
+            e = E(; decay = p1383_dk(10), min_obs = 5, regime_decay = p1383_dk(200),
+                  regime_min_obs = 5)
+            @test_logs min_level = Logging.Warn f(e, X; active_mask = am)
+        end
+    end
 end

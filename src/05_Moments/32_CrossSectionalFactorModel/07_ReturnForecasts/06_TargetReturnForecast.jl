@@ -186,7 +186,7 @@ TargetReturnForecast
     """
     min_obs
     """
-    Cross-validation estimator whose folds give the out-of-fold predictions the calibration reads, or `nothing` to calibrate on in-sample predictions.
+    Cross-validation estimator whose folds give the out-of-fold predictions the calibration reads, or `nothing` to calibrate on in-sample predictions. The field takes an estimator and never an integer: `KFold(; n = k)` gives `k` consecutive folds with no shuffle, which is the split that an integer `k` means in a K-fold short form.
     """
     cv
     """
