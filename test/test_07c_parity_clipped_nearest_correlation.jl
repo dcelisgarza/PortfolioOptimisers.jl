@@ -93,7 +93,10 @@ const P1412_CASES = [("Indefinite", false), ("IndefiniteHigham", true),
         X = p1412_in("Frame")
         mp = MatrixProcessing(; pdm = p1412_pdm())
         PortfolioOptimisers.matrix_processing_block!(mp, X, zeros(1, size(X, 2)))
-        @test parity_compare(X, p1412_out("Frame"); scale = :array, name = "Frame").ok
+        # Measured maxscaled 7.7e-16 (maxrel 4.8e-15). The tolerance keeps a margin for the
+        # eigen solver, whose round-off moves with the host and reaches 8.8e-14 on Retry.
+        @test parity_compare(X, p1412_out("Frame"); rtol = 1e-13, scale = :array,
+                             name = "Frame").ok
     end
     @testset "the idiosyncratic overlay of the prior, where the repair binds (#1383)" begin
         # The input is the oracle's own block before its repair, `th = 0.1` on the large panel
@@ -119,7 +122,9 @@ const P1412_CASES = [("Indefinite", false), ("IndefiniteHigham", true),
     @testset "Better: a constant asset keeps a zero row, and the block is repaired" begin
         X = p1412_in("ZeroVariance")
         Y = posdef(p1412_pdm(), X)
-        @test parity_compare(Y, p1412_out("ZeroVariance"); scale = :array,
+        # Measured maxscaled 7.7e-16 (maxrel 4.8e-15), the value of the Frame case: both
+        # repair the block of "Indefinite". The margin is the one of the Frame case.
+        @test parity_compare(Y, p1412_out("ZeroVariance"); rtol = 1e-13, scale = :array,
                              name = "ZeroVariance").ok
         @test all(iszero, Y[4, :]) && all(iszero, Y[:, 4])
     end

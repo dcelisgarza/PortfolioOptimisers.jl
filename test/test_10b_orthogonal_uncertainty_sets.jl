@@ -17,6 +17,7 @@ file against itself.
 =#
 # The synthetic point-in-time Asset Panel of the last testset.
 include(joinpath(@__DIR__, "test06c_setup.jl"))
+include(joinpath(@__DIR__, "parity_harness.jl"))
 @testset "Orthogonal uncertainty sets" begin
     using PortfolioOptimisers, Test, StableRNGs, Random, Clarabel, Statistics,
           LinearAlgebra, Distributions
@@ -141,10 +142,19 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
             mu_set, sigma_set = ucs(ue, pr777)
             @test isa(mu_set, NormBallUncertaintySet)
             @test isa(sigma_set, CompactCovarianceUncertaintySet)
-            @test isapprox(mu_set.kappa, radius_ref; rtol = 1e-12)
-            @test isapprox(mu_set.L * transpose(mu_set.L), LLt; atol = 1e-10)
-            @test isapprox(sigma_set.Q * transpose(sigma_set.Q), QQt; atol = 1e-12)
-            @test isapprox(collect(sigma_set.C), C; rtol = 1e-12)
+            # Measured, over the three cases: maxrel 1.4e-16 on the radius; maxscaled 2.8e-15
+            # on `L L'` and 1.2e-16 on `Q Q'`; `C` exact. A small cell of a projector is a
+            # cancellation of entries of order one, so the products compare against the
+            # largest entry (maxrel 1.4e-14 cell by cell). The margin is for the singular value
+            # and the eigen decompositions, whose round-off moves with the host.
+            tag = "$(nameof(typeof(metric))) $(nameof(typeof(scaling)))"
+            @test parity_compare([mu_set.kappa], [radius_ref]; rtol = 1e-14,
+                                 name = "$(tag) radius").ok
+            @test parity_compare(mu_set.L * transpose(mu_set.L), LLt; rtol = 1e-13,
+                                 scale = :array, name = "$(tag) LLt").ok
+            @test parity_compare(sigma_set.Q * transpose(sigma_set.Q), QQt; rtol = 1e-13,
+                                 scale = :array, name = "$(tag) QQt").ok
+            @test parity_compare(collect(sigma_set.C), C; rtol = 1e-14, name = "$(tag) C").ok
             @test mu_set.p == 2
             @test isa(mu_set.class, MuUncertaintySetClass)
             @test size(mu_set.L) == (N777, 4)

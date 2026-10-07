@@ -1,3 +1,4 @@
+include(joinpath(@__DIR__, "parity_harness.jl"))
 @testset "Reference fee parity" begin
     using PortfolioOptimisers, Test, LinearAlgebra
 
@@ -510,8 +511,10 @@
 
                     # The charge this library computes for the fold, against the two
                     # numbers the reference reported for it.
-                    @test isapprox(PortfolioOptimisers.calc_periodic_fees(wf, fe),
-                                   cost[tag][f] + fee[tag][f]; atol = atol)
+                    # Measured maxrel 1.7e-16, one rounding of a sum over five assets.
+                    @test parity_compare([PortfolioOptimisers.calc_periodic_fees(wf, fe)],
+                                         [cost[tag][f] + fee[tag][f]]; rtol = 1e-15,
+                                         name = "$(tag) fold $(f) charge").ok
 
                     # Only the fold that loses an asset owes an exit, and it owes the rate
                     # times the previous weight the scheme threaded.
@@ -537,8 +540,13 @@
                 @test length(r) == 60
                 @test all(isfinite, r)
                 # Both cumulative conventions, against the reference's own summaries.
-                @test isapprox(cumulative_returns(r)[end], smp[tag]; atol = 1e-14)
-                @test isapprox(cumulative_returns(r, true)[end], cmp[tag]; atol = 1e-14)
+                # Measured maxrel 1.6e-15 on the simple return, a sum of 60 returns that
+                # cancels to a total near 3e-3 (`mgmt_drift`), and 1.3e-16 on the compounded
+                # one, a product of 60 factors near one.
+                @test parity_compare([cumulative_returns(r)[end]], [smp[tag]]; rtol = 1e-14,
+                                     name = "$(tag) simple").ok
+                @test parity_compare([cumulative_returns(r, true)[end]], [cmp[tag]];
+                                     rtol = 1e-15, name = "$(tag) compounded").ok
             end
         end
 

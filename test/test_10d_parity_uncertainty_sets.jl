@@ -483,9 +483,12 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                      X)
         cm = NormBallUncertaintySet(me)
         cs = NormBallUncertaintySet(se)
+        # Measured maxscaled 2.4e-15 (mu) and 4.5e-13 (cov), the values of the full empirical
+        # shapes above: the converter carries the factor of the ellipsoid. The cov tolerance
+        # stays at 1e-12 for the reason of the Normal full shape, its repaired Cholesky factor.
         @test parity_compare(cm.L * transpose(cm.L),
                              load("NormBallUncertaintySet", "Empirical", "MuFullLLt");
-                             scale = :array, name = "converted mu").ok
+                             rtol = 1e-13, scale = :array, name = "converted mu").ok
         @test parity_compare(cs.L * transpose(cs.L),
                              load("NormBallUncertaintySet", "Empirical", "CovFullLLt");
                              scale = :array, name = "converted cov").ok

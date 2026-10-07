@@ -22,8 +22,9 @@ the one that admits the loosest:
     linkage it builds, agree to floating-point noise. This is the part of the hierarchical
     route that carries no tie-break.
  2. **The hierarchical allocation, with the dendrogram's leaf order pinned to the reference's.**
-    Bit-exact, on both panels and every fold. The leaf order has to be pinned because the two
-    sides order the *same* dendrogram differently -- see the note below -- and the allocation
+    Equal to round-off, on both panels and every fold (maxrel 6.3e-16). The leaf order has
+    to be pinned because the two sides order the *same* dendrogram differently -- see the
+    note below -- and the allocation
     is what this library is being asked to reproduce, not the third-party ordering routine.
  3. **The convex allocation.** Both sides solve the same quadratic programme through a
     different build of a solver, so the weights agree to the solver's precision rather than to
@@ -33,8 +34,8 @@ the one that admits the loosest:
 The leaf-ordering divergence
 ============================
 
-Both sides build the same dendrogram: the heights agree to `4.7e-13`, which is the precision
-the reference's numbers were exported at. They then order its branches differently on three of
+Both sides build the same dendrogram: the heights agree cell by cell to `8.5e-16` relative, a
+rounding of the linkage recursion. They then order its branches differently on three of
 the four folds of the complete panel, and each ordering is a valid ordering of that same tree --
 one is reachable from the other by flipping internal nodes. Since #1494 the library's default
 `branchorder = :optimal` is the exact optimal leaf ordering, and the other side's routine is not
@@ -43,6 +44,7 @@ optimal, so the two orders differ by design. The difference moves an HRP weight 
 the allocation rather than the leaf order.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
+include(joinpath(@__DIR__, "parity_harness.jl"))
 using Clarabel, Clustering, Statistics, Dates
 
 const REFP_SLV = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
@@ -175,16 +177,19 @@ end
         Xtr, _ = refp_window(tag, i)
         D = PortfolioOptimisers.distance(de, PortfolioOptimisersCovariance(), Xtr)
         @test isapprox(D, sqrt.(0.5 .* (1 .- cor(Xtr))); atol = 1e-15)
-        # And the dendrogram built from it has the reference's heights. `4.7e-13` is the
-        # precision the reference's numbers were exported at, not the agreement's limit.
+        # And the dendrogram built from it has the reference's heights. Measured maxrel
+        # 4.2e-16, and 8.5e-16 under the flags of CI (`--check-bounds=yes`): a rounding
+        # of the Ward recursion, whose summation order differs.
         clr = clusterise(ClustersEstimator(), Xtr)
-        @test isapprox(clr.res.heights, REFP_HEIGHT[tag][i]; atol = 1e-12)
+        @test parity_compare(clr.res.heights, REFP_HEIGHT[tag][i]; rtol = 1e-14,
+                             name = "$(tag) fold $(i) heights").ok
     end
 end
 
-@testset "Hierarchical Risk Parity reproduces the reference bit for bit" begin
+@testset "Hierarchical Risk Parity reproduces the reference to round-off" begin
     # With the dendrogram's leaf order pinned to the reference's, the allocation is the
-    # reference's own, on the complete panel and on the gapped one alike.
+    # reference's own, on the complete panel and on the gapped one alike. Measured maxrel
+    # 3.6e-16, and 6.3e-16 under the flags of CI, a few ulps.
     for tag in ("full", "gap"), i in 1:4
         Xtr, keep = refp_window(tag, i)
         clr = clusterise(ClustersEstimator(), Xtr)
@@ -194,7 +199,8 @@ end
         w = optimise(HierarchicalRiskParity(; r = Variance(),
                                             opt = HierarchicalOptimiser(; cle = pinned)),
                      ReturnsResult(; nx = refp_rd(tag).nx[keep], X = Xtr)).w
-        @test isapprox(w, REFP_HRP[tag][i]; atol = 1e-15)
+        @test parity_compare(w, REFP_HRP[tag][i]; rtol = 1e-14,
+                             name = "$(tag) fold $(i) HRP").ok
         @test isapprox(sum(w), 1)
     end
 end
@@ -211,15 +217,18 @@ end
             # The weights agree to the solver's precision. The two sides run different
             # builds of the solver on the same programme, so this tolerance is sized to the
             # solve and not to the arithmetic: the largest disagreement measured over the
-            # eight folds is `5.6e-4` in the two-norm and `3.5e-4` on a single weight.
-            @test isapprox(w, ref; atol = 1e-3)
+            # eight folds is `5.6e-4` in the two-norm and `3.5e-4` on a single weight. The
+            # check is absolute: a weight near zero on one side has no relative meaning.
+            @test parity_compare(w, ref; rtol = 0.0, atol = 1e-3,
+                                 name = "$(tag) fold $(i) min-variance").ok
             @test isapprox(sum(w), 1)
             # The objective is where the comparison is meaningful, and it is where this
             # library does not lose: the variance it attains is never the higher one.
             sigma = cov(PortfolioOptimisersCovariance(), Xtr)
             @test dot(w, sigma, w) <= dot(ref, sigma, ref)
-            # The two objectives agree to `2.6e-6` relative at worst.
-            @test isapprox(dot(w, sigma, w), dot(ref, sigma, ref); rtol = 1e-5)
+            # The two objectives agree to `2.5e-6` relative at worst.
+            @test parity_compare([dot(w, sigma, w)], [dot(ref, sigma, ref)]; rtol = 1e-5,
+                                 name = "$(tag) fold $(i) objective").ok
         end
     end
 end
