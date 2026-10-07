@@ -1,6 +1,119 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype of the rules that build the diagonal covariance shape of a [`NormalUncertaintySet`](@ref).
+
+The shape of the covariance set is the asymptotic covariance of ``\\operatorname{vec}(\\hat{\\mathbf{\\Sigma}})``, ``N^{2} \\times N^{2}``. A `diagonal = true` algorithm keeps one variance per entry of ``\\hat{\\mathbf{\\Sigma}}``, and a member states which variance. The mean axis does not read the rule, because the diagonal of ``\\hat{\\mathbf{\\Sigma}} / T`` is the same under every member.
+
+# Interfaces
+
+## `diagonal_sigma_shape`
+
+  - `diagonal_sigma_shape(dc::AbstractDiagonalConstruction, pdm::Option{<:AbstractPosdefEstimator}, sigma_mu::MatNum, sigma::MatNum, T::Number) -> LinearAlgebra.Diagonal`: Returns the diagonal covariance shape, ``N^{2} \\times N^{2}``, with non-negative entries.
+
+# Related
+
+  - [`DiagonalOfShape`](@ref)
+  - [`ShapeOfDiagonal`](@ref)
+  - [`diagonal_sigma_shape`](@ref)
+  - [`NormalUncertaintySet`](@ref)
+"""
+abstract type AbstractDiagonalConstruction <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Takes the diagonal of the full covariance shape, the default.
+
+Each entry is the exact variance of its entry of ``\\hat{\\mathbf{\\Sigma}}`` at the covariance matrix the set is centred on, so the diagonal set and the full set (`diagonal = false`) read one sampling law.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\left(\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}\\right)_{(i,j),(i,j)} &= \\dfrac{\\hat{\\mathbf{\\Sigma}}_{ii} \\hat{\\mathbf{\\Sigma}}_{jj} + \\hat{\\mathbf{\\Sigma}}_{ij}^{2}}{T}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\left(\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}\\right)_{(i,j),(i,j)}``: Diagonal entry of the covariance shape at the ``(i, j)`` entry of ``\\hat{\\mathbf{\\Sigma}}``.
+  - $(math_dict[:Sigma_hat_ii])
+  - $(math_dict[:Sigma_hat_ij])
+  - $(math_dict[:T])
+
+It is the variance of the ``(i, j)`` entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw.
+
+# Algorithm
+
+The branch of [`diagonal_sigma_shape`](@ref) that this tag selects runs these steps.
+
+ 1. Build the full shape with [`sigma_asymptotic_cov`](@ref), repaired under `pdm`.
+ 2. Return its diagonal as a `LinearAlgebra.Diagonal`.
+
+# Examples
+
+```jldoctest
+julia> DiagonalOfShape()
+DiagonalOfShape()
+```
+
+# Related
+
+  - [`AbstractDiagonalConstruction`](@ref)
+  - [`ShapeOfDiagonal`](@ref)
+  - [`diagonal_sigma_shape`](@ref)
+"""
+struct DiagonalOfShape <: AbstractDiagonalConstruction end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Sets the covariances of ``\\hat{\\mathbf{\\Sigma}}`` to zero, then builds the covariance shape.
+
+Each entry is the variance of its entry of ``\\hat{\\mathbf{\\Sigma}}`` under an assumed ``\\hat{\\mathbf{\\Sigma}}_{ij} = 0`` for ``i \\neq j``, while the set stays centred on ``\\hat{\\mathbf{\\Sigma}}`` with its covariances. It drops ``\\hat{\\mathbf{\\Sigma}}_{ij}^{2}`` from each off-diagonal entry that [`DiagonalOfShape`](@ref) keeps, so it is the less exact rule, and its diagonal set can differ from the full set (`diagonal = false`).
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\left(\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}\\right)_{(i,j),(i,j)} &= \\dfrac{\\left(1 + \\delta_{ij}\\right) \\hat{\\mathbf{\\Sigma}}_{ii} \\hat{\\mathbf{\\Sigma}}_{jj}}{T}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\left(\\mathbf{\\Sigma}_{\\mathbf{\\Sigma}}\\right)_{(i,j),(i,j)}``: Diagonal entry of the covariance shape at the ``(i, j)`` entry of ``\\hat{\\mathbf{\\Sigma}}``.
+  - ``\\delta_{ij}``: Kronecker delta, `1` when ``i = j`` and `0` otherwise.
+  - $(math_dict[:Sigma_hat_ii])
+  - $(math_dict[:T])
+
+It is the diagonal of ``T (\\mathbf{I} + \\mathbf{K})(\\mathbf{D} \\otimes \\mathbf{D})``, with ``\\mathbf{D}`` the diagonal of ``\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``. The two rules agree on each entry ``(i, i)``.
+
+# Algorithm
+
+The branch of [`diagonal_sigma_shape`](@ref) that this tag selects runs these steps.
+
+ 1. Read `d`, the diagonal of `sigma_mu`.
+ 2. Form the vector `v = vec(T .* d .* transpose(d))`, whose entry ``(i, j)`` in column-major order is ``T d_{i} d_{j}``.
+ 3. Double the ``N`` entries ``(i, i)``, at the stride `N + 1` of `v`.
+ 4. Return `LinearAlgebra.Diagonal(v)`. No ``N^{2} \\times N^{2}`` matrix is formed, and `pdm` is not read: a diagonal of non-negative entries is positive semi-definite, and the repair of `posdef!` leaves such a matrix unchanged.
+
+# Examples
+
+```jldoctest
+julia> ShapeOfDiagonal()
+ShapeOfDiagonal()
+```
+
+# Related
+
+  - [`AbstractDiagonalConstruction`](@ref)
+  - [`DiagonalOfShape`](@ref)
+  - [`diagonal_sigma_shape`](@ref)
+"""
+struct ShapeOfDiagonal <: AbstractDiagonalConstruction end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Fits a box or an ellipsoidal uncertainty set from the sampling laws that normal returns imply: the mean is normal and the covariance is Wishart.
 
 The two laws are Equation 11.16 of the source. `alg` picks the shape, and `n_sim` sets the number of Wishart draws the covariance bounds are read from. Its sampling-free counterpart is [`DeltaUncertaintySet`](@ref), and its distribution-free counterpart is [`ARCHUncertaintySet`](@ref).
@@ -20,6 +133,7 @@ $(DocStringExtensions.FIELDS)
         seed::Option{<:Integer} = nothing,
         ens::Option{<:Number} = nothing,
         pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
+        dc::AbstractDiagonalConstruction = DiagonalOfShape(),
         kwargs::NamedTuple = (;),
     ) -> NormalUncertaintySet
 
@@ -66,6 +180,7 @@ NormalUncertaintySet
      pdm ┼ Posdef
          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      dc ┼ DiagonalOfShape()
   kwargs ┴ @NamedTuple{}: NamedTuple()
 ```
 
@@ -76,6 +191,7 @@ NormalUncertaintySet
   - [`AbstractUncertaintySetEstimator`](@ref)
   - [`BoxUncertaintySetAlgorithm`](@ref)
   - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`AbstractDiagonalConstruction`](@ref)
 
 # References
 
@@ -117,6 +233,10 @@ NormalUncertaintySet
     """
     pdm
     """
+    $(field_dict[:dc_ucs])
+    """
+    dc
+    """
     $(field_dict[:kwargs])
     """
     kwargs
@@ -125,14 +245,21 @@ NormalUncertaintySet
                                   q::Number, rng::Random.AbstractRNG,
                                   seed::Option{<:Integer}, ens::Option{<:Number},
                                   pdm::Option{<:AbstractPosdefEstimator},
-                                  kwargs::NamedTuple)
+                                  dc::AbstractDiagonalConstruction, kwargs::NamedTuple)
         @argcheck(zero(n_sim) < n_sim, DomainError(n_sim, "n_sim must be > 0"))
         assert_resource_cap(n_sim, RESOURCE_LIMITS[].max_n_sim, :n_sim, :max_n_sim)
         assert_unit_interval(q, :q)
         return new{typeof(pe), typeof(alg), typeof(n_sim), typeof(q), typeof(rng),
-                   typeof(seed), typeof(ens), typeof(pdm), typeof(kwargs)}(pe, alg, n_sim,
-                                                                           q, rng, seed,
-                                                                           ens, pdm, kwargs)
+                   typeof(seed), typeof(ens), typeof(pdm), typeof(dc), typeof(kwargs)}(pe,
+                                                                                       alg,
+                                                                                       n_sim,
+                                                                                       q,
+                                                                                       rng,
+                                                                                       seed,
+                                                                                       ens,
+                                                                                       pdm,
+                                                                                       dc,
+                                                                                       kwargs)
     end
 end
 function NormalUncertaintySet(;
@@ -143,8 +270,9 @@ function NormalUncertaintySet(;
                               seed::Option{<:Integer} = nothing,
                               ens::Option{<:Number} = nothing,
                               pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
+                              dc::AbstractDiagonalConstruction = DiagonalOfShape(),
                               kwargs::NamedTuple = (;))::NormalUncertaintySet
-    return NormalUncertaintySet(pe, alg, n_sim, q, rng, seed, ens, pdm, kwargs)
+    return NormalUncertaintySet(pe, alg, n_sim, q, rng, seed, ens, pdm, dc, kwargs)
 end
 """
     commutation_matrix(X::MatNum)
@@ -339,7 +467,7 @@ Where:
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
 
-The right-hand form is the asymptotic covariance of ``\\operatorname{vec}(\\hat{\\mathbf{\\Sigma}})`` for a normal sample. Its ``(i,j)`` diagonal entry is ``\\left(\\hat{\\Sigma}_{ii} \\hat{\\Sigma}_{jj} + \\hat{\\Sigma}_{ij}^{2}\\right) / T``, which is the variance of the ``(i,j)`` entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw. The sample that [`ucs`](@ref) builds from those draws and the shape matrix it measures that sample against are therefore on one scale.
+The right-hand form is the asymptotic covariance of ``\\operatorname{vec}(\\hat{\\mathbf{\\Sigma}})`` for a normal sample. Its ``(i,j)`` diagonal entry is ``\\left(\\hat{\\Sigma}_{ii} \\hat{\\Sigma}_{jj} + \\hat{\\Sigma}_{ij}^{2}\\right) / T``, which is the variance of the ``(i,j)`` entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw. The sample that [`ucs`](@ref) builds from those draws and the shape matrix it measures that sample against are therefore on one scale. A `diagonal = true` set keeps this diagonal under [`DiagonalOfShape`](@ref), the default. [`ShapeOfDiagonal`](@ref) builds the diagonal from the variances alone, and [`diagonal_sigma_shape`](@ref) states both rules.
 
 # Algorithm
 
@@ -363,6 +491,7 @@ The right-hand form is the asymptotic covariance of ``\\operatorname{vec}(\\hat{
 
   - [`mu_asymptotic_cov`](@ref)
   - [`commutation_matrix`](@ref)
+  - [`diagonal_sigma_shape`](@ref)
   - [`NormalUncertaintySet`](@ref)
 
 # References
@@ -376,6 +505,88 @@ function sigma_asymptotic_cov(pdm::Option{<:AbstractPosdefEstimator}, sigma_mu::
     sigma_sigma = T * (LinearAlgebra.I + K) * kron(sigma_mu, sigma_mu)
     posdef!(pdm, sigma_sigma)
     return sigma_sigma
+end
+"""
+    diagonal_sigma_shape(::DiagonalOfShape, pdm::Option{<:AbstractPosdefEstimator},
+                         sigma_mu::MatNum, sigma::MatNum, T::Number)
+    diagonal_sigma_shape(::ShapeOfDiagonal, ::Option{<:AbstractPosdefEstimator},
+                         sigma_mu::MatNum, ::MatNum, T::Number)
+
+Diagonal covariance shape of a [`NormalUncertaintySet`](@ref) under the rule that `dc` names.
+
+# Algorithm
+
+ 1. On [`DiagonalOfShape`](@ref), run the steps that its docstring lists.
+ 2. On [`ShapeOfDiagonal`](@ref), run the steps that its docstring lists.
+
+# Arguments
+
+  - `dc`: Construction of the diagonal shape.
+  - `pdm`: Positive definite matrix estimator of the full shape. [`ShapeOfDiagonal`](@ref) does not read it.
+  - `sigma_mu`: Mean asymptotic covariance from [`mu_asymptotic_cov`](@ref).
+  - `sigma`: Point estimate of the covariance matrix. Only its shape is read, and only by [`DiagonalOfShape`](@ref).
+  - `T`: Scaling parameter from [`choose_scaling_parameter`](@ref).
+
+# Returns
+
+  - `sigma_sigma::LinearAlgebra.Diagonal`: Diagonal covariance shape, ``N^{2} \\times N^{2}``.
+
+# Related
+
+  - [`AbstractDiagonalConstruction`](@ref)
+  - [`DiagonalOfShape`](@ref)
+  - [`ShapeOfDiagonal`](@ref)
+  - [`sigma_asymptotic_cov`](@ref)
+  - [`normal_sigma_shape`](@ref)
+"""
+function diagonal_sigma_shape(::DiagonalOfShape, pdm::Option{<:AbstractPosdefEstimator},
+                              sigma_mu::MatNum, sigma::MatNum, T::Number)
+    return LinearAlgebra.Diagonal(sigma_asymptotic_cov(pdm, sigma_mu, sigma, T))
+end
+function diagonal_sigma_shape(::ShapeOfDiagonal, ::Option{<:AbstractPosdefEstimator},
+                              sigma_mu::MatNum, ::MatNum, T::Number)
+    d = LinearAlgebra.diag(sigma_mu)
+    N = length(d)
+    v = vec(T .* d .* transpose(d))
+    v[1:(N + 1):end] .*= 2
+    return LinearAlgebra.Diagonal(v)
+end
+"""
+    normal_sigma_shape(ue::NormalUncertaintySet, sigma_mu::MatNum, sigma::MatNum, T::Number)
+
+Covariance shape that an ellipsoidal or norm-ball [`NormalUncertaintySet`](@ref) measures its set against.
+
+Each ellipsoidal and norm-ball arm of [`ucs`](@ref) and [`sigma_ucs`](@ref) builds its shape here, so the rule of `ue.dc` reaches every route that reads a diagonal shape. The box arms read no shape.
+
+# Algorithm
+
+ 1. When `ue.alg.diagonal` is `true`, return [`diagonal_sigma_shape`](@ref) under `ue.dc`.
+ 2. Otherwise return the full shape of [`sigma_asymptotic_cov`](@ref). `ue.dc` is not read.
+
+# Arguments
+
+  - `ue`: Normal uncertainty set estimator, whose `alg` is an [`EllipsoidalUncertaintySetAlgorithm`](@ref) or a [`NormBallUncertaintySetAlgorithm`](@ref).
+  - `sigma_mu`: Mean asymptotic covariance from [`mu_asymptotic_cov`](@ref).
+  - `sigma`: Point estimate of the covariance matrix.
+  - `T`: Scaling parameter from [`choose_scaling_parameter`](@ref).
+
+# Returns
+
+  - `sigma_sigma::MatNum`: Covariance shape, ``N^{2} \\times N^{2}``.
+
+# Related
+
+  - [`diagonal_sigma_shape`](@ref)
+  - [`sigma_asymptotic_cov`](@ref)
+  - [`NormalUncertaintySet`](@ref)
+"""
+function normal_sigma_shape(ue::NormalUncertaintySet, sigma_mu::MatNum, sigma::MatNum,
+                            T::Number)
+    return if ue.alg.diagonal
+        diagonal_sigma_shape(ue.dc, ue.pdm, sigma_mu, sigma, T)
+    else
+        sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
+    end
 end
 """
     mu_normal_box_set(mu::VecNum, sigma_mu::MatNum, q::Number)
@@ -925,7 +1136,7 @@ Where:
  5. Resolve the random number generator from `ue.rng` and `ue.seed` with [`resolve_rng`](@ref).
  6. Draw the mean sample with [`normal_mu_error_sample`](@ref), giving `X_mu`, one mean estimation error per row.
  7. Draw the covariance sample with [`normal_sigma_error_sample`](@ref), giving `X_sigma`, one vectorised covariance estimation error per row.
- 8. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 8. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
  9. Fit the mean ellipsoid with [`ellipsoidal_set`](@ref) on `X_mu` and `sigma_mu`, with `pr.mu` as the centre.
 10. Fit the covariance ellipsoid the same way on `X_sigma` and `sigma_sigma`, with `pr.sigma` as the centre.
 11. Return the two sets as a tuple, mean first.
@@ -965,7 +1176,7 @@ function ucs(ue::NormalUncertaintySet{Nothing,
     rng = resolve_rng(ue.rng, ue.seed)
     X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
     X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
-    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
+    sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
     mu_set, sigma_set = ellipsoidal_set(ue.alg, ue.q, X_mu, sigma_mu,
                                         MuUncertaintySetClass(), prr.mu),
                         ellipsoidal_set(ue.alg, ue.q, X_sigma, sigma_sigma,
@@ -1012,7 +1223,7 @@ The radius of each ellipsoid is the one [`k_ucs`](@ref) returns for `ue.alg.meth
  2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
  3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 5. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 5. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
  6. Fit the mean ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_mu`, passing `nothing` in place of a sample and `pr.mu` as the centre.
  7. Fit the covariance ellipsoid the same way on `sigma_sigma`, with `pr.sigma` as the centre.
  8. Return the two sets as a tuple, mean first.
@@ -1047,7 +1258,7 @@ function ucs(ue::NormalUncertaintySet{Nothing,
     sigma = prr.sigma
     T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
+    sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
     mu_set, sigma_set = ellipsoidal_set(ue.alg, ue.q, nothing, sigma_mu,
                                         MuUncertaintySetClass(), prr.mu),
                         ellipsoidal_set(ue.alg, ue.q, nothing, sigma_sigma,
@@ -1231,7 +1442,7 @@ Where:
  3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  5. Resolve the random number generator with [`resolve_rng`](@ref), and draw the sample with [`normal_sigma_error_sample`](@ref), giving `X_sigma`, one vectorised estimation error per row.
- 6. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 6. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
  7. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `X_sigma` and `sigma_sigma`, with `pr.sigma` as the centre.
  8. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
@@ -1266,7 +1477,7 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
     X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
-    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
+    sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
     set = ellipsoidal_set(ue.alg, ue.q, X_sigma, sigma_sigma, SigmaUncertaintySetClass(),
                           prr.sigma)
     return expand_investable_ucs(set, imsk, pr)
@@ -1308,7 +1519,7 @@ The significance level reaches [`k_ucs`](@ref) undivided, because an ellipsoid c
  2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
  3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref).
  4. Build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 5. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 5. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
  6. Fit and return the ellipsoid with [`ellipsoidal_set`](@ref) on `sigma_sigma`, passing `nothing` in place of a sample and `pr.sigma` as the centre.
  7. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
@@ -1340,7 +1551,7 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
     sigma = prr.sigma
     T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
+    sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
     set = ellipsoidal_set(ue.alg, ue.q, nothing, sigma_sigma, SigmaUncertaintySetClass(),
                           prr.sigma)
     return expand_investable_ucs(set, imsk, pr)
@@ -1363,7 +1574,7 @@ The two sets are the two ellipsoids of the sibling route with their shape matric
  2. Take the prior result `pr` the set is calibrated on, and read `mu`, `sigma` and `N = size(pr.X, 2)`.
  3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  4. Resolve one generator with [`resolve_rng`](@ref), and draw the two samples with [`normal_mu_error_sample`](@ref) and [`normal_sigma_error_sample`](@ref), mean first.
- 5. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 5. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
  6. Assemble the two sets with [`norm_ball_set`](@ref), on the mean shape and on the covariance shape, and return them as a tuple, mean first.
  7. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
@@ -1407,7 +1618,7 @@ function ucs(ue::NormalUncertaintySet{Nothing,
     rng = resolve_rng(ue.rng, ue.seed)
     X_mu = normal_mu_error_sample(ue, rng, mu, sigma_mu)
     X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
-    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
+    sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
     mu_set, sigma_set = norm_ball_set(ue.alg, ue.q, X_mu, sigma_mu, MuUncertaintySetClass(),
                                       prr.mu),
                         norm_ball_set(ue.alg, ue.q, X_sigma, sigma_sigma,
@@ -1430,7 +1641,7 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
  1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
  2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
  3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 4. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
  5. Assemble the two sets with [`norm_ball_set`](@ref), passing `nothing` in place of a sample, and return them as a tuple, mean first.
  6. Before the two sets leave, write both back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
@@ -1470,7 +1681,7 @@ function ucs(ue::NormalUncertaintySet{Nothing,
     sigma = prr.sigma
     T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
+    sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
     mu_set, sigma_set = norm_ball_set(ue.alg, ue.q, nothing, sigma_mu,
                                       MuUncertaintySetClass(), prr.mu),
                         norm_ball_set(ue.alg, ue.q, nothing, sigma_sigma,
@@ -1609,7 +1820,7 @@ The map is the factor of the vectorised covariance's asymptotic covariance, so t
  2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma` and `N = size(pr.X, 2)`.
  3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
  4. Resolve the generator with [`resolve_rng`](@ref), and draw the sample with [`normal_sigma_error_sample`](@ref).
- 5. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 5. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
  6. Assemble and return the set with [`norm_ball_set`](@ref), with `pr.sigma` as the centre.
  7. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
@@ -1650,7 +1861,7 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
     rng = resolve_rng(ue.rng, ue.seed)
     X_sigma = normal_sigma_error_sample(ue, rng, sigma, sigma_mu, T, N)
-    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
+    sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
     set = norm_ball_set(ue.alg, ue.q, X_sigma, sigma_sigma, SigmaUncertaintySetClass(),
                         prr.sigma)
     return expand_investable_ucs(set, imsk, pr)
@@ -1670,7 +1881,7 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
  1. Reduce the prior result to the Investable Mask with [`investable_ucs_reduction`](@ref). Inside an optimiser the result arrives already reduced and the step is a passthrough; standalone, on a prior fitted on a point-in-time Asset Panel, it takes the view the optimiser would have taken.
  2. Take the prior result `pr` the set is calibrated on, and read `sigma = pr.sigma`.
  3. Resolve the scaling parameter `T` with [`choose_scaling_parameter`](@ref), and build the mean shape `sigma_mu` with [`mu_asymptotic_cov`](@ref).
- 4. Build the covariance shape `sigma_sigma` with [`sigma_asymptotic_cov`](@ref).
+ 4. Build the covariance shape `sigma_sigma` with [`normal_sigma_shape`](@ref).
  5. Assemble and return the set with [`norm_ball_set`](@ref), passing `nothing` in place of a sample and `pr.sigma` as the centre.
  6. Before the set leaves, write it back onto the full universe with [`expand_investable_ucs`](@ref), so a set fitted standalone is over the same assets the prior is, and a view of it at the mask recovers the reduced fit.
 
@@ -1708,10 +1919,11 @@ function sigma_ucs(ue::NormalUncertaintySet{Nothing,
     sigma = prr.sigma
     T = choose_scaling_parameter(ue, prr)
     sigma_mu = mu_asymptotic_cov(ue.pdm, sigma, T)
-    sigma_sigma = sigma_asymptotic_cov(ue.pdm, sigma_mu, sigma, T)
+    sigma_sigma = normal_sigma_shape(ue, sigma_mu, sigma, T)
     set = norm_ball_set(ue.alg, ue.q, nothing, sigma_sigma, SigmaUncertaintySetClass(),
                         prr.sigma)
     return expand_investable_ucs(set, imsk, pr)
 end
 
-export NormalUncertaintySet
+export NormalUncertaintySet, DiagonalOfShape, ShapeOfDiagonal
+public AbstractDiagonalConstruction, diagonal_sigma_shape

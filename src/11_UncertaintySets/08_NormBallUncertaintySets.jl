@@ -408,7 +408,7 @@ The map is square. It is of full column rank when `cov` reaches this method repa
 
 # Algorithm
 
- 1. When `diagonal` is `true`, return `LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(cov)))`, the square root of the diagonal shape. The result is stored as a `Diagonal`, not as a dense matrix.
+ 1. When `diagonal` is `true`, return `LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(cov)))`, the square root of the diagonal shape. The result is stored as a `Diagonal`, not as a dense matrix. A [`NormalUncertaintySet`](@ref) hands it a diagonal shape already, built under its `dc` by [`diagonal_sigma_shape`](@ref), so the diagonal is the one that rule states.
  2. Otherwise return `matrix_square_root(mtx_sqrt, cov)`, which satisfies ``\\mathbf{L}\\mathbf{L}^{\\intercal} = \\mathbf{S}`` and is the map the converter constructor of [`NormBallUncertaintySet`](@ref) builds.
 
 # Arguments

@@ -761,6 +761,7 @@ UncertaintySetVariance
            │      pdm ┼ Posdef
            │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
            │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+           │       dc ┼ DiagonalOfShape()
            │   kwargs ┴ @NamedTuple{}: NamedTuple()
      sigma ┼ 3×3 Matrix{Float64}
   mtx_sqrt ┴ EigenFallbackSquareRoot()

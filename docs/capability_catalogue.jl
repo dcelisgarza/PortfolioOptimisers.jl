@@ -826,7 +826,9 @@ const CATALOGUE = [Section("Core abstractions",
                                 :k_norm_ball;
                                 label = "[`NormBallUncertaintySet`](@ref) and [`NormBallUncertaintySetAlgorithm`](@ref), which take the same scaling algorithms as the ellipsoid and apply them to the geometry map through [`k_norm_ball`](@ref)"),
                             Prose("Several estimators build the sets. The next two build a box, an ellipsoid or a norm ball."),
-                            Cap(:NormalUncertaintySet),
+                            Group(Cap(:NormalUncertaintySet),
+                                  [Group("Constructions of the diagonal covariance shape, read when the ellipsoid or the norm ball keeps only the diagonal",
+                                         [Cap(:DiagonalOfShape), Cap(:ShapeOfDiagonal)])]),
                             Group(Cap(:ARCHUncertaintySet;
                                       label = "Block bootstrap of the returns with the [`arch`](https://arch.readthedocs.io/en/latest/bootstrap/timeseries-bootstraps.html) package, [`ARCHUncertaintySet`](@ref)"),
                                   [Cap(:CircularBootstrap; label = "Circular"),

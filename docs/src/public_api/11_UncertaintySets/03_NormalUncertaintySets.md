@@ -1,10 +1,14 @@
 ```@meta
-Description = "Normal Uncertainty Sets, public API of PortfolioOptimisers.jl: NormalUncertaintySet, ucs, mu_ucs, sigma_ucs."
+Description = "Normal Uncertainty Sets, public API of PortfolioOptimisers.jl: NormalUncertaintySet, AbstractDiagonalConstruction, DiagonalOfShape, ShapeOfDiagonal, …"
 ```
 
 # Normal Uncertainty Sets
 
 ```@docs
+AbstractDiagonalConstruction
+DiagonalOfShape
+ShapeOfDiagonal
+diagonal_sigma_shape
 NormalUncertaintySet
 ucs(ue::NormalUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
 ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any}, pr::AbstractPriorResult; rd = nothing, kwargs...)

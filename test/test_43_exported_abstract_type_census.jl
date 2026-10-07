@@ -89,7 +89,7 @@
                           :AbstractDeformationCalibrationAlgorithm,
                           :AbstractDenoiseAlgorithm, :AbstractDenoiseEstimator,
                           :AbstractDescriptorEstimator, :AbstractDetoneEstimator,
-                          :AbstractEstimatorValueAlgorithm,
+                          :AbstractDiagonalConstruction, :AbstractEstimatorValueAlgorithm,
                           :AbstractExpectedReturnsEstimator, :AbstractExposureEstimator,
                           :AbstractForecastErrorAlgorithm,
                           :AbstractForecastScaleWarmUpAlgorithm,

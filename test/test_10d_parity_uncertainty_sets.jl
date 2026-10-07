@@ -294,6 +294,25 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                     @test !isapprox(s.L * transpose(s.L),
                                     load("NormBallUncertaintySet", kind, "CovDiagLLt");
                                     rtol = 1e-2)
+                    # `ShapeOfDiagonal()` is the oracle's rule (#1522): it sets `Σ_ij = 0`
+                    # before it builds the shape, so each entry is `(1 + δ_ij) Σ_ii Σ_jj / T`.
+                    # Measured maxscaled 1.5e-16 against the oracle's diagonal set.
+                    want_o = [(1 + (a == b)) * S[a, a] * S[b, b] for b in 1:N for a in 1:N] ./
+                             T
+                    m_o, s_o = ucs(NormalUncertaintySet(; alg = nb(true),
+                                                        dc = ShapeOfDiagonal()), X)
+                    @test parity_compare(s_o.L * transpose(s_o.L),
+                                         load("NormBallUncertaintySet", kind, "CovDiagLLt");
+                                         scale = :array,
+                                         name = "$(kind) cov Diag, ShapeOfDiagonal").ok
+                    @test isapprox(diag(s_o.L * transpose(s_o.L)), want_o; rtol = 1e-14)
+                    @test parity_compare([s_o.kappa], [radius[2 + k]];
+                                         name = "$(kind) cov radius, ShapeOfDiagonal").ok
+                    # The mean axis reads no construction.
+                    @test m_o.L == m.L && m_o.kappa == m.kappa
+                    # The rules agree on each variance `(i, i)` and differ on each pair.
+                    ii = 1:(N + 1):(N ^ 2)
+                    @test isapprox(diag(s_o.L)[ii], diag(s.L)[ii]; rtol = 1e-14)
                 else
                     # Measured maxscaled 4.5e-13 on the Normal full shape, whose Cholesky
                     # factor reads a matrix of rank N(N + 1) / 2 after its repair, and 3.7e-15
@@ -331,6 +350,40 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                 end
             end
         end
+    end
+
+    @testset "The construction of the diagonal covariance shape reaches every route (#1522)" begin
+        od = diag(load("NormBallUncertaintySet", "Empirical", "CovDiagLLt"))
+        S = cov(X)
+        mine = [S[a, a] * S[b, b] + S[a, b]^2 for b in 1:N for a in 1:N] ./ T
+        ue(alg, dc) = NormalUncertaintySet(; alg = alg, dc = dc, seed = 3, n_sim = 500)
+        shape(s) = isa(s, EllipsoidalUncertaintySet) ? s.sigma : s.L * transpose(s.L)
+        for method in (ChiSqKUncertaintyAlgorithm(), NormalKUncertaintyAlgorithm()),
+            mk in
+            ((m, d) -> EllipsoidalUncertaintySetAlgorithm(; method = m, diagonal = d),
+             (m, d) -> NormBallUncertaintySetAlgorithm(; method = m, diagonal = d))
+
+            _, so = ucs(ue(mk(method, true), ShapeOfDiagonal()), X)
+            _, sd = ucs(ue(mk(method, true), DiagonalOfShape()), X)
+            sg = sigma_ucs(ue(mk(method, true), ShapeOfDiagonal()), X)
+            # The ellipsoid and the norm ball read one diagonal shape under each member.
+            @test isapprox(diag(shape(so)), od; rtol = 1e-13)
+            @test isapprox(diag(shape(sg)), od; rtol = 1e-13)
+            @test isapprox(diag(shape(sd)), mine; rtol = 1e-13)
+            # `diagonal = false` does not read the field.
+            _, fo = ucs(ue(mk(method, false), ShapeOfDiagonal()), X)
+            _, fd = ucs(ue(mk(method, false), DiagonalOfShape()), X)
+            @test shape(fo) == shape(fd)
+        end
+        # The box reads no shape, so the field changes no bound.
+        _, bo = ucs(NormalUncertaintySet(; dc = ShapeOfDiagonal(), seed = 1), X)
+        _, bd = ucs(NormalUncertaintySet(; seed = 1), X)
+        @test bo.lb == bd.lb && bo.ub == bd.ub
+        # The construction keeps the number type of the data.
+        sb = sigma_ucs(NormalUncertaintySet(; alg = nb(true), dc = ShapeOfDiagonal(),
+                                            n_sim = 50), big.(X))
+        @test eltype(sb.L) == BigFloat
+        @test isapprox(Float64.(diag(sb.L * transpose(sb.L))), od; rtol = 1e-13)
     end
 
     @testset "The norm-ball terms of MeanRisk" begin

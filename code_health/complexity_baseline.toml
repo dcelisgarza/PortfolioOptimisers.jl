@@ -249,7 +249,7 @@ commit = "792ea65693"
 "src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 47, cog_sum = 28, arg_sum = 82, macros = [] }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 63, cog_sum = 30, arg_sum = 92, macros = [] }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 11, cog_sum = 4, arg_sum = 34, macros = [] }
-"src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 33, cog_sum = 8, arg_sum = 114, macros = [] }
+"src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { cyc = 3, cog = 3, arg = 10, cyc_sum = 37, cog_sum = 10, arg_sum = 129, macros = [] }
 "src/11_UncertaintySets/04_BootstrapUncertaintySets.jl" = { cyc = 3, cog = 4, arg = 11, cyc_sum = 36, cog_sum = 23, arg_sum = 83, macros = [] }
 "src/11_UncertaintySets/05_L1UncertaintySets.jl" = { cyc = 6, cog = 6, arg = 5, cyc_sum = 58, cog_sum = 51, arg_sum = 58, macros = [] }
 "src/11_UncertaintySets/06_CalibrationRules.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 89, cog_sum = 50, arg_sum = 160, macros = [] }

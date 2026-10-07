@@ -115,6 +115,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :val_ucs => "`val`: Quantity the set is a neighbourhood of — a characteristic vector on the mean axis, a covariance matrix on the covariance axis. `nothing` defers to the consumer's own quantity. When it is set, it takes precedence over the returns estimator's field and over the prior.",#
                  :method_ucs => "`method`: Ellipsoidal uncertainty set estimation method.",#
                  :diagonal => "`diagonal`: Whether to use only the diagonal of the covariance matrix.",#
+                 :dc_ucs => "`dc`: Construction of the diagonal covariance shape. It is read only when `alg` is an [`EllipsoidalUncertaintySetAlgorithm`](@ref) or a [`NormBallUncertaintySetAlgorithm`](@ref) with `diagonal = true`. [`DiagonalOfShape`](@ref) takes the diagonal of the full shape, and [`ShapeOfDiagonal`](@ref) builds the shape from the variances alone.",#
                  :eps_ucs => "`eps`: Radius of the ``\\ell_1`` uncertainty set on the characteristic vector. Larger values admit more estimation error, and therefore activate more assets.",#
                  :ep_ucs => "`ep`: Radius of the positive-error side of the signed ``\\ell_1`` uncertainty set.",#
                  :en_ucs => "`en`: Radius of the negative-error side of the signed ``\\ell_1`` uncertainty set.",#
