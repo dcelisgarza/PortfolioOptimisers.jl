@@ -401,7 +401,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 
     @testset "prices_to_returns closed form" begin
         # A two-row example, computed by hand. The simple branch is the formula the
-        # docstring states, bit for bit (#1414). The log branch is a difference of logarithms.
+        # docstring states, bit for bit (#1414). The log branch is `log1p` of it (#1519).
         ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 3))
         P = TimeArray(ts, [100.0 50.0; 110.0 45.0; 121.0 54.0], [:a, :b])
         simple = [(110-100)/100 (45-50)/50; (121-110)/110 (54-45)/45]
@@ -414,7 +414,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 
         rl = prices_to_returns(P; ret_method = :log)
         @test rl.X ≈ logret
-        @test rl.X == log.([110.0 45.0; 121.0 54.0]) .- log.([100.0 50.0; 110.0 45.0])
+        @test rl.X == log1p.(simple)
 
         # `padding` keeps the first observation and fills its return with `NaN`, so the
         # returns keep the length of the price clock.
@@ -435,6 +435,27 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test rq[[1, 2, 3, 5]] == Float64.(exact[[1, 2, 3, 5]])
         @test abs(rq[4] - exact[4]) <= eps(rq[4])
         @test rq != expm1.(log.(pq[2:end]) .- log.(pq[1:(end - 1)]))
+
+        # #1519: the log branch is `log1p` of the simple return. The simple return has one
+        # rounding, and `log1p` adds about one ulp, so every log return is within one ulp of
+        # the exact one. The difference of logarithms cancels on two close prices: each
+        # logarithm carries an absolute error of about `eps * |log p|`, so the error grows
+        # with the price level and not with the return.
+        lq = vec(prices_to_returns(TimeArray(tq, reshape(pq, :, 1), [:a]);
+                                   ret_method = :log).X)
+        lexact = log.(big.(pq[2:end]) ./ big.(pq[1:(end - 1)]))
+        @test lq == log1p.(rq)
+        @test all(abs.(lq .- lexact) .<= eps.(lq))
+        # Prices near 1e5 and a return of 1e-9: the old difference of logarithms is
+        # thousands of ulps off, and the fix stays within one ulp.
+        ph = [1.0e5, 1.0e5 * (1 + 1e-9), 1.0e5 * (1 + 2e-9)]
+        th = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 3))
+        lh = vec(prices_to_returns(TimeArray(th, reshape(ph, :, 1), [:a]);
+                                   ret_method = :log).X)
+        hexact = log.(big.(ph[2:end]) ./ big.(ph[1:(end - 1)]))
+        hold = log.(ph[2:end]) .- log.(ph[1:(end - 1)])
+        @test all(abs.(lh .- hexact) .<= eps.(lh))
+        @test all(abs.(hold .- hexact) .> 1000 .* eps.(lh))
 
         # A `NaN` price is carried, not deleted. The clock keeps its row, and the two
         # returns of `a` that read the absent price are the ones left non-finite: nothing
@@ -1043,7 +1064,9 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             # The log branch reads the same pair of prices through the same arithmetic.
             glog = prices_to_returns(Zg; ret_method = :log,
                                      gap_return_alg = CatchUpGapReturn())
-            @test glog.X[5, 2] == log(24.0) - log(21.0)
+            @test glog.X[5, 2] == log1p((24.0 - 21.0) / 21.0)
+            @test PortfolioOptimisers.gap_return_value(:log, 24.0, 21.0) ==
+                  log1p(PortfolioOptimisers.gap_return_value(:simple, 24.0, 21.0))
 
             # Under `padding` the padded row stays untouched for every asset.
             gpad = prices_to_returns(Zg; padding = true,

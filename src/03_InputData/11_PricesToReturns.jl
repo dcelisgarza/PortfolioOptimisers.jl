@@ -67,7 +67,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Compute one return from two prices that need not be consecutive.
 
-This function holds the two `ret_method` branches for the Gap Return family. A new algorithm chooses the two prices, and this function turns them into a return. It uses the arithmetic of step 3 of [`prices_to_returns`](@ref), which computes the simple branch as ``(p_{t} - p_{0}) / p_{0}`` and the log branch as a difference of logarithms. So a value that an algorithm writes uses the same formula as the cells around it.
+This function holds the two `ret_method` branches for the Gap Return family. A new algorithm chooses the two prices, and this function turns them into a return. It uses the arithmetic of step 3 of [`prices_to_returns`](@ref), which computes the simple branch as ``(p_{t} - p_{0}) / p_{0}`` and the log branch as `log1p` of the simple return. So a value that an algorithm writes uses the same formula as the cells around it.
 
 # Arguments
 
@@ -77,7 +77,7 @@ This function holds the two `ret_method` branches for the Gap Return family. A n
 
 # Returns
 
-  - `r::Number`: ``\\ln p_{t} - \\ln p_{0}`` under `:log`, and ``(p_{t} - p_{0}) / p_{0}`` otherwise.
+  - `r::Number`: ``\\ln(p_{t} / p_{0})`` under `:log`, computed as `log1p` of the simple return, and ``(p_{t} - p_{0}) / p_{0}`` otherwise.
 
 # Related
 
@@ -86,7 +86,9 @@ This function holds the two `ret_method` branches for the Gap Return family. A n
 """
 function gap_return_value(ret_method::Symbol, pt::Number, p0::Number)
     #! `abs` reads a signed zero `-0.0` as the zero price it is, as the batch conversion does.
-    return ret_method === :log ? log(pt) - log(p0) : (pt - p0) / abs(p0)
+    #! The log branch is `log1p` of the simple return, as in the batch conversion (#1519).
+    r = (pt - p0) / abs(p0)
+    return ret_method === :log ? log1p(r) : r
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -360,7 +362,7 @@ The conversion applies the same rule to a benchmark ``B``, and carries the bench
 
  1. Check with [`assert_distinct_series_names`](@ref) that the asset, factor, benchmark and Exogenous Series have distinct names. Read the asset names and the asset timestamps from `pr.X`. Check `pr.pnl` against them with [`check_asset_panel`](@ref), and `pr.span` with [`assert_span_shape`](@ref).
  2. Write the three price blocks and the Exogenous Series side by side on the clock of the `PricesResult` with [`append_price_block!`](@ref), which writes every absent price as `NaN` with [`unify_gaps`](@ref). The `PricesResult` states one clock. So the function reads a factor or benchmark series at the asset timestamps, and does not join it onto them. It refuses a series on a different clock and names the series, because a join adds or drops observations and [`price_ingestion`](@ref) owns every change of the clock. A benchmark is one shared column, or one column per asset.
- 3. Check that every present price is non-negative. Then convert the prices to returns under `ret_method` and `padding`. This step applies the formula above. The simple return is ``(p_{t,\\,i} - p_{t-1,\\,i}) / p_{t-1,\\,i}``. The difference is exact when the two prices are within a factor of two of each other, so the division is then the one rounding. The log return is ``\\ln p_{t,\\,i} - \\ln p_{t-1,\\,i}``, from `TimeSeries.percentchange`. When `padding` is `true`, the step keeps the first observation with a `NaN` return, so the returns keep the length of the price clock.
+ 3. Check that every present price is non-negative. Then convert the prices to returns under `ret_method` and `padding`. This step applies the formula above. The simple return is ``(p_{t,\\,i} - p_{t-1,\\,i}) / p_{t-1,\\,i}``. The difference is exact when the two prices are within a factor of two of each other, so the division is then the one rounding. The log return is `log1p` of the simple return, which adds about one ulp to that rounding. The difference of logarithms ``\\ln p_{t,\\,i} - \\ln p_{t-1,\\,i}`` cancels when the two prices are close: each logarithm carries an absolute error of about ``\\varepsilon \\lvert \\ln p \\rvert``, so its error grows with the price level and not with the return. When `padding` is `true`, the step keeps the first observation with a `NaN` return, so the returns keep the length of the price clock.
  4. **A gap carried here does not spread.** The formula reads two prices, so a run of `k` gapped prices makes non-finite only the returns that read one of them. That is `k + 1` returns for a run inside the series, and `k` for a run at either end, because no return reads a price before the first row or after the last. Every later return of that column reads two observed prices. A gap also stays in its own column, because the return of an asset reads no price of another asset.
  5. Resolve the returns that a gap left non-finite with [`apply_gap_return`](@ref), under `gap_return_alg`. The method for `nothing` is the default rule. It returns the table unchanged, so the returns of step 3 stay bit for bit the same. An algorithm writes only a return that reads a gapped price, inside the Listing Span of its column, after the first observed price. So every return computed from two observed prices keeps its value. The function logs an `@info` when it finds no writable return.
  6. Name the four blocks. Step 1 refused a name that two tables share and the name `timestamp`. So the asset names `nx`, the factor names `nf`, the benchmark names `nb` and the Exogenous Series names `ne` are the column names of the four tables, and `ts` is the `timestamp` column of the converted table.
@@ -383,7 +385,7 @@ The conversion applies the same rule to a benchmark ``B``, and carries the bench
 
 # Validation
 
-  - `ret_method` is `:simple` or `:log`. `TimeSeries.percentchange` throws an `ArgumentError` otherwise.
+  - `ret_method` is `:simple` or `:log`. The function throws an `ArgumentError` otherwise.
   - Every present price that reaches step 3 is non-negative, on both branches. The function throws a `DomainError` that names the columns otherwise. An absent price is `NaN`, and the check skips it. A zero price gives the returns that the mathematical definition states.
   - The asset, factor, benchmark and Exogenous Series column names are pairwise disjoint, and none of them is `timestamp`. The function throws a [`ConflictingArgumentError`](@ref) that names the columns otherwise.
   - If `pr.F`, `pr.B` or `pr.E` is not `nothing`, its timestamps equal the asset timestamps. The function throws a [`ConflictingArgumentError`](@ref) otherwise. The message names [`price_ingestion`](@ref), which puts two series on one clock.
@@ -469,20 +471,24 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
                                  DataFrames.names(P, DataFrames.Not(:timestamp))),
                           "every present price is non-negative, because a price is never negative and a negative value has no return. Got a negative price in these columns"))
     TA = TimeSeries.TimeArray(P; timestamp = :timestamp)
-    X = if ret_method === :simple
-        #! `percentchange` computes this branch as `expm1` of a log difference, which loses
-        #! up to a few hundred ulps against the closed form (#1414). The difference of two
-        #! prices within a factor of two of each other is exact, so the division is the one
-        #! rounding. `p_t / p_{t-1} - 1` keeps the absolute rounding of a quotient near one,
-        #! which is a large relative error on a small return. `lag` pads as `percentchange`
-        #! does. The check above refused a negative price, so `abs` changes only a signed
-        #! zero `-0.0`, which is a zero price: the return after it is `Inf`, as under `log`.
-        L = TimeSeries.lag(TA; padding = padding)
-        R = (TA .- L) ./ abs.(L)
-        TimeSeries.TimeArray(TimeSeries.timestamp(R), values(R), TimeSeries.colnames(TA))
-    else
-        TimeSeries.percentchange(TA, ret_method; padding = padding)
-    end
+    @argcheck(ret_method in (:simple, :log),
+              ArgumentError("ret_method must be :simple or :log, got :$ret_method"))
+    #! `percentchange` computes the simple branch as `expm1` of a log difference, which
+    #! loses up to a few hundred ulps against the closed form (#1414). The difference of
+    #! two prices within a factor of two of each other is exact, so the division is the
+    #! one rounding. `p_t / p_{t-1} - 1` keeps the absolute rounding of a quotient near
+    #! one, which is a large relative error on a small return. `lag` pads as
+    #! `percentchange` does. The check above refused a negative price, so `abs` changes
+    #! only a signed zero `-0.0`, which is a zero price: the return after it is `Inf`.
+    #! The log branch is `log1p` of that simple return (#1519). `log(p_t) - log(p_{t-1})`
+    #! cancels: each logarithm carries an absolute error of `eps * |log p|`, which grows
+    #! with the price level, not with the return. `log1p` adds about one ulp to the one
+    #! rounding of the simple return. A zero price gives `log1p(-1) = -Inf`, and the
+    #! return after it gives `log1p(Inf) = Inf`, as the difference of logarithms does.
+    L = TimeSeries.lag(TA; padding = padding)
+    R = (TA .- L) ./ abs.(L)
+    V = ret_method === :log ? log1p.(values(R)) : values(R)
+    X = TimeSeries.TimeArray(TimeSeries.timestamp(R), V, TimeSeries.colnames(TA))
     X = DataFrames.DataFrame(X)
     X = apply_gap_return(gap_return_alg, X, P, ret_method)
     #! The three name lists are pairwise disjoint, and none of them is `timestamp`, because

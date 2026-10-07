@@ -217,3 +217,30 @@ stays in its own column, and the writable set is the same. A zero price still gi
 observation and `Inf` on the next, and a signed zero `-0.0` reads as a zero price. An infinite price
 now gives `NaN` on the next observation, where the log route gave `-1`; an infinite price is not a
 price, and neither value is a return. Every simple return of the library changes in its last bits.
+
+## Amendment (2026-10-07): the log branch is `log1p` of the simple return
+
+The amendment of 2026-09-29 kept `TimeSeries.percentchange` on the log branch, which computes
+`log(p[t]) - log(p[t-1])`. That difference cancels. Each logarithm carries an absolute error of
+about `eps * |ln p|`, so the error grows with the price level and not with the return. The parity
+audit found it (row R32 of #1416), and #1519 fixes it.
+
+The log branch is now `log1p((p[t] - p[t-1]) / p[t-1])`, in `prices_to_returns` and in
+`gap_return_value`. The simple return has one rounding, as the amendment of 2026-09-29 states, and
+`log1p` is accurate to about one ulp for every argument above `-1`. Over 20,000 random pairs of
+prices from 0.5 to 2e5 and returns up to 1e-2, the errors against the exact log return were:
+
+| Formula | Median error | Largest error |
+| --- | --- | --- |
+| `log(p[t]) - log(p[t-1])`, the old branch | 229 ulps | 2.0e6 ulps |
+| `log1p(p[t] / p[t-1] - 1)`, the quotient form | 45 ulps | 1.4e6 ulps |
+| `log1p((p[t] - p[t-1]) / p[t-1])`, the new branch | 0 ulps | 1 ulp |
+
+On prices near `1e5` with a return of `1e-9`, the old branch was about `1e8` ulps off.
+
+`prices_to_returns` now refuses a `ret_method` other than `:simple` and `:log` with an
+`ArgumentError` of its own, because no call to `TimeSeries.percentchange` is left to refuse it.
+
+Nothing that this ADR decides moves. A zero price still gives `-Inf` on its observation and `Inf` on
+the next, because `log1p(-1) = -Inf` and `log1p(Inf) = Inf`. Every log return of the library changes
+in its last bits.
