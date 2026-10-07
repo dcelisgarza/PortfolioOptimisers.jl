@@ -18,5 +18,6 @@ exposure_pair_sums
 exposure_cross_section_std
 exposure_universe_size
 exposure_covered_count
+exposure_coverage_weights
 cs_diagnostic_exposures
 ```

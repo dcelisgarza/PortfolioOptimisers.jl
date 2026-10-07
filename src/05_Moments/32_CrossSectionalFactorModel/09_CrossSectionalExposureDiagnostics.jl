@@ -764,13 +764,13 @@ end
 """
     exposure_coverage(B::Arr3Num, w::Option{<:MatNum} = nothing) -> Vector{<:Real}
     exposure_coverage(csfm::CrossSectionalFactorModel;
-                      weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> FactorDiagnosticResult
+                      weighting::AbstractOrthogonalityMetric = RegressionWeightMetric()) -> FactorDiagnosticResult
 
 Return the coverage of every factor exposure, one entry per factor.
 
 The coverage is the share of the universe at which the exposure is finite, averaged over the observations. The universe of an observation is the assets that carry a finite positive weight, and it is every asset when the verb reads no weight history. A factor whose coverage falls has lost its panel field on part of the universe, and the fit of that observation then rests on fewer assets than the caller believes.
 
-The block method answers on the raw factor axis, and it reads the unlagged history.
+The block method answers on the raw factor axis, and it reads the unlagged history. By default it reads the regression weights, so the universe is the estimation universe of the fit, the assets of positive regression weight, and the answer is the coverage column of [`factor_model_summary`](@ref). A block that carries no regression weights was fitted on every asset, so its universe is every asset. `weighting = BenchmarkWeightMetric()` reads the benchmark universe instead.
 
 # Mathematical definition
 
@@ -792,12 +792,13 @@ Where:
   - `B`: Exposure history `observations × assets × factors`, unlagged.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for every asset.
   - `csfm`: A cross-sectional factor model block.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history that sets the universe, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history that sets the universe, and [`exposure_coverage_weights`](@ref) resolves it over the whole observation axis.
 
 # Validation
 
   - `!isempty(B)`.
   - `csfm.Ms` is not `nothing`. Otherwise the verb raises an `IsNothingError` that names `Ms`.
+  - The field that `weighting` names is not `nothing`, except under [`RegressionWeightMetric`](@ref). Otherwise the verb raises an `IsNothingError` that names the field.
 
 # Returns
 
@@ -808,7 +809,8 @@ Where:
 
   - [`exposure_weights`](@ref)
   - [`exposure_dispersion`](@ref)
-  - [`cs_diagnostic_weights`](@ref)
+  - [`exposure_coverage_weights`](@ref)
+  - [`factor_model_summary`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
 function exposure_coverage(B::Arr3Num, w::Option{<:MatNum} = nothing)
@@ -882,10 +884,47 @@ function exposure_covered_count(B::Arr3Num, u::MatNum, t::Integer, k::Integer)
     return n
 end
 function exposure_coverage(csfm::CrossSectionalFactorModel;
-                           weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
+                           weighting::AbstractOrthogonalityMetric = RegressionWeightMetric())
     c = exposure_coverage(cs_diagnostic_exposures(csfm),
-                          cs_diagnostic_weights(weighting, csfm))
+                          exposure_coverage_weights(weighting, csfm))
     return FactorDiagnosticResult(c, csfm.nf, csfm.fam, (1,))
+end
+"""
+    exposure_coverage_weights(weighting::AbstractOrthogonalityMetric,
+                              csfm::CrossSectionalFactorModel)
+    exposure_coverage_weights(weighting::RegressionWeightMetric,
+                              csfm::CrossSectionalFactorModel)
+
+Return the weight history that sets the universe of [`exposure_coverage`](@ref).
+
+The regression weights state the estimation universe of the fit. A block that carries none was fitted with a unit weight on every asset, so under [`RegressionWeightMetric`](@ref) the function returns `csfm.rw` as it stands, and `nothing` reads as the universe of every asset. Every other metric reads its history through [`cs_diagnostic_weights`](@ref), which refuses an absent one by name.
+
+# Arguments
+
+  - `weighting`: The metric that names the history.
+  - `csfm`: A cross-sectional factor model block.
+
+# Validation
+
+  - Under a metric other than [`RegressionWeightMetric`](@ref), the field that the metric names is not `nothing`, else an `IsNothingError` that names the field.
+
+# Returns
+
+  - `u::Option{<:MatNum}`: `observations × assets`, or `nothing` for the universe of every asset.
+
+# Related
+
+  - [`exposure_coverage`](@ref)
+  - [`cs_diagnostic_weights`](@ref)
+  - [`RegressionWeightMetric`](@ref)
+"""
+function exposure_coverage_weights(weighting::AbstractOrthogonalityMetric,
+                                   csfm::CrossSectionalFactorModel)
+    return cs_diagnostic_weights(weighting, csfm)
+end
+function exposure_coverage_weights(::RegressionWeightMetric,
+                                   csfm::CrossSectionalFactorModel)
+    return csfm.rw
 end
 """
     cs_diagnostic_exposures(csfm::CrossSectionalFactorModel)

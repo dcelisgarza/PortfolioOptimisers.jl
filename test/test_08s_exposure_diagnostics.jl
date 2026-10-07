@@ -161,13 +161,13 @@ using Statistics
         @test exposure_agrees(port_hit_rate .* (8 / 9), ref_hit_rate)
         @test exposure_agrees(exposure_stability(csfm; step = 2).X, ref_stability)
         @test exposure_agrees(exposure_dispersion(csfm).X, ref_dispersion)
-        # The reference's summary reads the regression weights for the universe of the
-        # coverage, where this verb reads the weighting the caller names. The benchmark
-        # weighting is the default, so the reference's answer is the one under
-        # `RegressionWeightMetric()`.
-        @test exposure_agrees(exposure_coverage(csfm; weighting = RegressionWeightMetric()).X,
-                              ref_coverage)
-        @test exposure_coverage(csfm).X[4] == 0.34
+        # The coverage reads the regression weights by default, so its universe is the
+        # estimation universe of the fit, as the reference's summary reads it. The
+        # benchmark universe is one keyword away, and it gives a different answer here.
+        @test exposure_agrees(exposure_coverage(csfm).X, ref_coverage)
+        @test exposure_coverage(csfm).X ==
+              exposure_coverage(csfm; weighting = RegressionWeightMetric()).X
+        @test exposure_coverage(csfm; weighting = BenchmarkWeightMetric()).X[4] == 0.34
     end
 
     @testset "the answers carry the axes the verbs state" begin
@@ -326,7 +326,17 @@ using Statistics
         end
         @test_throws PortfolioOptimisers.IsNothingError exposure_stability(bare; step = 2)
         @test_throws PortfolioOptimisers.IsNothingError exposure_dispersion(bare)
-        @test_throws PortfolioOptimisers.IsNothingError exposure_coverage(bare)
+        for metric in (BenchmarkWeightMetric(), InverseIdiosyncraticVarianceMetric())
+            @test_throws PortfolioOptimisers.IsNothingError exposure_coverage(bare;
+                                                                              weighting = metric)
+        end
+        # The coverage alone reads an absent regression weight history as a fit on every
+        # asset, so its universe is every asset, and it refuses nothing.
+        @test isnothing(PortfolioOptimisers.exposure_coverage_weights(RegressionWeightMetric(),
+                                                                      bare))
+        @test exposure_coverage(bare).X ==
+              exposure_coverage(bare; weighting = IdentityMetric()).X ==
+              exposure_coverage(Ms)
     end
 
     @testset "a block that carries no history refuses by name" begin

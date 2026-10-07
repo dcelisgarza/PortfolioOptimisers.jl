@@ -938,7 +938,7 @@ The answer is on the **raw** factor axis. The regression group answers on the re
   - `threshold`: Absolute t-statistic that the exceedance rate counts against.
   - `step`: Number of observations between the two cross-sections that the stability reads.
   - `weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose weight history the stability reads.
-  - `coverage_weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose positive weights are the universe of the coverage. Its default of [`RegressionWeightMetric`](@ref) is the estimation universe of the fit.
+  - `coverage_weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose positive weights are the universe of the coverage. Its default of [`RegressionWeightMetric`](@ref) is the estimation universe of the fit, and every asset when the block carries no regression weights. [`exposure_coverage`](@ref) reads the same default.
 
 # Validation
 

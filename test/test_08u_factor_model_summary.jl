@@ -213,8 +213,22 @@ using Statistics
         for k in 1:KA
             @test isapprox(fs.stability[k], Statistics.median(filter(!isnan, S[:, k])))
         end
+        # The standalone verb reads the regression weights by default, as the summary
+        # does, so the two give one coverage.
+        @test fs.coverage == exposure_coverage(csfmA).X
         @test fs.coverage ==
               exposure_coverage(csfmA; weighting = RegressionWeightMetric()).X
+    end
+
+    @testset "a block with no regression weights covers every asset" begin
+        # The block was fitted on every asset, so the universe of the coverage is every
+        # asset, in the summary and in the standalone verb.
+        blk = CrossSectionalFactorModel(; M = MsA[TA, :, :], b = zeros(NA), csr = csrA,
+                                        Ms = MsA, bw = bwA, lag = 1)
+        fs = factor_model_summary(blk; ppy = 252, step = 3)
+        @test fs.coverage == exposure_coverage(blk).X
+        @test fs.coverage == exposure_coverage(MsA)
+        @test fs.coverage == exposure_coverage(blk; weighting = IdentityMetric()).X
     end
 
     @testset "a block with no exposure history carries five absent columns" begin
