@@ -255,7 +255,7 @@ end
 
 Return the factor mean, the spanned coefficients and the factor covariance in the form that a Spanned Shrinkage rule reads.
 
-The blend acts on the estimated factors alone, so the function keeps the leading entries of the factor moments, one per column of `cs.csfm.csr.f`. The factor covariance of those factors can be singular. A market factor beside a full one-hot industry block is the common case: the market exposure is the sum of the industry exposures, so the fitted factor returns, their mean and the spanned coefficients all lie in a subspace, and the covariance is zero across it. An Empty Factor carries a zero variance and no return, which is the same case in one direction. So the function reads the covariance through its pseudo-inverse over the eigenvalues it keeps, and `K` is the number of those eigenvalues, the dimension in which the factor mean has a sampling error.
+The blend acts on the estimated factors alone, so the function keeps the leading entries of the factor moments, one per column of `cs.csfm.csr.f`. The factor covariance of those factors can be singular. A market factor beside a full one-hot industry block is the common case: the market exposure is the sum of the industry exposures, so the fitted factor returns, their mean and the spanned coefficients all lie in a subspace, and the covariance is zero across it. An Empty Factor carries a zero variance and no return, which is the same case in one direction. So the function reads the covariance through its pseudo-inverse over the eigenvalues it keeps, and `K` is the number of those eigenvalues, the dimension in which the factor mean has a sampling error. A factor whose mean or variance the factor prior does not state has no sampling error to measure, so the function keeps the estimated factors with a finite mean and a finite variance alone.
 
 # Mathematical definition
 
@@ -269,7 +269,7 @@ The blend acts on the estimated factors alone, so the function keeps the leading
 
 Where:
 
-  - ``\\hat{\\mathbf{\\Sigma}}_{f}``: Factor covariance of the nested factor prior, over the estimated factors.
+  - ``\\hat{\\mathbf{\\Sigma}}_{f}``: Factor covariance of the nested factor prior, over the estimated factors with a finite mean and a finite variance.
   - ``\\ell_{i}``, ``\\boldsymbol{u}_{i}``: Eigenvalue ``i`` of the factor covariance and its eigenvector.
   - ``\\mathbf{W}``: The kept eigenvectors, each divided by the square root of its eigenvalue, so ``\\mathbf{W} \\mathbf{W}^{\\intercal}`` is the pseudo-inverse of the factor covariance.
   - ``\\tau``: Threshold below which an eigenvalue is taken as zero. The zero eigenvalue of a singular factor covariance is round-off, and its size depends on the machine, so the threshold sits far above round-off: an eigenvalue that small carries no variance a sample can measure.
@@ -283,9 +283,9 @@ Where:
 
 # Returns
 
-  - `mu::VecNum`: The factor mean of the estimated factors.
-  - `G::AbstractMatrix`: The spanned coefficients, unchanged.
-  - `W::MatNum`: The whitening matrix, `estimated factors × K`.
+  - `mu::VecNum`: The factor mean of the kept estimated factors.
+  - `G::AbstractMatrix`: The rows of the spanned coefficients at the kept estimated factors.
+  - `W::MatNum`: The whitening matrix, `kept estimated factors × K`.
   - `ev::VecNum`: The kept eigenvalues.
   - `K::Int`: Number of kept eigenvalues.
 
@@ -298,11 +298,14 @@ Where:
 function spanned_shrinkage_moments(pr::AbstractPriorResult, cs::NamedTuple,
                                    G::AbstractMatrix)
     Ke = size(cs.csfm.csr.f, 2)
-    E = LinearAlgebra.eigen(LinearAlgebra.Symmetric(pr.sigma[1:Ke, 1:Ke]))
+    # A factor the factor prior states no mean or no variance for has no sampling error to
+    # measure, so the rule reads the other estimated factors alone (#1510).
+    rk = findall(@views cross_sectional_ready_factors(pr.mu[1:Ke], pr.sigma[1:Ke, 1:Ke]))
+    E = LinearAlgebra.eigen(LinearAlgebra.Symmetric(pr.sigma[rk, rk]))
     lmax = maximum(E.values)
     keep = E.values .> sqrt(eps(eltype(E.values))) * lmax
     ev = E.values[keep]
-    return (; mu = pr.mu[1:Ke], G = G, W = E.vectors[:, keep] ./ transpose(sqrt.(ev)),
+    return (; mu = pr.mu[rk], G = G[rk, :], W = E.vectors[:, keep] ./ transpose(sqrt.(ev)),
             ev = ev, K = count(keep))
 end
 """

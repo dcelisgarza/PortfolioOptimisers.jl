@@ -512,19 +512,115 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuse a fit whose factor prior states a non-finite factor moment.
+Return the factors whose moments the factor prior of a Cross-Sectional Factor Prior states.
 
-The warm-up of the Descriptors and the warm-up of the factor prior add up. The Descriptors fix the first observation of the factor-return history, and the factor prior then warms up over that history. A window that covers the first warm-up can be too short for the second. A factor prior that gives a `NaN` and does not raise then makes the whole prior non-finite, and a later factorisation fails with no name. So the fit checks the moments that the factor prior gives, and refuses a non-finite one with a message that names the cause.
+A factor is ready when its mean and its variance are finite, which is the rule of the Investable Mask of a [`LowOrderPrior`](@ref) read over the factors. A factor prior with a warm-up can state `NaN` for one factor and finite moments for the others, so the prior reads the moments of the ready factors alone. The covariance of two ready factors must then be finite, or the block of the ready factors states no covariance matrix. A factor prior that is a [`LowOrderPrior`](@ref) already keeps that rule, so the check fails only on moments that a processing step or a direct call gives.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{R} &= \\left\\{k : \\hat{\\mu}_{f,k} \\in \\mathbb{R},\\ \\hat{\\Sigma}_{f,kk} \\in \\mathbb{R}\\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{R}``: The ready factors.
+  - ``\\hat{\\mu}_{f,k}``: Entry ``k`` of the factor mean that the factor prior states.
+  - ``\\hat{\\Sigma}_{f,kl}``: Entry ``(k, l)`` of the factor covariance that the factor prior states.
+
+# Arguments
+
+  - `mu`: The factor means the factor prior stated.
+  - `sigma`: The factor covariance the factor prior stated.
+
+# Validation
+
+  - `mu` and `sigma` agree on the factor axis. Raises a `DimensionMismatch`.
+  - Every entry of `sigma` between two ready factors is finite. Raises an [`IsNonFiniteError`](@ref) that names the first such pair.
+
+# Returns
+
+  - `rdy::BitVector`: `true` at each ready factor.
+
+# Related
+
+  - [`cross_sectional_determined`](@ref)
+  - [`cross_sectional_factor_moments`](@ref)
+  - [`cross_sectional_lift`](@ref)
+"""
+function cross_sectional_ready_factors(mu::VecNum, sigma::MatNum)::BitVector
+    @argcheck(length(mu) == size(sigma, 1) == size(sigma, 2),
+              DimensionMismatch("mu ($(length(mu))) and sigma ($(size(sigma))) must agree on the factor axis"))
+    rdy = BitVector(map(k -> isfinite(mu[k]) && isfinite(sigma[k, k]), eachindex(mu)))
+    c = findfirst(.!isfinite.(sigma) .& rdy .& transpose(rdy))
+    @argcheck(isnothing(c),
+              IsNonFiniteError("the factor prior states a finite mean and a finite variance for factors $(c[1]) and $(c[2]), and a covariance between them of $(sigma[c]), so the block of the factors whose moments it states is not a covariance matrix. Give pe a factor prior whose covariance is finite wherever both factors have a finite mean and a finite variance."))
+    return rdy
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the assets whose factor moments a Cross-Sectional Factor Prior determines.
+
+The mean of an asset reads the factor means only on the support of its loadings, the factors where its loading is not zero. Its covariance with another asset reads the factor covariance only on the two supports. So an asset is determined when its loadings are finite and its support holds only ready factors. A factor that is not ready changes no moment of an asset with a zero loading on it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{D} &= \\left\\{i : B_{Tik} \\in \\mathbb{R} \\ \\forall k,\\ k \\in \\mathcal{R} \\ \\forall k : B_{Tik} \\neq 0\\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{D}``: The determined assets.
+  - ``\\mathcal{R}``: The ready factors, from [`cross_sectional_ready_factors`](@ref).
+  - $(math_dict[:B_T_cs])
+
+# Arguments
+
+  - `L`: The reduced loadings of the latest observation, `assets × factors`.
+  - `rdy`: `true` at each ready factor.
+
+# Validation
+
+  - `L` and `rdy` agree on the factor axis. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `det::BitVector`: `true` at each determined asset.
+
+# Related
+
+  - [`cross_sectional_ready_factors`](@ref)
+  - [`cross_sectional_investable`](@ref)
+  - [`assert_cross_sectional_factor_moments`](@ref)
+"""
+function cross_sectional_determined(L::MatNum, rdy::AbstractVector{Bool})::BitVector
+    @argcheck(size(L, 2) == length(rdy),
+              DimensionMismatch("L ($(size(L, 2)) columns) and rdy ($(length(rdy))) must agree on the factor axis"))
+    return vec(all(isfinite.(L) .& (transpose(rdy) .| iszero.(L)); dims = 2))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuse a fit whose factor prior determines the moments of no asset.
+
+The warm-up of the Descriptors and the warm-up of the factor prior add up. The Descriptors fix the first observation of the factor-return history, and the factor prior then warms up over that history. A window that covers the first warm-up can be too short for the second, and a factor prior then gives `NaN` and does not raise. An asset whose loadings read only finite factor moments keeps its moments, and every other asset is `NaN` and leaves through the Investable Mask. When no asset is determined, the prior states no moment at all, so the fit refuses with a message that names the cause.
 
 # Arguments
 
   - `mu`: The factor means the factor prior stated.
   - `sigma`: The factor covariance the factor prior stated.
   - `n`: The count of fitted observations the factor prior read.
+  - `det`: `true` at each determined asset, from [`cross_sectional_determined`](@ref).
 
 # Validation
 
-  - Every factor mean and every entry of the factor covariance is finite. Raises an [`IsNonFiniteError`](@ref).
+  - At least one asset is determined. Raises an [`IsNonFiniteError`](@ref) that counts the non-finite factor means and covariance entries.
 
 # Returns
 
@@ -532,15 +628,14 @@ The warm-up of the Descriptors and the warm-up of the factor prior add up. The D
 
 # Related
 
+  - [`cross_sectional_determined`](@ref)
   - [`cross_sectional_warmup`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-function assert_cross_sectional_factor_moments(mu::VecNum, sigma::MatNum,
-                                               n::Integer)::Nothing
-    nfm = count(!isfinite, mu)
-    nfs = count(!isfinite, sigma)
-    @argcheck(iszero(nfm) && iszero(nfs),
-              IsNonFiniteError("the factor prior read the $n observation(s) left after the Descriptor warm-up and the exposure lag, and stated $nfm non-finite factor mean(s) and $nfs non-finite factor covariance entr(ies). A Descriptor's warm-up and the factor prior's own warm-up are cumulative, so a window must cover both. Give more observations, shorten the warm-up of the Descriptors, or give pe a factor prior that estimates from fewer observations."))
+function assert_cross_sectional_factor_moments(mu::VecNum, sigma::MatNum, n::Integer,
+                                               det::AbstractVector{Bool})::Nothing
+    @argcheck(any(det),
+              IsNonFiniteError("the factor prior read the $n observation(s) left after the Descriptor warm-up and the exposure lag, and stated $(count(!isfinite, mu)) non-finite factor mean(s) and $(count(!isfinite, sigma)) non-finite factor covariance entr(ies), so the moments of no asset are determined. A Descriptor's warm-up and the factor prior's own warm-up are cumulative, so a window must cover both. Give more observations, shorten the warm-up of the Descriptors, or give pe a factor prior that estimates from fewer observations."))
     return nothing
 end
 """
@@ -556,10 +651,9 @@ The method over `pr` takes the factor prior already fitted on the factors that a
 
  1. Take the columns of `f` at `lv`, giving `fl`. When every factor is in `lv`, `fl` is `f`.
  2. Fit `pe` on `fl`, giving `pr`. The method over `pr` starts at step 3.
- 3. Refuse a non-finite moment of `pr` with [`assert_cross_sectional_factor_moments`](@ref).
- 4. Process the covariance of `pr` in place with `f_mp`, over `fl`.
- 5. When every factor is in `lv`, return the scenarios, the mean and the covariance of `pr`. Otherwise, write them into the columns at `lv` of a zero scenario matrix `X`, the entries at `lv` of a zero mean `mu`, and the block at `lv` of a zero covariance `sigma`.
- 6. Divide the scenario weights of `pr` by their sum with [`cross_sectional_scenario_weights`](@ref).
+ 3. Process the covariance of `pr` in place with `f_mp`, over `fl`, with [`matrix_processing_block!`](@ref). A factor prior with a warm-up can state `NaN` for one factor and finite moments for the others, so the processing reads the block of the finite variances, and every entry outside it keeps its `NaN`. A covariance with no finite variance has no block, and is not processed.
+ 4. When every factor is in `lv`, return the scenarios, the mean and the covariance of `pr`. Otherwise, write them into the columns at `lv` of a zero scenario matrix `X`, the entries at `lv` of a zero mean `mu`, and the block at `lv` of a zero covariance `sigma`.
+ 5. Divide the scenario weights of `pr` by their sum with [`cross_sectional_scenario_weights`](@ref).
 
 # Arguments
 
@@ -574,14 +668,14 @@ The method over `pr` takes the factor prior already fitted on the factors that a
 # Validation
 
   - `lv` has one entry per column of `f`. Raises a `DimensionMismatch`.
-  - The covariance of `pr` is a new matrix, because step 4 processes it in place.
-  - The rules of [`assert_cross_sectional_factor_moments`](@ref) and [`cross_sectional_scenario_weights`](@ref).
+  - The covariance of `pr` is a new matrix, because step 3 processes it in place.
+  - The rules of [`matrix_processing_block!`](@ref) and [`cross_sectional_scenario_weights`](@ref).
 
 # Returns
 
   - `X::MatNum`: The factor return scenarios of `pr` on the whole factor axis.
-  - `mu::VecNum`: The expected factor returns on the whole factor axis.
-  - `sigma::MatNum`: The processed factor covariance on the whole factor axis.
+  - `mu::VecNum`: The expected factor returns on the whole factor axis. A mean that `pr` does not state is `NaN`.
+  - `sigma::MatNum`: The processed factor covariance on the whole factor axis. The row and the column of a factor that the factor prior states no variance for are `NaN`.
   - `w`: The scenario weights of `pr` divided by their sum, or `nothing`.
   - `ens`, `kld`, `ow`: The effective number of scenarios, the Kullback-Leibler divergence and the original weights of `pr`.
 
@@ -607,8 +701,12 @@ function cross_sectional_factor_moments(pr::LowOrderPrior,
               DimensionMismatch("lv ($(length(lv))) must have one entry per column of f ($(size(f, 2)))"))
     live = all(lv)
     fl = live ? f : f[:, lv]
-    assert_cross_sectional_factor_moments(pr.mu, pr.sigma, size(f, 1))
-    matrix_processing!(f_mp, pr.sigma, fl; kwargs...)
+    # A factor with no variance has no row to process, so the processing reads the block of
+    # the finite variances, and the `NaN` frame around it stays as it is. With no finite
+    # variance there is no block, and the assembly refuses the fit by name (#1510).
+    if any(isfinite, LinearAlgebra.diag(pr.sigma))
+        matrix_processing_block!(f_mp, pr.sigma, fl; kwargs...)
+    end
     if live
         X, mu, sigma = pr.X, pr.mu, pr.sigma
     else
@@ -1030,13 +1128,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the assets a Cross-Sectional Factor Prior can state a finite moment for.
 
-The prior fits on the coverage universe and answers on it, so an asset that it cannot state a moment for stays in the result and carries `NaN`. An asset is investable when the Asset Panel activates it at the latest observation, its latest idiosyncratic variance is finite, and its latest loadings are finite.
+The prior fits on the coverage universe and answers on it, so an asset that it cannot state a moment for stays in the result and carries `NaN`. An asset is investable when the Asset Panel activates it at the latest observation, its latest idiosyncratic variance is finite, and the factor prior determines its factor moments.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathcal{I} &= \\left\\{i : a_{Ti} = 1,\\ v_{Ti} \\in \\mathbb{R},\\ B_{Tik} \\in \\mathbb{R} \\ \\forall k \\in \\{1, \\ldots, K\\}\\right\\}\\,.
+\\mathcal{I} &= \\left\\{i : a_{Ti} = 1,\\ v_{Ti} \\in \\mathbb{R},\\ i \\in \\mathcal{D}\\right\\}\\,.
 \\end{align}
 ```
 
@@ -1045,15 +1143,14 @@ Where:
   - $(math_dict[:I_inv])
   - $(math_dict[:a_ti_pnl])
   - $(math_dict[:v_ti_idio])
-  - $(math_dict[:B_T_cs])
+  - ``\\mathcal{D}``: The determined assets, from [`cross_sectional_determined`](@ref).
   - $(math_dict[:T])
-  - $(math_dict[:K])
 
 # Arguments
 
   - `amsk`: The active mask of the latest observation, one entry per asset.
-  - `L`: The reduced loadings of the latest observation, `assets × factors`.
   - `ev`: The latest idiosyncratic variances, one per asset.
+  - `det`: `true` at each determined asset.
 
 # Returns
 
@@ -1062,27 +1159,12 @@ Where:
 # Related
 
   - [`investable_mask`](@ref)
+  - [`cross_sectional_determined`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-function cross_sectional_investable(amsk::AbstractVector{Bool}, L::MatNum,
-                                    ev::VecNum)::Vector{Int}
-    idx = Int[]
-    for i in eachindex(amsk)
-        if !(amsk[i] && isfinite(ev[i]))
-            continue
-        end
-        ok = true
-        for k in axes(L, 2)
-            if !isfinite(L[i, k])
-                ok = false
-                break
-            end
-        end
-        if ok
-            push!(idx, i)
-        end
-    end
-    return idx
+function cross_sectional_investable(amsk::AbstractVector{Bool}, ev::VecNum,
+                                    det::AbstractVector{Bool})::Vector{Int}
+    return findall(i -> amsk[i] && isfinite(ev[i]) && det[i], eachindex(amsk))
 end
 """
     cross_sectional_panel_masks(pnl::AssetPanel{<:Any, Nothing, Nothing}) -> Union{}
@@ -1471,9 +1553,9 @@ The square root `chol` factorises the factor model before `mp` processes it, as 
 ```math
 \\begin{align}
 \\mathcal{S} &= \\left\\{i : B_{Tik} \\in \\mathbb{R} \\ \\forall k \\in \\{1, \\ldots, K\\}\\right\\}\\,, \\\\
-\\boldsymbol{\\mu}_{\\mathcal{S}} &= \\mathbf{B}_{T,\\,\\mathcal{S}} \\, \\boldsymbol{\\mu}_{f}\\,, \\\\
-\\mathbf{\\Sigma}_{\\mathcal{S}\\mathcal{S}} &= \\mathbf{B}_{T,\\,\\mathcal{S}} \\, \\mathbf{F} \\, \\mathbf{B}_{T,\\,\\mathcal{S}}^{\\intercal} + \\mathbf{D}_{\\mathcal{S}\\mathcal{S}}\\,, \\\\
-\\mathbf{C}_{\\cdot\\mathcal{I}} &= \\begin{bmatrix} \\mathbf{B}_{T,\\,\\mathcal{I}} \\, \\operatorname{chol}(\\mathbf{F}) & \\mathbf{R} \\end{bmatrix}^{\\intercal}\\,.
+\\boldsymbol{\\mu}_{\\mathcal{S}} &= \\mathbf{B}_{T,\\,\\mathcal{S}} \\odot \\boldsymbol{\\mu}_{f}\\,, \\\\
+\\mathbf{\\Sigma}_{\\mathcal{S}\\mathcal{S}} &= \\mathbf{B}_{T,\\,\\mathcal{S}} \\odot \\mathbf{F} \\odot \\mathbf{B}_{T,\\,\\mathcal{S}}^{\\intercal} + \\mathbf{D}_{\\mathcal{S}\\mathcal{S}}\\,, \\\\
+\\mathbf{C}_{\\cdot\\mathcal{I}} &= \\begin{bmatrix} \\mathbf{B}_{T,\\,\\mathcal{I}} \\, \\operatorname{chol}(\\mathbf{F}_{\\mathcal{R}\\mathcal{R}}) & \\mathbf{R} \\end{bmatrix}^{\\intercal}\\,.
 \\end{align}
 ```
 
@@ -1484,7 +1566,9 @@ Where:
   - ``\\mathbf{\\Sigma}``: Asset covariance.
   - ``\\mathbf{C}``: Low-rank square root of the asset covariance, ``(K + \\lvert \\mathcal{I} \\rvert) \\times N`` over the full asset universe.
   - ``\\mathbf{B}_{T,\\,\\mathcal{S}}``, ``\\mathbf{B}_{T,\\,\\mathcal{I}}``: The rows of ``\\mathbf{B}_{T}`` at the assets of ``\\mathcal{S}`` and of ``\\mathcal{I}``.
-  - ``\\operatorname{chol}``: The square root that [`matrix_square_root`](@ref) takes under `mtx_sqrt`. By default it is the lower Cholesky factor of a positive definite matrix, and the eigen square root of a singular one. Of a factor covariance with a zero row and column, which an Empty Factor carries, it is the square root of the block of the other factors, with a zero row and column at the Empty Factor.
+  - ``\\odot``: The product over the support of each row of loadings, from [`support_product`](@ref). It reads a factor moment only where the loading is not zero, so a factor moment that is `NaN` reaches only the entries of the assets that load on it.
+  - ``\\operatorname{chol}``: The square root that [`matrix_square_root`](@ref) takes under `mtx_sqrt`. By default it is the lower Cholesky factor of a positive definite matrix, and the eigen square root of a singular one. Of a factor covariance with a zero row and column, which an Empty Factor carries, it is the square root of the block of the other factors, with a zero row and column at the Empty Factor. It is written on the factor axis, with a zero row and column at each factor outside ``\\mathcal{R}``.
+  - ``\\mathcal{R}``: The ready factors, from [`cross_sectional_ready_factors`](@ref).
   - $(math_dict[:B_T_cs])
   - $(math_dict[:mu_f_patt])
   - $(math_dict[:F_patt])
@@ -1494,18 +1578,18 @@ Where:
 
 A consequence of the definition: ``\\mathbf{C}_{\\cdot\\mathcal{I}}^{\\intercal} \\mathbf{C}_{\\cdot\\mathcal{I}} = \\mathbf{\\Sigma}_{\\mathcal{I}\\mathcal{I}}``.
 
-The answer states an entry exactly when the model determines it. An asset of ``\\mathcal{S}`` outside ``\\mathcal{I}`` has no idiosyncratic variance, as in the warm-up of its variance. Its entry of ``\\boldsymbol{\\mu}`` is finite, and so is its covariance with each other asset of ``\\mathcal{S}`` when ``\\mathbf{D}`` is diagonal, because the model sets the idiosyncratic covariance of two assets to zero. Its variance is `NaN`, and so is each covariance that reads its variance through an idiosyncratic correlation. The first ``K`` entries of its column of ``\\mathbf{C}``, its systematic root, are finite, and the rest are `NaN`. Every entry outside ``\\mathcal{S}`` is `NaN`. The Investable Mask needs a finite mean and a finite variance, so it still leaves out every asset outside ``\\mathcal{I}``. `mp` processes the block over ``\\mathcal{I}`` alone, so an entry outside that block is the one the model states before any processing.
+The answer states an entry exactly when the model determines it. An asset of ``\\mathcal{S}`` outside ``\\mathcal{I}`` has no idiosyncratic variance, as in the warm-up of its variance. Its entry of ``\\boldsymbol{\\mu}`` is finite, and so is its covariance with each other asset of ``\\mathcal{S}`` when ``\\mathbf{D}`` is diagonal, because the model sets the idiosyncratic covariance of two assets to zero. Its variance is `NaN`, and so is each covariance that reads its variance through an idiosyncratic correlation. The first ``K`` entries of its column of ``\\mathbf{C}``, its systematic root, are finite, and the rest are `NaN`. Every entry outside ``\\mathcal{S}`` is `NaN`. An asset of ``\\mathcal{S}`` whose loadings read a factor that the factor prior states no moment for is outside ``\\mathcal{I}`` too. Its entries are `NaN` exactly where the product reads a `NaN` factor moment, and its systematic root is `NaN`, because a root of its factor covariance does not exist. The Investable Mask needs a finite mean and a finite variance, so it still leaves out every asset outside ``\\mathcal{I}``. `mp` processes the block over ``\\mathcal{I}`` alone, so an entry outside that block is the one the model states before any processing.
 
 # Algorithm
 
  1. Take `Li`, the rows of `L` at the investable assets. Get `D` and `R` from [`cross_sectional_residual_block`](@ref).
- 2. Project the factor mean through `Li`, giving `mui`, and the factor covariance, giving `si`.
+ 2. Project the factor mean through `Li`, giving `mui`, and the factor covariance, giving `si`, each with [`support_product`](@ref).
  3. Process `si` with `mp`, as [`factor_lift`](@ref) does.
  4. Add `D` to `si`, and make the sum positive definite with `mp.pdm`.
- 5. Take `lf`, the factors whose column of `f_sigma` is not zero, and the square root `Lf` of the block of `f_sigma` at `lf` under `mtx_sqrt`. Write `Lf` into the block at `lf` of a zero matrix `Cf`.
+ 5. Take the ready factors of `f_mu` and `f_sigma` with [`cross_sectional_ready_factors`](@ref), and `lf`, the ready factors whose column of `f_sigma` over the ready factors is not zero. Take the square root `Lf` of the block of `f_sigma` at `lf` under `mtx_sqrt`, and write it into the block at `lf` of a zero matrix `Cf`.
  6. Build `ci`, the low-rank square root `[Li * Cf  R]`.
- 7. Take `sdx`, the assets whose row of `L` is finite, and `Ls`, their rows. Project the factor covariance through `Ls`, and add the block of `esigma` at `sdx`, giving `ss`. A `NaN` variance in `esigma` makes `NaN` the entries that read it.
- 8. Write `Ls * f_mu`, `ss` and the systematic root `Ls * Cf` at `sdx` into the full asset universe, over `NaN`, then `mui`, `si` and `ci` at `idx` over them, giving `mu`, `sigma` and `chol`. Write `NaN` on the diagonal of `sigma` at every asset of `sdx` outside `idx`, so the Investable Mask of the answer is never wider than `idx`.
+ 7. Take `sdx`, the assets whose row of `L` is finite, and `Ls`, their rows. Project the factor covariance through `Ls` with [`support_product`](@ref), and add the block of `esigma` at `sdx`, giving `ss`. A `NaN` variance in `esigma` makes `NaN` the entries that read it. Take `cdx`, the assets of `sdx` whose loadings are zero at every factor that is not ready.
+ 8. Write the product of `Ls` and `f_mu` with [`support_product`](@ref) and `ss` at `sdx`, and the systematic root `L * Cf` at `cdx`, into the full asset universe, over `NaN`. Then write `mui`, `si` and `ci` at `idx` over them, giving `mu`, `sigma` and `chol`. Write `NaN` on the diagonal of `sigma` at every asset of `sdx` outside `idx`, so the Investable Mask of the answer is never wider than `idx`.
 
 # Arguments
 
@@ -1521,18 +1605,22 @@ The answer states an entry exactly when the model determines it. An asset of ``\
 # Validation
 
   - `L`, `f_mu` and `f_sigma` agree on the factor axis. Raises a `DimensionMismatch`.
+  - The rules of [`cross_sectional_ready_factors`](@ref) on `f_mu` and `f_sigma`.
   - The block of `f_sigma` at `lf` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`.
+  - Each asset of `idx` reads finite factor moments alone, as [`cross_sectional_determined`](@ref) states. The function does not check it.
 
 # Returns
 
-  - `mu::Vector{<:Real}`: Expected asset returns, `NaN` at an asset outside ``\\mathcal{S}``.
+  - `mu::Vector{<:Real}`: Expected asset returns, `NaN` at an asset outside ``\\mathcal{S}`` and at an asset whose loadings read a `NaN` factor mean.
   - `sigma::Matrix{<:Real}`: Asset covariance, `NaN` at every entry the model does not determine.
-  - `chol::Matrix{<:Real}`: The low-rank square root, `NaN` in the column of an asset outside ``\\mathcal{S}``, and below the first ``K`` rows of an asset outside ``\\mathcal{I}``.
+  - `chol::Matrix{<:Real}`: The low-rank square root, `NaN` in the column of an asset outside ``\\mathcal{S}`` or of an asset whose loadings read a factor that is not ready, and below the first ``K`` rows of an asset outside ``\\mathcal{I}``.
 
 # Related
 
   - [`factor_lift`](@ref)
   - [`cross_sectional_residual_block`](@ref)
+  - [`cross_sectional_ready_factors`](@ref)
+  - [`support_product`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
 function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
@@ -1544,12 +1632,15 @@ function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
               DimensionMismatch("L ($(size(L, 2)) columns), f_mu ($(length(f_mu))) and f_sigma ($(size(f_sigma, 1)) rows) must agree on the factor axis"))
     Li = L[idx, :]
     (; D, R) = cross_sectional_residual_block(esigma, idx, mtx_sqrt)
-    mui = Li * f_mu
-    si = Li * f_sigma * transpose(Li)
+    # A factor that the factor prior states no moment for is `NaN`, and `0 * NaN` is `NaN`,
+    # so each product reads the factor moments on the support of the loadings alone (#1510).
+    mui = support_product(Li, f_mu)
+    si = support_product(Li, f_sigma, Li)
     matrix_processing!(mp, si, Xs[:, idx]; kwargs...)
     si .+= D
     posdef!(mp.pdm, si)
-    lf = findall(k -> !all(iszero, view(f_sigma, :, k)), axes(f_sigma, 2))
+    rdy = cross_sectional_ready_factors(f_mu, f_sigma)
+    lf = findall(k -> rdy[k] && !all(iszero, view(f_sigma, rdy, k)), axes(f_sigma, 2))
     Lf = matrix_square_root(mtx_sqrt, f_sigma[lf, lf])
     Cf = zeros(eltype(Lf), size(f_sigma))
     Cf[lf, lf] = Lf
@@ -1561,14 +1652,17 @@ function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
     sdx = findall(i -> all(isfinite, view(L, i, :)), axes(L, 1))
     Ls = L[sdx, :]
     # The product is symmetric only to rounding, and a covariance is exactly symmetric.
-    ss = Matrix(LinearAlgebra.Symmetric(Ls * f_sigma * transpose(Ls)))
+    ss = Matrix(LinearAlgebra.Symmetric(support_product(Ls, f_sigma, Ls)))
     ss .+= esigma isa AbstractVector ? LinearAlgebra.diagm(esigma[sdx]) : esigma[sdx, sdx]
+    # The systematic root of an asset is a root of its factor covariance, so it exists only
+    # when its support lies in the ready factors.
+    cdx = filter(i -> all(k -> rdy[k] || iszero(L[i, k]), axes(L, 2)), sdx)
     N = size(L, 1)
     Tf = promote_type(real(eltype(si)), real(eltype(ss)))
     mu = fill(Tf(NaN), N)
     sigma = fill(Tf(NaN), N, N)
     chol = fill(Tf(NaN), size(ci, 2), N)
-    mu[sdx] = Ls * f_mu
+    mu[sdx] = support_product(Ls, f_mu)
     mu[idx] = mui
     sigma[sdx, sdx] = ss
     # The prior states no variance for an asset outside the investable set, so the Investable
@@ -1577,7 +1671,7 @@ function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
         sigma[i, i] = Tf(NaN)
     end
     sigma[idx, idx] = si
-    chol[axes(Cf, 2), sdx] = transpose(Ls * Cf)
+    chol[axes(Cf, 2), cdx] = transpose(L[cdx, :] * Cf)
     chol[:, idx] = transpose(ci)
     return (; mu = mu, sigma = sigma, chol = chol)
 end
@@ -1746,7 +1840,7 @@ end
 
 Blend the expected factor returns with the spanned part of a Return Forecast.
 
-A prior that states no Return Forecast Estimator has a spanned part of zero, and the method over `Nothing` takes it. There `lambda` shrinks the factor mean towards zero, and `lambda = 0` gives an expected return of zero.
+A prior that states no Return Forecast Estimator has a spanned part of zero, and the method over `Nothing` takes it. There `lambda` shrinks the factor mean towards zero, and `lambda = 0` gives an expected return of zero. At `lambda = 0` the blend reads no factor mean, so a factor mean that the factor prior does not state gives a finite blend there, and `NaN` at every other `lambda`.
 
 # Mathematical definition
 
@@ -1780,8 +1874,8 @@ Where:
   - [`cross_sectional_alpha_split`](@ref)
 """
 function cross_sectional_forecast_mu(lambda::Real, mu::VecNum, ::Nothing)
-    return lambda * mu
+    return lambda * (iszero(lambda) ? zero(mu) : mu)
 end
 function cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::VecNum)
-    return lambda * mu + (one(lambda) - lambda) * g
+    return lambda * (iszero(lambda) ? zero(mu) : mu) + (one(lambda) - lambda) * g
 end

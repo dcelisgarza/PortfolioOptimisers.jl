@@ -753,14 +753,14 @@ The prior states an entry exactly when the model determines it. An asset of ``\\
   - Under observed factors, `E` carries a column for every observed series, and every observed return of the fitted observations is finite. Raises an [`IsNothingError`](@ref), an `ArgumentError` or an [`IsNonFiniteError`](@ref), from [`cross_sectional_observed`](@ref) and [`cross_sectional_observed_block`](@ref).
   - At least one estimated factor is not empty. Raises an `ArgumentError`.
   - The regression fits no intercept. The prior states the moments through the factor returns alone, so an intercept would leave its mean out of `mu` and its variance out of `sigma`. Raises an `ArgumentError`.
-  - The factor prior states a finite factor mean and a finite factor covariance. Raises an [`IsNonFiniteError`](@ref).
+  - The factor prior determines the factor moments of at least one asset: the loadings of the asset read only factors with a finite mean and a finite variance. Raises an [`IsNonFiniteError`](@ref), from [`assert_cross_sectional_factor_moments`](@ref).
   - The scenario weights of the factor prior, when it carries any, sum to a positive number. Raises a `DomainError`, from [`cross_sectional_scenario_weights`](@ref).
   - At least one asset is investable at the latest observation. Raises an [`IsEmptyError`](@ref).
   - The rules of every verb the algorithm names.
 
 # Returns
 
-  - `pr::LowOrderPrior`: The prior on the full asset universe. An entry that the model does not determine is `NaN`: the whole entry of `mu` and row and column of `sigma` of an asset with no finite latest exposure, and the variance of an asset with no idiosyncratic variance, with its covariances under a positive `th`. `rr` is a [`CrossSectionalFactorModel`](@ref), and `fpr` is the factor prior on the raw factor axis. `w` holds the scenario weights of the factor prior divided by their sum, so they sum to one, and `fpr` holds the same `w`. It is `nothing` when the factor prior carries no weights.
+  - `pr::LowOrderPrior`: The prior on the full asset universe. An entry that the model does not determine is `NaN`: the whole entry of `mu` and row and column of `sigma` of an asset with no finite latest exposure, each entry that reads a factor moment the factor prior does not state, and the variance of an asset with no idiosyncratic variance, with its covariances under a positive `th`. An asset that loads on a factor whose mean or variance the factor prior does not state leaves the Investable Mask, and every other asset keeps its moments. `rr` is a [`CrossSectionalFactorModel`](@ref), and `fpr` is the factor prior on the raw factor axis. `w` holds the scenario weights of the factor prior divided by their sum, so they sum to one, and `fpr` holds the same `w`. It is `nothing` when the factor prior carries no weights.
 
 # Related
 
@@ -854,16 +854,17 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
 
 # Algorithm
 
- 1. Record the degrees of freedom and the divisor of each variance with [`cross_sectional_variance_counts`](@ref), from the count `cnt`.
- 2. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`. Take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation.
- 3. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, and a zero `b`. Under a family re-basis, expand the factor returns onto the raw axis with [`cross_sectional_expand`](@ref), each row with the basis of its lagged exposures, and store them in `fr`.
- 4. Fit the Return Forecast under the Orthogonal Forecast Fit `pe.ofit` with [`cross_sectional_return_forecast`](@ref) on `rde`, giving the spanned coefficients `g`, the orthogonal part `ap` before `c`, and the history when a slot answers `true` to [`reads_forecast_history`](@ref). The history extends the rows `hist` of `fit` when the carry fold carries them.
- 5. Resolve the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` with [`cross_sectional_calibration`](@ref), against the factor moments `f_pr` and the block `csfm`.
- 6. Write `b = c ap`, the Return Forecast Result and the resolved `lambda` and `c` onto the block with [`cross_sectional_forecast_block`](@ref), giving `rr`. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref) under the resolved `lambda`, and keep the mean of the observed factors, giving `f_mu`.
- 7. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref).
- 8. Take the investable assets `idx` with [`cross_sectional_investable`](@ref), and rebuild the asset return scenarios `Xs` with [`cross_sectional_scenarios`](@ref).
- 9. Lift the reduced factor distribution onto the assets with [`cross_sectional_lift`](@ref), and add `b` to the expected return it answers.
-10. Assemble a [`LowOrderPrior`](@ref) over `Xs`, with the base-currency returns of the scenario rows under `o_X`, the three lifted moments, the factor prior's `w` divided by its sum, its `ens`, `kld` and `ow`, the block under `rr`, and the expanded factor prior under `fpr`.
+ 1. Take the ready factors of `f_pr` with [`cross_sectional_ready_factors`](@ref) and the determined assets with [`cross_sectional_determined`](@ref). Refuse a fit that determines no asset with [`assert_cross_sectional_factor_moments`](@ref).
+ 2. Record the degrees of freedom and the divisor of each variance with [`cross_sectional_variance_counts`](@ref), from the count `cnt`.
+ 3. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`. Take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation.
+ 4. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, and a zero `b`. Under a family re-basis, expand the factor returns onto the raw axis with [`cross_sectional_expand`](@ref), each row with the basis of its lagged exposures, and store them in `fr`.
+ 5. Fit the Return Forecast under the Orthogonal Forecast Fit `pe.ofit` with [`cross_sectional_return_forecast`](@ref) on `rde`, giving the spanned coefficients `g`, the orthogonal part `ap` before `c`, and the history when a slot answers `true` to [`reads_forecast_history`](@ref). The history extends the rows `hist` of `fit` when the carry fold carries them.
+ 6. Resolve the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` with [`cross_sectional_calibration`](@ref), against the factor moments `f_pr` and the block `csfm`.
+ 7. Write `b = c ap`, the Return Forecast Result and the resolved `lambda` and `c` onto the block with [`cross_sectional_forecast_block`](@ref), giving `rr`. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref) under the resolved `lambda`, and keep the mean of the observed factors, giving `f_mu`.
+ 8. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref).
+ 9. Take the investable assets `idx` with [`cross_sectional_investable`](@ref), from the assets that the ready factors of the blended mean determine, and rebuild the asset return scenarios `Xs` with [`cross_sectional_scenarios`](@ref).
+10. Lift the reduced factor distribution onto the assets with [`cross_sectional_lift`](@ref), and add `b` to the expected return it answers.
+11. Assemble a [`LowOrderPrior`](@ref) over `Xs`, with the base-currency returns of the scenario rows under `o_X`, the three lifted moments, the factor prior's `w` divided by its sum, its `ens`, `kld` and `ow`, the block under `rr`, and the expanded factor prior under `fpr`.
 
 # Arguments
 
@@ -876,6 +877,7 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
 
 # Validation
 
+  - The factor prior determines the factor moments of at least one asset. Raises an [`IsNonFiniteError`](@ref).
   - At least one asset is investable at the latest observation. Raises an [`IsEmptyError`](@ref).
   - The rules of every verb the algorithm names. A resolved `lambda` lies in `[0, 1]`, and a resolved `c` is finite and `>= 0`.
 
@@ -893,6 +895,12 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
                                   ca::NamedTuple, fit::NamedTuple, rde::ReturnsResult;
                                   kwargs...)
     (; csr, W, vs, cnt, amr, bwr, Xo, r) = fit
+    # A factor the factor prior states no moment for changes no moment of an asset with a
+    # zero loading on it, so the fit refuses only when no asset is determined (#1510). The
+    # check runs before the calibration, which reads the factor moments.
+    rdy = cross_sectional_ready_factors(f_pr.mu, f_pr.sigma)
+    det = cross_sectional_determined(ca.L, rdy)
+    assert_cross_sectional_factor_moments(f_pr.mu, f_pr.sigma, size(ca.f, 1), det)
     (; edof, ediv) = cross_sectional_variance_counts(cnt, csr)
     S = cross_sectional_standardised_residuals(csr.eps, vs, amr)
     # The correlation reads the residuals with no fill: the fill of the scenarios writes the
@@ -936,9 +944,14 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
                        f_pr.mu[(Ke + 1):end])
     ex = cross_sectional_expand(ca.fcb, r, f_mu, f_pr.sigma)
     ev = vs[end, :]
-    idx = cross_sectional_investable(@view(amr[end, :]), L, ev)
+    # The blend at `lambda = 0` reads no factor mean, so the investable assets read the
+    # ready factors of the blended mean, which hold every factor ready before it.
+    idx = cross_sectional_investable(@view(amr[end, :]), ev,
+                                     cross_sectional_determined(L,
+                                                                cross_sectional_ready_factors(f_mu,
+                                                                                              f_pr.sigma)))
     @argcheck(!isempty(idx),
-              IsEmptyError("no asset is investable at the latest observation: every asset is either inactive, or carries a non-finite idiosyncratic variance or Factor Exposure. Give more observations, or widen the active mask of the Asset Panel."))
+              IsEmptyError("no asset is investable at the latest observation: every asset is either inactive, or carries a non-finite idiosyncratic variance or Factor Exposure, or loads on a factor whose moments the factor prior does not state. Give more observations, or widen the active mask of the Asset Panel."))
     Xs = cross_sectional_scenarios(f_pr.X, L, S, ev)
     # A factor prior with a Scenario Cap carries its last rows alone, and the scenarios pair
     # the last rows of each history, so the factor returns and the original returns keep the

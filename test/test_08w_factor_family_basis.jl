@@ -219,6 +219,28 @@ end
               dense_basis(fcb, 3) * S * transpose(dense_basis(fcb, 3))
     end
 
+    @testset "A factor with no covariance reaches only the raw factors that read it" begin
+        # A raw factor reads the reduced factors of its own family alone, so a `NaN` row of
+        # one reduced factor must not reach a dropped factor of another family through a
+        # zero weight (#1510).
+        A = randn(rng, Kr, Kr)
+        S = A * transpose(A)
+        k = Kr
+        Sn = copy(S)
+        Sn[k, :] .= NaN
+        Sn[:, k] .= NaN
+        B = dense_basis(fcb, T)
+        reads = .!iszero.(B[:, k])
+        raw = PO.expand_factor_covariance(fcb, Sn)
+        @test isnan.(raw) == (reads .| transpose(reads))
+        @test 0 < count(reads) < K
+        S0 = copy(S)
+        S0[k, :] .= 0
+        S0[:, k] .= 0
+        ok = .!isnan.(raw)
+        @test raw[ok] ≈ (B * S0 * transpose(B))[ok]
+    end
+
     @testset "Projecting coordinates is not a column selection" begin
         x = randn(rng, T, K)
         y = PO.project_factor_coordinates(fcb, x)

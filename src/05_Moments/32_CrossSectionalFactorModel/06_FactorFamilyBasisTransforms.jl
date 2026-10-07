@@ -601,8 +601,8 @@ Where:
 
  1. Check that `sigma` is ``K_{r} \\times K_{r}``.
  2. Build the reconstruction weights `W` of observation `t` with [`dropped_factor_weights`](@ref).
- 3. Multiply `W` by `sigma`, giving `DR`, the block of the dropped rows against the retained columns.
- 4. Multiply `DR` by the transpose of `W`, giving `DD`, the dropped block.
+ 3. Multiply `W` by `sigma` with [`support_product`](@ref), giving `DR`, the block of the dropped rows against the retained columns. A `NaN` of `sigma` reaches only the dropped factors whose weight at it is not zero.
+ 4. Multiply `W`, `sigma` and the transpose of `W` with [`support_product`](@ref), giving `DD`, the dropped block.
  5. Write `sigma`, `DR`, the transpose of `DR` and `DD` into their blocks of the ``K \\times K`` answer `raw`.
  6. For a stack, check that it holds one slice per observation of the basis, and do steps 1 to 5 on slice `t` with the ratios of observation `t`.
 
@@ -647,6 +647,7 @@ true
   - [`FactorFamilyBasis`](@ref)
   - [`reduce_factor_covariance`](@ref)
   - [`dropped_factor_weights`](@ref)
+  - [`support_product`](@ref)
 """
 function expand_factor_covariance(fcb::FactorFamilyBasis, sigma::MatNum,
                                   t::Integer = size(fcb.ratios, 1))
@@ -657,8 +658,10 @@ function expand_factor_covariance(fcb::FactorFamilyBasis, sigma::MatNum,
     Tf = promote_type(real(eltype(sigma)), eltype(W))
     ret = retained_factor_indices(fcb)
     drp = dropped_factor_indices(fcb)
-    DR = W * sigma
-    DD = DR * transpose(W)
+    # A dropped factor reads the covariance of its own family alone, so a `NaN` of another
+    # family must not reach it through a zero weight.
+    DR = support_product(W, sigma)
+    DD = support_product(W, sigma, W)
     raw = zeros(Tf, fcb.K, fcb.K)
     for b in eachindex(ret), a in eachindex(ret)
         raw[ret[a], ret[b]] = Tf(sigma[a, b])

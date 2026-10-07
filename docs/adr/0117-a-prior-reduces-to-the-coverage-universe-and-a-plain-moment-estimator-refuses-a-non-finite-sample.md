@@ -301,3 +301,44 @@ and column. The maintainer chose that rule over a named refusal and over an inve
 The oracle of map [#1375](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1375)
 refuses a variance that is not positive, so this is a **Better** row of that map. A negative
 variance is out of scope and keeps its `DomainError`.
+
+## Amendment (2026-10-07)
+
+**The factor side of the Cross-Sectional Factor Prior gates each asset, as its idiosyncratic side
+already did.** The prior states `mu_i = b_i + B_i' mu_f` and `sigma_ij = B_i' F B_j + D_ij`. Entry
+`i` reads the factor moments only on the support of `B_i`, the factors where its loading is not
+zero. So a factor that the factor prior states no moment for cannot change an entry of an asset
+with a zero loading on it. Before this amendment, the prior refused the whole fit when one factor
+moment was not finite, and the oracle of map
+[#1375](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1375) does the same. The
+maintainer chose the third rule on row R83 of
+[#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416), and
+[#1510](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1510) built it.
+
+- A factor is **ready** when its mean and its variance are finite, which is the rule of the
+  Investable Mask read over the factors. `cross_sectional_ready_factors` states it, and refuses a
+  non-finite covariance between two ready factors by name. A factor prior that is a
+  `LowOrderPrior` already keeps that rule, so only a processing step or a direct call reaches the
+  refusal.
+- An asset is **determined** when its loadings are finite and its support holds only ready
+  factors. `cross_sectional_determined` states it. The Investable Mask of the prior holds a
+  determined asset only, so an asset that loads on a factor with no moment leaves through it, as an
+  asset with no idiosyncratic variance does.
+- Every product of the loadings with a factor moment reads the support alone, through
+  `support_product`, because `0 * NaN` is `NaN`. An entry is `NaN` exactly where its product reads
+  a `NaN` factor moment. The same product expands the factor covariance under a constrained family,
+  so a `NaN` of one family does not reach a dropped factor of another.
+- The factor covariance is processed with `matrix_processing_block!`: the block of the finite
+  variances is processed, and the `NaN` frame stays as it is. A hole inside that block takes the
+  refusal of that verb.
+- The named `IsNonFiniteError` of `assert_cross_sectional_factor_moments` fires only when no asset
+  is determined. It keeps the counts of the non-finite factor means and covariance entries, and the
+  advice about the cumulative warm-ups.
+- A Spanned Shrinkage rule reads the estimated factors with a finite mean and a finite variance
+  alone, and the blend at `lambda = 0` reads no factor mean.
+
+The observed factors keep their own refusal: an observed factor return that is not finite on a
+fitted observation still refuses the fit before the factor prior runs. So a gap in one factor
+reaches this rule only through the factor prior itself.
+[#1530](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1530) holds the decision on
+a late observed series.

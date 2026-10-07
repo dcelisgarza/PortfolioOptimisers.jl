@@ -11,6 +11,25 @@
     @test PortfolioOptimisers.:⊕(C, B) == C .+ B
     @test PortfolioOptimisers.dot_scalar(C, A) == C * sum(A)
     @test PortfolioOptimisers.dot_scalar(A, C) == C * sum(A)
+    # A product over the support of each row: `0 * NaN` is `NaN`, so the plain product
+    # spreads a gap to every row, and this one reaches only the rows that read it (#1510).
+    Ls = [1.0 0.0 2.0; 0.5 1.0 0.0; 0.0 0.0 3.0]
+    x = [1.0, NaN, 2.0]
+    @test all(isnan, Ls * x)
+    px = PortfolioOptimisers.support_product(Ls, x)
+    @test px[[1, 3]] == [5.0, 6.0]
+    @test isnan(px[2])
+    @test PortfolioOptimisers.support_product(Ls, [1.0, 2.0, 3.0]) == Ls * [1.0, 2.0, 3.0]
+    Sg = [2.0 NaN 0.5; NaN NaN NaN; 0.5 NaN 1.0]
+    S0 = [2.0 0.0 0.5; 0.0 0.0 0.0; 0.5 0.0 1.0]
+    Pq = PortfolioOptimisers.support_product(Ls, Sg, Ls)
+    @test isnan.(Pq) == [false true false; true true true; false true false]
+    @test Pq[[1, 3], [1, 3]] == (Ls * S0 * transpose(Ls))[[1, 3], [1, 3]]
+    Sf = [2.0 0.1 0.5; 0.1 1.0 0.0; 0.5 0.0 1.0]
+    @test PortfolioOptimisers.support_product(Ls, Sf, Ls) == Ls * Sf * transpose(Ls)
+    # A non-finite coefficient of the left operand is in its support, as in the plain product.
+    @test isnan(PortfolioOptimisers.support_product([NaN 0.0], [1.0, 2.0])[1])
+    @test isnan(PortfolioOptimisers.support_product([NaN 0.0], [1.0, NaN])[1])
     @test PortfolioOptimisers.vec_to_real_measure(StdValue(), A) == std(A)
     @test PortfolioOptimisers.vec_to_real_measure(VarValue(), A) == var(A)
     @test PortfolioOptimisers.vec_to_real_measure(SumValue(), A) == sum(A)

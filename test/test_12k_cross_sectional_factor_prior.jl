@@ -1240,7 +1240,11 @@ end
     @testset "A factor prior that warms up over the factor returns" begin
         # A factor prior whose covariance estimator carries a warm-up longer than the
         # factor-return history left to it. A bare estimator answers `NaN` rather than
-        # raising, so only a check on its answer catches it; the oracle refuses this case too.
+        # raising, so only a check on its answer catches it. The check gates each asset: an
+        # asset whose loadings read only factors with a finite mean and variance keeps its
+        # moments, and the fit refuses only when no asset is determined. Here every factor is
+        # `NaN` and every asset loads on the market, so no asset is determined. The oracle
+        # refuses the whole fit as soon as one factor moment is not finite.
         # These Factor Exposures warm up over nothing, so the whole window reaches the
         # factor prior and the refusal below is its warm-up alone, not the Descriptors'.
         rd = csfp_panel(; n_observations = 300).rd
@@ -1258,20 +1262,38 @@ end
         @test isa(prior(pe2, rd), LowOrderPrior)
     end
     @testset "The refusal reads the moments it was handed" begin
-        # The verb itself, over bare arrays. A finite pair passes; a gap in either the
-        # mean or the covariance is named and counted.
-        @test isnothing(PO.assert_cross_sectional_factor_moments([1.0, 2.0],
-                                                                 [1.0 0.0; 0.0 1.0], 5))
-        @test_throws PO.IsNonFiniteError PO.assert_cross_sectional_factor_moments([1.0,
-                                                                                   NaN],
-                                                                                  [1.0 0.0;
-                                                                                   0.0 1.0],
-                                                                                  5)
-        @test_throws PO.IsNonFiniteError PO.assert_cross_sectional_factor_moments([1.0,
-                                                                                   2.0],
-                                                                                  [1.0 NaN;
-                                                                                   NaN 1.0],
-                                                                                  1)
+        # The verbs themselves, over bare arrays. A factor is ready when its mean and its
+        # variance are finite, and an asset is determined when its loadings read only ready
+        # factors. A gap in the mean or in the covariance takes its factor out, and the
+        # refusal names and counts the gaps only when no asset is left.
+        mu = [1.0, NaN, 3.0]
+        sigma = [1.0 NaN 0.1; NaN NaN NaN; 0.1 NaN 2.0]
+        rdy = PO.cross_sectional_ready_factors(mu, sigma)
+        @test rdy == [true, false, true]
+        @test PO.cross_sectional_ready_factors([1.0, 2.0, 3.0], sigma) == rdy
+        @test PO.cross_sectional_ready_factors([1.0, NaN], [1.0 0.0; 0.0 1.0]) ==
+              [true, false]
+        # Two ready factors with a covariance that is not finite state no covariance
+        # matrix, so the block is refused by name.
+        @test_throws PO.IsNonFiniteError PO.cross_sectional_ready_factors([1.0, 2.0],
+                                                                          [1.0 NaN;
+                                                                           NaN 1.0])
+        @test_throws DimensionMismatch PO.cross_sectional_ready_factors([1.0], sigma)
+        # Asset 2 has a zero loading on the factor that is not ready, so `0 * NaN` must not
+        # reach it. Asset 3 loads on it, and asset 4 has a loading that is not finite.
+        L = [1.0 0.5 0.2; 1.0 0.0 -0.3; 1.0 1e-12 0.0; NaN 0.0 1.0]
+        @test PO.cross_sectional_determined(L, rdy) == [false, true, false, false]
+        @test_throws DimensionMismatch PO.cross_sectional_determined(L, rdy[1:2])
+        @test isnothing(PO.assert_cross_sectional_factor_moments(mu, sigma, 5,
+                                                                 [false, true, false]))
+        e = try
+            PO.assert_cross_sectional_factor_moments(mu, sigma, 5, falses(3))
+        catch err
+            err
+        end
+        @test isa(e, PO.IsNonFiniteError)
+        @test occursin("1 non-finite factor mean(s) and 5 non-finite factor covariance",
+                       e.msg)
     end
     @testset "A fold's own train window takes the same refusal" begin
         # The scenario the issue names: the fold, not a hand-cut slice. The scheme's own
@@ -1282,6 +1304,115 @@ end
         (; train_idx) = PO.split(cv, rd)
         @test length(first(train_idx)) == 2
         @test_throws ArgumentError prior(pe, PO.port_opt_view(rd, first(train_idx), :))
+    end
+end
+
+# A factor prior that states no moment for the factors in `k`, as a factor prior does whose
+# warm-up is longer than the history of one factor. It writes `NaN` over the mean, the row
+# and the column of each factor in `k` of the factor prior it wraps.
+struct CsfpNaNFactorPrior{P} <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_A
+    pe::P
+    k::Vector{Int}
+end
+function PortfolioOptimisers.prior(pe::CsfpNaNFactorPrior, X::AbstractMatrix, args...;
+                                   kwargs...)
+    pr = prior(pe.pe, X, args...; kwargs...)
+    mu = copy(pr.mu)
+    sigma = copy(pr.sigma)
+    mu[pe.k] .= NaN
+    sigma[pe.k, :] .= NaN
+    sigma[:, pe.k] .= NaN
+    return LowOrderPrior(; X = pr.X, mu = mu, sigma = sigma, w = pr.w, ens = pr.ens,
+                         kld = pr.kld, ow = pr.ow)
+end
+
+@testset "A factor with no moment gates only the assets that load on it (#1510)" begin
+    PO = PortfolioOptimisers
+    # The prior states `mu_i = B_i' mu_f` and `sigma_ij = B_i' F B_j + D_ij`, so entry `i`
+    # reads the factor moments only on the support of `B_i`. Factor 3 is one industry of the
+    # one-hot block: the assets of that industry load on it, and every other asset has a
+    # loading of exactly zero on it. `0 * NaN` is `NaN`, so a product over the whole factor
+    # axis would make every asset `NaN`. The other assets must keep the moments of the fit
+    # whose factor prior states every moment, and the assets of the industry must be `NaN`
+    # and leave the Investable Mask. The oracle refuses the whole fit instead.
+    # The two fits multiply loading matrices of different row counts, so BLAS sums the same
+    # terms in another order: `sigma` agrees to round-off, about 1e-11 on one entry and 5e-12
+    # on the norm of the block, and `rtol = 1e-10` holds it.
+    rd = csfp_panel().rd
+    factors = csfp_factors()
+    function csfp_nan_pair(; kwargs...)
+        pe0 = CrossSectionalFactorPrior(; factors = factors, lag = 1, kwargs...)
+        pe1 = CrossSectionalFactorPrior(; factors = factors, lag = 1, kwargs...,
+                                        pe = CsfpNaNFactorPrior(pe0.pe, [3]))
+        return prior(pe0, rd), prior(pe1, rd)
+    end
+    @testset "The other assets keep the moments the model determines" begin
+        pr0, pr1 = csfp_nan_pair(; lambda = 1)
+        on = .!iszero.(pr0.rr.L[:, 3])
+        @test 0 < count(on) < size(rd.X, 2)
+        m0 = PO.investable_mask(pr0)
+        m1 = PO.investable_mask(pr1)
+        @test m1 == (m0 .& .!on)
+        @test count(m1) > 40
+        @test all(isnan, pr1.mu[on])
+        @test all(isnan, pr1.sigma[on, :])
+        @test all(isnan, pr1.chol[:, on])
+        @test isapprox(pr1.mu[m1], pr0.mu[m1]; rtol = 1e-12)
+        @test isapprox(pr1.sigma[m1, m1], pr0.sigma[m1, m1]; rtol = 1e-10)
+        # The root reads the block of the ready factors, which is a different root from the
+        # root of the whole factor covariance, so the identity is the check, not the entries.
+        C = pr1.chol[:, m1]
+        @test all(isfinite, C)
+        @test isapprox(transpose(C) * C, pr1.sigma[m1, m1]; rtol = 1e-12)
+        # The factor prior keeps its own `NaN`, and every other factor moment.
+        @test isnan(pr1.fpr.mu[3])
+        @test all(isnan, pr1.fpr.sigma[3, :])
+        k = [1, 2, 4, 5, 6, 7]
+        @test isapprox(pr1.fpr.sigma[k, k], pr0.fpr.sigma[k, k]; rtol = 1e-12)
+        @test pr1.fpr.mu[k] == pr0.fpr.mu[k]
+    end
+    @testset "The default Spanned Shrinkage reads the ready factors alone" begin
+        # `PrecisionBlend` reads the factor covariance through its pseudo-inverse, which a
+        # `NaN` would poison. It reads the other estimated factors, and the moments of the
+        # other assets are those of the full fit under the same `lambda`.
+        _, pr1 = csfp_nan_pair()
+        lambda = pr1.rr.lambda
+        @test 0 <= lambda <= 1
+        pr0 = prior(CrossSectionalFactorPrior(; factors = factors, lag = 1,
+                                              lambda = lambda), rd)
+        m1 = PO.investable_mask(pr1)
+        @test count(m1) > 40
+        @test isapprox(pr1.mu[m1], pr0.mu[m1]; rtol = 1e-12)
+        @test isapprox(pr1.sigma[m1, m1], pr0.sigma[m1, m1]; rtol = 1e-10)
+    end
+    @testset "A constrained family expands the NaN to the factors that read it" begin
+        # Under a zero-sum industry family, the dropped industry is a combination of the
+        # retained ones, so it reads the factor of the gap, and so does each asset of the
+        # dropped industry. Every other raw factor and asset keeps its moments.
+        pr0, pr1 = csfp_nan_pair(; lambda = 1, families = ["industry" => nothing])
+        fcb = pr1.rr.fcb
+        bad = sort([PO.retained_factor_indices(fcb)[3]; PO.dropped_factor_indices(fcb)])
+        good = setdiff(1:length(pr1.rr.nf), bad)
+        @test all(isnan, pr1.fpr.sigma[bad, :])
+        @test isapprox(pr1.fpr.sigma[good, good], pr0.fpr.sigma[good, good]; rtol = 1e-12)
+        @test all(isfinite, pr1.fpr.mu[good])
+        m1 = PO.investable_mask(pr1)
+        @test m1 == (PO.investable_mask(pr0) .& .!(.!iszero.(pr0.rr.L[:, 3])))
+        @test count(m1) > 10
+        @test isapprox(pr1.mu[m1], pr0.mu[m1]; rtol = 1e-12)
+        @test isapprox(pr1.sigma[m1, m1], pr0.sigma[m1, m1]; rtol = 1e-10)
+    end
+    @testset "No determined asset refuses by name" begin
+        # Every asset loads on the market, so a market with no moment determines no asset.
+        pe = CrossSectionalFactorPrior(; factors = factors, lag = 1, lambda = 1,
+                                       pe = CsfpNaNFactorPrior(EmpiricalPrior(), [1]))
+        e = try
+            prior(pe, rd)
+        catch err
+            err
+        end
+        @test isa(e, PO.IsNonFiniteError)
+        @test occursin("so the moments of no asset are determined", e.msg)
     end
 end
 
@@ -1494,7 +1625,9 @@ allocated the exposure history in the element type of the returns, so integer re
         L[2, 3] = NaN
         ev = rand(rng, nN)
         ev[5] = NaN
-        @test PO.cross_sectional_investable(amsk, L, ev) ==
+        det = PO.cross_sectional_determined(L, trues(nK))
+        @test det == [all(isfinite, L[i, :]) for i in 1:nN]
+        @test PO.cross_sectional_investable(amsk, ev, det) ==
               [i for i in 1:nN if amsk[i] && isfinite(ev[i]) && all(isfinite, L[i, :])]
     end
     @testset "The standardised residuals take the mean of their own observation at a gap" begin
@@ -1581,6 +1714,14 @@ allocated the exposure history in the element type of the returns, so integer re
         @test PO.cross_sectional_forecast_mu(0.3, [1.0, 2.0], nothing) ≈ [0.3, 0.6]
         @test PO.cross_sectional_forecast_mu(0.3, [1.0, 2.0], [10.0, -10.0]) ≈
               0.3 .* [1.0, 2.0] .+ 0.7 .* [10.0, -10.0]
+        # At `lambda = 0` the blend reads no factor mean, so a factor mean that the factor
+        # prior does not state reaches no entry. At any other `lambda` it does.
+        @test PO.cross_sectional_forecast_mu(0.0, [1.0, NaN], [10.0, -10.0]) ==
+              [10.0, -10.0]
+        @test PO.cross_sectional_forecast_mu(0.0, [1.0, NaN], nothing) == [0.0, 0.0]
+        mb = PO.cross_sectional_forecast_mu(0.3, [1.0, NaN], [10.0, -10.0])
+        @test mb[1] ≈ 7.3
+        @test isnan(mb[2])
     end
     @testset "The lift states every entry the model determines, and NaN elsewhere" begin
         rng = StableRNG(828_106)
