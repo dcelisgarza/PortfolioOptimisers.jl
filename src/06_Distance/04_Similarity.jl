@@ -95,6 +95,8 @@ Where:
   - $(math_dict[:D_mat_dist])
   - $(math_dict[:D_ij_dist])
 
+Equation 4 of Section 3 of [gower1966](@cite) relates a similarity matrix with a unit diagonal to the distance of its points by ``\\Delta_{i,\\,j}^{2} = 2(1 - S_{i,\\,j})``, so ``S_{i,\\,j} = 1 - \\Delta_{i,\\,j}^{2} / 2``. That relation halves the squared distance, and this transformation does not. No work that states ``1 - d_{i,\\,j}^{2}`` was found.
+
 !!! warning
 
     The transformation is defined only for a **finite** distance matrix. An infinite entry makes `ceil(Inf^2) - Inf^2`, which is `NaN`, and every other entry `Inf`. This is not a corner case: [`LogDistance`](@ref) maps an exactly zero correlation to an infinite distance, and this member is the default of both [`DBHT`](@ref) and [`LoGo`](@ref). [`assert_similarity_domain`](@ref) refuses it on the PMFG path.
@@ -121,6 +123,7 @@ The branch of [`distance_to_similarity`](@ref) that this tag selects runs these 
 # References
 
   - $(ref_dict[:cajas2025]) Section 13.1.4.2, footnote 7. $(ref_dict[:no_original_source])
+  - $(ref_dict[:gower1966]) Section 3, Equation 4.
 """
 struct MaximumDistanceSimilarity <: AbstractNonNegativeSimilarityMatrixAlgorithm end
 """

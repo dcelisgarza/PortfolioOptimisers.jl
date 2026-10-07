@@ -126,6 +126,9 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :charikar2002 => "[charikar2002](@cite) M. S. Charikar. *Similarity estimation techniques from rounding algorithms*. In: *Proceedings of the Thirty-Fourth Annual ACM Symposium on Theory of Computing* (2002); pp. 380–388.",#
                  :kraskov2005 => "[kraskov2005](@cite) A. Kraskov, H. Stögbauer, R. G. Andrzejak and P. Grassberger. *Hierarchical clustering using mutual information*. Europhysics Letters 70, 278–284 (2005).",#
                  :meila2007 => "[meila2007](@cite) M. Meilă. *Comparing clusterings—an information based distance*. Journal of Multivariate Analysis 98, 873–895 (2007).",#
+                 :rajski1961 => "[rajski1961](@cite) C. Rajski. *A metric space of discrete probability distributions*. Information and Control 4, 371–377 (1961).",#
+                 :gower1966 => "[gower1966](@cite) J. C. Gower. *Some distance properties of latent root and vector methods used in multivariate analysis*. Biometrika 53, 325–338 (1966).",#
+                 :rousseeuw1993transformation => "[rousseeuw1993transformation](@cite) P. J. Rousseeuw and G. Molenberghs. *Transformation of non positive semidefinite correlation matrices*. Communications in Statistics - Theory and Methods 22, 965–984 (1993).",#
                  :no_original_source => "The original source of this formulation was not found. The formulation follows this work and is not checked against the original.",#
                  :vandongen2012 => "[vandongen2012](@cite) S. Van Dongen and A. J. Enright. *Metric distances derived from cosine similarity and Pearson and Spearman correlations*. arXiv preprint arXiv:1208.3145 (2012).",#
                  :rousseeuw1987 => "[rousseeuw1987](@cite) P. J. Rousseeuw. *Silhouettes: a graphical aid to the interpretation and validation of cluster analysis*. Journal of Computational and Applied Mathematics 20, 53–65 (1987).",#

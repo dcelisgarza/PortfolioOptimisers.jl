@@ -69,7 +69,7 @@ Lemma 3 of [vandongen2012](@cite) states this distance, ``\\sin(\\theta / 2)`` o
 # References
 
   - $(ref_dict[:vandongen2012]) Section 4, Lemma 3.
-  - $(ref_dict[:lopezdeprado2016]) Stage 1, Example 1, and Appendix A.1.
+  - $(ref_dict[:lopezdeprado2016]) Online supplementary materials, Stage 1, Example 1, and Appendix A.1.
 """
 struct SimpleDistance <: AbstractDistanceAlgorithm end
 """
@@ -94,7 +94,7 @@ Where:
 
 The clamp is a numerical guard and nothing more, as in [`SimpleDistance`](@ref): ``1 - \\lvert\\rho_{i,\\,j}\\rvert`` already lies in ``[0,\\,1]`` for every ``\\lvert\\rho_{i,\\,j}\\rvert \\leq 1``.
 
-Appendix A.1 of [lopezdeprado2016](@cite) states this distance and proves that it is a metric for a Pearson correlation.
+Appendix A.1 of the online supplementary materials of [lopezdeprado2016](@cite) states this distance and proves that it is a metric for a Pearson correlation.
 
 # Related
 
@@ -108,7 +108,7 @@ Appendix A.1 of [lopezdeprado2016](@cite) states this distance and proves that i
 
 # References
 
-  - $(ref_dict[:lopezdeprado2016]) Appendix A.1.
+  - $(ref_dict[:lopezdeprado2016]) Online supplementary materials, Appendix A.1.
 """
 struct SimpleAbsoluteDistance <: AbstractDistanceAlgorithm end
 """
@@ -135,7 +135,7 @@ The floor at zero is not cosmetic. A covariance estimator that shrinks, denoises
 
 Perfectly uncorrelated assets remain infinitely far apart: ``\\rho_{i,\\,j} = 0`` gives ``d_{i,\\,j} = \\infty``, which is a meaningful value here and is left alone.
 
-Section 6.2.3 of [cajas2025](@cite) states this dissimilarity for a tail dependence coefficient, and it names [luca2011](@cite) as the work that proposes it. No copy of that work was found, so the formula follows the book.
+Equation 2 of Section 3 of [luca2011](@cite) proposes ``-\\log \\hat{\\lambda}_L`` for an estimated lower tail dependence coefficient ``\\hat{\\lambda}_L``. That section calls it a dissimilarity and not a distance, because it does not satisfy the triangle inequality. A tail dependence coefficient lies in ``[0,\\,1]``, so the absolute value and the floor at zero are this library's guards.
 
 # Related
 
@@ -150,8 +150,7 @@ Section 6.2.3 of [cajas2025](@cite) states this dissimilarity for a tail depende
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 6.2.3, Equation 6.26. $(ref_dict[:no_original_source])
-  - $(ref_dict[:luca2011])
+  - $(ref_dict[:luca2011]) Section 3, Equation 2.
 """
 struct LogDistance <: AbstractDistanceAlgorithm end
 """
@@ -182,7 +181,7 @@ Where:
 
     The intended domain has no negative entry. Give a signed correlation to [`SimpleDistance`](@ref), which halves and therefore never saturates, or to [`SimpleAbsoluteDistance`](@ref), which reads the magnitude.
 
-On a non-negative ``\\rho_{i,\\,j}`` the formula is the distance ``\\sqrt{1 - \\lvert\\rho_{i,\\,j}\\rvert}`` of Appendix A.1 of [lopezdeprado2016](@cite). That appendix proves the metric property for a Pearson correlation alone. Section 6.2.1 of [cajas2025](@cite) gives the formula for a distance correlation, and no work that first states that use was found.
+On a non-negative ``\\rho_{i,\\,j}`` the formula is the distance ``\\sqrt{1 - \\lvert\\rho_{i,\\,j}\\rvert}`` of Appendix A.1 of the online supplementary materials of [lopezdeprado2016](@cite). That appendix proves the metric property for a Pearson correlation alone. Section 3.2 of [mlp1](@cite) proves it again for a correlation estimate with ``\\sigma[X, Y] = \\rho[X, Y] \\sigma[X] \\sigma[Y]``, and it does not name a distance correlation. Section 6.2.1 of [cajas2025](@cite) gives the formula for a distance correlation, and no work that first states that use was found.
 
 # Related
 
@@ -197,7 +196,8 @@ On a non-negative ``\\rho_{i,\\,j}`` the formula is the distance ``\\sqrt{1 - \\
 
 # References
 
-  - $(ref_dict[:lopezdeprado2016]) Appendix A.1.
+  - $(ref_dict[:lopezdeprado2016]) Online supplementary materials, Appendix A.1.
+  - $(ref_dict[:mlp1]) Section 3.2.
   - $(ref_dict[:cajas2025]) Section 6.2.1, Equation 6.23. $(ref_dict[:no_original_source])
 """
 struct CorrelationDistance <: AbstractDistanceAlgorithm end
@@ -231,7 +231,7 @@ Where:
   - ``H(X_{i})``: Marginal Shannon entropy of asset ``i``, estimated from a histogram whose bin count comes from `bins`.
   - ``I(X_{i};X_{j})``: Mutual information between assets ``i`` and ``j``.
 
-The first formula is the variation of information of Equation 19 of [meila2007](@cite), which proves that it is a metric. The second is ``D = 1 - I(X_{i};X_{j}) / H(X_{i},\\,X_{j})`` of Theorem 1 of [kraskov2005](@cite), which proves that it is a metric on ``[0,\\,1]``. Their Theorem 2 gives a second metric on ``[0,\\,1]``, which divides by ``\\max(H(X_{i}),\\, H(X_{j}))`` instead. This algorithm does not compute that second metric.
+The first formula is the variation of information of Equation 19 of [meila2007](@cite), which proves that it is a metric. The second is ``d = 1 - I(X_{i};X_{j}) / H(X_{i},\\,X_{j})`` of Equation 1 of [rajski1961](@cite), which proves that it is a distance on discrete distributions. Theorem 1 of [kraskov2005](@cite) proves again that it is a metric on ``[0,\\,1]``. Their Theorem 2 gives a second metric on ``[0,\\,1]``, which divides by ``\\max(H(X_{i}),\\, H(X_{j}))`` instead. This algorithm does not compute that second metric.
 
 # Algorithm
 
@@ -282,6 +282,7 @@ VariationInfoDistance
 # References
 
   - $(ref_dict[:meila2007]) Section 3, Equation 19.
+  - $(ref_dict[:rajski1961]) Theorem, Equation 1.
   - $(ref_dict[:kraskov2005]) Section 2.3, Theorems 1 and 2.
 """
 @concrete struct VariationInfoDistance <: AbstractDistanceAlgorithm

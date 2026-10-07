@@ -94,7 +94,7 @@ Where:
 
 Subtracting a set of eigenmodes takes the diagonal of ``\\mathbf{C}`` below one, so the rescaling is not cosmetic: it changes every entry. The subtraction can also take an eigenvalue of ``\\mathbf{C}`` below zero, which is the reason a detoned matrix may not be positive definite.
 
-Equation 5 of [kim2005](@cite) splits a correlation matrix into the market mode, the group modes and the noise modes, and the subtraction at ``n = 1`` removes the first of those parts. That work does not rescale. The rescale follows Equation 3.57 of [cajas2025](@cite), which names [mlp1](@cite) as the source of detoning. No copy of that work was found.
+Equation 5 of [kim2005](@cite) splits a correlation matrix into the market mode, the group modes and the noise modes, and the subtraction at ``n = 1`` removes the first of those parts. That work does not rescale. Section 2.6 of [mlp1](@cite) states detoning: it subtracts the market components, usually one but possibly more, and rescales the remainder to unit diagonal. No earlier work that states the rescale was found. That section detones a denoised matrix, and this estimator detones the matrix it is given.
 
 # Algorithm
 
@@ -148,8 +148,7 @@ Detone
 # References
 
   - $(ref_dict[:kim2005]) Equation 5.
-  - $(ref_dict[:cajas2025]) Section 3.5.3, Equation 3.57. $(ref_dict[:no_original_source])
-  - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:mlp1]) Section 2.6.
 """
 @concrete struct Detone <: AbstractDetoneEstimator
     """
@@ -229,8 +228,7 @@ julia> detone!(Detone(), X)
 # References
 
   - $(ref_dict[:kim2005]) Equation 5.
-  - $(ref_dict[:cajas2025]) Section 3.5.3, Equation 3.57. $(ref_dict[:no_original_source])
-  - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:mlp1]) Section 2.6.
 """
 function detone!(::Nothing, X::MatNum)::MatNum
     return X
@@ -306,8 +304,7 @@ julia> size(Xd)
 # References
 
   - $(ref_dict[:kim2005]) Equation 5.
-  - $(ref_dict[:cajas2025]) Section 3.5.3, Equation 3.57. $(ref_dict[:no_original_source])
-  - $(ref_dict[:mlp1]) Chapter 2.
+  - $(ref_dict[:mlp1]) Section 2.6.
 """
 function detone(::Nothing, X::MatNum)::MatNum
     return X

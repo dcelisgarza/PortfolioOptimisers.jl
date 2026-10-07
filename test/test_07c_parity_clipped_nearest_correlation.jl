@@ -160,3 +160,12 @@ end
     # A PSD result with a zero-variance row returns with no message.
     @test_logs min_level = Logging.Warn posdef(pdm, p1412_in("ZeroVariance"))
 end
+
+@testset "ClippedNearestCorrelation: Equation 3.3 of Rousseeuw and Molenberghs (1993) (#1536)" begin
+    # Section 3 of the original replaces the negative eigenvalues by a small positive number,
+    # Delta = 0.05 in its example, and scales the diagonal back to one. Equation 3.3 prints the
+    # result for the matrix of its Equation 2.5 to three decimals.
+    R = [1.0 -0.9 -0.9; -0.9 1.0 0.3; -0.9 0.3 1.0]
+    Y = posdef(Posdef(; alg = ClippedNearestCorrelation(; tau = 0.05)), R)
+    @test round.(Y; digits = 3) == [1.0 -0.781 -0.781; -0.781 1.0 0.327; -0.781 0.327 1.0]
+end

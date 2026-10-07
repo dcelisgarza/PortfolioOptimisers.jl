@@ -74,7 +74,7 @@ DistanceDistance
 
 # References
 
-  - $(ref_dict[:lopezdeprado2016]) Stage 1, Example 2.
+  - $(ref_dict[:lopezdeprado2016]) Online supplementary materials, Stage 1, Example 2.
 """
 @concrete struct DistanceDistance <: AbstractDistanceEstimator
     """
