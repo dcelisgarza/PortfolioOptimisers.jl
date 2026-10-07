@@ -45,6 +45,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :vorobets2021 => "[vorobets2021](@cite) A. Vorobets. *Sequential entropy pooling heuristics*. Available at SSRN 3936392 (2021).",#
                  :cvar => "[cvar](@cite) R. T. Rockafellar and S. Uryasev. *Optimization of conditional value-at-risk*. Journal of Risk 2, 21–41 (2000).",#
                  :evar => "[evar](@cite) A. Ahmadi-Javid. *Entropic value-at-risk: A new coherent risk measure*. Journal of Optimization Theory and Applications 155, 1105–1123 (2012).",#
+                 :kaniadakis2001 => "[kaniadakis2001](@cite) G. Kaniadakis. *Non-linear kinetics underlying generalized statistics*. Physica A: Statistical Mechanics and its Applications 296, 405–425 (2001).",#
                  :rlvar => "[rlvar](@cite) D. Cajas. *Portfolio Optimization of Relativistic Value at Risk*. Available at SSRN 4378498 (2023).",#
                  :cdar => "[cdar](@cite) A. Chekhlov, S. Uryasev and M. Zabarankin. *Drawdown measure in portfolio optimization*. International Journal of Theoretical and Applied Finance 8, 13–58 (2005).",#
                  :pnvar => "[pnvar](@cite) P. A. Krokhmal. *Higher moment coherent risk measures*. Quantitative Finance 7, 373–387 (2007).",#
@@ -64,6 +65,8 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :lpm => "[lpm](@cite) P. C. Fishburn. *Mean-risk analysis with risk associated with below-target returns*. The American Economic Review 67, 116–126 (1977).",#
                  :palomar2025 => "[palomar2025](@cite) D. P. Palomar. *Portfolio Optimization: Theory and Application* (Cambridge University Press, 2025).",#
                  :benidis2018 => "[benidis2018](@cite) K. Benidis, Y. Feng and D. P. Palomar. *Optimization Methods for Financial Index Tracking: From Theory to Practice*. Foundations and Trends in Optimization 3, 171–279 (2018).",#
+                 :beasley2003 => "[beasley2003](@cite) J. E. Beasley, N. Meade and T.-J. Chang. *An evolutionary heuristic for the index tracking problem*. European Journal of Operational Research 148, 621–643 (2003).",#
+                 :rudolf1999 => "[rudolf1999](@cite) M. Rudolf, H.-J. Wolter and H. Zimmermann. *A linear model for tracking error minimization*. Journal of Banking & Finance 23, 85–103 (1999).",#
                  :cajas2025 => "[cajas2025](@cite) D. Cajas. *Advanced Portfolio Optimization: A Cutting-edge Quantitative Approach* (Springer Nature Switzerland, 2025).",#
                  :goldfarbiyengar2003 => "[goldfarbiyengar2003](@cite) D. Goldfarb and G. Iyengar. *Robust Portfolio Selection Problems*. Mathematics of Operations Research 28, 1–38 (2003).",#
                  :bentalnemirovski1998 => "[bentalnemirovski1998](@cite) A. Ben-Tal and A. Nemirovski. *Robust Convex Optimization*. Mathematics of Operations Research 23, 769–805 (1998).",#

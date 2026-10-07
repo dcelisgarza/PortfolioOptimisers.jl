@@ -1,9 +1,9 @@
 """
     kappa_log(u::Number, kappa::Number)
 
-Evaluate the Kaniadakis logarithm.
+Evaluate the Kaniadakis logarithm of [kaniadakis2001](@cite), the inverse of the κ-deformed exponential.
 
-The relativistic risk measures, their JuMP constraint layer and the entropy pooling views of the relativistic value at risk all scale a dual variable by this quantity, so the library states it once here. The function checks neither argument, because every caller holds `kappa` in a field that its constructor has already passed to [`assert_unit_interval`](@ref), and every caller passes the reciprocal of a tail mass, which is positive.
+[rlvar](@cite) builds the relativistic value at risk on this logarithm. So the relativistic risk measures, their JuMP constraint layer and the entropy pooling views of the relativistic value at risk all scale a dual variable by this quantity, and the library states it once here. The function checks neither argument, because every caller holds `kappa` in a field that its constructor has already passed to [`assert_unit_interval`](@ref), and every caller passes the reciprocal of a tail mass, which is positive.
 
 # Mathematical definition
 
@@ -50,7 +50,8 @@ julia> PortfolioOptimisers.kappa_log(0.5, 0.3)
 
 # References
 
-  - $(ref_dict[:rlvar])
+  - $(ref_dict[:kaniadakis2001]) Section VI, Equation 63.
+  - $(ref_dict[:rlvar]) Section 2.2, Equation 5.
 """
 function kappa_log(u::Number, kappa::Number)
     return (u^kappa - u^(-kappa)) / (2 * kappa)
