@@ -259,7 +259,7 @@ Each family has two arities. The data form answers for a batch fit over `X`. The
 
   - [`Covariance`](@ref) answers the centre that [`weighted_centre`](@ref) resolves from `ce.me` and `ce.w`, or `state.mu`. Under a [`CoveragePolicy`](@ref) the batch fit and the fold are one computation, so the data form folds the window and reads the same `state.mu`. That vector is the diagonal of the per-pair centre, the available-case mean of each asset. The forecast centres each off-diagonal product on the mean of the observations that the pair shares, and one vector cannot carry that centre. The per-asset ratios read the diagonal only.
   - [`GeneralCovariance`](@ref) answers the sample mean, weighted by `ce.w` when it carries observation weights, or `state.mu`.
-  - [`ExpWeightedCovariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref) answer `state.location`, or zero for every asset when `centred = true`, because the estimator then assumes a zero mean. The data form runs over the window the same pass that the batch fit runs, and reads the location at the end of the pass.
+  - [`ExpWeightedCovariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref) answer `state.location` under [`EstimatedCentring`](@ref), or zero for every asset under [`PreCentred`](@ref), because the estimator then assumes a zero mean. The data form runs over the window the same pass that the batch fit runs, and reads the location at the end of the pass.
   - [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref) answer what the estimator that they hold answers, because a matrix transform moves no centre. A `StatsBase.CovarianceEstimator` that they hold is read as a [`GeneralCovariance`](@ref), as `cov` reads it.
   - Any other [`AbstractCovarianceEstimator`](@ref) answers the sample mean of the window, over the finite rows of each column. Its data-less form reads the state through [`forecast_state_location`](@ref), which refuses a state of a shape that it does not know.
   - Under [`Online`](@ref), every family answers its data form over the rows and masks of the buffer, because a buffer means the batch verb over its rows each time the estimate is made from the state.
@@ -363,11 +363,7 @@ function forecast_location(ce::GeneralCovariance)
 end
 function forecast_location(ce::Union{<:ExpWeightedCovariance,
                                      <:RegimeAdjustedExpWeightedCovariance})
-    c = forecast_state_location(ce, ce.cache)
-    # Under `centred = true` the estimator never writes its location, so the state keeps the
-    # seed, which is `NaN` for an asset that was inactive at the first observation; the
-    # location such an estimator is about is zero for every asset.
-    return ce.centred ? zero(c) : c
+    return centring_report_location(ce.centring, forecast_state_location(ce, ce.cache))
 end
 function forecast_location(ce::PortfolioOptimisersCovariance)
     return forecast_state_location(ce, ce.cache)

@@ -23,8 +23,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     # measured case where it binds: without it the factor covariance is 0.991 times the stored
     # one. This file measures the masks.
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
-                        ce = RegimeAdjustedExpWeightedCovariance(; centred = true,
-                                                                 debias = false,
+                        ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred(),
+                                                                 debias = RawStatistic(),
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
     load(c, o) = parity_load("CrossSectionalFactorPrior", c, o)

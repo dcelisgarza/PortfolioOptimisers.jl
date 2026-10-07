@@ -64,7 +64,8 @@ using Dates
                 CovOnline = (; online = true),
                 CovHoliday = (; online = true, holiday = 100, test = 1),
                 CovHolidayBatch = (; holiday = 100, test = 1))
-    ce = ExpWeightedCovariance(; decay = 2.0^(-1 / 20), min_obs = 10, centred = true)
+    ce = ExpWeightedCovariance(; decay = 2.0^(-1 / 20), min_obs = 10,
+                               centring = PreCentred())
     function evaluate(; online = false, expand = false, gap = false, holiday = 0,
                       train = 60, test = 5, purged = 2, w = nothing)
         cv = if online
@@ -144,8 +145,8 @@ using Dates
         a = covariance_forecast_evaluation(ce, rd, cv; target = HorizonReturn())
         b = covariance_forecast_evaluation(ExpWeightedCovariance(; decay = 2.0^(-1 / 40),
                                                                  min_obs = 10,
-                                                                 centred = true), rd, cv;
-                                           target = HorizonReturn())
+                                                                 centring = PreCentred()),
+                                           rd, cv; target = HorizonReturn())
         c = covariance_forecast_compare(a, b; lags = 0)
         k = (a.n_valid .> 0) .& (b.n_valid .> 0)
         @test count(!, k) == 1

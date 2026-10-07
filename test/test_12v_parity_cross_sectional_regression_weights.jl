@@ -141,8 +141,8 @@ const PARITY_CS_WEIGHT_CASES = ["Cap00" => (0.0, 0.0, 20.0, (0.025, 0.975)),
 # The variance of the weights clips its regime multiplier to (0.7, 1.6), as the oracle does by
 # default. That default is #1383's to measure, and this file measures the weights.
 function parity_cs_weights(fx, (p, lambda, ratio, wins);
-                           ve = RegimeAdjustedExpWeightedVariance(; centred = true,
-                                                                  debias = false,
+                           ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
+                                                                  debias = RawStatistic(),
                                                                   regime_lohi_mult = (0.7,
                                                                                       1.6)))
     alg = if iszero(lambda)
@@ -369,7 +369,8 @@ end
         cfg = ("Blend05" => (0.5, 0.5, 20.0, (0.025, 0.975)))[2]
         stored = parity_load("BlendedInverseVarianceWeights", "Blend05Tiny", "W1")
         # The floor of the variance is off, so the inverse is infinite, as in the oracle.
-        ve = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false,
+        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
+                                               debias = RawStatistic(),
                                                regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
         wz = parity_cs_weights_fixture(; zero = true)
         IV = PortfolioOptimisers.cross_sectional_lagged_inverse_variance(ve, wz.eps, wz.msk;
@@ -402,11 +403,13 @@ end
         factors = ["market" => ConstantExposure(), "style1" => mpass("style1"),
                    "style2" => mpass("style2")]
         pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
-                            ce = RegimeAdjustedExpWeightedCovariance(; centred = true,
-                                                                     debias = false,
+                            ce = RegimeAdjustedExpWeightedCovariance(;
+                                                                     centring = PreCentred(),
+                                                                     debias = RawStatistic(),
                                                                      regime_lohi_mult = (0.7,
                                                                                          1.6)))
-        ve = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false,
+        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
+                                               debias = RawStatistic(),
                                                regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
         # Asset 4 is in its warm-up at the latest observation: both sides state its mean and
         # its covariances, and neither states its variance (#1384).

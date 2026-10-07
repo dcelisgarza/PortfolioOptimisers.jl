@@ -323,9 +323,9 @@ $(DocStringExtensions.FIELDS)
                               families::Option{<:Dict_VecPair} = nothing,
                               cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
                               wa::AbstractCrossSectionalWeightsAlgorithm = MarketCapWeights(),
-                              pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(; me = ExpWeightedExpectedReturns(), ce = RegimeAdjustedExpWeightedCovariance(; centred = true)),
-                              ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(; centred = true),
-                              ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(; centred = true),
+                              pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(; me = ExpWeightedExpectedReturns(), ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred())),
+                              ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(; centring = PreCentred()),
+                              ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(; centring = PreCentred()),
                               f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                               mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                               th::Real = 0.0, bp::Real = 1.0,
@@ -432,11 +432,11 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     @fprop wa
     """
-    $(field_dict[:pe]) The fit gives it the reduced factor-return series, so a constrained Factor Family gives it a full-rank covariance. The default is an [`EmpiricalPrior`](@ref) of an [`ExpWeightedExpectedReturns`](@ref) and a [`RegimeAdjustedExpWeightedCovariance`](@ref) with `centred = true`. Its half-life is the 40 observations of the default `ve`, so the systematic part and the specific part of `sigma` answer on one horizon, and after a change of regime both of them move. The factor covariance is centred, which is the convention of `ce` and of `ve`.
+    $(field_dict[:pe]) The fit gives it the reduced factor-return series, so a constrained Factor Family gives it a full-rank covariance. The default is an [`EmpiricalPrior`](@ref) of an [`ExpWeightedExpectedReturns`](@ref) and a [`RegimeAdjustedExpWeightedCovariance`](@ref) with `centring = PreCentred()`. Its half-life is the 40 observations of the default `ve`, so the systematic part and the specific part of `sigma` answer on one horizon, and after a change of regime both of them move. The factor covariance is centred, which is the convention of `ce` and of `ve`.
     """
     @fprop pe
     """
-    $(field_dict[:ve]) [`variance_series`](@ref) on it gives the idiosyncratic variance history, whose last row is the idiosyncratic risk of the latest observation. The default is a [`RegimeAdjustedExpWeightedVariance`](@ref) with `centred = true`, which measures the second moment of each idiosyncratic series about zero. The prior states the mean of an asset through the factors alone, so the model sets the mean of the idiosyncratic return to zero, and the specific risk is its second moment. A variance about a running mean would understate it, and would also move the regime multiplier.
+    $(field_dict[:ve]) [`variance_series`](@ref) on it gives the idiosyncratic variance history, whose last row is the idiosyncratic risk of the latest observation. The default is a [`RegimeAdjustedExpWeightedVariance`](@ref) with `centring = PreCentred()`, which measures the second moment of each idiosyncratic series about zero. The prior states the mean of an asset through the factors alone, so the model sets the mean of the idiosyncratic return to zero, and the specific risk is its second moment. A variance about a running mean would understate it, and would also move the regime multiplier.
     """
     @fprop @vprop ve
     """
@@ -593,11 +593,11 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(;
                                                                                             me = ExpWeightedExpectedReturns(),
                                                                                             ce = RegimeAdjustedExpWeightedCovariance(;
-                                                                                                                                     centred = true)),
+                                                                                                                                     centring = PreCentred())),
                                    ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(;
-                                                                                                       centred = true),
+                                                                                                       centring = PreCentred()),
                                    ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(;
-                                                                                             centred = true),
+                                                                                             centring = PreCentred()),
                                    f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    th::Real = 0.0, bp::Real = 1.0,

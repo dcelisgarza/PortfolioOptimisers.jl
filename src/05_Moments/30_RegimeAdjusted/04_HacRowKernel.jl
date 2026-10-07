@@ -355,7 +355,9 @@ before its update, else `ce.hac_lags`. The kernel is made the first time the sta
   - [`update_var_cor!`](@ref)
 """
 function correlation_hac_lags!(store::NamedTuple, ce::RegimeAdjustedExpWeightedCovariance)
-    if isnothing(ce.hac_lags) || !has_separate_cor_decay(ce) || !ce.hac_vol_before
+    if isnothing(ce.hac_lags) ||
+       !has_separate_cor_decay(ce) ||
+       !volatility_before_update(ce.hac_vol_before)
         return ce.hac_lags
     end
     if isempty(store.kernel)

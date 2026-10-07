@@ -74,7 +74,8 @@ function regime_target_statistic(::DiagonalTarget, cache::RegimeAdjustedCovarian
                                  idx::AbstractVector{<:Integer})
     moments = isnothing(cache.bias) ? nothing : cache.bias.moments
     m = regime_bias!.(Ref(moments), Ref(RegimeTermMoments(ce.regime_method)), ce.decay,
-                      view(cache.obs_count, idx), ce.hac_lags)
+                      centring_terms.(Ref(ce.centring), view(cache.obs_count, idx)),
+                      ce.hac_lags)
     C = regime_covariance_block(cache, ce, idx)
     return regime_statistic(DiagonalTarget(), X[idx] ./ sqrt.(first.(m)), C, idx,
                             ce.min_val) ./
@@ -142,7 +143,7 @@ The true ``R`` is not known, and the eigenvalues of its estimate ``\\hat{R}`` ar
 the law of ``\\hat{R}`` over-corrects by up to 1.3 % and 2.7 %. So
 [`diagonal_law_correlation`](@ref) shrinks ``\\hat{R}`` towards the identity until its dispersion
 is the unbiased one. The factor reads the correlation alone, so a scaled return leaves it
-unchanged. Where `ce.debias` is `false`, the factor is one, which is the raw statistic.
+unchanged. Under `debias = RawStatistic()` the factor is one, which is the raw statistic.
 
 # Arguments
 
@@ -171,7 +172,7 @@ function diagonal_law_factor(method::Union{<:FirstMomentRegimeAdjusted,
                              cache::RegimeAdjustedCovarianceState,
                              ce::RegimeAdjustedExpWeightedCovariance, C::MatNum,
                              idx::AbstractVector{<:Integer}, m::AbstractVector)
-    if !ce.debias
+    if !debiases(ce.debias)
         return one(eltype(C))
     end
 
@@ -786,7 +787,7 @@ function regime_target_statistic(target::PortfolioTarget,
         return nothing
     end
 
-    K = minimum(view(cache.obs_count, idx))
+    K = centring_terms(ce.centring, minimum(view(cache.obs_count, idx)))
     separate = has_separate_cor_decay(ce)
     f = regime_bias!(cache.bias, ce.regime_method, separate ? ce.cor_decay : ce.decay, K,
                      ce.hac_lags)
@@ -1115,7 +1116,7 @@ Makes the empty table of bias factors for a new state of a regime-adjusted varia
   - [`RegimeAdjustedVarianceState`](@ref)
 """
 function regime_bias_state(ce::RegimeAdjustedExpWeightedVariance, ::Type{T}) where {T}
-    return ce.debias && !isnothing(ce.regime_method) ? T[] : nothing
+    return debiases(ce.debias) && !isnothing(ce.regime_method) ? T[] : nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1145,7 +1146,7 @@ target holds one factor for each count.
   - [`RegimeAdjustedCovarianceState`](@ref)
 """
 function regime_bias_state(ce::RegimeAdjustedExpWeightedCovariance, ::Type{T}) where {T}
-    if !ce.debias || isnothing(ce.regime_method)
+    if !debiases(ce.debias) || isnothing(ce.regime_method)
         return nothing
     end
 
@@ -1159,9 +1160,9 @@ Factorises a covariance block for the Mahalanobis regime statistic, and refuses 
 throws when no ridge makes it factorise.
 
 A block with fewer observations than assets is singular. Where the estimator has
-`debias = true`, [`regime_target_statistic`](@ref) skips such a block before it reaches this
+`debias = ExactDebias()`, [`regime_target_statistic`](@ref) skips such a block before it reaches this
 function, so the ridge serves a block that is singular in the data, and the raw statistic of
-`debias = false`.
+`debias = RawStatistic()`.
 The regime statistic is one observation of a smoother rather than a result a caller reads, so a
 refusal skips that observation's regime update, and the fit continues.
 
@@ -1198,11 +1199,11 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Computes the squared Mahalanobis distance of one observation, divided by the bias of the
-estimated block that the regime method reads, where `ce.debias` is `true`.
+estimated block that the regime method reads, where `ce.debias` is `ExactDebias()`.
 
 # Algorithm
 
- 1. Where `ce.debias` is `false`, the factor is one. Else take ``K``, the smallest count of
+ 1. Where `ce.debias` is `RawStatistic()`, the factor is one. Else take ``K``, the smallest count of
     observations among the contributing assets, and return `nothing` where
     [`regime_bias_open`](@ref) refuses it. Else read the decay of the correlation structure:
     `cor_decay` on the separate path, else `decay`. Find the factor of `ce.regime_method` with
@@ -1239,12 +1240,12 @@ function regime_target_statistic(target::MahalanobisTarget,
                                  cache::RegimeAdjustedCovarianceState,
                                  ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
                                  idx::AbstractVector{<:Integer})
-    K = minimum(view(cache.obs_count, idx))
+    K = centring_terms(ce.centring, minimum(view(cache.obs_count, idx)))
     n = length(idx)
     decay = has_separate_cor_decay(ce) ? ce.cor_decay : ce.decay
-    b = if !ce.debias
+    b = if !debiases(ce.debias)
         one(ce.decay)
-    elseif !regime_bias_open(true, n, decay, K, ce.hac_lags)
+    elseif !regime_bias_open(ce.debias, n, decay, K, ce.hac_lags)
         nothing
     else
         mahalanobis_regime_bias!(cache.bias.nodes, ce.regime_method, decay, K, n,
@@ -1531,13 +1532,6 @@ function Statistics.cov(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dims
                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = regime_adjusted_covariance_pass!(ce, X, dims, estimation_mask, active_mask)
-    if !ce.centred
-        unseen = cache.obs_count .< one(eltype(cache.obs_count))
-        if any(unseen)
-            cache.location[unseen] .= NaN
-        end
-    end
-
     return regime_adjusted_covariance(cache, ce)
 end
 """
@@ -2055,7 +2049,8 @@ function Base.copy(x::RegimeAdjustedCovarianceState)
                                          cor_state, cor_weight, copy(x.XXt), copy(x.Xi),
                                          copy(x.X_old_i), copy(x.location),
                                          copy(x.obs_count), copy(x.active), x.regime_state,
-                                         x.n_regime_obs, deepcopy(x.bias))
+                                         x.n_regime_obs, deepcopy(x.bias),
+                                         deepcopy(x.overlap), deepcopy(x.lag_records))
 end
 """
     Statistics.cov(

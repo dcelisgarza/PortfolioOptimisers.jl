@@ -44,11 +44,12 @@ end
     factors = ["market" => ConstantExposure(), "style1" => mpass("style1"),
                "style2" => mpass("style2")]
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
-                        ce = RegimeAdjustedExpWeightedCovariance(; centred = true,
-                                                                 debias = false,
+                        ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred(),
+                                                                 debias = RawStatistic(),
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
-    ve = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false,
+    ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
+                                           debias = RawStatistic(),
                                            regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
     est(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = factors, pe = pe,
                                              ve = ve, kw...)
@@ -165,7 +166,7 @@ end
         Sf = PO.cross_sectional_standardised_residuals(eps, pr.rr.vs, amr)
         Df = PO.cross_sectional_idiosyncratic_covariance(0.1,
                                                          ExpWeightedCovariance(;
-                                                                               centred = true),
+                                                                               centring = PreCentred()),
                                                          nothing, Sf, pr.rr.vs[end, :], amr)
         @test count(!iszero, Df[rs, rs]) - length(rs) == 72
 
@@ -185,10 +186,11 @@ end
         Z = PO.cross_sectional_standardised_residuals(eps, pl.rr.vs, amr; filled = false)
         B = PO.cross_sectional_idiosyncratic_covariance(0.1,
                                                         ExpWeightedCovariance(;
-                                                                              centred = true),
+                                                                              centring = PreCentred()),
                                                         nothing, Z, pl.rr.vs[end, :], amr)
         E = load("PitLargeOverlayRaw", "IdioCov")
-        st = partial_fit!(ExpWeightedCovariance(; centred = true), Z; active_mask = amr).cache
+        st = partial_fit!(ExpWeightedCovariance(; centring = PreCentred()), Z;
+                          active_mask = amr).cache
         w = sqrt.(LinearAlgebra.diag(st.weight))
         ratio = (w * transpose(w)) ./ st.weight
         same = [isapprox(ratio[i, j], 1; rtol = 1e-12) for i in axes(B, 1), j in axes(B, 2)]
@@ -348,7 +350,8 @@ end
         # fewest eligible assets of an observation, and a Descriptor that is never finite
         # leaves the whole history cold.
         rows(T) = PO.port_opt_view(fxs.rd, 1:T, :)
-        ve60 = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false,
+        ve60 = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
+                                                 debias = RawStatistic(),
                                                  regime_lohi_mult = (0.7, 1.6),
                                                  min_val = 0.0, min_obs = 60)
         @test_throws PO.IsNonFiniteError prior(est(; minra = 5), rows(40))

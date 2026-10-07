@@ -156,8 +156,8 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test po.forecast_location(GeneralCovariance(; w = ow), Xm[1:60, :]) ≈
               vec(mean(Xm[1:60, :], ow; dims = 1))
         @test po.forecast_location(PortfolioOptimisersCovariance(), Xm[1:60, :]) ≈ c
-        @test po.forecast_location(ExpWeightedCovariance(; centred = true), Xm[1:60, :]) ==
-              zeros(N)
+        @test po.forecast_location(ExpWeightedCovariance(; centring = PreCentred()),
+                                   Xm[1:60, :]) == zeros(N)
         @test all(!iszero, po.forecast_location(ExpWeightedCovariance(), Xm[1:60, :]))
         @test po.forecast_location(EmpiricalPrior(), po.port_opt_view(rd, 1:60, :)) ≈
               vec(mean(X[1:60, :]; dims = 1))
@@ -258,7 +258,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
                  (Covariance(; cvg = CoveragePolicy()), rdg, 0.0),
                  (EmpiricalPrior(), rd, 1e-12), (EmpiricalPrior(), rdg, 1e-12),
                  (ExpWeightedCovariance(), rd, 0.0),
-                 (ExpWeightedCovariance(; centred = true), rdg, 0.0),
+                 (ExpWeightedCovariance(; centring = PreCentred()), rdg, 0.0),
                  (RegimeAdjustedExpWeightedCovariance(), rd, 0.0))
         for (est, r, tol) in cases
             b = cfe(est, r, batch_cv)

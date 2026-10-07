@@ -53,7 +53,8 @@ using Dates, StatsPlots, GraphRecipes, Statistics
                              pnl = AssetPanel(; amsk = amsk, emsk = copy(amsk)))
     end
     function cp_estimator(hl)
-        return ExpWeightedCovariance(; decay = 2.0^(-1 / hl), min_obs = 10, centred = true)
+        return ExpWeightedCovariance(; decay = 2.0^(-1 / hl), min_obs = 10,
+                                     centring = PreCentred())
     end
     W3 = [fill(1 / 8, 8), collect(1.0:8.0), collect(8.0:-1:1)]
     CP_CASES = (;

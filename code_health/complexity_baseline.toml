@@ -5,7 +5,7 @@
 julia = "1.13.1"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "e11eeec482"
+commit = "64a255d37d"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -125,11 +125,13 @@ commit = "e11eeec482"
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { cyc = 5, cog = 7, arg = 6, cyc_sum = 26, cog_sum = 20, arg_sum = 48, macros = [] }
 "src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { cyc = 6, cog = 9, arg = 6, cyc_sum = 35, cog_sum = 25, arg_sum = 78, macros = [] }
 "src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 39, cog_sum = 31, arg_sum = 85, macros = [] }
+"src/05_Moments/29_ExpWeighted/04_ExpWeightedCentring.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 40, cog_sum = 11, arg_sum = 107, macros = [] }
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { cyc = 13, cog = 19, arg = 12, cyc_sum = 82, cog_sum = 71, arg_sum = 147, macros = [] }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { cyc = 13, cog = 28, arg = 15, cyc_sum = 86, cog_sum = 89, arg_sum = 110, macros = [] }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 100, cog_sum = 82, arg_sum = 176, macros = [] }
 "src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl" = { cyc = 8, cog = 9, arg = 6, cyc_sum = 89, cog_sum = 90, arg_sum = 119, macros = [] }
 "src/05_Moments/30_RegimeAdjusted/04_HacRowKernel.jl" = { cyc = 7, cog = 13, arg = 4, cyc_sum = 36, cog_sum = 45, arg_sum = 25, macros = [] }
+"src/05_Moments/30_RegimeAdjusted/05_RegimeSwitches.jl" = { cyc = 4, cog = 4, arg = 4, cyc_sum = 13, cog_sum = 6, arg_sum = 17, macros = [] }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 32, cog_sum = 12, arg_sum = 70, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { cyc = 6, cog = 10, arg = 5, cyc_sum = 40, cog_sum = 33, arg_sum = 36, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { cyc = 5, cog = 5, arg = 4, cyc_sum = 24, cog_sum = 18, arg_sum = 5, macros = [] }

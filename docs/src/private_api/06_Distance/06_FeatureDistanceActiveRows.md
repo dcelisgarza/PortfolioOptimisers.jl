@@ -25,7 +25,7 @@ compose_readable_mask
 entry_activity
 feature_window_mask
 readable_cells
-window_rows
+readable_window_rows
 last_active_rows
 static_window
 empty_pair_rule

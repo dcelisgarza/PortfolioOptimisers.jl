@@ -369,7 +369,7 @@ end
                                                       ce = ExpWeightedCovariance(;
                                                                                  decay = decay,
                                                                                  min_obs = 5,
-                                                                                 centred = true),
+                                                                                 centring = PreCentred()),
                                                       window = 60, rule = SeedWindow()))
         ss = pinned((; style..., pe = seed))
         check(ss, "CarrySeedStyle", "Fold")

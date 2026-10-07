@@ -138,7 +138,7 @@ end
         @test isa(vol, EWVolatility)
         @test vol.ce.decay ≈ exp2(-inv(40.0))
         @test vol.ce.min_obs == 40
-        @test vol.ce.centred
+        @test isa(vol.ce.centring, PreCentred)
         @test isnothing(vol.ce.regime_method)
         @test isa(vol.alg, FullMoment)
         @test iszero(vol.mar)

@@ -142,7 +142,8 @@ end
         # A standard error reads the idiosyncratic variance of every pair of the regression, so
         # the attribution fits a variance estimate with no warm-up (#1388).
         pa = prior(obs_prior(;
-                             ve = RegimeAdjustedExpWeightedVariance(; centred = true,
+                             ve = RegimeAdjustedExpWeightedVariance(;
+                                                                    centring = PreCentred(),
                                                                     min_obs = 1)), fx.rd)
         fa = factor_attribution(w, pa, fx.rd.X; se = true)
         @test isnan(fa.fbd.mu_se[2]) && isnan(fa.fbd.mu_se[3])

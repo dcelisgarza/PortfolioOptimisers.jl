@@ -664,7 +664,7 @@ end
 
 Name the rows that a collapse reads, and cut the mask of the cells it can read to them.
 
-A cell is readable where the asset is active and every value column of `cols` was observed: [`readable_cells`](@ref) joins the active mask of the panel with [`feature_observed_cells`](@ref). An unobserved cell holds the placeholder of a blank, not data. So a collapse reads it as it reads an inactive cell: each asset and each pair at its own readable rows. [`window_rows`](@ref) names the rows on this mask, so [`LastActiveRow`](@ref) reads the last readable row of each asset. [`window_activity`](@ref) cuts the mask to the rows.
+A cell is readable where the asset is active and every value column of `cols` was observed: [`readable_cells`](@ref) joins the active mask of the panel with [`feature_observed_cells`](@ref). An unobserved cell holds the placeholder of a blank, not data. So a collapse reads it as it reads an inactive cell: each asset and each pair at its own readable rows. [`readable_window_rows`](@ref) names the rows on this mask, so [`LastActiveRow`](@ref) reads the last readable row of each asset. [`window_activity`](@ref) cuts the mask to the rows.
 
 # Arguments
 
@@ -682,12 +682,12 @@ A cell is readable where the asset is active and every value column of `cols` wa
   - [`feature_window`](@ref)
   - [`entry_activity`](@ref)
   - [`readable_cells`](@ref)
-  - [`window_rows`](@ref)
+  - [`readable_window_rows`](@ref)
 """
 function feature_window_mask(alg::AbstractFeatureCollapseAlgorithm, pnl::AssetPanel,
                              cols::AbstractVector{Tuple{Int, Int, Symbol}})
     R = readable_cells(pnl.amsk, feature_observed_cells(pnl, cols))
-    rows = window_rows(alg, pnl, R)
+    rows = readable_window_rows(alg, pnl, R)
     return rows, window_activity(R, rows)
 end
 """
@@ -710,7 +710,7 @@ function readable_cells(amsk::AbstractMatrix{Bool}, o::AbstractMatrix{Bool})
     return amsk .& o
 end
 """
-    window_rows(alg, pnl::AssetPanel, R)
+    readable_window_rows(alg, pnl::AssetPanel, R)
 
 Name the rows that a collapse reads on the mask `R` of readable cells. [`LastObservation`](@ref) forwards to its rule. [`LastActiveRow`](@ref) on a time-varying panel names them with [`last_active_rows`](@ref) on `R`, so an asset whose last active cell is unobserved is read at its last readable row. Every other case is [`collapse_rows`](@ref).
 
@@ -719,13 +719,13 @@ Name the rows that a collapse reads on the mask `R` of readable cells. [`LastObs
   - [`collapse_rows`](@ref)
   - [`feature_window_mask`](@ref)
 """
-function window_rows(alg, pnl::AssetPanel, ::Any)
+function readable_window_rows(alg, pnl::AssetPanel, ::Any)
     return collapse_rows(alg, pnl)
 end
-function window_rows(alg::LastObservation, pnl::AssetPanel, R)
-    return window_rows(alg.alg, pnl, R)
+function readable_window_rows(alg::LastObservation, pnl::AssetPanel, R)
+    return readable_window_rows(alg.alg, pnl, R)
 end
-function window_rows(::LastActiveRow, ::AssetPanel, R::AbstractMatrix{Bool})
+function readable_window_rows(::LastActiveRow, ::AssetPanel, R::AbstractMatrix{Bool})
     return last_active_rows(R)
 end
 """
@@ -736,7 +736,7 @@ Name the rows from the earliest last `true` row of an asset in the mask `A`, `ob
 # Related
 
   - [`collapse_rows`](@ref)
-  - [`window_rows`](@ref)
+  - [`readable_window_rows`](@ref)
 """
 function last_active_rows(::Nothing)
     return Colon()

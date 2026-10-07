@@ -167,3 +167,31 @@ bound. Under this decision the division removes the bias, the error of each entr
 and the repair binds only where the entries read different observations. The oracle of map #1375
 takes the same step, so the raw state equals its raw state; its read-out divides by the per-asset
 congruence, so it shrinks a late listing as decision 1 did, and this rule is Better there.
+
+## Amendment (2026-10-06)
+
+The step of the amendment of 2026-09-29 takes `e` as the deviation of a return. #1507 replaced
+the Bool `centred` with the `centring` field, and its default `EstimatedCentring()` takes each
+deviation from the normalised location of the returns of its own asset before it (ADR 0190). That
+location is an estimate, so for returns independent in time the product of a pair has the mean
+`σ_ij (1 + c_ij)`, with `c_ij` the sum, over the common valid returns of the two locations, of the
+products of their normalised weights. The step divides each product by that factor:
+
+```text
+S[D, D] <- λ S[D, D] + (1 - λ) (e_D e_D') ./ (1 + C[D, D])      every other entry holds
+W[D, D] <- λ W[D, D] + (1 - λ)
+Σ[i, j]  = S[i, j] / W[i, j]
+```
+
+- `D` is the set of the valid assets that give a deviation. Under `EstimatedCentring` an asset
+  gives one from its second valid return, because the first has no location before it. Under
+  `PreCentred()` `D` is the valid set, `C` is zero, and the step is the step above.
+- `C[i, j] = P[i, j] / (S1_i S1_j)`, with `S1_i = 1 - λ^n_i` the sum of the weights of the
+  location of asset `i`, and `P` the overlap that the state carries, `P <- λ^(v_i + v_j) P +
+  v_i v_j (1 - λ)²` on the valid indicators `v`. It reads the common returns of the pair, so rule
+  Q holds: each pair still ages on its own common observations and is divided by its own weight.
+- Where every asset shares one history, `C` is one scalar on every entry, so the step is a scaled
+  outer product and the estimate stays positive semidefinite by construction. Otherwise the repair
+  of the amendment above binds as before.
+- A simulation on the holiday fixture of `test_08z` confirmed the factor against the Monte Carlo
+  mean of each product before the build: the z-scores had an RMS of 0.97 over 245 cells.

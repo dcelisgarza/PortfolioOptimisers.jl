@@ -65,7 +65,7 @@ end
     # A volatility estimator whose warm-up is set apart from its half-life.
     vol(h, w) = RegimeAdjustedExpWeightedVariance(;
                                                   decay = PortfolioOptimisers.half_life_decay(h),
-                                                  min_obs = w, centred = true,
+                                                  min_obs = w, centring = PreCentred(),
                                                   regime_method = nothing)
     # Each case: the unit, the case, the returns data, and the Descriptor. The case names the
     # fixture (the small raw panel, its clean copy, or the large raw panel) and the

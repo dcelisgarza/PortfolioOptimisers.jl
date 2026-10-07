@@ -76,7 +76,7 @@ pnl_mix = make_panel(amsk_mix)
 pnl_full = make_panel(trues(T, N))
 
 me = ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 2)
-ce = ExpWeightedCovariance(; decay = 0.9, min_obs = 2, centred = true)
+ce = ExpWeightedCovariance(; decay = 0.9, min_obs = 2, centring = PreCentred())
 # The estimator that accepts the whole matrix in silence, and the one that accepts none.
 pe = EmpiricalPrior(; me = me, ce = ce, fill_limit = 1)
 pe0 = EmpiricalPrior(; me = me, ce = ce)

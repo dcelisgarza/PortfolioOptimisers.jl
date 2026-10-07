@@ -402,5 +402,75 @@ A **Calibration Rule** is not a [`DeferredQuantity`](@ref), and the two mechanis
   - [`DeferredQuantity`](@ref)
 """
 abstract type AbstractCalibrationAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the centring of an exponentially weighted moment, the rule that says which location each deviation is taken from.
+
+The four exponentially weighted moment estimators hold a centring in their `centring` field: [`ExpWeightedVariance`](@ref), [`ExpWeightedCovariance`](@ref), [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). [`EstimatedCentring`](@ref) estimates the location and corrects the bias that the estimate puts in each deviation. [`PreCentred`](@ref) takes the returns as deviations from a mean of zero. [`ZeroStartCentring`](@ref) takes the location of the reference implementation, a recursion from zero that is not divided by its weight. The root lives with the other roots, because the estimators bind their field before the members load.
+
+# Interfaces
+
+A centring is a marker for dispatch, and it holds no data. A new centring needs a method of each verb that the members implement: [`centring_lag`](@ref), [`centring_deviation_mask`](@ref), [`centring_location!`](@ref), [`centring_report_location`](@ref), [`centring_factor`](@ref), [`centring_overlap`](@ref), [`centring_lag_records`](@ref) and [`centring_lag_factor`](@ref).
+
+# Related
+
+  - [`EstimatedCentring`](@ref)
+  - [`PreCentred`](@ref)
+  - [`ZeroStartCentring`](@ref)
+"""
+abstract type AbstractCentring <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the debias rule of a regime statistic, the rule that says whether the statistic corrects the bias of the estimated variance it reads.
+
+The two regime-adjusted estimators hold a debias rule in their `debias` field: [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). The root lives with the other roots, because the estimators bind their field before the members load.
+
+# Interfaces
+
+A debias rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`debiases`](@ref).
+
+# Related
+
+  - [`ExactDebias`](@ref)
+  - [`RawStatistic`](@ref)
+"""
+abstract type AbstractRegimeDebias <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the floor of a HAC term, the rule that says whether each HAC-adjusted product is floored at zero before it enters the variance recursion.
+
+The two regime-adjusted estimators hold a floor rule in their `hac_floor` field: [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). The rule acts only where `hac_lags` is not `nothing`. The root lives with the other roots, because the estimators bind their field before the members load.
+
+# Interfaces
+
+A floor rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`hac_floor!`](@ref).
+
+# Related
+
+  - [`NoHacFloor`](@ref)
+  - [`PerTermHacFloor`](@ref)
+"""
+abstract type AbstractHacFloor <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the volatility that standardises a row of the separate correlation path under HAC, the rule that says whether the row is divided by the volatility before or after its own update.
+
+[`RegimeAdjustedExpWeightedCovariance`](@ref) holds the rule in its `hac_vol_before` field. The rule acts only where `hac_lags` is not `nothing` and `cor_decay` differs from `decay`. The root lives with the other roots, because the estimator binds its field before the members load.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`volatility_before_update`](@ref).
+
+# Related
+
+  - [`VolatilityBeforeUpdate`](@ref)
+  - [`VolatilityAfterUpdate`](@ref)
+"""
+abstract type AbstractHacVolatilityTiming <: AbstractAlgorithm end
 public AbstractPartialFitState, DynamicAbstractWeights, AbstractOptimisationEstimator,
-       OptimisationEstimator, NonFiniteAllocationOptimisationEstimator
+       OptimisationEstimator, NonFiniteAllocationOptimisationEstimator, AbstractCentring,
+       AbstractRegimeDebias, AbstractHacFloor, AbstractHacVolatilityTiming

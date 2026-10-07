@@ -108,7 +108,7 @@ Where:
     from a recursion over the ``n - 1`` other directions that is exact at one asset and at equal
     weights, and it is within 0.15 % of a Monte Carlo at half-lives of 10 and more.
 
-With `debias = false`, ``\\beta = 1`` and every observation above `min_obs` is scored: a block
+With `debias = RawStatistic()`, ``\\beta = 1`` and every observation above `min_obs` is scored: a block
 that is not positive definite takes the ridge of [`safe_regime_cholesky`](@ref). Its statistic
 can then be about ``10^{12}``, and that one value holds the regime state for many half-lives.
 
@@ -163,7 +163,7 @@ Targets the diagonal of a covariance matrix, in a regime adjustment and in a geo
 
 In a regime adjustment, the baseline covariance structure is diagonal, so the regime statistic reads the variances alone. In a [`GeodesicShrinkageCovariance`](@ref), the target matrix is the diagonal of the matrix being shrunk, which keeps the variances and removes every correlation.
 
-Each term of the regime statistic reads one estimated variance, and the inverse of an estimate is too large on average. Where the estimator has `debias = true`, [`regime_target_statistic`](@ref) divides each term by the mean of that inverse at the count of its asset, so the statistic has the mean ``n`` at every correlation. The root and the log of the statistic read its law, which the correlation of the assets and the noise of each estimate set, so for the first-moment and the log methods it then divides the sum by [`diagonal_law_factor`](@ref).
+Each term of the regime statistic reads one estimated variance, and the inverse of an estimate is too large on average. Where the estimator has `debias = ExactDebias()`, [`regime_target_statistic`](@ref) divides each term by the mean of that inverse at the count of its asset, so the statistic has the mean ``n`` at every correlation. The root and the log of the statistic read its law, which the correlation of the assets and the noise of each estimate set, so for the first-moment and the log methods it then divides the sum by [`diagonal_law_factor`](@ref).
 
 # Related
 
@@ -181,7 +181,7 @@ $(DocStringExtensions.TYPEDEF)
 Regime-adjustment target that uses a portfolio-weighted baseline covariance structure.
 
 Each direction reads one estimated variance, and the inverse of an estimate is too large on
-average. Where the estimator has `debias = true`, [`regime_target_statistic`](@ref) divides each
+average. Where the estimator has `debias = ExactDebias()`, [`regime_target_statistic`](@ref) divides each
 direction by the bias that the regime method reads. The factor is exact for fixed weights. The
 inverse-volatility direction of `w = nothing` is built from the same estimate, so a smaller bias
 remains, which that function states.
@@ -262,9 +262,17 @@ A `regime_method` of `nothing` turns the adjustment off: no regime state advance
 multiplier stays at one and the estimator is the plain exponentially weighted recursion.
 
 The statistic divides a realised square by an estimated variance, and the inverse of an estimate
-is too large on average (Jensen's inequality). With `debias = true`, the default, the statistic
-skips an estimate too young for a finite variance and divides the rest by the known size of the
-bias, as each target states. `debias = false` scores the raw statistic.
+is too large on average (Jensen's inequality). With `debias = ExactDebias()`, the default, the
+statistic skips an estimate too young for a finite variance and divides the rest by the known
+size of the bias, as each target states. `debias = RawStatistic()` scores the raw statistic.
+
+With `centring = EstimatedCentring()`, the default, each deviation is taken from the normalised
+location of the returns of its asset before it, and each product is divided by its exact factor,
+[`centring_pair_factor`](@ref) plus, under HAC, [`centring_lag_factor`](@ref). The covariance is
+then unbiased from the second valid return of each asset, whatever the mean. The regime statistic
+reads each deviation divided by the root of its own factor, which is exact on the diagonal and
+where the assets share one history. `centring = PreCentred()` takes the returns as deviations
+from zero.
 
 # Mathematical definition
 
@@ -286,8 +294,10 @@ Where:
   - ``W_{ij,t}``: Weight that the pair holds in ``S``, seeded at zero. It is
     ``1 - \\lambda^{n_{ij}}``, with ``n_{ij}`` the count of the common valid observations of the
     pair.
-  - ``u_{i,t}``: Observation ``t`` of asset ``i``, centred where `centred` is `false`, and
-    HAC-adjusted where `hac_lags` is not `nothing`.
+  - ``u_{i,t} u_{j,t}``: The product of the deviations of observation ``t``, HAC-adjusted where
+    `hac_lags` is not `nothing`, and divided by its exact factor. Under
+    [`EstimatedCentring`](@ref) a pair steps only where both assets have a valid return before
+    ``t``.
 
 Where `cor_decay` is not `nothing`, the variance and the correlation run at their own decays and
 are recombined:
@@ -306,7 +316,7 @@ Where:
   - ``v_{i,t}``: Raw exponentially weighted variance of asset ``i``.
   - ``Q_{ij,t}``: Raw exponentially weighted correlation state. Like ``S``, it steps only on
     the pairs of which both assets are valid, so a holiday of asset ``i`` holds every entry of
-    ``i``. Where `hac_lags` is not `nothing` and `hac_vol_before` is `true`, the product
+    ``i``. Where `hac_lags` is not `nothing` and `hac_vol_before` is `VolatilityBeforeUpdate()`, the product
     divides by ``\\sqrt{v_{i,t-1} v_{j,t-1}}``, the variances before the step, because the
     diagonal of a HAC product can be negative and a variance that holds it amplifies it.
   - ``W_{ij,t}``: Weight that the pair holds in ``Q``, with the step of ``Q`` on a unit
@@ -327,7 +337,7 @@ Where:
 
   - $(math_dict[:Sigma_hat])
   - ``\\mathrm{mult}(s_T)^{2}\\, S_{ij,T} / W_{ij,T}``: The entry where `cor_decay` is
-    `nothing`. On the separate path it is ``\\mathrm{mult}(s_T)^{2}\\, \\rho_{ij,T} \\sqrt{\\hat{v}_{i} \\hat{v}_{j}}``, with ``\\hat{v}_{i} = v_{i,T} / (1 - \\lambda^{n_i})``.
+    `nothing`. On the separate path it is ``\\mathrm{mult}(s_T)^{2}\\, \\rho_{ij,T} \\sqrt{\\hat{v}_{i} \\hat{v}_{j}}``, with ``\\hat{v}_{i} = v_{i,T} / (1 - \\lambda^{K_i})`` and ``K_i`` the count of the terms of asset ``i``.
   - ``\\mathrm{mult}(s_T)``: Regime multiplier of the smoothed regime state ``s_T``, clamped to
     `regime_lohi_mult` where that field is not `nothing`.
 
@@ -350,16 +360,16 @@ $(DocStringExtensions.FIELDS)
         cor_decay::Option{<:Number}                           = nothing,
         min_obs::Integer                                      = round(Int, max(1, decay_half_life(decay), isnothing(cor_decay) ? 1 : decay_half_life(cor_decay, :cor_decay))),
         hac_lags::Option{<:Integer}                           = nothing,
-        hac_floor::Bool                                       = false,
-        hac_vol_before::Bool                                  = true,
+        hac_floor::AbstractHacFloor                           = NoHacFloor(),
+        hac_vol_before::AbstractHacVolatilityTiming           = VolatilityBeforeUpdate(),
         regime_method::Option{<:RegimeAdjustedMethod}         = FirstMomentRegimeAdjusted(),
         regime_decay::Number                                  = exp2(-2 / decay_half_life(decay)),
         regime_min_obs::Integer                               = round(Int, max(1, decay_half_life(decay) / 2)),
         regime_target::RegimeAdjustedTarget                   = PortfolioTarget(),
         regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = (0.7, 1.6),
         min_val::Number                                       = 1e-12,
-        centred::Bool                                         = false,
-        debias::Bool                                          = true,
+        centring::AbstractCentring                            = EstimatedCentring(),
+        debias::AbstractRegimeDebias                          = ExactDebias(),
         cache::Option{<:AbstractPartialFitState}              = nothing
     ) -> RegimeAdjustedExpWeightedCovariance
 
@@ -447,9 +457,9 @@ true
     """
     min_val
     """
-    $(field_dict[:centred])
+    $(field_dict[:centring])
     """
-    centred
+    centring
     """
     $(field_dict[:ra_debias])
     """
@@ -461,15 +471,17 @@ true
     function RegimeAdjustedExpWeightedCovariance(decay::Number, cor_decay::Option{<:Number},
                                                  min_obs::Integer,
                                                  hac_lags::Option{<:Integer},
-                                                 hac_floor::Bool, hac_vol_before::Bool,
+                                                 hac_floor::AbstractHacFloor,
+                                                 hac_vol_before::AbstractHacVolatilityTiming,
                                                  regime_method::Option{<:RegimeAdjustedMethod},
                                                  regime_decay::Number,
                                                  regime_min_obs::Integer,
                                                  regime_target::RegimeAdjustedTarget,
                                                  regime_lohi_mult::Option{<:Tuple{<:Number,
                                                                                   <:Number}},
-                                                 min_val::Number, centred::Bool,
-                                                 debias::Bool,
+                                                 min_val::Number,
+                                                 centring::AbstractCentring,
+                                                 debias::AbstractRegimeDebias,
                                                  cache::Option{<:AbstractPartialFitState})
         assert_unit_interval(decay, :decay)
         if !isnothing(cor_decay)
@@ -488,12 +500,12 @@ true
         return new{typeof(decay), typeof(cor_decay), typeof(min_obs), typeof(hac_lags),
                    typeof(hac_floor), typeof(hac_vol_before), typeof(regime_method),
                    typeof(regime_decay), typeof(regime_min_obs), typeof(regime_target),
-                   typeof(regime_lohi_mult), typeof(min_val), typeof(centred),
+                   typeof(regime_lohi_mult), typeof(min_val), typeof(centring),
                    typeof(debias), typeof(cache)}(decay, cor_decay, min_obs, hac_lags,
                                                   hac_floor, hac_vol_before, regime_method,
                                                   regime_decay, regime_min_obs,
                                                   regime_target, regime_lohi_mult, min_val,
-                                                  centred, debias, cache)
+                                                  centring, debias, cache)
     end
 end
 function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
@@ -508,8 +520,8 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                                                                               :cor_decay)
                                                                           end)),
                                              hac_lags::Option{<:Integer} = nothing,
-                                             hac_floor::Bool = false,
-                                             hac_vol_before::Bool = true,
+                                             hac_floor::AbstractHacFloor = NoHacFloor(),
+                                             hac_vol_before::AbstractHacVolatilityTiming = VolatilityBeforeUpdate(),
                                              regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
                                              regime_decay::Number = exp2(-2 /
                                                                          decay_half_life(decay)),
@@ -521,13 +533,14 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                              regime_lohi_mult::Option{<:Tuple{<:Number,
                                                                               <:Number}} = (0.7,
                                                                                             1.6),
-                                             min_val::Number = 1e-12, centred::Bool = false,
-                                             debias::Bool = true,
+                                             min_val::Number = 1e-12,
+                                             centring::AbstractCentring = EstimatedCentring(),
+                                             debias::AbstractRegimeDebias = ExactDebias(),
                                              cache::Option{<:AbstractPartialFitState} = nothing)::RegimeAdjustedExpWeightedCovariance
     return RegimeAdjustedExpWeightedCovariance(decay, cor_decay, min_obs, hac_lags,
                                                hac_floor, hac_vol_before, regime_method,
                                                regime_decay, regime_min_obs, regime_target,
-                                               regime_lohi_mult, min_val, centred, debias,
+                                               regime_lohi_mult, min_val, centring, debias,
                                                cache)
 end
 """
@@ -612,6 +625,14 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:ra_cov_bias])
     """
     bias
+    """
+    $(field_dict[:ew_overlap])
+    """
+    overlap
+    """
+    $(field_dict[:ra_lag_records])
+    """
+    lag_records
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -762,7 +783,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Computes the first-moment normalisation of the regime statistic for the diagonal target.
 
 The root of `n` is the root of the mean of the statistic, not the mean of its root, so it is not
-the expectation of the root at any correlation. The raw statistic of `debias = false` divides by
+the expectation of the root at any correlation. The raw statistic of `debias = RawStatistic()` divides by
 it. The debiased statistic is first divided by [`diagonal_law_factor`](@ref), which makes this
 constant hold at the correlation of the assets and the noise of each estimate, to the second order
 in that noise.
@@ -998,48 +1019,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Computes the outer product of one observation, with the Newey-West HAC correction where
-`hac_lags` is not `nothing`.
-
-The correction adds each lagged cross-product and its transpose, weighted by the Bartlett kernel
-``w_j = 1 - j/(L+1)``, so the update reads the serial correlation of the returns. An entry of a
-lagged observation that is not finite is read as zero, which freezes that pair's contribution.
-
-# Arguments
-
-  - `cache::RegimeAdjustedCovarianceState`: Online covariance computation cache (mutated).
-  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
-  - `X::VecNum`: Current centred returns vector.
-
-# Returns
-
-  - `XXt::MatNum`: The HAC-adjusted outer product stored in `cache.XXt`.
-
-# Related
-
-  - [`RegimeAdjustedCovarianceState`](@ref)
-  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
-  - [`hac_squared_returns!`](@ref)
-"""
-function hac_outer_product!(cache::RegimeAdjustedCovarianceState,
-                            ce::RegimeAdjustedExpWeightedCovariance, X::VecNum)
-    cache.XXt .= X .* transpose(X)
-    if isnothing(cache.ret_buffer) || isempty(cache.ret_buffer)
-        return cache.XXt
-    end
-
-    for (i, X_old) in enumerate(Iterators.reverse(cache.ret_buffer))
-        wi = one(eltype(X)) - i / (ce.hac_lags + 1)
-        cache.X_old_i .= replace(X_old, NaN => zero(eltype(X_old)))
-        cross = X .* transpose(cache.X_old_i)
-        cache.XXt .+= wi * (cross + transpose(cross))
-    end
-
-    return cache.XXt
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Returns the correlation of the separate path on a block of assets, each pair normalised by the
 weight it holds.
 
@@ -1099,7 +1078,7 @@ reads.
 
  1. Advance the variance with the diagonal of the outer product, floored at zero.
  2. Standardise the outer product by the running volatilities: after the step of 1, or, where
-    `hac_lags` is not `nothing` and `hac_vol_before` is `true`, before it. The diagonal of a HAC
+    `hac_lags` is not `nothing` and `hac_vol_before` is `VolatilityBeforeUpdate()`, before it. The diagonal of a HAC
     row can be negative, and a volatility that holds the row amplifies a negative row, so the
     diagonal of the correlation state is skewed down. An asset whose variance is not above
     `min_val` contributes zero, so under the rule before the step an asset contributes nothing
@@ -1132,13 +1111,14 @@ function update_var_cor!(cache::RegimeAdjustedCovarianceState,
                          ce::RegimeAdjustedExpWeightedCovariance,
                          valid::AbstractVector{<:Bool}, pair_valid::AbstractMatrix{<:Bool})
     T = eltype(cache.variance)
-    hac_var = LinearAlgebra.diag(cache.XXt)
-    if ce.hac_floor
-        hac_var .= max.(hac_var, zero(T))
-    end
+    hac_var = hac_floor!(ce.hac_floor, LinearAlgebra.diag(cache.XXt), valid)
     # Under HAC a row divides by the variance before the step, a copy; else `v` aliases the state
     # and reads it after the step (ADR 0190).
-    v = ce.hac_vol_before && !isnothing(ce.hac_lags) ? copy(cache.variance) : cache.variance
+    v = if volatility_before_update(ce.hac_vol_before) && !isnothing(ce.hac_lags)
+        copy(cache.variance)
+    else
+        cache.variance
+    end
     cache.variance[valid] .= ce.decay * view(cache.variance, valid) +
                              (one(ce.decay) - ce.decay) * view(hac_var, valid)
     positive = valid .& (v .> ce.min_val)
@@ -1203,7 +1183,8 @@ function bias_corrected_covariance(cache::RegimeAdjustedCovarianceState,
                                    ce::RegimeAdjustedExpWeightedCovariance)
     T = eltype(cache.covariance)
     N = length(cache.obs_count)
-    counted = cache.obs_count .> zero(eltype(cache.obs_count))
+    K = centring_terms.(Ref(ce.centring), cache.obs_count)
+    counted = K .> zero(eltype(K))
     if !has_separate_cor_decay(ce)
         sigma = fill(T(NaN), N, N)
         act = findall(cache.active)
@@ -1220,8 +1201,7 @@ function bias_corrected_covariance(cache::RegimeAdjustedCovarianceState,
     end
     idx = findall(active)
     var_bc = view(cache.variance, idx) .*
-             inv.(max.(one(ce.decay) .- ce.decay .^ view(cache.obs_count, idx),
-                       eps(ce.decay)))
+             inv.(max.(one(ce.decay) .- ce.decay .^ view(K, idx), eps(ce.decay)))
     # The report divides by no volatility, so a variance of zero stays zero; only round-off
     # below zero is removed.
     vol = sqrt.(max.(var_bc, zero(T)))
@@ -1266,8 +1246,8 @@ function regime_covariance_block(cache::RegimeAdjustedCovarianceState,
         return pair_weighted_block(cache.covariance, cache.weight, idx)
     end
     sigma = cache.covariance[idx, idx]
-    correction = inv.(sqrt.(max.(one(ce.decay) .- ce.decay .^ view(cache.obs_count, idx),
-                                 eps(ce.decay))))
+    K = centring_terms.(Ref(ce.centring), view(cache.obs_count, idx))
+    correction = inv.(sqrt.(max.(one(ce.decay) .- ce.decay .^ K, eps(ce.decay))))
     sigma .*= correction .* transpose(correction)
 
     return sigma
@@ -1312,8 +1292,11 @@ function update_regime!(cache::RegimeAdjustedCovarianceState,
     if isnothing(ce.regime_method)
         return cache
     end
-    regime_mask = valid .& cache.active .& (cache.obs_count .>= ce.min_obs) .&
-                  regime_bias_open.(ce.debias, 1, ce.decay, cache.obs_count, ce.hac_lags)
+    regime_mask = valid .& cache.active .&
+                  centring_ready.(Ref(ce.centring), cache.obs_count, ce.min_obs) .&
+                  regime_bias_open.(Ref(ce.debias), 1, ce.decay,
+                                    centring_terms.(Ref(ce.centring), cache.obs_count),
+                                    ce.hac_lags)
     if !isnothing(estimation_mask)
         regime_mask .&= estimation_mask
     end
@@ -1383,23 +1366,22 @@ function process_observation!(cache::RegimeAdjustedCovarianceState,
     T = eltype(cache.covariance)
     finite_mask = isfinite.(X)
     valid = isnothing(active_mask) ? finite_mask : (finite_mask .& active_mask)
-    filled = ifelse.(valid, X, zero(T))
-    if ce.centred
-        cache.Xi .= filled
-    else
-        loc = replace(cache.location, NaN => zero(T))
-        cache.Xi .= filled .- loc
-        cache.location[valid] .= ce.decay * view(loc, valid) +
-                                 (one(ce.decay) - ce.decay) * view(filled, valid)
-    end
-    cache.Xi .= ifelse.(valid, cache.Xi, zero(T))
+    dvalid = centring_deviation_mask(ce.centring, valid, cache.obs_count)
+    f = ifelse.(dvalid, centring_factor.(Ref(ce.centring), ce.decay, cache.obs_count),
+                one(ce.decay))
+    dev, _ = centring_location!(ce.centring, cache.location, cache.obs_count,
+                                ifelse.(valid, X, zero(T)), valid, ce.decay)
+    cache.Xi .= ifelse.(dvalid, dev, zero(T))
 
-    cache = update_regime!(cache, ce, cache.Xi, valid, estimation_mask)
+    # The statistic reads each deviation over the root of its own factor.
+    Xs = similar(cache.Xi)
+    Xs .= cache.Xi ./ sqrt.(f)
+    cache = update_regime!(cache, ce, Xs, dvalid, estimation_mask)
 
-    hac_outer_product!(cache, ce, cache.Xi)
-    pair_valid = valid .& transpose(valid)
+    hac_outer_product!(cache, ce, cache.Xi, dvalid)
+    pair_valid = dvalid .& transpose(dvalid)
     if has_separate_cor_decay(ce)
-        update_var_cor!(cache, ce, valid, pair_valid)
+        update_var_cor!(cache, ce, dvalid, pair_valid)
     else
         # Each pair ages on its common observations, and a holiday holds it (ADR 0181).
         step = one(ce.decay) - ce.decay
@@ -1408,13 +1390,15 @@ function process_observation!(cache::RegimeAdjustedCovarianceState,
                                     cache.covariance)
         cache.weight .= ifelse.(pair_valid, ce.decay .* cache.weight .+ step, cache.weight)
     end
-    cache.obs_count[valid] .+= 1
 
     if !isnothing(cache.ret_buffer)
         X_new = copy(cache.Xi)
-        X_new[.!valid] .= T(NaN)
+        X_new[.!dvalid] .= T(NaN)
         push!(cache.ret_buffer, X_new)
+        centring_lag_push!(cache.lag_records, cache.obs_count, valid, cache.overlap)
     end
+    centring_overlap!(cache.overlap, valid, ce.decay)
+    cache.obs_count[valid] .+= 1
 
     if isnothing(active_mask)
         cache.active .= true
@@ -1437,9 +1421,10 @@ function process_observation!(cache::RegimeAdjustedCovarianceState,
             cache.cor_weight[newly_inactive, :] .= zero(T)
             cache.cor_weight[:, newly_inactive] .= zero(T)
         end
-        if !ce.centred
-            cache.location[newly_inactive] .= T(NaN)
-        end
+        cache.location[newly_inactive] .= T(NaN)
+        centring_reset!(cache.overlap, newly_inactive)
+        hac_buffer_reset!(cache.ret_buffer, newly_inactive)
+        centring_lag_reset!(cache.lag_records, newly_inactive)
     end
     cache.active .= active_mask
 
@@ -1573,11 +1558,11 @@ function regime_adjusted_covariance_pass!(f, ce::RegimeAdjustedExpWeightedCovari
     # The state holds a covariance and a `NaN`, so an integer panel computes in its floating
     # point type, and every other type is kept: a `Float32` panel keeps a `Float32` state.
     Tf = float_if_integer(eltype(X))
-    # An uncentred estimator seeds its location from the first observation it sees, so the
-    # location starts as `NaN`.
-    location = ce.centred ? zeros(Tf, N) : fill(convert(Tf, NaN), N)
+    # The location starts as `NaN`, which marks an asset with no valid observation.
+    location = fill(convert(Tf, NaN), N)
     cache = if isnothing(state)
         separate = has_separate_cor_decay(ce)
+        overlap = centring_overlap(ce.centring, Tf, N)
         RegimeAdjustedCovarianceState(if isnothing(ce.hac_lags)
                                           nothing
                                       else
@@ -1588,7 +1573,10 @@ function regime_adjusted_covariance_pass!(f, ce::RegimeAdjustedExpWeightedCovari
                                       separate ? zeros(Tf, N, N) : nothing,
                                       separate ? zeros(Tf, N, N) : nothing, zeros(Tf, N, N),
                                       zeros(Tf, N), zeros(Tf, N), location, zeros(Int, N),
-                                      trues(N), nothing, 0, regime_bias_state(ce, Tf))
+                                      trues(N), nothing, 0, regime_bias_state(ce, Tf),
+                                      overlap,
+                                      centring_lag_records(ce.centring, ce.hac_lags,
+                                                           overlap))
     else
         @argcheck(size(state.covariance, 1) == N,
                   DimensionMismatch("the state holds $(size(state.covariance, 1)) assets, and `X` holds $N"))
@@ -1685,7 +1673,7 @@ function regime_adjusted_covariance(cache::RegimeAdjustedCovarianceState,
                                     repair::Bool = true)
     T = eltype(cache.covariance)
     sigma = bias_corrected_covariance(cache, ce)
-    not_ready = cache.obs_count .< ce.min_obs
+    not_ready = .!centring_ready.(Ref(ce.centring), cache.obs_count, ce.min_obs)
     if any(not_ready)
         sigma[not_ready, :] .= T(NaN)
         sigma[:, not_ready] .= T(NaN)

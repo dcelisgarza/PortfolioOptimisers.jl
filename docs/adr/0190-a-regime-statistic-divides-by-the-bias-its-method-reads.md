@@ -31,10 +31,10 @@ and the simulated estimators match each moment within the noise.
 
 ## Decision
 
-**`debias::Bool = true` is a field of both estimators**, not of a target. The bias is a property
+**`debias::AbstractRegimeDebias = ExactDebias()` is a field of both estimators**, not of a target. The bias is a property
 of the estimate. `DiagonalTarget` is a field-less singleton that `GeodesicShrinkageCovariance` also
 reads, and the scalar estimator has no target. The field that #1415 put on `MahalanobisTarget` moves
-to the estimator. That commit had not reached `main`. `debias = false` is the raw statistic, bit
+to the estimator. That commit had not reached `main`. `debias = RawStatistic()` is the raw statistic, bit
 for bit, and the oracle's rule of map #1375, one keyword away (ADR 0186).
 
 **A statistic of one direction divides by the exact moment that its method reads.**
@@ -79,7 +79,7 @@ method takes each square as a `Gamma(x, y)` variate, which is the law that its c
 its factor is one at `μ = 1` whatever its parameters. The spectrum is that of the estimated
 correlation, shrunk towards the identity until `Σ_{i≠j} r_ij²` is its unbiased estimate: the
 variance of a sample correlation is `(1 − r²)² / K_ij`, with `K_ij` from the weight of the pair.
-The factor reads the correlation alone, so it keeps the scale invariance. `debias = false` takes no
+The factor reads the correlation alone, so it keeps the scale invariance. `debias = RawStatistic()` takes no
 factor, and `RootMeanSquaredAdjusted` needs none, so neither pays the eigen-decomposition.
 
 **A HAC estimate reads the spectrum of its weight matrix (#1433).** Over `K` observations the
@@ -110,8 +110,8 @@ separate correlation path floored each HAC square `x_t² + 2 Σ k_i x_t x_{t−i
 documented formula does not state. On returns with no autocorrelation the floor makes the variance
 6.7 %, 16 % and 41 % too large at one, two and five lags, and the scalar variance then differs from
 the diagonal of the covariance of one decay, which has no floor. The floor also leaves the law
-without a closed form. `hac_floor = false`, the default, keeps the recursion the quadratic form,
-and the scalar estimator floors the variance that it returns at zero. `hac_floor = true` is the
+without a closed form. `hac_floor = NoHacFloor()`, the default, keeps the recursion the quadratic form,
+and the scalar estimator floors the variance that it returns at zero. `hac_floor = PerTermHacFloor()` is the
 oracle's rule of map #1375 (ADR 0186).
 
 **The factor of the law also reads the noise of each estimate, in the variable of the method
@@ -221,7 +221,7 @@ lags the rule after the update has 9 % to 19 % more mean squared error than the 
 to 252 % more at eight lags. There 1.1 % to 3.0 % of its rows fall on the guards of the state,
 which hold the covariance where a diagonal of `Q` is not above `min_val` and clamp the correlation
 to `[−1, 1]`; the rule before the update trips no guard. So under HAC the row divides by the
-variance before the step. It needs no new state. `hac_vol_before = false` keeps the rule after the
+variance before the step. It needs no new state. `hac_vol_before = VolatilityAfterUpdate()` keeps the rule after the
 update, the rule of the oracle (ADR 0186).
 
 **Under HAC the tables at `cor_decay` read the kernel of the damped rows** (#1445). Under the rule
@@ -252,7 +252,7 @@ subtracts the same noise from `Σ r̂²`, and it reads the same kernel (#1461): 
 the mean of `r̂²` at `R = I` 14 % too high, the kernel 4 %, and the FirstMoment and Log factors move
 towards their truth by up to 0.3 % and 0.7 % at a correlated `R`, and by at most 0.26 %
 away from it at `R = I`, where the Bartlett over-shrink stopped on the identity. The variance keeps
-the Bartlett kernel, and `hac_vol_before = false` keeps the Bartlett kernel for the correlation too.
+the Bartlett kernel, and `hac_vol_before = VolatilityAfterUpdate()` keeps the Bartlett kernel for the correlation too.
 
 **Without HAC the factor does not read the correlation of the assets, and this is a documented
 limit** (the maintainer ruled so on #1447). With `h_i = √(Q_ii / V̂_i)` the statistic splits
@@ -280,11 +280,50 @@ half-lives of 5, 10 and 40, one to five lags and one to 12 assets, the first sco
 positive definite in at most `2 × 10⁻⁴` of draws, and a steady state with too few effective
 observations, such as 12 assets at a half-life of 5, is never scored.
 
+**The estimated location is normalised, and each term is divided by its exact factor (#1507).**
+The location of an asset was the recursion `m ← λ m + (1 − λ) x` from zero, so it estimated
+`(1 − λ^k) μ`, and each deviation kept part of the mean: even with an exact factor the variance
+was 2.4 % (half-life 10, 20 rows, `μ / σ = 0.3`) to 36 % (half-life 40, 60 rows, `μ / σ = 1`) too
+large in the warm-up. The location is now the exponentially weighted mean divided by its weight,
+and a return gives a term from the second valid return of its asset. For returns independent in
+time the deviation from the location before it has the variance `σ² (1 + 1 / n_eff)`, with
+`n_eff` the Kish count of the weights of the location, so each squared deviation is divided by
+that factor. Each product of a pair is divided by `1 + c_ij`, with `c_ij` the overlap of the two
+locations over their common returns (ADR 0181, amendment of 2026-10-06). Under HAC a lagged
+product of two estimated deviations has a non-zero mean too, and the factor adds it, from the
+counts, the valid assets and the overlap of each lagged observation. With equal weights the
+factor is `k / (k − 1)`, the factor of the sample variance. A simulation checked the three
+factors against Monte Carlo means before the build (z-scores with an RMS of 0.97 and 1.02), and
+`test_08z` pins the estimate at the truth from the second row, with and without HAC.
+
+**Centring is a field, and so are the three switches of this ADR.** The estimators hold
+`centring = EstimatedCentring()`, `PreCentred()` or `ZeroStartCentring()`, `debias = ExactDebias()` or
+`RawStatistic()`, `hac_floor = NoHacFloor()` or `PerTermHacFloor()`, and, on the covariance,
+`hac_vol_before = VolatilityBeforeUpdate()` or `VolatilityAfterUpdate()`. Each abstract root is
+public and each member is exported. The rule of the oracle is one keyword away for every switch:
+`PreCentred()` is its default centring, `RawStatistic()`, `PerTermHacFloor()` and
+`VolatilityAfterUpdate()` are its other rules, bit for bit. `ZeroStartCentring()` is the oracle's
+estimated location, the recursion from zero that is not divided by its weight, with no factor. It
+estimates `(1 − λ^k) μ` rather than the mean that it subtracts, so it is not the default, and it
+stays one keyword away (ADR 0186) at parity with every stored oracle case of that rule.
+
+**The tables hold under the estimated location without HAC, and read the risk 0.3 % to 1.5 % low
+under HAC.** The tables read the law of `Q` with independent terms. Under the estimated location
+each term has the right mean, but the terms share their location. A simulation compared the mean
+squared multiplier under `ExactDebias()` on iid Normal returns, `EstimatedCentring()` at a mean of
+0.3 against `PreCentred()` at a mean of zero, at a half-life of 10 and a regime half-life of 500,
+12 000 rows and six seeds, for the three methods, the scalar estimator and the three targets.
+Without HAC all twelve agree within 0.72 standard errors. At two lags every difference is
+negative: −0.5 % (root mean square) and −0.4 % (first moment) on the scalar estimator, −1.5 % and
+−1.4 % on the Mahalanobis target, and −0.3 % to −1.0 % within the noise on the diagonal and
+portfolio targets. The exact law under HAC reads the spectrum of a dense form in the deviations at
+each count, and #1527 holds that work.
+
 ## Consequences
 
 - Every default fit of a regime estimator moves, and so does every default fit of the
   Cross-Sectional Factor Prior, whose `ve` and `pe` are regime estimators. A stored oracle case
-  states `debias = false`.
+  states `debias = RawStatistic()`.
 - The default inverse-volatility direction keeps the next order of its excess, about `9 s₂²`,
   which the docstring of its statistic states with the warm-up rows.
 - **Two limits remain.** On the separate correlation path the Mahalanobis factor does not read the
@@ -293,7 +332,7 @@ observations, such as 12 assets at a half-life of 5, is never scored.
   0.2 % to 2.2 % high at `R = I` and −2.6 % to +3.4 % at correlated `R` over 4 to 24 assets and
   one to four lags (#1445).
 - A HAC fit on the separate path moves with the row rule of #1444; no stored oracle case runs that
-  path, and `hac_vol_before = false` gives the rule of the oracle bit for bit.
+  path, and `hac_vol_before = VolatilityAfterUpdate()` gives the rule of the oracle bit for bit.
 - The Mahalanobis nodes under HAC cost 0.3 s to 1.5 s for each count of assets at half-lives up
   to 40, and up to 3.7 s at a half-life of 250 and five lags. On the separate path under HAC the
   kernel of the damped rows costs 0.1 s at a half-life of 10 and two lags, and 4 s at a half-life
@@ -306,7 +345,7 @@ observations, such as 12 assets at a half-life of 5, is never scored.
   of the correlation that the law reads.
 - The diagonal factor of the first moment and the log costs one eigen-decomposition of `D R̃ D`, one
   of the `n × n` integral of the tilted law, and a few products of order `n³` per scored row.
-  `RootMeanSquaredAdjusted` and `debias = false` pay none of it.
+  `RootMeanSquaredAdjusted` and `debias = RawStatistic()` pay none of it.
 
 ## Alternatives rejected
 

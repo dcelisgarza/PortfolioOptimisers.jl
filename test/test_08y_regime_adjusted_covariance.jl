@@ -75,8 +75,8 @@ function oracle_estimator(; kwargs...)
                                                regime_decay = exp2(-2 / inv(log2(inv(0.9)))),
                                                regime_min_obs = 2,
                                                regime_lohi_mult = (0.7, 1.6),
-                                               centred = true, min_val = 1e-12,
-                                               debias = false, kwargs...)
+                                               centring = PreCentred(), min_val = 1e-12,
+                                               debias = RawStatistic(), kwargs...)
 end
 
 @testset "the port reproduces the reference implementation" begin
@@ -88,7 +88,8 @@ end
                                            regime_method = PO.RootMeanSquaredAdjusted(), hac_lags = 2),
                           ORACLE_DIAGONAL_RMS_HAC),
                          (oracle_estimator(; cor_decay = 0.97), ORACLE_SEPARATE_CORR),
-                         (oracle_estimator(; centred = false), ORACLE_UNCENTRED))
+                         # The reference's estimated location, `ZeroStartCentring()` since #1507.
+                         (oracle_estimator(; centring = ZeroStartCentring()), ORACLE_UNCENTRED))
         # The two implementations run the same operations in a different language, so they
         # agree to round-off rather than bit for bit.
         @test isapprox(cov(ce, ORACLE_X), oracle; rtol = 1e-12)
@@ -119,7 +120,8 @@ end
                RegimeAdjustedExpWeightedCovariance(; decay = 0.94, cor_decay = 0.97, min_obs = 5,
                                                    regime_min_obs = 3),
                RegimeAdjustedExpWeightedCovariance(; decay = 0.94, min_obs = 5,
-                                                   regime_min_obs = 3, centred = false),
+                                                   regime_min_obs = 3,
+                                                   centring = EstimatedCentring()),
                RegimeAdjustedExpWeightedCovariance(; decay = 0.94, min_obs = 5,
                                                    regime_min_obs = 3,
                                                    regime_target = PO.MahalanobisTarget()),
@@ -162,7 +164,7 @@ end
                    (decay = 0.9, min_obs = 3, regime_min_obs = 2, hac_lags = 2),
                    (decay = 0.9, cor_decay = 0.95, min_obs = 3, regime_min_obs = 2),
                    (decay = 0.9, cor_decay = 0.95, min_obs = 3, regime_min_obs = 2, hac_lags = 2),
-                   (decay = 0.9, min_obs = 3, regime_min_obs = 2, centred = false))
+                   (decay = 0.9, min_obs = 3, regime_min_obs = 2, centring = EstimatedCentring()))
         ce = RegimeAdjustedExpWeightedCovariance(; kwargs...)
         batch = cov(ce, X)
 
@@ -408,7 +410,9 @@ lines, and each one is driven here on purpose.
     # A sample below the numerical floor lifts the variance off zero and leaves the correlation
     # state's diagonal at it, so the rebuild stops one step later than the case above. The
     # read-out then reports the variance alone, with no correlation to carry off the diagonal.
-    tiny = cov(sep(), fill(1.0e-9, 6, 3))
+    # The returns are taken as deviations from zero: an estimated location would remove the
+    # constant sample whole.
+    tiny = cov(sep(; centring = PreCentred()), fill(1.0e-9, 6, 3))
     @test all(>(0), LinearAlgebra.diag(tiny))
     @test all(iszero, tiny - LinearAlgebra.Diagonal(tiny))
 
@@ -491,10 +495,12 @@ end
     # correlation, which is one, and keeps the variances.
     r = [0.02, -0.01, 0.015, -0.02, 0.01, 0.03, -0.025, 0.02]
     Xh = vcat(hcat(r, r), [zeros(5) fill(NaN, 5)])
-    ce = RegimeAdjustedExpWeightedCovariance(; decay = 0.7, min_obs = 1, centred = true)
+    ce = RegimeAdjustedExpWeightedCovariance(; decay = 0.7, min_obs = 1,
+                                             centring = PreCentred())
     st = partial_fit!(ce, Xh).cache
     short = partial_fit!(RegimeAdjustedExpWeightedCovariance(; decay = 0.7, min_obs = 1,
-                                                             centred = true), Xh[1:8, :]).cache
+                                                             centring = PreCentred()),
+                         Xh[1:8, :]).cache
     @test st.covariance[:, 2] == short.covariance[:, 2]
     @test st.weight[:, 2] == short.weight[:, 2]
     P = st.covariance ./ st.weight
@@ -527,7 +533,7 @@ end
     r = [0.02, -0.01, 0.015, -0.02, 0.01, 0.03, -0.025, 0.02]
     Xh = vcat(hcat(r, r), [zeros(5) fill(NaN, 5)])
     mk() = RegimeAdjustedExpWeightedCovariance(; decay = 0.7, cor_decay = 0.9, min_obs = 1,
-                                               centred = true)
+                                               centring = PreCentred())
     ce = mk()
     @test PO.has_separate_cor_decay(ce)
     st = partial_fit!(ce, Xh).cache
@@ -560,10 +566,10 @@ Issue #1415. The squared Mahalanobis distance against an estimated block is too 
 because the inverse of an estimate is (Jensen's inequality). While the block had fewer
 observations than assets it was singular, the ridge of `safe_regime_cholesky` made the distance
 about 1e12, and that one value held the regime state for many half-lives. The estimator keyword
-`debias = true` skips each row whose block has `n + 3` observations or fewer, where the variance
+`debias = ExactDebias()` skips each row whose block has `n + 3` observations or fewer, where the variance
 of the statistic is not finite, and divides the rest by the bias factor of the regime method
 (#1431; the fixed point `mahalanobis_bias` was the factor of the mean alone).
-`debias = false` is the oracle's raw statistic, which the first testset pins. The keyword was a
+`debias = RawStatistic()` is the oracle's raw statistic, which the first testset pins. The keyword was a
 field of the target until #1428 moved it to the estimator.
 =#
 @testset "the Mahalanobis statistic is divided by the bias of its estimated block" begin
@@ -585,8 +591,8 @@ field of the target until #1428 moved it to the estimator.
 
     # On iid Normal returns, the squared multiplier of `RootMeanSquaredAdjusted` is the mean of
     # the statistic over its dimension, so a correct statistic gives one. Measured on this seed
-    # after #1431: 0.957 with `debias = true` and 1.010 on the separate path, where the factor of
-    # the mean alone gave 0.951 and 1.009, and 3.8e10 with `debias = false`, from the ridge of
+    # after #1431: 0.957 with `debias = ExactDebias()` and 1.010 on the separate path, where the factor of
+    # the mean alone gave 0.951 and 1.009, and 3.8e10 with `debias = RawStatistic()`, from the ridge of
     # the singular rows. The testset of #1431 measures the calibration over 12 000 rows and a
     # regime half-life of 500.
     rng = StableRNG(1415)
@@ -595,7 +601,7 @@ field of the target until #1428 moved it to the estimator.
     U = cholesky(Symmetric(A * transpose(A) / na + Diagonal(rand(rng, na)))).U
     R = randn(rng, nr, na) * U .* 0.01
     base = (; decay = 2.0^(-1 / 10), min_obs = 5, regime_lohi_mult = nothing,
-            regime_decay = 2.0^(-1 / 1000), regime_min_obs = 1, centred = true)
+            regime_decay = 2.0^(-1 / 1000), regime_min_obs = 1, centring = PreCentred())
     function squared_multiplier(target; extra...)
         rms = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
                                                   regime_target = target,
@@ -606,7 +612,7 @@ field of the target until #1428 moved it to the estimator.
     end
     @test 0.9 < squared_multiplier(PO.MahalanobisTarget()) < 1.1
     @test 0.9 < squared_multiplier(PO.MahalanobisTarget(); cor_decay = 2.0^(-1 / 20)) < 1.1
-    @test squared_multiplier(PO.MahalanobisTarget(); debias = false) > 1e6
+    @test squared_multiplier(PO.MahalanobisTarget(); debias = RawStatistic()) > 1e6
 
     # The gate skips each row whose block has n + 3 observations or fewer, and does not count it.
     # The raw statistic scores every row after `min_obs`.
@@ -615,13 +621,13 @@ field of the target until #1428 moved it to the estimator.
                                                                              regime_target = target),
                                          R[1:60, :]).cache
     @test fit(PO.MahalanobisTarget()).n_regime_obs == 60 - (na + 4)
-    @test fit(PO.MahalanobisTarget(); debias = false).n_regime_obs == 60 - 5
+    @test fit(PO.MahalanobisTarget(); debias = RawStatistic()).n_regime_obs == 60 - 5
 end
 
 #=
 Issue #1428. A statistic of one direction reads one estimated variance `v̂ = σ² Q`, with
 `Q = Σ w_j z_j²`, and each regime method reads its own moment of `Q`: `E[1/Q]` for the root mean
-square, `E[Q^(-1/2)]²` for the first moment, `exp(-E[ln Q])` for the log. `debias = true` divides
+square, `E[Q^(-1/2)]²` for the first moment, `exp(-E[ln Q])` for the log. `debias = ExactDebias()` divides
 by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divides each term by
 `E[1/Q_i]`, which keeps the mean of its sum at `n` at every correlation (ADR 0190).
 =#
@@ -649,9 +655,9 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
     f_far = PO.regime_bias!(bias, PO.RootMeanSquaredAdjusted(), 0.9, 10^6)
     @test length(bias) == ceil(Int, log(eps()) / log(0.9)) && f_far == bias[end]
     @test PO.regime_bias!(nothing, PO.RootMeanSquaredAdjusted(), 0.9, 10) === one(0.9)
-    @test !PO.regime_bias_open(true, 1, 0.9, 4, nothing) &&
-          PO.regime_bias_open(true, 1, 0.9, 5, nothing) &&
-          PO.regime_bias_open(false, 1, 0.9, 1, nothing)
+    @test !PO.regime_bias_open(ExactDebias(), 1, 0.9, 4, nothing) &&
+          PO.regime_bias_open(ExactDebias(), 1, 0.9, 5, nothing) &&
+          PO.regime_bias_open(RawStatistic(), 1, 0.9, 1, nothing)
 
     # On iid Normal returns the squared multiplier is the mean of the transformed statistic,
     # which is one when the statistic is correct. Measured on this seed, half-life 10:
@@ -663,7 +669,7 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
     U = cholesky(Symmetric(A * transpose(A) / na + Diagonal(rand(rng, na)))).U
     R = randn(rng, nr, na) * U .* 0.01
     base = (; decay = 2.0^(-1 / 10), min_obs = 5, regime_lohi_mult = nothing,
-            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centred = true)
+            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centring = PreCentred())
     function covariance_multiplier(target, method; extra...)
         on = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
                                                  regime_target = target,
@@ -682,8 +688,8 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
     for method in (PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted())
         @test 0.98 < variance_multiplier(method) < 1.02
         @test 0.98 < covariance_multiplier(fixed, method) < 1.02
-        @test variance_multiplier(method; debias = false) > 1.04
-        @test covariance_multiplier(fixed, method; debias = false) > 1.04
+        @test variance_multiplier(method; debias = RawStatistic()) > 1.04
+        @test covariance_multiplier(fixed, method; debias = RawStatistic()) > 1.04
     end
     # The diagonal target also divides the sum by the factor of its law for the root and the log
     # (#1432). Measured on this seed: 0.996 and 0.992 on both paths; 8 seeds read 0.941 and 0.962
@@ -694,7 +700,7 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
         @test 0.98 < covariance_multiplier(PO.DiagonalTarget(), method; extra...) < 1.02
     end
     @test covariance_multiplier(PO.DiagonalTarget(), PO.RootMeanSquaredAdjusted();
-                                debias = false) > 1.05
+                                debias = RawStatistic()) > 1.05
 
     # The gate skips an estimate of four observations or fewer. With `min_obs = 1` the raw
     # statistic scores every row after the first, and the debiased one every row after the fifth.
@@ -702,15 +708,21 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
     for target in (PO.DiagonalTarget(), fixed)
         state(debias) = partial_fit!(RegimeAdjustedExpWeightedCovariance(; short...,
                                                                          regime_target = target,
-                                                                         debias = debias),
-                                     R[1:40, :]).cache
+                                                                         debias = if debias
+                                                                             ExactDebias()
+                                                                         else
+                                                                             RawStatistic()
+                                                                         end), R[1:40, :]).cache
         @test state(true).n_regime_obs == 40 - 5
         @test state(false).n_regime_obs == 40 - 1
         @test isnothing(state(false).bias)
     end
     vstate(debias) = partial_fit!(RegimeAdjustedExpWeightedVariance(; short...,
-                                                                    debias = debias),
-                                  R[1:40, :]).cache
+                                                                    debias = if debias
+                                                                        ExactDebias()
+                                                                    else
+                                                                        RawStatistic()
+                                                                    end), R[1:40, :]).cache
     @test vstate(true).n_regime_obs == 40 - 5
     @test vstate(false).n_regime_obs == 40 - 1
 
@@ -747,7 +759,7 @@ end
 #=
 Issue #1430. The default `PortfolioTarget()` builds its inverse-volatility direction from the
 estimate that it divides by, so the direction and the error of the estimate are correlated, and
-the factor of a fixed direction leaves 1.058 at 12 assets and a half-life of 10. `debias = true`
+the factor of a fixed direction leaves 1.058 at 12 assets and a half-life of 10. `debias = ExactDebias()`
 also divides that direction by `1 + Δ`, its second-order excess, read on the estimated
 correlation of the block (ADR 0190).
 =#
@@ -796,7 +808,7 @@ correlation of the block (ADR 0190).
     U = cholesky(Symmetric(S)).U
     R = randn(rng, 12000, na) * U .* 0.01
     base = (; decay = lambda, min_obs = 5, regime_lohi_mult = nothing,
-            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centred = true)
+            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centring = PreCentred())
     function covariance_multiplier(method; extra...)
         on = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
                                                  regime_method = method)
@@ -806,7 +818,8 @@ correlation of the block (ADR 0190).
     end
     @test 0.99 < covariance_multiplier(PO.RootMeanSquaredAdjusted()) < 1.01
     @test 0.97 < covariance_multiplier(PO.FirstMomentRegimeAdjusted()) < 1.03
-    @test covariance_multiplier(PO.RootMeanSquaredAdjusted(); debias = false) > 1.08
+    @test covariance_multiplier(PO.RootMeanSquaredAdjusted(); debias = RawStatistic()) >
+          1.08
     @test 0.98 <
           covariance_multiplier(PO.RootMeanSquaredAdjusted(); cor_decay = 2.0^(-1 / 20)) <
           1.02
@@ -847,10 +860,12 @@ law, on the estimated spectrum shrunk until its dispersion is unbiased (ADR 0190
                                                  regime_method = FM)
         cache = partial_fit!(ce, X).cache
         C = PO.regime_covariance_block(cache, ce, idx)
-        # Each pair read all 200 rows, so `1/K` is the sum of the squared normalised weights, and
-        # the shrunk spectrum keeps the trace and has the unbiased dispersion `Σ_{i≠j} r²`. On the
-        # separate path the correlation reads `cor_decay`.
-        w = [(1 - lam) * lam^j for j in 0:199]
+        # Each pair read all 200 rows, so `1/K` is the sum of the squared normalised weights of
+        # its terms, and the shrunk spectrum keeps the trace and has the unbiased dispersion
+        # `Σ_{i≠j} r²`. On the separate path the correlation reads `cor_decay`. The estimated
+        # location takes no term from the first row, so the terms are 199.
+        nterms = 200 - PO.centring_lag(ce.centring)
+        w = [(1 - lam) * lam^j for j in 0:(nterms - 1)]
         w ./= sum(w)
         rho = C ./ sqrt.(diag(C) * transpose(diag(C)))
         q = sum(rho[i, j]^2 - (1 - rho[i, j]^2)^2 * sum(abs2, w)
@@ -874,7 +889,8 @@ law, on the estimated spectrum shrunk until its dispersion is unbiased (ADR 0190
         # factor reads the moments of each term at the count of its asset (#1434).
         raw = RegimeAdjustedExpWeightedCovariance(; decay = lambda, min_obs = 5, extra...,
                                                   regime_target = PO.DiagonalTarget(),
-                                                  regime_method = FM, debias = false)
+                                                  regime_method = FM,
+                                                  debias = RawStatistic())
         m = [PO.regime_bias!(cache.bias.moments, PO.RegimeTermMoments(FM), lambda, k)
              for k in cache.obs_count[idx]]
         @test PO.diagonal_law_factor(PO.RootMeanSquaredAdjusted(), cache, ce, C, idx, m) ===
@@ -972,7 +988,7 @@ every term carries the same noise (ADR 0190).
     U = cholesky(Symmetric(A * transpose(A) / na + Diagonal(rand(rng, na)))).U
     Rt = randn(rng, nr, na) * U .* 0.01
     base = (; decay = 2.0^(-1 / 10), min_obs = 5, regime_lohi_mult = nothing,
-            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centred = true,
+            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centring = PreCentred(),
             regime_target = PO.DiagonalTarget())
     function multiplier(method; extra...)
         on = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
@@ -996,7 +1012,7 @@ eigenvalues of `A`. Every bias factor reads that spectrum, without an eigen-deco
 tables and the Mahalanobis fixed point from a banded LDLᵀ factorisation of `I + s A`, and the
 effective count from `tr(A²)`. `A` is indefinite, so the gate also needs `1 / tr(A²) > n + 1`.
 The per-term floor at zero made the variance 16 % too large at two lags, so it is off by default,
-and `hac_floor = true` keeps it (ADR 0190).
+and `hac_floor = PerTermHacFloor()` keeps it (ADR 0190).
 =#
 @testset "a HAC estimate reads the spectrum of its weight matrix" begin
     function hac_A(lam, L, K)
@@ -1066,7 +1082,8 @@ and `hac_floor = true` keeps it (ADR 0190).
 
     # The gate: 12 assets at a half-life of 10 and two lags first score at 54 observations;
     # at a half-life of 5 the steady state has 6.8 effective observations, and never scores.
-    first_open(n, d, L) = findfirst(K -> PO.regime_bias_open(true, n, d, K, L), 1:2000)
+    first_open(n, d, L) = findfirst(K -> PO.regime_bias_open(ExactDebias(), n, d, K, L),
+                                    1:2000)
     @test first_open(12, lam, 2) == 54
     @test first_open(1, lam, 2) == 5
     @test isnothing(first_open(12, 2.0^(-1 / 5), 2))
@@ -1079,22 +1096,24 @@ and `hac_floor = true` keeps it (ADR 0190).
     A = randn(rng, na, na)
     U = cholesky(Symmetric(A * transpose(A) / na + Diagonal(rand(rng, na)))).U
     R = randn(rng, nr, na) * U .* 0.01
-    plain = (; decay = lam, min_obs = 5, regime_method = nothing, centred = true,
+    plain = (; decay = lam, min_obs = 5, regime_method = nothing, centring = PreCentred(),
              hac_lags = 2)
     @test isapprox(var(RegimeAdjustedExpWeightedVariance(; plain...), R),
                    diag(cov(RegimeAdjustedExpWeightedCovariance(; plain...), R));
                    rtol = 1e-12)
-    @test !isapprox(var(RegimeAdjustedExpWeightedVariance(; plain..., hac_floor = true), R),
-                    diag(cov(RegimeAdjustedExpWeightedCovariance(; plain...), R));
+    @test !isapprox(var(RegimeAdjustedExpWeightedVariance(; plain...,
+                                                          hac_floor = PerTermHacFloor()),
+                        R), diag(cov(RegimeAdjustedExpWeightedCovariance(; plain...), R));
                     rtol = 1e-3)
-    # The separate path floors its variance only under `hac_floor = true` too.
+    # The separate path floors its variance only under `hac_floor = PerTermHacFloor()` too.
     sep = (; plain..., cor_decay = 2.0^(-1 / 20))
     @test cov(RegimeAdjustedExpWeightedCovariance(; sep...), R) !=
-          cov(RegimeAdjustedExpWeightedCovariance(; sep..., hac_floor = true), R)
+          cov(RegimeAdjustedExpWeightedCovariance(; sep..., hac_floor = PerTermHacFloor()),
+              R)
 
     # On iid Normal returns the squared multiplier is one when the statistic is correct.
     base = (; decay = lam, min_obs = 5, regime_lohi_mult = nothing, hac_lags = 2,
-            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centred = true)
+            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centring = PreCentred())
     function covariance_multiplier(target, method; extra...)
         on = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
                                                  regime_target = target,
@@ -1119,13 +1138,13 @@ and `hac_floor = true` keeps it (ADR 0190).
     for method in (RMS, FM)
         @test 0.97 < variance_multiplier(method) < 1.03
     end
-    @test variance_multiplier(RMS; debias = false) > 1.1
-    @test variance_multiplier(RMS; hac_floor = true) < 0.9
+    @test variance_multiplier(RMS; debias = RawStatistic()) > 1.1
+    @test variance_multiplier(RMS; hac_floor = PerTermHacFloor()) < 0.9
     @test 0.97 < covariance_multiplier(fixed, RMS) < 1.03
-    @test covariance_multiplier(fixed, RMS; debias = false) > 1.1
+    @test covariance_multiplier(fixed, RMS; debias = RawStatistic()) > 1.1
     @test 0.97 < covariance_multiplier(PO.MahalanobisTarget(), RMS; min_obs = 17) < 1.03
-    @test covariance_multiplier(PO.MahalanobisTarget(), RMS; min_obs = 17, debias = false) >
-          2
+    @test covariance_multiplier(PO.MahalanobisTarget(), RMS; min_obs = 17,
+                                debias = RawStatistic()) > 2
 end
 
 #=
@@ -1190,7 +1209,7 @@ weights, and `mahalanobis_regime_bias!` interpolates it over the count of observ
     U = cholesky(Symmetric(A * transpose(A) / na + Diagonal(rand(rng, na)))).U
     R = randn(rng, nr, na) * U .* 0.01
     base = (; decay = lam, min_obs = 5, regime_lohi_mult = nothing,
-            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centred = true)
+            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centring = PreCentred())
     function multiplier(method)
         on = RegimeAdjustedExpWeightedCovariance(; base...,
                                                  regime_target = PO.MahalanobisTarget(),
@@ -1210,7 +1229,7 @@ weights, and `mahalanobis_regime_bias!` interpolates it over the count of observ
     st = fit()
     @test st.bias.nodes isa AbstractDict && collect(keys(st.bias.nodes)) == [na]
     @test copy(st).bias !== st.bias && copy(st).bias == st.bias
-    @test isnothing(fit(; debias = false).bias)
+    @test isnothing(fit(; debias = RawStatistic()).bias)
 end
 
 #=
@@ -1264,7 +1283,7 @@ a child issue of map #1375; #1439 then added the spread of each method (the test
     U = cholesky(Symmetric(A * transpose(A) / na + Diagonal(rand(rng, na)))).U
     R = randn(rng, nr, na) * U .* 0.01
     base = (; decay = lam, cor_decay = lamc, min_obs = 5, regime_lohi_mult = nothing,
-            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centred = true)
+            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centring = PreCentred())
     function multiplier(method; extra...)
         on = RegimeAdjustedExpWeightedCovariance(; base..., extra...,
                                                  regime_target = PO.MahalanobisTarget(),
@@ -1278,7 +1297,7 @@ a child issue of map #1375; #1439 then added the spread of each method (the test
     # The per-method term of #1439 brings Log to 0.0042 of RMS on this seed, from 0.0079.
     @test mults[1] - mults[3] < 0.006
     # At two lags, measured on this seed: 1.0111, and 1.0337 where each row divides by the
-    # volatility after its update (`hac_vol_before = false`, #1448). Eight seeds gave
+    # volatility after its update (`hac_vol_before = VolatilityAfterUpdate()`, #1448). Eight seeds gave
     # 1.0009 ± 0.0040, 1.0006 ± 0.0040 and 1.0001 ± 0.0039 for the three methods, where the
     # Bartlett kernel at `cor_decay` gave 0.9659 ± 0.0050 for RMS (#1445), and 1.0260 ± 0.0059 with
     # the rule after the update, where the factor at `cor_decay` alone gave 1.0898. Before #1438 the
@@ -1467,7 +1486,7 @@ the recursion itself, and the interpolation serves the rest (ADR 0190).
     U = cholesky(Symmetric(A * transpose(A) / na + Diagonal(rand(rng, na)))).U
     R = randn(rng, nr, na) * U .* 0.01
     base = (; decay = lam, min_obs = 5, regime_lohi_mult = nothing, hac_lags = 2,
-            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centred = true)
+            regime_decay = 2.0^(-1 / 500), regime_min_obs = 1, centring = PreCentred())
     function multiplier(method)
         on = RegimeAdjustedExpWeightedCovariance(; base...,
                                                  regime_target = PO.MahalanobisTarget(),
@@ -1485,7 +1504,7 @@ Issue #1448, ruled on #1444. Under HAC the diagonal of a row, `x_t² + 2 Σ w_l 
 negative. A volatility that holds the row damps a positive row and amplifies a negative one, so
 the diagonal of the correlation state is skewed down and falls on the guards of `update_var_cor!`
 and `pair_weighted_correlation`. So under HAC the separate path divides each row by the volatility
-before its update, and `hac_vol_before = false` keeps the rule after it. Without HAC the diagonal
+before its update, and `hac_vol_before = VolatilityAfterUpdate()` keeps the rule after it. Without HAC the diagonal
 is `x_t² ≥ 0`, and the rule after the update stays (#1440).
 =#
 @testset "under HAC the separate path divides each row by the volatility before its update" begin
@@ -1509,10 +1528,13 @@ is `x_t² ≥ 0`, and the rule after the update stays (#1440).
     X = randn(StableRNG(1448), 6, 2) .* [0.02 0.01]
     rule(b; extra...) = RegimeAdjustedExpWeightedCovariance(; decay = 0.8, cor_decay = 0.9,
                                                             hac_lags = 1,
-                                                            hac_vol_before = b,
-                                                            regime_method = nothing,
-                                                            centred = true, min_obs = 1,
-                                                            extra...)
+                                                            hac_vol_before = if b
+                                                                VolatilityBeforeUpdate()
+                                                            else
+                                                                VolatilityAfterUpdate()
+                                                            end, regime_method = nothing,
+                                                            centring = PreCentred(),
+                                                            min_obs = 1, extra...)
     states = map((true, false)) do b
         return PO.regime_adjusted_covariance_pass!(rule(b), X, 1, nothing, nothing)
     end
@@ -1523,7 +1545,7 @@ is `x_t² ≥ 0`, and the rule after the update stays (#1440).
     end
     # The two rules differ, and the default is the rule before the update.
     @test !isapprox(states[1].cor_state, states[2].cor_state; rtol = 1e-2)
-    @test RegimeAdjustedExpWeightedCovariance().hac_vol_before
+    @test isa(RegimeAdjustedExpWeightedCovariance().hac_vol_before, VolatilityBeforeUpdate)
 
     # Without HAC, or on the path with one decay, the keyword changes nothing.
     Y = randn(StableRNG(1449), 200, 3) .* 0.01
@@ -1538,8 +1560,12 @@ is `x_t² ≥ 0`, and the rule after the update stays (#1440).
     function guard_rows(b, X)
         ce = RegimeAdjustedExpWeightedCovariance(; decay = 2.0^(-1 / 10),
                                                  cor_decay = 2.0^(-1 / 20), hac_lags = 8,
-                                                 hac_vol_before = b,
-                                                 regime_method = nothing, centred = true)
+                                                 hac_vol_before = if b
+                                                     VolatilityBeforeUpdate()
+                                                 else
+                                                     VolatilityAfterUpdate()
+                                                 end, regime_method = nothing,
+                                                 centring = PreCentred())
         rows = 0
         PO.regime_adjusted_covariance_pass!(ce, X, 1, nothing, nothing) do i, cache
             if i > 500
@@ -1626,11 +1652,15 @@ tables at `cor_decay` read (ADR 0190).
     # The tables at `cor_decay` read the kernel on the separate path under HAC with the rule before
     # the update, once for each state, and the Bartlett weights elsewhere.
     sep(b; extra...) = RegimeAdjustedExpWeightedCovariance(; decay = lam, cor_decay = lamc,
-                                                           hac_lags = 2, hac_vol_before = b,
-                                                           regime_method = RMS,
+                                                           hac_lags = 2,
+                                                           hac_vol_before = if b
+                                                               VolatilityBeforeUpdate()
+                                                           else
+                                                               VolatilityAfterUpdate()
+                                                           end, regime_method = RMS,
                                                            regime_target = PO.MahalanobisTarget(),
-                                                           centred = true, min_obs = 1,
-                                                           extra...)
+                                                           centring = PreCentred(),
+                                                           min_obs = 1, extra...)
     store = PO.regime_bias_store(PO.MahalanobisTarget(), lamc, Float64)
     kern = PO.correlation_hac_lags!(store, sep(true))
     @test kern == PO.hac_row_kernel(lam, 2) &&
@@ -1698,11 +1728,15 @@ the kernel of `hac_row_kernel`, as the Mahalanobis tables do (ADR 0190).
     diag_ce(b; extra...) = RegimeAdjustedExpWeightedCovariance(; decay = lam,
                                                                cor_decay = lamc,
                                                                hac_lags = 2,
-                                                               hac_vol_before = b,
+                                                               hac_vol_before = if b
+                                                                   VolatilityBeforeUpdate()
+                                                               else
+                                                                   VolatilityAfterUpdate()
+                                                               end,
                                                                regime_method = PO.FirstMomentRegimeAdjusted(),
                                                                regime_target = PO.DiagonalTarget(),
-                                                               centred = true, min_obs = 1,
-                                                               extra...)
+                                                               centring = PreCentred(),
+                                                               min_obs = 1, extra...)
     X = randn(StableRNG(1461), 300, 4) *
         [1.0 0.5 0.3 0.0; 0.0 1.0 0.4 0.2; 0.0 0.0 1.0 0.6; 0.0 0.0 0.0 1.0]
     for ce in (diag_ce(false), diag_ce(true; cor_decay = nothing))

@@ -1027,13 +1027,18 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
             wg = aweights(rand(rng1334, T1334))
             @test PO.variance_count(SimpleVariance(; w = wg), Xg).n[2] ≈
                   sum(wg[6:end])^2 / sum(abs2, wg[6:end])
-            # The exponential weights sum to one, so the count is also the divisor.
-            for ve in (ExpWeightedVariance(), RegimeAdjustedExpWeightedVariance())
-                lam = ve.decay
-                a = lam .^ (0:(T1334 - 1))
-                c = PO.variance_count(ve, X1334)
-                @test c.n ≈ fill(sum(a)^2 / sum(abs2, a), N1334)
-                @test c.m == c.n
+            # The exponential weights sum to one, so under `PreCentred` the count is also the
+            # divisor. Under the estimated location the terms start at the second row, and the
+            # location spends one observation, as the mean of a sample variance does (#1507).
+            for E in (ExpWeightedVariance, RegimeAdjustedExpWeightedVariance)
+                for (centring, lag) in ((PreCentred(), 0), (EstimatedCentring(), 1))
+                    ve = E(; centring = centring)
+                    lam = ve.decay
+                    a = lam .^ (0:(T1334 - 1 - lag))
+                    c = PO.variance_count(ve, X1334)
+                    @test c.m ≈ fill(sum(a)^2 / sum(abs2, a), N1334)
+                    @test c.n == c.m .+ lag
+                end
             end
             c = PO.variance_count(WindowedVariance(; window = 20), X1334)
             @test c.n == fill(20, N1334)

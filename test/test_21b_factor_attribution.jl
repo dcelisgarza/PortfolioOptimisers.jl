@@ -50,7 +50,7 @@ end
 
 # An idiosyncratic variance estimate with no warm-up, so the standard errors read a stated variance
 # at every pair of the regression.
-const FA_VE1 = RegimeAdjustedExpWeightedVariance(; centred = true, min_obs = 1)
+const FA_VE1 = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), min_obs = 1)
 
 function fa_prior(; n_assets::Integer = 20, n_observations::Integer = 60,
                   n_industries::Integer = 3, seed::Integer = 782_001, kwargs...)

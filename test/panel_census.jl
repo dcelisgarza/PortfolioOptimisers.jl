@@ -192,7 +192,7 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            # The mask of the cells FeatureDistance reads: the masks alone, and no cell value.
                                            :feature_observed_cells => "reads the observed masks",
                                            :feature_window_mask => "a step of FeatureDistance, whose cases are below",
-                                           :window_rows => "reads the axes and the masks")
+                                           :readable_window_rows => "reads the axes and the masks")
 
 # The fixture: the small parity panel, with the negative volume and short interest made
 # positive so the turnover and the days to cover compute, a benchmark weight for the composite
@@ -256,8 +256,8 @@ function census_cases(rd::ReturnsResult)
     factors = ["market" => ConstantExposure(), "style1" => pass("style1"),
                "style2" => pass("style2")]
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
-                        ce = RegimeAdjustedExpWeightedCovariance(; centred = true))
-    ve = RegimeAdjustedExpWeightedVariance(; centred = true, min_val = 0.0)
+                        ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred()))
+    ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), min_val = 0.0)
     cspe(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = factors, pe = pe,
                                               ve = ve, minra = 5, kw...)
     fit(r; kw...) = prior(cspe(; kw...), r)

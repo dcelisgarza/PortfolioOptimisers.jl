@@ -1074,7 +1074,7 @@ function mahalanobis_bias_start(decay::Number, n::Integer,
                                 hac_lags::Union{<:Integer, <:VecNum})
     K = n + 4
     Ksat = mahalanobis_bias_saturation(decay, n)
-    while K < Ksat && !regime_bias_open(true, n, decay, K, hac_lags)
+    while K < Ksat && !regime_bias_open(ExactDebias(), n, decay, K, hac_lags)
         K += 1
     end
 
@@ -1341,7 +1341,7 @@ damping. At two lags the methods then read 1.0076, 1.0078 and 1.0077 at ``R = I`
 correlation half-lives of 20 and 40 and one to four lags the mean reads 0.2 % to 2.2 % high at
 ``R = I``, where the Bartlett kernel read 0.8 % to 9.5 % low; the rest grows with the count of
 assets and of lags. Where each row divides by the volatility after its update
-(`hac_vol_before = false`), the tables keep the Bartlett kernel, and the mean reads 1.1 % to
+(`hac_vol_before = VolatilityAfterUpdate()`), the tables keep the Bartlett kernel, and the mean reads 1.1 % to
 3.0 % high at two lags.
 
 The factor does not read the correlation of the assets. With ``h_{i} = \\sqrt{Q_{ii} / \\hat{V}_{i}}``

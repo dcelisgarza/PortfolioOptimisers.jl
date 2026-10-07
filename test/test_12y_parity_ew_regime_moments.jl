@@ -35,7 +35,7 @@ THE MEASURE. Every case below agreed on the `NaN` pattern.
 | the separate path on a constant asset | Better: the variance 0, where the report floored it at `min_val` | `test_08y` |
 
 The Mahalanobis target with `min_obs = 5` on 12 assets reads a singular block, so its cases here
-use `min_obs = 13`. Every case takes the oracle's raw statistic, `debias = false`. The default
+use `min_obs = 13`. Every case takes the oracle's raw statistic, `debias = RawStatistic()`. The default
 statistic skips an estimate with too few observations and divides the rest by the bias of the
 estimate (#1415 for the Mahalanobis target, #1428 for the others, Better, `test_08y`).
 =#
@@ -45,8 +45,8 @@ const P1383 = PortfolioOptimisers
 p1383_dk(hl) = 2.0^(-1.0 / hl)
 # The oracle's clip, floor, centring and raw statistic. The first two are the defaults since
 # #1383. The default statistic divides by the bias of the estimate it reads (#1415, #1428).
-const P1383_ORC = (; regime_lohi_mult = (0.7, 1.6), min_val = 1e-12, centred = true,
-                   debias = false)
+const P1383_ORC = (; regime_lohi_mult = (0.7, 1.6), min_val = 1e-12,
+                   centring = PreCentred(), debias = RawStatistic())
 
 function p1383_rv(; hl = 10, min_obs = 5, rhl = hl / 2, rmin = floor(Int, rhl), kw...)
     return RegimeAdjustedExpWeightedVariance(; decay = p1383_dk(hl), min_obs = min_obs,
@@ -64,34 +64,36 @@ const P1383_MU = ["MuDefault" => () -> ExpWeightedExpectedReturns(; decay = p138
                       () -> ExpWeightedExpectedReturns(; decay = p1383_dk(10), min_obs = 5),
                   "MuHL10p6" => () -> ExpWeightedExpectedReturns(; decay = p1383_dk(10.6))]
 const P1383_VAR = ["VarDefault" =>
-                       () -> ExpWeightedVariance(; decay = p1383_dk(40), centred = true),
+                       () -> ExpWeightedVariance(; decay = p1383_dk(40),
+                                                 centring = PreCentred()),
                    "VarCentred" =>
                        () -> ExpWeightedVariance(; decay = p1383_dk(10), min_obs = 5,
-                                                 centred = true),
+                                                 centring = PreCentred()),
                    "VarUncentred" =>
                        () -> ExpWeightedVariance(; decay = p1383_dk(10), min_obs = 5,
-                                                 centred = false)]
+                                                 centring = ZeroStartCentring())]
 const P1383_COV = ["CovDefault" =>
-                       () -> ExpWeightedCovariance(; decay = p1383_dk(40), centred = true),
+                       () -> ExpWeightedCovariance(; decay = p1383_dk(40),
+                                                   centring = PreCentred()),
                    "CovCentred" =>
                        () -> ExpWeightedCovariance(; decay = p1383_dk(10), min_obs = 5,
-                                                   centred = true),
+                                                   centring = PreCentred()),
                    "CovUncentred" =>
                        () -> ExpWeightedCovariance(; decay = p1383_dk(10), min_obs = 5,
-                                                   centred = false)]
+                                                   centring = ZeroStartCentring())]
 const P1383_RV = ["RVDefault" => () -> p1383_rv(; hl = 40, min_obs = 40),
                   "RVFirst" => () -> p1383_rv(),
                   "RVLog" => () -> p1383_rv(; regime_method = P1383.LogRegimeAdjusted()),
                   "RVRms" =>
                       () -> p1383_rv(; regime_method = P1383.RootMeanSquaredAdjusted()),
                   # The oracle floors each HAC square at zero, which makes the variance 16 % too
-                  # large on returns with no autocorrelation; `hac_floor = true` keeps its rule
+                  # large on returns with no autocorrelation; `hac_floor = PerTermHacFloor()` keeps its rule
                   # (#1433).
-                  "RVHac2" => () -> p1383_rv(; hac_lags = 2, hac_floor = true),
+                  "RVHac2" => () -> p1383_rv(; hac_lags = 2, hac_floor = PerTermHacFloor()),
                   "RVRegimeHL3" => () -> p1383_rv(; rhl = 3, rmin = 4),
                   "RVNoClip" => () -> p1383_rv(; regime_lohi_mult = nothing),
                   "RVClipAboveOne" => () -> p1383_rv(; regime_lohi_mult = (1.1, 2.0)),
-                  "RVUncentred" => () -> p1383_rv(; centred = false),
+                  "RVUncentred" => () -> p1383_rv(; centring = ZeroStartCentring()),
                   "RVMinObs3" => () -> p1383_rv(; min_obs = 3)]
 # Two portfolios: equal weights, and weights proportional to the index of the asset.
 p1383_w(n) = vcat(fill(1 / n, 1, n), permutedims(collect(1.0:n) ./ (n * (n + 1) / 2)))
@@ -129,7 +131,7 @@ const P1383_RC = ["RCDefault" => (n) -> p1383_rc(; hl = 40, min_obs = 40),
                                                                             w = p1383_w(n))),
                   "RCNoClip" => (n) -> p1383_rc(; regime_lohi_mult = nothing),
                   "RCClipAboveOne" => (n) -> p1383_rc(; regime_lohi_mult = (1.1, 2.0)),
-                  "RCUncentred" => (n) -> p1383_rc(; centred = false),
+                  "RCUncentred" => (n) -> p1383_rc(; centring = ZeroStartCentring()),
                   "RCRegimeHL3" => (n) -> p1383_rc(; rhl = 3, rmin = 4)]
 const P1383_RC_SERIES = ["RCDefault", "RCDiagonalLog", "RCMahalanobisFirstFull",
                          "RCCorrHL5", "RCClipAboveOne"]
@@ -139,6 +141,11 @@ const P1383_SMALL_MULT = [0.7562660923140582, 0.8388726265938486, 0.821142546327
                           1.1643502876725171, 1.1697258124619465, 1.1611765971360257,
                           0.7605405673104944, 0.9212423935074233, 0.7208906150115325,
                           0.7728297271335702, 1.1, 0.7867814999193841, 0.7]
+
+# The "Uncentred" cases are the oracle's estimated location, which starts at zero and is not
+# divided by its weight. Since #1507 it is `ZeroStartCentring()`, one keyword away from the
+# default `EstimatedCentring()` (ADR 0190), and `test_08z` pins the default against its hand
+# reference and its bias against the truth.
 
 # The multiplier the report applies, read from the state after the fit.
 function p1383_mult(ce, X, am, em)
@@ -319,7 +326,7 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
         for E in (RegimeAdjustedExpWeightedVariance, RegimeAdjustedExpWeightedCovariance)
             @test E().regime_lohi_mult == (0.7, 1.6)
             @test E().min_val == 1e-12
-            @test E().centred == false
+            @test isa(E().centring, EstimatedCentring)
         end
         # The multiplier is a ratio of volatilities, so a change of units must not move it. The
         # floor of sqrt(eps) excluded every variance below 1.5e-8, and on returns a thousand
@@ -332,16 +339,16 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
                                                                                    min_obs = 5,
                                                                                    regime_decay = p1383_dk(5),
                                                                                    regime_min_obs = 5,
-                                                                                   centred = true,
-                                                                                   debias = false)),
+                                                                                   centring = PreCentred(),
+                                                                                   debias = RawStatistic())),
                                           ("RVLog",
                                            () -> RegimeAdjustedExpWeightedVariance(; decay = p1383_dk(10),
                                                                                    min_obs = 5,
                                                                                    regime_decay = p1383_dk(5),
                                                                                    regime_min_obs = 5,
                                                                                    regime_method = P1383.LogRegimeAdjusted(),
-                                                                                   centred = true,
-                                                                                   debias = false))))
+                                                                                   centring = PreCentred(),
+                                                                                   debias = RawStatistic()))))
             m1 = p1383_mult(make(), X, am, em)
             mc = p1383_mult(make(), X .* c, am, em)
             @test isapprox(mc, m1; rtol = 1e-12)
@@ -358,7 +365,8 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
                                                      regime_decay = p1383_dk(5),
                                                      regime_min_obs = 5,
                                                      regime_target = t[1],
-                                                     regime_method = t[2], centred = true)
+                                                     regime_method = t[2],
+                                                     centring = PreCentred())
             S1 = cov(ce, X; active_mask = am, estimation_mask = em)
             Sc = cov(ce, X .* c; active_mask = am, estimation_mask = em)
             @test parity_compare(Sc, c^2 .* S1; scale = :array, name = "milli $k").ok

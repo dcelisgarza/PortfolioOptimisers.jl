@@ -11,7 +11,10 @@ where every asset has the same history. On this fixture asset 4 lists late, so i
 are the reference's times `sqrt(W_ii W_jj) / W_ij`, 1.0607, and every other entry is equal. The
 oracle is the reference itself: `oracle_returns` is an exactly representable
 fixture that both languages build bit for bit, so no file is exchanged, and the literals below were
-measured by fitting the reference on it at `half_life = 10`.
+measured by fitting the reference on it at `half_life = 10`. They pin `centring = PreCentred()`,
+the reference's default, and `ZeroStartCentring()`, the reference's estimated location, which
+starts at zero and is not divided by its weight. The library's default estimated location is
+pinned against the hand references at the end of this file (#1507, ADR 0190).
 
 The fixture is 60 observations of 4 assets, and asset 4 lists at observation 31. The measured
 parity is exact on every masked path and about `1e-19` on a complete window, where the reference
@@ -49,9 +52,9 @@ const EW_COV_UNCENTRED = [0.00033623254238345147 -1.0202070579665484e-05 -0.0002
                           -0.00022912357990465665 2.7708276324016633e-05 0.0005008949140988659 -7.767021272719638e-06;
                           -0.00017683625902148656 -0.00023600959967264636 -7.767021272719638e-06 0.000568991661812869]
 const EW_COV_RAW_STATE = [0.00031043185325520587 -6.722330287604037e-06 -0.00020627871574763144 -0.00014613203796115705;
-                          -6.722330287604037e-06 0.0003406101015025423 3.225949310358637e-05 -0.00019291682264353322;
-                          -0.00020627871574763144 3.225949310358637e-05 0.0004707516397209744 1.1267599687451917e-05;
-                          -0.00014613203796115705 -0.00019291682264353322 1.1267599687451917e-05 0.0004947775979468148]
+                           -6.722330287604037e-06 0.0003406101015025423 3.225949310358637e-05 -0.00019291682264353322;
+                           -0.00020627871574763144 3.225949310358637e-05 0.0004707516397209744 1.1267599687451917e-05;
+                           -0.00014613203796115705 -0.00019291682264353322 1.1267599687451917e-05 0.0004947775979468148]
 
 # The fixture. Every entry is an exactly rounded product of exactly representable doubles, so the
 # reference builds the same matrix with no file exchange.
@@ -105,15 +108,19 @@ end
     # recursion freezes. The gap and the inactive period coincide here, so the two agree.
     @test isequal(mean(me, Xg), mean(me, Xg; active_mask = amsk))
 
-    vc = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1, centred = true)
+    vc = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1, centring = PreCentred())
     @test isapprox(var(vc, Xg; active_mask = amsk), EW_VAR_CENTRED; rtol = 1e-12)
     @test isapprox(std(vc, Xg; active_mask = amsk), sqrt.(EW_VAR_CENTRED); rtol = 1e-12)
 
-    vu = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1, centred = false)
+    # The oracle's estimated location starts at zero and is not divided by its weight. It is
+    # `ZeroStartCentring()` since #1507 (ADR 0190). The default estimated location of the
+    # library is pinned against its hand reference at the end of this file.
+    vu = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1,
+                             centring = ZeroStartCentring())
     @test isapprox(var(vu, Xg; active_mask = amsk), EW_VAR_UNCENTRED; rtol = 1e-12)
 
-    v40 = var(ExpWeightedVariance(; decay = EW_DECAY, min_obs = 40, centred = true), Xg;
-              active_mask = amsk)
+    v40 = var(ExpWeightedVariance(; decay = EW_DECAY, min_obs = 40,
+                                  centring = PreCentred()), Xg; active_mask = amsk)
     @test isnan(v40[EW_N])
     @test isapprox(view(v40, 1:(EW_N - 1)), view(EW_VAR_MIN40, 1:(EW_N - 1)); rtol = 1e-12)
 
@@ -121,8 +128,9 @@ end
     # weight it holds (ADR 0181, 2026-09-29). Asset 4 lists at 31, so its pairs hold less weight
     # than the congruence assumes, and the port's covariance is the reference's times
     # `sqrt(W_ii W_jj) / W_ij`: measured to 2.2e-16 cell by cell.
-    for (centred, lit) in ((true, EW_COV_CENTRED), (false, EW_COV_UNCENTRED))
-        ce = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centred = centred)
+    for (centring, lit) in
+        ((PreCentred(), EW_COV_CENTRED), (ZeroStartCentring(), EW_COV_UNCENTRED))
+        ce = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centring = centring)
         W = partial_fit!(ce, Xg; active_mask = amsk).cache.weight
         w = sqrt.(diag(W))
         ratio = (w * transpose(w)) ./ W
@@ -130,7 +138,7 @@ end
         @test all(isapprox.(ratio[1:3, 1:3], 1; rtol = 1e-14))
         @test all(isapprox.(ratio[1:3, 4], 1.0606601717798214; rtol = 1e-12))
     end
-    cc = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centred = true)
+    cc = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centring = PreCentred())
 
     # The delisting: asset 2 leaves at observation 46, so its state resets and it is blanked.
     amsk_d = copy(amsk)
@@ -152,7 +160,7 @@ end
     amsk = oracle_active_mask()
     Xg = gapped(X, amsk)
 
-    cc = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centred = true)
+    cc = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centring = PreCentred())
     fitted = partial_fit!(cc, Xg; active_mask = amsk)
     S = fitted.cache.covariance
     W = fitted.cache.weight
@@ -188,9 +196,11 @@ end
     Xh = copy(Xg)
     Xh[end, 1] = NaN
     held = partial_fit!(ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1,
-                                              centred = true), Xh; active_mask = amsk)
+                                              centring = PreCentred()), Xh;
+                        active_mask = amsk)
     short = partial_fit!(ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1,
-                                               centred = true), view(Xg, 1:(EW_T - 1), :);
+                                               centring = PreCentred()),
+                         view(Xg, 1:(EW_T - 1), :);
                          active_mask = view(amsk, 1:(EW_T - 1), :))
     @test held.cache.covariance[1, :] == short.cache.covariance[1, :]
     @test held.cache.weight[1, :] == short.cache.weight[1, :]
@@ -199,8 +209,8 @@ end
 
     # 5. The warm-up mask. Asset 4 carries 30 observations, so a threshold above it blanks the
     #    whole row and column and leaves every other entry alone.
-    warm = cov(ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 31, centred = true), Xg;
-               active_mask = amsk)
+    warm = cov(ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 31,
+                                     centring = PreCentred()), Xg; active_mask = amsk)
     @test all(isnan, view(warm, EW_N, :))
     @test all(isnan, view(warm, :, EW_N))
     @test all(isfinite, view(warm, 1:(EW_N - 1), 1:(EW_N - 1)))
@@ -211,12 +221,13 @@ end
     sw = sum(w)
     @test isapprox(mean(ExpWeightedExpectedReturns(; decay = EW_DECAY, min_obs = 1), X),
                    transpose(w) * X / sw |> vec; rtol = 1e-12)
-    @test isapprox(var(ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1, centred = true),
-                       X), transpose(w) * (X .^ 2) / sw |> vec; rtol = 1e-12)
+    @test isapprox(var(ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1,
+                                           centring = PreCentred()), X),
+                   transpose(w) * (X .^ 2) / sw |> vec; rtol = 1e-12)
     Xw = X .* sqrt.(w)
     @test isapprox(cov(ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1,
-                                             centred = true), X), transpose(Xw) * Xw / sw;
-                   rtol = 1e-12)
+                                             centring = PreCentred()), X),
+                   transpose(Xw) * Xw / sw; rtol = 1e-12)
 
     # 7. The mean's correction is the first power, and the covariance's is the square root. The
     #    two are not interchangeable, so the mean is re-derived here in plain Julia.
@@ -242,12 +253,12 @@ end
     @test isequal(mean(me, Xg, pnl), mean(me, Xg; active_mask = amsk))
     @test isfinite(mean(me, Xg, pnl)[EW_N])
 
-    vc = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1, centred = true)
+    vc = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1, centring = PreCentred())
     @test isequal(var(vc, Xg, pnl), var(vc, Xg; active_mask = amsk))
     @test isequal(std(vc, Xg, pnl), std(vc, Xg; active_mask = amsk))
     @test isfinite(var(vc, Xg, pnl)[EW_N])
 
-    cc = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centred = true)
+    cc = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centring = PreCentred())
     @test isequal(cov(cc, Xg, pnl), cov(cc, Xg; active_mask = amsk))
     @test isequal(cor(cc, Xg, pnl), cor(cc, Xg; active_mask = amsk))
     @test isfinite(cov(cc, Xg, pnl)[EW_N, EW_N])
@@ -279,7 +290,7 @@ end
                               axes(Xg, 1); init = me)
     @test isequal(mean(one_row_at_a_time), mean(me, Xg; active_mask = amsk))
 
-    vc = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1, centred = true)
+    vc = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1, centring = PreCentred())
     two_blocks = partial_fit!(partial_fit!(vc, view(Xg, 1:20, :);
                                            active_mask = view(amsk, 1:20, :)),
                               view(Xg, 21:EW_T, :); active_mask = view(amsk, 21:EW_T, :))
@@ -287,7 +298,7 @@ end
     @test isequal(std(two_blocks), std(vc, Xg; active_mask = amsk))
     @test isequal(var(vc, two_blocks.cache), var(two_blocks))
 
-    cc = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centred = true)
+    cc = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centring = PreCentred())
     fitted = partial_fit!(cc, Xg; active_mask = amsk)
     @test isequal(cov(fitted), cov(cc, Xg; active_mask = amsk))
     @test isequal(cor(fitted), cor(cc, Xg; active_mask = amsk))
@@ -400,10 +411,10 @@ end
     @test_throws ArgumentError PortfolioOptimisers.merge_states(ca, cb)
 
     # The regime-adjusted variance with no regime is this estimator, so the two cannot drift.
-    plain = var(ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1, centred = true), Xg;
-                active_mask = amsk)
+    plain = var(ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1,
+                                    centring = PreCentred()), Xg; active_mask = amsk)
     sibling = var(RegimeAdjustedExpWeightedVariance(; decay = EW_DECAY, min_obs = 1,
-                                                    centred = true,
+                                                    centring = PreCentred(),
                                                     regime_method = nothing), Xg;
                   active_mask = amsk)
     @test isequal(plain, sibling)
@@ -414,10 +425,11 @@ end
                   mean(ExpWeightedExpectedReturns(; decay = EW_DECAY, min_obs = 1), Xg;
                        active_mask = amsk))
     @test isequal(cov(ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1,
-                                            centred = true), transpose(Xg); dims = 2,
-                      active_mask = transpose(amsk)),
+                                            centring = PreCentred()), transpose(Xg);
+                      dims = 2, active_mask = transpose(amsk)),
                   cov(ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1,
-                                            centred = true), Xg; active_mask = amsk))
+                                            centring = PreCentred()), Xg;
+                      active_mask = amsk))
 end
 
 @testset "Exponentially weighted moments: the edges of the recursion" begin
@@ -434,9 +446,9 @@ end
     # contributes nothing: the recursion leaves the observation untouched.
     me = ExpWeightedExpectedReturns(; decay = EW_DECAY, min_obs = 1)
     @test all(isfinite, mean(me, Xb; active_mask = blank))
-    vc = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1, centred = true)
+    vc = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1, centring = PreCentred())
     @test all(isfinite, var(vc, Xb; active_mask = blank))
-    cc = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centred = true)
+    cc = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centring = PreCentred())
     @test all(isfinite, diag(cov(cc, Xb; active_mask = blank)))
 
     # An asset that is inactive at the last observation loses its location as well as its
@@ -444,9 +456,11 @@ end
     amsk_end = copy(amsk)
     amsk_end[end, 2] = false
     Xe = gapped(X, amsk_end)
-    vu = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1, centred = false)
+    vu = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1,
+                             centring = EstimatedCentring())
     @test isnan(var(vu, Xe; active_mask = amsk_end)[2])
-    cu = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centred = false)
+    cu = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1,
+                               centring = EstimatedCentring())
     @test all(isnan, view(cov(cu, Xe; active_mask = amsk_end), 2, :))
 
     # The covariance continues from a state the estimator already holds.
@@ -523,7 +537,7 @@ end
     # account and no answer of its inner estimator changes that. `ProcessedCovariance` and
     # `DenoiseCovariance` are constructors that build a `PortfolioOptimisersCovariance`, so
     # they take the recursion of the type they build.
-    ew = ExpWeightedCovariance(; centred = true)
+    ew = ExpWeightedCovariance(; centring = PreCentred())
     for nest in (PortfolioOptimisersCovariance(; ce = ew), ProcessedCovariance(; ce = ew),
                  DenoiseCovariance(; ce = ew), CorrelationCovariance(; ce = ew),
                  PortfolioOptimisersCovariance(; ce = CorrelationCovariance(; ce = ew)))
@@ -617,10 +631,19 @@ end
                [0.01 -0.02]) == [0.01, -0.02]
 end
 
+# The normalised weights of the location of asset `i` before the observation `t`, one per valid
+# observation of `V` before `t`, written out from the definition with no recursion.
+function ew_location_weights(V, t, λ)
+    prior = [s for s in V if s < t]
+    w = [λ^count(u -> s < u < t, prior) for s in prior]
+    return Dict(zip(prior, w ./ sum(w)))
+end
+
 # The closed form that the docstring of `ExpWeightedCovariance` states, entry by entry and in
-# BigFloat: the valid set of each asset, the running location from zero, and the mean of the two
-# exponents of a pair, each counted on the clock of its own asset.
-function ew_cov_closed_form(X, amsk, λ, centred, min_obs)
+# BigFloat: the valid set of each asset, the normalised location of the returns before each one,
+# the factor `1 + c_ij` of each product, and the mean of the two exponents of a pair, each
+# counted on the clock of its own asset. Under `PreCentred` the deviation is the return.
+function ew_cov_closed_form(X, amsk, λ, estimated, min_obs)
     T, N = size(X)
     λ = big(λ)
     active = isnothing(amsk) ? trues(T, N) : amsk
@@ -630,27 +653,32 @@ function ew_cov_closed_form(X, amsk, λ, centred, min_obs)
         s = isnothing(s) ? 1 : s + 1
         V[i] = [t for t in s:T if isfinite(X[t, i]) && active[t, i]]
     end
+    # The observations that give a deviation: every one but the first under the estimate.
+    D = estimated ? [v[2:end] for v in V] : V
+    a = [Dict(t => ew_location_weights(V[i], t, λ) for t in D[i]) for i in 1:N]
     e = fill(big(NaN), T, N)
-    for i in 1:N, (k, t) in enumerate(V[i])
-        m = if centred
-            big(0)
-        else
-            (1 - λ) *
-            sum((λ^(k - 1 - q) * big(X[V[i][q], i]) for q in 1:(k - 1)); init = big(0))
-        end
+    for i in 1:N, t in D[i]
+        m = estimated ? sum(w * big(X[s, i]) for (s, w) in a[i][t]) : big(0)
         e[t, i] = big(X[t, i]) - m
     end
+    factor(i, j, t) =
+        if estimated
+            1 + sum((w * get(a[j][t], s, big(0)) for (s, w) in a[i][t]))
+        else
+            big(1)
+        end
     n = length.(V)
     Σ = fill(big(NaN), N, N)
     # Each pair ages on its common observations and is divided by the weight it holds
     # (ADR 0181, amendment of 2026-09-29).
     for i in 1:N, j in 1:N
-        common = intersect(V[i], V[j])
+        common = intersect(D[i], D[j])
         c(t) = count(>(t), common)
-        S = (1 - λ) * sum((λ^c(t) * e[t, i] * e[t, j] for t in common); init = big(0))
+        S = (1 - λ) * sum((λ^c(t) * e[t, i] * e[t, j] / factor(i, j, t) for t in common);
+                          init = big(0))
         Σ[i, j] = isempty(common) ? big(0) : S / (1 - λ^length(common))
     end
-    bad = [n[i] < min_obs || !active[T, i] for i in 1:N]
+    bad = [n[i] < min_obs || n[i] < 1 + estimated || !active[T, i] for i in 1:N]
     Σ[bad, :] .= NaN
     Σ[:, bad] .= NaN
     return Σ
@@ -668,10 +696,12 @@ end
     X[.!amsk] .= NaN
     X[[5, 17, 33], 1] .= NaN
     X[40, 4] = Inf
-    for centred in (true, false), mask in (amsk, nothing)
-        ce = ExpWeightedCovariance(; decay = 0.93, min_obs = 3, centred = centred)
+    for (centring, estimated) in ((PreCentred(), false), (EstimatedCentring(), true)),
+        mask in (amsk, nothing)
+
+        ce = ExpWeightedCovariance(; decay = 0.93, min_obs = 3, centring = centring)
         sigma = cov(ce, X; active_mask = mask)
-        ref = Float64.(ew_cov_closed_form(X, mask, 0.93, centred, 3))
+        ref = Float64.(ew_cov_closed_form(X, mask, 0.93, estimated, 3))
         # The report repairs a block that the division leaves indefinite.
         f = findall(isfinite, diag(ref))
         ref[f, f] = PortfolioOptimisers.restore_psd!(ref[f, f])
@@ -679,10 +709,15 @@ end
         @test isapprox(filter(isfinite, sigma), filter(isfinite, ref); rtol = 1e-13)
     end
 
-    # The first deviation of an uncentred asset is its return, because the location starts at
-    # zero: one observation gives the outer product of the returns.
+    # The first return of an asset gives no deviation under the estimated location, so one
+    # observation is not ready. Two observations give the sample covariance of the two: the
+    # location of one return is that return, and its factor is `1 + 1 / n_eff = 2`.
     x1 = [0.01 -0.02 0.03]
-    @test cov(ExpWeightedCovariance(; decay = 0.9, min_obs = 1), x1) ≈ transpose(x1) * x1
+    @test all(isnan, cov(ExpWeightedCovariance(; decay = 0.9, min_obs = 1), x1))
+    @test cov(ExpWeightedCovariance(; decay = 0.9, min_obs = 1, centring = PreCentred()),
+              x1) ≈ transpose(x1) * x1
+    x2 = [0.01 -0.02 0.03; -0.005 0.01 0.02]
+    @test cov(ExpWeightedCovariance(; decay = 0.9, min_obs = 1), x2) ≈ cov(x2)
 
     # The correlation is the correlation of the state divided by its weights.
     ce = ExpWeightedCovariance(; decay = 0.9, min_obs = 1)
@@ -697,7 +732,7 @@ end
     # the nearest positive semidefinite correlation, which is one, and keeps the variances.
     r = [0.02, -0.01, 0.015, -0.02, 0.01, 0.03, -0.025, 0.02]
     Xh = vcat(hcat(r, r), [zeros(5) fill(NaN, 5)])
-    ch = ExpWeightedCovariance(; decay = 0.7, min_obs = 1, centred = true)
+    ch = ExpWeightedCovariance(; decay = 0.7, min_obs = 1, centring = PreCentred())
     sh = cov(ch, Xh)
     sth = partial_fit!(ch, Xh).cache
     Ph = sth.covariance ./ sth.weight
@@ -719,8 +754,8 @@ end
         Xr[rand(rng, T, N) .< rand(rng) / 2] .= NaN
         ar = rand(rng, T, N) .> 0.05
         λr = 0.01 + 0.98 * rand(rng)
-        for centred in (true, false), mask in (ar, nothing)
-            er = ExpWeightedCovariance(; decay = λr, min_obs = 1, centred = centred)
+        for centring in (PreCentred(), EstimatedCentring()), mask in (ar, nothing)
+            er = ExpWeightedCovariance(; decay = λr, min_obs = 1, centring = centring)
             Sr = cov(er, Xr; active_mask = mask)
             f = findall(isfinite, diag(Sr))
             length(f) < 2 && continue
@@ -737,17 +772,17 @@ end
     @test worst > -1e-14
     @test worst_raw < -0.01
 
-    # The fold S = λ^{n_b} S_a + S_b is exact for a centred estimator over a complete block and
-    # not for an uncentred one, which is why a merge is refused.
-    fold_gap(centred) = begin
-        est = ExpWeightedCovariance(; decay = 0.9, centred = centred)
+    # The fold S = λ^{n_b} S_a + S_b is exact under `PreCentred` over a complete block and not
+    # under the estimated location, which is why a merge is refused.
+    fold_gap(centring) = begin
+        est = ExpWeightedCovariance(; decay = 0.9, centring = centring)
         a = partial_fit!(est, view(Xc, 1:12, :)).cache.covariance
         b = partial_fit!(est, view(Xc, 13:EW_T, :)).cache.covariance
         full = partial_fit!(est, Xc).cache.covariance
         maximum(abs, 0.9^(EW_T - 12) * a + b - full) / maximum(abs, full)
     end
-    @test fold_gap(true) < 1e-14
-    @test fold_gap(false) > 1e-4
+    @test fold_gap(PreCentred()) < 1e-14
+    @test fold_gap(EstimatedCentring()) > 1e-4
 
     # A second block writes the state of the first estimator in place, so the two share it.
     c1 = partial_fit!(ExpWeightedCovariance(; decay = 0.9), view(Xc, 1:20, :))
@@ -768,11 +803,13 @@ end
 end
 
 # The mathematics of `ExpWeightedVariance`, written out one asset at a time: the valid returns
-# since the last reset, a location seeded at zero and not corrected for the cold start, the
-# deviation from the location before each return, and the corrected weighted sum of squares.
-function ewvar_reference(X, amsk, decay, min_obs, centred)
+# since the last reset, the normalised location of the returns before each one, its factor
+# `1 + sum(a^2)` read from the weights themselves, and the corrected weighted sum of the terms.
+# Under `PreCentred` each return is its own term.
+function ewvar_reference(X, amsk, decay, min_obs, estimated)
     T, N = size(X)
     out = fill(NaN, T, N)
+    lag = estimated ? 1 : 0
     for i in 1:N
         hist = Float64[]
         for t in 1:T
@@ -783,17 +820,22 @@ function ewvar_reference(X, amsk, decay, min_obs, centred)
                 push!(hist, X[t, i])
             end
             n = length(hist)
-            if (!act || n < min_obs)
+            K = n - lag
+            if (!act || n < min_obs || K < 1)
                 continue
             end
-            m = 0.0
             S = 0.0
-            for (k, x) in enumerate(hist)
-                e = centred ? x : x - m
-                m = decay * m + (1 - decay) * x
-                S += (1 - decay) * decay^(n - k) * e^2
+            for k in (lag + 1):n
+                w = decay .^ ((k - 2):-1:0)
+                a = w ./ sum(w)
+                e2 = if estimated
+                    (hist[k] - sum(a .* hist[1:(k - 1)]))^2 / (1 + sum(abs2, a))
+                else
+                    hist[k]^2
+                end
+                S += (1 - decay) * decay^(n - k) * e2
             end
-            out[t, i] = S / (1 - decay^n)
+            out[t, i] = S / (1 - decay^K)
         end
     end
     return out
@@ -812,9 +854,10 @@ end
         amsk = rand(rng, Bool) ? nothing : rand(rng, T, N) .> 0.12
         decay = rand(rng, (0.5, 0.9, exp2(-inv(40.0))))
         min_obs = rand(rng, 1:4)
-        centred = rand(rng, Bool)
-        ce = ExpWeightedVariance(; decay = decay, min_obs = min_obs, centred = centred)
-        ref = ewvar_reference(X, amsk, decay, min_obs, centred)
+        estimated = rand(rng, Bool)
+        ce = ExpWeightedVariance(; decay = decay, min_obs = min_obs,
+                                 centring = estimated ? EstimatedCentring() : PreCentred())
+        ref = ewvar_reference(X, amsk, decay, min_obs, estimated)
         vs = PortfolioOptimisers.variance_series(ce, X; active_mask = amsk)
         @test isequal(isnan.(vs), isnan.(ref))
         @test isapprox(filter(isfinite, vs), filter(isfinite, ref); rtol = 1e-12)
@@ -834,20 +877,26 @@ end
         @test isequal(var(both), vs[end, :])
     end
 
-    # The location is the mean of `ExpWeightedExpectedReturns` without its correction, so it is
-    # that mean times `1 - decay^n`.
+    # The estimated location on the oracle's fixture, against the hand reference.
+    Xo, ao = oracle_returns(), oracle_active_mask()
+    Xog = gapped(Xo, ao)
+    @test isapprox(var(ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1), Xog;
+                       active_mask = ao),
+                   ewvar_reference(Xog, ao, EW_DECAY, 1, true)[end, :]; rtol = 1e-12)
+
+    # The location is divided by the sum of its weights, so it is the mean of
+    # `ExpWeightedExpectedReturns` (#1507).
     X = 0.02 .* randn(rng, 25, 3) .+ 0.01
     X[1:7, 2] .= NaN
     ce = ExpWeightedVariance(; decay = 0.9, min_obs = 1)
-    n = vec(count(isfinite, X; dims = 1))
     mu = mean(ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 1), X)
-    @test partial_fit!(ce, X).cache.location ≈ (1 .- 0.9 .^ n) .* mu
+    @test partial_fit!(ce, X).cache.location ≈ mu rtol = 1e-14
 
-    # A reset puts the location back at its seed, zero.
+    # A reset leaves the asset with no location, `NaN`.
     amsk = trues(size(X))
     amsk[end, 3] = false
     state = partial_fit!(ce, X; active_mask = amsk).cache
-    @test iszero(state.location[3]) &&
+    @test isnan(state.location[3]) &&
           iszero(state.variance[3]) &&
           iszero(state.obs_count[3])
 
@@ -869,10 +918,17 @@ end
     # The cold-start correction divides by `1 - decay^n` with no floor. A floor at `eps` of the
     # element type halved the one-observation answer at `decay = prevfloat(1.0)`, and cut it
     # to 0.84 of itself on `Float32` data at `decay = 1 - 1e-7`.
-    @test var(ExpWeightedVariance(; decay = prevfloat(1.0), min_obs = 1),
-              fill(0.01, 1, 1)) ≈ [1e-4]
-    @test var(ExpWeightedVariance(; decay = 1 - 1e-7, min_obs = 1), fill(0.01f0, 1, 1)) ≈
-          [1.0f-4] rtol = 1e-5
+    @test var(ExpWeightedVariance(; decay = prevfloat(1.0), min_obs = 1,
+                                  centring = PreCentred()), fill(0.01, 1, 1)) ≈ [1e-4]
+    @test var(ExpWeightedVariance(; decay = 1 - 1e-7, min_obs = 1, centring = PreCentred()),
+              fill(0.01f0, 1, 1)) ≈ [1.0f-4] rtol = 1e-5
+    # Under the estimated location one return gives no term, and two give the sample variance
+    # of the two, whatever the decay.
+    @test isnan(only(var(ExpWeightedVariance(; decay = 0.9, min_obs = 1), fill(0.01, 1, 1))))
+    for decay in (0.5, 0.9, prevfloat(1.0))
+        @test only(var(ExpWeightedVariance(; decay = decay, min_obs = 1), [0.01; -0.02;;])) ≈
+              var([0.01, -0.02])
+    end
 
     # An integer panel gets a floating-point state, and a `Float32` panel keeps `Float32`.
     Xi = [1 2; 3 -1; 0 2; 2 1; -1 0]
@@ -883,18 +939,174 @@ end
     @test eltype(var(ce, Float32.(Xi))) === Float32
     @test eltype(PortfolioOptimisers.variance_series(ce, Float32.(Xi))) === Float32
 
-    # The effective count is Kish's count of the weights `decay^k` over the finite rows, and it
-    # is also the divisor, because the weights sum to one.
+    # Under `PreCentred` the effective count is Kish's count of the weights `decay^k` over the
+    # finite rows, and it is also the divisor, because the weights sum to one. Under the
+    # estimated location the terms start at the second row, so the divisor is Kish's count of
+    # one row fewer, and the location spends one observation, as the mean of a sample variance
+    # does: with equal weights the pair is `(n, n - 1)`.
     X[3:9, 1] .= NaN
-    cnt = PortfolioOptimisers.variance_count(ExpWeightedVariance(; decay = 0.9), X)
+    cnt = PortfolioOptimisers.variance_count(ExpWeightedVariance(; decay = 0.9,
+                                                                 centring = PreCentred()),
+                                             X)
+    cne = PortfolioOptimisers.variance_count(ExpWeightedVariance(; decay = 0.9), X)
+    kish(k) = (a = 0.9 .^ (0:(k - 1)); a = a / sum(a); sum(a)^2 / sum(abs2, a))
     for i in axes(X, 2)
-        a = 0.9 .^ (0:(count(isfinite, view(X, :, i)) - 1))
-        a = a / sum(a)
-        @test cnt.n[i] ≈ sum(a)^2 / sum(abs2, a)
+        k = count(isfinite, view(X, :, i))
+        @test cnt.n[i] ≈ kish(k)
+        @test cne.m[i] ≈ kish(k - 1)
     end
     @test cnt.m == cnt.n
+    @test cne.n == cne.m .+ 1
     λ = exp2(-inv(40.0))
-    @test PortfolioOptimisers.exp_weighted_variance_count(λ, ones(10_000, 1)).n[1] ≈
+    @test PortfolioOptimisers.exp_weighted_variance_count(λ, ones(10_000, 1), PreCentred()).n[1] ≈
           (1 + λ) / (1 - λ)
     @test round((1 + λ) / (1 - λ)) == 115
+end
+
+#=
+#1507. The estimated location is unbiased from the second valid return.
+
+For returns independent in time with mean `μ` and variance `σ²`, the deviation from the normalised
+location of the returns before it has the variance `σ² (1 + 1 / n_eff)`, and the deviations of a
+pair have the covariance `σ_ij (1 + c_ij)`, with `c_ij` the overlap of the two locations. Each
+term divided by its factor has the mean `σ²`, so every exponentially weighted mean of the terms is
+unbiased, at every row and on any pattern of holidays. A simulation on #1507 checked the three
+formulas (the scalar factor, the pair factor and the lagged HAC term) against Monte Carlo means:
+the z-scores had an RMS of 0.97 and 1.02 over 245 and 4390 cells. Each test below compares the
+mean over many independent samples with the truth, within four standard errors of that mean.
+`PreCentred()` is the contrast: its mean is too large by `μ²`, or by `μ_i μ_j` for a pair.
+=#
+function within_se(est::AbstractMatrix, truth; k = 4)
+    m = vec(mean(est; dims = 2))
+    se = vec(std(est; dims = 2)) ./ sqrt(size(est, 2))
+    return all(abs.(m .- truth) .< k .* se)
+end
+
+@testset "The estimated location is unbiased from the second return" begin
+    rng = StableRNG(1507)
+    μ, M = 0.3, 20_000
+    for (hl, T) in ((10, 20), (40, 60))
+        λ = 2.0^(-1 / hl)
+        X = μ .+ randn(rng, T, M)
+        vs = PortfolioOptimisers.variance_series(ExpWeightedVariance(; decay = λ,
+                                                                     min_obs = 1), X)
+        @test all(isnan, vs[1, :])
+        @test within_se(vs[2:end, :], 1.0)
+        vp = PortfolioOptimisers.variance_series(ExpWeightedVariance(; decay = λ,
+                                                                     min_obs = 1,
+                                                                     centring = PreCentred()),
+                                                 X)
+        @test within_se(vp, 1 + μ^2)
+        @test !within_se(vp, 1.0)
+        # The regime-adjusted variance with no regime is the same estimate.
+        rv = RegimeAdjustedExpWeightedVariance(; decay = λ, min_obs = 1,
+                                               regime_method = nothing)
+        @test isequal(PortfolioOptimisers.variance_series(rv, X), vs)
+    end
+end
+
+@testset "A pair with different histories is unbiased under its own factor" begin
+    # The holiday fixture of the simulation of #1507: asset 1 is valid at every row, asset 2 has
+    # a holiday every fifth row, and asset 3 lists at row 12 with holidays at 18, 19 and 27.
+    T, R = 40, 20_000
+    λ = 2.0^(-1 / 10)
+    μ = [0.3, -0.5, 1.0]
+    s = [1.0, 1.5, 0.7]
+    C = [1.0 0.6 -0.3; 0.6 1.0 0.2; -0.3 0.2 1.0] .* (s * transpose(s))
+    L = cholesky(C).L
+    V = trues(T, 3)
+    V[5:5:T, 2] .= false
+    V[1:11, 3] .= false
+    V[[18, 19, 27], 3] .= false
+    rng = StableRNG(1508)
+    est = Dict(c => zeros(6, R) for c in (:estimated, :pre, :hac))
+    pairs = [(1, 1), (2, 2), (3, 3), (1, 2), (1, 3), (2, 3)]
+    ce = ExpWeightedCovariance(; decay = λ, min_obs = 1)
+    cp = ExpWeightedCovariance(; decay = λ, min_obs = 1, centring = PreCentred())
+    ch = RegimeAdjustedExpWeightedCovariance(; decay = λ, min_obs = 1, hac_lags = 2,
+                                             regime_method = nothing)
+    for r in 1:R
+        X = transpose(μ .+ L * randn(rng, 3, T))
+        X = ifelse.(V, X, NaN)
+        Se = PortfolioOptimisers.exp_weighted_moment(partial_fit!(ce, X).cache, ce;
+                                                     repair = false)
+        Sp = PortfolioOptimisers.exp_weighted_moment(partial_fit!(cp, X).cache, cp;
+                                                     repair = false)
+        Sh = PortfolioOptimisers.regime_adjusted_covariance(partial_fit!(ch, X).cache, ch;
+                                                            repair = false)
+        for (k, (i, j)) in enumerate(pairs)
+            est[:estimated][k, r] = Se[i, j]
+            est[:pre][k, r] = Sp[i, j]
+            est[:hac][k, r] = Sh[i, j]
+        end
+    end
+    truth = [C[i, j] for (i, j) in pairs]
+    @test within_se(est[:estimated], truth)
+    @test within_se(est[:hac], truth)
+    @test within_se(est[:pre], truth .+ [μ[i] * μ[j] for (i, j) in pairs])
+    @test !within_se(est[:pre], truth)
+end
+
+@testset "The HAC variance is unbiased under the estimated location" begin
+    # Under HAC each term adds the lagged products of the deviations, and a lagged product of
+    # two estimated deviations has a non-zero mean. The factor reads it, so the recursion is
+    # unbiased for returns independent in time, at one, two and five lags, with holidays. The
+    # test reads the raw state: the report floors a negative HAC variance at zero, which is the
+    # floor of `NoHacFloor` and adds a positive bias to a young estimate.
+    rng = StableRNG(1509)
+    μ, M, T = 0.3, 20_000, 30
+    λ = 2.0^(-1 / 10)
+    X = μ .+ randn(rng, T, M)
+    X[rand(rng, T, M) .< 0.1] .= NaN
+    for (L, centring, truth) in
+        ((1, EstimatedCentring(), 1.0), (2, EstimatedCentring(), 1.0),
+         (5, EstimatedCentring(), 1.0), (2, PreCentred(), 1.0))
+        rv = RegimeAdjustedExpWeightedVariance(; decay = λ, min_obs = 1, hac_lags = L,
+                                               regime_method = nothing, centring = centring)
+        lag = PortfolioOptimisers.centring_lag(centring)
+        raw = fill(NaN, T, M)
+        PortfolioOptimisers.regime_adjusted_variance_pass!(rv, X, 1, nothing, nothing
+                                                           ) do t, c
+            K = c.obs_count .- lag
+            raw[t, :] = ifelse.(K .>= 1, c.variance ./ (1 .- λ .^ K), NaN)
+            return nothing
+        end
+        z = map(2:T) do t
+            r = filter(isfinite, view(raw, t, :))
+            return (mean(r) - truth) / (std(r) / sqrt(length(r)))
+        end
+        # `PreCentred` is unbiased only for a mean of zero, so it is the contrast here.
+        @test (maximum(abs, z) < 4) == isa(centring, EstimatedCentring)
+    end
+end
+
+@testset "The estimated location folds exactly, one block at a time" begin
+    # The online state carries the location, its count and the overlap of each pair, so three
+    # blocks fold to the fit over every row, on a panel with a listing, a reset and holidays.
+    rng = StableRNG(1510)
+    T, N = 45, 4
+    X = 0.02 .* randn(rng, T, N) .+ 0.005
+    amsk = trues(T, N)
+    amsk[1:9, 2] .= false
+    amsk[20:24, 3] .= false
+    X[.!amsk] .= NaN
+    X[[7, 13, 31], 1] .= NaN
+    blocks = (1:11, 12:30, 31:T)
+    for est in (ExpWeightedVariance(; decay = 0.9, min_obs = 2),
+                ExpWeightedCovariance(; decay = 0.9, min_obs = 2),
+                RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 2, hac_lags = 2,
+                                                  regime_min_obs = 2),
+                RegimeAdjustedExpWeightedCovariance(; decay = 0.9, min_obs = 2, hac_lags = 2,
+                                                    regime_min_obs = 2))
+        folded = foldl((e, b) -> partial_fit!(e, view(X, b, :);
+                                              active_mask = view(amsk, b, :)), blocks;
+                       init = est)
+        whole = partial_fit!(est, X; active_mask = amsk)
+        v = if est isa Union{ExpWeightedVariance, RegimeAdjustedExpWeightedVariance}
+            var
+        else
+            cov
+        end
+        @test isequal(v(folded), v(whole))
+    end
 end

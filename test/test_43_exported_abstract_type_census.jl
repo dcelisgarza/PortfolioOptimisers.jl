@@ -159,7 +159,9 @@
                           :AbstractLastObservationAlgorithm, :AbstractEmptyPairAlgorithm,
                           :AbstractPanelCollapseAlgorithm, :AbstractWindowRule,
                           :AbstractChoiceRule, :AbstractNeutralisationWeights,
-                          :AbstractOrthogonalForecastFit])
+                          :AbstractOrthogonalForecastFit, :AbstractCentring,
+                          :AbstractRegimeDebias, :AbstractHacFloor,
+                          :AbstractHacVolatilityTiming])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&

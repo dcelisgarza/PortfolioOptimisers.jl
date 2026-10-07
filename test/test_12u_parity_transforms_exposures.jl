@@ -119,8 +119,8 @@ function parity_neutralise_prior(; neutralise = nothing,
                                             "style1" => parity_passthrough("style1"),
                                             "style2" => parity_passthrough("style2")])
     pe = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
-                        ce = RegimeAdjustedExpWeightedCovariance(; centred = true,
-                                                                 debias = false,
+                        ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred(),
+                                                                 debias = RawStatistic(),
                                                                  regime_lohi_mult = (0.7,
                                                                                      1.6)))
     return CrossSectionalFactorPrior(; lambda = 1, factors = factors,

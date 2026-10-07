@@ -18,7 +18,7 @@ $(DocStringExtensions.FIELDS)
     ExpWeightedVariance(;
         decay::Number = exp2(-inv(40.0)),
         min_obs::Integer = round(Int, max(1, decay_half_life(decay))),
-        centred::Bool = false,
+        centring::AbstractCentring = EstimatedCentring(),
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> ExpWeightedVariance
 
@@ -31,42 +31,36 @@ Keywords correspond to the struct's fields.
 
 # Mathematical definition
 
-Let ``x_{i, k}`` be the ``k``-th valid return of asset ``i`` since its last reset, ``k = 1, \\ldots, n_i``. The running location starts at zero and follows the same recursion as the variance,
+Let ``x_{i, k}`` be the ``k``-th valid return of asset ``i`` since its last reset, ``k = 1, \\ldots, n_i``. Under [`EstimatedCentring`](@ref), the default, the location is the exponentially weighted mean of the returns, divided by the sum of its weights. The deviation of a return is taken from the location of the returns before it, and its square is divided by its exact factor, because the location is itself an estimate,
 
 ```math
 \\begin{align}
-m_{i, 0} &= 0\\,, \\\\
-m_{i, k} &= \\lambda\\, m_{i, k - 1} + (1 - \\lambda)\\, x_{i, k}\\,.
+m_{i, k} &= \\frac{\\sum_{j = 1}^{k} \\lambda^{k - j} x_{i, j}}{\\sum_{j = 1}^{k} \\lambda^{k - j}}\\,, \\\\
+e_{i, k}^{2} &= \\frac{\\left(x_{i, k} - m_{i, k - 1}\\right)^{2}}{1 + 1 / n^{\\mathrm{eff}}_{k - 1}}\\,, \\quad k = 2, \\ldots, n_i\\,.
 \\end{align}
 ```
 
-The deviation of observation ``k`` is taken from the location that stands before it,
-
-```math
-e_{i, k} = \\begin{cases}
-x_{i, k} - m_{i, k - 1} & \\text{if } \\texttt{centred} = \\texttt{false}\\,, \\\\
-x_{i, k} & \\text{if } \\texttt{centred} = \\texttt{true}\\,.
-\\end{cases}
-```
-
-The internal state of asset ``i`` is the exponentially weighted sum of the squared deviations, and the reported variance divides out the weights that the cold start never accumulated,
+The first return gives no term, so the lag of the centring is ``\\ell = 1``. Under [`PreCentred`](@ref) the deviation is the return, ``e_{i, k} = x_{i, k}`` for ``k = 1, \\ldots, n_i``, and ``\\ell = 0``. The internal state of asset ``i`` is the exponentially weighted sum of its ``K_i = n_i - \\ell`` terms, and the reported variance divides out the weights that the cold start never accumulated,
 
 ```math
 \\begin{align}
-S_i &= (1 - \\lambda) \\sum_{k = 1}^{n_i} \\lambda^{n_i - k} e_{i, k}^{2}\\,, \\\\
-\\hat{\\sigma}^{2}_i &= \\frac{S_i}{1 - \\lambda^{n_i}}\\,.
+S_i &= (1 - \\lambda) \\sum_{k = \\ell + 1}^{n_i} \\lambda^{n_i - k} e_{i, k}^{2}\\,, \\\\
+\\hat{\\sigma}^{2}_i &= \\frac{S_i}{1 - \\lambda^{K_i}}\\,.
 \\end{align}
 ```
 
-The location is not divided by ``1 - \\lambda^{k}``. During the cold start it is pulled toward zero, so an early deviation is taken from a location smaller than the mean of the returns seen. [`ExpWeightedExpectedReturns`](@ref) divides its mean out, so the two locations agree only once ``\\lambda^{k}`` is negligible.
+For returns that are independent in time, each term has the mean ``\\sigma^{2}_i``, so under `EstimatedCentring` the estimate is unbiased from the second return, whatever the mean. Under `PreCentred` it is too large by the square of the mean. [`ZeroStartCentring`](@ref) keeps the rule of the reference implementation: ``\\ell = 0``, the location takes the step ``m_{i, k} = \\lambda m_{i, k - 1} + (1 - \\lambda) x_{i, k}`` from ``m_{i, 0} = 0``, and ``e_{i, k} = x_{i, k} - m_{i, k - 1}`` with no factor.
 
 Where:
 
   - $(math_dict[:lambda_ew])
   - $(math_dict[:n_i_ew])
   - ``x_{i, k}``: The ``k``-th valid return of asset ``i`` since its last reset.
-  - ``m_{i, k}``: The running location of asset ``i`` after ``k`` valid returns.
-  - ``e_{i, k}``: The deviation of the ``k``-th valid return of asset ``i``.
+  - ``m_{i, k}``: The location of asset ``i`` after ``k`` valid returns.
+  - ``n^{\\mathrm{eff}}_{k}``: The Kish count of the weights of a location of ``k`` returns, so ``1 + 1 / n^{\\mathrm{eff}}_{k}`` is the factor of [`centring_factor`](@ref).
+  - ``e_{i, k}^{2}``: The term of the ``k``-th valid return of asset ``i``.
+  - ``\\ell``: The lag of the centring, the count of the leading returns that give no term.
+  - ``K_i``: The count of the terms of asset ``i``.
   - ``S_i``: The internal state of asset ``i``, the `variance` field of [`ExpWeightedVarianceState`](@ref).
   - ``\\hat{\\sigma}^{2}_i``: The reported variance of asset ``i``.
 
@@ -111,28 +105,29 @@ julia> pe.ve.window
     """
     min_obs
     """
-    $(field_dict[:centred])
+    $(field_dict[:centring])
     """
-    centred
+    centring
     """
     $(field_dict[:ew_cache])
     """
     cache
-    function ExpWeightedVariance(decay::Number, min_obs::Integer, centred::Bool,
+    function ExpWeightedVariance(decay::Number, min_obs::Integer,
+                                 centring::AbstractCentring,
                                  cache::Option{<:AbstractPartialFitState})
         assert_unit_interval(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
-        return new{typeof(decay), typeof(min_obs), typeof(centred), typeof(cache)}(decay,
-                                                                                   min_obs,
-                                                                                   centred,
-                                                                                   cache)
+        return new{typeof(decay), typeof(min_obs), typeof(centring), typeof(cache)}(decay,
+                                                                                    min_obs,
+                                                                                    centring,
+                                                                                    cache)
     end
 end
 function ExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                              min_obs::Integer = round(Int, max(1, decay_half_life(decay))),
-                             centred::Bool = false,
+                             centring::AbstractCentring = EstimatedCentring(),
                              cache::Option{<:AbstractPartialFitState} = nothing)::ExpWeightedVariance
-    return ExpWeightedVariance(decay, min_obs, centred, cache)
+    return ExpWeightedVariance(decay, min_obs, centring, cache)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -177,14 +172,14 @@ An asset is valid when its return is finite and the active mask admits it. A val
 # Algorithm
 
  1. Mark each asset whose return is finite and that `active_mask` admits, giving `valid`. With `nothing`, `valid` is the finite mask alone.
- 2. Where `active_mask` is not `nothing`, mark each asset that was active before this observation and is inactive now, giving `newly_inactive`, and set its `variance`, `location` and `obs_count` to zero.
+ 2. Where `active_mask` is not `nothing`, mark each asset that was active before this observation and is inactive now, giving `newly_inactive`. Set its `variance` and `obs_count` to zero, and its `location` to `NaN`.
  3. Store `active_mask` in `active`. With `nothing`, set every entry of `active` to `true`.
  4. If no entry of `valid` is `true`, return the cache unchanged.
- 5. Take the deviation `Xi`. Where `centred` is `true` it is `X`. Where it is `false` it is `X` less the `location` that stands before the observation, and the `location` of each valid asset then takes one step of the recursion of ``m_{i, k}`` in [`ExpWeightedVariance`](@ref).
- 6. Give the `variance` of each valid asset one step of the recursion of ``S_i``, and add one to its `obs_count`.
+ 5. Take the deviations, and the mask `dvalid` of the assets that give a term, with [`centring_location!`](@ref). It also moves the `location` of each valid asset.
+ 6. Divide the square of each deviation by its factor, [`centring_factor`](@ref) of the count before the observation. Give the `variance` of each asset of `dvalid` one step of the recursion of ``S_i``, and add one to the `obs_count` of each valid asset.
  7. Return the cache.
 
-An active asset whose return is not finite is not in `valid`, so steps 5 and 6 leave its state as it was: the state freezes over the holiday.
+An active asset whose return is not finite is not in `valid`, so steps 5 and 6 leave its state as it was: the state freezes over the holiday. Under [`EstimatedCentring`](@ref) the first valid return of an asset moves its location and its count, and gives no term.
 
 # Arguments
 
@@ -211,7 +206,7 @@ function process_observation!(cache::ExpWeightedVarianceState, ce::ExpWeightedVa
         newly_inactive = .!active_mask .& cache.active
         if any(newly_inactive)
             cache.variance[newly_inactive] .= zero(eltype(cache.variance))
-            cache.location[newly_inactive] .= zero(eltype(cache.location))
+            cache.location[newly_inactive] .= convert(eltype(cache.location), NaN)
             cache.obs_count[newly_inactive] .= 0
         end
         cache.active .= active_mask
@@ -223,17 +218,12 @@ function process_observation!(cache::ExpWeightedVarianceState, ce::ExpWeightedVa
         return cache
     end
 
-    Xi = if ce.centred
-        X
-    else
-        dev = X - cache.location
-        cache.location[valid] = ce.decay * view(cache.location, valid) +
-                                (one(ce.decay) - ce.decay) * view(X, valid)
-        dev
-    end
-
-    cache.variance[valid] .= ce.decay * view(cache.variance, valid) +
-                             (one(ce.decay) - ce.decay) * view(Xi, valid) .^ 2
+    dev, dvalid = centring_location!(ce.centring, cache.location, cache.obs_count, X, valid,
+                                     ce.decay)
+    e2 = view(dev, dvalid) .^ 2 ./
+         centring_factor.(Ref(ce.centring), ce.decay, view(cache.obs_count, dvalid))
+    cache.variance[dvalid] .= ce.decay * view(cache.variance, dvalid) +
+                              (one(ce.decay) - ce.decay) * e2
     cache.obs_count[valid] .+= 1
 
     return cache
@@ -266,7 +256,8 @@ function exp_weighted_pass!(f, est::ExpWeightedVariance, X::MatNum, dims::Int,
     # integer panel gets a floating-point state and a `Float32` panel keeps a `Float32` one.
     T = float_if_integer(eltype(X))
     cache = if isnothing(state)
-        ExpWeightedVarianceState(zeros(T, N), zeros(T, N), zeros(Int, N), trues(N))
+        ExpWeightedVarianceState(zeros(T, N), fill(convert(T, NaN), N), zeros(Int, N),
+                                 trues(N))
     else
         @argcheck(length(state.variance) == N,
                   DimensionMismatch("the state holds $(length(state.variance)) assets, and `X` holds $N"))
@@ -306,13 +297,13 @@ Applies the cold-start bias correction and sets every asset that is not ready to
 # Algorithm
 
  1. Copy `cache.variance` into `variance`.
- 2. Mark each asset with a positive `obs_count`, giving `counted`.
- 3. Give each counted asset the cold-start `correction` ``1 / (1 - \\lambda^{n_i})``. Every other asset keeps a `correction` of one.
+ 2. Take the count of the terms ``K_i`` of each asset from its `obs_count` with [`centring_terms`](@ref), and mark each asset with a positive count, giving `counted`.
+ 3. Give each counted asset the cold-start `correction` ``1 / (1 - \\lambda^{K_i})``. Every other asset keeps a `correction` of one.
  4. Multiply `variance` by `correction`.
- 5. Mark each asset that is inactive, or whose `obs_count` is below `est.min_obs`, giving `not_ready`, and set its entry of `variance` to `NaN`.
+ 5. Mark each asset that is inactive, or that [`centring_ready`](@ref) does not find ready, giving `not_ready`, and set its entry of `variance` to `NaN`.
  6. Return `variance`.
 
-Because ``0 < \\lambda < 1``, ``1 - \\lambda^{n_i} \\geq 1 - \\lambda > 0`` for every ``n_i \\geq 1``, so the division needs no floor.
+Because ``0 < \\lambda < 1``, ``1 - \\lambda^{K_i} \\geq 1 - \\lambda > 0`` for every ``K_i \\geq 1``, so the division needs no floor.
 
 # Returns
 
@@ -326,12 +317,12 @@ Because ``0 < \\lambda < 1``, ``1 - \\lambda^{n_i} \\geq 1 - \\lambda > 0`` for 
 """
 function exp_weighted_moment(cache::ExpWeightedVarianceState, est::ExpWeightedVariance)
     variance = copy(cache.variance)
-    counted = cache.obs_count .> zero(eltype(cache.obs_count))
+    K = centring_terms.(Ref(est.centring), cache.obs_count)
+    counted = K .> zero(eltype(K))
     correction = ones(eltype(variance), length(variance))
-    correction[counted] .= inv.(one(est.decay) .-
-                                est.decay .^ view(cache.obs_count, counted))
+    correction[counted] .= inv.(one(est.decay) .- est.decay .^ view(K, counted))
     variance .*= correction
-    not_ready = .!cache.active .| (cache.obs_count .< est.min_obs)
+    not_ready = .!cache.active .| .!centring_ready.(Ref(est.centring), cache.obs_count, est.min_obs)
     if any(not_ready)
         variance[not_ready] .= NaN
     end
@@ -809,7 +800,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses to merge two [`ExpWeightedVarianceState`](@ref).
 
-A centred state folds forward exactly, `S = λ^{n_b} S_a + S_b` with `n_b` the valid observations of the second block, but only while no asset resets inside that block. The state records the count that a reset zeroed and not the reset itself, so a merge cannot tell the two cases apart, and it would keep a history that the reset discarded. An uncentred state does not fold at all, because each deviation of the second block reads a location that carries the first block. Fold the second block into the first with `partial_fit!` instead.
+A state under [`PreCentred`](@ref) folds forward exactly, `S = λ^{n_b} S_a + S_b` with `n_b` the valid observations of the second block, but only while no asset resets inside that block. The state records the count that a reset zeroed and not the reset itself, so a merge cannot tell the two cases apart, and it would keep a history that the reset discarded. A state under [`EstimatedCentring`](@ref) does not fold at all, because each deviation of the second block reads a location that carries the first block. Fold the second block into the first with `partial_fit!` instead.
 
 # Arguments
 
@@ -862,24 +853,31 @@ function supports_partial_fit(::ExpWeightedVariance)
     return true
 end
 """
-    exp_weighted_variance_count(decay::Number, X::MatNum)
+    exp_weighted_variance_count(decay::Number, X::MatNum, centring::AbstractCentring)
 
 Effective count and divisor of an exponentially weighted variance, for each column of `X`.
 
-Each column enters the recursion on its finite rows alone, and the recursion divides out the weights that the cold start never accumulated. So the weights of a column of ``n`` finite rows are proportional to ``\\lambda^{k}``, ``k = 0, \\ldots, n - 1``, and they sum to one. The count reads no active mask, so it does not start again at a reset. Their Kish count is the effective count, and because they sum to one it is also the divisor. [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref) share this count.
+Each column enters the recursion on its finite rows alone, and the recursion divides out the weights that the cold start never accumulated. A column of ``n_{i}`` finite rows gives ``K_{i} = n_{i} - \\ell`` terms, with ``\\ell`` the lag of the centring of [`centring_lag`](@ref). The weights of the terms are proportional to ``\\lambda^{k}``, ``k = 0, \\ldots, K_{i} - 1``, and they sum to one. The count reads no active mask, so it does not start again at a reset. [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref) share this count.
+
+The Kish count of the weights of the terms is the count of the terms that the estimate is worth. Under [`PreCentred`](@ref) each term reads one observation, so it is both the effective count and the divisor. Under [`EstimatedCentring`](@ref) the location spends one observation, as the mean of a sample variance does, so the effective count is one more than the divisor. With equal weights the pair is ``(n_{i}, n_{i} - 1)``, the count and the divisor of a sample variance.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-n_{i}^{\\mathrm{eff}} &= \\dfrac{\\left(\\sum_{k=0}^{n_{i}-1} \\lambda^{k}\\right)^{2}}{\\sum_{k=0}^{n_{i}-1} \\lambda^{2k}} = \\dfrac{\\left(1 - \\lambda^{n_{i}}\\right)\\left(1 + \\lambda\\right)}{\\left(1 - \\lambda\\right)\\left(1 + \\lambda^{n_{i}}\\right)}\\,.
+\\kappa_{i} &= \\dfrac{\\left(\\sum_{k=0}^{K_{i}-1} \\lambda^{k}\\right)^{2}}{\\sum_{k=0}^{K_{i}-1} \\lambda^{2k}} = \\dfrac{\\left(1 - \\lambda^{K_{i}}\\right)\\left(1 + \\lambda\\right)}{\\left(1 - \\lambda\\right)\\left(1 + \\lambda^{K_{i}}\\right)}\\,, \\\\
+n_{i}^{\\mathrm{eff}} &= \\kappa_{i} + \\ell\\,, \\\\
+m_{i} &= \\kappa_{i}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``n_{i}^{\\mathrm{eff}}``: Effective count of the observations of asset ``i``, and the divisor of its variance.
+  - ``\\kappa_{i}``: Kish count of the weights of the terms of asset ``i``.
+  - ``n_{i}^{\\mathrm{eff}}``: Effective count of the observations of asset ``i``.
+  - ``m_{i}``: The divisor of its variance.
   - ``n_{i}``: Number of finite rows of column ``i``.
+  - ``\\ell``: The lag of the centring.
   - $(math_dict[:lambda_ew])
 
 The count tends to ``(1 + \\lambda) / (1 - \\lambda)`` as ``n_{i}`` grows, which is about ``115`` at the default half-life of ``40`` observations.
@@ -888,10 +886,11 @@ The count tends to ``(1 + \\lambda) / (1 - \\lambda)`` as ``n_{i}`` grows, which
 
   - `decay`: Decay of the recursion.
   - `X`: Data matrix `observations × assets`.
+  - `centring`: The centring of the estimator.
 
 # Returns
 
-  - `(; n, m)::NamedTuple`: The effective count `n` and the divisor `m`, one entry per column of `X`. The two vectors are equal.
+  - `(; n, m)::NamedTuple`: The effective count `n` and the divisor `m`, one entry per column of `X`.
 
 # Related
 
@@ -899,15 +898,15 @@ The count tends to ``(1 + \\lambda) / (1 - \\lambda)`` as ``n_{i}`` grows, which
   - [`ExpWeightedVariance`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
-function exp_weighted_variance_count(decay::Number, X::MatNum)
-    n = map(axes(X, 2)) do i
-        lk = decay^count(isfinite, view(X, :, i))
+function exp_weighted_variance_count(decay::Number, X::MatNum, centring::AbstractCentring)
+    m = map(axes(X, 2)) do i
+        lk = decay^centring_terms(centring, count(isfinite, view(X, :, i)))
         return (one(lk) - lk) * (one(decay) + decay) /
                ((one(decay) - decay) * (one(lk) + lk))
     end
-    return (; n = n, m = n)
+    return (; n = m .+ centring_lag(centring), m = m)
 end
 function variance_count(ve::ExpWeightedVariance, X::MatNum)
-    return exp_weighted_variance_count(ve.decay, X)
+    return exp_weighted_variance_count(ve.decay, X, ve.centring)
 end
 export ExpWeightedVariance

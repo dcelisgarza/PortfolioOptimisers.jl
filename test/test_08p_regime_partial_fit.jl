@@ -24,7 +24,8 @@ const PO = PortfolioOptimisers
 const RA_CONFIGS = (RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5,
                                                       regime_min_obs = 3),
                     RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 4,
-                                                      regime_min_obs = 2, centred = true),
+                                                      regime_min_obs = 2,
+                                                      centring = PreCentred()),
                     RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5,
                                                       regime_min_obs = 3, hac_lags = 2),
                     RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5,
@@ -141,7 +142,7 @@ function of the two block states can put back what neither of them recorded.
 @testset "the family refuses a merge, and the shortfall says why" begin
     X = ra_sample(6104)
     ce = RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5, regime_min_obs = 3,
-                                           centred = true)
+                                           centring = PreCentred())
 
     whole = partial_fit!(ce, X).cache
     a = partial_fit!(ce, X[1:30, :]).cache

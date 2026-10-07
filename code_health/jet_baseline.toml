@@ -8,7 +8,7 @@ jet = "0.12.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "e11eeec482"
+commit = "64a255d37d"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -131,11 +131,13 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/29_ExpWeighted/04_ExpWeightedCentring.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/04_HacRowKernel.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/05_RegimeSwitches.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { raw = 1, reviewed = 1 }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { raw = 0, reviewed = 0 }
@@ -532,11 +534,13 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/29_ExpWeighted/04_ExpWeightedCentring.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/04_HacRowKernel.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/05_RegimeSwitches.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { raw = 0, reviewed = 0 }

@@ -141,14 +141,18 @@ end
     X, pnl = fx.rd.X, fx.rd.pnl
     load(c, k) = parity_load("WindowedMoments", c, k)
     decay = 2.0^(-1 / 10)
-    @testset "$(c)" for (c, n, centred) in (("W30HL10", 30, true), ("W12HL10", 12, true),
-                                            ("W30HL10Unc", 30, false))
+    # "Unc" is the oracle's estimated location, which starts at zero and is not divided by its
+    # weight: `ZeroStartCentring()` since #1507 (ADR 0190).
+    @testset "$(c)" for (c, n, centring) in
+                        (("W30HL10", 30, PreCentred()), ("W12HL10", 12, PreCentred()),
+                         ("W30HL10Unc", 30, ZeroStartCentring()))
         me = WindowedExpectedReturns(;
                                      me = ExpWeightedExpectedReturns(; decay, min_obs = 5),
                                      window = n)
-        vw = WindowedVariance(; ve = ExpWeightedVariance(; decay, min_obs = 5, centred),
+        vw = WindowedVariance(; ve = ExpWeightedVariance(; decay, min_obs = 5, centring),
                               window = n)
-        cw = WindowedCovariance(; ce = ExpWeightedCovariance(; decay, min_obs = 5, centred),
+        cw = WindowedCovariance(;
+                                ce = ExpWeightedCovariance(; decay, min_obs = 5, centring),
                                 window = n)
         @test parity_compare(vec(mean(me, X, pnl)), vec(load(c, "Mu")); name = "$c mu").ok
         @test parity_compare(vec(var(vw, X, pnl)), vec(load(c, "Var")); name = "$c var").ok
@@ -170,7 +174,7 @@ end
                                  outlier = nothing, scoring = nothing, family = "style")
     factors = ["market" => ConstantExposure(), "style1" => mpass("style1"),
                "style2" => mpass("style2")]
-    ve = ExpWeightedVariance(; decay = 2.0^(-1 / 10), min_obs = 5, centred = true)
+    ve = ExpWeightedVariance(; decay = 2.0^(-1 / 10), min_obs = 5, centring = PreCentred())
     fit(v, wa = MarketCapWeights()) = prior(CrossSectionalFactorPrior(; lambda = 1,
                                                                       factors = factors,
                                                                       minra = 5, wa = wa,
@@ -259,8 +263,8 @@ end
     X, am = fx.rd.X, fx.rd.pnl.amsk
     T, N = size(X)
     mi = ExpWeightedExpectedReturns(; decay = SW_DECAY, min_obs = 5)
-    ci = ExpWeightedCovariance(; decay = SW_DECAY, min_obs = 5, centred = true)
-    vi = ExpWeightedVariance(; decay = SW_DECAY, min_obs = 5, centred = true)
+    ci = ExpWeightedCovariance(; decay = SW_DECAY, min_obs = 5, centring = PreCentred())
+    vi = ExpWeightedVariance(; decay = SW_DECAY, min_obs = 5, centring = PreCentred())
     # The read-out after a stream is the batch fit of the inner estimator over the window of
     # the first block and every later row, the rows `s:t`. The fold and the batch fit run the
     # same recursion, so the two are equal.
@@ -371,16 +375,17 @@ end
     T, N = size(X)
     streams = Dict("Blocks" => [0, 45, 52, 53, 66, T], "Rows" => vcat([0, 40], 41:T))
     load(c, k) = parity_load("SeedWindow", c, k)
-    @testset "$(c)" for (c, n, centred, h, st) in
-                        (("W30Blocks", 30, true, nothing, "Blocks"),
-                         ("W12Blocks", 12, true, nothing, "Blocks"),
-                         ("W30BlocksUnc", 30, false, nothing, "Blocks"),
-                         ("W30Rows", 30, true, nothing, "Rows"),
-                         ("W100Blocks", 100, true, nothing, "Blocks"),
-                         ("W30BlocksH5", 30, true, 5, "Blocks"))
+    # `W30BlocksUnc` pins the oracle's zero-start location, `ZeroStartCentring()` since #1507.
+    @testset "$(c)" for (c, n, centring, h, st) in
+                        (("W30Blocks", 30, PreCentred(), nothing, "Blocks"),
+                         ("W12Blocks", 12, PreCentred(), nothing, "Blocks"),
+                         ("W30BlocksUnc", 30, ZeroStartCentring(), nothing, "Blocks"),
+                         ("W30Rows", 30, PreCentred(), nothing, "Rows"),
+                         ("W100Blocks", 100, PreCentred(), nothing, "Blocks"),
+                         ("W30BlocksH5", 30, PreCentred(), 5, "Blocks"))
         mi = ExpWeightedExpectedReturns(; decay = SW_DECAY, min_obs = 5)
-        ci = ExpWeightedCovariance(; decay = SW_DECAY, min_obs = 5, centred = centred)
-        vi = ExpWeightedVariance(; decay = SW_DECAY, min_obs = 5, centred = centred)
+        ci = ExpWeightedCovariance(; decay = SW_DECAY, min_obs = 5, centring = centring)
+        vi = ExpWeightedVariance(; decay = SW_DECAY, min_obs = 5, centring = centring)
         me = WindowedExpectedReturns(; me = mi, window = n, rule = SeedWindow())
         ce = WindowedCovariance(; ce = ci, window = n, rule = SeedWindow())
         vw = WindowedVariance(; ve = vi, window = n, rule = SeedWindow())

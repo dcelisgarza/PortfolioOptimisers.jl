@@ -55,7 +55,7 @@ asset is inactive, and it wrote it unconditionally: no estimator in the `ce` slo
 It now asks `ce` what a gapped cell is worth to it with `gap_fill_value`. A plain moment estimator
 takes the fallback zero, because it refuses a gapped sample outright; a gap-aware one answers `NaN`,
 which leaves the gap where it is and is handed the panel's active mask beside it. The slot's default
-is now `ExpWeightedCovariance(; centred = true)`, which is what the reference implementation's own
+is now `ExpWeightedCovariance(; centring = PreCentred())`, which is what the reference implementation's own
 default is, so the overlay reaches its answer to machine precision. `gap_fill_value` recurses
 through a composite that forwards the sample untouched, and `test_08z` gates the trait itself.
 =#
@@ -167,14 +167,14 @@ fit_rows(rd, pr) = (size(rd.X, 1) - size(pr.X, 1) + 1):size(rd.X, 1)
         @test isa(pe.pe, EmpiricalPrior)
         @test isa(pe.pe.me, ExpWeightedExpectedReturns)
         @test isa(pe.pe.ce, RegimeAdjustedExpWeightedCovariance)
-        @test pe.pe.ce.centred
+        @test isa(pe.pe.ce.centring, PreCentred)
         @test isa(pe.ve, RegimeAdjustedExpWeightedVariance)
-        @test pe.ve.centred
+        @test isa(pe.ve.centring, PreCentred)
         @test pe.pe.me.decay == pe.pe.ce.decay == pe.ve.decay
         # Issue #925. `EWCovariance(assume_centered=True, nearest=False)` is the reference
-        # implementation's own default, and `centred` is the whole residual against it.
+        # implementation's own default, and `centring` is the whole residual against it.
         @test isa(pe.ce, ExpWeightedCovariance)
-        @test pe.ce.centred
+        @test isa(pe.ce.centring, PreCentred)
         @test isnan(PO.gap_fill_value(pe.ce))
         @test iszero(pe.th)
         @test isone(pe.bp)
@@ -721,7 +721,7 @@ end
 
         # The gap-aware default is handed the gap and the mask instead, so its answer is the
         # masked estimator's own.
-        ce = ExpWeightedCovariance(; centred = true)
+        ce = ExpWeightedCovariance(; centring = PreCentred())
         @test isnan(PO.gap_fill_value(ce))
         Dg = PO.cross_sectional_idiosyncratic_covariance(th, ce, nothing, S, ev, amsk)
         @test isapprox(Dg,

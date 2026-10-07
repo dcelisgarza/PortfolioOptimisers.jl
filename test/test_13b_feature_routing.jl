@@ -486,7 +486,7 @@ const PO = PortfolioOptimisers
                         AggregateFeatures(), AggregateDistances(), StackObservations())
                 de_r = FeatureDistance(; sel = sel, alg = alg)
                 Zr = feature_matrix(de_r, nothing, trd, trd.X)
-                rr = PortfolioOptimisers.window_rows(alg, tpnl, R)
+                rr = PortfolioOptimisers.readable_window_rows(alg, tpnl, R)
                 @test size(Zr, 1) == length((1:Tt)[rr])
                 @test isequal(Zr, Z0[rr, :, :])
                 @test isequal(res(() -> distance(de_r, nothing, trd.X; rd = trd)),

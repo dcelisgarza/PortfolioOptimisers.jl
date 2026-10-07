@@ -4,7 +4,7 @@
 
 Build the exponentially weighted variance estimator an [`EWVolatility`](@ref) reads by default.
 
-The estimator is the plain recursion. It is uncentred, it divides by `1 - λ^n` to correct the bias, it restarts an asset that turns inactive, and it applies **no regime adjustment**. `centred = true` gives the uncentred form, because the flag declares the returns already centred, so the estimator tracks no location. `regime_method = nothing` turns off the regime multiplier of [`RegimeAdjustedExpWeightedVariance`](@ref), because a volatility Descriptor is not scaled by a regime.
+The estimator is the plain recursion. It is uncentred, it divides by `1 - λ^n` to correct the bias, it restarts an asset that turns inactive, and it applies **no regime adjustment**. `centring = PreCentred()` gives the uncentred form, because it declares the returns already centred, so the estimator tracks no location. `regime_method = nothing` turns off the regime multiplier of [`RegimeAdjustedExpWeightedVariance`](@ref), because a volatility Descriptor is not scaled by a regime.
 
 # Mathematical definition
 
@@ -49,8 +49,9 @@ Where:
 ```jldoctest
 julia> ce = PortfolioOptimisers.ew_variance_estimator(5.0);
 
-julia> (ce.decay ≈ exp2(-inv(5.0)), ce.min_obs, ce.centred, ce.regime_method)
-(true, 5, true, nothing)
+julia> (ce.decay ≈ exp2(-inv(5.0)), ce.min_obs, ce.centring, ce.regime_method)
+(true, 5, PreCentred()
+, nothing)
 
 julia> PortfolioOptimisers.ew_variance_estimator(5.0, 8.0).min_obs
 8
@@ -66,7 +67,8 @@ function ew_variance_estimator(half_life::Real,
                                warm_up::Real = half_life)::RegimeAdjustedExpWeightedVariance
     return RegimeAdjustedExpWeightedVariance(; decay = half_life_decay(half_life),
                                              min_obs = half_life_min_obs(warm_up, :warm_up),
-                                             centred = true, regime_method = nothing)
+                                             centring = PreCentred(),
+                                             regime_method = nothing)
 end
 """
 $(DocStringExtensions.TYPEDEF)

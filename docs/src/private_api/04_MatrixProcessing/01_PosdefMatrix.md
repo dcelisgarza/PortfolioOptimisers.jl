@@ -1,5 +1,5 @@
 ```@meta
-Description = "Posdef matrix, private API of PortfolioOptimisers.jl: posdef_accepts, posdef_repair!, clipped_correlation, clipped_repair_holds, …"
+Description = "Posdef matrix, private API of PortfolioOptimisers.jl: posdef_accepts, posdef_repair!, clipped_correlation, clipped_repair_holds, assert_posdef_repair, …"
 ```
 
 # Posdef matrix: private API

@@ -54,9 +54,11 @@ using Statistics
 # oracle's raw regime statistic. The library's default divides the statistic by the bias of the
 # estimate it reads (#1428, ADR 0190), and the oracle does not.
 const PARITY_PE = EmpiricalPrior(; me = ExpWeightedExpectedReturns(),
-                                 ce = RegimeAdjustedExpWeightedCovariance(; centred = true,
-                                                                          debias = false))
-const PARITY_VE = RegimeAdjustedExpWeightedVariance(; centred = true, debias = false)
+                                 ce = RegimeAdjustedExpWeightedCovariance(;
+                                                                          centring = PreCentred(),
+                                                                          debias = RawStatistic()))
+const PARITY_VE = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
+                                                    debias = RawStatistic())
 
 """
     parity_panel(; T, N, seed) -> NamedTuple
