@@ -257,11 +257,6 @@ MatrixProcessing
   - [`Denoise`](@ref)
   - [`Detone`](@ref)
   - [`AbstractMatrixProcessingAlgorithm`](@ref)
-
-# References
-
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:mpdist])
 """
 @concrete struct MatrixProcessing <: AbstractMatrixProcessingEstimator
     """
@@ -395,11 +390,6 @@ julia> matrix_processing!(MatrixProcessing(; dt = Detone()), sigma, X)
   - [`detone!`](@ref)
   - [`matrix_processing_algorithm!`](@ref)
   - [`MatNum`](@ref)
-
-# References
-
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:mpdist])
 """
 function matrix_processing!(::Nothing, sigma::MatNum, args...; kwargs...)::MatNum
     return sigma

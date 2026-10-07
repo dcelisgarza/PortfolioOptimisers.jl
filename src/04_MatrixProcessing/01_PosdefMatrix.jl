@@ -85,6 +85,8 @@ The covariance ``\\mathbf{\\Sigma}`` is standardised, and the eigenvalues of the
 \\end{align}
 ```
 
+Equations 8 to 13 of [rebonato2000](@cite) state the clip and the scaling of the diagonal with a floor of zero: they set only the negative eigenvalues to zero, so their result can be singular. The floor ``\\tau > 0`` is this library's change, and it keeps the smallest eigenvalue away from zero. The standardisation of a covariance, the restored variances, the acceptance test and the retry are also this library's.
+
 The repair is accepted when ``\\hat{\\mathbf{\\Sigma}}`` has a Cholesky factor, ``\\lambda_{\\min}(\\hat{\\mathbf{\\Sigma}}) > 0`` and ``\\lambda_{\\min}(\\hat{\\mathbf{C}}) \\geq \\tau / 2``. The half floor absorbs the round-off of the scaling, so a matrix that was repaired once is not repaired again. After the retry at ``10 \\tau``, the repair is also accepted when the Cholesky factor exists and ``\\lambda_{\\min}(\\hat{\\mathbf{\\Sigma}}) \\geq -n\\, \\varepsilon \\max_i |\\lambda_i(\\hat{\\mathbf{\\Sigma}})|``.
 
 With `higham = true`, Higham's alternating projections with Dykstra's correction replace ``\\mathbf{C}`` before the clip. Each iteration projects onto the positive semidefinite cone with an eigenvalue floor of ``5 \\varepsilon``, and then onto the matrices of unit diagonal:
@@ -99,6 +101,8 @@ With `higham = true`, Higham's alternating projections with Dykstra's correction
 ```
 
 The iterations start at ``\\mathbf{Y}_0 = \\mathbf{C}`` and ``\\Delta\\mathbf{S}_0 = \\mathbf{0}``. They stop when ``\\lambda_{\\min}(\\mathbf{Y}_k) \\geq -n\\, \\varepsilon \\max_i |\\lambda_i(\\mathbf{Y}_k)|``, or after `iter` iterations. The clip then runs on the last ``\\mathbf{Y}_k``, so a sequence that has not converged still gives a repaired matrix, and the call is never refused for it.
+
+This is Algorithm 3.3 of [higham2002](@cite) with the unweighted Frobenius norm. That algorithm projects onto the positive semidefinite cone with a floor of zero, and it states no stop test. The floor of ``5 \\varepsilon`` and the stop test above are this library's changes.
 
 Where:
 
@@ -186,7 +190,8 @@ true
 
 # References
 
-  - $(ref_dict[:higham2002])
+  - $(ref_dict[:rebonato2000]) Section 3, Equations 8 to 13.
+  - $(ref_dict[:higham2002]) Section 3.2, Algorithm 3.3.
 """
 @concrete struct ClippedNearestCorrelation <: AbstractAlgorithm
     """
@@ -256,8 +261,8 @@ Posdef
 
 # References
 
-  - $(ref_dict[:higham2002])
-  - $(ref_dict[:qisun2006])
+  - $(ref_dict[:higham2002]) Section 1, Equation 1.1.
+  - $(ref_dict[:qisun2006]) Section 5, Algorithm 5.1.
 """
 @concrete struct Posdef <: AbstractPosdefEstimator
     """
@@ -718,6 +723,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Run Higham's alternating projections with Dykstra's correction on a correlation matrix, and return the last iterate. [`ClippedNearestCorrelation`](@ref) states the iteration under `# Mathematical definition`.
 
+This is Algorithm 3.3 of [higham2002](@cite) with the unweighted Frobenius norm. The floor of `5 * eps` in step 2.2 and the stop test of step 2.5 are this library's changes: the algorithm projects with a floor of zero and states no stop test.
+
 The iterations stop at the first iterate that is positive semidefinite to round-off, or after `iter` iterations. The last iterate is returned in both cases, and the clip that follows repairs the rest. An iterate that has not converged has a unit diagonal and a spectrum that is nearly positive semidefinite, so its clip is a valid correlation matrix, and it is nearer the input than the clip of the input alone.
 
 # Algorithm
@@ -747,7 +754,7 @@ The iterations stop at the first iterate that is positive semidefinite to round-
 
 # References
 
-  - $(ref_dict[:higham2002])
+  - $(ref_dict[:higham2002]) Section 3.2, Algorithm 3.3.
 """
 function higham_alternating_projections(C::MatNum, iter::Integer)
     T = real(eltype(C))

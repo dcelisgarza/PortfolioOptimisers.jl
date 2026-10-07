@@ -9,10 +9,3 @@ Distance
 distance
 cor_and_dist
 ```
-
-## References
-
-```@bibliography
-Pages = [@__FILE__]
-Canonical = false
-```

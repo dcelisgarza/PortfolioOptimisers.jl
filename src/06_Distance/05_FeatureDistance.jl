@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Normalised angular distance metric.
 
-Unlike `Distances.CosineDist` (``1 - \\cos``), the angular distance satisfies the triangle inequality, so it is a true metric and the hierarchies built from it are well defined. It maps ``[-1,\\,1] \\to [1,\\,0]``, so it is bounded, scale-invariant per asset, and admits signed features. Its exact similarity counterpart is [`AngularSimilarity`](@ref), which recovers the cosine from the distance alone.
+Unlike `Distances.CosineDist` (``1 - \\cos``), the angular distance satisfies the triangle inequality, so it is a true metric and the hierarchies built from it are well defined. Lemma 3 of [vandongen2012](@cite) states the angle ``\\arccos`` of a cosine or of a correlation as a metric, and it shows that ``1 - \\cos`` is not one. Section 1 of [charikar2002](@cite) divides the angle by ``\\pi``. It maps ``[-1,\\,1] \\to [1,\\,0]``, so it is bounded, scale-invariant per asset, and admits signed features. Its exact similarity counterpart is [`AngularSimilarity`](@ref), which recovers the cosine from the distance alone.
 
 A zero feature vector has no direction, so the cosine is undefined. By convention two zero vectors are at distance `0` from each other (they are identical) and at distance `1` from every non-zero vector (maximally dissimilar), which keeps ``S = \\cos(\\pi D)`` true on every entry of the matching similarity matrix.
 
@@ -55,7 +55,8 @@ One matrix multiplication replaces ``N^{2}`` scalar calls, and it is the faster 
 
 # References
 
-  - $(ref_dict[:vandongen2012])
+  - $(ref_dict[:vandongen2012]) Section 4, Lemma 3.
+  - $(ref_dict[:charikar2002]) Section 1.
 """
 struct AngularDist <: Distances.Metric end
 function (::AngularDist)(a, b)

@@ -17,6 +17,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :fabozzi2007 => "[fabozzi2007](@cite) F. J. Fabozzi, P. N. Kolm, D. A. Pachamanova and S. M. Focardi. *Robust Portfolio Optimization and Management* (John Wiley & Sons, Hoboken, NJ, 2007).",#
                  :sousalobo2000 => "[sousalobo2000](@cite) M. Sousa Lobo and S. Boyd. *The worst-case risk of a portfolio*. Technical report, Stanford University (2000).",#
                  :higham2002 => "[higham2002](@cite) N. J. Higham. *Computing the nearest correlation matrix—a problem from finance*. IMA Journal of Numerical Analysis 22, 329–343 (2002).",#
+                 :rebonato2000 => "[rebonato2000](@cite) R. Rebonato and P. Jäckel. *The most general methodology for creating a valid correlation matrix for risk management and option pricing purposes*. Journal of Risk 2, 17–27 (2000).",#
                  :qisun2006 => "[qisun2006](@cite) H. Qi and D. Sun. *A quadratically convergent Newton method for computing the nearest correlation matrix*. SIAM Journal on Matrix Analysis and Applications 28, 360–385 (2006).",#
                  :gmd => "[gmd](@cite) S. Yitzhaki. *Stochastic dominance, mean variance, and Gini's mean difference*. The American Economic Review 72, 178–185 (1982).",#
                  :knuth2019 => "[knuth2019](@cite) K. H. Knuth. *Optimal data-based binning for histograms and histogram-based probability density models*. Digital Signal Processing 95, 102581 (2019).",#
@@ -24,6 +25,9 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :markowitz1952 => "[markowitz1952](@cite) H. Markowitz. *Modern portfolio theory*. Journal of Finance 7, 77–91 (1952).",#
                  :mlp1 => "[mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020).",#
                  :lopezdeprado2018 => "[lopezdeprado2018](@cite) M. López de Prado. *Advances in Financial Machine Learning* (John Wiley & Sons, Hoboken, NJ, 2018).",#
+                 :laloux1999 => "[laloux1999](@cite) L. Laloux, P. Cizeau, J.-P. Bouchaud and M. Potters. *Noise dressing of financial correlation matrices*. Phys. Rev. Lett. 83, 1467–1470 (1999).",#
+                 :plerou2002 => "[plerou2002](@cite) V. Plerou, P. Gopikrishnan, B. Rosenow, L. A. Amaral, T. Guhr and H. E. Stanley. *Random matrix approach to cross correlations in financial data*. Phys. Rev. E 65, 066126 (2002).",#
+                 :kim2005 => "[kim2005](@cite) D.-H. Kim and H. Jeong. *Systematic analysis of group identification in stock markets*. Phys. Rev. E 72, 046133 (2005).",#
                  :mpdist => "[mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).",#
                  :NHPG => "[NHPG](@cite) W.-M. Song, T. Di Matteo and T. Aste. *Nested hierarchies in planar graphs*. Discrete Applied Mathematics 159, 2135–2146 (2011).",#
                  :owa1 => "[owa1](@cite) D. Cajas. *OWA portfolio optimization: A disciplined convex programming framework*. Available at SSRN 3988927 (2021).",#
@@ -119,6 +123,10 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :luca2011 => "[luca2011](@cite) G. De Luca and P. Zuccolotto. *A tail dependence-based dissimilarity measure for financial time series clustering*. Advances in Data Analysis and Classification 5, 323–340 (2011).",#
                  :hacinegharbi2012 => "[hacinegharbi2012](@cite) A. Hacine-Gharbi, P. Ravier, R. Harba and T. Mohamadi. *Low bias histogram-based estimation of mutual information for feature selection*. Pattern Recognition Letters 33, 1302–1308 (2012).",#
                  :hacinegharbi2018 => "[hacinegharbi2018](@cite) A. Hacine-Gharbi and P. Ravier. *A binning formula of bi-histogram for joint entropy estimation using mean square error minimization*. Pattern Recognition Letters 101, 21–28 (2018).",#
+                 :charikar2002 => "[charikar2002](@cite) M. S. Charikar. *Similarity estimation techniques from rounding algorithms*. In: *Proceedings of the Thirty-Fourth Annual ACM Symposium on Theory of Computing* (2002); pp. 380–388.",#
+                 :kraskov2005 => "[kraskov2005](@cite) A. Kraskov, H. Stögbauer, R. G. Andrzejak and P. Grassberger. *Hierarchical clustering using mutual information*. Europhysics Letters 70, 278–284 (2005).",#
+                 :meila2007 => "[meila2007](@cite) M. Meilă. *Comparing clusterings—an information based distance*. Journal of Multivariate Analysis 98, 873–895 (2007).",#
+                 :no_original_source => "The original source of this formulation was not found. The formulation follows this work and is not checked against the original.",#
                  :vandongen2012 => "[vandongen2012](@cite) S. Van Dongen and A. J. Enright. *Metric distances derived from cosine similarity and Pearson and Spearman correlations*. arXiv preprint arXiv:1208.3145 (2012).",#
                  :rousseeuw1987 => "[rousseeuw1987](@cite) P. J. Rousseeuw. *Silhouettes: a graphical aid to the interpretation and validation of cluster analysis*. Journal of Computational and Applied Mathematics 20, 53–65 (1987).",#
                  :lopezdeprado2019 => "[lopezdeprado2019](@cite) M. López de Prado and M. J. Lewis. *Detection of false investment strategies using unsupervised learning methods*. Quantitative Finance 19, 1555–1565 (2019).",#
