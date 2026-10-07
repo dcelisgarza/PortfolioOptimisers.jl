@@ -1,21 +1,40 @@
 ## ────────────────────────────────────────────────────────────────────────────
 ## The covariance forecast evaluation figures
 ## ────────────────────────────────────────────────────────────────────────────
-# Each figure is the rolling form of `covariance_forecast_summary`. Point t reads the steps
-# t - W + 1, …, t that scored, with the weights the summary gives them, so a window as wide
-# as the run ends at the number of the summary. A step with no active asset adds nothing to
-# a window, and a window with no scored step is `NaN` and drawn blank. The per-step
-# statistics come from the library (`target_dof`, `covariance_diagonal_mean`,
+# Each figure is the rolling form of `covariance_forecast_summary`. Point t reads the scored
+# steps of its window, with the weights the summary gives them, so a window as wide as the
+# run ends at the number of the summary. A step with no active asset adds nothing to a
+# window, and a window with no scored step is `NaN` and drawn blank. The per-step statistics
+# come from the library (`target_dof`, `covariance_step_weights`, `covariance_diagonal_mean`,
 # `covariance_exceedance`), so a figure computes the window and the band and nothing else.
 const COVARIANCE_CALIBRATION_LABELS = (; mahalanobis = "Mahalanobis Ratio",
                                        diagonal = "Diagonal Ratio", bias = "Bias Statistic")
-function covariance_plot_check_window(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult,
-                                      window::Integer)
-    M = length(cfer.dates)
-    if !(1 <= window <= M)
-        throw(DomainError(window, "window must be in 1:$(M), the steps of the evaluation"))
+# The window of each point of a rolling series, as `t => r`: point t reads the scored steps
+# of the range r. Under `scored_steps = false` the window of point t is the steps
+# t - W + 1, …, t, so the first W - 1 points have none. Under `true` it is the last W scored
+# steps up to t, so it stretches over a step with no active asset, and a point sits only at a
+# scored step.
+function covariance_windows(scored::AbstractVector{Bool}, window::Integer,
+                            scored_steps::Bool)
+    if !scored_steps
+        return [t => ((t - window + 1):t) for t in window:length(scored)]
     end
-    return nothing
+    s = findall(scored)
+    return [s[j] => (s[j - window + 1]:s[j]) for j in window:length(s)]
+end
+# The windows of an evaluation, and the first point its series draws: the first step under
+# `whole_windows = false`, and the first whole window under `true`. `wo` holds the three
+# window keywords of a figure: `window`, `scored_steps` and `whole_windows`.
+function covariance_plot_windows(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult,
+                                 wo::NamedTuple)
+    scored = cfer.n_valid .> 0
+    M = wo.scored_steps ? count(scored) : length(scored)
+    if !(1 <= wo.window <= M)
+        throw(DomainError(wo.window,
+                          "window must be in 1:$(M), the steps that the window counts (the scored steps under `scored_steps = true`)"))
+    end
+    wins = covariance_windows(scored, wo.window, wo.scored_steps)
+    return (; wins = wins, from = wo.whole_windows ? first(first(wins)) : 1)
 end
 function covariance_plot_check_diagnostics(diagnostics)
     if isempty(diagnostics) ||
@@ -37,16 +56,16 @@ function covariance_plot_check_evaluations(cfers::AbstractVector)
     end
     return nothing
 end
-# The weighted mean of the scored steps of each window. A ratio weights a step by its
-# degrees of freedom, as the summary does, and a loss or a rate, whose `nu` is `nothing`,
-# weights each step by one.
+# The weighted mean of the scored steps of each window. A ratio weights a step by the
+# weights of `covariance_step_weights`, as the summary does, and a loss or a rate, whose
+# `omega` is `nothing`, weights each step by one.
 function covariance_step_weight(::Nothing, ::Integer)
     return 1
 end
-function covariance_step_weight(nu::AbstractVector{<:Integer}, j::Integer)
-    return nu[j]
+function covariance_step_weight(omega::AbstractVector{<:Real}, j::Integer)
+    return omega[j]
 end
-function covariance_window_mean(v::VecNum, nu::Option{<:AbstractVector{<:Integer}},
+function covariance_window_mean(v::VecNum, omega::Option{<:AbstractVector{<:Real}},
                                 scored::AbstractVector{Bool}, r::AbstractUnitRange,
                                 nan::Real)
     s = zero(nan)
@@ -55,7 +74,7 @@ function covariance_window_mean(v::VecNum, nu::Option{<:AbstractVector{<:Integer
         if !(scored[j])
             continue
         end
-        nj = covariance_step_weight(nu, j)
+        nj = covariance_step_weight(omega, j)
         s += nj * v[j]
         n += nj
     end
@@ -77,24 +96,24 @@ function covariance_window_std(v::VecNum, scored::AbstractVector{Bool},
     end
     return sqrt(ss / (n - 1))
 end
-# Point t of a rolling series reads the window of the steps t - W + 1, …, t. The first
-# W - 1 points have no whole window, so they stay `NaN`.
-function covariance_rolling(f, v::VecNum, window::Integer)
+# Point t of a rolling series reads its window from `covariance_windows`. A point with no
+# window stays `NaN`.
+function covariance_rolling(f, v::VecNum, wins::AbstractVector{<:Pair})
     nan = PortfolioOptimisers.float_if_integer(eltype(v))(NaN)
     out = fill(nan, length(v))
-    for t in window:length(v)
-        out[t] = f((t - window + 1):t, nan)
+    for (t, r) in wins
+        out[t] = f(r, nan)
     end
     return out
 end
-function covariance_rolling_mean(v::VecNum, nu::Option{<:AbstractVector{<:Integer}},
-                                 scored::AbstractVector{Bool}, window::Integer)
-    return covariance_rolling((r, nan) -> covariance_window_mean(v, nu, scored, r, nan), v,
-                              window)
+function covariance_rolling_mean(v::VecNum, omega::Option{<:AbstractVector{<:Real}},
+                                 scored::AbstractVector{Bool}, wins::AbstractVector{<:Pair})
+    return covariance_rolling((r, nan) -> covariance_window_mean(v, omega, scored, r, nan),
+                              v, wins)
 end
-function covariance_rolling_std(v::VecNum, scored::AbstractVector{Bool}, window::Integer)
-    return covariance_rolling((r, nan) -> covariance_window_std(v, scored, r, nan), v,
-                              window)
+function covariance_rolling_std(v::VecNum, scored::AbstractVector{Bool},
+                                wins::AbstractVector{<:Pair})
+    return covariance_rolling((r, nan) -> covariance_window_std(v, scored, r, nan), v, wins)
 end
 # One test portfolio is drawn as its own line. Several are drawn as their median, with a
 # band from the fifth to the ninety-fifth percentile over the portfolios: the statistics
@@ -110,31 +129,33 @@ function covariance_portfolio_line(f, V::MatNum)
     return med, (lo, hi)
 end
 function covariance_calibration_line(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult,
-                                     d::Symbol, window::Integer)
+                                     d::Symbol, wins::AbstractVector{<:Pair},
+                                     sw::PortfolioOptimisers.AbstractStepWeighting)
     scored = cfer.n_valid .> 0
     return if d === :mahalanobis
         nu = PortfolioOptimisers.target_dof.(Ref(cfer.target), cfer.n_valid, cfer.horizon)
-        covariance_rolling_mean(cfer.mahalanobis_ratio, nu, scored, window), nothing
+        omega = PortfolioOptimisers.covariance_step_weights(sw, nu)
+        covariance_rolling_mean(cfer.mahalanobis_ratio, omega, scored, wins), nothing
     elseif d === :diagonal
         nu = PortfolioOptimisers.target_step_dof.(Ref(cfer.target), cfer.horizon)
-        covariance_rolling_mean(PortfolioOptimisers.covariance_diagonal_mean(cfer), nu,
-                                scored, window), nothing
+        omega = PortfolioOptimisers.covariance_step_weights(sw, nu)
+        covariance_rolling_mean(PortfolioOptimisers.covariance_diagonal_mean(cfer), omega,
+                                scored, wins), nothing
     else
-        covariance_portfolio_line(v -> covariance_rolling_std(v, scored, window),
+        covariance_portfolio_line(v -> covariance_rolling_std(v, scored, wins),
                                   cfer.standardised_return)
     end
 end
 function covariance_qlike_line(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult,
-                               window::Integer)
+                               wins::AbstractVector{<:Pair})
     scored = cfer.n_valid .> 0
-    return covariance_portfolio_line(v -> covariance_rolling_mean(v, nothing, scored,
-                                                                  window),
+    return covariance_portfolio_line(v -> covariance_rolling_mean(v, nothing, scored, wins),
                                      cfer.portfolio_qlike)
 end
 function covariance_exceedance_line(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult,
-                                    q::Real, window::Integer)
+                                    q::Real, wins::AbstractVector{<:Pair})
     e = PortfolioOptimisers.covariance_exceedance(cfer, q)
-    return covariance_rolling_mean(e, nothing, cfer.n_valid .> 0, window)
+    return covariance_rolling_mean(e, nothing, cfer.n_valid .> 0, wins)
 end
 # A series of one evaluation is labelled by what it draws. A series of a comparison is
 # labelled by its evaluation alone when each evaluation draws one series, and by both
@@ -162,30 +183,45 @@ function covariance_plot_lines(entries, title::AbstractString, ylabel::AbstractS
     end
     return plt
 end
+# One drawn series, from the first point that the windows draw.
+function covariance_band_slice(::Nothing, ::AbstractUnitRange)
+    return nothing
+end
+function covariance_band_slice(band::Tuple, k::AbstractUnitRange)
+    return (band[1][k], band[2][k])
+end
+function covariance_plot_entry(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult,
+                               rw::NamedTuple, y::VecNum, label, band)
+    k = (rw.from):length(y)
+    return (; x = cfer.dates[k], y = y[k], label = label,
+            band = covariance_band_slice(band, k))
+end
 function covariance_calibration_entries(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult,
-                                        name, diagnostics, window::Integer)
-    covariance_plot_check_window(cfer, window)
+                                        name, diagnostics,
+                                        sw::PortfolioOptimisers.AbstractStepWeighting,
+                                        wo::NamedTuple)
+    rw = covariance_plot_windows(cfer, wo)
     return map(collect(diagnostics)) do d
-        y, band = covariance_calibration_line(cfer, d, window)
+        y, band = covariance_calibration_line(cfer, d, rw.wins, sw)
         label = covariance_series_label(name, COVARIANCE_CALIBRATION_LABELS[d],
                                         length(diagnostics))
-        return (; x = cfer.dates, y = y, label = label, band = band)
+        return covariance_plot_entry(cfer, rw, y, label, band)
     end
 end
 function covariance_qlike_entry(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult,
-                                name, window::Integer)
-    covariance_plot_check_window(cfer, window)
-    y, band = covariance_qlike_line(cfer, window)
-    return (; x = cfer.dates, y = y, label = covariance_series_label(name, "QLIKE", 1),
-            band = band)
+                                name, wo::NamedTuple)
+    rw = covariance_plot_windows(cfer, wo)
+    y, band = covariance_qlike_line(cfer, rw.wins)
+    return covariance_plot_entry(cfer, rw, y, covariance_series_label(name, "QLIKE", 1),
+                                 band)
 end
 function covariance_exceedance_entries(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult,
-                                       name, levels, window::Integer)
-    covariance_plot_check_window(cfer, window)
+                                       name, levels, wo::NamedTuple)
+    rw = covariance_plot_windows(cfer, wo)
     return map(collect(levels)) do q
-        y = covariance_exceedance_line(cfer, q, window)
+        y = covariance_exceedance_line(cfer, q, rw.wins)
         label = covariance_series_label(name, "q = $(q)", length(levels))
-        return (; x = cfer.dates, y = y, label = label, band = nothing)
+        return covariance_plot_entry(cfer, rw, y, label, nothing)
     end
 end
 function covariance_calibration_title(window::Integer)
@@ -201,9 +237,13 @@ function PortfolioOptimisers.plot_covariance_calibration(cfer::PortfolioOptimise
                                                          window::Integer = 50,
                                                          diagnostics = (:mahalanobis,
                                                                         :diagonal, :bias),
+                                                         step_weighting::PortfolioOptimisers.AbstractStepWeighting = PortfolioOptimisers.DofStepWeighting(),
+                                                         scored_steps::Bool = false,
+                                                         whole_windows::Bool = false,
                                                          kwargs...)
     covariance_plot_check_diagnostics(diagnostics)
-    entries = covariance_calibration_entries(cfer, nothing, diagnostics, window)
+    entries = covariance_calibration_entries(cfer, nothing, diagnostics, step_weighting,
+                                             (; window, scored_steps, whole_windows))
     plt = covariance_plot_lines(entries, covariance_calibration_title(window),
                                 "Calibration"; kwargs...)
     return idio_diagnostic_reference!(plt, 1.0)
@@ -213,37 +253,53 @@ function PortfolioOptimisers.plot_covariance_calibration(cfers::AbstractVector{<
                                                          window::Integer = 50,
                                                          diagnostics = (:mahalanobis,
                                                                         :diagonal, :bias),
+                                                         step_weighting::PortfolioOptimisers.AbstractStepWeighting = PortfolioOptimisers.DofStepWeighting(),
+                                                         scored_steps::Bool = false,
+                                                         whole_windows::Bool = false,
                                                          kwargs...)
     covariance_plot_check_evaluations(cfers)
     covariance_plot_check_diagnostics(diagnostics)
     nms = PortfolioOptimisers.covariance_forecast_names(names, length(cfers))
     entries = reduce(vcat,
-                     [covariance_calibration_entries(cfers[k], nms[k], diagnostics, window)
+                     [covariance_calibration_entries(cfers[k], nms[k], diagnostics,
+                                                     step_weighting,
+                                                     (; window, scored_steps,
+                                                      whole_windows))
                       for k in eachindex(cfers, nms)])
     plt = covariance_plot_lines(entries, covariance_calibration_title(window),
                                 "Calibration"; kwargs...)
     return idio_diagnostic_reference!(plt, 1.0)
 end
 function PortfolioOptimisers.plot_covariance_qlike(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult;
-                                                   window::Integer = 50, kwargs...)
-    return covariance_plot_lines([covariance_qlike_entry(cfer, nothing, window)],
+                                                   window::Integer = 50,
+                                                   scored_steps::Bool = false,
+                                                   whole_windows::Bool = false, kwargs...)
+    return covariance_plot_lines([covariance_qlike_entry(cfer, nothing,
+                                                         (; window, scored_steps,
+                                                          whole_windows))],
                                  covariance_qlike_title(window), "QLIKE Loss"; kwargs...)
 end
 function PortfolioOptimisers.plot_covariance_qlike(cfers::AbstractVector{<:PortfolioOptimisers.CovarianceForecastEvaluationResult};
                                                    names = nothing, window::Integer = 50,
-                                                   kwargs...)
+                                                   scored_steps::Bool = false,
+                                                   whole_windows::Bool = false, kwargs...)
     covariance_plot_check_evaluations(cfers)
     nms = PortfolioOptimisers.covariance_forecast_names(names, length(cfers))
-    entries = [covariance_qlike_entry(cfers[k], nms[k], window)
+    entries = [covariance_qlike_entry(cfers[k], nms[k],
+                                      (; window, scored_steps, whole_windows))
                for k in eachindex(cfers, nms)]
     return covariance_plot_lines(entries, covariance_qlike_title(window), "QLIKE Loss";
                                  kwargs...)
 end
 function PortfolioOptimisers.plot_covariance_exceedance(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult;
                                                         levels = (0.95, 0.99),
-                                                        window::Integer = 50, kwargs...)
+                                                        window::Integer = 50,
+                                                        scored_steps::Bool = false,
+                                                        whole_windows::Bool = false,
+                                                        kwargs...)
     covariance_plot_check_levels(levels)
-    entries = covariance_exceedance_entries(cfer, nothing, levels, window)
+    entries = covariance_exceedance_entries(cfer, nothing, levels,
+                                            (; window, scored_steps, whole_windows))
     plt = covariance_plot_lines(entries, covariance_exceedance_title(window),
                                 "Exceedance Rate"; kwargs...)
     # Each target rate is drawn in the colour of the series of its level.
@@ -255,12 +311,16 @@ function PortfolioOptimisers.plot_covariance_exceedance(cfer::PortfolioOptimiser
 end
 function PortfolioOptimisers.plot_covariance_exceedance(cfers::AbstractVector{<:PortfolioOptimisers.CovarianceForecastEvaluationResult};
                                                         names = nothing, levels = (0.95,),
-                                                        window::Integer = 50, kwargs...)
+                                                        window::Integer = 50,
+                                                        scored_steps::Bool = false,
+                                                        whole_windows::Bool = false,
+                                                        kwargs...)
     covariance_plot_check_evaluations(cfers)
     covariance_plot_check_levels(levels)
     nms = PortfolioOptimisers.covariance_forecast_names(names, length(cfers))
     entries = reduce(vcat,
-                     [covariance_exceedance_entries(cfers[k], nms[k], levels, window)
+                     [covariance_exceedance_entries(cfers[k], nms[k], levels,
+                                                    (; window, scored_steps, whole_windows))
                       for k in eachindex(cfers, nms)])
     plt = covariance_plot_lines(entries, covariance_exceedance_title(window),
                                 "Exceedance Rate"; kwargs...)

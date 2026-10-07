@@ -249,3 +249,35 @@ online form.
 The same measure fixes the window convention of a parity run: the oracle's `train` rows before a
 purge of `purged` rows are `IndexWalkForward(train + purged, test; purged_size = purged)` here,
 because the training span of the library counts the purge.
+
+## Amendment (2026-10-07)
+
+**Three rules of the summary and its figures stay the defaults, and each gains the oracle's rule
+as a keyword.** The last verdicts of
+[#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416) (rows R56, R88 and
+R91), built by [#1513](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1513).
+
+- **The weight of a step (R56).** Under a calibrated Gaussian forecast the ratio of step `t` is
+  `chi2(nu_t) / nu_t`, with mean one and variance `2 / nu_t`. Every mean with fixed weights is
+  unbiased. The mean weighted by `nu_t` has the least variance, and it is itself
+  `chi2(sum nu) / sum nu`. The oracle takes the plain mean, which is a convention and not an error,
+  and the two agree when every step has the same horizon and active count.
+  `covariance_forecast_summary` and `plot_covariance_calibration` take
+  `step_weighting::AbstractStepWeighting`: `DofStepWeighting()`, the default and the rule above,
+  or `EqualStepWeighting()`, the plain mean. The public verb `covariance_step_weights` gives the
+  weights, and the Gaussian band of every rule reads the variance of its own mean,
+  `2 sum(omega_t^2 / nu_t) / (sum omega_t)^2`, which is `2 / sum nu_t` to the last bit under the
+  default. The rule weights the diagonal ratio too, on its own degrees of freedom. The Result
+  records the rule in the field `step_weighting`.
+- **A window over a step with nothing scored (R88).** The default window of a figure spans the
+  last `window` steps, a fixed stretch of the walk-forward, so two evaluations stay paired step by
+  step, and an unscored step adds nothing. `scored_steps = true` makes the window hold the last
+  `window` scored steps, the oracle's rule, and an unscored step draws no point. Both are valid
+  moving averages.
+- **The first `window - 1` points (R91).** The default series covers every step, and a point with
+  no whole window is blank, so figures at different windows line up. `whole_windows = true` starts
+  each series at its first whole window, the oracle's layout.
+
+With all three keywords set, the rolling series equal the oracle's point for point, and the
+summary under `EqualStepWeighting()` equals the oracle's summary.
+`test_25b_parity_covariance_forecast_plots.jl` pins both.

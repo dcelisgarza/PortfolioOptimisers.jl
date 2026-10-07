@@ -37,6 +37,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :S_t_realised => "``\\mathbf{S}_t``: Realised covariance of step ``t``, formed from the centred returns that follow it.",#
                  :h_step => "``h``: Horizon of a step, the number of observations the forecast is judged on.",#
                  :M_steps => "``M``: Steps of the walk-forward, the number of forecasts a run scores.",#
+                 :z_band => "``z_{\\alpha/2}``: Upper ``\\alpha / 2`` quantile of the standard normal distribution.",#
                  :c_weight_bias => "``c``: Bias correction of the weighted denominator. It is fixed by the **type** of the weights, never by the estimator: `corrected = false` gives ``c = 0`` for every type, and `corrected = true` gives ``c = 1`` for `StatsBase.FrequencyWeights`, ``c = \\sum_t w_t^2 / \\sum_t w_t`` for `StatsBase.AnalyticWeights` and ``c = \\sum_t w_t / T`` for `StatsBase.ProbabilityWeights`.",#
                  # Shrinkage of the sample expected returns.
                  :mu_hat_shrink => "``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of sample expected returns, whose ``i``-th entry is ``\\hat{\\mu}_i``.",#

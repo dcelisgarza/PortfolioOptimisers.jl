@@ -1,6 +1,164 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for the step weighting of a covariance forecast evaluation, the rule that weights each scored step in the mean of a calibration ratio over the steps.
+
+[`covariance_forecast_summary`](@ref) and [`plot_covariance_calibration`](@ref) read the rule for the Mahalanobis ratio and for the diagonal ratio. Under a calibrated Gaussian forecast every rule gives a mean whose expected value is one, so the rules differ in the variance of the mean, not in its target. [`DofStepWeighting`](@ref) gives the least variance, and it is the default. [`EqualStepWeighting`](@ref) gives the plain mean over the steps. The two rules agree when every step has the same degrees of freedom.
+
+# Interfaces
+
+A step weighting is a marker for dispatch, and it holds no data. A new step weighting needs a method of [`covariance_step_weights`](@ref), which returns one non-negative weight per step. The mean and the half-width of its Gaussian band follow from the weights, as [`covariance_step_weights`](@ref) states.
+
+# Related
+
+  - [`DofStepWeighting`](@ref)
+  - [`EqualStepWeighting`](@ref)
+  - [`covariance_step_weights`](@ref)
+  - [`covariance_forecast_summary`](@ref)
+  - [`plot_covariance_calibration`](@ref)
+"""
+abstract type AbstractStepWeighting <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Weights each scored step by the degrees of freedom of its ratio under a Gaussian null. This is the default step weighting.
+
+The ratio of step ``t`` is ``\\chi^2_{\\nu_t} / \\nu_t`` under a calibrated Gaussian forecast, so its variance is ``2 / \\nu_t``. The weights ``\\nu_t`` are the inverse variances, so the weighted mean is the unbiased mean of least variance. It is itself ``\\chi^2_{\\sum_t \\nu_t} / \\sum_t \\nu_t``, the ratio of the pooled statistic. A date walk-forward whose folds differ in length, a listing and a delisting all move the degrees of freedom of a step, and each step then counts by the data it scored.
+
+# Constructors
+
+    DofStepWeighting() -> DofStepWeighting
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.covariance_step_weights(DofStepWeighting(), [8, 8, 7])
+3-element Vector{Int64}:
+ 8
+ 8
+ 7
+```
+
+# Related
+
+  - [`AbstractStepWeighting`](@ref)
+  - [`EqualStepWeighting`](@ref)
+  - [`covariance_forecast_summary`](@ref)
+"""
+struct DofStepWeighting <: AbstractStepWeighting end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Gives each scored step the same weight, so the mean of a ratio is its plain mean over the steps.
+
+The plain mean is unbiased under a calibrated Gaussian forecast, as every mean with fixed weights is. Its variance is ``2 \\sum_t \\nu_t^{-1} / M^2``, which is at least that of [`DofStepWeighting`](@ref), and it has no chi-squared law. The two rules agree when every step has the same horizon and the same active count. The rule reads each step as one observation of the calibration, whatever data the step scored.
+
+# Constructors
+
+    EqualStepWeighting() -> EqualStepWeighting
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.covariance_step_weights(EqualStepWeighting(), [8, 8, 7])
+3-element Vector{Int64}:
+ 1
+ 1
+ 1
+```
+
+# Related
+
+  - [`AbstractStepWeighting`](@ref)
+  - [`DofStepWeighting`](@ref)
+  - [`covariance_forecast_summary`](@ref)
+"""
+struct EqualStepWeighting <: AbstractStepWeighting end
+"""
+    covariance_step_weights(sw::DofStepWeighting, nu::AbstractVector{<:Integer})
+    covariance_step_weights(sw::EqualStepWeighting, nu::AbstractVector{<:Integer})
+
+Return the weight of each step in the mean of a calibration ratio of a covariance forecast evaluation.
+
+[`covariance_forecast_summary`](@ref) and [`plot_covariance_calibration`](@ref) read the weights. The mean of a ratio and the half-width of its Gaussian band follow from them.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\bar{r} &= \\frac{\\sum_{t=1}^{M} \\omega_t\\, r_t}{\\sum_{t=1}^{M} \\omega_t}\\,, \\\\
+\\bar{r} &\\in 1 \\pm \\frac{z_{\\alpha/2}}{\\sum_{t=1}^{M} \\omega_t} \\sqrt{2 \\sum_{t=1}^{M} \\frac{\\omega_t^2}{\\nu_t}}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\bar{r}``: Mean of the ratio over the steps.
+  - ``\\omega_t``: Weight of step ``t``, from this function.
+  - ``r_t``: Ratio of step ``t``.
+  - ``\\nu_t``: Degrees of freedom of the ratio of step ``t`` under a Gaussian null.
+  - $(math_dict[:M_steps])
+  - $(math_dict[:z_band])
+
+The ratio of step ``t`` has variance ``2 / \\nu_t`` under a calibrated Gaussian forecast, and the steps are independent, so the band is the Gaussian band of the mean with its own variance. Under [`DofStepWeighting`](@ref) the half-width is ``z_{\\alpha/2} \\sqrt{2 / \\sum_t \\nu_t}``.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. [`DofStepWeighting`](@ref): the weight of each step is its degrees of freedom, `nu` itself.
+ 2. [`EqualStepWeighting`](@ref): the weight of each step is one, in the element type of `nu`.
+
+# Arguments
+
+  - `sw`: The step weighting.
+  - `nu`: The degrees of freedom of each step, from [`target_dof`](@ref) for the Mahalanobis ratio and from [`target_step_dof`](@ref) for the diagonal ratio.
+
+# Returns
+
+  - `omega::AbstractVector`: One weight per step.
+
+# Related
+
+  - [`AbstractStepWeighting`](@ref)
+  - [`covariance_forecast_summary`](@ref)
+  - [`plot_covariance_calibration`](@ref)
+"""
+function covariance_step_weights(::DofStepWeighting, nu::AbstractVector{<:Integer})
+    return nu
+end
+function covariance_step_weights(::EqualStepWeighting, nu::AbstractVector{<:Integer})
+    return one.(nu)
+end
+"""
+    covariance_ratio_band(z::Number, omega::AbstractVector, nu::AbstractVector{<:Integer})
+
+Return the half-width of the Gaussian band on the weighted mean of a calibration ratio.
+
+The mean weights step ``t`` by ``\\omega_t``, and the ratio of the step has variance ``2 / \\nu_t`` under a calibrated Gaussian forecast. [`covariance_step_weights`](@ref) states the formula. Under [`DofStepWeighting`](@ref) each term ``\\omega_t^2 / \\nu_t`` is the integer ``\\nu_t``, so the variance is ``2 / \\sum_t \\nu_t`` to the last bit.
+
+# Arguments
+
+  - `z`: The quantile of the standard normal distribution at the level of the band.
+  - `omega`: The weight of each step.
+  - `nu`: The degrees of freedom of each step.
+
+# Returns
+
+  - `hw::Number`: The half-width of the band.
+
+# Related
+
+  - [`covariance_step_weights`](@ref)
+  - [`covariance_forecast_summary`](@ref)
+"""
+function covariance_ratio_band(z::Number, omega::AbstractVector,
+                               nu::AbstractVector{<:Integer})
+    return z * sqrt(2 * mapreduce((o, n) -> abs2(o) / n, +, omega, nu) / abs2(sum(omega)))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 The headline statistics of one or more covariance forecast evaluations, one entry per evaluation.
 
 `CovarianceForecastSummaryResult` is what [`covariance_forecast_summary`](@ref) returns. Each column has one entry per evaluation, so one evaluation is the length-1 case and two forecasts side by side are the length-2 case. So, like [`ForecastSummaryResult`](@ref) for the return forecasts, it needs no separate comparison type. The summary reads every column from the per-step diagnostics of a [`CovarianceForecastEvaluationResult`](@ref). The bands are Gaussian references, and the summary does not correct them for heavy tails.
@@ -9,9 +167,9 @@ The headline statistics of one or more covariance forecast evaluations, one entr
 
 ```math
 \\begin{align}
-\\bar{m} &= \\frac{\\sum_{t=1}^{M} \\nu_t\\, m_t}{\\sum_{t=1}^{M} \\nu_t}\\,, \\quad \\nu_t = \\operatorname{dof}(N_t, h_t)\\,, \\\\
-\\bar{d} &= \\frac{\\sum_{t=1}^{M} \\nu'_t\\, \\bar{d}_t}{\\sum_{t=1}^{M} \\nu'_t}\\,, \\quad \\nu'_t = \\operatorname{dof}'(h_t)\\,, \\\\
-\\bar{m} &\\in 1 \\pm z_{\\alpha/2} \\sqrt{\\frac{2}{\\sum_{t=1}^{M} \\nu_t}}\\,, \\quad \\bar{d} \\in 1 \\pm z_{\\alpha/2} \\sqrt{\\frac{2}{\\sum_{t=1}^{M} \\nu'_t}}\\,, \\\\
+\\bar{m} &= \\frac{\\sum_{t=1}^{M} \\omega_t\\, m_t}{\\sum_{t=1}^{M} \\omega_t}\\,, \\quad \\nu_t = \\operatorname{dof}(N_t, h_t)\\,, \\\\
+\\bar{d} &= \\frac{\\sum_{t=1}^{M} \\omega'_t\\, \\bar{d}_t}{\\sum_{t=1}^{M} \\omega'_t}\\,, \\quad \\nu'_t = \\operatorname{dof}'(h_t)\\,, \\\\
+\\bar{m} &\\in 1 \\pm \\frac{z_{\\alpha/2}}{\\sum_{t} \\omega_t} \\sqrt{2 \\sum_{t=1}^{M} \\frac{\\omega_t^2}{\\nu_t}}\\,, \\quad \\bar{d} \\in 1 \\pm \\frac{z_{\\alpha/2}}{\\sum_{t} \\omega'_t} \\sqrt{2 \\sum_{t=1}^{M} \\frac{\\omega_t'^2}{\\nu'_t}}\\,, \\\\
 B &= \\sqrt{\\frac{1}{M - 1} \\sum_{t=1}^{M} \\left(b_t - \\bar{b}\\right)^2}\\,, \\\\
 e_q &= \\frac{1}{M} \\sum_{t=1}^{M} \\mathbb{1}\\left[\\nu_t\\, m_t > \\chi^2_{\\nu_t}(q)\\right]\\,.
 \\end{align}
@@ -21,6 +179,7 @@ Where:
 
   - ``\\bar{m}``: Mahalanobis ratio over the walk-forward.
   - ``m_t``: Mahalanobis ratio of step ``t``.
+  - ``\\omega_t``, ``\\omega'_t``: Weight of step ``t`` in the Mahalanobis mean and in the diagonal mean, from [`covariance_step_weights`](@ref) on ``\\nu_t`` and on ``\\nu'_t``.
   - ``\\nu_t``: Degrees of freedom of the Mahalanobis statistic of step ``t`` under a Gaussian null, ``N_t h_t`` for the realised covariance and ``N_t`` for the horizon return.
   - ``N_t``: Number of active assets at step ``t``.
   - $(math_dict[:h_step])
@@ -28,16 +187,16 @@ Where:
   - ``\\bar{d}``: Diagonal ratio over the walk-forward.
   - ``\\bar{d}_t``: Mean of the diagonal ratio over the active assets of step ``t``.
   - ``\\nu'_t``: Degrees of freedom of the ratio of one asset at step ``t`` under a Gaussian null, ``h_t`` for the realised covariance and ``1`` for the horizon return.
-  - ``z_{\\alpha/2}``: Upper ``\\alpha / 2`` quantile of the standard normal distribution.
+  - $(math_dict[:z_band])
   - ``B``: Bias statistic of a test portfolio, the sample standard deviation of its standardised returns.
   - ``b_t``: Standardised return of the test portfolio at step ``t``.
   - ``\\bar{b}``: Mean of the standardised returns of the test portfolio.
   - ``e_q``: Exceedance rate at level ``q``, the share of steps whose Mahalanobis statistic exceeds the chi-squared quantile of that level.
   - ``\\chi^2_{\\nu}(q)``: Quantile at level ``q`` of the chi-squared distribution with ``\\nu`` degrees of freedom.
 
-Under a Gaussian null, with the forecast correct and the whitened returns independent, ``\\bar{m} \\sum_t \\nu_t \\sim \\chi^2_{\\sum_t \\nu_t}``. So ``\\mathbb{E}[\\bar{m}] = 1``, and the band holds with probability ``1 - \\alpha``. The ratio of sums weights a step by its degrees of freedom, and it is the plain mean when every step has the same ``N_t`` and ``h_t``. The band on ``\\bar{d}`` is the band of the ratio of one asset. A mean over assets has at most the variance of the ratio of one asset, so the band is conservative, and it is exact only when the ratios of the assets are perfectly correlated.
+Under a Gaussian null, with the forecast correct and the whitened returns independent, ``\\mathbb{E}[\\bar{m}] = 1`` under every step weighting, and the band is the Gaussian band of the mean at level ``1 - \\alpha``. Under [`DofStepWeighting`](@ref), the default, ``\\omega_t = \\nu_t``, so ``\\bar{m} \\sum_t \\nu_t \\sim \\chi^2_{\\sum_t \\nu_t}`` and the half-width is ``z_{\\alpha/2} \\sqrt{2 / \\sum_t \\nu_t}``. That ratio of sums is the plain mean when every step has the same ``N_t`` and ``h_t``. Under [`EqualStepWeighting`](@ref), ``\\omega_t = 1``, which gives the plain mean and its own wider band. The band on ``\\bar{d}`` is the band of the ratio of one asset. A mean over assets has at most the variance of the ratio of one asset, so the band is conservative, and it is exact only when the ratios of the assets are perfectly correlated.
 
-Let ``\\kappa`` be the fourth moment of one whitened coordinate of the realised quantity, with the Gaussian value three. Under the realised covariance the coordinate is that of one return, and under the horizon return it is that of the horizon return divided by ``\\sqrt{h_t}``. With independent coordinates, the variance of ``\\bar{m}`` is ``(\\kappa - 1) / \\sum_t \\nu_t``, so the band widens by ``\\sqrt{(\\kappa - 1) / 2}``. A horizon return sums ``h_t`` returns, so for independent and identically distributed returns its excess of ``\\kappa`` over three is that of one return divided by ``h_t``.
+Let ``\\kappa`` be the fourth moment of one whitened coordinate of the realised quantity, with the Gaussian value three. Under the realised covariance the coordinate is that of one return, and under the horizon return it is that of the horizon return divided by ``\\sqrt{h_t}``. With independent coordinates, the variance of ``\\bar{m}`` is ``(\\kappa - 1) / 2`` times its Gaussian value, so the band widens by ``\\sqrt{(\\kappa - 1) / 2}``. A horizon return sums ``h_t`` returns, so for independent and identically distributed returns its excess of ``\\kappa`` over three is that of one return divided by ``h_t``.
 
 The median of ``\\chi^2_{\\nu} / \\nu`` lies below one, near ``(1 - 2 / (9 \\nu))^3 \\approx 1 - 2 / (3 \\nu)``, so compare a median with that value and not with one. ``B = 1`` under a calibrated forecast, and ``B > 1`` when the forecast under-predicts the risk of the portfolio. ``B`` needs two steps. ``e_q`` is ``1 - q`` under the Gaussian null, and it rises with heavy tails as well as with a misspecified forecast.
 
@@ -52,7 +211,8 @@ $(DocStringExtensions.FIELDS)
         mahalanobis_band_lo, mahalanobis_band_hi, diagonal_mean, diagonal_median,
         diagonal_p5, diagonal_p95, diagonal_band_lo, diagonal_band_hi, bias_statistic,
         bias_p5, bias_p25, bias_p75, bias_p95, qlike_mean, frobenius_mean,
-        portfolio_qlike_mean, levels, exceedance, n_steps, n_portfolios, alpha
+        portfolio_qlike_mean, levels, exceedance, n_steps, n_portfolios, alpha,
+        step_weighting
     ) -> CovarianceForecastSummaryResult
 
 Arguments correspond to the struct's fields, in the order they are declared. [`covariance_forecast_summary`](@ref) builds the type, and a caller reads it. The type has no keyword constructor, and it validates nothing.
@@ -70,7 +230,7 @@ Arguments correspond to the struct's fields, in the order they are declared. [`c
     """
     names
     """
-    Mahalanobis ratio over the walk-forward, the mean of the per-step ratios weighted by their degrees of freedom. One entry per evaluation. The target is one.
+    Mahalanobis ratio over the walk-forward, the mean of the per-step ratios weighted by `step_weighting`. One entry per evaluation. The target is one.
     """
     mahalanobis_mean
     """
@@ -94,7 +254,7 @@ Arguments correspond to the struct's fields, in the order they are declared. [`c
     """
     mahalanobis_band_hi
     """
-    Diagonal ratio over the walk-forward, the mean over the steps of the per-step mean over the active assets, weighted by the degrees of freedom of the steps. One entry per evaluation. The target is one.
+    Diagonal ratio over the walk-forward, the mean over the steps of the per-step mean over the active assets, weighted by `step_weighting`. One entry per evaluation. The target is one.
     """
     diagonal_mean
     """
@@ -169,25 +329,31 @@ Arguments correspond to the struct's fields, in the order they are declared. [`c
     Level of the Gaussian bands.
     """
     alpha
+    """
+    $(field_dict[:cfe_step_weighting])
+    """
+    step_weighting
 end
 """
     covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastEvaluationResult};
                                 names = nothing, alpha::Real = 0.05,
-                                levels = (0.95, 0.99)) -> CovarianceForecastSummaryResult
+                                levels = (0.95, 0.99),
+                                step_weighting::AbstractStepWeighting = DofStepWeighting())
+        -> CovarianceForecastSummaryResult
     covariance_forecast_summary(cfer::CovarianceForecastEvaluationResult; kwargs...)
 
 Summarise one or more covariance forecast evaluations, one entry per evaluation.
 
 For each evaluation, the summary gives the mean, the median and the tail percentiles of the two calibration ratios, the Gaussian band on each mean, the bias statistic of the test portfolios with its percentiles over the portfolios, the mean of each loss, and the exceedance rate of the Mahalanobis statistic at each level. The method for one Result is the length-1 case.
 
-The mean of a ratio is a ratio of sums, which weights each step by its degrees of freedom under the target of the evaluation ([`target_dof`](@ref), [`target_step_dof`](@ref)). A date walk-forward whose folds differ in length weights each step by its length. A listing or a delisting also changes the weight of a step of the Mahalanobis ratio, because its degrees of freedom count the active assets. So the Mahalanobis mean is the plain mean only when every step has the same horizon and the same active count, and the diagonal mean is the plain mean when every step has the same horizon.
+The mean of a ratio weights each step by `step_weighting`. The default, [`DofStepWeighting`](@ref), gives a ratio of sums, which weights each step by its degrees of freedom under the target of the evaluation ([`target_dof`](@ref), [`target_step_dof`](@ref)). A date walk-forward whose folds differ in length then weights each step by its length. A listing or a delisting also changes the weight of a step of the Mahalanobis ratio, because its degrees of freedom count the active assets. So the Mahalanobis mean is the plain mean only when every step has the same horizon and the same active count, and the diagonal mean is the plain mean when every step has the same horizon. [`EqualStepWeighting`](@ref) gives the plain mean in every case, with the band of the plain mean.
 
 # Algorithm
 
- 1. For each evaluation, keep the scored steps, the steps with `n_valid > 0`. An unscored step has no diagnostic, so no statistic reads it. Find the degrees of freedom of each step for the Mahalanobis ratio through [`target_dof`](@ref), and for the ratio of one asset through [`target_step_dof`](@ref).
+ 1. For each evaluation, keep the scored steps, the steps with `n_valid > 0`. An unscored step has no diagnostic, so no statistic reads it. Find the degrees of freedom of each step for the Mahalanobis ratio through [`target_dof`](@ref), and for the ratio of one asset through [`target_step_dof`](@ref). Find the weight of each step from them through [`covariance_step_weights`](@ref).
  2. Reduce the diagonal ratio of each step to its mean over the active assets.
  3. For each ratio, take the weighted mean, the median, and the fifth and ninety-fifth percentiles through [`summary_quantile`](@ref).
- 4. Find the half-width of the Gaussian band of each mean at `alpha`, from the sum of the degrees of freedom.
+ 4. Find the half-width of the Gaussian band of each mean at `alpha`, from the weights and the degrees of freedom, through [`covariance_ratio_band`](@ref).
  5. Take the sample standard deviation of the standardised returns of each test portfolio. Take the median and the percentiles of these over the portfolios, through [`summary_quantile`](@ref).
  6. Take the mean of each loss over the steps, and the median over the portfolios of the mean portfolio QLIKE.
  7. For each level, find the share of the steps whose Mahalanobis statistic exceeds the chi-squared quantile of that level.
@@ -198,6 +364,7 @@ The mean of a ratio is a ratio of sums, which weights each step by its degrees o
   - `names`: A name per evaluation, or `nothing` for `"forecast_1"`, `"forecast_2"`, ….
   - `alpha`: Level of the Gaussian bands, `1 - alpha` coverage.
   - `levels`: Confidence levels of the exceedance rates.
+  - $(arg_dict[:cfe_step_weighting])
 
 # Validation
 
@@ -218,10 +385,12 @@ The mean of a ratio is a ratio of sums, which weights each step by its degrees o
   - [`covariance_forecast_compare`](@ref)
   - [`target_dof`](@ref)
   - [`target_step_dof`](@ref)
+  - [`AbstractStepWeighting`](@ref)
 """
 function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastEvaluationResult};
                                      names::Option{<:AbstractVector} = nothing,
-                                     alpha::Real = 0.05, levels = (0.95, 0.99))
+                                     alpha::Real = 0.05, levels = (0.95, 0.99),
+                                     step_weighting::AbstractStepWeighting = DofStepWeighting())
     @argcheck(!isempty(cfers), IsEmptyError("`cfers` cannot be empty"))
     @argcheck(zero(alpha) < alpha < one(alpha),
               DomainError(alpha, "`alpha` must lie in (0, 1)"))
@@ -262,18 +431,20 @@ function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastE
         dof = target_dof.(Ref(cfer.target), cfer.n_valid[k], cfer.horizon[k])
         sdof = target_step_dof.(Ref(cfer.target), cfer.horizon[k])
         dbar = covariance_diagonal_mean(cfer)[k]
-        mm[i] = LinearAlgebra.dot(dof, m) / sum(dof)
+        om = covariance_step_weights(step_weighting, dof)
+        som = covariance_step_weights(step_weighting, sdof)
+        mm[i] = LinearAlgebra.dot(om, m) / sum(om)
         mmed[i] = Statistics.median(m)
         m5[i] = summary_quantile(m, 0.05)
         m95[i] = summary_quantile(m, 0.95)
-        hw = z * sqrt(2 / sum(dof))
+        hw = covariance_ratio_band(z, om, dof)
         mlo[i] = 1 - hw
         mhi[i] = 1 + hw
-        dm[i] = LinearAlgebra.dot(sdof, dbar) / sum(sdof)
+        dm[i] = LinearAlgebra.dot(som, dbar) / sum(som)
         dmed[i] = Statistics.median(dbar)
         d5[i] = summary_quantile(dbar, 0.05)
         d95[i] = summary_quantile(dbar, 0.95)
-        hwd = z * sqrt(2 / sum(sdof))
+        hwd = covariance_ratio_band(z, som, sdof)
         dlo[i] = 1 - hwd
         dhi[i] = 1 + hwd
         b = vec(Statistics.std(view(cfer.standardised_return, k, :); dims = 1))
@@ -294,7 +465,7 @@ function covariance_forecast_summary(cfers::AbstractVector{<:CovarianceForecastE
     end
     return CovarianceForecastSummaryResult(nms, mm, mmed, m5, m95, mlo, mhi, dm, dmed, d5,
                                            d95, dlo, dhi, bs, b5, b25, b75, b95, ql, fr,
-                                           pql, levels, ex, ns, np, alpha)
+                                           pql, levels, ex, ns, np, alpha, step_weighting)
 end
 function covariance_forecast_summary(cfer::CovarianceForecastEvaluationResult; kwargs...)
     return covariance_forecast_summary([cfer]; kwargs...)
@@ -680,6 +851,7 @@ function covariance_forecast_portfolio(cfer::CovarianceForecastEvaluationResult,
     return (; standardised_return = b, portfolio_qlike = pq)
 end
 
-export covariance_forecast_summary, CovarianceForecastSummaryResult,
-       covariance_forecast_compare, CovarianceForecastComparisonResult,
-       covariance_forecast_portfolio
+export DofStepWeighting, EqualStepWeighting, covariance_forecast_summary,
+       CovarianceForecastSummaryResult, covariance_forecast_compare,
+       CovarianceForecastComparisonResult, covariance_forecast_portfolio
+public AbstractStepWeighting, covariance_step_weights

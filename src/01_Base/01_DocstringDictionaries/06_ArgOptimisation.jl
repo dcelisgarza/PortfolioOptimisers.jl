@@ -160,6 +160,10 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :store_weight_path => "`store_weight_path`: If `true`, the fold stores the weight path it computed; if `false`, a reader rebuilds it on demand.",#
                  :cv_strict => "`strict`: If `true`, a Held Gap raises an `ArgumentError`; if `false`, it warns and the pair contributes zero. A Held Gap is an (observation, asset) pair at which the fold's weight is non-zero and the asset's return is missing, which is what a delisting inside a test window makes.",#
                  :pws_wd => "`wd`: Weight drift the held weights are computed under when the return series carries no drift of its own.",#
+                 # The covariance forecast evaluation summary and its figures.
+                 :cfe_step_weighting => "`step_weighting`: [`AbstractStepWeighting`](@ref) that weights each scored step in the mean of a calibration ratio and in its Gaussian band. [`DofStepWeighting`](@ref) weights a step by the degrees of freedom of its ratio, and [`EqualStepWeighting`](@ref) gives every step the same weight.",#
+                 :cfe_scored_steps => "`scored_steps`: If `false`, the window of a point is the last `window` steps of the walk-forward, and a step with no active asset adds nothing to it. If `true`, the window is the last `window` scored steps, so it stretches over a step with no active asset, and a point sits only at a scored step.",#
+                 :cfe_whole_windows => "`whole_windows`: If `false`, the series covers every step of the evaluation, and a point with no whole window is `NaN` and drawn blank. If `true`, the series starts at its first whole window.",#
                  # Prediction result fields.
                  :pred_nx => "`nx`: Asset name vector.",#
                  :pred_nf => "`nf`: Factor name vector.",#

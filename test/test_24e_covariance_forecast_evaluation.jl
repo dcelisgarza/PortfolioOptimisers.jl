@@ -549,6 +549,53 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test all(l -> po.newey_west_variance(alt, l) >= 0, 0:8)
     end
 
+    @testset "The step weighting: the plain mean is one keyword away (#1513)" begin
+        # A listing and a delisting move N_t, and a calendar walk-forward moves h_t, so the
+        # two rules differ on both ratios.
+        z = po.Distributions.cquantile(po.Distributions.Normal(), 0.025)
+        for r in (cfe(Covariance(), rdg, batch_cv),
+                  cfe(Covariance(), rd, DateWalkForward(2, 1; period = Month(1))))
+            k = r.n_valid .> 0
+            sd = covariance_forecast_summary(r)
+            se = covariance_forecast_summary(r; step_weighting = EqualStepWeighting())
+            @test sd.step_weighting === DofStepWeighting()
+            @test se.step_weighting === EqualStepWeighting()
+            sx = covariance_forecast_summary(r; step_weighting = DofStepWeighting())
+            @test all(f -> isequal(getfield(sd, f), getfield(sx, f)),
+                      fieldnames(typeof(sd)))
+            m = r.mahalanobis_ratio[k]
+            nu = po.target_dof.(Ref(r.target), r.n_valid[k], r.horizon[k])
+            dbar = po.covariance_diagonal_mean(r)[k]
+            snu = po.target_step_dof.(Ref(r.target), r.horizon[k])
+            # The plain mean, and the band of the plain mean: Var = 2 sum(1 / nu_t) / M^2.
+            @test se.mahalanobis_mean[1] ≈ mean(m) rtol = 1e-14
+            @test se.diagonal_mean[1] ≈ mean(dbar) rtol = 1e-14
+            M = length(m)
+            @test se.mahalanobis_band_hi[1] - 1 ≈ z * sqrt(2 * sum(inv, nu)) / M rtol = 1e-14
+            @test 1 - se.diagonal_band_lo[1] ≈ z * sqrt(2 * sum(inv, snu)) / M rtol = 1e-14
+            # The default band is the chi-squared variance 2 / sum(nu), to the last bit.
+            @test sd.mahalanobis_band_hi[1] == 1 + z * sqrt(2 / sum(nu))
+            @test sd.diagonal_band_lo[1] == 1 - z * sqrt(2 / sum(snu))
+            @test sd.mahalanobis_mean[1] == dot(nu, m) / sum(nu)
+            # The plain mean has the wider band: sum(1/nu) / M^2 >= 1 / sum(nu).
+            @test se.mahalanobis_band_hi[1] > sd.mahalanobis_band_hi[1]
+            # Every other column reads no weight.
+            for f in (:mahalanobis_median, :mahalanobis_p5, :diagonal_p95, :bias_statistic,
+                      :qlike_mean, :exceedance, :n_steps)
+                @test isequal(getfield(sd, f), getfield(se, f))
+            end
+        end
+        # The two rules agree when every step has the same degrees of freedom.
+        r = cfe(Covariance(), rd, batch_cv)
+        @test allequal(r.n_valid) && allequal(r.horizon)
+        @test covariance_forecast_summary(r; step_weighting = EqualStepWeighting()).mahalanobis_mean[1] ≈
+              covariance_forecast_summary(r).mahalanobis_mean[1] rtol = 1e-14
+        @test po.covariance_step_weights(DofStepWeighting(), [8, 8, 7]) == [8, 8, 7]
+        @test po.covariance_step_weights(EqualStepWeighting(), [8, 8, 7]) == [1, 1, 1]
+        @test DofStepWeighting() isa po.AbstractStepWeighting
+        @test EqualStepWeighting() isa po.AbstractStepWeighting
+    end
+
     @testset "A wrapper centres where the estimator it holds centres" begin
         # The panel arm of the wrapper's `cov` hands the panel to the estimator it holds, so a
         # mask-aware estimator inside it admits the young asset; the location follows.

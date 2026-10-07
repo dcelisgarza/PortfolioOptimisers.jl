@@ -14,21 +14,28 @@ pins against it. So these cases measure the window and the band, and nothing bef
 oracle leaves out the first `window - 1` points, where we draw a blank `NaN`, so each case compares
 the points the oracle drew. Every point compares at `rtol = 1e-12`, measured 2.6e-15 at most.
 
-THE MAHALANOBIS RATIO WITH A LISTING (Deliberate difference). The oracle takes the plain mean of
-the per-step ratios in a window. We take the mean weighted by the degrees of freedom of each
-step, as the summary does. The two agree while every step has the same active count and
+THE MAHALANOBIS RATIO WITH A LISTING (Deliberate difference, the oracle's rule one keyword away,
+#1513). The oracle takes the plain mean of the per-step ratios in a window. We take the mean
+weighted by the degrees of freedom of each step, as the summary does. The two agree while every step has the same active count and
 horizon. They differ when an asset lists or delists (`Portfolios`). Under a Gaussian null
 `m_t` is chi-squared on `ν_t` over `ν_t`, so its variance is `2 / ν_t`. The weights `ν_t` are the
 inverse variances, so the weighted mean is the unbiased linear combination of least variance,
 and it is itself chi-squared on `Σ ν_t` over `Σ ν_t`. The plain mean has a larger variance and no
 chi-squared law. The test pins our weighted series, and shows that the plain mean of the same
-steps is the oracle's series, so the weights are the whole difference.
+steps is the oracle's series, so the weights are the whole difference. `step_weighting =
+EqualStepWeighting()` draws the plain mean, and gives the oracle's summary of the same steps
+(`Parity_CovarianceForecastPlots_Portfolios_Summary`: the rows Mahalanobis ratio, diagonal
+ratio, standardised return and portfolio QLIKE of each evaluation, the columns mean, median,
+standard deviation, p5 and p95).
 
 THE STEP WITH NO ACTIVE ASSET (`Holiday`). The oracle drops the step, so its window counts the
 scored steps. We keep the step in its place (#1389), so a window is the last `window` steps of
 the walk-forward, and the unscored step adds nothing to it. The two windows are the same set of
 steps when the window does not hold the unscored step, and the case compares those points. A
-window that holds it is the mean of its other steps, pinned here by hand.
+window that holds it is the mean of its other steps, pinned here by hand. `scored_steps = true`
+windows over the scored steps instead, and `whole_windows = true` starts each series at its first
+whole window, the oracle's layout. With both set, every figure equals the oracle's point for
+point (#1513).
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 using Dates, StatsPlots, GraphRecipes, Statistics
@@ -233,7 +240,8 @@ using Dates, StatsPlots, GraphRecipes, Statistics
             for (j, ev) in zip(mcols, (a, b))
                 scored = ev.n_valid .> 0
                 plain = ext.covariance_rolling_mean(ev.mahalanobis_ratio, nothing, scored,
-                                                    W)
+                                                    ext.covariance_windows(scored, W,
+                                                                           false))
                 @test parity_compare(plain[k], oracle[:, j];
                                      name = "$(case) $(fig) plain Mahalanobis").ok
                 if allequal(ev.n_valid[scored])
@@ -249,5 +257,92 @@ using Dates, StatsPlots, GraphRecipes, Statistics
                 end
             end
         end
+    end
+
+    @testset "The oracle's rules, one keyword away (#1513)" begin
+        eq = EqualStepWeighting()
+        # R56: the plain mean of the steps is the oracle's summary and its rolling mean.
+        c = CP_CASES.Portfolios
+        a, b = cp_evaluations(c)
+        o = load("Portfolios", "Summary")
+        for (ev, rows) in ((a, 1:4), (b, 5:8))
+            @test !allequal(ev.n_valid[ev.n_valid .> 0])
+            os = o[rows, :]
+            se = covariance_forecast_summary(ev; step_weighting = eq)
+            sd = covariance_forecast_summary(ev)
+            @test parity_compare([se.mahalanobis_mean[1], se.mahalanobis_median[1],
+                                  se.mahalanobis_p5[1], se.mahalanobis_p95[1],
+                                  se.diagonal_mean[1], se.diagonal_median[1],
+                                  se.diagonal_p5[1], se.diagonal_p95[1]],
+                                 [os[1, 1], os[1, 2], os[1, 4], os[1, 5], os[2, 1],
+                                  os[2, 2], os[2, 4], os[2, 5]];
+                                 name = "Portfolios summary").ok
+            @test !parity_compare([sd.mahalanobis_mean[1]], [os[1, 1]]).ok
+        end
+        firsts = first.(a.test_idx)
+        for (fig, p, n) in
+            ((:Cal, plot_covariance_calibration(a; window = c.window, step_weighting = eq),
+              3),
+             (:CmpCal,
+              plot_covariance_calibration([a, b]; window = c.window, step_weighting = eq),
+              6))
+            oc = load("Portfolios", String(fig))
+            k = [findfirst(==(x), firsts) for x in oc[:, 1]]
+            ours = traces(p, n)[k, :]
+            @test parity_compare(ours, oc[:, 2:end]; name = "Portfolios $(fig) equal").ok
+        end
+        # R88 and R91: with both keywords, every figure of the holiday case is the oracle's,
+        # point for point, and the unscored step draws a blank point inside the series.
+        c = CP_CASES.Holiday
+        W = c.window
+        a, b = cp_evaluations(c)
+        kw = (; window = W, scored_steps = true, whole_windows = true)
+        scored = a.n_valid .> 0
+        u = findfirst(!, scored)
+        s = findall(scored)
+        t0 = s[W]
+        figs = (; Cal = (plot_covariance_calibration(a; step_weighting = eq, kw...), 3),
+                Qlike = (plot_covariance_qlike(a; kw...), 1),
+                Exc = (plot_covariance_exceedance(a; kw...), 2),
+                CmpCal = (plot_covariance_calibration([a, b]; step_weighting = eq, kw...),
+                          6), CmpQlike = (plot_covariance_qlike([a, b]; kw...), 2),
+                CmpExc = (plot_covariance_exceedance([a, b]; kw...), 2))
+        for (fig, (p, n)) in pairs(figs)
+            oc = load("Holiday", String(fig))
+            @test p.series_list[1][:x] == Dates.value.(a.dates[t0:end])
+            y = traces(p, n)
+            @test all(isnan, y[u - t0 + 1, :])
+            keep = scored[t0:end]
+            @test first.(a.test_idx)[t0:end][keep] == oc[:, 1]
+            @test parity_compare(y[keep, :], oc[:, 2:end]; name = "Holiday $(fig) oracle").ok
+        end
+        # A window over the scored steps stretches over the hole: the point after it reads
+        # the last W scored steps.
+        p = plot_covariance_qlike(a; window = W, scored_steps = true)
+        t = u + 3
+        j = findfirst(==(t), s)
+        @test p.series_list[1][:y][t] ≈ mean(a.portfolio_qlike[s[(j - W + 1):j], 1]) rtol = 1e-14
+        @test all(isnan, p.series_list[1][:y][1:(t0 - 1)])
+        @test isnan(p.series_list[1][:y][u])
+        # `whole_windows` alone starts at step W.
+        q = plot_covariance_qlike(a; window = W, whole_windows = true)
+        @test q.series_list[1][:x] == Dates.value.(a.dates[W:end])
+        @test isequal(q.series_list[1][:y],
+                      plot_covariance_qlike(a; window = W).series_list[1][:y][W:end])
+        # The defaults keep every value.
+        for (f, x) in
+            ((plot_covariance_calibration, (; step_weighting = DofStepWeighting())),
+             (plot_covariance_qlike, (;)), (plot_covariance_exceedance, (;)))
+            d = f(a; window = W)
+            e = f(a; window = W, scored_steps = false, whole_windows = false, x...)
+            @test all(i -> isequal(d.series_list[i][:y], e.series_list[i][:y]),
+                      eachindex(d.series_list))
+        end
+        # The window counts the scored steps under `scored_steps = true`.
+        M = count(scored)
+        @test_throws DomainError plot_covariance_qlike(a; window = M + 1,
+                                                       scored_steps = true)
+        @test length(plot_covariance_qlike(a; window = M, scored_steps = true,
+                                           whole_windows = true).series_list[1][:y]) == 1
     end
 end

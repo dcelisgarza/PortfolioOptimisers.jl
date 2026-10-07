@@ -162,7 +162,8 @@
                           :AbstractChoiceRule, :AbstractNeutralisationWeights,
                           :AbstractOrthogonalForecastFit, :AbstractCentring,
                           :AbstractRegimeDebias, :AbstractHacFloor,
-                          :AbstractHacVolatilityTiming, :AbstractCalibrationWarmup])
+                          :AbstractHacVolatilityTiming, :AbstractCalibrationWarmup,
+                          :AbstractStepWeighting])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&
