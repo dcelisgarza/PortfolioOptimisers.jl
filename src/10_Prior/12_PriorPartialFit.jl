@@ -1265,7 +1265,8 @@ No [`AssetPanel`](@ref) reaches this verb. A panel describes the fold and is not
   - `f`: The batch verb of the member.
   - `est`: The member, or `nothing`.
   - `X`: The rows that the outer estimator carries, which are the rows the member was folded on.
-  - `kwargs...`: Additional keyword arguments, forwarded to the batch verb alone. A folded member is read with no keyword argument, because its state is already the estimate.
+  - `readout`: Keyword arguments that reach the verb whether the member folds or not. A prior passes `strict` to its covariance here, so that a peel of a [`CoveragePolicy`](@ref) refuses under `strict` in both arms.
+  - `kwargs...`: Additional keyword arguments, forwarded to the batch verb alone. A folded member is read with no other keyword argument, because its state is already the estimate.
 
 # Returns
 
@@ -1277,8 +1278,12 @@ No [`AssetPanel`](@ref) reaches this verb. A panel describes the fold and is not
   - [`supports_partial_fit`](@ref)
   - [`EmpiricalPrior`](@ref)
 """
-function read_member(f::F, est, X::MatNum; kwargs...) where {F}
-    return supports_partial_fit(est) ? f(est) : f(est, X; dims = 1, kwargs...)
+function read_member(f::F, est, X::MatNum; readout::NamedTuple = (;), kwargs...) where {F}
+    return if supports_partial_fit(est)
+        f(est; readout...)
+    else
+        f(est, X; dims = 1, readout..., kwargs...)
+    end
 end
 """
     partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
@@ -1534,7 +1539,7 @@ The equality holds for `mu`, `sigma`, `X` and `ens`, with and without a horizon,
 # Arguments
 
   - `pe`: Empirical prior estimator carrying a [`PriorCarryState`](@ref).
-  - `strict`: Whether a zero-filled scenario raises rather than warns.
+  - `strict`: Whether a zero-filled scenario raises rather than warns. It also reaches the covariance, where a peel of a [`CoveragePolicy`](@ref) refuses under `strict` and warns otherwise.
   - `kwargs...`: Additional keyword arguments, forwarded to the batch verb of a member that did not fold.
 
 # Validation
@@ -1562,7 +1567,10 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
     fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
     X = sample_buffer(state)
     mu = vec(read_member(Statistics.mean, pe.me, X; kwargs...))
-    sigma = read_member(Statistics.cov, pe.ce, X; kwargs...)
+    # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
+    # `strict`.
+    readout = isa(pe.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
+    sigma = read_member(Statistics.cov, pe.ce, X; readout = readout, kwargs...)
     # Materialised, not viewed: the buffer's backing matrix is written and reallocated by the
     # next fold, and a Result holding a view of it would change under its holder.
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
@@ -1580,7 +1588,10 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
     # them too. The carried rows are the arithmetic ones the caller handed in.
     Xl = log1p.(X)
     mu = vec(read_member(Statistics.mean, pe.me, Xl; kwargs...))
-    sigma = read_member(Statistics.cov, pe.ce, Xl; kwargs...)
+    # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
+    # `strict`.
+    readout = isa(pe.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
+    sigma = read_member(Statistics.cov, pe.ce, Xl; readout = readout, kwargs...)
     horizon_moments!(mu, sigma, pe.horizon)
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
     return LowOrderPrior(;

@@ -342,3 +342,45 @@ fitted observation still refuses the fit before the factor prior runs. So a gap 
 reaches this rule only through the factor prior itself.
 [#1530](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1530) holds the decision on
 a late observed series.
+
+## Amendment (2026-10-07, #1511)
+
+**A Coverage Policy peels the assets of an undetermined pair at admission.** The sentence "There
+is no peel" above describes the library up to this date. Row R86 of
+[#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416) replaced it with a
+family of rules, and [#1511](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1511)
+built it.
+
+A pair is **undetermined** when both of its assets are admitted and have a variance, and the pair
+shares too few observations for a covariance (`nu_ij - corrected < 1`). The undetermined pairs
+make a graph, and a set of assets removes every pair exactly when it is a vertex cover of that
+graph. The smallest cover keeps the most assets.
+
+- `CoveragePolicy` has a field `peel`, bound to the public abstract type `AbstractPeel`. Its verb
+  `peel_assets(peel, U)` returns the vertices to remove from the adjacency matrix `U`.
+- `MinimalPeel()` is the default. It is the exact minimum vertex cover. It returns the greedy
+  cover when that cover is minimum, and the lexicographically smallest minimum cover otherwise.
+- `GreedyPeel()` is the oracle's rule: the asset with the most undetermined pairs first, the
+  smallest index on a tie. It can remove more than the minimum. On the star X-(A1, A2, A3) whose
+  leaves each carry one edge Ai-Li it removes four assets, where three suffice.
+- `NoPeel()` removes nothing. The `NaN` reaches `matrix_processing_block!`, which refuses it with
+  the `IsNonFiniteError` and the message it had before.
+
+**The peel runs at admission, not in the matrix repair.** `coverage_peel` runs after
+`coverage_admission` in each available-case covariance: the state arm, which the batch
+`FullMoment` arm reads, and the two-pass `SemiMoment` arm. A peeled asset is `NaN` across its row
+and column, so the Investable Mask drops it, and every consumer of the result reads one universe.
+A peel inside `matrix_processing_block!` would remove the asset from the covariance and keep it in
+the Coverage Universe. The refusal of that function stays for every other source of the `NaN`.
+
+**A peel removes data, so the caller is told.** `coverage_peel` reports through
+`strict_diagnostic`: a warning names the peeled assets, the count of undetermined pairs and the
+rule, and `strict = true` refuses with an `ArgumentError`. The covariance verbs take `strict`, and
+`EmpiricalPrior` passes its own `strict` to its covariance, in the batch fit and in the readout of
+a fold. The second argument of this decision, that a peel is a second silent universe rule, holds
+no more: the peel is part of admission, and it is never silent.
+
+A mean and a variance have no pairs, so the rule binds on a covariance and a correlation alone.
+The third and fourth co-moments keep the refusal of the block rule for an undetermined triple or
+quadruple. The table row "The block repair" of *Considered options* records the choice of that
+date.

@@ -310,6 +310,7 @@ The method of `Statistics.cov` that makes the estimate from a Sample Buffer. An 
 
   - $(arg_dict[:ce])
   - `state`: The buffer to read.
+  - `kwargs...`: Additional keyword arguments passed to the batch verb, `strict` among them.
 
 # Returns
 
@@ -322,8 +323,10 @@ The method of `Statistics.cov` that makes the estimate from a Sample Buffer. An 
   - [`sample_buffer`](@ref)
   - [`partial_fit!`](@ref)
 """
-function Statistics.cov(ce::AbstractCovarianceEstimator, state::SampleBufferState)
-    return Statistics.cov(ce, sample_buffer(state); sample_buffer_kwargs(state)...)
+function Statistics.cov(ce::AbstractCovarianceEstimator, state::SampleBufferState;
+                        kwargs...)
+    return Statistics.cov(ce, sample_buffer(state); sample_buffer_kwargs(state)...,
+                          kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -336,6 +339,7 @@ The method of `Statistics.cor` that makes the estimate from a Sample Buffer. An 
 
   - $(arg_dict[:ce])
   - `state`: The buffer to read.
+  - `kwargs...`: Additional keyword arguments passed to the batch verb, `strict` among them.
 
 # Returns
 
@@ -348,8 +352,10 @@ The method of `Statistics.cor` that makes the estimate from a Sample Buffer. An 
   - [`sample_buffer`](@ref)
   - [`partial_fit!`](@ref)
 """
-function Statistics.cor(ce::AbstractCovarianceEstimator, state::SampleBufferState)
-    return Statistics.cor(ce, sample_buffer(state); sample_buffer_kwargs(state)...)
+function Statistics.cor(ce::AbstractCovarianceEstimator, state::SampleBufferState;
+                        kwargs...)
+    return Statistics.cor(ce, sample_buffer(state); sample_buffer_kwargs(state)...,
+                          kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

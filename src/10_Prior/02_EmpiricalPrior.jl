@@ -316,7 +316,7 @@ Under a **mask-aware** `pe.me` and `pe.ce` — the exponentially weighted family
   - `F`: Factor returns matrix (ignored).
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a column filled above the limit [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`.
+  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a column filled above the limit [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`. It also reaches the covariance, where a peel of a [`CoveragePolicy`](@ref) refuses under `strict` and warns otherwise.
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Validation
@@ -348,7 +348,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any}, X::MatNum,
     # [`resolve_fill_limit`](@ref)).
     fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
     mu = vec(Statistics.mean(pe.me, X, pnl; dims = 1, kwargs...))
-    sigma = Statistics.cov(library_covariance_estimator(pe.ce), X, pnl; dims = 1, kwargs...)
+    sigma = Statistics.cov(library_covariance_estimator(pe.ce), X, pnl; dims = 1,
+                           strict = strict, kwargs...)
     # The Scenario Cap cuts the rows the result carries and leaves the moments above it
     # alone, so the fill runs over the matrix a consumer actually reads and its share is
     # measured against that window (see [`scenario_window`](@ref)).
@@ -424,7 +425,7 @@ Step 8 takes the same fill the no-horizon method takes, on the **arithmetic** `X
   - `F`: Factor returns matrix (ignored).
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a column filled above the limit [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`.
+  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a column filled above the limit [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`. It also reaches the covariance, where a peel of a [`CoveragePolicy`](@ref) refuses under `strict` and warns otherwise.
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Validation
@@ -454,7 +455,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
     X_log = log1p.(X)
     mu = vec(Statistics.mean(pe.me, X_log, pnl; dims = 1, kwargs...))
     sigma = Statistics.cov(library_covariance_estimator(pe.ce), X_log, pnl; dims = 1,
-                           kwargs...)
+                           strict = strict, kwargs...)
     horizon_moments!(mu, sigma, pe.horizon)
     Xs = scenario_window(pe.max_scenarios, X)
     # The fill is on the arithmetic `X` the caller handed in, and it is taken after step 7,
