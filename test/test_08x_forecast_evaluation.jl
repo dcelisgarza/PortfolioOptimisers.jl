@@ -2106,7 +2106,7 @@ end
 
     @testset "An empty grid is refused" begin
         @test_throws PO.IsEmptyError PO.forecast_window_table(fe, alpha, nothing,
-                                                              Tuple{Int, Int}[], 3)
+                                                              Tuple{Int, Int}[], 3, 1)
     end
 
     @testset "A grid deeper than the sample prints a table of NaN" begin
@@ -2542,7 +2542,8 @@ const FS_REF_GAP = (; spearman_mean_ic = 0.8333333333333334,
                     spread_ann_volatility = 1.1547005383792515,
                     spread_sharpe = 2.0207259421636903, spread_hit_rate = 1.0)
 
-# The thirty columns whose axis is the forecast, in the order the Result declares them.
+# The thirty columns of the reference summary whose axis is the forecast, in the order the
+# Result declares them. The three scored-coverage columns of #1512 follow them.
 const FS_CORE = (:spearman_mean_ic, :spearman_std_ic, :spearman_ic_ir, :spearman_t_stat,
                  :spearman_hit_rate, :pearson_mean_ic, :pearson_std_ic, :pearson_ic_ir,
                  :pearson_t_stat, :pearson_hit_rate, :rank_ann_return, :rank_ann_volatility,
@@ -2690,6 +2691,67 @@ end
     @testset "A vector method with no evaluation has nothing to summarise" begin
         @test_throws PO.IsEmptyError forecast_evaluation_summary(ForecastEvaluationResult[])
     end
+end
+
+@testset "A listing stacks the summary of each evaluation, and a comparison refuses it" begin
+    # R90 of #1416, built by #1512. A comparison of skill is paired: one estimand, one sample
+    # and one unit. `paired = false` is a listing, the oracle's table of evaluations.
+    PO = PortfolioOptimisers
+    fe1 = forecast_evaluation(IC_ALPHA, PO.forward_mean_returns(IC_ALPHA, 1, 1))
+    fe2 = forecast_evaluation(IC_ALPHA, PO.forward_mean_returns(IC_ALPHA, 2, 1);
+                              horizon = 2, ppy = 12)
+    @test_throws PO.ConflictingArgumentError forecast_evaluation_summary([fe1, fe2])
+    ls = forecast_evaluation_summary([fe1, fe2]; paired = false, names = ["h1", "h2"],
+                                     quantiles = (0.25,))
+    s1 = forecast_evaluation_summary(fe1; quantiles = (0.25,))
+    s2 = forecast_evaluation_summary(fe2; quantiles = (0.25,))
+    @test ls.names == ["h1", "h2"]
+    for f in (FS_CORE..., :n_silenced, :mean_coverage_scored, :min_coverage_scored,
+              FS_SPREAD...)
+        @test isequal(getfield(ls, f), vcat(getfield(s1, f), getfield(s2, f)))
+    end
+    @test ls.ppy == [1, 12]
+    err = try
+        forecast_evaluation_summary([fe1, fe2]; paired = false, align = true)
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, PO.ConflictingArgumentError)
+    @test occursin("`paired = false`", err.msg) && occursin("`align = true`", err.msg)
+    # On a comparable pair the listing has the rows of the comparison.
+    cp = forecast_evaluation_summary([fe1, fe1])
+    lp = forecast_evaluation_summary([fe1, fe1]; paired = false)
+    for f in FS_CORE
+        @test isequal(getfield(cp, f), getfield(lp, f))
+    end
+    @test cp.ppy == 1 && lp.ppy == [1, 1]
+    @test_throws PO.IsEmptyError forecast_evaluation_summary(ForecastEvaluationResult[];
+                                                             paired = false)
+end
+
+@testset "A silenced date counts in the coverage, and the scored coverage leaves it out" begin
+    # R87 of #1416, built by #1512. The middle date scores no asset of a full universe.
+    PO = PortfolioOptimisers
+    alpha = copy(IC_ALPHA)
+    alpha[2, :] .= NaN
+    fe = forecast_evaluation(alpha, PO.forward_mean_returns(IC_ALPHA, 1, 1))
+    @test fe.dates == [1, 2, 3]
+    c = forecast_coverage(fe)
+    @test c == [1, 0, 1]
+    cv = PO.forecast_summary_coverage(fe, nothing)
+    @test cv.n_silenced == 1
+    @test cv.mean_coverage ≈ 2 / 3 && cv.min_coverage == 0
+    @test cv.mean_coverage_scored == 1 && cv.min_coverage_scored == 1
+    @test cv.mean_coverage_scored ≈ cv.mean_coverage * 3 / (3 - cv.n_silenced)
+    # A date whose universe is empty has no coverage, so it is neither scored nor silenced.
+    umsk = trues(size(alpha))
+    umsk[2, :] .= false
+    cu = PO.forecast_summary_coverage(forecast_evaluation(alpha,
+                                                          PO.forward_mean_returns(IC_ALPHA,
+                                                                                  1, 1);
+                                                          umsk = umsk), nothing)
+    @test cu.n_silenced == 0 && cu.mean_coverage == 1 && cu.mean_coverage_scored == 1
 end
 
 @testset "An incomparable pair is refused, and the message names the field" begin
@@ -3175,9 +3237,9 @@ end
               a.sharpe ≈ b.sharpe
         @test a.sortino ≈ b.sortino && a.cvar ≈ b.cvar && a.sharpe_stderr ≈ b.sharpe_stderr
         @test !(a.max_drawdown ≈ b.max_drawdown)
-        @test length(PO.forecast_summary_row(fe, nothing, 10)) == 30
+        @test length(PO.forecast_summary_row(fe, nothing, 10)) == 33
         @test collect(keys(PO.forecast_summary_row(fe, nothing, 10))) ==
-              collect(fieldnames(ForecastSummaryResult)[2:31])
+              collect(fieldnames(ForecastSummaryResult)[2:34])
     end
 
     @testset "The aligned grid is the set the definition states, on the later phase" begin

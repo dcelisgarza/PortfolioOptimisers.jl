@@ -72,6 +72,18 @@ different matrix, `Σ + 1e-12 s I`. A bare Cholesky of a singular matrix succeed
 round-off, so the pivot of the null direction carries no information. The eigen square root still
 refuses an indefinite matrix and a matrix that is not Hermitian, so it hides no data error.
 
+### The calibration warm-up of a fitted forecast is a named rule
+
+`TargetReturnForecast` calibrates on out-of-fold predictions, and a cross-validation estimator
+needs two valid samples per fold. Below that count no prediction is out of fold, so no
+out-of-fold slope exists. The library states that with a `NaN` slope, `NaNWarmup()`, the default.
+The oracle then calibrates on the in-sample predictions of the fitted model. An in-sample slope
+is biased upward, because each prediction comes from a model that trained on its own target. But
+it is a biased estimate and not a wrong formula, so `warmup = InSampleWarmup()` gives it
+(#1512). On the fixture of 9 valid samples under five folds, the two agree to round-off. With an
+explicit cross-validation estimator below the count, the oracle refuses. That refusal rejects
+valid input, so no keyword reproduces it.
+
 ### A repair returns a positive semidefinite matrix or refuses
 
 Every repair of `Posdef` ends with one test: the smallest eigenvalue of the result is at least

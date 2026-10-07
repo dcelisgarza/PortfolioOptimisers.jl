@@ -1,6 +1,119 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for the calibration warm-up of a [`TargetReturnForecast`](@ref), the rule that states the uncalibrated prediction the calibration reads while no prediction is out of fold.
+
+A cross-validation estimator in `cv` needs two valid samples per fold, which is twice the split count that [`n_splits`](@ref) reports. Below that count no out-of-fold prediction exists, so no out-of-fold slope exists. [`NaNWarmup`](@ref) states that with a `NaN` slope. [`InSampleWarmup`](@ref) calibrates on the in-sample predictions of the fitted model, which gives a slope that is biased upward. The rule acts only below that count and only under a cross-validation estimator.
+
+# Interfaces
+
+A warm-up is a marker for dispatch, and it holds no data. A new warm-up needs a method of [`target_forecast_warmup`](@ref).
+
+# Related
+
+  - [`NaNWarmup`](@ref)
+  - [`InSampleWarmup`](@ref)
+  - [`TargetReturnForecast`](@ref)
+  - [`target_forecast_uncalibrated`](@ref)
+"""
+abstract type AbstractCalibrationWarmup <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Gives a `NaN` uncalibrated prediction to every sample while no prediction is out of fold, so the calibration coefficient is `NaN`. This is the default warm-up.
+
+Below two valid samples per fold, no fold has a model that did not train on its test samples. So no out-of-fold slope exists, and `NaN` states that.
+
+# Constructors
+
+    NaNWarmup() -> NaNWarmup
+
+# Examples
+
+```jldoctest
+julia> TargetReturnForecast(;
+                            scores = DescriptorScores(;
+                                                      descriptors = [Passthrough(; field = \"a\")])).warmup
+NaNWarmup()
+```
+
+# Related
+
+  - [`AbstractCalibrationWarmup`](@ref)
+  - [`InSampleWarmup`](@ref)
+"""
+struct NaNWarmup <: AbstractCalibrationWarmup end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Calibrates on the in-sample predictions of the fitted model while no prediction is out of fold.
+
+The in-sample prediction of a sample comes from a model that trained on that sample, so it agrees with its own target by construction. Its slope is biased upward: on scores that carry no information the slope is zero, and the in-sample slope is positive. The rule gives a biased estimate, not a wrong formula, so it stays available as an option. The calibration under `cv = nothing` reads the same predictions at every sample count.
+
+# Constructors
+
+    InSampleWarmup() -> InSampleWarmup
+
+# Examples
+
+```jldoctest
+julia> TargetReturnForecast(;
+                            scores = DescriptorScores(;
+                                                      descriptors = [Passthrough(; field = \"a\")]),
+                            warmup = InSampleWarmup()).warmup
+InSampleWarmup()
+```
+
+# Related
+
+  - [`AbstractCalibrationWarmup`](@ref)
+  - [`NaNWarmup`](@ref)
+"""
+struct InSampleWarmup <: AbstractCalibrationWarmup end
+"""
+    target_forecast_warmup(warmup::NaNWarmup, rfe::TargetReturnForecast, model,
+                           Sf::MatNum, yf::VecNum, ok::AbstractVector{Bool}) -> VecNum
+    target_forecast_warmup(warmup::InSampleWarmup, rfe::TargetReturnForecast, model,
+                           Sf::MatNum, yf::VecNum, ok::AbstractVector{Bool}) -> VecNum
+
+Return the uncalibrated prediction that the calibration of a [`TargetReturnForecast`](@ref) reads while no prediction is out of fold.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. [`NaNWarmup`](@ref): every sample reads `NaN`.
+ 2. [`InSampleWarmup`](@ref): the fitted model predicts its own valid samples, as [`target_forecast_uncalibrated`](@ref) does under `cv = nothing`, and every other sample reads `NaN`.
+
+# Arguments
+
+  - `warmup`: The calibration warm-up. It is `rfe.warmup`.
+  - `rfe`: Target Return Forecast Estimator.
+  - `model`: The model fitted on every valid sample.
+  - `Sf`: The flattened design.
+  - `yf`: The flattened target.
+  - `ok`: The mask of the valid samples.
+
+# Returns
+
+  - `p::VecNum`: The uncalibrated prediction of every sample.
+
+# Related
+
+  - [`AbstractCalibrationWarmup`](@ref)
+  - [`target_forecast_uncalibrated`](@ref)
+"""
+function target_forecast_warmup(::NaNWarmup, ::Any, ::Any, Sf::MatNum, ::VecNum,
+                                ok::AbstractVector{Bool})::VecNum
+    return fill(real(eltype(Sf))(NaN), length(ok))
+end
+function target_forecast_warmup(::InSampleWarmup, rfe, model, Sf::MatNum, yf::VecNum,
+                                ok::AbstractVector{Bool})::VecNum
+    return target_forecast_uncalibrated(nothing, rfe, model, Sf, yf, ok)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 A Return Forecast fitted by a regression target over every observation and asset at once.
 
 The member turns its Descriptors into scores with the recipe in `scores`, and hands every `(observation, asset)` pair whose forward target has matured to a regression target as one sample. The combination of the Descriptors is whatever the target fits, so this member admits a nonlinear one. [`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref) are two targets the library defines. A caller's own target runs here when it states `StatsAPI.fit` and `StatsAPI.predict`, as the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states. The member fits the target without observation weights, so the target needs no weight method here.
@@ -42,7 +155,7 @@ Where:
   - $(math_dict[:u_ti_cs])
   - ``\\mathcal{S}``: The valid samples, the pairs whose target has matured, ``t \\leq T - \\ell - h + 1``, with ``u_{ti} > 0`` and a finite ``z_{ti}`` and ``\\boldsymbol{s}_{ti}``.
   - ``\\mathcal{M}``: The model the regression target fits on the valid samples.
-  - ``p_{ti}``: Uncalibrated prediction of asset ``i`` at observation ``t``, in return units. Under a cross-validation estimator in `cv`, the calibration reads the prediction of each valid sample from the model fitted on the folds that do not hold that sample. Below two valid samples per fold, no prediction is out of fold, and the calibration is in its warm-up.
+  - ``p_{ti}``: Uncalibrated prediction of asset ``i`` at observation ``t``, in return units. Under a cross-validation estimator in `cv`, the calibration reads the prediction of each valid sample from the model fitted on the folds that do not hold that sample. Below two valid samples per fold, no prediction is out of fold, and `warmup` states the prediction the calibration reads.
   - ``\\mathcal{A}_{t}``: The assets of a matured observation ``t`` that enter the calibration, those with ``u_{ti} > 0`` and a finite ``v_{ti}``, ``p_{ti}`` and ``\\bar{\\varepsilon}_{ti}``.
   - ``\\omega_{ti}``: Calibration weight of asset ``i`` at observation ``t``. The weights of one observation have a mean of one.
   - ``a_{t}``, ``c_{t}``: The weighted normal product and cross product of observation ``t``.
@@ -71,6 +184,7 @@ $(DocStringExtensions.TYPEDFIELDS)
                          half_life::Real = 20.0, decay::Real = half_life_decay(half_life),
                          min_obs::Integer = 1,
                          cv::Option{<:CrossValidationEstimator} = KFold(),
+                         warmup::AbstractCalibrationWarmup = NaNWarmup(),
                          unit::AbstractForecastUnit = IdiosyncraticReturnUnit(),
                          intercept::Bool = false) -> TargetReturnForecast
 
@@ -126,6 +240,7 @@ TargetReturnForecast
                  │                  fa ┼ nothing
                  │   store_weight_path ┼ Bool: false
                  │              strict ┴ Bool: false
+          warmup ┼ NaNWarmup()
             unit ┼ IdiosyncraticReturnUnit()
        intercept ┴ Bool: false
 ```
@@ -190,6 +305,10 @@ TargetReturnForecast
     """
     cv
     """
+    Calibration warm-up, the rule that states the prediction the calibration reads below two valid samples per fold of `cv`. [`NaNWarmup`](@ref) gives a `NaN` coefficient there, and [`InSampleWarmup`](@ref) calibrates on the in-sample predictions. The field acts only under a cross-validation estimator.
+    """
+    warmup
+    """
     $(field_dict[:rf_unit])
     """
     unit
@@ -203,6 +322,7 @@ TargetReturnForecast
                                   target_scoring::Option{<:AbstractCrossSectionalTransform},
                                   calibrate::Bool, scale::Real, decay::Real,
                                   min_obs::Integer, cv::Option{<:CrossValidationEstimator},
+                                  warmup::AbstractCalibrationWarmup,
                                   unit::AbstractForecastUnit, intercept::Bool)
         assert_nonempty_gt0_finite_val(horizon, :horizon)
         assert_nonempty_gt0_finite_val(lag, :lag)
@@ -213,12 +333,19 @@ TargetReturnForecast
         return new{typeof(scores), typeof(tgt), typeof(horizon), typeof(lag),
                    typeof(whole_history), typeof(target_outlier), typeof(target_scoring),
                    typeof(calibrate), typeof(scale), typeof(decay), typeof(min_obs),
-                   typeof(cv), typeof(unit), typeof(intercept)}(scores, tgt, horizon, lag,
-                                                                whole_history,
-                                                                target_outlier,
-                                                                target_scoring, calibrate,
-                                                                scale, decay, min_obs, cv,
-                                                                unit, intercept)
+                   typeof(cv), typeof(warmup), typeof(unit), typeof(intercept)}(scores, tgt,
+                                                                                horizon,
+                                                                                lag,
+                                                                                whole_history,
+                                                                                target_outlier,
+                                                                                target_scoring,
+                                                                                calibrate,
+                                                                                scale,
+                                                                                decay,
+                                                                                min_obs, cv,
+                                                                                warmup,
+                                                                                unit,
+                                                                                intercept)
     end
 end
 function TargetReturnForecast(; scores::DescriptorScores,
@@ -232,11 +359,12 @@ function TargetReturnForecast(; scores::DescriptorScores,
                               decay::Real = half_life_decay(half_life),
                               min_obs::Integer = 1,
                               cv::Option{<:CrossValidationEstimator} = KFold(),
+                              warmup::AbstractCalibrationWarmup = NaNWarmup(),
                               unit::AbstractForecastUnit = IdiosyncraticReturnUnit(),
                               intercept::Bool = false)::TargetReturnForecast
     return TargetReturnForecast(scores, tgt, horizon, lag, whole_history, target_outlier,
-                                target_scoring, calibrate, scale, decay, min_obs, cv, unit,
-                                intercept)
+                                target_scoring, calibrate, scale, decay, min_obs, cv,
+                                warmup, unit, intercept)
 end
 function fits_idiosyncratic_target(::TargetReturnForecast)::Bool
     return true
@@ -430,7 +558,7 @@ Predict the uncalibrated forecast of the samples a [`TargetReturnForecast`](@ref
 The method that Julia selects is the algorithm.
 
  1. `nothing`: the fitted model predicts its own training samples, so the calibration runs in sample.
- 2. A cross-validation estimator: [`Base.split`](@ref) splits the valid samples. For each split, the function fits a model on the training folds and predicts the test fold, so the calibration never reads a prediction of a sample the model trained on. A sample that no split tests keeps its `NaN`. Below two valid samples per fold, which is twice the split count that [`n_splits`](@ref) reports, the function fits nothing, so every sample keeps its `NaN` and the calibration is in its warm-up. An in-sample prediction in their place would give the slope the bias that the split removes.
+ 2. A cross-validation estimator: [`Base.split`](@ref) splits the valid samples. For each split, the function fits a model on the training folds and predicts the test fold, so the calibration never reads a prediction of a sample the model trained on. A sample that no split tests keeps its `NaN`. Below two valid samples per fold, which is twice the split count that [`n_splits`](@ref) reports, the function fits no fold and returns the prediction of [`target_forecast_warmup`](@ref) under `rfe.warmup`. The default [`NaNWarmup`](@ref) gives `NaN` to every sample, so the calibration is in its warm-up. [`InSampleWarmup`](@ref) gives the in-sample prediction of method 1, with the bias that the split removes.
 
 # Arguments
 
@@ -443,7 +571,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `p::VecNum`: The uncalibrated prediction of every sample, `NaN` where the sample is not valid, and everywhere in the warm-up of an out-of-fold calibration.
+  - `p::VecNum`: The uncalibrated prediction of every sample, `NaN` where the sample is not valid, and everywhere in the warm-up of an out-of-fold calibration under [`NaNWarmup`](@ref).
 
 # Related
 
@@ -460,16 +588,16 @@ function target_forecast_uncalibrated(::Nothing, ::TargetReturnForecast, model, 
     return p
 end
 function target_forecast_uncalibrated(cv::CrossValidationEstimator,
-                                      rfe::TargetReturnForecast, ::Any, Sf::MatNum,
+                                      rfe::TargetReturnForecast, model, Sf::MatNum,
                                       yf::VecNum, ok::AbstractVector{Bool})::VecNum
     Tf = real(eltype(Sf))
     idx = findall(ok)
     m = length(idx)
     rdx = ReturnsResult(; nx = ["sample"], X = zeros(Tf, m, 1))
-    p = fill(Tf(NaN), length(ok))
     if m < 2 * n_splits(cv, rdx)
-        return p
+        return target_forecast_warmup(rfe.warmup, rfe, model, Sf, yf, ok)
     end
+    p = fill(Tf(NaN), length(ok))
     Sv = Sf[idx, :]
     yv = yf[idx]
     q = fill(Tf(NaN), m)
@@ -1034,4 +1162,5 @@ function target_forecast_orthogonal_rows(cre::AbstractCrossSectionalRegressionEs
     return Q
 end
 
-export TargetReturnForecast, TargetReturnForecastResult
+export TargetReturnForecast, TargetReturnForecastResult, NaNWarmup, InSampleWarmup
+public AbstractCalibrationWarmup, target_forecast_warmup

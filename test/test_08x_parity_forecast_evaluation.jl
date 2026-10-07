@@ -41,7 +41,9 @@ THE TWO DIFFERENCES THAT ADR 0149 RULES.
      root of a whole count of dates, and that identity is asserted where the two differ.
   2. A date with no scorable asset. The oracle drops it from the grid. We keep it with `NaN`
      statistics, so `step` means the same thing everywhere. No statistic reads the kept date but
-     the coverage, which counts it as a silenced date by design. The book carries its weights
+     the coverage, which counts it as a silenced date by design. The summary also reports the
+     count of silenced dates and the coverage over the scored dates, which is the oracle's
+     coverage (#1512). The book carries its weights
      over such a date, because the forecast states nothing there: before #1389 the turnover out
      of it read a trade out of an empty book (Defect found).
 
@@ -172,6 +174,24 @@ end
                                  st[:, [1, 2, 4, 5, 7, 8, 9, 10, 11]];
                                  name = "$(case) tables").ok
             @test whole_root(st[:, 3], tabs[:, 2]) && whole_root(st[:, 6], tabs[:, 5])
+            # R89 (#1512): the oracle's tables are per period whatever its factor is. An
+            # evaluation annualised at 12 gives them with `ppy = 1` on the two verbs, and its
+            # default tables are the linear rescale of them.
+            fe12 = PO.ForecastEvaluationResult(o.fe.alpha, o.fe.y, o.fe.umsk, o.fe.dates,
+                                               o.fe.target, o.fe.horizon, o.fe.lag,
+                                               o.fe.step, o.fe.min_count, o.fe.ties, 12)
+            per = vcat(table(forecast_holding_period(fe12, c.X, c.W; n = c.nfp, ppy = 1)),
+                       table(forecast_decay(fe12, c.X, c.W; n = c.nfp, ppy = 1)))
+            @test parity_compare(per[:, 7:10], st[:, 7:10]; name = "$(case) per period").ok
+            ann = vcat(table(forecast_holding_period(fe12, c.X, c.W; n = c.nfp)),
+                       table(forecast_decay(fe12, c.X, c.W; n = c.nfp)))
+            @test isequal(isnan.(ann), isnan.(per))
+            f = isfinite.(per)
+            @test isapprox(ann[:, [7, 9]][f[:, [7, 9]]], 12 .* per[:, [7, 9]][f[:, [7, 9]]];
+                           rtol = 1e-12)
+            @test isapprox(ann[:, [8, 10]][f[:, [8, 10]]],
+                           sqrt(12) .* per[:, [8, 10]][f[:, [8, 10]]]; rtol = 1e-12)
+            @test isequal(ann[:, setdiff(1:11, 7:10)], per[:, setdiff(1:11, 7:10)])
             cb = forecast_calibration(o.fe, c.W)
             curve = hcat(cb.curve.bin, cb.curve.mean_alpha, cb.curve.mean_y, cb.curve.count)
             @test parity_compare(curve, load(case, "Curve"); name = "$(case) curve").ok
@@ -200,6 +220,16 @@ end
             else
                 @test parity_compare(s[29:32], ss[29:32]).ok
             end
+            # R87 (#1512): the coverage over the scored dates is the oracle's coverage, and
+            # the silenced dates are the dates the oracle dropped. The two means satisfy the
+            # identity of `forecast_summary_coverage`.
+            fs = forecast_evaluation_summary(o.fe, c.W)
+            @test fs.n_silenced == [length(dropped)]
+            @test parity_compare([fs.mean_coverage_scored[1], fs.min_coverage_scored[1]],
+                                 ss[29:30]; name = "$(case) scored coverage").ok
+            nc = count(isfinite, forecast_coverage(o.fe, c.W))
+            @test isapprox(fs.mean_coverage_scored[1],
+                           fs.mean_coverage[1] * nc / (nc - fs.n_silenced[1]); rtol = 1e-12)
         end
     end
 

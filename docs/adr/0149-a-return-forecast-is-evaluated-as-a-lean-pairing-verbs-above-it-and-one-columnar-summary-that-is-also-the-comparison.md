@@ -360,3 +360,36 @@ kept, cannot.
 `test_08x_parity_forecast_evaluation.jl` pins every per-date series, the forward-window tables,
 the calibration curve and the summary against the oracle on nine cases, and the two differences
 this ADR rules (the t-statistic of an overlap and the kept date) by identity.
+
+## Amendment (2026-10-07)
+
+[#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416) kept three rules of
+this ADR and asked for the oracle's rule beside each one.
+[#1512](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1512) built them.
+
+**A silenced date has coverage zero, and the summary also reports the coverage over the scored
+dates.** The stride defines a fixed schedule of dates, and coverage is the share of the universe
+scored at each scheduled date. So a scheduled date whose universe is not empty and at which
+nothing is scored has coverage zero, and the mean coverage counts it. The oracle drops the date
+and averages over the dates it kept, which conditions on success and overstates the coverage. The
+summary now also reports `n_silenced`, the count of such dates, and `mean_coverage_scored` and
+`min_coverage_scored`, the coverage over the dates that scored an asset. With `J` dates of finite
+coverage, `mean_coverage_scored = mean_coverage * J / (J - n_silenced)` exactly, and the two
+scored figures are the oracle's coverage.
+
+**The forward-window tables take `ppy`.** Annualisation is a linear rescale: the mean times `p`
+and the ratio times `sqrt(p)`. The tables build each window with the `ppy` of the evaluation, so
+a table and the summary of one evaluation share their units, and that stays the default. The
+oracle's tables are per period whatever its factor is. `forecast_holding_period` and
+`forecast_decay` now take `ppy`, so `ppy = 1` gives the oracle's per-period tables from the same
+evaluation as an annualised summary.
+
+**A comparison is paired, and a listing is a separate product.** A comparison of skill needs one
+estimand (the target, the horizon and the lag), one sample (the dates and the universe) and one
+unit (`ppy`). The tests of forecast comparison are defined on a common sample. So the refusal of
+evaluations that are not comparable stays the guard of the summary. `paired = false` gives a
+listing: it stacks the summary of each evaluation on its own and runs no check, which is the
+oracle's table of evaluations. Its `ppy` holds one entry per forecast. A difference between two
+rows of a listing is not a difference in skill, and the docstring says so. `align = true`
+re-dates the evaluations onto one grid, so it does not give the oracle's rows, and the two
+keywords conflict by name.

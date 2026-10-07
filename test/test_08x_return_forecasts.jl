@@ -1281,6 +1281,44 @@ end
                                        csfm).calib)
     end
 
+    @testset "InSampleWarmup reaches the oracle's in-sample fallback below the threshold" begin
+        # R53 of #1416, built by #1512. Nine valid samples are fewer than the ten that five
+        # folds need, so no prediction is out of fold. The oracle then calibrates on the
+        # in-sample predictions of the fitted model. The stored oracle is its latest forecast
+        # and its coefficient on this fixture, measured 1.0e-15 and 2.2e-16 relative. Under an
+        # explicit splitter the oracle refuses the same fit; that refuses valid input, so no
+        # keyword reproduces it, and ours does not refuse.
+        kw = (; scores = ds, target_outlier = nothing, half_life = 10.0)
+        @test TargetReturnForecast(; scores = ds).warmup === NaNWarmup()
+        nan = return_forecast(TargetReturnForecast(; kw...), rd, csfm)
+        @test isnan(nan.calib) && all(isnan, nan.mu)
+        ins = return_forecast(TargetReturnForecast(; kw..., warmup = InSampleWarmup()), rd,
+                              csfm)
+        @test isapprox(ins.calib, 1.9589560993595951; rtol = 1e-12)
+        @test isapprox(ins.mu,
+                       [0.0084208520108218, 0.00886405474823346, 0.00443202737411673];
+                       rtol = 1e-12)
+        # The fallback is the calibration of `cv = nothing`, and an explicit splitter takes it.
+        cvn = return_forecast(TargetReturnForecast(; kw..., cv = nothing), rd, csfm)
+        xcv = return_forecast(TargetReturnForecast(; kw..., cv = KFold(; n = 5),
+                                                   warmup = InSampleWarmup()), rd, csfm)
+        @test ins.calib == cvn.calib == xcv.calib
+        @test isequal(ins.mu, cvn.mu) && isequal(xcv.mu, cvn.mu)
+        # Above the threshold the warm-up does not act.
+        k3 = (; kw..., cv = KFold(; n = 3))
+        @test return_forecast(TargetReturnForecast(; k3..., warmup = InSampleWarmup()), rd,
+                              csfm).calib ==
+              return_forecast(TargetReturnForecast(; k3...), rd, csfm).calib
+        # Each method of the verb, on the flattened samples.
+        Sf, yf, ok = PO.target_forecast_samples(cat(a[1:3, :], b[1:3, :]; dims = 3),
+                                                eps[2:4, :], ones(3, 3), 3)
+        rfe = TargetReturnForecast(; kw...)
+        model = PO.target_forecast_fit(rfe, Sf, yf, ok)
+        @test all(isnan, PO.target_forecast_warmup(NaNWarmup(), rfe, model, Sf, yf, ok))
+        @test PO.target_forecast_warmup(InSampleWarmup(), rfe, model, Sf, yf, ok) ≈
+              Sf * (Sf \ yf)
+    end
+
     @testset "The intercept appends a column of ones to every design" begin
         # #1419: the fit, the out-of-fold fits and the latest prediction all read the constant.
         rf = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
