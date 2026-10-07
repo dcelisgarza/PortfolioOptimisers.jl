@@ -407,7 +407,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the centring of an exponentially weighted moment, the rule that says which location each deviation is taken from.
 
-The four exponentially weighted moment estimators hold a centring in their `centring` field: [`ExpWeightedVariance`](@ref), [`ExpWeightedCovariance`](@ref), [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). [`EstimatedCentring`](@ref) estimates the location and corrects the bias that the estimate puts in each deviation. [`PreCentred`](@ref) takes the returns as deviations from a mean of zero. [`ZeroStartCentring`](@ref) takes the location of the reference implementation, a recursion from zero that is not divided by its weight. The root lives with the other roots, because the estimators bind their field before the members load.
+The four exponentially weighted moment estimators hold a centring in their `centring` field: [`ExpWeightedVariance`](@ref), [`ExpWeightedCovariance`](@ref), [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). [`EstimatedCentring`](@ref) estimates the location and corrects the bias that the estimate puts in each deviation. [`PreCentred`](@ref) takes the returns as deviations from a mean of zero. [`ZeroStartCentring`](@ref) takes the location of a recursion from zero that is not divided by its weight. The root lives with the other roots, because the estimators bind their field before the members load.
 
 # Interfaces
 

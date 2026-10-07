@@ -70,7 +70,7 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
 
     @testset "A family label that names a factor is allowed only when it is that factor" begin
         # `market` is both the name of the single factor and the label of its family, which
-        # is the case the reference implementation permits.
+        # is the case the oracle permits.
         sets = PO.cross_sectional_factor_sets(factors, rd)
         @test sets.dict["market"] == ["market"]
         # A label shared with a factor of another family would answer two different lists.

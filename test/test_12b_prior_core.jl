@@ -662,7 +662,7 @@ end
                                         f_views = LinearConstraintEstimator(;
                                                                             val = ["MTUM == 0.0001",
                                                                                    "QUAL - USMV == -0.0003"]))]
-    # The fixture is the published reference this estimator was ported from, and the
+    # The fixture is the stored oracle this estimator was ported from, and the
     # covariance still matches it exactly: ADR 0063's amendment moves the intercept and the
     # rate into the prior stack, and the covariance path never reads the prior mean.
     for (i, pe) in enumerate(pes)
@@ -675,17 +675,17 @@ end
         @test success
     end
 
-    # `mu` departs from the reference, deliberately and by a stated amount (#570).
+    # `mu` departs from the oracle, deliberately and by a stated amount (#570).
     #
-    # Column 1, `l === nothing`: the reference adds the loadings constant to a historical
+    # Column 1, `l === nothing`: the oracle adds the loadings constant to a historical
     # mean that already contains it, because least squares with an intercept makes the mean
-    # of `X` equal `M * mu_f + b`. Ours is the reference less `rr.b`, entry by entry.
+    # of `X` equal `M * mu_f + b`. Ours is the oracle less `rr.b`, entry by entry.
     pr1 = prior(pes[1], rd)
     @test isapprox(pr1.mu, df[1:20, 1] .- pr1.rr.b; atol = 1e-16)
     @test isapprox(maximum(abs, pr1.rr.b), 0.0016160796925727256; rtol = 1e-6)
 
     # Column 2, `l = 2`: the equilibrium premium carries no intercept, so only the *place*
-    # differs. Ours blends the views against a prior that carries `b`, and the reference
+    # differs. Ours blends the views against a prior that carries `b`, and the oracle
     # adds `b` whole afterwards, so the departure is `(I - G*P)b - b` on the asset half.
     # That is not a plain offset, so it is pinned here as one measured number.
     pr2 = prior(pes[2], rd)
@@ -2320,10 +2320,10 @@ end
 
 #=
 The residual comoments of `src/10_Prior/08_HighOrderFactorPriorEstimator.jl`, checked against
-hand-built matrices rather than read. Sweep ticket #534. Riskfolio-Lib carries the reference
-implementation of both, and this library's branch chain matches it entry for entry; what differs
-is that the reference builds the systematic covariance itself from the loadings, while this
-library takes it as an argument and asks the caller to remove the residual block first.
+hand-built matrices rather than read. Sweep ticket #534. The oracle implements both, and this
+library's branch chain matches it entry for entry; what differs is that the oracle builds the
+systematic covariance itself from the loadings, while this library takes it as an argument and
+asks the caller to remove the residual block first.
 =#
 @testset "Residual coskewness and cokurtosis" begin
     PO = PortfolioOptimisers
@@ -2405,7 +2405,7 @@ library takes it as an argument and asks the caller to remove the residual block
     #=
     The docstring used to say that every pattern with a lone index is zero. It is not: only
     the pattern whose four indices are ALL DISTINCT vanishes. A pair with two singles gives
-    `e2[a] * sigma[b, c]`, which is what the reference implementation gives too. Sweep ticket
+    `e2[a] * sigma[b, c]`, which is what the oracle gives too. Sweep ticket
     #534 moved the documentation, not the code.
     =#
     N4 = 4

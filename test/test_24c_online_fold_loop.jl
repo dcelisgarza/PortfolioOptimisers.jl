@@ -447,7 +447,7 @@ assets is what keeps the JuMP families cheap.
     end
 
     @testset "A failed step leaves the previous weights where they were (#1021)" begin
-        # The reference's online loop skips `set_params(previous_weights = …)` on a failed
+        # The oracle's online loop skips `set_params(previous_weights = …)` on a failed
         # step. Here the online arm advances `prev` by the same rule as the batch arm, so a
         # failed step threads nothing and the step after it reads the last threadable one.
         ok = WeightBounds(; lb = zeros(N), ub = ones(N))

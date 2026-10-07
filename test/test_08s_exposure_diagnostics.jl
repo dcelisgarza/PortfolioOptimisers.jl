@@ -580,7 +580,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             @test iszero(exposure_dispersion(fill(x, 1, n, 1), rand(rng8, 1, n))[1, 1])
         end
         # The intercept of the fixture is constant, so its dispersion is exactly zero, where
-        # the reference reads the round-off `2.2e-16`.
+        # the oracle reads the round-off `2.2e-16`.
         @test all(iszero, exposure_dispersion(csfm).X[:, 3])
     end
 

@@ -1,18 +1,18 @@
 #=
-The plain exponentially weighted family answers a gapped panel the way the reference does.
+The plain exponentially weighted family answers a gapped panel the way the oracle does.
 
 `ExpWeightedExpectedReturns`, `ExpWeightedVariance` and `ExpWeightedCovariance` are ports of the
-reference implementation's three plain exponentially weighted members. Each seeds its recursion at
+oracle's three plain exponentially weighted members. Each seeds its recursion at
 zero, freezes a moment of an asset on its holiday, resets on an inactive period, and divides out the
-damping that the cold start costs. The covariance takes the reference's step, so its raw state is
-the reference's, but it divides each pair by the weight that the pair holds, where the reference
+damping that the cold start costs. The covariance takes the oracle's step, so its raw state is
+the oracle's, but it divides each pair by the weight that the pair holds, where the oracle
 divides by the per-asset congruence (ADR 0181, amendment of 2026-09-29, #1420). The two agree
 where every asset has the same history. On this fixture asset 4 lists late, so its covariances
-are the reference's times `sqrt(W_ii W_jj) / W_ij`, 1.0607, and every other entry is equal. The
-oracle is the reference itself: `oracle_returns` is an exactly representable
+are the oracle's times `sqrt(W_ii W_jj) / W_ij`, 1.0607, and every other entry is equal. The
+oracle is the external implementation itself: `oracle_returns` is an exactly representable
 fixture that both languages build bit for bit, so no file is exchanged, and the literals below were
-measured by fitting the reference on it at `half_life = 10`. They pin `centring = PreCentred()`,
-the reference's default, and `ZeroStartCentring()`, the reference's estimated location, which
+measured by fitting the oracle on it at `half_life = 10`. They pin `centring = PreCentred()`,
+the oracle's default, and `ZeroStartCentring()`, the oracle's estimated location, which
 starts at zero and is not divided by its weight. The library's default estimated location is
 pinned against the hand references at the end of this file (#1507, ADR 0190).
 
@@ -25,7 +25,7 @@ takes `rtol = 1e-14`: the measure is one ulp, and the margin is for a host that 
 of the recursion otherwise.
 
 Two families of testset sit beside the parity. The first pins the structural identities the census
-of the reference states, and each is checked in plain Julia rather than against a stored number: the
+of the oracle states, and each is checked in plain Julia rather than against a stored number: the
 division of each pair by its weight, the congruence where the histories agree, the positive
 semidefiniteness of the raw state, the holiday identity on the raw state, the warm-up mask and the
 equal-history identity. The second pins the seam of ADR 0117: a mask-aware estimator overrides the
@@ -34,7 +34,7 @@ reduce-and-expand root and answers a young asset that the Coverage Universe drop
 using Test, PortfolioOptimisers, Statistics, LinearAlgebra, StableRNGs
 include(joinpath(@__DIR__, "parity_harness.jl"))
 
-# The reference's answers on the fixture below, at `half_life = 10`.
+# The oracle's answers on the fixture below, at `half_life = 10`.
 const EW_MU_MIN1 = [0.001292041816555475, 0.002114893063360849, 0.0033233997239623943,
                     0.006285777102402957]
 const EW_MU_MIN40 = [0.001292041816555475, 0.002114893063360849, 0.0033233997239623943, NaN]
@@ -62,7 +62,7 @@ const EW_COV_RAW_STATE = [0.00031043185325520587 -6.722330287604037e-06 -0.00020
                            -0.00014613203796115705 -0.00019291682264353322 1.1267599687451917e-05 0.0004947775979468148]
 
 # The fixture. Every entry is an exactly rounded product of exactly representable doubles, so the
-# reference builds the same matrix with no file exchange.
+# oracle builds the same matrix with no file exchange.
 const EW_BASE = [0.012, -0.005, 0.031, -0.018, 0.007, 0.024, -0.011, 0.002, -0.027, 0.015]
 const EW_T = 60
 const EW_N = 4
@@ -135,9 +135,9 @@ end
     @test parity_compare(view(v40, 1:(EW_N - 1)), view(EW_VAR_MIN40, 1:(EW_N - 1));
                          rtol = 1e-14, name = "var min40").ok
 
-    # The reference divides by the per-asset congruence, and the port divides each pair by the
+    # The oracle divides by the per-asset congruence, and the port divides each pair by the
     # weight it holds (ADR 0181, 2026-09-29). Asset 4 lists at 31, so its pairs hold less weight
-    # than the congruence assumes, and the port's covariance is the reference's times
+    # than the congruence assumes, and the port's covariance is the oracle's times
     # `sqrt(W_ii W_jj) / W_ij`: measured to maxrel 2.2e-16 cell by cell.
     for (centring, lit) in
         ((PreCentred(), EW_COV_CENTRED), (ZeroStartCentring(), EW_COV_UNCENTRED))
@@ -181,7 +181,7 @@ end
     n = fitted.cache.obs_count
     sigma = cov(cc, Xg; active_mask = amsk)
 
-    # The raw state matches the reference's own, which is what the holiday identity compares.
+    # The raw state matches the oracle's own, which is what the holiday identity compares.
     @test parity_compare(S, EW_COV_RAW_STATE; rtol = 1e-14, name = "raw state").ok
 
     # 1. Each pair is divided by the weight it holds, and the weight of a variance is the

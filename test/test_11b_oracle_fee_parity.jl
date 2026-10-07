@@ -1,13 +1,12 @@
 include(joinpath(@__DIR__, "parity_harness.jl"))
-@testset "Reference fee parity" begin
+@testset "Oracle fee parity" begin
     using PortfolioOptimisers, Test, LinearAlgebra
 
-    # Every expected number in this file was measured by RUNNING the reference
-    # implementation, not by reading it. The fixture below is stated as literals on both
-    # sides, so the two languages parse identical `Float64` bits and no data file is
-    # exchanged.
+    # Every expected number in this file was measured by RUNNING the oracle, not by reading
+    # it. The fixture below is stated as literals on both sides, so the two languages parse
+    # identical `Float64` bits and no data file is exchanged.
     #
-    # The reference's cost model, which this file pins:
+    # The oracle's cost model, which this file pins:
     #
     #   total_cost = sum(transaction_costs .* abs.(previous_weights - weights)) + liquidation
     #   total_fee  = sum(management_fees .* weights)
@@ -16,37 +15,37 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     # The whole cost is subtracted from **every** observation. That is the same clock this
     # library puts `l`, `s` and `tn` on, so the two agree term for term:
     #
-    #   | the reference       | this library                        |
+    #   | the oracle          | this library                        |
     #   | ------------------- | ----------------------------------- |
     #   | `transaction_costs` | `tn`, a `Turnover` carrier          |
     #   | `management_fees`   | `l` on a long book, `s` on a short  |
     #   | `liquidation_cost`  | the `lq` carrier of ADR 0121        |
     #
-    # The reference has no fixed fee, so `fl`, `fs` and the `flq` carrier of ADR 0121 have
+    # The oracle has no fixed fee, so `fl`, `fs` and the `flq` carrier of ADR 0121 have
     # no counterpart there and are pinned by the hand oracles of `test_11_fees_and_returns`.
     #
     # Two conventions differ:
     #
-    #  1. The reference charges its proportional fee as `management_fees .* weights` over
+    #  1. The oracle charges its proportional fee as `management_fees .* weights` over
     #     every asset, so a short position earns a **credit**. This library splits the term
     #     into `l` over `w .>= 0` and `s` over `w .< 0`, and negates the short half. A
     #     non-negative `s` makes it a charge, and `s = -l` makes it the same credit (#1518).
     #     The testset on a short book pins that case against the oracle.
-    #  2. The reference stores `compounded` as an attribute of its portfolio object. Here it
+    #  2. The oracle stores `compounded` as an attribute of its portfolio object. Here it
     #     is the positional `compound` argument of `cumulative_returns` and `drawdowns`.
     #     Same switch, same default, different carrier.
     #
-    # Tolerances. Every value below was measured **bit-for-bit equal** to the reference
+    # Tolerances. Every value below was measured **bit-for-bit equal** to the oracle
     # except the three noted at their assertions, which are sums that cancel to within a few
     # ulp of zero and so carry an absolute error near `1e-16` with no meaningful relative
     # one. `atol` guards those, and guards the row sums against a BLAS that reassociates.
     #
     # **Every weight vector here is stated, never solved.** That is what buys the tolerance
     # above: the file compares fee arithmetic on identical inputs, so no solver enters it.
-    # A test that first optimises cannot hold this tolerance, because the reference reaches
+    # A test that first optimises cannot hold this tolerance, because the oracle reaches
     # its weights through a different build of the solver. Extend this file that way only
     # with a tolerance sized to the weights, and note that `max_step_fraction = 0.75` brings
-    # this library's solver settings close to the reference's defaults.
+    # this library's solver settings close to the oracle's defaults.
     atol = 1e-15
 
     X = [0.010 -0.020 0.005 0.030
@@ -54,7 +53,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
          0.020 0.010 0.015 -0.008
          -0.005 -0.030 0.020 0.018
          0.008 0.014 -0.025 0.006]
-    # Asset names, in this order, are "a", "b", "c", "d" on the reference side.
+    # Asset names, in this order, are "a", "b", "c", "d" on the oracle side.
     tc = [0.001, 0.002, 0.010, 0.003]
     mf = [0.0005, 0.0004, 0.0003, 0.0002]
     prev = fill(0.25, 4)
@@ -62,10 +61,10 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "The turnover charge on a long-short book" begin
         w = [0.4, -0.3, 0.5, 0.4]
         fees = Fees(; tn = Turnover(; w = prev, val = tc))
-        # The reference reported `total_cost = 0.0042`.
+        # The oracle reported `total_cost = 0.0042`.
         @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, fees), 0.0042; atol = atol)
         # `tn` is a per period rate, so the charge lands on every observation, which is what
-        # the reference does with its `total_cost`.
+        # the oracle does with its `total_cost`.
         @test isapprox(PortfolioOptimisers.calc_one_off_fees(w, fees), 0.0; atol = atol)
         @test isapprox(calc_net_returns(w, X, fees),
                        [0.020300000000000002, -0.0179, 0.0050999999999999995, 0.02,
@@ -81,14 +80,14 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "The proportional charge on a long-only book" begin
         w = [0.4, 0.1, 0.2, 0.3]
         fees = Fees(; tn = Turnover(; w = prev, val = tc), l = mf)
-        # The reference reported `total_cost = 0.0011` and `total_fee = 0.00036`.
+        # The oracle reported `total_cost = 0.0011` and `total_fee = 0.00036`.
         @test isapprox(calc_fees(w, Turnover(; w = prev, val = tc)), 0.0010999999999999998;
                        atol = atol)
         @test isapprox(calc_fees(w, mf, .>=), 0.00036; atol = atol)
         # The book is long, so `s` is unused and the two conventions coincide.
         @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, fees),
                        0.0010999999999999998 + 0.00036; atol = atol)
-        # The last entry is the one that cancels: the reference reported
+        # The last entry is the one that cancels: the oracle reported
         # `-6.000000000000097e-5` where this library reports `-6.0000000000001025e-5`.
         @test isapprox(calc_net_returns(w, X, fees),
                        [0.01054, -0.0033599999999999997, 0.00814, 0.0029399999999999995,
@@ -140,7 +139,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         w = [0.4, 0.1, 0.2, 0.3]
         fees = Fees(; tn = Turnover(; w = prev, val = tc), l = mf)
         r = calc_net_returns(w, X, fees)
-        # `compound = false` is the reference's `compounded=False`, and `true` its `True`.
+        # `compound = false` is the oracle's `compounded=False`, and `true` its `True`.
         # The compounded pair matched bit-for-bit; the simple pair differs in the last ulp
         # of its final entry, which is a sum that cancels.
         @test isapprox(cumulative_returns(r),
@@ -159,7 +158,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # ADR 0121 charges an asset that leaves the Investable Mask through a `Turnover`
         # carrier on the complement of the mask. This testset walks the path a caller
         # actually takes: a reduced `Fees` carrying `lq`, read by the ordinary fee verbs.
-        # The reference meets the same charge the same way — it holds a named
+        # The oracle meets the same charge the same way — it holds a named
         # `previous_weights` that includes an asset absent from `X`, and reports the cost
         # through the portfolio's `total_cost`.
         #
@@ -168,7 +167,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # exiting asset sits on the other axis, and that independence is itself contract.
         w = [0.4, -0.3, 0.9]
 
-        # A per asset rate. The reference reported turnover `0.25` and cost `0.0025`.
+        # A per asset rate. The oracle reported turnover `0.25` and cost `0.0025`.
         lq = Turnover(; w = [0.25], val = [0.010])
         @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, Fees(; lq = lq)), 0.0025;
                        atol = atol)
@@ -177,12 +176,12 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         @test isapprox(PortfolioOptimisers.calc_one_off_fees(w, Fees(; lq = lq)), 0.0;
                        atol = atol)
 
-        # One scalar rate over every exit. The reference reported cost `0.001`.
+        # One scalar rate over every exit. The oracle reported cost `0.001`.
         sc = Fees(; lq = Turnover(; w = [0.25], val = 0.004))
         @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, sc), 0.001; atol = atol)
 
         # Two exits of opposite sign: "b" short at `-0.4` and "c" long at `0.25`. The
-        # reference reported turnover `0.65` and cost `0.0033`, so the charge reads the
+        # oracle reported turnover `0.65` and cost `0.0033`, so the charge reads the
         # absolute previous weight and does not credit the short.
         lq2 = Turnover(; w = [-0.4, 0.25], val = [0.002, 0.010])
         @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, Fees(; lq = lq2)), 0.0033;
@@ -207,7 +206,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # the charge rides on every observation beside the reduced turnover rather than one
         # time.
         #
-        # This is the reference's own reduced portfolio: it was handed `X` for "a", "b" and
+        # This is the oracle's own reduced portfolio: it was handed `X` for "a", "b" and
         # "d" with a named `previous_weights` still naming "c", and it reported
         # `total_cost = 0.0057` — the reduced turnover `0.0032` plus the exit `0.0025` —
         # subtracted from each of the five observations.
@@ -223,7 +222,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         @test isapprox(PortfolioOptimisers.calc_liquidation_fees(fees.lq), 0.0025;
                        atol = atol)
 
-        # The whole charge lands on every observation, which is the reference's series.
+        # The whole charge lands on every observation, which is the oracle's series.
         @test isapprox(calc_net_returns(wred, Xred, fees),
                        [0.031299999999999994, -0.0084, -0.0079, 0.017499999999999998,
                         -0.001299999999999999]; atol = atol)
@@ -242,16 +241,16 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         using Clarabel
 
         # The testsets above compare arithmetic on stated weights, which is why they hold a
-        # `1e-15` tolerance. This one solves, so it cannot: the reference reaches its weights
+        # `1e-15` tolerance. This one solves, so it cannot: the oracle reaches its weights
         # through a different build of the solver. `max_step_fraction = 0.75` brings this
-        # library's Clarabel close to the one the reference drives through its modelling
+        # library's Clarabel close to the one the oracle drives through its modelling
         # layer, and the residual gap measured `8.3e-5` on a weight and `2.9e-5` on a summed
         # return series, so the tolerances below are sized to that and not to the arithmetic.
         w_atol = 1e-3
         s_atol = 2e-4
 
         # A deterministic panel from an integer LCG, so both languages hold identical bits
-        # with no data file between them. Every element matched the reference exactly.
+        # with no data file between them. Every element matched the oracle exactly.
         T, N = 120, 5
         seed = 12345
         vals = Vector{Float64}(undef, T * N)
@@ -270,7 +269,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         z5 = zeros(5)
 
         # Three folds of a rolling sixty-observation window and a twenty-observation test,
-        # which is the reference's `train_size = 60, test_size = 20`. `expand_train` is
+        # which is the oracle's `train_size = 60, test_size = 20`. `expand_train` is
         # `false` by default on both sides, so the window rolls rather than expands.
         #
         # **`wd` alone reproduces the oracle's drift (#1518, row R102 of #1416).** The oracle
@@ -286,8 +285,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                                        pws = TargetWeights())
 
         # Every proportional term this library carries, against its counterpart in the
-        # reference: `l` is the reference's per asset holding fee, and `tn` its transaction
-        # cost. `s` has no counterpart, because the reference credits a short holding fee
+        # oracle: `l` is the oracle's per asset holding fee, and `tn` its transaction
+        # cost. `s` has no counterpart, because the oracle credits a short holding fee
         # where this library charges it, so the books below are long only. The two
         # liquidation carriers of ADR 0121 are pinned by the two testsets above, which is as
         # far as they can be taken until issue #897 puts them on `Fees`.
@@ -295,7 +294,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                      "tn" => Fees(; tn = Turnover(; w = z5, val = tccv)),
                      "both" => Fees(; l = mgmt, tn = Turnover(; w = z5, val = tccv))]
 
-        # Measured from the reference, per case: the summed net return series, then the last
+        # Measured from the oracle, per case: the summed net return series, then the last
         # cumulative return under `compound = false` and under `compound = true`.
         expected = Dict("nofee_flat" => (-0.007998610740968356, -0.007998610740968363,
                                          0.9912156849257472),
@@ -314,7 +313,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                         "both_drift" => (-0.12690154123329553, -0.12690154123329575,
                                          0.8798228692359749))
 
-        # The reference solved the same weights in all four fee cases, because its default
+        # The oracle solved the same weights in all four fee cases, because its default
         # objective minimises risk and a proportional cost enters the return expression
         # alone. This library's default objective is the same, so it agrees.
         ref_w0 = [0.23892993656480035, 0.1412161727402494, 0.18064324954439945,
@@ -338,7 +337,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             @test isapprox(pred.pred[3].res.w, ref_w2; atol = w_atol)
 
             @test isapprox(sum(r), ret_sum; atol = s_atol)
-            # `compound = false` is the reference's `compounded=False`, `true` its `True`.
+            # `compound = false` is the oracle's `compounded=False`, `true` its `True`.
             @test isapprox(cumulative_returns(r)[end], smp_last; atol = s_atol)
             @test isapprox(cumulative_returns(r, true)[end], cmp_last; atol = s_atol)
         end
@@ -390,15 +389,15 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # fold, so the mask derives itself from the data, the fold that loses it charges a
         # forced exit, and the folds that lose nothing charge none.
         #
-        # **What can and cannot be compared.** The reference reaches a delisting only
+        # **What can and cannot be compared.** The oracle reaches a delisting only
         # through its exponentially weighted moments with `active_mask` routing, because its
         # plain prior refuses a `NaN`. This library's plain prior handles the gap natively.
         # The two therefore fit different moments and solve to different weights, so the
         # series cannot be compared. What can be compared exactly is the **charge**, which
         # is arithmetic on the weights: the first half below feeds this library's fee verbs
-        # the reference's own per fold weights and matches its reported cost to rounding.
+        # the oracle's own per fold weights and matches its reported cost to rounding.
         # The second half then drives this library's whole pipeline and pins the invariants
-        # the reference cannot speak to.
+        # the oracle cannot speak to.
 
         T3, N3 = 120, 5
         seed3 = 12345
@@ -420,13 +419,13 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                       settings = Dict("verbose" => false, "max_step_fraction" => 0.75))
 
         @testset "The parity matrix, over the delisting" begin
-            # The matrix the port is verified by: every fee the reference supports, against
+            # The matrix the port is verified by: every fee the oracle supports, against
             # both weight-drift settings, summarised under both settings of `compound` —
             # all of it over a panel where an asset delists, so every cell charges a forced
             # exit at the fold that loses it.
             #
-            # The comparison is driven from the **reference's own per fold weights**. That
-            # is not a shortcut, it is the only way the cells are comparable: the reference
+            # The comparison is driven from the **oracle's own per fold weights**. That
+            # is not a shortcut, it is the only way the cells are comparable: the oracle
             # reaches a delisting solely through its exponentially weighted moments with
             # `active_mask` routing, because its plain prior refuses a `NaN`, while this
             # library's plain prior handles the gap natively. The two therefore fit
@@ -434,7 +433,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             # removes that difference and leaves exactly what is being verified: the fee
             # arithmetic, the clock, the drift and the two cumulative conventions.
             #
-            # The reference solved the same weights in all six cells, because its default
+            # The oracle solved the same weights in all six cells, because its default
             # objective minimises risk and a proportional cost does not move that argmin.
             W = [[0.23372395184635317, 0.14070442963485008, 0.18641912894883597,
                   0.17987749947299542, 0.2592749900969653],
@@ -457,7 +456,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             rows = [61:80, 81:100, 101:120]
             @test iszero(W[3][k3])
 
-            # Per fold `total_cost` and `total_fee` as the reference reported them.
+            # Per fold `total_cost` and `total_fee` as the oracle reported them.
             cost = Dict("tn_flat" => [0.003956056559411261, 0.0004659372891764765,
                                       0.002478800265941117],
                         "tn_drift" => [0.003956056559411261, 0.0004368712140818054,
@@ -510,7 +509,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                     wf = W[f][keep]
 
                     # The charge this library computes for the fold, against the two
-                    # numbers the reference reported for it.
+                    # numbers the oracle reported for it.
                     # Measured maxrel 1.7e-16, one rounding of a sum over five assets.
                     @test parity_compare([PortfolioOptimisers.calc_periodic_fees(wf, fe)],
                                          [cost[tag][f] + fee[tag][f]]; rtol = 1e-15,
@@ -539,7 +538,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
 
                 @test length(r) == 60
                 @test all(isfinite, r)
-                # Both cumulative conventions, against the reference's own summaries.
+                # Both cumulative conventions, against the oracle's own summaries.
                 # Measured maxrel 1.6e-15 on the simple return, a sum of 60 returns that
                 # cancels to a total near 3e-3 (`mgmt_drift`), and 1.3e-16 on the compounded
                 # one, a product of 60 factors near one.
@@ -591,7 +590,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                 @test length(exit_res.fees.lq.w) == 1
                 held = only(exit_res.fees.lq.w)
                 # The charge is the rate times the weight the fold actually threaded, which
-                # is the reference's arithmetic on this library's own weights.
+                # is the oracle's arithmetic on this library's own weights.
                 @test isapprox(PortfolioOptimisers.calc_liquidation_fees(exit_res.fees.lq),
                                tc3[k3] * held; atol = atol)
                 # **Which** weight that is, is the `pws` switch, and the exit obeys it like

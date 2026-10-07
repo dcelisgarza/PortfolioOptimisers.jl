@@ -74,7 +74,7 @@ struct PreCentred <: AbstractCentring end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Takes each deviation from a location that starts at zero and is not divided by its weight. This is the rule of the reference implementation, kept one keyword away from the default.
+Takes each deviation from a location that starts at zero and is not divided by its weight. It is the uncorrected recursion, kept one keyword away from the default.
 
 The location of an asset takes the step ``m_{k} = \\lambda m_{k - 1} + (1 - \\lambda) x_{k}`` from ``m_{0} = 0``, and the deviation of a return is taken from the location before it, so the first deviation is the return itself. Every valid return gives a term, and no term is corrected. The weights of the location sum to ``1 - \\lambda^{k}``, so it estimates ``(1 - \\lambda^{k}) \\mu`` rather than the mean, and each deviation keeps part of the mean: the variance is too large, by 2.4 % to 36 % in the warm-up and by 3.5 % after it at a half-life of 10. [`EstimatedCentring`](@ref) is the unbiased rule.
 

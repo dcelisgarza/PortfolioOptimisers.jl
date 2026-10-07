@@ -17,10 +17,10 @@ The recovery testset is statistical, not exact: the synthetic panel's Panel Fiel
 functions of the true loadings, so a fitted exposure correlates with the truth rather than equalling
 it. The one exception is the industry block, which a one-hot exposure recovers exactly.
 
-THE FOUR STORED CASES ARE THE REFERENCE IMPLEMENTATION'S OWN OUTPUT.
+THE FOUR STORED CASES ARE THE ORACLE'S OWN OUTPUT.
 `assets/CrossSectionalFactorPriorFactorReturns.csv.gz` and
-`assets/CrossSectionalFactorPriorFamilyFactorReturns.csv.gz` hold the factor returns the reference
-implementation's own prior produced, driven on the panel `csfp_reference_case` rebuilds, with the
+`assets/CrossSectionalFactorPriorFamilyFactorReturns.csv.gz` hold the factor returns the oracle's
+own prior produced, driven on the panel `csfp_oracle_case` rebuilds, with the
 same four factors, the same lag, the same two capitalisation powers and the same factor prior.
 `assets/CrossSectionalFactorPriorForecastMu.csv.gz` and
 `assets/CrossSectionalFactorPriorFamilyForecastMu.csv.gz` hold the expected returns the same prior
@@ -31,7 +31,7 @@ whole fit was diffed the same way before the cases were stored, over 40 assets a
 the loadings and the benchmark weights agree BIT FOR BIT, the regression weights to 5.7e-14, the
 factor returns to 1.3e-16, the idiosyncratic returns to 5.9e-16 and the factor mean to 1.1e-18, in
 both the plain and the constrained-family case. The two libraries solve the same weighted least
-squares by different routes -- this one factorises the weighted design, the reference implementation
+squares by different routes -- this one factorises the weighted design, the oracle
 solves the normal equations -- so machine precision is the agreement to expect.
 
 The panel of those testsets is fully active and carries no blank cell, and its two style exposures
@@ -39,13 +39,13 @@ are standardised in the test rather than by a Descriptor. Both choices are delib
 every departure below out of the picture, so the stored cases measure the fit alone. Issue #721
 already diffed the Factor Exposures themselves.
 
-ONE DEPARTURE FROM THE REFERENCE IMPLEMENTATION, recorded in the resolution comment of #725. Two
+ONE DEPARTURE FROM THE ORACLE, recorded in the resolution comment of #725. Two
 others are gone. The first, recorded in that of #739, went with issue #835, which built ADR 0112, so
 the Return Forecast Estimator now reads the WHOLE carrier and answers on the block's rows. The
 second went with issue #925, below.
 
   - The benchmark mask and the eligibility mask both drop a pair whose market capitalisation is not
-    finite. The reference implementation lets such a pair carry a `NaN` weight. The library refuses
+    finite. The oracle lets such a pair carry a `NaN` weight. The library refuses
     a non-finite capitalisation on an eligible pair, and `exposure_benchmark_weights` already zeroes
     a non-finite weight, so dropping the pair is what the library's own convention asks for.
 
@@ -55,7 +55,7 @@ asset is inactive, and it wrote it unconditionally: no estimator in the `ce` slo
 It now asks `ce` what a gapped cell is worth to it with `gap_fill_value`. A plain moment estimator
 takes the fallback zero, because it refuses a gapped sample outright; a gap-aware one answers `NaN`,
 which leaves the gap where it is and is handed the panel's active mask beside it. The slot's default
-is now `ExpWeightedCovariance(; centring = PreCentred())`, which is what the reference implementation's own
+is now `ExpWeightedCovariance(; centring = PreCentred())`, which is what the oracle's own
 default is, so the overlay reaches its answer to machine precision. `gap_fill_value` recurses
 through a composite that forwards the sample untouched, and `test_08z` gates the trait itself.
 =#
@@ -157,7 +157,7 @@ fit_rows(rd, pr) = (size(rd.X, 1) - size(pr.X, 1) + 1):size(rd.X, 1)
 @testset "The estimator, its defaults and its refusals" begin
     PO = PortfolioOptimisers
     pe = CrossSectionalFactorPrior(; factors = csfp_factors())
-    @testset "Every default is the reference implementation's own" begin
+    @testset "Every default is the oracle's own" begin
         @test isa(pe, PO.AbstractLowOrderPriorEstimator_A)
         @test isa(pe.cre, CrossSectionalLinearRegression)
         @test isa(pe.wa, MarketCapWeights)
@@ -171,8 +171,8 @@ fit_rows(rd, pr) = (size(rd.X, 1) - size(pr.X, 1) + 1):size(rd.X, 1)
         @test isa(pe.ve, RegimeAdjustedExpWeightedVariance)
         @test isa(pe.ve.centring, PreCentred)
         @test pe.pe.me.decay == pe.pe.ce.decay == pe.ve.decay
-        # Issue #925. `EWCovariance(assume_centered=True, nearest=False)` is the reference
-        # implementation's own default, and `centring` is the whole residual against it.
+        # Issue #925. `EWCovariance(assume_centered=True, nearest=False)` is the oracle's
+        # own default, and `centring` is the whole residual against it.
         @test isa(pe.ce, ExpWeightedCovariance)
         @test isa(pe.ce.centring, PreCentred)
         @test isnan(PO.gap_fill_value(pe.ce))
@@ -444,7 +444,7 @@ end
         Xi = pr.X[:, i]
         @test all(isfinite, Xi[am])
         # An asset that was not listed at an observation carries NaN in that scenario. The
-        # reference implementation leaves the same NaN there, for the same reason: the
+        # oracle leaves the same NaN there, for the same reason: the
         # observation has no idiosyncratic return to standardise.
         @test all(isnan, Xi[.!am])
     end
@@ -788,7 +788,7 @@ end
 # exposure is bit-identical on both sides and the diff isolates the fit. `signal` is a field no
 # Factor Exposure reads, so a Return Forecast built on it carries a part the factors do not
 # span, and the stored `mu` measures the split rather than a projection onto the design.
-function csfp_reference_case()
+function csfp_oracle_case()
     PO = PortfolioOptimisers
     rd0 = csfp_panel(; n_assets = 40, n_observations = 120, n_industries = 3,
                      seed = 725_900, late_listing_proba = 0.0, delisting_proba = 0.0,
@@ -823,8 +823,8 @@ function csfp_reference_case()
     return rd, factors
 end
 
-@testset "The fit matches the reference implementation's own output" begin
-    rd, factors = csfp_reference_case()
+@testset "The fit matches the oracle's own output" begin
+    rd, factors = csfp_oracle_case()
     @test all(rd.pnl.amsk)
     for (nm, fams) in (("", nothing), ("Family", ["industry" => nothing]))
         pr = prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
@@ -835,7 +835,7 @@ end
         @test size(pr.fpr.X) == size(E)
         @test all(isfinite, E)
         # The two libraries solve the same weighted least squares by different routes: this
-        # one factorises the weighted design, and the reference implementation solves the
+        # one factorises the weighted design, and the oracle solves the
         # normal equations. The absolute agreement is therefore machine precision, and a
         # near-zero factor return makes the relative figure larger than that.
         @test maximum(abs, pr.fpr.X - E) < 1e-14
@@ -907,7 +907,7 @@ end
         # A forecast that is not finite at one asset alone is a split, and that asset's
         # orthogonal part is `NaN` whatever `c` is, because `0 * NaN` is `NaN`: the prior
         # states no expected return for it, and it leaves the Investable Mask while its
-        # variance stays finite. The reference implementation answers the same.
+        # variance stays finite. The oracle answers the same.
         mu1 = zeros(N)
         mu1[i[1]] = NaN
         mu1[i[2]] = 0.01
@@ -931,8 +931,8 @@ end
     end
 end
 
-@testset "The Return Forecast split matches the reference implementation's own output" begin
-    rd, factors = csfp_reference_case()
+@testset "The Return Forecast split matches the oracle's own output" begin
+    rd, factors = csfp_oracle_case()
     # One passthrough Descriptor over `signal`, scored by neither transform, so the forecast
     # is bit-identical on both sides and the two stored cases measure the split alone.
     rfe = FixedWeightedReturnForecast(;
@@ -953,7 +953,7 @@ end
                                 DataFrame)))
         @test length(E) == length(pr.mu)
         @test all(isfinite, E)
-        # The reference implementation's own expected returns, over the same universe. The
+        # The oracle's own expected returns, over the same universe. The
         # split is the last step of the fit, so the stored vector pins the whole chain.
         @test maximum(abs, pr.mu - E) < 1e-14
         # The forecast the split consumed travels on the block, and its `mu` is the last
@@ -1003,7 +1003,7 @@ end
 
 @testset "lambda and c are Calibration Slots" begin
     PO = PortfolioOptimisers
-    rd, factors = csfp_reference_case()
+    rd, factors = csfp_oracle_case()
     rfe = FixedWeightedReturnForecast(;
                                       scores = DescriptorScores(;
                                                                 descriptors = [Passthrough(;

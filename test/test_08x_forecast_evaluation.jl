@@ -7,7 +7,7 @@ Check `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/07_Forecas
 `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl`,
 `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl` and
 `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl` against the contract their
-docstrings state, and against the reference implementation the map of issue #931 ports.
+docstrings state, and against the stored oracle of map #931.
 Issues #934, #935, #936, #937, #938, #939, #940 and #941.
 
 ELEVEN CONVENTIONS SHAPE THE PROBES.
@@ -36,17 +36,17 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
    information coefficient is a measurement rather than noise. Both are asserted, because a
    positive coefficient means nothing without the fixture that reports none.
 
-5. THE STATISTICS ARE ORACLED BY RUNNING THE REFERENCE, NOT BY READING IT. `IC_ALPHA` and
-   its gapped variant were put through the reference's own diagnostic and its correlation
+5. THE STATISTICS ARE MEASURED BY RUNNING THE ORACLE, NOT BY READING IT. `IC_ALPHA` and
+   its gapped variant were put through the oracle's own diagnostic and its correlation
    summary, and the literals below are what it answered. The one place the port diverges is
    the hit rate: the library reads it against the dates that carried a coefficient, where
-   the reference's exposure summary counts a date with no coefficient as a miss. That is
+   the oracle's exposure summary counts a date with no coefficient as a miss. That is
    `exposure_ic_factor_summary`'s convention, which both summaries share, and it is
    asserted as a divergence rather than papered over. The second divergence is the
-   t-statistic: the reference scales the ratio by the root of the date count wherever it
+   t-statistic: the oracle scales the ratio by the root of the date count wherever it
    is read, and the port's standard error reads the overlap of the forward windows through
    `forecast_ic_lags`, so the two agree only where the windows are disjoint. The
-   holding-period table at a stride of one is where they part, and the reference's number
+   holding-period table at a stride of one is where they part, and the oracle's number
    is asserted there as the plain ratio beside the corrected column.
 
 6. THE TWO ALPHA PORTFOLIOS ARE PINNED BY THEIR INVARIANTS, NOT BY A STORED NUMBER. Both
@@ -77,13 +77,13 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
    Neutralisation. Through the evaluation it is DIRECTIONAL: the grouped scoring step
    rescales each industry on its own, and the evaluation weighs the active assets that the
    estimation mask leaves out, so the correlation falls far but not to zero. The
-   reference's rule, `intercept = false`, keeps a correlation above 0.5.
+   oracle's rule, `intercept = false`, keeps a correlation above 0.5.
 
-9. A FORWARD-WINDOW TABLE IS PINNED ROW BY ROW AGAINST THE REFERENCE, AND ITS DATE RULE IS
-   PINNED SEPARATELY. `WINDOW_ALPHA` was put through the reference's own holding-period and
+9. A FORWARD-WINDOW TABLE IS PINNED ROW BY ROW AGAINST THE ORACLE, AND ITS DATE RULE IS
+   PINNED SEPARATELY. `WINDOW_ALPHA` was put through the oracle's own holding-period and
    decay diagnostics and the literals below are what it answered, to every digit (#1558;
    before it, to the six digits it printed). The date rule is the one thing those literals cannot pin, because the
-   reference and the port agree on it: every row of a table is read on the dates every
+   oracle and the port agree on it: every row of a table is read on the dates every
    window of the grid can be scored at, so `n` sets the sample as well as the depth. The
    ticket asked for the opposite -- that shortening `n` leave the rows that remain -- and
    that is FALSE in general and asserted as false. It holds only when the base evaluation
@@ -99,7 +99,7 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
     two readings it does not move.
 
 11. THE SUMMARY IS ORACLED WHOLE, AND ITS PLUMBING IS PINNED SEPARATELY. Every column of
-    `ForecastSummaryResult` was put through the reference implementation's own five
+    `ForecastSummaryResult` was put through the oracle's own five
     summary methods over `IC_ALPHA` and over the gapped variant, and `FS_REF` and
     `FS_REF_GAP` are what it answered, to every digit -- the coefficients, both books,
     the calibration, the coverage and the quantile spread alike. Beside those literals
@@ -543,8 +543,8 @@ end
     end
 end
 
-# The oracle of the information coefficients, measured by running the reference
-# implementation on the same two matrices. `IC_ALPHA` is a forecast whose ordering of the
+# The stored oracle of the information coefficients, measured by running the oracle
+# on the same two matrices. `IC_ALPHA` is a forecast whose ordering of the
 # four assets is good at the first date, mixed at the second and wrong at the third, and
 # whose *spacing* is uneven, so the rank column and the level column disagree — which is the
 # whole reason both are answered. Issue #936.
@@ -564,12 +564,12 @@ function ic_gap_fixture()
     return alpha
 end
 
-@testset "The information coefficients reproduce the reference implementation" begin
+@testset "The information coefficients reproduce the stored oracle" begin
     PO = PortfolioOptimisers
     y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
     fe = forecast_evaluation(IC_ALPHA, y)
 
-    @testset "Both columns are answered, and both match the reference" begin
+    @testset "Both columns are answered, and both match the oracle" begin
         ic = forecast_ic(fe)
         @test size(ic) == (length(fe.dates), 2)
         # Every IC, IC summary and coverage literal of the oracle in this file measures
@@ -619,7 +619,7 @@ end
                                                    weighting = BenchmarkWeightMetric())
     end
 
-    @testset "A gap in the panel moves both columns, as it does in the reference" begin
+    @testset "A gap in the panel moves both columns, as it does in the oracle" begin
         gap = ic_gap_fixture()
         fg = forecast_evaluation(gap, PO.forward_mean_returns(gap, 1, 1); min_count = 2)
         ic = forecast_ic(fg)
@@ -636,7 +636,7 @@ end
     ic = forecast_ic(forecast_evaluation(IC_ALPHA, y))
     s = forecast_ic_summary(ic)
 
-    @testset "The five figures of each series match the reference" begin
+    @testset "The five figures of each series match the oracle" begin
         @test keys(s) == (:spearman, :pearson)
         @test keys(s.spearman) == (:mean_ic, :std_ic, :ic_ir, :t_stat, :hit_rate)
         @test parity_compare(collect(values(s.spearman)),
@@ -710,7 +710,7 @@ end
               1
     end
 
-    @testset "At no lag the statistic is the one the reference states, bit for bit" begin
+    @testset "At no lag the statistic is the one the oracle states, bit for bit" begin
         y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
         ic = forecast_ic(forecast_evaluation(IC_ALPHA, y))
         for k in 1:2
@@ -879,7 +879,7 @@ end
     @testset "Every figure of the summary, the hit rate included, drops a NaN" begin
         # A `NaN` coefficient is a date at which nothing was measured, not a miss, so the hit
         # rate is read against the dates that carried a score, as the mean, the ratio and the
-        # t-statistic beside it are, and as the reference reads it. Until 2026-09-14 the hit
+        # t-statistic beside it are, and as the oracle reads it. Until 2026-09-14 the hit
         # rate alone counted every date and reported 1/4 here.
         ic = forecast_ic(fe)
         s = forecast_ic_summary(ic)
@@ -908,7 +908,7 @@ end
     gap = ic_gap_fixture()
     fg = forecast_evaluation(gap, PO.forward_mean_returns(gap, 1, 1); min_count = 2)
 
-    @testset "It matches the reference, one entry per evaluation date" begin
+    @testset "It matches the oracle, one entry per evaluation date" begin
         c = forecast_coverage(fg)
         @test length(c) == length(fg.dates)
         @test parity_compare(c, IC_REF_GAP_COVERAGE; rtol = 1e-14, name = "coverage gap").ok
@@ -998,7 +998,7 @@ end
         # from 10 to 19 over the evaluation dates. Every listed asset is scored at every date,
         # so the share is one throughout and the count is what moves. Divided by every asset
         # the panel ever held, the same dates read as low as one half, which is the port's
-        # defect the reference does not share.
+        # defect the oracle does not share.
         px = evaluation_fixture(; planted = true)
         fw = FixedWeightedReturnForecast(; scores = px.scores, scale = 1.0,
                                          weights = [0.4, 0.6])
@@ -1594,7 +1594,7 @@ end
         @test mneu < 0.4
     end
 
-    @testset "`intercept = false`, the reference rule, keeps a large correlation (#950)" begin
+    @testset "`intercept = false`, the oracle's rule, keeps a large correlation (#950)" begin
         # The residual is orthogonal to the target in the UNCENTRED sense alone, so it keeps
         # a large Pearson correlation with it.
         dn0 = DescriptorScores(; descriptors = ds.descriptors, neutralise = "style",
@@ -1702,7 +1702,7 @@ end
     end
 end
 
-# The reference implementation's factor diagnostics on the planted fixture of the testset
+# The oracle's factor diagnostics on the planted fixture of the testset
 # below, run on 2026-09-14 through its own `_compute_factor_correlation_diagnostics` and
 # `_correlation_stats` over the fixture's exported forecast history, exposure history and
 # estimation mask, with equal weights, Pearson and `min_count = 3`. The style factor's
@@ -1730,9 +1730,9 @@ const FC_REF_SUMMARY = (; mean = 0.9835597986375235, std = 0.004192196953212379,
                         ir = 234.61679153309947, t_stat = 1691.8457439148713,
                         hit_rate = 1.0)
 
-@testset "A contemporaneous statistic is read on every observation, as the reference reads it" begin
+@testset "A contemporaneous statistic is read on every observation, as the oracle reads it" begin
     PO = PortfolioOptimisers
-    # Issue #1071. The reference implementation correlates the forecast against every
+    # Issue #1071. The oracle correlates the forecast against every
     # exposure over the whole forecast history and summarises it over that count; it has no
     # evaluation grid for a statistic that looks nowhere forward. The port read `fe.dates`
     # only, so under `step = horizon` it saw `1 / horizon` of the observations and its
@@ -1812,7 +1812,7 @@ end
 
 @testset "The forecast is written onto the estimation universe at the pairing" begin
     PO = PortfolioOptimisers
-    # Issue #1074. The reference implementation masks the forecast by the estimation mask
+    # Issue #1074. The oracle masks the forecast by the estimation mask
     # before every statistic; the pairing does it once, so every verb above it inherits
     # the universe from `fe.alpha` and none carries a mask of its own.
     y = PO.forward_mean_returns(FC_ALPHA, 1, 1)
@@ -1944,10 +1944,10 @@ end
     end
 end
 
-@testset "The two tables reproduce the reference implementation" begin
+@testset "The two tables reproduce the stored oracle" begin
     PO = PortfolioOptimisers
     alpha = WINDOW_ALPHA
-    # The forward means of a longer window tie on this fixture, and the reference breaks a
+    # The forward means of a longer window tie on this fixture, and the oracle breaks a
     # tie by the asset order here, so `ties = :ordinal` reproduces its numbers.
     fe = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1,
                              ties = :ordinal)
@@ -1978,7 +1978,7 @@ end
         @test h.dates == d.dates == [1, 2, 3, 4, 5]
     end
 
-    @testset "The holding-period table is what the reference answered" begin
+    @testset "The holding-period table is what the oracle answered" begin
         # The literals of both tables are the oracle's full digits (#1558; the six-digit
         # printouts before it held the tables to `rtol = 1e-5`). Every cell measures
         # bit-equal, and so do the hand literals of the overlap rows.
@@ -1988,11 +1988,11 @@ end
                               0.12 0.39562828403747213 0.18017986772428515 0.37101420854458156;
                               0.27999999999999997 0.6390096504226938 0.40098776003427916 0.6059206450877959];
                              rtol = 1e-14, name = "holding ic").ok
-        # The reference's t-statistic is the ratio times the root of the five dates at every
+        # The oracle's t-statistic is the ratio times the root of the five dates at every
         # row. The port answers that at the first row alone: at a stride of one, row `p`'s
         # windows overlap their `p - 1` neighbours, and the port's standard error reads the
-        # overlap where the reference's does not. That is a deliberate divergence, asserted
-        # here beside the reference's number rather than papered over.
+        # overlap where the oracle's does not. That is a deliberate divergence, asserted
+        # here beside the oracle's number rather than papered over.
         @test parity_compare(hcat(h.spearman_ic_ir, h.pearson_ic_ir) .* sqrt(5),
                              [3.162277660168379 3.162277660168379;
                               0.8846517369293827 0.8296129909239677;
@@ -2028,7 +2028,7 @@ end
         @test h.mean_coverage == [1.0, 1.0, 1.0]
     end
 
-    @testset "The decay table is what the reference answered" begin
+    @testset "The decay table is what the oracle answered" begin
         @test parity_compare(hcat(d.spearman_mean_ic, d.spearman_ic_ir, d.spearman_t_stat),
                              [0.4 1.414213562373095 3.162277660168379;
                               0.040000000000000015 0.12171612389003696 0.2721655269759088;
@@ -2210,7 +2210,7 @@ end
     end
 end
 
-# The oracle of the calibration, measured by running the reference implementation on
+# The stored oracle of the calibration, measured by running the oracle on
 # `IC_ALPHA` and its forward target -- the same two matrices the information coefficients
 # are oracled on, so the two sets of literals describe one forecast. `IC_ALPHA` spaces its
 # assets very unevenly, which is what makes a scale statistic worth taking on it: the
@@ -2222,7 +2222,7 @@ const CAL_REF_MEAN_ALPHA = 6.333333333333333
 const CAL_REF_STD_ALPHA = 10.790006599823858
 const CAL_REF_MEAN_Y = 6.083333333333333
 const CAL_REF_STD_Y = 10.799480907839406
-# The reference numbers its buckets from zero and the library from one, so the indices below
+# The oracle numbers its buckets from zero and the library from one, so the indices below
 # are its `[0, 2, 4, 5, 7, 8]` shifted by one. The four bins it never fills are dropped by
 # both.
 const CAL_REF_BIN = [1, 3, 5, 6, 8, 9]
@@ -2230,7 +2230,7 @@ const CAL_REF_BIN_ALPHA = [1.0, 2.0, 3.0, 4.0, 5.0, 24.0]
 const CAL_REF_BIN_Y = [2.5, 2.0, 5.5, 5.0, 1.5, 21.5]
 const CAL_REF_BIN_COUNT = [2, 3, 2, 1, 2, 2]
 
-@testset "The calibration reproduces the reference implementation" begin
+@testset "The calibration reproduces the stored oracle" begin
     PO = PortfolioOptimisers
     y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
     fe = forecast_evaluation(IC_ALPHA, y)
@@ -2305,7 +2305,7 @@ end
     @testset "The edges are the quantiles, and they are answered once each" begin
         # The cut writes out the linear interpolation `Statistics.quantile` applies by
         # default, so it answers what that verb answers to rounding. That keeps the curve at
-        # parity with the reference implementation.
+        # parity with the oracle.
         for x in ([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], [1.0, 1.0, 2.0, 40.0],
                   collect(range(-3.0, 5.0, 17)))
             for bins in (1, 2, 3, 10)
@@ -2561,7 +2561,7 @@ end
     end
 end
 
-# The oracle of the summary, measured by running the reference implementation's own
+# The stored oracle of the summary, measured by running the oracle's own
 # `ic_summary`, `portfolio_summary`, `quantile_summary`, `calibration_summary` and
 # `coverage_summary` over `IC_ALPHA` and over the gapped variant, on the evaluation dates
 # both agree on. Convention 11. Issue #941.
@@ -2606,7 +2606,7 @@ const FS_REF_GAP = (; spearman_mean_ic = 0.8333333333333334,
                     spread_ann_volatility = 1.1547005383792515,
                     spread_sharpe = 2.0207259421636903, spread_hit_rate = 1.0)
 
-# The thirty columns of the reference summary whose axis is the forecast, in the order the
+# The thirty columns of the oracle's summary whose axis is the forecast, in the order the
 # Result declares them. The three scored-coverage columns of #1512 follow them.
 const FS_CORE = (:spearman_mean_ic, :spearman_std_ic, :spearman_ic_ir, :spearman_t_stat,
                  :spearman_hit_rate, :pearson_mean_ic, :pearson_std_ic, :pearson_ic_ir,
@@ -2619,7 +2619,7 @@ const FS_CORE = (:spearman_mean_ic, :spearman_std_ic, :spearman_ic_ir, :spearman
 const FS_SPREAD = (:spread_ann_return, :spread_ann_volatility, :spread_sharpe,
                    :spread_hit_rate)
 
-@testset "The summary reproduces the reference implementation, column for column" begin
+@testset "The summary reproduces the stored oracle, column for column" begin
     PO = PortfolioOptimisers
 
     @testset "Every core column matches, bit for bit" begin
@@ -2634,7 +2634,7 @@ const FS_SPREAD = (:spread_ann_return, :spread_ann_volatility, :spread_sharpe,
                              rtol = 1e-14, name = "summary").ok
     end
 
-    @testset "A gapped panel moves the coverage block, and the reference agrees" begin
+    @testset "A gapped panel moves the coverage block, and the oracle agrees" begin
         # Two gaps thin two of the three cross-sections, so the coverage columns stop
         # reading the whole universe and the count columns say how far they fell. This is
         # the fixture that separates `mean_coverage` from `min_coverage`, which a full

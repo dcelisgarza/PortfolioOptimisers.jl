@@ -436,8 +436,8 @@ end
 end
 @testset "The docstrings of 03_SchurComplementHierarchicalRiskParity.jl against numbers" begin
     PO = PortfolioOptimisers
-    # A six-asset covariance matrix, its leaf order, and the weights of the reference
-    # implementation at three values of gamma and after its monotonic search.
+    # A six-asset covariance matrix, its leaf order, and the weights of the oracle at three
+    # values of gamma and after its monotonic search.
     sigma = [7.782724171567788e-05 2.972127065997405e-05 -1.0114668612318741e-05 -2.9250463659699806e-05 -7.148034104575605e-06 1.2420446918541947e-05;
              2.972127065997405e-05 0.00010677258384304971 -2.5656442592669714e-05 2.2799233426940835e-06 -3.1371817657803e-05 -3.333868821011886e-05;
              -1.0114668612318741e-05 -2.5656442592669714e-05 4.5654013279841325e-05 -1.7069599855629958e-06 8.902017870314719e-06 1.321778381265861e-05;
@@ -465,7 +465,7 @@ end
         @test gamma == g
         @test r.sigma === sigma
     end
-    # The reference returns the weights of the last midpoint it evaluated, and this search
+    # The oracle returns the weights of the last midpoint it evaluated, and this search
     # returns the weights of the value it reports. Both find the same value here.
     p = SchurComplementParams(; gamma = 1.0, alg = MonotonicSchurComplement(; N = 11))
     w, gamma, _ = PO.schur_complement_weights(prs, [order], wb6, p)

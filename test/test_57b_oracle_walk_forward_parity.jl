@@ -1,15 +1,15 @@
 #=
-Walk-forward parity with the reference implementation, on a point-in-time universe (#677).
+Walk-forward parity with the oracle, on a point-in-time universe (#677).
 
 `test_57_point_in_time_universe.jl` pins the contract against a hand-reduced oracle. This file
-asks the other question: on the same walk-forward, does this library reach the reference's own
-numbers? Every expected value below was measured by RUNNING the reference at its `v1.0.4` tag,
+asks the other question: on the same walk-forward, does this library reach the oracle's own
+numbers? Every expected value below was measured by RUNNING the oracle at its `v1.0.4` tag,
 not by reading it, on the two panels the generator of #656 draws at `StableRNG(3)`.
 
 Where the two can be compared, and where they cannot
 ====================================================
 
-The reference reduces to an investable subset in its **convex** family only. Its hierarchical
+The oracle reduces to an investable subset in its **convex** family only. Its hierarchical
 base shadows the input cleaner with a version that omits the mask, so a gapped panel does not
 reach a reduction there at all -- it reaches its correlation step and raises
 `ValueError: Input X contains NaN`. Measured on all four folds of the gapped panel below. That
@@ -21,7 +21,7 @@ the one that admits the loosest:
  1. **The clustering inputs.** The distance matrix each side clusters, and the heights of the
     linkage it builds, agree to floating-point noise. This is the part of the hierarchical
     route that carries no tie-break.
- 2. **The hierarchical allocation, with the dendrogram's leaf order pinned to the reference's.**
+ 2. **The hierarchical allocation, with the dendrogram's leaf order pinned to the oracle's.**
     Equal to round-off, on both panels and every fold (maxrel 6.3e-16). The leaf order has
     to be pinned because the two sides order the *same* dendrogram differently -- see the
     note below -- and the allocation
@@ -55,7 +55,7 @@ const REFP_SLV = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                                         "tol_infeas_rel" => 1e-12))
 
 # The two panels. `gap` moves its universe inside the window; `full` is the same draw with the
-# listing and the delisting probabilities set to zero, so the reference has an answer for every
+# listing and the delisting probabilities set to zero, so the oracle has an answer for every
 # family on it and the comparison isolates the walk-forward and the optimiser from the
 # reduction.
 const REFP_GAP = synthetic_asset_panel(; n_assets = 8, n_observations = 300,
@@ -69,20 +69,20 @@ const REFP_FULL = synthetic_asset_panel(; n_assets = 8, n_observations = 300,
 const REFP_CV = IndexWalkForward(120, 40)
 const REFP_TRAIN = [1:120, 41:160, 81:200, 121:240]
 
-# The assets the reference optimises over, per fold. On the complete panel that is every
-# asset; on the gapped one it is the subset the reference was handed by hand, because its
+# The assets the oracle optimises over, per fold. On the complete panel that is every
+# asset; on the gapped one it is the subset the oracle was handed by hand, because its
 # hierarchical family cannot derive it.
 const REFP_KEEP = Dict("full" => [collect(1:8) for _ in 1:4],
                        "gap" => [[1, 4, 8], [1, 2, 4, 6, 8], [1, 2, 3, 4, 5, 6, 8],
                                  [1, 2, 3, 4, 5, 6, 8]])
 
-# The reference's dendrogram leaf order, per fold, as positions within `REFP_KEEP`.
+# The oracle's dendrogram leaf order, per fold, as positions within `REFP_KEEP`.
 const REFP_ORDER = Dict("full" => [[7, 6, 2, 5, 4, 3, 8, 1], [7, 8, 1, 2, 5, 4, 3, 6],
                                    [7, 8, 3, 2, 5, 4, 1, 6], [7, 8, 3, 4, 5, 2, 1, 6]],
                         "gap" => [[3, 1, 2], [5, 4, 3, 2, 1], [6, 1, 4, 5, 2, 3, 7],
                                   [6, 1, 2, 5, 4, 3, 7]])
 
-# The heights of the reference's linkage, per fold.
+# The heights of the oracle's linkage, per fold.
 const REFP_HEIGHT = Dict("full" =>
                              [[0.28730777867496443, 0.38571468075473603, 0.4673070260805271,
                                0.55059746754279781, 0.59395677279713754,
@@ -108,7 +108,7 @@ const REFP_HEIGHT = Dict("full" =>
                                     0.42439743106937344, 0.42654761744367853,
                                     0.50932732862639785, 0.60248587755092353]])
 
-# The reference's Hierarchical Risk Parity weights, per fold, on the assets of `REFP_KEEP`.
+# The oracle's Hierarchical Risk Parity weights, per fold, on the assets of `REFP_KEEP`.
 const REFP_HRP = Dict("full" => [[0.076390784075419924, 0.089096067878742732,
                                   0.093107791547405824, 0.038879879913144358,
                                   0.070635201103435477, 0.1320137965934281, 0.35706074794069786,
@@ -133,7 +133,7 @@ const REFP_HRP = Dict("full" => [[0.076390784075419924, 0.089096067878742732,
                             0.062169971148710854, 0.11508192299491267, 0.23425395124266593,
                             0.20034016146119696]])
 
-# The reference's minimum-variance weights, per fold, on the assets of `REFP_KEEP`.
+# The oracle's minimum-variance weights, per fold, on the assets of `REFP_KEEP`.
 const REFP_MR = Dict("full" => [[0.079620316071204164, 0.026102935248386226,
                                  6.5057722590900107e-7, 7.8994606463973309e-8,
                                  2.0087278651385208e-7, 0.1346271321786163, 0.53192634108756043,
@@ -162,14 +162,14 @@ const REFP_MR = Dict("full" => [[0.079620316071204164, 0.026102935248386226,
 
 refp_rd(tag) = tag == "full" ? REFP_FULL : REFP_GAP
 
-# The training window of one fold, reduced to the assets the reference optimised over.
+# The training window of one fold, reduced to the assets the oracle optimised over.
 function refp_window(tag, i)
     keep = REFP_KEEP[tag][i]
     return refp_rd(tag).X[REFP_TRAIN[i], keep], keep
 end
 
-@testset "The clustering inputs agree with the reference" begin
-    # The distance each side clusters. The reference's is `sqrt(0.5 * (1 - corr))`, which is
+@testset "The clustering inputs agree with the oracle" begin
+    # The distance each side clusters. The oracle's is `sqrt(0.5 * (1 - corr))`, which is
     # this library's canonical distance over a Pearson correlation, so the two are the same
     # quantity reached by two routes.
     de = Distance(; alg = CanonicalDistance())
@@ -177,7 +177,7 @@ end
         Xtr, _ = refp_window(tag, i)
         D = PortfolioOptimisers.distance(de, PortfolioOptimisersCovariance(), Xtr)
         @test isapprox(D, sqrt.(0.5 .* (1 .- cor(Xtr))); atol = 1e-15)
-        # And the dendrogram built from it has the reference's heights. Measured maxrel
+        # And the dendrogram built from it has the oracle's heights. Measured maxrel
         # 4.2e-16, and 8.5e-16 under the flags of CI (`--check-bounds=yes`): a rounding
         # of the Ward recursion, whose summation order differs.
         clr = clusterise(ClustersEstimator(), Xtr)
@@ -186,8 +186,8 @@ end
     end
 end
 
-@testset "Hierarchical Risk Parity reproduces the reference to round-off" begin
-    # With the dendrogram's leaf order pinned to the reference's, the allocation is the
+@testset "Hierarchical Risk Parity reproduces the oracle to round-off" begin
+    # With the dendrogram's leaf order pinned to the oracle's, the allocation is the
     # reference's own, on the complete panel and on the gapped one alike. Measured maxrel
     # 3.6e-16, and 6.3e-16 under the flags of CI, a few ulps.
     for tag in ("full", "gap"), i in 1:4
@@ -205,7 +205,7 @@ end
     end
 end
 
-@testset "The minimum-variance programme reaches the reference's optimum or better" begin
+@testset "The minimum-variance programme reaches the oracle's optimum or better" begin
     mr = MeanRisk(; obj = MinimumRisk(), r = Variance(),
                   opt = JuMPOptimiser(; slv = REFP_SLV))
     for tag in ("full", "gap")
@@ -234,12 +234,12 @@ end
 end
 
 @testset "The gapped panel is answered here and refused there" begin
-    # The reference raises `ValueError: Input X contains NaN` on every fold of the gapped
+    # The oracle raises `ValueError: Input X contains NaN` on every fold of the gapped
     # panel through its hierarchical family, with its exponentially weighted moments routed
     # the active mask and everything else at its defaults: the mask never reaches its
     # correlation step. This library answers the same run, which is the capability the map
     # was charted to add, so what is asserted here is that the answer exists and obeys the
-    # contract -- there is no reference number to compare it against.
+    # contract -- there is no oracle number to compare it against.
     for opt in
         (HierarchicalRiskParity(; r = Variance()), HierarchicalEqualRiskContribution(),
          SchurComplementHierarchicalRiskParity())

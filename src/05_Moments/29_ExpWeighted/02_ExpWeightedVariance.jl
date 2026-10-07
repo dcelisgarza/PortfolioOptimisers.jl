@@ -49,7 +49,7 @@ S_i &= (1 - \\lambda) \\sum_{k = \\ell + 1}^{n_i} \\lambda^{n_i - k} e_{i, k}^{2
 \\end{align}
 ```
 
-For returns that are independent in time, each term has the mean ``\\sigma^{2}_i``, so under `EstimatedCentring` the estimate is unbiased from the second return, whatever the mean. Under `PreCentred` it is too large by the square of the mean. [`ZeroStartCentring`](@ref) keeps the rule of the reference implementation: ``\\ell = 0``, the location takes the step ``m_{i, k} = \\lambda m_{i, k - 1} + (1 - \\lambda) x_{i, k}`` from ``m_{i, 0} = 0``, and ``e_{i, k} = x_{i, k} - m_{i, k - 1}`` with no factor.
+For returns that are independent in time, each term has the mean ``\\sigma^{2}_i``, so under `EstimatedCentring` the estimate is unbiased from the second return, whatever the mean. Under `PreCentred` it is too large by the square of the mean. [`ZeroStartCentring`](@ref) keeps the uncorrected rule: ``\\ell = 0``, the location takes the step ``m_{i, k} = \\lambda m_{i, k - 1} + (1 - \\lambda) x_{i, k}`` from ``m_{i, 0} = 0``, and ``e_{i, k} = x_{i, k} - m_{i, k - 1}`` with no factor.
 
 Where:
 

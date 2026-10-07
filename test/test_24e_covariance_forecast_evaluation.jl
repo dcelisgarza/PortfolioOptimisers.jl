@@ -4,12 +4,12 @@ The covariance forecast evaluation, issue #1023, against the decision of #873 (A
 One verb through the one fold loop: `covariance_forecast_evaluation(est, rd, cv)` scores a
 covariance estimator's, or a prior's, forecast on the test rows of every fold, in batch when
 the walk-forward refits and online when it is an Online Scheme. Around the verb sit
-the per-step kernel and its parity with the reference implementation's, the two realised
+the per-step kernel and its parity with the oracle's, the two realised
 targets, the location the test rows are centred on, the online and rolling identities over a
-panel with a listing and a delisting, the date form, the summary against the reference's
+panel with a listing and a delisting, the date form, the summary against the oracle's
 summaries, the Diebold–Mariano–West comparison, the re-projection, and every refusal.
 
-The kernel's parity literals were produced by the reference's per-step kernel on the fixed
+The kernel's parity literals were produced by the oracle's per-step kernel on the fixed
 forecast and test rows below, with two test portfolios, once with every cell finite and once
 with one cell missing; the summary literals by its summary verbs on a run of seven such
 steps. Both sides read the same formula-built inputs, so no random stream is shared.
@@ -42,7 +42,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
     columns = (:mahalanobis_ratio, :diagonal_ratio, :qlike, :frobenius,
                :standardised_return, :portfolio_qlike)
 
-    @testset "The kernel against the reference, with and without a missing cell" begin
+    @testset "The kernel against the oracle, with and without a missing cell" begin
         A = [1.0 0.3 -0.2 0.1; 0.2 1.1 0.4 -0.3; -0.1 0.5 0.9 0.2; 0.3 -0.2 0.1 1.2]
         sig = (A * A') / 1e4 + Diagonal([1e-4, 2e-4, 1.5e-4, 1.2e-4])
         Zr = [sin(0.7 * t + 0.29 * i) / 100 + 0.004 * cos(0.11 * t * i)
@@ -50,7 +50,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         Zn = copy(Zr)
         Zn[2, 3] = NaN
         W = [[0.25, 0.25, 0.25, 0.25], [0.1, 0.2, 0.3, 0.4]]
-        # The reference centres nothing, so its numbers are ours at a zero location under
+        # The oracle centres nothing, so its numbers are ours at a zero location under
         # its own target, the horizon return.
         k(Z, wt) = covariance_forecast_step(sig, Z, zeros(4), wt, HorizonReturn())
         s = k(Zr, nothing)
@@ -65,7 +65,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test isapprox(s.portfolio_qlike, [-6.961786146396911, -7.110698408378284];
                        atol = 1e-13)
         # One missing cell: the pairwise count scales the forecast, `H ⊙ Σ̂`, and the
-        # reference's numbers move with it.
+        # oracle's numbers move with it.
         s = k(Zn, nothing)
         @test s.n_valid == 4
         @test isapprox(s.mahalanobis_ratio, 0.9039713006494878; atol = 1e-14)
@@ -91,7 +91,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         v = dot(wn, seff, wn)
         @test isapprox(s.standardised_return[2], dot(wn, R) / sqrt(v); rtol = 1e-12)
         @test isapprox(s.portfolio_qlike[2], log(v) + sum(abs2, Zf * wn) / v; rtol = 1e-12)
-        # The whole-matrix losses, which the reference does not compute, against their
+        # The whole-matrix losses, which the oracle does not compute, against their
         # closed forms on the finite case: `h log|Σ̂| + tr(Σ̂⁻¹ S)` and `‖S / h − Σ̂‖²_F`.
         sr = covariance_forecast_step(sig, Zr, zeros(4), nothing, RealisedCovariance())
         S = Zr' * Zr
@@ -136,7 +136,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         # With `R` the raw column sums of the test rows, `S_raw − S_c = R c' + c R' − h c c'`,
         # so the raw Mahalanobis ratio exceeds the centred one by
         # `(2 R' Σ̂⁻¹ c − h c' Σ̂⁻¹ c) / (N h)` at every step, exactly; its expectation when
-        # `E[z] = c` is the bias `c' Σ̂⁻¹ c / N` the reference's raw ratio carries.
+        # `E[z] = c` is the bias `c' Σ̂⁻¹ c / N` the oracle's raw ratio carries.
         Xm = X .+ 0.02
         sig = cov(Covariance(), Xm[1:60, :])
         c = vec(mean(Xm[1:60, :]; dims = 1))
@@ -344,7 +344,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test rn.dates == first.(split(batch_cv, rd).test_idx)
     end
 
-    @testset "The summary against the reference's summaries" begin
+    @testset "The summary against the oracle's summaries" begin
         A = [1.0 0.3 -0.2 0.1; 0.2 1.1 0.4 -0.3; -0.1 0.5 0.9 0.2; 0.3 -0.2 0.1 1.2]
         sig = (A * A') / 1e4 + Diagonal([1e-4, 2e-4, 1.5e-4, 1.2e-4])
         W = [[0.25, 0.25, 0.25, 0.25], [0.1, 0.2, 0.3, 0.4]]
@@ -376,7 +376,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
                         0.2726172060164678]; atol = 1e-14)
         s = covariance_forecast_summary(cfer)
         @test s.names == ["forecast_1"]
-        # The reference's `summary()` rows, to the six digits it prints.
+        # The oracle's `summary()` rows, to the six digits it prints.
         @test isapprox(s.mahalanobis_mean[1], 0.364582; atol = 5e-7)
         @test isapprox(s.mahalanobis_median[1], 0.315531; atol = 5e-7)
         @test isapprox(s.mahalanobis_p5[1], 0.055945; atol = 5e-7)

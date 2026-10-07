@@ -8,7 +8,7 @@ call can take -- one Panel Field laid out as it stands, the long layout and the 
 across the panel's static and time-varying shapes, and the two selections and the categorical
 decoding that narrow each of them.
 
-A `TensorPanelField` is the one Panel Field the reference implementation's own export skips.
+A `TensorPanelField` is the one Panel Field the oracle's own export skips.
 Here it is carried: its trailing axis spreads into one column per label, under the
 `"<field>=<label>"` name it already takes in a derived Feature Matrix. Only the single-field
 shape refuses it, because observations × assets has no room for a third axis.

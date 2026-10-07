@@ -41,7 +41,7 @@ Three kinds of check run here, and the first two are what catch a drift no invar
 
   - AN INDEPENDENT FIT. The log-linear regression is re-derived here from the normal
     equations through `\`, not through `GLM`, and the two must agree. This is the assertion
-    the reference implementation makes of itself -- rebuild the prediction from the
+    the oracle makes of itself -- rebuild the prediction from the
     coefficients, the last implied volatility and the last window's realised volatility --
     so one solver's bug cannot hide behind the other's.
 
@@ -54,7 +54,7 @@ data, so `make_implied_vol` below derives one from the returns themselves: a 20-
 realised volatility, annualised, lifted by a fixed 1.15 volatility risk premium and
 perturbed by a seeded log-normal shock. The result runs from about 9 % to about 120 %
 annualised, and the predicted realised volatilities it produces sit between 0.0093 and
-0.049 daily, which is the range the reference implementation's own fixture reaches. THE
+0.049 daily, which is the range the oracle's own fixture reaches. THE
 RECIPE MUST NOT CHANGE without regenerating `assets/ImpliedVolatility.csv.gz`.
 =#
 using PortfolioOptimisers, Statistics, StatsBase
@@ -250,7 +250,7 @@ end
                                                                                          ws = 126)),
                                      X; iv = iv)
         # Three windows is the smallest the fit accepts, and it stays finite there. This is
-        # the reference implementation's own floor of three folds.
+        # the oracle's own floor of three folds.
         @test all(isfinite,
                   diag(cov(ImpliedVolatility(; ppy = 252,
                                              alg = ImpliedVolatilityRegression(; ws = 84)),
@@ -269,7 +269,7 @@ end
         `matrix_processing!` found nothing to repair and the optimiser was handed an asset
         whose correlations all pointed the wrong way. A `NaN` was refused, but only by
         accident, and by `NearestCorrelationMatrix`, which named neither `ivpa` nor the
-        estimator. The reference implementation refuses all three at the fit.
+        estimator. The oracle refuses all three at the fit.
         =#
         cep = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium())
         ivpam = copy(ivpav)

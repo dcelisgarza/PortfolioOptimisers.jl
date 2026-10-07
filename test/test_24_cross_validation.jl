@@ -2257,11 +2257,11 @@
         end
     end
     @testset "A failed fold holds (#1021)" begin
-        # The reference's online loop leaves its previous weights where they were on a failed
+        # The oracle's online loop leaves its previous weights where they were on a failed
         # step, so the next step reads the last successful ones; its batch loop threads the
         # failed step's `NaN`. Here both arms thread the last threadable fold, a failed fold
         # under a drift holds the weights it was handed, and `PreviousWeights` is the
-        # reference's `fallback = "previous_weights"`.
+        # oracle's `fallback = "previous_weights"`.
         PO = PortfolioOptimisers
         N = size(rd.X, 2)
         ok = WeightBounds(; lb = zeros(N), ub = ones(N))
@@ -2345,7 +2345,7 @@
             @test threaded(p3) == p1.res.w
             @test p3.res.w == cross_val_predict(mk(2), rd, cv).pred[3].res.w
         end
-        @testset "PreviousWeights is the reference's previous-weights fallback" begin
+        @testset "PreviousWeights is the oracle's previous-weights fallback" begin
             @test PO.needs_previous_weights(PreviousWeights())
             @test PO.needs_previous_weights(mk(()))
             @test PO.needs_previous_weights(MeanRisk(; opt = JuMPOptimiser(; slv = slv),

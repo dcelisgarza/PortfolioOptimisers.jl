@@ -170,7 +170,7 @@ $(DocStringExtensions.TYPEDFIELDS)
     """
     nw
     """
-    Cross-Sectional Regression Estimator of the Neutralisation. Its `intercept` sets what the residual is orthogonal to. Under `true`, the default, the fit removes the weighted mean and the component along each exposure, so the residual is orthogonal to the constant and to each exposure. It is then uncorrelated with each exposure under every design, and the scoring step after it keeps both properties. Under `false`, the fit removes the component along the raw exposure alone. The residual is then uncorrelated with an exposure only when the exposures span the constant, and a centring scoring step after it breaks the orthogonality too. Where the exposures span the constant, the two rules give the same residual. `CrossSectionalLinearRegression(; intercept = false)` is the rule of the reference implementation.
+    Cross-Sectional Regression Estimator of the Neutralisation. Its `intercept` sets what the residual is orthogonal to. Under `true`, the default, the fit removes the weighted mean and the component along each exposure, so the residual is orthogonal to the constant and to each exposure. It is then uncorrelated with each exposure under every design, and the scoring step after it keeps both properties. Under `false`, the fit removes the component along the raw exposure alone. The residual is then uncorrelated with an exposure only when the exposures span the constant, and a centring scoring step after it breaks the orthogonality too. Where the exposures span the constant, the two rules give the same residual. `CrossSectionalLinearRegression(; intercept = false)` selects the second rule.
     """
     cre
     """

@@ -1,6 +1,6 @@
 #=
 Check `src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl` against the contract its docstrings
-state, and against the reference implementation the map of issue #643 ports. Issue #706.
+state, and against the stored oracle of map #643. Issue #706.
 
 THREE FACTS SHAPE THE PROBES.
 
@@ -16,7 +16,7 @@ THREE FACTS SHAPE THE PROBES.
    all four against a hand-written slice, and it reorders the assets so that a probe cannot
    pass on a shape alone.
 
-3. THE REFERENCE IMPLEMENTATION'S OWN SELECTION TESTS ARE THE ORACLE. They state which field
+3. THE ORACLE'S OWN SELECTION TESTS SET THE RULES. They state which field
    moves under an asset selection and which passes through, that a full idiosyncratic
    covariance is cut on both axes while a diagonal one is cut once, and that a model may drop
    its exposure history, its idiosyncratic returns, its idiosyncratic variance history and its
@@ -160,8 +160,8 @@ using Dates
         full_esigma_model = full_model(; esigma = esigma_full)
         @test diag_model.esigma === esigma_diag
         @test full_esigma_model.esigma === esigma_full
-        # A diagonal covariance is cut once, and a full one on both axes. The reference
-        # implementation's own selection tests state the pair.
+        # A diagonal covariance is cut once, and a full one on both axes. The oracle's
+        # own selection tests state the pair.
         i = [3, 1]
         @test PortfolioOptimisers.port_opt_view(diag_model, i).esigma == esigma_diag[i]
         @test PortfolioOptimisers.port_opt_view(full_esigma_model, i).esigma ==
@@ -251,7 +251,7 @@ using Dates
     end
 
     @testset "A slim model keeps its loadings and drops its histories" begin
-        # The fields the reference implementation's own slim mode drops.
+        # The fields the oracle's own slim mode drops.
         csfm = CrossSectionalFactorModel(; M = M, b = b, esigma = esigma_full, rw = rw,
                                          L = L, fcb = fcb, lag = 1)
         @test all(isnothing, (csfm.csr, csfm.Ms, csfm.vs, csfm.bw))

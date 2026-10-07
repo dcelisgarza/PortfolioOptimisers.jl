@@ -3,12 +3,11 @@ Issue #777 builds `OrthogonalUncertaintySet`, the one member of the prior arm of
 triple that #776 opened. It reads the factor model of the optimisation's own prior and
 confines both of its sets to the directions the loadings do not span.
 
-The literals below are the reference implementation's own output on one fixed synthetic
-case, taken by driving it in a Python environment built for the purpose. They are the
-oracle of the port, and they are stored as the two invariant products `L * L'` and `Q * Q'`
-rather than as `L` and `Q` themselves: a singular vector and a QR factor each carry an
-arbitrary sign, so the maps differ between the two implementations where the subspaces they
-span do not.
+The literals below are the oracle's own output on one fixed synthetic case, taken by driving
+it in a Python environment built for the purpose. They are stored as the two invariant
+products `L * L'` and `Q * Q'` rather than as `L` and `Q` themselves: a singular vector and a
+QR factor each carry an arbitrary sign, so the maps differ between the two implementations
+where the subspaces they span do not.
 
 `The geometry is the orthogonal complement of the weighted span` re-derives the same
 subspace in plain Julia by a different route -- a pseudo-inverse projector rather than a
@@ -24,7 +23,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     using PortfolioOptimisers: orthogonal_factor_span, orthogonality_weights,
                                orthogonal_scaling
 
-    # The reference implementation's fixed case: six assets, two factors.
+    # The oracle's fixed case: six assets, two factors.
     B = [1.3554269999999999 -1.0825450000000001;
          0.145787 0.265851;
          0.36465999999999998 1.1712560000000001;
@@ -42,7 +41,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
 
     # `rr` and `fpr` travel together on a `LowOrderPrior`, so the factor block comes with a
     # factor-axis prior. Neither the fit nor the sets read `fpr`, and the factor covariance
-    # is the one the reference's case used.
+    # is the one the oracle's case used.
     function prior777(Bm, dv; rw = nothing, bw = nothing, esigma = dv)
         K = size(Bm, 2)
         rr = CrossSectionalFactorModel(; M = Bm, b = zeros(size(Bm, 1)), esigma = esigma,
@@ -90,8 +89,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         end
     end
 
-    @testset "The port reproduces the reference implementation" begin
-        # `L * L'` and `Q * Q'` of the reference's own fit on the case above.
+    @testset "The port reproduces the stored oracle" begin
+        # `L * L'` and `Q * Q'` of the oracle's own fit on the case above.
         LLt_inv_idio_identity = [0.11358862792337392 -0.10042660828263195 0.027492390721669847 0.17947653852694018 0.072346980909459874 -0.22890828469670357;
                                  -0.10042660828263195 0.64267960183902639 -0.20473902747961212 0.28777903056481913 -0.17685759609006041 0.25207851647259433;
                                  0.027492390721669847 -0.20473902747961212 0.87426181348351339 0.15512341386912093 -0.1134306090674099 0.17413907500422537;
@@ -128,7 +127,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                                 0.0011334294439515624 0.00089844812483163747 0.0013934599539521619 0.0040830818024392155 0.0010115451512762597 -0.0010947776534619641;
                                 0.00038420372223206778 -0.00050262617046211518 -0.00097161442700997066 0.0010115451512762597 0.0049605532722933757 0.00097695094346104917;
                                 -0.00093205507746635472 0.0003480198240005325 0.0012277298375759171 -0.0010947776534619641 0.00097695094346104917 0.0030544090896761642]
-        # The reference's radius at `q = 0.05` and a rank of four.
+        # The oracle's radius at `q = 0.05` and a rank of four.
         radius_ref = 3.0802157451680481
 
         for (metric, scaling, LLt, QQt, C) in
@@ -289,7 +288,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         @testset "The idiosyncratic scaling reads a stored covariance whole" begin
             # A cross-sectional prior with a correlation threshold writes a full
             # idiosyncratic covariance. The scaling is `G' * E * G` over all of it, as the
-            # reference implementation reads it, and not over its diagonal alone.
+            # oracle reads it, and not over its diagonal alone.
             rho = [1.0 0.3 0.0 0.0 0.2 0.0;
                    0.3 1.0 0.1 0.0 0.0 0.0;
                    0.0 0.1 1.0 0.4 0.0 0.0;

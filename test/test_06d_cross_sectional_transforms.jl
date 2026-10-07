@@ -4,7 +4,7 @@ state, and against the oracle that the map of issue #643 ports. Issue #716.
 
 THREE FACTS SHAPE THE PROBES.
 
-1. THE STORED MATRICES COME FROM THE ORACLE. Every `REFERENCE_*` matrix below was produced
+1. THE STORED MATRICES COME FROM THE ORACLE. Every `ORACLE_*` matrix below was produced
    by the oracle's own five transformers, driven on the inputs written beside them. `The five
    members reproduce the oracle` compares each one cell by cell, including the position of
    every `NaN`, and states the measured worst cell beside its tolerance.
@@ -203,36 +203,36 @@ const RAND_G = [1 0 1 2 1 2 0;
 #
 # Produced by the oracle on the inputs above.
 
-const REFERENCE_STD_VECTOR = [-0.806225774829855 -0.558156305651438 -0.062017367294604234 1.4263994477758974]
-const REFERENCE_STANDARDISE = [-1.0910894511799618 NaN 0.2182178902359925 0.8728715609439697;
+const ORACLE_STD_VECTOR = [-0.806225774829855 -0.558156305651438 -0.062017367294604234 1.4263994477758974]
+const ORACLE_STANDARDISE = [-1.0910894511799618 NaN 0.2182178902359925 0.8728715609439697;
                                1.161895003862225 0.3872983346207417 -0.3872983346207417 -1.161895003862225;
                                -0.8728715609439694 -0.2182178902359923 NaN 1.091089451179962]
-const REFERENCE_STANDARDISE_WG = [-0.5545432546903087 NaN -0.6218206328680191 1.1427251984694726;
+const ORACLE_STANDARDISE_WG = [-0.5545432546903087 NaN -0.6218206328680191 1.1427251984694726;
                                   0.6225458561187999 -0.1532420568907816 0.5035012041966656 -1.165728610956177;
                                   -1.3373607497456683 0.20821245125832238 NaN 0.4100168291432739]
-const REFERENCE_WINSORISE = [1.4 NaN 3.0 3.8; 3.7 3.0 2.0 1.3; 12.0 20.0 NaN 36.0]
-const REFERENCE_WINSORISE_W = [1.4 NaN 3.0 3.8; 3.6 3.0 2.0 1.2; 12.0 20.0 NaN 36.0]
-const REFERENCE_TANH = [1.1247186586948457 NaN 3.0 3.983484358943085;
+const ORACLE_WINSORISE = [1.4 NaN 3.0 3.8; 3.7 3.0 2.0 1.3; 12.0 20.0 NaN 36.0]
+const ORACLE_WINSORISE_W = [1.4 NaN 3.0 3.8; 3.6 3.0 2.0 1.2; 12.0 20.0 NaN 36.0]
+const ORACLE_TANH = [1.1247186586948457 NaN 3.0 3.983484358943085;
                         3.945606186343971 2.9979044051347525 2.0020955948652475 1.0543938136560287;
                         10.165156410569153 20.0 NaN 38.75281341305154]
-const REFERENCE_TANH_W = [1.1247186586948457 NaN 3.0 3.983484358943085;
+const ORACLE_TANH_W = [1.1247186586948457 NaN 3.0 3.983484358943085;
                           3.875281341305154 2.983484358943085 2.0 1.0165156410569152;
                           10.165156410569153 20.0 NaN 38.75281341305154]
-const REFERENCE_GAUSSIAN = [-1.0 NaN 0.0 1.0;
+const ORACLE_GAUSSIAN = [-1.0 NaN 0.0 1.0;
                             1.1803020040387493 0.32693604766393136 -0.32693604766393136 -1.1803020040387493;
                             -1.0 0.0 NaN 1.0]
-const REFERENCE_GAUSSIAN_WG = [-0.6791367019533091 NaN -0.3454139090430476 1.1914120074514876;
+const ORACLE_GAUSSIAN_WG = [-0.6791367019533091 NaN -0.3454139090430476 1.1914120074514876;
                                0.6985779156934256 0.08635889733764598 0.36442411553058796 -1.1743866312782931;
                                -1.3330544887858795 0.13413753156684322 NaN 0.4527392765742459]
-const REFERENCE_PERCENTILE = [0.16666666666666666 NaN 0.5 0.8333333333333334;
+const ORACLE_PERCENTILE = [0.16666666666666666 NaN 0.5 0.8333333333333334;
                               0.875 0.625 0.375 0.125;
                               0.16666666666666666 0.5 NaN 0.8333333333333334]
-const REFERENCE_PERCENTILE_WG = [0.16666666666666666 NaN 0.25 0.75;
+const ORACLE_PERCENTILE_WG = [0.16666666666666666 NaN 0.25 0.75;
                                  0.8333333333333334 0.6666666666666666 0.75 0.25;
                                  0.25 0.75 NaN 0.8333333333333334]
-const REFERENCE_GAUSSIAN_N2 = [-0.7071067811865475 0.7071067811865475]
-const REFERENCE_PERCENTILE_N2 = [0.25 0.75]
-const REFERENCE_RAND_STANDARDISE_WG = [-0.9732008167705817 0.636947972680258 NaN 0.6795691885714986 0.8482610664787932 -1.0976576809784284 -1.1229265099574306;
+const ORACLE_GAUSSIAN_N2 = [-0.7071067811865475 0.7071067811865475]
+const ORACLE_PERCENTILE_N2 = [0.25 0.75]
+const ORACLE_RAND_STANDARDISE_WG = [-0.9732008167705817 0.636947972680258 NaN 0.6795691885714986 0.8482610664787932 -1.0976576809784284 -1.1229265099574306;
                                        NaN -0.8756374006965427 1.080447936381937 -0.4495311256884143 0.9139345921394546 NaN 1.0141679977191214;
                                        NaN NaN NaN NaN NaN NaN NaN;
                                        0.0 0.0 0.0 0.0 0.0 0.0 0.0;
@@ -241,7 +241,7 @@ const REFERENCE_RAND_STANDARDISE_WG = [-0.9732008167705817 0.636947972680258 NaN
                                        -0.24327457408267078 -1.0076442814090247 -0.5015503879445279 0.08454059373357573 -1.0418139396690067 1.5068126216329571 0.6208377684732352;
                                        1.1738887597746162 -0.2805141217053441 -1.0686346412704182 -0.17219720648544495 0.1654182691247276 -1.3213157849182775 -1.2642889406776139;
                                        -0.25239203459984605 -1.60893090238727 1.2763164137624106 -0.6485654336528176 -0.17498232501554672 0.9069802835781051 -0.6669234240735282]
-const REFERENCE_RAND_GAUSSIAN_WG = [-1.0696547877373648 0.7228452820190501 NaN 0.7228452820190501 0.7228452820190501 -1.0696547877373648 -1.0696547877373648;
+const ORACLE_RAND_GAUSSIAN_WG = [-1.0696547877373648 0.7228452820190501 NaN 0.7228452820190501 0.7228452820190501 -1.0696547877373648 -1.0696547877373648;
                                     NaN -0.757003048462599 1.3634123286129871 -0.757003048462599 0.7053366541669216 NaN 0.7053366541669216;
                                     NaN NaN NaN NaN NaN NaN NaN;
                                     0.0 0.0 0.0 0.0 0.0 0.0 0.0;
@@ -250,7 +250,7 @@ const REFERENCE_RAND_GAUSSIAN_WG = [-1.0696547877373648 0.7228452820190501 NaN 0
                                     -0.4557525008713562 -0.98085346447882 -0.5754619697240673 0.09469446620253628 -1.1416197117323017 1.331008644137374 0.7648509021291396;
                                     0.887209798643473 -0.2205969096129938 -1.3874840205140937 0.09022163677638026 0.09022163677638026 -1.2694100956729926 -1.2694100956729926;
                                     -0.18782517131387136 -1.6451994006771897 1.2695490580494466 -0.5519677213087968 0.17631737868105415 0.5995670603242557 -0.9752174029519983]
-const REFERENCE_RAND_PERCENTILE_G = [0.25 0.75 NaN 0.75 0.75 0.25 0.25;
+const ORACLE_RAND_PERCENTILE_G = [0.25 0.75 NaN 0.75 0.75 0.25 0.25;
                                      NaN 0.25 0.9 0.25 0.75 NaN 0.75;
                                      0.875 0.25 0.125 0.375 0.75 0.7857142857142857 0.625;
                                      0.5 0.5 0.5 0.5 0.5 0.5 0.5;
@@ -259,7 +259,7 @@ const REFERENCE_RAND_PERCENTILE_G = [0.25 0.75 NaN 0.75 0.75 0.25 0.25;
                                      0.375 0.25 0.5 0.625 0.125 0.875 0.75;
                                      0.9285714285714286 0.6428571428571429 0.21428571428571427 0.75 0.75 0.25 0.25;
                                      0.5 0.07142857142857142 0.9285714285714286 0.35714285714285715 0.6428571428571429 0.7857142857142857 0.21428571428571427]
-const REFERENCE_RAND_TANH_W = [0.8498457315787247 -0.2394168817853104 NaN -1.829691736692697 1.5644530718248375 -1.908798591751048 -2.7793873412298233;
+const ORACLE_RAND_TANH_W = [0.8498457315787247 -0.2394168817853104 NaN -1.829691736692697 1.5644530718248375 -1.908798591751048 -2.7793873412298233;
                                NaN 0.8278383772321528 3.021621116601644 -3.487027965653941 0.9802347671245752 NaN -1.8256649614232;
                                NaN NaN NaN NaN NaN NaN NaN;
                                2.5 2.5 2.5 2.5 2.5 2.5 2.5;
@@ -268,7 +268,7 @@ const REFERENCE_RAND_TANH_W = [0.8498457315787247 -0.2394168817853104 NaN -1.829
                                -0.30330298712025716 -0.7044233300567011 0.09133970051814871 0.4321792560280313 -1.9824758962839528 3.396856856400813 1.8577881769999078;
                                5.445467122458685 3.2312988916503693 1.5412344260974788 2.6099672161637946 3.409571384910116 -0.25688731337487525 2.32168842877521;
                                1.8056965631636879 -1.2822718982051673 5.1570281236189555 0.7627235664124943 2.0124919691460788 4.55194756701089 0.7159502624022387]
-const REFERENCE_RAND_WINSORISE_W = [0.9167957292444923 -0.2346415855536521 NaN -1.8344670329243553 1.7095666224963832 -1.915160074432138 -2.7862004847192363;
+const ORACLE_RAND_WINSORISE_W = [0.9167957292444923 -0.2346415855536521 NaN -1.8344670329243553 1.7095666224963832 -1.915160074432138 -2.7862004847192363;
                                     NaN 0.8278383772321528 2.9753327026820573 -3.7187193684850497 0.9802467543908795 NaN -1.891796716385608;
                                     NaN NaN NaN NaN NaN NaN NaN;
                                     2.5 2.5 2.5 2.5 2.5 2.5 2.5;
@@ -283,63 +283,62 @@ const REFERENCE_RAND_WINSORISE_W = [0.9167957292444923 -0.2346415855536521 NaN -
     # classification.
     @test oracle_matrix(cross_sectional_transform(CrossSectionalWinsoriser(; low = 0.1,
                                                                            high = 0.9),
-                                                  DOC_X), REFERENCE_WINSORISE, "WINSORISE")
+                                                  DOC_X), ORACLE_WINSORISE, "WINSORISE")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalWinsoriser(; low = 0.1,
                                                                            high = 0.9),
                                                   DOC_X; w = DOC_MASK_W),
-                        REFERENCE_WINSORISE_W, "WINSORISE_W")
+                        ORACLE_WINSORISE_W, "WINSORISE_W")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalTanhShrinker(), DOC_X),
-                        REFERENCE_TANH, "TANH")
+                        ORACLE_TANH, "TANH")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalTanhShrinker(), DOC_X;
-                                                  w = DOC_MASK_W), REFERENCE_TANH_W,
-                        "TANH_W")
+                                                  w = DOC_MASK_W), ORACLE_TANH_W, "TANH_W")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalStandardiser(), DOC_X),
-                        REFERENCE_STANDARDISE, "STANDARDISE")
+                        ORACLE_STANDARDISE, "STANDARDISE")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalStandardiser(;
                                                                              min_group_size = 2),
                                                   DOC_X; w = DOC_W, groups = DOC_G),
-                        REFERENCE_STANDARDISE_WG, "STANDARDISE_WG")
+                        ORACLE_STANDARDISE_WG, "STANDARDISE_WG")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalGaussianRank(), DOC_X),
-                        REFERENCE_GAUSSIAN, "GAUSSIAN")
+                        ORACLE_GAUSSIAN, "GAUSSIAN")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalGaussianRank(;
                                                                              min_group_size = 2),
                                                   DOC_X; w = DOC_W, groups = DOC_G),
-                        REFERENCE_GAUSSIAN_WG, "GAUSSIAN_WG")
+                        ORACLE_GAUSSIAN_WG, "GAUSSIAN_WG")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalPercentileRank(), DOC_X),
-                        REFERENCE_PERCENTILE, "PERCENTILE")
+                        ORACLE_PERCENTILE, "PERCENTILE")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalPercentileRank(;
                                                                                min_group_size = 2),
                                                   DOC_X; w = DOC_MASK_W, groups = DOC_G),
-                        REFERENCE_PERCENTILE_WG, "PERCENTILE_WG")
+                        ORACLE_PERCENTILE_WG, "PERCENTILE_WG")
     # The census's own four-value cross-section, and the two-asset cross-section that pins
     # the smallest rank a member can carry.
     @test oracle_matrix(cross_sectional_transform(CrossSectionalStandardiser(),
-                                                  [1.0 2.0 4.0 10.0]), REFERENCE_STD_VECTOR,
+                                                  [1.0 2.0 4.0 10.0]), ORACLE_STD_VECTOR,
                         "STD_VECTOR")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalGaussianRank(), [1.0 2.0]),
-                        REFERENCE_GAUSSIAN_N2, "GAUSSIAN_N2")
+                        ORACLE_GAUSSIAN_N2, "GAUSSIAN_N2")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalPercentileRank(),
-                                                  [1.0 2.0]), REFERENCE_PERCENTILE_N2,
+                                                  [1.0 2.0]), ORACLE_PERCENTILE_N2,
                         "PERCENTILE_N2")
     # The nine-observation panel, which carries every awkward observation at once.
     @test oracle_matrix(cross_sectional_transform(CrossSectionalWinsoriser(), RAND_X;
-                                                  w = RAND_W), REFERENCE_RAND_WINSORISE_W,
+                                                  w = RAND_W), ORACLE_RAND_WINSORISE_W,
                         "RAND_WINSORISE_W")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalTanhShrinker(), RAND_X;
-                                                  w = RAND_W), REFERENCE_RAND_TANH_W,
+                                                  w = RAND_W), ORACLE_RAND_TANH_W,
                         "RAND_TANH_W")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalStandardiser(;
                                                                              min_group_size = 2),
                                                   RAND_X; w = RAND_W, groups = RAND_G),
-                        REFERENCE_RAND_STANDARDISE_WG, "RAND_STANDARDISE_WG")
+                        ORACLE_RAND_STANDARDISE_WG, "RAND_STANDARDISE_WG")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalGaussianRank(;
                                                                              min_group_size = 2),
                                                   RAND_X; w = RAND_W, groups = RAND_G),
-                        REFERENCE_RAND_GAUSSIAN_WG, "RAND_GAUSSIAN_WG")
+                        ORACLE_RAND_GAUSSIAN_WG, "RAND_GAUSSIAN_WG")
     @test oracle_matrix(cross_sectional_transform(CrossSectionalPercentileRank(;
                                                                                min_group_size = 2),
                                                   RAND_X; groups = RAND_G),
-                        REFERENCE_RAND_PERCENTILE_G, "RAND_PERCENTILE_G")
+                        ORACLE_RAND_PERCENTILE_G, "RAND_PERCENTILE_G")
 end
 
 @testset "An independent derivation agrees with the port" begin

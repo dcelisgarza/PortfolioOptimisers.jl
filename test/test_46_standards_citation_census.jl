@@ -229,7 +229,7 @@
                           "_F" => "the same, for `AbstractLowOrderPriorEstimator_F`",
                           "_AF" => "the same, for `AbstractLowOrderPriorEstimator_AF`",
                           "refit_last" =>
-                              "a keyword of the reference's online runner, cited by " *
+                              "a keyword of the oracle's online runner, cited by " *
                               "`GLOSSARY.md` § Resume as the exit the library does not " *
                               "port")
 

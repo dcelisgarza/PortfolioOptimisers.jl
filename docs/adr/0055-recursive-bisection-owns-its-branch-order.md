@@ -107,7 +107,7 @@ rather than assert on it.
 
 - Issue #947 — the reproduction, the per-fold leaf orders, and the brute-force objective scores
   that show neither routine attains the minimum on every fold.
-- `test/test_57b_reference_walk_forward_parity.jl` — the walk-forward parity that holds the leaf
+- `test/test_57b_oracle_walk_forward_parity.jl` — the walk-forward parity that holds the leaf
   order equal and passes to `5.6e-17`.
 
 ## Amendment (2026-10-06)

@@ -1,7 +1,7 @@
 #=
 Check `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/01_Base_ReturnForecast.jl`, `02_DescriptorScores.jl`,
 `03_CustomValueReturnForecast.jl` and `04_FixedWeightedReturnForecast.jl` against the contract
-their docstrings state, and against the reference implementation the map of issue #643 ports.
+their docstrings state, and against the stored oracle of map #643.
 Issue #737.
 
 FOUR CONVENTIONS SHAPE THE PROBES.
@@ -19,9 +19,9 @@ FOUR CONVENTIONS SHAPE THE PROBES.
    the conversion is a method on the tag: the Sharpe unit multiplies the whole history by the
    idiosyncratic volatility of the same observation, so its last row is what `mu` reads.
 
-4. THE STORED CASES ARE THE REFERENCE IMPLEMENTATION'S OWN OUTPUT.
+4. THE STORED CASES ARE THE ORACLE'S OWN OUTPUT.
    `assets/FixedWeightedReturnForecast1.csv.gz` and `assets/FixedWeightedReturnForecast2.csv.gz`
-   were produced by the reference implementation's fixed-weighted alpha estimator, driven on
+   were produced by the oracle's fixed-weighted alpha estimator, driven on
    the synthetic panel the last testset rebuilds, with the same two raw Descriptors, the same
    weights, the same coverage threshold, the same two transforms, the same grouping and, for
    the second case, the same Neutralisation and the same Forecast Unit. The factor-model block
@@ -210,7 +210,7 @@ end
             @test dot(xv .- mean(xv), epsi) ≈ 0 atol = 1e-10
         end
 
-        @testset "`intercept = false` keeps the reference rule, and the residual stays correlated" begin
+        @testset "`intercept = false` keeps the oracle's rule, and the residual stays correlated" begin
             eps0 = vec(descriptor_scores(ds3(; neutralise = ["style"], cre = no_intercept),
                                          rd3, blk3).S)
             # Orthogonal to the raw exposure...
@@ -641,7 +641,7 @@ end
     end
 end
 
-@testset "The member reproduces the reference implementation" begin
+@testset "The member reproduces the stored oracle" begin
     sp = synthetic_asset_panel(; n_assets = 20, n_observations = 60, n_industries = 4,
                                late_listing_proba = 0.3, delisting_proba = 0.3,
                                missing_ratio = 0.08, rng = StableRNG(987654321))
@@ -721,7 +721,7 @@ FOUR MORE CONVENTIONS SHAPE THESE PROBES.
    and the weights are the inverse idiosyncratic variance. In the Sharpe unit the target
    carries the division and the weights are the estimation mask alone.
 
-7. THE STORED CASES ARE THE REFERENCE IMPLEMENTATION'S OWN OUTPUT, on the same synthetic
+7. THE STORED CASES ARE THE ORACLE'S OWN OUTPUT, on the same synthetic
    panel the file already rebuilds, with the idiosyncratic returns and variances drawn from
    the two closed forms the last testset writes and exported to both sides.
 
@@ -1554,7 +1554,7 @@ end
     end
 end
 
-@testset "The two fitted members reproduce the reference implementation" begin
+@testset "The two fitted members reproduce the stored oracle" begin
     sp = synthetic_asset_panel(; n_assets = 20, n_observations = 60, n_industries = 4,
                                late_listing_proba = 0.3, delisting_proba = 0.3,
                                missing_ratio = 0.08, rng = StableRNG(987654321))
@@ -1755,19 +1755,19 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
 
 10. THE DESCRIPTORS OF THE FORECAST WARM UP OVER THE WHOLE CARRIER. A Descriptor with a
     warm-up would otherwise warm up a second time inside the block's window, which is the
-    one design the reference implementation cannot express. Every member then cuts to the
+    one design the oracle cannot express. Every member then cuts to the
     block's rows, so `hist` still lines up with `vs`, with `csr.eps` and with `pr.o_X`.
 
 11. THE TARGET MEMBER KEEPS THE BOUNDARY BAND. Under `whole_history = true` the block's
     idiosyncratic returns are placed into the rows they were fitted on, so a signal row
     before the block whose forward window reaches into the block is a training row. There
     are exactly `lag + horizon - 1` such rows. Under `false` the fit trains on the block's
-    rows alone, and the reference implementation has no such mode.
+    rows alone, and the oracle has no such mode.
 
     `assets/FixedWeightedReturnForecast3.csv.gz`, `assets/TargetReturnForecast3.csv.gz` and
-    `assets/TargetReturnForecast4.csv.gz` are the reference implementation's own output on
+    `assets/TargetReturnForecast4.csv.gz` are the oracle's own output on
     the panel this testset rebuilds, with the block padded back onto the whole observation
-    axis as the reference's own prior pads it. Its momentum Descriptor carries a warm-up,
+    axis as the oracle's own prior pads it. Its momentum Descriptor carries a warm-up,
     which is what the earlier stored cases cannot see. The forecast agrees to a relative
     1.3e-14 and the calibration coefficient BIT FOR BIT.
 =#
@@ -1900,7 +1900,7 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
                              csfm)
         E = vec(Matrix(CSV.read(joinpath(@__DIR__, "assets/TargetReturnForecast4.csv.gz"),
                                 DataFrame)))
-        # The reference implementation's own coefficient, which the padded rows never enter.
+        # The oracle's own coefficient, which the padded rows never enter.
         # Bit-equal when measured (#1386).
         @test isapprox(rf.calib, -0.7730488894268933; rtol = 1e-14)
         # Measured maxrel 1.8e-13 at most over the four stored cases, cell by cell (#1386).

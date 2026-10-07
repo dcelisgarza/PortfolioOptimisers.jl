@@ -15,10 +15,10 @@ The identity every fold must satisfy is the one the map fixed in #647 and #669:
  3. The assets inside it hold the weights of the same optimisation run on the listed subset
     alone -- the panel with the dead columns removed by hand, weight for weight.
 
-The oracle is the hand-reduced problem rather than the reference implementation, because the
-reference reduces in its convex family only: its hierarchical base shadows the input cleaner
+The oracle here is the hand-reduced problem rather than the external oracle, because that one
+reduces in its convex family only: its hierarchical base shadows the input cleaner
 with a version that omits the mask, so running it on a gapped panel would measure its defect
-and not this port. `test_57b_reference_walk_forward_parity.jl` pins what the reference *can*
+and not this port. `test_57b_oracle_walk_forward_parity.jl` pins what the external oracle *can*
 answer, and is where the cross-language numbers live.
 
 The panel comes from the generator of map #643 ticket #656 (`test06c_setup.jl`) rather than a

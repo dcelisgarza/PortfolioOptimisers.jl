@@ -728,7 +728,7 @@ end
     wd = SelfFinancingDrift()
 
     # Fixture 1 of research #749: three assets, three observations. Every number below
-    # is a printed output of the reference implementation.
+    # is a printed output of the oracle.
     R1 = [0.10 -0.04 0.02
           -0.03 0.08 0.01
           0.05 -0.02 -0.01]
@@ -740,8 +740,8 @@ end
           0.005 0.028 -0.003 0.018
           0.024 -0.011 0.015 -0.006]
 
-    @testset "the drift reproduces the reference implementation" begin
-        # Grilling #758 fixed the tolerance at `rtol = atol = 1e-14`, the reference's
+    @testset "the drift reproduces the stored oracle" begin
+        # Grilling #758 fixed the tolerance at `rtol = atol = 1e-14`, the oracle's
         # own, at any panel size. It absorbs the summation-order drift a wide panel
         # carries, which a bare equality bound to a small fixture would not. Cell by cell,
         # 12 of the 14 comparisons below are exact, and the worst is maxrel 2.2e-16 (the
@@ -790,7 +790,7 @@ end
                              [0.4254456242441918, 0.19292184707995289, 0.09682490767960966];
                              rtol, atol, name = "drift 9").ok
 
-        # The charged period. The reference charges the whole cost and the whole fee on
+        # The charged period. The oracle charges the whole cost and the whole fee on
         # every observation, so `fa` stays `nothing` here.
         w = [0.5, 0.3, 0.2]
         fees = Fees(; l = 0.001, tn = Turnover(; w = [0.4, 0.4, 0.2], val = 0.002))
@@ -901,8 +901,8 @@ end
         @test calc_net_returns(w, one_obs, nothing, wd)[1] == 0.04200000000000004
 
         # A one-observation window has a path of exactly one row, the target weights,
-        # and its held weights are the reference's own one-observation ending weights.
-        # Both comparisons of the reference's outputs here measure exact, at the tolerance
+        # and its held weights are the oracle's own one-observation ending weights.
+        # Both comparisons of the oracle's outputs here measure exact, at the tolerance
         # of #758.
         @test PO.weight_path(wd, w, one_obs) == transpose(w)
         @test parity_compare(PO.held_weights(wd, w, one_obs),
@@ -920,7 +920,7 @@ end
     end
 
     @testset "the weight path and the held weights sum to one with the cash" begin
-        # The identity the reference's own oracle test asserts. The deflated cash is what
+        # The identity the oracle's own test asserts. The deflated cash is what
         # the weights leave uninvested, and it earns zero.
         w = [0.4, 0.2, 0.1]
         cash = 1 - sum(w)

@@ -25,15 +25,15 @@ asserted at machine precision, because each is a construction rather than an est
     idiosyncratic variance is zero, and the factor rows then agree with `factor_risk_contribution`
     exactly, because the leakage term the docstring names is `pinv(M) * D * w` and `D` is zero.
 
-THE ORACLE IS THE REFERENCE IMPLEMENTATION'S OWN ATTRIBUTION MODULE, whose four test files this one
-mirrors. Two departures are deliberate and are recorded in the resolution comment of #708 and in the
-docstring of `factor_attribution`:
+THE ORACLE IS AN EXTERNAL ATTRIBUTION MODULE, whose four test files this one mirrors. Two
+departures are deliberate and are recorded in the resolution comment of #708 and in the docstring
+of `factor_attribution`:
 
-  - The predicted side carries an unattributed remainder, which the reference's own predicted
+  - The predicted side carries an unattributed remainder, which the oracle's own predicted
     attribution cannot express. Under decision 5 of #708 the predicted totals anchor on `pr.mu` and
     `pr.sigma`, which is what the optimiser saw, so a wrapping prior's gap lands in the remainder.
   - The spread of the weight history uses the corrected denominator, as the spread of the exposure
-    history beside it does. The reference uses the uncorrected one for the weights alone.
+    history beside it does. The oracle uses the uncorrected one for the weights alone.
 =#
 using Statistics, Distributions, Dates, Random
 include(joinpath(@__DIR__, "test06c_setup.jl"))

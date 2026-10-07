@@ -556,7 +556,7 @@ Fallback that throws for an [`AbstractReturnsResult`](@ref) subtype that does no
 
 Without it, the call reaches the generic fallback `port_opt_view(x, i, args...)`, which throws a `MethodError` for [`nothing_scalar_array_view`](@ref), a function that the author of the subtype never called. This method names the missing method instead. Returns data always has an asset axis, so no subtype can pass through a view unchanged.
 
-A subtype that carries an [`AssetPanel`](@ref) subselects it as it subselects `X`. It subselects the asset axis in every method, and the observation axis in the methods that take one. When the labels of a tensor Panel Field are the assets, see [`features_are_assets`](@ref), it subselects the label axis of that field too. A panel that a fold does not subselect gives a finite distance over the wrong universe, and no check catches it. The [`ReturnsResult`](@ref) methods are the reference implementation.
+A subtype that carries an [`AssetPanel`](@ref) subselects it as it subselects `X`. It subselects the asset axis in every method, and the observation axis in the methods that take one. When the labels of a tensor Panel Field are the assets, see [`features_are_assets`](@ref), it subselects the label axis of that field too. A panel that a fold does not subselect gives a finite distance over the wrong universe, and no check catches it. The [`ReturnsResult`](@ref) methods are the model to follow.
 
 # Algorithm
 

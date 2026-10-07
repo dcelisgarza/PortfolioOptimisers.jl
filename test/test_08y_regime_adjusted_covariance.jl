@@ -6,11 +6,11 @@ Issue #637 held that gap: `cov` and `cor` reached the covariance surface's own f
 reads `cor`, which reads `cov` back through `StatsBase`'s generic method, so a caller met a
 `StackOverflowError` rather than a matrix.
 
-The recursion is a port of the reference implementation, so the oracle of this file is the
-reference itself. `ORACLE_X` and the five matrices below were measured by fitting the reference
+The recursion is a port of the oracle, so this file is checked against the oracle
+itself. `ORACLE_X` and the five matrices below were measured by fitting the oracle
 on that fixture, one matrix per configuration, and pasted here as literals.
 
-`oracle_estimator` names three keywords of the reference: it clamps the multiplier to
+`oracle_estimator` names three keywords of the oracle: it clamps the multiplier to
 `(0.7, 1.6)`, it assumes centred returns, and its numerical floor is `1e-12`. Since #1383 the
 clamp and the floor are this estimator's defaults too, and only the centring differs. Every
 other keyword is the same value on both sides.
@@ -27,7 +27,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
 
 const PO = PortfolioOptimisers
 
-# ---------------------------------------------------------------- the reference oracle
+# ---------------------------------------------------------------------- the oracle
 
 const ORACLE_X = [0.000684 0.027195 0.024494;
                   -0.010206 -0.005959 -0.010548;

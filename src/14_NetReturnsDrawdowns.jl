@@ -960,7 +960,7 @@ end
 
 Read a wealth vector as the return series of the drifted window.
 
-The return of an observation is the ratio of its wealth to the wealth before it, and the wealth before the first observation is the initial capital of one. The series is therefore the wealth ratio of the drifted holdings, and it is **not** the dot product of the held weights with the asset returns: the two differ by up to 809 ulp, and the wealth ratio is what the reference arithmetic computes.
+The return of an observation is the ratio of its wealth to the wealth before it, and the wealth before the first observation is the initial capital of one. The series is therefore the wealth ratio of the drifted holdings, and it is **not** the dot product of the held weights with the asset returns: the two differ by up to 809 ulp, and the function returns the wealth ratio of the definition below.
 
 # Mathematical definition
 
