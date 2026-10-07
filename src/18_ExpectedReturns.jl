@@ -1237,7 +1237,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PerformanceSummaryResult(
-        n_periods, periods_per_year, alpha, compound,
+        n_periods, ppy, alpha, compound,
         ann_return, ann_volatility, sharpe, sharpe_stderr,
         sortino, calmar, max_drawdown, cvar,
         excess_ret, tracking_error, information_ratio, turnover
@@ -1262,7 +1262,7 @@ the arguments that produced the statistics after them.
     """
     $(field_dict[:ps_ppy])
     """
-    periods_per_year
+    ppy
     """
     $(field_dict[:ps_alpha])
     """
@@ -1321,11 +1321,11 @@ the arguments that produced the statistics after them.
     turnover
 end
 """
-    performance_summary(ret::VecNum; periods_per_year::Number = 252, alpha::Number = 0.05,
+    performance_summary(ret::VecNum; ppy::Number = 1, alpha::Number = 0.05,
                         compound::Bool = false,
                         benchmark::Option{<:VecNum} = nothing) -> PerformanceSummaryResult
     performance_summary(w::ArrNum, X::MatNum, fees::Option{<:Fees} = nothing;
-                        periods_per_year, alpha, compound, benchmark) -> PerformanceSummaryResult
+                        ppy, alpha, compound, benchmark) -> PerformanceSummaryResult
     performance_summary(w::ArrNum, rd::ReturnsResult, fees::Option{<:Fees} = nothing;
                         kwargs...) -> PerformanceSummaryResult
     performance_summary(res::OptimisationResult, rd::ReturnsResult;
@@ -1380,7 +1380,7 @@ Where:
   - $(math_dict[:xret])
   - $(math_dict[:b_norm_err])
   - $(math_dict[:T])
-  - ``p``: Number of periods per year, `periods_per_year`.
+  - ``p``: Number of periods per year, `ppy`.
   - ``m``, ``s``: Sample mean and corrected sample standard deviation of ``\\boldsymbol{x}``.
   - ``\\boldsymbol{d}``: Drawdown path of the cumulative wealth of ``\\boldsymbol{x}``, compounded or not as `compound` states, with ``d_{t} \\leq 0``.
   - ``m_e``, ``s_e``: Sample mean and corrected sample standard deviation of the excess series ``\\boldsymbol{e} = \\boldsymbol{x} - \\boldsymbol{b}``.
@@ -1403,7 +1403,7 @@ The expression corrects for the third and fourth moments and **not** for serial 
 
 Every method reduces to [`summarise_returns`](@ref), which runs the steps. A method that takes weights nets the returns through [`calc_net_returns`](@ref) first, and the method that takes a prediction result takes the first series when it carries several, and reads the turnover of its held path.
 
- 1. Check `alpha` and `periods_per_year`, as `# Validation` states.
+ 1. Check `alpha` and `ppy`, as `# Validation` states.
  2. Take `T`, the number of periods, and `m` and `s`, the sample mean and the corrected sample standard deviation of `ret` about `m`. Clamp the mean to the least and the greatest entry of `ret`. The clamp moves nothing in exact arithmetic. The rounded mean of a constant `ret` can differ from its common value, and the clamp makes `m` equal that value, so `s` is exactly zero.
  3. Annualise the two, giving `ann_ret` and `ann_vol`.
  4. Divide, giving `sharpe`. A non-positive `ann_vol` gives a `NaN` in its place.
@@ -1423,7 +1423,7 @@ Every method reduces to [`summarise_returns`](@ref), which runs the steps. A met
   - `fees`: Optional transaction fees.
   - `rd`: [`ReturnsResult`](@ref) carrying the asset returns.
   - `res`: An [`OptimisationResult`](@ref), whose weights and fees meet the caller's `rd` on the result's investable universe through [`result_investable_view`](@ref).
-  - $(arg_dict[:ps_ppy])
+  - $(arg_dict[:ps_ppy]) It defaults to `1`, which reports the statistics per period at any frequency of the data.
   - $(arg_dict[:ps_alpha])
   - $(arg_dict[:ps_compound])
   - `benchmark`: Benchmark return series over the same periods as `ret`, or `nothing` for no excess statistics.
@@ -1431,7 +1431,7 @@ Every method reduces to [`summarise_returns`](@ref), which runs the steps. A met
 # Validation
 
   - `0 < alpha < 1`.
-  - `periods_per_year > 0`.
+  - `ppy > 0`.
   - `length(benchmark) == length(ret)` when a benchmark is given. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
@@ -1549,7 +1549,7 @@ function held_path_turnover(pred::MultiPeriodPredictionResult)
     return sum(sum(abs, view(W0, f, :) - view(W1, f - 1, :)) for f in 2:F) / (F - 1)
 end
 """
-    summarise_returns(ret::VecNum, turnover::Option{<:Number}; periods_per_year::Number = 252,
+    summarise_returns(ret::VecNum, turnover::Option{<:Number}; ppy::Number = 1,
                       alpha::Number = 0.05, compound::Bool = false,
                       benchmark::Option{<:VecNum} = nothing) -> PerformanceSummaryResult
 
@@ -1561,11 +1561,11 @@ Every `performance_summary` method reduces to this function. The bare-series met
 
   - `ret`: Periodic portfolio returns.
   - `turnover`: Mean turnover per rebalance, or `nothing` when the caller holds no weight path.
-  - `periods_per_year`, `alpha`, `compound`, `benchmark`: As [`performance_summary`](@ref) states them.
+  - `ppy`, `alpha`, `compound`, `benchmark`: As [`performance_summary`](@ref) states them.
 
 # Validation
 
-  - `0 < alpha < 1` and `periods_per_year > 0`. A `DomainError` is thrown otherwise.
+  - `0 < alpha < 1` and `ppy > 0`. A `DomainError` is thrown otherwise.
   - `length(benchmark) == length(ret)` when a benchmark is given, checked by [`excess_statistics`](@ref). A `DimensionMismatch` is thrown otherwise.
 
 # Returns
@@ -1578,15 +1578,13 @@ Every `performance_summary` method reduces to this function. The bare-series met
   - [`excess_statistics`](@ref)
   - [`held_path_turnover`](@ref)
 """
-function summarise_returns(ret::VecNum, turnover::Option{<:Number};
-                           periods_per_year::Number = 252, alpha::Number = 0.05,
-                           compound::Bool = false,
+function summarise_returns(ret::VecNum, turnover::Option{<:Number}; ppy::Number = 1,
+                           alpha::Number = 0.05, compound::Bool = false,
                            benchmark::Option{<:VecNum} = nothing)::PerformanceSummaryResult
     assert_unit_interval(alpha, :alpha)
-    @argcheck(periods_per_year > zero(periods_per_year),
-              DomainError(periods_per_year, "periods_per_year must be positive"))
+    @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
     T = length(ret)
-    ann = periods_per_year
+    ann = ppy
     # The clamp moves nothing in exact arithmetic. On a constant series it makes the mean the
     # common value, so `s` is exactly zero and every guard below fires.
     m = clamp(mean(ret), extrema(ret)...)

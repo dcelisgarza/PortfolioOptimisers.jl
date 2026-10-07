@@ -540,7 +540,7 @@ The evaluation and every statistic above it compute in the element types of `alp
   - `step`: Number of observations between two evaluation dates. The default of `horizon` gives forward windows that do not overlap. A smaller stride scores more dates whose windows overlap, and the t-statistic of every summary reads that overlap through [`forecast_ic_lags`](@ref), so a smaller stride does not inflate it.
   - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported. It is carried rather than applied here, because the pairing is the same whatever the threshold.
   - $(arg_dict[:cs_ties]) It is carried rather than applied here, and [`forecast_ic`](@ref), [`forecast_factor_correlation`](@ref) and the `:rank` book of [`forecast_portfolio`](@ref) read it. The default gives equal forecasts equal ranks. A caller who wants the other rule on the same pairing calls the bare method again on `fe.alpha`, `fe.y` and `umsk = fe.umsk`, which refits nothing.
-  - `ppy`: Periods per year. `252` annualises a daily fit, and the default of `1` reports the statistics per period. It is carried rather than applied here, and the verbs above map it onto `performance_summary`'s `periods_per_year`.
+  - `ppy`: Periods per year. `252` annualises a daily fit, and the default of `1` reports the statistics per period. It is carried rather than applied here, and the verbs above pass it to the `ppy` of `performance_summary`.
 
 # Validation
 

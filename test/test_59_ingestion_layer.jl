@@ -847,7 +847,7 @@ end
     # The estimator narrows its Coverage Universe to the columns whose implied
     # volatilities are complete: `C` takes the `NaN` row and column an absent return takes,
     # and the surviving block is the fit on `A` and `B` alone.
-    ce = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+    ce = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium())
     for f in (cov, cor)
         m = f(ce, rdg.X, rdg.pnl; iv = rdg.iv, ivpa = rdg.ivpa)
         @test all(isnan, view(m, 3, :))

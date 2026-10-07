@@ -319,7 +319,7 @@ Score the long-short portfolio that a Return Forecast states by itself.
 
 The information coefficient states how well the forecast orders the cross-section. This verb states what that ordering earns as a book, which is the reading a caller acts on. The book reads no covariance, no constraint and no solver, so the forecast is the only thing it measures.
 
-The return series is the return of a portfolio, so it gets the whole of [`performance_summary`](@ref) and not only a mean and a volatility. That is a Sharpe ratio and its standard error, a Sortino ratio, a Calmar ratio, a maximum drawdown and a conditional value at risk. `fe.ppy` annualises it, as the `periods_per_year` of that verb.
+The return series is the return of a portfolio, so it gets the whole of [`performance_summary`](@ref) and not only a mean and a volatility. That is a Sharpe ratio and its standard error, a Sortino ratio, a Calmar ratio, a maximum drawdown and a conditional value at risk. `fe.ppy` annualises it, as the `ppy` of that verb.
 
 # Mathematical definition
 
@@ -353,7 +353,7 @@ The book of a gap date stays in `w`, because [`forecast_portfolio_weights`](@ref
  1. Build the weights of every evaluation date with [`forecast_portfolio_weights`](@ref) under `fe.ties`, giving `w`.
  2. For each date, contract its weights with its target over the assets that carry both a finite forecast and a finite target, giving `ret`. A date with fewer than `fe.min_count` such assets gets a `NaN` instead.
  3. Take the turnover of `w` with [`calc_turnover`](@ref), and write a `NaN` into every date whose return is a `NaN`, so the two series read the same dates.
- 4. Drop the gaps of `ret` and summarise the remainder with [`performance_summary`](@ref) at `periods_per_year = fe.ppy`.
+ 4. Drop the gaps of `ret` and summarise the remainder with [`performance_summary`](@ref) at `ppy = fe.ppy`.
  5. Read the hit rate of `ret` with [`forecast_hit_rate`](@ref), and the mean of the finite entries of the turnover.
 
 # Arguments
@@ -412,7 +412,7 @@ function forecast_portfolio(fe::ForecastEvaluationResult; kind::Symbol = :rank)
     turnover[.!isfinite.(ret)] .= Tf(NaN)
     ftn = turnover[isfinite.(turnover)]
     return (; w = w, ret = ret, turnover = turnover,
-            summary = performance_summary(ret[isfinite.(ret)]; periods_per_year = ppy),
+            summary = performance_summary(ret[isfinite.(ret)]; ppy = ppy),
             hit_rate = forecast_hit_rate(ret),
             mean_turnover = isempty(ftn) ? Tf(NaN) : sum(ftn) / length(ftn))
 end

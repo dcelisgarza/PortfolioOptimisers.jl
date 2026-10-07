@@ -203,7 +203,7 @@ and be-the-leader collapses onto the static comparator.
     @testset "The benchmark fields of the performance summary" begin
         ret = [0.02, -0.01, 0.03]
         bench = [0.01, 0.0, 0.01]
-        ps = performance_summary(ret; benchmark = bench)
+        ps = performance_summary(ret; ppy = 252, benchmark = bench)
         e = ret .- bench
         @test isapprox(ps.excess_ret, mean(e) * 252)
         @test isapprox(ps.excess_ret, 1.68; atol = 1e-6)
@@ -213,9 +213,9 @@ and be-the-leader collapses onto the static comparator.
         @test isapprox(ps.information_ratio, 6.9; atol = 0.05)
         @test isnan(ps.turnover)
         # The seven released statistics do not move under a benchmark.
-        ps0 = performance_summary(ret)
+        ps0 = performance_summary(ret; ppy = 252)
         for f in (:ann_return, :ann_volatility, :sharpe, :sharpe_stderr, :sortino, :calmar,
-                  :max_drawdown, :cvar, :n_periods, :periods_per_year, :alpha, :compound)
+                  :max_drawdown, :cvar, :n_periods, :ppy, :alpha, :compound)
             @test isequal(getproperty(ps, f), getproperty(ps0, f))
         end
         @test isnan(ps0.excess_ret) &&

@@ -1212,7 +1212,7 @@ end
     @testset "The portfolio summary scales and the turnover does not" begin
         p1 = forecast_portfolio(fe1)
         p4 = forecast_portfolio(fe4)
-        @test p4.summary.periods_per_year == 4
+        @test p4.summary.ppy == 4
         @test p4.summary.ann_return ≈ 4 * p1.summary.ann_return
         @test p4.summary.ann_volatility ≈ 2 * p1.summary.ann_volatility
         @test p4.summary.sharpe ≈ 2 * p1.summary.sharpe
@@ -1308,14 +1308,13 @@ end
         @test isnan(p.ret[2])
         @test count(isfinite, p.ret) == 4
         @test p.summary.n_periods == 4
-        @test p.summary ==
-              performance_summary(p.ret[isfinite.(p.ret)]; periods_per_year = 1)
+        @test p.summary == performance_summary(p.ret[isfinite.(p.ret)]; ppy = 1)
     end
 
     @testset "The uncompressed series is what the compression avoids" begin
         # `performance_summary`'s Precomputed-returns contract: a `NaN` makes the mean and
         # the drawdown non-finite, and the tail figure answers a number rather than a `NaN`.
-        raw = performance_summary(p.ret; periods_per_year = 1)
+        raw = performance_summary(p.ret; ppy = 1)
         @test isnan(raw.ann_return)
         @test isnan(raw.max_drawdown)
         @test isfinite(raw.cvar)
@@ -3614,7 +3613,7 @@ end
             p = forecast_portfolio(fe; kind = :rank)
             held = copy(p.ret)
             held[2] = sum(p.w[2, i] * gap_y(g)[2, i] for i in 1:4)
-            full = performance_summary(held; periods_per_year = 1)
+            full = performance_summary(held; ppy = 1)
             @test p.summary.max_drawdown ≈ -0.15
             @test (p.summary.max_drawdown < full.max_drawdown) == deeper
         end

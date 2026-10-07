@@ -18,7 +18,7 @@ In order to implement a new concrete type that works seamlessly with the library
 The implied volatilities are the **second** positional argument and the returns the **third**. The two are matrices of the same size, so a call that swaps them is well typed and silently wrong.
 
   - `alg`: The concrete subtype instance.
-  - `iv`: Implied volatility matrix `observations × assets`, already divided by ``\\sqrt{\\mathrm{af}}`` by the caller.
+  - `iv`: Implied volatility matrix `observations × assets`, already divided by ``\\sqrt{\\mathrm{ppy}}`` by the caller.
   - `X`: Asset returns matrix `observations × assets`.
   - `ivpa`: Implied volatility premium adjustment factor. It is `nothing` when the caller supplies none, so an algorithm that needs one raises on that method.
 
@@ -37,7 +37,7 @@ julia> function PortfolioOptimisers.predict_realised_vols(::MyImpliedVolatilityA
            return vec(iv[end, :])
        end
 
-julia> cov(ImpliedVolatility(; alg = MyImpliedVolatilityAlgorithm(), af = 1),
+julia> cov(ImpliedVolatility(; alg = MyImpliedVolatilityAlgorithm(), ppy = 1),
            [0.1 0.2; 0.3 0.1; 0.2 0.4]; iv = [0.5 0.6; 0.4 0.7; 0.3 0.8])
 2×2 Matrix{Float64}:
   0.09       -0.0785584
@@ -195,14 +195,14 @@ $(DocStringExtensions.FIELDS)
         ce::StatsBase.CovarianceEstimator = Covariance(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
-        af::Number = 252
+        ppy::Number
     ) -> ImpliedVolatility
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. `ppy` has no default. The implied volatility is annual, and `ppy` converts it to the period of the returns, so no value is right at every data frequency: the caller states it, for example `ppy = 252` for daily returns.
 
 ## Validation
 
-  - `af > 0`.
+  - `ppy > 0`.
 
 ## Propagated parameters
 
@@ -220,7 +220,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 # Examples
 
 ```jldoctest
-julia> ImpliedVolatility()
+julia> ImpliedVolatility(; ppy = 252)
 ImpliedVolatility
    ce ┼ Covariance
       │    me ┼ SimpleExpectedReturns
@@ -247,7 +247,7 @@ ImpliedVolatility
       │   ws ┼ Int64: 20
       │   re ┼ LinearModel
       │      │   kwargs ┴ @NamedTuple{}: NamedTuple()
-   af ┴ Int64: 252
+  ppy ┴ Int64: 252
 ```
 
 # Related
@@ -278,21 +278,21 @@ ImpliedVolatility
     """
     @fprop alg
     """
-    Annualisation factor for converting annualised implied volatility to the data frequency. The `cov` and `cor` methods divide the implied volatilities by `sqrt(af)` before the algorithm reads them.
+    Periods per year of the returns, which converts the annual implied volatility to the data frequency. The `cov` and `cor` methods divide the implied volatilities by `sqrt(ppy)` before the algorithm reads them.
     """
-    af
+    ppy
     function ImpliedVolatility(ce::StatsBase.CovarianceEstimator,
                                mp::AbstractMatrixProcessingEstimator,
-                               alg::ImpliedVolatilityAlgorithm, af::Number)
-        assert_gt0(af, :af)
-        return new{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg, af)
+                               alg::ImpliedVolatilityAlgorithm, ppy::Number)
+        assert_gt0(ppy, :ppy)
+        return new{typeof(ce), typeof(mp), typeof(alg), typeof(ppy)}(ce, mp, alg, ppy)
     end
 end
 function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
-                           af::Number = 252)::ImpliedVolatility
-    return ImpliedVolatility(ce, mp, alg, af)
+                           ppy::Number)::ImpliedVolatility
+    return ImpliedVolatility(ce, mp, alg, ppy)
 end
 """
     realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,
@@ -704,7 +704,7 @@ Where:
 
   - $(math_dict[:Sigma_hat])
   - ``\\hat{\\boldsymbol{\\rho}} = \\operatorname{cor}(\\mathbf{X})``: Correlation matrix from asset returns, computed by `ce.ce`.
-  - ``\\hat{\\boldsymbol{\\sigma}}^{\\mathrm{rv}}``: Predicted realised volatilities, from ``\\mathbf{iv} / \\sqrt{\\mathrm{af}}``.
+  - ``\\hat{\\boldsymbol{\\sigma}}^{\\mathrm{rv}}``: Predicted realised volatilities, from ``\\mathbf{iv} / \\sqrt{\\mathrm{ppy}}``, where ``\\mathrm{ppy}`` is `ce.ppy`, the number of periods of `X` in one year.
 
 The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is therefore the square of the predicted realised volatility of each asset, and never a unit.
 
@@ -713,7 +713,7 @@ The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is therefore the square of the pred
  1. Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
  2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`.
  3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`, giving `sigma`, the base correlation matrix. The oriented `iv` is forwarded so that a base estimator that reads its own implied volatility series, such as a nested [`ImpliedVolatility`](@ref), receives it. Every other shipped estimator absorbs it into its own `kwargs...` and ignores it.
- 4. Divide `iv` by `sqrt(ce.af)`, converting the annualised implied volatility to the frequency of `X`.
+ 4. Divide `iv` by `sqrt(ce.ppy)`, converting the annualised implied volatility to the frequency of `X`.
  5. Call [`predict_realised_vols`](@ref) with `ce.alg`, giving `iv`, one predicted realised volatility per asset. The implied volatilities are the second argument and the returns the third.
  6. Scale `sigma` in place with `StatsBase.cor2cov!`, which applies the closed form above.
  7. Post-process `sigma` in place with [`matrix_processing!`](@ref) and `ce.mp`.
@@ -751,7 +751,7 @@ function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
     assert_finite_sample(X)
     sigma = Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean,
                            iv = iv, kwargs...)
-    iv = iv / sqrt(ce.af)
+    iv = iv / sqrt(ce.ppy)
     iv = predict_realised_vols(ce.alg, iv, X, ivpa)
     StatsBase.cor2cov!(sigma, iv)
     matrix_processing!(ce.mp, sigma, X; kwargs...)
@@ -774,7 +774,7 @@ That round trip was the identity in exact arithmetic alone. In floating point th
  1. Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
  2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`.
  3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`, giving `rho`, the base correlation matrix. The oriented `iv` is forwarded so that a base estimator that reads its own implied volatility series, such as a nested [`ImpliedVolatility`](@ref), receives it.
- 4. Call [`predict_realised_vols`](@ref) with `ce.alg` and `iv / sqrt(ce.af)`, and discard the result. The call runs for its raises alone, and `iv` is divided by `sqrt(ce.af)` for it exactly as it is in `cov`.
+ 4. Call [`predict_realised_vols`](@ref) with `ce.alg` and `iv / sqrt(ce.ppy)`, and discard the result. The call runs for its raises alone, and `iv` is divided by `sqrt(ce.ppy)` for it exactly as it is in `cov`.
  5. Normalise `rho` in place with `StatsBase.cov2cor!`, which divides the entry in row `i` and column `j` by the square roots of the diagonal entries `i` and `j`. The call also mirrors the lower triangle into the upper one, clamps every off-diagonal entry into `[-1, 1]`, and sets the diagonal to exactly one. The exact diagonal is what step 6 needs: [`matrix_processing!`](@ref) reads the value of the diagonal to decide whether it holds a correlation matrix or a covariance matrix.
  6. Post-process `rho` in place with [`matrix_processing!`](@ref) and `ce.mp`.
 
@@ -812,7 +812,7 @@ function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
     rho = Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean,
                          iv = iv, kwargs...)
     # The prediction is discarded. It runs so that `cor` refuses what `cov` refuses.
-    predict_realised_vols(ce.alg, iv / sqrt(ce.af), X, ivpa)
+    predict_realised_vols(ce.alg, iv / sqrt(ce.ppy), X, ivpa)
     StatsBase.cov2cor!(rho)
     matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho

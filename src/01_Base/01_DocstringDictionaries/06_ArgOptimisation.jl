@@ -255,7 +255,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :b_sim => "`b_sim`: Number of integration points for the upper tail Gini approximation.",#
                  # Portfolio summary statistics.
                  :ps_n_periods => "`n_periods`: Number of observations in the return series.",#
-                 :ps_ppy => "`periods_per_year`: Annualisation factor. 252 for daily, 52 for weekly, 12 for monthly returns.",#
+                 :ps_ppy => "`ppy`: Periods per year, the annualisation factor. 252 for daily, 52 for weekly, 12 for monthly returns, and 1 states each figure per period.",#
                  :ps_alpha => "`alpha`: Tail probability used for the CVaR, ``\\alpha \\in (0, 1)``.",#
                  :ps_compound => "`compound`: Whether the wealth path behind the drawdown statistics was compounded.",#
                  :ps_ann_return => "`ann_return`: Annualised arithmetic mean return.",#

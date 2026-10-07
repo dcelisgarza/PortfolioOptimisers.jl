@@ -184,14 +184,14 @@ using Statistics
         # first three columns are `performance_summary` on the series itself.
         fs = factor_model_summary(csfmA; ppy = 252, step = 3)
         for k in (1, 3)
-            ps = performance_summary(fA[:, k]; periods_per_year = 252)
+            ps = performance_summary(fA[:, k]; ppy = 252)
             @test isapprox(fs.ann_return[k], ps.ann_return)
             @test isapprox(fs.ann_volatility[k], ps.ann_volatility)
             @test isapprox(fs.sharpe[k], ps.sharpe)
         end
         # The second series carries an absent observation. The summary drops it and
         # `performance_summary` does not, so only the summary answers there.
-        ps2 = performance_summary(fA[:, 2]; periods_per_year = 252)
+        ps2 = performance_summary(fA[:, 2]; ppy = 252)
         @test isnan(ps2.ann_return)
         @test isfinite(fs.ann_return[2])
     end

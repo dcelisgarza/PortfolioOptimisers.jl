@@ -1788,16 +1788,16 @@ function plot_efficient_frontier end
         w::ArrNum,
         X::MatNum,
         fees::Option{<:Fees} = nothing;
-        periods_per_year::Number = 252,
+        ppy::Number = 1,
         alpha::Number = 0.05,
         compound::Bool = false,
         benchmark::Option{<:VecNum} = nothing,
         kwargs...
     ) -> Plot
-    plot_performance_summary(ret::VecNum; periods_per_year, alpha, compound, benchmark, kwargs...) -> Plot
-    plot_performance_summary(w, rd::ReturnsResult, fees = nothing; periods_per_year, alpha, compound, benchmark, kwargs...) -> Plot
-    plot_performance_summary(res::OptimisationResult, rd::ReturnsResult; periods_per_year, alpha, compound, benchmark, kwargs...) -> Plot
-    plot_performance_summary(pred::PredRes_MultiPredRes; periods_per_year, alpha, compound, benchmark, kwargs...) -> Plot
+    plot_performance_summary(ret::VecNum; ppy, alpha, compound, benchmark, kwargs...) -> Plot
+    plot_performance_summary(w, rd::ReturnsResult, fees = nothing; ppy, alpha, compound, benchmark, kwargs...) -> Plot
+    plot_performance_summary(res::OptimisationResult, rd::ReturnsResult; ppy, alpha, compound, benchmark, kwargs...) -> Plot
+    plot_performance_summary(pred::PredRes_MultiPredRes; ppy, alpha, compound, benchmark, kwargs...) -> Plot
 
 Plot the performance statistics of a portfolio as a bar chart of eleven bars, blue at a value of zero or more and red below it.
 
@@ -1830,7 +1830,7 @@ Where:
   - `w`: Portfolio weights.
   - `X`: Asset returns matrix (observations × assets).
   - `fees`: Transaction fees, or `nothing`.
-  - `periods_per_year`: Number of periods in one year, which annualises the statistics.
+  - `ppy`: Number of periods in one year, which annualises the statistics. It defaults to `1`, which draws the statistics per period.
   - `alpha`: Tail probability of the conditional value at risk.
   - `compound`: Compound the returns of the maximum drawdown when `true`.
   - `benchmark`: Benchmark return series of the three excess statistics, or `nothing`.
@@ -1840,7 +1840,7 @@ Where:
 
 # Validation
 
-  - The rules of [`performance_summary`](@ref): `0 < alpha < 1` and `periods_per_year > 0`, else a `DomainError` is raised, and a `benchmark` of the length of the returns, else a `DimensionMismatch` is raised.
+  - The rules of [`performance_summary`](@ref): `0 < alpha < 1` and `ppy > 0`, else a `DomainError` is raised, and a `benchmark` of the length of the returns, else a `DimensionMismatch` is raised.
 
 # Returns
 
