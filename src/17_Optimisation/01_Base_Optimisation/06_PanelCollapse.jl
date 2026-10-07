@@ -135,8 +135,8 @@ To add a rule, subtype `AbstractPanelCollapseAlgorithm` and implement the method
 ### Arguments
 
   - `alg`: The concrete subtype instance.
-  - `m`: The active mask of the panel, `observations × assets`.
-  - `W`: The normalised inner weights, `assets × sub-portfolios`.
+  - `m`: The mask of the cells that the collapse reads, `observations × members`: a member is read where it is active and its cell was observed. A member is an asset, and a pair of assets for a tensor field whose labels are the asset names.
+  - `W`: The normalised inner weights, `members × sub-portfolios`, or `kron(W, W)` for the pairs.
 
 ### Returns
 
@@ -424,9 +424,9 @@ function collapse_panel_mask(o::AbstractMatrix{Bool}, W::MatNum, m::AbstractMatr
     return collapse_panel_numeric(o, W, m, nothing) .> 0
 end
 """
-    collapse_panel_field(f::NumericPanelField, W, nx, syn, m, d) -> NumericPanelField
-    collapse_panel_field(f::CategoricalPanelField, W, nx, syn, m, d) -> TensorPanelField
-    collapse_panel_field(f::TensorPanelField, W, nx, syn, m, d) -> TensorPanelField
+    collapse_panel_field(f::NumericPanelField, W, nx, syn, m, alg) -> NumericPanelField
+    collapse_panel_field(f::CategoricalPanelField, W, nx, syn, m, alg) -> TensorPanelField
+    collapse_panel_field(f::TensorPanelField, W, nx, syn, m, alg) -> TensorPanelField
 
 Collapses one Panel Field onto the sub-portfolios of a meta-optimiser.
 
@@ -438,9 +438,11 @@ The collapse acts on one field at a time and returns a field. So the collapsed p
 
 A field that a time-varying panel lifts from a static input, see [`RepeatedLeading`](@ref), holds the same value at every row, and its collapse reads the active members of each row. So the collapsed field changes over time where the active members change.
 
+The collapse reads a member only where it is active and its cell was observed. An unobserved cell holds a placeholder, not data, so the rule `alg` divides by the weight of the active observed members. The collapsed value is then the same for every placeholder. A collapsed cell with no active observed member is unobserved.
+
 # Algorithm
 
-The method that Julia selects is the algorithm. Each kind contracts its values and its observed mask, through [`collapse_panel_numeric`](@ref), [`collapse_panel_tensor`](@ref), [`collapse_panel_mask`](@ref) and [`collapse_categorical_mask`](@ref).
+The method that Julia selects is the algorithm. Each kind contracts its values over the active observed cells, through [`read_cells`](@ref), [`collapse_read_numeric`](@ref), [`collapse_read_onehot`](@ref) and [`collapse_read_tensor`](@ref). It contracts its observed mask through [`collapse_panel_mask`](@ref), [`collapse_panel_tensor`](@ref) and [`collapse_categorical_mask`](@ref).
 
 # Arguments
 
@@ -449,7 +451,7 @@ The method that Julia selects is the algorithm. Each kind contracts its values a
   - `nx`: The asset names of the returns data, or `nothing`. Only a tensor field reads it, to find the square case.
   - `syn`: The names of the sub-portfolios.
   - `m`: The active mask of the panel, or `nothing` for a static panel.
-  - `d`: The divisors of [`active_weight_divisor`](@ref), or `nothing`.
+  - `alg`: The rule of the panel collapse.
 
 # Returns
 
@@ -463,30 +465,190 @@ The method that Julia selects is the algorithm. Each kind contracts its values a
   - [`AbstractPanelField`](@ref)
 """
 function collapse_panel_field(f::NumericPanelField, W::MatNum, ::Any, ::Any,
-                              m::Option{<:AbstractMatrix{Bool}}, d::Option{<:MatNum})
+                              m::Option{<:AbstractMatrix{Bool}},
+                              alg::AbstractPanelCollapseAlgorithm)
     return NumericPanelField(; name = f.name,
-                             vals = collapse_panel_numeric(f.vals, W, m, d),
+                             vals = collapse_read_numeric(f.vals, W, read_cells(m, f.omsk),
+                                                          alg),
                              omsk = collapse_panel_mask(f.omsk, W, m))
 end
 function collapse_panel_field(f::CategoricalPanelField, W::MatNum, ::Any, ::Any,
-                              m::Option{<:AbstractMatrix{Bool}}, d::Option{<:MatNum})
+                              m::Option{<:AbstractMatrix{Bool}},
+                              alg::AbstractPanelCollapseAlgorithm)
     return TensorPanelField(; name = f.name, axis = "level", labels = f.levels,
-                            vals = collapse_panel_tensor(panel_onehot(f), W, false, m, d),
+                            vals = collapse_read_onehot(panel_onehot(f), W,
+                                                        read_cells(m, f.omsk), alg),
                             omsk = collapse_categorical_mask(f.omsk, W, length(f.levels),
                                                              m))
 end
 function collapse_panel_field(f::TensorPanelField, W::MatNum, nx::Option{<:VecStr},
                               syn::VecStr, m::Option{<:AbstractMatrix{Bool}},
-                              d::Option{<:MatNum})
+                              alg::AbstractPanelCollapseAlgorithm)
     sq = features_are_assets(f, nx)
     return TensorPanelField(; name = f.name, axis = f.axis, labels = sq ? syn : f.labels,
                             groups = sq ? nothing : f.groups,
-                            vals = collapse_panel_tensor(f.vals, W, sq, m, d),
+                            vals = collapse_read_tensor(f.vals, W, sq, m, f.omsk, alg),
                             omsk = if isnothing(f.omsk)
                                 nothing
                             else
                                 collapse_panel_tensor(f.omsk, W, sq, m, nothing) .> 0
                             end)
+end
+"""
+    read_cells(m, o)
+
+Give the mask of the cells that the panel collapse reads for a numeric or a categorical Panel Field: a member is read where it is active and its cell was observed.
+
+The panel stores a placeholder in an unobserved cell, not data, so the collapse reads it as it reads an inactive member. `nothing` reads every cell. A static panel has no active mask, so its mask is the observed mask, and `nothing` when every cell was observed. Then the collapse keeps the static contraction bit for bit.
+
+# Arguments
+
+  - `m`: The active mask of the panel, `observations × assets`, or `nothing` for a static panel.
+  - `o`: The observed mask of the Panel Field, or `nothing`.
+
+# Returns
+
+  - The mask, `observations × assets` or `assets`, or `nothing`.
+
+# Related
+
+  - [`collapse_panel_field`](@ref)
+  - [`collapse_read_numeric`](@ref)
+"""
+function read_cells(m::Option{<:AbstractMatrix{Bool}}, ::Nothing)
+    return m
+end
+function read_cells(::Nothing, o::AbstractVector{Bool})
+    return all(o) ? nothing : o
+end
+function read_cells(m::AbstractMatrix{Bool}, o::AbstractMatrix{Bool})
+    return m .& o
+end
+"""
+    collapse_read_numeric(A::AbstractArray, W::MatNum, r, alg::AbstractPanelCollapseAlgorithm) -> Array
+
+Collapse the values of a numeric Panel Field over the cells that the mask `r` of [`read_cells`](@ref) marks.
+
+The rule `alg` divides by the weight of the read members, through [`active_weight_divisor`](@ref) on `r`. Where every cell was observed, `r` is the active mask, and the collapse is the one that reads the active members alone. A static mask is a window of one row: the values and the mask take an observation axis of length one, collapse as a time-varying field does, and drop it after.
+
+# Arguments
+
+  - `A`: The values, `assets` or `observations × assets`.
+  - `W`: The normalised inner weights, `assets × sub-portfolios`.
+  - `r`: The mask of the read cells, or `nothing`.
+  - `alg`: The rule of the panel collapse.
+
+# Returns
+
+  - The collapsed values.
+
+# Related
+
+  - [`collapse_panel_field`](@ref)
+  - [`collapse_panel_numeric`](@ref)
+  - [`collapse_read_onehot`](@ref)
+"""
+function collapse_read_numeric(A::AbstractArray, W::MatNum, ::Nothing,
+                               ::AbstractPanelCollapseAlgorithm)
+    return collapse_panel_numeric(A, W)
+end
+function collapse_read_numeric(A::AbstractMatrix, W::MatNum, r::AbstractMatrix{Bool},
+                               alg::AbstractPanelCollapseAlgorithm)
+    return collapse_panel_numeric(A, W, r, active_weight_divisor(alg, r, W))
+end
+function collapse_read_numeric(A::AbstractVector, W::MatNum, r::AbstractVector{Bool},
+                               alg::AbstractPanelCollapseAlgorithm)
+    return vec(collapse_read_numeric(reshape(A, 1, :), W, reshape(r, 1, :), alg))
+end
+"""
+    collapse_read_onehot(H::AbstractArray, W::MatNum, r, alg::AbstractPanelCollapseAlgorithm) -> Array
+
+Collapse the one-hot block `H` of a categorical Panel Field, `assets × levels` or `observations × assets × levels`, over the cells that the mask `r` of [`read_cells`](@ref) marks. A cell is observed or not for every level at once, so one mask serves each level. It is [`collapse_read_numeric`](@ref) with a trailing level axis, through [`collapse_panel_tensor`](@ref).
+
+# Related
+
+  - [`collapse_panel_field`](@ref)
+  - [`collapse_read_numeric`](@ref)
+  - [`collapse_panel_tensor`](@ref)
+"""
+function collapse_read_onehot(H::AbstractMatrix, W::MatNum, ::Nothing,
+                              ::AbstractPanelCollapseAlgorithm)
+    return collapse_panel_tensor(H, W, false)
+end
+function collapse_read_onehot(H::AbstractArray{<:Any, 3}, W::MatNum,
+                              r::AbstractMatrix{Bool}, alg::AbstractPanelCollapseAlgorithm)
+    return collapse_panel_tensor(H, W, false, r, active_weight_divisor(alg, r, W))
+end
+function collapse_read_onehot(H::AbstractMatrix, W::MatNum, r::AbstractVector{Bool},
+                              alg::AbstractPanelCollapseAlgorithm)
+    C = collapse_read_onehot(reshape(H, 1, size(H)...), W, reshape(r, 1, :), alg)
+    return dropdims(C; dims = 1)
+end
+"""
+    collapse_read_tensor(A::AbstractArray, W::MatNum, sq::Bool, m, o, alg::AbstractPanelCollapseAlgorithm) -> Array
+
+Collapse the values of a tensor Panel Field over the cells that are active and observed.
+
+The observed mask `o` of a tensor Panel Field has a label axis, so a member can be observed at one label and not at another. Where each active member is observed at every label, the cells to read are the active members, and [`collapse_panel_tensor`](@ref) collapses the field as it does with no observed mask. Otherwise each collapsed value is a weighted mean over its own read cells.
+
+  - A rectangular field collapses each label as a numeric field, through [`collapse_read_numeric`](@ref), on the active members observed at that label.
+  - A square field reads a pair of members, the asset and the label, with the weight ``\\tilde{W}_{ik} \\tilde{W}_{jl}``. A pair is read where both are active and the cell is observed. The pairs collapse as the members of a numeric field, with the weights `kron(W, W)`, so the rule divides by the weight of the read pairs. This keeps a symmetric field symmetric, and a separable mask gives the collapse of the active members.
+
+A static field takes an observation axis of length one, and drops it after.
+
+# Arguments
+
+  - `A`: The values, `assets × labels` or `observations × assets × labels`.
+  - `W`: The normalised inner weights, `assets × sub-portfolios`.
+  - `sq`: `true` when the label axis is the asset axis.
+  - `m`: The active mask of the panel, or `nothing` for a static panel.
+  - `o`: The observed mask of the Panel Field, with the shape of `A`, or `nothing`.
+  - `alg`: The rule of the panel collapse.
+
+# Returns
+
+  - The collapsed values.
+
+# Related
+
+  - [`collapse_panel_field`](@ref)
+  - [`collapse_panel_tensor`](@ref)
+  - [`active_weight_divisor`](@ref)
+"""
+function collapse_read_tensor(A::AbstractArray, W::MatNum, sq::Bool,
+                              m::Option{<:AbstractMatrix{Bool}}, ::Nothing,
+                              alg::AbstractPanelCollapseAlgorithm)
+    return collapse_panel_tensor(A, W, sq, m, active_weight_divisor(alg, m, W))
+end
+function collapse_read_tensor(A::AbstractMatrix, W::MatNum, sq::Bool, ::Nothing,
+                              o::AbstractMatrix{Bool}, alg::AbstractPanelCollapseAlgorithm)
+    if all(o)
+        return collapse_panel_tensor(A, W, sq)
+    end
+    C = collapse_read_tensor(reshape(A, 1, size(A)...), W, sq, trues(1, size(A, 1)),
+                             reshape(o, 1, size(o)...), alg)
+    return dropdims(C; dims = 1)
+end
+function collapse_read_tensor(A::AbstractArray{<:Any, 3}, W::MatNum, sq::Bool,
+                              m::AbstractMatrix{Bool}, o::AbstractArray{Bool, 3},
+                              alg::AbstractPanelCollapseAlgorithm)
+    ma = sq ? m .& reshape(m, size(m, 1), 1, size(m, 2)) : m
+    #! A cell of `o` sits at the leading indices of `ma`, which holds no label axis on a
+    #! rectangular field.
+    if all(k -> o[k] || !ma[CartesianIndex(Tuple(k)[1:ndims(ma)])], CartesianIndices(o))
+        return collapse_panel_tensor(A, W, sq, m, active_weight_divisor(alg, m, W))
+    end
+    T, N, L = size(A)
+    if sq
+        r = reshape(ma .& o, T, N * L)
+        W2 = kron(W, W)
+        k = size(W, 2)
+        C = collapse_panel_numeric(reshape(A, T, N * L), W2, r,
+                                   active_weight_divisor(alg, r, W2))
+        return reshape(C, T, k, k)
+    end
+    return stack((collapse_read_numeric(view(A, :, :, l), W, m .& view(o, :, :, l), alg)
+                  for l in 1:L))
 end
 """
     collapse_categorical_mask(o::Nothing, W::MatNum, nl::Integer, m) -> nothing
@@ -540,7 +702,7 @@ The outer problem of a meta-optimiser allocates over sub-portfolios, which are t
 
 A feature is intensive, as `iv` and `ivpa` are. So the collapse starts from the weights of [`synthetic_asset_weights`](@ref), which divide out the gross exposure ``s_k`` of each sub-portfolio. A weighted sum with no normalisation multiplies the feature vector of a sub-portfolio by its gross exposure, which makes it larger under leverage or short positions. Under the default [`AngularDist`](@ref), the normalisation does not change a rectangular field, because a scale of one row changes no cosine. In the square case it does change the field, because the product on both sides scales the label axis too. The normalisation also keeps the collapse bounded for every gross exposure larger than zero.
 
-At an observation where a member is outside the universe, the panel stores a finite value that has no meaning, so the collapse reads only the active members. The rule `alg` states what the weight of an inactive member becomes. The default, [`RenormaliseActive`](@ref), divides by the weight of the active members, as the normalisation divides out the gross exposure, and each value stays a convex combination. [`InactiveAsCash`](@ref) reads the missing weight as cash with a zero feature. It matches the outer returns for an additive feature, because those returns read the weight of an inactive asset as cash.
+At an observation where a member is outside the universe, the panel stores a finite value that has no meaning, so the collapse reads only the active members. A cell that a fill did not reach holds a placeholder too, and its observed mask is `false`. So for each Panel Field the collapse reads only the members that are active and observed. The rule `alg` states what the weight of an inactive member becomes. The default, [`RenormaliseActive`](@ref), divides by the weight of the active members, as the normalisation divides out the gross exposure, and each value stays a convex combination. [`InactiveAsCash`](@ref) reads the missing weight as cash with a zero feature. It matches the outer returns for an additive feature, because those returns read the weight of an inactive asset as cash.
 
 The collapse does not support an extensive feature, such as a market capitalisation or a headcount, that needs a weighted sum. The divisor comes from the inner solve, so a caller cannot scale the feature before the solve.
 
@@ -552,7 +714,7 @@ At each observation ``t`` of a panel that changes over time:
 
 ```math
 \\begin{align}
-D_{t,ik} &= \\frac{\\tilde{W}_{ik} m_{ti}}{d_{tk}}\\,,\\\\
+D_{t,ik} &= \\frac{\\tilde{W}_{ik} r_{ti}}{d_{tk}}\\,, \\quad r_{ti} = m_{ti} o_{ti}\\,,\\\\
 \\boldsymbol{a}^{o}_{t} &= \\mathbf{D}_{t}^\\intercal \\boldsymbol{a}_{t}\\,,\\\\
 \\mathbf{C}^{o}_{t} &= \\mathbf{D}_{t}^\\intercal \\mathbf{C}_{t}\\,,\\\\
 \\mathbf{S}^{o}_{t} &= \\mathbf{D}_{t}^\\intercal \\mathbf{S}_{t} \\mathbf{D}_{t}\\,,\\\\
@@ -562,15 +724,15 @@ o^{o}_{tk} &= \\mathbf{1}\\left[\\left(\\tilde{\\mathbf{W}}^\\intercal (\\boldsy
 \\end{align}
 ```
 
-Under [`RenormaliseActive`](@ref), ``d_{tk} = \\sum_{i} \\tilde{W}_{ik} m_{ti}``, so a numeric value is
+The divisor and the restricted weights belong to one Panel Field, because each field has its own observed mask. Under [`RenormaliseActive`](@ref), ``d_{tk} = \\sum_{i} \\tilde{W}_{ik} r_{ti}``, so a numeric value is
 
 ```math
 \\begin{align}
-a^{o}_{tk} &= \\frac{\\sum_{i=1}^{N} \\tilde{W}_{ik} m_{ti} a_{ti}}{\\sum_{i=1}^{N} \\tilde{W}_{ik} m_{ti}}\\,.
+a^{o}_{tk} &= \\frac{\\sum_{i=1}^{N} \\tilde{W}_{ik} r_{ti} a_{ti}}{\\sum_{i=1}^{N} \\tilde{W}_{ik} r_{ti}}\\,.
 \\end{align}
 ```
 
-Under [`InactiveAsCash`](@ref), ``d_{tk} = 1``, so ``a^{o}_{tk} = \\sum_{i} \\tilde{W}_{ik} m_{ti} a_{ti}``. A static panel has no mask: ``\\mathbf{D}_{t} = \\tilde{\\mathbf{W}}`` under every rule, and the observed mask collapses with ``\\boldsymbol{m}_{t} = \\mathbf{1}``.
+Under [`InactiveAsCash`](@ref), ``d_{tk} = 1``, so ``a^{o}_{tk} = \\sum_{i} \\tilde{W}_{ik} r_{ti} a_{ti}``. A static panel has no active mask, so ``m_{ti} = 1`` on its one row, and ``r_{ti} = o_{ti}``. A tensor field reads the observed mask of each label, and a square field reads a pair of members, see [`collapse_read_tensor`](@ref). Where every active cell is observed, ``r_{ti} = m_{ti}``.
 
 Where:
 
@@ -583,22 +745,22 @@ Where:
   - ``\\mathbf{F}^{o}_{t}``: Membership fractions, `sub-portfolios × levels`.
   - $(math_dict[:m_active_panel]) ``\\boldsymbol{m}_{t}`` is its row ``t``.
   - ``m^{o}_{tk}``: Active mask of the collapsed panel. The estimation mask collapses in the same way.
-  - ``\\boldsymbol{o}_{t}``, ``o^{o}_{tk}``: Observed mask of a Panel Field at observation ``t``, and its collapse.
+  - ``\\boldsymbol{o}_{t}``, ``o^{o}_{tk}``: Observed mask of a Panel Field at observation ``t``, and its collapse. ``o_{ti}`` is ``1`` for a Panel Field that cannot blank.
+  - ``r_{ti}``: Mask of the cells that the collapse reads: ``1`` where member ``i`` is active and observed at observation ``t``.
   - ``\\mathbf{1}[\\cdot]``: Indicator, ``1`` when the condition holds and ``0`` otherwise.
   - ``\\odot``: Element-wise product.
   - $(math_dict[:W_tilde_syn])
   - $(math_dict[:N])
 
-Under [`RenormaliseActive`](@ref), each column of ``\\mathbf{D}_{t}`` sums to one or is a column of zeros. So each collapsed value is a convex combination of the values of the active members, or zero. A row of ``\\mathbf{F}^{o}_{t}`` sums to one when the sub-portfolio has an active member with weight and every member has a level.
+Under [`RenormaliseActive`](@ref), each column of ``\\mathbf{D}_{t}`` sums to one or is a column of zeros. So each collapsed value is a convex combination of the values of the active observed members, or zero. A row of ``\\mathbf{F}^{o}_{t}`` sums to one when the sub-portfolio has an active member with weight and every member has a level.
 
 # Algorithm
 
  1. Return `nothing` when `pnl` is `nothing`.
  2. Normalise the inner weights with [`synthetic_asset_weights`](@ref), giving `W`.
  3. Name the sub-portfolios `"_1"`, `"_2"`, …, giving `syn`.
- 4. Compute the divisors of `alg` with [`active_weight_divisor`](@ref), giving `d`. It is `nothing` for a static panel.
- 5. Collapse each Panel Field with [`collapse_panel_field`](@ref), on the active mask of the panel and `d`.
- 6. Collapse the active mask and the estimation mask with [`collapse_panel_mask`](@ref). They stay `nothing` for a static panel.
+ 4. Collapse each Panel Field with [`collapse_panel_field`](@ref), on the active mask of the panel and the rule `alg`. Each field computes its divisors on its own active observed cells.
+ 5. Collapse the active mask and the estimation mask with [`collapse_panel_mask`](@ref). They stay `nothing` for a static panel.
 
 # Arguments
 
@@ -629,11 +791,10 @@ function collapse_asset_panel(pnl::AssetPanel, wi::MatNum, nx::Option{<:VecStr},
     W = synthetic_asset_weights(wi)
     syn = ["_$(k)" for k in 1:size(W, 2)]
     m = pnl.amsk
-    d = active_weight_divisor(alg, m, W)
     #! A panel with no Panel Field is the ingestion layer's shape. An untyped comprehension
     #! over an empty vector answers a `Vector{Any}`, which the panel's constructor refuses,
     #! so the comprehension is typed: it answers the same vector empty or full.
-    pf = AbstractPanelField[collapse_panel_field(f, W, nx, syn, m, d) for f in pnl.pf]
+    pf = AbstractPanelField[collapse_panel_field(f, W, nx, syn, m, alg) for f in pnl.pf]
     return AssetPanel(; pf = pf, amsk = collapse_panel_mask(pnl.amsk, W),
                       emsk = collapse_panel_mask(pnl.emsk, W))
 end

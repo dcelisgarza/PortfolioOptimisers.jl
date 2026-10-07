@@ -103,6 +103,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :fdsel => "`sel`: Feature Selector naming the Panel Fields the Feature Matrix stacks, or `nothing` to stack every field's values. An entry is a field name, a field paired with the levels or labels it keeps, a field paired with one level or label, a tensor field paired with a [`LabelGroup`](@ref), or a field paired with `:observed`. The vector order is the column order.",#
                  :fdstrict => "`strict`: Whether a `sel` entry naming a field, a level, a label or a group the Asset Panel does not hold throws instead of warning and being dropped.",#
                  :fdrows => "`rows`: The observation rows a time-varying Asset Panel stacks, as positions or as a `Bool` mask, and `Colon()` for every row. A static panel has no observation axis and refuses any other value.",#
+                 :fdunobs => "`unobserved`: The value that the Feature Matrix holds at a value column's cell whose observed mask is `false`, or `nothing` to keep the stored placeholder. The default `NaN` shows where the data held a blank, so no reader takes the placeholder as data.",#
                  # Stats.
                  :sigma => "`sigma`: Covariance matrix `assets × assets`.",#
                  :mu => "`mu`: Expected returns vector `assets × 1`.",#

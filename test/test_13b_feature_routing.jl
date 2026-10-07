@@ -373,17 +373,19 @@ const PO = PortfolioOptimisers
             sel = ["beta" => "smb", "mcap", "sector" => ["E"], "mcap" => :observed]
             @test feature_labels(gpnl, sel) ==
                   ["beta" => "smb", "mcap", "sector" => "E", "mcap" => :observed]
-            @test feature_matrix(gpnl, sel) ==
-                  [2.0 1.0 0.0 1.0; 4.0 2.0 1.0 0.0; 6.0 3.0 0.0 1.0]
-            @test feature_matrix(gpnl, reverse(sel)) ==
-                  feature_matrix(gpnl, sel)[:, [4, 3, 2, 1]]
+            # `mcap` and `beta` are unobserved at row 2, so their value columns hold `NaN`
+            # there (#1508), and the mask column shows the blank.
+            @test isequal(feature_matrix(gpnl, sel),
+                          [2.0 1.0 0.0 1.0; NaN NaN 1.0 0.0; 6.0 3.0 0.0 1.0])
+            @test isequal(feature_matrix(gpnl, reverse(sel)),
+                          feature_matrix(gpnl, sel)[:, [4, 3, 2, 1]])
         end
 
         @testset "a label vector is a selector that rebuilds the same matrix" begin
             for sel in (nothing, ["mcap"], ["sector"], ["beta" => ["smb", "mkt"]],
                         ["mcap" => :observed, "beta" => :observed, "sector"])
                 lab = feature_labels(gpnl, sel)
-                @test feature_matrix(gpnl, lab) == feature_matrix(gpnl, sel)
+                @test isequal(feature_matrix(gpnl, lab), feature_matrix(gpnl, sel))
                 @test feature_labels(gpnl, lab) == lab
             end
         end
@@ -439,9 +441,9 @@ const PO = PortfolioOptimisers
             @test size(Zt) == (Tt, Nt, 7)
             # `rows` cuts the observation axis alone, keeps it, and every writer agrees
             # with the full stack row for row.
-            @test feature_matrix(tpnl, sel; rows = Tt:Tt) == Zt[Tt:Tt, :, :]
-            @test feature_matrix(tpnl, sel; rows = [2, 5]) == Zt[[2, 5], :, :]
-            @test feature_matrix(tpnl, sel; rows = 3:5) == Zt[3:5, :, :]
+            @test isequal(feature_matrix(tpnl, sel; rows = Tt:Tt), Zt[Tt:Tt, :, :])
+            @test isequal(feature_matrix(tpnl, sel; rows = [2, 5]), Zt[[2, 5], :, :])
+            @test isequal(feature_matrix(tpnl, sel; rows = 3:5), Zt[3:5, :, :])
             @test eltype(feature_matrix(tpnl, sel; rows = Tt:Tt)) == eltype(Zt)
             # The rows must lie on the observation axis, and a static panel has none.
             @test_throws ArgumentError feature_matrix(tpnl, sel; rows = [0, 2])
@@ -450,11 +452,11 @@ const PO = PortfolioOptimisers
             # `true` at, as `selectdim` reads it. Its length is the observation count and
             # not the stack's, which threw a DimensionMismatch before #845.
             bmsk = [false, true, false, false, true, false, false]
-            @test feature_matrix(tpnl, sel; rows = bmsk) == Zt[[2, 5], :, :]
+            @test isequal(feature_matrix(tpnl, sel; rows = bmsk), Zt[[2, 5], :, :])
             @test PortfolioOptimisers.stacked_axes((Tt, Nt), bmsk) == (2, Nt)
             @test_throws ArgumentError feature_matrix(tpnl, sel; rows = [true, false])
             @test_throws ArgumentError feature_matrix(gpnl; rows = 1:1)
-            @test feature_matrix(gpnl; rows = Colon()) == feature_matrix(gpnl)
+            @test isequal(feature_matrix(gpnl; rows = Colon()), feature_matrix(gpnl))
             @test PortfolioOptimisers.stacked_axes((Tt, Nt), Colon()) == (Tt, Nt)
             @test PortfolioOptimisers.stacked_axes((Nt,), Colon()) == (Nt,)
             @test PortfolioOptimisers.stacked_axes((Tt, Nt), 2:3) == (2, Nt)
@@ -464,23 +466,39 @@ const PO = PortfolioOptimisers
             for alg in (AggregateFeatures(), AggregateDistances(), StackObservations())
                 @test PortfolioOptimisers.collapse_rows(alg, tpnl) === Colon()
             end
-            # The routed entry stacks what its collapse reads, and the distance it
-            # measures is the one the full stack gives.
+            # The routed entry stacks what its collapse reads, with a zero at an unobserved
+            # cell, and the distance it measures is the one the full stack gives on the
+            # cells it can read: active, and observed in each value column (#1508). With
+            # half of the cells blank, a collapse can refuse, and the refusal is the same.
             trd = ReturnsResult(; nx = ["a", "b", "c"], X = randn(rng, Tt, Nt), pnl = tpnl)
-            for alg in (LastObservation(), AggregateFeatures(), AggregateDistances(),
-                        StackObservations())
+            Z0 = feature_matrix(tpnl, sel; unobserved = 0)
+            R = PortfolioOptimisers.feature_observed_cells(tpnl,
+                                                           PortfolioOptimisers.select_fields(tpnl,
+                                                                                             sel,
+                                                                                             false))
+            res(f) =
+                try
+                    f()
+                catch e
+                    sprint(showerror, e)
+                end
+            for alg in (LastObservation(), LastObservation(; alg = LastActiveRow()),
+                        AggregateFeatures(), AggregateDistances(), StackObservations())
                 de_r = FeatureDistance(; sel = sel, alg = alg)
                 Zr = feature_matrix(de_r, nothing, trd, trd.X)
-                @test size(Zr, 1) == (alg isa LastObservation ? 1 : Tt)
-                @test Zr == Zt[(alg isa LastObservation ? (Tt:Tt) : (1:Tt)), :, :]
-                @test distance(de_r, nothing, trd.X; rd = trd) == distance(de_r, Zt)
+                rr = PortfolioOptimisers.window_rows(alg, tpnl, R)
+                @test size(Zr, 1) == length((1:Tt)[rr])
+                @test isequal(Zr, Z0[rr, :, :])
+                @test isequal(res(() -> distance(de_r, nothing, trd.X; rd = trd)),
+                              res(() -> distance(de_r, Z0; amsk = R, nx = trd.nx)))
             end
             # The labels are untouched by the rows: the rebuild is the measurement
             # column for column.
             de_l = FeatureDistance(; sel = sel)
             @test feature_labels(de_l, nothing, trd, trd.X) == feature_labels(tpnl, sel)
-            @test feature_matrix(tpnl, feature_labels(tpnl, sel); rows = Tt:Tt) ==
-                  feature_matrix(de_l, nothing, trd, trd.X)
+            @test isequal(feature_matrix(tpnl, feature_labels(tpnl, sel); rows = Tt:Tt,
+                                         unobserved = 0),
+                          feature_matrix(de_l, nothing, trd, trd.X))
         end
 
         @testset "an unresolvable field, level or label warns and drops, or throws" begin
@@ -621,8 +639,9 @@ const PO = PortfolioOptimisers
             sel = ["expo" => LabelGroup("size"), "mcap", "expo" => LabelGroup("momentum")]
             @test feature_labels(tpnl, sel) ==
                   ["expo" => "size", "mcap", "expo" => "mom12", "expo" => "mom6"]
-            @test feature_matrix(tpnl, sel) ==
-                  [4.0 1.0 1.0 3.0; 8.0 2.0 5.0 7.0; 12.0 3.0 9.0 11.0]
+            # `mcap` is unobserved at row 2, so it holds `NaN` there (#1508).
+            @test isequal(feature_matrix(tpnl, sel),
+                          [4.0 1.0 1.0 3.0; 8.0 NaN 5.0 7.0; 12.0 3.0 9.0 11.0])
             # The time-varying shape selects the same labels on every observation, and the
             # documented slice of the values by group is the same array.
             tv = TensorPanelField(; name = "expo", axis = "factor", labels = tg.labels,

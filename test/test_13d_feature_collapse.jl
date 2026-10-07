@@ -632,9 +632,10 @@ end
         cr = PO.collapse_asset_panel(pnl, Wi, nx3, RenormaliseActive())
         cc = PO.collapse_asset_panel(pnl, Wi, nx3, InactiveAsCash())
         # A numeric field: row 1 has every member active and keeps the plain collapse. Row 2
-        # divides by the active weight 0.75 under the default and not under the cash rule.
-        @test vals(cr, "a") ≈ [1.75 2.0; 14 / 3 0.0; 8.0 0.0]
-        @test vals(cc, "a") ≈ [1.75 2.0; 3.5 0.0; 2.0 0.0]
+        # reads asset 3 alone, because asset 1 is unobserved there (#1508): 6 under the
+        # default, and 0.25 × 6 under the cash rule. Row 3 has no active observed member.
+        @test vals(cr, "a") ≈ [1.75 2.0; 6.0 0.0; 0.0 0.0]
+        @test vals(cc, "a") ≈ [1.75 2.0; 1.5 0.0; 0.0 0.0]
         # A static input lifted over the observations collapses row by row, so it varies.
         @test vals(cr, "lift") ≈ [17.5 20.0; 50 / 3 0.0; 30.0 0.0]
         @test vals(cc, "lift") ≈ [17.5 20.0; 12.5 0.0; 7.5 0.0]
@@ -662,8 +663,10 @@ end
         # `iv` takes the rule row by row, and `ivpa` the members active at the last row.
         _, _, ivr, ivpar, _, _ = PO.prepare_outer_rd(rdh, Wi, RenormaliseActive())
         _, _, ivc, ivpac, _, _ = PO.prepare_outer_rd(rdh, Wi, InactiveAsCash())
-        @test ivr ≈ vals(cr, "a")
-        @test ivc ≈ vals(cc, "a")
+        # `iv` carries no observed mask, so it reads asset 1 at row 2 and asset 3 at row 3: it
+        # divides by the active weight 0.75 under the default, and not under the cash rule.
+        @test ivr ≈ [1.75 2.0; 14 / 3 0.0; 8.0 0.0]
+        @test ivc ≈ [1.75 2.0; 3.5 0.0; 2.0 0.0]
         @test ivpar ≈ [3.0, 0.0]
         @test ivpac ≈ [0.75, 0.0]
         # A static panel has no inactive member, so both rules give the plain collapse.

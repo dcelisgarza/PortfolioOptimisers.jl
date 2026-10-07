@@ -175,7 +175,7 @@ A cell is missing when the observed mask of its Panel Field is false. The builde
 
 With `by = nothing` the table has one row for each Panel Field. With `by` the name of a [`CategoricalPanelField`](@ref), the table has one row for each other Panel Field and each level of `by`. A cell belongs to a level when it is active, and when `by` is observed there and holds that level. A tensor Panel Field counts one cell for each label.
 
-A share over no cell is `NaN`: an empty set has no share.
+A share is a fraction in `[0, 1]`, not a percentage. A table that reports a percentage gives the share times 100. A share over no cell is `NaN`: an empty set has no share.
 
 # Algorithm
 
@@ -195,7 +195,7 @@ A share over no cell is `NaN`: an empty set has no share.
 
 # Returns
 
-  - `df::DataFrames.DataFrame`: With `by = nothing`, the columns `field`, `kind`, `cells`, `missing` (the share of the cells), `active_cells`, `active_missing` (the share of the active cells) and `assets_missing` (the count of assets whose active cells are all missing). With `by`, the columns `field`, `level`, `cells` (the count of cells of the level) and `missing` (their share).
+  - `df::DataFrames.DataFrame`: With `by = nothing`, the columns `field`, `kind`, `cells`, `missing` (the share of the cells, a fraction in `[0, 1]`), `active_cells`, `active_missing` (the share of the active cells, a fraction in `[0, 1]`) and `assets_missing` (the count of assets whose active cells are all missing). With `by`, the columns `field`, `level`, `cells` (the count of cells of the level) and `missing` (their share, a fraction in `[0, 1]`). A share over no cell is `NaN`.
 
 # Examples
 

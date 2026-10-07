@@ -631,7 +631,7 @@ Write the loadings that a [`RegressionPanel`](@ref) read on the Investable Mask 
 
 A prior fitted on a point-in-time Asset Panel writes `NaN` into the loadings of every asset outside its Investable Mask, and a Panel Field admits no `NaN`. So the producer reads the loadings on the mask, and this function expands them. Each asset outside the mask gets a zero row and a false observed mask. Every uncertainty set that a caller fits on its own on such a prior follows the same rule, and a Panel Field already has that shape for a cell that a fill policy wrote.
 
-A zero row is a zero feature vector. [`AngularDist`](@ref) puts it at distance `1` from every asset that has loadings, and at distance `0` from every other asset that has none. The selector `"loadings" => :observed` reads the mask as a column.
+A zero row is a placeholder, not a zero feature vector, because its observed mask is false. A [`FeatureDistance`](@ref) reads no unobserved cell: a direct call refuses such an asset by name. An optimiser hands the producer the prior reduced to the mask, so a fit meets no such row. The selector `"loadings" => :observed` reads the mask as a column.
 
 # Mathematical definition
 

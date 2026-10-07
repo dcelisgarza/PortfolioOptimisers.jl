@@ -442,3 +442,30 @@ An unfilled blank keeps the policy's `val` with `omsk = false`. #1416 found that
 that `val` as data: `feature_matrix` (and through it `FeatureDistance`) and the panel collapse of a
 meta-optimiser. A child task of map #1375 makes them read observed cells only, and adds a census
 that poisons the active unobserved cells, as `test_06j` poisons the inactive ones.
+
+## Amendment (2026-10-06, #1508)
+
+([#1508](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1508), a build task
+of #1416.) **A reader reads the active observed cells alone, and `val` is a placeholder that no
+reader reads.** A placeholder is a storage convention, not an observation. A reader that uses it
+adds a fabricated value to its sample, and its answer then changes with `val`. A correct reader
+gives the same answer for every `val`.
+
+- `feature_matrix` holds `unobserved` at a cell of a value column whose observed mask is `false`,
+  `NaN` by default, as `panel_field_values` does. `unobserved = nothing` keeps the placeholder. An
+  observed-mask column is data in every cell, so it is unchanged.
+- `FeatureDistance` reads an asset at a cell only where it is active and every value column of its
+  selector was observed. The rules of #1454 for an inactive cell apply to an unobserved one: each
+  asset and each pair at its own readable rows, `LastActiveRow` at the last readable row, and the
+  entry of a fit drops an asset with no readable row. A static panel has one row, so an asset with
+  an unobserved selected cell is unreadable there.
+- The panel collapse of a meta-optimiser reads, for each Panel Field, the members that are active
+  and observed, and the rule of #1456 divides by their weight. A tensor field reads the observed
+  mask of each label. A square field reads a pair of members with the weight `W[i, k] W[j, l]` and
+  divides by the weight of the read pairs, so a symmetric field stays symmetric. A collapsed cell
+  with no active observed member is unobserved. Where every active cell is observed, the collapse
+  is the one that reads the active members, bit for bit.
+
+`test_06m` gates the rule. It blanks about one active cell in twenty of every Panel Field, poisons
+`val` there, and needs every consumer of an Asset Panel to give the same answer on the clean and on
+the poisoned copy.

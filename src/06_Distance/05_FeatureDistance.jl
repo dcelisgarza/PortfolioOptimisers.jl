@@ -229,7 +229,7 @@ To add a rule, subtype `AbstractLastObservationAlgorithm` and implement the two 
 ### Arguments
 
   - `alg`: The concrete subtype instance.
-  - `A`: The active mask of the window, `observations × assets`.
+  - `A`: The mask of readable cells of the window, `observations × assets`: the asset is active, and every value column that the Feature Selector names was observed.
 
 ### Returns
 
@@ -1298,20 +1298,21 @@ function feature_distance(de::FeatureDistance{<:Any, <:AggregateDistances}, Z::A
     return D ./= sw
 end
 """
-    distance(de::FeatureDistance, Z::MatNum; dims::Int = 1, kwargs...)
+    distance(de::FeatureDistance, Z::MatNum; dims::Int = 1, amsk = nothing, nx = nothing,
+             kwargs...)
     distance(de::FeatureDistance, Z::Arr3Num; dims::Int = 1, amsk = nothing, nx = nothing,
              kwargs...)
 
 Compute the distance matrix from a feature matrix.
 
-The 2-D method never consults `de.alg`: a static feature matrix has no observation axis to collapse, so the collapse algorithm is inert rather than an error. The 3-D method dispatches on it. Assets whose feature vector is entirely zero are given the convention documented in [`patch_zero_feature_vectors!`](@ref).
+The 2-D method collapses nothing: a static feature matrix has no observation axis, so the collapse algorithm reads its one row. Its `amsk` is `1 × assets` and marks the assets whose every value column was observed, and the method refuses an asset that it marks `false`. The 3-D method dispatches on it. Assets whose feature vector is entirely zero are given the convention documented in [`patch_zero_feature_vectors!`](@ref).
 
 The 3-D method reads the active mask `amsk` of the window. A collapse then reads each asset, or each pair of assets, at its own active rows, as each member of [`AbstractFeatureCollapseAlgorithm`](@ref) states. A window with no inactive cell gives the result that it gives with no mask.
 
 # Algorithm
 
  1. Validate `Z` and `dims` with [`assert_feature_matrix`](@ref).
- 2. On the 2-D method, hand `de.metric` and `Z` to the kernel.
+ 2. On the 2-D method, check the one-row mask with [`static_window`](@ref) and [`assert_feature_readable`](@ref), and hand `de.metric` and `Z` to the kernel.
  3. On the 3-D method, check the active mask with [`active_window`](@ref), and check that the collapse can read each asset with [`assert_feature_readable`](@ref).
  4. With no inactive cell, hand `de` and `Z` to the collapse dispatcher [`feature_distance`](@ref), which selects the branch that `de.alg` names. Otherwise hand the window to [`active_feature_distance`](@ref).
 
@@ -1320,8 +1321,8 @@ The 3-D method reads the active mask `amsk` of the window. A collapse then reads
   - `de`: Feature distance estimator.
   - $(arg_dict[:Z])
   - $(arg_dict[:dims])
-  - `amsk`: The active mask of the window, `observations × assets`, or `nothing` when every cell is active. The 3-D method alone reads it.
-  - `nx`: The asset names that a refusal quotes, or `nothing` to quote positions. The 3-D method alone reads it.
+  - `amsk`: The mask of readable cells of the window, `observations × assets` on the 3-D method and `1 × assets` on the 2-D method, or `nothing` when every cell is readable.
+  - `nx`: The asset names that a refusal quotes, or `nothing` to quote positions.
   - `kwargs...`: Additional keyword arguments (ignored).
 
 # Validation
@@ -1330,7 +1331,7 @@ The 3-D method reads the active mask `amsk` of the window. A collapse then reads
   - `!isempty(Z)`.
   - `all(isfinite, Z)`.
   - `Z` lies in `de.metric`'s domain (see [`assert_metric_domain`](@ref)).
-  - On the 3-D method, `amsk` is `observations × assets`, and the collapse can read each asset. See [`assert_feature_readable`](@ref).
+  - `amsk` is `observations × assets` on the 3-D method and `1 × assets` on the 2-D method, and the collapse can read each asset. See [`assert_feature_readable`](@ref).
   - On the 3-D method, a pair of assets with no shared active row takes the rule of the `pair` field of [`AggregateDistances`](@ref) and [`StackObservations`](@ref).
 
 # Returns
@@ -1355,9 +1356,11 @@ julia> distance(FeatureDistance(), Z)
   - [`cor_and_dist`](@ref)
   - [`AbstractFeatureCollapseAlgorithm`](@ref)
 """
-function distance(de::FeatureDistance, Z::MatNum; dims::Int = 1, kwargs...)
+function distance(de::FeatureDistance, Z::MatNum; dims::Int = 1, amsk = nothing,
+                  nx = nothing, kwargs...)
     assert_dims(dims)
     assert_feature_matrix(de, Z, dims)
+    assert_feature_readable(de.alg, static_window(amsk, Z, dims), nx)
     return feature_distance(de.metric, Z, dims)
 end
 function distance(de::FeatureDistance, Z::Arr3Num; dims::Int = 1, amsk = nothing,
@@ -1448,7 +1451,7 @@ The method that Julia selects is the algorithm.
 
  1. [`LastObservation`](@ref) forwards to its rule.
  2. [`LastRow`](@ref) on a time-varying panel: the last observation, `nobs:nobs`, where `nobs` is the observation count [`panel_axes`](@ref) reads.
- 3. [`LastActiveRow`](@ref) on a time-varying panel: `r0:nobs`, where `r0` is the earliest of the last active rows of the assets that have one, or `nobs` when no asset has one.
+ 3. [`LastActiveRow`](@ref) on a time-varying panel: the rows that [`last_active_rows`](@ref) names on the active mask.
  4. Every other case: `Colon()`.
 
 # Arguments
@@ -1479,13 +1482,7 @@ function collapse_rows(::LastRow, pnl::AssetPanel)
     return length(ax) == 2 ? (ax[1]:ax[1]) : Colon()
 end
 function collapse_rows(::LastActiveRow, pnl::AssetPanel)
-    amsk = pnl.amsk
-    if isnothing(amsk)
-        return Colon()
-    end
-    nobs = size(amsk, 1)
-    r0 = minimum(i -> something(findlast(view(amsk, :, i)), nobs), axes(amsk, 2))
-    return r0:nobs
+    return last_active_rows(pnl.amsk)
 end
 """
     feature_matrix(de::FeatureDistance, pr, rd, X) -> AbstractArray{<:Number}
@@ -1533,15 +1530,17 @@ end
 """
     feature_window(de::FeatureDistance, pr, rd, X) -> (Z, A)
 
-Stack the Feature Matrix a [`FeatureDistance`](@ref) measures, beside the active mask of the rows it stacks.
+Stack the Feature Matrix a [`FeatureDistance`](@ref) measures, beside the mask of the cells it can read in the rows it stacks.
 
-It is [`feature_matrix`](@ref) with the active mask added. The mask is the active mask of the panel, cut to the rows that [`collapse_rows`](@ref) names, so it has one row per observation of the stack. A static panel has no active mask, and its mask is `nothing`.
+It is [`feature_matrix`](@ref) with the mask added. A cell is readable where the asset is active and every value column of `de.sel` was observed. The mask is cut to the rows that the collapse reads, so it has one row per observation of the stack. A static panel has one row, the cells of the assets. Its mask is `nothing` when every cell is observed, and a `1 × assets` matrix otherwise. A time-varying panel whose every cell is readable gives the active mask, which the kernel drops when it is all `true`.
+
+The stack holds a zero at an unobserved cell, never the placeholder that the panel stores. The mask leaves that cell out, so the zero is never read, and the stack is the same for every placeholder.
 
 # Algorithm
 
- 1. Resolve the panel with [`asset_panel`](@ref).
- 2. Name the rows the collapse reads with [`collapse_rows`](@ref).
- 3. Stack the panel over those rows with [`feature_matrix`](@ref), and cut the active mask of the panel to them.
+ 1. Resolve the panel with [`asset_panel`](@ref), and resolve `de.sel` against it with [`select_fields`](@ref).
+ 2. Name the rows the collapse reads, and cut the mask of readable cells to them, with [`feature_window_mask`](@ref).
+ 3. Stack the panel over those rows with [`feature_stack`](@ref), with a zero at each unobserved cell.
 
 # Arguments
 
@@ -1553,33 +1552,36 @@ It is [`feature_matrix`](@ref) with the active mask added. The mask is the activ
 # Returns
 
   - `Z::Array`: The Feature Matrix, as [`feature_matrix`](@ref) returns it.
-  - `A::Option{<:AbstractMatrix{Bool}}`: The active mask of the stacked rows, `observations × assets`, or `nothing` for a static panel.
+  - `A::Option{<:AbstractMatrix{Bool}}`: The mask of readable cells of the stacked rows, `observations × assets`, or `1 × assets` for a static panel with an unobserved cell, or `nothing`.
 
 # Related
 
   - [`feature_matrix`](@ref)
+  - [`feature_window_mask`](@ref)
   - [`collapse_rows`](@ref)
   - [`distance`](@ref)
 """
 function feature_window(de::FeatureDistance, pr, rd, X)
     pnl = asset_panel(de.ape, pr, rd, X)
-    rows = collapse_rows(de.alg, pnl)
-    return feature_matrix(pnl, de.sel; strict = de.strict, rows = rows),
-           window_activity(pnl.amsk, rows)
+    cols = select_fields(pnl, de.sel, de.strict)
+    rows, A = feature_window_mask(de.alg, pnl, cols)
+    #! The mask leaves out every unobserved cell, so the zero written there is never read. It
+    #! keeps the stack finite for the checks of the kernel, whatever the placeholder holds.
+    return feature_stack(pnl, cols; rows = rows, unobserved = 0), A
 end
 """
     window_activity(amsk, rows)
 
-Cut the active mask of an Asset Panel to the rows that a Feature Matrix stacks. A static panel has no active mask, so its window has none either.
+Cut a mask of the cells of an Asset Panel to the rows that a Feature Matrix stacks. A static panel has no observation axis. Its mask, one entry per asset, becomes a window of one row, `1 × assets`, and `nothing` when every entry is `true`. No mask gives no window.
 
 # Arguments
 
-  - `amsk`: The active mask of the panel, `observations × assets`, or `nothing` for a static panel.
+  - `amsk`: The mask, `observations × assets` or `assets`, or `nothing`.
   - $(arg_dict[:fdrows])
 
 # Returns
 
-  - `A::Option{<:AbstractMatrix{Bool}}`: `amsk[rows, :]`, or `nothing`.
+  - `A::Option{<:AbstractMatrix{Bool}}`: `amsk[rows, :]`, the one-row window of a static mask, or `nothing`.
 
 # Related
 
@@ -1591,6 +1593,9 @@ function window_activity(::Nothing, ::Any)
 end
 function window_activity(amsk::AbstractMatrix{Bool}, rows)
     return amsk[rows, :]
+end
+function window_activity(o::AbstractVector{Bool}, ::Colon)
+    return all(o) ? nothing : reshape(BitVector(o), 1, :)
 end
 """
     feature_asset_names(pr, rd)
@@ -1665,8 +1670,8 @@ The prior result and the returns data come in the keyword tail as `pr` and `rd`,
 
 # Algorithm
 
- 1. Stack the Feature Matrix with [`feature_window`](@ref), which resolves the panel and cuts it to `de.sel` and to the observation rows that `de.alg` reads, beside the active mask of those rows.
- 2. Compute the distance matrix `D` of that stack with the two-argument method, at `dims = 1`, with the active mask and the asset names of `rd`.
+ 1. Stack the Feature Matrix with [`feature_window`](@ref), which resolves the panel and cuts it to `de.sel` and to the observation rows that `de.alg` reads, beside the mask of the cells it can read in those rows: the asset is active, and every value column of `de.sel` was observed.
+ 2. Compute the distance matrix `D` of that stack with the two-argument method, at `dims = 1`, with that mask and the asset names of `rd`.
 
 # Arguments
 
@@ -1682,7 +1687,7 @@ The prior result and the returns data come in the keyword tail as `pr` and `rd`,
   - $(val_dict[:fd_panel])
   - $(val_dict[:fd_strict])
   - The stacked Feature Matrix passes [`assert_feature_matrix`](@ref) at `dims = 1`: it is not empty, every entry is finite, and it lies in the domain of `de.metric`.
-  - The collapse can read each asset at the active rows of the window, see [`assert_feature_readable`](@ref), and a pair with no shared active row takes the `pair` rule of its collapse. A fit drops an unreadable asset at its entry with [`feature_readable_mask`](@ref), and this call refuses it.
+  - The collapse can read each asset at the readable rows of the window, see [`assert_feature_readable`](@ref), and a pair with no shared readable row takes the `pair` rule of its collapse. A fit drops an unreadable asset at its entry with [`feature_readable_mask`](@ref), and this call refuses it.
 
 # Returns
 
@@ -1710,8 +1715,8 @@ This is the form that [`clusterise`](@ref) and the network estimators call. It r
 
 # Algorithm
 
- 1. Stack the Feature Matrix with [`feature_window`](@ref), which resolves the panel and cuts it to `de.sel` and to the observation rows that `de.alg` reads, beside the active mask of those rows.
- 2. Compute the similarity matrix `S` and the distance matrix `D` of that stack with the two-argument method, at `dims = 1`, with the active mask and the asset names of `rd`.
+ 1. Stack the Feature Matrix with [`feature_window`](@ref), which resolves the panel and cuts it to `de.sel` and to the observation rows that `de.alg` reads, beside the mask of the cells it can read in those rows: the asset is active, and every value column of `de.sel` was observed.
+ 2. Compute the similarity matrix `S` and the distance matrix `D` of that stack with the two-argument method, at `dims = 1`, with that mask and the asset names of `rd`.
 
 # Arguments
 
@@ -1727,7 +1732,7 @@ This is the form that [`clusterise`](@ref) and the network estimators call. It r
   - $(val_dict[:fd_panel])
   - $(val_dict[:fd_strict])
   - The stacked Feature Matrix passes [`assert_feature_matrix`](@ref) at `dims = 1`: it is not empty, every entry is finite, and it lies in the domain of `de.metric`.
-  - The collapse can read each asset at the active rows of the window, see [`assert_feature_readable`](@ref), and a pair with no shared active row takes the `pair` rule of its collapse. A fit drops an unreadable asset at its entry with [`feature_readable_mask`](@ref), and this call refuses it.
+  - The collapse can read each asset at the readable rows of the window, see [`assert_feature_readable`](@ref), and a pair with no shared readable row takes the `pair` rule of its collapse. A fit drops an unreadable asset at its entry with [`feature_readable_mask`](@ref), and this call refuses it.
 
 # Returns
 
