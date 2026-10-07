@@ -1,10 +1,9 @@
 #=
 The summary of the cross-sectional diagnostics, decided by #709 and built by #801.
 
-The oracle is the reference implementation. The blocks of `# the reference oracle` below were
-built from the very arrays this file builds, run in the reference implementation's own
-environment, and its answers are written out as literals. Rebuild them by generating the
-same fixtures, exporting them, and running the reference's factor model block on them.
+The two testsets `the stored oracle` compare with literals that the oracle gave on the very
+arrays this file builds. Rebuild them by an export of the same fixtures and a run of the
+oracle's factor model block on them. Each comparison is cell by cell (`parity_compare`).
 
 The first fixture is the one `test_08r_cs_regression_diagnostics.jl` uses, whose design is
 well conditioned on every observation but one, so its Gram columns carry values. The second is the one
@@ -12,20 +11,20 @@ well conditioned on every observation but one, so its Gram columns carry values.
 drives the patch that reads a constant exposure as perfectly stable.
 =#
 using Statistics
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 @testset "Factor model summary" begin
-    # A `NaN` compares unequal to itself, so the pattern of the absent answers is asserted
-    # separately from the values.
-    function summary_agrees(a, b; rtol = 1e-10)
-        if isnan.(a) != isnan.(b)
-            return false
-        end
-        m = .!isnan.(a)
-        return isapprox(a[m], b[m]; rtol = rtol)
+    # Cell by cell: the pattern of the absent answers agrees exactly, and each finite cell
+    # lies within `rtol` of its own size. Against the oracle, every column of both fixtures
+    # measures maxrel 4.3e-16 or less, and the rates and the coverage are bit-equal. The
+    # tolerance `1e-14` is about twenty times the worst value: the
+    # round-off of a mean and a deviation that sum in another order.
+    function summary_agrees(a, b, label = ""; rtol = 1e-14)
+        return parity_compare(a, b; rtol = rtol, name = label).ok
     end
 
     # The first fixture. Every mutation drives one branch of the regression group, so a
-    # change to any of them invalidates the literals in `# the reference oracle`.
+    # change to any of them invalidates the literals of `the stored oracle`.
     rngA = StableRNG(987654321)
     TA, NA, KA = 8, 6, 3
     MsA = randn(rngA, TA, NA, KA)
@@ -50,15 +49,15 @@ using Statistics
     csfmA = CrossSectionalFactorModel(; M = MsA[TA, :, :], b = zeros(NA), csr = csrA,
                                       Ms = MsA, rw = rwA, bw = bwA, lag = 1)
 
-    @testset "the reference oracle, the well-conditioned fixture" begin
+    @testset "the stored oracle, the well-conditioned fixture" begin
         ref_ann_return = [1.7688020592276463, -4.704611043276863, 0.06102501991895286]
         ref_ann_vol = [0.2500971159903252, 0.30449966488269103, 0.2801176875443828]
         ref_sharpe = [7.07246084075624, -15.450299576156583, 0.21785493252468693]
         ref_autocorr = [-0.5425646747475837, NaN, -0.39620089475439907]
         # Observation 6 is collinear, and it identifies the second coefficient alone
-        # (#1421). The reference's three columns that read the t-statistics and the factors
+        # (#1421). The oracle's three columns that read the t-statistics and the factors
         # count its pseudo-inverse answers there. Ours drop the t-statistics of the pair
-        # (`0.6639470271883212` and `7.300135695412292` in the reference), scale the second
+        # (`0.6639470271883212` and `7.300135695412292` in the oracle), scale the second
         # (`14.363795117368108`) by `sqrt(4 / 3)` for a variance over `n - 2`, and give the
         # pair an infinite factor. `test_08r_cs_regression_diagnostics.jl` pins each row.
         ref_mean_abs_t = [(5 * 1.3761850065112538 - 0.6639470271883212) / 4,
@@ -97,7 +96,7 @@ using Statistics
         @test summary_agrees(fs1.coverage, ref_coverage)
 
         # The stability reads the weight history the caller names, and the coverage does
-        # not: the reference wires its universe to the regression weights alone.
+        # not: the oracle wires its universe to the regression weights alone.
         ref_stability_id = [-0.4257338194977314, 0.11924492275222023, 0.18145249792020487]
         ref_stability_rw = [-0.25229769514274375, 0.0032308107079838436,
                             0.26713295230303086]
@@ -116,7 +115,7 @@ using Statistics
         @test summary_agrees(fs21.coverage, ref_coverage)
 
         # The threshold steers the exceedance rate alone.
-        # The reference's `[2 / 5, 4 / 5, 3 / 5]`, less observation 6 on the pair.
+        # The oracle's `[2 / 5, 4 / 5, 3 / 5]`, less observation 6 on the pair.
         ref_t_rate_1 = [2 / 4, 4 / 5, 2 / 4]
         fst = factor_model_summary(csfmA; ppy = 252, step = 3, threshold = 1)
         @test summary_agrees(fst.t_rate, ref_t_rate_1)
@@ -147,7 +146,7 @@ using Statistics
     csfmB = CrossSectionalFactorModel(; M = MsB[TB, :, :], b = zeros(NB), csr = csrB,
                                       Ms = MsB, vs = vsB, rw = rwB, bw = bwB, lag = 1)
 
-    @testset "the reference oracle, the constant-exposure fixture" begin
+    @testset "the stored oracle, the constant-exposure fixture" begin
         ref_ann_return = [-0.4907810529445153, 1.7641281876800439, 3.287865325954306,
                           2.112811248657294]
         ref_ann_vol = [0.33405767428380584, 0.3481792051822995, 0.27711562516097665,

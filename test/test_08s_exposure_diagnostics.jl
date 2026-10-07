@@ -1,17 +1,17 @@
 #=
 The exposure group of the cross-sectional diagnostics, decided by #709 and built by #799.
 
-The oracle is the reference implementation. The block of `# the reference oracle` below was
-built from the very arrays this file builds, run in the reference implementation's own
-environment, and its answers are written out as literals. Rebuild them by generating the
-same fixture, exporting it, and running the reference's factor model block on it.
+The testset `the stored oracle` compares with literals that the oracle gave on the very
+arrays this file builds. Rebuild them by an export of the same fixture and a run of the
+oracle's factor model block on it. Each comparison is cell by cell (`parity_compare`), and
+states the worst value measured beside its tolerance.
 =#
 using Statistics
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 @testset "Cross-sectional exposure diagnostics" begin
-    # The fixture the reference oracle was measured on. Every mutation below drives one
-    # branch, so a change to any of them invalidates the literals in `# the reference
-    # oracle`.
+    # The fixture the oracle was measured on. Every mutation below drives one branch, so a
+    # change to any of them invalidates the literals of `the stored oracle`.
     rng = StableRNG(24680)
     T, N, K = 10, 6, 4
     Ms = randn(rng, T, N, K)
@@ -48,17 +48,15 @@ using Statistics
                                       Ms = Ms[:, :, 1:3], vs = vs, rw = rw, bw = bw,
                                       lag = 1)
 
-    # A `NaN` compares unequal to itself, so the pattern of the absent answers is asserted
-    # separately from the values.
-    function exposure_agrees(a, b; rtol = 1e-10)
-        if isnan.(a) != isnan.(b)
-            return false
-        end
-        m = .!isnan.(a)
-        return isapprox(a[m], b[m]; rtol = rtol)
+    # Cell by cell: the pattern of the absent answers agrees exactly, and each finite cell
+    # lies within `rtol` of its own size. The worst value measured against the oracle is
+    # 6.3e-15, and all but one check measure 6.6e-16 or less, so `1e-14` is about ten
+    # times the round-off of a weighted mean of another order.
+    function exposure_agrees(a, b, label = ""; rtol = 1e-14)
+        return parity_compare(a, b; rtol = rtol, name = label).ok
     end
 
-    @testset "the reference oracle" begin
+    @testset "the stored oracle" begin
         ref_corr_bw = [ 1.0 -0.11910774310012738 0.0 NaN;
                        -0.11910774310012745 1.0 0.0 NaN;
                        0.0 0.0 1.0 NaN;
@@ -100,7 +98,7 @@ using Statistics
         ref_mean_ic = [0.057142857142857204, 0.2392857142857143, -0.23571428571428568]
         ref_std_ic = [0.733695466730492, 0.4584006929917067, 0.23843513154179433]
         ref_ic_ir = [0.07788361756887816, 0.5220012053734906, -0.9885887377002087]
-        # The reference's exposure summary reads `nanmean(ic > 0)`, and the comparison turns
+        # The oracle's exposure summary reads `nanmean(ic > 0)`, and the comparison turns
         # a `NaN` into `false` before the mean sees it, so it counts the one silenced date of
         # nine as a miss: 5/9, 7/9, 1/9. Its evaluation summary drops a `NaN`, as every
         # summary of this library does, so the port reads the eight dates that carried a
@@ -127,6 +125,7 @@ using Statistics
                           0.6332267854890944 0.3970126344357655 2.220446049250313e-16 0.01635061891197087]
         ref_coverage = [0.9833333333333334, 0.9333333333333332, 1.0, 0.32]
 
+        # Measured maxrel 3.5e-16, 6.6e-16 and 3.4e-16.
         @test exposure_agrees(exposure_correlation(csfm).X, ref_corr_bw)
         @test exposure_agrees(exposure_correlation(csfm; weighting = IdentityMetric()).X,
                               ref_corr_id)
@@ -134,14 +133,19 @@ using Statistics
                                                    weighting = RegressionWeightMetric()).X,
                               ref_corr_rw)
         # The third factor is the constant intercept, so every asset of it is in one tie. The
-        # reference breaks a tie by its sort, which on this fixture is the order of the asset
+        # oracle breaks a tie by its sort, which on this fixture is the order of the asset
         # axis, and it scores a rank coefficient there. `ties = :ordinal` reproduces it.
+        # Every rank coefficient below is bit-equal.
         @test exposure_agrees(exposure_ic(csfm3; ties = :ordinal).X, ref_ic_spearman)
-        @test exposure_agrees(exposure_ic(csfm3; rank = false).X, ref_ic_pearson)
+        # Measured maxrel 6.3e-15 on the cell `0.0177`, maxscaled 9.3e-16: a correlation
+        # near zero is a cancellation of the centred cross-products, so its error scales
+        # with the largest cell.
+        @test exposure_agrees(exposure_ic(csfm3; rank = false).X, ref_ic_pearson,
+                              "linear ic"; rtol = 5e-14)
         @test exposure_agrees(exposure_ic(csfm3; horizon = 2, ties = :ordinal).X, ref_ic_h2)
         # Under the default `ties = :average`, a constant exposure has constant ranks, so it
         # has no rank coefficient, as it has no Pearson one. The two factors with no tie keep
-        # the reference's numbers.
+        # the oracle's numbers.
         ica = exposure_ic(csfm3).X
         @test all(isnan, ica[:, 3])
         @test exposure_agrees(ica[:, 1:2], ref_ic_spearman[:, 1:2])
@@ -151,6 +155,7 @@ using Statistics
         @test isequal(exposure_ic_summary(csfm3).mean_ic[1:2],
                       exposure_ic_summary(csfm3; ties = :ordinal).mean_ic[1:2])
         @test isnan(exposure_ic_summary(csfm3).mean_ic[3])
+        # The summary is bit-equal, and the scaled hit rate measures maxrel 1.4e-16.
         s = exposure_ic_summary(csfm3; ties = :ordinal)
         @test exposure_agrees(s.mean_ic, ref_mean_ic)
         @test exposure_agrees(s.std_ic, ref_std_ic)
@@ -159,11 +164,19 @@ using Statistics
         @test count(isfinite, exposure_ic(csfm3).X[:, 1]) == 8
         @test size(exposure_ic(csfm3).X, 1) == 9
         @test exposure_agrees(port_hit_rate .* (8 / 9), ref_hit_rate)
+        # Measured maxrel 4.2e-16.
         @test exposure_agrees(exposure_stability(csfm; step = 2).X, ref_stability)
-        @test exposure_agrees(exposure_dispersion(csfm).X, ref_dispersion)
+        # The intercept is constant, so its dispersion is exactly zero. The oracle reads the
+        # round-off `2.2e-16` of a mean that is not clamped to the range of the values, and
+        # this library clamps it (#842, as in #1045): a Better answer, which `a constant
+        # cross-section has no spread at any scale` pins. The other three columns agree
+        # with the oracle, cell by cell: measured maxrel 1.5e-16.
+        disp = copy(ref_dispersion)
+        disp[:, 3] .= 0
+        @test exposure_agrees(exposure_dispersion(csfm).X, disp, "dispersion")
         # The coverage reads the regression weights by default, so its universe is the
-        # estimation universe of the fit, as the reference's summary reads it. The
-        # benchmark universe is one keyword away, and it gives a different answer here.
+        # estimation universe of the fit, as the oracle's summary reads it. The benchmark
+        # universe is one keyword away, and it gives a different answer here. Bit-equal.
         @test exposure_agrees(exposure_coverage(csfm).X, ref_coverage)
         @test exposure_coverage(csfm).X ==
               exposure_coverage(csfm; weighting = RegressionWeightMetric()).X

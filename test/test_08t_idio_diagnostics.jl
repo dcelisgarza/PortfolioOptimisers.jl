@@ -1,18 +1,19 @@
 #=
 The idiosyncratic group of the cross-sectional diagnostics, decided by #709 and built by #800.
 
-The oracle is the reference implementation. The block of `# the reference oracle` below was
-built from the very arrays this file builds, run in the reference implementation's own
-environment, and its answers are written out as literals. Rebuild them by generating the
-same fixture, exporting it, and running the reference's factor model block on it.
+The testset `the stored oracle` compares with literals that the oracle gave on the very
+arrays this file builds. Rebuild them by an export of the same fixture and a run of the
+oracle's factor model block on it. Each comparison is cell by cell (`parity_compare`), and
+states the worst value measured beside its tolerance.
 =#
 using Statistics
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 @testset "Cross-sectional idiosyncratic diagnostics" begin
-    # The fixture the reference oracle was measured on. Every mutation below drives one
-    # branch, so a change to any of them invalidates the literals in `# the reference
-    # oracle`. The order matters: `eps` is drawn from the unmutated `vs`, so a mutation of
-    # `vs` that moved above the draw would change every entry of both arrays.
+    # The fixture the oracle was measured on. Every mutation below drives one branch, so a
+    # change to any of them invalidates the literals of `the stored oracle`. The order
+    # matters: `eps` is drawn from the unmutated `vs`, so a mutation of `vs` that moved
+    # above the draw would change every entry of both arrays.
     rng = StableRNG(13579)
     T, N = 12, 8
     vs = abs.(randn(rng, T, N)) .+ 0.5
@@ -40,17 +41,15 @@ using Statistics
     csfm = CrossSectionalFactorModel(; M = randn(rng, N, 3), b = zeros(N), csr = csr,
                                      vs = vs, lag = 1)
 
-    # A `NaN` compares unequal to itself, so the pattern of the absent answers is asserted
-    # separately from the values.
-    function idio_agrees(a, b; rtol = 1e-10)
-        if isnan.(a) != isnan.(b)
-            return false
-        end
-        m = .!isnan.(a)
-        return isapprox(a[m], b[m]; rtol = rtol)
+    # Cell by cell: the pattern of the absent answers agrees exactly, and each finite cell
+    # lies within `rtol` of its own size.
+    # Against the oracle, the calibration measures maxrel 1.7e-16 and the rest is
+    # bit-equal, except the two higher moments, which state their own tolerance.
+    function idio_agrees(a, b, label = ""; rtol = 1e-14)
+        return parity_compare(a, b; rtol = rtol, name = label).ok
     end
 
-    @testset "the reference oracle" begin
+    @testset "the stored oracle" begin
         ref_cal = [0.6576024139953216, 0.9566856355619364, 3.5819946565338796,
                    1.0519333239956812, 0.9497821692436044, 1.2977713493444354,
                    0.6959235710960231, 0.0, 0.8998539717557806, NaN, NaN,
@@ -65,14 +64,14 @@ using Statistics
                    0.6761337170660473, -0.387749898137298, 0.26469296344660576,
                    0.03572329744216094, NaN, 0.6348304054154105, NaN, NaN,
                    1.0182452423606356]
-        # The reference ranks a cross-section with an unstable sort, so a tie block takes an
+        # The oracle ranks a cross-section with an unstable sort, so a tie block takes an
         # order the sort chose and not one a rule states. Observation ten carries seven
-        # predicted volatilities that are exactly zero, and the reference answers
+        # predicted volatilities that are exactly zero, and the oracle answers
         # `0.21428571428571427` there. Under `ties = :ordinal`, `cs_ranks` breaks a tie by the
-        # order of the asset axis, which is the deterministic reading, and the reference
+        # order of the asset axis, which is the deterministic reading, and the oracle
         # reproduces this series to the last bit once its own ranks are made stable. The
         # entry below is the library's answer under that rule, and it is the only one of the
-        # ninety-eight this file asserts that parts from the reference as it runs.
+        # ninety-eight this file asserts that parts from the oracle as it runs.
         ref_ic = [-0.09523809523809523, -0.5714285714285714, -0.047619047619047616,
                   -0.3333333333333333, -0.07142857142857142, -0.023809523809523808, NaN,
                   0.2857142857142857, -0.8095238095238095, 0.19047619047619047,
@@ -86,14 +85,19 @@ using Statistics
         @test idio_agrees(idio_calibration(eps, vs; ahead = false), ref_cal)
         @test idio_agrees(idio_tail_rate(eps, vs; ahead = false), ref_tr3)
         @test idio_agrees(idio_tail_rate(eps, vs; threshold = 2, ahead = false), ref_tr2)
-        @test idio_agrees(idio_kurtosis(eps, vs; ahead = false), ref_kur)
-        @test idio_agrees(idio_skewness(eps, vs; ahead = false), ref_skw)
+        # Measured maxrel 1.9e-14 and 3.6e-15, maxscaled 4.9e-16 and 2.1e-16. An excess
+        # kurtosis subtracts 3 from a ratio of moments, and a skewness near zero cancels its
+        # centred cubes, so a small cell carries the round-off of the largest one.
+        @test idio_agrees(idio_kurtosis(eps, vs; ahead = false), ref_kur, "kurtosis";
+                          rtol = 1e-13)
+        @test idio_agrees(idio_skewness(eps, vs; ahead = false), ref_skw, "skewness";
+                          rtol = 5e-14)
         @test idio_agrees(idio_vol_ic(eps, vs; ties = :ordinal), ref_ic)
         @test idio_agrees(idio_vol_residual_dependence(eps, vs; ties = :ordinal), ref_rd)
         # Under the default `ties = :average`, the two observations whose predictions tie
         # move. Observation eleven predicts zero for every asset, so its ranks are constant
         # and it has no coefficient. Observation ten gives its seven zeros their mean rank,
-        # which `tiedrank` states. No other entry has a tie, so each keeps the reference's
+        # which `tiedrank` states. No other entry has a tie, so each keeps the oracle's
         # number. The residual dependence divides by the zeros, so it has no tie to move.
         ica = idio_vol_ic(eps, vs)
         sig = PortfolioOptimisers.idio_predicted_volatility(vs)
@@ -105,13 +109,12 @@ using Statistics
         @test isequal(idio_vol_ic(csfm; ties = :ordinal),
                       idio_vol_ic(eps, vs; ties = :ordinal))
 
-        # The reference's own summary, under its own key names.
+        # The oracle's own summary, under its own key names. Measured maxrel 1.0e-15.
         s = idio_calibration_summary(eps, vs; ahead = false)
-        @test isapprox(s.mean_cs_std, 1.0676183867528448; rtol = 1e-12)
-        @test isapprox(s.median_cs_std, 0.9248180704996924; rtol = 1e-12)
-        @test isapprox(s.mean_kurtosis, 0.4908334153749917; rtol = 1e-12)
-        @test isapprox(s.mean_skewness, 0.4275619994726381; rtol = 1e-12)
-        @test isapprox(s.mean_tail_rate, 0.011363636363636364; rtol = 1e-12)
+        @test idio_agrees([s.mean_cs_std, s.median_cs_std, s.mean_kurtosis, s.mean_skewness,
+                           s.mean_tail_rate],
+                          [1.0676183867528448, 0.9248180704996924, 0.4908334153749917,
+                           0.4275619994726381, 0.011363636363636364], "summary")
     end
 
     @testset "the level-0 kernel" begin

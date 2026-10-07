@@ -1,17 +1,17 @@
 #=
 The regression group of the cross-sectional diagnostics, decided by #709 and built by #798.
 
-The oracle is the reference implementation. The block of `# the reference oracle` below was
-built from the very arrays this file builds, run in the reference implementation's own
-environment, and its answers are written out as literals. Rebuild them by generating the
-same fixture, exporting it, and running the reference's factor model block on it.
+The testset `the stored oracle` compares with literals that the oracle gave on the very
+arrays this file builds. Rebuild them by an export of the same fixture and a run of the
+oracle's factor model block on it. Each comparison is cell by cell (`parity_compare`), and
+states the worst value measured beside its tolerance.
 =#
 using Statistics
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 @testset "Cross-sectional regression diagnostics" begin
-    # The fixture the reference oracle was measured on. Every mutation below drives one
-    # branch, so a change to any of them invalidates the literals in `# the reference
-    # oracle`.
+    # The fixture the oracle was measured on. Every mutation below drives one branch, so a
+    # change to any of them invalidates the literals of `the stored oracle`.
     rng = StableRNG(987654321)
     T, N, K = 8, 6, 3
     Ms = randn(rng, T, N, K)
@@ -40,7 +40,7 @@ using Statistics
     csfm = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
                                      rw = rw, bw = bw, lag = 1)
 
-    @testset "the reference oracle" begin
+    @testset "the stored oracle" begin
         ref_t = [3.069044320420541 -5.281244570976589 9.690084569128215;
                  -0.3009740870778322 -0.25525639680758366 0.4581283746731422;
                  0.5071171529394058 -1.3892133124364714 -0.2597881748342029;
@@ -65,52 +65,51 @@ using Statistics
         ref_bic = [-57.774082049179185, -29.426712065552497, -40.216320225562384, NaN,
                    -39.81056574603296, -53.28050758291223, NaN]
 
-        # A `NaN` compares unequal to itself, so the pattern of the absent answers is
-        # asserted separately from the values.
-        function agrees(a, b; rtol = 1e-10)
-            if isnan.(a) != isnan.(b)
-                return false
-            end
-            m = .!isnan.(a)
-            return isapprox(a[m], b[m]; rtol = rtol)
-        end
+        # Cell by cell (`parity_compare`): the pattern of the absent answers must agree
+        # exactly, and each finite cell lies within `rtol` of its own size. The worst
+        # value measured is stated at each check. The tolerance `1e-14` is about ten times
+        # the worst one, which is the round-off of a Gram solve of a different order.
+        agrees(a, b, name; rtol = 1e-14) = parity_compare(a, b; rtol = rtol, name = name).ok
 
         # Observation 6 is collinear: its third column repeats the first, so the design
-        # identifies the second coefficient alone and has rank two (#1421). The reference
+        # identifies the second coefficient alone and has rank two (#1421). The oracle's
         # answers there read the pseudo-inverse. Its t-statistics of the pair are ratios of
         # an arbitrary split, its factors of the pair fall below one, and its variance and
         # scores charge three regressors. Every other observation has full rank and agrees.
         fr = [1:5; 7]
         t = cs_regression_t_stats(csfm).X
         vif = exposure_vif(csfm).X
-        @test agrees(t[fr, :], ref_t[fr, :])
-        @test agrees(vif[fr, :], ref_vif[fr, :])
-        @test agrees(cs_regression_r2(csfm), ref_r2)
+        # Measured maxrel 7.6e-16, 1.7e-15 and 1.2e-15.
+        @test agrees(t[fr, :], ref_t[fr, :], "t")
+        @test agrees(vif[fr, :], ref_vif[fr, :], "vif")
+        @test agrees(cs_regression_r2(csfm), ref_r2, "r2")
+        # The three scores are bit-equal, with either count of regressors.
         for (verb, ref) in
             ((cs_regression_adjusted_r2, ref_adj), (cs_regression_aic, ref_aic),
              (cs_regression_bic, ref_bic))
-            @test agrees(verb(csfm)[fr], ref[fr])
-            # The reference's count of regressors is one keyword away.
-            @test agrees(verb(csfm; k = K), ref)
+            @test agrees(verb(csfm)[fr], ref[fr], "$(verb)")
+            # The oracle's count of regressors is one keyword away.
+            @test agrees(verb(csfm; k = K), ref, "$(verb) k")
         end
         # The pair has no t-statistic and an infinite factor. The second coefficient keeps
         # its factor, and its residual variance divides by `n - 2 = 4` rather than
-        # `n - 3 = 3`, so its t-statistic is the reference's times `sqrt(4 / 3)`.
+        # `n - 3 = 3`, so its t-statistic is the oracle's times `sqrt(4 / 3)`. Each of the
+        # five checks below is bit-equal.
         @test all(isnan, t[6, [1, 3]]) && all(==(Inf), vif[6, [1, 3]])
-        @test isapprox(vif[6, 2], ref_vif[6, 2]; rtol = 1e-10)
-        @test isapprox(t[6, 2], ref_t[6, 2] * sqrt(4 / 3); rtol = 1e-10)
+        @test agrees([vif[6, 2]], [ref_vif[6, 2]], "vif 6")
+        @test agrees([t[6, 2]], [ref_t[6, 2] * sqrt(4 / 3)], "t 6")
         # A score charges two regressors: the AIC less 2, the BIC less `ln 6`, and the
         # adjusted score over `n - 3` rather than `n - 4`.
-        @test isapprox(cs_regression_aic(csfm)[6], ref_aic[6] - 2; rtol = 1e-10)
-        @test isapprox(cs_regression_bic(csfm)[6], ref_bic[6] - log(6); rtol = 1e-10)
-        @test isapprox(cs_regression_adjusted_r2(csfm)[6], 1 - (1 - ref_r2[6]) * 5 / 3;
-                       rtol = 1e-10)
-        # The rate of the pair loses observation 6, where the reference counted 2 of 5 and
-        # 2 of 5. The second factor keeps it, at the reference's 3 of 5.
-        @test agrees(cs_regression_t_stat_exceedance_rate(csfm).X, [2 / 4, 3 / 5, 1 / 4])
+        @test agrees([cs_regression_aic(csfm)[6]], [ref_aic[6] - 2], "aic 6")
+        @test agrees([cs_regression_bic(csfm)[6]], [ref_bic[6] - log(6)], "bic 6")
+        @test agrees([cs_regression_adjusted_r2(csfm)[6]], [1 - (1 - ref_r2[6]) * 5 / 3],
+                     "adjusted r2 6")
+        # The rate of the pair loses observation 6, where the oracle counted 2 of 5 and
+        # 2 of 5. The second factor keeps it, at the oracle's 3 of 5.
+        @test cs_regression_t_stat_exceedance_rate(csfm).X == [2 / 4, 3 / 5, 1 / 4]
         @test ref_rate == [2 / 5, 3 / 5, 2 / 5]
 
-        # The condition number agrees everywhere the design has full rank. The reference
+        # The condition number agrees everywhere the design has full rank. The oracle
         # answers `1.9e17` at the collinear observation where this answers `Inf`: the
         # smallest singular value of a rank-deficient matrix rounds either to zero or to a
         # value near the machine epsilon, which is a property of the decomposition and not
@@ -119,7 +118,8 @@ using Statistics
                     6.588259138577632, 13.607428734322603]
         kappa = exposure_condition_number(csfm)
         @test length(kappa) == 7
-        @test isapprox(kappa[1:5], ref_cond; rtol = 1e-10)
+        # Measured maxrel 1.2e-15: two singular value decompositions.
+        @test agrees(kappa[1:5], ref_cond, "condition number")
         @test kappa[6] > 1e12
         @test isnan(kappa[7])
     end

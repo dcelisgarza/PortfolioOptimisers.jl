@@ -31,6 +31,7 @@ re-derivation written out by hand in plain Julia, and once as the oracle's own o
 five observations, stored as a literal.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 # A small hand panel of returns. The Asset Panel needs one Panel Field, and no rolling
 # Descriptor reads it, so a constant one carries the masks and nothing else.
@@ -80,11 +81,14 @@ end
 # agree exactly. The values agree only to the last bit, because the estimator differences one
 # cumulative sum where the re-derivation adds the window up directly, and the two orders of
 # summation round differently. `RollingMax` takes no sum, so its probes compare exactly.
-function rolling_agrees(D::AbstractMatrix{<:Real}, E::AbstractMatrix{<:Real})
-    if !(isequal(isnan.(D), isnan.(E)))
-        return false
-    end
-    return all(k -> isapprox(D[k], E[k]; rtol = 1e-13, atol = 1e-15), findall(.!isnan.(D)))
+# The comparison is cell by cell (`parity_compare`). A difference of two cumulative sums
+# carries the round-off of the sums, not of the window, so a cell near zero needs `atol`.
+# Over every probe of this file, the worst cell measures maxabs 6.1e-16, and maxrel reaches
+# 2.8e-11 on a cell near zero (maxscaled 1.2e-15). `atol = 2e-15` is about three times the
+# worst cell.
+function rolling_agrees(D::AbstractMatrix{<:Real}, E::AbstractMatrix{<:Real}, label = "";
+                        rtol = 1e-14, atol = 2e-15)
+    return parity_compare(D, E; rtol = rtol, atol = atol, name = label).ok
 end
 
 @testset "Rolling Descriptor constructors and their refusals" begin
@@ -350,8 +354,12 @@ end
              (RollingMomentum(; window = 2, skip = 0, exponentiate = true),
               ref_mom_w2_s0_exp), (Reversal(; window = 2), ref_rev_w2),
              (MaxReturn(; window = 3), ref_max_w3))
-    for (de, ref) in cases
-        @test rolling_agrees(descriptor(de, rd), ref)
+    # Against the oracle, the worst cell of the four sums measures maxrel 4.4e-16 and
+    # maxabs 6.9e-18, and the maximum is bit-equal. The cumulative sums of eight rows stay
+    # small, so no cell needs `atol` here, and `rtol = 1e-14` is about twenty times the
+    # worst value.
+    for (i, (de, ref)) in enumerate(cases)
+        @test rolling_agrees(descriptor(de, rd), ref, "gapped case $(i)"; atol = 0.0)
     end
     @test isequal(descriptor(MaxReturn(; window = 3), rd), ref_max_w3)
     @test isnan(ref_mom_w2_s2[4, 2])
