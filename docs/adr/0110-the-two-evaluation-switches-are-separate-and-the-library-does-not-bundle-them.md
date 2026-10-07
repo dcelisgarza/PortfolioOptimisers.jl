@@ -125,3 +125,32 @@ switches: a caller can drift without amortising, and amortise without drifting.
 - **A new fee type for the smoothed charge, beside the existing one.** Refused on a measured
   cost: 201 `Option{<:Fees}` type bounds across 29 files would have had to widen. A field on the
   two existing fee types moves no bound.
+
+## Amendment (2026-10-07)
+
+**An unset Previous-Weights Source follows the Weight Drift.** The two switches stay two fields,
+and each one stays `nothing` by default. But `pws = nothing` no longer means *the target weights*
+on its own. It means *follow `wd`*: the target weights when `wd` is `nothing`, and
+`DriftedWeights(wd)` when `wd` is set. `resolve_previous_weights_source` applies the rule, and
+the three timeline schemes call it in `fold_evaluation`, so every route to the fold loop reads the
+resolved source.
+
+The reason is consistency. If the series drifts, the fund holds the drifted weights at the end of
+the fold, so the trade it places next is `w_new - w_drifted`. A turnover charged against the
+targets while the series drifts, or the reverse, prices a trade that no one placed. So the two
+consistent pairs are (no drift, targets) and (drift, drifted weights). Under the old default, `wd`
+alone gave an inconsistent pair: the turnover cases of `test_11b` stood `3.5e-3` from the oracle,
+which carries one flag for the consistent drifted pair.
+
+**The mixed pairs stay one keyword away.** A new leaf, `TargetWeights()`, states the target weights
+explicitly, and an explicit `pws` overrides the rule. `wd` with `pws = TargetWeights()` drifts the
+series and measures the change in the decision. That separates the turnover of the decision from
+the turnover the fund executes, which is the one use the mixed pairs keep. The resolution maps
+`TargetWeights()` to `nothing`, the target read of the fold loop, so no reader of the source grows
+a third arm.
+
+This changes the numbers of a run that sets `wd`, sets no `pws`, and reads previous weights. The
+first consequence above still holds. Such a run was sequential already, because its optimiser reads
+previous weights. A run whose optimiser reads no previous weights stays parallel, and its numbers do
+not move. The table of the decision now reads
+"Off (`nothing`): follows `wd`" for `pws`. Recorded by #1518, from row R102 of #1416.

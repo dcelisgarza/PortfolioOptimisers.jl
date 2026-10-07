@@ -293,7 +293,7 @@ The bars are [`risk_contribution`](@ref) of `w`, rescaled to shares when `percen
 
 The bars decompose **one** number, the scalarised aggregate of `r`, so they sum to the aggregate and not to any one element. Under [`MaxScalariser`](@ref) and [`MinScalariser`](@ref) the decomposition is exact only where the argmax is **unique**. At a near tie between two scaled measures the subgradient is a set, and the bars are one admissible answer of several.
 
-The method that takes a fold reads the target weights of the fold and the asset returns that its Held Weights record kept, and it settles the fee against the length of the fold, as [`predict`](@ref) did. Under a Weight Drift the bars are exact to **first order in the drift** only, for the reason [`risk_contribution`](@ref) states. A fold whose scheme set neither `wd` nor `pws` keeps no record and so no asset returns.
+The method that takes a fold reads the target weights of the fold and the asset returns that its Held Weights record kept, and it settles the fee against the length of the fold, as [`predict`](@ref) did. Under a Weight Drift the bars are exact to **first order in the drift** only, for the reason [`risk_contribution`](@ref) states. A fold whose scheme set neither `wd` nor a `DriftedWeights` source keeps no record and so no asset returns.
 
 # Mathematical definition
 

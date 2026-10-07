@@ -24,13 +24,13 @@
     # The reference has no fixed fee, so `fl`, `fs` and the `flq` carrier of ADR 0121 have
     # no counterpart there and are pinned by the hand oracles of `test_11_fees_and_returns`.
     #
-    # Two conventions differ deliberately, and neither is exercised here:
+    # Two conventions differ:
     #
     #  1. The reference charges its proportional fee as `management_fees .* weights` over
     #     every asset, so a short position earns a **credit**. This library splits the term
-    #     into `l` over `w .>= 0` and `s` over `w .< 0`, and negates the short half so it is
-    #     a positive charge. The two agree exactly on a long-only book, which is what the
-    #     proportional testset uses.
+    #     into `l` over `w .>= 0` and `s` over `w .< 0`, and negates the short half. A
+    #     non-negative `s` makes it a charge, and `s = -l` makes it the same credit (#1518).
+    #     The testset on a short book pins that case against the oracle.
     #  2. The reference stores `compounded` as an attribute of its portfolio object. Here it
     #     is the positional `compound` argument of `cumulative_returns` and `drawdowns`.
     #     Same switch, same default, different carrier.
@@ -92,6 +92,47 @@
         @test isapprox(calc_net_returns(w, X, fees),
                        [0.01054, -0.0033599999999999997, 0.00814, 0.0029399999999999995,
                         -6.000000000000097e-5]; atol = atol)
+    end
+
+    @testset "A short book earns the linear fee's credit under `s = -l`" begin
+        # #1518, row R101 of #1416. The proportional fee `l max(w, 0) - s min(w, 0)` is
+        # convex if and only if `s >= -l`, and `s = -l` is the linear `l w` the oracle
+        # charges. Every number below was measured by running the oracle on these literals.
+        w = [0.4, -0.3, 0.5, 0.4]
+        fees = Fees(; l = mf, s = -mf)
+        # The oracle reported `total_fee = 0.00031`.
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, fees), 0.00031;
+                       atol = atol)
+        @test isapprox(calc_net_returns(w, X, fees),
+                       [0.02419, -0.014009999999999998, 0.00899, 0.023889999999999998,
+                        -0.01141]; atol = atol)
+        A = calc_net_asset_returns(w, X, fees)
+        @test isapprox(vec(sum(A; dims = 2)), calc_net_returns(w, X, fees); atol = atol)
+        # With its transaction cost too, the oracle reported `total_cost = 0.0042`.
+        fees_tn = Fees(; tn = Turnover(; w = prev, val = tc), l = mf, s = -mf)
+        @test isapprox(calc_net_returns(w, X, fees_tn),
+                       [0.01999, -0.01821, 0.004789999999999999, 0.01969, -0.01561];
+                       atol = atol)
+        # The book of the ticket: `w = (1.5, -0.5)` and `f = 0.01`. The oracle reported
+        # `total_fee = 0.009999999999999998`. The long side pays 0.015 and the short earns
+        # 0.005.
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees([1.5, -0.5],
+                                                              Fees(; l = 0.01, s = -0.01)),
+                       0.009999999999999998; atol = atol)
+        # `s = l` is the carry reading, which charges both sides.
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees([1.5, -0.5],
+                                                              Fees(; l = 0.01, s = 0.01)),
+                       0.02; atol = atol)
+        # Below `-l` the fee is not convex, so the constructor refuses it, entry by entry.
+        # A `nothing` `l` reads as zero.
+        @test_throws DomainError Fees(; l = 0.01, s = -0.02)
+        @test_throws DomainError Fees(; s = -0.01)
+        @test_throws DomainError Fees(; l = [0.01, 0.02], s = [-0.01, -0.03])
+        @test Fees(; l = [0.01, 0.02], s = -0.01).s == -0.01
+        # The estimator resolves `s` by asset name, so it accepts a credit and `Fees` checks
+        # the bound after the resolution.
+        @test FeesEstimator(; l = 0.01, s = -0.01, ds = -0.01).s == -0.01
+        @test_throws DomainError FeesEstimator(; s = Inf)
     end
 
     @testset "The cumulative summaries under both settings of `compound`" begin
@@ -231,16 +272,17 @@
         # which is the reference's `train_size = 60, test_size = 20`. `expand_train` is
         # `false` by default on both sides, so the window rolls rather than expands.
         #
-        # **Reproducing the reference's drift needs both of this library's switches.** The
-        # reference carries one bundled flag: with it set, the series drifts *and* the next
-        # fold budgets its turnover against the drifted ending weights. Here those are two
-        # independent switches, `wd` and `pws`, so a caller can drift the series while still
-        # budgeting turnover against the targets. `wd` alone left the turnover cases
-        # `3.5e-3` from the reference; `wd` with `pws = DriftedWeights()` brought every case
-        # back inside `s_atol`.
+        # **`wd` alone reproduces the oracle's drift (#1518, row R102 of #1416).** The oracle
+        # carries one flag: with it set, the series drifts *and* the next fold budgets its
+        # turnover against the drifted ending weights. Here those are two switches, `wd` and
+        # `pws`, and an unset `pws` follows `wd`, so `wd` alone gives the same consistent
+        # pair. Before #1518 an unset `pws` meant the targets, and `wd` alone left the
+        # turnover cases `3.5e-3` from the oracle. `pws = TargetWeights()` keeps that mixed
+        # pair one keyword away.
         flat = () -> IndexWalkForward(60, 20)
-        drift = () -> IndexWalkForward(60, 20; wd = SelfFinancingDrift(),
-                                       pws = DriftedWeights())
+        drift = () -> IndexWalkForward(60, 20; wd = SelfFinancingDrift())
+        mixed = () -> IndexWalkForward(60, 20; wd = SelfFinancingDrift(),
+                                       pws = TargetWeights())
 
         # Every proportional term this library carries, against its counterpart in the
         # reference: `l` is the reference's per asset holding fee, and `tn` its transaction
@@ -299,6 +341,45 @@
             @test isapprox(cumulative_returns(r)[end], smp_last; atol = s_atol)
             @test isapprox(cumulative_returns(r, true)[end], cmp_last; atol = s_atol)
         end
+
+        # The resolution of the two switches, on each timeline scheme's `fold_evaluation`.
+        resolve = PortfolioOptimisers.resolve_previous_weights_source
+        sfd = SelfFinancingDrift()
+        @test isnothing(resolve(nothing, nothing))
+        @test resolve(nothing, sfd) isa DriftedWeights
+        @test isnothing(resolve(TargetWeights(), sfd))
+        @test isnothing(resolve(TargetWeights(), nothing))
+        @test resolve(DriftedWeights(), nothing) isa DriftedWeights
+        @test PortfolioOptimisers.fold_evaluation(drift()).pws isa DriftedWeights
+        @test isnothing(PortfolioOptimisers.fold_evaluation(mixed()).pws)
+        @test isnothing(PortfolioOptimisers.fold_evaluation(flat()).pws)
+        @test PortfolioOptimisers.fold_evaluation(OnlineIndexWalkForward(60, 20; wd = sfd)).pws isa
+              DriftedWeights
+        @test PortfolioOptimisers.fold_evaluation(HindsightSplit(; wd = sfd)).pws isa
+              DriftedWeights
+
+        # An explicit source overrides the rule. With the drifted source stated, the run is
+        # the run of `wd` alone, bit for bit. With the targets stated, a case that reads
+        # previous weights keeps the mixed pair, `3.5e-3` from the oracle, and a case that
+        # reads none does not move.
+        mr_tn = MeanRisk(;
+                         opt = JuMPOptimiser(; wb = WeightBounds(; lb = 0, ub = 1), bgt = 1,
+                                             fees = Fees(;
+                                                         tn = Turnover(; w = z5,
+                                                                       val = tccv)),
+                                             slv = slv))
+        r_drift = cross_val_predict(mr_tn, rdcv, drift()).mrd.X
+        r_both = cross_val_predict(mr_tn, rdcv,
+                                   IndexWalkForward(60, 20; wd = sfd,
+                                                    pws = DriftedWeights())).mrd.X
+        r_mixed = cross_val_predict(mr_tn, rdcv, mixed()).mrd.X
+        @test r_both == r_drift
+        @test abs(sum(r_mixed) - expected["tn_drift"][1]) > 1e-3
+        mr_l = MeanRisk(;
+                        opt = JuMPOptimiser(; wb = WeightBounds(; lb = 0, ub = 1), bgt = 1,
+                                            fees = Fees(; l = mgmt), slv = slv))
+        @test cross_val_predict(mr_l, rdcv, mixed()).mrd.X ==
+              cross_val_predict(mr_l, rdcv, drift()).mrd.X
     end
 
     @testset "A walk-forward over a delisting, with a liquidation carrier" begin

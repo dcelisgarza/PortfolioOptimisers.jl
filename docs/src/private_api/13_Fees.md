@@ -16,6 +16,7 @@ calc_fixed_liquidation_fees
 calc_asset_liquidation_fees
 calc_asset_fixed_liquidation_fees
 add_liquidation_terms
+assert_short_fee_convex
 override_fee_amortisation
 two_axis_fees_view
 strip_liquidation_charges

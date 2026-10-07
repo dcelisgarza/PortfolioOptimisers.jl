@@ -125,11 +125,13 @@ The scheme refits every fold from its training window. Its online form, under wh
 
 ## Weight drift and previous weights
 
-The two switches are independent, and each one is `nothing` by default, which is the library's original behaviour.
+Each switch is `nothing` by default. An unset `pws` follows `wd`, so `wd` alone gives a consistent pair of the series and the previous weights.
 
 `wd` is the Weight Drift of the scheme. `nothing` reads a fold's return series as `X * w` net of fees, at the target weights of that fold. A [`SelfFinancingDrift`](@ref) reads the series as the wealth ratio of the drifted holdings instead. `store_weight_path` makes the fold store the weight path it computed, which a reader otherwise rebuilds on demand. `strict` decides what a **Held Gap** does: an asset that delists inside a test window carries a non-zero weight and a missing return, and the fold zeroes that pair and warns, or refuses with an `ArgumentError` under `strict`.
 
-`pws` is the Previous-Weights Source. `nothing` threads the target weights of the previous fold into the next one. A [`DriftedWeights`](@ref) threads the weights held after the last observation of the previous fold instead, so a turnover, a tracking or a fee estimator measures the trades a fund places rather than the change in the decision. A fold enumeration of this scheme is a timeline, so the source has a previous fold to read.
+`pws` is the Previous-Weights Source. A [`TargetWeights`](@ref) threads the target weights of the previous fold into the next one. A [`DriftedWeights`](@ref) threads the weights held after the last observation of the previous fold instead, so a turnover, a tracking or a fee estimator measures the trades a fund places rather than the change in the decision. A fold enumeration of this scheme is a timeline, so the source has a previous fold to read.
+
+`nothing` follows `wd`, through [`resolve_previous_weights_source`](@ref): the target weights when `wd` is `nothing`, and the drifted weights when `wd` is set. If the series drifts, the fund holds the drifted weights at the end of the fold, so the next trade starts there. An explicit `pws` overrides the rule. `wd` with `pws = TargetWeights()` drifts the series and still measures the change in the decision, which separates the turnover of the decision from the turnover the fund executes.
 
 ## Fee clock
 
@@ -498,11 +500,13 @@ The scheme refits every fold from its training window. Its online form, under wh
 
 ## Weight drift and previous weights
 
-The two switches are independent, and each one is `nothing` by default, which is the library's original behaviour.
+Each switch is `nothing` by default. An unset `pws` follows `wd`, so `wd` alone gives a consistent pair of the series and the previous weights.
 
 `wd` is the Weight Drift of the scheme. `nothing` reads a fold's return series as `X * w` net of fees, at the target weights of that fold. A [`SelfFinancingDrift`](@ref) reads the series as the wealth ratio of the drifted holdings instead. `store_weight_path` makes the fold store the weight path it computed, which a reader otherwise rebuilds on demand. `strict` decides what a **Held Gap** does: an asset that delists inside a test window carries a non-zero weight and a missing return, and the fold zeroes that pair and warns, or refuses with an `ArgumentError` under `strict`.
 
-`pws` is the Previous-Weights Source. `nothing` threads the target weights of the previous fold into the next one. A [`DriftedWeights`](@ref) threads the weights held after the last observation of the previous fold instead, so a turnover, a tracking or a fee estimator measures the trades a fund places rather than the change in the decision. A fold enumeration of this scheme is a timeline, so the source has a previous fold to read.
+`pws` is the Previous-Weights Source. A [`TargetWeights`](@ref) threads the target weights of the previous fold into the next one. A [`DriftedWeights`](@ref) threads the weights held after the last observation of the previous fold instead, so a turnover, a tracking or a fee estimator measures the trades a fund places rather than the change in the decision. A fold enumeration of this scheme is a timeline, so the source has a previous fold to read.
+
+`nothing` follows `wd`, through [`resolve_previous_weights_source`](@ref): the target weights when `wd` is `nothing`, and the drifted weights when `wd` is set. If the series drifts, the fund holds the drifted weights at the end of the fold, so the next trade starts there. An explicit `pws` overrides the rule. `wd` with `pws = TargetWeights()` drifts the series and still measures the change in the decision, which separates the turnover of the decision from the turnover the fund executes.
 
 ## Fee clock
 
@@ -1285,11 +1289,60 @@ function fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::Returns
 end
 
 """
+    resolve_previous_weights_source(pws::Nothing, wd::Nothing)
+    resolve_previous_weights_source(pws::Nothing, wd::AbstractWeightDrift)
+    resolve_previous_weights_source(pws::TargetWeights, wd::Option{<:AbstractWeightDrift})
+    resolve_previous_weights_source(pws::AbstractPreviousWeightsSource, wd::Option{<:AbstractWeightDrift})
+
+Resolve the Previous-Weights Source a fold loop runs, from the two switches of a walk-forward scheme.
+
+An unset `pws` follows `wd`. If the series drifts, the fund holds the drifted weights at the end of the fold, so the trade it places next is the distance from them. A turnover charged against the targets while the series drifts, or the reverse, prices a trade that no one placed. So the two consistent pairs are no drift with the target weights, and a drift with the drifted weights. An explicit `pws` overrides the rule, for the two mixed pairs.
+
+The fold loop reads `nothing` as the target weights. So the resolution maps [`TargetWeights`](@ref) to `nothing`, and every reader of the source keeps its two arms.
+
+# Algorithm
+
+ 1. `pws` and `wd` are both unset: give `nothing`, the target weights.
+ 2. `pws` is unset and `wd` is set: give [`DriftedWeights`](@ref) under `wd`.
+ 3. `pws` is a [`TargetWeights`](@ref): give `nothing`, the target weights, whatever `wd` is.
+ 4. Any other `pws`: give it unchanged.
+
+# Arguments
+
+  - `pws`: Previous-weights source of the scheme, or `nothing`.
+  - `wd`: Weight drift of the scheme, or `nothing`.
+
+# Returns
+
+  - `Option{<:AbstractPreviousWeightsSource}`: The source the fold loop reads, where `nothing` is the target weights.
+
+# Related
+
+  - [`AbstractPreviousWeightsSource`](@ref)
+  - [`TargetWeights`](@ref)
+  - [`DriftedWeights`](@ref)
+  - [`held_weights_drift`](@ref)
+  - [`fold_evaluation`](@ref)
+"""
+function resolve_previous_weights_source(::Nothing, ::Nothing)
+    return nothing
+end
+function resolve_previous_weights_source(::Nothing, wd::AbstractWeightDrift)
+    return DriftedWeights(wd)
+end
+function resolve_previous_weights_source(::TargetWeights, ::Option{<:AbstractWeightDrift})
+    return nothing
+end
+function resolve_previous_weights_source(pws::AbstractPreviousWeightsSource,
+                                         ::Option{<:AbstractWeightDrift})
+    return pws
+end
+"""
     fold_evaluation(cv::IndexWalkForward)
 
 Read the evaluation switches of a [`IndexWalkForward`](@ref).
 
-The folds of this scheme are a timeline, so it carries both weight switches and states both of them here, beside the Fee Clock of its realised series.
+The folds of this scheme are a timeline, so it carries both weight switches and states both of them here, beside the Fee Clock of its realised series. It states the Previous-Weights Source that [`resolve_previous_weights_source`](@ref) gives, so an unset `pws` follows `wd`.
 
 # Returns
 
@@ -1300,10 +1353,11 @@ The folds of this scheme are a timeline, so it carries both weight switches and 
   - [`fold_evaluation`](@ref)
   - [`IndexWalkForward`](@ref)
   - [`held_weights_drift`](@ref)
+  - [`resolve_previous_weights_source`](@ref)
   - [`override_fee_amortisation`](@ref)
 """
 function fold_evaluation(cv::IndexWalkForward)
-    return (; wd = cv.wd, pws = cv.pws, fa = cv.fa,
+    return (; wd = cv.wd, pws = resolve_previous_weights_source(cv.pws, cv.wd), fa = cv.fa,
             store_weight_path = cv.store_weight_path, strict = cv.strict)
 end
 """
@@ -1311,7 +1365,7 @@ end
 
 Read the evaluation switches of a [`DateWalkForward`](@ref).
 
-The folds of this scheme are a timeline, so it carries both weight switches and states both of them here, beside the Fee Clock of its realised series.
+The folds of this scheme are a timeline, so it carries both weight switches and states both of them here, beside the Fee Clock of its realised series. It states the Previous-Weights Source that [`resolve_previous_weights_source`](@ref) gives, so an unset `pws` follows `wd`.
 
 # Returns
 
@@ -1322,10 +1376,11 @@ The folds of this scheme are a timeline, so it carries both weight switches and 
   - [`fold_evaluation`](@ref)
   - [`DateWalkForward`](@ref)
   - [`held_weights_drift`](@ref)
+  - [`resolve_previous_weights_source`](@ref)
   - [`override_fee_amortisation`](@ref)
 """
 function fold_evaluation(cv::DateWalkForward)
-    return (; wd = cv.wd, pws = cv.pws, fa = cv.fa,
+    return (; wd = cv.wd, pws = resolve_previous_weights_source(cv.pws, cv.wd), fa = cv.fa,
             store_weight_path = cv.store_weight_path, strict = cv.strict)
 end
 """
@@ -1333,7 +1388,7 @@ end
 
 Read the evaluation switches of a [`HindsightSplit`](@ref).
 
-The folds of this scheme are a timeline, so it carries both weight switches and states both of them here, beside the Fee Clock of its realised series.
+The folds of this scheme are a timeline, so it carries both weight switches and states both of them here, beside the Fee Clock of its realised series. It states the Previous-Weights Source that [`resolve_previous_weights_source`](@ref) gives, so an unset `pws` follows `wd`.
 
 # Returns
 
@@ -1344,10 +1399,11 @@ The folds of this scheme are a timeline, so it carries both weight switches and 
   - [`fold_evaluation`](@ref)
   - [`HindsightSplit`](@ref)
   - [`held_weights_drift`](@ref)
+  - [`resolve_previous_weights_source`](@ref)
   - [`override_fee_amortisation`](@ref)
 """
 function fold_evaluation(cv::HindsightSplit)
-    return (; wd = cv.wd, pws = cv.pws, fa = cv.fa,
+    return (; wd = cv.wd, pws = resolve_previous_weights_source(cv.pws, cv.wd), fa = cv.fa,
             store_weight_path = cv.store_weight_path, strict = cv.strict)
 end
 export WalkForwardResult, IndexWalkForward, DateWalkForward, HindsightSplit,

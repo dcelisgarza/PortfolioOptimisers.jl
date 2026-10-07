@@ -730,7 +730,7 @@ end
 
 Read the weights a fold threads into the fold that follows it.
 
-This is the one function that reads the Previous-Weights Source. The first fold of a run has no fold behind it, so it threads nothing whatever the source is. A later fold threads the target weights of the previous fold by default, and the weights that fold **held** after its last observation when the scheme sets a source.
+This is the one function that reads the Previous-Weights Source. The first fold of a run has no fold behind it, so it threads nothing whatever the source is. A later fold threads the target weights of the previous fold under a `nothing` source, and the weights that fold **held** after its last observation under a source. The source is the one [`resolve_previous_weights_source`](@ref) gives, so a scheme that sets `wd` and no `pws` threads the held weights.
 
 `prev` is the last fold whose weights can be threaded, which is not always the fold before. The sequential loops advance it only when [`threads_weights`](@ref) holds of a fold, so a failed fold is skipped and the fold before it is read. The weights this function gives are therefore finite whenever it gives any.
 
@@ -901,7 +901,7 @@ Split a fold's net return series over the assets that produced it.
 
 This is the fold-taking method of [`calc_net_asset_returns`](@ref), and the mirror of [`calc_net_returns(res::OptimisationResult, X, fees)`](@ref). It finds the asset returns, the weight path and the fee of the fold, so a caller that holds a fold reaches the split in one call. The fee is spread over the length of the fold as [`predict`](@ref) spread it, so the rows of the result sum to the series the fold stored, to rounding.
 
-A fold that carries no Held Weights record raises. `pred.rd.X` is the **portfolio** series, not the asset returns, so a fold whose scheme set neither `wd` nor `pws` keeps no matrix to split.
+A fold that carries no Held Weights record raises. `pred.rd.X` is the **portfolio** series, not the asset returns, so a fold whose scheme set neither `wd` nor a `DriftedWeights` source keeps no matrix to split.
 
 # Algorithm
 
@@ -943,7 +943,7 @@ function calc_net_asset_returns(pred::PredictionResult{<:Any, <:Any, <:HeldWeigh
                                   result_investable_mask(pred.res))
 end
 function calc_net_asset_returns(::PredictionResult{<:Any, <:Any, Nothing}, args...)
-    return throw(ArgumentError("`calc_net_asset_returns(pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`.\nSet one of them so the fold records its asset returns, or call `calc_net_asset_returns(w, X, fees)` with the returns you fitted on."))
+    return throw(ArgumentError("`calc_net_asset_returns(pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor a `DriftedWeights` source.\nSet one of them so the fold records its asset returns, or call `calc_net_asset_returns(w, X, fees)` with the returns you fitted on."))
 end
 """
     risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult}, fees = nothing; kwargs...)
@@ -1006,7 +1006,7 @@ function risk_contribution(r::BaseRM_VecBaseRM,
 end
 function risk_contribution(::BaseRM_VecBaseRM, ::PredictionResult{<:Any, <:Any, Nothing},
                            args...; kwargs...)
-    return throw(ArgumentError("`risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`.\nSet one of them so the fold records its asset returns, or call `risk_contribution(r, pred.res.w, rd.X, fees)` with the returns you fitted on."))
+    return throw(ArgumentError("`risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor a `DriftedWeights` source.\nSet one of them so the fold records its asset returns, or call `risk_contribution(r, pred.res.w, rd.X, fees)` with the returns you fitted on."))
 end
 """
     factor_risk_contribution(r::BaseRM_VecBaseRM, pred::PredictionResult{<:Any, <:Any, <:HeldWeightsResult}, fees = nothing; rd, kwargs...)
@@ -1107,7 +1107,7 @@ end
 function factor_risk_contribution(::BaseRM_VecBaseRM,
                                   ::PredictionResult{<:Any, <:Any, Nothing}, args...;
                                   kwargs...)
-    return throw(ArgumentError("`factor_risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor `pws`.\nSet one of them so the fold records its asset returns, or call `factor_risk_contribution(r, pred.res.w, rd.X, fees; rd = rd)` with the returns you fitted on."))
+    return throw(ArgumentError("`factor_risk_contribution(r, pred::PredictionResult)` needs the fold's asset returns, and this fold kept none: `pred.rd.X` is the portfolio return series, and `pred.hw` is absent because the fold's scheme set neither `wd` nor a `DriftedWeights` source.\nSet one of them so the fold records its asset returns, or call `factor_risk_contribution(r, pred.res.w, rd.X, fees; rd = rd)` with the returns you fitted on."))
 end
 """
     mapreduce_RetMtx(rd, sym = :X)

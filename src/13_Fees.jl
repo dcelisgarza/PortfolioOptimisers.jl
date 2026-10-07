@@ -119,7 +119,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - The constructor checks `l`, `s`, `fl`, `fs`, `dl`, `ds`, `dfl` and `dfs` with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - The constructor checks `l`, `fl`, `fs`, `dl`, `dfl` and `dfs` with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - The constructor checks `s` and `ds` with [`assert_nonempty_finite_val`](@ref). A negative short rate is a credit. The bound `s >= -l` reads both rates on one asset axis, so [`Fees`](@ref) checks it after the resolution, through [`assert_short_fee_convex`](@ref).
 
 ## Propagated parameters
 
@@ -246,11 +247,13 @@ FeesEstimator
                            fa::Option{<:AbstractFeeAmortisation} = nothing,
                            kwargs::NamedTuple = (; atol = 1e-8))::FeesEstimator
         assert_nonempty_nonneg_finite_val(l, :l)
-        assert_nonempty_nonneg_finite_val(s, :s)
+        # A negative short rate is a credit, and `Fees` checks it against `l` after the
+        # resolution, because only then do the two rates sit on one asset axis.
+        assert_nonempty_finite_val(s, :s)
         assert_nonempty_nonneg_finite_val(fl, :fl)
         assert_nonempty_nonneg_finite_val(fs, :fs)
         assert_nonempty_nonneg_finite_val(dl, :dl)
-        assert_nonempty_nonneg_finite_val(ds, :ds)
+        assert_nonempty_finite_val(ds, :ds)
         assert_nonempty_nonneg_finite_val(dfl, :dfl)
         assert_nonempty_nonneg_finite_val(dfs, :dfs)
         return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs), typeof(lq),
@@ -356,7 +359,18 @@ Where:
   - ``\\boldsymbol{w} \\neq 0``: Evaluated as `!isapprox(w, 0; kwargs...)`, so `kwargs` decides how near zero counts as zero. Only the fixed terms use this test, ``\\boldsymbol{w}_{\\text{flq}} \\neq 0`` included, because a proportional fee on a zero weight is zero anyway.
   - ``\\odot``: Elementwise (Hadamard) product.
 
-The definition subtracts the short proportional term. ``\\boldsymbol{w}`` is negative wherever its indicator is one, so the minus sign makes the fee a positive charge.
+The definition subtracts the short proportional term. ``\\boldsymbol{w}`` is negative wherever its indicator is one, so the minus sign makes the fee a positive charge when ``\\boldsymbol{f}_{\\text{p}}^{-}`` is non-negative.
+
+## A negative short rate is a credit
+
+`s` can be negative down to `-l`, asset by asset. Per asset, the proportional term ``\\phi(w) = l \\max(w, 0) - s \\min(w, 0)`` has slope ``l`` for ``w > 0`` and ``-s`` for ``w < 0``, so it is convex if and only if ``s \\geq -l``. The constructor refuses a rate below that bound, because a model that charges a non-convex fee is no longer convex.
+
+The two ends of the range read a fee in two ways, and both are legitimate:
+
+  - `s = l` charges ``l \\lvert w \\rvert``: a carry or a borrow cost charged to the position, whatever its sign.
+  - `s = -l` charges the linear ``l w``: an expense ratio built into the instrument and absent from the returns, so it lowers the asset's return, and a short position earns it.
+
+The default leaves `s` at `nothing`, which charges a short position nothing.
 
 ## The per asset fees sum to the portfolio fee
 
@@ -369,6 +383,8 @@ The two families compute the same definition. [`calc_asset_fees`](@ref) splits o
 Under a [`PartsBoundWeights`](@ref) head those variables only *bound* the parts of ``\\boldsymbol{w}``, so the model's fee is an upper bound on this definition. The budget pins `sum(lw)` and `sum(sw)` whether or not the portfolio holds a short position, so the model charges both sides in full.
 
 Setting `xbgt = true` on the [`JuMPOptimiser`](@ref) pins the decomposition, and the model's fee then agrees with this definition. The setting adds binary variables, so the same problem then needs a mixed-integer conic solver rather than a conic one.
+
+A negative `s` does not use the parts. A slack `sw` would earn a credit on an exposure the model does not hold, so the bound would fall below the definition. [`set_proportional_fees!`](@ref) charges the whole proportional fee against ``\\boldsymbol{w}`` instead, through the epigraph of ``\\max(l w, -s w)``, which equals the definition exactly.
 
 A long-only model needs no pinning, because it holds no short side to bound.
 
@@ -407,7 +423,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - The constructor checks `l`, `s`, `fl` and `fs` with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - The constructor checks `l`, `fl` and `fs` with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - The constructor checks `s` with [`assert_nonempty_finite_val`](@ref), and checks `s >= -l` entry by entry with [`assert_short_fee_convex`](@ref). A `nothing` `l` reads as zero there.
   - The `val` of `tn`, `lq` and `flq` is finite. [`Turnover`](@ref) accepts a `+Inf` rate, which is an uncapped bound, but a fee rate of `+Inf` gives the model an infinite coefficient.
 
 ## Propagated parameters
@@ -459,6 +476,7 @@ Fees
   - [`set_non_fixed_fees!`](@ref)
   - [`set_long_non_fixed_fees!`](@ref)
   - [`set_short_non_fixed_fees!`](@ref)
+  - [`set_proportional_fees!`](@ref)
   - [`set_turnover_fees!`](@ref)
   - [`FeesEstimator`](@ref)
   - [`Option`](@ref)
@@ -469,6 +487,8 @@ Fees
   - [`AmortisedFees`](@ref)
   - [`charge_fees`](@ref)
   - [`assert_nonempty_nonneg_finite_val`](@ref)
+  - [`assert_nonempty_finite_val`](@ref)
+  - [`assert_short_fee_convex`](@ref)
   - [`fees_constraints`](@ref)
   - [`calc_fees`](@ref)
   - [`calc_asset_fees`](@ref)
@@ -536,7 +556,8 @@ Fees
                   kwargs::NamedTuple = (; atol = 1e-8),
                   imsk::Option{<:BitVector} = nothing)::Fees
         assert_nonempty_nonneg_finite_val(l, :l)
-        assert_nonempty_nonneg_finite_val(s, :s)
+        assert_nonempty_finite_val(s, :s)
+        assert_short_fee_convex(l, s)
         assert_nonempty_nonneg_finite_val(fl, :fl)
         assert_nonempty_nonneg_finite_val(fs, :fs)
         # A `Turnover` lets a `+Inf` rate through, because as a bound it is the uncapped cap.
@@ -558,6 +579,51 @@ function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = noth
               kwargs::NamedTuple = (; atol = 1e-8),
               imsk::Option{<:BitVector} = nothing)::Fees
     return Fees(tn, l, s, fl, fs, lq, flq, fa, kwargs, imsk)
+end
+"""
+    assert_short_fee_convex(l::Option{<:Num_VecNum}, s::Nothing)
+    assert_short_fee_convex(l::Nothing, s::Num_VecNum)
+    assert_short_fee_convex(l::Num_VecNum, s::Num_VecNum)
+
+Check that the short proportional rate `s` of a [`Fees`](@ref) keeps the proportional fee convex.
+
+Per asset, the proportional fee is ``\\phi(w) = l \\max(w, 0) - s \\min(w, 0)``. Its slope is ``l`` for ``w > 0`` and ``-s`` for ``w < 0``, so ``\\phi`` is convex if and only if ``s \\geq -l``. Convexity keeps every JuMP model that charges the fee convex. A negative `s` is a credit on a short position. At ``s = -l`` the fee is the linear ``l w`` on either sign, which is the reading of an expense ratio built into the instrument: a short position earns it.
+
+# Algorithm
+
+ 1. On a `nothing` `s`, check nothing.
+ 2. On a `nothing` `l`, read `l` as zero, so `s` must be non-negative.
+ 3. Otherwise check `s .>= -l` entry by entry. A scalar applies to every asset.
+
+# Arguments
+
+  - `l`: The long proportional rate, or `nothing`.
+  - `s`: The short proportional rate, or `nothing`.
+
+# Validation
+
+  - `all(s .>= -l)`, which raises a `DomainError` that names the convexity bound.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`set_proportional_fees!`](@ref)
+"""
+function assert_short_fee_convex(::Option{<:Num_VecNum}, ::Nothing)::Nothing
+    return nothing
+end
+function assert_short_fee_convex(::Nothing, s::Num_VecNum)::Nothing
+    return assert_short_fee_convex(zero(eltype(s)), s)
+end
+function assert_short_fee_convex(l::Num_VecNum, s::Num_VecNum)::Nothing
+    @argcheck(all(Broadcast.instantiate(Broadcast.broadcasted((si, li) -> si >= -li, s, l))),
+              DomainError(s,
+                          "the short fee `s` must be at least `-l` on every asset, because the proportional fee `l max(w, 0) - s min(w, 0)` is convex if and only if `s >= -l`. `s = -l` charges the linear fee `l w`, which credits a short position"))
+    return nothing
 end
 """
     show_fields(fees::Fees)
@@ -2041,7 +2107,7 @@ Charge the terms of a fee that fall on every observation.
 # Algorithm
 
  1. Charge the long proportional term, the call of [`calc_fees`](@ref) on `fees.l` under `.>=`.
- 2. Charge the short proportional term, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation makes the term a positive charge.
+ 2. Charge the short proportional term, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation makes the term a charge under a non-negative `s` and a credit under a negative one.
  3. Charge the turnover term, the call of [`calc_fees`](@ref) on `fees.tn`.
  4. Charge the proportional forced exit, the call of [`calc_liquidation_fees`](@ref) on `fees.lq`.
  5. Return the sum of the four terms.

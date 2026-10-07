@@ -97,13 +97,13 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Fees.
                  :tn_fees => "`tn`: Turnover estimator or result.",#
                  :l_fees => "`l`: Long proportional fees.",#
-                 :s_fees => "`s`: Short proportional fees.",#
+                 :s_fees => "`s`: Short proportional fees. A negative rate down to `-l` is a credit on a short position.",#
                  :fl => "`fl`: Long fixed fees.",#
                  :fs => "`fs`: Short fixed fees.",#
                  :lq_fees => "`lq`: Proportional liquidation fees, which the fee charges when a position leaves the Investable Mask. The field `lq` is on the complement of the mask, so its entries are the assets that left and not the assets held. A forced exit trades to zero, so the charge is the rate times the absolute previous weight, and it falls on every period beside `l`, `s` and `tn`.",#
                  :flq_fees => "`flq`: Fixed liquidation fees, which the fee charges when a position leaves the Investable Mask. The field `flq` is on the complement of the mask, as `lq` is. The fee charges the amount once for each entry whose absolute previous weight is not `isapprox` to zero under `kwargs`, and it falls on the clock `fa` names beside `fl` and `fs`.",#
                  :dl => "`dl`: Default long proportional fee.",#
-                 :ds => "`ds`: Default short proportional fee.",#
+                 :ds => "`ds`: Default short proportional fee. A negative rate is a credit on a short position.",#
                  :dfl => "`dfl`: Default long fixed fee.",#
                  :dfs => "`dfs`: Default short fixed fee.",#
                  :fa_fees => "`fa`: Fee amortisation algorithm, and the clock the fixed fee terms `fl`, `fs` and `flq` fall on. `nothing` and a [`FirstObservationFees`](@ref) charge them one time, on the first observation of a return series. An [`AmortisedFees`](@ref) spreads them evenly over the observation count that the calling site passes in. It affects no other term, because `l`, `s`, `tn` and `lq` are rates per period.",#

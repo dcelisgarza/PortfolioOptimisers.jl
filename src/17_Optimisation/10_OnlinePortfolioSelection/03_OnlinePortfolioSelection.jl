@@ -998,7 +998,7 @@ The recursion reads its own allocation, so the fund's held book is the one base 
 # Arguments
 
   - `opt`: The estimator handed to the loop.
-  - `pws`: The scheme's Previous-Weights Source, or `nothing`.
+  - `pws`: The scheme's Previous-Weights Source as [`resolve_previous_weights_source`](@ref) gives it, where `nothing` threads the target weights. A scheme that sets `wd` and no `pws` passes a [`DriftedWeights`](@ref), and an explicit [`TargetWeights`](@ref) passes `nothing`.
 
 # Validation
 
@@ -1010,10 +1010,11 @@ The recursion reads its own allocation, so the fund's held book is the one base 
   - [`assert_online_entry`](@ref)
   - [`fees_carry_turnover`](@ref)
   - [`DriftedWeights`](@ref)
+  - [`resolve_previous_weights_source`](@ref)
 """
 function assert_online_fee_source(opt::OnlinePortfolioSelection, pws)::Nothing
     if isnothing(pws) && fees_carry_turnover(opt.fees)
-        throw(ArgumentError("an `OnlinePortfolioSelection` head whose `fees` carry a turnover term needs a Previous-Weights Source on the walk-forward: the recursion reads its own allocation, so without one the fee would price the distance between two targets rather than the trade the fund makes. Set `pws = DriftedWeights()` on the scheme, or drop `tn` from the head's fees."))
+        throw(ArgumentError("an `OnlinePortfolioSelection` head whose `fees` carry a turnover term needs a Previous-Weights Source on the walk-forward: the recursion reads its own allocation, so without one the fee would price the distance between two targets rather than the trade the fund makes. Set a Weight Drift `wd` on the scheme, whose unset `pws` then threads the drifted weights, or set `pws = DriftedWeights()`, or drop `tn` from the head's fees."))
     end
     return nothing
 end

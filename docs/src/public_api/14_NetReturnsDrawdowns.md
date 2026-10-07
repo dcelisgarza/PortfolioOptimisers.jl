@@ -1,5 +1,5 @@
 ```@meta
-Description = "Net returns drawdowns, public API of PortfolioOptimisers.jl: AbstractPreviousWeightsSource, SelfFinancingDrift, DriftedWeights, HeldWeightsResult, …"
+Description = "Net returns drawdowns, public API of PortfolioOptimisers.jl: AbstractPreviousWeightsSource, SelfFinancingDrift, DriftedWeights, TargetWeights, …"
 ```
 
 # Net returns drawdowns
@@ -10,6 +10,7 @@ The functions below compute the returns of a portfolio net of fees, the returns 
 AbstractPreviousWeightsSource
 SelfFinancingDrift
 DriftedWeights
+TargetWeights
 HeldWeightsResult
 calc_net_returns(w::VecNum, X::MatNum, args...)
 calc_net_returns(w::MatNum, X::MatNum, args...)

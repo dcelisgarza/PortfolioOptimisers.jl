@@ -157,6 +157,37 @@ end
     end
 end
 
+@testset "A short credit is charged exactly, against the weights" begin
+    # #1518. A negative `s` is a credit. A slack short part would earn it on an exposure the
+    # model does not hold, so the builder charges `max(l w, -s w)` per asset against `w`.
+    for fees in (Fees(; l = 0.001, s = -0.001),
+                 Fees(; l = fill(0.002, N_fc), s = [-0.002, -0.001, 0.0, 0.001, -0.002, 0.0]))
+        kw = (; wb = WeightBounds(; lb = -1.0, ub = 1.0), sbgt = 0.5, fees = fees)
+        res = solve_fc(MaximumReturn(); slv = cslv_fc, kw...)
+        @test isa(res.retcode, OptimisationSuccess)
+        m = res.model
+        @test all(n -> n in entry_names_fc(res), (:t_fp, :cfp_l, :cfp_s, :fp, :fees))
+        @test !haskey(m, :fl)
+        @test !haskey(m, :fs)
+        w = JuMP.value.(m[:w])
+        @test any(<(-1e-6), w)
+        # The objective pulls the fee down, so the epigraph is tight and the model's fee is
+        # the fee of the realised weights.
+        @test isapprox(JuMP.value(m[:fp]), PO.calc_periodic_fees(w, fees); atol = 1e-8)
+        # Under minimum risk nothing pulls on the fee, and it still never falls below the
+        # definition, whatever the parts hold.
+        res = solve_fc(MinimumRisk(); slv = cslv_fc, kw...)
+        w = JuMP.value.(res.model[:w])
+        @test JuMP.value(res.model[:fp]) >= PO.calc_periodic_fees(w, fees) - 1e-8
+    end
+    # A long-only model holds no short part and no short position, so its part builders
+    # stay exact and charge `l` alone.
+    res = solve_fc(MaximumReturn(); slv = cslv_fc, fees = Fees(; l = 0.001, s = -0.001))
+    @test haskey(res.model, :fl)
+    @test !haskey(res.model, :fp)
+    @test isapprox(JuMP.value(res.model[:fl]), 0.001 * sum(res.w); atol = 1e-9)
+end
+
 @testset "The liquidation charges are constants times k" begin
     lq = Turnover(; w = [0.1, -0.2, 0.0], val = [0.01, 0.02, 0.03])
     for k in (1, 2.5)

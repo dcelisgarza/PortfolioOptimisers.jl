@@ -2044,10 +2044,16 @@
             w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
             optn = JuMPOptimiser(; slv = slv, tn = Turnover(; w = w0, val = 0.02))
             mrt = MeanRisk(; opt = optn)
-            a = cross_val_predict(mrt, rd, IndexWalkForward(500, 250; wd = sfd))
+            a = cross_val_predict(mrt, rd,
+                                  IndexWalkForward(500, 250; wd = sfd,
+                                                   pws = TargetWeights()))
             b = cross_val_predict(mrt, rd, IndexWalkForward(500, 250; wd = sfd, pws = dw))
             @test a.pred[1].res.w == b.pred[1].res.w
             @test a.pred[2].res.w != b.pred[2].res.w
+            # An unset source follows the drift (#1518), so `wd` alone threads the held
+            # weights, as the explicit source does.
+            c = cross_val_predict(mrt, rd, IndexWalkForward(500, 250; wd = sfd))
+            @test c.pred[2].res.w == b.pred[2].res.w
         end
         @testset "The drift reaches the pipeline entry point" begin
             pipe = Pipeline(; steps = (EmpiricalPrior(), ivol))
@@ -2165,7 +2171,7 @@
             catch e
                 sprint(showerror, e)
             end
-            @test occursin("neither `wd` nor `pws`", msg)
+            @test occursin("neither `wd` nor a `DriftedWeights` source", msg)
 
             # The fold-taking form hands the fold's bare asset returns to the free
             # function, so a moment measure whose slot is unfilled is refused by name there
@@ -2267,7 +2273,8 @@
         dw = DriftedWeights()
         cv = IndexWalkForward(250, 250)
         cvd = IndexWalkForward(250, 250; wd = sfd, pws = dw)
-        cvw = IndexWalkForward(250, 250; wd = sfd, store_weight_path = true)
+        cvw = IndexWalkForward(250, 250; wd = sfd, pws = TargetWeights(),
+                               store_weight_path = true)
         n = n_splits(cv, rd)
         @test n >= 3
         sched(k) = TimeDependent([i in k ? bad : ok for i in 1:n])
@@ -2326,15 +2333,15 @@
             @test !PO.threads_weights(dw, res1.pred[1])
             @test threaded(res1.pred[2]) == tn.w
         end
-        @testset "under a drift alone, a failed fold holds the last target" begin
+        @testset "under a drift and the target source, a failed fold holds the last target" begin
             res = cross_val_predict(mk(2), rd, cvw)
             p1, p2, p3 = res.pred[1], res.pred[2], res.pred[3]
             @test isa(p2.res.retcode, OptimisationFailure)
             @test p2.hw.w0 == p1.res.w
             @test all(isfinite, p2.hw.U)
             @test p2.hw.w == PO.held_weights(sfd, p1.res.w, p2.hw.X)
-            # No source, so the target read skips the failed fold and reads fold 1, and the
-            # solve is the one the undrifted run made: a drift moves no target.
+            # The target source, so the target read skips the failed fold and reads fold 1,
+            # and the solve is the one the undrifted run made: a drift moves no target.
             @test threaded(p3) == p1.res.w
             @test p3.res.w == cross_val_predict(mk(2), rd, cv).pred[3].res.w
         end
