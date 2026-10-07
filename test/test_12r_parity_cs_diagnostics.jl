@@ -218,6 +218,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                            for k in 1:K])
         end
         if c in fam
+            # The rank coefficient on the reduced axis is bit-equal on the three panels. The
+            # linear one carries the round-off of the fit's returns, as on the raw axis:
+            # measured maxrel 1.1e-12 on the large panel, and maxscaled 2.3e-15.
             o = load(n, "ICRed")
             Kr = size(o, 2) ÷ 2
             @test pc(exposure_ic(csfm; ties = :ordinal, reduced = true).X, o[:, 1:Kr],
@@ -245,30 +248,45 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             @test all(isfinite, factor_model_summary(csfm).ann_return[drop])
             # A level that empties leaves rows where the design is singular. There a
             # coefficient the design does not identify has no t-statistic and an infinite
-            # or absent factor, and the others divide by `n - rank`, where the oracle reads
-            # round-off and `n - K` (#1421, see the regression group). So the three columns
-            # that read them leave the comparison for every factor such a row reaches.
+            # VIF, and the others divide by `n - rank`, where the oracle reads round-off and
+            # `n - K` (#1421, see the regression group). So a singular row changes the
+            # t-statistic of every factor, and the oracle's mean absolute t and exceedance
+            # rate differ for each one, by 0.33 and 0.26 relative on the large panel. A factor
+            # that a singular row does not identify has a mean VIF of `Inf`, where the oracle's
+            # is finite. The three columns compare instead against the same statistics of the
+            # oracle's t-statistics and VIFs on the rows of full rank and ours on the singular
+            # rows, which the regression group pins to the fit on a pivoted basis. A factor
+            # that no singular row identifies reads the oracle's rows of full rank alone
+            # (1.7500 for the level of one member, where the round-off rows gave 1.7755).
+            # Every row of `FamTwo` is singular, so there the check reads ours alone and tests
+            # the statistics. Measured maxrel 8.2e-16 on the mean absolute t, 2.9e-16 on the
+            # mean VIF, and an exact rate.
             t = cs_regression_t_stats(csfm).X
             vif = exposure_vif(csfm).X
             R = load(n, "Regression")
             K = size(t, 2)
-            same(a, b) = parity_compare(a, b; rtol = 1e-9, name = "").ok
-            bad = [!(same(t[:, j], R[:, j]) && same(vif[:, j], R[:, K + j])) for j in 1:K]
-            @test any(bad)
-            nr = PO.cs_diagnostic_factor_names(csfm)
-            keep[[x in nr[bad] for x in nf], 5:7] .= false
-            # A factor that no singular row identifies reads the rows of full rank alone, so
-            # its mean absolute t-statistic is the mean of the oracle's over those rows
-            # (1.7500 for the level of one member, where the round-off rows gave 1.7755).
-            idf = (exposure_condition_number(csfm) .< 1e12) .& (R[:, 2K + 1] .< 1e12)
-            gone = [all(isnan, t[.!idf, j]) for j in 1:K]
-            @test any(gone)
-            fs = factor_model_summary(csfm; ppy = 252)
-            for j in findall(gone)
-                @test pc([fs.mean_abs_t[findfirst(==(nr[j]), nf)]],
-                         [mean(abs, filter(!isnan, R[idf, j]))], "$(n) mean abs t $(j)";
-                         rtol = 2e-12)
+            sing = .!((exposure_condition_number(csfm) .< 1e12) .& (R[:, 2K + 1] .< 1e12))
+            @test any(sing) && (c == "FamTwo" || !all(sing))
+            th = R[:, 1:K]
+            th[sing, :] .= t[sing, :]
+            vh = R[:, (K + 1):(2K)]
+            vh[sing, :] .= vif[sing, :]
+            pos = PO.factor_summary_positions(csfm)
+            colmean(A) = PO.factor_summary_mapped([PO.factor_summary_column_mean(A, j)
+                                                   for j in 1:K], pos)
+            mabs = colmean(abs.(th))
+            mvif = colmean(vh)
+            @test any(isinf, mvif)
+            for (thr, step) in ((2, 1), (1.5, 5))
+                fs = factor_model_summary(csfm; ppy = 252, threshold = thr, step = step)
+                rate = PO.factor_summary_mapped(cs_regression_t_stat_exceedance_rate(th;
+                                                                                     threshold = thr),
+                                                pos)
+                @test pc(fs.mean_abs_t, mabs, "$(n) mean abs t $(thr)")
+                @test pc(fs.t_rate, rate, "$(n) t rate $(thr)")
+                @test pc(fs.mean_vif, mvif, "$(n) mean vif $(thr)")
             end
+            keep[:, 5:7] .= false
         end
         if c == "Macro"
             # The stability reads the benchmark weights of the fit, which differ on two cells
