@@ -174,6 +174,79 @@ end
         end
     end
 
+    @testset "A late observed series is a gap, and the factor prior states its moments (#1530)" begin
+        fx = obs_fixture()
+        Eg = copy(fx.R)
+        # EUR starts at observation 11, nine fitted observations after the lag.
+        Eg[1:10, 1] .= NaN
+        gap = obs_fixture(; Eo = Eg)
+        eur = findall(==(1), fx.code)
+        usd = findall(==(2), fx.code)
+        for pe in (obs_prior(), obs_prior(; pe = EmpiricalPrior()))
+            pr = prior(pe, gap.rd)
+            # The net returns of the EUR holders are NaN on the gap, so the regression
+            # drops them there and keeps every asset after it.
+            @test all(==(length(usd)), pr.rr.csr.n[1:9])
+            @test all(==(length(fx.code)), pr.rr.csr.n[10:end])
+            # The factor prior states the factor moments from the factor returns as the
+            # fit stores them, the gap of EUR among them.
+            F = hcat(pr.rr.csr.f, pr.rr.fx)
+            @test count(isnan, F) == 9
+            q = prior(pe.pe, F)
+            @test isequal(pr.fpr.mu, q.mu)
+            @test isequal(pr.fpr.sigma, q.sigma)
+        end
+        # The default factor prior is mask-aware, so it estimates EUR from the observations
+        # the series has, and every asset is investable.
+        pd = prior(obs_prior(), gap.rd)
+        @test all(isfinite, pd.mu) && all(isfinite, pd.sigma)
+        # A plain factor prior leaves EUR out of its Coverage Universe, so only the EUR
+        # holders leave the Investable Mask.
+        pp = prior(obs_prior(; pe = EmpiricalPrior()), gap.rd)
+        @test isnan(pp.fpr.mu[2]) && isfinite(pp.fpr.mu[1]) && isfinite(pp.fpr.mu[3])
+        @test PO.investable_mask(pp) == [i in usd for i in eachindex(fx.code)]
+        # The carry fold equals the batch fit, with a first step inside the gap.
+        for pe in (obs_prior(), obs_prior(; pe = EmpiricalPrior())),
+            edges in ((0, 40, 60, 80), (0, 5, 40, 80))
+
+            p = pe
+            for k in 1:(length(edges) - 1)
+                p = partial_fit!(p,
+                                 PO.port_opt_view(gap.rd, (edges[k] + 1):edges[k + 1], :))
+            end
+            @test isa(p.cache, PO.CrossSectionalCarryState)
+            a = prior(p)
+            b = prior(pe, gap.rd)
+            for (x, y) in ((a.mu, b.mu), (a.sigma, b.sigma))
+                @test isequal(isfinite.(x), isfinite.(y))
+                @test filter(isfinite, x) ≈ filter(isfinite, y)
+            end
+        end
+        # A late series that every asset holds leaves no asset on the gap, and the refusal
+        # names the series, on the batch fit and on the carry fold.
+        m = 0.004 .* randn(StableRNG(7), 80)
+        mg = copy(m)
+        mg[1:10] .= NaN
+        rd = ReturnsResult(; nx = fx.rd.nx, X = fx.rd.X .+ m, ne = ["EUR", "USD", "SPX"],
+                           E = hcat(fx.R, mg), pnl = fx.rd.pnl)
+        pm = obs_prior(;
+                       factors = ["beta" => obs_pass("beta", "style"),
+                                  "currency" => CurrencyExposure(),
+                                  "mkt" => ObservedExposure(; xe = ConstantExposure(),
+                                                            series = "SPX")])
+        for f in
+            (() -> prior(pm, rd), () -> partial_fit!(pm, PO.port_opt_view(rd, 1:40, :)))
+            err = try
+                f()
+                nothing
+            catch e
+                e
+            end
+            @test err isa ArgumentError
+            @test occursin("observed factors [\"mkt\"] have no return", err.msg)
+        end
+    end
+
     @testset "The refusals" begin
         fx = obs_fixture()
         rd0 = ReturnsResult(; nx = fx.rd.nx, X = fx.rd.X, pnl = fx.rd.pnl)
@@ -185,8 +258,9 @@ end
         rd2 = ReturnsResult(; nx = fx.rd.nx, X = fx.rd.X, ne = ["JPY", "USD", "EUR"],
                             E = hcat(fx.R[:, 2], fx.R[:, 2], fx.R[:, 1]), pnl = fx.rd.pnl)
         @test prior(obs_prior(), rd2).rr.fx == fx.R[2:end, :]
-        # A non-finite return on a fitted row names the series and the observation.
-        for v in (NaN, Inf)
+        # An infinite return on a fitted row names the series and the observation. A NaN
+        # marks a gap, which the testset of the late series states (#1530).
+        for v in (Inf, -Inf)
             Eb = copy(fx.R)
             Eb[6, 1] = v
             err = try

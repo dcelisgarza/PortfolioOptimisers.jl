@@ -488,6 +488,7 @@ A cross-sectional fit of `K` factors needs more assets than factors, and a fit w
 
   - `msk`: The eligibility mask, `observations × assets`.
   - `minra`: The smallest eligible asset count an observation may carry.
+  - `cb`: The observed factors of the fitted observations, from [`cross_sectional_observed_block`](@ref), or `nothing`. An observed return that is `NaN` makes the net return of every asset that holds the factor `NaN`, so the message names the observed factors that have no return at the observation it names, with [`cross_sectional_observed_gap`](@ref).
 
 # Validation
 
@@ -502,11 +503,12 @@ A cross-sectional fit of `K` factors needs more assets than factors, and a fit w
   - [`cross_sectional_eligible`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-function assert_cross_sectional_coverage(msk::AbstractMatrix{Bool}, minra::Integer)::Nothing
+function assert_cross_sectional_coverage(msk::AbstractMatrix{Bool}, minra::Integer,
+                                         cb::Option{<:NamedTuple} = nothing)::Nothing
     n = vec(sum(msk; dims = 2))
     bad = findall(x -> x < minra, n)
     @argcheck(isempty(bad),
-              ArgumentError("$(length(bad)) observation(s) carry fewer than minra = $minra eligible assets, the fewest being $(minimum(view(n, bad))) at observation $(bad[argmin(view(n, bad))]). Widen the coverage of the Descriptors, lower the min_coverage of the Factor Exposures, or lower minra."))
+              ArgumentError("$(length(bad)) observation(s) carry fewer than minra = $minra eligible assets, the fewest being $(minimum(view(n, bad))) at observation $(bad[argmin(view(n, bad))]). Widen the coverage of the Descriptors, lower the min_coverage of the Factor Exposures, or lower minra.$(cross_sectional_observed_gap(cb, bad[argmin(view(n, bad))]))"))
     return nothing
 end
 """

@@ -492,12 +492,13 @@ end
                             E = rd.E, pnl = rd.pnl)
         @test occursin("a later block must carry the same names",
                        message(() -> partial_fit!(e1, rows(ren, 91:170))))
-        # The carry keeps every fitted row, so the step that fits a row refuses a non-finite
-        # observed return on it, as the batch fit does. Row 1 has no lagged exposure, so the
-        # regression never reads it, and the value is accepted.
-        for (row, refused) in ((200, true), (1, false))
+        # The carry keeps every fitted row, so the step that fits a row refuses an infinite
+        # observed return on it, as the batch fit does. A NaN marks a gap, and the step fits
+        # it as the batch fit does (#1530). Row 1 has no lagged exposure, so the regression
+        # never reads it.
+        for (row, v, refused) in ((200, Inf, true), (200, NaN, false), (1, NaN, false))
             E = copy(rd.E)
-            E[row, 1] = NaN
+            E[row, 1] = v
             rn = ReturnsResult(; nx = rd.nx, X = rd.X, ne = rd.ne, E = E, pnl = rd.pnl)
             if refused
                 e2 = partial_fit!(partial_fit!(pe, rows(rn, 1:90)), rows(rn, 91:170))

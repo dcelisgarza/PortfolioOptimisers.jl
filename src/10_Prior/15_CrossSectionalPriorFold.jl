@@ -503,7 +503,7 @@ The batch fit runs the same passes over every observation. Each observation is f
 # Arguments
 
   - `pe`: Cross-Sectional Factor Prior estimator.
-  - `blk`: The observations: `Zl`, the lagged reduced exposures; `Xr`, the returns; `em` and `am`, the masks; and `mcl`, the lagged market capitalisation or `nothing`.
+  - `blk`: The observations: `Zl`, the lagged reduced exposures; `Xr`, the returns; `em` and `am`, the masks; `mcl`, the lagged market capitalisation or `nothing`; and `cb`, the observed factors of the block or `nothing`.
   - `prev`: The marks `lv1` and `lv`, the folded estimator `ve1` and the number `seed` of rows to fold as one block.
 
 # Validation
@@ -521,10 +521,10 @@ The batch fit runs the same passes over every observation. Each observation is f
 """
 function cross_sectional_fold_regression(pe::CrossSectionalFactorPrior, blk::NamedTuple,
                                          prev::NamedTuple)
-    (; Zl, Xr, em, am, mcl) = blk
+    (; Zl, Xr, em, am, mcl, cb) = blk
     msk = cross_sectional_eligible(Xr, Zl, em)
     cross_sectional_cap_finite!(msk, mcl)
-    assert_cross_sectional_coverage(msk, cross_sectional_minra(pe, size(Zl, 3)))
+    assert_cross_sectional_coverage(msk, cross_sectional_minra(pe, size(Zl, 3)), cb)
     W = cs_weights_initial(pe.wa, mcl, msk)
     p1 = cross_sectional_fold_pass(pe, Zl, Xr, W, prev.lv1)
     if isnothing(p1) || !needs_second_pass(pe.wa)
@@ -925,7 +925,7 @@ This is the first fit, and the fit after a step that moves the automatic choice 
 # Algorithm
 
  1. Build the Factor Family Basis of every observation with [`cross_sectional_family_basis`](@ref), under `families`, or under the families of `pe` at the first fit, and name its dropped members with [`cross_sectional_dropped_names`](@ref).
- 2. Take the observed factors of every fitted observation with [`cross_sectional_observed_block`](@ref), which refuses a non-finite observed return.
+ 2. Take the observed factors of every fitted observation with [`cross_sectional_observed_block`](@ref), which refuses an infinite observed return.
  3. Run the regression passes over every fitted observation with [`cross_sectional_fold_regression`](@ref), on the returns net of the observed factors.
  4. Fold `ve` over the residuals with [`cross_sectional_fold_variance`](@ref), and the factor prior over the factor returns of [`cross_sectional_fold_factor_returns`](@ref) with [`cross_sectional_fold_factors`](@ref).
 
@@ -956,7 +956,7 @@ function cross_sectional_fold_refit(pe::CrossSectionalFactorPrior,
     d = (pe.lag + 1):Tf
     cb = cross_sectional_observed_block(st.obs, 1:Tf, d, st.buf.n - Tf)
     blk = (; Zl = fb.Ms[1:D, :, :], Xr = something(st.Xl, st.X)[d, :], em = st.emsk[d, :],
-           am = st.amsk[d, :], mcl = cross_sectional_rows(st.mcap, 1:D))
+           am = st.amsk[d, :], mcl = cross_sectional_rows(st.mcap, 1:D), cb = cb)
     reg = cross_sectional_fold_regression(pe, blk,
                                           (; lv1 = nothing, lv = nothing, ve1 = nothing,
                                            seed = seed))
@@ -986,7 +986,7 @@ Each output of a fitted observation reads no later observation, so the step fits
 # Algorithm
 
  1. Reduce the exposures of the new observations with [`cross_sectional_family_basis`](@ref) under `families`, and lag them behind the reduced exposures of the last `lag` observations.
- 2. Take the observed factors of the new observations with [`cross_sectional_observed_block`](@ref), which refuses a non-finite observed return.
+ 2. Take the observed factors of the new observations with [`cross_sectional_observed_block`](@ref), which refuses an infinite observed return.
  3. Run the regression passes over the new observations with [`cross_sectional_fold_regression`](@ref), under the marks of the fitted observations, on the returns net of the observed factors.
  4. Fold `ve` over the new residuals with [`cross_sectional_fold_variance`](@ref), and the factor prior over the new factor returns of [`cross_sectional_fold_factor_returns`](@ref) with [`cross_sectional_fold_factors`](@ref).
  5. Append every output to the state with [`cross_sectional_fold_append`](@ref).
@@ -1016,7 +1016,7 @@ function cross_sectional_fold_step(pe::CrossSectionalFactorPrior,
     Zc = cat(st.Z, fb.Ms; dims = 1)
     cb = cross_sectional_observed_block(st.obs, 1:Tf, q, st.buf.n - Tf)
     blk = (; Zl = Zc[1:m, :, :], Xr = something(st.Xl, st.X)[q, :], em = st.emsk[q, :],
-           am = st.amsk[q, :], mcl = cross_sectional_rows(st.mcap, q .- pe.lag))
+           am = st.amsk[q, :], mcl = cross_sectional_rows(st.mcap, q .- pe.lag), cb = cb)
     reg = cross_sectional_fold_regression(pe, blk,
                                           (; lv1 = st.lv1, lv = st.lv, ve1 = st.ve1,
                                            seed = 0))

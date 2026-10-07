@@ -694,9 +694,9 @@ end
     cross_sectional_observed_block(cc::Nothing, rw, r, o::Integer = 0) -> nothing
     cross_sectional_observed_block(cc::NamedTuple, rw, r, o::Integer = 0) -> NamedTuple
 
-Trim the observed factors to the observations a fit reads, and refuse a non-finite observed return among them.
+Trim the observed factors to the observations a fit reads, and refuse an infinite observed return among them.
 
-The Descriptor warm-up and the exposure lag consume the first observations, and the fit reads none of them, so a `NaN` there changes nothing and is accepted. The check reads only the observations left after the two trims. It runs before the regression, so a gap in an observed series is named as the cause, even when the net returns it spoils leave an observation too few assets.
+A `NaN` marks a gap, such as a series that starts after the first fitted observation, and the trimmed returns keep it. The derived net returns of every asset that holds the factor are then `NaN` at that observation, so the eligibility mask drops those pairs from the regression. The factor prior states the moments of the factor by its own rule. A mask-aware estimator, such as the default one, estimates them from the observations the series has. A plain estimator leaves the factor out of its Coverage Universe, so the moments are `NaN`, and the assets that hold the factor leave the Investable Mask. An infinity marks no gap, so it is refused. The check reads only the observations left after the Descriptor warm-up and the exposure lag, and it runs before the regression, so the error names the series.
 
 # Arguments
 
@@ -707,7 +707,7 @@ The Descriptor warm-up and the exposure lag consume the first observations, and 
 
 # Validation
 
-  - Every observed return of the fitted observations is finite. Raises an [`IsNonFiniteError`](@ref) that names the series and the first observation, as a row of the returns data.
+  - No observed return of the fitted observations is infinite. Raises an [`IsNonFiniteError`](@ref) that names the series and the first observation, as a row of the returns data.
 
 # Returns
 
@@ -725,13 +725,46 @@ end
 function cross_sectional_observed_block(cc::NamedTuple, rw, r, o::Integer = 0)
     rows = rw[r]
     R = cc.R[rows, :]
-    bad = [c for c in axes(R, 2) if !all(isfinite, view(R, :, c))]
+    bad = [c for c in axes(R, 2) if any(isinf, view(R, :, c))]
     if !isempty(bad)
-        t = findfirst(t -> !all(isfinite, view(R, t, :)), axes(R, 1))
-        throw(IsNonFiniteError("the observed factor returns must be finite on every observation the fit reads, and the series $(unique(cc.lv[bad])) are not, first at observation $(o + rows[t]) of the returns data. A gap in the observations the Descriptor warm-up and the exposure lag consume is accepted, because the fit reads none of them."))
+        t = findfirst(t -> any(isinf, view(R, t, :)), axes(R, 1))
+        throw(IsNonFiniteError("the observed factor returns must not be infinite on an observation the fit reads, and the series $(unique(cc.lv[bad])) are, first at observation $(o + rows[t]) of the returns data. A NaN marks a gap and is accepted."))
     end
     return (; R = R, Zr = cc.Z[rows, :, :], Zt = cc.Z[rows[end], :, :], nf = cc.nf,
             fam = cc.fam)
+end
+"""
+    cross_sectional_observed_gap(cb::Nothing, t::Integer) -> String
+    cross_sectional_observed_gap(cb::NamedTuple, t::Integer) -> String
+
+State the observed factors that have no return at one fitted observation, as a sentence a refusal appends.
+
+A `NaN` observed return makes the net return of every asset that holds the factor `NaN` at that observation, so the eligibility mask drops those assets there. An observed factor that every asset holds, such as an [`ObservedExposure`](@ref) of a [`ConstantExposure`](@ref), then leaves the observation with no eligible asset, and [`assert_cross_sectional_coverage`](@ref) refuses the fit. The sentence names the cause, which the advice of that refusal does not reach. A prior with no observed factor, or an observation where every observed return is a number, gives the empty string.
+
+# Arguments
+
+  - `cb`: The observed factors of the fitted observations, from [`cross_sectional_observed_block`](@ref), or `nothing`.
+  - `t`: The fitted observation, as a row of `cb.R`.
+
+# Returns
+
+  - `note::String`: The sentence, with a leading space, or the empty string.
+
+# Related
+
+  - [`cross_sectional_observed_block`](@ref)
+  - [`assert_cross_sectional_coverage`](@ref)
+"""
+function cross_sectional_observed_gap(::Nothing, ::Integer)
+    return ""
+end
+function cross_sectional_observed_gap(cb::NamedTuple, t::Integer)
+    gap = cb.nf[isnan.(view(cb.R, t, :))]
+    return if isempty(gap)
+        ""
+    else
+        " The observed factors $gap have no return at that observation, so the net return of every asset that holds them is NaN there. Start the fit where those series start, or give them a return there."
+    end
 end
 """
     cross_sectional_observed_append(cb::Nothing, f, L, Ms, nf, fam, fcb) -> NamedTuple

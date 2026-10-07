@@ -113,8 +113,9 @@ state owns it once, and the Fold Context reads it back.
   the series as the refit's buffer does, so the Fold Context of an optimiser reads it back. Its call
   with no data equals the batch fit over the same rows, bit for bit, with `CurrencyExposure`,
   `ObservedExposure` and `EWMacroSensitivity`, and its pinned choice under currency factors is at
-  parity with the oracle's online update. The carry keeps every fitted row, so a step refuses a
-  non-finite observed return on a row that it fits, before the regression, as the batch fit does.
+  parity with the oracle's online update. The carry keeps every fitted row, so a step refuses an
+  infinite observed return on a row that it fits, before the regression, as the batch fit does. A
+  `NaN` marks a gap, and the step folds it as the batch fit reads it (#1530).
   An `EWMacroSensitivity` states no look-back, so the carry keeps every panel row under it, which is
   exact for a recursion from the first row.
 
