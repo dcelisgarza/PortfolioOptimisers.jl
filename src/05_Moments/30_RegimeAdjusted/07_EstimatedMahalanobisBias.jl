@@ -183,18 +183,16 @@ function mahalanobis_level_sum!(grid::NamedTuple, gh::VecNum, rh::VecNum,
     cut = mahalanobis_cut!(gh, rh, grid.xf, shift[2], peak)
     mahalanobis_pair_differences!(dg, dr, grid, gh, rh, shift)
     fill!(v, zero(eltype(v)))
-    J = zero(eltype(v))
-    for k in 0:(n - 1)
-        if k > 0
-            mahalanobis_level_step!(v, e, lv, dg, dr, grid)
-        end
+    mahalanobis_q_integral!(e, v, grid)
+    so, L = mahalanobis_transform(merge(grid, (; cut)), gh, e, m)
+    J = grid.ho * sum(L)
+    for _ in 1:(n - 1)
+        mahalanobis_level_step!(v, e, lv, dg, dr, grid)
         mahalanobis_q_integral!(e, v, grid)
         so, L = mahalanobis_transform(merge(grid, (; cut)), gh, e, m)
         J += grid.ho * sum(L)
-        if k == n - 1
-            return so, L, J
-        end
     end
+    return so, L, J
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
