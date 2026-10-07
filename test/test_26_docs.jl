@@ -275,6 +275,8 @@ nothing raises `@error "File exists but no references were collected"` in
 
     @testset "every ref_dict entry has a user" begin
         for key in keys(PO.ref_dict)
+            # The standard note is the one key that names no work.
+            key === :no_original_source && continue
             @test string(key) in bib_keys
         end
         users = Set{Symbol}()
@@ -317,26 +319,74 @@ nothing raises `@error "File exists but no references were collected"` in
     # A bullet under `# References` must be one interpolation of `ref_dict`, optionally
     # followed by a locator such as `Chapter 2.`. Anything else is a pasted copy of the
     # reference prose, which is what this table exists to stop.
+    # The line numbers of the bullets of every `# References` section of `lines`.
+    function references_bullets(lines)
+        acc = Int[]
+        i = 1
+        while i <= length(lines)
+            if strip(lines[i]) == "# References"
+                j = i + 1
+                while j <= length(lines) && isempty(strip(lines[j]))
+                    j += 1
+                end
+                while j <= length(lines) && startswith(strip(lines[j]), "- ")
+                    push!(acc, j)
+                    j += 1
+                end
+                i = j
+            else
+                i += 1
+            end
+        end
+        return acc
+    end
+
     @testset "no # References bullet carries inline reference prose" begin
         bullet = r"^\s*- \$\(ref_dict\[:[A-Za-z0-9_]+\]\)"
         for f in source_files
             lines = split(read(f, String), '\n')
-            i = 1
-            while i <= length(lines)
-                if strip(lines[i]) == "# References"
-                    j = i + 1
-                    while j <= length(lines) && isempty(strip(lines[j]))
-                        j += 1
-                    end
-                    while j <= length(lines) && startswith(strip(lines[j]), "- ")
-                        @test occursin(bullet, lines[j])
-                        j += 1
-                    end
-                    i = j
-                else
-                    i += 1
-                end
+            for j in references_bullets(lines)
+                @test occursin(bullet, lines[j])
             end
+        end
+    end
+
+    #=
+    The standard note marks a formulation whose original source was not found. It closes the
+    `# References` bullet of the secondary source the docstring follows, after a locator that
+    names the equation the code follows, because a later search starts there. A note anywhere
+    else, or one with no locator before it, cannot be read that way. The note is the honest
+    result of a search, so nothing counts the notes: this check reads their form alone.
+    =#
+    note_bullet = r"^\s*- \$\(ref_dict\[:([A-Za-z0-9_]+)\]\)\s+[^$]*[^$\s]\s+\$\(ref_dict\[:no_original_source\]\)\s*$"
+    function note_offenders(text)
+        lines = split(text, '\n')
+        bullets = Set(references_bullets(lines))
+        acc = String[]
+        for (k, line) in pairs(lines)
+            occursin("ref_dict[:no_original_source]", line) || continue
+            m = match(note_bullet, line)
+            ok = k in bullets && !isnothing(m) && m.captures[1] != "no_original_source"
+            ok || push!(acc, strip(line))
+        end
+        return acc
+    end
+
+    @testset "the standard note closes a # References bullet after a locator" begin
+        # The check is vacuous until a docstring carries the note, so it is pinned on text.
+        refs = "# References\n\n  - \$(ref_dict[:cajas2025])"
+        note = "\$(ref_dict[:no_original_source])"
+        @test isempty(note_offenders("$(refs) Equation 3.45. $(note)\n"))
+        # No locator, text after the note, a note outside a bullet, a note as the reference.
+        bad = ("$(refs) $(note)\n", "$(refs) Equation 3.45. $(note) Page 2.\n",
+               "$(refs) Equation 3.45.\n\nThe formula. $(note)\n",
+               "# References\n\n  - $(note) Equation 3.45. $(note)\n")
+        for text in bad
+            @test length(note_offenders(text)) == 1
+        end
+        for f in source_files
+            f == dict_file && continue
+            @test isempty(note_offenders(read(f, String))) || f
         end
     end
 

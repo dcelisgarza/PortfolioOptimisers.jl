@@ -279,7 +279,8 @@ number_or_dash(x) = x === nothing ? "—" : string(x)
 
 The sub-issue of ADR 0084. It mirrors the child map that owns it, one file wide: the fixed
 `ROUTING` block, a Destination naming the file and its measured row, the five conditions of #404
-restated compactly, the sentence that the committed files are the authority, and Notes that point
+restated compactly (condition 2 names the original source of a formulation and the standard note
+of `.github/instructions/julia-docstrings.instructions.md` § *The original source*), the sentence that the committed files are the authority, and Notes that point
 at #404 without copying a rule.
 
 **Every field is generated**, so the job needs no judgement: the path, `map` and `units` from
@@ -306,7 +307,9 @@ function body_of(c::Candidate, commit::AbstractString)
             number_or_dash(c.lines), " |\n")
     println(io, "Five conditions, from #", UMBRELLA, ":\n")
     println(io, "1. Its documentation states the mathematics.")
-    println(io, "2. Its code agrees with that statement, checked with real numbers.")
+    println(io, "2. Its code agrees with that statement, checked with real numbers. Each ",
+            "formulation is checked against its original source, the work that first states ",
+            "it, and a formulation whose original was not found carries the standard note.")
     println(io, "3. Its lines are covered, or exempted with a reason.")
     println(io, "4. Its prose passes `/unslop`.")
     println(io, "5. Its code carries no performance trap: `code_health/perf.jl scan ",

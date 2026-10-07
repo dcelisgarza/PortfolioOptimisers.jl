@@ -244,6 +244,18 @@ A method that has the name of a person, such as the Weiszfeld iteration or Welfo
 
 **The Gate.** [`test/test_74_source_citation_census.jl`](../../test/test_74_source_citation_census.jl) reads the literal text of each docstring under `src/` and `ext/`, field docstrings included, and each value in the docstring dictionaries. It fails on the words "paper", "article", "co-author" and "the authors", and on a name with a capital letter that a year in parentheses follows. The same census reads every string literal under `src/` and `ext/`, messages included, and fails on a word of the `mechanism` pattern of `code_health/prose.jl`. The census does not find an author list that has no year, or a private name for a value that the pattern does not list. Those two hold by review, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md). `test/test_26_docs.jl` checks that the key of each `[key](@cite)` and `[key](@citet)` is in `docs/src/References.bib`.
 
+### The original source
+
+A formulation is checked against its **original source**: the work that first states the formulation that the code builds. A book, a survey, a software manual or another library that restates the formulation is a **secondary source** of it. A check against a secondary source cannot find an error that the secondary source carries.
+
+A work is secondary for one formulation, not by its kind. A book is the original source of a formulation that it states first. An article is a secondary source of a formulation that it takes from an earlier work.
+
+- **Find the original.** Follow the bibliography of the secondary source back to the work that first states the formulation. Search the web when the bibliography is not enough.
+- **Check the code against the original, and cite the original.** Cite a secondary source too only where it adds something, such as a generalisation or a conic encoding. The sentence that cites it says what it adds.
+- **When the original cannot be found, write the standard note.** It closes the `# References` bullet of the secondary source that the docstring follows. [The `# References` Section](#the--references-section) states its form.
+
+So a `# References` bullet with no note states that every formulation the docstring takes from that work was checked against its original source.
+
 ---
 
 ## The prose passes `/unslop`
@@ -621,7 +633,18 @@ A docstring that rests on a published source names it. The section is **last**, 
     - $(ref_dict[:mlp1]) Chapter 2.
   ```
 
-  A locator such as `Chapter 2.` may follow the interpolation. Nothing else may.
+  A locator such as `Chapter 2.` may follow the interpolation. Nothing else may, except the standard note below.
+- **The standard note marks a formulation whose original source was not found.** [The original source](#the-original-source) states when to write it. It closes the bullet of the secondary source that the docstring follows, after a locator that names the equation, the section or the page that the code follows:
+
+  ```julia
+  # References
+
+    - $(ref_dict[:cajas2025]) Equation 3.45. $(ref_dict[:no_original_source])
+  ```
+
+  The note is one key of `ref_dict`, `no_original_source`, so its wording cannot drift and a search for the key lists every formulation that is still open. Its text is "The original source of this formulation was not found. The formulation follows this work and is not checked against the original." It is the one key of `ref_dict` that is not a key of `docs/src/References.bib`. The locator is mandatory, because a later search starts from it. A docstring that follows a secondary source for one formulation and an original source for another carries the note on the bullet of the secondary source alone, and the locator names the formulation.
+
+  The note is the honest result of a search, so no ratchet counts the notes. A note leaves when a later search finds the original: the docstring then cites the original, and the code is checked against it.
 - **If the work has no key**, add the BibTeX entry to `docs/src/References.bib`, then add the matching `ref_dict` entry. The `ref_dict` value is the citation marker followed by the reference formatted as `DocumenterCitations` renders it in the bibliography.
 - **If the type has no source**, write no section. A `ref_dict` entry with no user is a test failure, and so is a citation whose key is not in `References.bib`.
 - **Add the page's bibliography block.** An API page whose prose or whose included docstrings cite anything carries this block, and a page that cites nothing must not:
@@ -638,7 +661,7 @@ A docstring that rests on a published source names it. The section is **last**, 
   `Canonical = false` is load-bearing. `docs/src/99_references.md` holds the one canonical block; a second canonical block silently skips every entry the first claimed. A `Pages` block on a page that cites nothing is a docs-**build error**, not a warning.
 - An inline citation in prose — `as described in [DBHTs](@cite)` — needs no bullet of its own, but the work still needs a `# References` bullet on the type that owns it.
 
-The four rules above are checked by the `"References"` testset in `test/test_26_docs.jl`.
+The rules above are checked by the `"References"` testset in `test/test_26_docs.jl`. It checks the form of the note: the note closes a `# References` bullet, a locator comes before it, and it appears nowhere else. The check of a formulation against its original source holds by review.
 
 ---
 

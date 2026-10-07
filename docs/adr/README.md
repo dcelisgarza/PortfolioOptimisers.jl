@@ -225,3 +225,4 @@ ADRs 0017, 0018, and 0028 carry no `status` frontmatter. Every other ADR is `acc
 
 [`examples-coverage.md`](examples-coverage.md) is a living inventory of which pipeline-stage
 topics have an example or a user-guide page. ADR 0014 records the decision behind its grouping.
+| 0198 | [A docstring cites the original source, and a standard note marks one that was not found](0198-a-docstring-cites-the-original-source-and-a-standard-note-marks-one-not-found.md) | | A formulation is checked against the work that first states it, never only against a book, a survey or a manual that restates it, and the docstring cites that work. When it cannot be found, `ref_dict[:no_original_source]` closes the `# References` bullet of the secondary source after a mandatory locator. `test_26` checks the form of the note, and no ratchet counts the notes. |
