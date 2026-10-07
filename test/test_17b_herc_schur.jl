@@ -313,6 +313,64 @@ end
     @test gamma == 0
     @test w == nm_weights(pr, 0)
 end
+@testset "The Schur bisection refines below tol and evaluates only gamma in [0, gamma]" begin
+    PO = PortfolioOptimisers
+    bs = PO.schur_complement_binary_search
+    # The variance falls up to t and rises after it. A turning point below tol is still
+    # found above zero: the bracket halves towards its start until a midpoint passes. No
+    # probe of the slope evaluates a negative gamma.
+    for t in (1e-7, 1e-5, 0.025, 0.03)
+        calls = Float64[]
+        obj = g -> (push!(calls, g); ([g], (g - t)^2))
+        w, g = bs(obj, 0.0, 0.1, t^2, [0.0])
+        @test 0 < g && abs(g - t) <= min(1e-4, t)
+        @test w == [g]
+        @test all(c -> 0 <= c <= 0.1, calls)
+    end
+    # The variance rises from the start, or every allocation fails. A rejected midpoint
+    # takes no probe of the slope, so the derived budget of 21 bisections costs 21 calls.
+    for feasible in (true, false)
+        calls = Float64[]
+        obj = g -> (push!(calls, g); feasible ? ([g], g^2) : (nothing, Inf))
+        w0 = feasible ? [0.0] : nothing
+        w, g = bs(obj, 0.0, 0.1, feasible ? 0.0 : Inf, w0)
+        @test w === w0
+        @test g == 0
+        @test length(calls) == 21
+    end
+    # The variance falls up to 0.08, and the allocation fails above b. The answer is the
+    # largest value at which the allocation exists, to within tol.
+    for b in (0.025, 0.03, 0.034)
+        obj = g -> g > b ? (nothing, Inf) : ([g], (g - 0.08)^2)
+        w, g = bs(obj, 0.0, 0.1, 0.08^2, [0.0])
+        @test 0 <= b - g <= 1e-4
+        @test w == [g]
+    end
+    # A nine-asset panel whose augmented block stops being positive definite between
+    # 0.26275 and 0.2628, while the variance still falls. The bisection continues past a
+    # failed midpoint until a midpoint exists. An independent implementation of the same
+    # search, with the same scan grid, gives 0.262744140625. A bisection that stops at the
+    # first bracket of width tol gives 0.2626953125, at a higher variance.
+    rng = StableRNG(123)
+    F = randn(rng, 200, 1) * 0.01
+    B = randn(rng, 9, 1) * 0.9
+    E = randn(rng, 200, 9) * 0.01 * 0.3
+    pr = prior(EmpiricalPrior(), F * B' + E)
+    items = [collect(1:9)]
+    wb = WeightBounds(; lb = zeros(9), ub = ones(9))
+    p = SchurComplementParams(; gamma = 0.5, alg = MonotonicSchurComplement(; N = 6))
+    w, gamma, _ = PO.schur_complement_weights(pr, items, wb, p)
+    @test isapprox(gamma, 0.262744140625; atol = 1e-12)
+    pn = SchurComplementParams(; gamma = 0.5, alg = NonMonotonicSchurComplement(),
+                               flag = false)
+    @test w == PO.schur_complement_weights(pr, items, wb, pn, gamma)[1]
+    @test isnothing(PO.schur_complement_weights(pr, items, wb, pn, 0.2628)[1])
+    # A range narrower than tol checks the slope at its top against the variance at zero.
+    p = SchurComplementParams(; gamma = 5e-5, alg = MonotonicSchurComplement(; N = 2))
+    w, gamma, _ = PO.schur_complement_weights(pr, items, wb, p)
+    @test gamma == 5e-5
+    @test w == PO.schur_complement_weights(pr, items, wb, pn, 5e-5)[1]
+end
 @testset "A later Schur split reads the repaired blocks" begin
     #=
     With `flag = true` the recursion repairs each augmented block before it reads the risk.
@@ -520,8 +578,8 @@ end
     @test_throws ArgumentError PO.schur_complement_weights(prx, [collect(1:10)], wbx, pft)
     @test isnothing(PO.assert_schur_weights(ones(2), 0.5))
 
-    # A bracket already narrower than tol ends the bisection with no warning, even when the
-    # derived budget is zero or less.
+    # A bracket already narrower than tol still takes one bisection, with no warning. The
+    # variance falls up to 5e-8, so the midpoint is the answer and not the start.
     obj(x) = (fill(x, 1), (x - 5e-8)^2)
     @test (@test_logs min_level = Logging.Warn PO.schur_complement_binary_search(obj, 0.0,
                                                                                  1e-7,
@@ -530,7 +588,7 @@ end
                                                                                  1e-4,
                                                                                  nothing,
                                                                                  true)) ==
-          ([0.0], 0.0)
+          ([5e-8], 5e-8)
 
     # port_opt_view of a bundle views the measure and keeps the other fields.
     pv = SchurComplementParams(; r = Variance(; sigma = sigma), gamma = 0.4,
