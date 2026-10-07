@@ -1597,6 +1597,7 @@ Keywords correspond to the struct's fields.
 
   - `!isempty(sigma)`.
   - `size(sigma, 1) == size(sigma, 2)`.
+  - `!(k isa Bool)`, else an `ArgumentError`. The converter to [`NormBallUncertaintySet`](@ref) carries `k` into its radius `kappa`, which refuses a `Bool` too.
   - `k > 0`.
   - If `val` is provided: `length(val) == size(sigma, 1)`. The rule reads a length rather than a size, so it holds on both axes: `val` is a characteristic vector of length ``N`` beside an ``N \\times N`` shape matrix, and an ``N \\times N`` covariance matrix beside an ``N^{2} \\times N^{2}`` one.
 
@@ -1645,6 +1646,8 @@ EllipsoidalUncertaintySet
                                        val::Option{<:ArrNum})
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
         assert_matrix_issquare(sigma, :sigma)
+        @argcheck(!isa(k, Bool),
+                  ArgumentError("k is a radius, so it must be a number and not a Bool. Got\nk => $k."))
         @argcheck(k > zero(k), DomainError(k, "k must be positive"))
         if isa(val, ArrNum)
             @argcheck(length(val) == size(sigma, 1),

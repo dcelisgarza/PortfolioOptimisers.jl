@@ -46,6 +46,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
+  - `!(kappa isa Bool)`, else an `ArgumentError`.
   - `isfinite(kappa)` and `kappa >= 0`.
   - `!isempty(C)`, `all(isfinite, C)` and `all(x -> x >= 0, C)`.
   - `all(isfinite, Q)`.
@@ -99,6 +100,8 @@ CompactCovarianceUncertaintySet
     val
     function CompactCovarianceUncertaintySet(kappa::Number, C::VecNum, Q::MatNum, R::MatNum,
                                              val::Option{<:MatNum})
+        @argcheck(!isa(kappa, Bool),
+                  ArgumentError("kappa is a radius, so it must be a number and not a Bool. Got\nkappa => $kappa."))
         @argcheck(isfinite(kappa) && kappa >= zero(kappa),
                   DomainError(kappa, "kappa must be finite and >= 0"))
         @argcheck(!isempty(C), IsEmptyError("C cannot be empty"))

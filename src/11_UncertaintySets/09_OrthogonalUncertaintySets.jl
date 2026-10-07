@@ -364,7 +364,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `0 < q < 1`.
-  - If `kappa` is a number: `isfinite(kappa)` and `kappa >= 0`. A rule is checked where its number lands, by the constructor of [`CompactCovarianceUncertaintySet`](@ref).
+  - If `kappa` is a number: `!(kappa isa Bool)`, else an `ArgumentError`, and `isfinite(kappa)` and `kappa >= 0`. A `Bool` is an `Integer` in Julia, so `true` would pass as the radius `1`, and a `Bool` in the radius slot is a flag in the wrong place. A rule is checked where its number lands, by the constructor of [`CompactCovarianceUncertaintySet`](@ref).
 
 # Examples
 
@@ -425,6 +425,8 @@ OrthogonalUncertaintySet
         # A rule states no number yet, so its range is checked where the number lands, in
         # `CompactCovarianceUncertaintySet`'s own constructor.
         if isa(kappa, Number)
+            @argcheck(!isa(kappa, Bool),
+                      ArgumentError("kappa is a radius, so it must be a number and not a Bool. Got\nkappa => $kappa."))
             @argcheck(isfinite(kappa) && kappa >= zero(kappa),
                       DomainError(kappa, "kappa must be finite and >= 0"))
         end

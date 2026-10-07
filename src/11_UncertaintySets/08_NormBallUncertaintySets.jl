@@ -53,6 +53,7 @@ Keywords correspond to the struct's fields. The second constructor converts a bu
 
 ## Validation
 
+  - `!(kappa isa Bool)`, else an `ArgumentError`.
   - `isfinite(kappa)` and `kappa >= 0`.
   - `!isnan(p)` and `p >= 1`. `Inf` is admitted.
   - `size(L, 1) > 0` and `all(isfinite, L)`. A map with no column is admitted.
@@ -118,6 +119,8 @@ NormBallUncertaintySet
     function NormBallUncertaintySet(kappa::Number, L::MatNum, p::Number, class::C,
                                     val::Option{<:ArrNum}) where {C <:
                                                                   AbstractUncertaintySetClass}
+        @argcheck(!isa(kappa, Bool),
+                  ArgumentError("kappa is a radius, so it must be a number and not a Bool. Got\nkappa => $kappa."))
         @argcheck(isfinite(kappa) && kappa >= zero(kappa),
                   DomainError(kappa, "kappa must be finite and >= 0"))
         @argcheck(!isnan(p) && p >= one(p), DomainError(p, "p must be >= 1"))

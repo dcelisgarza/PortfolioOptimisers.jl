@@ -441,8 +441,11 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
 
     @testset "An invalid confidence level refuses" begin
         # The oracle refuses a confidence level of `True`, 1.5, 0.0 and "0.9"; the library
-        # states `q = 1 - confidence`. A `Bool` radius is the number 0 or 1 in Julia, so a
-        # `kappa = true` is the radius 1, where the oracle refuses a boolean.
+        # states `q = 1 - confidence`. The oracle refuses a boolean radius too (#1516). A
+        # `Bool` is an `Integer` in Julia, so the range check alone takes `kappa = true` as the
+        # radius 1. Every slot of that radius refuses a `Bool` by name: the estimator, the
+        # compact set, the norm ball, and the ellipsoid, whose `k` the converter carries into
+        # the norm ball's `kappa`.
         for q in (true, -0.5, 1.0, 0.0, NaN)
             @test_throws DomainError OrthogonalUncertaintySet(; q = q)
         end
@@ -450,6 +453,27 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         for k in (-1.0, Inf, NaN)
             @test_throws DomainError OrthogonalUncertaintySet(; kappa = k)
         end
+        C = [1.0, 1.0]
+        Q = reshape([1.0, 0.0], 2, 1)
+        L = [1.0 0.0; 0.0 1.0]
+        S = [1.0 0.2; 0.2 1.0]
+        for b in (true, false)
+            @test_throws "kappa is a radius" OrthogonalUncertaintySet(; kappa = b)
+            @test_throws ArgumentError CompactCovarianceUncertaintySet(; kappa = b, C = C,
+                                                                       Q = Q)
+            @test_throws ArgumentError NormBallUncertaintySet(; kappa = b, L = L,
+                                                              class = MuUncertaintySetClass())
+            @test_throws ArgumentError EllipsoidalUncertaintySet(S, b,
+                                                                 MuUncertaintySetClass())
+        end
+        # Every number in range still constructs, the degenerate radius 0 among them.
+        for k in (0, 1, 0.0, 2.5, 1 // 2)
+            @test OrthogonalUncertaintySet(; kappa = k).kappa === k
+            @test CompactCovarianceUncertaintySet(; kappa = k, C = C, Q = Q).kappa === k
+            @test NormBallUncertaintySet(; kappa = k, L = L,
+                                         class = MuUncertaintySetClass()).kappa === k
+        end
+        @test EllipsoidalUncertaintySet(S, 1, MuUncertaintySetClass()).k === 1
     end
 
     @testset "The two radius rules meet their stated bounds on a real prior" begin
