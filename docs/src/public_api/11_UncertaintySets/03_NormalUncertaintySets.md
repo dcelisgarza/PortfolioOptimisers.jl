@@ -1,5 +1,5 @@
 ```@meta
-Description = "Normal Uncertainty Sets, public API of PortfolioOptimisers.jl: NormalUncertaintySet, AbstractDiagonalConstruction, DiagonalOfShape, ShapeOfDiagonal, …"
+Description = "Normal Uncertainty Sets, public API of PortfolioOptimisers.jl: AbstractDiagonalConstruction, DiagonalOfShape, ShapeOfDiagonal, diagonal_sigma_shape, …"
 ```
 
 # Normal Uncertainty Sets

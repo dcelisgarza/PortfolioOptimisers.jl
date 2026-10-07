@@ -77,7 +77,7 @@ include(joinpath(@__DIR__, "moment_family_setup.jl"))
     rescaled = filter(S -> takes_correlation_rescale(S), families.ce)
     @test !isempty(rescaled)
     for S in rescaled
-        @test hasfield(typeof(S()), :ve)
+        @test hasfield(typeof(default_instance(S)), :ve)
         @test owns_verb(Statistics.cor, S)
     end
 end
@@ -97,7 +97,7 @@ that take the identity, so that a leaf added with a per-asset field reds the bui
 either declares the axis or states here why it has none. Closed polarity, as ADR 0037's rules
 and the censuses of ADR 0058 have it.
 
-The probe asks about `typeof(S())` rather than `S`, for the reason `dispatched_method` gives: a
+The probe asks about `typeof(default_instance(S))` rather than `S`, for the reason `dispatched_method` gives: a
 parametric leaf arrives as a `UnionAll`, and `which` on one reads the fallback whatever the leaf
 declares.
 =#
@@ -126,7 +126,7 @@ end
 # `CustomValueExpectedReturns` is on the list below and its three shapes are pinned one by one.
 function takes_view_identity(S::Type)
     me = try
-        S()
+        default_instance(S)
     catch
         return false
     end
