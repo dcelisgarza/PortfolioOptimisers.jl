@@ -1812,7 +1812,10 @@ end
                 PO.regime_bias_factor(PO.FirstMomentRegimeAdjusted(), s, G .* sqrt.(V ./ f),
                                       c, 1 / 200),
                 PO.regime_bias_factor(PO.LogRegimeAdjusted(), s, G, c, 1 / 200),
-                PO.regime_log_variance(s, G, 1 / 200)), minimum(mu) > 0
+                PO.regime_log_variance(s, G, 1 / 200),
+                PO.regime_bias_factor(PO.RootMeanSquaredAdjusted(), s, G, c, 1 / 200),
+                PO.regime_bias_factor(PO.FirstMomentRegimeAdjusted(), s, G, c, 1 / 200)),
+               minimum(mu) > 0
     end
     lam = 2.0^(-1 / 10)
     methods = (PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted(),
@@ -1821,6 +1824,9 @@ end
         tables = [PO.regime_bias_table(m, lam, 64, L, EstimatedCentring()) for m in methods]
         logm = PO.regime_bias_table(PO.RegimeTermMoments(PO.LogRegimeAdjusted()), lam, 64,
                                     L, EstimatedCentring())
+        # The law of the estimate alone: the deviation taken as independent of it.
+        laws = [PO.regime_bias_table(m, lam, 64, L, EstimatedCentring(), LawDebias())
+                for m in methods[1:2]]
         for K in (5, 20, 40)
             d, definite = dense_factors(lam, L, K)
             # Measured: 7e-13 where the estimate is positive definite, and 1.3e-9 where it
@@ -1831,6 +1837,8 @@ end
             end
             @test isapprox(logm[K][3], d[4]; rtol)
             @test logm[K][1] == tables[1][K]
+            @test isapprox(laws[1][K], d[5]; rtol)
+            @test isapprox(laws[2][K], d[6]; rtol)
         end
     end
     # The pre-centred table over the exact one at the steady state, a half-life of 10, and one,
@@ -1908,20 +1916,38 @@ end
     ch = PO.estimated_log_det_chain(lam, K, 1e-30, lat.k)
     @test ch[1] && ch[2] == (1 - lam^K) / (1 - lam) && ch[3] == 1e-30 * ch[2]
     # At 200 counts, a half-life of 10, two lags and five assets, a Monte Carlo of a million
-    # draws of the statistic reads 1.4994, 1.4513 and 1.4046 (standard error 0.08 %): the
-    # root mean square is within 0.07 %, and the first moment and the log read the law alone,
-    # 0.45 % and 0.37 % above it. The pre-centred factors read 1.6 %, 1.4 % and 1.3 % above.
+    # draws of the statistic reads 1.4994, 1.4513 and 1.4046 (standard error 0.08 %): the three
+    # factors of the exact rule are within 0.07 %. The law alone reads 0.5 % above, and the
+    # pre-centred factors 1.6 %, 1.4 % and 1.3 % above.
     f = [PO.mahalanobis_level_bias(m, lam, [200], 5, 2, EstimatedCentring())[1]
          for m in methods]
-    @test isapprox(f, [1.49839, 1.45779, 1.40984]; rtol = 1e-5)
+    @test isapprox(f, [1.49839, 1.45126, 1.40387]; rtol = 1e-5)
+    f = [PO.mahalanobis_level_bias(m, lam, [200], 5, 2, EstimatedCentring(), LawDebias())[1]
+         for m in methods]
+    @test isapprox(f, [1.50738, 1.45779, 1.40984]; rtol = 1e-5)
+    # Without HAC the three factors are within 0.05 % of a Monte Carlo of the statistic.
+    f = [PO.mahalanobis_level_bias(m, lam, [200], 5, nothing, EstimatedCentring())[1]
+         for m in methods]
+    @test isapprox(f, [1.23597, 1.21405, 1.19265]; rtol = 1e-5)
     # Past λ^K = √ε the factor holds its ratio to the pre-centred one.
     Kh = ceil(Int, log(sqrt(eps())) / log(lam))
-    f2 = PO.mahalanobis_level_bias(methods[2], lam, [Kh, Kh + 40], 2, 2, EstimatedCentring())
+    f2 = PO.mahalanobis_level_bias(methods[2], lam, [Kh, Kh + 40], 2, 2,
+                                   EstimatedCentring())
     p2 = PO.mahalanobis_level_bias(methods[2], lam, [Kh, Kh + 40], 2, 2)
     @test f2[2] / p2[2] ≈ f2[1] / p2[1]
-    # Without HAC the law and the dependence cancel within the error of the recursion, and the
-    # target reads the pre-centred factor.
-    @test PO.mahalanobis_level_bias(methods[2], lam, [40, 200], 5, nothing,
-                                    EstimatedCentring()) ==
-          PO.mahalanobis_level_bias(methods[2], lam, [40, 200], 5, nothing)
+    # A pre-centred estimate has no dependence to read, so the rule changes nothing there.
+    @test PO.mahalanobis_level_bias(methods[2], lam, [40, 200], 5, 2, PreCentred(),
+                                    LawDebias()) ==
+          PO.mahalanobis_level_bias(methods[2], lam, [40, 200], 5, 2)
+    @test PO.debiases(LawDebias()) &&
+          PO.reads_dependence(ExactDebias()) &&
+          !PO.reads_dependence(LawDebias()) &&
+          !PO.reads_dependence(RawStatistic())
+    # The state of an estimator holds the table of its rule.
+    ce = RegimeAdjustedExpWeightedVariance(; decay = lam, hac_lags = 2, min_obs = 1,
+                                           debias = LawDebias())
+    st = PO.regime_adjusted_variance_pass!(ce, randn(StableRNG(1549), 40, 2), 1, nothing,
+                                           nothing)
+    @test st.bias == PO.regime_bias_table(ce.regime_method, lam, length(st.bias), 2,
+                                          EstimatedCentring(), LawDebias())
 end

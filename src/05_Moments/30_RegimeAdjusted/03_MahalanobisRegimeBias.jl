@@ -1120,6 +1120,8 @@ and up to 3.7 s at a half-life of 250, five lags and 12 assets.
   - `n::Integer`: Count of assets that contribute to the statistic, at least two.
   - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
+  - `centring::AbstractCentring`: The centring of the estimator, [`PreCentred`](@ref) by default.
+  - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
 
 # Returns
 
@@ -1136,7 +1138,8 @@ and up to 3.7 s at a half-life of 250, five lags and 12 assets.
 """
 function mahalanobis_bias_nodes(method::RegimeAdjustedMethod, decay::Number, n::Integer,
                                 hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing,
-                                centring::AbstractCentring = PreCentred())
+                                centring::AbstractCentring = PreCentred(),
+                                debias::AbstractRegimeDebias = ExactDebias())
     start = mahalanobis_bias_start(decay, n, hac_lags)
     Ksat = max(mahalanobis_bias_saturation(decay, n), start)
     K1 = min(start + (isnothing(hac_lags) ? 0 : 32), Ksat)
@@ -1147,7 +1150,7 @@ function mahalanobis_bias_nodes(method::RegimeAdjustedMethod, decay::Number, n::
                  end
                  for t in (1 .- cos.(pi .* (0:15) ./ 15 .* one(decay))) ./ 2])
     f = mahalanobis_level_bias(method, decay, vcat(Ks, start:(K1 - 1)), n, hac_lags,
-                               centring)
+                               centring, debias)
     sigma = decay .^ (Ks .- (n + 4))
     ratio = view(f, eachindex(Ks)) ./
             [inverse_wishart_bias(method, mahalanobis_bias(decay, K, n), n) for K in Ks]
@@ -1170,6 +1173,8 @@ interpolation the first time the state meets a count of assets.
   - `n::Integer`: Count of assets that contribute to the statistic.
   - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
+  - `centring::AbstractCentring`: The centring of the estimator, [`PreCentred`](@ref) by default.
+  - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
 
 # Returns
 
@@ -1186,9 +1191,10 @@ interpolation the first time the state meets a count of assets.
 function mahalanobis_regime_bias!(store::AbstractDict, method::RegimeAdjustedMethod,
                                   decay::Number, K::Integer, n::Integer,
                                   hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing,
-                                  centring::AbstractCentring = PreCentred())
-    nodes = get!(() -> mahalanobis_bias_nodes(method, decay, n, hac_lags, centring), store,
-                 n)
+                                  centring::AbstractCentring = PreCentred(),
+                                  debias::AbstractRegimeDebias = ExactDebias())
+    nodes = get!(() -> mahalanobis_bias_nodes(method, decay, n, hac_lags, centring, debias),
+                 store, n)
     i = K - nodes.start + 1
     if i in eachindex(nodes.exact)
         return nodes.exact[i]

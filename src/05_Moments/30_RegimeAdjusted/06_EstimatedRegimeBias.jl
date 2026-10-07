@@ -331,6 +331,8 @@ returns.
     where its top falls).
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of the terms of the estimate.
+  - `dep::Bool`: Whether ``I_{R}`` and ``I_{F}`` read the dependence ``V / f``. Without it they
+    read one, the law of the estimate alone.
 
 # Returns
 
@@ -345,14 +347,15 @@ returns.
   - [`estimated_bias_freeze!`](@ref)
   - [`hac_laplace!`](@ref)
 """
-function estimated_bias_integrals!(lat::NamedTuple, decay::Number, K::Integer)
+function estimated_bias_integrals!(lat::NamedTuple, decay::Number, K::Integer,
+                                   dep::Bool = true)
     (; h, x, s, es, tail0, tail1, P, lZ) = lat
     f = centring_factor(EstimatedCentring(), decay, K + 1)
     icut, wl = estimated_bias_cut(lat)
     acc = estimated_bias_seed(lat, decay, K)
     for i in 1:icut
         G = exp(-lZ[i] / 2)
-        r = (1 + P[1, 1, i]) / f
+        r = dep ? (1 + P[1, 1, i]) / f : one(f)
         w = i == 1 ? h / 2 : (i == icut ? wl : h)
         acc = acc .+ w .* (G * r * s[i], G * sqrt(r * s[i]), es[i] - G, x[i] * (G - es[i]))
     end
@@ -534,8 +537,8 @@ function estimated_bias_factor(m::RegimeTermMoments{<:LogRegimeAdjusted}, I::Nam
     return (f, estimated_bias_factor(m.method, I, c) / f, v)
 end
 """
-    regime_bias_table(method, decay::Number, K::Integer, hac_lags, ::PreCentred)
-    regime_bias_table(method, decay::Number, K::Integer, hac_lags, ::ZeroStartCentring)
+    regime_bias_table(method, decay::Number, K::Integer, hac_lags, ::PreCentred, debias)
+    regime_bias_table(method, decay::Number, K::Integer, hac_lags, ::ZeroStartCentring, debias)
 
 Computes the bias factor of a regime statistic for every count from one to `K`, on the law of a
 pre-centred estimate.
@@ -553,6 +556,8 @@ the table takes the same law.
   - `K::Integer`: Largest count of terms in the table.
   - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
     `nothing`.
+  - `::AbstractRegimeDebias`: Ignored debias rule: a pre-centred deviation does not depend on the
+    estimate.
 
 # Returns
 
@@ -565,12 +570,14 @@ the table takes the same law.
 """
 function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
                            decay::Number, K::Integer, ::Nothing,
-                           ::Union{PreCentred, ZeroStartCentring})
+                           ::Union{PreCentred, ZeroStartCentring},
+                           ::AbstractRegimeDebias = ExactDebias())
     return regime_bias_table(method, decay, K)
 end
 function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
                            decay::Number, K::Integer, hac_lags::Union{<:Integer, <:VecNum},
-                           ::Union{PreCentred, ZeroStartCentring})
+                           ::Union{PreCentred, ZeroStartCentring},
+                           ::AbstractRegimeDebias = ExactDebias())
     return regime_bias_table(method, decay, K, hac_lags)
 end
 """
@@ -619,6 +626,9 @@ count costs 0.1 s at a half-life of 40 and two lags.
   - `K::Integer`: Largest count of terms in the table.
   - `hac_lags::Option{<:Integer}`: Count of HAC lags, or `nothing`.
   - `::EstimatedCentring`: The centring of the estimator.
+  - `debias::AbstractRegimeDebias`: The debias rule. [`ExactDebias`](@ref), the default, reads the
+    dependence of the deviation on the estimate, and [`LawDebias`](@ref) the law of the
+    estimate alone.
 
 # Returns
 
@@ -636,14 +646,17 @@ count costs 0.1 s at a half-life of 40 and two lags.
 """
 function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
                            decay::Number, K::Integer, hac_lags::Option{<:Integer},
-                           ::EstimatedCentring)
+                           ::EstimatedCentring,
+                           debias::AbstractRegimeDebias = ExactDebias())
     base = regime_bias_table(method, decay, K, hac_lags, PreCentred())
     lat = estimated_bias_lattice(decay, hac_lags)
     Kh = min(K, ceil(Int, log(sqrt(eps(eltype(lat.s)))) / log(decay)))
     table = similar(base)
     for k in 1:Kh
         estimated_bias_count!(lat, decay, k)
-        table[k] = estimated_bias_factor(method, estimated_bias_integrals!(lat, decay, k),
+        table[k] = estimated_bias_factor(method,
+                                         estimated_bias_integrals!(lat, decay, k,
+                                                                   reads_dependence(debias)),
                                          (one(decay) - decay) / (one(decay) - decay^k))
     end
     r = table[Kh] ./ base[Kh]

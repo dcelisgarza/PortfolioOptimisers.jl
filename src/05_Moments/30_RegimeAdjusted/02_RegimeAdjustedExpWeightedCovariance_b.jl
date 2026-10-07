@@ -75,7 +75,7 @@ function regime_target_statistic(::DiagonalTarget, cache::RegimeAdjustedCovarian
     moments = isnothing(cache.bias) ? nothing : cache.bias.moments
     m = regime_bias!.(Ref(moments), Ref(RegimeTermMoments(ce.regime_method)), ce.decay,
                       centring_terms.(Ref(ce.centring), view(cache.obs_count, idx)),
-                      ce.hac_lags, Ref(ce.centring))
+                      ce.hac_lags, Ref(ce.centring), Ref(ce.debias))
     C = regime_covariance_block(cache, ce, idx)
     return regime_statistic(DiagonalTarget(), X[idx] ./ sqrt.(first.(m)), C, idx,
                             ce.min_val) ./
@@ -791,7 +791,7 @@ function regime_target_statistic(target::PortfolioTarget,
     separate = has_separate_cor_decay(ce)
     # The separate path reads the pre-centred law at `cor_decay`.
     f = regime_bias!(cache.bias, ce.regime_method, separate ? ce.cor_decay : ce.decay, K,
-                     ce.hac_lags, separate ? PreCentred() : ce.centring)
+                     ce.hac_lags, separate ? PreCentred() : ce.centring, ce.debias)
     if isnothing(target.w) && !isnothing(cache.bias)
         sv = exp_weight_cross_sum(ce.decay, ce.decay, K, ce.hac_lags)
         svc = separate ? exp_weight_cross_sum(ce.decay, ce.cor_decay, K, ce.hac_lags) : sv
@@ -1252,8 +1252,8 @@ function regime_target_statistic(target::MahalanobisTarget,
         # The separate path reads the pre-centred law at `cor_decay`.
         mahalanobis_regime_bias!(cache.bias.nodes, ce.regime_method, decay, K, n,
                                  correlation_hac_lags!(cache.bias, ce),
-                                 has_separate_cor_decay(ce) ? PreCentred() : ce.centring) *
-        variance_noise_bias!(cache.bias, ce, K, n)
+                                 has_separate_cor_decay(ce) ? PreCentred() : ce.centring,
+                                 ce.debias) * variance_noise_bias!(cache.bias, ce, K, n)
     end
     if isnothing(b)
         return nothing

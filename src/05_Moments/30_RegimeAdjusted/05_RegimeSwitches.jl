@@ -5,6 +5,8 @@ Divides the regime statistic by the exact bias that its method reads in the inve
 
 The inverse of an estimated variance is too large on average (Jensen's inequality), so a raw statistic has a mean above the one the method assumes. Each method reads its own moment of the ratio ``Q = \\hat{v} / \\sigma^2``: the root mean square reads ``\\mathbb{E}[1 / Q]``, the first moment reads ``\\mathbb{E}[Q^{-1/2}]^2`` and the log reads ``\\exp(-\\mathbb{E}[\\ln Q])``. [`regime_bias_table`](@ref) computes each one exactly from the law of the estimate. The statistic skips an estimate too young for its variance to be finite.
 
+Under [`EstimatedCentring`](@ref) the deviation that the statistic reads shares its location with the terms of the estimate, so the two are not independent, and each method reads the moment of the deviation and the estimate together: ``\\mathbb{E}[u^{2} / Q]`` for the root mean square, and so on. This rule reads that dependence for every method and every target. [`LawDebias`](@ref) reads the law of the estimate alone.
+
 # Constructors
 
     ExactDebias() -> ExactDebias
@@ -19,10 +21,36 @@ ExactDebias()
 # Related
 
   - [`AbstractRegimeDebias`](@ref)
+  - [`LawDebias`](@ref)
   - [`RawStatistic`](@ref)
   - [`regime_bias_table`](@ref)
 """
 struct ExactDebias <: AbstractRegimeDebias end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Divides the regime statistic by the bias of the law of the estimate alone, without the dependence of the deviation on the estimate.
+
+The factor of each method is the one of [`ExactDebias`](@ref) with the deviation taken as independent of the estimate. Under [`PreCentred`](@ref) the two rules agree. Under [`EstimatedCentring`](@ref) the deviation shares its location with the terms of the estimate, and this rule omits that part: on the scalar estimator the root mean square reads 0.2 % low at a half-life of 10 and two lags, and on the Mahalanobis target at 5 to 12 assets the three methods read 0.2 % to 0.7 % high without HAC and 0.4 % to 1.4 % high with it. The Mahalanobis nodes cost about half of those of [`ExactDebias`](@ref) for the first moment and the log, and a third for the root mean square.
+
+# Constructors
+
+    LawDebias() -> LawDebias
+
+# Examples
+
+```jldoctest
+julia> RegimeAdjustedExpWeightedCovariance(; debias = LawDebias()).debias
+LawDebias()
+```
+
+# Related
+
+  - [`AbstractRegimeDebias`](@ref)
+  - [`ExactDebias`](@ref)
+  - [`reads_dependence`](@ref)
+"""
+struct LawDebias <: AbstractRegimeDebias end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -45,27 +73,54 @@ RawStatistic()
 
   - [`AbstractRegimeDebias`](@ref)
   - [`ExactDebias`](@ref)
+  - [`LawDebias`](@ref)
 """
 struct RawStatistic <: AbstractRegimeDebias end
 """
-    debiases(::ExactDebias) -> Bool
+    debiases(::Union{ExactDebias, LawDebias}) -> Bool
     debiases(::RawStatistic) -> Bool
 
 Whether the regime statistic corrects the bias of the estimate it reads.
 
 # Returns
 
-  - `flag::Bool`: `true` for [`ExactDebias`](@ref), `false` for [`RawStatistic`](@ref).
+  - `flag::Bool`: `true` for [`ExactDebias`](@ref) and [`LawDebias`](@ref), `false` for
+    [`RawStatistic`](@ref).
 
 # Related
 
   - [`AbstractRegimeDebias`](@ref)
+  - [`reads_dependence`](@ref)
   - [`regime_bias_open`](@ref)
 """
-function debiases(::ExactDebias)
+function debiases(::Union{ExactDebias, LawDebias})
     return true
 end
 function debiases(::RawStatistic)
+    return false
+end
+"""
+    reads_dependence(::ExactDebias) -> Bool
+    reads_dependence(::Union{LawDebias, RawStatistic}) -> Bool
+
+Whether the bias of the regime statistic reads the dependence of the deviation on the estimate,
+which an estimated location puts in.
+
+# Returns
+
+  - `flag::Bool`: `true` for [`ExactDebias`](@ref), `false` for [`LawDebias`](@ref) and
+    [`RawStatistic`](@ref).
+
+# Related
+
+  - [`AbstractRegimeDebias`](@ref)
+  - [`debiases`](@ref)
+  - [`regime_bias_table`](@ref)
+"""
+function reads_dependence(::ExactDebias)
+    return true
+end
+function reads_dependence(::Union{LawDebias, RawStatistic})
     return false
 end
 """
@@ -286,6 +341,6 @@ function hac_pair_factor(cache::RegimeAdjustedCovarianceState,
     return F .+ centring_lag_factor(ce.centring, ce.decay, cache.obs_count, dvalid,
                                     cache.lag_records, w, false)
 end
-export ExactDebias, RawStatistic, NoHacFloor, PerTermHacFloor, VolatilityBeforeUpdate,
-       VolatilityAfterUpdate
-public debiases, hac_floor!, volatility_before_update
+export ExactDebias, LawDebias, RawStatistic, NoHacFloor, PerTermHacFloor,
+       VolatilityBeforeUpdate, VolatilityAfterUpdate
+public debiases, reads_dependence, hac_floor!, volatility_before_update

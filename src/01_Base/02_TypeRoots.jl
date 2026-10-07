@@ -429,11 +429,12 @@ The two regime-adjusted estimators hold a debias rule in their `debias` field: [
 
 # Interfaces
 
-A debias rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`debiases`](@ref).
+A debias rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`debiases`](@ref) and of [`reads_dependence`](@ref).
 
 # Related
 
   - [`ExactDebias`](@ref)
+  - [`LawDebias`](@ref)
   - [`RawStatistic`](@ref)
 """
 abstract type AbstractRegimeDebias <: AbstractAlgorithm end

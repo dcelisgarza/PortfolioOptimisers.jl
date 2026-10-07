@@ -297,8 +297,8 @@ factors against Monte Carlo means before the build (z-scores with an RMS of 0.97
 `test_08z` pins the estimate at the truth from the second row, with and without HAC.
 
 **Centring is a field, and so are the three switches of this ADR.** The estimators hold
-`centring = EstimatedCentring()`, `PreCentred()` or `ZeroStartCentring()`, `debias = ExactDebias()` or
-`RawStatistic()`, `hac_floor = NoHacFloor()` or `PerTermHacFloor()`, and, on the covariance,
+`centring = EstimatedCentring()`, `PreCentred()` or `ZeroStartCentring()`, `debias = ExactDebias()`,
+`LawDebias()` or `RawStatistic()`, `hac_floor = NoHacFloor()` or `PerTermHacFloor()`, and, on the covariance,
 `hac_vol_before = VolatilityBeforeUpdate()` or `VolatilityAfterUpdate()`. Each abstract root is
 public and each member is exported. The rule of the oracle is one keyword away for every switch:
 `PreCentred()` is its default centring, `RawStatistic()`, `PerTermHacFloor()` and
@@ -326,20 +326,34 @@ Monte Carlo of the estimator over half-lives 5 to 40, one to four lags and every
 mean squared multiplier within its noise (z from −1.2 to 0.5), where the scalar estimator was at
 z = −3.0 before.
 
-The Mahalanobis target under HAC starts its level recursion from `ln det(I + σM_K)` of the same
-lattice, on a grid of the lattice's step, with the peak placed on the exact slope of one chain.
-The root mean square adds the dependence exactly: `E[u'W⁻¹u] = E[tr W⁻¹] + E[y'W⁻¹y]` with
-`y = Z'g`, and the second term is the derivative in `t` of `E[ln det Z'(M + t gg')Z]`, which the
-sum of the levels gives. The first moment and the log read the law alone. Against a Monte Carlo of
-a million draws of the statistic the root mean square is within 0.3 % at the steady state and
-0.6 % at the first scored count, and the first moment and the log are 0.4 % to 1.3 % high, where
-the pre-centred factors were 1.3 % to 3.1 % high, and 7.5 % at the first scored count of a
-half-life of 40. The nodes cost about twice the pre-centred nodes. Without HAC the Mahalanobis
-target keeps the pre-centred recursion: there the two parts cancel within 0.16 % for every method,
-and the law alone would read the first moment and the log 0.17 % to 0.65 % high. The exact
-dependence of the first moment and the log has a route, `E ln(1 + t d²) = E ln det W_t − E ln det W`
-for every `t`, at the cost of one run of the recursion per `t`; #1549 holds that question of
-cost. The separate path keeps the pre-centred law at `cor_decay`, with the limits below.
+The Mahalanobis target starts its level recursion from `ln det(I + σM_K)` of the same lattice,
+on a grid of the lattice's step, with the peak placed on the exact slope of one chain. Each method
+then reads the dependence exactly (#1549). In the frame where the deviation is the first direction,
+`d² ∝ ‖u‖²/S` with `S` its Schur complement, and `ln det W = ln det W⊥ + ln S`, where `W⊥` is a
+plain weighted Wishart of `n − 1` directions on the weights of `diag(M_K, 0)` compressed onto
+`e = (−g; 1)`; by the identity of Jacobi its log-determinant is `ln det(I + σM_K) + ln(V/f)`, with
+the same `V` that the lattice gives. The root mean square reads `E[tr W⁻¹] + E[y'W⁻¹y]`, `y = Z'g`,
+the second term the derivative in `t` of `E[ln det Z'(M + t gg')Z]`. The log reads
+`E ln d² = E ln ‖u‖² + E ln det W⊥ − E ln det W`, each log-determinant the sum over the levels of
+`E ln S_k`. The first moment reads `E[d]`: given the other directions `S` is a quadratic form whose
+coordinate along `e` is `‖u‖/√f`, so the mean over it is in closed form, and with the mean
+log-determinant inside the exponential, as the recursion takes it, the last transform `L` becomes
+`L^{n+1} L⊥^{−n}`. Against a Monte Carlo of a million draws of the statistic, at half-lives of 5,
+10 and 40, no lag to four lags and two to 12 assets, the three factors are within 0.3 % at the
+steady state and 0.6 % at the first scored count, the error of the level recursion, with or
+without HAC, where the pre-centred factors were 1.3 % to 3.1 % high under HAC and 7.5 % at the first
+scored count of a half-life of 40. The research of #1527 had found an identity for the root mean
+square alone and a route through `E ln(1 + t d²)` for the others; that route needs a weight `t` far
+above the spectrum, which the recursion does not hold past `t d² ≈ 3`, and the frame of `W⊥` needs
+no such weight.
+
+**`ExactDebias()` reads the law and the dependence, and `LawDebias()` the law alone (#1549).** The
+maintainer asked for both, the exact rule as the default. `LawDebias()` takes the deviation as
+independent of the estimate on every target: the scalar root mean square then reads 0.2 % low at a
+half-life of 10 and two lags, and the Mahalanobis factors 0.2 % to 0.7 % high without HAC and 0.4 %
+to 1.4 % high with it. Under `PreCentred()` the two rules agree. A new rule implements
+`reads_dependence` beside `debiases`. The separate path keeps the pre-centred law at `cor_decay`,
+with the limits below.
 
 ## Consequences
 
@@ -353,12 +367,12 @@ cost. The separate path keeps the pre-centred law at `cor_decay`, with the limit
   documented limit (#1447). Under HAC, on the kernel of the damped rows, the statistic reads
   0.2 % to 2.2 % high at `R = I` and −2.6 % to +3.4 % at correlated `R` over 4 to 24 assets and
   one to four lags (#1445).
-- Under HAC and the estimated location, the Mahalanobis first moment and log read the law of the
-  shared deviations and not the dependence of the deviation: 0.4 % to 1.3 % high against a Monte
-  Carlo of the statistic, a documented limit until #1549 decides its cost.
 - The exact table of the estimated location costs 0.12 s to 0.16 s per state at a half-life of 40
-  and 3.4 s at 250, where the pre-centred table costs 0.04 s at 40. The Mahalanobis nodes under
-  HAC cost about twice the pre-centred nodes.
+  and 3.4 s at 250, where the pre-centred table costs 0.04 s at 40. The Mahalanobis nodes of one
+  count of assets cost about 3.5 times the pre-centred nodes for the first moment and the log, and
+  5 times for the root mean square, which runs the recursion three times: 2 s to 6.5 s at half-lives
+  of 10 and 40, two lags and 5 to 12 assets, against 0.6 s to 1.3 s. `LawDebias()` costs about
+  twice the pre-centred nodes.
 - A HAC fit on the separate path moves with the row rule of #1444; no stored oracle case runs that
   path, and `hac_vol_before = VolatilityAfterUpdate()` gives the rule of the oracle bit for bit.
 - The Mahalanobis nodes under HAC cost 0.3 s to 1.5 s for each count of assets at half-lives up

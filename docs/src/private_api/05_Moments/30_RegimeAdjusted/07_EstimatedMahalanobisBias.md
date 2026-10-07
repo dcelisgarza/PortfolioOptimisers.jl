@@ -12,5 +12,6 @@ estimated_mahalanobis_columns!
 mahalanobis_level_sum!
 estimated_mahalanobis_level_bias
 estimated_mahalanobis_factor
+estimated_perp_run
 estimated_mahalanobis_dependence
 ```
