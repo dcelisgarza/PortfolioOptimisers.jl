@@ -23,6 +23,7 @@ two masks blank what they should, that the state answers the same as the sample,
 estimator refuses what it cannot fit.
 =#
 using Test, PortfolioOptimisers, Statistics, LinearAlgebra, StableRNGs
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 const PO = PortfolioOptimisers
 
@@ -79,23 +80,28 @@ function oracle_estimator(; kwargs...)
                                                debias = RawStatistic(), kwargs...)
 end
 
-@testset "the port reproduces the reference implementation" begin
-    for (ce, oracle) in ((oracle_estimator(), ORACLE_DEFAULTS),
-                         # The oracle scores the raw statistic (#1415, #1428).
-                         (oracle_estimator(; regime_target = PO.MahalanobisTarget(),
-                                           regime_method = PO.LogRegimeAdjusted()), ORACLE_MAHALANOBIS_LOG),
-                         (oracle_estimator(; regime_target = PO.DiagonalTarget(),
-                                           regime_method = PO.RootMeanSquaredAdjusted(), hac_lags = 2),
-                          ORACLE_DIAGONAL_RMS_HAC),
-                         (oracle_estimator(; cor_decay = 0.97), ORACLE_SEPARATE_CORR),
-                         # The reference's estimated location, `ZeroStartCentring()` since #1507.
-                         (oracle_estimator(; centring = ZeroStartCentring()), ORACLE_UNCENTRED))
-        # The two implementations run the same operations in a different language, so they
-        # agree to round-off rather than bit for bit.
-        @test isapprox(cov(ce, ORACLE_X), oracle; rtol = 1e-12)
+@testset "the port reproduces the oracle" begin
+    for (c, ce, oracle) in (("defaults", oracle_estimator(), ORACLE_DEFAULTS),
+                            # The oracle scores the raw statistic (#1415, #1428).
+                            ("mahalanobis log",
+                             oracle_estimator(; regime_target = PO.MahalanobisTarget(),
+                                              regime_method = PO.LogRegimeAdjusted()), ORACLE_MAHALANOBIS_LOG),
+                            ("diagonal rms hac",
+                             oracle_estimator(; regime_target = PO.DiagonalTarget(),
+                                              regime_method = PO.RootMeanSquaredAdjusted(), hac_lags = 2),
+                             ORACLE_DIAGONAL_RMS_HAC),
+                            ("separate corr", oracle_estimator(; cor_decay = 0.97), ORACLE_SEPARATE_CORR),
+                            # The oracle's estimated location, `ZeroStartCentring()` since #1507.
+                            ("uncentred", oracle_estimator(; centring = ZeroStartCentring()), ORACLE_UNCENTRED))
+        # The two implementations run the same operations in a different language and sum in
+        # another order, so they agree to round-off rather than bit for bit. Measured on
+        # 2026-10-07, cell by cell: the covariance to maxrel 2.5e-15 (`separate corr`; the
+        # other four 1.7e-15 or less), the correlation to 2.5e-15. That is about ten ulps
+        # after the recursion over 16 rows and the multiplier, so `1e-14` leaves a factor four.
+        @test parity_compare(cov(ce, ORACLE_X), oracle; rtol = 1e-14, name = "$c cov").ok
         # The correlation is the same matrix rescaled, so it needs no oracle of its own.
-        @test isapprox(cor(ce, ORACLE_X), PO.regime_adjusted_correlation(oracle);
-                       rtol = 1e-12)
+        @test parity_compare(cor(ce, ORACLE_X), PO.regime_adjusted_correlation(oracle);
+                             rtol = 1e-14, name = "$c cor").ok
     end
 
     # The five configurations are distinct answers, so no pair of them is a vacuous pass.

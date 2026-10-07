@@ -17,8 +17,12 @@ starts at zero and is not divided by its weight. The library's default estimated
 pinned against the hand references at the end of this file (#1507, ADR 0190).
 
 The fixture is 60 observations of 4 assets, and asset 4 lists at observation 31. The measured
-parity is exact on every masked path and about `1e-19` on a complete window, where the reference
-takes a matrix-multiply fast path and the port takes the row recursion.
+parity is exact on every masked path and about `1e-19` on a complete window, where the oracle
+takes a matrix-multiply fast path and the port takes the row recursion. Measured on 2026-10-07,
+cell by cell: the variances, the standard deviations and the raw state are bit-equal, the means
+differ by maxrel 1.4e-16 (maxabs 8.7e-19) and the covariances by 2.2e-16. Every oracle check
+takes `rtol = 1e-14`: the measure is one ulp, and the margin is for a host that orders the sums
+of the recursion otherwise.
 
 Two families of testset sit beside the parity. The first pins the structural identities the census
 of the reference states, and each is checked in plain Julia rather than against a stored number: the
@@ -28,6 +32,7 @@ equal-history identity. The second pins the seam of ADR 0117: a mask-aware estim
 reduce-and-expand root and answers a young asset that the Coverage Universe drops.
 =#
 using Test, PortfolioOptimisers, Statistics, LinearAlgebra, StableRNGs
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 # The reference's answers on the fixture below, at `half_life = 10`.
 const EW_MU_MIN1 = [0.001292041816555475, 0.002114893063360849, 0.0033233997239623943,
@@ -91,50 +96,57 @@ function oracle_panel(amsk)
     return AssetPanel(; pf = pf, amsk = amsk, emsk = copy(amsk))
 end
 
-@testset "Exponentially weighted moments: parity with the reference" begin
+@testset "Exponentially weighted moments: parity with the oracle" begin
     X = oracle_returns()
     amsk = oracle_active_mask()
     Xg = gapped(X, amsk)
 
     me = ExpWeightedExpectedReturns(; decay = EW_DECAY, min_obs = 1)
-    @test isapprox(mean(me, Xg; active_mask = amsk), EW_MU_MIN1; rtol = 1e-12)
+    @test parity_compare(mean(me, Xg; active_mask = amsk), EW_MU_MIN1; rtol = 1e-14,
+                         name = "mu").ok
 
     me40 = ExpWeightedExpectedReturns(; decay = EW_DECAY, min_obs = 40)
     mu40 = mean(me40, Xg; active_mask = amsk)
     @test isnan(mu40[EW_N])
-    @test isapprox(view(mu40, 1:(EW_N - 1)), view(EW_MU_MIN40, 1:(EW_N - 1)); rtol = 1e-12)
+    @test parity_compare(view(mu40, 1:(EW_N - 1)), view(EW_MU_MIN40, 1:(EW_N - 1));
+                         rtol = 1e-14, name = "mu min40").ok
 
     # With no mask every asset is active, so the leading `NaN` reads as a holiday and the
     # recursion freezes. The gap and the inactive period coincide here, so the two agree.
     @test isequal(mean(me, Xg), mean(me, Xg; active_mask = amsk))
 
     vc = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1, centring = PreCentred())
-    @test isapprox(var(vc, Xg; active_mask = amsk), EW_VAR_CENTRED; rtol = 1e-12)
-    @test isapprox(std(vc, Xg; active_mask = amsk), sqrt.(EW_VAR_CENTRED); rtol = 1e-12)
+    @test parity_compare(var(vc, Xg; active_mask = amsk), EW_VAR_CENTRED; rtol = 1e-14,
+                         name = "var").ok
+    @test parity_compare(std(vc, Xg; active_mask = amsk), sqrt.(EW_VAR_CENTRED);
+                         rtol = 1e-14, name = "std").ok
 
     # The oracle's estimated location starts at zero and is not divided by its weight. It is
     # `ZeroStartCentring()` since #1507 (ADR 0190). The default estimated location of the
     # library is pinned against its hand reference at the end of this file.
     vu = ExpWeightedVariance(; decay = EW_DECAY, min_obs = 1,
                              centring = ZeroStartCentring())
-    @test isapprox(var(vu, Xg; active_mask = amsk), EW_VAR_UNCENTRED; rtol = 1e-12)
+    @test parity_compare(var(vu, Xg; active_mask = amsk), EW_VAR_UNCENTRED; rtol = 1e-14,
+                         name = "var zero start").ok
 
     v40 = var(ExpWeightedVariance(; decay = EW_DECAY, min_obs = 40,
                                   centring = PreCentred()), Xg; active_mask = amsk)
     @test isnan(v40[EW_N])
-    @test isapprox(view(v40, 1:(EW_N - 1)), view(EW_VAR_MIN40, 1:(EW_N - 1)); rtol = 1e-12)
+    @test parity_compare(view(v40, 1:(EW_N - 1)), view(EW_VAR_MIN40, 1:(EW_N - 1));
+                         rtol = 1e-14, name = "var min40").ok
 
     # The reference divides by the per-asset congruence, and the port divides each pair by the
     # weight it holds (ADR 0181, 2026-09-29). Asset 4 lists at 31, so its pairs hold less weight
     # than the congruence assumes, and the port's covariance is the reference's times
-    # `sqrt(W_ii W_jj) / W_ij`: measured to 2.2e-16 cell by cell.
+    # `sqrt(W_ii W_jj) / W_ij`: measured to maxrel 2.2e-16 cell by cell.
     for (centring, lit) in
         ((PreCentred(), EW_COV_CENTRED), (ZeroStartCentring(), EW_COV_UNCENTRED))
         ce = ExpWeightedCovariance(; decay = EW_DECAY, min_obs = 1, centring = centring)
         W = partial_fit!(ce, Xg; active_mask = amsk).cache.weight
         w = sqrt.(diag(W))
         ratio = (w * transpose(w)) ./ W
-        @test all(isapprox.(cov(ce, Xg; active_mask = amsk), lit .* ratio; rtol = 1e-12))
+        @test parity_compare(cov(ce, Xg; active_mask = amsk), lit .* ratio; rtol = 1e-14,
+                             name = "cov $(nameof(typeof(centring)))").ok
         @test all(isapprox.(ratio[1:3, 1:3], 1; rtol = 1e-14))
         @test all(isapprox.(ratio[1:3, 4], 1.0606601717798214; rtol = 1e-12))
     end
@@ -146,10 +158,12 @@ end
     Xd = gapped(X, amsk_d)
     mu_d = mean(me, Xd; active_mask = amsk_d)
     @test isnan(mu_d[2])
-    @test isapprox(mu_d[[1, 3, 4]], EW_MU_DELIST[[1, 3, 4]]; rtol = 1e-12)
+    @test parity_compare(mu_d[[1, 3, 4]], EW_MU_DELIST[[1, 3, 4]]; rtol = 1e-14,
+                         name = "mu delist").ok
     var_d = var(vc, Xd; active_mask = amsk_d)
     @test isnan(var_d[2])
-    @test isapprox(var_d[[1, 3, 4]], EW_VAR_DELIST[[1, 3, 4]]; rtol = 1e-12)
+    @test parity_compare(var_d[[1, 3, 4]], EW_VAR_DELIST[[1, 3, 4]]; rtol = 1e-14,
+                         name = "var delist").ok
     cov_d = cov(cc, Xd; active_mask = amsk_d)
     @test all(isnan, view(cov_d, 2, :))
     @test all(isnan, view(cov_d, :, 2))
@@ -168,7 +182,7 @@ end
     sigma = cov(cc, Xg; active_mask = amsk)
 
     # The raw state matches the reference's own, which is what the holiday identity compares.
-    @test isapprox(S, EW_COV_RAW_STATE; rtol = 1e-12)
+    @test parity_compare(S, EW_COV_RAW_STATE; rtol = 1e-14, name = "raw state").ok
 
     # 1. Each pair is divided by the weight it holds, and the weight of a variance is the
     #    per-asset correction `1 - λ^n`. No repair runs on this fixture.

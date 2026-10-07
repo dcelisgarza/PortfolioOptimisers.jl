@@ -350,8 +350,9 @@ end
     its own reduced covariance. The oracle expanded the whole stack at once, reduced its answer,
     built the weights of the dropped factors for every observation, and expanded one mean per
     row. Each output is a vertical stack, row `(t - 1) n + a` holding entry `(t, a, :)`.
-    Measured on 2026-09-30: every cell is bit-equal. The tolerance stays at `1e-12`, because the
-    products go through BLAS, which can round them differently on another host.
+    Measured on 2026-09-30 and again on 2026-10-07: every cell of the four outputs is bit-equal
+    (maxrel 0). The tolerance is `1e-14`, not zero, because the products go through BLAS, which
+    can round them differently on another host.
     =#
     PO = PortfolioOptimisers
     rng = StableRNG(1406)
@@ -370,13 +371,16 @@ end
     oracle(o, n) = unstack(parity_load("FactorFamilyBasis", "Stack", o), n)
     E = PO.expand_factor_covariance(fcb, V)
     # A covariance compares against its largest entry: an off-diagonal cell can be a
-    # cancellation.
-    @test parity_compare(E, oracle("Expanded", K); scale = :array).ok
+    # cancellation, so a sum that BLAS orders differently moves it by more than its own ulps.
+    @test parity_compare(E, oracle("Expanded", K); rtol = 1e-14, scale = :array,
+                         name = "stack expanded").ok
     @test parity_compare(PO.reduce_factor_covariance(fcb, E), oracle("Reduced", Kr);
-                         scale = :array).ok
-    @test parity_compare(PO.dropped_factor_weights(fcb), oracle("Weights", 2)).ok
+                         rtol = 1e-14, scale = :array, name = "stack reduced").ok
+    @test parity_compare(PO.dropped_factor_weights(fcb), oracle("Weights", 2); rtol = 1e-14,
+                         name = "stack weights").ok
     @test parity_compare(PO.expand_factor_mu(fcb, M),
-                         parity_load("FactorFamilyBasis", "Stack", "Mu")).ok
+                         parity_load("FactorFamilyBasis", "Stack", "Mu"); rtol = 1e-14,
+                         name = "stack mu").ok
 end
 
 @testset "FactorFamilyBasis transforms agree with their closed forms in exact arithmetic" begin
@@ -983,8 +987,9 @@ end
     built from the synthetic Asset Panel below. The two cases pinned here are the constraint
     ratios of the automatic drop and of a stated drop. The literals are the oracle's printed
     values, and ours differ from them by 3.0e-16 at most, one or two units in the last place of
-    a sum taken in another order (#1385). The neutralised exposures agreed to 6e-15, which is the
-    difference between two orders of the same weighted least squares.
+    a sum taken in another order (#1385). The neutralised exposures agree to maxabs 1.1e-16 (a
+    relative 1.1e-14 on a cell near zero), which is the difference between two orders of the
+    same weighted least squares.
     =#
     res = synthetic_asset_panel(; n_assets = 12, n_observations = 40, n_industries = 3,
                                 rng = StableRNG(987))
@@ -1014,16 +1019,18 @@ end
         fcb = factor_family_basis(["industry" => nothing], Ms, bw, ax.nf, ax.fam)
         @test PO.dropped_factor_names(fcb, ax.nf) == ["industry=Software"]
         @test size(fcb.ratios) == (40, 2)
-        # The oracle's own numbers, to the last bit it printed. Measured maxrel 0.0, 0.0,
-        # 1.4e-16 and 1.8e-16.
-        @test isapprox(fcb.ratios[1, :], [0.45312850847114156, 0.5134232034472233];
-                       rtol = 1e-15)
-        @test isapprox(fcb.ratios[2, :], [0.4499883905713916, 0.5141858044142668];
-                       rtol = 1e-15)
-        @test isapprox(fcb.ratios[end, :], [0.4003878534447987, 0.4488185225503101];
-                       rtol = 1e-15)
-        @test isapprox(vec(sum(fcb.ratios; dims = 1)),
-                       [17.16704789180863, 19.62192609499553]; rtol = 1e-15)
+        # The oracle's own numbers, to the last bit it printed, cell by cell. Measured on
+        # 2026-10-07: maxrel 0.0, 0.0, 1.4e-16 and 1.8e-16, one ulp of a sum taken in another
+        # order.
+        @test parity_compare(fcb.ratios[1, :], [0.45312850847114156, 0.5134232034472233];
+                             rtol = 1e-15, name = "ratios 1").ok
+        @test parity_compare(fcb.ratios[2, :], [0.4499883905713916, 0.5141858044142668];
+                             rtol = 1e-15, name = "ratios 2").ok
+        @test parity_compare(fcb.ratios[end, :], [0.4003878534447987, 0.4488185225503101];
+                             rtol = 1e-15, name = "ratios 3").ok
+        @test parity_compare(vec(sum(fcb.ratios; dims = 1)),
+                             [17.16704789180863, 19.62192609499553]; rtol = 1e-15,
+                             name = "ratios 4").ok
     end
 
     @testset "Case two: a stated drop matches the oracle" begin
@@ -1031,13 +1038,14 @@ end
                                   ax.fam)
         @test fcb.di == [1]
         @test PO.dropped_factor_names(fcb, ax.nf) == ["industry=Real Estate"]
-        # Measured maxrel 0.0, 2.0e-16 and 3.0e-16.
-        @test isapprox(fcb.ratios[1, :], [2.2068794642252954, 1.1330631241444427];
-                       rtol = 1e-15)
-        @test isapprox(fcb.ratios[end, :], [2.4975782641664717, 1.1209593864769638];
-                       rtol = 1e-15)
-        @test isapprox(vec(sum(fcb.ratios; dims = 1)),
-                       [93.32153055932386, 45.704976978893356]; rtol = 1e-15)
+        # Measured on 2026-10-07, cell by cell: maxrel 0.0, 2.0e-16 and 3.0e-16.
+        @test parity_compare(fcb.ratios[1, :], [2.2068794642252954, 1.1330631241444427];
+                             rtol = 1e-15, name = "ratios 5").ok
+        @test parity_compare(fcb.ratios[end, :], [2.4975782641664717, 1.1209593864769638];
+                             rtol = 1e-15, name = "ratios 6").ok
+        @test parity_compare(vec(sum(fcb.ratios; dims = 1)),
+                             [93.32153055932386, 45.704976978893356]; rtol = 1e-15,
+                             name = "ratios 7").ok
     end
 
     @testset "The Neutralisation matches the oracle" begin
@@ -1047,16 +1055,21 @@ end
         v = Y[:, :, 3]
         fin = isfinite.(v)
         @test count(!, fin) == 7
-        # The two orders of the same weighted least squares differ in the last bits, so the
-        # tolerance is loose where the ratios above are exact.
-        @test v[1, :][fin[1, :]] ≈
-              [0.799889405563868, -0.004743865235128638, 0.2239307925031833,
-               0.7848793720945417, 0.6921418278212657, 0.8139226090427376,
-               0.6331743087329431, 0.5729801019175156, 1.277378472749908,
-               0.7383912304326324, -0.08625133637864447, -2.3746306903228844][fin[1, :]] rtol=1e-12
-        @test sum(v[fin]) ≈ 120.8785614679006 rtol=1e-12
-        # The re-standardisation makes the weighted sum of squares the eligible count.
-        @test sum(abs2, v[fin]) ≈ 433.0 rtol=1e-12
+        # The two orders of the same weighted least squares differ in the last bits. Measured on
+        # 2026-10-07: maxrel 1.1e-14 and maxabs 1.1e-16. The worst relative cell is
+        # -0.0047, a residual near zero, so its error is an ulp of the unit-scale exposures
+        # and the comparison takes an absolute tolerance of a few of those ulps.
+        @test parity_compare(v[1, :][fin[1, :]],
+                             [0.799889405563868, -0.004743865235128638, 0.2239307925031833,
+                              0.7848793720945417, 0.6921418278212657, 0.8139226090427376,
+                              0.6331743087329431, 0.5729801019175156, 1.277378472749908,
+                              0.7383912304326324, -0.08625133637864447,
+                              -2.3746306903228844][fin[1, :]]; rtol = 1e-14, atol = 1e-15,
+                             name = "neutralised row 1").ok
+        # The sum of the eligible cells, and the weighted sum of squares, which the
+        # re-standardisation makes the eligible count. Measured on 2026-10-07: maxrel 2.4e-16.
+        @test parity_compare([sum(v[fin]), sum(abs2, v[fin])], [120.8785614679006, 433.0];
+                             rtol = 1e-14, name = "neutralised sums").ok
     end
 end
 

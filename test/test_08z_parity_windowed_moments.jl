@@ -136,7 +136,10 @@ end
 @testset "The windowed moments at parity with the oracle's window" begin
     # `parity_small_panel()` has a late listing, a delisting, a relisting and a holiday. The
     # stored files are the oracle's batch fit with `window_size`, and its windowed batch fit
-    # on each prefix `1:t`, which is row `t` of our series. Measured maxrel 6.8e-16 or less.
+    # on each prefix `1:t`, which is row `t` of our series. Measured on 2026-10-07, cell by
+    # cell: the variances are bit-equal, the means differ by maxrel 2.2e-16, the covariances by
+    # 5.6e-16 and the two series by 6.8e-16, one to three ulps of a sum taken in another order.
+    # `1e-14` leaves room for a host that orders the sums otherwise.
     fx = parity_small_panel()
     X, pnl = fx.rd.X, fx.rd.pnl
     load(c, k) = parity_load("WindowedMoments", c, k)
@@ -154,17 +157,17 @@ end
         cw = WindowedCovariance(;
                                 ce = ExpWeightedCovariance(; decay, min_obs = 5, centring),
                                 window = n)
-        @test parity_compare(vec(mean(me, X, pnl)), vec(load(c, "Mu")); name = "$c mu").ok
-        @test parity_compare(vec(var(vw, X, pnl)), vec(load(c, "Var")); name = "$c var").ok
+        @test parity_compare(vec(mean(me, X, pnl)), vec(load(c, "Mu")); rtol = 1e-14,
+                             name = "$c mu").ok
+        @test parity_compare(vec(var(vw, X, pnl)), vec(load(c, "Var")); rtol = 1e-14,
+                             name = "$c var").ok
         # Every asset shares one history over the last rows, so the covariance matches entry by
-        # entry; it compares against its largest entry because of the cancellation of its small
-        # off-diagonal entries.
-        @test parity_compare(cov(cw, X, pnl), load(c, "Cov"); scale = :array,
-                             name = "$c cov").ok
+        # entry. No off-diagonal entry cancels on this fixture, so it compares cell by cell.
+        @test parity_compare(cov(cw, X, pnl), load(c, "Cov"); rtol = 1e-14, name = "$c cov").ok
         @test parity_compare(PortfolioOptimisers.variance_series(vw, X, pnl),
-                             load(c, "VarSeries"); name = "$c var series").ok
+                             load(c, "VarSeries"); rtol = 1e-14, name = "$c var series").ok
         @test parity_compare(PortfolioOptimisers.variance_series(cw, X, pnl),
-                             load(c, "CovSeries"); name = "$c cov series").ok
+                             load(c, "CovSeries"); rtol = 1e-14, name = "$c cov series").ok
     end
 end
 
@@ -367,9 +370,13 @@ end
     # the read-out after batch `b`. The covariance compares raw states: the library divides
     # each pair by the weight that the pair holds (ADR 0181, #1420), so the raw state of the
     # oracle is its output times `w * w'`, with `w` the root of the diagonal weights, and the
-    # oracle runs without its projection to a positive definite matrix. Under a horizon only the diagonal of `sigma` reads no
-    # pair weight. Measured: mu 1.9e-16 scaled, raw covariance 4.9e-16 scaled, variance
-    # 3.9e-16, horizon mu 7.3e-15 scaled and horizon diagonal 6.3e-16.
+    # oracle runs without its projection to a positive definite matrix. Under a horizon only
+    # the diagonal of `sigma` reads no pair weight. Measured on 2026-10-07, cell by cell over
+    # every batch of the six cases: mu maxrel 3.5e-16, variance 3.9e-16, raw covariance
+    # 6.0e-16 and horizon diagonal 6.3e-16, one to three ulps, so each takes `1e-14`. The
+    # horizon mu is `exp(h mu + h sigma_ii / 2) - 1`: the subtraction of one leaves an error of
+    # an ulp of one, maxabs 2.2e-16, which is maxrel 2.1e-12 on a mean near zero. It takes an
+    # absolute tolerance of a few ulps of one.
     fx = parity_small_panel()
     X, am = fx.rd.X, fx.rd.pnl.amsk
     T, N = size(X)
@@ -400,17 +407,20 @@ end
             vw = sw_fold(vw, X, r; active_mask = am[r, :])
             pr = prior(pe)
             Ob = C[((b - 1) * N + 1):(b * N), :]
-            @test parity_compare(pr.mu, M[b, :]; scale = :array, name = "$c mu $b").ok
-            @test parity_compare(vec(var(vw)), V[b, :]; name = "$c var $b").ok
+            @test parity_compare(pr.mu, M[b, :]; rtol = 1e-14,
+                                 atol = isnothing(h) ? 0.0 : 1e-15, name = "$c mu $b").ok
+            @test parity_compare(vec(var(vw)), V[b, :]; rtol = 1e-14, name = "$c var $b").ok
             if isnothing(h)
                 s = pe.ce.ce.cache
                 f = findall(isfinite, LinearAlgebra.diag(Ob))
+                # An empty selection would compare nothing.
+                @test !isempty(f)
                 w = sqrt.(LinearAlgebra.diag(s.weight))
                 @test parity_compare(s.covariance[f, f], (Ob .* (w * transpose(w)))[f, f];
-                                     scale = :array, name = "$c raw cov $b").ok
+                                     rtol = 1e-14, name = "$c raw cov $b").ok
             else
                 @test parity_compare(LinearAlgebra.diag(pr.sigma), LinearAlgebra.diag(Ob);
-                                     name = "$c diag sigma $b").ok
+                                     rtol = 1e-14, name = "$c diag sigma $b").ok
             end
         end
     end

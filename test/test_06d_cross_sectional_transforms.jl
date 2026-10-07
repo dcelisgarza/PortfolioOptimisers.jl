@@ -1,14 +1,13 @@
 #=
 Check `src/03_InputData/14_CrossSectionalTransforms.jl` against the rules its docstrings
-state, and against the reference implementation the map of issue #643 ports. Issue #716.
+state, and against the oracle that the map of issue #643 ports. Issue #716.
 
 THREE FACTS SHAPE THE PROBES.
 
-1. THE STORED MATRICES COME FROM THE REFERENCE IMPLEMENTATION. Every `REFERENCE_*` matrix
-   below was produced by the reference implementation's own five transformers, driven on the
-   inputs written beside them, and they are the oracle of the port. `The five members
-   reproduce the reference implementation` compares each one cell by cell, including the
-   position of every `NaN`.
+1. THE STORED MATRICES COME FROM THE ORACLE. Every `REFERENCE_*` matrix below was produced
+   by the oracle's own five transformers, driven on the inputs written beside them. `The five
+   members reproduce the oracle` compares each one cell by cell, including the position of
+   every `NaN`, and states the measured worst cell beside its tolerance.
 
 2. A SECOND, INDEPENDENT DERIVATION STANDS BESIDE THEM. `naive_winsorise`,
    `naive_tanh_shrink`, `naive_standardise`, `naive_percentile_rank` and
@@ -25,6 +24,7 @@ THREE FACTS SHAPE THE PROBES.
 =#
 
 using Statistics, Distributions
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 # --- the second derivation ---------------------------------------------------------------
 #
@@ -149,9 +149,17 @@ function same_matrix(A, B; atol = 1e-12)
     return all(isnan(a) || isapprox(a, b; atol = atol) for (a, b) in zip(A, B))
 end
 
+# Cell-by-cell agreement with a stored oracle matrix, with every `NaN` in the same place.
+# Measured on 2026-10-07: 11 of the 18 cases are bit-equal, and the worst cell is maxrel
+# 3.1e-15 (maxabs 3.3e-16), on `GAUSSIAN_WG`. The Gaussian rank goes through an inverse normal
+# that the oracle computes by another routine, so its cells differ by a few ulps, and a small
+# cell near the median shows that as a larger relative difference. The ranks, the
+# standardisations and the clips differ by 2e-16 at most. No cell needs an absolute tolerance.
+oracle_matrix(A, B, name) = parity_compare(A, B; rtol = 1e-14, name).ok
+
 # --- the inputs --------------------------------------------------------------------------
 
-# The four-asset panel the reference implementation documents its own transformers on. The
+# The four-asset panel the oracle documents its own transformers on. The
 # `NaN`s are the blanks, and the two weight matrices are the same estimation universe read
 # two ways: `DOC_MASK_W` selects, and `DOC_W` selects and weights.
 const DOC_X = [1.0 NaN 3.0 4.0; 4.0 3.0 2.0 1.0; 10.0 20.0 NaN 40.0]
@@ -193,7 +201,7 @@ const RAND_G = [1 0 1 2 1 2 0;
 
 # --- the oracle --------------------------------------------------------------------------
 #
-# Produced by the reference implementation on the inputs above.
+# Produced by the oracle on the inputs above.
 
 const REFERENCE_STD_VECTOR = [-0.806225774829855 -0.558156305651438 -0.062017367294604234 1.4263994477758974]
 const REFERENCE_STANDARDISE = [-1.0910894511799618 NaN 0.2182178902359925 0.8728715609439697;
@@ -270,62 +278,68 @@ const REFERENCE_RAND_WINSORISE_W = [0.9167957292444923 -0.2346415855536521 NaN -
                                     6.248169227012285 3.2375237670223345 1.5083789238399274 2.6099672161637946 3.4229991281360674 -1.1234563060549467 2.3210754150873134;
                                     1.8056965631636879 -1.6692651944204535 5.8327146299844514 0.7467212510705343 2.0126134625870966 4.904709938139171 0.6976501658294585]
 
-@testset "The five members reproduce the reference implementation" begin
+@testset "The five members reproduce the oracle" begin
     # The three-observation panel, read with no weights, with a mask, and with a weight and a
     # classification.
-    @test same_matrix(cross_sectional_transform(CrossSectionalWinsoriser(; low = 0.1,
-                                                                         high = 0.9),
-                                                DOC_X), REFERENCE_WINSORISE)
-    @test same_matrix(cross_sectional_transform(CrossSectionalWinsoriser(; low = 0.1,
-                                                                         high = 0.9), DOC_X;
-                                                w = DOC_MASK_W), REFERENCE_WINSORISE_W)
-    @test same_matrix(cross_sectional_transform(CrossSectionalTanhShrinker(), DOC_X),
-                      REFERENCE_TANH)
-    @test same_matrix(cross_sectional_transform(CrossSectionalTanhShrinker(), DOC_X;
-                                                w = DOC_MASK_W), REFERENCE_TANH_W)
-    @test same_matrix(cross_sectional_transform(CrossSectionalStandardiser(), DOC_X),
-                      REFERENCE_STANDARDISE)
-    @test same_matrix(cross_sectional_transform(CrossSectionalStandardiser(;
-                                                                           min_group_size = 2),
-                                                DOC_X; w = DOC_W, groups = DOC_G),
-                      REFERENCE_STANDARDISE_WG)
-    @test same_matrix(cross_sectional_transform(CrossSectionalGaussianRank(), DOC_X),
-                      REFERENCE_GAUSSIAN)
-    @test same_matrix(cross_sectional_transform(CrossSectionalGaussianRank(;
-                                                                           min_group_size = 2),
-                                                DOC_X; w = DOC_W, groups = DOC_G),
-                      REFERENCE_GAUSSIAN_WG)
-    @test same_matrix(cross_sectional_transform(CrossSectionalPercentileRank(), DOC_X),
-                      REFERENCE_PERCENTILE)
-    @test same_matrix(cross_sectional_transform(CrossSectionalPercentileRank(;
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalWinsoriser(; low = 0.1,
+                                                                           high = 0.9),
+                                                  DOC_X), REFERENCE_WINSORISE, "WINSORISE")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalWinsoriser(; low = 0.1,
+                                                                           high = 0.9),
+                                                  DOC_X; w = DOC_MASK_W),
+                        REFERENCE_WINSORISE_W, "WINSORISE_W")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalTanhShrinker(), DOC_X),
+                        REFERENCE_TANH, "TANH")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalTanhShrinker(), DOC_X;
+                                                  w = DOC_MASK_W), REFERENCE_TANH_W,
+                        "TANH_W")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalStandardiser(), DOC_X),
+                        REFERENCE_STANDARDISE, "STANDARDISE")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalStandardiser(;
                                                                              min_group_size = 2),
-                                                DOC_X; w = DOC_MASK_W, groups = DOC_G),
-                      REFERENCE_PERCENTILE_WG)
+                                                  DOC_X; w = DOC_W, groups = DOC_G),
+                        REFERENCE_STANDARDISE_WG, "STANDARDISE_WG")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalGaussianRank(), DOC_X),
+                        REFERENCE_GAUSSIAN, "GAUSSIAN")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalGaussianRank(;
+                                                                             min_group_size = 2),
+                                                  DOC_X; w = DOC_W, groups = DOC_G),
+                        REFERENCE_GAUSSIAN_WG, "GAUSSIAN_WG")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalPercentileRank(), DOC_X),
+                        REFERENCE_PERCENTILE, "PERCENTILE")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalPercentileRank(;
+                                                                               min_group_size = 2),
+                                                  DOC_X; w = DOC_MASK_W, groups = DOC_G),
+                        REFERENCE_PERCENTILE_WG, "PERCENTILE_WG")
     # The census's own four-value cross-section, and the two-asset cross-section that pins
     # the smallest rank a member can carry.
-    @test same_matrix(cross_sectional_transform(CrossSectionalStandardiser(),
-                                                [1.0 2.0 4.0 10.0]), REFERENCE_STD_VECTOR)
-    @test same_matrix(cross_sectional_transform(CrossSectionalGaussianRank(), [1.0 2.0]),
-                      REFERENCE_GAUSSIAN_N2)
-    @test same_matrix(cross_sectional_transform(CrossSectionalPercentileRank(), [1.0 2.0]),
-                      REFERENCE_PERCENTILE_N2)
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalStandardiser(),
+                                                  [1.0 2.0 4.0 10.0]), REFERENCE_STD_VECTOR,
+                        "STD_VECTOR")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalGaussianRank(), [1.0 2.0]),
+                        REFERENCE_GAUSSIAN_N2, "GAUSSIAN_N2")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalPercentileRank(),
+                                                  [1.0 2.0]), REFERENCE_PERCENTILE_N2,
+                        "PERCENTILE_N2")
     # The nine-observation panel, which carries every awkward observation at once.
-    @test same_matrix(cross_sectional_transform(CrossSectionalWinsoriser(), RAND_X;
-                                                w = RAND_W), REFERENCE_RAND_WINSORISE_W)
-    @test same_matrix(cross_sectional_transform(CrossSectionalTanhShrinker(), RAND_X;
-                                                w = RAND_W), REFERENCE_RAND_TANH_W)
-    @test same_matrix(cross_sectional_transform(CrossSectionalStandardiser(;
-                                                                           min_group_size = 2),
-                                                RAND_X; w = RAND_W, groups = RAND_G),
-                      REFERENCE_RAND_STANDARDISE_WG)
-    @test same_matrix(cross_sectional_transform(CrossSectionalGaussianRank(;
-                                                                           min_group_size = 2),
-                                                RAND_X; w = RAND_W, groups = RAND_G),
-                      REFERENCE_RAND_GAUSSIAN_WG)
-    @test same_matrix(cross_sectional_transform(CrossSectionalPercentileRank(;
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalWinsoriser(), RAND_X;
+                                                  w = RAND_W), REFERENCE_RAND_WINSORISE_W,
+                        "RAND_WINSORISE_W")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalTanhShrinker(), RAND_X;
+                                                  w = RAND_W), REFERENCE_RAND_TANH_W,
+                        "RAND_TANH_W")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalStandardiser(;
                                                                              min_group_size = 2),
-                                                RAND_X; groups = RAND_G),
-                      REFERENCE_RAND_PERCENTILE_G)
+                                                  RAND_X; w = RAND_W, groups = RAND_G),
+                        REFERENCE_RAND_STANDARDISE_WG, "RAND_STANDARDISE_WG")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalGaussianRank(;
+                                                                             min_group_size = 2),
+                                                  RAND_X; w = RAND_W, groups = RAND_G),
+                        REFERENCE_RAND_GAUSSIAN_WG, "RAND_GAUSSIAN_WG")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalPercentileRank(;
+                                                                               min_group_size = 2),
+                                                  RAND_X; groups = RAND_G),
+                        REFERENCE_RAND_PERCENTILE_G, "RAND_PERCENTILE_G")
 end
 
 @testset "An independent derivation agrees with the port" begin
