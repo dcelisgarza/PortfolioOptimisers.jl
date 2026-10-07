@@ -86,7 +86,10 @@ by about ``1 - \\ln(\\omega) / 2``.
 # Arguments
 
   - `decay::Number`: Decay of the weights. Its number type is the type of every weight.
-  - `Klat::Integer`: Largest count of observations the lattice of `g` must serve.
+  - `hf::Number`: Step of the lattice `xf` of ``\\ln \\sigma``, ``1/8`` by default.
+  - `xflo::Number`: First point of `xf`, ``-61 + \\ln(1 - \\lambda)`` by default.
+  - `xfhi::Number`: Last point of `xf`, 42 by default. Past it a stencil extrapolates, which a
+    step of ``1/8`` bears and a finer step does not.
 
 # Returns
 
@@ -101,7 +104,9 @@ by about ``1 - \\ln(\\omega) / 2``.
   - [`lagrange_stencil`](@ref)
   - [`chebyshev_stencil`](@ref)
 """
-function mahalanobis_bias_grid(decay::Number)
+function mahalanobis_bias_grid(decay::Number, hf::Number = one(decay) / 8,
+                               xflo::Number = -61 * one(decay) + log1p(-decay),
+                               xfhi::Number = 42 * one(decay))
     o = one(decay)
     h = o / 4
     xlo = -o
@@ -112,9 +117,8 @@ function mahalanobis_bias_grid(decay::Number)
     cheb = [sc * (1 + cos(pi * (l - o / 2) / 8)) / 2 for l in 1:8]
     nodes = vcat(cheb, view(sg, 6:NG))
     su = exp.(range(-30 * o, 40 * o; step = h))
-    hf = o / 8
     # The lattice serves every shift `m hf` of the normalisation, down to `log(1 - decay)`.
-    xf = range(-61 * o + log1p(-decay), 42 * o; step = hf)
+    xf = range(xflo, xfhi; step = hf)
     NF = length(xf)
     geo = (; sc, xlo, xhi, h, NG, send = sg[end])
     fstencil(s) = lagrange_stencil(first(xf), hf, NF, log(s))
@@ -530,6 +534,9 @@ rule.
   - `decay::Number`: Decay of the weights.
   - `K::Integer`: Count of observations.
   - `hac_lags::Union{<:Integer, <:VecNum}`: Count of HAC lags, or the weight of each lag.
+  - `slope`: In place of `decay`, `K` and `hac_lags`, a function of ``\\sigma`` that gives the exact
+    derivative, or a negative number past the first zero of the determinant. The first method
+    reads it from [`hac_log_det_slopes`](@ref) on the banded matrix.
 
 # Returns
 
@@ -545,14 +552,17 @@ rule.
 """
 function hac_log_det_peak(gh::VecNum, rh::VecNum, xf::AbstractRange, decay::Number,
                           K::Integer, hac_lags::Union{<:Integer, <:VecNum})
+    c = (one(decay) - decay) / (one(decay) - decay^K)
+    return hac_log_det_peak(gh, rh, xf,
+                            function (sigma)
+                                sl = hac_log_det_slopes(decay, K, sigma / c, hac_lags)
+                                return isnothing(sl) ? -one(sigma) : sl[1] / c
+                            end)
+end
+function hac_log_det_peak(gh::VecNum, rh::VecNum, xf::AbstractRange, slope)
     p = findfirst(i -> !(rh[i] > zero(rh[i])) || isinf(gh[i]), eachindex(gh, rh))
     if isnothing(p)
         return nothing
-    end
-    c = (one(decay) - decay) / (one(decay) - decay^K)
-    function slope(sigma)
-        sl = hac_log_det_slopes(decay, K, sigma / c, hac_lags)
-        return isnothing(sl) ? -one(sigma) : sl[1] / c
     end
     a = exp(xf[p - 1])
     lo, hi = a, exp(xf[p])
@@ -1125,7 +1135,8 @@ and up to 3.7 s at a half-life of 250, five lags and 12 assets.
   - [`inverse_wishart_bias`](@ref)
 """
 function mahalanobis_bias_nodes(method::RegimeAdjustedMethod, decay::Number, n::Integer,
-                                hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing)
+                                hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing,
+                                centring::AbstractCentring = PreCentred())
     start = mahalanobis_bias_start(decay, n, hac_lags)
     Ksat = max(mahalanobis_bias_saturation(decay, n), start)
     K1 = min(start + (isnothing(hac_lags) ? 0 : 32), Ksat)
@@ -1135,7 +1146,8 @@ function mahalanobis_bias_nodes(method::RegimeAdjustedMethod, decay::Number, n::
                      clamp(round(Int, K1 + log(t) / log(decay)), K1, Ksat)
                  end
                  for t in (1 .- cos.(pi .* (0:15) ./ 15 .* one(decay))) ./ 2])
-    f = mahalanobis_level_bias(method, decay, vcat(Ks, start:(K1 - 1)), n, hac_lags)
+    f = mahalanobis_level_bias(method, decay, vcat(Ks, start:(K1 - 1)), n, hac_lags,
+                               centring)
     sigma = decay .^ (Ks .- (n + 4))
     ratio = view(f, eachindex(Ks)) ./
             [inverse_wishart_bias(method, mahalanobis_bias(decay, K, n), n) for K in Ks]
@@ -1173,8 +1185,10 @@ interpolation the first time the state meets a count of assets.
 """
 function mahalanobis_regime_bias!(store::AbstractDict, method::RegimeAdjustedMethod,
                                   decay::Number, K::Integer, n::Integer,
-                                  hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing)
-    nodes = get!(() -> mahalanobis_bias_nodes(method, decay, n, hac_lags), store, n)
+                                  hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing,
+                                  centring::AbstractCentring = PreCentred())
+    nodes = get!(() -> mahalanobis_bias_nodes(method, decay, n, hac_lags, centring), store,
+                 n)
     i = K - nodes.start + 1
     if i in eachindex(nodes.exact)
         return nodes.exact[i]

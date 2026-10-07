@@ -307,17 +307,39 @@ estimated location, the recursion from zero that is not divided by its weight, w
 estimates `(1 − λ^k) μ` rather than the mean that it subtracts, so it is not the default, and it
 stays one keyword away (ADR 0186) at parity with every stored oracle case of that rule.
 
-**The tables hold under the estimated location without HAC, and read the risk 0.3 % to 1.5 % low
-under HAC.** The tables read the law of `Q` with independent terms. Under the estimated location
-each term has the right mean, but the terms share their location. A simulation compared the mean
-squared multiplier under `ExactDebias()` on iid Normal returns, `EstimatedCentring()` at a mean of
-0.3 against `PreCentred()` at a mean of zero, at a half-life of 10 and a regime half-life of 500,
-12 000 rows and six seeds, for the three methods, the scalar estimator and the three targets.
-Without HAC all twelve agree within 0.72 standard errors. At two lags every difference is
-negative: −0.5 % (root mean square) and −0.4 % (first moment) on the scalar estimator, −1.5 % and
-−1.4 % on the Mahalanobis target, and −0.3 % to −1.0 % within the noise on the diagonal and
-portfolio targets. The exact law under HAC reads the spectrum of a dense form in the deviations at
-each count, and #1527 holds that work.
+**Under the estimated location the tables read the exact law of the shared deviations (#1548).**
+Each term has the right mean, but the terms share their location, so the estimate is a quadratic
+form `Q = c x'Mx` in the returns with a dense `M`, and the next deviation `u` reads the same
+location. Two parts move each factor: the law of `Q`, and the dependence of `u` on `Q`, which the
+root mean square (`E[u²/Q]`) and the first moment (`E[|u|/√Q]`) read and the log does not. Without
+HAC they nearly cancel; with HAC they add, so the pre-centred tables read the risk low (#1527): at
+a half-life of 10 the root-mean-squared factor was 0.26 %, 0.58 % and 1.39 % too large at one, two
+and four lags, and the Mahalanobis factor 1.3 % to 3.1 % at two to 12 assets. The estimate after
+`K` terms is `R_K = λ R_{K−1} + q_K`, so on a lattice of step `|ln λ|` in `ln s` the transform at
+`s` reads the transform at `λ s` of the count before, and a Gaussian state of the location and the
+last `L` deviations carries both parts exactly, one step per point and count. The scalar table
+under `EstimatedCentring()` reads it with or without HAC, and so do the diagonal target and the
+portfolio target on one decay. It agrees with the eigenvalues of `M` to `10⁻¹²` where the estimate
+is positive definite. Past `λ^K = √ε` it holds its ratio to the pre-centred table, within
+`4 × 10⁻⁹`. It costs 0.12 s to 0.16 s at a half-life of 40 and 3.4 s at 250, once per state. A
+Monte Carlo of the estimator over half-lives 5 to 40, one to four lags and every target puts the
+mean squared multiplier within its noise (z from −1.2 to 0.5), where the scalar estimator was at
+z = −3.0 before.
+
+The Mahalanobis target under HAC starts its level recursion from `ln det(I + σM_K)` of the same
+lattice, on a grid of the lattice's step, with the peak placed on the exact slope of one chain.
+The root mean square adds the dependence exactly: `E[u'W⁻¹u] = E[tr W⁻¹] + E[y'W⁻¹y]` with
+`y = Z'g`, and the second term is the derivative in `t` of `E[ln det Z'(M + t gg')Z]`, which the
+sum of the levels gives. The first moment and the log read the law alone. Against a Monte Carlo of
+a million draws of the statistic the root mean square is within 0.3 % at the steady state and
+0.6 % at the first scored count, and the first moment and the log are 0.4 % to 1.3 % high, where
+the pre-centred factors were 1.3 % to 3.1 % high, and 7.5 % at the first scored count of a
+half-life of 40. The nodes cost about twice the pre-centred nodes. Without HAC the Mahalanobis
+target keeps the pre-centred recursion: there the two parts cancel within 0.16 % for every method,
+and the law alone would read the first moment and the log 0.17 % to 0.65 % high. The exact
+dependence of the first moment and the log has a route, `E ln(1 + t d²) = E ln det W_t − E ln det W`
+for every `t`, at the cost of one run of the recursion per `t`; #1549 holds that question of
+cost. The separate path keeps the pre-centred law at `cor_decay`, with the limits below.
 
 ## Consequences
 
@@ -331,6 +353,12 @@ each count, and #1527 holds that work.
   documented limit (#1447). Under HAC, on the kernel of the damped rows, the statistic reads
   0.2 % to 2.2 % high at `R = I` and −2.6 % to +3.4 % at correlated `R` over 4 to 24 assets and
   one to four lags (#1445).
+- Under HAC and the estimated location, the Mahalanobis first moment and log read the law of the
+  shared deviations and not the dependence of the deviation: 0.4 % to 1.3 % high against a Monte
+  Carlo of the statistic, a documented limit until #1549 decides its cost.
+- The exact table of the estimated location costs 0.12 s to 0.16 s per state at a half-life of 40
+  and 3.4 s at 250, where the pre-centred table costs 0.04 s at 40. The Mahalanobis nodes under
+  HAC cost about twice the pre-centred nodes.
 - A HAC fit on the separate path moves with the row rule of #1444; no stored oracle case runs that
   path, and `hac_vol_before = VolatilityAfterUpdate()` gives the rule of the oracle bit for bit.
 - The Mahalanobis nodes under HAC cost 0.3 s to 1.5 s for each count of assets at half-lives up

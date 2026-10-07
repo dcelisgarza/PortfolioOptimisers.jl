@@ -173,6 +173,8 @@ include("05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.j
 include("05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl")
 include("05_Moments/30_RegimeAdjusted/04_HacRowKernel.jl")
 include("05_Moments/30_RegimeAdjusted/05_RegimeSwitches.jl")
+include("05_Moments/30_RegimeAdjusted/06_EstimatedRegimeBias.jl")
+include("05_Moments/30_RegimeAdjusted/07_EstimatedMahalanobisBias.jl")
 include("05_Moments/31_HigherMomentPartialFit.jl")
 include("05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl")
 include("05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl")

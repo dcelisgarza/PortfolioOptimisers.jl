@@ -181,6 +181,8 @@
 "src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl" = { map = 3, units = 28, swept = false }
 "src/05_Moments/30_RegimeAdjusted/04_HacRowKernel.jl" = { map = 3, units = 7, swept = false }
 "src/05_Moments/30_RegimeAdjusted/05_RegimeSwitches.jl" = { map = 3, units = 11, swept = false }
+"src/05_Moments/30_RegimeAdjusted/06_EstimatedRegimeBias.jl" = { map = 3, units = 12, swept = false }
+"src/05_Moments/30_RegimeAdjusted/07_EstimatedMahalanobisBias.jl" = { map = 3, units = 7, swept = false }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { map = 3, units = 29, swept = false }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { map = 3, units = 21, swept = false }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { map = 3, units = 12, swept = false }

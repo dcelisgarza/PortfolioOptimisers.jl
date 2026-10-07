@@ -1776,3 +1776,152 @@ the kernel of `hac_row_kernel`, as the Mahalanobis tables do (ADR 0190).
     @test 0.93 < r2 / PO.pair_weight_square_sum(lamc, 1.0, kern) < 1
     @test r2 / PO.pair_weight_square_sum(lamc, 1.0, 2) < 0.9
 end
+
+@testset "under the estimated location the tables read the law of the shared deviations" begin
+    # The estimate as the variance pass forms it: after K + 1 returns it is (1 - λ) xᵀ M x, and
+    # the location is gᵀx, both read off the pass by polarisation on unit returns.
+    function estimated_form(lam, L, K)
+        ce = RegimeAdjustedExpWeightedVariance(; decay = lam, hac_lags = L,
+                                               regime_method = nothing, min_obs = 1)
+        state(x) = PO.regime_adjusted_variance_pass!(ce, reshape(x, :, 1), 1, nothing,
+                                                     nothing)
+        E = Matrix(1.0I, K + 1, K + 1)
+        R(x) = state(x).variance[1] / (1 - lam)
+        r = [R(E[:, i]) for i in 1:(K + 1)]
+        M = [i == j ? r[i] : (R(E[:, i] + E[:, j]) - r[i] - r[j]) / 2
+             for i in 1:(K + 1), j in 1:(K + 1)]
+        g = [state(E[:, i]).location[1] for i in 1:(K + 1)]
+        return M, g
+    end
+    # Each factor from the eigenvalues on a grid of step 1/200, with the tilted variance
+    # V = 1 + gᵀ(I + sM)⁻¹g of the next deviation: the root mean square and the first moment
+    # read it, and the log reads the law of the estimate alone.
+    function dense_factors(lam, L, K)
+        M, g = estimated_form(lam, L, K)
+        F = eigen(Symmetric(M))
+        mu = F.values
+        gq = F.vectors' * g
+        s = exp.(range(-75, 60; step = 1 / 200))
+        lG = map(x -> (v = 1 .+ x .* mu; any(<=(0), v) ? -Inf : -sum(log, v) / 2), s)
+        G = PO.hac_laplace!(similar(s), lG)
+        V = [max(1 + sum(gq .^ 2 ./ (1 .+ x .* mu)), 0) for x in s]
+        c = (1 - lam) / (1 - lam^K)
+        f = PO.centring_factor(EstimatedCentring(), lam, K + 1)
+        return (PO.regime_bias_factor(PO.RootMeanSquaredAdjusted(), s, G .* V ./ f, c,
+                                      1 / 200),
+                PO.regime_bias_factor(PO.FirstMomentRegimeAdjusted(), s, G .* sqrt.(V ./ f),
+                                      c, 1 / 200),
+                PO.regime_bias_factor(PO.LogRegimeAdjusted(), s, G, c, 1 / 200),
+                PO.regime_log_variance(s, G, 1 / 200)), minimum(mu) > 0
+    end
+    lam = 2.0^(-1 / 10)
+    methods = (PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted(),
+               PO.LogRegimeAdjusted())
+    for L in (nothing, 2)
+        tables = [PO.regime_bias_table(m, lam, 64, L, EstimatedCentring()) for m in methods]
+        logm = PO.regime_bias_table(PO.RegimeTermMoments(PO.LogRegimeAdjusted()), lam, 64,
+                                    L, EstimatedCentring())
+        for K in (5, 20, 40)
+            d, definite = dense_factors(lam, L, K)
+            # Measured: 7e-13 where the estimate is positive definite, and 1.3e-9 where it
+            # is not, where the cut moves with the grid.
+            rtol = definite ? 1e-11 : 1e-8
+            for i in 1:3
+                @test isapprox(tables[i][K], d[i]; rtol)
+            end
+            @test isapprox(logm[K][3], d[4]; rtol)
+            @test logm[K][1] == tables[1][K]
+        end
+    end
+    # The pre-centred table over the exact one at the steady state, a half-life of 10, and one,
+    # two and four lags. A Monte Carlo of the estimator (64 000 paths) reads 1.0024, 1.0058 and
+    # 1.0140 for the root mean square.
+    for (L, ratio) in ((1, 1.00256), (2, 1.00583), (4, 1.01388))
+        @test isapprox(PO.regime_bias_table(PO.RootMeanSquaredAdjusted(), lam, 400, L)[400] /
+                       PO.regime_bias_table(PO.RootMeanSquaredAdjusted(), lam, 400, L,
+                                            EstimatedCentring())[400], ratio; atol = 1e-5)
+    end
+    # Past λ^K = √ε the table holds its ratio to the pre-centred one: at a count of 400 that is
+    # within 1e-9 of the recursion run to that count.
+    lat = PO.estimated_bias_lattice(lam, 2)
+    for k in 1:400
+        PO.estimated_bias_count!(lat, lam, k)
+        k == 400 &&
+            @test isapprox(PO.regime_bias_table(PO.RootMeanSquaredAdjusted(), lam, 400, 2,
+                                                EstimatedCentring())[400],
+                           PO.estimated_bias_factor(PO.RootMeanSquaredAdjusted(),
+                                                    PO.estimated_bias_integrals!(lat, lam,
+                                                                                 k),
+                                                    (1 - lam) / (1 - lam^k)); rtol = 1e-9)
+        k < 400 && PO.estimated_bias_integrals!(lat, lam, k)
+    end
+    # The number type of the decay carries through, and a pre-centred or zero-start estimate
+    # reads the table without a centring.
+    @test eltype(PO.regime_bias_table(PO.FirstMomentRegimeAdjusted(), Float32(lam), 64, 2,
+                                      EstimatedCentring())) === Float32
+    @test PO.regime_bias_table(PO.LogRegimeAdjusted(), lam, 64, 2, PreCentred()) ==
+          PO.regime_bias_table(PO.LogRegimeAdjusted(), lam, 64, 2)
+    @test PO.regime_bias_table(PO.LogRegimeAdjusted(), lam, 64, nothing,
+                               ZeroStartCentring()) ==
+          PO.regime_bias_table(PO.LogRegimeAdjusted(), lam, 64)
+    # The state of an estimator under the estimated location holds the exact table.
+    @test PO.regime_bias!(Float64[], PO.RootMeanSquaredAdjusted(), lam, 30, 2,
+                          EstimatedCentring()) ==
+          PO.regime_bias_table(PO.RootMeanSquaredAdjusted(), lam, 64, 2,
+                               EstimatedCentring())[30]
+    ce = RegimeAdjustedExpWeightedVariance(; decay = lam, hac_lags = 2, min_obs = 1)
+    st = PO.regime_adjusted_variance_pass!(ce, randn(StableRNG(1548), 40, 2), 1, nothing,
+                                           nothing)
+    @test st.bias == PO.regime_bias_table(ce.regime_method, lam, length(st.bias), 2,
+                                          EstimatedCentring())
+
+    # The Mahalanobis columns against the eigenvalues of the form: g = ln det(I + σM), its
+    # derivative, and σ gᵀ(I + σM)⁻¹g, below the peak.
+    K = 60
+    M, g = estimated_form(lam, 2, K)
+    F = eigen(Symmetric(M))
+    mu = F.values
+    gq = F.vectors' * g
+    x0 = log(eps()) + log1p(-lam)
+    lat = PO.estimated_bias_lattice(lam, 2, x0, 51.0, ComplexF64)
+    j0 = ceil(Int, (x0 - (-61 + log1p(-lam))) / lat.h)
+    xf = range(x0 - j0 * lat.h, 50 + 8 * lat.h; step = lat.h)
+    cols = (; g = zeros(length(xf)), r = zeros(length(xf)), vt = zeros(length(xf)),
+            rt = zeros(length(xf)))
+    for k in 1:K
+        PO.estimated_bias_count!(lat, lam, k)
+        PO.estimated_bias_freeze!(lat)
+    end
+    PO.estimated_mahalanobis_columns!(cols, lat, xf, j0, lam, K)
+    for j in (j0 - 50, j0 + 5, j0 + 300, j0 + 560)
+        sig = exp(xf[j])
+        @test isapprox(cols.g[j], sum(log1p.(sig .* mu)); rtol = 1e-11, atol = 1e-14)
+        @test isapprox(cols.r[j], sum(mu ./ (1 .+ sig .* mu)); rtol = 1e-11)
+        @test isapprox(cols.vt[j], sig * sum(gq .^ 2 ./ (1 .+ sig .* mu)); rtol = 1e-11)
+    end
+    # The chain at one point gives the same slope and value.
+    ch = PO.estimated_log_det_chain(lam, K, exp(xf[j0 + 300]), lat.k)
+    @test ch[1]
+    @test isapprox(ch[2], cols.r[j0 + 300]; rtol = 1e-11)
+    @test isapprox(ch[3], cols.g[j0 + 300]; rtol = 1e-11)
+    # Below the seed the chain reads the mean of the estimate.
+    ch = PO.estimated_log_det_chain(lam, K, 1e-30, lat.k)
+    @test ch[1] && ch[2] == (1 - lam^K) / (1 - lam) && ch[3] == 1e-30 * ch[2]
+    # At 200 counts, a half-life of 10, two lags and five assets, a Monte Carlo of a million
+    # draws of the statistic reads 1.4994, 1.4513 and 1.4046 (standard error 0.08 %): the
+    # root mean square is within 0.07 %, and the first moment and the log read the law alone,
+    # 0.45 % and 0.37 % above it. The pre-centred factors read 1.6 %, 1.4 % and 1.3 % above.
+    f = [PO.mahalanobis_level_bias(m, lam, [200], 5, 2, EstimatedCentring())[1]
+         for m in methods]
+    @test isapprox(f, [1.49839, 1.45779, 1.40984]; rtol = 1e-5)
+    # Past λ^K = √ε the factor holds its ratio to the pre-centred one.
+    Kh = ceil(Int, log(sqrt(eps())) / log(lam))
+    f2 = PO.mahalanobis_level_bias(methods[2], lam, [Kh, Kh + 40], 2, 2, EstimatedCentring())
+    p2 = PO.mahalanobis_level_bias(methods[2], lam, [Kh, Kh + 40], 2, 2)
+    @test f2[2] / p2[2] ≈ f2[1] / p2[1]
+    # Without HAC the law and the dependence cancel within the error of the recursion, and the
+    # target reads the pre-centred factor.
+    @test PO.mahalanobis_level_bias(methods[2], lam, [40, 200], 5, nothing,
+                                    EstimatedCentring()) ==
+          PO.mahalanobis_level_bias(methods[2], lam, [40, 200], 5, nothing)
+end

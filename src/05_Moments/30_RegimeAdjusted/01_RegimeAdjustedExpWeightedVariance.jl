@@ -1047,6 +1047,9 @@ larger count. A fit over ``T`` rows thus makes the table once or a few times, an
   - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags of the estimate, or the
     weight of each lag, whose table [`regime_bias_table`](@ref) computes from its banded weight
     matrix, or `nothing`.
+  - `centring::AbstractCentring`: The centring of the estimate. Under [`EstimatedCentring`](@ref)
+    the table reads the exact law of the estimated deviations. The default, [`PreCentred`](@ref),
+    reads the law of pre-centred terms.
 
 # Returns
 
@@ -1060,15 +1063,12 @@ larger count. A fit over ``T`` rows thus makes the table once or a few times, an
 function regime_bias!(bias::AbstractVector,
                       method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
                       decay::Number, K::Integer,
-                      hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing)
+                      hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing,
+                      centring::AbstractCentring = PreCentred())
     Ksat = ceil(Int, log(eps(eltype(eltype(bias)))) / log(decay))
     if K > length(bias) && length(bias) < Ksat
-        n = min(max(2 * K, 64), Ksat)
-        table = if isnothing(hac_lags)
-            regime_bias_table(method, decay, n)
-        else
-            regime_bias_table(method, decay, n, hac_lags)
-        end
+        table = regime_bias_table(method, decay, min(max(2 * K, 64), Ksat), hac_lags,
+                                  centring)
         resize!(bias, length(table))
         copyto!(bias, table)
     end
@@ -1087,6 +1087,7 @@ Returns one, the factor of a state that takes no bias correction.
   - `decay::Number`: Decay of the weights.
   - `::Integer`: Ignored count of observations.
   - `::Any`: Ignored count of HAC lags.
+  - `::Any`: Ignored centring.
 
 # Returns
 
@@ -1096,7 +1097,8 @@ Returns one, the factor of a state that takes no bias correction.
 
   - [`regime_bias!`](@ref)
 """
-function regime_bias!(::Nothing, ::Any, decay::Number, ::Integer, ::Any = nothing)
+function regime_bias!(::Nothing, ::Any, decay::Number, ::Integer, ::Any = nothing,
+                      ::Any = nothing)
     return one(decay)
 end
 """
@@ -1270,7 +1272,7 @@ function process_observation!(cache::RegimeAdjustedVarianceState,
         factor = inv.(max.(one(ce.decay) .- ce.decay .^ Kv, eps(ce.decay)))
         var_corrected = view(cache.variance, var_idx) .* factor .*
                         regime_bias!.(Ref(cache.bias), Ref(ce.regime_method), ce.decay, Kv,
-                                      ce.hac_lags)
+                                      ce.hac_lags, Ref(ce.centring))
         cache.z2[var_idx] = view(Xi, var_idx) .^ 2 ./ view(f, var_idx) ./ var_corrected
     end
 
