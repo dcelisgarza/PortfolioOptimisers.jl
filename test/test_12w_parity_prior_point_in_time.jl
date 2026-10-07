@@ -25,6 +25,18 @@ both defaults floor at `1e-12`; that moves only a variance in `(0, 1e-12]`:
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 
+# A factor prior that multiplies the scenario weights of the prior it wraps by `s` (#1509).
+struct ScaledWeightsPrior{P, T} <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_A
+    pe::P
+    s::T
+end
+function PortfolioOptimisers.prior(pe::ScaledWeightsPrior, X::PortfolioOptimisers.MatNum,
+                                   args...; kwargs...)
+    pr = prior(pe.pe, X, args...; kwargs...)
+    return PortfolioOptimisers.forward_prior(pr; w = pweights(pe.s .* pr.w.values),
+                                             ens = nothing, kld = nothing)
+end
+
 @testset "The prior on a point-in-time panel, at parity (#1384)" begin
     PO = PortfolioOptimisers
     mpass(f) = CompositeExposure(; descriptors = [Passthrough(; field = f)],
@@ -195,8 +207,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     @testset "The scenario weights and a Scenario Cap" begin
         # The oracle keeps the weights of the scenarios it keeps, and divides them by their
         # sum. Every factor prior of the library carries one scenario for each fitted
-        # observation or fewer, so every weight is kept, and the weights of an entropy-pooling
-        # prior already sum to one. Measured maxrel 3.0e-16.
+        # observation or fewer, so every weight is kept. The prior divides the weights by
+        # their sum, as the oracle does (#1509). Measured maxrel 3.0e-16.
         sets = UniverseSets(; dict = Dict("nx" => ["market", "style1", "style2"]))
         views = LinearConstraintEstimator(; val = ["style1 == 0.002", "style2 == -0.001"])
         pr = prior(est(;
@@ -219,6 +231,45 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         @test isequal(pc.o_X, prs.o_X[(end - 29):end, :])
         @test isequal(pc.mu, prs.mu) && isequal(pc.sigma, prs.sigma)
         @test pc.ens == size(prs.X, 1)
+    end
+
+    @testset "The scenario weights are divided by their sum (#1509)" begin
+        # A scenario weight vector states a probability measure only when it sums to one, and
+        # a reader that forms sum(w .* L) with no division needs that measure. The mean, the
+        # covariance, the scenarios and the calibration are ratios in w, so the division
+        # moves none of them. Measured: w differs from the plain fit by 1.0e-17.
+        sets = UniverseSets(; dict = Dict("nx" => ["market", "style1", "style2"]))
+        views = LinearConstraintEstimator(; val = ["style1 == 0.002", "style2 == -0.001"])
+        ep = EntropyPoolingPrior(; pe = pe, sets = sets, mu_views = views)
+        # The default rule of lambda reads the weights through their effective count.
+        pb = PrecisionBlend()
+        p1 = prior(est(; pe = ep, lambda = pb), fxl.rd)
+        p2 = prior(est(; pe = ScaledWeightsPrior(ep, 2), lambda = pb), fxl.rd)
+        @test isapprox(sum(p2.w), 1; rtol = 1e-14)
+        @test p2.w isa StatsBase.ProbabilityWeights
+        @test p2.w === p2.fpr.w
+        @test parity_compare(collect(p2.w), collect(p1.w); name = "w").ok
+        @test isequal(p2.mu, p1.mu) && isequal(p2.sigma, p1.sigma)
+        @test isequal(p2.X, p1.X) && isequal(p2.fpr.X, p1.fpr.X)
+        @test isequal(p2.rr.lambda, p1.rr.lambda) && 0 < p1.rr.lambda < 1
+        # No weights means unweighted (ADR 0043).
+        @test isnothing(prl.w)
+        # A sum of zero states no measure, and the prior refuses it.
+        @test_throws DomainError prior(est(; pe = ScaledWeightsPrior(ep, 0)), fxl.rd)
+        sw = PO.cross_sectional_scenario_weights
+        @test_throws DomainError sw(pweights([-1.0, 0.5]))
+        # StatsBase refuses a weight vector whose sum is not finite when it builds it.
+        @test_throws ArgumentError aweights([floatmax(), floatmax()])
+        # The kind of the weights is kept where scaling leaves its corrected variance as it
+        # was. A count would divide its corrected variance by sum(w) - 1 = 0, so FrequencyWeights
+        # become ProbabilityWeights, as does a kind the function cannot rebuild (#1523).
+        @test sw(aweights([2.0, 1.0, 1.0])) isa StatsBase.AnalyticWeights
+        @test sw(StatsBase.weights([2.0, 1.0, 1.0])) isa StatsBase.Weights
+        @test sw(fweights([2, 1, 1])) == pweights([0.5, 0.25, 0.25])
+        @test sw(fweights([2, 1, 1])) isa StatsBase.ProbabilityWeights
+        @test sw(uweights(4)) == pweights(fill(0.25, 4))
+        @test sw(pweights(1:4)) == [0.1, 0.2, 0.3, 0.4]
+        @test isnothing(sw(nothing))
     end
 
     @testset "The split of a forecast; a tiny forecast is Better" begin

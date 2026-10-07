@@ -10,6 +10,7 @@ The functions below are the steps of a [`CrossSectionalFactorPrior`](@ref) fit. 
 - The history of each factor exposure, in an order that puts each exposure after the exposures it is derived from.
 - The active mask and the estimation mask of the asset panel.
 - The regression of each observation on the factors that are not empty, and the moments of the factors, with no mean and no variance for a factor whose exposure is zero at every asset that the fit weights.
+- The scenario weights of the factors, divided by their sum.
 - The idiosyncratic covariance of the latest observation, and the degrees of freedom and the divisor of each idiosyncratic variance.
 - The return scenarios of the assets.
 - The moments of the assets, from the moments of the factors and the loadings.
@@ -29,6 +30,7 @@ PortfolioOptimisers.cross_sectional_eligible
 PortfolioOptimisers.assert_cross_sectional_coverage
 PortfolioOptimisers.assert_cross_sectional_factor_moments
 PortfolioOptimisers.cross_sectional_factor_moments
+PortfolioOptimisers.cross_sectional_scenario_weights
 PortfolioOptimisers.cross_sectional_idiosyncratic_covariance
 PortfolioOptimisers.cross_sectional_variance_counts
 PortfolioOptimisers.cross_sectional_finite_mean

@@ -559,6 +559,7 @@ The method over `pr` takes the factor prior already fitted on the factors that a
  3. Refuse a non-finite moment of `pr` with [`assert_cross_sectional_factor_moments`](@ref).
  4. Process the covariance of `pr` in place with `f_mp`, over `fl`.
  5. When every factor is in `lv`, return the scenarios, the mean and the covariance of `pr`. Otherwise, write them into the columns at `lv` of a zero scenario matrix `X`, the entries at `lv` of a zero mean `mu`, and the block at `lv` of a zero covariance `sigma`.
+ 6. Divide the scenario weights of `pr` by their sum with [`cross_sectional_scenario_weights`](@ref).
 
 # Arguments
 
@@ -574,14 +575,15 @@ The method over `pr` takes the factor prior already fitted on the factors that a
 
   - `lv` has one entry per column of `f`. Raises a `DimensionMismatch`.
   - The covariance of `pr` is a new matrix, because step 4 processes it in place.
-  - The rules of [`assert_cross_sectional_factor_moments`](@ref).
+  - The rules of [`assert_cross_sectional_factor_moments`](@ref) and [`cross_sectional_scenario_weights`](@ref).
 
 # Returns
 
   - `X::MatNum`: The factor return scenarios of `pr` on the whole factor axis.
   - `mu::VecNum`: The expected factor returns on the whole factor axis.
   - `sigma::MatNum`: The processed factor covariance on the whole factor axis.
-  - `w`, `ens`, `kld`, `ow`: The observation weights, the effective number of scenarios, the Kullback-Leibler divergence and the original weights of `pr`.
+  - `w`: The scenario weights of `pr` divided by their sum, or `nothing`.
+  - `ens`, `kld`, `ow`: The effective number of scenarios, the Kullback-Leibler divergence and the original weights of `pr`.
 
 # Related
 
@@ -618,8 +620,70 @@ function cross_sectional_factor_moments(pr::LowOrderPrior,
         sigma = zeros(eltype(pr.sigma), K, K)
         sigma[lv, lv] = pr.sigma
     end
-    return (; X = X, mu = mu, sigma = sigma, w = pr.w, ens = pr.ens, kld = pr.kld,
-            ow = pr.ow)
+    return (; X = X, mu = mu, sigma = sigma, w = cross_sectional_scenario_weights(pr.w),
+            ens = pr.ens, kld = pr.kld, ow = pr.ow)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Divide the scenario weights of the factor prior of a Cross-Sectional Factor Prior by their sum.
+
+A scenario weight vector states a probability measure over the scenarios only when it sums to one. A ratio estimator, such as the weighted mean ``\\sum_t w_t x_t / \\sum_t w_t``, gives the same answer at every scale of ``w``. A consumer that reads the weights as probabilities, such as a scenario risk measure that forms ``\\sum_t w_t L_t`` and divides by nothing, gives a wrong answer at every other scale. So the prior stores the weights divided by their sum, which every consumer reads correctly. A sum that is zero states no measure, so the function refuses it.
+
+The function keeps the kind of `StatsBase.Weights`, `AnalyticWeights` and `ProbabilityWeights`, as [`nothing_scalar_array_getindex`](@ref) does. The corrected variance of each of these kinds is the same at every scale of the weights. `FrequencyWeights` are counts, so their corrected variance divides by ``\\sum_t w_t - 1``, which is zero after the division. So `FrequencyWeights`, and a kind the function cannot rebuild such as `StatsBase.UnitWeights`, become `StatsBase.ProbabilityWeights`, as the prior probabilities of [`EntropyPoolingPrior`](@ref) do.
+
+# Mathematical definition
+
+```math
+\\begin{aligned}
+p_t &= \\frac{w_t}{\\sum_{s = 1}^{T} w_s}\\,.
+\\end{aligned}
+```
+
+Where:
+
+  - ``p_t``: The scenario weight that the prior stores for scenario ``t``.
+  - ``w_t``: The scenario weight of the factor prior for scenario ``t``.
+  - $(math_dict[:T])
+
+# Algorithm
+
+ 1. `w` is `nothing`: return `nothing`, because no weights means unweighted.
+ 2. `w` is a `StatsBase.Weights`, `AnalyticWeights` or `ProbabilityWeights`: refuse a sum that is not positive, and return weights of the same kind over `w.values` divided by the sum.
+ 3. `w` is any other `StatsBase.AbstractWeights`, `FrequencyWeights` among them: wrap its values in `StatsBase.ProbabilityWeights`, and apply step 2.
+
+# Arguments
+
+  - `w`: The scenario weights of the factor prior, or `nothing`.
+
+# Validation
+
+  - The sum of `w` is positive. Raises a `DomainError` that holds the sum. StatsBase refuses a weight vector whose sum is not finite when it builds the vector, so a sum that reaches this function is finite.
+
+# Returns
+
+  - `p::Option{<:StatsBase.AbstractWeights}`: The weights `w` divided by their sum, or `nothing`.
+
+# Related
+
+  - [`cross_sectional_factor_moments`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function cross_sectional_scenario_weights(::Nothing)
+    return nothing
+end
+function cross_sectional_scenario_weights(w::Union{<:StatsBase.Weights,
+                                                   <:StatsBase.AnalyticWeights,
+                                                   <:StatsBase.ProbabilityWeights})
+    s = sum(w)
+    @argcheck(s > zero(s),
+              DomainError(s,
+                          "the scenario weights of the factor prior sum to $s, so they state no probability measure over the scenarios. A Cross-Sectional Factor Prior divides its scenario weights by their sum, which must be positive. Give pe a factor prior whose weights are not all zero."))
+    return Base.typename(typeof(w)).wrapper(w.values / s)
+end
+function cross_sectional_scenario_weights(w::StatsBase.AbstractWeights)
+    return cross_sectional_scenario_weights(StatsBase.pweights(collect(w)))
 end
 """
     cross_sectional_variance_counts(cnt::Nothing, csr::CrossSectionalRegression)
