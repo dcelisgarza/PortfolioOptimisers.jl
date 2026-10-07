@@ -81,8 +81,8 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
 
 9. A FORWARD-WINDOW TABLE IS PINNED ROW BY ROW AGAINST THE REFERENCE, AND ITS DATE RULE IS
    PINNED SEPARATELY. `WINDOW_ALPHA` was put through the reference's own holding-period and
-   decay diagnostics and the twenty-two literals below are what it answered, to every digit
-   it printed. The date rule is the one thing those literals cannot pin, because the
+   decay diagnostics and the literals below are what it answered, to every digit (#1558;
+   before it, to the six digits it printed). The date rule is the one thing those literals cannot pin, because the
    reference and the port agree on it: every row of a table is read on the dates every
    window of the grid can be scored at, so `n` sets the sample as well as the depth. The
    ticket asked for the opposite -- that shortening `n` leave the rows that remain -- and
@@ -111,6 +111,7 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
     and 7 meet here with one denominator: a date with no coefficient and a date with no
     trade are both unmeasured, and the coverage columns count them.
 =#
+include(joinpath(@__DIR__, "parity_harness.jl"))
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 include(joinpath(@__DIR__, "forecast_evaluation_fixture.jl"))
 
@@ -571,8 +572,11 @@ end
     @testset "Both columns are answered, and both match the reference" begin
         ic = forecast_ic(fe)
         @test size(ic) == (length(fe.dates), 2)
-        @test ic[:, 1] ≈ IC_REF_SPEARMAN
-        @test ic[:, 2] ≈ IC_REF_PEARSON
+        # Every IC, IC summary and coverage literal of the oracle in this file measures
+        # bit-equal, cell by cell (#1558). `rtol = 1e-14` only leaves room for a `sqrt` or a
+        # sum that rounds one ulp apart on another host.
+        @test parity_compare(ic[:, 1], IC_REF_SPEARMAN; rtol = 1e-14, name = "ic spearman").ok
+        @test parity_compare(ic[:, 2], IC_REF_PEARSON; rtol = 1e-14, name = "ic pearson").ok
         # The two columns disagree, which is why the verb answers both rather than one.
         @test !isapprox(ic[:, 1], ic[:, 2])
     end
@@ -590,8 +594,10 @@ end
 
     @testset "A weighting moves the Pearson column and leaves the Spearman one" begin
         ic = forecast_ic(fe, IC_W)
-        @test ic[:, 1] ≈ IC_REF_SPEARMAN
-        @test ic[:, 2] ≈ IC_REF_PEARSON_W
+        @test parity_compare(ic[:, 1], IC_REF_SPEARMAN; rtol = 1e-14,
+                             name = "ic w spearman").ok
+        @test parity_compare(ic[:, 2], IC_REF_PEARSON_W; rtol = 1e-14,
+                             name = "ic w pearson").ok
         @test !isapprox(ic[:, 2], IC_REF_PEARSON)
     end
 
@@ -617,8 +623,10 @@ end
         gap = ic_gap_fixture()
         fg = forecast_evaluation(gap, PO.forward_mean_returns(gap, 1, 1); min_count = 2)
         ic = forecast_ic(fg)
-        @test ic[:, 1] ≈ IC_REF_GAP_SPEARMAN
-        @test ic[:, 2] ≈ IC_REF_GAP_PEARSON
+        @test parity_compare(ic[:, 1], IC_REF_GAP_SPEARMAN; rtol = 1e-14,
+                             name = "ic gap spearman").ok
+        @test parity_compare(ic[:, 2], IC_REF_GAP_PEARSON; rtol = 1e-14,
+                             name = "ic gap pearson").ok
     end
 end
 
@@ -631,16 +639,14 @@ end
     @testset "The five figures of each series match the reference" begin
         @test keys(s) == (:spearman, :pearson)
         @test keys(s.spearman) == (:mean_ic, :std_ic, :ic_ir, :t_stat, :hit_rate)
-        @test s.spearman.mean_ic ≈ 0.3333333333333333
-        @test s.spearman.std_ic ≈ 0.7023769168568493
-        @test s.spearman.ic_ir ≈ 0.4745789978762494
-        @test s.spearman.t_stat ≈ 0.8219949365267862
-        @test s.spearman.hit_rate ≈ 0.6666666666666666
-        @test s.pearson.mean_ic ≈ 0.2567790285367673
-        @test s.pearson.std_ic ≈ 0.6206266852224849
-        @test s.pearson.ic_ir ≈ 0.4137415207093715
-        @test s.pearson.t_stat ≈ 0.7166213350694421
-        @test s.pearson.hit_rate ≈ 0.6666666666666666
+        @test parity_compare(collect(values(s.spearman)),
+                             [0.3333333333333333, 0.7023769168568493, 0.4745789978762494,
+                              0.8219949365267862, 0.6666666666666666]; rtol = 1e-14,
+                             name = "ic summary spearman").ok
+        @test parity_compare(collect(values(s.pearson)),
+                             [0.2567790285367673, 0.6206266852224849, 0.4137415207093715,
+                              0.7166213350694421, 0.6666666666666666]; rtol = 1e-14,
+                             name = "ic summary pearson").ok
     end
 
     @testset "The t-statistic is the mean over the standard error of the mean" begin
@@ -905,7 +911,7 @@ end
     @testset "It matches the reference, one entry per evaluation date" begin
         c = forecast_coverage(fg)
         @test length(c) == length(fg.dates)
-        @test c ≈ IC_REF_GAP_COVERAGE
+        @test parity_compare(c, IC_REF_GAP_COVERAGE; rtol = 1e-14, name = "coverage gap").ok
     end
 
     @testset "It counts the assets carrying a finite pair over the universe" begin
@@ -1766,11 +1772,14 @@ const FC_REF_SUMMARY = (; mean = 0.9835597986375235, std = 0.004192196953212379,
         # and the pairing writes the forecast onto that mask once (#1074); the fixture
         # carries one active asset off the mask, so the pins would miss by up to `0.098`
         # in a cell were either side to read it.
-        @test c[:, 1] ≈ FC_REF_STYLE rtol = 1e-12
-        @test s.mean_ic[1] ≈ FC_REF_SUMMARY.mean rtol = 1e-12
-        @test s.std_ic[1] ≈ FC_REF_SUMMARY.std rtol = 1e-12
-        @test s.ic_ir[1] ≈ FC_REF_SUMMARY.ir rtol = 1e-12
-        @test s.t_stat[1] ≈ FC_REF_SUMMARY.t_stat rtol = 1e-12
+        # Measured cell by cell, with and without the flags of `Pkg.test` (#1558): the column
+        # 5.6e-16 at most, the summary 7.9e-15 at most. The column
+        # sits near 0.98 with a spread of 0.004, so its standard deviation cancels: the ratio
+        # is 235 and the ratio and the t-statistic carry about 235 times the round-off.
+        @test parity_compare(c[:, 1], FC_REF_STYLE; rtol = 1e-14, name = "factor column").ok
+        @test parity_compare([s.mean_ic[1], s.std_ic[1], s.ic_ir[1], s.t_stat[1]],
+                             [FC_REF_SUMMARY.mean, FC_REF_SUMMARY.std, FC_REF_SUMMARY.ir,
+                              FC_REF_SUMMARY.t_stat]; rtol = 5e-14, name = "factor summary").ok
         @test s.hit_rate[1] == FC_REF_SUMMARY.hit_rate
         @test count(isfinite, view(c, :, 1)) == size(c, 1)
     end
@@ -1948,8 +1957,9 @@ end
     @testset "Under the default tie rule, the rows whose targets tie move and the first does not" begin
         fa = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1)
         ha = forecast_holding_period(fa, alpha; n = 3)
-        @test ha.spearman_mean_ic[1] ≈ h.spearman_mean_ic[1]
-        @test ha.pearson_mean_ic ≈ h.pearson_mean_ic
+        @test parity_compare([ha.spearman_mean_ic[1]; ha.pearson_mean_ic],
+                             [h.spearman_mean_ic[1]; h.pearson_mean_ic]; rtol = 1e-14,
+                             name = "untied rows").ok
         @test !isapprox(ha.spearman_mean_ic[2:3], h.spearman_mean_ic[2:3])
     end
 
@@ -1969,21 +1979,28 @@ end
     end
 
     @testset "The holding-period table is what the reference answered" begin
-        @test isapprox(h.spearman_mean_ic, [0.4, 0.12, 0.28])
-        @test isapprox(h.spearman_ic_ir, [1.414214, 0.395628, 0.639010]; rtol = 1e-6)
-        @test isapprox(h.pearson_mean_ic, [0.4, 0.180180, 0.400988]; rtol = 1e-5)
-        @test isapprox(h.pearson_ic_ir, [1.414214, 0.371014, 0.605921]; rtol = 1e-6)
+        # The literals of both tables are the oracle's full digits (#1558; the six-digit
+        # printouts before it held the tables to `rtol = 1e-5`). Every cell measures
+        # bit-equal, and so do the hand literals of the overlap rows.
+        @test parity_compare(hcat(h.spearman_mean_ic, h.spearman_ic_ir, h.pearson_mean_ic,
+                                  h.pearson_ic_ir),
+                             [0.4 1.414213562373095 0.4 1.414213562373095;
+                              0.12 0.39562828403747213 0.18017986772428515 0.37101420854458156;
+                              0.27999999999999997 0.6390096504226938 0.40098776003427916 0.6059206450877959];
+                             rtol = 1e-14, name = "holding ic").ok
         # The reference's t-statistic is the ratio times the root of the five dates at every
         # row. The port answers that at the first row alone: at a stride of one, row `p`'s
         # windows overlap their `p - 1` neighbours, and the port's standard error reads the
         # overlap where the reference's does not. That is a deliberate divergence, asserted
         # here beside the reference's number rather than papered over.
-        @test isapprox(h.spearman_ic_ir .* sqrt(5), [3.162278, 0.884652, 1.428869];
-                       rtol = 1e-6)
-        @test isapprox(h.pearson_ic_ir .* sqrt(5), [3.162278, 0.829613, 1.354880];
-                       rtol = 1e-6)
-        @test h.spearman_t_stat[1] ≈ 3.162278 rtol = 1e-6
-        @test h.pearson_t_stat[1] ≈ 3.162278 rtol = 1e-6
+        @test parity_compare(hcat(h.spearman_ic_ir, h.pearson_ic_ir) .* sqrt(5),
+                             [3.162277660168379 3.162277660168379;
+                              0.8846517369293827 0.8296129909239677;
+                              1.4288690166235205 1.3548797513868356]; rtol = 1e-14,
+                             name = "holding oracle t").ok
+        @test parity_compare([h.spearman_t_stat[1], h.pearson_t_stat[1]],
+                             [3.162277660168379, 3.162277660168379]; rtol = 1e-14,
+                             name = "holding t first row").ok
         for p in 2:3
             fp = PO.ForecastEvaluationResult(alpha,
                                              PO.forward_mean_returns(alpha, h.horizon[p],
@@ -1994,30 +2011,39 @@ end
             @test isequal(h.spearman_t_stat[p], s.spearman.t_stat)
             @test isequal(h.pearson_t_stat[p], s.pearson.t_stat)
         end
-        @test h.spearman_t_stat[2] ≈ 0.8624393618641034
-        @test h.pearson_t_stat[2] ≈ 0.7453765425294355
+        @test parity_compare([h.spearman_t_stat[2], h.pearson_t_stat[2],
+                              h.pearson_t_stat[3]],
+                             [0.8624393618641034, 0.7453765425294355, 1.9491738847880407];
+                             rtol = 1e-14, name = "holding t overlap").ok
         # Five dates at two lags sum the Spearman series' long-run variance to a
         # non-positive number, and the statistic is NaN there rather than clamped.
         @test isnan(h.spearman_t_stat[3])
-        @test h.pearson_t_stat[3] ≈ 1.9491738847880407
-        @test isapprox(h.rank_ann_return, [1.0, 0.55, 0.733333]; rtol = 1e-6)
-        @test isapprox(h.rank_sharpe, [1.414214, 0.792825, 0.964764]; rtol = 1e-6)
-        @test isapprox(h.zscore_ann_return, h.rank_ann_return)
-        @test isapprox(h.zscore_sharpe, h.rank_sharpe)
+        @test parity_compare(hcat(h.rank_ann_return, h.rank_sharpe),
+                             [1.0 1.414213562373095; 0.55 0.7928249671720919;
+                              0.7333333333333332 0.964763821237732]; rtol = 1e-14,
+                             name = "holding rank book").ok
+        @test parity_compare(hcat(h.zscore_ann_return, h.zscore_sharpe),
+                             hcat(h.rank_ann_return, h.rank_sharpe); rtol = 1e-14,
+                             name = "holding zscore book").ok
         @test h.mean_coverage == [1.0, 1.0, 1.0]
     end
 
     @testset "The decay table is what the reference answered" begin
-        @test isapprox(d.spearman_mean_ic, [0.4, 0.04, 0.44])
-        @test isapprox(d.spearman_ic_ir, [1.414214, 0.121716, 1.073490]; rtol = 1e-6)
-        @test isapprox(d.spearman_t_stat, [3.162278, 0.272166, 2.400397]; rtol = 1e-6)
-        @test isapprox(d.pearson_mean_ic, d.spearman_mean_ic)
-        @test isapprox(d.pearson_ic_ir, d.spearman_ic_ir)
-        @test isapprox(d.pearson_t_stat, d.spearman_t_stat)
-        @test isapprox(d.rank_ann_return, [1.0, 0.1, 1.1]; rtol = 1e-6)
-        @test isapprox(d.rank_sharpe, [1.414214, 0.121716, 1.073490]; rtol = 1e-6)
-        @test isapprox(d.zscore_ann_return, d.rank_ann_return)
-        @test isapprox(d.zscore_sharpe, d.rank_sharpe)
+        @test parity_compare(hcat(d.spearman_mean_ic, d.spearman_ic_ir, d.spearman_t_stat),
+                             [0.4 1.414213562373095 3.162277660168379;
+                              0.040000000000000015 0.12171612389003696 0.2721655269759088;
+                              0.43999999999999995 1.0734900802433864 2.400396792595916];
+                             rtol = 1e-14, name = "decay spearman").ok
+        @test parity_compare(hcat(d.pearson_mean_ic, d.pearson_ic_ir, d.pearson_t_stat),
+                             hcat(d.spearman_mean_ic, d.spearman_ic_ir, d.spearman_t_stat);
+                             rtol = 1e-14, name = "decay pearson").ok
+        @test parity_compare(hcat(d.rank_ann_return, d.rank_sharpe),
+                             [1.0 1.414213562373095; 0.1 0.12171612389003691;
+                              1.1 1.0734900802433864]; rtol = 1e-14,
+                             name = "decay rank book").ok
+        @test parity_compare(hcat(d.zscore_ann_return, d.zscore_sharpe),
+                             hcat(d.rank_ann_return, d.rank_sharpe); rtol = 1e-14,
+                             name = "decay zscore book").ok
         @test d.mean_coverage == [1.0, 1.0, 1.0]
     end
 end
@@ -2211,12 +2237,12 @@ const CAL_REF_BIN_COUNT = [2, 3, 2, 1, 2, 2]
     c = forecast_calibration(fe)
 
     @testset "The slope and the pooled moments match, weighted and unweighted" begin
-        @test c.slope ≈ CAL_REF_SLOPE
-        @test forecast_calibration(fe, IC_W).slope ≈ CAL_REF_SLOPE_W
-        @test c.mean_alpha ≈ CAL_REF_MEAN_ALPHA
-        @test c.std_alpha ≈ CAL_REF_STD_ALPHA
-        @test c.mean_y ≈ CAL_REF_MEAN_Y
-        @test c.std_y ≈ CAL_REF_STD_Y
+        # Measured bit-equal, cell by cell, here and on the curve (#1558).
+        @test parity_compare([c.slope, forecast_calibration(fe, IC_W).slope, c.mean_alpha,
+                              c.std_alpha, c.mean_y, c.std_y],
+                             [CAL_REF_SLOPE, CAL_REF_SLOPE_W, CAL_REF_MEAN_ALPHA,
+                              CAL_REF_STD_ALPHA, CAL_REF_MEAN_Y, CAL_REF_STD_Y];
+                             rtol = 1e-14, name = "calibration").ok
         # A good ordering and a bad scale: the coefficients of #936 are positive at the
         # first two dates and the slope is a third of one all the same.
         @test c.slope < 0.5
@@ -2225,8 +2251,9 @@ const CAL_REF_BIN_COUNT = [2, 3, 2, 1, 2, 2]
     @testset "The curve matches bin for bin, and the empty bins are dropped" begin
         @test c.n_bins == length(CAL_REF_BIN)
         @test c.curve.bin == CAL_REF_BIN
-        @test c.curve.mean_alpha ≈ CAL_REF_BIN_ALPHA
-        @test c.curve.mean_y ≈ CAL_REF_BIN_Y
+        @test parity_compare(hcat(c.curve.mean_alpha, c.curve.mean_y),
+                             hcat(CAL_REF_BIN_ALPHA, CAL_REF_BIN_Y); rtol = 1e-14,
+                             name = "calibration curve").ok
         @test c.curve.count == CAL_REF_BIN_COUNT
         @test c.n_bins < 10
     end
@@ -2255,7 +2282,8 @@ end
             @test forecast_calibration(forecast_evaluation(k * IC_ALPHA, y)).slope ≈
                   forecast_calibration(fe).slope / k
         end
-        @test forecast_calibration(forecast_evaluation(-IC_ALPHA, y)).slope ≈ -CAL_REF_SLOPE
+        @test parity_compare([forecast_calibration(forecast_evaluation(-IC_ALPHA, y)).slope],
+                             [-CAL_REF_SLOPE]; rtol = 1e-14, name = "negated slope").ok
     end
 
     @testset "The line is pinned through the origin" begin
@@ -2599,12 +2627,11 @@ const FS_SPREAD = (:spread_ann_return, :spread_ann_volatility, :spread_sharpe,
                                                              PO.forward_mean_returns(IC_ALPHA,
                                                                                      1, 1));
                                          quantiles = (0.1,))
-        for f in FS_CORE
-            @test getfield(fs, f)[1] ≈ getfield(FS_REF, f)
-        end
-        for f in FS_SPREAD
-            @test getfield(fs, f)[1, 1] ≈ getfield(FS_REF, f)
-        end
+        # Every column measures bit-equal, on this panel and on the gapped one (#1558).
+        @test parity_compare([[getfield(fs, f)[1] for f in FS_CORE];
+                              [getfield(fs, f)[1, 1] for f in FS_SPREAD]],
+                             [getfield(FS_REF, f) for f in (FS_CORE..., FS_SPREAD...)];
+                             rtol = 1e-14, name = "summary").ok
     end
 
     @testset "A gapped panel moves the coverage block, and the reference agrees" begin
@@ -2618,15 +2645,14 @@ const FS_SPREAD = (:spread_ann_return, :spread_ann_volatility, :spread_sharpe,
                                                                                      1);
                                                              min_count = 2);
                                          quantiles = (0.25,))
-        for f in FS_CORE
-            @test getfield(fs, f)[1] ≈ getfield(FS_REF_GAP, f)
-        end
-        for f in FS_SPREAD
-            @test getfield(fs, f)[1, 1] ≈ getfield(FS_REF_GAP, f)
-        end
-        @test fs.mean_coverage[1] ≈ sum(IC_REF_GAP_COVERAGE) / 3
-        @test fs.min_coverage[1] ≈ minimum(IC_REF_GAP_COVERAGE)
-        @test fs.mean_n_scored[1] ≈ sum(IC_REF_GAP_COVERAGE .* 4) / 3
+        @test parity_compare([[getfield(fs, f)[1] for f in FS_CORE];
+                              [getfield(fs, f)[1, 1] for f in FS_SPREAD]],
+                             [getfield(FS_REF_GAP, f) for f in (FS_CORE..., FS_SPREAD...)];
+                             rtol = 1e-14, name = "summary gap").ok
+        @test parity_compare([fs.mean_coverage[1], fs.min_coverage[1], fs.mean_n_scored[1]],
+                             [sum(IC_REF_GAP_COVERAGE) / 3, minimum(IC_REF_GAP_COVERAGE),
+                              sum(IC_REF_GAP_COVERAGE .* 4) / 3]; rtol = 1e-14,
+                             name = "summary gap coverage").ok
         @test fs.min_n_scored[1] == 2
     end
 end

@@ -50,7 +50,10 @@ THE TWO DIFFERENCES THAT ADR 0149 RULES.
 The coefficients, the books, the spreads, the coverage, the calibration and the curve compare cell
 by cell at `rtol = 1e-12`. Measured 3.9e-14 at most on a series and 5.5e-15 on a table. The factor
 correlation compares against its largest entry (measured 5.6e-16 of it), because the one-hot columns give cells of round-off size, and the pooled mean of a
-standardised forecast is round-off zero, so it compares against the pooled standard deviation.
+standardised forecast is round-off zero, so it compares against the pooled standard deviation
+(measured 1.3e-15 of it, #1558). The t-statistic that ADR 0149 rules is the oracle's at
+`rtol = 1e-14` (measured 1.8e-15) and the square of its ratio to ours is a whole count to
+`rtol = 1e-13` (measured 2.5e-14).
 =#
 include(joinpath(@__DIR__, "parity_harness.jl"))
 include(joinpath(@__DIR__, "test06c_setup.jl"))
@@ -148,9 +151,13 @@ end
                     t.rank_sharpe, t.zscore_ann_return, t.zscore_sharpe, t.mean_coverage)
     load(c, o) = parity_load("ForecastEvaluation", c, o)
     # The oracle's t-statistic is our ratio times the root of a whole count of dates.
-    whole_root(t, ir) = all(i -> !isfinite(t[i] / ir[i]) ||
-                                 abs((t[i] / ir[i])^2 - round((t[i] / ir[i])^2)) < 1e-9,
-                            eachindex(t, ir))
+    # Measured 2.5e-14 at most under the flags of `Pkg.test` and 1.1e-14 without them (H5,
+    # Pearson; #1558): the square of a ratio of the oracle's value and ours, each summed in
+    # its own order, doubles the round-off of both.
+    function whole_root(t, ir, name)
+        r = filter(isfinite, (t ./ ir) .^ 2)
+        return parity_compare(r, round.(r); rtol = 1e-13, name = "$(name) whole root").ok
+    end
     nonT = [1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
     for (name, kw) in pairs(FE_CASES)
         case = String(name)
@@ -173,7 +180,8 @@ end
             @test parity_compare(tabs[:, [1, 2, 4, 5, 7, 8, 9, 10, 11]],
                                  st[:, [1, 2, 4, 5, 7, 8, 9, 10, 11]];
                                  name = "$(case) tables").ok
-            @test whole_root(st[:, 3], tabs[:, 2]) && whole_root(st[:, 6], tabs[:, 5])
+            @test whole_root(st[:, 3], tabs[:, 2], "$(case) spearman")
+            @test whole_root(st[:, 6], tabs[:, 5], "$(case) pearson")
             # R89 (#1512): the oracle's tables are per period whatever its factor is. An
             # evaluation annualised at 12 gives them with `ppy = 1` on the two verbs, and its
             # default tables are the linear rescale of them.
@@ -187,10 +195,13 @@ end
                        table(forecast_decay(fe12, c.X, c.W; n = c.nfp)))
             @test isequal(isnan.(ann), isnan.(per))
             f = isfinite.(per)
-            @test isapprox(ann[:, [7, 9]][f[:, [7, 9]]], 12 .* per[:, [7, 9]][f[:, [7, 9]]];
-                           rtol = 1e-12)
-            @test isapprox(ann[:, [8, 10]][f[:, [8, 10]]],
-                           sqrt(12) .* per[:, [8, 10]][f[:, [8, 10]]]; rtol = 1e-12)
+            # The mean rescales bit-equal; the ratio measures 4.0e-16 at most (#1558).
+            @test parity_compare(ann[:, [7, 9]][f[:, [7, 9]]],
+                                 12 .* per[:, [7, 9]][f[:, [7, 9]]]; rtol = 1e-14,
+                                 name = "$(case) annual mean").ok
+            @test parity_compare(ann[:, [8, 10]][f[:, [8, 10]]],
+                                 sqrt(12) .* per[:, [8, 10]][f[:, [8, 10]]]; rtol = 1e-14,
+                                 name = "$(case) annual ratio").ok
             @test isequal(ann[:, setdiff(1:11, 7:10)], per[:, setdiff(1:11, 7:10)])
             cb = forecast_calibration(o.fe, c.W)
             curve = hcat(cb.curve.bin, cb.curve.mean_alpha, cb.curve.mean_y, cb.curve.count)
@@ -201,13 +212,19 @@ end
             @test n == length(ss)
             keep = setdiff(1:n, [4, 9, 29, 30, 31, 32, n - 4])
             @test parity_compare(s[keep], ss[keep]; name = "$(case) summary").ok
-            @test abs(s[n - 4] - ss[n - 4]) <= 1e-12 * s[n - 3]
+            # The pooled mean of a standardised forecast is round-off zero, so it compares
+            # against the pooled standard deviation beside it: measured 1.3e-15 of it at most
+            # under the flags of `Pkg.test` (Spearman) and 2.2e-16 without them. The t
+            # identities below measure 1.8e-15 at most (H5), each a ratio over a root (#1558).
+            @test parity_compare(s[[n - 4, n - 3]], ss[[n - 4, n - 3]]; rtol = 1e-14,
+                                 scale = :array, name = "$(case) pooled mean").ok
             ic = forecast_ic(o.fe, c.W)
             nsp, npe = count(isfinite, ic[:, 1]), count(isfinite, ic[:, 2])
-            @test isapprox(ss[4], s[3] * sqrt(nsp); rtol = 1e-12)
-            @test isapprox(ss[9], s[8] * sqrt(npe); rtol = 1e-12)
+            @test parity_compare(ss[[4, 9]], [s[3] * sqrt(nsp), s[8] * sqrt(npe)];
+                                 rtol = 1e-14, name = "$(case) oracle t").ok
             if PO.forecast_ic_lags(o.fe) == 0
-                @test isapprox(s[[4, 9]], ss[[4, 9]]; rtol = 1e-12)
+                @test parity_compare(s[[4, 9]], ss[[4, 9]]; rtol = 1e-14,
+                                     name = "$(case) disjoint t").ok
             end
             # The coverage summary counts a silenced date; on the scored dates it is the
             # oracle's.
@@ -228,8 +245,10 @@ end
             @test parity_compare([fs.mean_coverage_scored[1], fs.min_coverage_scored[1]],
                                  ss[29:30]; name = "$(case) scored coverage").ok
             nc = count(isfinite, forecast_coverage(o.fe, c.W))
-            @test isapprox(fs.mean_coverage_scored[1],
-                           fs.mean_coverage[1] * nc / (nc - fs.n_silenced[1]); rtol = 1e-12)
+            # Measured bit-equal in every case (#1558).
+            @test parity_compare([fs.mean_coverage_scored[1]],
+                                 [fs.mean_coverage[1] * nc / (nc - fs.n_silenced[1])];
+                                 rtol = 1e-14, name = "$(case) coverage identity").ok
         end
     end
 
@@ -255,7 +274,10 @@ end
             k = findfirst(==(10), fe.dates)
             @test isnan(p.ret[k]) && isnan(p.turnover[k])
             @test p.w[k, :] == p.w[k - 1, :]
-            @test p.turnover[k + 1] ≈ sum(abs, p.w[k + 1, :] .- p.w[k - 1, :])
+            # Measured 1.2e-16 (#1558).
+            @test parity_compare([p.turnover[k + 1]],
+                                 [sum(abs, p.w[k + 1, :] .- p.w[k - 1, :])]; rtol = 1e-14,
+                                 name = "$(kind) turnover out of the gap").ok
         end
     end
 end
