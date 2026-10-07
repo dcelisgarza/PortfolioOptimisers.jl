@@ -61,8 +61,8 @@ tenth to the EW moments, which already fold exactly.
 2. **The carry fold.** An unwrapped prior seeds a carry state of its own, as `EmpiricalPrior` does, and
    applies the rule of ADR 0136: a carry folds what folds and refits the rest. At each step it computes
    the exposures of the new rows from the carried panel, runs the regression on the new dates only,
-   and folds `pe`, `ve` and `ce`. The return forecast and the idiosyncratic correlation refit from the
-   carried rows. A member that does not fold refits over the carried histories: a factor prior that
+   and folds `pe` and `ve`. The return forecast and the idiosyncratic correlation `ce` refit from the
+   carried rows at the call with no data. A member that does not fold refits over the carried histories: a factor prior that
    is not an `EmpiricalPrior` at each call with no data, and a variance estimator that does not fold, such as
    a rolling window, by a fit of every carried observation at each step. The call with no data builds the
    result with the code of the batch fit, so the two routes differ only in how they reach its inputs.
@@ -95,9 +95,10 @@ state owns it once, and the Fold Context reads it back.
   prior's state, as it does for the factor returns.
 - `SampleBufferState` renames its estimation mask from `E` to `M`, and `E` and `ne` hold the
   Exogenous Series, so `E` means one thing on the whole online seam.
-- A step of a tree that reads the series must bring it. The first step pins `ne`. A non-finite value
-  is refused only on the rows that the fit reads, as ADR 0184 states. The step records such a value,
-  and the call with no data refuses it when the fit reads its row, so a later cap can drop it.
+- A step of a tree that reads the series must bring it. The first step pins `ne`. A `NaN` is a gap,
+  and the fit reads it by its own gap rule (#1530). An infinite value is refused only on the rows that the fit reads, as ADR 0184 states. The step records such a
+  value, and the call with no data refuses it when the fit reads its row, so a later cap can drop
+  it.
 - The refit route is built
   ([#1478](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1478)). Its call with no
   data equals the batch fit over the buffer's rows, bit for bit, with `CurrencyExposure`,
@@ -121,7 +122,7 @@ state owns it once, and the Fold Context reads it back.
 
 ### The step decides its two refusals by route
 
-The step passes the estimation mask to every prior whose route honours it: every refit, and the host
+The step passes the estimation mask to every prior whose route honours it: every refit, and the carry
 fold. It refuses a differing estimation mask only for a route that cannot honour it, such as the carry
 of `EmpiricalPrior`. It passes the Panel Fields to a prior whose buffer records the panel, and it
 refuses them for the other priors.

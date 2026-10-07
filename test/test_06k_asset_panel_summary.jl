@@ -151,6 +151,21 @@ end
     @test !occursin("duration", s)
 end
 
+@testset "panel_info prints the median of an even count of assets or observations" begin
+    # Better than the oracle (R80 of #1416). The median of an even count of numbers is the mean
+    # of its two middle numbers. The oracle takes that median and prints its integer part.
+    # The four observations hold 1, 2, 3 and 4 assets, and the four assets last 4, 3, 2 and 1
+    # observations. Each middle pair is 2 and 3, so each median is (2 + 3) / 2 = 2.5. The
+    # oracle prints 2.
+    amsk = Bool[1 0 0 0; 1 1 0 0; 1 1 1 0; 1 1 1 1]
+    c = PO.panel_mask_coverage(amsk)
+    @test c.per_observation == (; min = 1, median = 2.5, max = 4)
+    @test c.durations == (; min = 1, median = 2.5, max = 4)
+    s = sprint(panel_info, AssetPanel(; amsk = amsk, emsk = amsk))
+    @test occursin("assets per obs.  : min 1, median 2.5, max 4", s)
+    @test occursin("duration (obs.)  : min 1, median 2.5, max 4", s)
+end
+
 @testset "panel_align_active moves the start of each asset to its first observed cell" begin
     pnl = summary_small_panel()
     res = panel_align_active(pnl, "mcap")
@@ -210,7 +225,7 @@ end
     for (msk, name) in ((pnl.amsk, "InfoActive"), (pnl.emsk, "InfoEstimation"))
         c = PO.panel_mask_coverage(msk)
         ref = Int.(vec(parity_load("AssetPanelSummary", "Small", name)))
-        # The oracle truncates a median to an integer.
+        # The oracle truncates a median to an integer. The testset above pins our median.
         @test [c.in_mask, c.cells, c.per_observation.min,
                floor(Int, c.per_observation.median), c.per_observation.max, c.assets, c.N,
                floor(Int, c.durations.median), c.durations.min, c.durations.max] == ref

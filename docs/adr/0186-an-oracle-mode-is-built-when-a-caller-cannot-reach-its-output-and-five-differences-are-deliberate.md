@@ -2,7 +2,7 @@
 status: accepted
 ---
 
-# An oracle mode is built when a caller cannot reach its output, and five differences are deliberate
+# An oracle mode is built when a caller cannot reach its output, and seven differences are deliberate
 
 ## Context
 
@@ -37,6 +37,8 @@ keyword away.
 | A warning when the regime half-life exceeds 138 observations | The `regime_decay` docstring states the threshold `2^(-1/138)` and its effect | The rule of #1282: the docstring states the condition, and the measure does not change its behaviour. The numbers are the same; only the message at run time differs. |
 | An integer `cv`, which means K-fold with that many folds | `cv = KFold(; n)` | No field or verb of the library takes an integer as a short form for an estimator. |
 | A Spanned Shrinkage `lambda` of one, which keeps the fitted factor mean | `lambda = PrecisionBlend()` is the default, and `lambda = 1` gives the oracle's mean. Every stored parity case of the Cross-Sectional Factor Prior states `lambda = 1`. | The precision blend weighs the factor mean and the spanned part of the Return Forecast by the error of each. On the known truth of [#1480](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1480) and [#1482](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1482) it had a smaller `Σ⁻¹` error of the mean than `lambda = 1` in every cell, and with no Return Forecast it shrinks the factor mean towards zero, the largest gain measured (83.9 to 16.7 at 20 factors and 60 rows). [#1483](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1483) built it. The Orthogonal Forecast Scale `c` keeps the oracle's `1`, because its rule reads a history that costs minutes to make. |
+| A Neutralisation of the Descriptor scores with no intercept | `DescriptorScores` defaults to `cre = CrossSectionalLinearRegression(; intercept = true)`, and `intercept = false` gives the oracle's rule. The parity cases of the Return Forecasts state `intercept = false`. | Without an intercept the residual is orthogonal to each target in the uncentred product alone, so the neutralised score still correlates with a target set that does not span the constant. With an intercept it is uncorrelated with each target under every design, and where the targets span the constant the two rules give the same residual. [#1521](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1521) built it, and it reverses #950. |
+| A fitted Return Forecast read as it stands inside the prior | `CrossSectionalFactorPrior` defaults to `ofit = ScoreNeutralisation()`, and `ofit = UnadjustedForecast()` gives the oracle's form. Every stored parity case with a fitted member states `UnadjustedForecast()`. | A fitted member regresses an idiosyncratic return that the cross-sectional regression makes orthogonal to the loadings, so its orthogonal part is under-scaled by `var(s⊥) / var(s)`. The default neutralises its scores against the estimated factors, so the orthogonal part carries the scale of its fit ([ADR 0194](0194-a-fitted-return-forecast-neutralises-its-scores-so-its-orthogonal-part-carries-the-scale-of-its-fit.md)). |
 
 The oracle's history cap on its prior truncates the stored histories and the scenarios, and leaves
 the moments folded over every observation. The library reaches the scenario cap through

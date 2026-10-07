@@ -183,6 +183,36 @@ end
           panel_field(pnl, "load").vals
     @test_throws KeyError asset_panel(sub, mf)
 end
+@testset "an observation with no active asset is valid input" begin
+    # Better than the oracle (R76 of #1416, ADR 0102). The universe of an observation is a set
+    # of assets, and the empty set is a set: before the first listing, or in a sub-universe
+    # whose assets are all delisted. A view on assets intersects each row with the selection,
+    # so the views of a panel are panels only when an empty row is allowed. The oracle refuses
+    # an empty row, so it refuses its own selection of asset 1 below.
+    amsk = Bool[1 0; 1 1; 0 1]
+    pnl = AssetPanel(;
+                     pf = [NumericPanelField(; name = "book",
+                                             vals = [1.0 2.0; 3.0 4.0; 5.0 6.0],
+                                             omsk = Bool[0 0; 1 1; 1 1])], amsk = amsk,
+                     emsk = copy(amsk))
+    # Every observation holds an active asset, and the view on asset 1 has none at
+    # observation 3.
+    v = PortfolioOptimisers.port_opt_view(pnl, :, [1])
+    @test v.amsk == reshape(Bool[1, 1, 0], 3, 1)
+    @test v.emsk == v.amsk
+    # The alignment to `book` moves the start of asset 1 to observation 2, so observation 1
+    # holds no active asset.
+    res = panel_align_active(pnl, "book")
+    @test res.n == 1
+    @test res.pnl.amsk == Bool[0 0; 1 1; 0 1]
+    @test !any(res.pnl.amsk[1, :])
+    # The long table keeps no cell of that observation, and the manifest restores it.
+    @test panel_1399_equal(res.pnl, panel_1399_trip(res.pnl; layout = :long);
+                           active_only = true)
+    # The count of active assets of each observation is 0, 2 and 1.
+    c = PortfolioOptimisers.panel_mask_coverage(res.pnl.amsk)
+    @test c.per_observation == (; min = 0, median = 1.0, max = 2)
+end
 @testset "asset_panel(df, mf): masks alone, a lifted field and the parity fixture" begin
     # A panel with no Panel Field, and one with no observation.
     for T in (3, 0)

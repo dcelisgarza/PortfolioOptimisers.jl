@@ -22,19 +22,21 @@ message that names no asset, so a `NaN` for a missing value is no remedy.
 
 ## Decision
 
-**A `FeatureDistance` reads each asset, or each pair of assets, only at its own active rows.**
-This is available-case estimation, as a Coverage Policy fits a covariance cell on the rows at
-which both of its assets are active. The maintainer decided each part in a grilling session on
+**A `FeatureDistance` reads each asset, or each pair of assets, only at its own readable rows.**
+A row is readable for an asset where the asset is active and every value column of the Feature
+Selector was observed (#1508), because the panel stores a placeholder in an unobserved cell, not
+data. This is available-case estimation, as a Coverage Policy fits a covariance cell on the rows
+at which both of its assets are active. The maintainer decided each part in a grilling session on
 issue #1450, and #1454 built it.
 
 | Part | Rule |
 | --- | --- |
-| `LastObservation` | A field `alg` holds a rule. `LastRow()`, the default, reads the last row, and an asset inactive there has no value to read. `LastActiveRow()` reads each asset at its last active row of the window. |
-| `AggregateFeatures` | Each asset over its active rows. `w` is resolved once over the window, restricted to the asset's active rows and divided by their sum. `MedianCollapse` takes the same weights. |
-| `AggregateDistances` | Each pair over the rows at which both assets are active, the weights restricted and divided by their sum. |
-| `StackObservations` | Each pair stacks its `n` shared active rows, and `stack_rescale` rescales the distance to the `T` rows of the window, one method per metric (below). |
+| `LastObservation` | A field `alg` holds a rule. `LastRow()`, the default, reads the last row, and an asset that is not readable there has no value to read. `LastActiveRow()` reads each asset at its last readable row of the window. |
+| `AggregateFeatures` | Each asset over its readable rows. `w` is resolved once over the window, restricted to the asset's readable rows and divided by their sum. `MedianCollapse` takes the same weights. |
+| `AggregateDistances` | Each pair over the rows at which both assets are readable, the weights restricted and divided by their sum. |
+| `StackObservations` | Each pair stacks its `n` shared readable rows, and `stack_rescale` rescales the distance to the `T` rows of the window, one method per metric (below). |
 | An asset with no value to read | Inside a fit, the entry composes the Investable Mask of the prior with the assets that each `FeatureDistance` can read (`feature_readable_mask`), before `investable_reduction`. The asset departs as a non-investable asset: announced, dropped, weight zero, and listed on the Non-Investable Axis. A direct `distance`, `cor_and_dist` or `clusterise` call refuses, and names the asset and the remedy. |
-| A pair with no shared active row | A field `pair` on `AggregateDistances` and `StackObservations`. `RefusePair()`, the default, refuses and names the pair. `DropFewerRows()` drops, at the entry of a fit, the asset of the first empty pair with fewer active rows (the later asset on a tie), until no pair is empty. `FeatureFallback(; alg = MeanCollapse(), w = nothing)` measures the pair by each asset's features collapsed over its own active rows. |
+| A pair with no shared readable row | A field `pair` on `AggregateDistances` and `StackObservations`. `RefusePair()`, the default, refuses and names the pair. `DropFewerRows()` drops, at the entry of a fit, the asset of the first empty pair with fewer readable rows (the later asset on a tie), until no pair is empty. `FeatureFallback(; alg = MeanCollapse(), w = nothing)` measures the pair by each asset's features collapsed over its own readable rows. |
 
 **The rescale of the stack.** A metric that sums over the coordinates sums over fewer of them
 when a pair shares fewer rows, so the stack scales the sum back to the whole window, the rule of
@@ -59,8 +61,8 @@ two collapsed vectors, the value that every row gives, and `StackObservations` r
 of `T` equal rows, which a sum metric scales by `T` as its rescale at `n = 1` does. So the
 fallback needs no rescale method, and a weighted metric keeps the length of its weights.
 
-**A window with no inactive cell takes the old path.** The kernel receives the active mask of
-the stacked rows, and a mask with no `false` entry reads as `nothing`. So every default result
+**A window with no unreadable cell takes the old path.** The kernel receives the mask of the
+readable cells of the stacked rows, and a mask with no `false` entry reads as `nothing`. So every default result
 is unchanged bit for bit. #1454 compared 40 results of the old and the new code (direct
 distances of each collapse under three metrics, HRP and HERC fits under the default prior).
 
@@ -73,8 +75,6 @@ stack that reads no feature keeps the asset that a clustering member drops.
 
 ## Consequences
 
-- An **active** cell that is unobserved keeps its fill value. The fill policy of ADR 0102 is the
-  caller's choice.
 - A prior whose covariance needs a shared row refuses an empty pair before the entry sees it, so
   `DropFewerRows` and `FeatureFallback` act in a fit only under a prior that does not need one,
   for example a precomputed prior result.

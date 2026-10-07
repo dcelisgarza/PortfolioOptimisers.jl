@@ -425,3 +425,46 @@ end
         end
     end
 end
+
+#=
+A seed window on the idiosyncratic variance of the Cross-Sectional Factor Prior (R104 of #1416,
+#1471, ADR 0193). Better than the oracle: the oracle's prior fills this slot by one `partial_fit`
+per row, so the first call of its variance estimator holds one row, and a window of `n` rows cuts
+nothing there or later. The library cuts the window where its rule states it, in the first fit
+of the prior. Row `j` of the first fit reads the last `n` rows up to `j`. After the first fit,
+row `j` reads the last `n` rows of the first fit and every row after them, rows `s:j` with
+`s = k - n + 1`, where `k` is the count of rows of the first fit.
+=#
+@testset "A seed window on the idiosyncratic variance of the prior" begin
+    fx = parity_small_panel()
+    rd = fx.rd
+    T = size(rd.X, 1)
+    mpass(f) = CompositeExposure(; descriptors = [Passthrough(; field = f)],
+                                 outlier = nothing, scoring = nothing, family = "style")
+    factors = ["market" => ConstantExposure(), "style1" => mpass("style1"),
+               "style2" => mpass("style2")]
+    vi = ExpWeightedVariance(; decay = SW_DECAY, min_obs = 5, centring = PreCentred())
+    # The market-cap weights read no variance, so the residuals do not depend on `ve`.
+    est(ve) = CrossSectionalFactorPrior(; lambda = 1, factors = factors, minra = 5,
+                                        wa = MarketCapWeights(), ve = ve)
+    n, T0 = 20, 50
+    pe = est(WindowedVariance(; ve = vi, window = n, rule = SeedWindow()))
+    pe = partial_fit!(pe, PortfolioOptimisers.port_opt_view(rd, 1:T0, :))
+    pe = partial_fit!(pe, PortfolioOptimisers.port_opt_view(rd, (T0 + 1):T, :))
+    pr = prior(pe)
+    b = prior(est(vi), rd)
+    E, idx = b.rr.csr.eps, b.rr.idx
+    @test pr.rr.idx == idx && isequal(pr.rr.csr.eps, E)
+    am = rd.pnl.amsk[idx, :]
+    k = count(<=(T0), idx)
+    s = max(1, k - n + 1)
+    @test k > n
+    for j in axes(E, 1)
+        r = j <= k ? (max(1, j - n + 1):j) : (s:j)
+        @test isequal(pr.rr.vs[j, :], vec(var(vi, E[r, :]; active_mask = am[r, :])))
+    end
+    # The oracle's row `j` is the fit on rows `1:j`, the series with no window. The two agree
+    # until the window fills, and differ at the last row.
+    @test isequal(pr.rr.vs[1:n, :], b.rr.vs[1:n, :])
+    @test !isequal(pr.rr.vs[end, :], b.rr.vs[end, :])
+end

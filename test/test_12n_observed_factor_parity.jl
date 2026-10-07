@@ -58,8 +58,9 @@ end
         @test size(pr.fpr.X) == size(F) == (119, 8)
         # Measured cell by cell, Plain and Family: maxrel 9.5e-13 and 3.2e-13 (factor
         # returns), 1.7e-14 and 1.7e-14 (factor mean), 6.9e-15 and 3.4e-15 (factor
-        # covariance), 5.4e-15 and 1.9e-13 (`mu`).
-        @test parity_compare(pr.fpr.X, F; name = "$(nm) factor returns").ok
+        # covariance), 5.4e-15 and 1.9e-13 (`mu`). A CI host can double a cell, so the
+        # factor returns read five times their measure.
+        @test parity_compare(pr.fpr.X, F; rtol = 5e-12, name = "$(nm) factor returns").ok
         # The Currency Factors carry the observed returns, and no regression touched them.
         @test pr.fpr.X[:, 6:8] == fx.R[2:end, :]
         @test parity_compare(pr.fpr.mu, vec(ccy_asset("$(nm)FactorMu"));

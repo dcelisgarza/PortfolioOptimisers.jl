@@ -196,3 +196,20 @@ rule that swaps a real field name prints the swapped value.
 
 Found by #439, the condition 2 and 3 sweep of `src/01_Base.jl`, which needed every line of the
 macro to be reachable from a test.
+
+## Amendment (2026-10-07)
+
+**The macro also generates `ConstructionBase.setproperties`.** The decision above names the
+`getproperty` and `propertynames` pair alone.
+[#1497](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1497) found that a search
+could not tune a field of a prior that this macro decorates. `Accessors.set` rebuilds each struct
+on a lens path through `ConstructionBase.setproperties`, and the default method refuses a type
+whose `propertynames` differ from its `fieldnames`. It also reads every field through
+`getproperty`, so a `swap(L, M)` rule would write `M` into an unset `L`.
+
+The generated method calls `forward_setproperties`. It reads every field with `getfield`, merges
+the patch over them, and calls the keyword constructor of `T`, so every guard of the constructor
+runs on the new value. A patch that names a forwarded, aliased or computed property is refused,
+because such a property is a view of a nested value with no storage of its own. The message names
+the path to set instead, where the property has one, and the fields otherwise. The keyword constructor of a decorated type must take every field by its
+field name.

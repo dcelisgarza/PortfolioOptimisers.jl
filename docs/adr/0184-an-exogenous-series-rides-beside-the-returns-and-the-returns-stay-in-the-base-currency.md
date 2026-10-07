@@ -76,7 +76,8 @@ currency can hold it. With log returns the split has no cross term.
    `ret_method`, `padding` and Gap Return rule as `X`, so the two cannot use two different return
    methods. The online form keeps the last price row, so it covers `E` too, and a price-level fold
    and a `Pipeline` see `E` as one more price series. A gap stays a gap: the consumer that names
-   a series refuses a non-finite value only on the rows that it fits.
+   a series refuses an infinite value only on the rows that it fits, and it reads a `NaN` by its
+   own gap rule (#1530).
 4. **Every observation slice cuts `E` by rows, and an asset view passes it through.** Both
    arities of `port_opt_view`, the validation of the constructors and every site that rebuilds a
    `ReturnsResult` carry the block. The asset-only view leaves it whole, as it leaves `F`.
@@ -151,8 +152,10 @@ currency can hold it. With log returns the split has no cross term.
 - `CrossSectionalFactorPrior` takes observed members in its factor list (#1368).
 - The outer problem of a meta-optimiser views its returns data onto the observations its Prior
   Result answers on, so a cross-sectional prior runs inside `NestedClustered` (#1369).
-- `CrossSectionalFactorPrior` has no online path now. A future online path must buffer `E` as
-  it buffers `F`.
+- `CrossSectionalFactorPrior` steps online by a refit over a Sample Buffer or by its carry fold
+  ([ADR 0193](0193-the-cross-sectional-factor-prior-refits-online-first-and-folds-as-a-host-next.md)).
+  Both buffer `E` as they buffer `F`: the state records `E` and its names `ne`, so a step of a
+  tree that reads the series must bring it.
 - `EWMacroSensitivity` gains the field `series`, which names a column of the Exogenous Series,
   so that it works inside the prior and inside a fold, and an `ObservedExposure` can pair it with
   the observed series (#1365). The keyword `ref` stays for a direct call, because its removal

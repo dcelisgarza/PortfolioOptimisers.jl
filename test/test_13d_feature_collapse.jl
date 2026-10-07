@@ -685,6 +685,64 @@ end
         @test_throws TypeError NestedClustered(; opti = ew, opto = ew, pcol = :cash)
     end
 
+    @testset "Every member active: both rules equal the plain collapse bit for bit" begin
+        #=
+        #1456 promised that a fit whose members are all active does not change. Where no
+        weighted member is inactive, the divisor of `RenormaliseActive` is exactly `1`, not a
+        sum that rounds to one, and `InactiveAsCash` zeroes no cell. So each rule equals the
+        plain contraction of the methods that take no mask, which is the collapse of the code
+        before #1456. A gapless ingestion emits `AllTrueMask`, and a caller can pass a dense
+        `trues` mask: both must give those bits. The check is `==`, because a last-bit change
+        is the defect it guards, as in the first draft of #1456, whose `ivpa` summed in
+        another order.
+        =#
+        iva = 0.1 .+ 0.2 .* rand(StableRNG(9), T, N)
+        ivpaa = collect(1.0:N)
+        function all_active_rd(msk)
+            pnl = AssetPanel(;
+                             pf = [NumericPanelField(; name = "z", vals = Z3[:, :, 1]),
+                                   TensorPanelField(; name = "beta", axis = "factor",
+                                                    labels = nf, vals = Z3)], amsk = msk,
+                             emsk = msk)
+            return ReturnsResult(; nx = nx, X = X, ts = ts, iv = iva, ivpa = ivpaa,
+                                 pnl = pnl)
+        end
+        rds = (all_active_rd(PO.AllTrueMask(T, N)), all_active_rd(trues(T, N)))
+        wn = saw(Wlev)
+        for rd in rds, alg in (RenormaliseActive(), InactiveAsCash())
+            _, _, iv, ivpa, pnl, _ = PO.prepare_outer_rd(rd, Wlev, alg)
+            @test iv == PO.collapse_panel_numeric(iva, wn)
+            @test ivpa == PO.collapse_panel_numeric(ivpaa, wn)
+            @test PO.panel_field(pnl, "z").vals ==
+                  PO.collapse_panel_numeric(Z3[:, :, 1], wn)
+            @test PO.panel_field(pnl, "beta").vals ==
+                  PO.collapse_panel_tensor(Z3, wn, false)
+        end
+        # Four optimisations whose outer problem reads the collapsed panel: each
+        # meta-optimiser, with and without cross-validation. The cash rule divides by
+        # nothing, so its fit is the reference that each mask and each rule must equal.
+        cvopt = OptimisationCrossValidation(; cv = KFold(; n = 3))
+        outer() = HierarchicalRiskParity(;
+                                         opt = hopt(FeatureDistance(;
+                                                                    alg = StackObservations())))
+        function metas(pcol)
+            return [NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
+                                    opti = plain_hrp(), opto = outer(), pcol = pcol,
+                                    ex = seq),
+                    NestedClustered(; cle = ClustersEstimator(; de = FeatureDistance()),
+                                    opti = plain_hrp(), opto = outer(), cv = cvopt,
+                                    pcol = pcol, ex = seq),
+                    Stacking(; opti = [plain_hrp(), InverseVolatility()], opto = outer(),
+                             pcol = pcol, ex = seq),
+                    Stacking(; opti = [plain_hrp(), InverseVolatility()], opto = outer(),
+                             cv = cvopt, pcol = pcol, ex = seq)]
+        end
+        w0 = [optimise(o, rds[1]).w for o in metas(InactiveAsCash())]
+        for rd in rds, alg in (RenormaliseActive(), InactiveAsCash())
+            @test [optimise(o, rd).w for o in metas(alg)] == w0
+        end
+    end
+
     @testset "The cross-validated path keeps the collapsed masks and rates" begin
         #=
         The folds stack the collapse of each fold, masks included, so a sub-portfolio is

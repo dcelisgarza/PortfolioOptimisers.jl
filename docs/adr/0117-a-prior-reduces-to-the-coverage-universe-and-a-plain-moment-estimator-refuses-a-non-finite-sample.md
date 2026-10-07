@@ -343,6 +343,15 @@ reaches this rule only through the factor prior itself.
 [#1530](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1530) holds the decision on
 a late observed series.
 
+**A repair that leaves the block indefinite refuses, and it does not warn.** The amendment of
+2026-09-29 says that the warning of `posdef!` fires when the positive block stays indefinite.
+[#1506](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1506) removed that warning.
+Every `Posdef` repair now ends with `assert_posdef_repair`, which raises a `PosdefRepairError`
+when the result is not finite or its smallest eigenvalue is below the tolerance of the eigen square
+root. A result that passes returns with no message, singular or not, so the zero rows of a zero
+variance still pass. [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-five-differences-are-deliberate.md)
+states the rule.
+
 ## Amendment (2026-10-07, #1511)
 
 **A Coverage Policy peels the assets of an undetermined pair at admission.** The sentence "There

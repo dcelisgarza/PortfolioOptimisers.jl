@@ -46,6 +46,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     # its weights through a different build of the solver. Extend this file that way only
     # with a tolerance sized to the weights, and note that `max_step_fraction = 0.75` brings
     # this library's solver settings close to the oracle's defaults.
+    # The arithmetic below measured maxabs 3.5e-18 at most against the oracle's literals.
     atol = 1e-15
 
     X = [0.010 -0.020 0.005 0.030
@@ -66,9 +67,10 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # `tn` is a per period rate, so the charge lands on every observation, which is what
         # the oracle does with its `total_cost`.
         @test isapprox(PortfolioOptimisers.calc_one_off_fees(w, fees), 0.0; atol = atol)
-        @test isapprox(calc_net_returns(w, X, fees),
-                       [0.020300000000000002, -0.0179, 0.0050999999999999995, 0.02,
-                        -0.015299999999999998]; atol = atol)
+        @test parity_compare(calc_net_returns(w, X, fees),
+                             [0.020300000000000002, -0.0179, 0.0050999999999999995, 0.02,
+                              -0.015299999999999998]; rtol = 0.0, atol = atol,
+                             name = "long-short net").ok
         # The per asset split sums to the series the scalar verb charges. It is one matrix
         # on the caller's universe, and this book has no forced exit, so every column of it
         # is an investable one.
@@ -89,9 +91,10 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                        0.0010999999999999998 + 0.00036; atol = atol)
         # The last entry is the one that cancels: the oracle reported
         # `-6.000000000000097e-5` where this library reports `-6.0000000000001025e-5`.
-        @test isapprox(calc_net_returns(w, X, fees),
-                       [0.01054, -0.0033599999999999997, 0.00814, 0.0029399999999999995,
-                        -6.000000000000097e-5]; atol = atol)
+        @test parity_compare(calc_net_returns(w, X, fees),
+                             [0.01054, -0.0033599999999999997, 0.00814,
+                              0.0029399999999999995, -6.000000000000097e-5]; rtol = 0.0,
+                             atol = atol, name = "long-short mf net").ok
     end
 
     @testset "A short book earns the linear fee's credit under `s = -l`" begin
@@ -103,16 +106,16 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # The oracle reported `total_fee = 0.00031`.
         @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, fees), 0.00031;
                        atol = atol)
-        @test isapprox(calc_net_returns(w, X, fees),
-                       [0.02419, -0.014009999999999998, 0.00899, 0.023889999999999998,
-                        -0.01141]; atol = atol)
+        @test parity_compare(calc_net_returns(w, X, fees),
+                             [0.02419, -0.014009999999999998, 0.00899, 0.023889999999999998,
+                              -0.01141]; rtol = 0.0, atol = atol, name = "short fee net").ok
         A = calc_net_asset_returns(w, X, fees)
         @test isapprox(vec(sum(A; dims = 2)), calc_net_returns(w, X, fees); atol = atol)
         # With its transaction cost too, the oracle reported `total_cost = 0.0042`.
         fees_tn = Fees(; tn = Turnover(; w = prev, val = tc), l = mf, s = -mf)
-        @test isapprox(calc_net_returns(w, X, fees_tn),
-                       [0.01999, -0.01821, 0.004789999999999999, 0.01969, -0.01561];
-                       atol = atol)
+        @test parity_compare(calc_net_returns(w, X, fees_tn),
+                             [0.01999, -0.01821, 0.004789999999999999, 0.01969, -0.01561];
+                             rtol = 0.0, atol = atol, name = "short fee tn net").ok
         # The book of the ticket: `w = (1.5, -0.5)` and `f = 0.01`. The oracle reported
         # `total_fee = 0.009999999999999998`. The long side pays 0.015 and the short earns
         # 0.005.
@@ -142,14 +145,16 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # `compound = false` is the oracle's `compounded=False`, and `true` its `True`.
         # The compounded pair matched bit-for-bit; the simple pair differs in the last ulp
         # of its final entry, which is a sum that cancels.
-        @test isapprox(cumulative_returns(r),
-                       [0.01054, 0.007180000000000001, 0.01532, 0.01826,
-                        0.018199999999999997]; atol = atol)
+        @test parity_compare(cumulative_returns(r),
+                             [0.01054, 0.007180000000000001, 0.01532, 0.01826,
+                              0.018199999999999997]; rtol = 0.0, atol = atol,
+                             name = "cumulative").ok
         @test cumulative_returns(r, true) ==
               [1.01054, 1.0071445855999999, 1.0153427425267838, 1.0183278501898125,
                1.0182667505188012]
-        @test isapprox(drawdowns(r), [0.0, -0.00336, 0.0, 0.0, -6.0000000000001025e-5];
-                       atol = atol)
+        @test parity_compare(drawdowns(r),
+                             [0.0, -0.00336, 0.0, 0.0, -6.0000000000001025e-5]; rtol = 0.0,
+                             atol = atol, name = "drawdowns").ok
         @test drawdowns(r, true) ==
               [0.0, -0.0033600000000001407, 0.0, 0.0, -5.999999999994898e-5]
     end
@@ -223,9 +228,10 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                        atol = atol)
 
         # The whole charge lands on every observation, which is the oracle's series.
-        @test isapprox(calc_net_returns(wred, Xred, fees),
-                       [0.031299999999999994, -0.0084, -0.0079, 0.017499999999999998,
-                        -0.001299999999999999]; atol = atol)
+        @test parity_compare(calc_net_returns(wred, Xred, fees),
+                             [0.031299999999999994, -0.0084, -0.0079, 0.017499999999999998,
+                              -0.001299999999999999]; rtol = 0.0, atol = atol,
+                             name = "liquidation net").ok
 
         # Charging the exit one time instead would leave four of the five observations
         # short by the whole charge, so the two clocks are distinguishable here.
@@ -244,7 +250,7 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         # `1e-15` tolerance. This one solves, so it cannot: the oracle reaches its weights
         # through a different build of the solver. `max_step_fraction = 0.75` brings this
         # library's Clarabel close to the one the oracle drives through its modelling
-        # layer, and the residual gap measured `8.3e-5` on a weight and `2.9e-5` on a summed
+        # layer, and the residual gap measured `1.5e-4` on a weight and `2.9e-5` on a summed
         # return series, so the tolerances below are sized to that and not to the arithmetic.
         w_atol = 1e-3
         s_atol = 2e-4
@@ -332,9 +338,12 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             ret_sum, smp_last, cmp_last = expected[fl * "_" * dl]
 
             @test length(pred.pred) == 3
-            @test isapprox(pred.pred[1].res.w, ref_w0; atol = w_atol)
-            @test isapprox(pred.pred[2].res.w, ref_w1; atol = w_atol)
-            @test isapprox(pred.pred[3].res.w, ref_w2; atol = w_atol)
+            @test parity_compare(pred.pred[1].res.w, ref_w0; rtol = 0.0, atol = w_atol,
+                                 name = "cv w0 $(fl) $(dl)").ok
+            @test parity_compare(pred.pred[2].res.w, ref_w1; rtol = 0.0, atol = w_atol,
+                                 name = "cv w1 $(fl) $(dl)").ok
+            @test parity_compare(pred.pred[3].res.w, ref_w2; rtol = 0.0, atol = w_atol,
+                                 name = "cv w2 $(fl) $(dl)").ok
 
             @test isapprox(sum(r), ret_sum; atol = s_atol)
             # `compound = false` is the oracle's `compounded=False`, `true` its `True`.

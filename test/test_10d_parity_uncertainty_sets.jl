@@ -71,7 +71,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                                 ("MuIdioLLt", IdiosyncraticVarianceScaling(), 2))
                 mu = mu_ucs(OrthogonalUncertaintySet(; metric = m, scaling = s), pr)
                 L = mu.L[i, :]
-                # Measured maxscaled 2.2e-14 on the panels and 5.2e-14 on `FamTwo`.
+                # Measured maxscaled 2.2e-14 on the panels and 5.2e-14 on `FamTwo`. The check
+                # is `:array`, because an entry of `L L'` near zero cancels: the cell maxrel
+                # reaches 2.6e-9.
                 @test parity_compare(L * transpose(L),
                                      load("OrthogonalUncertaintySet", case, out);
                                      scale = :array, name = "$(case) $(out)").ok
@@ -81,7 +83,8 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             end
             sg = sigma_ucs(OrthogonalUncertaintySet(; metric = m), pr)
             Q = sg.Q[i, :]
-            # Measured maxscaled 1.1e-15, and maxrel 1.0e-15 on `C`.
+            # Measured maxscaled 1.1e-15, and maxrel 1.0e-15 on `C`. The cell maxrel of
+            # `Q Q'` reaches 3.6e-13, from the entries that cancel, so the check is `:array`.
             @test parity_compare(Q * transpose(Q),
                                  load("OrthogonalUncertaintySet", case, "CovQQt");
                                  scale = :array, name = "$(case) QQt").ok
@@ -122,7 +125,8 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         QQt = load("OrthogonalUncertaintySet", c, "CovQQt")
         LLt = load("OrthogonalUncertaintySet", c, "MuLLt")
         # Both sets refitted on the sub-universe equal the oracle's refit. Measured maxscaled
-        # 7.8e-16 (Q Q') and 1.2e-15 (L L').
+        # 7.8e-16 (Q Q') and 1.2e-15 (L L'). The cell maxrel reaches 1.1e-12, from the entries
+        # that cancel, so the checks are `:array`.
         @test parity_compare(sr.Q * transpose(sr.Q), QQt; scale = :array,
                              name = "$(c) refit QQt").ok
         @test parity_compare(collect(sr.C), loadv("OrthogonalUncertaintySet", c, "CovC");
@@ -225,7 +229,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             # Measured relative difference of the objective 4.5e-9 at most, and of the
             # weights 8.0e-6 at most, where the objective is flat.
             @test abs(fj - fo) <= 5e-8 * abs(fo)
-            @test isapprox(res.w, wo; atol = 5e-5)
+            @test parity_compare(res.w, wo; rtol = 0.0, atol = 5e-5, name = "MR w $(k)").ok
         end
     end
 
@@ -275,7 +279,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             radius = loadv("NormBallUncertaintySet", kind, "Radius")
             for (k, (d, dn)) in enumerate(((true, "Diag"), (false, "Full")))
                 m, s = ucs(ue(d), X)
-                # Measured maxscaled 2.4e-15 on the mean.
+                # Measured maxscaled 2.4e-15 on the mean. The cell maxrel of the full shape
+                # reaches 2.8e-13, from the entries of `L L'` that cancel, so the check is
+                # `:array`.
                 @test parity_compare(m.L * transpose(m.L),
                                      load("NormBallUncertaintySet", kind, "Mu$(dn)LLt");
                                      scale = :array, name = "$(kind) mu $(dn)").ok
@@ -290,20 +296,21 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                     want = [S[a, a] * S[b, b] + S[a, b]^2 for b in 1:N for a in 1:N] ./ T
                     full = load("NormBallUncertaintySet", kind, "CovFullLLt")
                     @test isapprox(diag(s.L * transpose(s.L)), want; rtol = 1e-14)
-                    @test isapprox(diag(s.L * transpose(s.L)), diag(full); rtol = 1e-13)
+                    # Measured maxrel 4.0e-15.
+                    @test parity_compare(diag(s.L * transpose(s.L)), diag(full);
+                                         rtol = 1e-13, name = "$(kind) diag of full").ok
                     @test !isapprox(s.L * transpose(s.L),
                                     load("NormBallUncertaintySet", kind, "CovDiagLLt");
                                     rtol = 1e-2)
                     # `ShapeOfDiagonal()` is the oracle's rule (#1522): it sets `Σ_ij = 0`
                     # before it builds the shape, so each entry is `(1 + δ_ij) Σ_ii Σ_jj / T`.
-                    # Measured maxscaled 1.5e-16 against the oracle's diagonal set.
+                    # Measured maxrel 4.1e-16 cell by cell against the oracle's diagonal set.
                     want_o = [(1 + (a == b)) * S[a, a] * S[b, b] for b in 1:N for a in 1:N] ./
                              T
                     m_o, s_o = ucs(NormalUncertaintySet(; alg = nb(true),
                                                         dc = ShapeOfDiagonal()), X)
                     @test parity_compare(s_o.L * transpose(s_o.L),
                                          load("NormBallUncertaintySet", kind, "CovDiagLLt");
-                                         scale = :array,
                                          name = "$(kind) cov Diag, ShapeOfDiagonal").ok
                     @test isapprox(diag(s_o.L * transpose(s_o.L)), want_o; rtol = 1e-14)
                     @test parity_compare([s_o.kappa], [radius[2 + k]];
@@ -367,8 +374,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             _, sd = ucs(ue(mk(method, true), DiagonalOfShape()), X)
             sg = sigma_ucs(ue(mk(method, true), ShapeOfDiagonal()), X)
             # The ellipsoid and the norm ball read one diagonal shape under each member.
-            @test isapprox(diag(shape(so)), od; rtol = 1e-13)
-            @test isapprox(diag(shape(sg)), od; rtol = 1e-13)
+            # Measured maxrel 4.1e-16.
+            @test parity_compare(diag(shape(so)), od; rtol = 1e-13, name = "dc so").ok
+            @test parity_compare(diag(shape(sg)), od; rtol = 1e-13, name = "dc sg").ok
             @test isapprox(diag(shape(sd)), mine; rtol = 1e-13)
             # `diagonal = false` does not read the field.
             _, fo = ucs(ue(mk(method, false), ShapeOfDiagonal()), X)
@@ -383,7 +391,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         sb = sigma_ucs(NormalUncertaintySet(; alg = nb(true), dc = ShapeOfDiagonal(),
                                             n_sim = 50), big.(X))
         @test eltype(sb.L) == BigFloat
-        @test isapprox(Float64.(diag(sb.L * transpose(sb.L))), od; rtol = 1e-13)
+        # Measured maxrel 9.9e-16.
+        @test parity_compare(Float64.(diag(sb.L * transpose(sb.L))), od; rtol = 1e-13,
+                             name = "dc BigFloat").ok
     end
 
     @testset "The norm-ball terms of MeanRisk" begin
@@ -460,7 +470,8 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             # the accuracy of the semidefinite evaluation itself. The weights: 6.8e-5 at
             # most, at `p = Inf`, where the objective is flat.
             @test abs(fj - fo) <= 1e-6 * abs(fo)
-            @test isapprox(res.w, W[:, k]; atol = 1e-4)
+            @test parity_compare(res.w, W[:, k]; rtol = 0.0, atol = 1e-4,
+                                 name = "NB w $(k)").ok
         end
     end
 
@@ -486,6 +497,8 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         # Measured maxscaled 2.4e-15 (mu) and 4.5e-13 (cov), the values of the full empirical
         # shapes above: the converter carries the factor of the ellipsoid. The cov tolerance
         # stays at 1e-12 for the reason of the Normal full shape, its repaired Cholesky factor.
+        # The cell maxrel of the cov reaches 9.7e-11, from the entries that cancel, so both
+        # checks are `:array`.
         @test parity_compare(cm.L * transpose(cm.L),
                              load("NormBallUncertaintySet", "Empirical", "MuFullLLt");
                              rtol = 1e-13, scale = :array, name = "converted mu").ok

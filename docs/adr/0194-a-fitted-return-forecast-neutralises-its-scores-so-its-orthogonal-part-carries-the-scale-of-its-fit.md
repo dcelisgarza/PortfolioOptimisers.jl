@@ -55,10 +55,13 @@ to round-off, so `α⊥ = α`.
 
 **The weights are `rw[t]`.** They are the inner product of the split at `T`, and they read no
 future row. `DescriptorScores` has a public field `nw` for the weights of its Neutralisation:
-`EstimationMaskWeights()` by default, which keeps parity and every standalone result, or
-`BlockRegressionWeights()`. The scoring step after the regression reads the same weights, so a
-standardised score stays orthogonal when the loadings span the constant. A standalone caller can
-make the same repair.
+`EstimationMaskWeights()` by default, which keeps every standalone result, or
+`BlockRegressionWeights()`. The scoring step after the regression reads the same weights. The
+Neutralisation fits an intercept by default (#1521), so its residual has a zero weighted mean, and
+a standardised score stays orthogonal to the loadings for every design. Parity with the
+independent implementation needs `EstimationMaskWeights()` and
+`cre = CrossSectionalLinearRegression(; intercept = false)`. A standalone caller can make the same
+repair.
 
 **Only the fitted members, by a trait.** `fits_idiosyncratic_target` answers `true` for
 `TargetReturnForecast` and `ExpWeightedReturnForecast`, and `false` by default.

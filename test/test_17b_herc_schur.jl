@@ -1,4 +1,5 @@
 include(joinpath(@__DIR__, "test17_setup.jl"))
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 @testset "HierarchicalEqualRiskContribution" begin
     w1 = [0.02771765212089022, 0.009402158178351775, 0.03331519584748935,
@@ -459,7 +460,9 @@ end
         p = SchurComplementParams(; gamma = g, alg = NonMonotonicSchurComplement(),
                                   flag = false)
         w, gamma, r = PO.schur_complement_weights(prs, [order], wb6, p)
-        @test isapprox(w, wref[g]; atol = 1e-15)
+        # Measured maxabs 1.1e-16, and 0 on the monotonic search below.
+        @test parity_compare(w, wref[g]; rtol = 0.0, atol = 1e-15,
+                             name = "Schur nonmonotonic w $(g)").ok
         # The weights of the recursion sum to one before any finaliser.
         @test isapprox(sum(w), 1; atol = 1e-15)
         @test gamma == g
@@ -470,7 +473,7 @@ end
     p = SchurComplementParams(; gamma = 1.0, alg = MonotonicSchurComplement(; N = 11))
     w, gamma, _ = PO.schur_complement_weights(prs, [order], wb6, p)
     @test gamma == 1.0
-    @test isapprox(w, wmono; atol = 1e-15)
+    @test parity_compare(w, wmono; rtol = 0.0, atol = 1e-15, name = "Schur monotonic w").ok
 
     # symmetric_step_up_matrix: the identity, the average of the insertions, and the
     # scaled transpose. Every row sums to one.

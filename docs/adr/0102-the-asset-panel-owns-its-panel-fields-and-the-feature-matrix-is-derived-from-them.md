@@ -469,3 +469,12 @@ gives the same answer for every `val`.
 `test_06m` gates the rule. It blanks about one active cell in twenty of every Panel Field, poisons
 `val` there, and needs every consumer of an Asset Panel to give the same answer on the clean and on
 the poisoned copy.
+
+## Amendment (2026-10-07)
+
+**Panel persistence is built.** The Consequences above say that it is not.
+[#1399](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1399) built the round trip in
+`src/03_InputData/22_PanelRoundTrip.jl`. `panel_manifest(pnl)` writes a manifest that names the
+axes, the selected assets and every Panel Field with its labels or levels. `asset_panel(df, mf)`
+reads an Asset Panel back from a table that `panel_dataframe` wrote, in the long or the wide
+layout, with its active and estimation masks. The `AssetPanel` constructor checks the result.

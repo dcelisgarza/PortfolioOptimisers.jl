@@ -362,6 +362,8 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         A = load(n, "AheadIdio")
         @test pc(idio_calibration(csfm), A[:, 1], "$(n) ahead calibration")
         @test pc(idio_tail_rate(csfm), A[:, 2], "$(n) ahead tail")
+        # An excess kurtosis near zero is a difference of near-equal terms: measured cell
+        # maxrel 2.4e-11 and maxscaled 2.6e-15, so the check is `:array`.
         @test pc(idio_kurtosis(csfm), A[:, 3], "$(n) ahead kurtosis"; scale = :array)
         @test pc(idio_skewness(csfm), A[:, 4], "$(n) ahead skewness")
         @test pc(collect(values(idio_calibration_summary(csfm))),

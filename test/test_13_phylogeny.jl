@@ -1138,9 +1138,9 @@
                                                   alg = DBHT()), pr.X)
         #=
         `P` is zero on every PMFG edge here, so `DBHTs` sees a graph with no edge, and 380
-        of the 400 shortest path lengths are `Inf`. The oracle drops the same edges. The
+        of the 400 shortest path lengths are `Inf`. The original DBHT code of Song, Di Matteo and Aste drops the same edges. The
         pin below was the output of a `NaN` that `Inf * 0` made in `BubbleCluster8s` until
-        #1314. The discrete clusters `T8` are the ones the oracle returns on these two
+        #1314. The discrete clusters `T8` are the ones that original code returns on these two
         matrices under Octave.
         =#
         @test PortfolioOptimisers.DBHTs(clr.P, clr.S)[1] ==
@@ -1714,8 +1714,8 @@
     end
     # The three defects that the documentation sweep of the DBHT family, issue #469, found on
     # the `EqualRoot` path: #507, #508 and #509. That path is now
-    # `src/08_Phylogeny/06_DBHT/04_CliqueHierarchy.jl`. The oracle is the original code of
-    # the two papers below, and it carries all three. The papers are Song, Di Matteo and
+    # `src/08_Phylogeny/06_DBHT/04_CliqueHierarchy.jl`. The original code of
+    # the two papers below carries all three. The papers are Song, Di Matteo and
     # Aste, *Nested hierarchies in planar graphs*, Discrete Applied Mathematics 159 (2011)
     # 2135-2146, and Song, Di Matteo and Aste, *Hierarchical information clustering by means
     # of topologically embedded graphs*, PLoS ONE 7 (2012) e31929.

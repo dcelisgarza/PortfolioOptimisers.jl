@@ -29,6 +29,7 @@ FOUR CONVENTIONS SHAPE THE PROBES.
    #725 has not landed.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 # A small hand panel. Every numeric field takes a forward fill, so each earns an observed-mask
 # column and a raw `NaN` reads back as `NaN` rather than as the fill value.
@@ -1316,9 +1317,9 @@ end
         ins = return_forecast(TargetReturnForecast(; kw..., warmup = InSampleWarmup()), rd,
                               csfm)
         @test isapprox(ins.calib, 1.9589560993595951; rtol = 1e-12)
-        @test isapprox(ins.mu,
-                       [0.0084208520108218, 0.00886405474823346, 0.00443202737411673];
-                       rtol = 1e-12)
+        @test parity_compare(ins.mu,
+                             [0.0084208520108218, 0.00886405474823346, 0.00443202737411673];
+                             name = "InSampleWarmup mu").ok
         # The fallback is the calibration of `cv = nothing`, and an explicit splitter takes it.
         cvn = return_forecast(TargetReturnForecast(; kw..., cv = nothing), rd, csfm)
         xcv = return_forecast(TargetReturnForecast(; kw..., cv = KFold(; n = 5),

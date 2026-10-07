@@ -128,7 +128,8 @@ end
     o = load("Mirror")
     off = [i != CartesianIndex(5, 5) for i in CartesianIndices(L)]
     # Bit-equal on the development host. Another host's BLAS moves the last bits, so the
-    # check reads the parity tolerance and not `==`.
+    # check reads the parity tolerance and not `==`. The check is `:array`, because a factor
+    # entry near zero carries the round-off of the largest entry.
     @test parity_compare(L[off], o[off]; scale = :array, name = "Mirror chol").ok
     S = (A + A') / 2
     s = Statistics.mean(abs, diag(S))
@@ -163,9 +164,13 @@ end
     # The oracle's ridge is one keyword away.
     pr = prior(mirror(; mtx_sqrt = RidgeCholeskySquareRoot()), rd)
     load(o) = parity_load("CrossSectionalFactorPrior", "Mirror", o)
+    # Measured 0. The check is `:array`, because the mirrored factor makes covariances that
+    # cancel to near zero.
     @test parity_compare(pr.fpr.sigma, parity_load("MatrixSquareRoot", "Mirror", "Input");
                          scale = :array, name = "Mirror factor sigma").ok
-    # Measured maxrel 8.8e-15, 2.2e-15 and 1.6e-15, and maxscaled 3.0e-13 on `sigma`.
+    # Measured maxrel 8.8e-15, 2.2e-15 and 1.6e-15, and maxscaled 3.0e-13 on `sigma`. The
+    # cell maxrel of `sigma` is 9.8e-12: an entry of `L F L'` near zero cancels, so that
+    # check is `:array`.
     @test parity_compare(pr.mu, vec(load("Mu")); name = "Mirror mu").ok
     @test parity_compare(pr.sigma, load("Sigma"); scale = :array, name = "Mirror sigma").ok
     @test parity_compare(pr.fpr.sigma, load("FactorCov"); name = "Mirror fcov").ok

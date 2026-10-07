@@ -2,6 +2,7 @@ using PortfolioOptimisers, Test, LinearAlgebra, Statistics, StatsBase, StableRNG
 using CovarianceEstimation: CovarianceEstimation
 
 const PO = PortfolioOptimisers
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 # The geodesic from its first form, S^(1/2) (S^(-1/2) T S^(-1/2))^a S^(1/2). The library
 # computes the second form, from the target end, so this derivation shares no step with it.
@@ -97,9 +98,10 @@ const REFX10 = Dict(:scaled =>
               fill(2.0, 1, 1)
     end
     @testset "parity with the oracle interpolation" begin
+        # Measured maxrel 5.1e-15 cell by cell.
         for a in (0.25, 0.75), key in (:scaled, :diagonal, :custom)
             got = PO.geodesic_point(TARGETS3[key], S3, a)
-            @test isapprox(got, REF3[(a, key)]; rtol = 1e-12)
+            @test parity_compare(got, REF3[(a, key)]; name = "geodesic $(a) $(key)").ok
         end
         for a in (0.25, 0.75), (key, tgt) in TARGETS3
             T = PO.shrinkage_target(tgt, S3)
@@ -110,8 +112,10 @@ const REFX10 = Dict(:scaled =>
     @testset "parity with the oracle estimator" begin
         for key in (:scaled, :diagonal)
             ce = GeodesicShrinkageCovariance(; tgt = TARGETS3[key], alpha = 0.4)
-            @test isapprox(cov(ce, X10), REFX10[key]; rtol = 1e-12)
-            @test isapprox(cov(ce, permutedims(X10); dims = 2), REFX10[key]; rtol = 1e-12)
+            # Measured maxrel 3.1e-15 cell by cell, in both orientations.
+            @test parity_compare(cov(ce, X10), REFX10[key]; name = "geodesic X10 $(key)").ok
+            @test parity_compare(cov(ce, permutedims(X10); dims = 2), REFX10[key];
+                                 name = "geodesic X10' $(key)").ok
         end
     end
     @testset "end points" begin

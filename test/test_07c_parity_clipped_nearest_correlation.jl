@@ -116,7 +116,10 @@ const P1412_CASES = [("Indefinite", false), ("IndefiniteHigham", true),
         Y = posdef(p1412_pdm(true), X)
         Z = parity_load("ClippedNearestCorrelation", "HighamStop", "Converged")
         C = p1412_cor(X)
-        @test norm(p1412_cor(Y) - p1412_cor(Z)) < 1e-10
+        # Measured maxrel 8.2e-13 cell by cell. The two answers come from two different
+        # iterates, so the tolerance is five times the measure.
+        @test parity_compare(p1412_cor(Y), p1412_cor(Z); rtol = 5e-12,
+                             name = "HighamStop clip vs converged").ok
         @test norm(p1412_cor(Y) - C) < norm(p1412_cor(posdef(p1412_pdm(), X)) - C) / 2
     end
     @testset "Better: a constant asset keeps a zero row, and the block is repaired" begin

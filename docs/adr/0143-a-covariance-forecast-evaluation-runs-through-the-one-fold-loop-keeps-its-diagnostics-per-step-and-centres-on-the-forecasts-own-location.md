@@ -70,7 +70,7 @@ batch expanding, batch rolling, online expanding and online rolling forms are th
 compositions the walk-forward and the `Online` wrapper already express, and the verb reads none
 of them. An `Online` at the root under a scheme with no Fold Fit is refused by name, because a
 batch fold would never seed its buffer. The verb and the kernel live in
-`src/20_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl`, after the loop it
+`src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl`, after the loop it
 runs through, and the three verbs above the Result in `14_CovarianceForecastSummary.jl`. It owes
 the loop four small methods: `partial_fit!(pe::AbstractPriorEstimator, rd)`, which is
 `fold_prior`; `partial_fit!(ce::AbstractCovarianceEstimator, rd)`; `is_time_dependent` and
@@ -281,3 +281,12 @@ R91), built by [#1513](https://github.com/dcelisgarza/PortfolioOptimisers.jl/iss
 With all three keywords set, the rolling series equal the oracle's point for point, and the
 summary under `EqualStepWeighting()` equals the oracle's summary.
 `test_25b_parity_covariance_forecast_plots.jl` pins both.
+
+**An exponentially weighted estimator names its centring with a type, not a flag.** Fact 5 and
+the decision above name a Bool `centred` on `ExpWeightedCovariance` and
+`RegimeAdjustedExpWeightedCovariance`.
+[#1507](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1507) replaced it with the
+field `centring`, which takes a singleton type of `AbstractCentring`. `forecast_location` reads the
+location through `centring_report_location`: zero for every asset under `PreCentred()`, and
+`state.location` under `EstimatedCentring()`, the default, or under `ZeroStartCentring()`. So the
+rule of this ADR holds, and `PreCentred()` is the case that `centred = true` named.

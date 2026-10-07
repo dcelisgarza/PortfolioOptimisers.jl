@@ -393,3 +393,11 @@ oracle's table of evaluations. Its `ppy` holds one entry per forecast. A differe
 rows of a listing is not a difference in skill, and the docstring says so. `align = true`
 re-dates the evaluations onto one grid, so it does not give the oracle's rows, and the two
 keywords conflict by name.
+
+**The descriptor Neutralisation fits an intercept by default.** The Consequences above state that
+both Neutralisation sites fit with no intercept. The site of `DescriptorScores` no longer does:
+[#1521](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1521) set its default to
+`cre = CrossSectionalLinearRegression(; intercept = true)`, which reverses #950. The residual is
+then orthogonal to the constant and to each target, so the score is uncorrelated with each target
+under every design. `cre = CrossSectionalLinearRegression(; intercept = false)` gives the oracle's
+rule. The Neutralisation of a Factor Exposure reads the `cre` of the prior, and it does not change.

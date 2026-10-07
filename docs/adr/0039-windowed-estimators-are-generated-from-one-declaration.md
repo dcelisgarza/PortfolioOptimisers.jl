@@ -64,8 +64,9 @@ number.
 ### 1. One declaration per windowed estimator
 
 `@windowed_estimator`, defined in
-[01_Base_Moments.jl](../../src/05_Moments/01_Base_Moments.jl) beside its only collaborator
-`windowed_preamble`, emits the whole family member from one block: the `@propagatable`
+[01_Base_Moments.jl](../../src/05_Moments/01_Base_Moments.jl), with its only collaborator
+`windowed_preamble` in
+[06_WindowedPreamble.jl](../../src/05_Moments/26_Windowed/06_WindowedPreamble.jl), emits the whole family member from one block: the `@propagatable`
 `@concrete` struct, both constructors with their validation, one forwarding method per
 `forward` entry, the `export`, and every docstring.
 
@@ -170,3 +171,22 @@ folds exactly, held by a host that folds; a refit refuses it by name.
 [ADR 0193](0193-the-cross-sectional-factor-prior-refits-online-first-and-folds-as-a-host-next.md)
 holds the names, and [#1469](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1469)
 builds it. The field is one more line of the one declaration that this ADR records.
+
+## Amendment (2026-10-07)
+
+[#1398](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1398) found that a windowed
+wrapper dropped the Asset Panel and the masks of its call, and it changed the declaration in three
+ways.
+
+- **The macro also writes an Asset Panel method.** A `forward` entry whose input is an Asset Panel
+  gives a method that takes `pnl` and cuts it to the window through `windowed_panel`, before the
+  returns are cut. So the inner estimator reads the panel over the rows it fits, and a plain inner
+  estimator reduces to the Coverage Universe of the window. `windowed_panel` is the second
+  collaborator of the macro, beside `windowed_preamble`.
+- **The masks are cut to the window.** `windowed_preamble` cuts the `active_mask` and
+  `estimation_mask` keywords with the returns, through `windowed_keywords`. Every other keyword
+  passes through unchanged.
+- **The variance series rolls.** `WindowedCovariance` and `WindowedVariance` define
+  `variance_series` through `windowed_variance_series`. Row `t` is the wrapper fitted on the rows
+  that its window keeps among `1:t`, so the window rolls with `t`, and the last row equals the batch
+  fit.

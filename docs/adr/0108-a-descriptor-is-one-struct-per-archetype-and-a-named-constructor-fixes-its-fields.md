@@ -168,7 +168,7 @@ possible: a concrete type has no subtypes. A `BookToPrice` wrapper that forwards
 
 `EWMacroSensitivity` gains the field `series` after `mcap`
 ([#1365](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1365)). It names the column
-of the Exogenous Series that holds the oracle return, so the descriptor reads its series from
+of the Exogenous Series that holds the reference return, so the descriptor reads its series from
 the returns data inside `CrossSectionalFactorPrior` and inside a cross-validation fold, where no
 keyword reaches `descriptor`. The default `series = nothing` keeps the keyword `ref` of a direct
 call, and a call that gives both is refused. ADR 0184 states the Exogenous Series. The field list
