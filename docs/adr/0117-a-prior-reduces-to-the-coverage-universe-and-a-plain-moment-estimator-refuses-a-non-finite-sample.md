@@ -26,10 +26,10 @@ sample whose fourth asset lists at observation 31:
 - `MutualInfoCovariance` throws `InexactError: Int64(NaN)`.
 - `RegimeAdjustedExpWeightedVariance` handles the gap through its `active_mask` keyword.
 
-The reference implementation refuses a `NaN` in every plain estimator and handles a gap in its
+The oracle refuses a `NaN` in every plain estimator and handles a gap in its
 exponentially weighted family alone, through an `active_mask` input, a per-asset observation count,
 a freeze on a holiday, a reset on an inactive period, a warm-up `NaN` and a bias correction. Its
-prior reduces nowhere. A caller of the reference cannot fit a Gerber or a sample covariance on a
+prior reduces nowhere. A caller of the oracle cannot fit a Gerber or a sample covariance on a
 gapped panel at all.
 
 The glossary already says that a Prior Estimator fits on the coverage universe and returns a result
@@ -53,9 +53,9 @@ includes a regression result: its rows outside the Coverage Universe are `NaN`.
 ### The Coverage Universe is finite and active at every row
 
 An asset is in the Coverage Universe of one fit when its return is finite and the panel's active
-mask is `true` at every row of the window. That is the reference's per-cell rule,
+mask is `true` at every row of the window. That is the oracle's per-cell rule,
 `valid = isfinite(X) & active_mask`, taken over the whole window. The estimation mask is not read:
-the reference reads it for a regime signal only, never for a moment. With no panel, or a panel
+the oracle reads it for a regime signal only, never for a moment. With no panel, or a panel
 with no masks, the rule is finiteness alone.
 
 A complete window yields `nothing`, and that sentinel skips the slice and the expansion, as the
@@ -157,7 +157,7 @@ Two assets whose observed rows do not intersect — each quoting on rows the oth
 at the last row — are each admitted on their own share and share no observation, so their pair is
 `NaN` while both diagonals are finite. The refusal therefore cannot live only in the framed branch:
 a matrix whose diagonal is finite everywhere still reaches it, and the caller is told which pair and
-why. The reference's own peel is defensive for a pairwise estimator, which the library does not
+why. The oracle's own peel is defensive for a pairwise estimator, which the library does not
 have.
 
 ### The third and fourth order take the policy, and the block rule is one law
@@ -205,7 +205,7 @@ named.
 
 ### The exponentially weighted family is ported on the same seam
 
-The reference's three exponentially weighted estimators, and the fit that
+The oracle's three exponentially weighted estimators, and the fit that
 [#692](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/692) found missing on
 `RegimeAdjustedExpWeightedCovariance`, are the mask-aware answer for a young asset. They enter
 through the panel override, and the identities the census of
@@ -233,7 +233,7 @@ for a covariance.
 | The third and fourth order | Filling an empty cell before the spectral step, with zero or the complete-case value. | It fabricates a number, which is what the plain path refuses to do, and the library has just removed its last silent fill. |
 | The mixed configuration | Refusing a policy on the low order without one on `ske` and `kte`. | The configuration is well defined once the mask reads every order, and refusing it would make an opt-in field mandatory in a place the caller did not ask for it. |
 | The block repair | `matrix_processing!` derives the block for every caller. | Every plain path then accepts a frame, which relaxes a finiteness check in advance. |
-| The block repair | The reference's greedy peel. | No estimator can make it fire, and a peel hides a defect. |
+| The block repair | The oracle's greedy peel. | No estimator can make it fire, and a peel hides a defect. |
 
 ## Consequences
 
@@ -261,7 +261,7 @@ for a covariance.
   derived at every optimiser entry and a derivation owes no side effect, so `assert_matched_coverage`
   runs once, where the high-order prior is assembled, and the mask narrows in silence.
 - Under the exponentially weighted family a young asset is investable while its early scenario
-  rows are `NaN`. The reference zero-fills those rows and warns. What the library does with them
+  rows are `NaN`. The oracle zero-fills those rows and warns. What the library does with them
   is the measures decision of the map.
 - `prices_to_returns` dropped every row that still held a missing entry when this was decided, so
   a gapped panel reached the moments only through a hand-built `ReturnsResult`. Map

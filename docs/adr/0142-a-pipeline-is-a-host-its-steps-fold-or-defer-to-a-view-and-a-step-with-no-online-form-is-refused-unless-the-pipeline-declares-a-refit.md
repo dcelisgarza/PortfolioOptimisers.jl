@@ -56,12 +56,12 @@ the decision.
    `inject_context` routes `ctx.prior` into the optimiser's `pe` before the step runs
    (`03_Pipeline.jl:629`), so the optimiser's own prior is never fitted there. The row owner of a
    Pipeline is therefore not fixed by the optimiser's type but by the steps.
-4. **The reference refuses every Pipeline.** skfolio raises
+4. **The oracle refuses every Pipeline.** It raises
    `TypeError("Pipeline is not supported")` in `online_predict`, `online_score` and
    `OnlineGridSearch` (`model_selection/_online/_validation.py:862`), because scikit-learn 1.9.0's
-   `Pipeline` defines no `partial_fit`; no selector of the reference has one; and the width of
-   every online estimator is pinned at the first call. A caller of the reference cannot run a
-   Pipeline online, and the reference never meets a re-selection between two steps. Any route here
+   `Pipeline` defines no `partial_fit`; no selector of the oracle has one; and the width of
+   every online estimator is pinned at the first call. A caller of the oracle cannot run a
+   Pipeline online, and the oracle never meets a re-selection between two steps. Any route here
    adds capability and removes none.
 
 Two earlier rulings of the map pull apart on the window-valued class.

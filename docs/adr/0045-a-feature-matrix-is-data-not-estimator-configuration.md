@@ -1009,7 +1009,7 @@ Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802)'s f
 [#807](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/807), decides what the Asset
 Panel does at the four places a feature matrix was sliced or aggregated: an asset view, a
 cross-validation fold, a meta-optimiser collapse and preselection. Every option was judged from
-zero, on architecture, maintainability, ergonomics and performance. The reference implementation
+zero, on architecture, maintainability, ergonomics and performance. The oracle
 slices its panel by observation as a view and by asset as a copy, never slices a third axis by
 asset, and has no collapse onto a synthetic universe, so every decision here adds capability.
 
@@ -1089,8 +1089,7 @@ collapse. The build is
 Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802)'s sixth decision,
 [#816](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/816), closes the question the first text left
 open: whether a `Clusters` result should record which matrix produced it. Every option was judged
-from zero, on architecture, maintainability, ergonomics and performance. The reference
-implementation's clustering estimator records the asset names it was fit on, for its dendrogram
+from zero, on architecture, maintainability, ergonomics and performance. The oracle's clustering estimator records the asset names it was fit on, for its dendrogram
 plot, and its distance estimators record the codependence and the distance. Neither records a
 feature name, because neither reads a panel, so both decisions here add capability.
 

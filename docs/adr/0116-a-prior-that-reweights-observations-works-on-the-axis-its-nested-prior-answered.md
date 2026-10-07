@@ -91,15 +91,15 @@ shorter axis carries probabilities over other scenarios, so it is refused by nam
 the opinion's index, its type, both counts, and the fix: move the estimator that drops rows into
 `pe1`.
 
-## What the reference does
+## What the oracle does
 
-The reference fits its nested prior first and pushes no weights into it. It reads the observation
+The oracle fits its nested prior first and pushes no weights into it. It reads the observation
 count off the result, it reads the prior sample weights off the result, and it falls back to uniform
 over that count. It never refits the nested estimator; between stages it recomputes the mean and the
 variance from the scenarios.
 
-So the reference already answers this question the same way. This library keeps two capabilities the
-reference does not have, and both survive the change: the nested estimator is refitted under the
+So the oracle already answers this question the same way. This library keeps two capabilities the
+oracle does not have, and both survive the change: the nested estimator is refitted under the
 posterior weights, so a factor model carries the views; and a caller states prior probabilities in
 `pe.w`.
 

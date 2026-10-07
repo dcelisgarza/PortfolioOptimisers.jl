@@ -29,7 +29,7 @@ Six facts shaped the decision.
    ticket named it as "the slot a non-optimisation evaluation fits". Its one member is
    `MultipleRandomised`, a resampling *split*. A scheme says how folds are cut; an evaluation
    consumes a scheme, as `fit_and_predict(opt, rd, cv)` does.
-3. **The reference has this feature, and #864 did not read it.** Its batch and online verbs each
+3. **The oracle has this feature, and #864 did not read it.** Its batch and online verbs each
    hand-roll a walk-forward and share one per-step kernel; its Result stores per-step scalars
    only — the squared Mahalanobis distance, its ratio, the diagonal ratio averaged over assets,
    the standardised portfolio return and the portfolio QLIKE per test portfolio, the active count
@@ -53,7 +53,7 @@ Six facts shaped the decision.
    `mu`. So `E[(z − c)(z − c)'] = Σ̂` has a definite `c` for every family that fits a second moment,
    and the raw proxy `zz'` estimates `Σ + (μ − c)(μ − c)'` instead. The bias is `c'Σ̂⁻¹c / N`:
    0.16 % on daily data, 3.2 % on monthly data or for the horizon return at `h = 20`.
-6. **Under a Coverage Policy a forecast is a `NaN` frame** (ADR 0117), which is the reference's
+6. **Under a Coverage Policy a forecast is a `NaN` frame** (ADR 0117), which is the oracle's
    own convention for an inactive asset: "NaN diagonal entries mark inactive assets".
 
 ## Decision
@@ -79,12 +79,12 @@ the loop four small methods: `partial_fit!(pe::AbstractPriorEstimator, rd)`, whi
 
 **The realised quantity is a typed family, `AbstractRealisedTarget`.** `RealisedCovariance()`,
 the default, compares `S_t = Σ_s (z_s − c)(z_s − c)'` against `h Σ̂_t` — a per-row statistic whose
-ratio has per-step variance `2 / (N h)` under a Gaussian null. `HorizonReturn()`, the reference's
+ratio has per-step variance `2 / (N h)` under a Gaussian null. `HorizonReturn()`, the oracle's
 member, compares `R R'` with `R = Σ_s (z_s − c)` against the same target — the `h`-day holder's
-question, rank one, per-step variance `2 / N`. The two coincide at `h = 1`, so the reference is
-an oracle at `h = 1` for both and at any `h` for `HorizonReturn()`. A gap in the test window
+question, rank one, per-step variance `2 / N`. The two coincide at `h = 1`, so the oracle
+checks both at `h = 1` and at any `h` for `HorizonReturn()`. A gap in the test window
 contributes to neither `S` nor its count, so the target of cell `ij` is `H_ij Σ̂_ij` with `H` the
-pairwise count of finite rows — the reference's convention, and the per-cell denominator ADR 0117
+pairwise count of finite rows — the oracle's convention, and the per-cell denominator ADR 0117
 made the moment layer's own.
 
 **The realised return is centred on the location the forecast is about, always.** One verb,
@@ -103,10 +103,10 @@ no `demean` flag: the location is the estimator's, not the caller's, and an esti
 a zero mean is evaluated at zero. An asset whose location is not finite is not active at the step,
 beside one whose forecast variance is not: a return that cannot be centred cannot be scored.
 
-**The diagnostics are the reference's five and three more.** Per step and free of `w`: the
-Mahalanobis ratio `tr((H ⊙ Σ̂)⁻¹S) / N` — `tr(Σ̂⁻¹S) / (N h)` with no gap, and the reference's
+**The diagnostics are the oracle's five and three more.** Per step and free of `w`: the
+Mahalanobis ratio `tr((H ⊙ Σ̂)⁻¹S) / N` — `tr(Σ̂⁻¹S) / (N h)` with no gap, and the oracle's
 `R'(H ⊙ Σ̂)⁻¹R / N` under its target — the diagonal ratio per asset `S_ii / (H_ii Σ̂_ii)` — kept
-as `M × N`, where the reference keeps the mean over assets — the whole-matrix QLIKE, coded through
+as `M × N`, where the oracle keeps the mean over assets — the whole-matrix QLIKE, coded through
 the identity `h log|Σ̂| + N h m_t` so that it is `h log|Σ̂| + tr(Σ̂⁻¹S)` with no gap and stays
 finite under one, and the Frobenius loss `Σ_{H_ij > 0} (S_ij / H_ij − Σ̂_ij)²`, the per-cell form
 of `‖S/h − Σ̂‖²_F`; the two losses #864 proved robust to the proxy. Per step and per test
@@ -115,7 +115,7 @@ reads the per-row portfolio returns whichever target formed `S`. Over the run: t
 and quantiles of each ratio, where the mean is the ratio of sums #864 §4.1 states — the per-step
 ratios weighted by their degrees of freedom, `N_t h_t` under the realised covariance and `N_t`
 under the horizon return, which is the plain mean at a fixed universe and horizon and is what the
-reference reports — the Gaussian band `1 ± z_{α/2} √(2 / Σ_t dof_t)` on the mean ratio and
+oracle reports — the Gaussian band `1 ± z_{α/2} √(2 / Σ_t dof_t)` on the mean ratio and
 `√(2 / Σ_t dof'_t)` on one asset's or one portfolio's ratio, the bias statistic `B = std(b_t)` per
 portfolio with its cross-portfolio quantiles at `(5, 25, 75, 95)`, the mean losses, and the
 exceedance rate of `dof_t m_t` against `χ²_{dof_t}` at each of `levels`, `(0.95, 0.99)` by
@@ -126,7 +126,7 @@ not computed.
 
 **The test portfolio.** `w = nothing` is inverse volatility recomputed every step from `Σ̂_t`;
 a vector is one static portfolio; a vector of vectors is `P` portfolios. Each is renormalised
-over the step's active assets, as the reference does. A portfolio *solved* per step by an optimiser
+over the step's active assets, as the oracle does. A portfolio *solved* per step by an optimiser
 on the forecast — Engle and Colacito's minimum-variance test — is not built here; it needs the
 optimiser's read-out under the online arm, and is fog on the map.
 
@@ -141,7 +141,7 @@ nature, and a horizon per step is the `h_t` #864 §4.1 already wrote, so nothing
 summary weights each step by its own length. The step row type is a `NamedTuple`, because the
 kernel's numeric types are known only after the first fit, as the optimiser entry's
 `PredictionResult` is a `UnionAll`. This is the opposite of map #931's lazy ruling, for
-the reason fact 4 gives, and the shape of the reference, so its numbers are an oracle. The
+the reason fact 4 gives, and it is the oracle's shape, so the oracle's numbers check it. The
 per-step kernel is exported as the level-1 verb `covariance_forecast_step(Σ̂, Z, c, w, target)`
 on bare arrays, so a caller holding forecasts of their own builds the same Result by hand.
 
@@ -163,7 +163,7 @@ build ticket #1023 over eight assets with a listing and a delisting: **exact, to
 merge the decision assumed, so their identity is at the rounding of that recursion and not at the
 bit. The rolling identity is `Online(est; max_history = w)` against `expand_train = false`, as ADR
 0140 states it, and it is exact for every family measured, because the capped buffer's read-out
-is the batch verb over the rolling window's rows. The reference is the oracle for
+is the batch verb over the rolling window's rows. The oracle checks
 `HorizonReturn()` on a fixture whose location is zero: its per-step kernel agrees to `1e-15` on
 all five numbers, with and without a missing cell, and its three summaries to the six digits it
 prints. The centring term is asserted as the difference: with `R` the raw column sums,
@@ -176,8 +176,8 @@ On the loop:
 
 1. **One verb through `fold_loop`, the scheme is the walk-forward** — chosen. One body, the
    identity by construction, `DateWalkForward`, purging and the rolling window for free, and
-   the reference's two verbs collapse to one call.
-2. **The reference's shape: two verbs, each with a private loop** — rejected. A ninth fold loop,
+   the oracle's two verbs collapse to one call.
+2. **The oracle's shape: two verbs, each with a private loop** — rejected. A ninth fold loop,
    the shape ADR 0141 removed; no date form; the identity by arithmetic coincidence.
 3. **Map #931's shape: a fixed grid of refits on `1:t`, no scheme** — rejected. No rolling
    window, no purge, no online form without a second loop. #931 chose it because it had no
@@ -189,10 +189,10 @@ On the Result:
    `O(N² M)` when the caller asks for it, and the re-projection verb is what the request buys.
 2. **Lean: store every `Σ̂_t`, every diagnostic a verb** — rejected on fact 4. The rule that fits
    a `T × N` pairing does not fit an `N² × M` one.
-3. **Per-step diagnostics only, no forecasts ever** — the reference. Rejected because a caller
+3. **Per-step diagnostics only, no forecasts ever** — the oracle. Rejected because a caller
    who can pay for the forecasts loses a re-projection they would otherwise rerun the loop for.
 
-On the diagnostics: **the reference's five alone** was rejected because a loss projected on one
+On the diagnostics: **the oracle's five alone** was rejected because a loss projected on one
 portfolio is blind to a correlation error the portfolio does not touch, and a summary without a
 band or a test prints numbers a reader cannot judge; **the five plus the whole-matrix losses and
 the band, without the comparison** was the recommended middle and was passed over for the test,
@@ -200,10 +200,10 @@ because two mean losses side by side invite exactly the reading the test exists 
 
 On the realised quantity: **the horizon return as the default** was rejected because it is the
 noisier statistic when the better one costs nothing; **the realised covariance alone** was
-rejected because it makes the `h`-day holder's question inexpressible, a capability the reference
+rejected because it makes the `h`-day holder's question inexpressible, a capability the oracle
 has.
 
-On centring: **no centring** (the reference) and **a `demean` flag reading the prior's `mu`**
+On centring: **no centring** (the oracle) and **a `demean` flag reading the prior's `mu`**
 were both drafted and both rejected when the location turned out to be a field or a state
 component of every family that fits a second moment. A flag would have let a caller evaluate a
 forecast against a proxy for a moment the forecast does not estimate.
@@ -221,7 +221,7 @@ forecast against a proxy for a moment the forecast does not estimate.
   fallback that reads the window; a caller's `AbstractCovarianceEstimator` gets the fallback.
 - `GLOSSARY.md` gains **Covariance Forecast Evaluation** and **Realised Target**, and the *Avoid*
   line of **Forecast Calibration** names the covariance case.
-- The reference's raw ratios differ from the library's by the centring term; a parity test
+- The oracle's raw ratios differ from the library's by the centring term; a parity test
   states it.
 - The build was [#1023](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1023) on
   map #861; the plots, the optimiser-solved test portfolio, a `Pipeline` in the estimator slot,

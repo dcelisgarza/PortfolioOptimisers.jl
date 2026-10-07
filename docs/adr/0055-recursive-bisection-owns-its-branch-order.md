@@ -85,11 +85,11 @@ continue to pin `:optimal`.
 
 `:optimal` is not a single algorithm this library owns; it is
 `Clustering.orderbranches_barjoseph!`, a routine the `Clustering.jl` dependency ships. #947
-measured that this library's leaf order and a reference implementation's disagree on the same
+measured that this library's leaf order and the oracle's disagree on the same
 dendrogram — same distance matrix, same linkage heights, same merge tree, different branch
 order — because each side calls its own package's optimal-leaf-ordering routine, and the two
-routines do not attain the same objective value on every fixture. Substituting the reference's
-order into this library's HRP reproduces the reference's weights exactly, so nothing in this
+routines do not attain the same objective value on every fixture. Substituting the oracle's
+order into this library's HRP reproduces the oracle's weights exactly, so nothing in this
 library's HRP, its distance, or its linkage is implicated; the divergence is entirely in the
 third-party ordering step.
 

@@ -40,13 +40,13 @@ Five facts decided it, measured on `dev` at `2dcfa371a3`.
    `cross_val_predict(res::OptimisationResult, rd, cv)` and the three
    `fit_and_predict(res, rd, cv)` methods predict every fold with a *fixed* result and fit nothing
    (`06_Validation.jl:38`, `04_WalkForward.jl:960`).
-5. **The reference.** skfolio's `online_predict` and `online_score` clone the estimator before the
+5. **The oracle.** Its `online_predict` and `online_score` clone the estimator before the
    loop (`model_selection/_online/_validation.py:188`, `:389`) and return the portfolio alone, so
    the state is discarded and nothing resumes. Only `OnlineGridSearch` keeps a fitted estimator,
    `best_estimator_`, folded through the end of the last test window by `refit_last=True`
    (`_search.py:979`, `_validation.py:568`); it serves `predict(X_new)` and records no row and
    checks no continuity. In its batch loop the question does not exist: a stateless loop reruns
-   from zero and a once-partial fold comes out full, recomputed. A caller of the reference cannot
+   from zero and a once-partial fold comes out full, recomputed. A caller of the oracle cannot
    continue an evaluation, cannot learn where the state stopped, and folds a gap in silence.
 
 Every state is an immutable `@concrete struct` of numeric and Boolean matrices, name vectors, a
@@ -112,7 +112,7 @@ a schedule's `i` and `n` are the combined split's.
   fails exactly when the window was partial. The message names the workaround: resume the same
   Result **terminally** with `reduce_test = true` for the live view of the leftover rows, and
   resume it again with `reduce_test = false` when rows arrive. The resumed run may itself end
-  partial. This is the reference's own reading made explicit: after `refit_last` its state is a
+  partial. This is the oracle's own reading made explicit: after `refit_last` its state is a
   deployment object, never resumed.
 - the pinned context — names, static panel, column presence — on every delta step, through
   `partial_fit!` on the `ReturnsBufferState` as before.
@@ -132,7 +132,7 @@ Julia-version-bound, and no other format is provided. No dependency.
    Rejected: nothing pins the fold-for-fold identity, and continuing an evaluation means
    rewriting the schedule, the purge, the previous-weights thread and the held-weights logic by
    hand, which is what the loop exists to own.
-3. **The reference's `refit_last`** — the estimator leaves folded through the last test window.
+3. **The oracle's `refit_last`** — the estimator leaves folded through the last test window.
    Rejected: it equals no fold of any run and cannot be unfolded, so the resume is unreachable
    from it, and the flag is a second exit beside the first.
 

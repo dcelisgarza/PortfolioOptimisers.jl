@@ -144,7 +144,7 @@ put a `NaN` into a cross-sectional fit, and `assert_panel_masks` would not catch
 `emsk ⊆ amsk`, not finiteness. Re-deriving makes the subset invariant hold by construction rather
 than by refusal, and removes the one way a declaration can produce an incoherent panel.
 
-The reference implementation has no door of this kind: its panel's active mask is the caller's,
+The oracle has no door of this kind: its panel's active mask is the caller's,
 all-true when unstated, and its only data-driven adjustment is a caller-invoked trim of an asset's
 leading inactive entries. The layer keeps parity — a caller's own calendar still enters, as `span`
 — and improves on it, since an unstated calendar is derived from the prices at both ends rather

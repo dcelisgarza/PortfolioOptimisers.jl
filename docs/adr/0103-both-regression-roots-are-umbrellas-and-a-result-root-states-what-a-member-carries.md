@@ -19,7 +19,7 @@ factor-return matrix, a residual matrix and a count of the assets that entered e
 [Issue #648](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/648) decided the shape and
 [issue #679](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/679) built it. Both sit
 under map [#643](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/643), whose governing
-rule is that every decision must reproduce the reference implementation, and may only **add**
+rule is that every decision must reproduce the oracle, and may only **add**
 capability or **simplify** the design.
 
 Four facts about the library decided the shape.
@@ -123,7 +123,7 @@ it the cross-sectional weights as observation weights through `factory`.
 `QR` inline, because `rank(::QRPivoted)` needs Julia 1.12 while `Project.toml` allows 1.11.
 
 The intercept is a `Bool` and it is fitted by demeaning the cross-section by its weighted centroid,
-then recovering `b_t = ybar - f_t . xbar`. The reference implementation's own prior refuses an
+then recovering `b_t = ybar - f_t . xbar`. The oracle's own prior refuses an
 intercept, and its regressor is public, so the flag stays: dropping it would remove a mode.
 
 ## What the build measured, against the ticket's stated ground truth

@@ -24,7 +24,7 @@ projection "is where the padding convention is resolved".
 ### The three candidate series
 
 [Issue #957](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/957) measured that the
-reference implementation produces the first two of these and never the third.
+oracle produces the first two of these and never the third.
 
 | Rule | Inside the gap | The observation that ends it | Wealth across the gap |
 | --- | --- | --- | --- |

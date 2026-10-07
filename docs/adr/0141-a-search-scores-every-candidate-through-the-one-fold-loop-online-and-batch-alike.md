@@ -41,7 +41,7 @@ Four facts shaped the decision.
    The read-out is pure ([ADR 0137](0137-an-optimiser-forwards-to-its-prior-alone-and-a-read-out-reconstitutes-the-carrier-and-runs-the-batch-path.md)),
    so a failed read-out leaves the threaded state intact and the later steps still run.
 
-The reference's online search is a separate class from its batch search. It clones the
+The oracle's online search is a separate class from its batch search. It clones the
 candidate, runs its own online walk-forward, and scores the **concatenated** multi-period
 portfolio once per candidate. Under its default `raise_on_failure = True` a solver error fails the
 whole candidate and no later step runs; under `False` a failed step is a portfolio of `NaN`
@@ -87,7 +87,7 @@ identity from the grid search.
 **A failed step drops the candidate, and every step still runs.** ADR 0120 is unchanged: the
 column holds `NaN` at the failed step, the candidate never reaches the scorer, and the raw matrix
 shows which step failed. The later steps run and score, so the online column reads as the batch
-column does. This is the reference's `raise_on_failure = False` regime, which is what a
+column does. This is the oracle's `raise_on_failure = False` regime, which is what a
 `NaN`-weights fallback chain already is.
 
 **The `Pipeline`'s search takes the same route now**, in batch. Its door keeps the refusal of a
@@ -106,7 +106,7 @@ a fold with no training window means to a `Pipeline`'s `fit`.
 3. **Step inside the search's own loop** — rejected. Warming up `opt_i`, folding the delta rows
    and reading out through `fit_and_predict(opt_i, rd; test_idx)` matches the batch search exactly,
    because neither threads anything, but it is a second online loop beside `fold_loop`, the shape
-   ADR 0140 rejected for the reference's `online_predict`.
+   ADR 0140 rejected for the oracle's `online_predict`.
 
 On the executor, **candidates sequential and folds parallel** (the combinatorial method's
 convention) was rejected because a batch grid loses most of its parallelism and an online search
@@ -115,20 +115,20 @@ predict which loop their `ex` reaches.
 
 On the reset, **letting the loop refuse per candidate** was rejected because the refusal would
 surface after the grid is built, inside `@floop`, up to `N` times; **resetting each candidate
-cold**, the reference's `clone`, was rejected because it needs the per-state-type "empty, keep the
+cold**, the oracle's `clone`, was rejected because it needs the per-state-type "empty, keep the
 cap" verb ADR 0140 costed, and the search would then disagree with the loop on the same input.
 
-On the score, **one aggregate row**, the reference's statistic over the concatenated series, was
+On the score, **one aggregate row**, the oracle's statistic over the concatenated series, was
 rejected because it changes every released walk-forward search's matrix and winner, and a
 `HighestMeanScore` over one row is a plain `argmax`; **a switch on the search** was rejected as a
 knob the map did not ask for. An aggregate score for a walk-forward search is a scoring feature of
 the search, batch and online alike, and is not this map's.
 
-On the failed candidate, **short-circuiting after the first non-finite step**, the reference's
+On the failed candidate, **short-circuiting after the first non-finite step**, the oracle's
 default, was rejected because "failed" and "not run" then read alike in the raw matrix, the online
 column diverges from the batch one, and it needs a per-fold hook the loop does not have;
 **scoring on the finite steps** was rejected because a candidate that failed once could win, which
-ADR 0120 forbids, and neither reference regime does it.
+ADR 0120 forbids, and neither regime of the oracle does it.
 
 ## Consequences
 
@@ -161,6 +161,6 @@ ADR 0120 forbids, and neither reference regime does it.
   when no prior is passed.
 - One finding outside this decision: `previous_weights` hands the next fold `prev.res.w` or
   `prev.hw.w` verbatim, so after a failed fold the sequential arm threads a `NaN` vector into a
-  `Turnover` term, where the reference keeps the last successful weights. That is the fold loop's,
+  `Turnover` term, where the oracle keeps the last successful weights. That is the fold loop's,
   batch and online alike, and belongs with the previous-weights map that
   [#1004](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1004) seeds.

@@ -36,7 +36,7 @@ Three facts decided the reworked shape.
     bound against the feature axis; a walk from a column back to its owner; and two naming
     conventions, `"<field>=<level>"` and `"<field>::observed"`, which the first shape rejected as
     the index and then kept to name the columns.
- 2. **The reference implementation stores per-field values.** Its panel is a dictionary of fields,
+ 2. **The oracle stores per-field values.** Its panel is a dictionary of fields,
     each with its own array and element type, a categorical as integer codes over labels, and two
     boolean masks. It has no verb that stacks fields into one matrix, and no distance or
     clustering consumer, so it never needed one.
@@ -260,18 +260,18 @@ a function, and it never enters a carrier at all.
 
 The leak is stated in `BackwardPanelFill`'s own docstring rather than refused. Map #643's
 governing rule is that a decision may add capability or simplify the design and may never remove
-a mode, and the reference implementation offers a backward fill. A panel built outside any fold
+a mode, and the oracle offers a backward fill. A panel built outside any fold
 looks forward into nothing, so the mode is real.
 
 ### The subset invariant is checked, not coerced
 
 The estimation mask is a subset of the active mask: an asset that is not listed at an observation
-cannot enter that observation's estimate. The reference implementation coerces silently. A
+cannot enter that observation's estimate. The oracle coerces silently. A
 coercion allocates a new mask, and `port_opt_view` must return views, so the rule is **checked**
 and the caller writes `emsk .& amsk` when they want the coercion. A slice of two masks that
 satisfy the rule satisfies it again, so a view never has to re-establish it and never throws.
 
-**The per-observation non-empty checks are deliberately not ported.** The reference refuses a
+**The per-observation non-empty checks are deliberately not ported.** The oracle refuses a
 panel in which some observation has no active asset. An asset view can produce exactly that, and
 a view must not throw. The rule would also be a refusal rather than a capability, so dropping it
 removes no mode.

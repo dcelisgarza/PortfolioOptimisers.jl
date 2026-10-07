@@ -58,13 +58,13 @@ size of `mu` and `sigma` fitted over `t` unweighted observations is `t`, whateve
 afterwards. A cap does not change the sample behind the moments; it changes the rows the result
 carries.
 
-### What the reference does
+### What the oracle does
 
 Its empirical and bootstrap sets fit their own `prior_estimator` on `X` inside their `fit`, and
 have no `partial_fit`, so an online optimiser configured with one raises. Its orthogonal set reads
 the optimiser's return distribution and ignores `X`. It reads the observation count off the buffer
 **after** its history cap truncates it, with a static `n_eff` as the caller's override. A caller
-of the reference cannot say "the set of the prior I am optimising on", and cannot recover the
+of the oracle cannot say "the set of the prior I am optimising on", and cannot recover the
 folded count without typing it.
 
 ## Decision
@@ -142,7 +142,7 @@ After `t` steps of `partial_fit!(opt, rd)`:
 ## Considered options
 
 1. **Refit every set's own `pe` at the read-out, as ADR 0137 left it.** Zero code, bit-identical,
-   already ahead of the reference. Rejected as the *only* route because the map's destination
+   already ahead of the oracle. Rejected as the *only* route because the map's destination
    says a member with an exact recursion folds without a refit from zero, and the delta, normal
    and characteristic sets are exact by composition; it stays as the route of a set with its own
    `pe`.
@@ -158,7 +158,7 @@ After `t` steps of `partial_fit!(opt, rd)`:
 5. **A new `nobs` field on the carrier** for the capped count. Rejected: `ens` already means the
    effective count behind the moments to the one reader that reads it, every wrapping prior
    already forwards it, and `port_opt_view` already carries it.
-6. **Leave the capped count as the rows carried, as the reference does.** Rejected: a cap would
+6. **Leave the capped count as the rows carried, as the oracle does.** Rejected: a cap would
    silently mis-price every count reader by `t / w`.
 
 ## Consequences

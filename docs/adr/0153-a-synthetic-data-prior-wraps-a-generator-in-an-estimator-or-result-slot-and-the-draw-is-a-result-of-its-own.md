@@ -47,10 +47,9 @@ The facts the ruling rests on, read in the source on 2026-09-15:
   `s = sqrt.(diag(X))` and calls `cov2cor!(X, s)`, which divides the zero row and column by
   `s = 0`; the fit returns a `sigma` of `NaN` behind a `@warn`. Downstream, `cholesky(sigma)` in
   the variance constraint and the relaxed risk-budgeting constraint throws `PosDefException` on
-  an exactly singular matrix. Risk measures that read only `X` are unaffected. The reference
-  implementation repairs this with `1e-6 · N(0, 1)` noise from an unseeded global generator, one
+  an exactly singular matrix. Risk measures that read only `X` are unaffected. The oracle repairs this with `1e-6 · N(0, 1)` noise from an unseeded global generator, one
   vector broadcast onto every constant column.
-- **The reference implementation** takes a distribution estimator, `n_samples` and a
+- **The oracle** takes a distribution estimator, `n_samples` and a
   `sample_args` dictionary; conditioning lives in `sample_args`; every re-stress is a refit; its
   `sample` returns a bare array with no read of how it was drawn; the prior is the plain sample
   mean and covariance of that array.
@@ -79,7 +78,7 @@ AbstractLowOrderPriorEstimator_A` holds:
 - `rng` and `seed` — the library's pair, resolved once by `resolve_rng` at the top of `prior`.
 - `jitter` — the constant-column repair, below.
 - `pe::AbstractLowOrderPriorEstimator_A` — the inner moment estimator, default `EmpiricalPrior()`,
-  fitted on the synthetic panel. This is the first improvement over the reference, whose moments
+  fitted on the synthetic panel. This is the first improvement over the oracle, whose moments
   are the plain sample moments.
 
 **Two verbs.** `synthetic_data(est, X) -> AbstractSyntheticDataResult` fits the generator, with a
@@ -129,7 +128,7 @@ no draw is repeated, and no estimator that does not draw changes behaviour.
 estimator's own generator, nullable, on by default.** It runs after the draw and before `pe.pe`,
 so every generator gets it. Each constant column takes its own `Normal(0, s)` draw from the
 resolved `rng`, so two fixed assets are independent noise and every run is reproducible from the
-estimator's fields. The default scale is the reference's `1e-6`; `nothing` disables it, for a
+estimator's fields. The default scale is the oracle's `1e-6`; `nothing` disables it, for a
 caller who regularises inside `pe.pe` or runs `X`-only risk measures, and the docstring names the
 `NaN` outcome of the default covariance path. The first build ships a scalar and a per-asset
 vector; three richer forms graduate to a ticket of their own: per-asset pairs `"asset" => value`

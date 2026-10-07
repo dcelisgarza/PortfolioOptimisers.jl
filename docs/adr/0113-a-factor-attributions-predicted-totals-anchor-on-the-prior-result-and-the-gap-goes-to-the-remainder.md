@@ -35,7 +35,7 @@ So a predicted attribution has two candidates for its total, and they disagree:
 2. **The carrier's total**, `w' pr.sigma w` and `w' pr.mu`. This is what the optimiser saw, what
    `expected_return` reports and what `expected_risk(Variance(), w, pr)` reports.
 
-The reference implementation takes the first, because its predicted attribution takes the model's
+The oracle takes the first, because its predicted attribution takes the model's
 five arrays as arguments and never sees a carrier. Its Result has no place to put a difference, so
 it cannot show one.
 
@@ -63,7 +63,7 @@ reproduces its own carrier, and it is the measured gap under a wrapper.
 
 Three consequences follow from the anchoring, and each is deliberate.
 
-- **The remainder is present on the predicted side.** The reference's predicted Result carries no
+- **The remainder is present on the predicted side.** The oracle's predicted Result carries no
   remainder at all. This one does, and it is the reader's only signal that the block and the
   carrier have parted company.
 - **No guard reports the gap.** A threshold on the remainder would be a numerical guard on a
@@ -83,7 +83,7 @@ two sides row by row.
 
 ## Alternatives rejected
 
-- **Anchor on the model and report no remainder**, as the reference does. Refused because the
+- **Anchor on the model and report no remainder**, as the oracle does. Refused because the
   numbers would then disagree with `expected_return` and `expected_risk` on the same weights and
   the same prior, with nothing in the Result to say why. A reader who tabulates an attribution
   beside a performance summary would find two different portfolio returns.

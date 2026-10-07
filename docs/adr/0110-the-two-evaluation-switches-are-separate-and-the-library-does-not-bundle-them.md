@@ -21,7 +21,7 @@ previous fold's *target* weights, so `Turnover`, `TurnoverEstimator`, `WeightsTr
 not trade the change in the decision. It trades the distance from what it holds to what it now
 wants, and that distance is larger, because the holdings moved while the decision stood still.
 
-A reference implementation of the drifted series exists, and it answers both questions with one
+The oracle computes the drifted series too, and it answers both questions with one
 flag. Turning that flag on makes a fold report the drifted series **and** carry its held weights
 into the next fold. The two answers arrive together, and there is no way to take one without the
 other.
@@ -90,7 +90,7 @@ switches: a caller can drift without amortising, and amortise without drifting.
 - **A drifted run stays parallel.** `needs_previous_weights` did not move, and neither switch
   reaches it. A caller who wants the fund's reading of the return series pays no run-time for it.
   Under the bundle the same caller would pay a sequential run.
-- **Four settings exist where the reference implementation has two.** Off/off is the decision's
+- **Four settings exist where the oracle has two.** Off/off is the decision's
   reading. On/off reads the fund's series while it measures the change in the decision. Off/on is
   the setting a caller reaches for when the trades matter and the series does not. On/on is the
   fund's reading of both.
@@ -104,13 +104,12 @@ switches: a caller can drift without amortising, and amortise without drifting.
   zero or turns negative has no return series, so the drift refuses to form one. Under a
   population the failing member takes an `OptimisationFailure` retcode and the existing filters
   drop it; a single weight vector is a population of one, so it raises `NonPositiveWealthError`.
-- **The reproduction is exact.** With both switches on, the library reproduces the reference
-  implementation's return series, held weights and executed turnover at the reference's own
+- **The reproduction is exact.** With both switches on, the library reproduces the oracle's return series, held weights and executed turnover at the oracle's own
   tolerance, at any panel size.
 
 ## Alternatives considered
 
-- **One flag for both questions, as the reference implementation has.** Refused. It is one
+- **One flag for both questions, as the oracle has.** Refused. It is one
   switch fewer to explain and two capabilities fewer to offer, and it makes a drifted run
   sequential for a dependency the drift does not have.
 - **One typed block carrying both axes, held as one field on every scheme.** Refused after it was

@@ -18,7 +18,7 @@ not. Both orthogonal sets it charts are built from the fitted factor model of th
 optimiser is solving on: the effective loading matrix, the idiosyncratic covariance, and a
 cross-sectional weighting read off the block. They keep the point estimate where it is and add a
 penalty on the portfolio's exposure to the subspace the factors do not span. Those inputs exist only
-on a fitted prior result, and no returns matrix carries them. The reference implementation fits its
+on a fitted prior result, and no returns matrix carries them. The oracle fits its
 set estimator inside the problem build and hands it the fitted return distribution as an extra
 argument.
 
@@ -86,7 +86,7 @@ nothing, because the root's own method of the predicate answers for them.
 
 ### A standalone fit reduces to the Investable Mask and expands
 
-The prior arm offers a mode the reference lacks: `mu_ucs(ue, pr)` on a stored prior result builds
+The prior arm offers a mode the oracle lacks: `mu_ucs(ue, pr)` on a stored prior result builds
 the set with no returns and no optimiser. Inside an optimiser the result arrives reduced, because
 every family reduces once at its entry
 ([ADR 0115](0115-every-optimisation-estimator-reduces-once-at-its-entry-and-its-result-carries-the-investable-mask.md)).
@@ -177,7 +177,7 @@ the same reason.
 | Option | How the set would reach the prior | Why it was not taken |
 | --- | --- | --- |
 | **A prior arm on the triple** | Both builders pass `pr` beside `rd`; a per-type predicate picks the argument. | Taken. |
-| **`factory(rt, pr)`** | Resolve the slot to a fitted set inside `factory`, which already visits the return term with the prior in hand. | `factory` runs on the return term but on **no risk measure** on the JuMP route, so the covariance side would need a new call anyway. The reference fits its estimator inside the problem build and hands it the fitted result, which is the builder site rather than a preprocessing step. |
+| **`factory(rt, pr)`** | Resolve the slot to a fitted set inside `factory`, which already visits the return term with the prior in hand. | `factory` runs on the return term but on **no risk measure** on the JuMP route, so the covariance side would need a new call anyway. The oracle fits its estimator inside the problem build and hands it the fitted result, which is the builder site rather than a preprocessing step. |
 | **A Calibration Rule** | Put the set in the `ucs` slot as a rule resolved against the prior. | A Calibration Rule returns one number. It cannot read a factor model or build a set. |
 | **A Deferred Quantity** | Refit the set from `pr.original_X` at resolution. | A Deferred Quantity refits from the returns, which is the input the orthogonal set does not read. The `ucs` slot holds an Estimator, not a Deferred Quantity, and the comment at that slot says so. |
 

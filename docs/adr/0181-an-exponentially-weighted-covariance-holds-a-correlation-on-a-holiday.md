@@ -6,9 +6,9 @@ status: accepted
 
 ## Context
 
-`ExpWeightedCovariance` ports the exponentially weighted covariance of a reference
-implementation. An asset is on a holiday at an observation where the active mask admits it and its
-return is not finite. The port and the reference updated only the block of the valid assets at each
+`ExpWeightedCovariance` ports the exponentially weighted covariance of the
+oracle. An asset is on a holiday at an observation where the active mask admits it and its
+return is not finite. The port and the oracle updated only the block of the valid assets at each
 observation:
 
 ```text
@@ -50,7 +50,7 @@ the clock of its common observations. Pairwise deletion is not positive semidefi
    the ratio `S[i, j] / sqrt(S[i, i] S[j, j])` does not move. A holiday carries no information
    about the co-movement of its asset. The old rule held the covariance instead, so it moved the
    correlation by `λ^(-1/2)` at each step with no data to justify the move.
-3. **The departure from the reference is limited to holidays.** Without a holiday `D = sqrt(λ) I`
+3. **The departure from the oracle is limited to holidays.** Without a holiday `D = sqrt(λ) I`
    and the step is `λ S + (1 - λ) e e'`, the old recursion. A diagonal entry, the location, the
    count, the reset on an inactive period and the read-out are unchanged. The parity constants of
    `test/test_08z_exp_weighted_moments.jl` have no holiday, and they pass unchanged.
@@ -68,7 +68,7 @@ the clock of its common observations. Pairwise deletion is not positive semidefi
 ## Considered options
 
 - **Keep the recursion and document the defect.** This was the state after #891. It keeps parity
-  with the reference on a holiday, but the reference is wrong there: its own docstring claims the
+  with the oracle on a holiday, but the oracle is wrong there: its own docstring claims the
   property that it breaks. A consumer that factors the matrix, such as a JuMP risk measure through a
   Cholesky factor or an SOC row, gets an indefinite input from a bare estimator.
 - **Repair at read-out, for example with `posdef!`.** A projection moves every entry, including the

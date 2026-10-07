@@ -16,7 +16,7 @@ mask comes from the training window. Three consumers still meet one.
   `src/20_Optimisation/02_CrossValidation/01_Base_CrossValidation.jl:1435` through
   `calc_net_returns`, which is the plain product `X * w`, and `0 * NaN` is `NaN`. The census of
   [#671](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/671) measured it: the library
-  and the reference implementation agree on every observation until the delisting and disagree on
+  and the oracle agree on every observation until the delisting and disagree on
   every observation after it, and a weight of exactly zero on the dead asset poisons the date all
   the same.
 - **A value-level verb against a Prior Result.** `expected_risk(r, w, pr)`, `expected_return`,
@@ -38,13 +38,13 @@ prefix and divides by the poisoned length. The census measured a gapped CVaR tha
 for the ten observations it did not have. And the library has no `NaN` policy in the risk measures
 at all: 29 files, zero finiteness checks.
 
-The reference implementation makes its portfolio return series always finite at one line,
+The oracle makes its portfolio return series always finite at one line,
 `portfolio/_portfolio.py:592`: it replaces every gap by zero and takes the plain dot product, with
 no renormalisation and no diagnostic. That is why its measure layer can afford to be permissive. Its
 empirical prior zero-fills the missing scenarios of an investable asset and warns above a 5% share,
 and its warning names the cost: the fill understates that asset's risk in a scenario-based measure
 and leaves `mu` and the covariance untouched. Its market return renormalises to the live set
-instead, and the reference never reconciles the two conventions. A caller of the reference cannot
+instead, and the oracle never reconciles the two conventions. A caller of the oracle cannot
 learn that a third of the portfolio sat in cash.
 
 The library has its own precedent. The factor attribution, decided on
@@ -58,7 +58,7 @@ reach it first, and it is paid once there.
 Three measurements taken on this ticket, after available-case admission landed, redraw the fill's
 half of the answer. **The matrix-wide denominator is blind to the case it was written for**: the
 share is the count of filled entries over the count of entries of the whole returns matrix, the
-reference's denominator, so one asset of a hundred whose column is seven-tenths invented is seven
+oracle's denominator, so one asset of a hundred whose column is seven-tenths invented is seven
 thousandths of the matrix, beneath any limit a caller would set. **The limit and the coverage floor
 are the same number**: `admits` reads coverage as an asset's own observation count over the number
 of observations folded, and the fill counts that column's non-finite entries over the same
@@ -140,7 +140,7 @@ no finiteness check. Every one has internal callers that hand it a finite series
 kernels call the first for each half at every evaluation, and the performance summary and nine plot
 sites call the others on the funnel's output. Their docstrings state the Precomputed-returns
 contract: the series must be finite, a tail measure on a gapped series answers a finite wrong
-number, and `x[isfinite.(x)]` before the call reproduces the reference implementation's
+number, and `x[isfinite.(x)]` before the call reproduces the oracle's
 drop-per-column answer exactly, for every kernel but its unbiased semi-variance, whose Bessel
 correction reads the full length and is a defect the census recorded.
 
@@ -158,7 +158,7 @@ Under `strict = false` the prior warns when the filled share exceeds `fill_limit
 any fill refuses, whatever the share.
 
 **The share is per asset**: the worst investable column's own count of filled entries over the
-number of observations. The matrix-wide share, the reference's denominator, is reported in the
+number of observations. The matrix-wide share, the oracle's denominator, is reported in the
 message and trips nothing. It scales with the universe, so the column the notice exists to catch
 disappears inside it — one asset of a hundred whose column is seven-tenths invented is seven
 thousandths of the matrix, under any limit a caller would set. A per-column denominator means one
@@ -327,7 +327,7 @@ fill under either.
 | Option | Why it was refused |
 | --- | --- |
 | The fold filters the full window, with no view at the Investable Mask first | The same series, but the filter scans a dead column the fit already excluded, and the fold and the value-level door of this ADR then reduce by two different rules. |
-| A held gap renormalises the live weights to the held budget, the reference's market-return convention | It rebalances into the survivors on that observation, which the caller's weights never said, and the series is no longer linear in the weights. |
+| A held gap renormalises the live weights to the held budget, the oracle's market-return convention | It rebalances into the survivors on that observation, which the caller's weights never said, and the series is no longer linear in the weights. |
 | A held gap refuses with a named error, the census's recommendation | The first delisting inside a test window stops the walk-forward, so the map cannot close. |
 | Any gap refuses | The optimiser's own result on a gapped panel cannot be scored, because the dead asset's zero weight still meets its gap. |
 | The funnel scans the product and takes a slow path on a `NaN` | Paid at 70 call sites on every evaluation, on the hierarchical solves and the risk contribution among them. |
@@ -335,7 +335,7 @@ fill under either.
 | The seam zeros the rows of every bound array | One rule per block, `mu`, `sigma`, `sk`, `kt`, the columns of `X` and the factor block; a forgotten block is a silent `NaN`, and the seam does not see the weights. |
 | Each weights-only functor guards its own array | Six sites, and a new measure forgets. |
 | A finiteness check at the doors that take a caller's series, or in every kernel | A scan on a large series is paid by every internal caller that already hands a finite one; the caller cleans a value they built with one line. |
-| The doors compact the series, as the reference does | A denominator that changes with the gap count and that nothing records, an all-gap series that answers `NaN` in silence, and a hole to put back for the cumulative and the drawdown forms. |
+| The doors compact the series, as the oracle does | A denominator that changes with the gap count and that nothing records, an all-gap series that answers `NaN` in silence, and a hole to put back for the cumulative and the drawdown forms. |
 | The optimiser's reduction zero-fills the young asset's rows | A second site, and the value-level door and the meta-optimisers each need their own. |
 | A young asset is non-investable until its window is finite | It undoes the mask-aware family: the estimator that handles a listing is refused on every listing. |
 | The fill is silent, or it warns on any fill | Silent leaves the caller with the docstring alone; any fill warns on most folds of a walk-forward over a panel with listings. |

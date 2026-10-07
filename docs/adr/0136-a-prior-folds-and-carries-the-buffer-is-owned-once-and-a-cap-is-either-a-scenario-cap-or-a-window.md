@@ -31,7 +31,7 @@ with the batch verb over the buffer's rows. **The cap is therefore the window**,
 window is a composition rather than a mode. That ruling is right for a member whose estimate comes
 *from* the buffer. A prior's does not.
 
-### What the reference does
+### What the oracle does
 
 Its empirical prior forwards `partial_fit` to the mean and covariance sub-estimators, reads their
 fitted moments back, and separately appends the observations to a growing buffer that the fitted
@@ -108,7 +108,7 @@ anyway.
 | `EmpiricalPrior(; max_scenarios = w)` | `mu` and `sigma` folded over all `t`; `X` is the last `w` rows. Batch and online alike. | No batch fit. Documented, not tested. |
 | `Online(EmpiricalPrior(); max_history = w)` | The whole fit windowed: one buffer, every read-out over the last `w` rows. | `prior(pe, X[end - w + 1:end, :])`, exactly. |
 
-`max_scenarios` is the reference's knob. `Online`'s `max_history` keeps #997's meaning unbent, and
+`max_scenarios` is the oracle's knob. `Online`'s `max_history` keeps #997's meaning unbent, and
 it is also the cheap route to a rolling-window prior: wrapping `me` and `ce` separately costs three
 copies of `X` and three caps to keep in sync. Both set, they nest — moments over `max_history`,
 scenarios over `max_scenarios` — and `max_scenarios >= max_history` is a no-op.
@@ -196,11 +196,11 @@ it windows the fit. The `AssetPanel` is not buffered: it is fold context, not sa
 ## Considered options
 
 **One rule, one knob: a capped prior is a rolling-window prior.** Rejected. It is the simplest rule
-to state and the map's oracle would hold with no exception, but the reference's capability becomes
+to state and the map's oracle would hold with no exception, but the oracle's capability becomes
 inexpressible: a caller capping to bound memory, or to cut the zero-filled share, would silently
 shorten their covariance estimation window, and those are different concerns.
 
-**The reference's semantics on the wrapper's knob.** Rejected. It needs no new field and no second
+**The oracle's semantics on the wrapper's knob.** Rejected. It needs no new field and no second
 state type, but there is then no windowed-prior form at all, and `Online`'s ruling would gain an
 exception rather than a sibling.
 

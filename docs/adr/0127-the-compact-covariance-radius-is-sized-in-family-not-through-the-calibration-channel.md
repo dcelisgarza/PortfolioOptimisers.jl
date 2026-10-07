@@ -18,7 +18,7 @@ estimator builds, and `0` leaves the nominal variance untouched.
 [#928](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/928) asked for a rule, or for
 evidence that no rule of the ADR 0095 kind can exist. It was the *Selecting a radius* patch that
 kept map [#643](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/643) open. The
-reference implementation states the radius as `radius : float, default=1.0` with no calibration and
+oracle states the radius as `radius : float, default=1.0` with no calibration and
 no selection procedure, so anything found here is beyond parity, which was the intent.
 
 Two rules exist. The exploration also found that neither can be a **Calibration Rule**.
