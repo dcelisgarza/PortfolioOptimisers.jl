@@ -322,6 +322,14 @@ end
     end
 
     @testset "Parity with the oracle's online update" begin
+        # The prior of each step against the stored block of that step. `mu` compares cell by
+        # cell. `sigma` compares against its largest entry: an off-diagonal entry of two assets
+        # near zero correlation is a cancellation in `L F L'` (#1376), measured maxrel 1.3e-10
+        # cell by cell. The factor returns compare cell by cell with an absolute floor: the
+        # industry level "Utilities" is empty after its only asset delists, so its factor return
+        # is a round-off zero on both sides, measured maxrel 1.9 and maxabs 1.5e-16. The floor
+        # is at most 6e-14 of the largest factor return, and every other cell measured maxrel
+        # 5.7e-13.
         function check(out, unit_case, src)
             load(o) = parity_load("CrossSectionalFactorPrior", unit_case, "$(src)$(o)")
             mu, S, F = load("Mu"), load("Sigma"), load("FactorReturns")
@@ -332,7 +340,7 @@ end
                 @test parity_compare(pr.mu, mu[k, :]; name = "$(unit_case) mu $(k)").ok
                 @test parity_compare(pr.sigma, S[((k - 1) * N + 1):(k * N), :];
                                      scale = :array, name = "$(unit_case) sigma $(k)").ok
-                @test parity_compare(pr.fpr.X, F[(r0 + 1):(r0 + n), :]; scale = :array,
+                @test parity_compare(pr.fpr.X, F[(r0 + 1):(r0 + n), :]; atol = 1e-15,
                                      name = "$(unit_case) factor returns $(k)").ok
                 r0 += n
             end
@@ -341,21 +349,21 @@ end
                                                        choice = PinnedChoice()))
         # The pinned choice reproduces the oracle's online update, which pins the dropped
         # member at its first call. Measured over the three steps: mu maxrel 1.7e-14, sigma
-        # maxscaled 4.2e-13, factor returns maxscaled 6.7e-16 on `Style`; mu maxrel 5.3e-13,
-        # sigma maxscaled 6.5e-13, factor returns maxscaled 2.9e-15 on `Industry`.
+        # maxscaled 4.2e-13, factor returns maxrel 4.6e-14 on `Style`; mu maxrel 5.3e-13,
+        # sigma maxscaled 6.5e-13, factor returns maxabs 1.5e-16 on `Industry`.
         check(pinned(style), "OnlineStyle", "Fold")
         check(pinned(industry), "OnlineIndustry", "Fold")
         # Currency factors on the carry route (#1479). The oracle's online update reads the
         # Currency Excess Returns of each batch, and it pins `style1` as in `Style`. Measured
         # over the three steps: mu maxrel 2.3e-13, sigma maxscaled 4.2e-13, factor returns
-        # maxscaled 4.5e-16.
+        # maxrel 9.3e-14.
         cp = pinned((; grid_config("Currency", rd)..., families = ["style" => nothing]))
         @test all(x -> x.pe.cache.families == ["style" => "style1"], cp)
         check(cp, "OnlineCurrencyStyle", "Fold")
         # A seed window on the factor prior cuts the factor returns of the first fit to the
         # last 60, and every later step folds every row, as the oracle's does. Measured: mu
-        # maxrel 7.2e-15, sigma maxscaled 3.7e-13, factor returns maxscaled 6.7e-16 on `Style`;
-        # mu maxrel 1.4e-13, sigma maxscaled 7.3e-13, factor returns maxscaled 2.9e-15 on
+        # maxrel 7.2e-15, sigma maxscaled 3.7e-13, factor returns maxrel 4.6e-14 on `Style`;
+        # mu maxrel 1.4e-13, sigma maxscaled 7.3e-13, factor returns maxabs 1.5e-16 on
         # `Industry`.
         decay = 2.0^(-1 / 20)
         seed = EmpiricalPrior(;

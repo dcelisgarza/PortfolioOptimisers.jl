@@ -74,8 +74,9 @@ end
         # Every entry, with the `NaN` pattern of each side. Measured maxrel 1.9e-15 and
         # 7.0e-15.
         @test parity_compare(pr.mu, loadv(c, "Mu"); name = "$(c) mu").ok
-        # A covariance compares against its largest entry (#1376). Measured maxscaled 3.0e-13
-        # and 3.4e-13, and maxrel 1.4e-11 cell by cell.
+        # `sigma` compares against its largest entry: an off-diagonal entry of two assets near
+        # zero correlation is a cancellation in `L F L'` (#1376). Measured maxscaled 3.0e-13
+        # and 3.4e-13, and maxrel 9.8e-12 and 1.3e-11 cell by cell.
         @test parity_compare(pr.sigma, load(c, "Sigma"); scale = :array,
                              name = "$(c) sigma").ok
         # Measured maxrel 1.5e-15 at most.
@@ -104,10 +105,12 @@ end
         @test parity_compare(rr.vs, load(c, "IdioVariances"); name = "vs").ok
         @test parity_compare(prs.fpr.X, load(c, "FactorReturns"); name = "f").ok
         # A scenario is the sum of a systematic and an idiosyncratic return, so a small one
-        # comes from a cancellation. Measured maxscaled 6.3e-16, and maxrel 8.2e-13 cell by
-        # cell (1.5e-11 on the large panel). The column of an asset that is not investable is
+        # comes from a cancellation, and the comparison is against the largest entry. Measured
+        # maxscaled 6.3e-16 on this host and on CI, where maxrel cell by cell moves with the
+        # host: 8.2e-13 here, 1.6e-12 on CI. The column of an asset that is not investable is
         # `NaN` on both sides.
-        @test parity_compare(prs.X, load(c, "Scenarios"); scale = :array, name = "X").ok
+        @test parity_compare(prs.X, load(c, "Scenarios"); rtol = 1e-14, scale = :array,
+                             name = "X").ok
         @test isnothing(prs.w) && isnothing(prs.fpr.w)
     end
 
@@ -123,9 +126,9 @@ end
         os = load("PitSmall", "Sigma")
         @test isfinite(prs.mu[i4]) && isnan(prs.sigma[i4, i4])
         @test all(isfinite, prs.sigma[i4, rs])
-        # Measured maxrel 3.1e-16 and 7.9e-16.
+        # Measured maxrel 3.1e-16 and 2.2e-15 cell by cell.
         @test parity_compare([prs.mu[i4]], [om[i4]]; name = "mu4").ok
-        @test parity_compare(prs.sigma[i4, rs], os[i4, rs]; scale = :array, name = "sigma4").ok
+        @test parity_compare(prs.sigma[i4, rs], os[i4, rs]; name = "sigma4").ok
         @test findall(PO.investable_mask(prs)) == rs
         # Its systematic root, the loadings times the Cholesky factor of the factor
         # covariance, is finite, and the rows of the idiosyncratic root are `NaN`, because
@@ -154,7 +157,8 @@ end
         c = "PitSmallOverlay"
         K = size(pr.rr.L, 2)
         @test parity_compare(pr.mu, loadv(c, "Mu"); name = "overlay mu").ok
-        # Measured maxscaled 3.0e-13, and maxrel 1.5e-15 and 5.3e-15.
+        # `sigma` carries the cancellation of the default fit: measured maxscaled 3.0e-13, and
+        # maxrel 9.8e-12 cell by cell. Measured maxrel 1.3e-15 (`esigma`) and 5.3e-15 (root).
         @test parity_compare(pr.sigma, load(c, "Sigma"); scale = :array,
                              name = "overlay sigma").ok
         @test parity_compare(pr.rr.esigma, load(c, "IdioCov"); name = "overlay esigma").ok
@@ -251,9 +255,15 @@ end
         @test p2.w isa StatsBase.ProbabilityWeights
         @test p2.w === p2.fpr.w
         @test parity_compare(collect(p2.w), collect(p1.w); name = "w").ok
-        @test isequal(p2.mu, p1.mu) && isequal(p2.sigma, p1.sigma)
-        @test isequal(p2.X, p1.X) && isequal(p2.fpr.X, p1.fpr.X)
-        @test isequal(p2.rr.lambda, p1.rr.lambda) && 0 < p1.rr.lambda < 1
+        # Bit-equal under the default flags. Under `--check-bounds=yes`, the flag of CI, a sum
+        # takes another order: measured maxrel 1.8e-15 (`mu`) and 1.5e-16 (`lambda`).
+        @test parity_compare(p2.mu, p1.mu; rtol = 1e-14, name = "scaled mu").ok
+        @test parity_compare(p2.sigma, p1.sigma; rtol = 1e-14, name = "scaled sigma").ok
+        @test parity_compare(p2.X, p1.X; rtol = 1e-14, name = "scaled X").ok
+        @test parity_compare(p2.fpr.X, p1.fpr.X; rtol = 1e-14, name = "scaled f").ok
+        @test parity_compare([p2.rr.lambda], [p1.rr.lambda]; rtol = 1e-14,
+                             name = "scaled lambda").ok
+        @test 0 < p1.rr.lambda < 1
         # No weights means unweighted (ADR 0043).
         @test isnothing(prl.w)
         # A sum of zero states no measure, and the prior refuses it.

@@ -124,11 +124,18 @@ end
         full = runs[c].full
         @test isa(full.retcode, PO.OptimisationSuccess)
         # The oracle fits the prior inside its optimiser as well, so the weights of #1390,
-        # which pass the fitted prior, are the same oracle output. Measured 2.5e-11 and 1.1e-11.
-        @test maxabs(full.w, loadv(c, "FullW")) <= 1e-10
-        @test maxabs(full.w,
-                     parity_load("OrthogonalMeanRisk", "PitLarge", "Weights")[:, col]) <=
-              1e-10
+        # which pass the fitted prior, are the same oracle output. A weight compares in absolute
+        # terms: the objective is flat near the optimum (#1390), so a weight that is zero on one
+        # side is a round-off of the solver on the other, and its relative difference is 1.
+        # Measured maxabs 2.5e-11 and 1.1e-11, and 5.7e-12 against the weights of #1390. Under
+        # `--check-bounds=yes`, the flag of CI, the solver sums in another order: 4.7e-11 on
+        # `UbBoth`. Each side stops at its own duality gap, so the tolerance leaves a factor of
+        # four.
+        @test parity_compare(full.w, loadv(c, "FullW"); rtol = 0.0, atol = 2e-10,
+                             name = "$(c) full weights").ok
+        w1390 = parity_load("OrthogonalMeanRisk", "PitLarge", "Weights")[:, col]
+        @test parity_compare(full.w, w1390; rtol = 0.0, atol = 2e-10,
+                             name = "$(c) full weights #1390").ok
         # The prior of the run is the investable view of the standalone fit, bit for bit.
         v = PO.port_opt_view(pr, findall(PO.investable_mask(pr)))
         @test isequal(full.pr.mu, v.mu) && isequal(full.pr.sigma, v.sigma)
@@ -146,13 +153,21 @@ end
             @test isequal(p.res.pr.mu, PO.port_opt_view(prk, ik).mu)
             fj = objective(prk, p.res.w)
             fo = objective(prk, Wo[:, k])
-            # Measured relative difference of the objective 2.8e-10 at most, and of the
-            # weights 2.1e-7 at most (fold 2 of `Both`, where the objective is flat).
-            @test abs(fj - fo) <= 1e-9 * abs(fo)
-            @test maxabs(p.res.w, Wo[:, k]) <= 5e-7
+            # The objective is flat near the optimum (#1390), so the weights move far more than
+            # the objective. Measured maxrel of the objective 3.2e-10 at most (fold 1 of
+            # `Both`), and maxabs of the weights 2.1e-7 at most (fold 2 of `Both`). Under
+            # `--check-bounds=yes`, the flag of CI, the solver sums in another order, and fold 2
+            # of `UbBoth` ends at 3.3e-9 (objective) and 2.2e-8 (weights), so the objective
+            # takes 1e-8.
+            @test parity_compare([fj], [fo]; rtol = 1e-8, name = "$(c) fold $(k) objective").ok
+            @test parity_compare(p.res.w, Wo[:, k]; rtol = 0.0, atol = 5e-7,
+                                 name = "$(c) fold $(k) weights").ok
         end
-        # A `NaN` return of a held asset adds zero on both sides. Measured 1.9e-8.
-        @test maxabs(cv.mrd.X, loadv(c, "OosRet")) <= 1e-7
+        # A return is the weights times the returns of the assets, so it carries the difference
+        # of the weights. A `NaN` return of a held asset adds zero on both sides. Measured
+        # maxabs 1.9e-8 (`Both`) and 1.6e-10 (`UbBoth`).
+        @test parity_compare(cv.mrd.X, loadv(c, "OosRet"); rtol = 0.0, atol = 1e-7,
+                             name = "$(c) out-of-sample returns").ok
     end
 
     @testset "The attribution of the full run" begin
@@ -161,16 +176,20 @@ end
         wo = loadv("Both", "FullW")
         fap = fullrun_pack(factor_attribution(wo, pr; ppy = 252))
         far = fullrun_pack(factor_attribution(wo, pr, rd.X; ppy = 252, se = true))
-        cmp(a, b, n) = parity_compare(a, b; rtol = 1e-11, name = n).ok
-        # Measured 8.2e-13. The unattributed remainder of the predicted side, the gap between
-        # `pr.sigma` and the model, is round-off here, where the oracle states none (ADR 0113,
-        # `test_21c`).
+        cmp(a, b, n; rtol = 1e-12) = parity_compare(a, b; rtol = rtol, name = n).ok
+        # The predicted side reads `pr.sigma`, whose small entries carry the cancellation of
+        # `L F L'` (#1376). Measured maxrel 8.2e-13. The CI hosts move such a cell by a factor
+        # of two, so the tolerance leaves a factor of six. The unattributed remainder of the
+        # predicted side, the gap between `pr.sigma` and the model, is round-off here, where
+        # the oracle states none (ADR 0113, `test_21c`).
         C = load("Both", "PredComponents")
-        @test cmp(fap["Components"][[1, 2, 4], :], C[[1, 2, 4], :], "pred components")
+        @test cmp(fap["Components"][[1, 2, 4], :], C[[1, 2, 4], :], "pred components";
+                  rtol = 5e-12)
         @test all(isnan, C[3, 2:4]) && all(x -> abs(x) < 1e-11, fap["Components"][3, 2:4])
-        @test cmp(fap["Factors"], load("Both", "PredFactors"), "pred factors")
-        @test cmp(fap["Families"], load("Both", "PredFamilies"), "pred families")
-        # Measured 2.9e-13. The standard errors are `NaN`: asset 4 relists and is in the
+        @test cmp(fap["Factors"], load("Both", "PredFactors"), "pred factors"; rtol = 5e-12)
+        @test cmp(fap["Families"], load("Both", "PredFamilies"), "pred families";
+                  rtol = 5e-12)
+        # Measured maxrel 2.9e-13. The standard errors are `NaN`: asset 4 relists and is in the
         # warm-up of its variance at rows the regression reads, so the sandwich of those rows
         # is unknown (`SeWarmup` of `test_21c`), where the oracle drops the pair.
         for (k, se) in (("Components", 6), ("Factors", 9), ("Families", 6))
@@ -220,9 +239,11 @@ end
         @test fa121.total.vol ≈ std(ret) * sqrt(252) rtol = 1e-14
         @test !isapprox(fa121.total.vol, load("Both", "WfComponents")[4, 1]; rtol = 1e-3)
         # The weights of the library's own folds, through the same route, agree to the
-        # tolerance of the weights.
+        # tolerance of the weights. Measured maxabs 2.1e-7 (weights) and 1.9e-8 (returns), as
+        # in the walk-forward testset.
         W, r = PO.attribution_prediction_history(cv)
-        @test maxabs(W, Wh) <= 5e-7 && maxabs(r, ret) <= 1e-7
+        @test parity_compare(W, Wh; rtol = 0.0, atol = 5e-7, name = "wf weights").ok
+        @test parity_compare(r, ret; rtol = 0.0, atol = 1e-7, name = "wf returns").ok
         # The one call on the walk-forward equals the bare route on its own series, row 121
         # included. Measured: a difference of exactly zero.
         fcv = fullrun_pack(factor_attribution(cv, pr; ppy = 252, se = true))
@@ -299,23 +320,29 @@ end
                                         minra = 3, pe = PARITY_PE, ve = PARITY_VE)
         inner = MeanRisk(; opt = JuMPOptimiser(; pe = pec, slv = slv))
         # The variance that each side's weights reach, on the library's prior of the fit.
-        function relvar(res, wo)
+        function variances(res, wo)
             local sg = res.pr.sigma
-            return (dot(res.w, sg, res.w) - dot(wo, sg, wo)) / dot(wo, sg, wo)
+            return [dot(res.w, sg, res.w)], [dot(wo, sg, wo)]
         end
         full = optimise(inner, fx.rd)
-        # Measured 1.9e-13 (variance) and 7.3e-8 (weights).
-        @test abs(relvar(full, loadv("Ccy", "FullW"))) < 1e-12
-        @test maxabs(full.w, loadv("Ccy", "FullW")) <= 1e-6
+        # The weights compare in absolute terms, as in the first testset. Measured maxrel
+        # 1.9e-13 (variance) and maxabs 7.3e-8 (weights).
+        @test parity_compare(variances(full, loadv("Ccy", "FullW"))...; rtol = 1e-12,
+                             name = "ccy full variance").ok
+        @test parity_compare(full.w, loadv("Ccy", "FullW"); rtol = 0.0, atol = 5e-7,
+                             name = "ccy full weights").ok
         cv = cross_val_predict(inner, fx.rd, IndexWalkForward(60, 20))
         Wf = load("Ccy", "FoldW")
         for (k, p) in enumerate(cv.pred)
-            # Measured 1.1e-13 (variance) and 1.1e-7 (weights).
-            @test abs(relvar(p.res, Wf[:, k])) < 1e-12
-            @test maxabs(p.res.w, Wf[:, k]) <= 1e-6
+            # Measured maxrel 1.1e-13 (variance) and maxabs 1.1e-7 (weights).
+            @test parity_compare(variances(p.res, Wf[:, k])...; rtol = 1e-12,
+                                 name = "ccy fold $(k) variance").ok
+            @test parity_compare(p.res.w, Wf[:, k]; rtol = 0.0, atol = 5e-7,
+                                 name = "ccy fold $(k) weights").ok
         end
-        # Measured 7.1e-9.
-        @test maxabs(cv.mrd.X, loadv("Ccy", "OosRet")) <= 5e-8
+        # The returns carry the difference of the weights. Measured maxabs 7.1e-9.
+        @test parity_compare(cv.mrd.X, loadv("Ccy", "OosRet"); rtol = 0.0, atol = 5e-8,
+                             name = "ccy out-of-sample returns").ok
 
         # Better: the oracle refuses a NestedClustersOptimization over this prior and has no
         # subset-resampling optimiser. Each cluster and each subset fits the prior on its own
@@ -331,9 +358,13 @@ end
         Ws = load("Ccy", "SubW")
         for (k, r) in enumerate(vcat(nco.resi, sr.ress))
             wo = Ws[findall(==(1), S[:, k]), k]
-            # Measured 1.3e-11 (variance) and 9.5e-7 (weights) at most.
-            @test abs(relvar(r, wo)) < 5e-11
-            @test maxabs(r.w, wo) <= 2e-6
+            # Each side stops at its own duality gap. The largest relative difference of the
+            # variance, 1.3e-11 on the fourth cluster, is an absolute 7.4e-15, far inside the
+            # absolute gap of 1e-12 that `slv` states. Measured maxabs 9.5e-7 (weights) at most.
+            @test parity_compare(variances(r, wo)...; rtol = 5e-11,
+                                 name = "ccy sub $(k) variance").ok
+            @test parity_compare(r.w, wo; rtol = 0.0, atol = 2e-6,
+                                 name = "ccy sub $(k) weights").ok
         end
     end
 end

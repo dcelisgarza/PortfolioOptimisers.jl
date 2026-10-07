@@ -82,13 +82,24 @@ end
         pr = prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                              families = fam, pe = PARITY_PE,
                                              ve = PARITY_VE), fx.rd)
-        @test pr.fpr.mu ≈ vec(ccy_asset("$(nm)DefaultFactorMu")) rtol = 1e-12
-        @test pr.fpr.sigma ≈ ccy_asset("$(nm)DefaultFactorCov") rtol = 1e-12
-        @test pr.mu ≈ vec(ccy_asset("$(nm)DefaultMu")) rtol = 1e-12
+        # Measured cell by cell, Plain and Family: maxrel 2.7e-13 and 2.9e-13 (factor mean),
+        # 8.1e-14 and 3.9e-13 (factor covariance), 3.0e-13 and 2.4e-13 (`mu`), 7.4e-15 and
+        # 7.6e-15 (idiosyncratic variance).
+        @test parity_compare(pr.fpr.mu, vec(ccy_asset("$(nm)DefaultFactorMu"));
+                             name = "$(nm) default factor mean").ok
+        @test parity_compare(pr.fpr.sigma, ccy_asset("$(nm)DefaultFactorCov");
+                             name = "$(nm) default factor covariance").ok
+        @test parity_compare(pr.mu, vec(ccy_asset("$(nm)DefaultMu"));
+                             name = "$(nm) default mu").ok
         # The idiosyncratic variance is a second moment about zero, because the model sets
         # the mean of the idiosyncratic return to zero (#1373).
-        @test pr.rr.vs[end, :] ≈ vec(ccy_asset("$(nm)DefaultIdioVar")) rtol = 1e-12
-        @test pr.sigma ≈ ccy_asset("$(nm)DefaultSigma") rtol = 1e-12
+        @test parity_compare(pr.rr.vs[end, :], vec(ccy_asset("$(nm)DefaultIdioVar"));
+                             name = "$(nm) default idiosyncratic variance").ok
+        # `sigma` compares against its largest entry: an off-diagonal entry of two assets near
+        # zero correlation is a cancellation in `L F L'` (#1376). Measured maxscaled 5.3e-13
+        # and 6.0e-13, and maxrel 3.8e-11 and 5.1e-11 cell by cell.
+        @test parity_compare(pr.sigma, ccy_asset("$(nm)DefaultSigma"); scale = :array,
+                             name = "$(nm) default sigma").ok
     end
 
     @testset "A Return Forecast beside Currency Factors forecasts the local returns (#1394)" begin
@@ -327,11 +338,19 @@ end
         @test pr.rr.nf == ["ind1", "ind2", "ind3", "style1", "style2", "macro"]
         F = mac_asset("PlainFactorReturns")
         @test size(pr.fpr.X) == size(F) == (150, 6)
-        @test maximum(abs, pr.fpr.X - F) < 1e-14
-        @test pr.fpr.sigma ≈ mac_asset("PlainFactorCov") rtol = 1e-12
-        @test pr.rr.M ≈ mac_asset("PlainLoadings") rtol = 1e-12
-        @test pr.mu ≈ vec(mac_asset("PlainMu")) rtol = 1e-12
-        @test pr.sigma ≈ mac_asset("PlainSigma") rtol = 1e-12
+        # A small factor return carries the round-off of the regression: measured maxrel
+        # 1.2e-12 cell by cell, and maxabs 1.4e-16. The CI hosts move such a cell by a factor
+        # of two, so the tolerance leaves a factor of four.
+        @test parity_compare(pr.fpr.X, F; rtol = 5e-12, name = "macro factor returns").ok
+        # Measured maxrel 1.2e-13 (factor covariance), 7.5e-14 (loadings) and 7.5e-14 (`mu`).
+        @test parity_compare(pr.fpr.sigma, mac_asset("PlainFactorCov");
+                             name = "macro factor covariance").ok
+        @test parity_compare(pr.rr.M, mac_asset("PlainLoadings"); name = "macro loadings").ok
+        @test parity_compare(pr.mu, vec(mac_asset("PlainMu")); name = "macro mu").ok
+        # The cancellation of the default fit: measured maxscaled 4.9e-13, and maxrel 1.3e-10
+        # cell by cell.
+        @test parity_compare(pr.sigma, mac_asset("PlainSigma"); scale = :array,
+                             name = "macro sigma").ok
     end
     @testset "Beside Currency Factors, the Descriptors read the net returns" begin
         # The estimated members read the returns the regression explains, so the macro
@@ -342,11 +361,22 @@ end
                                              factors = mac_factors(; ccy = true),
                                              pe = PARITY_PE, ve = PARITY_VE), rd)
         @test pr.rr.nf[6:end] == ["macro", "currency=EUR", "currency=JPY", "currency=USD"]
-        @test pr.fpr.mu ≈ vec(mac_asset("CurrencyDefaultFactorMu")) rtol = 1e-12
-        @test pr.fpr.sigma ≈ mac_asset("CurrencyDefaultFactorCov") rtol = 1e-12
-        @test pr.rr.M ≈ mac_asset("CurrencyDefaultLoadings") rtol = 1e-12
-        @test pr.mu ≈ vec(mac_asset("CurrencyDefaultMu")) rtol = 1e-12
-        @test pr.sigma ≈ mac_asset("CurrencyDefaultSigma") rtol = 1e-12
+        # Measured maxrel 5.1e-14 (factor mean), 7.5e-14 (loadings) and 2.2e-13 (`mu`). An
+        # off-diagonal entry of the factor covariance is a cancellation of two factors near
+        # zero correlation: measured maxrel 8.0e-13. The CI hosts move such a cell by a factor
+        # of two, so the tolerance leaves a factor of six.
+        @test parity_compare(pr.fpr.mu, vec(mac_asset("CurrencyDefaultFactorMu"));
+                             name = "macro currency factor mean").ok
+        @test parity_compare(pr.fpr.sigma, mac_asset("CurrencyDefaultFactorCov");
+                             rtol = 5e-12, name = "macro currency factor covariance").ok
+        @test parity_compare(pr.rr.M, mac_asset("CurrencyDefaultLoadings");
+                             name = "macro currency loadings").ok
+        @test parity_compare(pr.mu, vec(mac_asset("CurrencyDefaultMu"));
+                             name = "macro currency mu").ok
+        # The cancellation of the default fit: measured maxscaled 5.1e-13, and maxrel 3.1e-11
+        # cell by cell.
+        @test parity_compare(pr.sigma, mac_asset("CurrencyDefaultSigma"); scale = :array,
+                             name = "macro currency sigma").ok
         # A Panel Field of the same local returns under `lx` gives the same fit, because the
         # derived net returns take the exposure of the same observation on the first rows.
         pl = prior(CrossSectionalFactorPrior(; lambda = 1,

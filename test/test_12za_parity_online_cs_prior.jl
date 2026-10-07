@@ -261,10 +261,13 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
     @testset "Parity with the oracle's online update" begin
         load(case, o) = parity_load("CrossSectionalFactorPrior", "Online$(case)", o)
         # The prior of each step against the stored block of that step. `mu` compares cell by
-        # cell; `sigma` and the factor returns compare against their largest entry, because
-        # their small entries come from a cancellation (#1376), and the industry level
-        # "Utilities" is empty after its only asset delists, so its factor return is a
-        # round-off zero on both sides.
+        # cell. `sigma` compares against its largest entry: an off-diagonal entry of two assets
+        # near zero correlation is a cancellation in `L F L'` (#1376), measured maxrel 1.3e-10
+        # cell by cell. The factor returns compare cell by cell with an absolute floor: the
+        # industry level "Utilities" is empty after its only asset delists, so its factor return
+        # is a round-off zero on both sides, measured maxrel 1.9 and maxabs 1.5e-16. The floor
+        # is at most 6e-14 of the largest factor return, and every other cell measured maxrel
+        # 5.7e-13.
         function check(out, case, src)
             mu = load(case, "$(src)Mu")
             S = load(case, "$(src)Sigma")
@@ -276,21 +279,21 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                 @test parity_compare(pr.mu, mu[k, :]; name = "$(case) $(src) mu $(k)").ok
                 @test parity_compare(pr.sigma, S[((k - 1) * N + 1):(k * N), :];
                                      scale = :array, name = "$(case) $(src) sigma $(k)").ok
-                @test parity_compare(pr.fpr.X, F[(r0 + 1):(r0 + n), :]; scale = :array,
+                @test parity_compare(pr.fpr.X, F[(r0 + 1):(r0 + n), :]; atol = 1e-15,
                                      name = "$(case) $(src) factor returns $(k)").ok
                 r0 += n
             end
         end
         # The pinned choice reproduces the oracle's online update, which pins the dropped
         # member at its first call. Measured over the three steps: mu maxrel 1.7e-14, sigma
-        # maxscaled 3.3e-13, factor returns maxscaled 6.7e-16 on `Style`; mu maxrel 5.3e-13,
-        # sigma maxscaled 6.5e-13, factor returns maxscaled 2.9e-15 on `Industry`.
+        # maxscaled 4.2e-13, factor returns maxrel 4.6e-14 on `Style`; mu maxrel 5.3e-13,
+        # sigma maxscaled 6.5e-13, factor returns maxabs 1.5e-16 on `Industry`.
         check(sp, "Style", "Fold")
         check(ip, "Industry", "Fold")
         # The pinned choice under currency factors (#1478): the buffer records the Exogenous
         # Series, and the update pins `style1` over the first batch while the batch fit over
         # 170 and 250 rows drops `style2`. Measured over the three steps: mu maxrel 2.3e-13,
-        # sigma maxscaled 4.2e-13, factor returns maxscaled 4.5e-16.
+        # sigma maxscaled 4.2e-13, factor returns maxrel 9.3e-14.
         cpe = CrossSectionalFactorPrior(; lambda = 1, grid_config("Currency", rd)...,
                                         families = ["style" => nothing],
                                         choice = PinnedChoice())
@@ -306,7 +309,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         # factor returns, whose time-varying ratios depend on the member, so its moments move
         # with the member: here sigma by 7.4e-5 at the second step. `PinnedChoice()` is the
         # oracle's rule, one keyword away. Measured against the oracle's batch fit: mu maxrel
-        # 2.7e-14, sigma maxscaled 4.1e-13, factor returns maxscaled 6.7e-16.
+        # 2.7e-14, sigma maxscaled 4.1e-13, factor returns maxrel 2.8e-13.
         check(sb, "Style", "Prefix")
         @test !parity_compare(sb[2].pr.sigma, load("Style", "FoldSigma")[(N + 1):(2N), :];
                               scale = :array, name = "Style batch vs fold sigma 2").ok

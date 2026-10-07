@@ -189,13 +189,14 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
                 @test r.ok
             end
         end
-        # A covariance compares against its largest entry: an off-diagonal cell of two unrelated
-        # assets is a cancellation, and carries a relative round-off near 1e-13. On "Full"
-        # every asset shares one history, and the report is at parity.
+        # On "Full" every asset shares one history, and the report is at parity cell by cell.
+        # The step and the oracle's add the same terms in the same order, so an off-diagonal
+        # cell of two unrelated assets carries no more round-off than the others. Measured
+        # maxrel 3.3e-16, so the tolerance leaves a factor of thirty for another host.
         Ocov = parity_load("ExpWeightedCovariance", "Full", "Cov")
         for (k, (name, make)) in enumerate(P1383_COV)
             r = parity_compare(cov(make(), XF; active_mask = aF), p1383_col(Ocov, k, NF);
-                               scale = :array, name = "Full $name")
+                               rtol = 1e-14, name = "Full $name")
             @test r.ok
         end
     end
@@ -213,8 +214,9 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
                 Ok = p1383_col(O, k, N)
                 f = findall(isfinite, LinearAlgebra.diag(Ok))
                 w = sqrt.(LinearAlgebra.diag(st.weight))
+                # Measured maxrel 2.2e-16 cell by cell.
                 @test parity_compare(st.covariance[f, f], (Ok .* (w * transpose(w)))[f, f];
-                                     scale = :array, name = "$case $name raw").ok
+                                     rtol = 1e-14, name = "$case $name raw").ok
                 S = cov(make(), Xc; active_mask = am)
                 @test !parity_compare(S[f, f], Ok[f, f]; rtol = 1e-4, scale = :array).ok
                 @test minimum(LinearAlgebra.eigvals(LinearAlgebra.Symmetric(S[f, f]))) >=
@@ -234,24 +236,25 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
                                      name = "$case $name multiplier").ok
             end
         end
+        # Measured maxrel 8.9e-16 cell by cell, on every row of each series.
         Os = parity_load("RegimeAdjustedExpWeightedVariance", "Small", "Series")
         for (k, name) in enumerate(P1383_RV_SERIES)
             make = Dict(P1383_RV)[name]
             s = P1383.variance_series(make(), X; active_mask = am, estimation_mask = em)
-            @test parity_compare(s, p1383_col(Os, k, N); scale = :array,
+            @test parity_compare(s, p1383_col(Os, k, N); rtol = 1e-14,
                                  name = "$name series").ok
         end
     end
 
     @testset "The regime-adjusted covariance, its multiplier and its series" begin
         # "Full": every asset shares one history, so the report, the multiplier and the series
-        # are at parity.
+        # are at parity cell by cell. Measured maxrel 7.9e-16 (report), 2.0e-16 (multiplier)
+        # and 1.5e-15 (series).
         Oc = parity_load("RegimeAdjustedExpWeightedCovariance", "Full", "Cov")
         Om = parity_load("RegimeAdjustedExpWeightedCovariance", "Full", "Mult")
         for (k, (name, make)) in enumerate(P1383_RC)
             S = cov(make(NF), XF; active_mask = aF, estimation_mask = eF)
-            @test parity_compare(S, p1383_col(Oc, k, NF); scale = :array,
-                                 name = "Full $name").ok
+            @test parity_compare(S, p1383_col(Oc, k, NF); rtol = 1e-14, name = "Full $name").ok
             @test parity_compare([p1383_mult(make(NF), XF, aF, eF)], Om[:, k];
                                  name = "Full $name multiplier").ok
         end
@@ -259,7 +262,7 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
         for (k, name) in enumerate(P1383_RC_SERIES)
             s = P1383.variance_series(Dict(P1383_RC)[name](NF), XF; active_mask = aF,
                                       estimation_mask = eF)
-            @test parity_compare(s, p1383_col(Os, k, NF); scale = :array,
+            @test parity_compare(s, p1383_col(Os, k, NF); rtol = 1e-14,
                                  name = "Full $name series").ok
         end
         # "Small": assets 2 and 4 list late. Better, amendment of 2026-09-29 to ADR 0181. On the
@@ -269,7 +272,8 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
         # The multiplier differs: the regime statistic reads the block with each pair over its
         # own weight, where the oracle's reads the congruence that shrinks a late listing. It
         # moves by 0 on the diagonal target, which reads the variances alone, and by up to 1.9%
-        # on the Mahalanobis target.
+        # on the Mahalanobis target. Measured maxrel 3.4e-16 cell by cell, on the raw state and
+        # on the report.
         Oc = parity_load("RegimeAdjustedExpWeightedCovariance", "Small", "Cov")
         Om = parity_load("RegimeAdjustedExpWeightedCovariance", "Small", "Mult")
         for (k, (name, make)) in enumerate(P1383_RC)
@@ -277,7 +281,7 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
             O = p1383_col(Oc, k, N)
             if P1383.has_separate_cor_decay(make(N))
                 S = cov(make(N), X; active_mask = am, estimation_mask = em)
-                @test parity_compare(S ./ m^2, O ./ Om[1, k]^2; scale = :array,
+                @test parity_compare(S ./ m^2, O ./ Om[1, k]^2; rtol = 1e-14,
                                      name = "Small $name report").ok
             else
                 st = partial_fit!(make(N), X; active_mask = am, estimation_mask = em).cache
@@ -285,7 +289,7 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
                 w = sqrt.(LinearAlgebra.diag(st.weight))
                 @test parity_compare(st.covariance[f, f],
                                      (O ./ Om[1, k]^2 .* (w * transpose(w)))[f, f];
-                                     scale = :array, name = "Small $name raw").ok
+                                     rtol = 1e-14, name = "Small $name raw").ok
             end
             @test isapprox(m, P1383_SMALL_MULT[k]; rtol = 1e-12)
         end
