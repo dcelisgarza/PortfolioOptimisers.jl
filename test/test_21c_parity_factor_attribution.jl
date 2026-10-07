@@ -22,12 +22,18 @@ on the predicted side and 6.2e-14 on the realised side, except the cells below.
   - Deliberate. The predicted side states an unattributed remainder, the gap between `pr.sigma`
     and the model (ADR 0113), where the oracle states none. It is at rounding level here, and the
     four components sum to the total.
-  - Deliberate (#782). The weight spread divides by `T - 1`, as every other spread does: ours is the
-    oracle's times `sqrt(T / (T - 1))`. A constant weight states no spread, `nothing`, where the
-    oracle states zeros.
-  - Deliberate (#844). A holding in a non-investable asset warns and is zeroed, and `strict = true`
-    refuses it. The oracle keeps the loadings of the relisted asset and reads its unknown
-    idiosyncratic variance as zero, which understates the portfolio variance.
+  - Changed (#1515, R95). The weight spread divides by `T - ddof`, `T - 1` by default, as the
+    exposure spread does: ours is the oracle's times `sqrt(T / (T - 1))`, and `ddof = 0` is at
+    parity. A constant weight states a spread of zero, at parity.
+  - Changed (#1515, R96, R65). A holding in a non-investable asset warns, and `strict = true`
+    refuses it. The default `EntrywiseUnknown()` keeps the finite loadings of the relisted asset,
+    so the exposures and the systematic numbers are exact, and gives `NaN` for every number that
+    reads its unknown idiosyncratic variance. `ZeroUnknown()` reads the unknown entries as zero and
+    is at parity (`PredHeld`), as is its asset axis on every case.
+  - Changed (#1515, R97). A held pair with no return at an active cell is a holiday and fills zero
+    with no message, so a returns result whose panel holds a holiday is at parity with no warning.
+  - Changed (#1515, R98). A static loadings matrix reads every row whatever the lag, as the oracle
+    does. `trim = true` cuts it by the lag.
   - Defect found and fixed (#1388). A pair with no idiosyncratic return adds nothing to the net
     series, and the realised decomposition kept its systematic return `w B f`, with the opposite
     amount in the remainder. It is now zero in every component (`attribution_zero_inactive`), at
@@ -332,11 +338,11 @@ end
                   "$(c) asset contributions")
         @test cmp(our[:, 11], orc[:, 11], "$(c) idiosyncratic mean";
                   atol = 1e-12 * maximum(abs, our[:, 12]))
-        # The weight spread (#782).
+        # The weight spread (#782, #1515).
         if startswith(c, "Pred")
             @test all(isnan, our[:, 2]) && all(isnan, orc[:, 2])
         elseif cases[c][3] isa AbstractVector
-            @test all(isnan, our[:, 2]) && all(iszero, orc[:, 2])
+            @test all(iszero, our[:, 2]) && all(iszero, orc[:, 2])
         else
             n = c == "RollHist" ? 30 : length(cases[c][4]) - 2
             @test cmp(our[:, 2], orc[:, 2] .* sqrt(n / (n - 1)), "$(c) weight spread")
@@ -412,21 +418,136 @@ end
         @test any(p[b] != p[1] for b in 2:nw)
     end
 
-    @testset "Deliberate (#844): a held non-investable asset is zeroed, or refused" begin
+    @testset "Changed (#1515): a held non-investable asset is decomposed entry by entry" begin
+        M, Fm, muf = prb.rr.M, prb.fpr.sigma, prb.fpr.mu
+        # Asset 4 relisted and is in the warm-up of its variance: its loadings are finite, and
+        # its idiosyncratic variance is unknown. Asset 3 delisted, and has no loadings.
+        @test all(isfinite, M[4, :])
+        @test isnan(PO.attribution_idiosyncratic_covariance(prb.rr)[4])
+        @test all(isnan, M[3, :])
+        # The weights of the stored case `PredHeld` hold both assets.
         wh = copy(wb)
         wh[3] = 0.05
         wh[4] = 0.07
         wh ./= sum(wh)
-        wz = copy(wh)
-        wz[3:4] .= 0
-        fh = @test_logs (:warn,) match_mode = :any factor_attribution(wh, prb)
-        fz = factor_attribution(wz, prb)
-        @test fh.sys.vol_contrib ≈ fz.sys.vol_contrib rtol = 1e-14
-        @test fh.idio.mu_contrib ≈ fz.idio.mu_contrib rtol = 1e-14
-        @test fh.total.vol ≈ fz.total.vol rtol = 1e-14
-        @test fh.fbd.exposure ≈ fz.fbd.exposure rtol = 1e-14
+        w4 = copy(wb)
+        w4[4] = 0.07
+        w4 ./= sum(w4)
+        f4 = @test_logs (:warn, r"Assets \[4\] are not investable") match_mode = :any factor_attribution(w4,
+                                                                                                         prb;
+                                                                                                         assets = true)
+        # The exposures, the systematic variance and the systematic mean are exact.
+        g = transpose(ifelse.(iszero.(w4), 0.0, M)) * w4
+        @test f4.fbd.exposure ≈ g rtol = 1e-14
+        @test f4.sys.vol ≈ sqrt(dot(g, Fm * g)) rtol = 1e-14
+        @test f4.sys.mu_contrib ≈ dot(g, muf) rtol = 1e-14
+        @test f4.abd.sys_mu_contrib[4] ≈ w4[4] * dot(M[4, :], muf) rtol = 1e-14
+        # Every number that reads the unknown variance is unknown.
+        @test isnan(f4.total.vol) && isnan(f4.idio.vol) && isnan(f4.unattr.vol_contrib)
+        @test isnan(f4.sys.vol_contrib) && isnan(f4.sys.pct_var) && isnan(f4.sys.corr)
+        @test all(isnan, f4.fbd.vol_contrib) && all(isnan, f4.fbd.pct_var)
+        @test isnan(f4.abd.idio_vol_contrib[4])
+        # The mean of the relisted asset is stated, so the means are exact.
+        @test isfinite(f4.total.mu_contrib) && isfinite(f4.unattr.mu_contrib)
+        # An asset the portfolio does not hold contributes zero.
+        z = iszero.(w4)
+        @test all(iszero, f4.abd.sys_vol_contrib[z]) && all(iszero, f4.abd.vol_contrib[z])
+        @test all(iszero, f4.afc.vol_contrib[z, :])
+        # A held asset without loadings makes the exposures that read them unknown.
+        fh = quiet(() -> factor_attribution(wh, prb))
+        @test all(isnan, fh.fbd.exposure)
+        # `ZeroUnknown()` on the arrays of the block is the oracle's predicted attribution.
+        a, o = fa_pred_arrays(prb)
+        zu = quiet(() -> fa_pack(factor_attribution(wh, a...; o..., assets = true,
+                                                    unknown = ZeroUnknown())))
+        orc = load("PredHeld", "Components")
+        sc = maximum(abs, filter(isfinite, zu["Components"][[4], 1:4]))
+        @test cmp(zu["Components"][[1, 2, 4], 1:5], orc[[1, 2, 4], 1:5],
+                  "PredHeld components"; atol = 1e-14 * sc)
+        @test all(iszero, zu["Components"][3, 2:4])
+        for out in ("Factors", "Assets", "AssetFactorVol", "AssetFactorMu")
+            @test cmp(zu[out], load("PredHeld", out), "PredHeld $(out)")
+        end
+        # The prior method reads its anchors, whose unknown entries read the model, so its
+        # totals are the oracle's to round-off and its remainder is at rounding level.
+        zp = quiet(() -> fa_pack(factor_attribution(wh, prb; assets = true,
+                                                    unknown = ZeroUnknown())))
+        @test cmp(zp["Components"][[1, 2, 4], 1:5], orc[[1, 2, 4], 1:5], "PredHeld prior";
+                  atol = 1e-14 * sc)
+        @test all(abs.(zp["Components"][3, 3]) .< 1e-11)
         @test_throws ArgumentError factor_attribution(wh, prb; strict = true)
+        @test_throws ArgumentError factor_attribution(wh, prb; strict = true,
+                                                      unknown = ZeroUnknown())
         @test_throws ArgumentError factor_attribution(wb, prb, X; strict = true)
+    end
+
+    @testset "Changed (#1515): `ZeroUnknown()` puts every standalone moment at parity" begin
+        zu = (; assets = true, unknown = ZeroUnknown())
+        prf = cases["PredFam"][2]
+        zc = quiet() do
+            return Dict("PredBase" => factor_attribution(wb, prb; zu...),
+                        "PredPpy" => factor_attribution(wc, prb; ppy = 252, zu...),
+                        "PredFam" => factor_attribution(wf, prf; zu...),
+                        "RealBase" => factor_attribution(wb, prb, X; zu...),
+                        "RealPpy" => factor_attribution(wc, prb, X; ppy = 252, zu...),
+                        "RealHist" => factor_attribution(Wh, prb, reth; zu...),
+                        "RollBase" => factor_attribution(wb, prb, X, 30; step = 5, zu...),
+                        "RollHist" =>
+                            factor_attribution(Wh, prb, reth, 30; step = 7, zu...))
+        end
+        for (c, fa) in zc
+            our = fa_pack(fa)["Assets"]
+            @test cmp(our[:, 3:5], load(c, "Assets")[:, 3:5], "$(c) standalone, zero rule")
+            # The weights hold no unknown entry, so the contributions do not read the rule.
+            @test isequal(our[:, 6:12], cases[c][1]["Assets"][:, 6:12])
+        end
+        # The relisted asset 4 states the oracle's volatility and correlation, from its unknown
+        # idiosyncratic variance read as zero. The default states neither.
+        a0, a1 = cases["PredBase"][1]["Assets"], fa_pack(zc["PredBase"])["Assets"]
+        @test isnan(a0[4, 3]) && isnan(a0[4, 5])
+        @test a1[4, 3] ≈ 0.0062 rtol = 0.01
+        @test a1[4, 5] ≈ 0.61 rtol = 0.01
+    end
+
+    @testset "Changed (#1515): `ddof = 0` gives the oracle's weight spread" begin
+        r0 = quiet(() -> fa_pack(factor_attribution(Wh, prb, reth; assets = true, ddof = 0)))
+        @test cmp(r0["Assets"][:, 2], load("RealHist", "Assets")[:, 2], "RealHist ddof 0")
+        @test isequal(r0["Assets"][:, [1; 3:12]],
+                      cases["RealHist"][1]["Assets"][:, [1; 3:12]])
+        w0 = quiet(() -> fa_pack(factor_attribution(Wh, prb, reth, 30; step = 7,
+                                                    assets = true, ddof = 0)))
+        @test cmp(w0["Assets"][:, 2], load("RollHist", "Assets")[:, 2], "RollHist ddof 0")
+    end
+
+    @testset "Changed (#1515): a holiday at a held pair fills zero with no message" begin
+        amsk = rd.pnl.amsk
+        # Asset 5 has one holiday, an active cell with no return. A book that holds it and no
+        # asset outside its active span holds no other gap.
+        @test findall(amsk .& .!isfinite.(X)) == [CartesianIndex(45, 5)]
+        w5 = copy(wc)
+        w5[5] = 0.1
+        w5 ./= sum(w5)
+        # The returns result carries the active mask, so the holiday is silent, under `strict`
+        # too. The series is the zero fill of the bare matrix, the series the oracle reads.
+        fr = @test_logs min_level = Logging.Warn factor_attribution(w5, prb, rd;
+                                                                    assets = true,
+                                                                    strict = true)
+        fx = quiet(() -> factor_attribution(w5, prb, X; assets = true))
+        @test isequal(fa_pack(fr), fa_pack(fx))
+        @test_logs min_level = Logging.Warn factor_attribution(w5, prb, rd, 30;
+                                                               strict = true)
+        # A bare matrix carries no mask, so no pair is known to be a holiday.
+        @test_logs (:warn, r"outside their active span") match_mode = :any factor_attribution(w5,
+                                                                                              prb,
+                                                                                              X)
+        @test_throws ArgumentError factor_attribution(w5, prb, X; strict = true)
+        # A held pair outside the active span warns, and refuses under `strict`. Asset 2 lists
+        # late.
+        @test_logs (:warn, r"Assets \[2\] carry a non-finite return at 20") match_mode = :any factor_attribution(wb,
+                                                                                                                 prb,
+                                                                                                                 rd)
+        @test_throws "outside their active span" PO.attribution_net_returns(wb, X, nothing,
+                                                                            true, amsk)
     end
 
     @testset "A prior method is the bare-array method on the arrays of its block (#1404)" begin
@@ -491,11 +612,24 @@ end
         r0 = factor_attribution(wt, Br, f, eps, ret)
         @test isequal(fa_pack(r0),
                       fa_pack(factor_attribution(wt, Br, f, eps, ret; lag = 0)))
+        # A static matrix reads every row whatever the lag, as the oracle does, and
+        # `trim = true` cuts it by the lag (#1515).
+        @test isequal(fa_pack(factor_attribution(wt, Br, f, eps, ret; lag = 1)),
+                      fa_pack(r0))
+        rt = fa_pack(factor_attribution(wt, Br, f, eps, ret; lag = 1, trim = true))
+        @test isequal(rt,
+                      fa_pack(factor_attribution(wt, Br, f[2:end, :], eps[2:end, :], ret)))
+        @test !isequal(rt, fa_pack(r0))
+        @test_throws DomainError factor_attribution(wt, Br, f, eps, ret; lag = -1,
+                                                    trim = true)
         T = size(f, 1)
         Bh = stack(fill(Br, T); dims = 1)
         @test isequal(fa_pack(factor_attribution(wt, Bh, f, eps, ret)),
                       fa_pack(factor_attribution(wt, Bh, f, eps, ret; lag = 1)))
         @test !isequal(fa_pack(factor_attribution(wt, Bh, f, eps, ret)), fa_pack(r0))
+        # `trim` reads a static matrix alone: a history is always cut by its lag.
+        @test isequal(fa_pack(factor_attribution(wt, Bh, f, eps, ret; trim = true)),
+                      fa_pack(factor_attribution(wt, Bh, f, eps, ret)))
         @test length(factor_attribution(wt, Br, f, eps, ret, 30; step = 10)) ==
               length(30:10:T)
         @test_throws DomainError factor_attribution(wt, Br, f, eps, ret; lag = -1)

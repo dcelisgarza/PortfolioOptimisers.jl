@@ -139,3 +139,49 @@ it is open, the totals, the four components, the factor rows, the family rows, t
 systematic and idiosyncratic rows and the asset-by-factor matrices are the same under both anchors.
 Only the per-asset `vol_contrib`, `pct_var` and `mu_contrib` move, by that asset's Euler share of
 the remainder.
+
+## Amendment (2026-10-07, #1515)
+
+The last grilling of the differences from the oracle (#1416, rows R65, R95, R96, R97 and R98)
+changed four rules of the attribution. The decision of this ADR stands: the predicted totals still
+anchor on the prior result, and the gap still goes to the remainder.
+
+**A held asset the prior could not estimate is decomposed entry by entry (R96, R65).** Before this
+amendment the attribution zeroed the whole row of a held non-investable asset, in the loadings,
+the orthogonal mean, the idiosyncratic block and the anchors. That is the exact variance of another
+portfolio, one with `w_i = 0` and no renormalisation, and it also misstated `B' w`. The variance is
+`sigma_P^2 = w' B F B' w + w' D w`. When `D_ii` is unknown and `w_i != 0`, `sigma_P` is unknown,
+but the exposures `B' w`, the systematic variance `w' B F B' w` and the systematic mean are known
+exactly. So the keyword `unknown` now takes a rule, a subtype of `AbstractUnknownEntryRule`:
+
+- `EntrywiseUnknown()`, the default, keeps every entry the prior states and gives `NaN` for every
+  number that reads an entry it does not state: the idiosyncratic part, the total, the remainder
+  and every share divided by `sigma_P`. A held asset without loadings makes the exposures that read
+  them unknown too. An entry of an asset with a weight of zero adds nothing, so it reads as zero.
+- `ZeroUnknown()` reads every entry the prior does not state as zero. It gives the oracle's
+  predicted numbers, which fill only the `NaN` entries with zero and keep the finite loadings. An
+  anchor entry the prior does not state reads the model's entry, with every unknown entry of the
+  model read as zero, so the gap of the remainder reads the stated entries alone.
+
+The rule also sets the standalone moments of the asset axis. On the predicted side they read the
+block's own entries, or the entries with every unknown read as zero. On the realised side they read
+the active pairs of the asset, or every observation with a zero at each inactive pair, which is the
+oracle's realised rule. The warning and `strict` stay, and the warning states what the rule does.
+
+**A held pair with no return splits by the active mask (R97).** An active pair is a holiday: the
+asset is listed and its price does not move, so its return is exactly zero, and the pair fills zero
+with no message. An inactive pair, after a delisting for example, can have a return as low as
+`-100 %`, so a zero there is an assumption the caller must see, and it warns, or refuses under
+`strict`. A returns result carries the mask of its Asset Panel. A bare matrix carries none, so every
+held pair with no return warns, as before.
+
+**The realised weight spread takes `ddof` (R95).** The exposure `g_t = B_t' w_t` is linear in the
+weights, so the weight spread takes the divisor of the exposure spread, `T - 1`, by default.
+`ddof = 0` gives the oracle's `T`. The library subtracts `ddof` itself, as ADR 0197 requires of the
+name. A constant weight states its exact spread, zero, and no longer `nothing`.
+
+**A static loadings matrix reads every row (R98).** A lag pairs each return with the exposure known
+before it, and a static matrix has no time index, so a lag means nothing for it. The bare-array
+realised method no longer cuts `lag` rows of a static matrix, as the oracle does not. `trim = true`
+keeps the one use of the cut, a common sample with a run on an exposure history. A negative lag
+still refuses, because it pairs a return with an exposure from after it.

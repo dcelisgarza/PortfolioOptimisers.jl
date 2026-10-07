@@ -397,6 +397,7 @@ commit = "64a255d37d"
 "src/18_ExpectedReturns.jl" = { code = 339, doc = 933, comment = 50, blank = 330, total = 1652 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { code = 391, doc = 992, comment = 8, blank = 392, total = 1783 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { code = 499, doc = 929, comment = 4, blank = 405, total = 1837 }
+"src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { code = 125, doc = 125, comment = 2, blank = 67, total = 319 }
 "src/20_AssetSelection.jl" = { code = 312, doc = 766, comment = 0, blank = 370, total = 1448 }
 "src/21_Pipeline/01_Base_Pipeline.jl" = { code = 154, doc = 347, comment = 0, blank = 151, total = 652 }
 "src/21_Pipeline/02_StepExecution.jl" = { code = 197, doc = 201, comment = 2, blank = 106, total = 506 }

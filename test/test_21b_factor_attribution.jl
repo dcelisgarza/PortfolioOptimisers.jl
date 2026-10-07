@@ -349,9 +349,9 @@ end
         @test isa(fa.fmbd.exposure_std, AbstractVector)
         @test length(fa.fmbd.exposure_std) == length(fa.fmbd.labels)
     end
-    @testset "A constant weight carries no spread of its own" begin
+    @testset "A constant weight carries a spread of exactly zero (#1515)" begin
         @test fa.abd.weight == w
-        @test isnothing(fa.abd.weight_std)
+        @test fa.abd.weight_std == zero(w)
     end
     @testset "The three entry points that form the same series agree" begin
         @test factor_attribution(w, pr, ReturnsResult(; nx = rd.nx, X = rd.X)).sys.vol_contrib ≈
@@ -444,6 +444,16 @@ end
         A = S .+ E
         @test fa.abd.weight ≈ vec(mean(W; dims = 1))
         @test fa.abd.weight_std ≈ vec(std(W; dims = 1))
+        # `ddof` sets the divisor of the weight spread alone (#1515).
+        fa0 = factor_attribution(Wh, pr, ret; assets = true, ppy = ppy, ddof = 0)
+        @test fa0.abd.weight_std ≈ vec(std(W; dims = 1, corrected = false))
+        @test fa0.abd.weight_std ≈ fa.abd.weight_std .* sqrt((n - 1) / n)
+        @test fa0.fbd.exposure_std == fa.fbd.exposure_std
+        @test fa0.sys.vol_contrib == fa.sys.vol_contrib
+        @test fa0.abd.vol_contrib == fa.abd.vol_contrib
+        @test_throws DomainError factor_attribution(Wh, pr, ret; ddof = -1)
+        @test_throws DomainError factor_attribution(Wh, pr, ret; ddof = n)
+        @test_throws DomainError factor_attribution(Wh, pr, ret, n; ddof = n)
         @test fa.abd.sys_vol_contrib ≈
               [cv(W[:, i] .* S[:, i]) / sig for i in 1:N] .* sqrt(ppy)
         @test fa.abd.sys_mu_contrib ≈ vec(mean(W .* S; dims = 1)) .* ppy
@@ -1057,27 +1067,48 @@ end
     end
 end
 
-@testset "The investable zeroing helpers of the predicted side" begin
+@testset "The rule for an unknown entry, helper by helper (#1515)" begin
     PO = PortfolioOptimisers
-    imsk = BitVector([true, false, true])
-    A = ones(3, 2)
-    v = ones(3)
-    E = ones(3, 3)
-    @test PO.attribution_investable_rows(A, nothing) === A
-    @test PO.attribution_investable_rows(A, imsk) == [1 1; 0 0; 1 1]
-    @test PO.attribution_investable_rows(v, imsk) == [1, 0, 1]
-    @test PO.attribution_investable_block(E, nothing) === E
-    @test PO.attribution_investable_block(v, imsk) == [1, 0, 1]
-    @test PO.attribution_investable_block(E, imsk) == [1 0 1; 0 0 0; 1 0 1]
+    w = [0.5, 0.0, 0.5]
+    # A held asset keeps its unknown entries under the entry rule, and no asset keeps them
+    # when they read as zero.
+    @test PO.attribution_unknown_keep(EntrywiseUnknown(), w) == [true, false, true]
+    @test PO.attribution_unknown_keep(ZeroUnknown(), w) == falses(3)
+    keep = BitVector([true, false, false])
+    A = [NaN 1.0; NaN 2.0; 3.0 NaN]
+    @test isequal(PO.attribution_unknown_rows(A, keep), [NaN 1.0; 0.0 2.0; 3.0 0.0])
+    v = [NaN, NaN, 1.0]
+    @test isequal(PO.attribution_unknown_rows(v, keep), [NaN, 0.0, 1.0])
+    @test isequal(PO.attribution_unknown_block(v, keep), [NaN, 0.0, 1.0])
+    # A full block keeps an unknown entry only between two kept assets.
+    E = fill(NaN, 3, 3)
+    E[3, 3] = 2.0
+    keep2 = BitVector([true, true, false])
+    @test isequal(PO.attribution_unknown_block(E, keep2),
+                  [NaN NaN 0.0; NaN NaN 0.0; 0.0 0.0 2.0])
+    @test PO.attribution_standalone(EntrywiseUnknown(), A) === A
+    @test isequal(PO.attribution_standalone(ZeroUnknown(), A), [0.0 1.0; 0.0 2.0; 3.0 0.0])
+    # A contribution of an asset with no weight is zero, and the sign of a finite zero stays.
+    C = [NaN -0.0; NaN NaN; 1.0 2.0]
+    H = PO.attribution_held_entries(C, w)
+    @test isequal(H, [NaN -0.0; 0.0 0.0; 1.0 2.0])
+    @test occursin("`NaN`", PO.attribution_unknown_note(EntrywiseUnknown()))
+    @test occursin("reads as zero", PO.attribution_unknown_note(ZeroUnknown()))
+    # The realised standalone moments read the active pairs, or every observation.
+    act = [true, false, true]
+    @test PO.attribution_standalone_pairs(EntrywiseUnknown(), act) === act
+    @test PO.attribution_standalone_pairs(ZeroUnknown(), act) == trues(3)
+    # The active mask of the returns data.
+    @test isnothing(PO.attribution_active_mask(nothing))
 end
 @testset "The refusals" begin
     PO = PortfolioOptimisers
     pr, rd = fa_prior()
     w = fa_weights(pr)
     # Issue #844: a holding in a non-investable asset takes the library's strictness policy.
-    # The default warns, names the assets and zeroes their contributions, which is what the
-    # reference implementation does and what a walk-forward over a panel with a delisting
-    # needs; `strict = true` keeps the refusal.
+    # The default warns and names the assets, which is what a walk-forward over a panel with a
+    # delisting needs; `strict = true` keeps the refusal. Issue #1515: the rule `unknown` sets
+    # the numbers, entry by entry, or with every unknown entry read as zero.
     @testset "A holding the prior could not estimate is warned about, and refused under strict" begin
         imsk = PO.investable_mask(pr)
         @test !isnothing(imsk)
@@ -1089,16 +1120,26 @@ end
         holds(l) = occursin("Assets [$(j)] are not investable", l.message)
         logs, fa = Test.collect_test_logs(() -> factor_attribution(bad, pr; assets = true))
         @test count(holds, logs) == 1
-        @test isfinite(fa.total.vol_contrib)
-        @test fa.sys.vol_contrib + fa.idio.vol_contrib + fa.unattr.vol_contrib ≈
-              fa.total.vol_contrib
+        @test any(l -> occursin("is `NaN`", l.message), logs)
+        # The variance of the held asset is unknown, so the total is unknown, and an asset the
+        # portfolio does not hold still contributes zero.
+        @test isnan(PO.attribution_idiosyncratic_covariance(pr.rr)[j])
+        @test isnan(fa.total.vol_contrib) && isnan(fa.idio.vol_contrib)
         @test fa.abd.weight[j] == 0.1
-        @test iszero(fa.abd.sys_vol_contrib[j])
-        @test iszero(fa.abd.idio_vol_contrib[j])
-        @test iszero(fa.abd.mu_contrib[j])
-        # The held asset contributes nothing, so the decomposition is the one of the
-        # portfolio without it.
-        @test fa.sys.vol_contrib ≈ factor_attribution(w, pr).sys.vol_contrib
+        z = iszero.(bad)
+        @test all(iszero, fa.abd.sys_vol_contrib[z]) && all(iszero, fa.abd.pct_var[z])
+        # `ZeroUnknown()` reads the unknown entries as zero, so the numbers are finite and the
+        # four components sum to the total.
+        logs, fz = Test.collect_test_logs(() -> factor_attribution(bad, pr; assets = true,
+                                                                   unknown = ZeroUnknown()))
+        @test count(holds, logs) == 1
+        @test any(l -> occursin("reads as zero", l.message), logs)
+        @test isfinite(fz.total.vol_contrib)
+        @test fz.sys.vol_contrib + fz.idio.vol_contrib + fz.unattr.vol_contrib ≈
+              fz.total.vol_contrib
+        fin(x) = isfinite(x) ? x : zero(x)
+        @test fz.fbd.exposure ≈ transpose(fin.(pr.rr.M)) * bad
+        @test fz.abd.weight[j] == 0.1
         logs, far = Test.collect_test_logs(() -> factor_attribution(bad, pr, rd.X))
         @test count(holds, logs) == 1
         @test isfinite(far.total.vol_contrib)

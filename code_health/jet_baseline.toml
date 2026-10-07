@@ -402,6 +402,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/18_ExpectedReturns.jl" = { raw = 1, reviewed = 1 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { raw = 0, reviewed = 0 }
+"src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { raw = 0, reviewed = 0 }
 "src/20_AssetSelection.jl" = { raw = 1, reviewed = 1 }
 "src/21_Pipeline/01_Base_Pipeline.jl" = { raw = 1, reviewed = 1 }
 "src/21_Pipeline/02_StepExecution.jl" = { raw = 0, reviewed = 0 }
@@ -805,6 +806,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/18_ExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { raw = 0, reviewed = 0 }
+"src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { raw = 0, reviewed = 0 }
 "src/20_AssetSelection.jl" = { raw = 0, reviewed = 0 }
 "src/21_Pipeline/01_Base_Pipeline.jl" = { raw = 0, reviewed = 0 }
 "src/21_Pipeline/02_StepExecution.jl" = { raw = 0, reviewed = 0 }

@@ -19,6 +19,7 @@ attribution_window_exposures
 attribution_window_basis
 attribution_window_weights
 attribution_weight_moments
+assert_attribution_ddof
 realised_attribution
 attribution_remainder
 attribution_series_component
@@ -34,13 +35,10 @@ attribution_expand_errors
 attribution_scatter
 attribution_family_errors
 realised_attribution_assets
+attribution_standalone_pairs
 realised_attribution_asset_factor
 attribution_rolling
-attribution_net_returns
 attribution_finite_series
 attribution_realised_entry
 attribution_rolling_entry
-attribution_prediction_history
-attribution_fold_weights
-attribution_fold_returns
 ```
