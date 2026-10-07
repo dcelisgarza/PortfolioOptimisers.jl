@@ -25,7 +25,8 @@ $(DocStringExtensions.FIELDS)
                              families = nothing, fcb = nothing, Z = nothing, csr = nothing,
                              lv1 = nothing, lv = nothing, W = nothing, vs = nothing,
                              ve = nothing, ve1 = nothing, pe = nothing,
-                             seed::Integer = 0, hist = nothing) -> CrossSectionalCarryState
+                             seed::Integer = 0, hist = nothing, S = nothing,
+                             Sc = nothing) -> CrossSectionalCarryState
 
 Keywords correspond to the struct's fields, and every field but `buf` defaults to `nothing`, or to `0` for `seed`. The default is the empty state that a first step builds.
 
@@ -146,6 +147,14 @@ Keywords correspond to the struct's fields, and every field but `buf` defaults t
     The Return Forecast history at every fitted observation but the last, `observations × assets`, or `nothing` when the state carries none. The row of an observation is the forecast of the member fitted on that observation and the observations before it, as [`forecast_history_refit`](@ref) fits it. The call with no data appends the forecast of the last observation.
     """
     hist
+    """
+    The standardised idiosyncratic returns of every fitted observation, with the fill, as [`cross_sectional_standardised_residuals`](@ref) states them, or `nothing` before the first fit. A row reads its own observation alone, so a step appends the rows of its new observations, and the call with no data reads them as they are.
+    """
+    S
+    """
+    The standardised idiosyncratic returns of every fitted observation with no fill, which the idiosyncratic correlation reads, or `nothing` before the first fit and when the threshold `th` of the prior is zero.
+    """
+    Sc
 end
 function CrossSectionalCarryState(; buf::SampleBufferState = SampleBufferState(),
                                   win::Option{<:ReturnsResult} = nothing, der = nothing,
@@ -155,11 +164,11 @@ function CrossSectionalCarryState(; buf::SampleBufferState = SampleBufferState()
                                   families = nothing, fcb = nothing, Z = nothing,
                                   csr = nothing, lv1 = nothing, lv = nothing, W = nothing,
                                   vs = nothing, ve = nothing, ve1 = nothing, pe = nothing,
-                                  seed::Integer = 0,
-                                  hist = nothing)::CrossSectionalCarryState
+                                  seed::Integer = 0, hist = nothing, S = nothing,
+                                  Sc = nothing)::CrossSectionalCarryState
     return CrossSectionalCarryState(buf, win, der, nf, fam, Ms, X, Xl, obs, bw, mcap, amsk,
                                     emsk, sums, families, fcb, Z, csr, lv1, lv, W, vs, ve,
-                                    ve1, pe, seed, hist)
+                                    ve1, pe, seed, hist, S, Sc)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1124,6 +1133,7 @@ This is the step of a prior that carries a [`CrossSectionalCarryState`](@ref). I
  4. Before the first fit, fit every observation with [`cross_sectional_fold_refit`](@ref) once `lag + 2` observations follow the warm-up, as the batch fit needs.
  5. After it, apply the Choice Rule with [`cross_sectional_fold_choice`](@ref). When the choice moves, fit every observation again with [`cross_sectional_fold_refit`](@ref). Otherwise fit the new observations with [`cross_sectional_fold_step`](@ref), and fit every observation again when it answers `nothing`. A variance estimator `pe.ve` that does not fold, as [`supports_partial_fit`](@ref) answers, carries no state, so every step fits every observation again.
  6. Bring the Return Forecast history up to the fitted observations with [`cross_sectional_carry_history`](@ref). It keeps the carried rows after a step of [`cross_sectional_fold_step`](@ref), and makes every row again after a fit of every observation.
+ 7. Bring the standardised idiosyncratic returns up to the fitted observations with [`cross_sectional_carry_standardised`](@ref), by the same rule.
 
 # Arguments
 
@@ -1173,9 +1183,10 @@ function cross_sectional_carry_fold(pe::CrossSectionalFactorPrior,
         return if Tf - pe.lag < 2
             st
         else
-            cross_sectional_carry_history(pe,
-                                          cross_sectional_fold_refit(pe, st, nothing,
-                                                                     Tf - pe.lag), false)
+            st = cross_sectional_fold_refit(pe, st, nothing, Tf - pe.lag)
+            cross_sectional_carry_standardised(pe,
+                                               cross_sectional_carry_history(pe, st, false),
+                                               false)
         end
     end
     # After the first fit every row follows the warm-up, and a `ReturnsResult` holds at least
@@ -1188,13 +1199,15 @@ function cross_sectional_carry_fold(pe::CrossSectionalFactorPrior,
     else
         nothing
     end
-    return if isnothing(stepped)
-        cross_sectional_carry_history(pe,
-                                      cross_sectional_fold_refit(pe, st, families, st.seed),
-                                      false)
+    st, stepped = if isnothing(stepped)
+        cross_sectional_fold_refit(pe, st, families, st.seed), false
     else
-        cross_sectional_carry_history(pe, stepped, true)
+        stepped, true
     end
+    return cross_sectional_carry_standardised(pe,
+                                              cross_sectional_carry_history(pe, st,
+                                                                            stepped),
+                                              stepped)
 end
 """
     partial_fit!(pe::CrossSectionalFactorPrior{<:Any, …, <:Option{<:CrossSectionalCarryState}},
@@ -1249,7 +1262,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a Cross-Sectional Factor Prior out of its carry fold, with no data.
 
-The call with no data builds the Prior Result with [`cross_sectional_assemble`](@ref), the code of the batch fit, from the histories that the state carries and the factor prior that it folded. The Return Forecast and the idiosyncratic correlation refit there from the carried rows.
+The call with no data builds the Prior Result with [`cross_sectional_assemble`](@ref), the code of the batch fit, from the histories that the state carries and the factor prior that it folded. The Return Forecast and the idiosyncratic correlation refit there from the carried rows. The standardised idiosyncratic returns are the rows that the state carries, so the call does not standardise the history again.
 
 # Algorithm
 
@@ -1258,7 +1271,7 @@ The call with no data builds the Prior Result with [`cross_sectional_assemble`](
  3. Read the factor prior with [`cross_sectional_factor_prior`](@ref) over the factor returns of the factors that are not empty and the observed returns, and process and expand its moments with [`cross_sectional_factor_moments`](@ref). An Observed Factor is never empty.
  4. Count the residuals of each asset with [`variance_count`](@ref) on the folded `ve`.
  5. Take the returns data of the Return Forecast with [`cross_sectional_carry_forecast_returns`](@ref).
- 6. Build the result with [`cross_sectional_assemble`](@ref), with the Return Forecast history that the state carries. The block records the position of each fitted row among the folded observations, and no timestamp, because the buffer keeps none.
+ 6. Build the result with [`cross_sectional_assemble`](@ref), with the Return Forecast history and the standardised idiosyncratic returns that the state carries. The block records the position of each fitted row among the folded observations, and no timestamp, because the buffer keeps none.
 
 # Arguments
 
@@ -1296,7 +1309,7 @@ function prior(pe::CrossSectionalFactorPrior, st::CrossSectionalCarryState;
     # the fold read, so the fitted rows sit at these positions of the folded returns.
     fit = (; csr = csr, W = st.W, vs = st.vs, cnt = variance_count(st.ve, csr.eps),
            amr = st.amsk[r, :], bwr = st.bw[r, :], Xo = st.X[r, :], r = r, hist = st.hist,
-           idx = (st.buf.n - Tf) .+ r, ts = nothing)
+           S = st.S, Sc = st.Sc, idx = (st.buf.n - Tf) .+ r, ts = nothing)
     return cross_sectional_assemble(pe, f_pr, ca, fit,
                                     cross_sectional_carry_forecast_returns(pe, st);
                                     kwargs...)

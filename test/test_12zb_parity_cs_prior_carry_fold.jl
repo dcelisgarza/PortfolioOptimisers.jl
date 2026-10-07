@@ -130,6 +130,15 @@ end
         for (k, x) in enumerate(stream(pe, rd, e))
             @test agrees(x.pr, batch(pe, k, rd, e))
         end
+        # The state keeps the standardised idiosyncratic returns, and a threshold above zero
+        # makes it keep them with no fill too, which the correlation reads. A step appends
+        # the rows of its new observations to both (#1565).
+        pe = CrossSectionalFactorPrior(; lambda = 1, th = 0.1, style...)
+        for (k, x) in enumerate(stream(pe, rd, e))
+            @test agrees(x.pr, batch(pe, k, rd, e))
+            st = x.pe.cache
+            @test size(st.S) == size(st.Sc) == size(st.csr.eps)
+        end
     end
 
     @testset "A Calibration Rule resolves at each step (#1481)" begin

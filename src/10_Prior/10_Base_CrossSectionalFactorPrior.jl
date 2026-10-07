@@ -1638,7 +1638,7 @@ function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
     # so each product reads the factor moments on the support of the loadings alone (#1510).
     mui = support_product(Li, f_mu)
     si = support_product(Li, f_sigma, Li)
-    matrix_processing!(mp, si, Xs[:, idx]; kwargs...)
+    matrix_processing!(mp, si, view(Xs, :, idx); kwargs...)
     si .+= D
     posdef!(mp.pdm, si)
     rdy = cross_sectional_ready_factors(f_mu, f_sigma)

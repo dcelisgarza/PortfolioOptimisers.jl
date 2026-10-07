@@ -156,3 +156,50 @@ function cross_sectional_carry_history(pe::CrossSectionalFactorPrior,
     R = permutedims(reduce(hcat, new))
     return cross_sectional_carry_with(st, (; hist = isnothing(H) ? R : vcat(H, R)))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Brings the standardised idiosyncratic returns of the carry fold of a Cross-Sectional Factor Prior up to its fitted observations.
+
+The standardised return of an observation reads the residual, the variance and the active mask of that observation alone, and the fill reads the other assets of the same observation. A step that fits the new observations alone changes no past residual and no past variance, so the state keeps its rows and appends the rows of the new observations. A step that fits every observation again can change every row, so it makes every row again. The call with no data then reads the rows as they are, and its cost does not grow with the history.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - `st`: The state after the fit of the step.
+  - `stepped`: `true` when the step fitted the new observations alone, `false` when it fitted every observation.
+
+# Returns
+
+  - `st::CrossSectionalCarryState`: The state with `S`, and `Sc` when the threshold `th` of the prior is not zero, at every fitted observation. A state with no fit is returned as it is.
+
+# Related
+
+  - [`cross_sectional_standardised_residuals`](@ref)
+  - [`cross_sectional_carry_fold`](@ref)
+  - [`cross_sectional_assemble`](@ref)
+"""
+function cross_sectional_carry_standardised(pe::CrossSectionalFactorPrior,
+                                            st::CrossSectionalCarryState, stepped::Bool)
+    if isnothing(st.csr)
+        return st
+    end
+    eps = st.csr.eps
+    k = stepped && !isnothing(st.S) ? size(st.S, 1) : 0
+    rn = (k + 1):size(eps, 1)
+    # The fitted rows sit after the first `lag` rows of the histories.
+    E = view(eps, rn, :)
+    V = view(st.vs, rn, :)
+    A = view(st.amsk, pe.lag .+ rn, :)
+    S = cross_sectional_standardised_residuals(E, V, A)
+    Sc = if iszero(pe.th)
+        nothing
+    else
+        cross_sectional_standardised_residuals(E, V, A; filled = false)
+    end
+    # A step that fits every observation again makes every row again.
+    S0, Sc0 = iszero(k) ? (nothing, nothing) : (st.S, st.Sc)
+    return cross_sectional_carry_with(st,
+                                      (; S = cross_sectional_fold_append(S0, S),
+                                       Sc = cross_sectional_fold_append(Sc0, Sc)))
+end
