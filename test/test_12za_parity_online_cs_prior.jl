@@ -236,11 +236,12 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                             E = rd.E, pnl = rd.pnl)
         m = message(() -> partial_fit!(e, rows(ren, 91:170)))
         @test occursin("a later block must carry the same names", m)
-        # A non-finite value is refused on a row that the fit reads, and accepted on a row
-        # that it does not: row 1 has no lagged exposure, so the regression never reads it.
-        for (row, refused) in ((200, true), (1, false))
+        # An infinite value is refused on a row that the fit reads. A `NaN` is a gap of the
+        # observed series (#1530), so the refit and the batch fit keep it alike. Row 1 has no
+        # lagged exposure, so the regression never reads it.
+        for (row, x, refused) in ((200, Inf, true), (200, NaN, false), (1, NaN, false))
             E = copy(rd.E)
-            E[row, 1] = NaN
+            E[row, 1] = x
             rn = ReturnsResult(; nx = rd.nx, X = rd.X, ne = rd.ne, E = E, pnl = rd.pnl)
             e = online(ccy)
             for k in 1:3
