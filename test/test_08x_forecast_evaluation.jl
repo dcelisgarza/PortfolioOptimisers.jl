@@ -70,12 +70,14 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
    permutation whose centred values and whose ordinal ranks are both orthogonal to
    `[1, 2, 3, 4]`, which an arbitrary orthogonal vector would not be -- a tied vector such
    as `[1, -1, -1, 1]` is Pearson-orthogonal and reads 0.4 under ordinal ranks. The
-   `ExposureNeutralisation` probe is the one that reads a real fixture, and it is
-   DIRECTIONAL rather than near-zero: issue #950 records that a Neutralisation fits a
-   cross-sectional regression with no intercept, so its residual is orthogonal to the
-   target in the UNCENTRED sense and keeps a large Pearson correlation with it. The probe
-   asserts the un-neutralised correlation above 0.9, the neutralised one below it and
-   still above 0.5, and it is tightened when #950 is settled.
+   `ExposureNeutralisation` probe is the one that reads a real fixture. Since #1521 the
+   Neutralisation of `DescriptorScores` fits an intercept by default, so its residual is
+   orthogonal to the constant and to the target, hence uncorrelated with the target. The
+   probe pins that to round-off on the scores themselves, under the weights of the
+   Neutralisation. Through the evaluation it is DIRECTIONAL: the grouped scoring step
+   rescales each industry on its own, and the evaluation weighs the active assets that the
+   estimation mask leaves out, so the correlation falls far but not to zero. The
+   reference's rule, `intercept = false`, keeps a correlation above 0.5.
 
 9. A FORWARD-WINDOW TABLE IS PINNED ROW BY ROW AGAINST THE REFERENCE, AND ITS DATE RULE IS
    PINNED SEPARATELY. `WINDOW_ALPHA` was put through the reference's own holding-period and
@@ -1576,31 +1578,66 @@ end
         @test mraw > 0.9
     end
 
-    @testset "The neutralised one is less correlated with it, and not near zero" begin
-        # THE ASSERTION IS DIRECTIONAL, AND ISSUE #950 IS WHY. `DescriptorScores`'s `cre`
-        # defaults to `CrossSectionalLinearRegression()`, whose `intercept` defaults to
-        # `false` to reproduce the reference implementation, so the residual is exactly
-        # orthogonal to the target in the UNCENTRED sense and keeps a large Pearson
-        # correlation with it. This is the library's default behaviour, not a bug left
-        # open: see the next testset for the opt-in fix.
-        @test mneu < mraw
-        @test mneu > 0.5
+    @testset "The neutralised one is far less correlated with it (#1521)" begin
+        # THE ASSERTION IS DIRECTIONAL. The default `cre` fits an intercept, so each score
+        # leaves the regression uncorrelated with the style exposure, as the next testset
+        # pins. The grouped scoring step after the fit rescales each industry on its own,
+        # and the evaluation weighs the active assets that the estimation mask leaves out,
+        # so the forecast keeps a small correlation.
+        @test dn.cre.intercept
+        @test mneu < 0.4
     end
 
-    @testset "`cre = CrossSectionalLinearRegression(; intercept = true)` narrows it further (#950)" begin
-        # An opt-in fix, not a changed default: the re-standardisation and the grouping
-        # after the fit reintroduce some correlation, so this does not reach zero, but it
-        # is well below the no-intercept default's floor.
-        dni = DescriptorScores(; descriptors = ds.descriptors, neutralise = "style",
-                               cre = CrossSectionalLinearRegression(; intercept = true),
+    @testset "`intercept = false`, the reference rule, keeps a large correlation (#950)" begin
+        # The residual is orthogonal to the target in the UNCENTRED sense alone, so it keeps
+        # a large Pearson correlation with it.
+        dn0 = DescriptorScores(; descriptors = ds.descriptors, neutralise = "style",
+                               cre = CrossSectionalLinearRegression(; intercept = false),
                                outlier = ds.outlier, scoring = ds.scoring, group = ds.group)
-        nei = FixedWeightedReturnForecast(; scores = dni, scale = 1.0, weights = [0.4, 0.6])
-        cni = forecast_factor_correlation(forecast_evaluation(nei, rd, csfm; horizon = 2),
+        ne0 = FixedWeightedReturnForecast(; scores = dn0, scale = 1.0, weights = [0.4, 0.6])
+        cn0 = forecast_factor_correlation(forecast_evaluation(ne0, rd, csfm; horizon = 2),
                                           csfm).X
-        mnei = abs(sum(filter(isfinite, view(cni, :, 1))) /
-                   count(isfinite, view(cni, :, 1)))
-        @test mnei < mneu
-        @test mnei < 0.4
+        mne0 = abs(sum(filter(isfinite, view(cn0, :, 1))) /
+                   count(isfinite, view(cn0, :, 1)))
+        @test mneu < mne0 < mraw
+        @test mne0 > 0.5
+    end
+
+    @testset "Each default score is uncorrelated with the target to round-off (#1521)" begin
+        # The scores themselves, under the weights of the Neutralisation, with an ungrouped
+        # standardiser after the fit: it maps each cross-section by one affine map, so it
+        # keeps the zero weighted mean and the orthogonality that the intercept gives.
+        PO = PortfolioOptimisers
+        X = csfm.Ms[:, :, 1]
+        function worst(cre)
+            d = DescriptorScores(; descriptors = ds.descriptors, neutralise = "style",
+                                 cre = cre, outlier = ds.outlier, scoring = ds.scoring)
+            r = descriptor_scores(d, rd, csfm)
+            w = PO.return_forecast_weights(rd)[r.rows, :]
+            wc = 0.0
+            wo = 0.0
+            for k in axes(r.S, 3), t in axes(X, 1)
+                s = r.S[r.rows[t], :, k]
+                m = isfinite.(s) .& isfinite.(view(X, t, :)) .& (view(w, t, :) .> 0)
+                u, s, x = w[t, m], s[m], X[t, m]
+                sc = s .- sum(u .* s) / sum(u)
+                xc = x .- sum(u .* x) / sum(u)
+                wc = max(wc,
+                         abs(sum(u .* sc .* xc)) /
+                         sqrt(sum(u .* sc .^ 2) * sum(u .* xc .^ 2)))
+                wo = max(wo,
+                         abs(sum(u .* s .* x)) / sqrt(sum(u .* s .^ 2) * sum(u .* x .^ 2)))
+            end
+            return (; corr = wc, orth = wo)
+        end
+        d1 = worst(CrossSectionalLinearRegression(; intercept = true))
+        d0 = worst(CrossSectionalLinearRegression(; intercept = false))
+        @test d1.corr < 1e-12
+        @test d1.orth < 1e-12
+        # Without the intercept the standardiser re-centres a residual whose weighted mean
+        # is not zero, so neither property survives it.
+        @test d0.corr > 0.5
+        @test d0.orth > 0.3
     end
 end
 

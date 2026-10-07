@@ -176,8 +176,8 @@ end
     end
 
     @testset "A Neutralisation against a factor leaves the residual of that fit" begin
-        # The one target is the score itself, and the fit carries no intercept, so every
-        # residual is zero.
+        # The one target is the score itself, so every residual is zero, with or without an
+        # intercept.
         Ms = reshape(Float64.(a), 2, 2, 1)
         blk = forecast_hand_block(2; Ms = Ms, nf = ["style"], fam = ["style"])
         dsn = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
@@ -186,7 +186,7 @@ end
         @test all(abs.(Sn) .< 1e-10)
     end
 
-    @testset "`cre` decides whether the residual is merely orthogonal or uncorrelated (#950)" begin
+    @testset "`cre` decides whether the residual is merely orthogonal or uncorrelated (#950, #1521)" begin
         # A target exposure with a non-zero cross-sectional mean under equal weights, and a
         # score that is not a multiple of it, so the two fits disagree.
         x = reshape([1.0, 2.0, 6.0], 1, 3, 1)
@@ -194,14 +194,25 @@ end
         rd3 = forecast_hand_panel(["a" => y])
         blk3 = forecast_hand_block(3; Ms = x, nf = ["style"], fam = ["style"])
         xv = vec(x)
+        ds3(; kw...) = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
+                                        outlier = nothing, scoring = nothing, kw...)
+        no_intercept = CrossSectionalLinearRegression(; intercept = false)
 
-        @testset "The default carries no intercept, and the residual stays correlated" begin
-            ds0 = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
-                                   neutralise = ["style"], outlier = nothing,
-                                   scoring = nothing)
-            @test isa(ds0.cre, CrossSectionalLinearRegression)
-            @test !ds0.cre.intercept
-            eps0 = vec(descriptor_scores(ds0, rd3, blk3).S)
+        @testset "The default fits an intercept, and the residual decorrelates" begin
+            dsi = ds3(; neutralise = ["style"])
+            @test isa(dsi.cre, CrossSectionalLinearRegression)
+            @test dsi.cre.intercept
+            epsi = vec(descriptor_scores(dsi, rd3, blk3).S)
+            # The normal equations of the intercept and of the slope: the residual is
+            # orthogonal to the constant and to `x`, so it is uncorrelated with `x`.
+            @test sum(epsi) ≈ 0 atol = 1e-10
+            @test dot(xv, epsi) ≈ 0 atol = 1e-10
+            @test dot(xv .- mean(xv), epsi) ≈ 0 atol = 1e-10
+        end
+
+        @testset "`intercept = false` keeps the reference rule, and the residual stays correlated" begin
+            eps0 = vec(descriptor_scores(ds3(; neutralise = ["style"], cre = no_intercept),
+                                         rd3, blk3).S)
             # Orthogonal to the raw exposure...
             @test dot(xv, eps0) ≈ 0 atol = 1e-10
             # ...but not to its cross-sectional deviation from the mean, so a Pearson
@@ -209,13 +220,20 @@ end
             @test dot(xv .- mean(xv), eps0) ≈ -225 / 41 atol = 1e-8
         end
 
-        @testset "`intercept = true` removes the centred projection, and the residual decorrelates" begin
-            dsi = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
-                                   neutralise = ["style"],
-                                   cre = CrossSectionalLinearRegression(; intercept = true),
-                                   outlier = nothing, scoring = nothing)
-            epsi = vec(descriptor_scores(dsi, rd3, blk3).S)
-            @test dot(xv .- mean(xv), epsi) ≈ 0 atol = 1e-10
+        @testset "Targets that span the constant give one residual under both rules" begin
+            # A market column of ones beside `x`. The column space already holds the
+            # constant, so the intercept adds nothing, and the residual is the one of the
+            # fit of `y` on `[1 x]`: slope `Sxy / Sxx = 1 / 14` through `(x̄, ȳ) = (3, 2)`.
+            Mm = cat(ones(1, 3, 1), x; dims = 3)
+            blkm = CrossSectionalFactorModel(; M = Mm[end, :, :], b = zeros(3), Ms = Mm,
+                                             nf = ["market", "style"],
+                                             fam = ["market", "style"])
+            nm = ["market", "style"]
+            epsi = vec(descriptor_scores(ds3(; neutralise = nm), rd3, blkm).S)
+            eps0 = vec(descriptor_scores(ds3(; neutralise = nm, cre = no_intercept), rd3,
+                                         blkm).S)
+            @test epsi ≈ [-6 / 7, 15 / 14, -3 / 14] atol = 1e-12
+            @test eps0 ≈ epsi atol = 1e-12
         end
     end
 
@@ -335,9 +353,12 @@ end
                                neutralise = "s", outlier = nothing, scoring = nothing)
         Sn = descriptor_scores(dsn, rdn, blkn).S
         @test eltype(Sn) === BigFloat
+        # The default fit has an intercept, so it runs through the centroid of the equal
+        # weights of the estimation mask.
         for t in 1:3
-            y = big.(a3[t, :])
-            @test Sn[t, :, 1] ≈ y - x[t, :] * (dot(x[t, :], y) / dot(x[t, :], x[t, :])) rtol = 1e-60
+            yc = big.(a3[t, :]) .- mean(big.(a3[t, :]))
+            xc = x[t, :] .- mean(x[t, :])
+            @test Sn[t, :, 1] ≈ yc - xc * (dot(xc, yc) / dot(xc, xc)) rtol = 1e-60
         end
         # A score type without `NaN` cannot mark the rows before a block that starts late.
         ar = Rational{Int}.(round.(Int, a3))

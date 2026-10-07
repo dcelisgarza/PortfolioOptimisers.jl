@@ -36,7 +36,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Weigh the Neutralisation of a [`DescriptorScores`](@ref) by the regression weights `rw` of the factor-model block.
 
-The weight of asset `i` at observation `t` is the weight that the pair carried in the cross-sectional fit of the block. The residual is then orthogonal to the exposures under the inner product of that fit. It is the inner product of the split of a Return Forecast in [`CrossSectionalFactorPrior`](@ref), and the one under which the idiosyncratic return of the fit is orthogonal to the exposures. The scoring transform after the regression reads the same weights. A [`CrossSectionalStandardiser`](@ref) maps each cross-section by one affine map, so the score stays orthogonal when the exposures span the constant, as a market factor does. [`ScoreNeutralisation`](@ref) sets these weights.
+The weight of asset `i` at observation `t` is the weight that the pair carried in the cross-sectional fit of the block. The residual is then orthogonal to the exposures under the inner product of that fit. It is the inner product of the split of a Return Forecast in [`CrossSectionalFactorPrior`](@ref), and the one under which the idiosyncratic return of the fit is orthogonal to the exposures. The scoring transform after the regression reads the same weights. A [`CrossSectionalStandardiser`](@ref) maps each cross-section by one affine map, so the score stays orthogonal when the residual has a weighted mean of zero. The intercept of the default `cre` gives that zero mean under every design, and exposures that span the constant, as a market factor does, give it without an intercept. [`ScoreNeutralisation`](@ref) sets these weights.
 
 # Related
 
@@ -140,7 +140,8 @@ $(DocStringExtensions.TYPEDFIELDS)
     DescriptorScores(; descriptors::AbstractVector{<:AbstractDescriptorEstimator},
                      neutralise::Option{<:Union{<:AbstractString, <:VecStr}} = nothing,
                      nw::AbstractNeutralisationWeights = EstimationMaskWeights(),
-                     cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
+                     cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(;
+                                                                                                     intercept = true),
                      outlier::Option{<:AbstractCrossSectionalTransform} = CrossSectionalWinsoriser(),
                      scoring::Option{<:AbstractCrossSectionalTransform} = CrossSectionalStandardiser(),
                      group::Option{<:AbstractString} = nothing,
@@ -169,7 +170,7 @@ $(DocStringExtensions.TYPEDFIELDS)
     """
     nw
     """
-    Cross-Sectional Regression Estimator of the Neutralisation. Its `intercept` sets what the residual is orthogonal to. Under `false`, the default, the fit removes the component along the raw exposure. Under `true`, it removes the component along the cross-sectional deviation of the exposure from its mean, so the residual is also uncorrelated with the exposure.
+    Cross-Sectional Regression Estimator of the Neutralisation. Its `intercept` sets what the residual is orthogonal to. Under `true`, the default, the fit removes the weighted mean and the component along each exposure, so the residual is orthogonal to the constant and to each exposure. It is then uncorrelated with each exposure under every design, and the scoring step after it keeps both properties. Under `false`, the fit removes the component along the raw exposure alone. The residual is then uncorrelated with an exposure only when the exposures span the constant, and a centring scoring step after it breaks the orthogonality too. Where the exposures span the constant, the two rules give the same residual. `CrossSectionalLinearRegression(; intercept = false)` is the rule of the reference implementation.
     """
     cre
     """
@@ -216,7 +217,8 @@ end
 function DescriptorScores(; descriptors::AbstractVector{<:AbstractDescriptorEstimator},
                           neutralise::Option{<:Union{<:AbstractString, <:VecStr}} = nothing,
                           nw::AbstractNeutralisationWeights = EstimationMaskWeights(),
-                          cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
+                          cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(;
+                                                                                                          intercept = true),
                           outlier::Option{<:AbstractCrossSectionalTransform} = CrossSectionalWinsoriser(),
                           scoring::Option{<:AbstractCrossSectionalTransform} = CrossSectionalStandardiser(),
                           group::Option{<:AbstractString} = nothing,
@@ -325,7 +327,7 @@ The method that Julia selects is the algorithm. The method for a recipe that nam
 
  1. Resolve the names to the raw factor indices `tidx`. A name resolves to a factor before it resolves to a Factor Family label. Take those columns of the exposure history as the design `X`.
  2. For each score in turn, build the regression weights `W` over the rows of the block. They are the base weights `w`, with a zero where the score or a design exposure of the asset is not finite.
- 3. Regress the score across the assets on the design under those weights with `cre`, and take the residual `csr.eps`. Under `cre.intercept = false` the residual is orthogonal to the raw design. Under `true` it is also uncorrelated with the design, as [`CrossSectionalLinearRegression`](@ref) states.
+ 3. Regress the score across the assets on the design under those weights with `cre`, and take the residual `csr.eps`. Under `cre.intercept = true`, the default, the residual is orthogonal to the constant and to the design, so it is also uncorrelated with the design, as [`CrossSectionalLinearRegression`](@ref) states. Under `false` it is orthogonal to the raw design alone.
  4. Score the residual once more under the base weights `w` and the group labels, so that every score leaves the step on one scale.
  5. Write `NaN` on the rows before the block, because the block states no exposure there.
 

@@ -59,7 +59,11 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
     desc = [Passthrough(; field = "net_income_ttm"), Passthrough(; field = "sales_ttm"),
             EWMomentum(; half_life = 5, skip = 3)]
     std2 = CrossSectionalStandardiser(; min_group_size = 2)
-    ds(; kw...) = DescriptorScores(; descriptors = desc, kw...)
+    # The reference neutralises with no intercept, so every case passes its rule (#1521).
+    ds(; kw...) = DescriptorScores(; descriptors = desc,
+                                   cre = CrossSectionalLinearRegression(;
+                                                                        intercept = false),
+                                   kw...)
     load(u, c, o) = parity_load(u, c, o)
     loadv(u, c, o) = vec(load(u, c, o))
     fxs = parity_small_panel()

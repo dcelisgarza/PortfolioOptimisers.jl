@@ -484,12 +484,15 @@ exactly what the exposures do not explain. It passes this check and fails the fi
 That is why the questions have an order, and why this question is last. A low correlation alone does
 not make a forecast useful.
 
-!!! note "Neutralising a score does not decorrelate it"
-    A forecast whose descriptor scores are neutralised against a factor family does not give zero in
-    that family's columns. Both neutralisation sites build a cross-sectional regression whose
-    `intercept` is `false`, so the residual is orthogonal to its target in the uncentred sense and
-    keeps a real correlation with it. Set `cre` to a regression with `intercept = true` when you
-    want an uncorrelated residual.
+!!! note "A neutralised score is uncorrelated with its targets, and the forecast nearly so"
+    The Neutralisation of [`DescriptorScores`](@ref) fits a cross-sectional regression with an
+    intercept by default, so each score leaves it uncorrelated with its targets. A forecast built
+    from those scores still gives small numbers in the targets' columns, not zero: a grouped scoring
+    step after the fit rescales each group on its own, and this check weighs every scored asset,
+    not only the estimation universe that the fit weighs. A Neutralisation under
+    `cre = CrossSectionalLinearRegression(; intercept = false)` fits no intercept. Its residual is
+    then orthogonal to its target in the uncentred sense alone, and keeps a real correlation with it. The Neutralisation of a Factor
+    Exposure reads the regression of the prior, whose `intercept` is `false` by default.
 =#
 
 #=

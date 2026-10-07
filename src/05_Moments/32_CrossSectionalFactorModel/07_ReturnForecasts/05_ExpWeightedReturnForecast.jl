@@ -311,7 +311,7 @@ ExpWeightedReturnForecast
             │            nw ┼ EstimationMaskWeights()
             │           cre ┼ CrossSectionalLinearRegression
             │               │         alg ┼ PseudoInverseFallback()
-            │               │   intercept ┼ Bool: false
+            │               │   intercept ┼ Bool: true
             │               │          ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
             │       outlier ┼ CrossSectionalWinsoriser
             │               │    low ┼ Float64: 0.01
