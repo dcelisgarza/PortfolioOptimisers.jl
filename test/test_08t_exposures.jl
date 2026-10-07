@@ -144,9 +144,26 @@ end
     rd = exposure_hand_panel(["a" => [1.0 2.0; 3.0 4.0]]; amsk = [true true; true false],
                              bw = [1.0 2.0; NaN 4.0])
     @testset "A benchmark weight is zero where it is unobserved or inactive" begin
-        W = PortfolioOptimisers.exposure_benchmark_weights(rd, "benchmark_weights")
+        # The blank at observation 2 of asset A1 is active, so its zero is named (#1520). The
+        # inactive cell of asset A2 is not.
+        W = @test_logs((:warn,
+                        r"not finite on 1 active cell\(s\) of the Asset Panel, first at observation 2 for the assets \[\"A1\"\]"),
+                       PortfolioOptimisers.exposure_benchmark_weights(rd,
+                                                                      "benchmark_weights"))
         @test W == [1.0 2.0; 0.0 0.0]
         @test all(isfinite, W)
+        @test_throws r"not finite on 1 active cell" PortfolioOptimisers.exposure_benchmark_weights(rd,
+                                                                                                   "benchmark_weights";
+                                                                                                   strict = true)
+        # A weight that is zero on an inactive cell alone stays silent.
+        ri = exposure_hand_panel(["a" => [1.0 2.0; 3.0 4.0]];
+                                 amsk = [true true; true false], bw = [1.0 2.0; 3.0 NaN])
+        Wi = @test_logs PortfolioOptimisers.exposure_benchmark_weights(ri,
+                                                                       "benchmark_weights";
+                                                                       strict = true)
+        @test Wi == [1.0 2.0; 3.0 0.0]
+        @test PortfolioOptimisers.exposure_weight_fill!([1.0 NaN; Inf 4.0], ri.pnl) ==
+              [(2, 1), (1, 2)]
     end
     @testset "A member that names no grouping field partitions nothing" begin
         @test isnothing(PortfolioOptimisers.exposure_group_labels(rd, nothing))

@@ -322,13 +322,13 @@ function composite_finalise!(num::AbstractMatrix{<:Real}, den::AbstractMatrix{<:
     return nothing
 end
 """
-    factor_exposure(xe::CompositeExposure, rd::ReturnsResult) -> Matrix{<:Real}
+    factor_exposure(xe::CompositeExposure, rd::ReturnsResult; strict::Bool = false) -> Matrix{<:Real}
 
 Compute the Factor Exposure of a fixed weighted combination of Descriptors.
 
 # Algorithm
 
- 1. Read the benchmark weights and the group labels off the `ReturnsResult`.
+ 1. Read the benchmark weights with [`exposure_benchmark_weights`](@ref), and the group labels, off the `ReturnsResult`.
  2. Compute each Descriptor, and apply the outlier slot and then the scoring slot to it.
  3. Accumulate the finite-aware weighted sum and the surviving weight of every cell.
  4. Divide, and write `NaN` where the surviving weight is zero or below `min_coverage`.
@@ -338,10 +338,12 @@ Compute the Factor Exposure of a fixed weighted combination of Descriptors.
 
   - `xe`: Composite Exposure Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+  - $(arg_dict[:strict_bw])
 
 # Validation
 
   - The rules of [`descriptor_field_values`](@ref) for the benchmark weights and for every Panel Field the Descriptors name.
+  - The rules of [`exposure_benchmark_weights`](@ref) under `strict`.
   - The rules of [`cross_sectional_transform`](@ref) for both transform slots.
 
 # Returns
@@ -378,8 +380,9 @@ julia> factor_exposure(xe, rd)
   - [`composite_accumulate!`](@ref)
   - [`composite_finalise!`](@ref)
 """
-function factor_exposure(xe::CompositeExposure, rd::ReturnsResult)::Matrix{<:Real}
-    w = exposure_benchmark_weights(rd, xe.bw)
+function factor_exposure(xe::CompositeExposure, rd::ReturnsResult;
+                         strict::Bool = false)::Matrix{<:Real}
+    w = exposure_benchmark_weights(rd, xe.bw; strict = strict)
     groups = exposure_group_labels(rd, xe.group)
     des = xe.descriptors
     wv = composite_weights(xe.weights, length(des))

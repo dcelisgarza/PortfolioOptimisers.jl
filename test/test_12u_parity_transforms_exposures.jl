@@ -12,7 +12,9 @@ Every output is at parity. The measure found no defect in the library, and three
   - a benchmark weight that is missing on an inactive or unobserved cell reads as zero. The oracle
     refuses the composite and the derived member on a panel whose weight field keeps its default
     policy, which writes NaN outside the active mask. Its prior writes the field under its zero
-    policy instead, and ours equals the oracle under that policy. Better.
+    policy instead, and ours equals the oracle under that policy. Better. On an active cell the
+    zero is named by a warning, and `strict = true` refuses the cell, as the oracle does (row R36
+    of #1416, #1520).
   - the constant exposure is `NaN` on an inactive cell, where the oracle writes one. No fit reads
     such a cell, so no fitted quantity moves (#721). Deliberate difference.
 =#
@@ -23,8 +25,10 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
 # observations 20 to 25, so an active finite cell sits outside the estimation set. `style2` is
 # blank on asset 1 at observations 30 and 31 and on asset 7 at observation 50, and
 # `book_equity` is blank on asset 1 at observation 30, where two of the three Descriptors of the
-# composite are then missing.
-function parity_exposure_case(; fx = parity_small_panel())
+# composite are then missing. `bw40`, when it is given, replaces the raw benchmark weight of asset 3
+# at observation 40, an active cell: `NaN` makes it a blank that the fill does not observe.
+function parity_exposure_case(; fx = parity_small_panel(),
+                              bw40::Union{Nothing, Real} = nothing)
     pnl = fx.rd.pnl
     amsk = pnl.amsk
     raw(name) = parity_field_rows(panel_field(pnl, name),
@@ -38,6 +42,9 @@ function parity_exposure_case(; fx = parity_small_panel())
     vals["book_equity"][30, 1] = NaN
     bw = copy(vals["market_cap"])
     bw[20:25, 8] .= 0.0
+    if !isnothing(bw40)
+        bw[40, 3] = bw40
+    end
     vals["benchmark_weights"] = bw
     T = size(amsk, 1)
     ccys = ["EUR", "JPY", "USD"]
@@ -183,13 +190,14 @@ end
     @testset "The composite, the derived and the one-hot members" begin
         O = parity_load("factor_exposure", "Small", "Exposures")
         xs = parity_exposures()
-        L1 = factor_exposure(xs.c1, c.rd)
+        # Every blank weight of this panel is on an inactive cell, so no member warns (#1520).
+        L1 = @test_nowarn factor_exposure(xs.c1, c.rd)
         @test parity_compare(vec(L1), O[:, 1]; name = "composite").ok
-        @test parity_compare(vec(factor_exposure(xs.c2, c.rd)), O[:, 2];
+        @test parity_compare(vec(@test_nowarn(factor_exposure(xs.c2, c.rd))), O[:, 2];
                              name = "composite, grouped").ok
-        @test parity_compare(vec(factor_exposure(xs.d1, c.rd, L1)), O[:, 3];
+        @test parity_compare(vec(@test_nowarn(factor_exposure(xs.d1, c.rd, L1))), O[:, 3];
                              name = "derived").ok
-        @test parity_compare(vec(factor_exposure(xs.d2, c.rd, L1)), O[:, 4];
+        @test parity_compare(vec(@test_nowarn(factor_exposure(xs.d2, c.rd, L1))), O[:, 4];
                              name = "derived, grouped").ok
         B = factor_exposure(OneHotExposure(; field = "industry", family = "industry"), c.rd)
         @test size(B, 3) == 4
@@ -200,6 +208,27 @@ end
         @test any(isnan, PortfolioOptimisers.panel_field_values(c.rd, "benchmark_weights"))
         # The coverage binds where two of the three Descriptors are missing.
         @test isnan(L1[30, 1]) && isfinite(L1[31, 1]) && isfinite(L1[50, 7])
+    end
+
+    # Row R36 of #1416, built by #1520. A blank benchmark weight on an active cell is unknown, and
+    # it reads as zero, which takes the asset out of the estimation set of that observation. The
+    # oracle refuses the member there, as `strict = true` does. Ours names the zero, and its
+    # answer is the answer with a zero weight, which is the oracle's under its zero policy. The
+    # blank on asset 3 at observation 40 moves the composite by about 0.1.
+    @testset "An active blank benchmark weight reads as zero, and is named" begin
+        cn = parity_exposure_case(; bw40 = NaN)
+        cz = parity_exposure_case(; bw40 = 0.0)
+        @test cn.amsk[40, 3]
+        xs = parity_exposures()
+        msg = r"not finite on 1 active cell\(s\) of the Asset Panel, first at observation 40 for the assets \[\"a3\"\]"
+        Ln = @test_logs (:warn, msg) factor_exposure(xs.c1, cn.rd)
+        Lz = @test_nowarn factor_exposure(xs.c1, cz.rd)
+        @test isequal(Ln, Lz)
+        @test maximum(abs, filter(isfinite, Ln .- factor_exposure(xs.c1, c.rd))) > 0.05
+        Dn = @test_logs (:warn, msg) factor_exposure(xs.d2, cn.rd, Lz)
+        @test isequal(Dn, factor_exposure(xs.d2, cz.rd, Lz))
+        @test_throws msg factor_exposure(xs.c1, cn.rd; strict = true)
+        @test_throws msg factor_exposure(xs.d2, cn.rd, Lz; strict = true)
     end
 
     # The oracle writes one on every cell, and ours writes NaN on an inactive one (#721). The

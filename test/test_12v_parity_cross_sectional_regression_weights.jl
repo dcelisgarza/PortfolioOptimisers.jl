@@ -128,6 +128,27 @@ function parity_cs_weights_tiny()
     eps[:, 2] = 1e-100 .* randn(StableRNG(1388), size(eps, 1))
     return merge(fx, (; eps))
 end
+# The fixture with assets 7 to 21, 15 of 25, on one shared residual series times `s`, so their
+# variances are equal: zero at `s = 0`, and tiny but not zero at `s = 1e-100`. After the warm-up
+# more than half of each row's inverse variances are then infinite at `s = 0` (#1520).
+function parity_cs_weights_half(; s::Real = 0.0)
+    fx = parity_cs_weights_fixture()
+    eps = copy(fx.eps)
+    z = randn(StableRNG(1520), size(eps, 1))
+    for j in 7:21
+        eps[:, j] = s .* z
+    end
+    return merge(fx, (; eps))
+end
+# Every asset on the shared residual series, and every asset active and estimable, so every
+# variance is equal (#1520). The eligibility mask keeps the pairs that the fixture drops at random.
+function parity_cs_weights_all(; s::Real = 0.0)
+    fx = parity_cs_weights_fixture()
+    T, N = size(fx.eps)
+    eps = repeat(s .* randn(StableRNG(1520), T), 1, N)
+    msk = fx.msk .| .!fx.emsk .| .!fx.amsk
+    return (; eps, mcap = fx.mcap, msk, emsk = trues(T, N), amsk = trues(T, N))
+end
 # The weight cases: tag => (p, lambda, ratio, wins). A `lambda` of zero is `MarketCapWeights`.
 const PARITY_CS_WEIGHT_CASES = ["Cap00" => (0.0, 0.0, 20.0, (0.025, 0.975)),
                                 "Cap05" => (0.5, 0.0, 20.0, (0.025, 0.975)),
@@ -387,6 +408,67 @@ end
         # Our answer on the tiny residual is at parity too. Measured maxrel 4.3e-16.
         @test parity_compare(parity_cs_weights(parity_cs_weights_tiny(), cfg; ve = ve).W1,
                              stored; name = "tiny variance").ok
+    end
+
+    # Row R43 of #1416, a defect of ours fixed by #1520. With half or more of a row's inverse
+    # variances infinite, the median is infinite and the cap does not bind. The row then took
+    # `Inf / Inf`, and lost its inverse-variance part, so it summed to `1 - lambda`. With every
+    # variance zero, the clamp wrote `NaN`, and the row fell back to the cap weights. The limit as
+    # the zero variances go to zero together gives each infinite entry an equal share of the
+    # inverse-variance part, and each finite entry none.
+    @testset "Half or more zero idiosyncratic variances: the limit" begin
+        alg = BlendedInverseVarianceWeights(; p = 1.0, lambda = 0.5)
+        blend(IV, W0) = PortfolioOptimisers.cs_weights_blend(alg, W0, copy(IV),
+                                                             trues(size(IV)))
+        cap = [0.1 0.2 0.3 0.4]
+        r = blend([1.0 2.0 Inf Inf], cap)
+        @test r ≈ 0.5 .* cap .+ 0.5 .* [0.0 0.0 0.5 0.5] rtol = 1e-15
+        # The finite path at an inverse variance of 1e300 is the oracle's rule, and gives the same.
+        @test r ≈ blend([1.0 2.0 1e300 1e300], cap) rtol = 1e-15
+        r = blend([1.0 2.0 3.0 Inf Inf Inf Inf], fill(1 / 7, 1, 7))
+        @test sum(r) ≈ 1 rtol = 1e-15
+        @test r ≈ [fill(1 / 14, 1, 3) fill(1 / 14 + 1 / 8, 1, 4)] rtol = 1e-15
+        @test blend([Inf Inf Inf Inf], cap) ≈ [0.175 0.225 0.275 0.325] rtol = 1e-15
+        # The clamp lifts every entry that is not NaN when the whole estimation set is infinite.
+        IV = [Inf 3.0 Inf NaN]
+        PortfolioOptimisers.cross_sectional_winsorise!(IV, [1.0 0.0 1.0 1.0],
+                                                       (0.025, 0.975))
+        @test isequal(IV, [Inf Inf Inf NaN])
+        @test PortfolioOptimisers.cross_sectional_median_cap!(IV, 20.0) == [true]
+        @test isequal(IV, [1/3 1/3 1/3 NaN])
+
+        # The full weight step against the oracle, which refuses an infinity, on the residuals
+        # `1e-100` times the shared series. Our answers at zero and at 1e-100 are both its limit.
+        ve = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
+                                               debias = RawStatistic(),
+                                               regime_lohi_mult = (0.7, 1.6), min_val = 0.0)
+        cfg = ("Blend05" => (0.5, 0.5, 20.0, (0.025, 0.975)))[2]
+        hz = parity_cs_weights_half()
+        IV = PortfolioOptimisers.cross_sectional_lagged_inverse_variance(ve, hz.eps, hz.msk;
+                                                                         estimation_mask = hz.emsk,
+                                                                         active_mask = hz.amsk)
+        rows = [t for t in axes(IV, 1) if any(isinf, view(IV, t, :))]
+        @test length(rows) == 20
+        @test all(t -> 2 * count(isinf, view(IV, t, :)) > count(!isnan, view(IV, t, :)),
+                  rows)
+        stored = parity_load("BlendedInverseVarianceWeights", "Blend05HalfTiny", "W1")
+        W1 = parity_cs_weights(hz, cfg; ve = ve).W1
+        @test all(x -> isapprox(x, 1; rtol = 1e-12),
+                  sum(view(W1, 2:size(W1, 1), :); dims = 2))
+        # Measured maxrel 3.7e-16, at zero and at 1e-100.
+        @test parity_compare(W1, stored; name = "half zero").ok
+        @test parity_compare(parity_cs_weights(parity_cs_weights_half(; s = 1e-100), cfg;
+                                               ve = ve).W1, stored; name = "half tiny").ok
+        # Every variance zero: the equal share of the eligible pairs blended with the cap weights.
+        az = parity_cs_weights_all()
+        (; W0, W1) = parity_cs_weights(az, cfg; ve = ve)
+        lim = 0.5 .* az.msk ./ sum(az.msk; dims = 2) .+ 0.5 .* W0 ./ sum(W0; dims = 2)
+        @test W1[41:end, :] ≈ lim[41:end, :] rtol = 1e-15
+        stored = parity_load("BlendedInverseVarianceWeights", "Blend05AllTiny", "W1")
+        # Measured maxrel 2.7e-16 at zero and 4.3e-16 at 1e-100.
+        @test parity_compare(W1, stored; name = "all zero").ok
+        @test parity_compare(parity_cs_weights(parity_cs_weights_all(; s = 1e-100), cfg;
+                                               ve = ve).W1, stored; name = "all tiny").ok
     end
 
     @testset "The weights inside the prior, at parity" begin

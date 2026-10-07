@@ -506,11 +506,14 @@ Clamp the inverse variance weights of each observation to two cross-sectional qu
 
 The clamp protects the blend from an asset whose estimated variance is very small, which would otherwise carry almost the whole cross-section. The quantiles come from the estimation universe, which is the set of pairs with a positive first-pass weight, and the clamp reaches the whole row, so a pair outside that universe still leaves inside the same bounds.
 
+An entry is infinite where its variance is exactly zero. When every entry of the set is infinite, both quantiles are infinite, and the clamp lifts every entry of the row that is not `NaN` to infinity. That is the limit of the clamp as the variances of the set go to zero together, so [`cross_sectional_median_cap!`](@ref) then gives those entries equal shares.
+
 # Algorithm
 
  1. For each observation, gather the entries in the estimation universe that are not `NaN`.
- 2. Take the quantiles `wins` of that set, and clamp the whole row between them.
- 3. Write an all-`NaN` row where the set carries no finite entry, because no bound exists there.
+ 2. Where the set carries a finite entry, take the quantiles `wins` of that set, and clamp the whole row between them.
+ 3. Where every entry of the set is infinite, write an infinity into every entry of the row that is not `NaN`.
+ 4. Write an all-`NaN` row where the set is empty, because no bound exists there.
 
 # Arguments
 
@@ -558,8 +561,11 @@ function cross_sectional_winsorise!(IV::Matrix{<:Number}, W0::MatNum,
         if any(isfinite, u)
             row .= clamp.(row, Statistics.quantile(u, wins[1]),
                           Statistics.quantile(u, wins[2]))
-        else
+        elseif isempty(u)
             row .= Tf(NaN)
+        else
+            # Every variance of the set is zero, so both bounds are infinite.
+            row .= ifelse.(isnan.(row), row, Tf(Inf))
         end
     end
     return nothing
@@ -571,11 +577,14 @@ Cap the inverse variance weights of each observation at a multiple of their medi
 
 The cap is the second of the two bounds, and it is what answers an asset whose estimated variance is exactly zero: its entry is infinite, and it leaves at `ratio` times the median, so the observation still returns a weight. The normalisation puts the row on the same scale as the capitalisation component, so the blend of the two realises the shrinkage the caller wrote.
 
+When half or more of the entries are infinite, the median is infinite and the cap does not bind. The row then takes the limit of the normalised row as those variances go to zero together: each infinite entry gets an equal share, and each finite entry gets zero. A row whose entries are all infinite gets equal shares the same way.
+
 # Algorithm
 
- 1. For each observation, record whether the row carries a finite entry.
+ 1. For each observation, record whether the row carries an entry that is not `NaN`.
  2. Take the median of the entries that are not `NaN`, and cap the row at `ratio` times it.
- 3. Divide the row by the sum of its entries that are not `NaN`.
+ 3. Where no entry is infinite after the cap, divide the row by the sum of its entries that are not `NaN`.
+ 4. Where ``n`` entries are still infinite, write ``1 / n`` into each of them and zero into every finite entry.
 
 # Arguments
 
@@ -584,7 +593,7 @@ The cap is the second of the two bounds, and it is what answers an asset whose e
 
 # Returns
 
-  - `ready::BitVector`: One entry per observation, `true` where the row carries a usable inverse variance estimate. A row that answers `false` is untouched.
+  - `ready::BitVector`: One entry per observation, `true` where the row carries an inverse variance estimate that is not `NaN`. A row that answers `false` is untouched.
 
 # Examples
 
@@ -608,16 +617,23 @@ julia> IV
 """
 function cross_sectional_median_cap!(IV::Matrix{<:Number}, ratio::Real)::BitVector
     ready = falses(size(IV, 1))
-    u = eltype(IV)[]
+    Tf = eltype(IV)
+    u = Tf[]
     for t in axes(IV, 1)
         row = view(IV, t, :)
-        ready[t] = any(isfinite, row)
+        ready[t] = any(!isnan, row)
         if !ready[t]
             continue
         end
         append!(empty!(u), Iterators.filter(!isnan, row))
         row .= min.(row, Statistics.median!(u) * ratio)
-        row ./= sum(append!(empty!(u), Iterators.filter(!isnan, row)))
+        n = count(isinf, row)
+        if iszero(n)
+            row ./= sum(append!(empty!(u), Iterators.filter(!isnan, row)))
+        else
+            # The limit as the zero variances go to zero together: equal shares for them.
+            row .= ifelse.(isnan.(row), row, ifelse.(isinf.(row), one(Tf) / n, zero(Tf)))
+        end
     end
     return ready
 end
