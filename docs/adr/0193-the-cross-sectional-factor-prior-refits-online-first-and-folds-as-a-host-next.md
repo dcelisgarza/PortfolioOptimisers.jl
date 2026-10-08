@@ -259,9 +259,11 @@ The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton
   ([#1601](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1601)). A Pinned Choice and
   a named member never move, so both pass.
 - `lookback` and `supports_partial_fit` are `public`, because a user subtype implements them to
-  pass `FoldOnly()`. The stateful seam of a Descriptor (`descriptor_step`, `carry_lookback`, a state
-  in `cache`) becomes `public` when a second family uses it
-  ([#1586](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1586)).
+  pass `FoldOnly()`. The stateful seam of a Descriptor is `public` too: `descriptor_step` and
+  `carry_lookback`, with the state in a field of the Descriptor. The exponentially weighted mean
+  Descriptors are its second family, after the rolling return
+  ([#1586](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1586)). A subtype that
+  implements both verbs folds on the carry with no change to the prior.
 
 ## Considered options
 

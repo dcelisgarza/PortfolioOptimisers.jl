@@ -1079,6 +1079,87 @@ end
         @test isa(last(last(s).pe.cache.xf[2]).descriptors[1].cache,
                   po.RollingLogReturnState)
     end
+    @testset "An EW mean Descriptor folds one row from its carried state (#1586)" begin
+        # The state runs the recursion from the first observation with the arithmetic of the
+        # batch call, so each folded row equals the batch call to the last bit, in blocks of
+        # any size. A skip reads the log returns of the ring of the state. A second step from
+        # the same state gives the same rows, because a step copies the state.
+        syn = synthetic_asset_panel(; n_assets = 60, n_observations = 160, n_industries = 4,
+                                    rng = StableRNG(1586)).rd
+        blocks = ((1, 1), (2, 30), (31, 31), (32, 100), (101, 160))
+        for de in (EWMomentum(; half_life = 10, skip = 5),
+                   EWMean(; decay = 0.9, min_obs = 3, exponentiate = true),
+                   EWShareTurnover(; half_life = 5), EWAmihudIlliquidity(; half_life = 7),
+                   DaysToCover(; half_life = 4),
+                   EWVolumeRatio(; num = nothing, den = "adj_close", decay = 0.7, min_obs = 2))
+            full = descriptor(de, syn)
+            st = de
+            for (a, b) in blocks
+                r = po.descriptor_step(st, rows(syn, a:b))
+                @test same(r.D, full[a:b, :])
+                @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
+                @test same(partial_fit!(st, rows(syn, a:b)).cache.s, r.de.cache.s)
+                st = r.de
+            end
+            @test count(isfinite, full) > 8000
+            c = copy(st.cache)
+            @test c.s == st.cache.s && c.s !== st.cache.s && c.n == st.cache.n
+            @test occursin("cannot merge two states fitted on disjoint blocks",
+                           message(() -> po.merge_states(c, st.cache)))
+            @test occursin("carries 60 assets, and the step brings 5",
+                           message(() -> po.descriptor_step(st,
+                                                            po.port_opt_view(rows(syn, 1:2),
+                                                                             1:5))))
+        end
+        @test length(partial_fit!(EWMomentum(; skip = 5), syn).cache.buf) == 6
+        # The state of a ratio holds no ring, so an EWMean refuses it.
+        ratio = partial_fit!(DaysToCover(; half_life = 4), rows(syn, 1:5)).cache
+        @test occursin("holds no ring of log returns",
+                       message(() -> po.descriptor_step(EWMean(; decay = 0.5, min_obs = 1,
+                                                               cache = ratio),
+                                                        rows(syn, 6:7))))
+        @test occursin("hold one entry per asset, got 2 and 1",
+                       message(() -> po.EWMeanState(; s = [0.0, 0.0], n = [0])))
+        @test po.show_fields(EWMean(; decay = 0.5, min_obs = 1)) ==
+              (:decay, :min_obs, :skip, :exponentiate)
+        # On the carry fold each Descriptor counts as one row, so the carry keeps the rows of
+        # the lag alone, and the exposures of every step equal those of the batch fit.
+        ew = ["market" => ConstantExposure(),
+              "momentum" => CompositeExposure(;
+                                              descriptors = [EWMomentum(; half_life = 10, skip = 5),
+                                                             BookToPrice()]),
+              "liquidity" => CompositeExposure(;
+                                               descriptors = [EWShareTurnover(; half_life = 5),
+                                                              DaysToCover(; half_life = 4)]),
+              "industry" => OneHotExposure(; field = "industry", family = "industry")]
+        pe = CrossSectionalFactorPrior(; lambda = 1, factors = ew,
+                                       families = ["industry" => nothing], minra = 5,
+                                       pe = GRID_PE, ve = GRID_VE)
+        @test isnothing(po.lookback(pe))
+        @test po.cross_sectional_carry_rows(pe) == 2
+        e = (0, 50, 80, 81, 120, 121, 160)
+        s = stream(pe, syn, e)
+        fitted = 0
+        for (k, x) in enumerate(s)
+            b = try
+                batch(pe, k, syn, e)
+            catch err
+                err
+            end
+            if isa(b, LowOrderPrior)
+                fitted += 1
+                @test same(x.pr.rr.Ms, b.rr.Ms)
+                @test same(x.pr.mu, b.mu) && same(x.pr.sigma, b.sigma)
+            else
+                @test typeof(x.pr) == typeof(b)
+            end
+        end
+        # The case reads out at least once, so the loop is not vacuous.
+        @test fitted >= 3
+        @test size(last(s).pe.cache.win.X, 1) == 2
+        @test all(d -> isa(d.cache, po.EWMeanState),
+                  last(last(s).pe.cache.xf[3]).descriptors)
+    end
 
     @testset "The Descriptor scores of a Return Forecast fold their stateful Descriptors (#1587)" begin
         # A Descriptor of the scores that carries a state reads the rows of the step alone, so
