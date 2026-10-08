@@ -26,9 +26,10 @@ $(DocStringExtensions.FIELDS)
                              lv1 = nothing, lv = nothing, W = nothing, vs = nothing,
                              ve = nothing, ve1 = nothing, pe = nothing,
                              seed::Integer = 0, hist = nothing, S = nothing,
-                             Sc = nothing) -> CrossSectionalCarryState
+                             Sc = nothing,
+                             tip::Base.RefValue{Int} = Ref(0)) -> CrossSectionalCarryState
 
-Keywords correspond to the struct's fields, and every field but `buf` defaults to `nothing`, or to `0` for `seed`. The default is the empty state that a first step builds.
+Keywords correspond to the struct's fields, and every field but `buf` and `tip` defaults to `nothing`, or to `0` for `seed`. `tip` defaults to a new counter at `0`. The default is the empty state that a first step builds.
 
 # Related
 
@@ -155,6 +156,10 @@ Keywords correspond to the struct's fields, and every field but `buf` defaults t
     The standardised idiosyncratic returns of every fitted observation with no fill, which the idiosyncratic correlation reads, or `nothing` before the first fit and when the threshold `th` of the prior is zero.
     """
     Sc
+    """
+    The number of observations that the newest state of this lineage folded. Every state that a step derives from this one shares the counter. A history appends in place only when the state is the newest one, as [`cross_sectional_carry_own`](@ref) checks.
+    """
+    tip
 end
 function CrossSectionalCarryState(; buf::SampleBufferState = SampleBufferState(),
                                   win::Option{<:ReturnsResult} = nothing, der = nothing,
@@ -165,10 +170,11 @@ function CrossSectionalCarryState(; buf::SampleBufferState = SampleBufferState()
                                   csr = nothing, lv1 = nothing, lv = nothing, W = nothing,
                                   vs = nothing, ve = nothing, ve1 = nothing, pe = nothing,
                                   seed::Integer = 0, hist = nothing, S = nothing,
-                                  Sc = nothing)::CrossSectionalCarryState
+                                  Sc = nothing,
+                                  tip::Base.RefValue{Int} = Ref(0))::CrossSectionalCarryState
     return CrossSectionalCarryState(buf, win, der, nf, fam, Ms, X, Xl, obs, bw, mcap, amsk,
                                     emsk, sums, families, fcb, Z, csr, lv1, lv, W, vs, ve,
-                                    ve1, pe, seed, hist, S, Sc)
+                                    ve1, pe, seed, hist, S, Sc, tip)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -200,7 +206,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Copies a [`CrossSectionalCarryState`](@ref), so that the copy shares no array and no folded state with the original.
+Copies a [`CrossSectionalCarryState`](@ref), so that the copy shares no array and no folded state with the original. The copy starts a lineage of its own, so its first step appends to its histories in place.
 
 # Arguments
 
@@ -217,8 +223,9 @@ Copies a [`CrossSectionalCarryState`](@ref), so that the copy shares no array an
 """
 function Base.copy(x::CrossSectionalCarryState)
     fns = fieldnames(CrossSectionalCarryState)
-    return CrossSectionalCarryState(;
-                                    NamedTuple{fns}(map(f -> deepcopy(getfield(x, f)), fns))...)
+    c = CrossSectionalCarryState(;
+                                 NamedTuple{fns}(map(f -> deepcopy(getfield(x, f)), fns))...)
+    return cross_sectional_carry_with(c, (; tip = Ref(c.buf.n)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -688,46 +695,6 @@ function cross_sectional_fold_mark(old::BitVector, new::BitVector)
     return any(i -> new[i] && !old[i], eachindex(new, old)) ? nothing : old
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Appends the rows of a block to a history, or starts the history with them.
-
-# Arguments
-
-  - `a`: The history, or `nothing`.
-  - `b`: The rows of the block. The observed factors `(; Z, R, lv, nf, fam)` of a block append their exposures and their returns, and keep the names of `a`.
-
-# Returns
-
-  - `h`: `a` followed by `b` along the observation axis.
-
-# Related
-
-  - [`cross_sectional_carry_fold`](@ref)
-"""
-function cross_sectional_fold_append(::Nothing, b)
-    return b
-end
-function cross_sectional_fold_append(a::AbstractMatrix, b::AbstractMatrix)
-    return vcat(a, b)
-end
-function cross_sectional_fold_append(a::AbstractArray{<:Any, 3}, b::AbstractArray{<:Any, 3})
-    return cat(a, b; dims = 1)
-end
-function cross_sectional_fold_append(a::FactorFamilyBasis, b::FactorFamilyBasis)
-    return FactorFamilyBasis(; fnm = a.fnm, fi = a.fi, di = a.di,
-                             ratios = vcat(a.ratios, b.ratios), K = a.K)
-end
-function cross_sectional_fold_append(a::CrossSectionalRegression,
-                                     b::CrossSectionalRegression)
-    return CrossSectionalRegression(; f = vcat(a.f, b.f), eps = vcat(a.eps, b.eps),
-                                    n = vcat(a.n, b.n), b = nothing, h1 = vcat(a.h1, b.h1))
-end
-function cross_sectional_fold_append(a::NamedTuple, b::NamedTuple)
-    return (; Z = cat(a.Z, b.Z; dims = 1), R = vcat(a.R, b.R), lv = a.lv, nf = a.nf,
-            fam = a.fam)
-end
-"""
     cross_sectional_fold_factor_returns(f::MatNum, lv::AbstractVector{Bool}, cb::Nothing)
     cross_sectional_fold_factor_returns(f::MatNum, lv::AbstractVector{Bool},
                                         cb::NamedTuple)
@@ -1045,7 +1012,8 @@ function cross_sectional_fold_step(pe::CrossSectionalFactorPrior,
                                       (; fcb = cross_sectional_fold_append(st.fcb, fb.fcb),
                                        Z = Zc[(m + 1):end, :, :],
                                        csr = cross_sectional_fold_append(st.csr, reg.csr),
-                                       W = vcat(st.W, reg.W), vs = vcat(st.vs, V), ve = ve,
+                                       W = cross_sectional_fold_append(st.W, reg.W),
+                                       vs = cross_sectional_fold_append(st.vs, V), ve = ve,
                                        ve1 = reg.ve1, pe = pf))
 end
 """
@@ -1119,8 +1087,8 @@ function cross_sectional_carry_append(pe::CrossSectionalFactorPrior,
     Tf = size(st.Ms, 1)
     r = (pe.lag + 1):Tf
     cb = cross_sectional_observed_block(st.obs, 1:Tf, r, st.buf.n - Tf)
-    ca = cross_sectional_observed_append(cb, st.csr.f, st.Z[end, :, :], st.Ms[r, :, :],
-                                         st.nf, st.fam, st.fcb)
+    ca = cross_sectional_observed_append(cb, st.csr.f, st.Z[end, :, :],
+                                         view(st.Ms, r, :, :), st.nf, st.fam, st.fcb)
     return (; r = r, ca = ca)
 end
 """
@@ -1226,8 +1194,9 @@ An unwrapped prior follows the rule of the carry fold: it folds what folds and r
 
 # Algorithm
 
- 1. Seed an empty [`CrossSectionalCarryState`](@ref) when `pe.cache` is `nothing`.
- 2. Fold `rd` with [`cross_sectional_carry_fold`](@ref), and rebuild the prior with the state it returns.
+ 1. Seed an empty [`CrossSectionalCarryState`](@ref) when `pe.cache` is `nothing`. Copy a state that is not the newest one of its lineage with [`cross_sectional_carry_own`](@ref), because the step appends to its histories in place.
+ 2. Fold `rd` with [`cross_sectional_carry_fold`](@ref). The step succeeded, so record the state it returns as the newest one of its lineage in `tip`. A step that throws leaves the counter, and the next step of the same state writes the same spare rows.
+ 3. Rebuild the prior with the state.
 
 # Arguments
 
@@ -1259,8 +1228,14 @@ function partial_fit!(pe::CrossSectionalFactorPrior{<:Any, <:Any, <:Any, <:Any, 
                                                     <:Any, <:Any, <:Any, <:Any,
                                                     <:Option{<:CrossSectionalCarryState}},
                       rd::ReturnsResult)
-    st = isnothing(pe.cache) ? CrossSectionalCarryState() : pe.cache
-    return rebuild_estimator(pe, (; cache = cross_sectional_carry_fold(pe, st, rd)))
+    st = if isnothing(pe.cache)
+        CrossSectionalCarryState()
+    else
+        cross_sectional_carry_own(pe.cache)
+    end
+    st = cross_sectional_carry_fold(pe, st, rd)
+    st.tip[] = st.buf.n
+    return rebuild_estimator(pe, (; cache = st))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1313,8 +1288,8 @@ function prior(pe::CrossSectionalFactorPrior, st::CrossSectionalCarryState;
     # The histories hold every observation after the warm-up, the last `Tf` of the `buf.n`
     # the fold read, so the fitted rows sit at these positions of the folded returns.
     fit = (; csr = csr, W = st.W, vs = st.vs, cnt = variance_count(st.ve, csr.eps),
-           amr = st.amsk[r, :], bwr = st.bw[r, :], Xo = st.X[r, :], r = r, hist = st.hist,
-           S = st.S, Sc = st.Sc, idx = (st.buf.n - Tf) .+ r, ts = nothing)
+           amr = view(st.amsk, r, :), bwr = view(st.bw, r, :), Xo = view(st.X, r, :), r = r,
+           hist = st.hist, S = st.S, Sc = st.Sc, idx = (st.buf.n - Tf) .+ r, ts = nothing)
     return cross_sectional_assemble(pe, f_pr, ca, fit,
                                     cross_sectional_carry_forecast_returns(pe, st);
                                     kwargs...)

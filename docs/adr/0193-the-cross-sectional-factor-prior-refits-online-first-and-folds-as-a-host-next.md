@@ -66,6 +66,10 @@ tenth to the EW moments, which already fold exactly.
    is not an `EmpiricalPrior` at each call with no data, and a variance estimator that does not fold, such as
    a rolling window, by a fit of every carried observation at each step. The call with no data builds the
    result with the code of the batch fit, so the two routes differ only in how they reach its inputs.
+   A step appends its rows to the histories in place, into the spare rows of a backing array, as
+   the Sample Buffer does, and each state keeps a view of its own rows (#1564). A step of a state
+   that a later step passed copies the state first, so the later state and the results read out of
+   it keep their rows.
 3. The folds of the Descriptors and of the return forecast are not specified yet. They can come one
    family at a time.
 

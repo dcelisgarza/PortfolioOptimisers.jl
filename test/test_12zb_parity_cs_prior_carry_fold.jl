@@ -421,6 +421,37 @@ end
         @test agrees(prior(e1), p1) && agrees(prior(e2), batch(pe, 2))
     end
 
+    @testset "A step appends to the histories in place (#1564)" begin
+        # A step writes its rows into the spare rows of the backing of each history, and each
+        # state keeps the view of its own rows.
+        pe = CrossSectionalFactorPrior(; lambda = 1, style...)
+        e = (0, 90, 91, 92, 93)
+        s = stream(pe, rd, e)
+        st2, st4 = s[2].pe.cache, s[4].pe.cache
+        @test st4.Ms isa SubArray && parent(st4.Ms) === parent(st2.Ms)
+        @test parent(st4.csr.f) === parent(st2.csr.f) && parent(st4.vs) === parent(st2.vs)
+        @test size(st2.Ms, 1) + 2 == size(st4.Ms, 1)
+        # An earlier estimator reads its own rows after a later step. The factor prior folds
+        # in place, so its moments read the later state, and the rows are compared alone.
+        function rows_agree(x, b)
+            return same(x.rr.csr.f, b.rr.csr.f) &&
+                   same(x.rr.vs, b.rr.vs) &&
+                   same(x.rr.Ms, b.rr.Ms) &&
+                   same(x.rr.rw, b.rr.rw) &&
+                   x.rr.idx == b.rr.idx
+        end
+        @test all(k -> rows_agree(prior(s[k].pe), s[k].pr), 1:4)
+        # A second step of an earlier state copies its histories, so the later state and the
+        # Result read out of it keep their rows.
+        H = deepcopy((st4.Ms, st4.X, st4.csr.f, st4.vs, st4.W))
+        rdz = deepcopy(rd)
+        rdz.X[92:93, :] .*= 1.5
+        b = partial_fit!(s[2].pe, rows(rdz, 92:93))
+        @test parent(b.cache.Ms) !== parent(st4.Ms)
+        @test isequal(H, (st4.Ms, st4.X, st4.csr.f, st4.vs, st4.W))
+        @test agrees(s[4].pr, batch(pe, 4, rd, e))
+    end
+
     @testset "An observed factor (#1479)" begin
         # The carry derives each row of the returns net of the observed factors one time, from
         # the observed exposures of the row `lag` observations before it, and carries the row.

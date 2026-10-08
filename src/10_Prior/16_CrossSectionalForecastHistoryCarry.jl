@@ -141,7 +141,7 @@ function cross_sectional_carry_history(pe::CrossSectionalFactorPrior,
     csfm = CrossSectionalFactorModel(; M = ca.Ms[end, :, :],
                                      b = zeros(real(eltype(st.vs)), size(st.X, 2)),
                                      csr = st.csr, Ms = ca.Ms, vs = st.vs, rw = st.W,
-                                     bw = st.bw[r, :], nf = ca.nf, fam = ca.fam,
+                                     bw = view(st.bw, r, :), nf = ca.nf, fam = ca.fam,
                                      lag = pe.lag, fx = ca.fx)
     rows = return_forecast_rows(rd, csfm)
     # The rows are the history of the member that the batch fit reads under its Orthogonal
@@ -154,7 +154,7 @@ function cross_sectional_carry_history(pe::CrossSectionalFactorPrior,
                            forecast_history_block(csfm, tb)).mu
            for tb in (k + 1):(length(rows) - 1)]
     R = permutedims(reduce(hcat, new))
-    return cross_sectional_carry_with(st, (; hist = isnothing(H) ? R : vcat(H, R)))
+    return cross_sectional_carry_with(st, (; hist = cross_sectional_fold_append(H, R)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
