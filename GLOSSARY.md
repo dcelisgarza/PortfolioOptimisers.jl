@@ -45,6 +45,10 @@ A whole-sample choice that moves, a Batch Choice of a dropped member or a factor
 *Avoid*: reading it as a refit; it fits no past observation again unless a whole-sample choice moves or a member does not fold.
 A scheme under `Online` buffers nothing: the same word there declares an Online Scheme, and the loop steps instead of refitting. ADR 0167.
 
+**Carry Rule**
+What a Carry Fold does with a member whose step costs more as the stream grows: a Descriptor with no finite look-back and no state of its own, a variance or a factor prior that does not fold, or a part that refits over every carried row. **Fold or Refit**, the default, is the rule of ADR 0136: the member is fitted again over every row it needs, so the step stays exact and its cost grows with the stream. **Fold Only** refuses such a member when the estimator is built, so every step it takes has a cost that does not grow. A member that reads a bounded window passes both rules. The rule is a field of the estimator that folds as a carry. ADR 0193, #1590.
+*Avoid*: reading Fold Only as a faster route; it changes no value and no cost, it only refuses a configuration whose step grows.
+
 **Scenario Cap**
 The number of observations a fold-and-carry Prior Estimator keeps in its Result's `X`, written `max_scenarios` and applied in batch and online alike. It bounds memory and the zero-filled share a Scenario Fill reports, and it does **not** move `mu` or `sigma`, which stay fitted over every observation — so a capped fit equals no batch fit, and that divergence is documented rather than tested. ADR 0136. A capped Result states the count its moments were fitted over in `ens`, so a consumer that prices a sample size — an Uncertainty Set (§3.9), a calibration rule — reads that count and not the rows carried; only a bootstrap, which can resample nothing but the rows carried, reads the cap. ADR 0138.
 *Avoid*: reading `size(X, 1)` of a capped Result as its sample size; that is the number of scenarios it carries.

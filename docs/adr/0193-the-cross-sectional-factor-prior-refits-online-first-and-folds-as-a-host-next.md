@@ -216,6 +216,31 @@ Result, and it aligns the fitted observations with the last rows of its returns 
 keeps every row under it, unless the forecast folds. A forecast that folds reads the look-back of its
 Descriptors alone. The output is exact in every case.
 
+### The Carry Rule
+
+Some members make the cost of a step grow with the stream: a Descriptor or an Exposure member with
+no finite look-back and no state, a Return Forecast that reads the panel, a `ve` that does not fold,
+a factor prior `pe` that does not fold, and the idiosyncratic correlation (`th > 0`) while it refits
+at each read-out. The oracle refuses each of them on its fold. Ours fits them again over the rows
+that they need, so the step stays exact
+([#1590](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1590)).
+
+The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton types:
+
+| Rule | Meaning |
+| --- | --- |
+| `FoldOrRefit()` | The default, the rule of ADR 0136. A member that does not fold is fitted again at each step. Its cost is documented. |
+| `FoldOnly()` | The constructor refuses a prior with a member whose step grows, and names each one. A bounded window passes. |
+
+- The refusal is in the constructor, because every test reads the configuration alone, and an
+  error must come as early as possible. A batch fit and `Online` ignore the rule, but a caller who
+  writes `FoldOnly()` asked for it.
+- The Choice Rule is not part of the test. A Batch Choice refits only when the choice moves.
+- `lookback` and `supports_partial_fit` are `public`, because a user subtype implements them to
+  pass `FoldOnly()`. The stateful seam of a Descriptor (`descriptor_step`, `carry_lookback`, a state
+  in `cache`) becomes `public` when a second family uses it
+  ([#1586](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1586)).
+
 ## Considered options
 
 - **The full fold of the oracle, now.** Rejected for now. It gives an O(1) step, but it needs about
@@ -240,6 +265,15 @@ Descriptors alone. The output is exact in every case.
 - **A pinned choice by default.** Rejected. It breaks the identity of the online call with no data and the batch
   fit when the choice moves. It stays one keyword away.
 - **A cap on the carried panel.** Rejected. It is not exact with an EW Descriptor.
+- **Refuse a member that does not fold, as the oracle does.** Rejected as the default. The refit is
+  exact and costs the user nothing to write. It stays one keyword away as `FoldOnly()`.
+- **Warn once, then refit.** Rejected. A cost is documented, not warned.
+- **A `Bool` field for the strict rule.** Rejected. The Choice Rule and the repair rule of the same
+  prior are singleton types, and a third rule can join the family with no breaking change.
+- **The refusal at the entry of `partial_fit!`.** Rejected. It keeps a prior constructible for a
+  batch fit, but the error comes later than the configuration lets it.
+- **Refuse every member with no state, a bounded window too.** Rejected. A bounded window has a
+  cost that does not grow.
 
 ## Consequences
 
@@ -255,6 +289,8 @@ Descriptors alone. The output is exact in every case.
   the Exogenous Series) and
   [#1479](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1479) (the carry fold
   takes an observed factor).
+- [#1602](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1602) builds the Carry
+  Rule, a child of sub-map #1562.
 - ADR 0136 and ADR 0039 carry amendments that point here.
 - A pinned choice and a seed window are two routes on which the online call with no data equals no batch fit.
   Each is documented, and each is tested against the oracle.
