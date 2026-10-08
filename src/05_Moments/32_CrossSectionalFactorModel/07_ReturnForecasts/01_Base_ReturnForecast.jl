@@ -241,6 +241,7 @@ function return_forecast_block_observations(csfm::CrossSectionalFactorModel)::Op
 end
 """
     return_forecast_rows(rd::ReturnsResult, csfm::CrossSectionalFactorModel) -> AbstractUnitRange
+    return_forecast_rows(Tc::Integer, csfm::CrossSectionalFactorModel) -> AbstractUnitRange
 
 Return the rows of the returns data the histories of a factor-model block live on.
 
@@ -265,6 +266,7 @@ Where:
 # Arguments
 
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+  - `Tc`: Number of observations of the returns data, in place of `rd`. [`return_forecast_step`](@ref) reads it off the scores it gets.
   - `csfm`: The fitted factor-model block.
 
 # Validation
@@ -285,7 +287,10 @@ Where:
 """
 function return_forecast_rows(rd::ReturnsResult,
                               csfm::CrossSectionalFactorModel)::AbstractUnitRange
-    Tc = size(descriptor_asset_panel(rd).amsk, 1)
+    return return_forecast_rows(size(descriptor_asset_panel(rd).amsk, 1), csfm)
+end
+function return_forecast_rows(Tc::Integer,
+                              csfm::CrossSectionalFactorModel)::AbstractUnitRange
     Tb = return_forecast_block_observations(csfm)
     if isnothing(Tb)
         return 1:Tc

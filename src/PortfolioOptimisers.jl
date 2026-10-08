@@ -209,6 +209,7 @@ include("05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/11_ForecastF
 include("05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl")
 include("05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl")
 include("05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl")
+include("05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/15_TargetReturnForecastStep.jl")
 include("05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl")
 include("05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl")
 include("05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl")

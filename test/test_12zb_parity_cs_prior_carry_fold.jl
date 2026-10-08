@@ -890,6 +890,104 @@ end
         @test st0.fst.A == A0
     end
 
+    @testset "A Target Return Forecast folds one row from its prequential state (#1581)" begin
+        # Under the prequential rule with a LinearModel of no keyword argument, the batch fit
+        # and a step run one fold, `return_forecast_step`. The state carries the normal
+        # equations, the two calibration regressions and the coefficients of the rows whose
+        # target has not matured, so the carry keeps the panel rows of the look-back alone.
+        # The Reversal score over the cut rows is a difference of cumulative sums from another
+        # first row (#1470), so the cases agree to rounding.
+        sharpe = IdiosyncraticSharpeUnit()
+        ind = grid_config("FamOne", rd).factors
+        ds = DescriptorScores(;
+                              descriptors = [Passthrough(; field = "net_income_ttm"),
+                                             Reversal(; window = 30),
+                                             GrowthRate(; field = "sales_ttm", lag = 5)],
+                              group = "industry")
+        tf(; kw...) = TargetReturnForecast(; scores = ds, half_life = 10.0, kw...)
+        fk = (; lambda = 0.4, c = 0.6, minra = 5, pe = GRID_PE, ve = GRID_VE)
+        wv = WindowedVariance(;
+                              ve = ExpWeightedVariance(; decay = 2.0^(-1 / 20),
+                                                       min_obs = 5), window = 60)
+        coef(rf) = isnothing(rf.model) ? Float64[] : po.StatsAPI.coef(rf.model)
+        function slope(a, b)
+            return isequal(a, b) || isapprox(a, b; rtol = 1e-12)
+        end
+        # The carry equals the batch fit at each step, and returns the same refusal.
+        function check(pe, ee, r = rd)
+            xs = stream(pe, r, ee)
+            for (k, x) in enumerate(xs)
+                b = try
+                    batch(pe, k, r, ee)
+                catch err
+                    err
+                end
+                if !isa(b, LowOrderPrior)
+                    @test typeof(x.pr) == typeof(b)
+                    continue
+                end
+                rf, rb = x.pr.rr.rf, b.rr.rf
+                @test relerr(x.pr.mu, b.mu) < 1e-13 && relerr(x.pr.sigma, b.sigma) < 1e-13
+                @test relerr(rf.mu, rb.mu) < 1e-13 && isequal(isnan.(rf.mu), isnan.(rb.mu))
+                @test relerr(coef(rf), coef(rb)) < 1e-12
+                @test slope(rf.calib, rb.calib)
+                @test isnothing(rf.ocalib) == isnothing(rb.ocalib)
+                @test isnothing(rf.ocalib) || slope(rf.ocalib, rb.ocalib)
+                st = x.pe.cache
+                @test size(st.fh, 1) == size(st.vs, 1)
+                @test size(st.fst.B, 1) <= po.forecast_target_gap(pe.rfe)
+            end
+            return xs
+        end
+        e = (0, 90, 91, 92, 93, 170, 250)
+        # The default, a Sharpe unit with an intercept, the calibration of the orthogonal
+        # part, a member that reads the block alone with a gap of three rows, a batch choice
+        # that moves at the second step, and a rolling variance that refits every step. The
+        # last two fit every observation again from the scores that the state carries.
+        for cfg in
+            ((; fk..., factors = ind, families = ["industry" => nothing], rfe = tf()),
+             (; fk..., factors = ind, rfe = tf(; unit = sharpe, intercept = true)),
+             (; fk..., factors = ind, ofit = OrthogonalPartCalibration(), rfe = tf()),
+             (; fk..., factors = ind, lag = 2, ofit = UnadjustedForecast(),
+              rfe = tf(; whole_history = false, horizon = 2, lag = 2)),
+             (; style..., fk..., rfe = tf()), (; style..., fk..., ve = wv, rfe = tf()))
+            pe = CrossSectionalFactorPrior(; cfg...)
+            @test po.folds_forecast_rows(pe.rfe)
+            @test po.cross_sectional_carry_rows(pe) == po.lookback(pe) == 30
+            xs = check(pe, e)
+            @test all(x -> size(x.pe.cache.win.X, 1) == 30, xs)
+        end
+        # Under `whole_history` a row before the block trains the fit when its forward window
+        # reaches into the block. With a gap of four rows the first row before the block
+        # matures at the fourth block row, after the first fit, so a step reads it again.
+        pas = DescriptorScores(;
+                               descriptors = [Passthrough(; field = "net_income_ttm"),
+                                              Passthrough(; field = "sales_ttm")])
+        pe = CrossSectionalFactorPrior(; style..., fk...,
+                                       rfe = TargetReturnForecast(; scores = pas, lag = 4,
+                                                                  half_life = 10.0))
+        @test po.cross_sectional_carry_rows(pe) == 2
+        check(pe, (0, 3, 4, 5, 6, 7, 8, 12, 40))
+        # A horizon above one under `whole_history` trains on rows of the Descriptor warm-up,
+        # and the carry keeps none, so the member refits from every row.
+        h2 = CrossSectionalFactorPrior(; fk..., factors = ind, rfe = tf(; horizon = 2))
+        @test !po.folds_forecast_rows(h2.rfe)
+        @test isnothing(po.cross_sectional_carry_rows(h2))
+        # A slot that reads the history reads the rows of the fold: the row of an
+        # observation is the forecast of a fit through that observation.
+        rl, bl = CarryHistoryShrinkage(), CarryHistoryShrinkage()
+        cfg = (; fk..., factors = ind, rfe = tf())
+        pc = CrossSectionalFactorPrior(; cfg..., lambda = rl)
+        pb = CrossSectionalFactorPrior(; cfg..., lambda = bl)
+        for (k, x) in enumerate(stream(pc, rd, e))
+            b = batch(pb, k, rd, e)
+            @test relerr(rl.seen[k], bl.seen[k]) < 1e-13
+            @test isequal(isnan.(rl.seen[k]), isnan.(bl.seen[k]))
+            @test isapprox(x.pr.rr.lambda, b.rr.lambda; rtol = 1e-12)
+            @test size(x.pe.cache.hist, 1) == size(x.pe.cache.fh, 1) - 1
+        end
+    end
+
     @testset "Refusals" begin
         pe = CrossSectionalFactorPrior(; lambda = 1, style...)
         m = message(() -> prior(partial_fit!(pe, rows(rd, 1:2))))

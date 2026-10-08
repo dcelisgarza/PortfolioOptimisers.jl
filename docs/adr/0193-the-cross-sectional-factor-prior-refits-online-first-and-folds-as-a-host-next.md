@@ -76,6 +76,9 @@ tenth to the EW moments, which already fold exactly.
    `forecast_target_gap` rows before them, whose targets mature at the step. `FixedWeightedReturnForecast`
    folds with no fold state (#1573). `ExpWeightedReturnForecast` carries its normal equations, its
    count and its coefficients, because its batch fit is the same forward recursion (#1574).
+   `TargetReturnForecast` under its prequential default carries its normal equations, its model,
+   its two calibration regressions and the coefficients of the rows whose target has not matured,
+   and its batch fit runs the same step from an empty state (#1581, ADR 0200).
 
 ### The Sample Buffer holds the panel
 

@@ -8,7 +8,7 @@ jet = "0.12.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "ae35b04329"
+commit = "be176ad877"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -174,6 +174,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/15_TargetReturnForecastStep.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }
@@ -581,6 +582,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/15_TargetReturnForecastStep.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }

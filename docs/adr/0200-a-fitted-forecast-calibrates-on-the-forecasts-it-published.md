@@ -88,9 +88,18 @@ values.
   columns, its coefficients equal those of `GLM.LinearModel` to 1.2e-15 relative, and a collinear
   column takes the same zero coefficient.
 - `target_forecast_uncalibrated` takes the number of assets as a last argument.
-- This ADR builds the rule in the batch fit. The carry fold of `CrossSectionalFactorPrior` still
-  refits the member over every row (`folds_forecast_rows` answers `false`). A sub-ticket of #1562
-  gives it a step that continues the fold from a carried state.
+- One function, `return_forecast_step`, runs the rule (#1581). The batch fit runs it over every
+  observation from an empty state. A step of the carry fold of `CrossSectionalFactorPrior` runs it
+  over the new observations and the observations whose target matures at the step, from the state
+  that the carry keeps: the normal equations, the model, the two calibration regressions, and the
+  coefficients that predicted the observations whose target has not matured. So the carry keeps
+  the panel rows of the look-back of the Descriptors alone, and the step and the batch fit do the
+  same arithmetic. Under `whole_history` with `horizon > 1`, a row of the Descriptor warm-up of
+  the prior trains the fit, and the carry keeps no such row, so the member refits over every row
+  there (`folds_forecast_rows` answers `false`).
+- The forecast that the member publishes at an observation is the forecast of a fit through that
+  observation. So the carry gives a slot that reads the Return Forecast history the rows of the
+  fold, and fits no member again for it.
 - [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-five-differences-are-deliberate.md)
   states the warm-up under a cross-validation estimator, and
   [ADR 0194](0194-a-fitted-return-forecast-neutralises-its-scores-so-its-orthogonal-part-carries-the-scale-of-its-fit.md)

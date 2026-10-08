@@ -1434,10 +1434,14 @@ end
             @test isapprox(q[f], p[f]; rtol = 1e-13, norm = x -> maximum(abs, x))
         end
         @testset "The model of the latest observation is the end of the fold" begin
-            m = PO.target_forecast_model(PrequentialCalibration(), LinearModel(), Sf, yf,
-                                         ok)
+            # The normal equations of every valid sample, added one sample at a time.
+            function normal(S, y)
+                XtX, Xty = zeros(size(S, 2), size(S, 2)), zeros(size(S, 2))
+                n = PO.normal_equations_add!(XtX, Xty, S, y, ok, eachindex(ok))
+                return NormalEquationsFit(XtX, Xty, n)
+            end
+            m = normal(Sf, yf)
             idx = findall(ok)
-            @test isa(m, NormalEquationsFit)
             @test m.n == length(idx)
             @test PO.StatsAPI.coef(m) ≈ Sf[idx, :] \ yf[idx]
             # One more observation, a copy of the first, reads the model of the whole fold.
@@ -1447,23 +1451,24 @@ end
             @test pe[T * N .+ js] ≈ PO.StatsAPI.predict(m, Sf[js, :])
             # A collinear column takes a zero coefficient, as GLM gives it.
             Sc = [Sf[:, 1:2] Sf[:, 1]]
-            mc = PO.target_forecast_model(PrequentialCalibration(), LinearModel(), Sc, yf,
-                                          ok)
+            mc = normal(Sc, yf)
             gc = PO.StatsAPI.fit(LinearModel(), Sc[idx, :], yf[idx])
             @test PO.StatsAPI.coef(mc) ≈ PO.StatsAPI.coef(gc)
             @test iszero(PO.StatsAPI.coef(mc)[3])
-            # A target with keyword arguments, and another rule, fit through GLM.
+            # The prequential rule with a LinearModel of no keyword argument folds its fit
+            # (#1581). A target with keyword arguments, and another rule, fit through GLM.
             gk = LinearModel(; kwargs = (; dropcollinear = true))
-            @test !isa(PO.target_forecast_model(PrequentialCalibration(), gk, Sf, yf, ok),
-                       NormalEquationsFit)
-            @test !isa(PO.target_forecast_model(KFold(), LinearModel(), Sf, yf, ok),
-                       NormalEquationsFit)
+            @test PO.target_forecast_folds(PrequentialCalibration(), LinearModel())
+            @test !PO.target_forecast_folds(PrequentialCalibration(), gk)
+            @test !PO.target_forecast_folds(KFold(), LinearModel())
         end
         @testset "The number type comes from the data" begin
+            # The fold adds BigFloat samples to BigFloat sums (#1581).
             n = 5 * N
-            pb = PO.target_forecast_prequential(LinearModel(), 1, big.(Sf[1:n, :]),
-                                                big.(yf[1:n]), ok[1:n], N)
-            @test eltype(pb) == BigFloat
+            XtX, Xty = zeros(BigFloat, K, K), zeros(BigFloat, K)
+            m = PO.normal_equations_add!(XtX, Xty, big.(Sf[1:n, :]), big.(yf[1:n]), ok[1:n],
+                                         1:n)
+            @test eltype(PO.StatsAPI.coef(NormalEquationsFit(XtX, Xty, m))) == BigFloat
             mb = NormalEquationsFit(big.([2.0 0.0; 0.0 4.0]), big.([2.0, 2.0]), 3)
             @test eltype(PO.StatsAPI.coef(mb)) == BigFloat
         end

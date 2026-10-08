@@ -11,7 +11,6 @@ target_forecast_variances
 target_forecast_alignment
 target_forecast_samples
 target_forecast_fit
-target_forecast_model
 target_forecast_uncalibrated
 target_forecast_insample
 target_forecast_prequential

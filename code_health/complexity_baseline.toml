@@ -5,7 +5,7 @@
 julia = "1.13.1"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "d1ead5ac39"
+commit = "b5f32c376e"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -168,6 +168,7 @@ commit = "d1ead5ac39"
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl" = { cyc = 7, cog = 12, arg = 7, cyc_sum = 18, cog_sum = 20, arg_sum = 43, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { cyc = 5, cog = 8, arg = 4, cyc_sum = 19, cog_sum = 21, arg_sum = 20, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { cyc = 7, cog = 12, arg = 3, cyc_sum = 38, cog_sum = 37, arg_sum = 20, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/15_TargetReturnForecastStep.jl" = { cyc = 9, cog = 13, arg = 4, cyc_sum = 45, cog_sum = 41, arg_sum = 4, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { cyc = 7, cog = 14, arg = 5, cyc_sum = 129, cog_sum = 135, arg_sum = 121, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { cyc = 8, cog = 10, arg = 5, cyc_sum = 75, cog_sum = 77, arg_sum = 66, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { cyc = 6, cog = 8, arg = 5, cyc_sum = 53, cog_sum = 51, arg_sum = 45, macros = [] }
@@ -247,7 +248,7 @@ commit = "d1ead5ac39"
 "src/10_Prior/13_PriorExpectedReturns.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 10, cog_sum = 8, arg_sum = 19, macros = [] }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 11, cog_sum = 5, arg_sum = 17, macros = [] }
 "src/10_Prior/15_CrossSectionalPriorFold.jl" = { cyc = 9, cog = 14, arg = 5, cyc_sum = 78, cog_sum = 55, arg_sum = 104, macros = [] }
-"src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { cyc = 6, cog = 8, arg = 4, cyc_sum = 32, cog_sum = 33, arg_sum = 21, macros = [] }
+"src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { cyc = 6, cog = 8, arg = 6, cyc_sum = 38, cog_sum = 36, arg_sum = 41, macros = [] }
 "src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 47, cog_sum = 28, arg_sum = 82, macros = [] }
 "src/10_Prior/18_CrossSectionalCarryHistories.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 12, cog_sum = 9, arg_sum = 17, macros = [] }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 63, cog_sum = 30, arg_sum = 92, macros = [] }

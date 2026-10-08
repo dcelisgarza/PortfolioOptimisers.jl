@@ -112,8 +112,11 @@ end
                                                                 scores = DescriptorScores(;
                                                                                           descriptors = [EWMomentum()]),
                                                                 scale = 1.0)))
-        @test isnothing(PO.lookback(ExpWeightedReturnForecast(; scores = ds)))
-        @test isnothing(PO.lookback(TargetReturnForecast(; scores = ds)))
+        # An exponentially weighted forecast reads the look-back of its Descriptors too (#1574).
+        @test PO.lookback(ExpWeightedReturnForecast(; scores = ds)) === 273
+        # A Target Return Forecast reads the look-back of its Descriptors (#1581). Its fit is
+        # a fold over a state that the carry keeps, not a read of the panel rows.
+        @test PO.lookback(TargetReturnForecast(; scores = ds)) === 273
     end
 end
 
@@ -152,10 +155,10 @@ end
                                                     rfe = CustomValueReturnForecast(;
                                                                                     mu = [0.1]))) ===
               274
-        @test isnothing(PO.lookback(CrossSectionalFactorPrior(; lambda = 1,
-                                                              factors = factors,
-                                                              rfe = ExpWeightedReturnForecast(;
-                                                                                              scores = short))))
+        @test PO.lookback(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
+                                                    rfe = ExpWeightedReturnForecast(;
+                                                                                    scores = short))) ===
+              274
     end
 end
 

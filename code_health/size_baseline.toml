@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.1"
 julia_syntax = "1.0.2"
-commit = "d06599fe16"
+commit = "790afc3ec4"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -169,6 +169,7 @@ commit = "d06599fe16"
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl" = { code = 123, doc = 262, comment = 0, blank = 110, total = 495 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { code = 92, doc = 202, comment = 0, blank = 91, total = 385 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { code = 248, doc = 447, comment = 7, blank = 150, total = 852 }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/15_TargetReturnForecastStep.jl" = { code = 155, doc = 168, comment = 3, blank = 80, total = 406 }
 "src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { code = 493, doc = 796, comment = 12, blank = 365, total = 1666 }
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { code = 297, doc = 430, comment = 6, blank = 194, total = 927 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { code = 235, doc = 471, comment = 8, blank = 203, total = 917 }
