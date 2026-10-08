@@ -670,6 +670,40 @@ function calibrates_orthogonal_part(::Any)::Bool
     return false
 end
 """
+    folds_forecast_rows(rfe) -> Bool
+    folds_forecast_rows(rfe::FixedWeightedReturnForecast) -> Bool
+
+Answer whether a Return Forecast Estimator computes the rows of its history one observation at a time.
+
+The carry fold of a [`CrossSectionalFactorPrior`](@ref) asks the member. A member that answers `true` computes the row of an observation from the scores of its [`DescriptorScores`](@ref) at that observation and from the block at that observation alone. So the carry keeps the scores of every fitted observation and the rows of the history, and keeps only the panel rows that a new observation reads. The fallback answers `false`, and the carry then keeps every panel row and fits the member again at each call with no data. [`FixedWeightedReturnForecast`](@ref) answers `true`.
+
+A member that answers `true` holds its [`DescriptorScores`](@ref) in a field named `scores`, and states [`return_forecast_step`](@ref) and [`return_forecast_result`](@ref).
+
+# Arguments
+
+  - `rfe`: Return Forecast Estimator, or `nothing`.
+
+# Returns
+
+  - `flag::Bool`: Whether the member computes its history one observation at a time.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.folds_forecast_rows(CustomValueReturnForecast(; mu = [0.1]))
+false
+```
+
+# Related
+
+  - [`return_forecast_step`](@ref)
+  - [`return_forecast_result`](@ref)
+  - [`CrossSectionalCarryState`](@ref)
+"""
+function folds_forecast_rows(::Any)::Bool
+    return false
+end
+"""
     estimated_factor_columns(csfm::CrossSectionalFactorModel) -> AbstractUnitRange
 
 Return the columns of the raw factor axis of a block that hold the estimated factors.

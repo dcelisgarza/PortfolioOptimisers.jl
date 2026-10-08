@@ -1759,12 +1759,14 @@ end
     cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit, rfe::Nothing,
                                     rd::ReturnsResult, csfm::CrossSectionalFactorModel,
                                     cre::AbstractCrossSectionalRegressionEstimator,
-                                    reads::Bool, H::Option{<:MatNum}) -> NamedTuple
+                                    reads::Bool, H::Option{<:MatNum},
+                                    rf0::Nothing = nothing) -> NamedTuple
     cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit,
                                     rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
                                     csfm::CrossSectionalFactorModel,
                                     cre::AbstractCrossSectionalRegressionEstimator,
-                                    reads::Bool, H::Option{<:MatNum}) -> NamedTuple
+                                    reads::Bool, H::Option{<:MatNum},
+                                    rf0::Option{<:AbstractReturnForecastResult} = nothing) -> NamedTuple
 
 Fit the Return Forecast of a [`CrossSectionalFactorPrior`](@ref) under its Orthogonal Forecast Fit, and split it against the latest Factor Exposures.
 
@@ -1773,7 +1775,7 @@ The split is unscaled by `c`. The Orthogonal Forecast Scale `c` can be a rule th
 # Algorithm
 
  1. Take the member that the prior fits with [`orthogonal_forecast_member`](@ref), giving `rfo`. Under [`ScoreNeutralisation`](@ref) a fitted member neutralises its scores against the estimated factors of `csfm`.
- 2. Fit `rfo` on the coverage universe with [`orthogonal_forecast_result`](@ref), giving `rf`. `rd` holds every observation, so the Descriptors of the forecast warm up over every observation of the panel. [`return_forecast_rows`](@ref) finds the block as a suffix of `rd` by its size.
+ 2. Take `rf0` as `rf` when the carry fold gives it. Otherwise fit `rfo` on the coverage universe with [`orthogonal_forecast_result`](@ref), giving `rf`. `rd` holds every observation, so the Descriptors of the forecast warm up over every observation of the panel. [`return_forecast_rows`](@ref) finds the block as a suffix of `rd` by its size.
  3. Split `rf.mu` against the latest exposures of the estimated factors with [`cross_sectional_alpha_split`](@ref), giving `g` and `ap`. The observed factors are the trailing columns of `L`, and the split leaves them out, so `g` has one entry per column of `csr.f`. Scale `ap` with [`orthogonal_forecast_rescale`](@ref), which changes it under [`OrthogonalPartCalibration`](@ref) alone.
  4. When `reads` is `true`, take the Return Forecast history of `rfo` once with [`cross_sectional_forecast_history`](@ref) from `rf`, giving `hist`. Otherwise `hist` is `nothing`.
 
@@ -1786,6 +1788,7 @@ The split is unscaled by `c`. The Orthogonal Forecast Scale `c` can be a rule th
   - `cre`: Cross-Sectional Regression Estimator of the split.
   - `reads`: Whether a slot of the prior reads the Return Forecast history, as [`reads_forecast_history`](@ref) answers.
   - `H`: The rows of the Return Forecast history that the carry fold carries, or `nothing` when the history is made here.
+  - `rf0`: The Return Forecast Result that the carry fold of a forecast that folds carries, as [`folds_forecast_rows`](@ref) answers, or `nothing` to fit the member here.
 
 # Validation
 
@@ -1812,16 +1815,17 @@ The split is unscaled by `c`. The Orthogonal Forecast Scale `c` can be a rule th
 function cross_sectional_return_forecast(::AbstractOrthogonalForecastFit, ::Nothing,
                                          ::ReturnsResult, ::CrossSectionalFactorModel,
                                          ::AbstractCrossSectionalRegressionEstimator,
-                                         ::Bool, ::Option{<:MatNum})
+                                         ::Bool, ::Option{<:MatNum}, ::Nothing = nothing)
     return (; rf = nothing, g = nothing, ap = nothing, hist = nothing)
 end
 function cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit,
                                          rfe::AbstractReturnForecastEstimator,
                                          rd::ReturnsResult, csfm::CrossSectionalFactorModel,
                                          cre::AbstractCrossSectionalRegressionEstimator,
-                                         reads::Bool, H::Option{<:MatNum})
+                                         reads::Bool, H::Option{<:MatNum},
+                                         rf0::Option{<:AbstractReturnForecastResult} = nothing)
     rfo = orthogonal_forecast_member(ofit, rfe, csfm)
-    rf = orthogonal_forecast_result(ofit, rfo, rd, csfm, cre)
+    rf = isnothing(rf0) ? orthogonal_forecast_result(ofit, rfo, rd, csfm, cre) : rf0
     rw = csfm.rw
     #! The observed factors are the trailing columns of `L`, and the fit observes their
     #! returns, so the forecast splits against the loadings the regression estimated.

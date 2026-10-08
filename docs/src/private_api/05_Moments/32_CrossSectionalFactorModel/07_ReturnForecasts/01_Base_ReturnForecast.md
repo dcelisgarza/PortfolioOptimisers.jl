@@ -27,6 +27,7 @@ forecast_idiosyncratic_variances
 forward_mean_returns
 fits_idiosyncratic_target
 calibrates_orthogonal_part
+folds_forecast_rows
 estimated_factor_columns
 orthogonal_forecast_member
 orthogonal_forecast_result

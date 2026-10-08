@@ -398,11 +398,17 @@ end
         x = last(stream(pe))
         @test po.cross_sectional_carry_rows(pe) == 2 == size(x.pe.cache.win.X, 1)
         @test size(po.sample_buffer(po.returns_buffer(x.pe.cache))) == size(rd.X)
-        # A Return Forecast that reads the panel keeps every row, a custom one keeps the
-        # rows of the exposures.
+        # A Return Forecast that refits at the call with no data keeps every row. One that
+        # computes its history one observation at a time keeps the rows of its look-back
+        # (#1573), and a custom one keeps the rows of the exposures.
         fixed = CrossSectionalFactorPrior(; lambda = 1, grid_config("FcFixed", rd)...)
-        @test isnothing(po.cross_sectional_carry_rows(fixed))
-        @test size(last(stream(fixed)).pe.cache.win.X, 1) == 250
+        @test po.cross_sectional_carry_rows(fixed) ==
+              po.lookback(fixed) ==
+              size(last(stream(fixed)).pe.cache.win.X, 1) ==
+              2
+        @test isnothing(po.cross_sectional_carry_rows(CrossSectionalFactorPrior(;
+                                                                                grid_config("FcEW",
+                                                                                            rd)...)))
         @test po.cross_sectional_carry_rows(CrossSectionalFactorPrior(; lambda = 1,
                                                                       grid_config("FcCustom",
                                                                                   rd)...)) ==
@@ -642,11 +648,9 @@ end
         exact = (; Currency = ccy, CurrencyLx = grid_config("CurrencyLx", rd),
                  Macro = grid_config("Macro", rd),
                  Sensitivity = (; base..., factors = [base.factors; msens]),
-                 MixedForecast = (; mixed..., rfe = rfr),
                  Entropy = (; ccy..., pe = EntropyPoolingPrior(; pe = GRID_PE)),
                  Rolling = (; ccy..., ve = wv))
-        # Measured: every case gives a difference of exactly zero at each step. The forecast
-        # reads the net returns of every row, so the carry keeps every row and every derived row.
+        # Measured: every case gives a difference of exactly zero at each step.
         for cfg in exact
             pe = CrossSectionalFactorPrior(; lambda = 1, cfg...)
             @test po.reads_exogenous_series(pe)
@@ -656,9 +660,13 @@ end
         # rolling return over the cut rows is a difference of cumulative sums from another first
         # row (#1470). Measured over the three steps, relative to the largest entry: mu 4.6e-16,
         # sigma 4.3e-16, factor returns 1.8e-16; under `lag = 2`, 1.4e-16, 3.1e-16 and 1.8e-16.
+        # A fixed weighted forecast scores the net returns of the rows it reads, so it keeps the
+        # same rows and derived rows (#1573). Measured with it: mu 1.8e-15, sigma 4.3e-16,
+        # factor returns 1.8e-16, the forecast history 1.6e-15.
         @test po.cross_sectional_carry_rows(CrossSectionalFactorPrior(; lambda = 1,
                                                                       mixed...)) == 22
-        for cfg in (mixed, (; mixed..., lag = 2))
+        for cfg in (mixed, (; mixed..., lag = 2), (; mixed..., rfe = rfr),
+                    (; mixed..., rfe = rfr, lag = 2))
             pe = CrossSectionalFactorPrior(; lambda = 1, cfg...)
             for (k, x) in enumerate(stream(pe))
                 b = batch(pe, k)
@@ -666,6 +674,7 @@ end
                       relerr(x.pr.sigma, b.sigma) < 1e-12 &&
                       relerr(x.pr.fpr.X, b.fpr.X) < 1e-12
                 @test isequal(isnan.(x.pr.sigma), isnan.(b.sigma))
+                @test isnothing(pe.rfe) || relerr(x.pr.rr.rf.hist, b.rr.rf.hist) < 1e-12
             end
         end
         # A macro sensitivity is a recursion from the first row and states no look-back, so the
@@ -727,6 +736,53 @@ end
                 @test_throws IsNonFiniteError batch(pe, 3, rn)
             else
                 @test agrees(last(stream(pe, rn)).pr, batch(pe, 3, rn))
+            end
+        end
+    end
+
+    @testset "A fixed weighted Return Forecast folds its rows (#1573)" begin
+        # A row of the history reads the scores and the block of its observation alone, so the
+        # state carries the scores and the rows, and keeps the panel rows of the look-back.
+        # The Reversal score over the cut rows is a difference of cumulative sums from another
+        # first row (#1470), so the cases agree to rounding. Measured, the largest relative
+        # difference over the steps: `mu` 2.1e-15, the history 1.4e-15, `sigma` 0.
+        sharpe = IdiosyncraticSharpeUnit()
+        ind = grid_config("FamOne", rd).factors
+        scores(nm) = DescriptorScores(;
+                                      descriptors = [Passthrough(;
+                                                                 field = "net_income_ttm"),
+                                                     Reversal(; window = 30),
+                                                     GrowthRate(; field = "sales_ttm",
+                                                                lag = 5)], neutralise = nm,
+                                      nw = BlockRegressionWeights(), group = "industry")
+        fw(nm, unit) = FixedWeightedReturnForecast(; scores = scores(nm), scale = 0.2,
+                                                   weights = [1.0, -0.5, 0.25], unit = unit)
+        fk = (; lambda = 0.4, c = 0.6, minra = 5, pe = GRID_PE, ve = GRID_VE)
+        e = (0, 90, 91, 92, 93, 170, 250)
+        wv = WindowedVariance(;
+                              ve = ExpWeightedVariance(; decay = 2.0^(-1 / 20),
+                                                       min_obs = 5), window = 60)
+        # The batch choice of `style` moves at the second step, and a rolling window does not
+        # fold, so both fit every observation again from the scores that the state carries.
+        for (cfg, ee) in (((; fk..., factors = ind, families = ["industry" => nothing],
+                            rfe = fw(["industry", "style1"], sharpe)), e),
+                          ((; fk..., factors = ind, lag = 2,
+                            rfe = fw(["industry", "style1"], IdiosyncraticReturnUnit())), e),
+                          ((; style..., fk..., rfe = fw(["style1"], sharpe)), edges),
+                          ((; style..., fk..., ve = wv, rfe = fw(["style1"], sharpe)), edges))
+            pe = CrossSectionalFactorPrior(; cfg...)
+            @test po.cross_sectional_carry_rows(pe) == po.lookback(pe) == 30
+            for (k, x) in enumerate(stream(pe, rd, ee))
+                b = batch(pe, k, rd, ee)
+                st = x.pe.cache
+                @test size(x.pe.cache.win.X, 1) == 30
+                @test size(st.fh) == size(st.vs) == size(b.rr.rf.hist)
+                @test size(st.fsc.S, 1) == size(st.Ms, 1)
+                @test relerr(x.pr.mu, b.mu) < 1e-14 &&
+                      relerr(x.pr.sigma, b.sigma) < 1e-14 &&
+                      relerr(x.pr.rr.rf.hist, b.rr.rf.hist) < 1e-14 &&
+                      x.pr.rr.rf.weights == b.rr.rf.weights
+                @test isequal(isnan.(x.pr.rr.rf.hist), isnan.(b.rr.rf.hist))
             end
         end
     end

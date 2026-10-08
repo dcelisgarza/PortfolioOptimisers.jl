@@ -400,10 +400,10 @@ The function computes the Descriptors over all the returns data. A Descriptor wi
 
 # Algorithm
 
- 1. Read the cross-sectional weights off the estimation mask of the Asset Panel, the group labels off the named categorical Panel Field, and the block's rows with [`return_forecast_rows`](@ref).
+ 1. Read the cross-sectional weights off the estimation mask of the Asset Panel, the group labels off the named categorical Panel Field, and the block's rows with [`return_forecast_rows`](@ref). Steps 1 to 3, except the rows of the block, run in [`descriptor_panel_scores`](@ref).
  2. Compute each Descriptor over all the returns data under `ds.ex`, through [`cross_sectional_foreach`](@ref), and apply the outlier slot and then the scoring slot to it.
  3. Stack the scores on a third axis of `S`, in the order of the Descriptors. The number type of `S` is the promotion of the number types of the scores and, when the recipe names Neutralisation targets, of the exposure history.
- 4. When the recipe names Neutralisation targets, residualise every score of the block's rows against those Factor Exposures under the base weights of [`neutralisation_base_weights`](@ref), score it once more, and write `NaN` on the rows before the block.
+ 4. When the recipe names Neutralisation targets, residualise every score of the block's rows against those Factor Exposures under the base weights of [`neutralisation_base_weights`](@ref), score it once more, and write `NaN` on the rows before the block, with [`descriptor_neutralised_scores`](@ref).
 
 # Arguments
 
@@ -456,35 +456,112 @@ julia> descriptor_scores(ds, rd, csfm).S
   - [`neutralise_scores!`](@ref)
   - [`return_forecast_rows`](@ref)
   - [`FixedWeightedReturnForecast`](@ref)
+  - [`descriptor_panel_scores`](@ref)
+  - [`descriptor_neutralised_scores`](@ref)
 """
 function descriptor_scores(ds::DescriptorScores, rd::ReturnsResult,
                            csfm::CrossSectionalFactorModel)
+    P = descriptor_panel_scores(ds, rd)
+    rows = return_forecast_rows(rd, csfm)
+    return (; S = descriptor_neutralised_scores(ds, P, csfm, rows), rows = rows)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Compute the part of the scores of a [`DescriptorScores`](@ref) that reads the Asset Panel alone.
+
+A score of an observation reads the last [`lookback`](@ref) rows of the panel, and no factor-model block. So the carry fold of a [`CrossSectionalFactorPrior`](@ref) computes it for the new observations alone, and carries it.
+
+# Algorithm
+
+ 1. Read the cross-sectional weights off the estimation mask of the Asset Panel with [`return_forecast_weights`](@ref), and the group labels off the named categorical Panel Field with [`exposure_group_labels`](@ref).
+ 2. Compute each Descriptor over all the returns data under `ds.ex`, through [`cross_sectional_foreach`](@ref), and apply the outlier slot and then the scoring slot to it with [`composite_score`](@ref).
+ 3. Stack the scores on a third axis, in the order of the Descriptors.
+
+# Arguments
+
+  - `ds`: The Descriptor Scores recipe.
+  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+
+# Validation
+
+  - The rules of [`return_forecast_weights`](@ref), of [`exposure_group_labels`](@ref) and of [`cross_sectional_transform`](@ref).
+
+# Returns
+
+  - `S::Array{<:Real, 3}`: The scores before the Neutralisation, `observations × assets × descriptors`.
+  - `w::MatNum`: The cross-sectional weights, `observations × assets`.
+  - `g::Option{<:AbstractMatrix{<:Integer}}`: The group labels, `observations × assets`, or `nothing`.
+
+# Related
+
+  - [`descriptor_scores`](@ref)
+  - [`descriptor_neutralised_scores`](@ref)
+"""
+function descriptor_panel_scores(ds::DescriptorScores, rd::ReturnsResult)
     w = return_forecast_weights(rd)
     groups = exposure_group_labels(rd, ds.group)
-    rows = return_forecast_rows(rd, csfm)
     # Each Descriptor writes its own entry of `sc`. `stack` promotes the number types of the
     # scores, whatever the element type of `sc`. It reads `sc` through a generator, because
     # JET reads its method for a `Vector{Any}` as a call to an `Array` method that no type
-    # has. Under a Neutralisation the residual is fitted
-    # on the exposure history, so `S` also takes the number type of that history. The bound on
-    # `S` keeps the `Nothing` method of `return_forecast_cut` out of every caller's inference,
-    # where a `stack` over an abstract Descriptor vector reads as `Any`.
+    # has. The bound on `S` keeps the `Nothing` method of `return_forecast_cut` out of every
+    # caller's inference, where a `stack` over an abstract Descriptor vector reads as `Any`.
     sc = Vector{Any}(undef, length(ds.descriptors))
     cross_sectional_foreach(ds.ex, eachindex(ds.descriptors)) do k
         return sc[k] = composite_score(ds.descriptors[k], rd, ds.outlier, ds.scoring, w,
                                        groups)
     end
     S::Arr3Num = stack(s for s in sc)
+    return (; S = S, w = w, g = groups)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Neutralise the scores of a [`DescriptorScores`](@ref) against the Factor Exposures of a block.
+
+# Algorithm
+
+ 1. When the recipe names Neutralisation targets, promote the scores to the number type of the exposure history, and take the base weights of [`neutralisation_base_weights`](@ref) on the rows of the block.
+ 2. Residualise every score of the rows of the block against those Factor Exposures with [`neutralise_scores!`](@ref), score it once more, and write `NaN` on the rows before the block.
+
+# Arguments
+
+  - `ds`: The Descriptor Scores recipe.
+  - `P`: The scores, the weights and the group labels, `(; S, w, g)`, as [`descriptor_panel_scores`](@ref) states them. The function changes `P.S` in place when no promotion copies it.
+  - `csfm`: The fitted factor-model block. The function reads its exposure history only when the recipe names Neutralisation targets.
+  - `rows`: The rows of `P` that the block covers.
+
+# Validation
+
+  - The rules of [`neutralise_scores!`](@ref) and of [`neutralisation_base_weights`](@ref) when the recipe names Neutralisation targets.
+
+# Returns
+
+  - `S::Array{<:Real, 3}`: The Descriptor scores, `observations × assets × descriptors`, on the rows of `P`.
+
+# Related
+
+  - [`descriptor_scores`](@ref)
+  - [`descriptor_panel_scores`](@ref)
+"""
+function descriptor_neutralised_scores(ds::DescriptorScores, P::NamedTuple,
+                                       csfm::CrossSectionalFactorModel,
+                                       rows::AbstractUnitRange)
+    # The bounds keep the `Nothing` methods of `return_forecast_cut` out of the inference of a
+    # caller whose `P` is a `NamedTuple` of open field types.
+    S::Arr3Num = P.S
+    w::MatNum = P.w
     # The base weights are read only under a Neutralisation, so a recipe that names none never
-    # asks the block for its regression weights.
+    # asks the block for its regression weights. The residual is fitted on the exposure
+    # history, so `S` also takes the number type of that history.
     wn = w
     if !isnothing(ds.neutralise)
         Tf = promote_type(eltype(S), eltype(first(descriptor_scores_axis(csfm))))
         S = convert(Array{Tf, 3}, S)
         wn = neutralisation_base_weights(ds.nw, return_forecast_cut(w, rows), csfm)
     end
-    neutralise_scores!(S, ds.neutralise, ds.cre, csfm, wn, ds.scoring, groups, rows)
-    return (; S = S, rows = rows)
+    neutralise_scores!(S, ds.neutralise, ds.cre, csfm, wn, ds.scoring, P.g, rows)
+    return S
 end
 
 export DescriptorScores, descriptor_scores, EstimationMaskWeights, BlockRegressionWeights
