@@ -225,7 +225,10 @@ Descriptor of a new row off them, equal to the batch fit to the last bit
 with a look-back of 273 rows leaves the carry at `1 + lag` rows. A Return Forecast that reads the panel keeps a value at every fitted observation in its
 Result, and it aligns the fitted observations with the last rows of its returns data, so the carry
 keeps every row under it, unless the forecast folds. A forecast that folds reads the look-back of its
-Descriptors alone. The output is exact in every case.
+Descriptors alone, and a Descriptor of its scores that folds from a state of its own counts as one
+row there too: the carry keeps the Descriptor Scores with the state of each such Descriptor
+([#1587](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1587)). The output is exact
+in every case.
 
 ### The Carry Rule
 

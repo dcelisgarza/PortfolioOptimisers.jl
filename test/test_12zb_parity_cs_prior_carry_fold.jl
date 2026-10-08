@@ -764,9 +764,8 @@ end
     @testset "A fixed weighted Return Forecast folds its rows (#1573)" begin
         # A row of the history reads the scores and the block of its observation alone, so the
         # state carries the scores and the rows, and keeps the panel rows of the look-back.
-        # The Reversal score over the cut rows is a difference of cumulative sums from another
-        # first row (#1470), so the cases agree to rounding. Measured, the largest relative
-        # difference over the steps: `mu` 2.1e-15, the history 1.4e-15, `sigma` 0.
+        # The Reversal score folds from its carried state (#1587), so the carry keeps the six
+        # rows that the GrowthRate score reads.
         sharpe = IdiosyncraticSharpeUnit()
         ind = grid_config("FamOne", rd).factors
         scores(nm) = DescriptorScores(;
@@ -792,11 +791,11 @@ end
                           ((; style..., fk..., rfe = fw(["style1"], sharpe)), edges),
                           ((; style..., fk..., ve = wv, rfe = fw(["style1"], sharpe)), edges))
             pe = CrossSectionalFactorPrior(; cfg...)
-            @test po.cross_sectional_carry_rows(pe) == po.lookback(pe) == 30
+            @test po.lookback(pe) == 30 && po.cross_sectional_carry_rows(pe) == 6
             for (k, x) in enumerate(stream(pe, rd, ee))
                 b = batch(pe, k, rd, ee)
                 st = x.pe.cache
-                @test size(x.pe.cache.win.X, 1) == 30
+                @test size(x.pe.cache.win.X, 1) == 6
                 @test size(st.fh) == size(st.vs) == size(b.rr.rf.hist)
                 @test size(st.fsc.S, 1) == size(st.Ms, 1)
                 @test relerr(x.pr.mu, b.mu) < 1e-14 &&
@@ -811,8 +810,9 @@ end
     @testset "An exponentially weighted Return Forecast folds its rows (#1574)" begin
         # The batch fit is a forward recursion over the rows whose target is known. A step
         # reads its new rows and the `lag + horizon - 1` rows before them, whose targets
-        # mature at the step, from the carried state of the recursion. The Reversal score over
-        # the cut rows agrees to rounding (#1470).
+        # mature at the step, from the carried state of the recursion. The Reversal score folds
+        # from its carried state (#1587), so the carry keeps the six rows that the GrowthRate
+        # score reads.
         sharpe = IdiosyncraticSharpeUnit()
         ind = grid_config("FamOne", rd).factors
         scores(nm) = DescriptorScores(;
@@ -862,9 +862,8 @@ end
                   edges))
         for (cfg, ee) in cases
             pe = CrossSectionalFactorPrior(; cfg...)
-            @test po.cross_sectional_carry_rows(pe) ==
-                  po.lookback(pe) ==
-                  (cfg === early ? 2 : 30)
+            @test po.lookback(pe) == (cfg === early ? 2 : 30)
+            @test po.cross_sectional_carry_rows(pe) == (cfg === early ? 2 : 6)
             for (k, x) in enumerate(stream(pe, rd, ee))
                 # A block too short for a fit refuses on both sides.
                 b = try
@@ -878,7 +877,7 @@ end
                     continue
                 end
                 rf, rb = x.pr.rr.rf, b.rr.rf
-                @test size(st.win.X, 1) <= 30
+                @test size(st.win.X, 1) <= 6
                 @test size(st.fh) == size(st.vs) == size(rb.hist)
                 @test relerr(x.pr.mu, b.mu) < 1e-13 &&
                       relerr(x.pr.sigma, b.sigma) < 1e-13 &&
@@ -905,8 +904,8 @@ end
         # and a step run one fold, `return_forecast_step`. The state carries the normal
         # equations, the two calibration regressions and the coefficients of the rows whose
         # target has not matured, so the carry keeps the panel rows of the look-back alone.
-        # The Reversal score over the cut rows is a difference of cumulative sums from another
-        # first row (#1470), so the cases agree to rounding.
+        # The Reversal score folds from its carried state (#1587), so the carry keeps the six
+        # rows that the GrowthRate score reads.
         sharpe = IdiosyncraticSharpeUnit()
         ind = grid_config("FamOne", rd).factors
         ds = DescriptorScores(;
@@ -963,9 +962,9 @@ end
              (; style..., fk..., rfe = tf()), (; style..., fk..., ve = wv, rfe = tf()))
             pe = CrossSectionalFactorPrior(; cfg...)
             @test po.folds_forecast_rows(pe.rfe)
-            @test po.cross_sectional_carry_rows(pe) == po.lookback(pe) == 30
+            @test po.lookback(pe) == 30 && po.cross_sectional_carry_rows(pe) == 6
             xs = check(pe, e)
-            @test all(x -> size(x.pe.cache.win.X, 1) == 30, xs)
+            @test all(x -> size(x.pe.cache.win.X, 1) == 6, xs)
         end
         # Under `whole_history` a row before the block trains the fit when its forward window
         # reaches into the block. With a gap of four rows the first row before the block
@@ -1064,6 +1063,84 @@ end
         @test size(last(s).pe.cache.win.X, 1) == 2
         @test isa(last(last(s).pe.cache.xf[2]).descriptors[1].cache,
                   po.RollingLogReturnState)
+    end
+
+    @testset "The Descriptor scores of a Return Forecast fold their stateful Descriptors (#1587)" begin
+        # A Descriptor of the scores that carries a state reads the rows of the step alone, so
+        # the carry keeps the rows of the lag alone, and every step equals the batch fit to the
+        # last bit. The state carries the Descriptor Scores with the state of each Descriptor.
+        ind = grid_config("FamOne", rd).factors
+        fk = (; lambda = 0.4, c = 0.6, minra = 5, pe = GRID_PE, ve = GRID_VE,
+              families = ["industry" => nothing])
+        e = (0, 90, 91, 92, 170, 250)
+        for de in (Reversal(), RollingMomentum(; window = 40, skip = 5))
+            ds = DescriptorScores(;
+                                  descriptors = [Passthrough(; field = "net_income_ttm"),
+                                                 de], group = "industry")
+            for rfe in (FixedWeightedReturnForecast(; scores = ds, scale = 0.02),
+                        ExpWeightedReturnForecast(; scores = ds),
+                        TargetReturnForecast(; scores = ds, half_life = 10.0))
+                pe = CrossSectionalFactorPrior(; fk..., factors = ind, rfe = rfe)
+                @test po.lookback(pe) == po.lookback(de)
+                @test po.carry_lookback(rfe) == 1
+                @test po.cross_sectional_carry_rows(pe) == 2
+                for (k, x) in enumerate(stream(pe, rd, e))
+                    b = batch(pe, k, rd, e)
+                    st = x.pe.cache
+                    @test size(st.win.X, 1) == 2
+                    @test same(x.pr.mu, b.mu) && same(x.pr.sigma, b.sigma)
+                    @test same(x.pr.rr.rf.mu, b.rr.rf.mu)
+                    @test isa(st.fds.descriptors[2].cache, po.RollingLogReturnState)
+                end
+            end
+        end
+        # The first steps end inside the warm-up of the momentum factor, so they bring no
+        # observation to score. Their rows still fold into the state of the Reversal score: a
+        # state that started at a later row would sum from another first row, and its scores
+        # would differ from the batch fit in the last bits.
+        syn = synthetic_asset_panel(; n_assets = 60, n_observations = 160, n_industries = 4,
+                                    rng = StableRNG(1583)).rd
+        momentum = ["market" => ConstantExposure(),
+                    "momentum" => CompositeExposure(;
+                                                    descriptors = [RollingMomentum(; window = 40,
+                                                                                   skip = 5)]),
+                    "industry" => OneHotExposure(; field = "industry", family = "industry")]
+        rev = DescriptorScores(; descriptors = [Reversal(; window = 10), BookToPrice()])
+        pe = CrossSectionalFactorPrior(; lambda = 1, factors = momentum,
+                                       families = ["industry" => nothing], minra = 5,
+                                       pe = GRID_PE, ve = GRID_VE,
+                                       rfe = FixedWeightedReturnForecast(; scores = rev,
+                                                                         scale = 0.02))
+        @test po.cross_sectional_carry_rows(pe) == 2
+        e = (0, 10, 20, 50, 80, 81, 120, 160)
+        s = stream(pe, syn, e)
+        @test isnothing(s[1].pe.cache.fsc) && isnothing(s[2].pe.cache.Ms)
+        @test isa(s[2].pe.cache.fds.descriptors[1].cache, po.RollingLogReturnState)
+        fitted = 0
+        for (k, x) in enumerate(s)
+            b = try
+                batch(pe, k, syn, e)
+            catch err
+                err
+            end
+            if isa(b, LowOrderPrior)
+                fitted += 1
+                @test same(x.pr.mu, b.mu) && same(x.pr.rr.rf.hist, b.rr.rf.hist)
+            else
+                @test typeof(x.pr) == typeof(b)
+            end
+        end
+        # Two of the steps read out, so the loop is not vacuous.
+        @test fitted == 2
+        # A forecast that does not fold its rows reads the panel, so the state carries no
+        # Descriptor Scores.
+        h2 = CrossSectionalFactorPrior(; fk..., factors = ind,
+                                       rfe = TargetReturnForecast(;
+                                                                  scores = DescriptorScores(;
+                                                                                            descriptors = [Reversal()]),
+                                                                  half_life = 10.0,
+                                                                  horizon = 2))
+        @test isnothing(partial_fit!(h2, rows(rd, 1:90)).cache.fds)
     end
 
     @testset "Refusals" begin

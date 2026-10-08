@@ -250,14 +250,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Appends the Descriptor scores of the new observations of a step to the carry fold of a Cross-Sectional Factor Prior.
 
-A Return Forecast that computes its history one observation at a time, as [`folds_forecast_rows`](@ref) answers, reads its scores at each fitted observation. A score reads the last [`lookback`](@ref) panel rows of its observation and no factor-model block, so a step computes the scores of its new observations alone, from the rows that it carries. A fit of every observation then reads the scores that the state carries, and no panel row before the carried ones.
+A Return Forecast that computes its history one observation at a time, as [`folds_forecast_rows`](@ref) answers, reads its scores at each fitted observation. A score reads the last [`lookback`](@ref) panel rows of its observation and no factor-model block, so a step computes the scores of its new observations alone, from the rows that it carries. A Descriptor that carries a state reads the new observations alone, as [`descriptor_carry`](@ref) folds them, so it adds no row: the state carries the Descriptor Scores with the state of each such Descriptor. A fit of every observation then reads the scores that the state carries, and no panel row before the carried ones.
 
 # Algorithm
 
- 1. Return `st` unchanged when the forecast does not fold, or when the step brings no observation after the warm-up.
- 2. Keep the last `lookback(pe.rfe) + m - 1` rows of `win` and of its derived series, and build the returns data of the forecast over them with [`cross_sectional_forecast_window`](@ref).
- 3. Score the Descriptors of the forecast over those rows with [`descriptor_panel_scores`](@ref), and keep the last `m` rows.
- 4. Append them to the scores that the state carries with [`cross_sectional_fold_append`](@ref).
+ 1. Return `st` unchanged when the forecast does not fold.
+ 2. Take the Descriptor Scores that the state carries, or the ones of the forecast at the first step. Keep the last `carry_lookback(ds.descriptors) + n - 1` rows of `win` and of its derived series, as [`carry_lookback`](@ref) counts them, and build the returns data of the forecast over them with [`cross_sectional_forecast_window`](@ref).
+ 3. Fold the `n` rows of the step into the Descriptors that carry a state with [`descriptor_carry`](@ref). When the step brings no observation after the warm-up, return the state with the folded Descriptor Scores alone.
+ 4. Score the Descriptors of the forecast over those rows with [`descriptor_panel_scores`](@ref), with the Descriptors that the fold reads off the states, and keep the last `m` rows.
+ 5. Append them to the scores that the state carries with [`cross_sectional_fold_append`](@ref), and keep the folded Descriptor Scores.
 
 # Arguments
 
@@ -265,10 +266,11 @@ A Return Forecast that computes its history one observation at a time, as [`fold
   - `st`: The state, with the rows of the step appended to its histories.
   - `win`: The carried rows followed by the rows of the step.
   - `rows`: The rows of the step, as [`cross_sectional_fold_rows`](@ref) returns them. Its `Ms` holds the `m` new observations after the warm-up, the last rows of `win`, and its `der` the derived series of every row of `win`, or `nothing` without an observed factor.
+  - `n`: Number of rows of the step, the last rows of `win`.
 
 # Returns
 
-  - `st::CrossSectionalCarryState`: The state with the scores of the new observations appended.
+  - `st::CrossSectionalCarryState`: The state with the scores of the new observations appended, and the Descriptor Scores after the rows of the step in `fds`.
 
 # Related
 
@@ -277,16 +279,25 @@ A Return Forecast that computes its history one observation at a time, as [`fold
 """
 function cross_sectional_carry_scores(pe::CrossSectionalFactorPrior,
                                       st::CrossSectionalCarryState, win::ReturnsResult,
-                                      rows::NamedTuple)
-    m = size(rows.Ms, 1)
-    if !folds_forecast_rows(pe.rfe) || iszero(m)
+                                      rows::NamedTuple, n::Integer)
+    if !folds_forecast_rows(pe.rfe)
         return st
     end
+    ds = something(st.fds, pe.rfe.scores)
     der = rows.der
-    (; rdi, k) = cross_sectional_exposure_rows(pe.rfe, win, m)
     T = size(win.X, 1)
-    dk = isnothing(der) ? nothing : (; Xl = view(der.Xl, (T - k + 1):T, :))
-    P = descriptor_panel_scores(pe.rfe.scores, cross_sectional_forecast_window(pe, rdi, dk))
+    # A Descriptor that carries a state reads the rows of the step alone, so the window holds
+    # the rows that the other Descriptors read before the rows of the step.
+    k = min(T, something(carry_lookback(ds.descriptors), T) + n - 1)
+    r = (T - k + 1):T
+    dk = isnothing(der) ? nothing : (; Xl = view(der.Xl, r, :))
+    rdk = cross_sectional_forecast_window(pe, k == T ? win : port_opt_view(win, r, :), dk)
+    dc = descriptor_carry(ds, rdk, n)
+    m = size(rows.Ms, 1)
+    if iszero(m)
+        return cross_sectional_carry_with(st, (; fds = dc.xf))
+    end
+    P = descriptor_panel_scores(dc.xv, rdk)
     Pn = map(A -> return_forecast_cut(A, (k - m + 1):k), P)
     return cross_sectional_carry_with(st,
                                       (;
@@ -297,7 +308,11 @@ function cross_sectional_carry_scores(pe::CrossSectionalFactorPrior,
                                            # `st.fsc` with the `map` method of another package.
                                            map(cross_sectional_fold_append,
                                                st.fsc::NamedTuple, Pn)
-                                       end))
+                                       end, fds = dc.xf))
+end
+function carry_lookback(rfe::Union{FixedWeightedReturnForecast, ExpWeightedReturnForecast,
+                                   TargetReturnForecast})::Option{<:Integer}
+    return carry_lookback(rfe.scores.descriptors)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

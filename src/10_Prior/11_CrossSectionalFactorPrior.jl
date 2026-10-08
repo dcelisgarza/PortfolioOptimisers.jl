@@ -1808,19 +1808,20 @@ function cross_sectional_live_factors(Z::Arr3Num, X::MatNum, W::MatNum)::BitVect
     return BitVector([any(c -> !iszero(Z[c[1], c[2], k]), act) for k in axes(Z, 3)])
 end
 function lookback(pe::CrossSectionalFactorPrior)::Option{<:Integer}
-    return cross_sectional_lookback(pe, lookback(map(last, pe.factors)))
+    return cross_sectional_lookback(pe, lookback(map(last, pe.factors)), lookback)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the look-back of a [`CrossSectionalFactorPrior`](@ref) from the look-back of its factors: that look-back plus `lag`, or the look-back of its Return Forecast Estimator when that one is larger. `nothing` from either part gives `nothing`.
 
-[`lookback`](@ref) gives it the look-back of the factors of the batch fit, and [`carry_lookback`](@ref) the look-back of the factors on the carry fold.
+[`lookback`](@ref) gives it the look-back of the factors of the batch fit and itself as `f`. [`carry_lookback`](@ref) gives it the look-back of the factors on the carry fold and itself as `f`, so a Descriptor of the scores of the forecast that carries a state counts one row.
 
 # Arguments
 
   - `pe`: Cross-Sectional Factor Prior estimator.
   - `L`: The look-back of its factors, or `nothing`.
+  - `f`: The verb that counts the look-back of the Return Forecast Estimator, [`lookback`](@ref) or [`carry_lookback`](@ref).
 
 # Returns
 
@@ -1831,9 +1832,9 @@ Returns the look-back of a [`CrossSectionalFactorPrior`](@ref) from the look-bac
   - [`lookback`](@ref)
   - [`carry_lookback`](@ref)
 """
-function cross_sectional_lookback(pe::CrossSectionalFactorPrior,
-                                  L::Option{<:Integer})::Option{<:Integer}
-    lr = isnothing(pe.rfe) ? 1 : lookback(pe.rfe)
+function cross_sectional_lookback(pe::CrossSectionalFactorPrior, L::Option{<:Integer},
+                                  f::Function)::Option{<:Integer}
+    lr = isnothing(pe.rfe) ? 1 : f(pe.rfe)
     return isnothing(L) || isnothing(lr) ? nothing : max(L + pe.lag, lr)
 end
 

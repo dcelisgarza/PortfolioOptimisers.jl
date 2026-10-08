@@ -27,7 +27,7 @@ $(DocStringExtensions.FIELDS)
                              ve = nothing, ve1 = nothing, pe = nothing,
                              seed::Integer = 0, hist = nothing, S = nothing,
                              Sc = nothing, fsc = nothing, fh = nothing, fst = nothing,
-                             xf = nothing,
+                             xf = nothing, fds = nothing,
                              tip::Base.RefValue{Int} = Ref(0)) -> CrossSectionalCarryState
 
 Keywords correspond to the struct's fields, and every field but `buf` and `tip` defaults to `nothing`, or to `0` for `seed`. `tip` defaults to a new counter at `0`. The default is the empty state that a first step builds.
@@ -174,6 +174,10 @@ Keywords correspond to the struct's fields, and every field but `buf` and `tip` 
     """
     xf
     """
+    The Descriptor Scores of the Return Forecast, as [`descriptor_carry`](@ref) folded their Descriptors, so that each Descriptor that carries a state holds its state after the folded observations. It is `nothing` before the first step, and when the forecast does not compute its history one observation at a time, as [`folds_forecast_rows`](@ref) answers. A step folds its new observations into them, and scores those observations with the Descriptors that it reads off them, in [`cross_sectional_carry_scores`](@ref).
+    """
+    fds
+    """
     The number of observations that the newest state of this lineage folded. Every state that a step derives from this one shares the counter. A history appends in place only when the state is the newest one, as [`cross_sectional_carry_own`](@ref) checks.
     """
     tip
@@ -188,11 +192,11 @@ function CrossSectionalCarryState(; buf::SampleBufferState = SampleBufferState()
                                   vs = nothing, ve = nothing, ve1 = nothing, pe = nothing,
                                   seed::Integer = 0, hist = nothing, S = nothing,
                                   Sc = nothing, fsc = nothing, fh = nothing, fst = nothing,
-                                  xf = nothing,
+                                  xf = nothing, fds = nothing,
                                   tip::Base.RefValue{Int} = Ref(0))::CrossSectionalCarryState
     return CrossSectionalCarryState(buf, win, der, nf, fam, Ms, X, Xl, obs, bw, mcap, amsk,
                                     emsk, sums, families, fcb, Z, csr, lv1, lv, W, vs, ve,
-                                    ve1, pe, seed, hist, S, Sc, fsc, fh, fst, xf, tip)
+                                    ve1, pe, seed, hist, S, Sc, fsc, fh, fst, xf, fds, tip)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -330,7 +334,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the number of panel rows that the carry fold of a Cross-Sectional Factor Prior carries, or `nothing` for every row.
 
-The Factor Exposures of a new observation read the last rows of the panel that [`carry_lookback`](@ref) of the prior counts, so the carry keeps them. A Descriptor that carries a state reads the new observation alone, as [`descriptor_carry`](@ref) folds it, so it adds no row. Under a Return Forecast that reads the panel at the call with no data, as [`cross_sectional_forecast_reads_panel`](@ref) answers, the carry keeps every row. A forecast that computes its history one observation at a time reads its last [`lookback`](@ref) rows, which [`carry_lookback`](@ref) of the prior counts. An unbounded look-back keeps every row too.
+The Factor Exposures of a new observation read the last rows of the panel that [`carry_lookback`](@ref) of the prior counts, so the carry keeps them. A Descriptor that carries a state reads the new observation alone, as [`descriptor_carry`](@ref) folds it, so it adds no row. Under a Return Forecast that reads the panel at the call with no data, as [`cross_sectional_forecast_reads_panel`](@ref) answers, the carry keeps every row. A forecast that computes its history one observation at a time reads its last [`carry_lookback`](@ref) rows, which [`carry_lookback`](@ref) of the prior counts: a Descriptor of its scores that carries a state counts one row. An unbounded look-back keeps every row too.
 
 # Arguments
 
@@ -349,7 +353,8 @@ function cross_sectional_carry_rows(pe::CrossSectionalFactorPrior)::Option{<:Int
     return cross_sectional_forecast_reads_panel(pe.rfe) ? nothing : carry_lookback(pe)
 end
 function carry_lookback(pe::CrossSectionalFactorPrior)::Option{<:Integer}
-    return cross_sectional_lookback(pe, carry_lookback(map(last, pe.factors)))
+    return cross_sectional_lookback(pe, carry_lookback(map(last, pe.factors)),
+                                    carry_lookback)
 end
 """
     cross_sectional_descriptor_carry(est::AbstractVector, rd::ReturnsResult, n::Nothing)
@@ -1222,7 +1227,7 @@ function cross_sectional_carry_fold(pe::CrossSectionalFactorPrior,
                                      st.buf.n + size(rd.X, 1) - size(win.X, 1))
     m = size(rows.Ms, 1)
     st = cross_sectional_carry_scores(pe, cross_sectional_fold_histories(pe, st, rows), win,
-                                      rows)
+                                      rows, size(rd.X, 1))
     n = cross_sectional_carry_rows(pe)
     st = cross_sectional_carry_with(st,
                                     (;

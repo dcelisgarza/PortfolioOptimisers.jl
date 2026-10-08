@@ -1282,7 +1282,7 @@ Each entry names the part and the method that it lacks. The test reads the confi
 # Algorithm
 
  1. For each factor `name => xe`, list the factor when [`carry_lookback`](@ref) of `xe` is `nothing`. The carry then keeps every panel row.
- 2. List `rfe` when [`cross_sectional_forecast_reads_panel`](@ref) answers `true`, because the forecast fits again over every row. Otherwise list it when its [`lookback`](@ref) is `nothing`, because the carry keeps every row under it.
+ 2. List `rfe` when [`cross_sectional_forecast_reads_panel`](@ref) answers `true`, because the forecast fits again over every row. Otherwise list it when its [`carry_lookback`](@ref) is `nothing`, because the carry keeps every row under it.
  3. List `ve` when [`supports_partial_fit`](@ref) answers `false`.
  4. List `pe` when [`cross_sectional_factor_prior_folds`](@ref) answers `false`.
  5. List `th` when it is positive, because the idiosyncratic correlation has no fold.
@@ -1347,7 +1347,7 @@ The method that Julia selects is the algorithm.
 
  1. An absent forecast does not grow.
  2. A forecast for which [`cross_sectional_forecast_reads_panel`](@ref) answers `true` fits again over every row at each call with no data.
- 3. Any other forecast whose [`lookback`](@ref) is `nothing` makes the carry keep every panel row.
+ 3. Any other forecast whose [`carry_lookback`](@ref) is `nothing` makes the carry keep every panel row. A Descriptor of its scores that carries a state counts one row there.
 
 # Arguments
 
@@ -1369,7 +1369,7 @@ function carry_forecast_parts(rfe::AbstractReturnForecastEstimator)::Vector{Stri
     reads = cross_sectional_forecast_reads_panel(rfe)
     return vcat(carry_growing_part(reads,
                                    "the Return Forecast `rfe` ($(nameof(typeof(rfe)))) has no fold of its rows in this configuration, so it fits again over every row"),
-                carry_growing_part(!reads && isnothing(lookback(rfe)),
+                carry_growing_part(!reads && isnothing(carry_lookback(rfe)),
                                    "the Return Forecast `rfe` ($(nameof(typeof(rfe)))) has no finite look-back, so the carry keeps every panel row. Each Descriptor of its scores needs a method of `lookback`"))
 end
 """

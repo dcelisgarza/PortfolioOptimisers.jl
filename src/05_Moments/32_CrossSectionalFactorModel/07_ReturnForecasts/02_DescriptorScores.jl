@@ -563,6 +563,11 @@ function descriptor_neutralised_scores(ds::DescriptorScores, P::NamedTuple,
     neutralise_scores!(S, ds.neutralise, ds.cre, csfm, wn, ds.scoring, P.g, rows)
     return S
 end
+function descriptor_carry(ds::DescriptorScores, rd::ReturnsResult, m::Integer)
+    cs = map(de -> descriptor_carry(de, rd, m), ds.descriptors)
+    return (; xf = Accessors.@set(ds.descriptors = map(c -> c.xf, cs)),
+            xv = Accessors.@set(ds.descriptors = map(c -> c.xv, cs)))
+end
 
 export DescriptorScores, descriptor_scores, EstimationMaskWeights, BlockRegressionWeights
 public AbstractNeutralisationWeights
