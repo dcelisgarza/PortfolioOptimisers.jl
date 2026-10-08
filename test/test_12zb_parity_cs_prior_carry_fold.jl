@@ -58,6 +58,17 @@ function (r::CarryHistoryScale)(key, pr, w, slv, ctx)
     push!(r.seen, copy(h))
     return mean(abs, filter(isfinite, h)) * 100
 end
+# A test-local rule of `c` that records the fit of the prior it reads (#1572).
+struct ContextRecordScale <:
+       PortfolioOptimisers.AbstractOrthogonalForecastScaleCalibrationAlgorithm
+    seen::Vector{Any}
+end
+ContextRecordScale() = ContextRecordScale(Any[])
+PortfolioOptimisers.reads_forecast_history(::ContextRecordScale) = true
+function (r::ContextRecordScale)(key, pr, w, slv, ctx)
+    push!(r.seen, ctx.cs)
+    return 1.0
+end
 
 @testset "The carry fold of the Cross-Sectional Factor Prior (#1471)" begin
     po = PortfolioOptimisers
@@ -314,6 +325,62 @@ end
                 fc(rf) = rf isa TargetReturnForecastResult ? [rf.calib] : rf.coef
                 @test relerr(fc(x.pr.rr.rf), fc(b.rr.rf)) <= 1e-12
             end
+        end
+        @testset "A forecast of a pair of leverage one counts no return twice (#1572)" begin
+            # On rows 1-880 asset 3 is the only member of its industry at the latest row. Its
+            # row of I - P is zero, so its orthogonal forecast is zero, and its whole forecast
+            # enters through the spanned coefficients g. The prior blends g with the factor
+            # mean convexly, and the factor mean of its industry already holds the
+            # idiosyncratic returns of asset 3. So the forecast replaces a share 1 - lambda of
+            # that mean, and adds nothing to it. Measured: |b[3]| is 1.7e-17 at lambda 0 and
+            # 1.0e-17 at lambda 0.4, and the largest |b| is 0.018 and 0.011.
+            p880 = rows(pp, 1:880)
+            fx = FixedWeightedReturnForecast(; scores = ds, scale = 0.02)
+            m0 = prior(CrossSectionalFactorPrior(; cfg..., lambda = 1, c = 0), p880).mu
+            for (lambda, c) in ((0.0, 1.0), (0.4, 0.6))
+                pr = prior(CrossSectionalFactorPrior(; cfg..., lambda = lambda, c = c,
+                                                     rfe = fx), p880)
+                @test pr.rr.csr.h1[end, 3]
+                @test abs(pr.rr.b[3]) < 1e-15
+                @test maximum(abs, filter(isfinite, pr.rr.b)) > 1e-3
+                @test isapprox(pr.mu[3], lambda * m0[3] + (1 - lambda) * pr.rr.rf.mu[3];
+                               rtol = 1e-12)
+            end
+            # A pair of the calibration slope is the orthogonal forecast of a row and the
+            # idiosyncratic return of the next row. When an asset becomes a pair of leverage
+            # one at the next row, its target is zero by construction and its forecast is
+            # not, so the pair would pull the slope towards zero. The panels of map #1562
+            # hold no such pair, because asset 3 is marked at every row that fits it. So the
+            # test marks one pair of another asset by hand, as the fit marks it.
+            rec = ContextRecordScale()
+            prior(CrossSectionalFactorPrior(; cfg..., lambda = 0.4, c = rec, rfe = fx), pp)
+            cs = only(rec.seen)
+            csr = cs.csfm.csr
+            ap = po.cross_sectional_split_history(cs).ap
+            t, j = Tuple(findfirst(k -> k[1] < size(ap, 1) &&
+                                        !csr.h1[k[1], k[2]] &&
+                                        !csr.h1[k[1] + 1, k[2]] &&
+                                        isfinite(ap[k]) &&
+                                        !iszero(ap[k]) &&
+                                        isfinite(csr.eps[k[1] + 1, k[2]]),
+                                   CartesianIndices(ap)))
+            function with_cell(h, e)
+                eps = copy(csr.eps)
+                eps[t + 1, j] = e
+                h1 = copy(csr.h1)
+                h1[t + 1, j] = h
+                c2 = CrossSectionalRegression(; f = csr.f, eps = eps, n = csr.n, b = csr.b,
+                                              h1 = h1)
+                return merge(cs,
+                             (; csfm = po.Accessors.setproperties(cs.csfm, (; csr = c2))))
+            end
+            marked = po.orthogonal_forecast_pairs(with_cell(true, 0.0))
+            byhand = po.orthogonal_forecast_pairs(with_cell(false, NaN))
+            pooled = po.orthogonal_forecast_pairs(with_cell(false, 0.0))
+            @test isequal(marked, byhand)
+            @test length(pooled.a) == length(marked.a) + 1
+            slope(x) = po.forecast_calibration_slope(x.a, x.b, x.q)
+            @test slope(pooled) != slope(marked)
         end
     end
 

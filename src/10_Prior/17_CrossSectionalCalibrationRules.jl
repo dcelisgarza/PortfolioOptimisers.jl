@@ -887,7 +887,7 @@ Where:
   - ``\\hat{c}``: The calibration slope, before the warm-up form `wu` takes it.
   - ``\\mathrm{se}``: The heteroskedasticity-consistent standard error of the slope, the HC0 sandwich.
   - ``a_{k}``: Orthogonal part of the forecast of the ``k``-th pair, an asset at a row of the history before the latest.
-  - ``b_{k}``: Idiosyncratic return of the same asset at the next row.
+  - ``b_{k}``: Idiosyncratic return of the same asset at the next row. The rule pools no pair whose target is a Leverage-One Pair, as [`orthogonal_forecast_pairs`](@ref) states.
   - ``q_{k}``: Regression weight of the same asset at the row of the forecast, zero where that weight is not finite.
 
 # Fields
@@ -958,7 +958,7 @@ Pool the pairs of the orthogonal part of each forecast row and the idiosyncratic
 # Algorithm
 
  1. Split the Return Forecast history with [`cross_sectional_split_history`](@ref), giving the orthogonal part `ap` of each row.
- 2. Take the idiosyncratic return of the next row as the target of each row, with [`forward_mean_returns`](@ref) at a horizon and a lag of one, over the residuals of `cs.csfm.csr`.
+ 2. Take the idiosyncratic return of the next row as the target of each row, with [`forward_mean_returns`](@ref) at a horizon and a lag of one, over the residuals that [`forecast_idiosyncratic_returns`](@ref) reads. A target at a Leverage-One Pair is `NaN`, because its residual is zero by construction and is no observation of the return, so the pair drops out.
  3. Pool the pairs of the rows before the latest with [`forecast_calibration_pairs`](@ref), under the regression weights `cs.csfm.rw`.
  4. Count the rows that give at least one pair, giving `n`.
 
@@ -986,7 +986,8 @@ Pool the pairs of the orthogonal part of each forecast row and the idiosyncratic
 function orthogonal_forecast_pairs(cs::NamedTuple)
     ap = cross_sectional_split_history(cs).ap
     csfm = cs.csfm
-    Y = forward_mean_returns(csfm.csr.eps, 1, 1)
+    # A target at a Leverage-One Pair is zero by construction, so it reads `NaN` (#1572).
+    Y = forward_mean_returns(forecast_idiosyncratic_returns(csfm), 1, 1)
     rw::MatNum = csfm.rw
     dates = 1:(size(ap, 1) - 1)
     a, b, q = forecast_calibration_pairs(ap, Y, rw, dates)
