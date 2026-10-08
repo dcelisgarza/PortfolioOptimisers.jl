@@ -528,6 +528,32 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Answers whether the factor prior of a [`CrossSectionalFactorPrior`](@ref) folds on the carry fold, at a cost that does not grow with the stream.
+
+[`cross_sectional_fold_factors`](@ref) folds an [`EmpiricalPrior`](@ref) alone. Its fold refits each member that does not fold over every carried factor return, as [`fold_member`](@ref) states, so the prior folds only when `me` and `ce` both answer [`supports_partial_fit`](@ref). Every other factor prior fits again over every factor return at each call with no data. [`carry_growing_parts`](@ref) reads this predicate.
+
+# Arguments
+
+  - `pe`: The factor prior.
+
+# Returns
+
+  - `folds::Bool`: `true` when the factor prior folds.
+
+# Related
+
+  - [`cross_sectional_fold_factors`](@ref)
+  - [`carry_growing_parts`](@ref)
+"""
+function cross_sectional_factor_prior_folds(pe::EmpiricalPrior)::Bool
+    return supports_partial_fit(pe.me) && supports_partial_fit(pe.ce)
+end
+function cross_sectional_factor_prior_folds(::AbstractPriorEstimator)::Bool
+    return false
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Reads the factor prior of the carry fold out of its state.
 
 A folded [`EmpiricalPrior`](@ref) answers from its carry state. Any other factor prior refits over the factor returns `f`.
@@ -1277,6 +1303,7 @@ function partial_fit!(pe::CrossSectionalFactorPrior{<:Any, <:Any, <:Any, <:Any, 
                                                     <:Any, <:Any, <:Any, <:Any, <:Any,
                                                     <:Any, <:Any, <:Any, <:Any, <:Any,
                                                     <:Any, <:Any, <:Any, <:Any, <:Any,
+                                                    <:Any,
                                                     <:Option{<:CrossSectionalCarryState}},
                       rd::ReturnsResult)
     st = if isnothing(pe.cache)

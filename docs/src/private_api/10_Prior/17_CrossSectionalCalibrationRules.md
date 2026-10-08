@@ -13,4 +13,8 @@ PortfolioOptimisers.stein_spanned_shrinkage
 PortfolioOptimisers.forecast_scale_distance
 PortfolioOptimisers.orthogonal_forecast_pairs
 PortfolioOptimisers.forecast_calibration_slope_se
+PortfolioOptimisers.carry_growing_parts
+PortfolioOptimisers.assert_carry_rule
+PortfolioOptimisers.carry_growing_part
+PortfolioOptimisers.carry_forecast_parts
 ```

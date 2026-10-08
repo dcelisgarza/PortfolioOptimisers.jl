@@ -123,4 +123,4 @@ In order to implement a new programme set, subtype `AbstractProgrammeAllocationS
 """
 abstract type AbstractProgrammeAllocationSet <: AbstractAllocationSet end
 
-public AbstractProgrammeAllocationSet, risk_constraint_solver
+public AbstractProgrammeAllocationSet, risk_constraint_solver, supports_partial_fit

@@ -1211,10 +1211,215 @@ function systematic_processing!(::NoSystematicRepair, mp::MatrixProcessing, sigm
     LinearAlgebra.hermitianpart!(sigma)
     return sigma
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Folds each part of a [`CrossSectionalFactorPrior`](@ref) that has a fold, and fits every other part again at each step of the carry fold. This is the default Carry Rule.
+
+The rule accepts every configuration. A part that does not fold, as [`carry_growing_parts`](@ref) lists it, is fitted again over every row that it reads, so the call with no data equals the batch fit over the folded observations. The cost of that refit grows with the stream:
+
+  - A factor or a Return Forecast with no finite look-back makes the carry keep every panel row, so each step computes its Factor Exposures over every row.
+  - A Return Forecast with no fold of its rows fits again over every row at each call with no data.
+  - A `ve` that does not fold fits every idiosyncratic return again at each step.
+  - A factor prior `pe` that does not fold fits every factor return again at each call with no data.
+  - The idiosyncratic correlation under `th > 0` is estimated again over every standardised idiosyncratic return at each call with no data.
+
+[`FoldOnly`](@ref) refuses such a prior in its constructor instead.
+
+# Constructors
+
+    FoldOrRefit() -> FoldOrRefit
+
+# Examples
+
+```jldoctest
+julia> FoldOrRefit()
+FoldOrRefit()
+```
+
+# Related
+
+  - [`AbstractCarryRule`](@ref)
+  - [`FoldOnly`](@ref)
+  - [`carry_growing_parts`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+struct FoldOrRefit <: AbstractCarryRule end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Accepts only a [`CrossSectionalFactorPrior`](@ref) whose every step of the carry fold has a cost that does not grow with the stream.
+
+The constructor of the prior refuses a configuration that holds a part from [`carry_growing_parts`](@ref), and names each such part and the method that it lacks. A bounded window passes: a factor whose Descriptors state a finite [`lookback`](@ref) makes the carry keep that many rows alone. On the configurations that the rule accepts, the carry fold runs the same step as under [`FoldOrRefit`](@ref), so the call with no data equals the batch fit.
+
+# Constructors
+
+    FoldOnly() -> FoldOnly
+
+# Examples
+
+```jldoctest
+julia> FoldOnly()
+FoldOnly()
+```
+
+# Related
+
+  - [`AbstractCarryRule`](@ref)
+  - [`FoldOrRefit`](@ref)
+  - [`assert_carry_rule`](@ref)
+  - [`carry_growing_parts`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+struct FoldOnly <: AbstractCarryRule end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Lists the parts of a [`CrossSectionalFactorPrior`](@ref) whose step cost on the carry fold grows with the number of folded observations.
+
+Each entry names the part and the method that it lacks. The test reads the configuration alone, so the constructor of the prior can run it.
+
+# Algorithm
+
+ 1. For each factor `name => xe`, list the factor when [`carry_lookback`](@ref) of `xe` is `nothing`. The carry then keeps every panel row.
+ 2. List `rfe` when [`cross_sectional_forecast_reads_panel`](@ref) answers `true`, because the forecast fits again over every row. Otherwise list it when its [`lookback`](@ref) is `nothing`, because the carry keeps every row under it.
+ 3. List `ve` when [`supports_partial_fit`](@ref) answers `false`.
+ 4. List `pe` when [`cross_sectional_factor_prior_folds`](@ref) answers `false`.
+ 5. List `th` when it is positive, because the idiosyncratic correlation has no fold.
+
+# Arguments
+
+  - `cfg`: The prior, or a `NamedTuple` of its fields `factors`, `pe`, `ve`, `rfe` and `th`.
+
+# Returns
+
+  - `parts::Vector{String}`: One description for each part that grows, empty when no part grows.
+
+# Related
+
+  - [`assert_carry_rule`](@ref)
+  - [`FoldOrRefit`](@ref)
+  - [`FoldOnly`](@ref)
+  - [`cross_sectional_carry_rows`](@ref)
+"""
+function carry_growing_parts(cfg::Union{<:CrossSectionalFactorPrior, <:NamedTuple})::Vector{String}
+    return vcat(String[],
+                (carry_growing_part(isnothing(carry_lookback(xe)),
+                                    "the factor \"$name\" ($(nameof(typeof(xe)))) has no finite look-back, so the carry keeps every panel row. Each of its Descriptors needs a method of `lookback`")
+                 for (name, xe) in cfg.factors)..., carry_forecast_parts(cfg.rfe),
+                carry_growing_part(!supports_partial_fit(cfg.ve),
+                                   "`ve` ($(nameof(typeof(cfg.ve)))) does not fold, so each step fits every idiosyncratic return again. It needs a method of `partial_fit!` and of `supports_partial_fit`"),
+                carry_growing_part(!cross_sectional_factor_prior_folds(cfg.pe),
+                                   "the factor prior `pe` ($(nameof(typeof(cfg.pe)))) does not fold, so it fits every factor return again. The carry folds an `EmpiricalPrior` whose `me` and `ce` answer `supports_partial_fit`"),
+                carry_growing_part(cfg.th > 0,
+                                   "`th = $(cfg.th)` estimates the idiosyncratic correlation again over every row, because the correlation has no fold. Set `th = 0`"))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the description of one part of a [`CrossSectionalFactorPrior`](@ref) in a vector when the part grows, and an empty vector otherwise.
+
+# Arguments
+
+  - `grows`: Whether the step cost of the part grows with the stream.
+  - `msg`: The description of the part.
+
+# Returns
+
+  - `parts::Vector{String}`: `[msg]` when `grows` is `true`, and an empty vector otherwise.
+
+# Related
+
+  - [`carry_growing_parts`](@ref)
+"""
+function carry_growing_part(grows::Bool, msg::String)::Vector{String}
+    return grows ? [msg] : String[]
+end
+"""
+    carry_forecast_parts(rfe::Nothing) -> Vector{String}
+    carry_forecast_parts(rfe::AbstractReturnForecastEstimator) -> Vector{String}
+
+Describes the Return Forecast of a [`CrossSectionalFactorPrior`](@ref) when its step cost on the carry fold grows with the stream.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. An absent forecast does not grow.
+ 2. A forecast for which [`cross_sectional_forecast_reads_panel`](@ref) answers `true` fits again over every row at each call with no data.
+ 3. Any other forecast whose [`lookback`](@ref) is `nothing` makes the carry keep every panel row.
+
+# Arguments
+
+  - `rfe`: The Return Forecast Estimator, or `nothing`.
+
+# Returns
+
+  - `parts::Vector{String}`: One description when the forecast grows, and an empty vector otherwise.
+
+# Related
+
+  - [`carry_growing_parts`](@ref)
+  - [`cross_sectional_carry_rows`](@ref)
+"""
+function carry_forecast_parts(::Nothing)::Vector{String}
+    return String[]
+end
+function carry_forecast_parts(rfe::AbstractReturnForecastEstimator)::Vector{String}
+    reads = cross_sectional_forecast_reads_panel(rfe)
+    return vcat(carry_growing_part(reads,
+                                   "the Return Forecast `rfe` ($(nameof(typeof(rfe)))) has no fold of its rows in this configuration, so it fits again over every row"),
+                carry_growing_part(!reads && isnothing(lookback(rfe)),
+                                   "the Return Forecast `rfe` ($(nameof(typeof(rfe)))) has no finite look-back, so the carry keeps every panel row. Each Descriptor of its scores needs a method of `lookback`"))
+end
+"""
+    assert_carry_rule(carry::FoldOrRefit, cfg) -> nothing
+    assert_carry_rule(carry::FoldOnly, cfg) -> nothing
+
+Applies the Carry Rule of a [`CrossSectionalFactorPrior`](@ref) to its configuration.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. [`FoldOrRefit`](@ref) accepts every configuration.
+ 2. [`FoldOnly`](@ref) refuses a configuration for which [`carry_growing_parts`](@ref) lists a part.
+
+# Arguments
+
+  - `carry`: The Carry Rule of the prior.
+  - `cfg`: The prior, or a `NamedTuple` of its fields `factors`, `pe`, `ve`, `rfe` and `th`.
+
+# Validation
+
+  - Under [`FoldOnly`](@ref), no part grows. Raises one `ArgumentError` that names every part that grows and the method that each part lacks.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`AbstractCarryRule`](@ref)
+  - [`carry_growing_parts`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function assert_carry_rule(::FoldOrRefit, ::Any)
+    return nothing
+end
+function assert_carry_rule(::FoldOnly,
+                           cfg::Union{<:CrossSectionalFactorPrior, <:NamedTuple})
+    parts = carry_growing_parts(cfg)
+    @argcheck(isempty(parts),
+              ArgumentError("carry = FoldOnly() refuses this CrossSectionalFactorPrior, because the cost of a step of its carry fold grows with the stream for each part below.\n" *
+                            join(map(p -> "  - " * p * ".", parts), "\n") *
+                            "\nUse carry = FoldOrRefit(), which fits these parts again at each step and stays exact. A batch fit and the refit under Online ignore the Carry Rule, so they take FoldOrRefit() too."))
+    return nothing
+end
 
 export PrecisionBlend, CurrentForecastError, ForecastHistoryError, SteinShrinkage,
        ForecastCalibrationSlope, ThresholdWarmUp, PlugInWarmUp, PositivePartWarmUp
 public AbstractForecastErrorAlgorithm, AbstractForecastScaleWarmUpAlgorithm,
        spanned_forecast_sample, forecast_scale_warm_up
-export SystematicRepair, NoSystematicRepair
-public AbstractSystematicRepair, systematic_processing!
+export SystematicRepair, NoSystematicRepair, FoldOrRefit, FoldOnly
+public AbstractSystematicRepair, systematic_processing!, AbstractCarryRule

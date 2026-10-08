@@ -24,11 +24,17 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - `D::Matrix{<:Real}`: The Descriptor, `observations × assets`, `NaN` wherever the active mask is `false`.
 
+## `lookback` (optional)
+
+  - `lookback(de::MyDescriptor) -> Option{<:Integer}`: The number of trailing observations that the value of the Descriptor at one observation reads, or `nothing` when the number is unbounded.
+
+The fallback returns `nothing`, which is exact for every Descriptor. Its cost is on the carry fold of a [`CrossSectionalFactorPrior`](@ref). With no finite look-back, [`FoldOrRefit`](@ref) keeps every panel row, and computes the Factor Exposures over all of them at each step. [`FoldOnly`](@ref) refuses the prior.
+
 # Related
 
   - [`AbstractEstimator`](@ref)
   - [`descriptor`](@ref)
-  - [`lookback`](@ref): The number of trailing observations that a Descriptor reads. A subtype can state its own method. The fallback returns `nothing`, which is exact for every Descriptor but makes a fold of the prior keep every row.
+  - [`lookback`](@ref)
   - [`PanelFieldRatio`](@ref)
   - [`PanelFieldLog`](@ref)
   - [`Passthrough`](@ref)
@@ -624,7 +630,7 @@ end
 
 Return the look-back of an estimator: the number of trailing observations that its value at one observation reads.
 
-The count includes the observation of the value, so a Descriptor that reads its own row has a look-back of one. A value that is computed from the last `lookback` rows of a panel alone equals the value at the last row of the full panel. A fold of a [`CrossSectionalFactorPrior`](@ref) can therefore keep only those rows. `nothing` states an unbounded look-back, because the value is a recursion from the first observation. An estimator that states no look-back of its own takes the fallback, which returns `nothing`. Its fold keeps every row, so its value stays exact.
+The count includes the observation of the value, so a Descriptor that reads its own row has a look-back of one. A value that is computed from the last `lookback` rows of a panel alone equals the value at the last row of the full panel. A fold of a [`CrossSectionalFactorPrior`](@ref) can therefore keep only those rows. `nothing` states an unbounded look-back, because the value is a recursion from the first observation. An estimator that states no look-back of its own takes the fallback, which returns `nothing`. Its fold keeps every row, so its value stays exact. Under [`FoldOnly`](@ref) the prior refuses such an estimator in its constructor, as [`carry_growing_parts`](@ref) states.
 
 # Algorithm
 
@@ -718,4 +724,4 @@ function lookback_max(f, ests::AbstractVector)::Option{<:Integer}
 end
 
 export descriptor
-public AbstractDescriptorEstimator
+public AbstractDescriptorEstimator, lookback

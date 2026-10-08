@@ -29,6 +29,13 @@ NoSystematicRepair
 systematic_processing!
 ```
 
+The two members of the carry rule of a [`CrossSectionalFactorPrior`](@ref) are on this page too. The rule stands in `carry`.
+
+```@docs
+FoldOrRefit
+FoldOnly
+```
+
 ## References
 
 ```@bibliography

@@ -306,6 +306,16 @@ The warm-ups of a fit add up, so a caller who sizes a window must sum three of t
 
 On the online step the prior takes one of two routes. Unwrapped, it folds as a carry: its first step of [`partial_fit!`](@ref) seeds a [`CrossSectionalCarryState`](@ref), and each step computes the exposures, the regression and the idiosyncratic variance of the new observations alone. Wrapped in [`Online`](@ref), it refits: each step records the returns, both masks and the Panel Fields in a sample buffer, the call with no data `prior(pe)` is the batch fit over the rows of the buffer, and a `max_history` on the wrapper bounds them. When a member reads the Exogenous Series, as [`reads_exogenous_series`](@ref) answers, the buffer records every column of the series too, so an observed factor takes the refit. The carry fold records the series of the rows it carries, so an observed factor takes the carry too. The automatic choice of a dropped member reads every row, so `choice` states whether each fit chooses again or the first fit pins it.
 
+The Carry Rule `carry` states what the carry fold does with a part that has no fold of its own. Under [`FoldOrRefit`](@ref), the default, the carry fits such a part again over every row that it reads. The call with no data stays equal to the batch fit, but the cost of the refit grows with the stream:
+
+  - A factor or a Return Forecast with no finite [`lookback`](@ref) makes the carry keep every panel row, and each step computes the Factor Exposures over all of them.
+  - A Return Forecast with no fold of its rows fits again over every row at each call with no data.
+  - A `ve` that does not fold, as [`supports_partial_fit`](@ref) answers, fits every idiosyncratic return again at each step.
+  - A factor prior `pe` that does not fold fits every factor return again at each call with no data.
+  - The idiosyncratic correlation under `th > 0` is estimated again over every standardised idiosyncratic return at each call with no data.
+
+[`FoldOnly`](@ref) makes the constructor refuse each of these parts, and names it. A batch fit and the refit under [`Online`](@ref) ignore the rule.
+
 A Scenario Cap is a route through `pe`. The prior builds its asset scenarios from the last rows of the factor scenarios and of the standardised idiosyncratic returns, as [`cross_sectional_scenarios`](@ref) states. So `pe = EmpiricalPrior(; …, max_scenarios = w)` gives the last `w` asset scenarios, and `mu` and `sigma` stay fitted over every observation. The `max_history` of [`Online`](@ref) is a different knob: it is a window on the whole fit, so the moments move with it.
 
 `ofit` is the Orthogonal Forecast Fit. A fitted Return Forecast regresses the forward idiosyncratic return, which the regression makes orthogonal to the Factor Exposures, so the part of its forecast that the exposures do not span is under-scaled. The default [`ScoreNeutralisation`](@ref) neutralises the scores of such a member against every estimated factor of the block before the fit, [`OrthogonalPartCalibration`](@ref) scales the orthogonal part by a slope fitted on it, and [`UnadjustedForecast`](@ref) reads the member as it stands.
@@ -341,6 +351,7 @@ $(DocStringExtensions.FIELDS)
                               mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                               ex::FLoops.Transducers.Executor = ThreadedEx(),
                               choice::AbstractChoiceRule = BatchChoice(),
+                              carry::AbstractCarryRule = FoldOrRefit(),
                               cache::Option{<:AbstractPartialFitState} = nothing) -> CrossSectionalFactorPrior
 
 Keywords correspond to the struct's fields. `factors`, `neutralise` and `families` also take a dictionary, and the constructor collects each one into a vector of Pairs.
@@ -361,6 +372,7 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
   - A stated `c` is finite and `>= 0`, by [`assert_orthogonal_forecast_scale`](@ref).
   - A rule in `lambda` or in `c` that reads the Return Forecast history needs a fitted `rfe`, as [`assert_forecast_history_rule`](@ref) states. A rule of the wrong family is refused by the bound of the slot. The number a rule returns is checked when the prior resolves it.
   - [`OrthogonalPartCalibration`](@ref) in `ofit` needs a member that can fit the slope of the orthogonal part, as [`assert_orthogonal_forecast_fit`](@ref) states.
+  - Under [`FoldOnly`](@ref) in `carry`, no part makes the cost of a step of the carry fold grow with the stream, as [`assert_carry_rule`](@ref) states.
 
 ## Propagated parameters
 
@@ -411,6 +423,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
   - [`CrossSectionalCarryState`](@ref)
   - [`AbstractChoiceRule`](@ref)
   - [`AbstractSystematicRepair`](@ref)
+  - [`AbstractCarryRule`](@ref)
 """
 @propagatable @concrete struct CrossSectionalFactorPrior <: AbstractLowOrderPriorEstimator_A
     """
@@ -514,6 +527,10 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     choice
     """
+    $(field_dict[:carry])
+    """
+    carry
+    """
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
@@ -536,7 +553,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        lx::Option{<:AbstractString},
                                        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
                                        ex::FLoops.Transducers.Executor,
-                                       choice::AbstractChoiceRule,
+                                       choice::AbstractChoiceRule, carry::AbstractCarryRule,
                                        cache::Option{<:AbstractPartialFitState})
         assert_closed_unit_interval(th, :th)
         assert_finite(bp, :bp)
@@ -561,14 +578,16 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         assert_forecast_history_rule(lambda, rfe, :lambda)
         assert_forecast_history_rule(c, rfe, :c)
         assert_orthogonal_forecast_fit(ofit, rfe)
+        assert_carry_rule(carry, (; factors, pe, ve, rfe, th))
         return new{typeof(factors), typeof(neutralise), typeof(families), typeof(cre),
                    typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(f_mp), typeof(mp),
                    typeof(srep), typeof(th), typeof(bp), typeof(mcap), typeof(bw),
                    typeof(lag), typeof(minra), typeof(rfe), typeof(lambda), typeof(c),
                    typeof(ofit), typeof(lx), typeof(mtx_sqrt), typeof(ex), typeof(choice),
-                   typeof(cache)}(factors, neutralise, families, cre, wa, pe, ve, ce, f_mp,
-                                  mp, srep, th, bp, mcap, bw, lag, minra, rfe, lambda, c,
-                                  ofit, lx, mtx_sqrt, ex, choice, cache)
+                   typeof(carry), typeof(cache)}(factors, neutralise, families, cre, wa, pe,
+                                                 ve, ce, f_mp, mp, srep, th, bp, mcap, bw,
+                                                 lag, minra, rfe, lambda, c, ofit, lx,
+                                                 mtx_sqrt, ex, choice, carry, cache)
     end
 end
 function CrossSectionalFactorPrior(; factors::Dict_VecPair,
@@ -599,13 +618,14 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                    choice::AbstractChoiceRule = BatchChoice(),
+                                   carry::AbstractCarryRule = FoldOrRefit(),
                                    cache::Option{<:AbstractPartialFitState} = nothing)::CrossSectionalFactorPrior
     return CrossSectionalFactorPrior(cross_sectional_prior_pairs(factors, :factors),
                                      cross_sectional_prior_option(neutralise, :neutralise),
                                      cross_sectional_prior_option(families, :families), cre,
                                      wa, pe, ve, ce, f_mp, mp, srep, th, bp, mcap, bw, lag,
                                      minra, rfe, lambda, c, ofit, lx, mtx_sqrt, ex, choice,
-                                     cache)
+                                     carry, cache)
 end
 # `lambda` and `c` are the two Calibration Slots of the prior. The prior resolves them itself,
 # inside `cross_sectional_assemble`, so the declaration serves the two `assert_` walks alone.
@@ -1619,7 +1639,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 function show_fields(::CrossSectionalFactorPrior)
     return (:factors, :neutralise, :families, :cre, :wa, :pe, :ve, :ce, :f_mp, :mp, :srep,
             :th, :bp, :mcap, :bw, :lag, :minra, :rfe, :lambda, :c, :ofit, :lx, :mtx_sqrt,
-            :ex, :choice)
+            :ex, :choice, :carry)
 end
 function factor_residual_config(::CrossSectionalFactorPrior)
     # The declaration names a variance estimator that a consumer re-runs on the

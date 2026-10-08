@@ -24,10 +24,17 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - `L::Array{<:Real}`: The Factor Exposure, `observations × assets` for a member producing one factor, `observations × assets × factors` for a member expanding one Panel Field into many, `NaN` wherever the active mask is `false`.
 
+## `lookback` (optional)
+
+  - `lookback(xe::MyExposure) -> Option{<:Integer}`: The number of trailing observations that the Factor Exposure at one observation reads, or `nothing` when the number is unbounded.
+
+The fallback returns `nothing`, which is exact for every Exposure Estimator. Its cost is on the carry fold of a [`CrossSectionalFactorPrior`](@ref). With no finite look-back, [`FoldOrRefit`](@ref) keeps every panel row, and computes the Factor Exposures over all of them at each step. [`FoldOnly`](@ref) refuses the prior.
+
 # Related
 
   - [`AbstractEstimator`](@ref)
   - [`factor_exposure`](@ref)
+  - [`lookback`](@ref)
   - [`CompositeExposure`](@ref)
   - [`DerivedExposure`](@ref)
   - [`OneHotExposure`](@ref)

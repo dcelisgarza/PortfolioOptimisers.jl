@@ -77,7 +77,8 @@
     `AbstractNeutralisationWeights` and `AbstractOrthogonalForecastFit`.
     `AbstractSystematicRepair`, the family of the Systematic Repair rule of
     `CrossSectionalFactorPrior`, joined with its `# Interfaces` section and its two members on
-    2026-10-08 (issue #1576).
+    2026-10-08 (issue #1576). `AbstractCarryRule`, the family of the Carry Rule of the same
+    prior, joined with its two members on 2026-10-08 (issue #1602).
     They are held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
@@ -167,7 +168,8 @@
                           :AbstractOrthogonalForecastFit, :AbstractCentring,
                           :AbstractRegimeDebias, :AbstractHacFloor,
                           :AbstractHacVolatilityTiming, :AbstractCalibrationWarmup,
-                          :AbstractStepWeighting, :AbstractSystematicRepair])
+                          :AbstractStepWeighting, :AbstractSystematicRepair,
+                          :AbstractCarryRule])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&

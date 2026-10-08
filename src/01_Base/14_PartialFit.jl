@@ -24,6 +24,12 @@ A family that answers this verb implements two methods:
   - `partial_fit!(est, X::MatNum; dims::Int = 1, kwargs...) -> est`: Folds every observation of `X`, in order.
   - `partial_fit!(est, x::VecNum; kwargs...) -> est`: Folds one observation, whose entries are the assets.
 
+A family that folds also states it through [`supports_partial_fit`](@ref):
+
+  - `supports_partial_fit(est::MyEstimator) -> Bool`: Returns `true`.
+
+The fallback answers `true` only for an estimator whose `cache` holds a [`SampleBufferState`](@ref). An outer estimator that asks, such as the carry fold of a [`CrossSectionalFactorPrior`](@ref), fits a member that answers `false` again at each step, over every row. Under [`FoldOnly`](@ref) the prior refuses such a `ve`.
+
 # Arguments
 
   - `est`: Estimator whose state is folded forward.

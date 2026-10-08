@@ -289,8 +289,14 @@ The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton
   the Exogenous Series) and
   [#1479](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1479) (the carry fold
   takes an observed factor).
-- [#1602](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1602) builds the Carry
-  Rule, a child of sub-map #1562.
+- [#1602](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1602) built the Carry
+  Rule, a child of sub-map #1562. `carry_growing_parts` lists the parts that grow, and
+  `assert_carry_rule` applies the rule in the constructor. Until
+  [#1594](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1594) folds the
+  idiosyncratic correlation, `FoldOnly()` refuses `th > 0`. Until
+  [#1595](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1595) makes the verb
+  "this factor prior folds", `cross_sectional_factor_prior_folds` answers it: an `EmpiricalPrior`
+  whose `me` and `ce` fold. Each of the two builds changes one line of `carry_growing_parts`.
 - ADR 0136 and ADR 0039 carry amendments that point here.
 - A pinned choice and a seed window are two routes on which the online call with no data equals no batch fit.
   Each is documented, and each is tested against the oracle.

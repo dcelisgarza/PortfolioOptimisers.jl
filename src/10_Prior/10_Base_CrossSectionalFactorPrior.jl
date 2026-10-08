@@ -1535,6 +1535,27 @@ In order to implement a new concrete type that works seamlessly with the library
 """
 abstract type AbstractSystematicRepair <: AbstractAlgorithm end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the Carry Rule of a [`CrossSectionalFactorPrior`](@ref), the rule that says whether the carry fold accepts a part whose step cost grows with the stream.
+
+The carry fold folds each part that has a fold of its own. It fits every other part again at each step, over every row that the part reads. That refit is exact, but its cost grows with the number of folded observations. Five kinds of part do that, as [`carry_growing_parts`](@ref) states: a factor with no finite look-back, a Return Forecast with no bounded fold, a `ve` that does not fold, a factor prior `pe` that does not fold, and the idiosyncratic correlation under `th > 0`. Every test reads the configuration alone, so the constructor of the prior applies the rule. A batch fit and the refit under [`Online`](@ref) ignore it.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. The constructor of [`CrossSectionalFactorPrior`](@ref) passes the rule and the configuration to [`assert_carry_rule`](@ref), which dispatches on the type of the rule. A new rule needs its own method of that check. The carry fold runs the same step under every rule, so a rule that changes the step needs its own method of the step too.
+
+# Related
+
+  - [`FoldOrRefit`](@ref)
+  - [`FoldOnly`](@ref)
+  - [`assert_carry_rule`](@ref)
+  - [`carry_growing_parts`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`CrossSectionalCarryState`](@ref)
+"""
+abstract type AbstractCarryRule <: AbstractAlgorithm end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Lift a factor distribution onto the assets of a Cross-Sectional Factor Prior.
