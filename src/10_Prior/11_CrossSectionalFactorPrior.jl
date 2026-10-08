@@ -336,6 +336,7 @@ $(DocStringExtensions.FIELDS)
                               pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(; me = ExpWeightedExpectedReturns(), ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred())),
                               ve::AbstractCovarianceEstimator = RegimeAdjustedExpWeightedVariance(; centring = PreCentred()),
                               ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(; centring = PreCentred()),
+                              pdm::AbstractPosdefEstimator = Posdef(; alg = ClippedNearestCorrelation()),
                               f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                               mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                               srep::AbstractSystematicRepair = NoSystematicRepair(),
@@ -459,6 +460,10 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     @fprop @vprop ce
     """
+    $(field_dict[:pdm]) It repairs the idiosyncratic covariance alone, after the threshold, over the assets with a finite variance, and the fit reads it only when `th` is positive. `mp.pdm` repairs a different matrix: the asset covariance, which is the sum of the systematic block and this one. The default clips the correlation eigenvalues with [`ClippedNearestCorrelation`](@ref), because the carry fold runs this repair at each call with no data, and the clip costs less than the nearest correlation matrix. `pdm = Posdef()` gives the nearest correlation matrix by `NearestCorrelationMatrix.Newton`.
+    """
+    pdm
+    """
     $(field_dict[:f_mp]) It processes the factor covariance that `pe` states, which is a different matrix from the asset covariance that `mp` processes. The factor covariance is on the factor axis, `pe` estimates it from the factor-return series, and a Factor Family that drops a member can leave it singular. [`cross_sectional_lift`](@ref) takes its square root under `mtx_sqrt` for the low-rank square root, so under the default `mtx_sqrt` a factor covariance that is not positive definite fails there rather than in the asset block.
     """
     @fprop f_mp
@@ -542,6 +547,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        pe::AbstractLowOrderPriorEstimator_A_AF,
                                        ve::AbstractCovarianceEstimator,
                                        ce::StatsBase.CovarianceEstimator,
+                                       pdm::AbstractPosdefEstimator,
                                        f_mp::AbstractMatrixProcessingEstimator,
                                        mp::AbstractMatrixProcessingEstimator,
                                        srep::AbstractSystematicRepair, th::Real, bp::Real,
@@ -580,14 +586,23 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         assert_orthogonal_forecast_fit(ofit, rfe)
         assert_carry_rule(carry, (; factors, pe, ve, rfe, th))
         return new{typeof(factors), typeof(neutralise), typeof(families), typeof(cre),
-                   typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(f_mp), typeof(mp),
-                   typeof(srep), typeof(th), typeof(bp), typeof(mcap), typeof(bw),
-                   typeof(lag), typeof(minra), typeof(rfe), typeof(lambda), typeof(c),
-                   typeof(ofit), typeof(lx), typeof(mtx_sqrt), typeof(ex), typeof(choice),
-                   typeof(carry), typeof(cache)}(factors, neutralise, families, cre, wa, pe,
-                                                 ve, ce, f_mp, mp, srep, th, bp, mcap, bw,
-                                                 lag, minra, rfe, lambda, c, ofit, lx,
-                                                 mtx_sqrt, ex, choice, carry, cache)
+                   typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(pdm),
+                   typeof(f_mp), typeof(mp), typeof(srep), typeof(th), typeof(bp),
+                   typeof(mcap), typeof(bw), typeof(lag), typeof(minra), typeof(rfe),
+                   typeof(lambda), typeof(c), typeof(ofit), typeof(lx), typeof(mtx_sqrt),
+                   typeof(ex), typeof(choice), typeof(carry), typeof(cache)}(factors,
+                                                                             neutralise,
+                                                                             families, cre,
+                                                                             wa, pe, ve, ce,
+                                                                             pdm, f_mp, mp,
+                                                                             srep, th, bp,
+                                                                             mcap, bw, lag,
+                                                                             minra, rfe,
+                                                                             lambda, c,
+                                                                             ofit, lx,
+                                                                             mtx_sqrt, ex,
+                                                                             choice, carry,
+                                                                             cache)
     end
 end
 function CrossSectionalFactorPrior(; factors::Dict_VecPair,
@@ -603,6 +618,8 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                                                                                        centring = PreCentred()),
                                    ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(;
                                                                                              centring = PreCentred()),
+                                   pdm::AbstractPosdefEstimator = Posdef(;
+                                                                         alg = ClippedNearestCorrelation()),
                                    f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    srep::AbstractSystematicRepair = NoSystematicRepair(),
@@ -623,9 +640,9 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
     return CrossSectionalFactorPrior(cross_sectional_prior_pairs(factors, :factors),
                                      cross_sectional_prior_option(neutralise, :neutralise),
                                      cross_sectional_prior_option(families, :families), cre,
-                                     wa, pe, ve, ce, f_mp, mp, srep, th, bp, mcap, bw, lag,
-                                     minra, rfe, lambda, c, ofit, lx, mtx_sqrt, ex, choice,
-                                     carry, cache)
+                                     wa, pe, ve, ce, pdm, f_mp, mp, srep, th, bp, mcap, bw,
+                                     lag, minra, rfe, lambda, c, ofit, lx, mtx_sqrt, ex,
+                                     choice, carry, cache)
 end
 # `lambda` and `c` are the two Calibration Slots of the prior. The prior resolves them itself,
 # inside `cross_sectional_assemble`, so the declaration serves the two `assert_` walks alone.
@@ -864,7 +881,7 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
 
  1. Take the ready factors of `f_pr` with [`cross_sectional_ready_factors`](@ref) and the determined assets with [`cross_sectional_determined`](@ref). Refuse a fit that determines no asset with [`assert_cross_sectional_factor_moments`](@ref).
  2. Record the degrees of freedom and the divisor of each variance with [`cross_sectional_variance_counts`](@ref), from the count `cnt`.
- 3. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`, unless `fit` carries them. Take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation.
+ 3. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`, unless `fit` carries them. Take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation, and repair it under `pe.pdm`.
  4. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, and a zero `b`. Under a family re-basis, expand the factor returns onto the raw axis with [`cross_sectional_expand`](@ref), each row with the basis of its lagged exposures, and store them in `fr`.
  5. Fit the Return Forecast under the Orthogonal Forecast Fit `pe.ofit` with [`cross_sectional_return_forecast`](@ref) on `rde`, giving the spanned coefficients `g`, the orthogonal part `ap` before `c`, and the history when a slot answers `true` to [`reads_forecast_history`](@ref). The history extends the rows `hist` of `fit` when the carry fold carries them. The forecast is the Result `rf` of `fit` when the carry fold carries it.
  6. Resolve the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` with [`cross_sectional_calibration`](@ref), against the factor moments `f_pr` and the block `csfm`.
@@ -923,8 +940,8 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
     else
         fit.Sc
     end
-    esigma = cross_sectional_idiosyncratic_covariance(pe.th, pe.ce, pe.mp.pdm, Sc,
-                                                      vs[end, :], amr)
+    esigma = cross_sectional_idiosyncratic_covariance(pe.th, pe.ce, pe.pdm, Sc, vs[end, :],
+                                                      amr)
     fnow = cross_sectional_basis_now(ca.fcb, r)
     # The block's `fcb` covers its own rows alone, and the factor return of row `t` is stated
     # in the basis of row `t - lag`, so the raw-axis history is expanded here, where the basis

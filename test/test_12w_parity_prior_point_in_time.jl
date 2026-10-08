@@ -182,10 +182,11 @@ end
         # oracle divides by the per-asset congruence. So on the pairs of a late listing, a
         # relisting or a holiday, ours is the oracle's times `sqrt(W_ii W_jj) / W_ij`, up to
         # 1.124 here: measured 2.4e-15 on the 1303 pairs that both keep, and 4 pairs cross the
-        # threshold. The thresholded block is not positive definite, so the repair binds:
-        # ours takes the nearest correlation by Newton, and the oracle clips the eigenvalues.
-        # `ClippedNearestCorrelation` in `mp.pdm` is the oracle's repair, and `test_07c` measures
-        # it on this block at parity (#1412).
+        # threshold. The thresholded block is not positive definite, so the repair binds. Ours
+        # clips the eigenvalues by default under the field `pdm`, as the oracle does (#1604),
+        # and `test_07c` measures the clip on this block at parity (#1412). `pdm = Posdef()`
+        # takes the nearest correlation by Newton, and it gives the block from before #1604 bit
+        # for bit. Measured: the clip moves `sigma` by 6.7e-7 from that block.
         pl = prior(est(; th = 0.1), fxl.rd)
         eps = pl.rr.csr.eps
         amr = fxl.amsk[(end - size(eps, 1) + 1):end, :]
@@ -208,8 +209,11 @@ end
         il = findall(isfinite, pl.mu)
         Br = B[il, il]
         @test !LinearAlgebra.isposdef(LinearAlgebra.Symmetric(Br))
-        posdef!(Posdef(), Br)
+        Bn = copy(Br)
+        posdef!(Posdef(; alg = ClippedNearestCorrelation()), Br)
         @test Br == pl.rr.esigma[il, il]
+        posdef!(Posdef(), Bn)
+        @test Bn == prior(est(; th = 0.1, pdm = Posdef()), fxl.rd).rr.esigma[il, il]
     end
 
     @testset "The scenario weights and a Scenario Cap" begin

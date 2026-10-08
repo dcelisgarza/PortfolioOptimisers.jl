@@ -830,7 +830,7 @@ Where:
  4. If `fv` is not finite, estimate `C` from `S` as it stands, with `amsk` as the `active_mask`. A gap-aware `ce` then freezes the block of an inactive asset and does not decay it, and it takes an active non-finite cell as a holiday.
  5. Convert `C` to the correlation `R`.
  6. Set to zero every entry of `R` off the diagonal whose magnitude does not exceed `th`, and set the diagonal to one. This step also sets a non-finite correlation to zero.
- 7. Rescale `R` by the latest idiosyncratic volatilities, giving `D`.
+ 7. Rescale `R` by the latest idiosyncratic volatilities, giving `D`. Copy the lower triangle of `D` into the upper one, so `D` is exactly symmetric.
  8. Make the block of `D` over the assets with a finite variance positive definite with [`posdef!`](@ref).
 
 # Arguments
@@ -886,7 +886,10 @@ function cross_sectional_idiosyncratic_covariance(th::Real,
         R[i, i] = one(eltype(R))
     end
     se = sqrt.(ev)
-    D = R .* se .* transpose(se)
+    # The two triangles multiply in a different order, so they differ by round-off. The clip
+    # accepts such a block, and its square root then refuses it as not Hermitian. Each repair
+    # reads the lower triangle, so the copy leaves the input of a repair as it was.
+    D = Matrix(LinearAlgebra.Symmetric(R .* se .* transpose(se), :L))
     idx = findall(isfinite, ev)
     if !isempty(idx)
         B = D[idx, idx]

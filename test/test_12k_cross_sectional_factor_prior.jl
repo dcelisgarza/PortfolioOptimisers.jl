@@ -748,6 +748,52 @@ end
                                                                    nothing, S, ev, amsk),
                        Dg)
     end
+    @testset "The overlay block is exactly symmetric, so the clip keeps a square root (#1604)" begin
+        # `R .* se .* se'` multiplies the two triangles in a different order. On this block the
+        # product is positive definite and asymmetric at round-off, and the clip reads the lower
+        # triangle alone, so it accepted the block unchanged. The square root then threw
+        # `PosDefException(-1)`, "matrix is not Hermitian". The overlay now copies the lower
+        # triangle into the upper one, so every repair reads the input it read before.
+        T, N, th = 80, 6, 0.2
+        rng = StableRNG(1604)
+        g = randn(rng, T)
+        S = 0.7 .* g .+ 0.7 .* randn(rng, T, N)
+        amsk = trues(T, N)
+        ev = 0.01 .+ 0.05 .* rand(rng, N)
+        ce = PortfolioOptimisersCovariance()
+        C = Statistics.cov(ce, S; dims = 1)
+        R = StatsBase.cov2cor(Matrix(C), sqrt.(LinearAlgebra.diag(C)))
+        R[(abs.(R) .<= th) .& .!LinearAlgebra.I(N)] .= 0
+        Dp = R .* sqrt.(ev) .* transpose(sqrt.(ev))
+        clip = Posdef(; alg = ClippedNearestCorrelation())
+        @test !LinearAlgebra.issymmetric(Dp)
+        @test PO.posdef_accepts(clip.alg, Dp)
+        D0 = PO.cross_sectional_idiosyncratic_covariance(th, ce, nothing, S, ev, amsk)
+        @test D0 == LinearAlgebra.Symmetric(Dp, :L)
+        D = PO.cross_sectional_idiosyncratic_covariance(th, ce, clip, S, ev, amsk)
+        @test LinearAlgebra.issymmetric(D)
+        @test D == D0
+        Q = PO.matrix_square_root(EigenFallbackSquareRoot(), D)
+        @test isapprox(Q * transpose(Q), D)
+    end
+    @testset "The idiosyncratic block takes its own repair, the clip by default (#1604)" begin
+        fac = csfp_factors()
+        clip = Posdef(; alg = ClippedNearestCorrelation())
+        @test CrossSectionalFactorPrior(; factors = fac).pdm == clip
+        @test_throws TypeError CrossSectionalFactorPrior(; factors = fac, pdm = nothing)
+        # At `th = 0.2` the thresholded block is indefinite, so each repair binds.
+        est(; kw...) = CrossSectionalFactorPrior(; lambda = 1, factors = fac, th = 0.2,
+                                                 kw...)
+        pc = prior(est(), rd)
+        pn = prior(est(; pdm = Posdef()), rd)
+        i = csfp_investable(pc)
+        @test i == csfp_investable(pn)
+        @test pc.rr.esigma[i, i] != pn.rr.esigma[i, i]
+        @test LinearAlgebra.isposdef(pc.rr.esigma[i, i])
+        # `mp.pdm` repairs the sum alone, so it leaves the block where `pdm` put it.
+        pm = prior(est(; mp = MatrixProcessing(; pdm = clip)), rd)
+        @test isequal(pm.rr.esigma, pc.rr.esigma)
+    end
     @testset "A power of zero reads no market capitalisation" begin
         @test !PO.cross_sectional_needs_market_cap(0.0, MarketCapWeights(; p = 0.0))
         @test PO.cross_sectional_needs_market_cap(1.0, MarketCapWeights(; p = 0.0))

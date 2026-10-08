@@ -101,9 +101,10 @@ const P1412_CASES = [("Indefinite", false), ("IndefiniteHigham", true),
     @testset "the idiosyncratic overlay of the prior, where the repair binds (#1383)" begin
         # The input is the oracle's own block before its repair, `th = 0.1` on the large panel
         # (`test_12w`). Its smallest correlation eigenvalue is -0.031, so the repair binds, and
-        # the oracle leaves by the clip. The prior repairs this block with `mp.pdm` over the
-        # assets with a finite variance, which is the block rule below. Newton differs from the
-        # oracle's repair by 7.8e-4 of the largest entry.
+        # the oracle leaves by the clip. The prior repairs this block with its field `pdm` over
+        # the assets with a finite variance, which is the block rule below, and the clip is the
+        # default of `pdm` (#1604). Newton differs from the oracle's repair by 7.8e-4 of the
+        # largest entry.
         E = parity_load("CrossSectionalFactorPrior", "PitLargeOverlayRaw", "IdioCov")
         mp = MatrixProcessing(; pdm = p1412_pdm())
         PortfolioOptimisers.matrix_processing_block!(mp, E, zeros(1, size(E, 2)))
