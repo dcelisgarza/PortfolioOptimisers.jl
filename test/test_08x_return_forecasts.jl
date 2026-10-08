@@ -789,6 +789,29 @@ end
         blk3 = CrossSectionalFactorModel(; M = reshape([1.0, 1.0], 2, 1), b = zeros(2),
                                          csr = csr, vs = [0.1 0.2; 0.3 NaN])
         @test isequal(PO.forecast_idiosyncratic_variances(blk3), [0.1 0.2; 0.3 NaN])
+        # A pair of leverage one is not an observation of the idiosyncratic return, so both
+        # reads give it `NaN`, and its zero variance is no error (#1571). A zero at a pair
+        # that `h1` does not mark is still a data error. The block does not change.
+        h1 = BitMatrix([0 0; 0 1])
+        csr1 = CrossSectionalRegression(; f = zeros(2, 1), eps = [0.1 0.2; 0.3 0.0],
+                                        n = [2, 2], h1 = h1)
+        blk4 = CrossSectionalFactorModel(; M = reshape([1.0, 1.0], 2, 1), b = zeros(2),
+                                         csr = csr1, vs = [0.1 0.2; 0.3 0.0])
+        @test isequal(PO.forecast_idiosyncratic_returns(blk4), [0.1 0.2; 0.3 NaN])
+        @test isequal(PO.forecast_idiosyncratic_variances(blk4), [0.1 0.2; 0.3 NaN])
+        @test blk4.csr.eps == [0.1 0.2; 0.3 0.0]
+        @test blk4.vs == [0.1 0.2; 0.3 0.0]
+        blk5 = CrossSectionalFactorModel(; M = reshape([1.0, 1.0], 2, 1), b = zeros(2),
+                                         csr = csr1, vs = [0.0 0.2; 0.3 0.0])
+        @test_throws DomainError PO.forecast_idiosyncratic_variances(blk5)
+        # A mask that marks no pair gives the history back as it is.
+        csr0 = CrossSectionalRegression(; f = zeros(2, 1), eps = [0.1 0.2; 0.3 0.4],
+                                        n = [2, 2], h1 = falses(2, 2))
+        blk0 = CrossSectionalFactorModel(; M = reshape([1.0, 1.0], 2, 1), b = zeros(2),
+                                         csr = csr0)
+        @test PO.forecast_idiosyncratic_returns(blk0) === csr0.eps
+        @test_throws DimensionMismatch PO.leverage_one_nan(h1, ones(3, 2))
+        @test PO.leverage_one_nan(nothing, csr0.eps) === csr0.eps
     end
 end
 

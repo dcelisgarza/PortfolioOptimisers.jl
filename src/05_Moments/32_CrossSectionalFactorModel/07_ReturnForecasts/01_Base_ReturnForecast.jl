@@ -443,6 +443,8 @@ Return the idiosyncratic return history a fitted Return Forecast builds its targ
 
 The history lives on the cross-sectional fit the block nests, which is optional, so this is the one place that states the refusal.
 
+A pair whose leverage is one, which the `h1` field of the fit marks, reads `NaN` through [`leverage_one_nan`](@ref). Its residual is zero by construction, so it is not an observation of the idiosyncratic return, and a forward target that reads it skips it. The block does not change.
+
 # Arguments
 
   - `csfm`: The fitted factor-model block.
@@ -453,26 +455,31 @@ The history lives on the cross-sectional fit the block nests, which is optional,
 
 # Returns
 
-  - `eps::MatNum`: Idiosyncratic returns, `observations × assets`.
+  - `eps::MatNum`: Idiosyncratic returns, `observations × assets`, `NaN` at a pair that `h1` marks.
 
 # Related
 
   - [`CrossSectionalFactorModel`](@ref)
   - [`CrossSectionalRegression`](@ref)
+  - [`leverage_one_nan`](@ref)
   - [`forward_mean_returns`](@ref)
 """
 function forecast_idiosyncratic_returns(csfm::CrossSectionalFactorModel)::MatNum
     csr = csfm.csr
     @argcheck(!isnothing(csr),
               IsNothingError("a fitted Return Forecast regresses its Descriptor scores on the forward idiosyncratic return, and the factor model block carries no cross-sectional fit in csr"))
-    return csr.eps
+    return leverage_one_nan(csr.h1, csr.eps)
 end
 """
     forecast_idiosyncratic_variances(csfm::CrossSectionalFactorModel) -> MatNum
 
 Return the idiosyncratic variance history a fitted Return Forecast weighs its fit by.
 
-A fitted member reads the variances whatever its Forecast Unit. In the return unit they are the regression weights, and in the Sharpe unit they scale the target and the forecast. The function refuses a finite variance that is not strictly positive. Such a variance is a weight of infinity in the return unit and a division by zero in the Sharpe unit.
+A fitted member reads the variances whatever its Forecast Unit. In the return unit they are the regression weights, and in the Sharpe unit they scale the target and the fit. The read-out of the latest row reads `csfm.vs` itself, so it does not pass through this function.
+
+A pair whose leverage is one, which the `h1` field of the cross-sectional fit marks, reads `NaN` through [`leverage_one_nan`](@ref), so the fit leaves it out. Its variance reads only residuals that are zero by construction, so it is zero, or a rounding of zero. The test is the mask and not the value, because a rounding passes a test of the value. The block does not change.
+
+The function refuses a finite variance that is not strictly positive at every other pair. Such a variance is a weight of infinity in the return unit and a division by zero in the Sharpe unit, so it is a data error.
 
 # Arguments
 
@@ -481,27 +488,29 @@ A fitted member reads the variances whatever its Forecast Unit. In the return un
 # Validation
 
   - `csfm.vs` is given. Raises an [`IsNothingError`](@ref).
-  - Every finite entry of `csfm.vs` is strictly positive. Raises a `DomainError`.
+  - Every finite entry of `csfm.vs` at a pair that `h1` does not mark is strictly positive. Raises a `DomainError`.
+  - The rules of [`leverage_one_nan`](@ref).
 
 # Returns
 
-  - `vs::MatNum`: Idiosyncratic variances, `observations × assets`.
+  - `vs::MatNum`: Idiosyncratic variances, `observations × assets`, `NaN` at a pair that `h1` marks.
 
 # Related
 
   - [`CrossSectionalFactorModel`](@ref)
+  - [`leverage_one_nan`](@ref)
   - [`forecast_unit_target`](@ref)
   - [`forecast_return_units`](@ref)
 """
 function forecast_idiosyncratic_variances(csfm::CrossSectionalFactorModel)::MatNum
-    vs = csfm.vs
-    @argcheck(!isnothing(vs),
+    @argcheck(!isnothing(csfm.vs),
               IsNothingError("a fitted Return Forecast weighs its fit by the idiosyncratic variance, and the factor model block carries no variance history in vs"))
+    vs = leverage_one_nan(isnothing(csfm.csr) ? nothing : csfm.csr.h1, csfm.vs)
     for idx in CartesianIndices(vs)
         v = vs[idx]
         @argcheck(!isfinite(v) || v > zero(v),
                   DomainError(v,
-                              "every finite idiosyncratic variance weighs a fit, so it must be strictly positive, got vs[$(idx[1]), $(idx[2])] = $v"))
+                              "every finite idiosyncratic variance of a pair whose leverage is not one weighs a fit, so it must be strictly positive, got vs[$(idx[1]), $(idx[2])] = $v"))
     end
     return vs
 end

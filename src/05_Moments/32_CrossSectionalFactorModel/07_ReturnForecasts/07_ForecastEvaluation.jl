@@ -40,7 +40,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Scores a Return Forecast against the forward idiosyncratic return.
 
-It is the default target, because it is the component a Return Forecast forecasts. A fitted member regresses its Descriptor scores on the forward idiosyncratic return inside [`CrossSectionalFactorPrior`](@ref), so the forecast answers for the idiosyncratic history. [`forecast_idiosyncratic_returns`](@ref) refuses a block that carries no cross-sectional fit.
+It is the default target, because it is the component a Return Forecast forecasts. A fitted member regresses its Descriptor scores on the forward idiosyncratic return inside [`CrossSectionalFactorPrior`](@ref), so the forecast answers for the idiosyncratic history. [`forecast_idiosyncratic_returns`](@ref) refuses a block that carries no cross-sectional fit, and gives `NaN` at a pair whose leverage is one, so that pair is not a sample of the target.
 
 # Examples
 

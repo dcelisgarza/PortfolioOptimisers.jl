@@ -39,7 +39,7 @@ end
 
 Return the mask of the `(observation, asset)` pairs an [`ExpWeightedReturnForecast`](@ref) fits on.
 
-A pair enters the fit when it carries a positive cross-sectional weight, a finite forward target, a positive and finite idiosyncratic variance and a finite score for every Descriptor. A variance of zero leaves the pair out: the fit weights a pair by the inverse of its variance, and a zero variance is that of a pair its own level of a one-hot family fits exactly, whose residual carries no idiosyncratic return to forecast. The function reads the four conditions once and returns a mask, so the gather of each observation does not derive them again.
+A pair enters the fit when it carries a positive cross-sectional weight, a finite forward target, a positive and finite idiosyncratic variance and a finite score for every Descriptor. A variance of zero leaves the pair out, because the fit weights a pair by the inverse of its variance. A pair of leverage one comes in with a `NaN` variance from [`forecast_idiosyncratic_variances`](@ref), so it leaves the fit too. The function reads the four conditions once and returns a mask, so the gather of each observation does not derive them again.
 
 # Arguments
 
@@ -492,7 +492,7 @@ Fit a Return Forecast by exponentially weighted least squares on the forward idi
  3. Read the regression weights through [`ew_forecast_weights`](@ref) and the eligibility mask through [`ew_forecast_valid`](@ref).
  4. Over the observations whose target is known, which are all but the last `lag + horizon - 1`, advance the normal equations through [`ew_forecast_accumulate!`](@ref) and solve them through [`ew_forecast_solve`](@ref). An observation with no valid asset advances nothing, does not decay `A` or `c`, and carries the previous coefficients forward.
  5. Write the coefficients of an observation into the coefficient history `coefs` only after `min_obs` observations have advanced the recursion. The count `n` holds the observations that advanced it, not the calendar observations.
- 6. Read the forecast history through [`ew_forecast_history`](@ref), multiply by `scale`, and convert the whole history to return units through [`forecast_return_units`](@ref).
+ 6. Read the forecast history through [`ew_forecast_history`](@ref), multiply by `scale`, and convert the whole history to return units through [`forecast_return_units`](@ref). The conversion reads the variances of the block as they stand. A pair of leverage one is out of the fit, and in the Sharpe unit its forecast is zero, because its variance is zero.
  7. Read `mu` off the last observation of that history, which is the latest scores under the latest published coefficients.
 
 # Arguments
@@ -552,8 +552,10 @@ function return_forecast(rfe::ExpWeightedReturnForecast, rd::ReturnsResult,
             coefs[t, :] = coef
         end
     end
+    # The fit reads `NaN` at a pair of leverage one, and the read-out converts with the
+    # variance the block holds there.
     hist = forecast_return_units(rfe.unit, rfe.scale .* ew_forecast_history(Sb, coefs, gap),
-                                 vs)
+                                 csfm.vs)
     return ExpWeightedReturnForecastResult(; mu = hist[end, :], hist = hist, coef = coef,
                                            A = A, c = c, n = n)
 end

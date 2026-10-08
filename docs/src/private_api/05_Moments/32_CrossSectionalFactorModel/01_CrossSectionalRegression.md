@@ -16,6 +16,7 @@ AbstractCrossSectionalSolveAlgorithm
 cross_sectional_design_mask
 cross_sectional_coefficients
 cross_sectional_leverage_one
+leverage_one_nan
 cross_sectional_least_squares
 cross_sectional_rank
 cross_sectional_solve

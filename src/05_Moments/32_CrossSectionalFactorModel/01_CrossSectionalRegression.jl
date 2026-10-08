@@ -669,6 +669,61 @@ function cross_sectional_leverage_one(A::MatNum, w::VecNum, intercept::Bool)::Bi
     return BitVector(one.(h) .- h .<= sqrt(eps(real(eltype(h)))))
 end
 """
+    leverage_one_nan(h1::Nothing, A::MatNum) -> MatNum
+    leverage_one_nan(h1::AbstractMatrix{Bool}, A::MatNum) -> MatNum
+
+Return a history of a cross-sectional fit with `NaN` at every pair whose leverage is one.
+
+A pair that `h1` marks gives no observation of its idiosyncratic return: the fit reproduced its return, so its residual is zero by construction, and so is the variance that reads that residual. A reader that treats such a pair as data reads the design, not the asset. The function writes `NaN` over the pair, so every reader that skips a value that is not finite leaves the pair out. It never changes `A`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `nothing`: a regression built by hand states no mask, so return `A`.
+ 2. A mask: check its size, and return `A` when it marks no pair. Otherwise copy `A` into the type of a square root of its elements, which holds a `NaN` and the division the readers take, and write `NaN` at every marked pair.
+
+# Arguments
+
+  - `h1`: The leverage-one mask of [`CrossSectionalRegression`](@ref), `observations × assets`, or `nothing`.
+  - `A`: A history on the axes of `h1`, `observations × assets`.
+
+# Validation
+
+  - `size(h1) == size(A)`. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `A::MatNum`: `A` itself when no pair is marked, otherwise a copy with `NaN` at every marked pair.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.leverage_one_nan(BitMatrix([0 1; 0 0]), [0.1 0.0; 0.3 0.4])
+2×2 Matrix{Float64}:
+ 0.1  NaN
+ 0.3    0.4
+```
+
+# Related
+
+  - [`CrossSectionalRegression`](@ref)
+  - [`cross_sectional_leverage_one`](@ref)
+"""
+function leverage_one_nan(::Nothing, A::MatNum)::MatNum
+    return A
+end
+function leverage_one_nan(h1::AbstractMatrix{Bool}, A::MatNum)::MatNum
+    @argcheck(size(h1) == size(A),
+              DimensionMismatch("h1 ($(size(h1, 1))×$(size(h1, 2))) must match the history ($(size(A, 1))×$(size(A, 2)))"))
+    if !any(h1)
+        return A
+    end
+    B = typeof(sqrt(one(float_if_integer(real(eltype(A)))))).(A)
+    B[h1] .= NaN
+    return B
+end
+"""
     cross_sectional_least_squares(cre::CrossSectionalLinearRegression) -> Bool
     cross_sectional_least_squares(cre::CrossSectionalTargetRegression) -> Bool
     cross_sectional_least_squares(tgt::LinearModel) -> Bool

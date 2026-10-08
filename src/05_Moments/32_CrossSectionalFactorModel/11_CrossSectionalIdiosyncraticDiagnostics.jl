@@ -946,6 +946,7 @@ A pair that the `h1` field of the regression marks has a leverage of one: the de
 
   - [`CrossSectionalFactorModel`](@ref)
   - [`CrossSectionalRegression`](@ref)
+  - [`leverage_one_nan`](@ref)
   - [`idio_calibration`](@ref)
   - [`idio_vol_ic`](@ref)
 """
@@ -959,13 +960,7 @@ function idio_diagnostic_data(::CrossSectionalRegression, ::Nothing)
     return throw(IsNothingError("vs cannot be nothing: an idiosyncratic diagnostic reads the idiosyncratic variance history of the block"))
 end
 function idio_diagnostic_data(csr::CrossSectionalRegression, vs::MatNum)
-    if isnothing(csr.h1) || !any(csr.h1)
-        return csr.eps, vs
-    end
-    # The group divides by a square root, so the `NaN` takes the type of that division.
-    ep = typeof(sqrt(one(float_if_integer(real(eltype(csr.eps)))))).(csr.eps)
-    ep[csr.h1] .= NaN
-    return ep, vs
+    return leverage_one_nan(csr.h1, csr.eps), vs
 end
 
 export standardised_idio_returns, idio_calibration, idio_tail_rate, idio_kurtosis,

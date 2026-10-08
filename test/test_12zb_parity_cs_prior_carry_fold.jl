@@ -232,6 +232,91 @@ end
         end
     end
 
+    @testset "A fitted forecast leaves a pair of leverage one out of its fit (#1571)" begin
+        # The panel and the factors of map #1562. Asset 3 is the only member of its industry
+        # on 627 of the 927 block rows, so its residual is zero by construction there and 588
+        # of its variances are exactly zero. Before #1571 both units of
+        # `TargetReturnForecast` raised a `DomainError` at `vs[40, 3]`.
+        pp = parity_panel(; T = 1200, N = 40, seed = 1471).rd
+        Np = size(pp.X, 2)
+        sty(d) = CompositeExposure(; descriptors = [d], family = "style")
+        cfg = (; minra = 5, pe = GRID_PE, ve = GRID_VE, families = ["industry" => nothing],
+               factors = ["market" => ConstantExposure(),
+                          "industry" =>
+                              OneHotExposure(; field = "industry", family = "industry"),
+                          "size" => sty(LogMarketCap()), "value" => sty(BookToPrice()),
+                          "momentum" => sty(RollingMomentum()),
+                          "reversal" => sty(Reversal())])
+        blk = prior(CrossSectionalFactorPrior(; cfg...), pp).rr
+        h1 = blk.csr.h1
+        @test findall(i -> any(view(h1, :, i)), 1:Np) == [3]
+        @test count(h1) == 627
+        # The same block with `NaN` at every marked pair by hand, and no mask.
+        e2 = copy(blk.csr.eps)
+        e2[h1] .= NaN
+        v2 = copy(blk.vs)
+        v2[h1] .= NaN
+        csr2 = CrossSectionalRegression(; f = blk.csr.f, eps = e2, n = blk.csr.n,
+                                        b = blk.csr.b)
+        blk2 = po.Accessors.setproperties(blk, (; csr = csr2, vs = v2))
+        ds = DescriptorScores(;
+                              descriptors = [Passthrough(; field = "net_income_ttm"),
+                                             Passthrough(; field = "sales_ttm")])
+        sharpe = IdiosyncraticSharpeUnit()
+        # Each fit equals the fit on the block with the cells set by hand. The oracle passes
+        # here only because its residual is rounding noise (3.6e-16, variance 7.4e-33), and
+        # its fit reads that noise: its calibration is 1.629 in the return unit and 0.964 in
+        # the Sharpe unit. With the cells of asset 3 set to `NaN`, the oracle gives 1.874 and
+        # 0.445 (#1566), and these are the values below. So this is a deliberate difference
+        # from the oracle as it stands.
+        calibs = Dict("return" => 1.8743201813934023, "sharpe" => 0.44520892743434026)
+        for (unit, uname) in ((IdiosyncraticReturnUnit(), "return"), (sharpe, "sharpe"))
+            rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, unit = unit)
+            a = return_forecast(rfe, pp, blk)
+            b = return_forecast(rfe, pp, blk2)
+            @test isequal(a.calib, b.calib)
+            @test isapprox(a.calib, calibs[uname]; rtol = 1e-10)
+            @test same(a.mu, b.mu)
+            rfe = ExpWeightedReturnForecast(; scores = ds, unit = unit)
+            a = return_forecast(rfe, pp, blk)
+            b = return_forecast(rfe, pp, blk2)
+            @test isequal(a.coef, b.coef) && isequal(a.A, b.A) && isequal(a.c, b.c)
+            @test a.n == b.n
+            @test same(a.mu, b.mu)
+            # The read-out converts with the variance the block holds. In the Sharpe unit a
+            # marked pair forecasts zero, and the block set by hand forecasts `NaN` there.
+            @test same(a.hist[.!h1], b.hist[.!h1])
+            if unit === sharpe
+                @test all(iszero, filter(isfinite, a.hist[h1 .& (blk.vs .== 0)]))
+            end
+        end
+        # The block does not change.
+        @test count(iszero, filter(isfinite, view(blk.vs, :, 3))) == 588
+        # The carry fold equals the batch fit under each fitted forecast, and carries the same
+        # mask. Measured: the first step is exact. The later steps differ by the round-off of
+        # the cut of `RollingMomentum` (#1563), which moves the exposures by 1.6e-15 with no
+        # forecast at all. The largest relative errors over the four forecasts are 5.6e-15 in
+        # `mu`, 1.5e-15 in `sigma`, 6.1e-16 in `vs` and 4.5e-14 in the calibration or the
+        # coefficients.
+        ep = (0, 1150, 1151, 1200)
+        fk = (; lambda = 0.4, c = 0.6, ofit = UnadjustedForecast())
+        for unit in (IdiosyncraticReturnUnit(), sharpe),
+            rfe in (TargetReturnForecast(; scores = ds, half_life = 10.0, unit = unit),
+                    ExpWeightedReturnForecast(; scores = ds, unit = unit))
+
+            pe = CrossSectionalFactorPrior(; cfg..., fk..., rfe = rfe)
+            for (k, x) in enumerate(stream(pe, pp, ep))
+                b = batch(pe, k, pp, ep)
+                @test x.pr.rr.csr.h1 == b.rr.csr.h1
+                @test relerr(x.pr.mu, b.mu) <= 1e-12
+                @test relerr(x.pr.sigma, b.sigma) <= 1e-12
+                @test relerr(x.pr.rr.vs, b.rr.vs) <= 1e-12
+                fc(rf) = rf isa TargetReturnForecastResult ? [rf.calib] : rf.coef
+                @test relerr(fc(x.pr.rr.rf), fc(b.rr.rf)) <= 1e-12
+            end
+        end
+    end
+
     @testset "The carried panel rows" begin
         # The Passthrough exposures read one row and the lag is one, so two rows are kept.
         pe = CrossSectionalFactorPrior(; lambda = 1, style...)

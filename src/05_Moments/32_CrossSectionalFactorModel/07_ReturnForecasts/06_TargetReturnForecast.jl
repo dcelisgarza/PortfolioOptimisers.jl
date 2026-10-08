@@ -649,7 +649,7 @@ end
 
 Gather the calibration sample of one observation of a [`TargetReturnForecast`](@ref).
 
-An asset enters when it carries a positive cross-sectional weight, a positive and finite idiosyncratic variance, a finite uncalibrated prediction and a finite forward return. A variance of zero would take an infinite weight: it is that of a pair its own level of a one-hot family fits exactly, so it leaves the sample. Its weight is the cross-sectional weight divided by its idiosyncratic variance. [`ExpWeightedReturnForecast`](@ref) weighs its regression the same way in the return unit.
+An asset enters when it carries a positive cross-sectional weight, a positive and finite idiosyncratic variance, a finite uncalibrated prediction and a finite forward return. A variance of zero would take an infinite weight, so it leaves the sample. A pair of leverage one comes in with a `NaN` variance from [`forecast_idiosyncratic_variances`](@ref), so it leaves the sample too. Its weight is the cross-sectional weight divided by its idiosyncratic variance. [`ExpWeightedReturnForecast`](@ref) weighs its regression the same way in the return unit.
 
 # Arguments
 
@@ -885,7 +885,7 @@ The four-argument method also fits the calibration coefficient `κ⊥` of the or
  4. Count the observations whose target has matured, all but the last `lag + horizon - 1`, giving `nt`. Flatten them into one sample per `(observation, asset)` pair through [`target_forecast_samples`](@ref), giving `Sf`, `yf` and `ok`.
  5. Fit the regression target on the valid samples through [`target_forecast_fit`](@ref), giving `model`.
  6. Compute the calibration coefficient `calib` and the uncalibrated prediction `P` of the matured observations through [`target_forecast_coefficient`](@ref). A row before the block has no idiosyncratic variance, so it can enter the fit and never enters the calibration. When `cre` is given, compute `κ⊥` from `P` through [`target_forecast_orthogonal_coefficient`](@ref).
- 7. Predict the latest observation through [`target_forecast_latest`](@ref) and convert the row to return units, giving `P`.
+ 7. Predict the latest observation through [`target_forecast_latest`](@ref) and convert the row to return units, giving `P`. The conversion reads the last row of the variances of the block as they stand. A pair of leverage one is out of the fit and the calibration, and in the Sharpe unit its forecast is zero, because its variance is zero.
  8. Multiply `P` by `scale` and by the multiplier of [`target_forecast_multiplier`](@ref), giving `mu`.
 
 # Arguments
@@ -945,8 +945,10 @@ function return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
     # starts at `first(rows)`. Otherwise they are the rows of the block.
     ocalib = target_forecast_orthogonal_coefficient(cre, cf.P, fwd, vs, emsk, rfe, csfm,
                                                     rfe.whole_history ? first(rows) - 1 : 0)
+    # The fit reads `NaN` at a pair of leverage one, and the read-out converts with the
+    # variance the block holds there. The last row of the block is the last row of `vs`.
     P = forecast_return_units(rfe.unit, target_forecast_latest(model, Sa),
-                              target_forecast_latest_variances(vs))
+                              target_forecast_latest_variances(csfm.vs))
     return TargetReturnForecastResult(;
                                       mu = vec(rfe.scale .*
                                                target_forecast_multiplier(rfe.calibrate,
