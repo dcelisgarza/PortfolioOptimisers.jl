@@ -143,11 +143,15 @@ function cross_sectional_carry_history(pe::CrossSectionalFactorPrior,
     H = keep ? st.hist : nothing
     rd = cross_sectional_carry_forecast_returns(pe, st)
     (; r, ca) = cross_sectional_carry_append(pe, st)
+    # The observed factor returns fill the reduced factor axis, so the model carries the
+    # reduced loadings and the basis, as the batch fit does.
+    fnow = cross_sectional_basis_now(ca.fcb, r)
     csfm = CrossSectionalFactorModel(; M = ca.Ms[end, :, :],
+                                     L = cross_sectional_reduced_loadings(fnow, ca.L),
                                      b = zeros(real(eltype(st.vs)), size(st.X, 2)),
                                      csr = st.csr, Ms = ca.Ms, vs = st.vs, rw = st.W,
                                      bw = view(st.bw, r, :), nf = ca.nf, fam = ca.fam,
-                                     lag = pe.lag, fx = ca.fx)
+                                     fcb = fnow, lag = pe.lag, fx = ca.fx)
     rows = return_forecast_rows(rd, csfm)
     # The rows are the history of the member that the batch fit reads under its Orthogonal
     # Forecast Fit, so the carried rows and the appended one come from the same member.
@@ -341,7 +345,9 @@ function cross_sectional_carry_forecast(pe::CrossSectionalFactorPrior,
     j = (k + 1 - min(k, g)):size(st.vs, 1)
     (; r, ca) = cross_sectional_carry_append(pe, st)
     csr = st.csr
+    fnow = cross_sectional_basis_now(ca.fcb, r[j])
     csfm = CrossSectionalFactorModel(; M = ca.Ms[end, :, :],
+                                     L = cross_sectional_reduced_loadings(fnow, ca.L),
                                      b = zeros(real(eltype(st.vs)), size(st.X, 2)),
                                      csr = CrossSectionalRegression(; f = csr.f[j, :],
                                                                     eps = csr.eps[j, :],
@@ -351,7 +357,7 @@ function cross_sectional_carry_forecast(pe::CrossSectionalFactorPrior,
                                                                                                                  :)),
                                      Ms = ca.Ms[j, :, :], vs = st.vs[j, :], rw = st.W[j, :],
                                      bw = st.bw[r[j], :], nf = ca.nf, fam = ca.fam,
-                                     lag = pe.lag,
+                                     fcb = fnow, lag = pe.lag,
                                      fx = nothing_scalar_array_getindex_odd_order(ca.fx, j,
                                                                                   :))
     rfo = orthogonal_forecast_member(pe.ofit, pe.rfe, csfm)

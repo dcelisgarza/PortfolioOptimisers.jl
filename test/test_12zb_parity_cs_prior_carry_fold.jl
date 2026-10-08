@@ -685,6 +685,19 @@ end
                 @test isnothing(pe.rfe) || relerr(x.pr.rr.rf.hist, b.rr.rf.hist) < 1e-12
             end
         end
+        # A constrained Family reduces the factor axis, and the observed factor returns fill its
+        # trailing columns. So the carry of a forecast that folds, and of the history of one
+        # that reads the panel, builds the model on the reduced axis, as the batch fit does
+        # (#1585). Before, the seed threw a `DimensionMismatch`.
+        famccy = [grid_config("FamOne", rd).factors; "ccy" => CurrencyExposure()]
+        fold = (; grid_config("FcFamily", rd)..., factors = famccy)
+        pe = CrossSectionalFactorPrior(; fold...)
+        @test all(((k, x),) -> agrees(x.pr, batch(pe, k)), enumerate(stream(pe)))
+        panel = (; grid_config("FcTarget", rd)..., factors = famccy,
+                 families = ["industry" => nothing])
+        pc = CrossSectionalFactorPrior(; panel..., lambda = CarryHistoryShrinkage())
+        pb = CrossSectionalFactorPrior(; panel..., lambda = CarryHistoryShrinkage())
+        @test all(((k, x),) -> agrees(x.pr, batch(pb, k)), enumerate(stream(pc)))
         # A macro sensitivity is a recursion from the first row and states no look-back, so the
         # carry keeps every row.
         @test isnothing(po.cross_sectional_carry_rows(CrossSectionalFactorPrior(;
