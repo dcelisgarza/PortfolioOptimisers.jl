@@ -71,7 +71,11 @@ function grid_config(name::AbstractString, rd::ReturnsResult)
                           descriptors = [Passthrough(; field = "net_income_ttm"),
                                          Passthrough(; field = "sales_ttm")])
     fc = (; lambda = 0.4, c = 0.6)
-    kw = (; factors = base, minra = 5, pe = GRID_PE, ve = GRID_VE)
+    # The oracle keeps an Unseen Member in the zero-sum condition of its observation, and
+    # solves the rank-deficient row by its pseudo-inverse, so every case states the solved
+    # rule. The default rule differs at such a row alone (#1606), which test_12x checks.
+    kw = (; factors = base, minra = 5, pe = GRID_PE, ve = GRID_VE,
+          unseen = SolvedUnseenMember())
     cfg = if name == "Base"
         kw
     elseif name == "Lag2"

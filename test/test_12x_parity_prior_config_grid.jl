@@ -206,3 +206,37 @@ end
         end
     end
 end
+
+@testset "The default Unseen Member rule differs from the oracle's where the oracle's depends on the dropped member (#1606)" begin
+    # The oracle keeps an Unseen Member in the zero-sum condition, so the row of its observation
+    # is rank-deficient, and its pseudo-inverse answer depends on the dropped member. The default
+    # rule gives the member a return of zero. Each grid case states the oracle's rule, and this
+    # testset compares the default with it on the automatic and the stated drop of the industry
+    # family. The only asset in "Utilities" of the small panel delists, which gives one such row.
+    maxabs(a, b) = maximum(abs, a .- b)
+    @testset "$(fix)" for (fix, fx) in (("Small", parity_small_panel()),
+                                        ("Large", parity_large_panel()))
+        rd = grid_fixture(fx)
+        fit(name; kw...) = prior(CrossSectionalFactorPrior(; lambda = 1,
+                                                           grid_config(name, rd)..., kw...),
+                                 rd).rr
+        za = fit("FamOne"; unseen = ZeroUnseenMember())
+        zb = fit("FamStated"; unseen = ZeroUnseenMember())
+        sa = fit("FamOne")
+        sb = fit("FamStated")
+        # The default does not depend on the dropped member at any row.
+        @test maxabs(za.fr, zb.fr) < 1e-14
+        # It differs from the oracle's rule only at the rows where the oracle's rule depends on
+        # the dropped member.
+        moved = findall(t -> maxabs(za.fr[t, :], sa.fr[t, :]) > 1e-13, axes(za.fr, 1))
+        split = findall(t -> maxabs(sa.fr[t, :], sb.fr[t, :]) > 1e-13, axes(sa.fr, 1))
+        @test moved == split
+        if fix == "Small"
+            @test !isempty(moved)
+        end
+        u = findfirst(==("industry=Utilities"), za.nf)
+        @test all(iszero, za.fr[moved, u])
+        rest = setdiff(axes(za.fr, 1), moved)
+        @test maxabs(za.fr[rest, :], sa.fr[rest, :]) < 1e-13
+    end
+end

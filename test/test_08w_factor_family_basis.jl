@@ -1104,3 +1104,163 @@ end
     @test_throws DomainError PO.append_passthrough_factors(nothing, -1)
     @test_throws MethodError PO.append_passthrough_factors(fcb, 1.5)
 end
+
+@testset "A member that no asset loads on leaves the zero-sum condition of its observation (#1606)" begin
+    PO = PortfolioOptimisers
+    cre = CrossSectionalLinearRegression()
+    rng = StableRNG(1_606)
+    # Raw axis: market, then the family a, b, c. Assets 5, 6 and 11 are the only assets in c,
+    # and they have no weight at observation 2, so the sample of observation 2 sees no asset
+    # in c.
+    ind = [2, 2, 3, 3, 4, 4, 2, 3, 3, 2, 4, 3]
+    N = length(ind)
+    B = zeros(2, N, 4)
+    for t in 1:2, i in 1:N
+        B[t, i, 1] = 1.0
+        B[t, i, ind[i]] = 1.0
+    end
+    X = randn(rng, 2, N) .* 0.01
+    W = ones(2, N)
+    W[2, findall(==(4), ind)] .= 0.0
+    # The benchmark-weighted exposures of the lagged observation, which still weight c.
+    cw = [3.0 4.0 2.0; 3.0 4.0 2.0]
+    basis(d) = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [d],
+                                 ratios = cw[:, setdiff(1:3, d)] ./ cw[:, d], K = 4)
+    function fit(d)
+        fcb = basis(d)
+        Zl = PO.reduce_exposures(fcb, B)
+        ud = PO.unseen_member_design(ZeroUnseenMember(), fcb, B, Zl, X, W)
+        csr = PO.unseen_member_returns(PO.cross_sectional_live_regression(cre, ud.Z, X, W).csr,
+                                       ud.P)
+        return (; Zl = Zl, ud = ud, csr = csr, f = PO.expand_factor_returns(fcb, csr.f))
+    end
+    A = fit(1)
+    Bf = fit(2)
+    C = fit(3)
+    @testset "Only the observation that sees no asset in c changes" begin
+        @test first.(A.ud.P) == [2]
+        @test A.ud.Z[1, :, :] == A.Zl[1, :, :]
+    end
+    @testset "c has a return of zero, and the condition holds over a and b" begin
+        for r in (A, Bf, C)
+            @test r.f[2, 4] == 0
+            @test abs(cw[2, 1] * r.f[2, 2] + cw[2, 2] * r.f[2, 3]) < 1e-15
+            @test abs(sum(cw[1, :] .* r.f[1, 2:4])) < 1e-15
+        end
+    end
+    @testset "The factor returns do not depend on the dropped member" begin
+        @test A.f≈Bf.f atol=1e-14
+        @test A.f≈C.f atol=1e-14
+    end
+    @testset "The answer is the regression under the condition over a and b" begin
+        act = findall(>(0), W[2, :])
+        # f_b = -c_a / c_b f_a and f_c = 0, so the design is [1, x_a - (c_a / c_b) x_b].
+        Zr = hcat(B[2, act, 1], B[2, act, 2] .- cw[2, 1] / cw[2, 2] .* B[2, act, 3])
+        h = Zr \ X[2, act]
+        @test A.f[2, 1:2]≈h atol=1e-14
+        @test A.f[2, 3]≈-cw[2, 1] / cw[2, 2] * h[2] atol=1e-14
+    end
+    @testset "The residuals of the sample are those of the solved rule" begin
+        # The solved rule keeps c in the condition, and the solve algorithm takes the
+        # minimum-norm answer of the rank-deficient row. Its residuals agree on the pairs of
+        # positive weight. An asset outside the sample reads the return of c, which the solved
+        # rule leaves to the solve.
+        old = PO.cross_sectional_live_regression(cre, A.Zl, X, W).csr
+        m = isfinite.(old.eps) .& (W .> 0)
+        @test isequal(isfinite.(A.csr.eps), isfinite.(old.eps))
+        @test maximum(abs, A.csr.eps[m] .- old.eps[m]) < 1e-15
+        # Outside the sample the residuals still agree across the dropped members.
+        for r in (Bf, C)
+            @test isequal(isfinite.(A.csr.eps), isfinite.(r.csr.eps))
+            @test maximum(abs, filter(isfinite, A.csr.eps .- r.csr.eps)) < 1e-15
+        end
+    end
+    @testset "A dropped member that the sample does not see moves the condition" begin
+        # Drop c: the condition moves onto b, the retained member with the larger ratio, so
+        # the column of b in the changed design is zero.
+        @test first.(C.ud.P) == [2]
+        @test all(iszero, last(only(C.ud.P))[:, 3])
+        @test all(iszero, C.ud.Z[2, :, 3])
+        # When the sample sees no member at all, every member has a return of zero.
+        fcb = basis(3)
+        W0 = copy(W)
+        W0[2, :] .= 0.0
+        Pt = last(only(PO.unseen_member_design(ZeroUnseenMember(), fcb, B,
+                                               PO.reduce_exposures(fcb, B), X, W0).P))
+        @test all(iszero, Pt[:, 2:3]) && Pt[1, 1] == 1
+        # When each member the sample sees has no benchmark weight, the dropped member is
+        # alone in the condition, so its zero return leaves the others free.
+        fz = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [3],
+                               ratios = [1.5 2.0; 0.0 0.0], K = 4)
+        Pt = last(only(PO.unseen_member_design(ZeroUnseenMember(), fz, B,
+                                               PO.reduce_exposures(fz, B), X, W).P))
+        @test Pt == LinearAlgebra.I
+    end
+    @testset "No basis, the solved rule and no unseen member change nothing" begin
+        for rule in (ZeroUnseenMember(), SolvedUnseenMember())
+            ud = PO.unseen_member_design(rule, nothing, B, B, X, W)
+            @test ud.Z === B && ud.P == ()
+        end
+        fcb = basis(1)
+        Zl = PO.reduce_exposures(fcb, B)
+        ud = PO.unseen_member_design(SolvedUnseenMember(), fcb, B, Zl, X, W)
+        @test ud.Z === Zl && ud.P == ()
+        ud = PO.unseen_member_design(ZeroUnseenMember(), fcb, B, Zl, X, ones(2, N))
+        @test ud.Z === Zl && isempty(ud.P)
+        csr = PO.cross_sectional_live_regression(cre, Zl, X, ones(2, N)).csr
+        @test PO.unseen_member_returns(csr, ud.P) === csr
+        # A member with no benchmark weight is out of the condition already.
+        fz = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [1],
+                               ratios = [4/3 2/3; 4/3 0.0], K = 4)
+        @test isempty(PO.unseen_member_design(ZeroUnseenMember(), fz, B,
+                                              PO.reduce_exposures(fz, B), X, W).P)
+    end
+    @testset "The number type of the ratios is kept" begin
+        fq = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [3],
+                               ratios = [3//2 2//1; 3//2 2//1], K = 4)
+        Bq = Rational{Int}.(B)
+        P = PO.unseen_member_design(ZeroUnseenMember(), fq, Bq, PO.reduce_exposures(fq, Bq),
+                                    X, W).P
+        @test eltype(last(only(P))) == Rational{Int}
+        @test last(only(P))[3, 2] == -3//4
+        fi = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [3],
+                               ratios = [1 2; 1 2], K = 4)
+        P = PO.unseen_member_design(ZeroUnseenMember(), fi, B, PO.reduce_exposures(fi, B),
+                                    X, W).P
+        @test eltype(last(only(P))) == Float64
+    end
+    @testset "The fitted prior of the delisting panel does not depend on the dropped member" begin
+        fx = parity_panel(; T = 300, N = 60, seed = 1601)
+        factors = ["market" => ConstantExposure(),
+                   "industry" => OneHotExposure(; field = "industry", family = "industry"),
+                   "size" => CompositeExposure(; descriptors = [LogMarketCap()],
+                                               family = "style"),
+                   "style1" =>
+                       CompositeExposure(; descriptors = [Passthrough(; field = "style1")],
+                                         family = "style")]
+        mk(fam; kw...) = CrossSectionalFactorPrior(; factors = factors, families = fam,
+                                                   minra = 5, kw...)
+        a = prior(mk(["industry" => nothing]), fx.rd).rr
+        b = prior(mk(["industry" => "industry=Energy"]), fx.rd).rr
+        # Asset 3 is the only asset in Utilities, and it delists after data row 225. The
+        # condition of row 226 reads the benchmark weights of row 225, which still weight it.
+        t = findfirst(==(226), a.idx)
+        u = findfirst(==("industry=Utilities"), a.nf)
+        @test a.fr≈b.fr atol=1e-15
+        @test a.fr[t, u] == 0 && b.fr[t, u] == 0
+        @test all(x -> abs(x) < 1e-15, a.fr[(t + 1):end, u])
+        m = isfinite.(a.csr.eps)
+        @test isequal(m, isfinite.(b.csr.eps))
+        @test maximum(abs, a.csr.eps[m] .- b.csr.eps[m]) < 1e-15
+        # The solved rule differs from the default at row 226 alone, and there its answer
+        # depends on the dropped member: measured 7.6e-4 on Utilities.
+        sa = prior(mk(["industry" => nothing]; unseen = SolvedUnseenMember()), fx.rd).rr
+        sb = prior(mk(["industry" => "industry=Energy"]; unseen = SolvedUnseenMember()),
+                   fx.rd).rr
+        others = setdiff(axes(a.fr, 1), t)
+        @test maximum(abs, a.fr[others, :] .- sa.fr[others, :]) < 1e-15
+        @test maximum(abs, sa.fr[t, :] .- sb.fr[t, :]) > 1e-4
+        @test maximum(abs, sa.fr[others, :] .- sb.fr[others, :]) < 1e-15
+        @test sa.fr[t, u] != 0
+    end
+end

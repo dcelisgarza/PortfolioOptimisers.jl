@@ -187,9 +187,14 @@ A batch choice that moves the dropped member on the carry fold runs no regressio
 ([#1601](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1601)). The zero-sum
 condition of a family is the same set for every dropped member. So the raw-axis factor returns, the
 residuals and the idiosyncratic variances do not depend on the member, and the reduced history under
-the new member is a selection of the columns of the raw-axis history. A move selects those columns,
-solves each rank-deficient row again in the new basis, because the pseudo-inverse answer of such a
-row depends on the parametrisation, and refits the factor prior over the selected history. The
+the new member is a selection of the columns of the raw-axis history. Under the default Unseen
+Member rule `ZeroUnseenMember()`, an Unseen Member has a return of zero, and the zero-sum condition
+of its observation holds over the other members
+([#1606](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1606)). So every row is
+identified, and its raw-axis answer does not depend on the member either. A move selects those
+columns and refits the factor prior over the selected history. It solves no row again. Under
+`SolvedUnseenMember()` a row with an Unseen Member stays rank-deficient, and its pseudo-inverse
+answer depends on the parametrisation, so a move solves each such row again in the new basis. The
 default factor covariance reads every column at once, so a sub-block of a raw-axis state is not the
 batch answer. The move then costs about one millisecond on 2520 rows, against 1.66 s for a refit of
 every row, and the carry still equals the batch fit to rounding. `BatchChoice()` stays the default.
@@ -326,9 +331,12 @@ The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton
   whose `me` and `ce` fold. Each of the two builds changes one line of `carry_growing_parts`.
 - [#1605](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1605) builds the fold of a
   move of a batch choice and the refusal of an automatic member under `FoldOnly()`.
-  [#1606](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1606) holds the rank-deficient
-  row whose factor returns depend on the dropped member. If it makes such a row identified, the
-  fold of a move needs no second solve.
+  [#1606](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1606) adds the Unseen
+  Member rule `unseen`. The default `ZeroUnseenMember()` gives an Unseen Member a return of zero
+  and holds the zero-sum condition over the other members, so a row whose factor returns depended
+  on the dropped member is identified, and the fold of a move needs no second solve.
+  `SolvedUnseenMember()` keeps the answer that depends on the dropped member, and a move under it
+  solves such a row again.
 - ADR 0136 and ADR 0039 carry amendments that point here.
 - A pinned choice and a seed window are two routes on which the online call with no data equals no batch fit.
   Each is documented, and each is tested against the oracle.

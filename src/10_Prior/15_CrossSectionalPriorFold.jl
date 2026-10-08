@@ -603,7 +603,7 @@ The batch fit runs the same passes over every observation. Each observation is f
 # Arguments
 
   - `pe`: Cross-Sectional Factor Prior estimator.
-  - `blk`: The observations: `Zl`, the lagged reduced exposures; `Xr`, the returns; `em` and `am`, the masks; `mcl`, the lagged market capitalisation or `nothing`; and `cb`, the observed factors of the block or `nothing`.
+  - `blk`: The observations: `Zl`, the lagged reduced exposures; `Xr`, the returns; `em` and `am`, the masks; `mcl`, the lagged market capitalisation or `nothing`; `cb`, the observed factors of the block or `nothing`; `fcb`, the Factor Family Basis of the lagged exposures or `nothing`; and `B`, the lagged exposures on the raw axis.
   - `prev`: The marks `lv1` and `lv`, the folded estimator `ve1` and the number `seed` of rows to fold as one block.
 
 # Validation
@@ -626,7 +626,7 @@ function cross_sectional_fold_regression(pe::CrossSectionalFactorPrior, blk::Nam
     cross_sectional_cap_finite!(msk, mcl)
     assert_cross_sectional_coverage(msk, cross_sectional_minra(pe, size(Zl, 3)), cb)
     W = cs_weights_initial(pe.wa, mcl, msk)
-    p1 = cross_sectional_fold_pass(pe, Zl, Xr, W, prev.lv1)
+    p1 = cross_sectional_fold_pass(pe, blk, W, prev.lv1)
     if isnothing(p1) || !needs_second_pass(pe.wa)
         return if isnothing(p1)
             nothing
@@ -645,7 +645,7 @@ function cross_sectional_fold_regression(pe::CrossSectionalFactorPrior, blk::Nam
                                        vcat(falses(1, size(msk, 2)), msk))[2:end, :]
     end
     W = cs_weights_blend(pe.wa, W, IV, msk)
-    p2 = cross_sectional_fold_pass(pe, Zl, Xr, W, prev.lv)
+    p2 = cross_sectional_fold_pass(pe, blk, W, prev.lv)
     return if isnothing(p2)
         nothing
     else
@@ -686,14 +686,14 @@ Runs one regression pass of the carry fold of a Cross-Sectional Factor Prior ove
 
 # Algorithm
 
- 1. Join the mark of the factors that are not empty over the block to `old` with [`cross_sectional_fold_mark`](@ref). Answer `nothing` when the block marks a new factor.
- 2. Regress on the marked factors with [`cross_sectional_live_regression`](@ref), and refuse an intercept with [`assert_cross_sectional_no_intercept`](@ref).
+ 1. Take the design of the regression under the Unseen Member rule `pe.unseen` with [`unseen_member_design`](@ref), giving `Z`.
+ 2. Join the mark of the factors that are not empty over `Z` to `old` with [`cross_sectional_fold_mark`](@ref). Answer `nothing` when the block marks a new factor.
+ 3. Regress `Z` on the marked factors with [`cross_sectional_live_regression`](@ref), map its coefficients back with [`unseen_member_returns`](@ref), and refuse an intercept with [`assert_cross_sectional_no_intercept`](@ref).
 
 # Arguments
 
   - `pe`: Cross-Sectional Factor Prior estimator.
-  - `Zl`: Lagged reduced exposures of the block.
-  - `Xr`: Returns of the block.
+  - `blk`: The observations, as [`cross_sectional_fold_regression`](@ref) states them. The pass reads `Zl`, the lagged reduced exposures; `Xr`, the returns; `fcb`, the Factor Family Basis of the lagged exposures or `nothing`; and `B`, the lagged exposures on the raw axis.
   - `W`: Regression weights of the block.
   - `old`: The mark of the fitted observations, or `nothing` for a first fit.
 
@@ -705,17 +705,17 @@ Runs one regression pass of the carry fold of a Cross-Sectional Factor Prior ove
 
   - [`cross_sectional_fold_regression`](@ref)
 """
-function cross_sectional_fold_pass(pe::CrossSectionalFactorPrior, Zl::Arr3Num, Xr::MatNum,
+function cross_sectional_fold_pass(pe::CrossSectionalFactorPrior, blk::NamedTuple,
                                    W::MatNum, old::Option{<:BitVector})
-    lv = cross_sectional_fold_mark(old, cross_sectional_live_factors(Zl, Xr, W))
+    (; Zl, Xr, fcb, B) = blk
+    ud = unseen_member_design(pe.unseen, fcb, B, Zl, Xr, W)
+    lv = cross_sectional_fold_mark(old, cross_sectional_live_factors(ud.Z, Xr, W))
     return if isnothing(lv)
         nothing
     else
-        (;
-         csr = assert_cross_sectional_no_intercept(cross_sectional_live_regression(pe.cre,
-                                                                                   Zl, Xr,
-                                                                                   W, lv).csr),
-         lv = lv)
+        csr = unseen_member_returns(cross_sectional_live_regression(pe.cre, ud.Z, Xr, W,
+                                                                    lv).csr, ud.P)
+        (; csr = assert_cross_sectional_no_intercept(csr), lv = lv)
     end
 end
 """
@@ -1022,7 +1022,8 @@ function cross_sectional_fold_refit(pe::CrossSectionalFactorPrior,
     d = (pe.lag + 1):Tf
     cb = cross_sectional_observed_block(st.obs, 1:Tf, d, st.buf.n - Tf)
     blk = (; Zl = fb.Ms[1:D, :, :], Xr = something(st.Xl, st.X)[d, :], em = st.emsk[d, :],
-           am = st.amsk[d, :], mcl = cross_sectional_rows(st.mcap, 1:D), cb = cb)
+           am = st.amsk[d, :], mcl = cross_sectional_rows(st.mcap, 1:D), cb = cb,
+           fcb = cross_sectional_basis_now(fb.fcb, 1:D), B = st.Ms[1:D, :, :])
     reg = cross_sectional_fold_regression(pe, blk,
                                           (; lv1 = nothing, lv = nothing, ve1 = nothing,
                                            seed = seed))
@@ -1079,10 +1080,12 @@ function cross_sectional_fold_step(pe::CrossSectionalFactorPrior,
     Tf = size(st.Ms, 1)
     q = (Tf - m + 1):Tf
     fb = cross_sectional_family_basis(families, st.Ms[q, :, :], st.bw[q, :], st.nf, st.fam)
+    fcb = cross_sectional_fold_append(st.fcb, fb.fcb)
     Zc = cat(st.Z, fb.Ms; dims = 1)
     cb = cross_sectional_observed_block(st.obs, 1:Tf, q, st.buf.n - Tf)
     blk = (; Zl = Zc[1:m, :, :], Xr = something(st.Xl, st.X)[q, :], em = st.emsk[q, :],
-           am = st.amsk[q, :], mcl = cross_sectional_rows(st.mcap, q .- pe.lag), cb = cb)
+           am = st.amsk[q, :], mcl = cross_sectional_rows(st.mcap, q .- pe.lag), cb = cb,
+           fcb = cross_sectional_basis_now(fcb, q .- pe.lag), B = st.Ms[q .- pe.lag, :, :])
     reg = cross_sectional_fold_regression(pe, blk,
                                           (; lv1 = st.lv1, lv = st.lv, ve1 = st.ve1,
                                            seed = 0))
@@ -1094,8 +1097,7 @@ function cross_sectional_fold_step(pe::CrossSectionalFactorPrior,
                                       cross_sectional_fold_factor_returns(reg.csr.f, reg.lv,
                                                                           cb))
     return cross_sectional_carry_with(st,
-                                      (; fcb = cross_sectional_fold_append(st.fcb, fb.fcb),
-                                       Z = Zc[(m + 1):end, :, :],
+                                      (; fcb = fcb, Z = Zc[(m + 1):end, :, :],
                                        csr = cross_sectional_fold_append(st.csr, reg.csr),
                                        W = cross_sectional_fold_append(st.W, reg.W),
                                        vs = cross_sectional_fold_append(st.vs, V), ve = ve,
@@ -1308,7 +1310,7 @@ function partial_fit!(pe::CrossSectionalFactorPrior{<:Any, <:Any, <:Any, <:Any, 
                                                     <:Any, <:Any, <:Any, <:Any, <:Any,
                                                     <:Any, <:Any, <:Any, <:Any, <:Any,
                                                     <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                    <:Any, <:Any,
+                                                    <:Any, <:Any, <:Any,
                                                     <:Option{<:CrossSectionalCarryState}},
                       rd::ReturnsResult)
     st = if isnothing(pe.cache)

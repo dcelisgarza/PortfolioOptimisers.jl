@@ -770,8 +770,315 @@ function project_factor_coordinates(fcb::FactorFamilyBasis, x::VecNum)
     end
     return y
 end
+"""
+$(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for the Unseen Member rule of a [`CrossSectionalFactorPrior`](@ref), the rule that says what return an Unseen Member gets at an observation.
+
+An Unseen Member is a member of a constrained Factor Family that no asset of positive regression weight loads on at one observation. The exposures lag the returns, so the zero-sum condition of an observation reads the benchmark weights of an earlier one, which can still weight the member after its last asset delists. The data state nothing about its return there. The rule states the return, and with it the zero-sum condition of the observation.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractUnseenMemberRule` and implement the following method:
+
+## `unseen_member_design`
+
+  - `unseen_member_design(rule::MyUnseenMemberRule, fcb::FactorFamilyBasis, B::Arr3Num, Zl::Arr3Num, X::MatNum, W::MatNum) -> NamedTuple`: Returns the design that the regression of the prior solves, and the change of each observation that maps its coefficients back to the reduced factor returns.
+
+### Arguments
+
+  - `rule`: The member of the family.
+  - `fcb`: The Factor Family Basis of the lagged exposures, one row per observation of `Zl`.
+  - `B`: Lagged exposures on the raw axis, `observations × assets × factors`.
+  - `Zl`: Lagged exposures on the reduced axis, which `fcb` gives from `B`.
+  - `X`: Asset returns matrix `observations × assets`.
+  - `W`: Cross-sectional weights matrix `observations × assets`.
+
+### Returns
+
+  - `Z::Arr3Num`: The design to regress on.
+  - `P`: One `t => P_t` pair per observation that the rule changes, where `P_t` is a `reduced factors × reduced factors` matrix, and the factor returns of `t` are `P_t` times the coefficients of `t`. It is empty when the rule changes no observation.
+
+# Related
+
+  - [`ZeroUnseenMember`](@ref)
+  - [`SolvedUnseenMember`](@ref)
+  - [`unseen_member_design`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+abstract type AbstractUnseenMemberRule <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The Unseen Member rule that gives an Unseen Member a return of zero at its observation, and holds the zero-sum condition of the observation over the other members of its family.
+
+The data state nothing about the return of the member, so the rule states the value that an Empty Factor gets, and that the member gets at an observation that gives it no benchmark weight. The condition over the whole family still holds, because the member adds a zero term to it. The observation is identified again, so its factor returns do not depend on the member that the family drops. [`unseen_member_design`](@ref) states the change of the design.
+
+# Constructors
+
+    ZeroUnseenMember() -> ZeroUnseenMember
+
+# Examples
+
+```jldoctest
+julia> ZeroUnseenMember()
+ZeroUnseenMember()
+```
+
+# Related
+
+  - [`AbstractUnseenMemberRule`](@ref)
+  - [`SolvedUnseenMember`](@ref)
+  - [`unseen_member_design`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+struct ZeroUnseenMember <: AbstractUnseenMemberRule end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The Unseen Member rule that keeps an Unseen Member in the zero-sum condition of its observation, and lets the solve algorithm of the regression state its return.
+
+The member keeps the benchmark weight of the lagged exposures in the condition. Its own column of the raw design is zero, so the member fixes the condition by itself, the condition no longer identifies the other members of the family, and the reduced design of the observation is rank-deficient. The solve algorithm of the Cross-Sectional Regression Estimator then gives the answer. Under [`PseudoInverseFallback`](@ref) it is the minimum-norm answer on the reduced axis, which depends on the member that the family drops. The residuals of the pairs of positive weight are the residuals of [`ZeroUnseenMember`](@ref) when the members that the sample sees span the same fitted values, which they do for a one-hot family.
+
+# Constructors
+
+    SolvedUnseenMember() -> SolvedUnseenMember
+
+# Examples
+
+```jldoctest
+julia> SolvedUnseenMember()
+SolvedUnseenMember()
+```
+
+# Related
+
+  - [`AbstractUnseenMemberRule`](@ref)
+  - [`ZeroUnseenMember`](@ref)
+  - [`unseen_member_design`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+struct SolvedUnseenMember <: AbstractUnseenMemberRule end
+"""
+    unseen_member_design(rule::AbstractUnseenMemberRule, fcb::Nothing, B::Arr3Num, Zl::Arr3Num,
+                         X::MatNum, W::MatNum)
+    unseen_member_design(rule::SolvedUnseenMember, fcb::FactorFamilyBasis, B::Arr3Num,
+                         Zl::Arr3Num, X::MatNum, W::MatNum)
+    unseen_member_design(rule::ZeroUnseenMember, fcb::FactorFamilyBasis, B::Arr3Num,
+                         Zl::Arr3Num, X::MatNum, W::MatNum)
+
+Return the design that the regression of a [`CrossSectionalFactorPrior`](@ref) solves under an Unseen Member rule, and the change of each observation that maps its coefficients back.
+
+Without a constrained Factor Family there is no Unseen Member. Under [`SolvedUnseenMember`](@ref) the regression solves the reduced design itself. In both cases the design is `Zl`, and no observation changes.
+
+The exposures lag the returns, so the condition of an observation reads the benchmark weights of an earlier one. An asset that loads on a member there can leave the regression sample of the observation, for example when it delists. If no asset of the sample loads on the member, the data state nothing about its return, and its column of the raw design is zero. The member then fixes the condition by itself. The condition no longer identifies the other members of the family, so the reduced design is rank-deficient, and a pseudo-inverse answer depends on the member that the family drops.
+
+Under [`ZeroUnseenMember`](@ref) the function gives the member a return of zero, as an Empty Factor has, and as the member has at an observation that gives it no benchmark weight. The condition then holds over the members that the sample sees, and over the whole family too, because the member adds a zero term to it. So the observation is identified again, and its answer does not depend on the dropped member. The residuals of the pairs of positive weight do not change when the members that the sample sees span the same fitted values, as a one-hot family does. The residual of an asset outside the sample reads the return of each Unseen Member that it loads on, which is zero.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{U}_{t} &= \\left\\{j \\in \\mathcal{F} : B_{tij} = 0 \\ \\forall i : u_{ti} > 0\\right\\}\\,, \\\\
+f^{\\mathrm{raw}}_{t,j} &= 0\\,, \\quad j \\in \\mathcal{U}_{t}\\,, \\\\
+\\sum_{j \\in \\mathcal{F} \\setminus \\mathcal{U}_{t}} c_{t}(j) \\, f^{\\mathrm{raw}}_{t,j} &= 0\\,, \\\\
+\\boldsymbol{f}^{\\mathrm{red}}_{t} &= \\mathbf{P}_{t} \\boldsymbol{h}_{t}\\,, \\quad \\boldsymbol{h}_{t} = \\underset{\\boldsymbol{h}}{\\arg\\min} \\sum_{i} u_{ti} \\left(x_{t,\\,i} - \\mathbf{B}^{\\mathrm{red}}_{t,i} \\mathbf{P}_{t} \\boldsymbol{h}\\right)^{2}\\,.
+\\end{align}
+```
+
+``\\mathbf{P}_{t}`` is the identity with a zero column at each retained member of ``\\mathcal{U}_{t}``. When the dropped member ``k`` is in ``\\mathcal{U}_{t}``, the condition moves onto the retained member ``q`` the sample sees with the largest ``|r_{t}(q)|``: the column of ``q`` is zero, and its row holds ``-r_{t}(j) / r_{t}(q)`` at each other retained member ``j`` the sample sees. So ``\\mathbf{B}^{\\mathrm{red}}_{t} \\mathbf{P}_{t} \\boldsymbol{h}_{t} = \\mathbf{B}^{\\mathrm{red}}_{t} \\boldsymbol{f}^{\\mathrm{red}}_{t}``, and the expansion of ``\\boldsymbol{f}^{\\mathrm{red}}_{t}`` through ``\\mathbf{R}_{t}`` gives the raw returns above. Under [`ZeroUnseenMember`](@ref) the function changes no observation where every member of ``\\mathcal{U}_{t}`` has ``c_{t}(j) = 0`` and the sample sees ``k``, because there the zero column already states that answer.
+
+Where:
+
+  - $(math_dict[:F_fam_att])
+  - ``\\mathcal{U}_{t}``: Members of ``\\mathcal{F}`` that no asset of positive weight at observation ``t`` loads on.
+  - $(math_dict[:B_tik_cs])
+  - $(math_dict[:u_ti_cs])
+  - $(math_dict[:c_tj_fcb])
+  - $(math_dict[:r_tj_fcb])
+  - $(math_dict[:f_t_fcb])
+  - ``\\mathbf{B}^{\\mathrm{red}}_{t,i}``: Reduced exposures of asset ``i`` at observation ``t``, ``1 \\times K_{r}``.
+  - $(math_dict[:x_ti_ret])
+  - ``\\mathbf{P}_{t}``: Change of the reduced design of observation ``t``, ``K_{r} \\times K_{r}``.
+  - ``\\boldsymbol{h}_{t}``: Coefficients of the regression on the changed design, ``K_{r} \\times 1``.
+
+# Arguments
+
+  - `rule`: The Unseen Member rule.
+  - `fcb`: The Factor Family Basis of the lagged exposures, one row per observation of `Zl`, or `nothing` without a constrained Factor Family.
+  - `B`: Lagged exposures on the raw axis, `observations × assets × factors`.
+  - `Zl`: Lagged exposures on the reduced axis, which `fcb` gives from `B`.
+  - `X`: Asset returns matrix `observations × assets`.
+  - `W`: Cross-sectional weights matrix `observations × assets`.
+
+# Validation
+
+  - The factor axis of `B` is `fcb.K`, and `B` matches the observation axis of the basis.
+  - The rules of [`cross_sectional_design_mask`](@ref).
+
+# Returns
+
+  - `Z::Arr3Num`: The design to regress on: `Zl`, with `Zl[t, :, :] * P` at each observation in `P`.
+  - `P`: One `t => P_t` pair per observation that the function changes. It is empty when the function changes none, and `()` without a basis or under [`SolvedUnseenMember`](@ref).
+
+# Related
+
+  - [`AbstractUnseenMemberRule`](@ref)
+  - [`ZeroUnseenMember`](@ref)
+  - [`SolvedUnseenMember`](@ref)
+  - [`unseen_member_returns`](@ref)
+  - [`reduce_exposures`](@ref)
+  - [`cross_sectional_live_regression`](@ref)
+"""
+function unseen_member_design(::AbstractUnseenMemberRule, ::Nothing, ::Arr3Num, Zl::Arr3Num,
+                              ::MatNum, ::MatNum)
+    return (; Z = Zl, P = ())
+end
+function unseen_member_design(::SolvedUnseenMember, ::FactorFamilyBasis, ::Arr3Num,
+                              Zl::Arr3Num, ::MatNum, ::MatNum)
+    return (; Z = Zl, P = ())
+end
+function unseen_member_design(::ZeroUnseenMember, fcb::FactorFamilyBasis, B::Arr3Num,
+                              Zl::Arr3Num, X::MatNum, W::MatNum)
+    assert_factor_axis_length(size(B, 3), fcb.K, :B)
+    assert_factor_basis_obs(size(B, 1), fcb, :B)
+    act = cross_sectional_design_mask(Zl, X, W)
+    Tp = float_if_integer(real(eltype(fcb.ratios)))
+    P = Pair{Int, Matrix{Tp}}[]
+    for t in axes(B, 1)
+        Pt = unseen_member_change(fcb, view(B, t, :, :), view(act, t, :), t)
+        if !isnothing(Pt)
+            push!(P, t => Pt)
+        end
+    end
+    if isempty(P)
+        return (; Z = Zl, P = P)
+    end
+    Z = similar(Zl, promote_type(eltype(Zl), Tp))
+    copyto!(Z, Zl)
+    for (t, Pt) in P
+        LinearAlgebra.mul!(view(Z, t, :, :), view(Zl, t, :, :), Pt)
+    end
+    return (; Z = Z, P = P)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the change of the reduced design of one observation under [`ZeroUnseenMember`](@ref), or `nothing` when the observation needs none.
+
+A family needs a change when the sample does not see its dropped member, or when it does not see a retained member that carries a ratio other than zero. [`unseen_member_design`](@ref) states the change and its mathematics.
+
+# Arguments
+
+  - `fcb`: The Factor Family Basis of the lagged exposures.
+  - `Bt`: The lagged exposures of the observation on the raw axis, `assets × factors`.
+  - `at`: `true` at each asset of positive weight at the observation.
+  - `t`: The observation, a row of `fcb.ratios`.
+
+# Returns
+
+  - `Pt::Option{<:Matrix}`: The change, `reduced factors × reduced factors`, or `nothing`.
+
+# Related
+
+  - [`unseen_member_design`](@ref)
+  - [`unseen_member_family!`](@ref)
+"""
+function unseen_member_change(fcb::FactorFamilyBasis, Bt::MatNum, at::AbstractVector{Bool},
+                              t::Integer)
+    Tp = float_if_integer(real(eltype(fcb.ratios)))
+    seen(i) = any(n -> at[n] && !iszero(Bt[n, i]), eachindex(at))
+    Pt = nothing
+    for j in eachindex(fcb.fnm)
+        raw, red, col = family_retained_indices(fcb, j)
+        us = map(!seen, raw)
+        ds = seen(fcb.fi[j][fcb.di[j]])
+        r = view(fcb.ratios, t, col)
+        if ds && all(iszero, view(r, us))
+            continue
+        end
+        Pt = something(Pt,
+                       Matrix{Tp}(LinearAlgebra.I, reduced_factor_count(fcb),
+                                  reduced_factor_count(fcb)))
+        unseen_member_family!(Pt, red, r, us, ds)
+    end
+    return Pt
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Write the change of one constrained Factor Family into the change of the reduced design of one observation.
+
+The column of each retained member that the sample does not see becomes zero. When the sample does not see the dropped member either, the zero-sum condition moves onto the retained member `q` that the sample sees with the largest ``|r_{t}(q)|``: its column becomes zero, and its row holds ``-r_{t}(j) / r_{t}(q)`` at each other retained member ``j`` that the sample sees. A family whose members the sample sees carry no ratio other than zero keeps the other columns, because the condition then reads the dropped member alone.
+
+# Arguments
+
+  - `Pt`: The change of the observation, modified in place.
+  - `red`: The reduced-axis index of each retained member of the family.
+  - `r`: The ratio of each retained member at the observation.
+  - `us`: `true` at each retained member that the sample does not see.
+  - `ds`: Whether the sample sees the dropped member.
+
+# Returns
+
+  - `Pt::Matrix`: The change, modified in place.
+
+# Related
+
+  - [`unseen_member_change`](@ref)
+  - [`unseen_member_design`](@ref)
+"""
+function unseen_member_family!(Pt::Matrix, red::AbstractVector{<:Integer}, r::VecNum,
+                               us::AbstractVector{Bool}, ds::Bool)
+    Pt[:, view(red, us)] .= zero(eltype(Pt))
+    live = findall(!, us)
+    if ds || isempty(live)
+        return Pt
+    end
+    q = argmax(p -> abs(r[p]), live)
+    if iszero(r[q])
+        return Pt
+    end
+    for p in live
+        Pt[red[q], red[p]] = -r[p] / r[q]
+    end
+    Pt[red[q], red[q]] = zero(eltype(Pt))
+    return Pt
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Map the coefficients of a regression on the design of [`unseen_member_design`](@ref) back to the reduced factor returns.
+
+The row of each changed observation `t` becomes `P_t` times the coefficients of that row. Every other row, the residuals, the counts, the intercept and the leverage-one mark stay as the regression gives them. The design times the coefficients equals the reduced exposures times the factor returns, so the residuals are those of the factor returns.
+
+# Arguments
+
+  - `csr`: The regression on the changed design.
+  - `P`: The `t => P_t` pairs of [`unseen_member_design`](@ref).
+
+# Returns
+
+  - `csr::CrossSectionalRegression`: The regression with the reduced factor returns in `f`. It is `csr` itself when `P` is empty.
+
+# Related
+
+  - [`unseen_member_design`](@ref)
+"""
+function unseen_member_returns(csr::CrossSectionalRegression, P)
+    if isempty(P)
+        return csr
+    end
+    f = copy(csr.f)
+    for (t, Pt) in P
+        LinearAlgebra.mul!(view(f, t, :), Pt, view(csr.f, t, :))
+    end
+    return CrossSectionalRegression(; f = f, eps = csr.eps, n = csr.n, b = csr.b,
+                                    h1 = csr.h1)
+end
+
+export ZeroUnseenMember, SolvedUnseenMember
 public reduce_factor_names, reduce_exposures, reduce_loadings, reduce_factor_returns,
        reduce_factor_mu, reduce_factor_covariance, dropped_factor_weights,
        expand_factor_returns, expand_factor_mu, expand_factor_covariance,
-       project_factor_coordinates
+       project_factor_coordinates, AbstractUnseenMemberRule, unseen_member_design

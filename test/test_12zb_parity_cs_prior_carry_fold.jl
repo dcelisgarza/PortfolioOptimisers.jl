@@ -158,6 +158,21 @@ end
                 @test agrees(x.pr, batch(pe, k, rd, e))
             end
         end
+        # A member that no asset of an observation loads on leaves the zero-sum condition of
+        # that observation, on a step as in the batch fit (#1606). The only asset in Utilities
+        # delists after data row 225, and the step of row 226 fits that row alone.
+        dl = parity_panel(; T = 300, N = 60, seed = 1601).rd
+        de = (0, 200, 225, 226, 300)
+        dlf = ["market" => ConstantExposure(),
+               "industry" => OneHotExposure(; field = "industry", family = "industry"),
+               "size" =>
+                   CompositeExposure(; descriptors = [LogMarketCap()], family = "style")]
+        for fam in (["industry" => "industry=Energy"], ["industry" => nothing])
+            pe = CrossSectionalFactorPrior(; factors = dlf, families = fam, minra = 5)
+            for (k, x) in enumerate(stream(pe, dl, de))
+                @test agrees(x.pr, batch(pe, k, dl, de))
+            end
+        end
     end
 
     @testset "A Calibration Rule resolves at each step (#1481)" begin

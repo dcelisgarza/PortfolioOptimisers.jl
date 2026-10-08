@@ -364,6 +364,10 @@ The time-varying change of basis that imposes each Factor Family's zero-sum cons
 An estimated factor of a Cross-Sectional Factor Prior whose exposure is zero at every pair of positive regression weight in one fit, so the data state nothing about its return. A sub-universe with no asset in one level of a one-hot factor leaves that level empty, and a meta-optimiser gives its sub-problems such sub-universes. The fit keeps the factor on every axis, with a return of zero at every observation, a mean of zero, and a zero row and column of the factor covariance.
 *Avoid*: a dropped factor, which is the member of a Factor Family that the Factor Family Basis rewrites through the others.
 
+**Unseen Member**
+A member of a constrained Factor Family that no asset of positive regression weight loads on at one observation of a Cross-Sectional Factor Prior. The exposures lag the returns, so the zero-sum condition of the observation reads earlier benchmark weights, which can still weight the member after its last asset delists. The data state nothing about its return there. The Unseen Member rule of the prior states it: by default a return of zero at that observation, with the zero-sum condition held over the other members, so the observation is identified and its factor returns do not depend on the dropped member (#1606).
+*Avoid*: an Empty Factor, which no asset loads on at any observation of the fit.
+
 **Currency Excess Index**
 The value in the base currency of a deposit in one currency funded in the base currency: the exchange rate times the cash total-return index of the currency, divided by the cash total-return index of the base currency. It is the level series whose return is the Currency Excess Return, and `currency_excess_index` builds it. See ADR 0184.
 *Avoid*: an exchange rate, which leaves out the two cash returns.

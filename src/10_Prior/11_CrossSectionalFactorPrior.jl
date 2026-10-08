@@ -331,6 +331,7 @@ $(DocStringExtensions.FIELDS)
     CrossSectionalFactorPrior(; factors::Dict_VecPair,
                               neutralise::Option{<:Dict_VecPair} = nothing,
                               families::Option{<:Dict_VecPair} = nothing,
+                              unseen::AbstractUnseenMemberRule = ZeroUnseenMember(),
                               cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
                               wa::AbstractCrossSectionalWeightsAlgorithm = MarketCapWeights(),
                               pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(; me = ExpWeightedExpectedReturns(), ce = RegimeAdjustedExpWeightedCovariance(; centring = PreCentred())),
@@ -436,9 +437,13 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     neutralise
     """
-    Constrained Factor Families, as Pairs of `family label => dropped member`, or `nothing`. When the dropped member is `nothing`, [`factor_family_basis`](@ref) chooses it.
+    Constrained Factor Families, as Pairs of `family label => dropped member`, or `nothing`. When the dropped member is `nothing`, [`factor_family_basis`](@ref) chooses it. `unseen` states the return of a member that no asset of an observation loads on.
     """
     families
+    """
+    Unseen Member rule of the constrained Factor Families, a member of [`AbstractUnseenMemberRule`](@ref). An Unseen Member is a member that no asset of positive regression weight loads on at one observation. Under [`ZeroUnseenMember`](@ref), the default, it has a return of zero there, and the zero-sum condition of the observation holds over the other members. Under [`SolvedUnseenMember`](@ref) it stays in the condition, and the solve algorithm of `cre` gives its return, which then depends on the dropped member.
+    """
+    unseen
     """
     Cross-Sectional Regression Estimator of the fit, and of the Neutralisation. It must fit no intercept, because the prior states the moments through the factor returns alone, and the fit refuses an intercept. A `"market" => ConstantExposure()` factor states the common return instead.
     """
@@ -542,6 +547,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     function CrossSectionalFactorPrior(factors::AbstractVector{<:Pair},
                                        neutralise::Option{<:AbstractVector{<:Pair}},
                                        families::Option{<:AbstractVector{<:Pair}},
+                                       unseen::AbstractUnseenMemberRule,
                                        cre::AbstractCrossSectionalRegressionEstimator,
                                        wa::AbstractCrossSectionalWeightsAlgorithm,
                                        pe::AbstractLowOrderPriorEstimator_A_AF,
@@ -585,29 +591,17 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         assert_forecast_history_rule(c, rfe, :c)
         assert_orthogonal_forecast_fit(ofit, rfe)
         assert_carry_rule(carry, (; factors, pe, ve, rfe, th))
-        return new{typeof(factors), typeof(neutralise), typeof(families), typeof(cre),
-                   typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(pdm),
-                   typeof(f_mp), typeof(mp), typeof(srep), typeof(th), typeof(bp),
-                   typeof(mcap), typeof(bw), typeof(lag), typeof(minra), typeof(rfe),
-                   typeof(lambda), typeof(c), typeof(ofit), typeof(lx), typeof(mtx_sqrt),
-                   typeof(ex), typeof(choice), typeof(carry), typeof(cache)}(factors,
-                                                                             neutralise,
-                                                                             families, cre,
-                                                                             wa, pe, ve, ce,
-                                                                             pdm, f_mp, mp,
-                                                                             srep, th, bp,
-                                                                             mcap, bw, lag,
-                                                                             minra, rfe,
-                                                                             lambda, c,
-                                                                             ofit, lx,
-                                                                             mtx_sqrt, ex,
-                                                                             choice, carry,
-                                                                             cache)
+        # One tuple of the fields gives both the type parameters and the values.
+        fs = (factors, neutralise, families, unseen, cre, wa, pe, ve, ce, pdm, f_mp, mp,
+              srep, th, bp, mcap, bw, lag, minra, rfe, lambda, c, ofit, lx, mtx_sqrt, ex,
+              choice, carry, cache)
+        return new{map(typeof, fs)...}(fs...)
     end
 end
 function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    neutralise::Option{<:Dict_VecPair} = nothing,
                                    families::Option{<:Dict_VecPair} = nothing,
+                                   unseen::AbstractUnseenMemberRule = ZeroUnseenMember(),
                                    cre::AbstractCrossSectionalRegressionEstimator = CrossSectionalLinearRegression(),
                                    wa::AbstractCrossSectionalWeightsAlgorithm = MarketCapWeights(),
                                    pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(;
@@ -639,10 +633,10 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    cache::Option{<:AbstractPartialFitState} = nothing)::CrossSectionalFactorPrior
     return CrossSectionalFactorPrior(cross_sectional_prior_pairs(factors, :factors),
                                      cross_sectional_prior_option(neutralise, :neutralise),
-                                     cross_sectional_prior_option(families, :families), cre,
-                                     wa, pe, ve, ce, pdm, f_mp, mp, srep, th, bp, mcap, bw,
-                                     lag, minra, rfe, lambda, c, ofit, lx, mtx_sqrt, ex,
-                                     choice, carry, cache)
+                                     cross_sectional_prior_option(families, :families),
+                                     unseen, cre, wa, pe, ve, ce, pdm, f_mp, mp, srep, th,
+                                     bp, mcap, bw, lag, minra, rfe, lambda, c, ofit, lx,
+                                     mtx_sqrt, ex, choice, carry, cache)
 end
 # `lambda` and `c` are the two Calibration Slots of the prior. The prior resolves them itself,
 # inside `cross_sectional_assemble`, so the declaration serves the two `assert_` walks alone.
@@ -740,7 +734,7 @@ The prior states an entry exactly when the model determines it. An asset of ``\\
  5. Neutralise the exposures with [`cross_sectional_neutralise!`](@ref), under the benchmark weights and the prior's own regression estimator.
  6. Build the Factor Family Basis `fb` with [`cross_sectional_family_basis`](@ref), and reduce the exposures through it.
  7. Lag the reduced exposures and the market capitalisation by `pe.lag`, giving `Zl` and `mcl`. Trim the observed factors to the fitted observations with [`cross_sectional_observed_block`](@ref), which refuses an infinite observed return among them and keeps a `NaN` as a gap. Take the eligibility mask `msk` of the fit with [`cross_sectional_eligible`](@ref) on `Xl`, and drop from it every pair whose lagged market capitalisation is not finite.
- 8. Regress each observation's `Xl` on its lagged reduced exposures with [`cross_sectional_live_regression`](@ref), giving `csr` and the mask `lv` of the factors that are not empty, under the weights `W` of [`cs_weights_initial`](@ref). Refuse a `csr` that carries an intercept with [`assert_cross_sectional_no_intercept`](@ref). When [`needs_second_pass`](@ref) answers `true`, refine the weights with [`cs_weights_refine`](@ref) and regress again. The refinement reads the idiosyncratic variance under the two universe masks, as step 9 does.
+ 8. Take the design of the regression under the Unseen Member rule `unseen` with [`unseen_member_design`](@ref). Regress each observation's `Xl` on the design it gives with [`cross_sectional_live_regression`](@ref), and map the coefficients back with [`unseen_member_returns`](@ref), giving `csr` and the mask `lv` of the factors that are not empty, under the weights `W` of [`cs_weights_initial`](@ref). Refuse a `csr` that carries an intercept with [`assert_cross_sectional_no_intercept`](@ref). When [`needs_second_pass`](@ref) answers `true`, refine the weights with [`cs_weights_refine`](@ref) and regress again. The refinement reads the idiosyncratic variance under the two universe masks, as step 9 does.
  9. Take the idiosyncratic variance history `vs` with [`variance_series`](@ref), under the active mask and the estimation mask of the fitted observations. An estimator that reads the masks resets an asset that the active mask turns off, and measures its regime over the estimation universe alone. An estimator that reads no mask ignores them. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`, and take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation. Record the degrees of freedom and the divisor of each variance with [`variance_count`](@ref) and [`cross_sectional_variance_counts`](@ref).
 10. Append the observed factors after the estimated ones with [`cross_sectional_observed_append`](@ref): the observed returns after the factor returns, the observed exposures after the loadings and the exposure history, the names and the family labels, and pass-through factors on the Factor Family Basis. Fit `pe.pe` on the combined reduced factor returns of the factors that are not empty with [`cross_sectional_factor_moments`](@ref), giving `f_pr`, which refuses a non-finite factor moment, divides the scenario weights by their sum, and processes the factor covariance under `pe.f_mp`, the matrix processing estimator of the factor axis and not the asset one. An Observed Factor is never empty. The method passes `strict` to `pe.pe`, as [`FactorPrior`](@ref) does, because the slot admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe. [`cross_sectional_assemble`](@ref) runs the standardisation and the counts of step 9 and the steps 11 to 17, and the call with no data of the carry fold runs it too.
 11. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, a zero `b`, and the observed returns in `fx`. Record the rows of `X` that the fit covers, `rw[r]`, in `idx`, and their timestamps in `ts` when `ts` is given. Under a family re-basis, expand the combined factor returns onto the raw axis with [`cross_sectional_expand`](@ref), each row with the basis of its lagged exposures, and store them in `fr`.
@@ -831,7 +825,13 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     cross_sectional_cap_finite!(msk, mcl)
     assert_cross_sectional_coverage(msk, cross_sectional_minra(pe, size(Zl, 3)), cb)
     W = cs_weights_initial(pe.wa, mcl, msk)
-    (; csr, lv) = cross_sectional_live_regression(pe.cre, Zl, Xr, W)
+    # The Unseen Member rule states the return of a member of a constrained family that no
+    # asset of an observation loads on (#1606).
+    Bl = Msw[r .- pe.lag, :, :]
+    fbl = cross_sectional_basis_now(fb.fcb, r .- pe.lag)
+    ud = unseen_member_design(pe.unseen, fbl, Bl, Zl, Xr, W)
+    (; csr, lv) = cross_sectional_live_regression(pe.cre, ud.Z, Xr, W)
+    csr = unseen_member_returns(csr, ud.P)
     assert_cross_sectional_no_intercept(csr)
     # The idiosyncratic variance is a folding statistic, so it reads both universe masks: it
     # resets an asset the active mask turns off, and a regime-adjusted estimator measures its
@@ -841,7 +841,9 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     if needs_second_pass(pe.wa)
         W = cs_weights_refine(pe.wa, W, csr.eps, pe.ve, msk; estimation_mask = emr,
                               active_mask = amr)
-        (; csr, lv) = cross_sectional_live_regression(pe.cre, Zl, Xr, W)
+        ud = unseen_member_design(pe.unseen, fbl, Bl, Zl, Xr, W)
+        (; csr, lv) = cross_sectional_live_regression(pe.cre, ud.Z, Xr, W)
+        csr = unseen_member_returns(csr, ud.P)
     end
     vs = variance_series(pe.ve, csr.eps; dims = 1, estimation_mask = emr, active_mask = amr)
     # `strict` reaches the nested factor prior for the reason it reaches `FactorPrior`'s:
@@ -1654,9 +1656,9 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
   - [`set_show_nothing_fields!`](@ref)
 """
 function show_fields(::CrossSectionalFactorPrior)
-    return (:factors, :neutralise, :families, :cre, :wa, :pe, :ve, :ce, :f_mp, :mp, :srep,
-            :th, :bp, :mcap, :bw, :lag, :minra, :rfe, :lambda, :c, :ofit, :lx, :mtx_sqrt,
-            :ex, :choice, :carry)
+    return (:factors, :neutralise, :families, :unseen, :cre, :wa, :pe, :ve, :ce, :pdm,
+            :f_mp, :mp, :srep, :th, :bp, :mcap, :bw, :lag, :minra, :rfe, :lambda, :c, :ofit,
+            :lx, :mtx_sqrt, :ex, :choice, :carry)
 end
 function factor_residual_config(::CrossSectionalFactorPrior)
     # The declaration names a variance estimator that a consumer re-runs on the
