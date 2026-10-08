@@ -150,7 +150,7 @@ Arguments correspond to the struct's fields, in the order they are declared. The
     """
     weight_std
     """
-    Contribution of each asset to the systematic part of the portfolio volatility.
+    Contribution of each asset to the systematic part of the portfolio volatility. It is `NaN` at a held Leverage-One Pair under [`EntrywiseUnknown`](@ref), because the split of the pair is not identified.
     """
     sys_vol_contrib
     """
@@ -158,7 +158,7 @@ Arguments correspond to the struct's fields, in the order they are declared. The
     """
     sys_mu_contrib
     """
-    Contribution of each asset to the idiosyncratic part of the portfolio volatility.
+    Contribution of each asset to the idiosyncratic part of the portfolio volatility. It is `NaN` at a held Leverage-One Pair under [`EntrywiseUnknown`](@ref), as the systematic part is.
     """
     idio_vol_contrib
     """
@@ -769,13 +769,17 @@ A Prior Estimator states no idiosyncratic variance for an asset in the warm-up o
 
   - [`EntrywiseUnknown`](@ref) keeps every entry the model states, and gives `NaN` for every number that reads an entry it does not state. It is the default.
   - [`ZeroUnknown`](@ref) reads every entry the model does not state as zero, and an absent return as a zero return.
+  - [`KindwiseUnknown`](@ref) applies one rule to each kind of unknown entry.
 
 The rule applies on the predicted side to every number, and on both sides to the standalone moments of the asset axis. An entry of an asset the portfolio does not hold has a weight of zero, so it adds nothing to a sum under either rule.
+
+A Leverage-One Pair is a second kind of unknown entry. The fit reproduced the return of the pair, so its total is exact and the split between its systematic and its idiosyncratic part is unknown. This is the opposite of an asset in the warm-up of its variance, whose split is exact up to its unknown idiosyncratic part. The rule applies to this kind on both sides, through [`attribution_leverage_split`](@ref).
 
 # Related
 
   - [`EntrywiseUnknown`](@ref)
   - [`ZeroUnknown`](@ref)
+  - [`KindwiseUnknown`](@ref)
   - [`factor_attribution`](@ref)
 """
 abstract type AbstractUnknownEntryRule <: AbstractAlgorithm end
@@ -786,10 +790,13 @@ Keeps every entry the factor model states, and gives `NaN` for every number that
 
 It is the default rule of [`factor_attribution`](@ref). A held asset in the warm-up of its variance keeps its loadings, so the exposures, the systematic variance and the systematic mean are exact. Its idiosyncratic variance is unknown, so the portfolio volatility is unknown, and with it the idiosyncratic part, the total, the remainder and every number divided by the portfolio volatility. A held asset without loadings makes the exposures that read them unknown too. On the asset axis the standalone moments read the entries of the asset alone, and on the realised side its active pairs alone.
 
+A portfolio that holds a Leverage-One Pair has an exact total and an unknown split. The volatility, the volatility contribution, the variance share and the correlation of the systematic and the idiosyncratic component are `NaN`, and so are those of the factor whose only member is the pair, and the systematic and idiosyncratic volatility contributions of the asset. The total, the remainder and every mean keep their values.
+
 # Related
 
   - [`AbstractUnknownEntryRule`](@ref)
   - [`ZeroUnknown`](@ref)
+  - [`KindwiseUnknown`](@ref)
   - [`factor_attribution`](@ref)
 """
 struct EntrywiseUnknown <: AbstractUnknownEntryRule end
@@ -800,213 +807,69 @@ Reads every entry the factor model does not state as zero, and an absent return 
 
 The rule is a stated assumption, not a fact of the model. An unknown idiosyncratic variance read as zero makes the portfolio variance a lower bound, so it understates the volatility and every share divided by it. A missing return read as zero dilutes the mean of an asset by the observations it was absent. A total moment the prior does not state reads the model, with every unknown entry of the model read as zero, so the gap of the remainder reads the stated entries alone.
 
+A Leverage-One Pair keeps the split as fitted: its idiosyncratic variance is zero, so the attribution reports a held pair as wholly systematic. This understates the idiosyncratic part by the unknown own variance of the asset, and the factor whose only member is the pair carries that variance.
+
 # Related
 
   - [`AbstractUnknownEntryRule`](@ref)
   - [`EntrywiseUnknown`](@ref)
+  - [`KindwiseUnknown`](@ref)
   - [`factor_attribution`](@ref)
 """
 struct ZeroUnknown <: AbstractUnknownEntryRule end
 """
-    attribution_unknown_keep(rule::EntrywiseUnknown, w::VecNum)
-    attribution_unknown_keep(rule::ZeroUnknown, w::VecNum)
+$(DocStringExtensions.TYPEDEF)
 
-Return the assets whose unknown entries stay unknown in a predicted attribution.
+Applies one rule to each kind of unknown entry.
 
-An entry of an asset with a weight of zero adds nothing to a sum, so its value is irrelevant, and it is replaced by zero under either rule. [`EntrywiseUnknown`](@ref) keeps the unknown entries of every held asset, so a sum that reads one is `NaN`. [`ZeroUnknown`](@ref) keeps none.
+[`EntrywiseUnknown`](@ref) and [`ZeroUnknown`](@ref) are presets that apply one rule to every kind. This rule holds one rule per kind, so a caller can read one kind as zero and keep the other unknown.
 
-# Arguments
+  - `unstated`: An entry the factor model does not state. It is the idiosyncratic variance of an asset in the warm-up of its variance, or the loadings of an asset that is not investable.
+  - `leverage`: The variance split of a Leverage-One Pair. The fit reproduced the return of the pair, so the data identify its total return and not the split between its systematic and its idiosyncratic part. [`EntrywiseUnknown`](@ref) gives `NaN` for every variance number that reads the split of a held pair. [`ZeroUnknown`](@ref) reads the split as fitted, the idiosyncratic variance of the pair as zero.
 
-  - `rule`: The rule for an unknown entry.
-  - `w`: Portfolio weights.
+# Fields
 
-# Returns
+$(DocStringExtensions.FIELDS)
 
-  - `keep::BitVector`: `true` at every asset whose unknown entries stay `NaN`.
+# Constructors
 
-# Related
+    KindwiseUnknown(;
+        unstated::AbstractUnknownEntryRule = EntrywiseUnknown(),
+        leverage::AbstractUnknownEntryRule = EntrywiseUnknown()
+    ) -> KindwiseUnknown
 
-  - [`AbstractUnknownEntryRule`](@ref)
-  - [`attribution_unknown_rows`](@ref)
-  - [`attribution_unknown_block`](@ref)
-"""
-function attribution_unknown_keep(::EntrywiseUnknown, w::VecNum)
-    return .!iszero.(w)
-end
-function attribution_unknown_keep(::ZeroUnknown, w::VecNum)
-    return falses(length(w))
-end
-"""
-    attribution_unknown_rows(A::AbstractArray, keep::AbstractVector{Bool})
+Keywords correspond to the struct's fields.
 
-Return the loadings, the intercept or the expected returns with every unknown entry outside the kept assets replaced by zero.
+## Validation
 
-A finite entry stays as it is, so a held non-investable asset keeps its finite loadings, and the exposures that read them are exact. A non-finite entry of a kept asset stays too, so every number that reads it is `NaN`.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\tilde{A}_{ik} &= \\begin{cases} A_{ik} & \\text{if } A_{ik} \\text{ is finite or } k_{i} = 1\\,, \\\\ 0 & \\text{otherwise}\\,. \\end{cases}
-\\end{align}
-```
-
-Where:
-
-  - ``A_{ik}``, ``\\tilde{A}_{ik}``: Entry of asset ``i`` in column ``k``, before and after the rule. A vector has one column.
-  - ``k_{i}``: Whether asset ``i`` keeps its unknown entries, from [`attribution_unknown_keep`](@ref).
-
-# Arguments
-
-  - `A`: The loadings, `assets × factors`, or a vector with one entry per asset.
-  - `keep`: Whether each asset keeps its unknown entries.
-
-# Returns
-
-  - `A::AbstractArray`: The array after the rule.
-
-# Related
-
-  - [`attribution_unknown_keep`](@ref)
-  - [`attribution_unknown_block`](@ref)
-  - [`predicted_attribution`](@ref)
-"""
-function attribution_unknown_rows(A::AbstractArray, keep::AbstractVector{Bool})
-    return ifelse.(keep .| isfinite.(A), A, zero(eltype(A)))
-end
-"""
-    attribution_unknown_block(E::VecNum_MatNum, keep::AbstractVector{Bool})
-
-Return the idiosyncratic covariance with every unknown entry outside the kept pairs replaced by zero.
-
-The covariance sibling of [`attribution_unknown_rows`](@ref). A diagonal covariance travels as a vector, and takes the rule of the rows. A full covariance keeps an unknown entry only when both of its assets keep their unknown entries, because the quadratic form `w' E w` reads the entry `(i, j)` with the weight `w_i w_j`.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\tilde{E}_{ij} &= \\begin{cases} E_{ij} & \\text{if } E_{ij} \\text{ is finite, or } k_{i} = k_{j} = 1\\,, \\\\ 0 & \\text{otherwise}\\,. \\end{cases}
-\\end{align}
-```
-
-Where:
-
-  - ``E_{ij}``, ``\\tilde{E}_{ij}``: Idiosyncratic covariance of assets ``i`` and ``j``, before and after the rule.
-  - ``k_{i}``: Whether asset ``i`` keeps its unknown entries, from [`attribution_unknown_keep`](@ref).
-
-# Arguments
-
-  - `E`: The idiosyncratic variances, one entry per asset, or the idiosyncratic covariance, `assets × assets`.
-  - `keep`: Whether each asset keeps its unknown entries.
-
-# Returns
-
-  - `E::VecNum_MatNum`: The variances or the covariance after the rule.
-
-# Related
-
-  - [`attribution_unknown_rows`](@ref)
-  - [`attribution_unknown_keep`](@ref)
-  - [`attribution_idiosyncratic_matrix`](@ref)
-"""
-function attribution_unknown_block(e::VecNum, keep::AbstractVector{Bool})
-    return attribution_unknown_rows(e, keep)
-end
-function attribution_unknown_block(E::MatNum, keep::AbstractVector{Bool})
-    return ifelse.((keep .& transpose(keep)) .| isfinite.(E), E, zero(eltype(E)))
-end
-"""
-    attribution_standalone(rule::EntrywiseUnknown, A::AbstractArray)
-    attribution_standalone(rule::ZeroUnknown, A::AbstractArray)
-
-Return the entries of the block that the standalone moments of the predicted asset axis read.
-
-The standalone volatility and mean of an asset are moments of the asset, not contributions, so they read the block's own entries. [`EntrywiseUnknown`](@ref) reads them as they are, so the model states no volatility for an asset whose idiosyncratic variance is unknown. [`ZeroUnknown`](@ref) reads every unknown entry as zero.
-
-# Arguments
-
-  - `rule`: The rule for an unknown entry.
-  - `A`: The loadings, the factor-orthogonal mean or the idiosyncratic block.
-
-# Returns
-
-  - `A::AbstractArray`: The entries the standalone moments read.
+  - Neither field is a `KindwiseUnknown`, else an `ArgumentError` is raised. A field is the rule of one kind, and a rule per kind has no kind inside it to apply to.
 
 # Related
 
   - [`AbstractUnknownEntryRule`](@ref)
-  - [`predicted_attribution_assets`](@ref)
-  - [`attribution_finite`](@ref)
+  - [`EntrywiseUnknown`](@ref)
+  - [`ZeroUnknown`](@ref)
+  - [`factor_attribution`](@ref)
 """
-function attribution_standalone(::EntrywiseUnknown, A::AbstractArray)
-    return A
+struct KindwiseUnknown{T1, T2} <: AbstractUnknownEntryRule
+    """
+    Rule for an entry the factor model does not state.
+    """
+    unstated::T1
+    """
+    Rule for the variance split of a Leverage-One Pair.
+    """
+    leverage::T2
+    function KindwiseUnknown(unstated::AbstractUnknownEntryRule,
+                             leverage::AbstractUnknownEntryRule)
+        @argcheck(!isa(unstated, KindwiseUnknown) && !isa(leverage, KindwiseUnknown),
+                  ArgumentError("each field of `KindwiseUnknown` is the rule of one kind of unknown entry, so it cannot be a `KindwiseUnknown`"))
+        return new{typeof(unstated), typeof(leverage)}(unstated, leverage)
+    end
 end
-function attribution_standalone(::ZeroUnknown, A::AbstractArray)
-    return attribution_finite(A)
-end
-"""
-    attribution_held_entries(X::AbstractArray, w::VecNum)
-
-Return a per-asset contribution with every non-finite entry of an asset the portfolio does not hold replaced by zero.
-
-A contribution of asset `i` is its weight times a number of the model, divided by the portfolio volatility where it is a share. An asset with a weight of zero contributes zero whatever that number is, because the number is finite in the model even where the attribution cannot state it. A held asset whose unknown entry reaches the number keeps its `NaN`. A finite entry stays as it is, so the sign of a zero is kept.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\tilde{x}_{ik} &= \\begin{cases} 0 & \\text{if } w_{i} = 0 \\text{ and } x_{ik} \\text{ is not finite}\\,, \\\\ x_{ik} & \\text{otherwise}\\,. \\end{cases}
-\\end{align}
-```
-
-Where:
-
-  - ``x_{ik}``, ``\\tilde{x}_{ik}``: Contribution of asset ``i`` in column ``k``, before and after the rule. A vector has one column.
-  - $(math_dict[:w_port])
-
-# Arguments
-
-  - `X`: The contributions, one row per asset.
-  - `w`: Portfolio weights.
-
-# Returns
-
-  - `X::AbstractArray`: The contributions after the rule.
-
-# Related
-
-  - [`predicted_attribution_assets`](@ref)
-  - [`attribution_unknown_keep`](@ref)
-"""
-function attribution_held_entries(X::AbstractArray, w::VecNum)
-    return ifelse.(iszero.(w) .& .!isfinite.(X), zero(eltype(X)), X)
-end
-"""
-    attribution_unknown_note(rule::EntrywiseUnknown)
-    attribution_unknown_note(rule::ZeroUnknown)
-
-Return the sentence a predicted attribution adds to the report of a held non-investable asset.
-
-The report names the assets, and this sentence states what the rule did with their unknown entries, so the reader knows which numbers to trust.
-
-# Arguments
-
-  - `rule`: The rule for an unknown entry.
-
-# Returns
-
-  - `note::String`: The sentence.
-
-# Related
-
-  - [`attribution_investable_diagnostic`](@ref)
-  - [`AbstractUnknownEntryRule`](@ref)
-"""
-function attribution_unknown_note(::EntrywiseUnknown)
-    return "The entries the prior states for them stay in the decomposition, and every number that reads an entry it does not state is `NaN`: the idiosyncratic part, the total, the remainder and every share of the portfolio volatility. Pass `unknown = ZeroUnknown()` to read those entries as zero"
-end
-function attribution_unknown_note(::ZeroUnknown)
-    return "Every entry the prior does not state for them reads as zero, so the idiosyncratic part and the total understate the variance of the portfolio"
+function KindwiseUnknown(; unstated::AbstractUnknownEntryRule = EntrywiseUnknown(),
+                         leverage::AbstractUnknownEntryRule = EntrywiseUnknown())::KindwiseUnknown
+    return KindwiseUnknown(unstated, leverage)
 end
 """
     attribution_finite(A::AbstractArray)
@@ -1428,7 +1291,8 @@ end
     factor_attribution(w::VecNum, B::MatNum, F::MatNum, d::VecNum_MatNum;
                        mu_f::Option{<:VecNum} = nothing, b::Option{<:VecNum} = nothing,
                        sigma::Option{<:MatNum} = nothing, mu::Option{<:VecNum} = nothing,
-                       fam::Option{<:VecStr} = nothing, assets::Bool = false,
+                       fam::Option{<:VecStr} = nothing,
+                       lev::Option{<:AbstractVector{Bool}} = nothing, assets::Bool = false,
                        ppy::Number = 1, strict::Bool = false,
                        unknown::AbstractUnknownEntryRule = EntrywiseUnknown())
         -> FactorAttributionResult
@@ -1437,7 +1301,8 @@ end
                        trim::Bool = false, rw::Option{<:MatNum} = nothing,
                        vs::Option{<:MatNum} = nothing,
                        fcb::Option{<:FactorFamilyBasis} = nothing, observed::Integer = 0,
-                       fam::Option{<:VecStr} = nothing, assets::Bool = false,
+                       fam::Option{<:VecStr} = nothing,
+                       h1::Option{<:AbstractMatrix{Bool}} = nothing, assets::Bool = false,
                        se::Bool = false, ppy::Number = 1, ddof::Integer = 1,
                        unknown::AbstractUnknownEntryRule = EntrywiseUnknown())
         -> FactorAttributionResult
@@ -1459,6 +1324,8 @@ The verb reads the weights and the factor model block, and returns one [`FactorA
 **A holding the prior could not estimate gets a warning, `strict` turns the warning into a refusal, and `unknown` states what the numbers do with it.** A non-investable asset carries `NaN` at least on the diagonal of `sigma`, so its variance is unknown, and with it the variance of any portfolio that holds it. A portfolio that holds one takes the library's strictness policy through [`attribution_investable_diagnostic`](@ref). Under `strict = true` an `ArgumentError` names the assets. Under the default `strict = false` a warning names them, and the rule `unknown` decides the numbers, entry by entry. The default [`EntrywiseUnknown`](@ref) keeps every entry the prior states, so the finite loadings of a held asset in the warm-up of its variance give exact exposures, an exact systematic variance and an exact systematic mean. Every number that reads an entry the prior does not state is `NaN`: the idiosyncratic part, the total, the remainder and every share divided by the portfolio volatility. [`ZeroUnknown`](@ref) reads every such entry as zero, which understates the portfolio variance, and on the realised side it reads an absent return as zero in the standalone moments of the asset axis.
 
 **A held pair with no return is a holiday when the asset is active, and an unknown otherwise.** A returns result whose Asset Panel carries an active mask separates the two through [`attribution_net_returns`](@ref). An active pair is a holiday, its price does not move, and it fills zero with no message. An inactive pair, after a delisting for example, takes the strictness policy: a warning names the observations and the assets and the pair contributes zero, or `strict = true` refuses. A bare matrix carries no mask, so every held pair with no return takes the policy. A pair the block cannot decompose, with no idiosyncratic return or no exposure, is zero in the systematic and the idiosyncratic series too, through [`attribution_zero_inactive`](@ref), so a pair that adds nothing to the total adds nothing to any component. A weight history from a walk-forward holds exactly this shape whenever an asset delisted inside the history, which is why the default warns rather than refuses.
+
+**A held Leverage-One Pair has an exact total and an unknown split.** The pair has a direction of the design of its own, for example the only member of a level of a one-hot family, so the fit reproduces its return and the factor return of that level holds the own return of the asset. Under the default the variance numbers that read the split are `NaN`: the volatility, the volatility contribution, the variance share and the correlation of the systematic and the idiosyncratic component, the same numbers of the factor whose only member is the pair, and the systematic and idiosyncratic volatility contributions of the asset. The total, the remainder and every mean keep their values, because the own return has an expected value of zero. The predicted side marks an asset that the fit marks at any row, because the factor covariance reads every row. The realised side marks a pair at each row the portfolio holds it, and a portfolio with a weight of zero at every marked pair is unchanged. `unknown = KindwiseUnknown(; leverage = ZeroUnknown())` reads the split as fitted, with no own variance, see [`KindwiseUnknown`](@ref).
 
 **The weight spread of the realised asset axis divides by `T - ddof`.** The exposure spread beside it divides by `T - 1`, and the exposure is linear in the weights, so the default `ddof = 1` makes the two comparable. `ddof = 0` gives the population spread. A constant weight states a spread of exactly zero.
 
@@ -1556,6 +1423,8 @@ The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\
   - `sigma`: Asset covariance the total variance reads, or `nothing` for the model's own.
   - `mu`: Expected asset returns the total mean reads, or `nothing` for the model's own.
   - `fam`: Family label of each factor, or `nothing` for no family axis.
+  - `lev`: Assets whose variance split the model does not identify, a Leverage-One Pair at one row or more, or `nothing` for none. A prior method reads it off the `h1` field of a cross-sectional fit, through [`attribution_marked_assets`](@ref).
+  - `h1`: Leverage-one mask, `observations × assets`, on the observations of `eps`, or `nothing` for none.
   - `f`: Factor returns, `observations × factors`.
   - `eps`: Idiosyncratic returns, `observations × assets`, `NaN` at a pair the model does not decompose.
   - `lag`: Number of observations by which the exposures lag the returns.
@@ -1620,7 +1489,9 @@ function factor_attribution(w::VecNum, pr::AbstractPriorResult;
     rr, fpr = blk.rr, blk.fpr
     return factor_attribution(w, rr.M, fpr.sigma, attribution_idiosyncratic_covariance(rr);
                               mu_f = fpr.mu, b = rr.b, sigma = pr.sigma, mu = pr.mu,
-                              fam = attribution_families(rr), kwargs...)
+                              fam = attribution_families(rr),
+                              lev = attribution_marked_assets(attribution_leverage_marks(rr)),
+                              kwargs...)
 end
 function factor_attribution(res::OptimisationResult, pr::Option{<:Pr_RR} = nothing;
                             kwargs...)::FactorAttributionResult
@@ -1660,7 +1531,8 @@ function attribution_block_arrays(rr::AbstractLoadingsRegressionResult,
             rw = attribution_regression_weights(rr),
             vs = attribution_idiosyncratic_variances(rr),
             fcb = attribution_family_basis(rr), no = attribution_observed_count(rr),
-            fam = attribution_families(rr), attribution_row_key(rr)...)
+            fam = attribution_families(rr), h1 = attribution_leverage_marks(rr),
+            attribution_row_key(rr)...)
 end
 """
     attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
@@ -1705,12 +1577,13 @@ function attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
                                  rw::Option{<:MatNum} = nothing,
                                  vs::Option{<:MatNum} = nothing,
                                  fcb::Option{<:FactorFamilyBasis} = nothing,
-                                 observed::Integer = 0, fam::Option{<:VecStr} = nothing)
+                                 observed::Integer = 0, fam::Option{<:VecStr} = nothing,
+                                 h1::Option{<:AbstractMatrix{Bool}} = nothing)
     @argcheck(lag >= zero(lag),
               DomainError(lag,
                           "the exposure lag must be non-negative: a negative lag pairs each return with an exposure from after it"))
     return (; B = B, f = f, eps = eps, lag = ifelse((B isa Arr3Num) | trim, lag, zero(lag)),
-            rw = rw, vs = vs, fcb = fcb, no = observed, fam = fam, idx = nothing,
+            rw = rw, vs = vs, fcb = fcb, no = observed, fam = fam, h1 = h1, idx = nothing,
             ts = nothing)
 end
 """
@@ -1748,10 +1621,11 @@ function attribution_array_model(B::MatNum, F::MatNum, d::VecNum_MatNum;
                                  b::Option{<:VecNum} = nothing,
                                  sigma::Option{<:MatNum} = nothing,
                                  mu::Option{<:VecNum} = nothing,
-                                 fam::Option{<:VecStr} = nothing)
+                                 fam::Option{<:VecStr} = nothing,
+                                 lev::Option{<:AbstractVector{Bool}} = nothing)
     return (; M = B, F = F, d = d, mu_f = something(mu_f, zeros(eltype(F), size(F, 1))),
             b = something(b, zeros(eltype(B), size(B, 1))), sigma = sigma, mu = mu,
-            fam = fam)
+            fam = fam, lev = lev)
 end
 """
     attribution_array_mask(mdl::NamedTuple) -> Option{BitVector}
@@ -1908,9 +1782,12 @@ function predicted_attribution(w::VecNum, mdl::NamedTuple; assets::Bool = false,
     @argcheck(all(isfinite, F) & all(isfinite, mu_f),
               IsNonFiniteError("the factor covariance and the expected factor returns describe every factor of the model, so every entry of them must be finite."))
     assert_attribution_assets(w, size(mdl.M, 1))
+    kinds = attribution_unknown_kinds(unknown)
+    ust = kinds.unstated
     attribution_investable_diagnostic(w, attribution_array_mask(mdl), strict,
-                                      attribution_unknown_note(unknown))
-    keep = attribution_unknown_keep(unknown, w)
+                                      attribution_unknown_note(ust))
+    keep = attribution_unknown_keep(ust, w)
+    lv = attribution_leverage_split(kinds.leverage, mdl.lev, w, mdl.M)
     M = attribution_unknown_rows(mdl.M, keep)
     bp = attribution_unknown_rows(mdl.b, keep)
     D = attribution_idiosyncratic_matrix(attribution_unknown_block(mdl.d, keep))
@@ -1948,15 +1825,17 @@ function predicted_attribution(w::VecNum, mdl::NamedTuple; assets::Bool = false,
                                 for k in eachindex(Fb)], bexp .* Fb ./ sigma_p .* sc.s2,
                                bexp .* Fb ./ total_var, mu_f .* sc.s1,
                                bexp .* mu_f .* sc.s1, nothing)
+    sys, idio, fbd = attribution_leverage_nan.(Ref(lv), (sys, idio, fbd))
     fmbd = attribution_family_axis(mdl.fam, fbd, nothing, nothing)
     abd, afc = predicted_attribution_assets(assets, w,
                                             (; md...,
-                                             Mr = attribution_standalone(unknown, mdl.M),
-                                             bpr = attribution_standalone(unknown, mdl.b),
-                                             er = attribution_standalone(unknown, mdl.d)),
-                                            Fb, sigma_p, sc)
-    return FactorAttributionResult(sys, idio, unattr, total, fbd, fmbd, abd, afc, false,
-                                   ppy)
+                                             Mr = attribution_standalone(ust, mdl.M),
+                                             bpr = attribution_standalone(ust, mdl.b),
+                                             er = attribution_standalone(ust, mdl.d)), Fb,
+                                            sigma_p, sc)
+    return FactorAttributionResult(sys, idio, unattr, total, fbd, fmbd,
+                                   attribution_leverage_nan(lv, abd),
+                                   attribution_leverage_nan(lv, afc), false, ppy)
 end
 """
     predicted_attribution_assets(assets::Bool, w, mdl::NamedTuple, Fb, sigma_p, sc)
@@ -2073,7 +1952,7 @@ end
 
 export AttributionComponent, AttributionBreakdown, AssetAttributionBreakdown,
        AssetFactorContribution, FactorAttributionResult, factor_attribution,
-       EntrywiseUnknown, ZeroUnknown
+       EntrywiseUnknown, ZeroUnknown, KindwiseUnknown
 public AbstractUnknownEntryRule
 """
     attribution_key_align(blk::NamedTuple, T::Integer, key::Nothing)

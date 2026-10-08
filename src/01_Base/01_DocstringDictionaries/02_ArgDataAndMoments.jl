@@ -219,5 +219,5 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # The benchmark weights of a Factor Exposure.
                  :strict_bw => "`strict`: If `true`, a benchmark weight that is not finite on an active cell raises an `ArgumentError`. If `false`, it reads as zero, and a warning names the cells.",#
                  # The factor attribution.
-                 :unknown_att => "`unknown`: Rule for an entry the factor model does not state, a subtype of [`AbstractUnknownEntryRule`](@ref). [`EntrywiseUnknown`](@ref) gives `NaN` for every number that reads one, and [`ZeroUnknown`](@ref) reads it as zero.",#
+                 :unknown_att => "`unknown`: Rule for an entry the factor model does not state, and for the variance split of a Leverage-One Pair, a subtype of [`AbstractUnknownEntryRule`](@ref). [`EntrywiseUnknown`](@ref) gives `NaN` for every number that reads one, [`ZeroUnknown`](@ref) reads it as zero, and [`KindwiseUnknown`](@ref) applies one rule to each kind.",#
                  :trim_att => "`trim`: Whether a static loadings matrix drops the first `lag` observations, as an exposure history with the same lag does. A static matrix reads every observation otherwise.")

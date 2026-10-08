@@ -314,6 +314,7 @@ Builds a factor model mapping factor returns to asset returns, underpinning fact
 **Cross-Sectional Regression**
 A regression of one observation's asset returns on the lagged Factor Exposures across the assets, one fit per observation.
 A **Leverage-One Pair** is an asset whose exposures give it a direction of the design of its own at one observation, such as the only member of a level of a one-hot factor: the fit reproduces its return, so its idiosyncratic return is zero by construction and states nothing about its specific risk. The fit marks it in `h1`, a least-squares fit writes an exact zero residual there, and the idiosyncratic diagnostics leave it out (#1423).
+A Factor Attribution reads its total as exact and its split between the systematic and the idiosyncratic part as unknown, the opposite of an asset in the warm-up of its variance: under the default Unknown Entry Rule every variance number that reads the split of a held pair is `NaN`, and the means keep their values (ADR 0113, amendment of #1579).
 *Avoid*: Regression Estimator (above), whose families fit one asset at a time over the observations.
 
 **Descriptor**
@@ -1091,6 +1092,7 @@ The part of a Factor Attribution that the factor model does not explain: what is
 
 **Unknown Entry Rule**
 What a Factor Attribution does with an entry of the factor model that the Prior Result does not state, such as the idiosyncratic variance of a held asset in the warm-up of its variance. `EntrywiseUnknown`, the default, keeps every entry the prior states and gives `NaN` for every number that reads one it does not, so the exposures and the systematic numbers of such a holding stay exact while its total and every share of the portfolio volatility are unknown. `ZeroUnknown` reads every unknown entry, and every absent return in the standalone moments of the asset axis, as zero, which understates the variance. An entry of an asset with a weight of zero adds nothing under either rule. ADR 0113, amendment of #1515.
+The variance split of a held Leverage-One Pair is a second kind of unknown entry. `KindwiseUnknown(; unstated, leverage)` holds one rule per kind, and each preset applies to both kinds: `EntrywiseUnknown` gives `NaN` for the split, and `ZeroUnknown` reads it as fitted, wholly systematic, as the oracle does. ADR 0113, amendment of #1579.
 A held pair with no return at an active cell is a holiday, whose return is exactly zero, so the realised attribution fills it with no message. A held pair outside the active span is not, and it warns, or refuses under `strict`.
 *Avoid*: reading `ZeroUnknown` as the conservative choice: a zero variance is a lower bound, not an estimate. *Avoid*: an Investable Mask, which says which assets a prior estimated; this rule says what an attribution does with a holding the mask left out.
 

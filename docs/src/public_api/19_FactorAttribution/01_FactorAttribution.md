@@ -13,5 +13,6 @@ AssetFactorContribution
 FactorAttributionResult
 EntrywiseUnknown
 ZeroUnknown
+KindwiseUnknown
 factor_attribution
 ```

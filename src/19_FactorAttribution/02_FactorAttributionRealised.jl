@@ -171,7 +171,8 @@ function attribution_align(blk::NamedTuple, T::Integer)
     return (; B = za.B, f = attribution_finite(f[brows, :]), eps = za.eps, act = za.act,
             rw = attribution_finite_rows(attribution_trim_rows(blk.rw, brows)),
             vs = attribution_trim_rows(blk.vs, brows),
-            fcb = attribution_trim_basis(blk.fcb, Tb - lag), rows = rows, no = blk.no)
+            fcb = attribution_trim_basis(blk.fcb, Tb - lag), rows = rows, no = blk.no,
+            h1 = attribution_trim_rows(blk.h1, brows))
 end
 """
     attribution_trim_exposures(B::MatNum, lag::Integer)
@@ -375,7 +376,8 @@ function attribution_window(al::NamedTuple, rows)
             eps = al.eps[rows, :], act = al.act[rows, :],
             rw = attribution_trim_rows(al.rw, rows),
             vs = attribution_trim_rows(al.vs, rows),
-            fcb = attribution_window_basis(al.fcb, rows), rows = rows, no = al.no)
+            fcb = attribution_window_basis(al.fcb, rows), rows = rows, no = al.no,
+            h1 = attribution_trim_rows(al.h1, rows))
 end
 """
     attribution_window_exposures(B::MatNum, rows)
@@ -648,6 +650,8 @@ function realised_attribution(W::VecNum_MatNum, ret::VecNum, al::NamedTuple,
     Tf = promote_type(real(eltype(f)), real(eltype(ret)), real(eltype(W)),
                       real(eltype(al.B)))
     sc = attribution_scale(ppy, zero(Tf))
+    kinds = attribution_unknown_kinds(unknown)
+    lv = attribution_leverage_split(kinds.leverage, al.h1, W, al.B)
     g = Matrix{Tf}(undef, T, K)
     sysr = Matrix{Tf}(undef, T, N)
     mag = Vector{Tf}(undef, T)
@@ -680,10 +684,13 @@ function realised_attribution(W::VecNum_MatNum, ret::VecNum, al::NamedTuple,
                                f_var_contrib ./ total_vol^2,
                                vec(mean(f; dims = 1)) .* sc.s1,
                                vec(mean(fpnl; dims = 1)) .* sc.s1, sers.factor)
+    sys, idio, fbd = attribution_leverage_nan.(Ref(lv), (sys, idio, fbd))
     fmbd = attribution_family_axis(fam, fbd, attribution_family_spread(fam, g), sers.family)
     abd, afc = realised_attribution_assets(assets, W, al, sysr, ret, total_vol, sc, wm,
-                                           unknown)
-    return FactorAttributionResult(sys, idio, unattr, total, fbd, fmbd, abd, afc, true, ppy)
+                                           kinds.unstated)
+    return FactorAttributionResult(sys, idio, unattr, total, fbd, fmbd,
+                                   attribution_leverage_nan(lv, abd),
+                                   attribution_leverage_nan(lv, afc), true, ppy)
 end
 """
     attribution_remainder(u::VecNum, mag::VecNum, n::Integer)

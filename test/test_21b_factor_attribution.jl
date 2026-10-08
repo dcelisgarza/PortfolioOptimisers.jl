@@ -1003,12 +1003,15 @@ end
     pr, rd = fa_prior()
     # The same panel with no timestamps, so the folds match the block by position alone.
     rdn = ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, pnl = rd.pnl)
+    # A path that holds a Leverage-One Pair has a `NaN` split on both routes (#1579), and two
+    # `NaN` are no gap.
+    d(x, y) = isequal(x, y) ? zero(x) : x - y
     gap(a, b) = maximum(abs,
-                        [a.total.vol - b.total.vol;
-                         a.sys.vol_contrib - b.sys.vol_contrib;
-                         a.idio.vol_contrib - b.idio.vol_contrib;
-                         a.sys.mu_contrib - b.sys.mu_contrib;
-                         a.fbd.vol_contrib - b.fbd.vol_contrib])
+                        [d(a.total.vol, b.total.vol);
+                         d(a.sys.vol_contrib, b.sys.vol_contrib);
+                         d(a.idio.vol_contrib, b.idio.vol_contrib);
+                         d(a.sys.mu_contrib, b.sys.mu_contrib);
+                         d.(a.fbd.vol_contrib, b.fbd.vol_contrib)])
     # The one call on a path against the bare-array route over the data rows its folds name.
     # Data row `t` is block row `t - 1`, its exposures are those of the row before, and rows 1
     # and 2 have none, so the bare route starts at row 3.
@@ -1019,7 +1022,8 @@ end
         k = findall(>=(3), rows)
         br = rows[k] .- 1
         ref = factor_attribution(W[k, :], blk.B[br .- blk.lag, :, :], blk.f[br, :],
-                                 blk.eps[br, :], ret[k]; lag = 0, fam = blk.fam)
+                                 blk.eps[br, :], ret[k]; lag = 0, fam = blk.fam,
+                                 h1 = blk.h1[br, :])
         return gap(factor_attribution(mp, prr), ref)
     end
     opt = EqualWeighted()

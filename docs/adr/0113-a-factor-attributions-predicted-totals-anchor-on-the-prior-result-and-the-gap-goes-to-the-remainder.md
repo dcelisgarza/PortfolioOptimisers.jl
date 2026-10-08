@@ -185,3 +185,40 @@ before it, and a static matrix has no time index, so a lag means nothing for it.
 realised method no longer cuts `lag` rows of a static matrix, as the oracle does not. `trim = true`
 keeps the one use of the cut, a common sample with a run on an exposure history. A negative lag
 still refuses, because it pairs a return with an exposure from after it.
+
+## Amendment (2026-10-08, #1579)
+
+**A Leverage-One Pair is a second kind of unknown entry (#1577).** A pair that the fit marks in `h1`
+has a direction of the design of its own, for example the only member of a level of a one-hot
+family. At its row the data identify only the sum of the factor return of that direction and the
+own return of the asset, so every own variance from zero upwards fits the data equally well. The
+total of the pair is exact, and its split between the systematic and the idiosyncratic part is not
+identified. This is the opposite of an asset in the warm-up of its variance, whose split is exact
+up to its unknown idiosyncratic part. The oracle reads the split as fitted and reports such a pair
+as wholly systematic.
+
+**The rule keyword holds one rule per kind.** `unknown` stays the one keyword of the rule.
+`EntrywiseUnknown()` and `ZeroUnknown()` stay presets that apply one rule to every kind.
+`KindwiseUnknown(; unstated, leverage)` holds the rule of each kind in a field: `unstated` is the
+meaning this ADR gave the rule before, and `leverage` is the split of a Leverage-One Pair. No
+`Bool` or `Symbol` keyword is added. A singleton type holds more than two rules, a rule can carry a
+value later (#1578), a misspelt rule fails at the call site, and users can subtype it.
+
+**Under `EntrywiseUnknown` the split of a held pair is `NaN`.** The volatility, the volatility
+contribution, the variance share and the correlation of the systematic and the idiosyncratic
+component are `NaN`, and so are those of the factor whose only member is the pair, and the
+systematic and idiosyncratic volatility contributions of the asset. The total, the remainder and
+every mean keep their values, because the own return has an expected value of zero. The realised
+side marks a pair at each row the portfolio holds it. The predicted side marks an asset that the
+fit marks at any row, because the factor covariance reads the factor returns of every row. A
+portfolio with a weight of zero at every marked pair is unchanged. `ZeroUnknown` for the `leverage`
+kind reproduces the oracle.
+
+**A GLM fit marks the same pairs.** `h1` tests the column space of the weighted design, and a
+positive weight does not change it. Under any link the fit sets the fitted mean of the pair to its
+return, so the level absorbs the own return, and the split is not identified there either. The rule
+reads `h1` for every fit.
+
+**The standard errors follow in #1580.** Under the default every standard error whose sandwich
+gives a held pair a coefficient that is not zero becomes `NaN`. Until #1580 lands the sandwich
+reads the plug-in variance, which is the oracle's.
