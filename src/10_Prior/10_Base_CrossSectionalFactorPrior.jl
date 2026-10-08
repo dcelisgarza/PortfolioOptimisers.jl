@@ -277,6 +277,34 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Return the rows of the returns data that one member of a factor list reads to give its Factor Exposures at the last `m` rows.
+
+The exposure of a row reads the last [`lookback`](@ref) rows of the panel, so the last `m` rows read the last `lookback(xe) + m - 1` of them. A member whose look-back is `nothing` reads every row.
+
+# Arguments
+
+  - `xe`: Exposure Estimator.
+  - $(arg_dict[:rd]) It carries the Asset Panel the member reads.
+  - `m`: Number of last rows whose exposures the member gives.
+
+# Returns
+
+  - `rdi::ReturnsResult`: `rd` when the member reads every row, or a view of its last `k` rows.
+  - `k::Int`: Number of rows of `rdi`.
+
+# Related
+
+  - [`lookback`](@ref)
+  - [`cross_sectional_exposure_history`](@ref)
+"""
+function cross_sectional_exposure_rows(xe, rd::ReturnsResult, m::Integer)
+    T = size(rd.X, 1)
+    k = min(T, something(lookback(xe), T) + m - 1)
+    return (; rdi = k == T ? rd : port_opt_view(rd, (T - k + 1):T, :), k = k)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Build the exposure history of a factor list, and the factor axis it is written on.
 
 # Algorithm
@@ -284,13 +312,15 @@ Build the exposure history of a factor list, and the factor axis it is written o
  1. Read the factor axis with [`cross_sectional_factor_axis`](@ref), and the column count of each factor with [`cross_sectional_exposure_widths`](@ref).
  2. Take the dependency layers with [`cross_sectional_exposure_order`](@ref).
  3. Compute the layers in order, and the members of one layer under `ex` through [`cross_sectional_foreach`](@ref). Give a [`DerivedExposure`](@ref) the exposure of its source, which an earlier layer has already written. Each member writes its own columns of `Ms`, so every executor gives the same history.
- 4. Write each Factor Exposure into `Ms` with [`cross_sectional_exposure_write!`](@ref). `Ms` takes the element type `float_if_integer(real(eltype(X)))`, so integer returns give a float history that can hold a fractional exposure and the `NaN` of an inactive cell.
+ 4. When `n` is an integer, give each member the rows of `rd` that [`cross_sectional_exposure_rows`](@ref) names, and keep the last `n` rows of its exposure. Those rows equal the rows of the exposure over every row of `rd`. A [`DerivedExposure`](@ref) has a look-back of one, so it reads the `n` rows of its source that `Ms` holds.
+ 5. Write each Factor Exposure into `Ms` with [`cross_sectional_exposure_write!`](@ref). `Ms` takes the element type `float_if_integer(real(eltype(X)))`, so integer returns give a float history that can hold a fractional exposure and the `NaN` of an inactive cell.
 
 # Arguments
 
   - `factors`: Pairs of `factor name => Exposure Estimator`.
   - $(arg_dict[:rd]) It carries the Asset Panel every member reads.
   - $(arg_dict[:ex]) It computes the members of one dependency layer.
+  - `n`: Number of last rows of `rd` to compute, or `nothing` for every row. The carry fold of a [`CrossSectionalFactorPrior`](@ref) gives the number of rows of a step.
 
 # Validation
 
@@ -299,7 +329,7 @@ Build the exposure history of a factor list, and the factor axis it is written o
 
 # Returns
 
-  - `Ms::Array{<:Real, 3}`: The exposure history, `observations × assets × factors`.
+  - `Ms::Array{<:Real, 3}`: The exposure history, `observations × assets × factors`, of the last `n` rows of `rd`, or of every row.
   - `nf::Vector{String}`: Name of each factor.
   - `fam::Vector{String}`: Family label of each factor.
 
@@ -307,11 +337,13 @@ Build the exposure history of a factor list, and the factor axis it is written o
 
   - [`factor_exposure`](@ref)
   - [`cross_sectional_factor_axis`](@ref)
+  - [`cross_sectional_exposure_rows`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
 function cross_sectional_exposure_history(factors::AbstractVector{<:Pair},
                                           rd::ReturnsResult,
-                                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())
+                                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx();
+                                          n::Option{<:Integer} = nothing)
     (; nf, fam) = cross_sectional_factor_axis(factors, rd)
     wid = cross_sectional_exposure_widths(factors, rd)
     lay, src = cross_sectional_exposure_order(factors)
@@ -323,102 +355,25 @@ function cross_sectional_exposure_history(factors::AbstractVector{<:Pair},
         end
     end
     X = rd.X
+    m = something(n, size(X, 1))
     Tf = float_if_integer(real(eltype(X)))
-    Ms = Array{Tf, 3}(undef, size(X, 1), size(X, 2), length(nf))
+    Ms = Array{Tf, 3}(undef, m, size(X, 2), length(nf))
     for cur in lay
         cross_sectional_foreach(ex, cur) do i
             nm = String(first(factors[i]))
             xe = last(factors[i])
+            (; rdi, k) = cross_sectional_exposure_rows(xe, rd, m)
             # A derived member reads a copy of its source, which an earlier layer wrote.
             A = if src[i] > 0
-                factor_exposure(xe, rd, Ms[:, :, col[src[i]]])
+                factor_exposure(xe, rdi, Ms[:, :, col[src[i]]])
             else
-                factor_exposure(xe, rd)
+                factor_exposure(xe, rdi)
             end
-            return cross_sectional_exposure_write!(Ms, A, col[i], wid[i], nm)
+            return cross_sectional_exposure_write!(Ms, selectdim(A, 1, (k - m + 1):k),
+                                                   col[i], wid[i], nm)
         end
     end
     return (; Ms = Ms, nf = nf, fam = fam)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return whether one asset carries a finite Factor Exposure to every factor at one observation.
-
-# Arguments
-
-  - `Ms`: The exposure history, `observations × assets × factors`.
-  - `t`: The observation.
-  - `i`: The asset.
-
-# Returns
-
-  - `ans::Bool`: Whether every exposure of the pair is finite.
-
-# Related
-
-  - [`cross_sectional_warmup`](@ref)
-  - [`cross_sectional_eligible`](@ref)
-"""
-function cross_sectional_exposures_finite(Ms::Arr3Num, t::Integer, i::Integer)::Bool
-    for k in axes(Ms, 3)
-        if !isfinite(Ms[t, i, k])
-            return false
-        end
-    end
-    return true
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the number of leading observations a Cross-Sectional Factor Prior discards.
-
-A Descriptor warms up, so the first observations of an exposure history carry no usable asset. An observation is cold when no asset of the estimation universe carries both a finite return and a finite Factor Exposure to every factor. The prior fits from the first observation that is not cold.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-n &= \\min\\left\\{t : \\exists\\, i,\\ e_{ti} = 1,\\ x_{t,\\,i} \\in \\mathbb{R},\\ B_{tik} \\in \\mathbb{R} \\ \\forall k \\in \\{1, \\ldots, K\\}\\right\\} - 1\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``n``: Count of the leading cold observations.
-  - $(math_dict[:e_ti_pnl])
-  - $(math_dict[:x_ti_ret])
-  - $(math_dict[:B_tik_cs])
-  - $(math_dict[:K])
-
-# Arguments
-
-  - `X`: Asset returns, `observations × assets`.
-  - `Ms`: The exposure history, `observations × assets × factors`.
-  - `emsk`: The estimation mask, `observations × assets`.
-
-# Validation
-
-  - At least one observation is not cold. Raises an `ArgumentError`.
-
-# Returns
-
-  - `n::Int`: The count of leading cold observations.
-
-# Related
-
-  - [`cross_sectional_exposure_history`](@ref)
-  - [`CrossSectionalFactorPrior`](@ref)
-"""
-function cross_sectional_warmup(X::MatNum, Ms::Arr3Num, emsk::AbstractMatrix{Bool})::Int
-    for t in axes(Ms, 1)
-        for i in axes(Ms, 2)
-            if emsk[t, i] && isfinite(X[t, i]) && cross_sectional_exposures_finite(Ms, t, i)
-                return t - 1
-            end
-        end
-    end
-    return throw(ArgumentError("no observation of this Asset Panel carries an asset of the estimation universe with both a finite return and a finite Factor Exposure to every factor, so the whole history is Descriptor warm-up. Give more observations, or shorten the warm-up of the Descriptors."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

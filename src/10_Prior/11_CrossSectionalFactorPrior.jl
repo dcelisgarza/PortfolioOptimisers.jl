@@ -1081,6 +1081,86 @@ function cross_sectional_forecast_block(csfm::CrossSectionalFactorModel, sp::Nam
                                      lambda = lambda, c = c, idx = csfm.idx, ts = csfm.ts)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return whether one asset carries a finite Factor Exposure to every factor at one observation.
+
+# Arguments
+
+  - `Ms`: The exposure history, `observations × assets × factors`.
+  - `t`: The observation.
+  - `i`: The asset.
+
+# Returns
+
+  - `ans::Bool`: Whether every exposure of the pair is finite.
+
+# Related
+
+  - [`cross_sectional_warmup`](@ref)
+  - [`cross_sectional_eligible`](@ref)
+"""
+function cross_sectional_exposures_finite(Ms::Arr3Num, t::Integer, i::Integer)::Bool
+    for k in axes(Ms, 3)
+        if !isfinite(Ms[t, i, k])
+            return false
+        end
+    end
+    return true
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the number of leading observations a Cross-Sectional Factor Prior discards.
+
+A Descriptor warms up, so the first observations of an exposure history carry no usable asset. An observation is cold when no asset of the estimation universe carries both a finite return and a finite Factor Exposure to every factor. The prior fits from the first observation that is not cold.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+n &= \\min\\left\\{t : \\exists\\, i,\\ e_{ti} = 1,\\ x_{t,\\,i} \\in \\mathbb{R},\\ B_{tik} \\in \\mathbb{R} \\ \\forall k \\in \\{1, \\ldots, K\\}\\right\\} - 1\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``n``: Count of the leading cold observations.
+  - $(math_dict[:e_ti_pnl])
+  - $(math_dict[:x_ti_ret])
+  - $(math_dict[:B_tik_cs])
+  - $(math_dict[:K])
+
+# Arguments
+
+  - `X`: Asset returns, `observations × assets`.
+  - `Ms`: The exposure history, `observations × assets × factors`.
+  - `emsk`: The estimation mask, `observations × assets`.
+
+# Validation
+
+  - At least one observation is not cold. Raises an `ArgumentError`.
+
+# Returns
+
+  - `n::Int`: The count of leading cold observations.
+
+# Related
+
+  - [`cross_sectional_exposure_history`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function cross_sectional_warmup(X::MatNum, Ms::Arr3Num, emsk::AbstractMatrix{Bool})::Int
+    for t in axes(Ms, 1)
+        for i in axes(Ms, 2)
+            if emsk[t, i] && isfinite(X[t, i]) && cross_sectional_exposures_finite(Ms, t, i)
+                return t - 1
+            end
+        end
+    end
+    return throw(ArgumentError("no observation of this Asset Panel carries an asset of the estimation universe with both a finite return and a finite Factor Exposure to every factor, so the whole history is Descriptor warm-up. Give more observations, or shorten the warm-up of the Descriptors."))
+end
+"""
     cross_sectional_exposure_stage(pe::CrossSectionalFactorPrior, X::MatNum,
                                    F::Option{<:MatNum}, pnl::AssetPanel;
                                    ne::Option{<:VecStr} = nothing,
@@ -1145,11 +1225,12 @@ end
                                     iv::Option{<:MatNum} = nothing,
                                     ivpa::Option{<:Num_VecNum} = nothing,
                                     kept::Option{<:NamedTuple} = nothing,
-                                    g0::Integer = 0) -> NamedTuple
+                                    g0::Integer = 0,
+                                    n::Option{<:Integer} = nothing) -> NamedTuple
 
 Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that give a value per observation: the benchmark weights, the observed factors, the returns that the regression reads, and the exposure history.
 
-[`cross_sectional_exposure_stage`](@ref) runs it over every observation, and then drops the Descriptor warm-up. The carry fold runs it over the rows that it carries and the rows of a step. The returns net of the observed factors are derived series: the batch fit derives each row from the observed exposures of the row `pe.lag` observations before it, and the first `pe.lag` rows of the sample from the exposure of the same row. So the carry gives the derived rows of its carried rows in `kept`, and the function derives the rows of the step alone.
+[`cross_sectional_exposure_stage`](@ref) runs it over every observation, and then drops the Descriptor warm-up. The carry fold runs it over the rows that it carries and the rows of a step. The returns net of the observed factors are derived series: the batch fit derives each row from the observed exposures of the row `pe.lag` observations before it, and the first `pe.lag` rows of the sample from the exposure of the same row. So the carry gives the derived rows of its carried rows in `kept`, and the function derives the rows of the step alone. The carry gives the number of rows of the step in `n` too, so the exposure history holds those rows alone.
 
 # Algorithm
 
@@ -1169,6 +1250,7 @@ Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that give a v
   - `ivpa`: Implied-volatility risk-premium adjustment, written onto the rebuilt returns data.
   - `kept`: The derived rows of the first rows of `X`, `(; Xn, Xl)` as the field `der` of a [`CrossSectionalCarryState`](@ref) holds them, or `nothing`.
   - `g0`: Number of observations before the first row of `X`.
+  - `n`: Number of last rows of `X` whose exposure history to compute, or `nothing` for every row. The carry fold gives the number of rows of a step.
 
 # Validation
 
@@ -1176,7 +1258,7 @@ Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that give a v
 
 # Returns
 
-  - `st::NamedTuple`: The fields `amsk` and `emsk`, the active mask and the estimation mask; `mcap`, the market capitalisation or `nothing`; `BW`, the benchmark weights; `Xu`, the returns that the universe and the warm-up read; `cc`, the observed factors or `nothing`; `Xl`, the returns the regression reads; `rde`, the returns data that the estimated members read; and `Ms`, `nf` and `fam`, the exposure history of the estimated factors with their names and Factor Family labels.
+  - `st::NamedTuple`: The fields `amsk` and `emsk`, the active mask and the estimation mask; `mcap`, the market capitalisation or `nothing`; `BW`, the benchmark weights; `Xu`, the returns that the universe and the warm-up read; `cc`, the observed factors or `nothing`; `Xl`, the returns the regression reads; `rde`, the returns data that the estimated members read; and `Ms`, `nf` and `fam`, the exposure history of the estimated factors over the last `n` rows or every row, with their names and Factor Family labels.
 
 # Related
 
@@ -1192,7 +1274,7 @@ function cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNu
                                          iv::Option{<:MatNum} = nothing,
                                          ivpa::Option{<:Num_VecNum} = nothing,
                                          kept::Option{<:NamedTuple} = nothing,
-                                         g0::Integer = 0)
+                                         g0::Integer = 0, n::Option{<:Integer} = nothing)
     (; amsk, emsk, mcap, BW, rdb, Xu) = cross_sectional_benchmark_stage(pe, X, F, pnl;
                                                                         ne = ne, E = E,
                                                                         iv = iv,
@@ -1207,7 +1289,7 @@ function cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNu
         ReturnsResult(; nx = rdb.nx, X = Xl, nf = rdb.nf, F = rdb.F, ne = rdb.ne, E = rdb.E,
                       iv = rdb.iv, ivpa = rdb.ivpa, pnl = rdb.pnl)
     end
-    (; Ms, nf, fam) = cross_sectional_exposure_history(est, rde, pe.ex)
+    (; Ms, nf, fam) = cross_sectional_exposure_history(est, rde, pe.ex; n = n)
     return (; amsk = amsk, emsk = emsk, mcap = mcap, BW = BW, Xu = Xu, cc = cc, Xl = Xl,
             rde = rde, Ms = Ms, nf = nf, fam = fam)
 end

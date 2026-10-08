@@ -870,7 +870,7 @@ The exposures of an observation read the last [`lookback`](@ref) rows of the pan
 
 # Algorithm
 
- 1. Run [`cross_sectional_exposure_series`](@ref) over the rows, with the derived series of the carried rows that the state holds. It gives the benchmark weights, the observed factors, the returns net of them and the exposures of the estimated factors, and it derives the rows of the step alone.
+ 1. Run [`cross_sectional_exposure_series`](@ref) over the rows, with the derived series of the carried rows that the state holds. It gives the benchmark weights, the observed factors, the returns net of them and the exposures of the estimated factors. It derives the rows of the step alone, and it computes the exposures of the `n` rows of the step alone, each from the last [`lookback`](@ref) rows that the member reads.
  2. Take the last `n` rows. Before the warm-up ends, drop the rows before the first one with an eligible asset on the estimated and the observed exposures together, as [`cross_sectional_warmup`](@ref) does.
  3. Neutralise the exposures of the rows that remain with [`cross_sectional_neutralise!`](@ref).
 
@@ -901,15 +901,20 @@ function cross_sectional_fold_rows(pe::CrossSectionalFactorPrior,
                                                                                         ne = win.ne,
                                                                                         E = win.E,
                                                                                         kept = st.der,
-                                                                                        g0 = g0)
+                                                                                        g0 = g0,
+                                                                                        n = n)
+    # `Ms` holds the last `n` rows of `win` alone: row `p[j]` of `Ms` is row `q[j]` of `win`.
     T = size(win.X, 1)
     q = (T - n + 1):T
+    p = 1:n
     if isnothing(st.Ms)
-        Mo = isnothing(cc) ? Ms[q, :, :] : cat(Ms[q, :, :], cc.Z[q, :, :]; dims = 3)
+        Mo = isnothing(cc) ? Ms : cat(Ms, cc.Z[q, :, :]; dims = 3)
         elig = cross_sectional_eligible(Xu[q, :], Mo, emsk[q, :])
-        q = q[something(findfirst(any, eachrow(elig)), length(q) + 1):end]
+        s = something(findfirst(any, eachrow(elig)), n + 1)
+        q = q[s:end]
+        p = p[s:end]
     end
-    Msn = Ms[q, :, :]
+    Msn = Ms[p, :, :]
     bwn = BW[q, :]
     if !isempty(q)
         cross_sectional_neutralise!(pe.neutralise, Msn, pe.cre, bwn, nf, fam)

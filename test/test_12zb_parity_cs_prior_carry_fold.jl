@@ -256,12 +256,16 @@ end
                    "value" => CompositeExposure(; descriptors = [BookToPrice()]),
                    "industry" => OneHotExposure(; field = "industry", family = "industry")]
         ew = vcat(bounded, ["beta" => CompositeExposure(; descriptors = [EWMarketBeta()])])
+        # A step computes the exposures of its rows alone, each from the rows that its member
+        # reads (#1563). A derived member reads the rows of its source that the step computes.
+        derived = vcat(bounded,
+                       ["value2" => DerivedExposure(; source = "value", f = x -> x .^ 2)])
         # The first block lies inside the Descriptor warm-up, and the next ones are too short
         # for the factor prior, so the fold refuses where the batch fit refuses, with the same
         # type of error. Inside the warm-up the batch fit refuses in its warm-up and the fold at
         # its call with no data, so the two messages differ there.
         e = (0, 10, 40, 41, 80, 81, 120, 160)
-        for (factors, kept) in ((bounded, 22), (ew, 160))
+        for (factors, kept) in ((bounded, 22), (ew, 160), (derived, 22))
             pe = CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                            families = ["industry" => nothing], minra = 5,
                                            pe = GRID_PE, ve = GRID_VE)
@@ -272,9 +276,10 @@ end
                     err
                 end
                 if isa(b, LowOrderPrior)
-                    # Measured 1.3e-15 on the bounded case: a rolling return over the cut
-                    # rows is a difference of cumulative sums from another first row (#1470).
-                    # Exactly zero on the unbounded case.
+                    # Measured 8.3e-16 on the bounded case, 6.9e-16 on the EW case and
+                    # 2.4e-15 on the derived case: a rolling return over the cut rows is a
+                    # difference of cumulative sums from another first row (#1470). A step
+                    # cuts the rows of each member (#1563), so the EW case cuts it too.
                     @test relerr(x.pr.mu, b.mu) < 1e-14 &&
                           relerr(x.pr.sigma, b.sigma) < 1e-14
                     @test isequal(isnan.(x.pr.sigma), isnan.(b.sigma))
