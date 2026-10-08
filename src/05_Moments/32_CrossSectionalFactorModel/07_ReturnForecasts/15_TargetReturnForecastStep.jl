@@ -28,10 +28,7 @@ function target_forecast_folds(::Any, ::Any)::Bool
     return false
 end
 function folds_forecast_rows(rfe::TargetReturnForecast)::Bool
-    # Under `whole_history` with a horizon above one, a row of the Descriptor warm-up of the
-    # prior trains the fit, and the carry fold keeps the scores of no such row.
-    return target_forecast_folds(rfe.cv, rfe.tgt) &&
-           (!rfe.whole_history || isone(rfe.horizon))
+    return target_forecast_folds(rfe.cv, rfe.tgt)
 end
 function forecast_target_gap(rfe::TargetReturnForecast)::Integer
     return rfe.lag + rfe.horizon - 1

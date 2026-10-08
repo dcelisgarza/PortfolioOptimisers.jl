@@ -992,11 +992,11 @@ end
                                                                   half_life = 10.0))
         @test po.cross_sectional_carry_rows(pe) == 2
         check(pe, (0, 3, 4, 5, 6, 7, 8, 12, 40))
-        # A horizon above one under `whole_history` trains on rows of the Descriptor warm-up,
-        # and the carry keeps none, so the member refits from every row.
+        # A horizon above one under `whole_history` folds too (#1588), and the carry keeps the
+        # rows of the look-back alone.
         h2 = CrossSectionalFactorPrior(; fk..., factors = ind, rfe = tf(; horizon = 2))
-        @test !po.folds_forecast_rows(h2.rfe)
-        @test isnothing(po.cross_sectional_carry_rows(h2))
+        @test po.folds_forecast_rows(h2.rfe)
+        @test po.cross_sectional_carry_rows(h2) == 6
         # A slot that reads the history reads the rows of the fold: the row of an
         # observation is the forecast of a fit through that observation.
         rl, bl = CarryHistoryShrinkage(), CarryHistoryShrinkage()
@@ -1230,13 +1230,83 @@ end
         @test fitted == 2
         # A forecast that does not fold its rows reads the panel, so the state carries no
         # Descriptor Scores.
-        h2 = CrossSectionalFactorPrior(; fk..., factors = ind,
+        kf = CrossSectionalFactorPrior(; fk..., factors = ind,
                                        rfe = TargetReturnForecast(;
                                                                   scores = DescriptorScores(;
                                                                                             descriptors = [Reversal()]),
                                                                   half_life = 10.0,
-                                                                  horizon = 2))
-        @test isnothing(partial_fit!(h2, rows(rd, 1:90)).cache.fds)
+                                                                  cv = KFold()))
+        @test !po.folds_forecast_rows(kf.rfe)
+        @test isnothing(partial_fit!(kf, rows(rd, 1:90)).cache.fds)
+    end
+
+    @testset "A Target Return Forecast trains on rows of the warm-up and folds (#1588)" begin
+        # Under `whole_history` the member trains on the last `lag + horizon - 1` rows before
+        # the block, and the histories hold `pe.lag` of them. The state keeps the scores of the
+        # other rows, which are rows of the warm-up of the momentum factor, before its first
+        # row. A neutralised score is `NaN` before the block, so the rows train only under a
+        # rule of `ofit` that does not neutralise. Before #1588 a horizon above one refitted
+        # from every row, and a forecast lag above `pe.lag` lost the first of those rows: under
+        # `UnadjustedForecast` its `mu` differed from the batch fit by 2 to 12 per cent.
+        syn = synthetic_asset_panel(; n_assets = 60, n_observations = 160, n_industries = 4,
+                                    rng = StableRNG(1583)).rd
+        momentum = ["market" => ConstantExposure(),
+                    "momentum" => CompositeExposure(;
+                                                    descriptors = [RollingMomentum(; window = 40,
+                                                                                   skip = 5)]),
+                    "industry" => OneHotExposure(; field = "industry", family = "industry")]
+        rev = DescriptorScores(; descriptors = [Reversal(; window = 10), BookToPrice()])
+        tf(; kw...) = TargetReturnForecast(; scores = rev, half_life = 10.0, kw...)
+        wv = WindowedVariance(;
+                              ve = ExpWeightedVariance(; decay = 2.0^(-1 / 20),
+                                                       min_obs = 5), window = 60)
+        un = UnadjustedForecast()
+        # Steps of one row cross the end of the warm-up, so the rows that the state keeps come
+        # from several steps. The rolling variance fits every observation again at each step.
+        e = (0, 20, 41, 42, 43, 44, 45, 46, 47, 80, 120, 160)
+        for (cfg, a) in (((; ofit = un, rfe = tf(; horizon = 5)), 4),
+                         ((; ofit = un, ve = wv, rfe = tf(; horizon = 5)), 4),
+                         ((; ofit = OrthogonalPartCalibration(), rfe = tf(; horizon = 3, lag = 2)), 3),
+                         ((; ofit = un, lag = 2, rfe = tf(; horizon = 2, lag = 4)), 3),
+                         ((; ofit = un, rfe = tf(; lag = 3)), 2), ((; rfe = tf(; horizon = 5)), 4))
+            pe = CrossSectionalFactorPrior(; lambda = 1, factors = momentum,
+                                           families = ["industry" => nothing], minra = 5,
+                                           pe = GRID_PE, ve = GRID_VE, cfg...)
+            @test po.folds_forecast_rows(pe.rfe)
+            @test po.cross_sectional_forecast_lead(pe.rfe, pe.lag) == a
+            s = stream(pe, syn, e)
+            fitted = 0
+            for (k, x) in enumerate(s)
+                b = try
+                    batch(pe, k, syn, e)
+                catch err
+                    err
+                end
+                if isa(b, LowOrderPrior)
+                    fitted += 1
+                    rf, rb = x.pr.rr.rf, b.rr.rf
+                    @test same(x.pr.mu, b.mu) && same(x.pr.sigma, b.sigma)
+                    @test same(rf.mu, rb.mu) && rf.model.n == rb.model.n
+                    @test isequal(rf.calib, rb.calib) && isequal(rf.ocalib, rb.ocalib)
+                else
+                    @test typeof(x.pr) == typeof(b)
+                end
+            end
+            @test fitted == 2
+            st = last(s).pe.cache
+            @test size(st.fsc.S, 1) - size(st.Ms, 1) == a
+            @test size(st.win.X, 1) == po.cross_sectional_carry_rows(pe)
+        end
+        # The strict carry rule accepts the member, because it folds.
+        @test po.folds_forecast_rows(CrossSectionalFactorPrior(; factors = momentum,
+                                                               carry = FoldOnly(),
+                                                               rfe = tf(; horizon = 5)).rfe)
+        # The member that reads the block alone keeps no row of the warm-up.
+        @test po.cross_sectional_forecast_lead(tf(; horizon = 5, whole_history = false),
+                                               1) == 0
+        @test po.cross_sectional_forecast_lead(ExpWeightedReturnForecast(; scores = rev),
+                                               1) == 0
+        @test po.cross_sectional_forecast_lead(tf(; horizon = 2, lag = 1), 3) == 0
     end
 
     @testset "Refusals" begin

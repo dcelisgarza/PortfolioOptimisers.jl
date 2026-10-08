@@ -94,9 +94,10 @@ values.
   that the carry keeps: the normal equations, the model, the two calibration regressions, and the
   coefficients that predicted the observations whose target has not matured. So the carry keeps
   the panel rows of the look-back of the Descriptors alone, and the step and the batch fit do the
-  same arithmetic. Under `whole_history` with `horizon > 1`, a row of the Descriptor warm-up of
-  the prior trains the fit, and the carry keeps no such row, so the member refits over every row
-  there (`folds_forecast_rows` answers `false`).
+  same arithmetic. Under `whole_history`, the member trains on the last `lag + horizon - 1` rows
+  before the block. When that gap is longer than the lag of the prior, the first of those rows
+  are rows of the Descriptor warm-up of the prior, so the carry keeps their scores, once, before
+  the scores of its histories (#1588).
 - The forecast that the member publishes at an observation is the forecast of a fit through that
   observation. So the carry gives a slot that reads the Return Forecast history the rows of the
   fold, and fits no member again for it.

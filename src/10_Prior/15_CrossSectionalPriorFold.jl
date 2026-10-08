@@ -158,7 +158,7 @@ Keywords correspond to the struct's fields, and every field but `buf` and `tip` 
     """
     Sc
     """
-    The Descriptor scores of the Return Forecast at every observation after the warm-up, `(; S, w, g)` as [`descriptor_panel_scores`](@ref) states them, or `nothing` when the forecast does not compute its history one observation at a time, as [`folds_forecast_rows`](@ref) answers. A step appends the scores of its new observations, with [`cross_sectional_carry_scores`](@ref).
+    The Descriptor scores of the Return Forecast at every observation after the warm-up, `(; S, w, g)` as [`descriptor_panel_scores`](@ref) states them, or `nothing` when the forecast does not compute its history one observation at a time, as [`folds_forecast_rows`](@ref) answers. The scores of the last rows of the warm-up that [`cross_sectional_forecast_lead`](@ref) counts come first. A step appends the scores of its new observations, with [`cross_sectional_carry_scores`](@ref).
     """
     fsc
     """
@@ -419,11 +419,11 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Keeps the last `n` rows of the panel rows of a step, or of their derived series, or every row when `n` is `nothing`.
+Keeps the last `n` rows of the panel rows of a step, of their derived series, or of the Descriptor scores of a Return Forecast, or every row when `n` is `nothing`.
 
 # Arguments
 
-  - `rd`: The panel rows, a matrix of rows, the derived series `(; Xn, Xl)` of the rows, or `nothing`.
+  - `rd`: The panel rows, an array whose first dimension is the rows, the derived series `(; Xn, Xl)` of the rows, the scores `(; S, w, g)`, or `nothing`.
   - `n`: The number of rows to keep, or `nothing`.
 
 # Returns
@@ -444,12 +444,12 @@ end
 function cross_sectional_window_trim(::Nothing, ::Any)
     return nothing
 end
-function cross_sectional_window_trim(A::AbstractMatrix, ::Nothing)
+function cross_sectional_window_trim(A::AbstractArray, ::Nothing)
     return A
 end
-function cross_sectional_window_trim(A::AbstractMatrix, n::Integer)
+function cross_sectional_window_trim(A::AbstractArray, n::Integer)
     T = size(A, 1)
-    return T <= n ? A : A[(T - n + 1):T, :]
+    return T <= n ? A : copy(selectdim(A, 1, (T - n + 1):T))
 end
 function cross_sectional_window_trim(der::NamedTuple, n::Option{<:Integer})
     return map(A -> cross_sectional_window_trim(A, n), der)

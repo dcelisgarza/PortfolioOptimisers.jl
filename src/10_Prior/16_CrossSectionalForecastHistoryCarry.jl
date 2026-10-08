@@ -250,15 +250,16 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Appends the Descriptor scores of the new observations of a step to the carry fold of a Cross-Sectional Factor Prior.
 
-A Return Forecast that computes its history one observation at a time, as [`folds_forecast_rows`](@ref) answers, reads its scores at each fitted observation. A score reads the last [`lookback`](@ref) panel rows of its observation and no factor-model block, so a step computes the scores of its new observations alone, from the rows that it carries. A Descriptor that carries a state reads the new observations alone, as [`descriptor_carry`](@ref) folds them, so it adds no row: the state carries the Descriptor Scores with the state of each such Descriptor. A fit of every observation then reads the scores that the state carries, and no panel row before the carried ones.
+A Return Forecast that computes its history one observation at a time, as [`folds_forecast_rows`](@ref) answers, reads its scores at each fitted observation. A score reads the last [`lookback`](@ref) panel rows of its observation and no factor-model block, so a step computes the scores of its new observations alone, from the rows that it carries. A Descriptor that carries a state reads the new observations alone, as [`descriptor_carry`](@ref) folds them, so it adds no row: the state carries the Descriptor Scores with the state of each such Descriptor. A fit of every observation then reads the scores that the state carries, and no panel row before the carried ones. A member that trains on rows before the block also reads the last rows of the warm-up that [`cross_sectional_forecast_lead`](@ref) counts, so the state keeps their scores before the scores of the first row of the histories.
 
 # Algorithm
 
  1. Return `st` unchanged when the forecast does not fold.
  2. Take the Descriptor Scores that the state carries, or the ones of the forecast at the first step. Keep the last `carry_lookback(ds.descriptors) + n - 1` rows of `win` and of its derived series, as [`carry_lookback`](@ref) counts them, and build the returns data of the forecast over them with [`cross_sectional_forecast_window`](@ref).
- 3. Fold the `n` rows of the step into the Descriptors that carry a state with [`descriptor_carry`](@ref). When the step brings no observation after the warm-up, return the state with the folded Descriptor Scores alone.
- 4. Score the Descriptors of the forecast over those rows with [`descriptor_panel_scores`](@ref), with the Descriptors that the fold reads off the states, and keep the last `m` rows.
- 5. Append them to the scores that the state carries with [`cross_sectional_fold_append`](@ref), and keep the folded Descriptor Scores.
+ 3. Fold the `n` rows of the step into the Descriptors that carry a state with [`descriptor_carry`](@ref).
+ 4. Count the rows of the step to score: the `m` observations after the warm-up and the last `a` rows of the warm-up before them, as [`cross_sectional_forecast_lead`](@ref) counts them, up to `n`. When the histories hold a row before the step, every row of the step follows the warm-up, so the count is `m`. When the count is zero, return the state with the folded Descriptor Scores alone.
+ 5. Score the Descriptors of the forecast over those rows with [`descriptor_panel_scores`](@ref), with the Descriptors that the fold reads off the states, and keep the counted rows.
+ 6. Append them to the scores that the state carries with [`cross_sectional_fold_append`](@ref), and keep the last `a` rows before the histories and every row of the histories with [`cross_sectional_window_trim`](@ref). Keep the folded Descriptor Scores.
 
 # Arguments
 
@@ -276,6 +277,7 @@ A Return Forecast that computes its history one observation at a time, as [`fold
 
   - [`cross_sectional_carry_fold`](@ref)
   - [`cross_sectional_carry_forecast`](@ref)
+  - [`cross_sectional_forecast_lead`](@ref)
 """
 function cross_sectional_carry_scores(pe::CrossSectionalFactorPrior,
                                       st::CrossSectionalCarryState, win::ReturnsResult,
@@ -294,21 +296,25 @@ function cross_sectional_carry_scores(pe::CrossSectionalFactorPrior,
     rdk = cross_sectional_forecast_window(pe, k == T ? win : port_opt_view(win, r, :), dk)
     dc = descriptor_carry(ds, rdk, n)
     m = size(rows.Ms, 1)
-    if iszero(m)
+    # The state also keeps the scores of the last `a` rows of the warm-up, which a member that
+    # trains on rows before the block reads. Once the histories hold a row before the step,
+    # every row of the step follows the warm-up, so `m == n` and `c == m`.
+    a = cross_sectional_forecast_lead(pe.rfe, pe.lag)
+    c = min(n, m + a)
+    if iszero(c)
         return cross_sectional_carry_with(st, (; fds = dc.xf))
     end
     P = descriptor_panel_scores(dc.xv, rdk)
-    Pn = map(A -> return_forecast_cut(A, (k - m + 1):k), P)
+    Pn = map(A -> return_forecast_cut(A, (k - c + 1):k), P)
+    # The bound stops JET from pairing an untyped `st.fsc` with the `map` method of another
+    # package.
+    fsc = isnothing(st.fsc) ? Pn : map(cross_sectional_fold_append, st.fsc::NamedTuple, Pn)
+    # The scores hold the rows of the histories and at most `a` rows before them, so the cut
+    # drops rows of the warm-up alone, until the histories hold a row before the step.
+    h = size(something(st.Ms, rows.Ms), 1) + a
     return cross_sectional_carry_with(st,
-                                      (;
-                                       fsc = if isnothing(st.fsc)
-                                           Pn
-                                       else
-                                           # The bound stops JET from pairing an untyped
-                                           # `st.fsc` with the `map` method of another package.
-                                           map(cross_sectional_fold_append,
-                                               st.fsc::NamedTuple, Pn)
-                                       end, fds = dc.xf))
+                                      (; fsc = cross_sectional_window_trim(fsc, h),
+                                       fds = dc.xf))
 end
 function carry_lookback(rfe::Union{FixedWeightedReturnForecast, ExpWeightedReturnForecast,
                                    TargetReturnForecast})::Option{<:Integer}
@@ -380,30 +386,34 @@ function cross_sectional_carry_forecast(pe::CrossSectionalFactorPrior,
     # `lag` of them. The cut copies, so the step can neutralise the copy in place.
     # A fit of every observation makes every row again, from an empty fold state.
     H0, fs0 = iszero(k) ? (nothing, nothing) : (st.fh, st.fst)
-    i = cross_sectional_forecast_rows(rfo, r, k, g)
+    # The scores also hold the rows of the warm-up that `cross_sectional_forecast_lead` counts,
+    # before the first row of the histories.
+    fsc::NamedTuple = st.fsc
+    i = cross_sectional_forecast_rows(rfo, r, k, g, size(fsc.S, 1) - size(st.Ms, 1))
     (; hist, fs) = orthogonal_forecast_step(pe.ofit, rfo,
-                                            map(A -> return_forecast_cut(A, i), st.fsc),
-                                            csfm, fs0, pe.cre)
+                                            map(A -> return_forecast_cut(A, i), fsc), csfm,
+                                            fs0, pe.cre)
     # The new rows are the last rows of the history of the step.
     H = view(hist, (size(hist, 1) - length(r) + k + 1):size(hist, 1), :)
     return cross_sectional_carry_with(st,
                                       (; fh = cross_sectional_fold_append(H0, H), fst = fs))
 end
 """
-    cross_sectional_forecast_rows(rfe, r::AbstractUnitRange, k::Integer, g::Integer)
+    cross_sectional_forecast_rows(rfe, r::AbstractUnitRange, k::Integer, g::Integer,
+                                  a::Integer)
     cross_sectional_forecast_rows(rfe::TargetReturnForecast, r::AbstractUnitRange,
-                                  k::Integer, g::Integer)
+                                  k::Integer, g::Integer, a::Integer)
 
-Returns the rows of the histories after the warm-up that a step of the carry fold of a Cross-Sectional Factor Prior hands its Return Forecast.
+Returns the rows of the carried Descriptor scores that a step of the carry fold of a Cross-Sectional Factor Prior hands its Return Forecast.
 
-The step hands the member its new observations, and before them the observations whose target matures at the step: the last `g` observations that the member read, or all of them when it read fewer.
+The step hands the member its new observations, and before them the observations whose target matures at the step: the last `g` observations that the member read, or all of them when it read fewer. The scores start `a` rows before the histories after the warm-up, as [`cross_sectional_forecast_lead`](@ref) counts them, so row `t` of the histories is row `a + t` of the scores.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. A member that reads the block alone: the fitted observations after the first `k`, and the last `g` of the first `k`, as rows of the histories.
- 2. [`TargetReturnForecast`](@ref) under `whole_history`: the member also trains on a row before the block whose forward window reaches into the block, so its observations are the rows of the histories. Return the rows after the first `k` fitted observations, and the `g` rows before them, or every row before them when there are fewer. Without `whole_history`, method 1.
+ 1. A member that reads the block alone: the fitted observations after the first `k`, and the last `g` of the first `k`, as rows of the scores.
+ 2. [`TargetReturnForecast`](@ref) under `whole_history`: the member also trains on a row before the block whose forward window reaches into the block, so its observations are the rows of the scores. Return the rows after the first `k` fitted observations, and the `g` rows before them, or every row before them when there are fewer. Without `whole_history`, method 1.
 
 # Arguments
 
@@ -411,22 +421,61 @@ The method that Julia selects is the algorithm.
   - `r`: The fitted observations, as rows of the histories after the warm-up.
   - `k`: Number of fitted observations that the state keeps.
   - `g`: The observations that a target takes to mature, as [`forecast_target_gap`](@ref) answers.
+  - `a`: Number of rows of the warm-up that the scores hold before the histories.
 
 # Returns
 
-  - `rows::AbstractUnitRange`: Rows of the histories after the warm-up.
+  - `rows::AbstractUnitRange`: Rows of the carried scores.
 
 # Related
 
+  - [`cross_sectional_forecast_lead`](@ref)
   - [`cross_sectional_carry_forecast`](@ref)
   - [`return_forecast_step`](@ref)
 """
-function cross_sectional_forecast_rows(::Any, r::AbstractUnitRange, k::Integer, g::Integer)
-    return r[(k + 1 - min(k, g)):end]
+function cross_sectional_forecast_rows(::Any, r::AbstractUnitRange, k::Integer, g::Integer,
+                                       a::Integer)
+    return (a + r[k + 1 - min(k, g)]):(a + last(r))
 end
 function cross_sectional_forecast_rows(rfe::TargetReturnForecast, r::AbstractUnitRange,
-                                       k::Integer, g::Integer)
-    return rfe.whole_history ? (max(1, r[k + 1] - g):last(r)) : r[(k + 1 - min(k, g)):end]
+                                       k::Integer, g::Integer, a::Integer)
+    i = rfe.whole_history ? max(1, a + r[k + 1] - g) : a + r[k + 1 - min(k, g)]
+    return i:(a + last(r))
+end
+"""
+    cross_sectional_forecast_lead(rfe, lag::Integer)
+    cross_sectional_forecast_lead(rfe::TargetReturnForecast, lag::Integer)
+
+Returns the number of rows of the Descriptor warm-up whose scores the carry fold of a Cross-Sectional Factor Prior keeps for its Return Forecast.
+
+The histories of the carry start `lag` rows before the first fitted observation. A member that trains on a row before the block trains on the last [`forecast_target_gap`](@ref) rows before it, because their forward windows reach into the block. When the gap is longer than `lag`, the first of those rows are rows of the warm-up, and the histories hold no such row. So the state keeps their scores, once, before the scores of the first row of the histories.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A member that reads the block alone trains on no row before it. Return zero.
+ 2. [`TargetReturnForecast`](@ref) under `whole_history`: return `forecast_target_gap(rfe) - lag`, or zero when the gap is not longer than `lag`. Without `whole_history`, method 1.
+
+# Arguments
+
+  - `rfe`: The Return Forecast Estimator that the step fits.
+  - `lag`: The lag of the exposures of the prior, `pe.lag`.
+
+# Returns
+
+  - `a::Integer`: The number of rows of the warm-up.
+
+# Related
+
+  - [`cross_sectional_carry_scores`](@ref)
+  - [`cross_sectional_forecast_rows`](@ref)
+"""
+function cross_sectional_forecast_lead(::Any, ::Integer)
+    return 0
+end
+function cross_sectional_forecast_lead(rfe::TargetReturnForecast, lag::Integer)
+    return rfe.whole_history ? max(forecast_target_gap(rfe) - lag, 0) : 0
 end
 """
     orthogonal_forecast_step(ofit::AbstractOrthogonalForecastFit, rfe, P::NamedTuple,
