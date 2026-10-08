@@ -180,8 +180,19 @@ its projection. A refit honours a pinned choice with no state: after the first f
 the choice into the configuration of the estimator that it returns. The first fit is the first step
 whose buffer the batch fit accepts, which for the Cross-Sectional Factor Prior is `lag + 2` rows
 after the Descriptor warm-up. The step runs the part of the fit that the choice reads over the
-buffer, so the member that it writes is the member that the call with no data of that step drops. In the carry fold, a batch choice
-that moves refits every past date, and a pinned choice is recorded in the carry state.
+buffer, so the member that it writes is the member that the call with no data of that step drops. In the carry fold, a pinned
+choice is recorded in the carry state.
+
+A batch choice that moves the dropped member on the carry fold runs no regression again
+([#1601](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1601)). The zero-sum
+condition of a family is the same set for every dropped member. So the raw-axis factor returns, the
+residuals and the idiosyncratic variances do not depend on the member, and the reduced history under
+the new member is a selection of the columns of the raw-axis history. A move selects those columns,
+solves each rank-deficient row again in the new basis, because the pseudo-inverse answer of such a
+row depends on the parametrisation, and refits the factor prior over the selected history. The
+default factor covariance reads every column at once, so a sub-block of a raw-axis state is not the
+batch answer. The move then costs about one millisecond on 2520 rows, against 1.66 s for a refit of
+every row, and the carry still equals the batch fit to rounding. `BatchChoice()` stays the default.
 
 ### The selection regressions of a factor prior
 
@@ -235,7 +246,10 @@ The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton
 - The refusal is in the constructor, because every test reads the configuration alone, and an
   error must come as early as possible. A batch fit and `Online` ignore the rule, but a caller who
   writes `FoldOnly()` asked for it.
-- The Choice Rule is not part of the test. A Batch Choice refits only when the choice moves.
+- `FoldOnly()` refuses a Batch Choice with an automatic dropped member, because a move refits the
+  factor prior over every carried factor return
+  ([#1601](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1601)). A Pinned Choice and
+  a named member never move, so both pass.
 - `lookback` and `supports_partial_fit` are `public`, because a user subtype implements them to
   pass `FoldOnly()`. The stateful seam of a Descriptor (`descriptor_step`, `carry_lookback`, a state
   in `cache`) becomes `public` when a second family uses it
@@ -264,6 +278,16 @@ The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton
   rows that the moment member gets, which the Descriptor warm-up, the lag trim and a cap all move.
 - **A pinned choice by default.** Rejected. It breaks the identity of the online call with no data and the batch
   fit when the choice moves. It stays one keyword away.
+- **A refit of every row when a batch choice moves.** Rejected. It is exact, but it costs about half
+  a batch fit at each move, and the fold of the move is exact to rounding at about one millisecond.
+- **A pinned choice by default on the carry fold alone.** Rejected. One field serves the batch fit
+  and the carry, so a default that differs by mode makes the two disagree for one estimator. With
+  the fold of a move, the batch choice costs about the same as the pinned choice.
+- **Accept a Batch Choice under `FoldOnly()`, and document the cost of a move.** Rejected. The cost
+  of a move grows with the stream, and `FoldOnly()` promises that no step cost grows.
+- **Accept a Batch Choice under `FoldOnly()` when the factor prior is separable by column.**
+  Rejected. The carry then needs a raw-axis state beside the reduced one, and the default factor
+  covariance is not separable, so the rule depends on the factor prior.
 - **A cap on the carried panel.** Rejected. It is not exact with an EW Descriptor.
 - **Refuse a member that does not fold, as the oracle does.** Rejected as the default. The refit is
   exact and costs the user nothing to write. It stays one keyword away as `FoldOnly()`.
@@ -297,6 +321,11 @@ The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton
   [#1595](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1595) makes the verb
   "this factor prior folds", `cross_sectional_factor_prior_folds` answers it: an `EmpiricalPrior`
   whose `me` and `ce` fold. Each of the two builds changes one line of `carry_growing_parts`.
+- [#1605](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1605) builds the fold of a
+  move of a batch choice and the refusal of an automatic member under `FoldOnly()`.
+  [#1606](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1606) holds the rank-deficient
+  row whose factor returns depend on the dropped member. If it makes such a row identified, the
+  fold of a move needs no second solve.
 - ADR 0136 and ADR 0039 carry amendments that point here.
 - A pinned choice and a seed window are two routes on which the online call with no data equals no batch fit.
   Each is documented, and each is tested against the oracle.

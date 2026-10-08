@@ -41,12 +41,13 @@ A Pipeline under `Online` buffers its **input data**, because its refit is the w
 
 **Carry Fold**
 The online route of an estimator that folds what folds and refits the rest over the rows it carries, the rule of ADR 0136. The Cross-Sectional Factor Prior folds as a carry when no `Online` wraps it: a new observation changes no past exposure, regression or idiosyncratic variance, so each step computes them for the new observations alone, folds the factor prior and the idiosyncratic variance, and refits the Return Forecast and the idiosyncratic correlation at the call with no data. It carries the panel rows that its Descriptors read, or every row when one of them, or a Return Forecast that reads the panel, has no finite look-back. ADR 0193, #1471.
-A whole-sample choice that moves, a Batch Choice of a dropped member or a factor that comes alive, makes the step fit every carried observation again, so the call with no data equals the batch fit. A Pinned Choice and a Seed Window keep a value of the first fit, so under either one the call with no data equals no batch fit.
-*Avoid*: reading it as a refit; it fits no past observation again unless a whole-sample choice moves or a member does not fold.
+A factor that comes alive makes the step fit every carried observation again, so the call with no data equals the batch fit. A Batch Choice of a dropped member that moves changes only the basis of the factor returns, so the step fits the factor prior again and no past regression (#1601). A Pinned Choice and a Seed Window keep a value of the first fit, so under either one the call with no data equals no batch fit.
+*Avoid*: reading it as a refit; it fits no past observation again unless a factor comes alive or a member does not fold.
 A scheme under `Online` buffers nothing: the same word there declares an Online Scheme, and the loop steps instead of refitting. ADR 0167.
 
 **Carry Rule**
 What a Carry Fold does with a member whose step costs more as the stream grows: a Descriptor with no finite look-back and no state of its own, a variance or a factor prior that does not fold, or a part that refits over every carried row. **Fold or Refit**, the default, is the rule of ADR 0136: the member is fitted again over every row it needs, so the step stays exact and its cost grows with the stream. **Fold Only** refuses such a member when the estimator is built, so every step it takes has a cost that does not grow. A member that reads a bounded window passes both rules. The rule is a field of the estimator that folds as a carry. ADR 0193, #1590.
+Fold Only refuses a Batch Choice that can move, because each move fits the factor prior again over the whole stream. A Pinned Choice or a named member passes. #1601.
 *Avoid*: reading Fold Only as a faster route; it changes no value and no cost, it only refuses a configuration whose step grows.
 
 **Scenario Cap**
@@ -56,6 +57,7 @@ The number of observations a fold-and-carry Prior Estimator keeps in its Result'
 
 **Choice Rule**
 How a choice that a fit makes over its whole sample behaves on the online step: the dropped member of a Factor Family, the factor set of a stepwise regression, the projection of a dimension-reduction regression. A **Batch Choice** chooses again over every observation at each fit, so the online call with no data equals the batch fit over the same rows; it is the default. A **Pinned Choice** keeps the choice of the first fit, so the basis of a fold stays fixed and each step stays cheap. The two agree in a batch fit. The rule is a field of the estimator that makes the choice. ADR 0193.
+On a Carry Fold, a Batch Choice that moves changes only the basis of the factor returns, so the step fits the factor prior again and no past regression, except one whose observation does not fix its factor returns. It costs about as little as a Pinned Choice. #1601.
 *Avoid*: reading a Pinned Choice as a state; a refit honours it by naming the chosen member in its configuration after the first fit.
 
 **Fold Context**
