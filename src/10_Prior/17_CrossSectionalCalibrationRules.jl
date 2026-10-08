@@ -1070,7 +1070,151 @@ function (alg::ForecastCalibrationSlope)(::Symbol, ::AbstractPriorResult, ::Any,
     return forecast_scale_warm_up(alg.wu, c, se, n, alg.target)
 end
 
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Repairs the systematic block before the lift of a [`CrossSectionalFactorPrior`](@ref) adds the idiosyncratic block.
+
+The lift runs every step of `mp` on the systematic block in the order of `mp.order`, the `:pdm` step included, as [`factor_lift`](@ref) does. Then it adds the idiosyncratic block and repairs the sum under `mp.pdm`. The systematic block has rank at most ``K``, so the `:pdm` step runs its full repair at each fit, and it moves the block by round-off alone.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{\\Sigma}_{\\mathcal{I}\\mathcal{I}} &= \\operatorname{pdm}\\left(\\operatorname{mp}\\left(\\mathbf{B}_{T,\\,\\mathcal{I}} \\odot \\mathbf{F} \\odot \\mathbf{B}_{T,\\,\\mathcal{I}}^{\\intercal}\\right) + \\mathbf{D}_{\\mathcal{I}\\mathcal{I}}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{\\Sigma}``: Asset covariance.
+  - ``\\operatorname{mp}``: Every step of `mp`, in the order of `mp.order`.
+  - ``\\operatorname{pdm}``: The repair under `mp.pdm`, from [`posdef!`](@ref).
+  - ``\\odot``: The product over the support of each row of loadings, from [`support_product`](@ref).
+  - ``\\mathbf{B}_{T,\\,\\mathcal{I}}``: The rows of ``\\mathbf{B}_{T}`` at the assets of ``\\mathcal{I}``.
+  - $(math_dict[:B_T_cs])
+  - $(math_dict[:F_patt])
+  - $(math_dict[:D_orth])
+  - $(math_dict[:I_inv])
+
+# Constructors
+
+    SystematicRepair() -> SystematicRepair
+
+# Examples
+
+```jldoctest
+julia> SystematicRepair()
+SystematicRepair()
+```
+
+# Related
+
+  - [`AbstractSystematicRepair`](@ref)
+  - [`NoSystematicRepair`](@ref)
+  - [`systematic_processing!`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+struct SystematicRepair <: AbstractSystematicRepair end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Does not repair the systematic block before the lift of a [`CrossSectionalFactorPrior`](@ref) adds the idiosyncratic block. This is the default rule.
+
+The lift runs every step of `mp` on the systematic block in the order of `mp.order`, except the `:pdm` step, and takes the symmetric part of the block. Then it adds the idiosyncratic block and repairs the sum under `mp.pdm`. That repair is the one repair of the asset covariance. A sum that is positive definite passes it unchanged, so the lift does no repair of a block that is positive semidefinite to round-off.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{\\Sigma}_{\\mathcal{I}\\mathcal{I}} &= \\operatorname{pdm}\\left(\\operatorname{mp}_{\\setminus\\mathrm{pdm}}\\left(\\mathbf{B}_{T,\\,\\mathcal{I}} \\odot \\mathbf{F} \\odot \\mathbf{B}_{T,\\,\\mathcal{I}}^{\\intercal}\\right) + \\mathbf{D}_{\\mathcal{I}\\mathcal{I}}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{\\Sigma}``: Asset covariance.
+  - ``\\operatorname{mp}_{\\setminus\\mathrm{pdm}}``: Every step of `mp` except the `:pdm` step, in the order of `mp.order`, then the symmetric part of the block.
+  - ``\\operatorname{pdm}``: The repair under `mp.pdm`, from [`posdef!`](@ref).
+  - ``\\odot``: The product over the support of each row of loadings, from [`support_product`](@ref).
+  - ``\\mathbf{B}_{T,\\,\\mathcal{I}}``: The rows of ``\\mathbf{B}_{T}`` at the assets of ``\\mathcal{I}``.
+  - $(math_dict[:B_T_cs])
+  - $(math_dict[:F_patt])
+  - $(math_dict[:D_orth])
+  - $(math_dict[:I_inv])
+
+# Constructors
+
+    NoSystematicRepair() -> NoSystematicRepair
+
+# Examples
+
+```jldoctest
+julia> NoSystematicRepair()
+NoSystematicRepair()
+```
+
+# Related
+
+  - [`AbstractSystematicRepair`](@ref)
+  - [`SystematicRepair`](@ref)
+  - [`systematic_processing!`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+struct NoSystematicRepair <: AbstractSystematicRepair end
+"""
+    systematic_processing!(srep::SystematicRepair, mp::AbstractMatrixProcessingEstimator,
+                           sigma::MatNum, X::MatNum; kwargs...) -> MatNum
+    systematic_processing!(srep::NoSystematicRepair, mp::MatrixProcessing, sigma::MatNum,
+                           X::MatNum; kwargs...) -> MatNum
+
+Processes the systematic block of the lift of a [`CrossSectionalFactorPrior`](@ref) in place, under the Systematic Repair rule `srep`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. [`SystematicRepair`](@ref): run [`matrix_processing!`](@ref) of `mp` on `sigma`, every step included.
+ 2. [`NoSystematicRepair`](@ref): run [`matrix_processing_step!`](@ref) for each step of `mp.order` except `:pdm`, in that order. Then replace `sigma` by its symmetric part ``(\\boldsymbol{\\Sigma} + \\boldsymbol{\\Sigma}^{\\intercal}) / 2``. The product of the loadings and the factor covariance is symmetric only to rounding, and [`posdef!`](@ref) accepts the sum without a repair only when it is exactly symmetric.
+
+# Arguments
+
+  - $(arg_dict[:srep])
+  - `mp`: Matrix processing estimator. [`NoSystematicRepair`](@ref) reads its steps one by one, so it takes a [`MatrixProcessing`](@ref) alone.
+  - `sigma`: The systematic block, `investable assets × investable assets`.
+  - `X`: The asset return scenarios of the investable assets, `scenarios × investable assets`.
+  - `kwargs...`: Additional keyword arguments passed to the steps of `mp`.
+
+# Returns
+
+  - `sigma::MatNum`: The systematic block, modified in place.
+
+# Related
+
+  - [`AbstractSystematicRepair`](@ref)
+  - [`cross_sectional_lift`](@ref)
+  - [`matrix_processing!`](@ref)
+"""
+function systematic_processing!(::SystematicRepair, mp::AbstractMatrixProcessingEstimator,
+                                sigma::MatNum, X::MatNum; kwargs...)
+    return matrix_processing!(mp, sigma, X; kwargs...)
+end
+function systematic_processing!(::NoSystematicRepair, mp::MatrixProcessing, sigma::MatNum,
+                                X::MatNum; kwargs...)
+    for step in mp.order
+        if step !== :pdm
+            matrix_processing_step!(Val(step), mp, sigma, X; kwargs...)
+        end
+    end
+    # The product of the loadings and the factor covariance is symmetric only to rounding, and
+    # the repair of the sum takes a matrix with no Newton step only when it is exactly symmetric.
+    LinearAlgebra.hermitianpart!(sigma)
+    return sigma
+end
+
 export PrecisionBlend, CurrentForecastError, ForecastHistoryError, SteinShrinkage,
        ForecastCalibrationSlope, ThresholdWarmUp, PlugInWarmUp, PositivePartWarmUp
 public AbstractForecastErrorAlgorithm, AbstractForecastScaleWarmUpAlgorithm,
        spanned_forecast_sample, forecast_scale_warm_up
+export SystematicRepair, NoSystematicRepair
+public AbstractSystematicRepair, systematic_processing!

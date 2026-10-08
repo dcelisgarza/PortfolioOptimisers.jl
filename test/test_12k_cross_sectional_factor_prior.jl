@@ -1745,7 +1745,7 @@ allocated the exposure history in the element type of the returns, so integer re
         Li = L[idx, :]
         Cf = cholesky(Sf).L
         for (es, Di) in ((ev, Diagonal(ev[idx])), (D, D[idx, idx]))
-            lf = PO.cross_sectional_lift(mp, L, muf, Sf, es, idx, Xs)
+            lf = PO.cross_sectional_lift(NoSystematicRepair(), mp, L, muf, Sf, es, idx, Xs)
             @test lf.mu[idx] ≈ Li * muf
             @test lf.sigma[idx, idx] ≈ Li * Sf * Li' + Di
             @test lf.chol[:, idx]' * lf.chol[:, idx] ≈ lf.sigma[idx, idx]
@@ -1773,16 +1773,71 @@ allocated the exposure history in the element type of the returns, so integer re
         end
         # `chol` factorises the factor model before `mp` processes it, so a detoning `mp`
         # moves `sigma` and leaves `chol` where it was.
-        lf = PO.cross_sectional_lift(MatrixProcessing(; dt = Detone()), L, muf, Sf, ev, idx,
+        lf = PO.cross_sectional_lift(NoSystematicRepair(),
+                                     MatrixProcessing(; dt = Detone()), L, muf, Sf, ev, idx,
                                      Xs)
         @test lf.chol[:, idx]' * lf.chol[:, idx] ≈ Li * Sf * Li' + Diagonal(ev[idx])
         @test !isapprox(lf.chol[:, idx]' * lf.chol[:, idx], lf.sigma[idx, idx])
         # An asset with finite inputs that `idx` leaves out keeps a `NaN` variance, so the
         # Investable Mask of the answer is never wider than `idx`.
         idx2 = setdiff(idx, 8)
-        lf = PO.cross_sectional_lift(mp, L, muf, Sf, ev, idx2, Xs)
+        lf = PO.cross_sectional_lift(NoSystematicRepair(), mp, L, muf, Sf, ev, idx2, Xs)
         @test isfinite(lf.mu[8]) && isnan(lf.sigma[8, 8])
         @test findall(isfinite.(lf.mu) .& isfinite.(diag(lf.sigma))) == idx2
+    end
+    @testset "The Systematic Repair rule of the lift (#1576)" begin
+        rng = StableRNG(828_107)
+        nN, nK = 8, 3
+        L = randn(rng, nN, nK)
+        A = randn(rng, nK, nK)
+        Sf = A * A' + I
+        muf = randn(rng, nK)
+        ev = rand(rng, nN) .+ 0.1
+        idx = collect(1:nN)
+        Xs = randn(rng, 30, nN)
+        @test CrossSectionalFactorPrior(; factors = csfp_factors()).srep ===
+              NoSystematicRepair()
+        # The systematic block has rank 3 of 8, so `LinearAlgebra.isposdef` refuses it, and
+        # the `:pdm` step runs the Newton repair on it.
+        si = PO.support_product(L, Sf, L)
+        D = PO.cross_sectional_residual_block(ev, idx).D
+        @test rank(si) == nK && !isposdef(si)
+        mp = MatrixProcessing()
+        # `SystematicRepair` gives the lift before #1576, written out here step by step.
+        old = matrix_processing!(mp, copy(si), Xs)
+        old .+= D
+        posdef!(mp.pdm, old)
+        rep = PO.cross_sectional_lift(SystematicRepair(), mp, L, muf, Sf, ev, idx, Xs)
+        @test rep.sigma == old
+        # `NoSystematicRepair` takes the symmetric part of the block under the default `mp`.
+        # The product is symmetric only to rounding, and `isposdef` refuses a matrix that is
+        # not exactly symmetric, so the repair of the sum would run its Newton step without
+        # it. The symmetric sum is positive definite, so its repair changes nothing.
+        no = PO.cross_sectional_lift(NoSystematicRepair(), mp, L, muf, Sf, ev, idx, Xs)
+        sym = (si + si') / 2
+        @test !issymmetric(si) && issymmetric(sym)
+        @test isposdef(sym + D)
+        @test no.sigma == sym + D
+        # Measured: the two rules differ by 7.8e-13 relative to the largest entry, the repair
+        # of a block that is positive semidefinite to round-off.
+        @test no.sigma != rep.sigma
+        @test maximum(abs, no.sigma - rep.sigma) / maximum(abs, rep.sigma) < 1e-11
+        @test no.mu == rep.mu && no.chol == rep.chol
+        # `NoSystematicRepair` skips the `:pdm` step alone: it equals `SystematicRepair` under
+        # an `mp` whose order leaves `:pdm` out, and it still runs every other step.
+        dt = MatrixProcessing(; dt = Detone(; n = 1))
+        nopdm = MatrixProcessing(; dt = Detone(; n = 1), order = (:dn, :dt, :alg))
+        a = PO.cross_sectional_lift(NoSystematicRepair(), dt, L, muf, Sf, ev, idx, Xs)
+        b = PO.cross_sectional_lift(SystematicRepair(), nopdm, L, muf, Sf, ev, idx, Xs)
+        @test a.sigma == b.sigma
+        @test a.sigma != no.sigma
+        # The verb runs the steps in place, and returns the block.
+        s = copy(si)
+        @test PO.systematic_processing!(NoSystematicRepair(), mp, s, Xs) === s
+        @test s == sym
+        s = copy(si)
+        @test PO.systematic_processing!(SystematicRepair(), mp, s, Xs) === s
+        @test s == matrix_processing!(mp, copy(si), Xs)
     end
     @testset "Integer returns fit, and equal the fit of their float copy" begin
         rd = csfp_panel(; n_assets = 40, n_observations = 80, n_industries = 3,

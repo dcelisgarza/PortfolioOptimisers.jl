@@ -234,6 +234,10 @@ Its default is one. The calibration slope of the orthogonal part on the next idi
 The rule by which a Cross-Sectional Factor Prior makes the orthogonal part of a fitted Return Forecast carry the scale of its fit. A fitted member regresses the forward idiosyncratic return, which the regression makes orthogonal to the Factor Exposures, so the part of its forecast that they do not span is under-scaled. The default neutralises the Descriptor Scores of such a member against every estimated factor before the fit; another rule fits the calibration slope on the orthogonal part, and a third reads the member as it stands.
 *Avoid*: Orthogonal Forecast Scale (above), which multiplies the part after this rule has acted, and which a caller states or a Calibration Rule computes.
 
+**Systematic Repair**
+The rule by which a Cross-Sectional Factor Prior decides which steps of its matrix processing run on the systematic block of the asset covariance, the factor covariance projected through the latest Factor Exposures of the investable assets, before it adds the idiosyncratic block. The block has rank at most the number of factors, so a positive-definite repair of it moves it by round-off alone. The prior repairs the sum of the two blocks under every rule. The default runs every step on the block except the positive-definite repair, and the other rule runs every step. Each rule is named for what the prior does to the systematic block before it adds the idiosyncratic block. ADR 0199.
+*Avoid*: the repair of the factor covariance, which the factor matrix processing does on the factor axis before the projection.
+
 **Return Forecast Estimator**
 A producer of a Return Forecast, from Descriptor Scores and the factor-model block of the Prior it serves, or from a stated vector. It scores its Descriptors over the whole history of the `ReturnsResult` and reads the block on the block's own rows, which are the last rows of the `ReturnsResult`, so its Result is on the block's axis.
 

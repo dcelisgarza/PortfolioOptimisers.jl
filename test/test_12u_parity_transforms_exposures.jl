@@ -257,8 +257,9 @@ end
         # The relisted asset is in its warm-up at the latest observation, so neither side
         # states its variance, and both state its mean and its covariances (#1377, #1384).
         @test parity_compare(pr.mu, vec(load("Mu")); name = "mu").ok
-        # A covariance compares against its largest entry (#1376). Measured maxscaled 3.8e-13,
-        # and maxrel 6.5e-11 cell by cell on its near-zero off-diagonal entries.
+        # A covariance compares against its largest entry (#1376). Measured maxscaled 2.1e-16,
+        # and maxrel 1.0e-13 cell by cell on its near-zero off-diagonal entries. They were
+        # 3.8e-13 and 6.5e-11 when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576).
         @test parity_compare(pr.sigma, load("Sigma"); scale = :array, name = "sigma").ok
         # The Neutralisation left the other factors alone.
         pp = prior(parity_neutralise_prior(), fx.rd)

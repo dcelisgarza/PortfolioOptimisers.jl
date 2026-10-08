@@ -150,6 +150,14 @@ end
             st = x.pe.cache
             @test size(st.S) == size(st.Sc) == size(st.csr.eps)
         end
+        # The batch fit and the read-out of the carry fold run the same lift, so the carry
+        # fold equals the batch fit under each Systematic Repair rule (#1576).
+        for srep in (NoSystematicRepair(), SystematicRepair())
+            pe = CrossSectionalFactorPrior(; lambda = 1, srep = srep, style...)
+            for (k, x) in enumerate(stream(pe, rd, e))
+                @test agrees(x.pr, batch(pe, k, rd, e))
+            end
+        end
     end
 
     @testset "A Calibration Rule resolves at each step (#1481)" begin
@@ -490,8 +498,8 @@ end
     @testset "Parity with the oracle's online update" begin
         # The prior of each step against the stored block of that step. `mu` compares cell by
         # cell. `sigma` compares against its largest entry: an off-diagonal entry of two assets
-        # near zero correlation is a cancellation in `L F L'` (#1376), measured maxrel 1.3e-10
-        # cell by cell. The factor returns compare cell by cell with an absolute floor: the
+        # near zero correlation is a cancellation in `L F L'` (#1376), measured maxrel 2.7e-12
+        # cell by cell. It was 1.3e-10 when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576). The factor returns compare cell by cell with an absolute floor: the
         # industry level "Utilities" is empty after its only asset delists, so its factor return
         # is a round-off zero on both sides, measured maxrel 1.9 and maxabs 1.5e-16. The floor
         # is at most 6e-14 of the largest factor return, and every other cell measured maxrel
@@ -515,22 +523,23 @@ end
                                                        choice = PinnedChoice()))
         # The pinned choice reproduces the oracle's online update, which pins the dropped
         # member at its first call. Measured over the three steps: mu maxrel 1.7e-14, sigma
-        # maxscaled 4.2e-13, factor returns maxrel 4.6e-14 on `Style`; mu maxrel 5.3e-13,
-        # sigma maxscaled 6.5e-13, factor returns maxabs 1.5e-16 on `Industry`.
+        # maxscaled 1.1e-15, factor returns maxrel 4.6e-14 on `Style`; mu maxrel 5.3e-13,
+        # sigma maxscaled 1.2e-15, factor returns maxabs 1.5e-16 on `Industry`. The sigma
+        # values were 4.2e-13 and 6.5e-13 when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576).
         check(pinned(style), "OnlineStyle", "Fold")
         check(pinned(industry), "OnlineIndustry", "Fold")
         # Currency factors on the carry route (#1479). The oracle's online update reads the
         # Currency Excess Returns of each batch, and it pins `style1` as in `Style`. Measured
-        # over the three steps: mu maxrel 2.3e-13, sigma maxscaled 4.2e-13, factor returns
-        # maxrel 9.3e-14.
+        # over the three steps: mu maxrel 2.3e-13, sigma maxscaled 5.6e-16 (4.2e-13 before
+        # #1576), factor returns maxrel 9.3e-14.
         cp = pinned((; grid_config("Currency", rd)..., families = ["style" => nothing]))
         @test all(x -> x.pe.cache.families == ["style" => "style1"], cp)
         check(cp, "OnlineCurrencyStyle", "Fold")
         # A seed window on the factor prior cuts the factor returns of the first fit to the
         # last 60, and every later step folds every row, as the oracle's does. Measured: mu
-        # maxrel 7.2e-15, sigma maxscaled 3.7e-13, factor returns maxrel 4.6e-14 on `Style`;
-        # mu maxrel 1.4e-13, sigma maxscaled 7.3e-13, factor returns maxabs 1.5e-16 on
-        # `Industry`.
+        # maxrel 7.2e-15, sigma maxscaled 1.5e-15 (3.7e-13 before #1576), factor returns maxrel
+        # 4.6e-14 on `Style`; mu maxrel 1.4e-13, sigma maxscaled 6.1e-16 (7.3e-13 before
+        # #1576), factor returns maxabs 1.5e-16 on `Industry`.
         decay = 2.0^(-1 / 20)
         seed = EmpiricalPrior(;
                               me = WindowedExpectedReturns(;

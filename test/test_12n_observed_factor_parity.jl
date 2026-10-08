@@ -97,8 +97,9 @@ end
         @test parity_compare(pr.rr.vs[end, :], vec(ccy_asset("$(nm)DefaultIdioVar"));
                              name = "$(nm) default idiosyncratic variance").ok
         # `sigma` compares against its largest entry: an off-diagonal entry of two assets near
-        # zero correlation is a cancellation in `L F L'` (#1376). Measured maxscaled 5.3e-13
-        # and 6.0e-13, and maxrel 3.8e-11 and 5.1e-11 cell by cell.
+        # zero correlation is a cancellation in `L F L'` (#1376). Measured maxscaled 6.5e-15
+        # and 6.0e-15, and maxrel 2.7e-12 and 2.4e-13 cell by cell. They were 5.3e-13 and
+        # 6.0e-13, and 3.8e-11 and 5.1e-11, when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576).
         @test parity_compare(pr.sigma, ccy_asset("$(nm)DefaultSigma"); scale = :array,
                              name = "$(nm) default sigma").ok
     end
@@ -348,8 +349,8 @@ end
                              name = "macro factor covariance").ok
         @test parity_compare(pr.rr.M, mac_asset("PlainLoadings"); name = "macro loadings").ok
         @test parity_compare(pr.mu, vec(mac_asset("PlainMu")); name = "macro mu").ok
-        # The cancellation of the default fit: measured maxscaled 4.9e-13, and maxrel 1.3e-10
-        # cell by cell.
+        # The cancellation of the default fit: measured maxscaled 6.9e-15, and maxrel 2.4e-12
+        # cell by cell. They were 4.9e-13 and 1.3e-10 when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576).
         @test parity_compare(pr.sigma, mac_asset("PlainSigma"); scale = :array,
                              name = "macro sigma").ok
     end
@@ -374,8 +375,8 @@ end
                              name = "macro currency loadings").ok
         @test parity_compare(pr.mu, vec(mac_asset("CurrencyDefaultMu"));
                              name = "macro currency mu").ok
-        # The cancellation of the default fit: measured maxscaled 5.1e-13, and maxrel 3.1e-11
-        # cell by cell.
+        # The cancellation of the default fit: measured maxscaled 6.9e-15, and maxrel 5.3e-13
+        # cell by cell. They were 5.1e-13 and 3.1e-11 when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576).
         @test parity_compare(pr.sigma, mac_asset("CurrencyDefaultSigma"); scale = :array,
                              name = "macro currency sigma").ok
         # A Panel Field of the same local returns under `lx` gives the same fit, because the

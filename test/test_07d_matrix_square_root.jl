@@ -168,9 +168,10 @@ end
     # cancel to near zero.
     @test parity_compare(pr.fpr.sigma, parity_load("MatrixSquareRoot", "Mirror", "Input");
                          scale = :array, name = "Mirror factor sigma").ok
-    # Measured maxrel 8.8e-15, 2.2e-15 and 1.6e-15, and maxscaled 3.0e-13 on `sigma`. The
-    # cell maxrel of `sigma` is 9.8e-12: an entry of `L F L'` near zero cancels, so that
-    # check is `:array`.
+    # Measured maxrel 8.8e-15, 2.2e-15 and 1.6e-15, and maxscaled 7.9e-16 on `sigma`. The
+    # cell maxrel of `sigma` is 2.0e-14: an entry of `L F L'` near zero cancels, so that
+    # check is `:array`. They were 3.0e-13 and 9.8e-12 when the lift repaired the systematic
+    # block `L F L'`, which the oracle does not repair (#1576).
     @test parity_compare(pr.mu, vec(load("Mu")); name = "Mirror mu").ok
     @test parity_compare(pr.sigma, load("Sigma"); scale = :array, name = "Mirror sigma").ok
     @test parity_compare(pr.fpr.sigma, load("FactorCov"); name = "Mirror fcov").ok

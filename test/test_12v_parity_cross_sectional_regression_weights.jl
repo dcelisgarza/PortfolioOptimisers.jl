@@ -512,8 +512,8 @@ end
             @test parity_compare(pr.rr.vs, load(c, "IdioVariances"); name = "$(c) vs").ok
             @test parity_compare(pr.mu, vec(load(c, "Mu")); name = "$(c) mu").ok
             # A covariance compares against its largest entry, because its small off-diagonal
-            # entries come from a cancellation (#1376). Measured maxscaled 3.3e-13, and maxrel
-            # 4.6e-11 cell by cell.
+            # entries come from a cancellation (#1376). Measured maxscaled 2.1e-15, and maxrel
+            # 4.6e-14 cell by cell. They were 3.3e-13 and 4.6e-11 when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576).
             @test parity_compare(pr.sigma, load(c, "Sigma"); scale = :array,
                                  name = "$(c) sigma").ok
         end

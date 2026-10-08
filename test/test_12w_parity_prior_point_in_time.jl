@@ -75,8 +75,9 @@ end
         # 7.0e-15.
         @test parity_compare(pr.mu, loadv(c, "Mu"); name = "$(c) mu").ok
         # `sigma` compares against its largest entry: an off-diagonal entry of two assets near
-        # zero correlation is a cancellation in `L F L'` (#1376). Measured maxscaled 3.0e-13
-        # and 3.4e-13, and maxrel 9.8e-12 and 1.3e-11 cell by cell.
+        # zero correlation is a cancellation in `L F L'` (#1376). Measured maxscaled 7.9e-16
+        # and 5.3e-16, and maxrel 1.6e-14 and 1.7e-14 cell by cell. They were 3.0e-13 and
+        # 3.4e-13, and 9.8e-12 and 1.3e-11, when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576).
         @test parity_compare(pr.sigma, load(c, "Sigma"); scale = :array,
                              name = "$(c) sigma").ok
         # Measured maxrel 1.5e-15 at most.
@@ -157,8 +158,9 @@ end
         c = "PitSmallOverlay"
         K = size(pr.rr.L, 2)
         @test parity_compare(pr.mu, loadv(c, "Mu"); name = "overlay mu").ok
-        # `sigma` carries the cancellation of the default fit: measured maxscaled 3.0e-13, and
-        # maxrel 9.8e-12 cell by cell. Measured maxrel 1.3e-15 (`esigma`) and 5.3e-15 (root).
+        # `sigma` carries the cancellation of the default fit: measured maxscaled 9.9e-16, and
+        # maxrel 9.4e-15 cell by cell. They were 3.0e-13 and 9.8e-12 when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576). Measured maxrel
+        # 1.3e-15 (`esigma`) and 5.3e-15 (root).
         @test parity_compare(pr.sigma, load(c, "Sigma"); scale = :array,
                              name = "overlay sigma").ok
         @test parity_compare(pr.rr.esigma, load(c, "IdioCov"); name = "overlay esigma").ok

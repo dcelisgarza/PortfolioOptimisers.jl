@@ -1499,6 +1499,42 @@ function cross_sectional_residual_block(esigma::MatNum, idx::AbstractVector{<:In
     return (; D = D, R = Matrix(matrix_square_root(mtx_sqrt, D)))
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the Systematic Repair rule of a [`CrossSectionalFactorPrior`](@ref), the rule that says whether the lift repairs the systematic block before it adds the idiosyncratic block.
+
+[`cross_sectional_lift`](@ref) projects the factor covariance onto the investable assets. The result is the systematic block, whose rank is at most the number of factors. So the block is not positive definite when the investable assets outnumber the factors, and a repair under `mp.pdm` moves it by round-off alone. The lift then adds the idiosyncratic block and repairs the sum under `mp.pdm`, under every rule. The rule decides only which steps of `mp` run on the systematic block before the sum.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractSystematicRepair` and implement the following method:
+
+## `systematic_processing!`
+
+  - `systematic_processing!(srep::MySystematicRepair, mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum; kwargs...) -> MatNum`: Processes the systematic block `sigma` in place under `mp`, and returns it.
+
+### Arguments
+
+  - `srep`: The member of the family.
+  - `mp`: The matrix processing estimator of the prior.
+  - `sigma`: The systematic block, `investable assets × investable assets`.
+  - `X`: The asset return scenarios of the investable assets, `scenarios × investable assets`.
+  - `kwargs...`: Additional keyword arguments passed to the steps of `mp`.
+
+### Returns
+
+  - `sigma::MatNum`: The systematic block, modified in place.
+
+# Related
+
+  - [`SystematicRepair`](@ref)
+  - [`NoSystematicRepair`](@ref)
+  - [`systematic_processing!`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_lift`](@ref)
+"""
+abstract type AbstractSystematicRepair <: AbstractAlgorithm end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Lift a factor distribution onto the assets of a Cross-Sectional Factor Prior.
@@ -1541,7 +1577,7 @@ The answer states an entry exactly when the model determines it. An asset of ``\
 
  1. Take `Li`, the rows of `L` at the investable assets. Get `D` and `R` from [`cross_sectional_residual_block`](@ref).
  2. Project the factor mean through `Li`, giving `mui`, and the factor covariance, giving `si`, each with [`support_product`](@ref).
- 3. Process `si` with `mp`, as [`factor_lift`](@ref) does.
+ 3. Process `si` under `srep` with [`systematic_processing!`](@ref). [`SystematicRepair`](@ref) runs every step of `mp`, as [`factor_lift`](@ref) does, and [`NoSystematicRepair`](@ref) runs every step except the `:pdm` step.
  4. Add `D` to `si`, and make the sum positive definite with `mp.pdm`.
  5. Take the ready factors of `f_mu` and `f_sigma` with [`cross_sectional_ready_factors`](@ref), and `lf`, the ready factors whose column of `f_sigma` over the ready factors is not zero. Take the square root `Lf` of the block of `f_sigma` at `lf` under `mtx_sqrt`, and write it into the block at `lf` of a zero matrix `Cf`.
  6. Build `ci`, the low-rank square root `[Li * Cf  R]`.
@@ -1550,6 +1586,7 @@ The answer states an entry exactly when the model determines it. An asset of ``\
 
 # Arguments
 
+  - $(arg_dict[:srep])
   - `mp`: Matrix processing estimator.
   - `L`: The reduced loadings of the latest observation, `assets × factors`.
   - `f_mu`: Expected factor returns on the reduced axis.
@@ -1579,8 +1616,11 @@ The answer states an entry exactly when the model determines it. An asset of ``\
   - [`cross_sectional_ready_factors`](@ref)
   - [`support_product`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
+  - [`AbstractSystematicRepair`](@ref)
+  - [`systematic_processing!`](@ref)
 """
-function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
+function cross_sectional_lift(srep::AbstractSystematicRepair,
+                              mp::AbstractMatrixProcessingEstimator, L::MatNum,
                               f_mu::VecNum, f_sigma::MatNum, esigma::VecNum_MatNum,
                               idx::AbstractVector{<:Integer}, Xs::MatNum;
                               mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
@@ -1593,7 +1633,7 @@ function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
     # so each product reads the factor moments on the support of the loadings alone (#1510).
     mui = support_product(Li, f_mu)
     si = support_product(Li, f_sigma, Li)
-    matrix_processing!(mp, si, view(Xs, :, idx); kwargs...)
+    systematic_processing!(srep, mp, si, view(Xs, :, idx); kwargs...)
     si .+= D
     posdef!(mp.pdm, si)
     rdy = cross_sectional_ready_factors(f_mu, f_sigma)

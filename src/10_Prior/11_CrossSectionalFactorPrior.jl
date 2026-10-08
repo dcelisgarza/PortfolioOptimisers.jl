@@ -328,6 +328,7 @@ $(DocStringExtensions.FIELDS)
                               ce::StatsBase.CovarianceEstimator = ExpWeightedCovariance(; centring = PreCentred()),
                               f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                               mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
+                              srep::AbstractSystematicRepair = NoSystematicRepair(),
                               th::Real = 0.0, bp::Real = 1.0,
                               mcap::AbstractString = "market_cap",
                               bw::AbstractString = "benchmark_weights", lag::Integer = 1,
@@ -409,6 +410,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
   - [`Online`](@ref)
   - [`CrossSectionalCarryState`](@ref)
   - [`AbstractChoiceRule`](@ref)
+  - [`AbstractSystematicRepair`](@ref)
 """
 @propagatable @concrete struct CrossSectionalFactorPrior <: AbstractLowOrderPriorEstimator_A
     """
@@ -451,6 +453,10 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     $(field_dict[:mp])
     """
     @fprop mp
+    """
+    $(field_dict[:srep]) The default is [`NoSystematicRepair`](@ref). The batch fit and the read-out of the carry fold run the same lift, so the carry fold equals the batch fit under each rule.
+    """
+    srep
     """
     Idiosyncratic correlation threshold. A value of zero leaves the idiosyncratic covariance diagonal, and a positive value keeps every correlation above it and zeroes the rest, so the block becomes a matrix.
     """
@@ -520,8 +526,9 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        ve::AbstractCovarianceEstimator,
                                        ce::StatsBase.CovarianceEstimator,
                                        f_mp::AbstractMatrixProcessingEstimator,
-                                       mp::AbstractMatrixProcessingEstimator, th::Real,
-                                       bp::Real, mcap::AbstractString, bw::AbstractString,
+                                       mp::AbstractMatrixProcessingEstimator,
+                                       srep::AbstractSystematicRepair, th::Real, bp::Real,
+                                       mcap::AbstractString, bw::AbstractString,
                                        lag::Integer, minra::Option{<:Integer},
                                        rfe::Option{<:AbstractReturnForecastEstimator},
                                        lambda::Num_SpanShrinkCal, c::Num_OrthFcScaleCal,
@@ -556,33 +563,12 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         assert_orthogonal_forecast_fit(ofit, rfe)
         return new{typeof(factors), typeof(neutralise), typeof(families), typeof(cre),
                    typeof(wa), typeof(pe), typeof(ve), typeof(ce), typeof(f_mp), typeof(mp),
-                   typeof(th), typeof(bp), typeof(mcap), typeof(bw), typeof(lag),
-                   typeof(minra), typeof(rfe), typeof(lambda), typeof(c), typeof(ofit),
-                   typeof(lx), typeof(mtx_sqrt), typeof(ex), typeof(choice), typeof(cache)}(factors,
-                                                                                            neutralise,
-                                                                                            families,
-                                                                                            cre,
-                                                                                            wa,
-                                                                                            pe,
-                                                                                            ve,
-                                                                                            ce,
-                                                                                            f_mp,
-                                                                                            mp,
-                                                                                            th,
-                                                                                            bp,
-                                                                                            mcap,
-                                                                                            bw,
-                                                                                            lag,
-                                                                                            minra,
-                                                                                            rfe,
-                                                                                            lambda,
-                                                                                            c,
-                                                                                            ofit,
-                                                                                            lx,
-                                                                                            mtx_sqrt,
-                                                                                            ex,
-                                                                                            choice,
-                                                                                            cache)
+                   typeof(srep), typeof(th), typeof(bp), typeof(mcap), typeof(bw),
+                   typeof(lag), typeof(minra), typeof(rfe), typeof(lambda), typeof(c),
+                   typeof(ofit), typeof(lx), typeof(mtx_sqrt), typeof(ex), typeof(choice),
+                   typeof(cache)}(factors, neutralise, families, cre, wa, pe, ve, ce, f_mp,
+                                  mp, srep, th, bp, mcap, bw, lag, minra, rfe, lambda, c,
+                                  ofit, lx, mtx_sqrt, ex, choice, cache)
     end
 end
 function CrossSectionalFactorPrior(; factors::Dict_VecPair,
@@ -600,6 +586,7 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                                                                              centring = PreCentred()),
                                    f_mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
+                                   srep::AbstractSystematicRepair = NoSystematicRepair(),
                                    th::Real = 0.0, bp::Real = 1.0,
                                    mcap::AbstractString = "market_cap",
                                    bw::AbstractString = "benchmark_weights",
@@ -616,8 +603,9 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
     return CrossSectionalFactorPrior(cross_sectional_prior_pairs(factors, :factors),
                                      cross_sectional_prior_option(neutralise, :neutralise),
                                      cross_sectional_prior_option(families, :families), cre,
-                                     wa, pe, ve, ce, f_mp, mp, th, bp, mcap, bw, lag, minra,
-                                     rfe, lambda, c, ofit, lx, mtx_sqrt, ex, choice, cache)
+                                     wa, pe, ve, ce, f_mp, mp, srep, th, bp, mcap, bw, lag,
+                                     minra, rfe, lambda, c, ofit, lx, mtx_sqrt, ex, choice,
+                                     cache)
 end
 # `lambda` and `c` are the two Calibration Slots of the prior. The prior resolves them itself,
 # inside `cross_sectional_assemble`, so the declaration serves the two `assert_` walks alone.
@@ -961,7 +949,7 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
     # the last rows of each history, so the factor returns and the original returns keep the
     # rows the scenarios keep (#1384).
     rs = (length(r) - size(Xs, 1) + 1):length(r)
-    lift = cross_sectional_lift(pe.mp, L, f_mu, f_pr.sigma, esigma, idx, Xs;
+    lift = cross_sectional_lift(pe.srep, pe.mp, L, f_mu, f_pr.sigma, esigma, idx, Xs;
                                 mtx_sqrt = pe.mtx_sqrt, kwargs...)
     fpr = LowOrderPrior(; X = something(fr, ca.f)[rs, :], mu = ex.mu, sigma = ex.sigma,
                         w = f_pr.w, ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow)
@@ -1624,9 +1612,9 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
   - [`set_show_nothing_fields!`](@ref)
 """
 function show_fields(::CrossSectionalFactorPrior)
-    return (:factors, :neutralise, :families, :cre, :wa, :pe, :ve, :ce, :f_mp, :mp, :th,
-            :bp, :mcap, :bw, :lag, :minra, :rfe, :lambda, :c, :ofit, :lx, :mtx_sqrt, :ex,
-            :choice)
+    return (:factors, :neutralise, :families, :cre, :wa, :pe, :ve, :ce, :f_mp, :mp, :srep,
+            :th, :bp, :mcap, :bw, :lag, :minra, :rfe, :lambda, :c, :ofit, :lx, :mtx_sqrt,
+            :ex, :choice)
 end
 function factor_residual_config(::CrossSectionalFactorPrior)
     # The declaration names a variance estimator that a consumer re-runs on the

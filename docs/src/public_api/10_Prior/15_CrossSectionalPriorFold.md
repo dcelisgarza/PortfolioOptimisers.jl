@@ -7,7 +7,7 @@ Description = "Cross-Sectional Prior Fold, public API of PortfolioOptimisers.jl:
 A [`CrossSectionalFactorPrior`](@ref) that [`Online`](@ref) does not wrap updates with each new block of observations. Its first `partial_fit!` creates a [`PortfolioOptimisers.CrossSectionalCarryState`](@ref). Each later update computes the exposures, the regression and the idiosyncratic variance of the new observations alone, from the last panel rows that its descriptors read. Then `prior(pe)` builds the result with the code of the batch fit.
 
 ```@docs
-PortfolioOptimisers.partial_fit!(pe::CrossSectionalFactorPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.CrossSectionalCarryState}}, rd::ReturnsResult)
+PortfolioOptimisers.partial_fit!(pe::CrossSectionalFactorPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.CrossSectionalCarryState}}, rd::ReturnsResult)
 prior(pe::CrossSectionalFactorPrior, st::PortfolioOptimisers.CrossSectionalCarryState; strict::Bool = false, kwargs...)
 merge_states(::PortfolioOptimisers.CrossSectionalCarryState, ::PortfolioOptimisers.CrossSectionalCarryState)
 PortfolioOptimisers.port_opt_view(::PortfolioOptimisers.CrossSectionalCarryState, i, args...)

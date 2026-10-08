@@ -70,7 +70,8 @@ function grid_check(pr, fix::AbstractString, c::AbstractString, rest)
         return nothing
     end
     # A covariance compares against its largest entry, because its small off-diagonal
-    # entries come from a cancellation (#1376). Measured maxscaled 6.9e-13.
+    # entries come from a cancellation (#1376). Measured maxscaled 1.2e-14, and maxrel
+    # 6.2e-12 cell by cell. It was 6.9e-13 when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576).
     @test parity_compare(pr.sigma[rest, rest], load("Sigma")[rest, rest]; scale = :array,
                          name = "$(nm) sigma").ok
     # A factor return is a difference of weighted sums, and one near zero carries the
