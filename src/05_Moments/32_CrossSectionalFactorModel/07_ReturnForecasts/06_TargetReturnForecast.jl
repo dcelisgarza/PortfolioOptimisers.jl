@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the calibration warm-up of a [`TargetReturnForecast`](@ref), the rule that states the uncalibrated prediction the calibration reads while no prediction is out of fold.
 
-A cross-validation estimator in `cv` needs two valid samples per fold, which is twice the split count that [`n_splits`](@ref) reports. Below that count no out-of-fold prediction exists, so no out-of-fold slope exists. [`NaNWarmup`](@ref) states that with a `NaN` slope. [`InSampleWarmup`](@ref) calibrates on the in-sample predictions of the fitted model, which gives a slope that is biased upward. The rule acts only below that count and only under a cross-validation estimator.
+A cross-validation estimator in `cv` needs two valid samples per fold, which is twice the split count that [`n_splits`](@ref) reports. Below that count no out-of-fold prediction exists, so no out-of-fold slope exists. [`NaNWarmup`](@ref) states that with a `NaN` slope. [`InSampleWarmup`](@ref) calibrates on the in-sample predictions of the fitted model, which gives a slope that is biased upward. The rule acts only below that count and only under a cross-validation estimator. [`PrequentialCalibration`](@ref), the default, states its own warm-up, so no warm-up rule acts under it.
 
 # Interfaces
 
@@ -109,7 +109,199 @@ function target_forecast_warmup(::NaNWarmup, ::Any, ::Any, Sf::MatNum, ::VecNum,
 end
 function target_forecast_warmup(::InSampleWarmup, rfe, model, Sf::MatNum, yf::VecNum,
                                 ok::AbstractVector{Bool})::VecNum
-    return target_forecast_uncalibrated(nothing, rfe, model, Sf, yf, ok)
+    return target_forecast_insample(model, Sf, ok)
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The prequential rule of the calibration of a [`TargetReturnForecast`](@ref). Each matured observation reads the prediction of the model fitted on the valid samples whose target had matured at that observation. This is the default rule.
+
+The member forecasts observation ``t`` at ``t``. At ``t`` the target of observation ``s`` has matured when ``s \\leq t - \\ell - h + 1``, with ``\\ell`` the lag and ``h`` the horizon. So the prediction of observation ``t`` is the forecast that the member publishes at ``t``, before its calibration. No prediction reads a later observation, and the forward window of no training target overlaps the forward window of the observation that it predicts. A new observation leaves every earlier prediction as it stands, so the member can fold one observation at a time.
+
+An observation predicts `NaN` while no valid sample matured before it, which is the warm-up of the member itself. The calibration then counts its own warm-up in `min_obs`.
+
+A cross-validation estimator in `cv` gives a different reading. Its folds cut the samples in order of observation, so the model that predicts an early fold trains on later observations. Under `horizon > 1` the forward windows at the edge of a fold also overlap those of the next fold. A new sample moves every edge, so that rule cannot fold.
+
+[`LinearModel`](@ref) with no keyword argument folds its fit. The member adds the valid samples of each observation to `X'X` and `X'y` and solves them, and the fitted model is a [`NormalEquationsFit`](@ref). Every other regression target fits again on the matured samples at each observation that adds one. This is exact, and it costs one fit for each observation.
+
+# Constructors
+
+    PrequentialCalibration() -> PrequentialCalibration
+
+# Examples
+
+```jldoctest
+julia> TargetReturnForecast(;
+                            scores = DescriptorScores(;
+                                                      descriptors = [Passthrough(; field = \"a\")])).cv
+PrequentialCalibration()
+```
+
+# Related
+
+  - [`TargetReturnForecast`](@ref)
+  - [`NormalEquationsFit`](@ref)
+  - [`target_forecast_prequential`](@ref)
+  - [`CrossValidationEstimator`](@ref)
+"""
+struct PrequentialCalibration <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The least squares fit of a [`LinearModel`](@ref) with no keyword argument, solved from its normal equations. [`TargetReturnForecast`](@ref) fits it under [`PrequentialCalibration`](@ref).
+
+The fit carries its sufficient statistics. The next observation adds its valid samples to `XtX` and `Xty`, and it reads nothing else of the past fit. The coefficients solve the normal equations through a Cholesky factorisation with pivots. A column that the factorisation finds collinear with the columns before it takes a zero coefficient, as `GLM.LinearModel` does under its default `dropcollinear = true`.
+
+# Fields
+
+$(DocStringExtensions.TYPEDFIELDS)
+
+# Constructors
+
+    NormalEquationsFit(XtX::MatNum, Xty::VecNum, n::Integer) -> NormalEquationsFit
+
+The constructor solves the coefficients through [`normal_equations_coef`](@ref).
+
+## Validation
+
+  - `XtX` is square, and its side is the length of `Xty`. Raises a `DimensionMismatch`.
+  - `n >= 0`.
+
+# Examples
+
+```jldoctest
+julia> m = NormalEquationsFit([4.0 0.0; 0.0 16.0], [4.0, 8.0], 3);
+
+julia> PortfolioOptimisers.StatsAPI.coef(m)
+2-element Vector{Float64}:
+ 1.0
+ 0.5
+
+julia> PortfolioOptimisers.StatsAPI.predict(m, [1.0 2.0])
+1-element Vector{Float64}:
+ 2.0
+```
+
+# Related
+
+  - [`PrequentialCalibration`](@ref)
+  - [`LinearModel`](@ref)
+  - [`normal_equations_add!`](@ref)
+  - [`normal_equations_coef`](@ref)
+"""
+@concrete struct NormalEquationsFit <: AbstractResult
+    """
+    The sum of the outer products of the valid design rows, `X'X`.
+    """
+    XtX
+    """
+    The sum of each valid design row times its target, `X'y`.
+    """
+    Xty
+    """
+    The number of valid samples in the two sums.
+    """
+    n
+    """
+    The coefficients that solve the normal equations.
+    """
+    coef
+    function NormalEquationsFit(XtX::MatNum, Xty::VecNum, n::Integer)
+        @argcheck(size(XtX, 1) == size(XtX, 2) == length(Xty),
+                  DimensionMismatch("XtX must be square with the side of Xty, got size(XtX) = $(size(XtX)) and length(Xty) = $(length(Xty))"))
+        @argcheck(n >= zero(n), DomainError(n, "n must be non-negative"))
+        coef = normal_equations_coef(XtX, Xty)
+        return new{typeof(XtX), typeof(Xty), typeof(n), typeof(coef)}(XtX, Xty, n, coef)
+    end
+end
+function StatsAPI.coef(m::NormalEquationsFit)::VecNum
+    return m.coef
+end
+function StatsAPI.predict(m::NormalEquationsFit, X::MatNum)::VecNum
+    return X * m.coef
+end
+"""
+    normal_equations_coef(XtX::MatNum, Xty::VecNum) -> VecNum
+
+Solve the normal equations `XtX * b = Xty` of a least squares fit, with a zero coefficient for each collinear column.
+
+# Algorithm
+
+ 1. Factorise `XtX` through a Cholesky factorisation with pivots, with the default tolerance of `LinearAlgebra`, as `GLM.LinearModel` does. This gives the rank `r` and the order `p` of the columns.
+ 2. Solve the leading `r × r` block for the first `r` columns of `p`, and give each other column a zero coefficient.
+
+# Arguments
+
+  - `XtX`: The sum of the outer products of the design rows.
+  - `Xty`: The sum of each design row times its target.
+
+# Returns
+
+  - `b::VecNum`: The coefficients.
+
+# Related
+
+  - [`NormalEquationsFit`](@ref)
+  - [`normal_equations_add!`](@ref)
+"""
+function normal_equations_coef(XtX::MatNum, Xty::VecNum)::VecNum
+    Tf = promote_type(real(eltype(XtX)), real(eltype(Xty)))
+    b = zeros(Tf, length(Xty))
+    # A dense copy, so the factorisation in place leaves the carried sums as they are.
+    F = LinearAlgebra.cholesky!(LinearAlgebra.Symmetric(Matrix{Tf}(XtX)),
+                                LinearAlgebra.RowMaximum(); tol = -one(Tf), check = false)
+    r = F.rank
+    if r > 0
+        p = F.p[1:r]
+        U = LinearAlgebra.UpperTriangular(F.U[1:r, 1:r])
+        b[p] = U \ (transpose(U) \ Xty[p])
+    end
+    return b
+end
+"""
+    normal_equations_add!(XtX::MatNum, Xty::VecNum, Sf::MatNum, yf::VecNum,
+                          ok::AbstractVector{Bool}, js::AbstractUnitRange) -> Integer
+
+Add the valid samples `js` of a flat design to the normal equations of a least squares fit, in place.
+
+The function adds one sample at a time, in the order of `js`. So a sum over many ranges, taken one range after the other, is the sum over their union to the last bit. This is what lets [`PrequentialCalibration`](@ref) fold one observation at a time and still equal the batch fit.
+
+# Arguments
+
+  - `XtX`: The sum of the outer products of the design rows. The function changes it.
+  - `Xty`: The sum of each design row times its target. The function changes it.
+  - `Sf`: The flattened design.
+  - `yf`: The flattened target.
+  - `ok`: The mask of the valid samples.
+  - `js`: The samples to add.
+
+# Returns
+
+  - `m::Integer`: The number of valid samples that the function added.
+
+# Related
+
+  - [`NormalEquationsFit`](@ref)
+  - [`normal_equations_coef`](@ref)
+  - [`target_forecast_prequential`](@ref)
+"""
+function normal_equations_add!(XtX::MatNum, Xty::VecNum, Sf::MatNum, yf::VecNum,
+                               ok::AbstractVector{Bool}, js::AbstractUnitRange)::Integer
+    m = 0
+    for j in js
+        if !ok[j]
+            continue
+        end
+        m += 1
+        for l in axes(Sf, 2)
+            x = Sf[j, l]
+            Xty[l] += x * yf[j]
+            for k in axes(Sf, 2)
+                XtX[k, l] += Sf[j, k] * x
+            end
+        end
+    end
+    return m
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -118,7 +310,7 @@ A Return Forecast fitted by a regression target over every observation and asset
 
 The member turns its Descriptors into scores with the recipe in `scores`, and hands every `(observation, asset)` pair whose forward target has matured to a regression target as one sample. The combination of the Descriptors is whatever the target fits, so this member admits a nonlinear one. [`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref) are two targets the library defines. A caller's own target runs here when it states `StatsAPI.fit` and `StatsAPI.predict`, as the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states. The member fits the target without observation weights, so the target needs no weight method here.
 
-The member transforms the target of the fit cross-sectionally before the fit reads it, so one extreme observation does not set the shape of the whole model. The transformed target has no unit, and neither has the prediction. One exponentially weighted scalar regression of the forward return on the prediction puts the prediction into return units. `cv` chooses whether that regression reads in-sample or out-of-fold predictions. The default is the out-of-fold predictions of a five-fold split. A prediction of a sample the model trained on agrees with its own target by construction, so an in-sample calibration gives a positive slope to scores that carry no information. A calibration slope is a measure of skill, and skill is an out-of-sample quantity.
+The member transforms the target of the fit cross-sectionally before the fit reads it, so one extreme observation does not set the shape of the whole model. The transformed target has no unit, and neither has the prediction. One exponentially weighted scalar regression of the forward return on the prediction puts the prediction into return units. `cv` chooses the predictions that regression reads. A prediction of a sample the model trained on agrees with its own target by construction, so an in-sample calibration gives a positive slope to scores that carry no information. A calibration slope is a measure of skill, and skill is an out-of-sample quantity. The default, [`PrequentialCalibration`](@ref), predicts each observation with the model fitted on the observations whose target had matured at it. That prediction is the forecast the member publishes at that observation, so it reads no later observation, and the member can fold one observation at a time. A cross-validation estimator gives out-of-fold predictions, but a fold that comes before another trains on later observations.
 
 `intercept` states whether the fit adds a constant to the scores. The intercept adds the same value to the prediction of every asset of an observation. The target is the idiosyncratic return, and under a market factor its weighted cross-sectional mean is zero at every observation, so an intercept estimates a quantity near zero. The default fits none.
 
@@ -155,7 +347,7 @@ Where:
   - $(math_dict[:u_ti_cs])
   - ``\\mathcal{S}``: The valid samples, the pairs whose target has matured, ``t \\leq T - \\ell - h + 1``, with ``u_{ti} > 0`` and a finite ``z_{ti}`` and ``\\boldsymbol{s}_{ti}``.
   - ``\\mathcal{M}``: The model the regression target fits on the valid samples.
-  - ``p_{ti}``: Uncalibrated prediction of asset ``i`` at observation ``t``, in return units. Under a cross-validation estimator in `cv`, the calibration reads the prediction of each valid sample from the model fitted on the folds that do not hold that sample. Below two valid samples per fold, no prediction is out of fold, and `warmup` states the prediction the calibration reads.
+  - ``p_{ti}``: Uncalibrated prediction of asset ``i`` at observation ``t``, in return units. Under [`PrequentialCalibration`](@ref), the calibration reads the prediction of each matured observation ``t`` from the model fitted on the valid samples of the observations up to ``t - \\ell - h + 1``, and `NaN` while there is no such sample. Under a cross-validation estimator in `cv`, the calibration reads the prediction of each valid sample from the model fitted on the folds that do not hold that sample. Below two valid samples per fold, no prediction is out of fold, and `warmup` states the prediction the calibration reads.
   - ``\\mathcal{A}_{t}``: The assets of a matured observation ``t`` that enter the calibration, those with ``u_{ti} > 0`` and a finite ``v_{ti}``, ``p_{ti}`` and ``\\bar{\\varepsilon}_{ti}``.
   - ``\\omega_{ti}``: Calibration weight of asset ``i`` at observation ``t``. The weights of one observation have a mean of one.
   - ``a_{t}``, ``c_{t}``: The weighted normal product and cross product of observation ``t``.
@@ -183,7 +375,7 @@ $(DocStringExtensions.TYPEDFIELDS)
                          calibrate::Bool = true, scale::Real = 1.0,
                          half_life::Real = 20.0, decay::Real = half_life_decay(half_life),
                          min_obs::Integer = 1,
-                         cv::Option{<:CrossValidationEstimator} = KFold(),
+                         cv::Union{Nothing, CrossValidationEstimator, PrequentialCalibration} = PrequentialCalibration(),
                          warmup::AbstractCalibrationWarmup = NaNWarmup(),
                          unit::AbstractForecastUnit = IdiosyncraticReturnUnit(),
                          intercept::Bool = false) -> TargetReturnForecast
@@ -232,14 +424,7 @@ TargetReturnForecast
            scale ┼ Float64: 1.0
            decay ┼ Float64: 0.7071067811865476
          min_obs ┼ Int64: 1
-              cv ┼ KFold
-                 │                   n ┼ Int64: 5
-                 │         purged_size ┼ Int64: 0
-                 │        embargo_size ┼ Int64: 0
-                 │                  wd ┼ nothing
-                 │                  fa ┼ nothing
-                 │   store_weight_path ┼ Bool: false
-                 │              strict ┴ Bool: false
+              cv ┼ PrequentialCalibration()
           warmup ┼ NaNWarmup()
             unit ┼ IdiosyncraticReturnUnit()
        intercept ┴ Bool: false
@@ -301,7 +486,7 @@ TargetReturnForecast
     """
     min_obs
     """
-    Cross-validation estimator whose folds give the out-of-fold predictions the calibration reads, or `nothing` to calibrate on in-sample predictions. The field takes an estimator and never an integer: `KFold(; n = k)` gives `k` consecutive folds with no shuffle, which is the split that an integer `k` means in a K-fold short form.
+    The rule that gives the uncalibrated predictions the calibration reads. [`PrequentialCalibration`](@ref), the default, reads the prediction of each observation from the model fitted on the targets that had matured at it. A cross-validation estimator reads the out-of-fold predictions of its folds, and `nothing` reads the in-sample predictions. The field takes an estimator and never an integer: `KFold(; n = k)` gives `k` consecutive folds with no shuffle, which is the split that an integer `k` means in a K-fold short form.
     """
     cv
     """
@@ -321,7 +506,9 @@ TargetReturnForecast
                                   target_outlier::Option{<:AbstractCrossSectionalTransform},
                                   target_scoring::Option{<:AbstractCrossSectionalTransform},
                                   calibrate::Bool, scale::Real, decay::Real,
-                                  min_obs::Integer, cv::Option{<:CrossValidationEstimator},
+                                  min_obs::Integer,
+                                  cv::Union{Nothing, CrossValidationEstimator,
+                                            PrequentialCalibration},
                                   warmup::AbstractCalibrationWarmup,
                                   unit::AbstractForecastUnit, intercept::Bool)
         assert_nonempty_gt0_finite_val(horizon, :horizon)
@@ -358,7 +545,8 @@ function TargetReturnForecast(; scores::DescriptorScores,
                               half_life::Real = 20.0,
                               decay::Real = half_life_decay(half_life),
                               min_obs::Integer = 1,
-                              cv::Option{<:CrossValidationEstimator} = KFold(),
+                              cv::Union{Nothing, CrossValidationEstimator,
+                                        PrequentialCalibration} = PrequentialCalibration(),
                               warmup::AbstractCalibrationWarmup = NaNWarmup(),
                               unit::AbstractForecastUnit = IdiosyncraticReturnUnit(),
                               intercept::Bool = false)::TargetReturnForecast
@@ -521,6 +709,13 @@ Fit the regression target of a [`TargetReturnForecast`](@ref) on the valid sampl
 
 A window with no valid sample fits nothing and returns `nothing`. This is the warm-up of the member, which forecasts `NaN` until the target of one observation has matured.
 
+# Algorithm
+
+The methods of [`target_forecast_model`](@ref) that Julia selects are the algorithm.
+
+ 1. [`PrequentialCalibration`](@ref) and a [`LinearModel`](@ref) with no keyword argument: add every valid sample to the normal equations through [`normal_equations_add!`](@ref), in the order of [`target_forecast_samples`](@ref), giving a [`NormalEquationsFit`](@ref). The predictions of [`target_forecast_prequential`](@ref) add the same samples in the same order, so the model of the latest observation is the end of that fold to the last bit.
+ 2. Any other pair: fit the regression target on the valid samples through `StatsAPI.fit`.
+
 # Arguments
 
   - `rfe`: Target Return Forecast Estimator. The function reads the regression target from its field rather than from an abstract argument, so the call of the third-party fit stays concrete.
@@ -537,19 +732,62 @@ A window with no valid sample fits nothing and returns `nothing`. This is the wa
   - [`TargetReturnForecast`](@ref)
   - [`target_forecast_samples`](@ref)
   - [`AbstractRegressionTarget`](@ref)
+  - [`NormalEquationsFit`](@ref)
 """
 function target_forecast_fit(rfe::TargetReturnForecast, Sf::MatNum, yf::VecNum,
                              ok::AbstractVector{Bool})
+    return any(ok) ? target_forecast_model(rfe.cv, rfe.tgt, Sf, yf, ok) : nothing
+end
+"""
+    target_forecast_model(cv::PrequentialCalibration, tgt::LinearModel{@NamedTuple{}},
+                          Sf::MatNum, yf::VecNum, ok::AbstractVector{Bool}) -> NormalEquationsFit
+    target_forecast_model(cv, tgt::AbstractRegressionTarget, Sf::MatNum, yf::VecNum,
+                          ok::AbstractVector{Bool})
+
+Fit the model of the latest observation of a [`TargetReturnForecast`](@ref) on the valid samples. [`target_forecast_fit`](@ref) states the two methods.
+
+# Arguments
+
+  - `cv`: The rule of the calibration, `rfe.cv`.
+  - `tgt`: The regression target, `rfe.tgt`.
+  - `Sf`: The flattened design.
+  - `yf`: The flattened target.
+  - `ok`: The mask of the valid samples. At least one sample is valid.
+
+# Returns
+
+  - `model`: The fitted model.
+
+# Related
+
+  - [`target_forecast_fit`](@ref)
+  - [`NormalEquationsFit`](@ref)
+"""
+function target_forecast_model(::PrequentialCalibration, ::LinearModel{@NamedTuple{}},
+                               Sf::MatNum, yf::VecNum,
+                               ok::AbstractVector{Bool})::NormalEquationsFit
+    Tf = promote_type(real(eltype(Sf)), real(eltype(yf)))
+    K = size(Sf, 2)
+    XtX = zeros(Tf, K, K)
+    Xty = zeros(Tf, K)
+    n = normal_equations_add!(XtX, Xty, Sf, yf, ok, eachindex(ok))
+    return NormalEquationsFit(XtX, Xty, n)
+end
+function target_forecast_model(::Any, tgt::AbstractRegressionTarget, Sf::MatNum, yf::VecNum,
+                               ok::AbstractVector{Bool})
     idx = findall(ok)
-    return !isempty(idx) ? StatsAPI.fit(rfe.tgt, Sf[idx, :], yf[idx]) : nothing
+    return StatsAPI.fit(tgt, Sf[idx, :], yf[idx])
 end
 """
     target_forecast_uncalibrated(cv::Nothing, rfe::TargetReturnForecast, model,
-                                 Sf::MatNum, yf::VecNum,
-                                 ok::AbstractVector{Bool}) -> VecNum
+                                 Sf::MatNum, yf::VecNum, ok::AbstractVector{Bool},
+                                 N::Integer) -> VecNum
     target_forecast_uncalibrated(cv::CrossValidationEstimator, rfe::TargetReturnForecast,
-                                 model, Sf::MatNum, yf::VecNum,
-                                 ok::AbstractVector{Bool}) -> VecNum
+                                 model, Sf::MatNum, yf::VecNum, ok::AbstractVector{Bool},
+                                 N::Integer) -> VecNum
+    target_forecast_uncalibrated(cv::PrequentialCalibration, rfe::TargetReturnForecast,
+                                 model, Sf::MatNum, yf::VecNum, ok::AbstractVector{Bool},
+                                 N::Integer) -> VecNum
 
 Predict the uncalibrated forecast of the samples a [`TargetReturnForecast`](@ref) trained on.
 
@@ -557,17 +795,19 @@ Predict the uncalibrated forecast of the samples a [`TargetReturnForecast`](@ref
 
 The method that Julia selects is the algorithm.
 
- 1. `nothing`: the fitted model predicts its own training samples, so the calibration runs in sample.
+ 1. `nothing`: the fitted model predicts its own training samples through [`target_forecast_insample`](@ref), so the calibration runs in sample.
  2. A cross-validation estimator: [`Base.split`](@ref) splits the valid samples. For each split, the function fits a model on the training folds and predicts the test fold, so the calibration never reads a prediction of a sample the model trained on. A sample that no split tests keeps its `NaN`. Below two valid samples per fold, which is twice the split count that [`n_splits`](@ref) reports, the function fits no fold and returns the prediction of [`target_forecast_warmup`](@ref) under `rfe.warmup`. The default [`NaNWarmup`](@ref) gives `NaN` to every sample, so the calibration is in its warm-up. [`InSampleWarmup`](@ref) gives the in-sample prediction of method 1, with the bias that the split removes.
+ 3. [`PrequentialCalibration`](@ref): each observation reads the prediction of the model fitted on the valid samples whose target had matured at it, through [`target_forecast_prequential`](@ref). The method reads no model that `model` holds.
 
 # Arguments
 
-  - `cv`: Cross-validation estimator, or `nothing`. It is `rfe.cv`. The caller passes it as an argument of its own, so that the method Julia selects is the algorithm.
+  - `cv`: The rule of the calibration. It is `rfe.cv`. The caller passes it as an argument of its own, so that the method Julia selects is the algorithm.
   - `rfe`: Target Return Forecast Estimator.
   - `model`: The model fitted on every valid sample.
   - `Sf`: The flattened design.
   - `yf`: The flattened target.
   - `ok`: The mask of the valid samples.
+  - `N`: The number of assets, so that the samples of observation `t` are `(t - 1) * N + 1` to `t * N`.
 
 # Returns
 
@@ -578,18 +818,16 @@ The method that Julia selects is the algorithm.
   - [`TargetReturnForecast`](@ref)
   - [`target_forecast_fit`](@ref)
   - [`CrossValidationEstimator`](@ref)
+  - [`PrequentialCalibration`](@ref)
 """
 function target_forecast_uncalibrated(::Nothing, ::TargetReturnForecast, model, Sf::MatNum,
-                                      ::VecNum, ok::AbstractVector{Bool})::VecNum
-    Tf = real(eltype(Sf))
-    p = fill(Tf(NaN), length(ok))
-    idx = findall(ok)
-    p[idx] = StatsAPI.predict(model, Sf[idx, :])
-    return p
+                                      ::VecNum, ok::AbstractVector{Bool}, ::Integer)::VecNum
+    return target_forecast_insample(model, Sf, ok)
 end
 function target_forecast_uncalibrated(cv::CrossValidationEstimator,
                                       rfe::TargetReturnForecast, model, Sf::MatNum,
-                                      yf::VecNum, ok::AbstractVector{Bool})::VecNum
+                                      yf::VecNum, ok::AbstractVector{Bool},
+                                      ::Integer)::VecNum
     Tf = real(eltype(Sf))
     idx = findall(ok)
     m = length(idx)
@@ -609,6 +847,172 @@ function target_forecast_uncalibrated(cv::CrossValidationEstimator,
     end
     p[idx] = q
     return p
+end
+function target_forecast_uncalibrated(::PrequentialCalibration, rfe::TargetReturnForecast,
+                                      ::Any, Sf::MatNum, yf::VecNum,
+                                      ok::AbstractVector{Bool}, N::Integer)::VecNum
+    return target_forecast_prequential(rfe.tgt, rfe.lag + rfe.horizon - 1, Sf, yf, ok, N)
+end
+"""
+    target_forecast_insample(model, Sf::MatNum, ok::AbstractVector{Bool}) -> VecNum
+
+Predict the valid samples of a [`TargetReturnForecast`](@ref) with the model fitted on all of them, and give every other sample `NaN`.
+
+# Arguments
+
+  - `model`: The model fitted on every valid sample.
+  - `Sf`: The flattened design.
+  - `ok`: The mask of the valid samples.
+
+# Returns
+
+  - `p::VecNum`: The in-sample prediction of every sample.
+
+# Related
+
+  - [`target_forecast_uncalibrated`](@ref)
+  - [`InSampleWarmup`](@ref)
+"""
+function target_forecast_insample(model, Sf::MatNum, ok::AbstractVector{Bool})::VecNum
+    Tf = real(eltype(Sf))
+    p = fill(Tf(NaN), length(ok))
+    idx = findall(ok)
+    p[idx] = StatsAPI.predict(model, Sf[idx, :])
+    return p
+end
+"""
+    target_forecast_prequential(tgt::LinearModel{@NamedTuple{}}, g::Integer, Sf::MatNum,
+                                yf::VecNum, ok::AbstractVector{Bool}, N::Integer) -> VecNum
+    target_forecast_prequential(tgt::AbstractRegressionTarget, g::Integer, Sf::MatNum,
+                                yf::VecNum, ok::AbstractVector{Bool}, N::Integer) -> VecNum
+
+Predict each valid sample of a [`TargetReturnForecast`](@ref) with the model fitted on the valid samples whose target had matured at its observation, the rule of [`PrequentialCalibration`](@ref).
+
+# Algorithm
+
+For each observation `t` in order:
+
+ 1. When `t > g`, the target of observation `t - g` matures at `t`. Add its valid samples to the fit.
+ 2. When the fit holds a valid sample, predict the valid samples of observation `t` with it. Otherwise they keep `NaN`.
+
+The method that Julia selects states how the fit grows.
+
+ 1. A [`LinearModel`](@ref) with no keyword argument: add the samples to the normal equations through [`normal_equations_add!`](@ref), and solve them through [`normal_equations_coef`](@ref) when they change. [`target_forecast_fit`](@ref) adds the same samples in the same order, so the two agree to the last bit.
+ 2. Any other regression target: fit it again through `StatsAPI.fit` on every matured valid sample, when step 1 adds one.
+
+# Arguments
+
+  - `tgt`: The regression target, `rfe.tgt`.
+  - `g`: The rows between an observation and the maturity of its target, `lag + horizon - 1`.
+  - `Sf`: The flattened design, `nt · N × K`.
+  - `yf`: The flattened target.
+  - `ok`: The mask of the valid samples.
+  - `N`: The number of assets.
+
+# Returns
+
+  - `p::VecNum`: The prequential prediction of every sample, `NaN` where the sample is not valid or no valid sample matured before its observation.
+
+# Related
+
+  - [`PrequentialCalibration`](@ref)
+  - [`target_forecast_uncalibrated`](@ref)
+  - [`NormalEquationsFit`](@ref)
+"""
+function target_forecast_prequential(::LinearModel{@NamedTuple{}}, g::Integer, Sf::MatNum,
+                                     yf::VecNum, ok::AbstractVector{Bool},
+                                     N::Integer)::VecNum
+    Tf = promote_type(real(eltype(Sf)), real(eltype(yf)))
+    K = size(Sf, 2)
+    p = fill(Tf(NaN), length(ok))
+    XtX = zeros(Tf, K, K)
+    Xty = zeros(Tf, K)
+    b = zeros(Tf, K)
+    n = 0
+    # No target matured before observation g + 1, so the first g observations keep NaN.
+    for t in (g + 1):target_forecast_observations(ok, N)
+        # The fit changes only when the matured observation adds a valid sample.
+        m = normal_equations_add!(XtX, Xty, Sf, yf, ok, target_forecast_row(t - g, N))
+        n += m
+        b = m > 0 ? normal_equations_coef(XtX, Xty) : b
+        for j in target_forecast_row(t, N)
+            if n > 0 && ok[j]
+                p[j] = LinearAlgebra.dot(view(Sf, j, :), b)
+            end
+        end
+    end
+    return p
+end
+function target_forecast_prequential(tgt::AbstractRegressionTarget, g::Integer, Sf::MatNum,
+                                     yf::VecNum, ok::AbstractVector{Bool},
+                                     N::Integer)::VecNum
+    Tf = promote_type(real(eltype(Sf)), real(eltype(yf)))
+    p = fill(Tf(NaN), length(ok))
+    idx = Int[]
+    model = nothing
+    for t in (g + 1):target_forecast_observations(ok, N)
+        m = length(idx)
+        append!(idx, Iterators.filter(j -> ok[j], target_forecast_row(t - g, N)))
+        if length(idx) > m
+            model = StatsAPI.fit(tgt, Sf[idx, :], yf[idx])
+        end
+        if isnothing(model)
+            continue
+        end
+        js = findall(view(ok, target_forecast_row(t, N))) .+ (t - 1) * N
+        if !isempty(js)
+            p[js] = StatsAPI.predict(model, Sf[js, :])
+        end
+    end
+    return p
+end
+"""
+    target_forecast_observations(ok::AbstractVector{Bool}, N::Integer) -> Integer
+
+Count the observations of the flat samples of a [`TargetReturnForecast`](@ref).
+
+[`target_forecast_samples`](@ref) writes the samples observation by observation, `N` to each. So the samples hold `length(ok) ÷ N` observations, or none when there is no asset.
+
+# Arguments
+
+  - `ok`: The mask of the valid samples.
+  - `N`: The number of assets.
+
+# Returns
+
+  - `nt::Integer`: The number of observations.
+
+# Related
+
+  - [`target_forecast_row`](@ref)
+  - [`target_forecast_prequential`](@ref)
+"""
+function target_forecast_observations(ok::AbstractVector{Bool}, N::Integer)::Integer
+    return N > 0 ? length(ok) ÷ N : 0
+end
+"""
+    target_forecast_row(t::Integer, N::Integer) -> UnitRange{Int}
+
+Return the flat samples of observation `t` of a [`TargetReturnForecast`](@ref).
+
+[`target_forecast_samples`](@ref) writes the samples observation by observation, `N` to each. So the samples of observation `t` are `(t - 1) * N + 1` to `t * N`.
+
+# Arguments
+
+  - `t`: Index of the observation.
+  - `N`: The number of assets.
+
+# Returns
+
+  - `js::UnitRange{Int}`: The samples of observation `t`.
+
+# Related
+
+  - [`target_forecast_observations`](@ref)
+  - [`target_forecast_prequential`](@ref)
+"""
+function target_forecast_row(t::Integer, N::Integer)::UnitRange{Int}
+    return ((t - 1) * N + 1):(t * N)
 end
 """
     target_forecast_scatter(p::VecNum, nt::Integer, N::Integer) -> Matrix{<:Real}
@@ -1019,7 +1423,7 @@ function target_forecast_coefficient(rfe::TargetReturnForecast, model, Sf::MatNu
         return (; calib = promote_type(real(eltype(Sf)), real(eltype(fwd)))(NaN),
                 P = nothing)
     end
-    p = target_forecast_uncalibrated(rfe.cv, rfe, model, Sf, yf, ok)
+    p = target_forecast_uncalibrated(rfe.cv, rfe, model, Sf, yf, ok, size(w, 2))
     P = forecast_return_units(rfe.unit, target_forecast_scatter(p, nt, size(w, 2)),
                               view(vs, 1:nt, :))
     return (; calib = target_forecast_calibration(P, fwd, vs, w, rfe.decay, rfe.min_obs),
@@ -1164,5 +1568,6 @@ function target_forecast_orthogonal_rows(cre::AbstractCrossSectionalRegressionEs
     return Q
 end
 
-export TargetReturnForecast, TargetReturnForecastResult, NaNWarmup, InSampleWarmup
+export TargetReturnForecast, TargetReturnForecastResult, NaNWarmup, InSampleWarmup,
+       PrequentialCalibration, NormalEquationsFit
 public AbstractCalibrationWarmup, target_forecast_warmup

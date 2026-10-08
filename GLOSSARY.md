@@ -220,6 +220,10 @@ A folding statistic may carry a memory beside its vector — the last `memory_ro
 A per-asset prediction of the next period's idiosyncratic return, supplied by the caller or fitted from Descriptor Scores, which a Prior splits against its latest Factor Exposures into a spanned part that blends into the factor mean and an orthogonal part that enters its mean vector under a scale.
 *Avoid*: `alpha` (§5), which is the Significance Level of a tail; and Expected Returns (above), which is a moment estimated from the sample.
 
+**Prequential Calibration**
+The rule by which a fitted Return Forecast reads the predictions that put it into return units: each matured observation is predicted by the model fitted on the targets that had matured at that observation, which is the forecast the member published there. It reads no later observation, so a new observation leaves every earlier prediction as it stands, and the batch fit and a step of the carry fold run one rule. It is the default `cv` of `TargetReturnForecast` (`PrequentialCalibration()`, ADR 0200). A plain `LinearModel` folds its fit through its normal equations (`NormalEquationsFit`); another regression target fits again at each observation.
+*Avoid*: an out-of-fold calibration, which a cross-validation estimator in the same field gives and whose early folds train on later observations; Forecast Calibration (below), which measures the scale of a forecast after the fact; walk-forward, which refits on a schedule of the caller.
+
 **Spanned Shrinkage**
 The weight in `[0, 1]` that a Cross-Sectional Factor Prior gives its fitted factor mean against the spanned part of its Return Forecast. A value of one keeps the fitted factor mean, and a value of zero takes the spanned part alone. It is a Calibration Slot (§3.9), so a Calibration Rule can compute it from the fit.
 Its default is the precision blend, a rule that weighs the fitted factor mean and the spanned part by the error of each, so with no Return Forecast it shrinks the factor mean towards zero.

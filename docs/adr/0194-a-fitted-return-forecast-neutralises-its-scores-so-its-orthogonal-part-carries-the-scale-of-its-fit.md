@@ -45,7 +45,7 @@ types of `AbstractOrthogonalForecastFit`:
 | Rule | What it does |
 | --- | --- |
 | `ScoreNeutralisation()`, the default | The prior neutralises the scores of a member that answers `true` to `fits_idiosyncratic_target` against every estimated factor of the block, after the Neutralisation names of the caller, under `BlockRegressionWeights()`. |
-| `OrthogonalPartCalibration()` | The calibration of `TargetReturnForecast` also fits `κ⊥` on the orthogonal part of each row of its out-of-fold prediction. The member still publishes `α = κ p`, its Result carries `κ⊥` in `ocalib`, and the prior keeps `g` and scales `α⊥` by `κ⊥ / κ`. |
+| `OrthogonalPartCalibration()` | The calibration of `TargetReturnForecast` also fits `κ⊥` on the orthogonal part of each row of the prediction that its calibration reads. The member still publishes `α = κ p`, its Result carries `κ⊥` in `ocalib`, and the prior keeps `g` and scales `α⊥` by `κ⊥ / κ`. |
 | `UnadjustedForecast()` | The prior reads the member as it stands. This is the form of the independent implementation, one keyword away as [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-five-differences-are-deliberate.md) requires. |
 
 **The default output of the prior differs from the independent implementation on purpose.** A
@@ -76,7 +76,8 @@ orthogonal to their exposures, and the split leaves them out.
 `TargetReturnForecast` under `calibrate = true`, so `κ⊥` is resolved there, through a
 four-argument method of `return_forecast` that takes the Cross-Sectional Regression Estimator of
 the prior. The default rule, the unadjusted form and the standalone member never pay for it. The
-calibration reuses the out-of-fold prediction of `κ`, so it runs no second cross-validation. A
+calibration reuses the prediction that `κ` reads, prequential by default or out of fold, so it
+fits no second set of models. A
 scale of the whole prediction by `κ⊥` was refused: it makes `g` about twice as large with no
 evidence, and `PrecisionBlend` reads `g`. The constructor of the prior refuses
 `OrthogonalPartCalibration()` with a member that answers `false` to `calibrates_orthogonal_part`,

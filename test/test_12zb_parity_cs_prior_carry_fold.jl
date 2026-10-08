@@ -288,13 +288,22 @@ end
         # the Sharpe unit. With the cells of asset 3 set to `NaN`, the oracle gives 1.874 and
         # 0.445 (#1566), and these are the values below. So this is a deliberate difference
         # from the oracle as it stands.
+        # The oracle calibrates out of fold in its batch fit, so the comparison states
+        # `KFold()`. The prequential default of #1575 treats the two blocks alike too. It
+        # gives -2.020 and -2.069 here: the two Passthrough scores anti-predict out of time.
         calibs = Dict("return" => 1.8743201813934023, "sharpe" => 0.44520892743434026)
         for (unit, uname) in ((IdiosyncraticReturnUnit(), "return"), (sharpe, "sharpe"))
-            rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, unit = unit)
+            rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, unit = unit,
+                                       cv = KFold())
             a = return_forecast(rfe, pp, blk)
             b = return_forecast(rfe, pp, blk2)
             @test isequal(a.calib, b.calib)
             @test isapprox(a.calib, calibs[uname]; rtol = 1e-10)
+            @test same(a.mu, b.mu)
+            rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, unit = unit)
+            a = return_forecast(rfe, pp, blk)
+            b = return_forecast(rfe, pp, blk2)
+            @test isequal(a.calib, b.calib)
             @test same(a.mu, b.mu)
             rfe = ExpWeightedReturnForecast(; scores = ds, unit = unit)
             a = return_forecast(rfe, pp, blk)

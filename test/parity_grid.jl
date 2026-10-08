@@ -127,14 +127,17 @@ function grid_config(name::AbstractString, rd::ReturnsResult)
         (; kw..., fc..., ofit = UnadjustedForecast(),
          rfe = ExpWeightedReturnForecast(; scores = ds, half_life = 10.0))
     elseif name == "FcTarget"
-        # Both sides calibrate the target member on the out-of-fold predictions of a 5-fold
-        # split by default (#1418). The oracle fits no intercept here.
+        # The oracle calibrates the target member on the out-of-fold predictions of a 5-fold
+        # split in its batch fit (#1418), so the case states `KFold()`: the default of the
+        # library is prequential since #1575. The oracle fits no intercept here.
         (; kw..., fc..., ofit = UnadjustedForecast(),
-         rfe = TargetReturnForecast(; scores = ds, half_life = 10.0))
+         rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, cv = KFold()))
     elseif name == "FcTargetIntercept"
-        # The oracle's default target member, which fits an intercept (#1419).
+        # The oracle's default target member, which fits an intercept (#1419), under the
+        # k-fold calibration of its batch fit (#1575).
         (; kw..., fc..., ofit = UnadjustedForecast(),
-         rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, intercept = true))
+         rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, intercept = true,
+                                    cv = KFold()))
     elseif name == "FcTargetRaw"
         # The same, uncalibrated, so the fitted model alone is compared.
         (; kw..., fc..., ofit = UnadjustedForecast(),

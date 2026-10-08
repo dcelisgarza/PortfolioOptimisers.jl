@@ -108,14 +108,19 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
                                                 scores = ds(; neutralise = "style", scoring = std2,
                                                             group = "industry"), half_life = 10.0,
                                                 unit = IdiosyncraticSharpeUnit())]
+    # The oracle calibrates on the out-of-fold predictions of a k-fold split in its batch fit,
+    # so every calibrated case states `KFold()`. The default of the library is prequential
+    # since #1575, and "NoCal" keeps it, so the oracle checks the model that it fits.
     target = ["NoCal" => TargetReturnForecast(; scores = ds(), calibrate = false),
-              "Default" => TargetReturnForecast(; scores = ds(), half_life = 10.0),
+              "Default" =>
+                  TargetReturnForecast(; scores = ds(), half_life = 10.0, cv = KFold()),
               "Hz3" => TargetReturnForecast(; scores = ds(), horizon = 3, lag = 2,
                                             cv = KFold(; n = 3), scale = 2.0),
               "Sharpe" => TargetReturnForecast(; scores = ds(; neutralise = "style"),
-                                               unit = IdiosyncraticSharpeUnit()),
+                                               unit = IdiosyncraticSharpeUnit(), cv = KFold()),
               "TgtScore" => TargetReturnForecast(; scores = ds(), target_outlier = nothing,
-                                                 target_scoring = CrossSectionalStandardiser())]
+                                                 target_scoring = CrossSectionalStandardiser(),
+                                                 cv = KFold())]
     # A matrix or a forecast compares against its largest entry, a coefficient cell by cell.
     same(a, b, n) = parity_compare(a, b; scale = :array, name = n).ok
     cell(a, b, n) = parity_compare(a, b; name = n).ok

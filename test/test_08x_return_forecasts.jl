@@ -1304,9 +1304,9 @@ end
     end
 
     @testset "An out of fold calibration below two samples per fold is in its warm-up" begin
-        # The default calibrates out of fold on five folds (#1418), and nine valid samples
-        # are fewer than ten, so no prediction is out of fold.
-        @test TargetReturnForecast(; scores = ds).cv == KFold(; n = 5)
+        # `KFold()` calibrates out of fold on five folds (#1418), and nine valid samples are
+        # fewer than ten, so no prediction is out of fold. The default is prequential since
+        # #1575, and a testset below covers it.
         kw = (; scores = ds, target_outlier = nothing, decay = 0.5, min_obs = 1)
         rf = return_forecast(TargetReturnForecast(; kw..., cv = KFold(; n = 3)), rd, csfm)
         @test isfinite(rf.calib)
@@ -1318,7 +1318,7 @@ end
         Sf, yf, ok = PO.target_forecast_samples(cat(a[1:3, :], b[1:3, :]; dims = 3),
                                                 eps[2:4, :], ones(3, 3), 3)
         p = PO.target_forecast_uncalibrated(KFold(; n = 7), TargetReturnForecast(; kw...),
-                                            nothing, Sf, yf, ok)
+                                            nothing, Sf, yf, ok, 3)
         @test length(p) == 9
         @test all(isnan, p)
         # The in-sample calibration stays one keyword away.
@@ -1332,8 +1332,9 @@ end
         # in-sample predictions of the fitted model. The stored oracle is its latest forecast
         # and its coefficient on this fixture, measured 1.0e-15 and 2.2e-16 relative. Under an
         # explicit splitter the oracle refuses the same fit; that refuses valid input, so no
-        # keyword reproduces it, and ours does not refuse.
-        kw = (; scores = ds, target_outlier = nothing, half_life = 10.0)
+        # keyword reproduces it, and ours does not refuse. The oracle calibrates out of fold in
+        # its batch fit, so the case states `KFold()`, the default before #1575.
+        kw = (; scores = ds, target_outlier = nothing, half_life = 10.0, cv = KFold())
         @test TargetReturnForecast(; scores = ds).warmup === NaNWarmup()
         nan = return_forecast(TargetReturnForecast(; kw...), rd, csfm)
         @test isnan(nan.calib) && all(isnan, nan.mu)
@@ -1364,6 +1365,118 @@ end
               Sf * (Sf \ yf)
     end
 
+    @testset "The prequential calibration reads the forecast published at each observation (#1575)" begin
+        @test TargetReturnForecast(; scores = ds).cv === PrequentialCalibration()
+        # The panel: 4 observations, 3 assets, 2 Descriptors, and the target of each
+        # observation matures one row later, so 3 observations matured. Observation 1 has no
+        # matured row before it. Observation 2 reads the fit on observation 1, and
+        # observation 3 the fit on observations 1 and 2.
+        A = [vec(transpose(a[1:3, :])) vec(transpose(b[1:3, :]))]
+        y = vec(transpose(eps[2:4, :]))
+        Sf, yf, ok = PO.target_forecast_samples(cat(a[1:3, :], b[1:3, :]; dims = 3),
+                                                eps[2:4, :], ones(3, 3), 3)
+        rfe = TargetReturnForecast(; scores = ds, target_outlier = nothing, decay = 0.5,
+                                   min_obs = 1)
+        p = PO.target_forecast_uncalibrated(rfe.cv, rfe, nothing, Sf, yf, ok, 3)
+        @test all(isnan, p[1:3])
+        # One observation of 3 samples fits 2 coefficients.
+        @test p[4:6] ≈ A[4:6, :] * (A[1:3, :] \ y[1:3])
+        @test p[7:9] ≈ A[7:9, :] * (A[1:6, :] \ y[1:6])
+        # The calibration regresses on those predictions, and the forecast reads the model
+        # fitted on every matured sample.
+        rf = return_forecast(rfe, rd, csfm)
+        P = permutedims(reshape(p, 3, 3))
+        @test rf.calib ≈
+              PO.target_forecast_calibration(P, PO.forward_mean_returns(eps, 1, 1), vs,
+                                             ones(4, 3), 0.5, 1)
+        @test isfinite(rf.calib)
+        @test isa(rf.model, NormalEquationsFit)
+        @test rf.mu ≈ rf.calib .* ([a[4, :] b[4, :]] * (A \ y))
+    end
+
+    @testset "A prequential prediction reads no later observation, and the fold equals the refit (#1575)" begin
+        rng = StableRNG(1575)
+        T, N, K = 40, 12, 3
+        Sf = randn(rng, T * N, K)
+        yf = Sf * [0.3, -0.2, 0.1] .+ randn(rng, T * N)
+        ok = rand(rng, T * N) .> 0.1
+        @testset "g = $(g)" for g in (1, 3)
+            p = PO.target_forecast_prequential(LinearModel(), g, Sf, yf, ok, N)
+            # Each observation t reads the least squares fit on the observations up to t - g.
+            for t in (g + 1, 20, T)
+                idx = findall(ok[1:((t - g) * N)])
+                js = filter(j -> ok[j], PO.target_forecast_row(t, N))
+                @test p[js] ≈ Sf[js, :] * (Sf[idx, :] \ yf[idx])
+            end
+            @test all(isnan, p[1:(g * N)])
+            @test all(isnan, p[.!ok])
+            @test all(isfinite, p[((g * N) + 1):end][ok[((g * N) + 1):end]])
+            # A new observation leaves every earlier prediction as it stands, to the last bit.
+            n = 25 * N
+            @test isequal(PO.target_forecast_prequential(LinearModel(), g, Sf[1:n, :],
+                                                         yf[1:n], ok[1:n], N), p[1:n])
+            # The target of observation 30 matures at 30 + g, so a change of it moves no
+            # prediction before 30 + g, and moves the prediction at 30 + g.
+            y2 = copy(yf)
+            y2[PO.target_forecast_row(30, N)] .+= 10
+            p2 = PO.target_forecast_prequential(LinearModel(), g, Sf, y2, ok, N)
+            m = (29 + g) * N
+            @test isequal(p2[1:m], p[1:m])
+            @test !isequal(p2[(m + 1):end], p[(m + 1):end])
+            # Another regression target fits again at each observation, and agrees with the
+            # fold.
+            q = PO.target_forecast_prequential(LinearModel(;
+                                                           kwargs = (;
+                                                                     dropcollinear = true)),
+                                               g, Sf, yf, ok, N)
+            @test isequal(isnan.(q), isnan.(p))
+            f = isfinite.(p)
+            @test isapprox(q[f], p[f]; rtol = 1e-13, norm = x -> maximum(abs, x))
+        end
+        @testset "The model of the latest observation is the end of the fold" begin
+            m = PO.target_forecast_model(PrequentialCalibration(), LinearModel(), Sf, yf,
+                                         ok)
+            idx = findall(ok)
+            @test isa(m, NormalEquationsFit)
+            @test m.n == length(idx)
+            @test PO.StatsAPI.coef(m) ≈ Sf[idx, :] \ yf[idx]
+            # One more observation, a copy of the first, reads the model of the whole fold.
+            pe = PO.target_forecast_prequential(LinearModel(), 1, [Sf; Sf[1:N, :]],
+                                                [yf; yf[1:N]], [ok; ok[1:N]], N)
+            js = findall(ok[1:N])
+            @test pe[T * N .+ js] ≈ PO.StatsAPI.predict(m, Sf[js, :])
+            # A collinear column takes a zero coefficient, as GLM gives it.
+            Sc = [Sf[:, 1:2] Sf[:, 1]]
+            mc = PO.target_forecast_model(PrequentialCalibration(), LinearModel(), Sc, yf,
+                                          ok)
+            gc = PO.StatsAPI.fit(LinearModel(), Sc[idx, :], yf[idx])
+            @test PO.StatsAPI.coef(mc) ≈ PO.StatsAPI.coef(gc)
+            @test iszero(PO.StatsAPI.coef(mc)[3])
+            # A target with keyword arguments, and another rule, fit through GLM.
+            gk = LinearModel(; kwargs = (; dropcollinear = true))
+            @test !isa(PO.target_forecast_model(PrequentialCalibration(), gk, Sf, yf, ok),
+                       NormalEquationsFit)
+            @test !isa(PO.target_forecast_model(KFold(), LinearModel(), Sf, yf, ok),
+                       NormalEquationsFit)
+        end
+        @testset "The number type comes from the data" begin
+            n = 5 * N
+            pb = PO.target_forecast_prequential(LinearModel(), 1, big.(Sf[1:n, :]),
+                                                big.(yf[1:n]), ok[1:n], N)
+            @test eltype(pb) == BigFloat
+            mb = NormalEquationsFit(big.([2.0 0.0; 0.0 4.0]), big.([2.0, 2.0]), 3)
+            @test eltype(PO.StatsAPI.coef(mb)) == BigFloat
+        end
+        @testset "The normal equations refuse a wrong shape and a negative count" begin
+            @test_throws DimensionMismatch NormalEquationsFit(zeros(2, 3), zeros(2), 1)
+            @test_throws DimensionMismatch NormalEquationsFit(zeros(2, 2), zeros(3), 1)
+            @test_throws DomainError NormalEquationsFit(zeros(2, 2), zeros(2), -1)
+            # No sample gives a zero rank and zero coefficients.
+            @test iszero(PO.StatsAPI.coef(NormalEquationsFit(zeros(2, 2), zeros(2), 0)))
+            @test PO.target_forecast_observations(trues(6), 0) == 0
+        end
+    end
+
     @testset "The intercept appends a column of ones to every design" begin
         # #1419: the fit, the out-of-fold fits and the latest prediction all read the constant.
         rf = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
@@ -1384,7 +1497,7 @@ end
         p = PO.target_forecast_uncalibrated(KFold(; n = 3),
                                             TargetReturnForecast(; scores = ds,
                                                                  intercept = true), nothing,
-                                            Sf, yf, trues(9))
+                                            Sf, yf, trues(9), 3)
         @test p[1:3] ≈ Sf[1:3, :] * (Sf[4:9, :] \ yf[4:9])
         @test isfinite(rfc.calib)
         @test rfc.mu ≈ rfc.calib .* rf.mu

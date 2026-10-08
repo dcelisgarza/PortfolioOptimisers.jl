@@ -76,8 +76,10 @@ refuses an indefinite matrix and a matrix that is not Hermitian, so it hides no 
 
 ### The calibration warm-up of a fitted forecast is a named rule
 
-`TargetReturnForecast` calibrates on out-of-fold predictions, and a cross-validation estimator
-needs two valid samples per fold. Below that count no prediction is out of fold, so no
+Under a cross-validation estimator in `cv`, `TargetReturnForecast` calibrates on out-of-fold
+predictions, and the estimator needs two valid samples per fold. The default of `cv` is
+`PrequentialCalibration()` since [ADR 0200](0200-a-fitted-forecast-calibrates-on-the-forecasts-it-published.md),
+and that rule needs no warm-up of its own. Below that count no prediction is out of fold, so no
 out-of-fold slope exists. The library states that with a `NaN` slope, `NaNWarmup()`, the default.
 The oracle then calibrates on the in-sample predictions of the fitted model. An in-sample slope
 is biased upward, because each prediction comes from a model that trained on its own target. But

@@ -12,6 +12,8 @@ TargetReturnForecastResult
 AbstractCalibrationWarmup
 NaNWarmup
 InSampleWarmup
+PrequentialCalibration
+NormalEquationsFit
 ```
 
 ## Functions

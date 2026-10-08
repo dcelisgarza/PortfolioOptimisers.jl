@@ -773,7 +773,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fit the calibration slope of a [`TargetReturnForecast`](@ref) on the orthogonal part of its prediction too, and scale `α⊥` by it.
 
-The prior asks the member for `κ⊥` through the four-argument method of [`return_forecast`](@ref). The calibration splits each row of its out-of-fold prediction against the exposures of the estimated factors of that row, under the regression weights of that row and the Cross-Sectional Regression Estimator of the prior, and runs the regression of `κ` on the orthogonal parts. The member still publishes `α = κ p`. The prior keeps `g` from `α`, and scales `α⊥` by `κ⊥ / κ` before the Orthogonal Forecast Scale `c`. A ratio that is not finite, in the warm-up of either slope, gives the zero split of a forecast that is not finite.
+The prior asks the member for `κ⊥` through the four-argument method of [`return_forecast`](@ref). The calibration splits each row of the prediction that `κ` reads against the exposures of the estimated factors of that row, under the regression weights of that row and the Cross-Sectional Regression Estimator of the prior, and runs the regression of `κ` on the orthogonal parts. The member still publishes `α = κ p`. The prior keeps `g` from `α`, and scales `α⊥` by `κ⊥ / κ` before the Orthogonal Forecast Scale `c`. A ratio that is not finite, in the warm-up of either slope, gives the zero split of a forecast that is not finite.
 
 The constructor of [`CrossSectionalFactorPrior`](@ref) refuses the rule with a member that answers `false` to [`calibrates_orthogonal_part`](@ref). The rule repairs `α⊥` alone and leaves the scores as they are, so only the member that asks for it pays for it.
 
