@@ -489,7 +489,7 @@ not make a forecast useful.
     intercept by default, so each score leaves it uncorrelated with its targets. A forecast built
     from those scores still gives small numbers in the targets' columns, not zero: a grouped scoring
     step after the fit rescales each group on its own, and this check weighs every scored asset,
-    not only the estimation universe that the fit weighs. A Neutralisation under
+    also those outside the estimation universe that the fit weighs. A Neutralisation under
     `cre = CrossSectionalLinearRegression(; intercept = false)` fits no intercept. Its residual is
     then orthogonal to its target in the uncentred sense alone, and keeps a real correlation with it. The Neutralisation of a Factor
     Exposure reads the regression of the prior, whose `intercept` is `false` by default.
