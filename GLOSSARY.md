@@ -319,6 +319,7 @@ Builds a factor model mapping factor returns to asset returns, underpinning fact
 A regression of one observation's asset returns on the lagged Factor Exposures across the assets, one fit per observation.
 A **Leverage-One Pair** is an asset whose exposures give it a direction of the design of its own at one observation, such as the only member of a level of a one-hot factor: the fit reproduces its return, so its idiosyncratic return is zero by construction and states nothing about its specific risk. The fit marks it in `h1`, a least-squares fit writes an exact zero residual there, and the idiosyncratic diagnostics leave it out (#1423).
 A Factor Attribution reads its total as exact and its split between the systematic and the idiosyncratic part as unknown, the opposite of an asset in the warm-up of its variance: under the default Unknown Entry Rule every variance number that reads the split of a held pair is `NaN`, and the means keep their values (ADR 0113, amendment of #1579).
+The variance of a Leverage-One Pair is not identified either, so a standard error of the attribution is `NaN` under the default where its sandwich gives a marked pair a coefficient that is not zero: the systematic error of a holder, the level of the pair, and the factors that the zero-sum constraint of its family ties to that level (#1580).
 *Avoid*: Regression Estimator (above), whose families fit one asset at a time over the observations.
 
 **Descriptor**

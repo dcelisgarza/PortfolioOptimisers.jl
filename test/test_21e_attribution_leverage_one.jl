@@ -64,6 +64,38 @@ end
     @test isnothing(PO.attribution_marked_assets(nothing))
 end
 
+@testset "The leverage test of a standard error, helper by helper (#1580)" begin
+    ses = (; sys = 0.5, factor = [0.1, 0.2, NaN], family = nothing)
+    # A rule that reads the plug-in variance, or a block with no mask, runs no more passes.
+    nopass(s2) = error("no pass")
+    reg = trues(2, 3)
+    @test PO.attribution_leverage_errors(ZeroUnknown(), falses(2, 3), reg, ses, nopass) ===
+          ses
+    @test PO.attribution_leverage_errors(EntrywiseUnknown(), nothing, reg, ses, nopass) ===
+          ses
+    # A mask of pairs outside the regression marks nothing.
+    h1 = BitMatrix([0 0 1; 0 0 0])
+    regh = BitMatrix([1 1 0; 1 1 1])
+    @test PO.attribution_leverage_errors(EntrywiseUnknown(), h1, regh, ses, nopass) === ses
+    # A marked pair of the regression: the first pass reads its indicator, the second every
+    # pair of the regression.
+    lev = (; sys = 1.0, factor = [0.0, 1.0, NaN], family = nothing)
+    scl = (; sys = 1.0, factor = [1.0, 1.0, NaN], family = nothing)
+    stub(s2) = count(s2) == 1 ? lev : scl
+    out = PO.attribution_leverage_errors(EntrywiseUnknown(), h1, reg, ses, stub)
+    @test isnan(out.sys) && isequal(out.factor, [0.1, NaN, NaN]) && isnothing(out.family)
+    # The ratio of the squares against `eps`: a ratio of round-off keeps the error, a ratio
+    # above `eps` is `NaN`, and a `NaN` or a missing family axis stays as it is.
+    e = eps(Float64)
+    @test PO.attribution_leverage_error_nan(0.5, sqrt(e / 10), 1.0) == 0.5
+    @test isnan(PO.attribution_leverage_error_nan(0.5, sqrt(10e), 1.0))
+    @test PO.attribution_leverage_error_nan(0.5, 0.0, 0.0) == 0.5
+    @test isnothing(PO.attribution_leverage_error_nan(nothing, nothing, nothing))
+    @test isequal(PO.attribution_leverage_error_nan([0.1, 0.2, NaN], [0.0, 1.0, NaN],
+                                                    [1.0, 1.0, NaN]), [0.1, NaN, NaN])
+    @test PO.attribution_leverage_error_nan(0.5f0, sqrt(10e), 1.0) == 0.5f0
+end
+
 @testset "The bare-array predicted method takes the marked assets (#1579)" begin
     B = [1.0 0.0; 1.0 1.0; 1.0 0.0]
     F = [4.0e-4 1.0e-5; 1.0e-5 2.0e-4]
@@ -205,5 +237,62 @@ end
                                 kw...)
         @test [isnan(x.sys.pct_var) for x in fr] ==
               [(t - 99) <= 300 - blk.lag <= t for t in 100:100:(Tb - blk.lag)]
+    end
+
+    @testset "The standard errors that read the pair are NaN (#1580)" begin
+        # A variance estimate with no warm-up, so no error is `NaN` for an unstated variance
+        # (#1388).
+        ve1 = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), min_obs = 1)
+        pe1 = CrossSectionalFactorPrior(; factors = factors,
+                                        families = ["industry" => nothing], minra = 5,
+                                        ve = ve1)
+        pr1 = prior(pe1, rd)
+        blk = PO.attribution_block_arrays(pr1.rr, pr1)
+        al = PO.attribution_align(blk, size(rd.X, 1))
+        reg = al.act .& .!iszero.(al.rw)
+        # The leverage index over the scale of each output, as squares of the two indicator
+        # passes.
+        function ratios(w)
+            g = reduce(vcat,
+                       [transpose(transpose(PO.attribution_slice(al.B, t)) * w)
+                        for t in axes(al.f, 1)])
+            red = PO.attribution_reduce_for_errors(al.fcb, al.B, g, al.no, size(g, 1))
+            pass(s2) = PO.attribution_error_pass(s2, g, al, red, blk.fam, 1)
+            l, s = pass(reg .& al.h1), pass(reg)
+            return (; sys = abs2(l.sys) / abs2(s.sys),
+                    factor = abs2.(l.factor) ./ abs2.(s.factor))
+        end
+        # Measured: a coefficient through the zero-sum constraint gives the market factor a
+        # ratio of 2.4e-3 and Utilities 0.76. A coefficient of round-off gives a style factor
+        # 2.2e-19 at most, and the holder of asset 5 a systematic ratio of zero.
+        r3, r5 = ratios(w3), ratios(w5)
+        @test r3.sys ≈ 1 rtol = 1e-10
+        @test r3.factor[1] ≈ 2.42e-3 rtol = 1e-2
+        @test r3.factor[ut] ≈ 0.7607 rtol = 1e-3
+        @test r5.sys < 1e-18
+        @test r5.factor[3] ≈ 1.42e-3 rtol = 1e-2
+        for r in (r3, r5)
+            @test all(<(1e-18), r.factor[6:9])
+        end
+        att(w, u) = quiet(() -> factor_attribution(w, pr1, rd; se = true, unknown = u))
+        lz = KindwiseUnknown(; leverage = ZeroUnknown())
+        for (w, sys, fac) in ((w3, true, [1, ut]), (w5, false, [1, 3]), (weq, true, 1:5))
+            fe, fz = att(w, EntrywiseUnknown()), att(w, lz)
+            @test isnan(fe.sys.mu_se) == sys && isnan(fe.idio.mu_se) == sys
+            @test findall(isnan, fe.fbd.mu_se) == fac
+            # Every other error keeps the plug-in value, and so do the style factors.
+            @test all(isfinite, fz.fbd.mu_se) && isfinite(fz.sys.mu_se)
+            keep = setdiff(1:9, fac)
+            @test fe.fbd.mu_se[keep] == fz.fbd.mu_se[keep]
+            @test isequal(isnan.(fe.fmbd.mu_se), [true, true, false])
+            @test fe.fmbd.mu_se[3] == fz.fmbd.mu_se[3]
+            # Every number that is not an error is the number of the split rule alone.
+            fs = quiet(() -> factor_attribution(w, pr1, rd; unknown = EntrywiseUnknown()))
+            @test same(fs.total, fe.total) && fs.sys.mu_contrib == fe.sys.mu_contrib
+        end
+        # A holder of asset 5 keeps its systematic error, equal to the plug-in one.
+        @test att(w5, EntrywiseUnknown()).sys.mu_se == att(w5, lz).sys.mu_se
+        # The oracle reads the plug-in variance of the pair, zero, so a holder has no error.
+        @test iszero(att(w3, lz).sys.mu_se)
     end
 end

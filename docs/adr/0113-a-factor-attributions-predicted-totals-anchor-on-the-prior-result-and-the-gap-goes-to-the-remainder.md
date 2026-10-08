@@ -219,6 +219,18 @@ positive weight does not change it. Under any link the fit sets the fitted mean 
 return, so the level absorbs the own return, and the split is not identified there either. The rule
 reads `h1` for every fit.
 
-**The standard errors follow in #1580.** Under the default every standard error whose sandwich
-gives a held pair a coefficient that is not zero becomes `NaN`. Until #1580 lands the sandwich
-reads the plug-in variance, which is the oracle's.
+**A standard error that reads the pair is `NaN` (#1580).** The sandwich of a realised standard
+error reads the idiosyncratic variance of every pair of the regression, and the variance of a marked
+pair is not identified. Under the default every standard error whose sandwich gives a marked pair a
+coefficient that is not zero is `NaN`. The test runs the reduction of the sandwich twice more: once
+with the indicator of the marked pairs in place of the variances, and once with the indicator of
+every pair of the regression. The first sum is the leverage index of an output, the sum of the
+squared coefficients of the marked pairs. The second is its scale. An output is `NaN` when the
+index exceeds `eps` times the scale. On the measured panel of #1577 a real coefficient gives a
+ratio of 1.4e-3 or more: the market factor and the sibling levels through the zero-sum constraint,
+and the level of the pair. A coefficient of round-off gives 2.2e-19 at most: the style factors, and
+the systematic error of a portfolio that holds no marked pair. The pair stays in the sandwich.
+Without it the Gram matrix is singular in the direction of the level, and the pseudo-inverse gives
+a minimum-norm number that is not an error: the oracle's drop gives Utilities 2.4e-6 where the
+plug-in sandwich gives 5.0e-4. `ZeroUnknown` for the `leverage` kind reads the plug-in variance,
+which is the oracle's, so a holder of the pair reports a systematic error of zero.

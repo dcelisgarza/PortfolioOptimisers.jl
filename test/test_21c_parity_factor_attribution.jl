@@ -51,6 +51,11 @@ on the predicted side and 6.2e-14 on the realised side, except the cells below.
   - Better. A standard error that reads an unknown idiosyncratic variance, in the warm-up of the
     variance estimate, is `NaN` (`SeWarmup`). The oracle drops the pair from the Gram matrix, which
     is the covariance of a regression the fit did not run.
+  - Better (#1580). A standard error whose sandwich gives a Leverage-One Pair a coefficient that
+    is not zero is `NaN` under the default: asset 3 is alone in Utilities until it delists, so the
+    market factor and the sibling levels of `SeFam`, `SeFamTwo`, `SeRankDef` and `RollSeFam` read
+    its variance, which the fit does not identify. The oracle reads the plug-in variance, and the
+    stored cases run under `KindwiseUnknown(; leverage = ZeroUnknown())`, which is at parity.
   - Better. An observed factor is not estimated by the regression, so it leaves the sandwich
     whatever its family label (`SeMacro`). The oracle leaves it only under the label "currency":
     relabelled so (`SeMacroObs`), the oracle equals ours.
@@ -182,6 +187,7 @@ end
                                             debias = RawStatistic(),
                                             regime_lohi_mult = (0.7, 1.6), min_val = 1e-12,
                                             min_obs = 1)
+    lz = KindwiseUnknown(; leverage = ZeroUnknown())
     fit(; kw...) = prior(CrossSectionalFactorPrior(; lambda = 1, factors = base, minra = 5,
                                                    pe = GRID_PE, ve = GRID_VE, kw...), rd)
     load(c, o) = parity_load(FA_UNIT, replace(c, "Arr" => ""), o)
@@ -232,11 +238,14 @@ end
                                                                    xe = grid_pass("macro_beta";
                                                                                   family = "macro"),
                                                                    series = "MACRO", family = "macro")])))
+            # The oracle reads the plug-in variance of a Leverage-One Pair, asset 3 alone in
+            # Utilities. `lz` does too; the default is a verdict of its own (#1580).
             w = fa_clean_weights(p, X)
-            cases[c] = (fa_pack(factor_attribution(w, p, X; se = true)), p)
+            cases[c] = (fa_pack(factor_attribution(w, p, X; se = true, unknown = lz)), p)
             if c == "SeFam"
                 cases["RollSeFam"] = (fa_pack(factor_attribution(w, p, X, 40; step = 9,
-                                                                 se = true)), p)
+                                                                 se = true, unknown = lz)),
+                                      p)
             end
         end
         cases["SeMacroObs"] = cases["SeMacro"]
@@ -400,6 +409,43 @@ end
         @test isnan(our["Factors"][4, 9]) && isfinite(load("SeMacro", "Factors")[4, 9])
         @test !isapprox(our["Components"][1, 6], load("SeMacro", "Components")[1, 6];
                         rtol = 1e-3)
+    end
+
+    @testset "Better: a standard error that reads a Leverage-One Pair is NaN (#1580)" begin
+        # Asset 3 is alone in Utilities until it delists, so `h1` marks it at rows 1 to 58 of the
+        # block. The portfolio holds no asset 3, so its systematic error stays at parity. The zero-
+        # sum constraint ties the market factor and the sibling levels to Utilities, and their
+        # errors read the variance of the pair: measured ratios 1e-2 to 0.54, against 5.7e-18
+        # at most for the systematic error and the styles.
+        nanrows = Dict("SeFam" => ([1, 2, 3, 4], [1, 2]),
+                       "SeFamTwo" => ([1, 2, 3, 4, 8, 9, 10], [1, 2, 3]),
+                       "SeRankDef" => ([1, 2, 3, 4], [1, 2]))
+        for (c, (fr, mr)) in nanrows
+            p = cases[c][2]
+            our = quiet(() -> fa_pack(factor_attribution(fa_clean_weights(p, X), p, X;
+                                                         se = true)))
+            orc = cases[c][1]
+            @test findall(isnan, our["Factors"][:, 9]) == fr
+            @test findall(isnan, our["Families"][:, 6]) == mr
+            @test all(isfinite, orc["Factors"][:, 9]) &&
+                  all(isfinite, orc["Families"][:, 6])
+            # Every other cell is the number at parity with the oracle.
+            @test isequal(our["Components"], orc["Components"])
+            for (k, j) in (("Factors", 9), ("Families", 6))
+                m = .!isnan.(our[k][:, j])
+                @test isequal(our[k][:, 1:(j - 1)], orc[k][:, 1:(j - 1)])
+                @test our[k][m, j] == orc[k][m, j]
+            end
+        end
+        # Every rolling window holds marked rows, so each window loses the same four errors.
+        p = cases["RollSeFam"][2]
+        our = quiet(() -> fa_pack(factor_attribution(fa_clean_weights(p, X), p, X, 40;
+                                                     step = 9, se = true)))
+        orc = cases["RollSeFam"][1]
+        @test findall(isnan, our["Factors"][:, 9]) ==
+              [7 * (b - 1) + k for b in 1:5 for k in 1:4]
+        @test isequal(our["Components"], orc["Components"])
+        @test isequal(our["Factors"][:, 1:8], orc["Factors"][:, 1:8])
     end
 
     @testset "Better: each rolling window states the labels of its own families" begin

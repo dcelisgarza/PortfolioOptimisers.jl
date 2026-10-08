@@ -577,6 +577,162 @@ function attribution_mask_nan(A::AbstractArray, m::AbstractArray{Bool})
     return map((x, b) -> b ? oftype(x, NaN) : x, A, m)
 end
 """
+    attribution_error_pass(s2::AbstractMatrix, g::MatNum, al::NamedTuple, red::NamedTuple,
+                           fam::Option{<:VecStr}, s1::Number) -> NamedTuple
+
+Return the standard errors of the mean return contributions for one matrix of idiosyncratic variances.
+
+The sandwich of each observation reads `s2`, and the function sums it over the observations through the portfolio exposure. [`attribution_standard_errors`](@ref) calls it with the variances of the regression pairs. [`attribution_leverage_errors`](@ref) calls it with an indicator in place of the variances, so one reduction gives the answer and the weight that each output puts on a set of pairs.
+
+# Arguments
+
+  - `s2`: The idiosyncratic variance of each pair, `observations × assets`, zero outside the regression.
+  - `g`: The per-observation portfolio exposure on the raw axis, `observations × factors`.
+  - `al`: The aligned factor model history, with the regression weights `rw`.
+  - `red`: The regression basis, from [`attribution_reduce_for_errors`](@ref).
+  - `fam`: The family label of each raw factor, or `nothing`.
+  - `s1`: The factor a mean takes under the annualisation.
+
+# Returns
+
+  - `sys::Real`: The standard error of the systematic mean return contribution.
+  - `factor::VecNum`: The standard error of each factor's, `NaN` for an observed factor.
+  - `family::Option{<:VecNum}`: The standard error of each family's, or `nothing`.
+
+# Related
+
+  - [`attribution_standard_errors`](@ref)
+  - [`attribution_sandwich`](@ref)
+  - [`attribution_family_errors`](@ref)
+"""
+function attribution_error_pass(s2::AbstractMatrix, g::MatNum, al::NamedTuple,
+                                red::NamedTuple, fam::Option{<:VecStr}, s1::Number)
+    T, K = size(g)
+    cur = attribution_observed_indices(al.no, K)
+    keep = findall(!, red.observed)
+    se(v) = s1 * sqrt(max(zero(v), v)) / T
+    V = [attribution_sandwich(view(red.B, t, :, :), view(al.rw, t, :), view(s2, t, :),
+                              keep) for t in 1:T]
+    sys = se(sum(LinearAlgebra.dot(view(red.g, t, keep), V[t], view(red.g, t, keep))
+                 for t in 1:T))
+    Vf = attribution_expand_errors(al.fcb, attribution_scatter(V, keep, red.nr))
+    factor = [se(sum(g[t, k]^2 * Vf[t, k, k] for t in 1:T)) for k in 1:K]
+    for k in cur
+        factor[k] = oftype(factor[k], NaN)
+    end
+    return (; sys = sys, factor = factor,
+            family = attribution_family_errors(fam, g, Vf, s1, T, cur))
+end
+"""
+    attribution_leverage_errors(rule::ZeroUnknown, h1, reg, ses, pass) -> NamedTuple
+    attribution_leverage_errors(rule::EntrywiseUnknown, h1::Nothing, reg, ses, pass)
+        -> NamedTuple
+    attribution_leverage_errors(rule::EntrywiseUnknown, h1::AbstractMatrix{Bool},
+                                reg::AbstractMatrix{Bool}, ses::NamedTuple, pass)
+        -> NamedTuple
+
+Return the standard errors with `NaN` at every output whose sandwich reads a Leverage-One Pair.
+
+The sandwich reads the idiosyncratic variance of a marked pair, and that variance is not identified: every own variance from zero upwards fits the data equally well. An output reads the pair when its sandwich gives the pair a coefficient that is not zero. The function runs the reduction of `pass` twice more, once with the indicator of the marked pairs and once with the indicator of every regression pair. The first sum is the leverage index of each output, and the second is its scale. An output is `NaN` when its leverage index exceeds ``\\varepsilon`` times its scale.
+
+A coefficient of round-off gives a ratio far below ``\\varepsilon``, of the order of ``10^{-19}`` on a panel of 40 assets, because the quadratic form adds round-off of its own to the square of the coefficient. This is the case of an output that the fit separates from the pair, a style factor or a portfolio that holds no marked pair. A real coefficient, through the zero-sum constraint of a family or through a holding of the pair, gives a ratio far above ``\\varepsilon``, of the order of ``10^{-3}`` or more. The pair stays in the sandwich: without it the Gram matrix is singular in the direction of the level, and the pseudo-inverse gives a minimum-norm number that is not an error.
+
+[`ZeroUnknown`](@ref) reads the plug-in variance of the pair, so it changes nothing. `h1 = nothing` marks no pair.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{c}_{t} &= \\mathbf{Q}_{t} \\mathbf{B}_{t} \\mathbf{G}_{t}^{+} \\boldsymbol{g}_{t}\\,, \\\\
+\\ell &= \\sum_{t=1}^{T} \\sum_{i=1}^{N} c_{ti}^{2}\\, h_{ti}\\,, \\\\
+S &= \\sum_{t=1}^{T} \\sum_{i=1}^{N} c_{ti}^{2}\\, a_{ti}\\,.
+\\end{align}
+```
+
+The output is `NaN` when ``\\ell > \\varepsilon\\, S``. The definition is that of the systematic error. A factor or a family takes the same sums with ``\\boldsymbol{g}_{t}`` restricted to its own entries.
+
+Where:
+
+  - ``\\boldsymbol{c}_{t}``: Coefficient of the output on each pair of observation ``t``, one entry ``c_{ti}`` per asset.
+  - ``\\ell``, ``S``: Leverage index and scale of the output.
+  - ``h_{ti}``: Whether pair ``(t, i)`` is a Leverage-One Pair in the regression.
+  - ``a_{ti}``: Whether pair ``(t, i)`` is in the regression: active, with a regression weight that is not zero.
+  - ``\\mathbf{G}_{t}^{+}``: Inverse of the Gram matrix of observation ``t``, or its pseudo-inverse, as [`attribution_sandwich`](@ref) states it.
+  - $(math_dict[:Q_t_att])
+  - $(math_dict[:B_t_att])
+  - $(math_dict[:g_t_att])
+  - $(math_dict[:eps_machine])
+  - $(math_dict[:N])
+  - $(math_dict[:T])
+
+# Arguments
+
+  - `rule`: The rule for the variance of a Leverage-One Pair.
+  - `h1`: The leverage-one mask, `observations × assets`, or `nothing`.
+  - `reg`: Whether each pair is in the regression, `observations × assets`.
+  - `ses`: The standard errors, from [`attribution_error_pass`](@ref).
+  - `pass`: The reduction, a function of the matrix of variances.
+
+# Returns
+
+  - `ses::NamedTuple`: The standard errors, with `NaN` at every output that reads a marked pair.
+
+# Related
+
+  - [`attribution_standard_errors`](@ref)
+  - [`attribution_leverage_split`](@ref)
+  - [`KindwiseUnknown`](@ref)
+"""
+function attribution_leverage_errors(::ZeroUnknown, ::Any, ::Any, ses::NamedTuple, ::Any)
+    return ses
+end
+function attribution_leverage_errors(::EntrywiseUnknown, ::Nothing, ::Any, ses::NamedTuple,
+                                     ::Any)
+    return ses
+end
+function attribution_leverage_errors(::EntrywiseUnknown, h1::AbstractMatrix{Bool},
+                                     reg::AbstractMatrix{Bool}, ses::NamedTuple, pass)
+    mk = reg .& h1
+    if !any(mk)
+        return ses
+    end
+    return map(attribution_leverage_error_nan, ses, pass(mk), pass(reg))
+end
+"""
+    attribution_leverage_error_nan(x::Nothing, l::Nothing, s::Nothing) -> Nothing
+    attribution_leverage_error_nan(x::Number, l::Number, s::Number) -> Number
+    attribution_leverage_error_nan(x::AbstractVector, l::AbstractVector, s::AbstractVector)
+        -> AbstractVector
+
+Return a standard error, or `NaN` when its leverage index exceeds ``\\varepsilon`` times its scale.
+
+The two indicator passes of [`attribution_leverage_errors`](@ref) return standard errors, which are the square roots of the two sums, so the test compares their squares. An output that the attribution states as `NaN` already, an observed factor for example, stays `NaN`. A family axis that the attribution does not have stays `nothing`.
+
+# Arguments
+
+  - `x`: The standard error.
+  - `l`: The standard error of the indicator of the marked pairs.
+  - `s`: The standard error of the indicator of every regression pair.
+
+# Returns
+
+  - `x`: The standard error, or `NaN`.
+
+# Related
+
+  - [`attribution_leverage_errors`](@ref)
+"""
+function attribution_leverage_error_nan(::Nothing, ::Nothing, ::Nothing)::Nothing
+    return nothing
+end
+function attribution_leverage_error_nan(x::Number, l::Number, s::Number)
+    return abs2(l) > eps(real(typeof(x))) * abs2(s) ? oftype(x, NaN) : x
+end
+function attribution_leverage_error_nan(x::AbstractVector, l::AbstractVector,
+                                        s::AbstractVector)
+    return attribution_leverage_error_nan.(x, l, s)
+end
+"""
     attribution_unknown_keep(rule::EntrywiseUnknown, w::VecNum)
     attribution_unknown_keep(rule::ZeroUnknown, w::VecNum)
 

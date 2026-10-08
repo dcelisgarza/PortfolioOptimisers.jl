@@ -671,7 +671,11 @@ function realised_attribution(W::VecNum_MatNum, ret::VecNum, al::NamedTuple,
     f_vol = vec(std(f; dims = 1))
     f_cov = [attribution_cov(view(f, :, k), retc) for k in 1:K]
     f_var_contrib = [attribution_cov(view(fpnl, :, k), retc) for k in 1:K]
-    sers = se ? attribution_standard_errors(g, al, fam, sc.s1, T) : attribution_no_errors()
+    sers = if se
+        attribution_standard_errors(g, al, fam, sc.s1, T, kinds.leverage)
+    else
+        attribution_no_errors()
+    end
     sys = attribution_series_component(sys_pnl, retc, total_vol, sc, sers.sys)
     idio = attribution_series_component(idio_pnl, retc, total_vol, sc, sers.sys)
     unattr = attribution_series_component(unattr_pnl, retc, total_vol, sc, nothing)
@@ -879,7 +883,8 @@ function attribution_no_errors()
 end
 """
     attribution_standard_errors(g::MatNum, al::NamedTuple, fam::Option{<:VecStr},
-                                s1::Number, T::Integer) -> NamedTuple
+                                s1::Number, T::Integer, rule::AbstractUnknownEntryRule)
+        -> NamedTuple
 
 Return the standard errors of the mean return contributions of a realised attribution.
 
@@ -890,6 +895,8 @@ Under a family re-basis the raw Gram matrix is singular by construction, so the 
 The systematic and the idiosyncratic errors are equal. The portfolio return is observed, so the two estimation errors sum to zero.
 
 **An unknown variance makes the error unknown.** The sandwich of an observation reads the idiosyncratic variance of every active pair with a non-zero regression weight. Where the block states no such variance, in the warm-up of the variance estimate for example, ``\\mathbf{V}_{t}`` is unknown, and every answer that sums over the observation is `NaN`. A zero variance would understate the error, and dropping the pair would give the covariance of a regression the fit did not run. A window after the warm-up, or a variance estimate with a shorter warm-up, states every entry. A pair outside the regression, or inactive, reads no variance.
+
+**A Leverage-One Pair makes the error unknown where the sandwich reads it.** The fit reproduces the return of a marked pair, so the variance of the pair is not identified, and the plug-in variance of the block is one of many values that fit the data. Under [`EntrywiseUnknown`](@ref) every answer whose sandwich gives a marked pair of the regression a coefficient that is not zero is `NaN`, through [`attribution_leverage_errors`](@ref). The pair stays in the sandwich. [`ZeroUnknown`](@ref) reads the plug-in variance, which is the answer of the oracle. One reduction, [`attribution_error_pass`](@ref), gives the answer and the two indicator sums of the test.
 
 # Mathematical definition
 
@@ -919,6 +926,7 @@ Where:
   - `fam`: The family label of each raw factor, or `nothing`.
   - `s1`: The factor a mean takes under the annualisation.
   - `T`: The number of aligned observations.
+  - `rule`: The rule for the variance of a Leverage-One Pair, the `leverage` kind of the rule of the attribution.
 
 # Validation
 
@@ -935,30 +943,20 @@ Where:
   - [`factor_attribution`](@ref)
   - [`realised_attribution`](@ref)
   - [`attribution_observed_indices`](@ref)
+  - [`attribution_error_pass`](@ref)
+  - [`attribution_leverage_errors`](@ref)
 """
 function attribution_standard_errors(g::MatNum, al::NamedTuple, fam::Option{<:VecStr},
-                                     s1::Number, T::Integer)
+                                     s1::Number, T::Integer, rule::AbstractUnknownEntryRule)
     rw = assert_attribution_field(al.rw, :rw)
     vs = assert_attribution_field(al.vs, :vs)
-    K = size(g, 2)
-    cur = attribution_observed_indices(al.no, K)
     red = attribution_reduce_for_errors(al.fcb, al.B, g, al.no, T)
-    keep = findall(!, red.observed)
-    se(v) = s1 * sqrt(max(zero(v), v)) / T
+    reg = al.act .& .!iszero.(rw)
+    pass(s2) = attribution_error_pass(s2, g, al, red, fam, s1)
     # An active pair of the regression reads its variance, `NaN` when unknown; any other pair
     # reads none, so its `NaN` must not reach the product `0 * NaN`.
-    s2 = ifelse.(al.act .& .!iszero.(rw), vs, zero.(vs))
-    V = [attribution_sandwich(view(red.B, t, :, :), view(rw, t, :), view(s2, t, :), keep)
-         for t in 1:T]
-    sys = se(sum(LinearAlgebra.dot(view(red.g, t, keep), V[t], view(red.g, t, keep))
-                 for t in 1:T))
-    Vf = attribution_expand_errors(al.fcb, attribution_scatter(V, keep, red.nr))
-    factor = [se(sum(g[t, k]^2 * Vf[t, k, k] for t in 1:T)) for k in 1:K]
-    for k in cur
-        factor[k] = oftype(factor[k], NaN)
-    end
-    return (; sys = sys, factor = factor,
-            family = attribution_family_errors(fam, g, Vf, s1, T, cur))
+    ses = pass(ifelse.(reg, vs, zero.(vs)))
+    return attribution_leverage_errors(rule, al.h1, reg, ses, pass)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
