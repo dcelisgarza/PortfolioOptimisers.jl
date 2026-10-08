@@ -1567,6 +1567,16 @@ function target_forecast_orthogonal_rows(cre::AbstractCrossSectionalRegressionEs
     end
     return Q
 end
+# The method of `orthogonal_forecast_rescale` that reads `κ⊥`. It takes the Result of the member
+# that states it alone, so no other Result reaches the read of `ocalib`.
+function orthogonal_forecast_rescale(::OrthogonalPartCalibration,
+                                     rf::TargetReturnForecastResult, g::VecNum, ap::VecNum)
+    r = rf.ocalib / rf.calib
+    if all(iszero, ap)
+        return (; g = g, ap = ap)
+    end
+    return isfinite(r) ? (; g = g, ap = r * ap) : (; g = zero(g), ap = zero(ap))
+end
 
 export TargetReturnForecast, TargetReturnForecastResult, NaNWarmup, InSampleWarmup,
        PrequentialCalibration, NormalEquationsFit

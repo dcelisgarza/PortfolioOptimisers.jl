@@ -26,7 +26,7 @@ $(DocStringExtensions.FIELDS)
                              lv1 = nothing, lv = nothing, W = nothing, vs = nothing,
                              ve = nothing, ve1 = nothing, pe = nothing,
                              seed::Integer = 0, hist = nothing, S = nothing,
-                             Sc = nothing, fsc = nothing, fh = nothing,
+                             Sc = nothing, fsc = nothing, fh = nothing, fst = nothing,
                              tip::Base.RefValue{Int} = Ref(0)) -> CrossSectionalCarryState
 
 Keywords correspond to the struct's fields, and every field but `buf` and `tip` defaults to `nothing`, or to `0` for `seed`. `tip` defaults to a new counter at `0`. The default is the empty state that a first step builds.
@@ -165,6 +165,10 @@ Keywords correspond to the struct's fields, and every field but `buf` and `tip` 
     """
     fh
     """
+    The fold state of the Return Forecast after the fitted observations whose target is known, as [`return_forecast_step`](@ref) gives it, or `nothing` when the forecast does not fold or carries no state. A step passes it to the forecast, and the call with no data builds the Result of the forecast with it.
+    """
+    fst
+    """
     The number of observations that the newest state of this lineage folded. Every state that a step derives from this one shares the counter. A history appends in place only when the state is the newest one, as [`cross_sectional_carry_own`](@ref) checks.
     """
     tip
@@ -178,11 +182,11 @@ function CrossSectionalCarryState(; buf::SampleBufferState = SampleBufferState()
                                   csr = nothing, lv1 = nothing, lv = nothing, W = nothing,
                                   vs = nothing, ve = nothing, ve1 = nothing, pe = nothing,
                                   seed::Integer = 0, hist = nothing, S = nothing,
-                                  Sc = nothing, fsc = nothing, fh = nothing,
+                                  Sc = nothing, fsc = nothing, fh = nothing, fst = nothing,
                                   tip::Base.RefValue{Int} = Ref(0))::CrossSectionalCarryState
     return CrossSectionalCarryState(buf, win, der, nf, fam, Ms, X, Xl, obs, bw, mcap, amsk,
                                     emsk, sums, families, fcb, Z, csr, lv1, lv, W, vs, ve,
-                                    ve1, pe, seed, hist, S, Sc, fsc, fh, tip)
+                                    ve1, pe, seed, hist, S, Sc, fsc, fh, fst, tip)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1295,7 +1299,7 @@ function prior(pe::CrossSectionalFactorPrior, st::CrossSectionalCarryState;
            amr = view(st.amsk, r, :), bwr = view(st.bw, r, :), Xo = view(st.X, r, :), r = r,
            hist = st.hist, S = st.S, Sc = st.Sc, idx = (st.buf.n - Tf) .+ r, ts = nothing,
            rf = if folds_forecast_rows(pe.rfe)
-               return_forecast_result(pe.rfe, st.fh)
+               return_forecast_result(pe.rfe, st.fh, st.fst)
            else
                nothing
            end)

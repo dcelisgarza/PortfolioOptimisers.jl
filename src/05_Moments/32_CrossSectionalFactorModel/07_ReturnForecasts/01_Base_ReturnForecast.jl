@@ -672,10 +672,11 @@ end
 """
     folds_forecast_rows(rfe) -> Bool
     folds_forecast_rows(rfe::FixedWeightedReturnForecast) -> Bool
+    folds_forecast_rows(rfe::ExpWeightedReturnForecast) -> Bool
 
 Answer whether a Return Forecast Estimator computes the rows of its history one observation at a time.
 
-The carry fold of a [`CrossSectionalFactorPrior`](@ref) asks the member. A member that answers `true` computes the row of an observation from the scores of its [`DescriptorScores`](@ref) at that observation and from the block at that observation alone. So the carry keeps the scores of every fitted observation and the rows of the history, and keeps only the panel rows that a new observation reads. The fallback answers `false`, and the carry then keeps every panel row and fits the member again at each call with no data. [`FixedWeightedReturnForecast`](@ref) answers `true`.
+The carry fold of a [`CrossSectionalFactorPrior`](@ref) asks the member. A member that answers `true` computes the rows of its new observations from a fold state and from the scores of its [`DescriptorScores`](@ref) and the block on those observations and on the [`forecast_target_gap`](@ref) observations before them. So the carry keeps the scores of every fitted observation, the rows of the history and the fold state, and keeps only the panel rows that a new observation reads. The fallback answers `false`, and the carry then keeps every panel row and fits the member again at each call with no data. [`FixedWeightedReturnForecast`](@ref) and [`ExpWeightedReturnForecast`](@ref) answer `true`.
 
 A member that answers `true` holds its [`DescriptorScores`](@ref) in a field named `scores`, and states [`return_forecast_step`](@ref) and [`return_forecast_result`](@ref).
 
@@ -698,10 +699,50 @@ false
 
   - [`return_forecast_step`](@ref)
   - [`return_forecast_result`](@ref)
+  - [`forecast_target_gap`](@ref)
   - [`CrossSectionalCarryState`](@ref)
 """
 function folds_forecast_rows(::Any)::Bool
     return false
+end
+"""
+    forecast_target_gap(rfe) -> Integer
+    forecast_target_gap(rfe::ExpWeightedReturnForecast) -> Integer
+
+Return the number of observations that a target of a Return Forecast Estimator takes to mature.
+
+A fitted member regresses the scores of an observation on the forward mean return that [`forward_mean_returns`](@ref) takes over the observations `lag` to `lag + horizon - 1` after it. So the target of an observation matures `lag + horizon - 1` observations later. A step of the carry fold of a [`CrossSectionalFactorPrior`](@ref) gives a member that folds, as [`folds_forecast_rows`](@ref) answers, its new observations and this number of observations before them, because the targets of those observations mature at the step. The fallback answers `0`, for a member whose row reads its own observation alone. [`ExpWeightedReturnForecast`](@ref) answers `lag + horizon - 1`.
+
+# Arguments
+
+  - `rfe`: Return Forecast Estimator.
+
+# Returns
+
+  - `gap::Integer`: The number of observations that a target takes to mature.
+
+# Examples
+
+```jldoctest
+julia> ds = DescriptorScores(; descriptors = [Passthrough(; field = \"a\")]);
+
+julia> PortfolioOptimisers.forecast_target_gap(ExpWeightedReturnForecast(; scores = ds,
+                                                                         horizon = 3, lag = 2))
+4
+
+julia> PortfolioOptimisers.forecast_target_gap(FixedWeightedReturnForecast(; scores = ds,
+                                                                           scale = 1.0))
+0
+```
+
+# Related
+
+  - [`folds_forecast_rows`](@ref)
+  - [`return_forecast_step`](@ref)
+  - [`forward_mean_returns`](@ref)
+"""
+function forecast_target_gap(::Any)::Integer
+    return 0
 end
 """
     estimated_factor_columns(csfm::CrossSectionalFactorModel) -> AbstractUnitRange
@@ -900,7 +941,7 @@ end
     orthogonal_forecast_rescale(ofit::AbstractOrthogonalForecastFit,
                                 rf::AbstractReturnForecastResult, g::VecNum, ap::VecNum)
     orthogonal_forecast_rescale(ofit::OrthogonalPartCalibration,
-                                rf::AbstractReturnForecastResult, g::VecNum, ap::VecNum)
+                                rf::TargetReturnForecastResult, g::VecNum, ap::VecNum)
 
 Scale the orthogonal part of the split of a Return Forecast under the Orthogonal Forecast Fit.
 
@@ -924,13 +965,13 @@ Where:
 
 The method that Julia selects is the algorithm.
 
- 1. Any rule but [`OrthogonalPartCalibration`](@ref): return `g` and `ap` unchanged.
- 2. [`OrthogonalPartCalibration`](@ref): return the zero split unchanged. Otherwise return a zero `g` and a zero `ap` when `κ⊥ / κ` is not finite, which is the warm-up of either slope, and `g` with `ap` times the ratio when it is finite.
+ 1. Any rule but [`OrthogonalPartCalibration`](@ref), or a Result that carries no `κ⊥`: return `g` and `ap` unchanged. The prior refuses [`OrthogonalPartCalibration`](@ref) with a member other than a [`TargetReturnForecast`](@ref), so the second case does not happen.
+ 2. [`OrthogonalPartCalibration`](@ref) with a [`TargetReturnForecastResult`](@ref): return the zero split unchanged. Otherwise return a zero `g` and a zero `ap` when `κ⊥ / κ` is not finite, which is the warm-up of either slope, and `g` with `ap` times the ratio when it is finite.
 
 # Arguments
 
   - `ofit`: The Orthogonal Forecast Fit of the prior.
-  - `rf`: The Result of the member. Under [`OrthogonalPartCalibration`](@ref) it carries `calib` and `ocalib`.
+  - `rf`: The Result of the member. A [`TargetReturnForecastResult`](@ref) carries `calib` and `ocalib`.
   - `g`: The spanned coefficients of the split.
   - `ap`: The unscaled orthogonal part of the split.
 
@@ -948,15 +989,6 @@ The method that Julia selects is the algorithm.
 function orthogonal_forecast_rescale(::AbstractOrthogonalForecastFit,
                                      ::AbstractReturnForecastResult, g::VecNum, ap::VecNum)
     return (; g = g, ap = ap)
-end
-function orthogonal_forecast_rescale(::OrthogonalPartCalibration,
-                                     rf::AbstractReturnForecastResult, g::VecNum,
-                                     ap::VecNum)
-    r = rf.ocalib / rf.calib
-    if all(iszero, ap)
-        return (; g = g, ap = ap)
-    end
-    return isfinite(r) ? (; g = g, ap = r * ap) : (; g = zero(g), ap = zero(ap))
 end
 
 export return_forecast, IdiosyncraticReturnUnit, IdiosyncraticSharpeUnit,

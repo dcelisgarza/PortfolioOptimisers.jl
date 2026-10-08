@@ -70,8 +70,12 @@ tenth to the EW moments, which already fold exactly.
    the Sample Buffer does, and each state keeps a view of its own rows (#1564). A step of a state
    that a later step passed copies the state first, so the later state and the results read out of
    it keep their rows.
-3. The folds of the Descriptors and of the return forecast are not specified yet. They can come one
-   family at a time.
+3. The folds of the Descriptors are not specified yet. They can come one family at a time. A return
+   forecast folds when `folds_forecast_rows` answers `true`: the state carries its Descriptor scores,
+   its history and a fold state of its own. A step gives the forecast its new rows and the
+   `forecast_target_gap` rows before them, whose targets mature at the step. `FixedWeightedReturnForecast`
+   folds with no fold state (#1573). `ExpWeightedReturnForecast` carries its normal equations, its
+   count and its coefficients, because its batch fit is the same forward recursion (#1574).
 
 ### The Sample Buffer holds the panel
 
@@ -202,7 +206,8 @@ Each Descriptor states its look-back: an `Integer`, or `nothing` for a recursion
 The carry keeps the last `look-back + lag` panel rows when every look-back is finite, and every row
 otherwise. A Return Forecast that reads the panel keeps a value at every fitted observation in its
 Result, and it aligns the fitted observations with the last rows of its returns data, so the carry
-keeps every row under it. The output is exact in every case.
+keeps every row under it, unless the forecast folds. A forecast that folds reads the look-back of its
+Descriptors alone. The output is exact in every case.
 
 ## Considered options
 

@@ -10,6 +10,6 @@ Description = "Fixed Weighted Return Forecast, private API of PortfolioOptimiser
 assert_signed_composite_weights
 signed_composite_weights
 signed_composite_accumulate!
-return_forecast_step
-return_forecast_result
+return_forecast_step(rfe::FixedWeightedReturnForecast, P::NamedTuple, csfm::CrossSectionalFactorModel, fs::Nothing)
+return_forecast_result(rfe::FixedWeightedReturnForecast, hist::MatNum, fs::Nothing)
 ```

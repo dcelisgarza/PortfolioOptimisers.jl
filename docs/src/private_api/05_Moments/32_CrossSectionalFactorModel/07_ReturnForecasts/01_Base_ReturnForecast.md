@@ -28,6 +28,7 @@ forward_mean_returns
 fits_idiosyncratic_target
 calibrates_orthogonal_part
 folds_forecast_rows
+forecast_target_gap
 estimated_factor_columns
 orthogonal_forecast_member
 orthogonal_forecast_result

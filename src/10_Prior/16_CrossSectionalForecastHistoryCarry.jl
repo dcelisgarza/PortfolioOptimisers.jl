@@ -284,7 +284,10 @@ function cross_sectional_carry_scores(pe::CrossSectionalFactorPrior,
                                        fsc = if isnothing(st.fsc)
                                            Pn
                                        else
-                                           map(cross_sectional_fold_append, st.fsc, Pn)
+                                           # The bound stops JET from pairing an untyped
+                                           # `st.fsc` with the `map` method of another package.
+                                           map(cross_sectional_fold_append,
+                                               st.fsc::NamedTuple, Pn)
                                        end))
 end
 """
@@ -292,15 +295,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Brings the Return Forecast rows of the carry fold of a Cross-Sectional Factor Prior up to its fitted observations.
 
-A Return Forecast that computes its history one observation at a time, as [`folds_forecast_rows`](@ref) answers, computes the row of a fitted observation from the scores and the block at that observation alone. A step that fits the new observations alone changes no past row of the block, so the state keeps its rows and computes the rows of the new observations. A step that fits every observation again can change every row of the block, so it computes every row again, from the scores that the state carries.
+A Return Forecast that computes its history one observation at a time, as [`folds_forecast_rows`](@ref) answers, computes the rows of its new observations from its fold state and from the scores and the block at those observations and at the [`forecast_target_gap`](@ref) observations before them. A step that fits the new observations alone changes no past row of the block, so the state keeps its rows and its fold state, and computes the rows of the new observations. A step that fits every observation again can change every row of the block, so it computes every row again from an empty fold state, from the scores that the state carries.
 
 # Algorithm
 
  1. Return `st` unchanged when the forecast does not fold, or before the first fit.
- 2. Keep the carried rows when `stepped` is `true`, and none otherwise. Take the fitted observations after them.
+ 2. Keep the carried rows and the fold state when `stepped` is `true`, and none otherwise. Take the fitted observations after the kept rows, and the last `forecast_target_gap(pe.rfe)` kept rows before them, or every kept row when there are fewer.
  3. Build the block of those observations from the state, with [`cross_sectional_carry_append`](@ref). Take the member of the Orthogonal Forecast Fit `pe.ofit` with [`orthogonal_forecast_member`](@ref).
- 4. Compute the rows of those observations with [`return_forecast_step`](@ref), from a copy of the scores that the state carries at them.
- 5. Append the new rows to the kept rows.
+ 4. Compute the rows of those observations and the new fold state with [`return_forecast_step`](@ref), from a copy of the scores that the state carries at them and from the kept fold state.
+ 5. Append the rows of the new observations to the kept rows, and keep the new fold state.
 
 # Arguments
 
@@ -314,7 +317,7 @@ A Return Forecast that computes its history one observation at a time, as [`fold
 
 # Returns
 
-  - `st::CrossSectionalCarryState`: The state with its Return Forecast rows at every fitted observation.
+  - `st::CrossSectionalCarryState`: The state with its Return Forecast rows at every fitted observation, and the fold state of the forecast after them.
 
 # Related
 
@@ -328,7 +331,9 @@ function cross_sectional_carry_forecast(pe::CrossSectionalFactorPrior,
         return st
     end
     k = stepped && !isnothing(st.fh) ? size(st.fh, 1) : 0
-    j = (k + 1):size(st.vs, 1)
+    # The targets of the last `d` kept rows mature at this step, so the step reads them again.
+    d = min(k, forecast_target_gap(pe.rfe))
+    j = (k + 1 - d):size(st.vs, 1)
     (; r, ca) = cross_sectional_carry_append(pe, st)
     csr = st.csr
     csfm = CrossSectionalFactorModel(; M = ca.Ms[end, :, :],
@@ -347,10 +352,13 @@ function cross_sectional_carry_forecast(pe::CrossSectionalFactorPrior,
     rfo = orthogonal_forecast_member(pe.ofit, pe.rfe, csfm)
     # The scores sit on the histories after the warm-up, and the fitted rows after the first
     # `lag` of them. The cut copies, so the step can neutralise the copy in place.
-    H = return_forecast_step(rfo, map(A -> return_forecast_cut(A, r[j]), st.fsc), csfm)
-    # A fit of every observation makes every row again.
-    H0 = iszero(k) ? nothing : st.fh
-    return cross_sectional_carry_with(st, (; fh = cross_sectional_fold_append(H0, H)))
+    # A fit of every observation makes every row again, from an empty fold state.
+    H0, fs0 = iszero(k) ? (nothing, nothing) : (st.fh, st.fst)
+    (; hist, fs) = return_forecast_step(rfo, map(A -> return_forecast_cut(A, r[j]), st.fsc),
+                                        csfm, fs0)
+    H = view(hist, (d + 1):size(hist, 1), :)
+    return cross_sectional_carry_with(st,
+                                      (; fh = cross_sectional_fold_append(H0, H), fst = fs))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

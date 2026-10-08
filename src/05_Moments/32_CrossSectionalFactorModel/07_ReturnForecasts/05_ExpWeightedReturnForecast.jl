@@ -191,6 +191,43 @@ function ew_forecast_solve(A::MatNum, c::VecNum, ridge::Real, t::Integer)::VecNu
     return cross_sectional_solve(PseudoInverseFallback(), Ar, c, t)
 end
 """
+    ew_forecast_state(fs::Nothing, Td::Type, K::Integer) -> NamedTuple
+    ew_forecast_state(fs::NamedTuple, Td::Type, K::Integer) -> NamedTuple
+
+Return the state of the recursion that a step of an [`ExpWeightedReturnForecast`](@ref) starts from.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `Nothing`: the empty state. `A` and `c` are zero, the count is zero and the coefficients are `NaN`, in the number type `Td`.
+ 2. `NamedTuple`: a copy of the carried state, so the state of an earlier step stays as it is. The number type is `Td` promoted with the number types of the carried state, so a carried state of a wider type widens the step too.
+
+# Arguments
+
+  - `fs`: The carried fold state `(; A, c, n, coef)`, or `nothing`.
+  - `Td`: The number type of the data and of the hyperparameters of the step.
+  - `K`: Number of Descriptors.
+
+# Returns
+
+  - `fs::NamedTuple`: The state `(; A, c, n, coef)` that the step advances.
+
+# Related
+
+  - [`ExpWeightedReturnForecast`](@ref)
+  - [`return_forecast_step`](@ref)
+  - [`ew_forecast_accumulate!`](@ref)
+"""
+function ew_forecast_state(::Nothing, Td::Type, K::Integer)::NamedTuple
+    return (; A = zeros(Td, K, K), c = zeros(Td, K), n = 0, coef = fill(Td(NaN), K))
+end
+function ew_forecast_state(fs::NamedTuple, Td::Type, ::Integer)::NamedTuple
+    Tf = promote_type(Td, eltype(fs.A), eltype(fs.c), eltype(fs.coef))
+    return (; A = Matrix{Tf}(fs.A), c = Vector{Tf}(fs.c), n = fs.n,
+            coef = Vector{Tf}(fs.coef))
+end
+"""
     ew_forecast_history(S::Arr3Num, coefs::MatNum, gap::Integer) -> Matrix{<:Real}
 
 Read the Return Forecast history of an [`ExpWeightedReturnForecast`](@ref) off its coefficient history.
@@ -487,13 +524,9 @@ Fit a Return Forecast by exponentially weighted least squares on the forward idi
 
 # Algorithm
 
- 1. Compute the Descriptor scores over all the returns data through [`descriptor_scores`](@ref), cut them to the block's rows, and read the idiosyncratic returns and variances off the block. A row before the block carries no idiosyncratic variance, so the fit drops it. The cut gives the same answer with less work.
- 2. Take the forward mean target through [`forward_mean_returns`](@ref), and convert it to the Forecast Unit through [`forecast_unit_target`](@ref).
- 3. Read the regression weights through [`ew_forecast_weights`](@ref) and the eligibility mask through [`ew_forecast_valid`](@ref).
- 4. Over the observations whose target is known, which are all but the last `lag + horizon - 1`, advance the normal equations through [`ew_forecast_accumulate!`](@ref) and solve them through [`ew_forecast_solve`](@ref). An observation with no valid asset advances nothing, does not decay `A` or `c`, and carries the previous coefficients forward.
- 5. Write the coefficients of an observation into the coefficient history `coefs` only after `min_obs` observations have advanced the recursion. The count `n` holds the observations that advanced it, not the calendar observations.
- 6. Read the forecast history through [`ew_forecast_history`](@ref), multiply by `scale`, and convert the whole history to return units through [`forecast_return_units`](@ref). The conversion reads the variances of the block as they stand. A pair of leverage one is out of the fit, and in the Sharpe unit its forecast is zero, because its variance is zero.
- 7. Read `mu` off the last observation of that history, which is the latest scores under the latest published coefficients.
+ 1. Compute the Descriptor scores over all the returns data through [`descriptor_panel_scores`](@ref), and cut them, the weights and the group labels to the block's rows with [`return_forecast_rows`](@ref). A row before the block carries no idiosyncratic variance, so the fit drops it. The cut gives the same answer with less work.
+ 2. Run the recursion over the block's rows from an empty state with [`return_forecast_step`](@ref), giving the history and the state of the recursion.
+ 3. Read `mu` off the last observation of that history with [`return_forecast_result`](@ref), which is the latest scores under the latest published coefficients.
 
 # Arguments
 
@@ -503,7 +536,7 @@ Fit a Return Forecast by exponentially weighted least squares on the forward idi
 
 # Validation
 
-  - The rules of [`descriptor_scores`](@ref), of [`forecast_idiosyncratic_returns`](@ref) and of [`forecast_idiosyncratic_variances`](@ref).
+  - The rules of [`return_forecast_step`](@ref).
 
 # Returns
 
@@ -513,34 +546,79 @@ Fit a Return Forecast by exponentially weighted least squares on the forward idi
 
   - [`ExpWeightedReturnForecast`](@ref)
   - [`ExpWeightedReturnForecastResult`](@ref)
-  - [`ew_forecast_accumulate!`](@ref)
-  - [`ew_forecast_solve`](@ref)
-  - [`ew_forecast_history`](@ref)
+  - [`return_forecast_step`](@ref)
+  - [`return_forecast_result`](@ref)
   - [`return_forecast_cut`](@ref)
-  - [`forecast_return_units`](@ref)
 """
 function return_forecast(rfe::ExpWeightedReturnForecast, rd::ReturnsResult,
                          csfm::CrossSectionalFactorModel)::ExpWeightedReturnForecastResult
-    (; S, rows) = descriptor_scores(rfe.scores, rd, csfm)
-    Sb = return_forecast_cut(S, rows)
+    rows = return_forecast_rows(rd, csfm)
+    P = map(A -> return_forecast_cut(A, rows), descriptor_panel_scores(rfe.scores, rd))
+    (; hist, fs) = return_forecast_step(rfe, P, csfm, nothing)
+    return return_forecast_result(rfe, hist, fs)
+end
+"""
+    return_forecast_step(rfe::ExpWeightedReturnForecast, P::NamedTuple,
+                         csfm::CrossSectionalFactorModel,
+                         fs::Option{<:NamedTuple}) -> NamedTuple
+
+Advance the recursion of an exponentially weighted Return Forecast over the rows of a block, and compute the Return Forecast history of those rows.
+
+The fold state `fs` holds the normal equations `A` and `c`, the count `n` of the observations that advanced them, and the latest coefficients `coef`. The first row of the block is the first row whose target the state has not read. So the batch fit runs every row of the block from an empty state, and a step of the carry fold of a [`CrossSectionalFactorPrior`](@ref) runs its new rows and the [`forecast_target_gap`](@ref) rows before them from the carried state. The targets of those rows mature at the step. The state reads each row once, in row order, so the step and the batch fit do the same arithmetic.
+
+# Algorithm
+
+ 1. Neutralise the scores with [`descriptor_neutralised_scores`](@ref), and read the idiosyncratic returns and variances off the block.
+ 2. Take the forward mean target through [`forward_mean_returns`](@ref), and convert it to the Forecast Unit through [`forecast_unit_target`](@ref).
+ 3. Read the regression weights through [`ew_forecast_weights`](@ref) and the eligibility mask through [`ew_forecast_valid`](@ref).
+ 4. Start from a copy of `fs`, or from an empty state when `fs` is `nothing`, through [`ew_forecast_state`](@ref). Over the rows whose target is known, which are all but the last `lag + horizon - 1`, advance the normal equations through [`ew_forecast_accumulate!`](@ref) and solve them through [`ew_forecast_solve`](@ref). A row with no valid asset advances nothing, does not decay `A` or `c`, and carries the previous coefficients forward.
+ 5. Write the coefficients of a row into the coefficient history `coefs` only after `min_obs` observations have advanced the recursion. The count `n` holds the observations that advanced it, not the calendar observations.
+ 6. Read the forecast history through [`ew_forecast_history`](@ref), multiply by `scale`, and convert the history to return units through [`forecast_return_units`](@ref). The conversion reads the variances of the block as they stand. A pair of leverage one is out of the fit, and in the Sharpe unit its forecast is zero, because its variance is zero. The first `lag + horizon - 1` rows of the block read no coefficients of the block, so they stay `NaN`, and a step of the carry fold keeps the rows that it carries for them.
+
+# Arguments
+
+  - `rfe`: Exponentially weighted Return Forecast Estimator.
+  - `P`: The scores, the weights and the group labels of the rows of the block, `(; S, w, g)`, as [`descriptor_panel_scores`](@ref) states them. The function can change `P.S` in place.
+  - `csfm`: The factor-model block of the rows of `P`. It must carry the cross-sectional fit and the idiosyncratic variance history, and the member reads its exposure history under a Neutralisation.
+  - `fs`: The fold state `(; A, c, n, coef)` after the rows before the block, or `nothing` for an empty state.
+
+# Validation
+
+  - The rules of [`descriptor_neutralised_scores`](@ref), of [`forecast_idiosyncratic_returns`](@ref) and of [`forecast_idiosyncratic_variances`](@ref).
+
+# Returns
+
+  - `hist::MatNum`: The Return Forecast history, `observations × assets`, on the rows of `P`.
+  - `fs::NamedTuple`: The fold state `(; A, c, n, coef)` after the rows whose target is known.
+
+# Related
+
+  - [`return_forecast`](@ref)
+  - [`return_forecast_result`](@ref)
+  - [`folds_forecast_rows`](@ref)
+  - [`ew_forecast_accumulate!`](@ref)
+  - [`ew_forecast_solve`](@ref)
+  - [`ew_forecast_history`](@ref)
+"""
+function return_forecast_step(rfe::ExpWeightedReturnForecast, P::NamedTuple,
+                              csfm::CrossSectionalFactorModel,
+                              fs::Option{<:NamedTuple})::NamedTuple
+    Sb = descriptor_neutralised_scores(rfe.scores, P, csfm, axes(P.S, 1))
+    emsk::MatNum = P.w
     vs = forecast_idiosyncratic_variances(csfm)
     fwd = forward_mean_returns(forecast_idiosyncratic_returns(csfm), rfe.horizon, rfe.lag)
-    emsk = return_forecast_cut(return_forecast_weights(rd), rows)
     y = forecast_unit_target(rfe.unit, fwd, vs)
     W = ew_forecast_weights(rfe.unit, emsk, vs)
     valid = ew_forecast_valid(Sb, fwd, vs, emsk)
     T = size(emsk, 1)
     K = size(Sb, 3)
-    gap = rfe.lag + rfe.horizon - 1
+    gap = forecast_target_gap(rfe)
     # The state holds the decay and the ridge as well as the data, so a hyperparameter of a
     # wider type widens the state and is not truncated into the type of the data.
-    Tf = promote_type(real(eltype(Sb)), real(eltype(y)), real(eltype(W)), typeof(rfe.decay),
+    Td = promote_type(real(eltype(Sb)), real(eltype(y)), real(eltype(W)), typeof(rfe.decay),
                       typeof(rfe.ridge))
-    A = zeros(Tf, K, K)
-    c = zeros(Tf, K)
-    coefs = fill(Tf(NaN), max(T - gap, 0), K)
-    coef = fill(Tf(NaN), K)
-    n = 0
+    (; A, c, n, coef) = ew_forecast_state(fs, Td, K)
+    coefs = fill(eltype(A)(NaN), max(T - gap, 0), K)
     for t in 1:(T - gap)
         if any(view(valid, t, :))
             St, yt, wt = ew_forecast_design(Sb, y, W, t, valid)
@@ -556,8 +634,44 @@ function return_forecast(rfe::ExpWeightedReturnForecast, rd::ReturnsResult,
     # variance the block holds there.
     hist = forecast_return_units(rfe.unit, rfe.scale .* ew_forecast_history(Sb, coefs, gap),
                                  csfm.vs)
-    return ExpWeightedReturnForecastResult(; mu = hist[end, :], hist = hist, coef = coef,
-                                           A = A, c = c, n = n)
+    return (; hist = hist, fs = (; A = A, c = c, n = n, coef = coef))
+end
+"""
+    return_forecast_result(rfe::ExpWeightedReturnForecast, hist::MatNum,
+                           fs::NamedTuple) -> ExpWeightedReturnForecastResult
+
+Build the Result of an exponentially weighted Return Forecast from its history and the state of its recursion.
+
+The forecast is the last row of the history, and the Result carries the state as it stands.
+
+# Arguments
+
+  - `rfe`: Exponentially weighted Return Forecast Estimator.
+  - `hist`: The Return Forecast history, `observations × assets`, as [`return_forecast_step`](@ref) computes it.
+  - `fs`: The fold state `(; A, c, n, coef)`, as [`return_forecast_step`](@ref) gives it.
+
+# Returns
+
+  - `rf::ExpWeightedReturnForecastResult`: The fitted forecast, its history and the state of the recursion.
+
+# Related
+
+  - [`return_forecast_step`](@ref)
+  - [`ExpWeightedReturnForecastResult`](@ref)
+"""
+function return_forecast_result(::ExpWeightedReturnForecast, hist::MatNum,
+                                fs::NamedTuple)::ExpWeightedReturnForecastResult
+    return ExpWeightedReturnForecastResult(; mu = hist[end, :], hist = hist, coef = fs.coef,
+                                           A = fs.A, c = fs.c, n = fs.n)
+end
+function folds_forecast_rows(::ExpWeightedReturnForecast)::Bool
+    return true
+end
+function forecast_target_gap(rfe::ExpWeightedReturnForecast)::Integer
+    return rfe.lag + rfe.horizon - 1
+end
+function lookback(rfe::ExpWeightedReturnForecast)::Option{<:Integer}
+    return lookback(rfe.scores.descriptors)
 end
 
 export ExpWeightedReturnForecast, ExpWeightedReturnForecastResult

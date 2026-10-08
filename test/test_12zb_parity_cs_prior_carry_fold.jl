@@ -409,14 +409,16 @@ end
         @test size(po.sample_buffer(po.returns_buffer(x.pe.cache))) == size(rd.X)
         # A Return Forecast that refits at the call with no data keeps every row. One that
         # computes its history one observation at a time keeps the rows of its look-back
-        # (#1573), and a custom one keeps the rows of the exposures.
-        fixed = CrossSectionalFactorPrior(; lambda = 1, grid_config("FcFixed", rd)...)
-        @test po.cross_sectional_carry_rows(fixed) ==
-              po.lookback(fixed) ==
-              size(last(stream(fixed)).pe.cache.win.X, 1) ==
-              2
+        # (#1573, #1574), and a custom one keeps the rows of the exposures.
+        for name in ("FcFixed", "FcEW")
+            fold = CrossSectionalFactorPrior(; lambda = 1, grid_config(name, rd)...)
+            @test po.cross_sectional_carry_rows(fold) ==
+                  po.lookback(fold) ==
+                  size(last(stream(fold)).pe.cache.win.X, 1) ==
+                  2
+        end
         @test isnothing(po.cross_sectional_carry_rows(CrossSectionalFactorPrior(;
-                                                                                grid_config("FcEW",
+                                                                                grid_config("FcTarget",
                                                                                             rd)...)))
         @test po.cross_sectional_carry_rows(CrossSectionalFactorPrior(; lambda = 1,
                                                                       grid_config("FcCustom",
@@ -794,6 +796,98 @@ end
                 @test isequal(isnan.(x.pr.rr.rf.hist), isnan.(b.rr.rf.hist))
             end
         end
+    end
+
+    @testset "An exponentially weighted Return Forecast folds its rows (#1574)" begin
+        # The batch fit is a forward recursion over the rows whose target is known. A step
+        # reads its new rows and the `lag + horizon - 1` rows before them, whose targets
+        # mature at the step, from the carried state of the recursion. The Reversal score over
+        # the cut rows agrees to rounding (#1470).
+        sharpe = IdiosyncraticSharpeUnit()
+        ind = grid_config("FamOne", rd).factors
+        scores(nm) = DescriptorScores(;
+                                      descriptors = [Passthrough(;
+                                                                 field = "net_income_ttm"),
+                                                     Reversal(; window = 30),
+                                                     GrowthRate(; field = "sales_ttm",
+                                                                lag = 5)], neutralise = nm,
+                                      nw = BlockRegressionWeights(), group = "industry")
+        ew(nm, unit; kw...) = ExpWeightedReturnForecast(; scores = scores(nm),
+                                                        half_life = 10, scale = 0.5,
+                                                        unit = unit, kw...)
+        fk = (; lambda = 0.4, c = 0.6, minra = 5, pe = GRID_PE, ve = GRID_VE)
+        e = (0, 90, 91, 92, 93, 170, 250)
+        # The first fit holds two rows, so the first steps carry fewer rows than the gap of
+        # four. Passthrough scores and a short variance warm-up let the recursion advance in
+        # them. The factor prior reads too few rows until the last step, so only the last
+        # step reads out, and it reads the rows and the state of the early steps.
+        e0 = (0, 3, 4, 5, 6, 7, 8, 120)
+        early = (; grid_config("Base", rd)..., fk..., ofit = UnadjustedForecast(),
+                 ve = ExpWeightedVariance(; decay = 2.0^(-1 / 20), min_obs = 2),
+                 rfe = ExpWeightedReturnForecast(;
+                                                 scores = DescriptorScores(;
+                                                                           descriptors = [Passthrough(;
+                                                                                                      field = "net_income_ttm"),
+                                                                                          Passthrough(;
+                                                                                                      field = "sales_ttm")]),
+                                                 half_life = 10, horizon = 2, lag = 3))
+        st = partial_fit!(CrossSectionalFactorPrior(; early...), rows(rd, 1:3))
+        st = partial_fit!(partial_fit!(st, rows(rd, 4:4)), rows(rd, 5:8)).cache
+        @test size(st.fh, 1) == 7 && st.fst.n == 2
+        wv = WindowedVariance(;
+                              ve = ExpWeightedVariance(; decay = 2.0^(-1 / 20),
+                                                       min_obs = 5), window = 60)
+        # The batch choice of `style` moves at the second step, and a rolling window does not
+        # fold, so both fit every observation again from an empty state of the recursion.
+        cases = (((; fk..., factors = ind, families = ["industry" => nothing],
+                   rfe = ew(["industry", "style1"], sharpe)), e),
+                 ((; fk..., factors = ind, lag = 2,
+                   rfe = ew(["industry", "style1"], IdiosyncraticReturnUnit(); horizon = 3,
+                            lag = 2, min_obs = 20, normalise = false)), e),
+                 ((; style..., fk..., ofit = UnadjustedForecast(),
+                   rfe = ew(nothing, sharpe; horizon = 2, lag = 3)), e), (early, e0),
+                 ((; style..., fk..., ofit = ScoreNeutralisation(),
+                   rfe = ew(nothing, IdiosyncraticReturnUnit())), edges),
+                 ((; style..., fk..., ve = wv, rfe = ew(["style1"], sharpe; horizon = 2)),
+                  edges))
+        for (cfg, ee) in cases
+            pe = CrossSectionalFactorPrior(; cfg...)
+            @test po.cross_sectional_carry_rows(pe) ==
+                  po.lookback(pe) ==
+                  (cfg === early ? 2 : 30)
+            for (k, x) in enumerate(stream(pe, rd, ee))
+                # A block too short for a fit refuses on both sides.
+                b = try
+                    batch(pe, k, rd, ee)
+                catch err
+                    err
+                end
+                st = x.pe.cache
+                if b isa Exception
+                    @test x.pr isa Exception
+                    continue
+                end
+                rf, rb = x.pr.rr.rf, b.rr.rf
+                @test size(st.win.X, 1) <= 30
+                @test size(st.fh) == size(st.vs) == size(rb.hist)
+                @test relerr(x.pr.mu, b.mu) < 1e-13 &&
+                      relerr(x.pr.sigma, b.sigma) < 1e-13 &&
+                      relerr(rf.hist, rb.hist) < 1e-13
+                @test isequal(isnan.(rf.hist), isnan.(rb.hist))
+                # The state of the recursion equals the one of the batch fit.
+                @test rf.n == rb.n == st.fst.n
+                @test relerr(rf.A, rb.A) < 1e-13 && relerr(rf.c, rb.c) < 1e-13
+                @test isequal(isnan.(rf.coef), isnan.(rb.coef)) &&
+                      relerr(rf.coef, rb.coef) < 1e-12
+            end
+        end
+        # A step copies the carried state, so the state of an earlier step stays as it is.
+        pe = CrossSectionalFactorPrior(; first(first(cases))...)
+        pe = partial_fit!(partial_fit!(pe, rows(rd, 1:90)), rows(rd, 91:91))
+        A0 = copy(pe.cache.fst.A)
+        st0 = pe.cache
+        partial_fit!(pe, rows(rd, 92:92))
+        @test st0.fst.A == A0
     end
 
     @testset "Refusals" begin
