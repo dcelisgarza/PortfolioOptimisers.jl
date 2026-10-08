@@ -321,11 +321,10 @@ end
         # The block does not change.
         @test count(iszero, filter(isfinite, view(blk.vs, :, 3))) == 588
         # The carry fold equals the batch fit under each fitted forecast, and carries the same
-        # mask. Measured: the first step is exact. The later steps differ by the round-off of
-        # the cut of `RollingMomentum` (#1563), which moves the exposures by 1.6e-15 with no
-        # forecast at all. The largest relative errors over the four forecasts are 5.6e-15 in
-        # `mu`, 1.5e-15 in `sigma`, 6.1e-16 in `vs` and 4.5e-14 in the calibration or the
-        # coefficients.
+        # mask. Measured: every step is exact since the rolling returns fold from their state
+        # (#1583). Before it, the cut of `RollingMomentum` (#1563) moved the exposures by
+        # 1.6e-15, and the four forecasts by up to 5.6e-15 in `mu` and 4.5e-14 in the
+        # calibration or the coefficients.
         ep = (0, 1150, 1151, 1200)
         fk = (; lambda = 0.4, c = 0.6, ofit = UnadjustedForecast())
         for unit in (IdiosyncraticReturnUnit(), sharpe),
@@ -425,7 +424,7 @@ end
                                                                                   rd)...)) ==
               2
         # A finite look-back keeps its last rows, an exponentially weighted Descriptor keeps
-        # every row. The synthetic panel lists, delists and leaves gaps.
+        # every row, and a rolling return keeps none, because it folds from its state (#1583). The synthetic panel lists, delists and leaves gaps.
         syn = synthetic_asset_panel(; n_assets = 60, n_observations = 160, n_industries = 4,
                                     rng = StableRNG(1471)).rd
         bounded = ["market" => ConstantExposure(),
@@ -442,7 +441,7 @@ end
         # type of error. Inside the warm-up the batch fit refuses in its warm-up and the fold at
         # its call with no data, so the two messages differ there.
         e = (0, 10, 40, 41, 80, 81, 120, 160)
-        for (factors, kept) in ((bounded, 22), (ew, 160), (derived, 22))
+        for (factors, kept) in ((bounded, 2), (ew, 160), (derived, 2))
             pe = CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                            families = ["industry" => nothing], minra = 5,
                                            pe = GRID_PE, ve = GRID_VE)
@@ -453,13 +452,11 @@ end
                     err
                 end
                 if isa(b, LowOrderPrior)
-                    # Measured 8.3e-16 on the bounded case, 6.9e-16 on the EW case and
-                    # 2.4e-15 on the derived case: a rolling return over the cut rows is a
-                    # difference of cumulative sums from another first row (#1470). A step
-                    # cuts the rows of each member (#1563), so the EW case cuts it too.
-                    @test relerr(x.pr.mu, b.mu) < 1e-14 &&
-                          relerr(x.pr.sigma, b.sigma) < 1e-14
-                    @test isequal(isnan.(x.pr.sigma), isnan.(b.sigma))
+                    # Equal to the last bit: the rolling return folds from its cumulative
+                    # sums since the first row (#1583). Before it, a step cut the rows of
+                    # the member (#1563), and the cases moved by 6.9e-16 to 2.4e-15.
+                    @test same(x.pr.rr.Ms, b.rr.Ms)
+                    @test same(x.pr.mu, b.mu) && same(x.pr.sigma, b.sigma)
                 else
                     @test typeof(x.pr) == typeof(b)
                 end
@@ -986,6 +983,74 @@ end
             @test isapprox(x.pr.rr.lambda, b.rr.lambda; rtol = 1e-12)
             @test size(x.pe.cache.hist, 1) == size(x.pe.cache.fh, 1) - 1
         end
+    end
+
+    @testset "A RollingLogReturn folds one row from its carried state (#1583)" begin
+        # The state takes the cumulative sums from the first observation with the arithmetic
+        # of the batch call, so each folded row equals the batch call to the last bit, in
+        # blocks of any size. A second step from the same state gives the same rows, because
+        # a step copies the buffers of the state and changes no carried row.
+        syn = synthetic_asset_panel(; n_assets = 60, n_observations = 160, n_industries = 4,
+                                    rng = StableRNG(1583)).rd
+        blocks = ((1, 1), (2, 30), (31, 31), (32, 100), (101, 160))
+        for de in (RollingMomentum(; window = 40, skip = 5), Reversal(),
+                   RollingLogReturn(; window = 10, sign = -1, exponentiate = true))
+            full = descriptor(de, syn)
+            st = de
+            for (a, b) in blocks
+                r = po.descriptor_step(st, rows(syn, a:b))
+                @test same(r.D, full[a:b, :])
+                @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
+                @test same(partial_fit!(st, rows(syn, a:b)).cache.cs[end],
+                           r.de.cache.cs[end])
+                st = r.de
+            end
+            @test length(st.cache.cs) == de.window + de.skip + 1
+            c = copy(st.cache)
+            @test all(i -> c.cs[i] == st.cache.cs[i] && c.cs[i] !== st.cache.cs[i],
+                      eachindex(c.cs))
+            @test occursin("cannot merge two states fitted on disjoint blocks",
+                           message(() -> po.merge_states(c, st.cache)))
+            @test occursin("carries 60 assets, and the step brings 5",
+                           message(() -> po.descriptor_step(st,
+                                                            po.port_opt_view(rows(syn, 1:2),
+                                                                             1:5))))
+        end
+        # On the carry fold the Descriptor counts as one row, so the carry keeps the rows of
+        # the lag alone, and the exposures of every step equal those of the batch fit.
+        momentum = ["market" => ConstantExposure(),
+                    "momentum" => CompositeExposure(;
+                                                    descriptors = [RollingMomentum(; window = 40,
+                                                                                   skip = 5),
+                                                                   BookToPrice()]),
+                    "industry" => OneHotExposure(; field = "industry", family = "industry")]
+        pe = CrossSectionalFactorPrior(; lambda = 1, factors = momentum,
+                                       families = ["industry" => nothing], minra = 5,
+                                       pe = GRID_PE, ve = GRID_VE)
+        @test po.lookback(pe) == 46
+        @test po.cross_sectional_carry_rows(pe) == 2
+        e = (0, 50, 80, 81, 120, 121, 160)
+        s = stream(pe, syn, e)
+        fitted = 0
+        for (k, x) in enumerate(s)
+            b = try
+                batch(pe, k, syn, e)
+            catch err
+                err
+            end
+            if isa(b, LowOrderPrior)
+                fitted += 1
+                @test same(x.pr.rr.Ms, b.rr.Ms)
+                @test same(x.pr.mu, b.mu) && same(x.pr.sigma, b.sigma)
+            else
+                @test typeof(x.pr) == typeof(b)
+            end
+        end
+        # The case reads out at least once, so the loop is not vacuous.
+        @test fitted >= 3
+        @test size(last(s).pe.cache.win.X, 1) == 2
+        @test isa(last(last(s).pe.cache.xf[2]).descriptors[1].cache,
+                  po.RollingLogReturnState)
     end
 
     @testset "Refusals" begin

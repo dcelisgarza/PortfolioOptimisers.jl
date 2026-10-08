@@ -26,5 +26,6 @@ PortfolioOptimisers.cross_sectional_live_factors
 PortfolioOptimisers.cross_sectional_pin_choice
 PortfolioOptimisers.cross_sectional_pinned_families
 PortfolioOptimisers.cross_sectional_axis_pairs
+PortfolioOptimisers.cross_sectional_lookback
 PortfolioOptimisers.show_fields(::CrossSectionalFactorPrior)
 ```

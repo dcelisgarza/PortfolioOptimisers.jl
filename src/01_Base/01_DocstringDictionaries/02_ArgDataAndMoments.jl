@@ -149,6 +149,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :window_roll => "`window`: Number of observations in the window.",#
                  :skip_roll => "`skip`: Number of the most recent observations that the window excludes, so the window ends at observation `t - skip`.",#
                  :sign_roll => "`sign`: Multiplier of the window sum, `1` or `-1`. A sign of `1` reads the window as momentum, and a sign of `-1` reads it as reversal.",#
+                 :roll_cache => "`cache`: The carried state of the cumulative sums, or `nothing` before the first call to [`partial_fit!`](@ref). It is the one Result this estimator holds, and its type bound is the enforcement of that exception. The batch call [`descriptor`](@ref) ignores it. The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads the Descriptor of each new observation off it, with [`descriptor_step`](@ref).",#
                  :exponentiate_roll => "`exponentiate`: Whether the Descriptor is the simple return `exp(sign * S) - 1` rather than the log return `sign * S`, where `S` is the sum of the log returns of the window.",#
                  # Regime adjusted estimators.
                  :decay => "`decay`: Exponential decay factor for the exponentially weighted estimator.",#

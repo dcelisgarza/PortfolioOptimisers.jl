@@ -138,15 +138,15 @@ commit = "b5f32c376e"
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { cyc = 6, cog = 10, arg = 5, cyc_sum = 40, cog_sum = 33, arg_sum = 36, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { cyc = 5, cog = 6, arg = 4, cyc_sum = 28, cog_sum = 22, arg_sum = 5, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl" = { cyc = 8, cog = 15, arg = 22, cyc_sum = 76, cog_sum = 42, arg_sum = 74, macros = ["@forward_properties"] }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 34, cog_sum = 35, arg_sum = 8, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl" = { cyc = 7, cog = 12, arg = 6, cyc_sum = 39, cog_sum = 38, arg_sum = 8, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/02_PanelFieldDescriptors.jl" = { cyc = 9, cog = 21, arg = 5, cyc_sum = 61, cog_sum = 37, arg_sum = 8, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/03_LagDescriptors.jl" = { cyc = 3, cog = 2, arg = 4, cyc_sum = 21, cog_sum = 8, arg_sum = 10, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl" = { cyc = 5, cog = 9, arg = 6, cyc_sum = 32, cog_sum = 19, arg_sum = 15, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/05_EWVolatilityDescriptors.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 15, cog_sum = 6, arg_sum = 9, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl" = { cyc = 9, cog = 13, arg = 8, cyc_sum = 69, cog_sum = 84, arg_sum = 36, macros = [] }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl" = { cyc = 6, cog = 11, arg = 4, cyc_sum = 24, cog_sum = 22, arg_sum = 6, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl" = { cyc = 6, cog = 11, arg = 5, cyc_sum = 56, cog_sum = 41, arg_sum = 28, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/08_Base_Exposure.jl" = { cyc = 4, cog = 4, arg = 0, cyc_sum = 15, cog_sum = 7, arg_sum = 0, macros = [] }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/09_CompositeExposure.jl" = { cyc = 4, cog = 5, arg = 8, cyc_sum = 18, cog_sum = 13, arg_sum = 8, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/09_CompositeExposure.jl" = { cyc = 4, cog = 5, arg = 8, cyc_sum = 21, cog_sum = 16, arg_sum = 11, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/10_DerivedExposure.jl" = { cyc = 2, cog = 1, arg = 7, cyc_sum = 5, cog_sum = 2, arg_sum = 9, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/11_OneHotExposure.jl" = { cyc = 7, cog = 12, arg = 2, cyc_sum = 18, cog_sum = 20, arg_sum = 2, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/12_ConstantExposure.jl" = { cyc = 1, cog = 1, arg = 1, cyc_sum = 3, cog_sum = 1, arg_sum = 1, macros = [] }
@@ -243,11 +243,11 @@ commit = "b5f32c376e"
 "src/10_Prior/08_HighOrderFactorPriorEstimator.jl" = { cyc = 22, cog = 37, arg = 6, cyc_sum = 48, cog_sum = 65, arg_sum = 20, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/09_AssetPanelEstimators.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 26, cog_sum = 11, arg_sum = 27, macros = ["@propagatable"] }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { cyc = 10, cog = 16, arg = 10, cyc_sum = 116, cog_sum = 94, arg_sum = 124, macros = [] }
-"src/10_Prior/11_CrossSectionalFactorPrior.jl" = { cyc = 6, cog = 7, arg = 26, cyc_sum = 74, cog_sum = 59, arg_sum = 126, macros = ["@propagatable"] }
+"src/10_Prior/11_CrossSectionalFactorPrior.jl" = { cyc = 6, cog = 7, arg = 26, cyc_sum = 75, cog_sum = 59, arg_sum = 127, macros = ["@propagatable"] }
 "src/10_Prior/12_PriorPartialFit.jl" = { cyc = 3, cog = 3, arg = 6, cyc_sum = 111, cog_sum = 63, arg_sum = 178, macros = [] }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 10, cog_sum = 8, arg_sum = 19, macros = [] }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 11, cog_sum = 5, arg_sum = 17, macros = [] }
-"src/10_Prior/15_CrossSectionalPriorFold.jl" = { cyc = 9, cog = 14, arg = 5, cyc_sum = 78, cog_sum = 55, arg_sum = 104, macros = [] }
+"src/10_Prior/15_CrossSectionalPriorFold.jl" = { cyc = 9, cog = 14, arg = 5, cyc_sum = 90, cog_sum = 69, arg_sum = 121, macros = [] }
 "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { cyc = 6, cog = 8, arg = 6, cyc_sum = 38, cog_sum = 36, arg_sum = 41, macros = [] }
 "src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 47, cog_sum = 28, arg_sum = 82, macros = [] }
 "src/10_Prior/18_CrossSectionalCarryHistories.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 12, cog_sum = 9, arg_sum = 17, macros = [] }

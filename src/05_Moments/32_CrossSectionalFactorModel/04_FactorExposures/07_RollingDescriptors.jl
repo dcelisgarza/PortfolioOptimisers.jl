@@ -142,6 +142,8 @@ The Descriptor is `NaN` unless every observation of the window is active. This o
 
 The output is a log return by default. A log cumulative return is more symmetric than a simple one, and the cross-sectional standardisation that reads it works better on a symmetric value. The logarithm is increasing, so the two orders of the assets agree. Set `exponentiate` to get the simple return.
 
+The Descriptor is a difference of cumulative sums from the first observation, so it folds one observation at a time. [`partial_fit!`](@ref) carries the last `window + skip + 1` rows of the sums in a [`RollingLogReturnState`](@ref), and the Descriptor of each new observation equals the one of the batch call to the last bit. The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads it that way, so it keeps no panel row for it.
+
 # Mathematical definition
 
 ```math
@@ -172,7 +174,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     RollingLogReturn(; window::Integer, skip::Integer = 0, sign::Real = 1,
-                     exponentiate::Bool = false) -> RollingLogReturn
+                     exponentiate::Bool = false,
+                     cache::Option{<:AbstractPartialFitState} = nothing) -> RollingLogReturn
 
 Keywords correspond to the struct's fields. `window` takes no default, because it depends on the data frequency. For example, `252` is one year of daily observations. The named Descriptors [`RollingMomentum`](@ref) and [`Reversal`](@ref) give a default to all four.
 
@@ -197,6 +200,7 @@ RollingLogReturn
 
   - [`AbstractDescriptorEstimator`](@ref)
   - [`descriptor`](@ref)
+  - [`RollingLogReturnState`](@ref)
   - [`RollingMax`](@ref)
   - [`RollingMomentum`](@ref)
   - [`Reversal`](@ref)
@@ -218,20 +222,47 @@ RollingLogReturn
     $(field_dict[:exponentiate_roll])
     """
     exponentiate
+    """
+    $(field_dict[:roll_cache])
+    """
+    cache
     function RollingLogReturn(window::Integer, skip::Integer, sign::Real,
-                              exponentiate::Bool)
+                              exponentiate::Bool, cache::Option{<:AbstractPartialFitState})
         assert_gt0(window, :window)
         assert_nonneg(skip, :skip)
         assert_rolling_sign(sign)
-        return new{typeof(window), typeof(skip), typeof(sign), typeof(exponentiate)}(window,
-                                                                                     skip,
-                                                                                     sign,
-                                                                                     exponentiate)
+        return new{typeof(window), typeof(skip), typeof(sign), typeof(exponentiate),
+                   typeof(cache)}(window, skip, sign, exponentiate, cache)
     end
 end
 function RollingLogReturn(; window::Integer, skip::Integer = 0, sign::Real = 1,
-                          exponentiate::Bool = false)::RollingLogReturn
-    return RollingLogReturn(window, skip, sign, exponentiate)
+                          exponentiate::Bool = false,
+                          cache::Option{<:AbstractPartialFitState} = nothing)::RollingLogReturn
+    return RollingLogReturn(window, skip, sign, exponentiate, cache)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`RollingLogReturn`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one, such as a [`CompositeExposure`](@ref). Set `set_show_nothing_fields!(:RollingLogReturn, true)` to render it.
+
+# Arguments
+
+  - `de`: The estimator.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, `(:window, :skip, :sign, :exponentiate)`.
+
+# Related
+
+  - [`RollingLogReturn`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+function show_fields(::RollingLogReturn)
+    return (:window, :skip, :sign, :exponentiate)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -415,6 +446,463 @@ function lookback(de::RollingLogReturn)::Integer
 end
 function lookback(de::RollingMax)::Integer
     return de.window
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Carried state of a [`RollingLogReturn`](@ref): the last `window + skip + 1` rows of the cumulative sums that its batch call takes.
+
+The batch call [`descriptor`](@ref) takes the cumulative sums of `log1p` of the returns and of the active mask from the first observation. The Descriptor of an observation is one difference of two rows of each. So the last `window + skip + 1` rows give the Descriptor of the next observation, and the state holds no other value. The state adds each new row to the last carried row, as the batch call does, so the Descriptor of a new observation equals the one of the batch call over every folded observation to the last bit. A running window sum that adds the new row and subtracts the old one drifts by round-off, so the state keeps no such sum.
+
+Each row is a vector of its own, and no verb changes a row after the state carries it. A step copies the two buffers, which copies the references to the rows and no row, so the state before the step stays as it was.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    RollingLogReturnState(; cs::DataStructures.CircularBuffer{<:AbstractVector{<:Real}},
+                          ac::DataStructures.CircularBuffer{<:AbstractVector{<:Integer}}) -> RollingLogReturnState
+
+Keywords correspond to the struct's fields. [`descriptor_step`](@ref) seeds a state whose one row is zero, the row before the first observation of the batch call.
+
+## Validation
+
+  - `cs` and `ac` have the same capacity, and hold the same number of rows. A `DimensionMismatch` is thrown otherwise.
+
+# Related
+
+  - [`RollingLogReturn`](@ref)
+  - [`descriptor_step`](@ref)
+  - [`AbstractPartialFitState`](@ref)
+"""
+@concrete struct RollingLogReturnState <: AbstractPartialFitState
+    """
+    The cumulative sums of `log1p` of the returns of each asset, one row per observation, oldest first. A missing return adds zero.
+    """
+    cs
+    """
+    The cumulative counts of the active observations of each asset, one row per observation, oldest first.
+    """
+    ac
+    function RollingLogReturnState(cs::DataStructures.CircularBuffer{<:AbstractVector{<:Real}},
+                                   ac::DataStructures.CircularBuffer{<:AbstractVector{<:Integer}})
+        @argcheck(DataStructures.capacity(cs) == DataStructures.capacity(ac) &&
+                  length(cs) == length(ac),
+                  DimensionMismatch("the cumulative sums and the active counts of a RollingLogReturnState hold the same rows, got $(length(cs)) of $(DataStructures.capacity(cs)) and $(length(ac)) of $(DataStructures.capacity(ac))"))
+        return new{typeof(cs), typeof(ac)}(cs, ac)
+    end
+end
+function RollingLogReturnState(;
+                               cs::DataStructures.CircularBuffer{<:AbstractVector{<:Real}},
+                               ac::DataStructures.CircularBuffer{<:AbstractVector{<:Integer}})::RollingLogReturnState
+    return RollingLogReturnState(cs, ac)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses to merge two [`RollingLogReturnState`](@ref) fitted on disjoint blocks.
+
+The cumulative sums of the second block start from the last row of the first block, so the state of the second block alone does not give its Descriptors. The two blocks fold in sequence.
+
+# Arguments
+
+  - `a`: The state of the first block.
+  - `b`: The state of the second block.
+
+# Validation
+
+  - Always throws an `ArgumentError`.
+
+# Related
+
+  - [`RollingLogReturnState`](@ref)
+  - [`merge_states`](@ref)
+"""
+function merge_states(::RollingLogReturnState, ::RollingLogReturnState)
+    return throw(ArgumentError("a RollingLogReturnState cannot merge two states fitted on disjoint blocks: the cumulative sums of the second block start from the last row of the first. Fold the second block into the state of the first with partial_fit!."))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Copies a [`RollingLogReturnState`](@ref), so that the copy shares no row with the original.
+
+# Arguments
+
+  - `x`: The state to copy.
+
+# Returns
+
+  - `state::RollingLogReturnState`: A new state, equal to `x`.
+
+# Related
+
+  - [`RollingLogReturnState`](@ref)
+"""
+function Base.copy(x::RollingLogReturnState)
+    return RollingLogReturnState(rolling_state_buffer(copy, x.cs),
+                                 rolling_state_buffer(copy, x.ac))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Builds a buffer of the capacity of `cb` that holds `f` of each of its rows, in order.
+
+# Arguments
+
+  - `f`: The function of a row, `identity` to share the rows or `copy` to copy them.
+  - `cb`: The buffer.
+
+# Returns
+
+  - `cb::DataStructures.CircularBuffer`: The new buffer.
+
+# Related
+
+  - [`RollingLogReturnState`](@ref)
+"""
+function rolling_state_buffer(f, cb::DataStructures.CircularBuffer)
+    out = DataStructures.CircularBuffer{eltype(cb)}(DataStructures.capacity(cb))
+    for r in cb
+        push!(out, f(r))
+    end
+    return out
+end
+"""
+    rolling_state_seed(de::RollingLogReturn, X::MatNum)
+
+Returns the state that a step of a [`RollingLogReturn`](@ref) folds its rows into: a seeded state when the estimator carries none, or a copy of its buffers that shares their rows.
+
+# Arguments
+
+  - `de`: The estimator.
+  - `X`: The returns of the step, `observations × assets`.
+
+# Validation
+
+  - A carried state holds the assets of `X`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `state::RollingLogReturnState`: A state that no other estimator holds.
+
+# Related
+
+  - [`descriptor_step`](@ref)
+"""
+function rolling_state_seed(de::RollingLogReturn{<:Any, <:Any, <:Any, <:Any, Nothing},
+                            X::MatNum)
+    k = de.window + de.skip + 1
+    N = size(X, 2)
+    cs = DataStructures.CircularBuffer{Vector{eltype(X)}}(k)
+    ac = DataStructures.CircularBuffer{Vector{Int}}(k)
+    push!(cs, zeros(eltype(X), N))
+    push!(ac, zeros(Int, N))
+    return RollingLogReturnState(cs, ac)
+end
+function rolling_state_seed(de::RollingLogReturn{<:Any, <:Any, <:Any, <:Any,
+                                                 <:RollingLogReturnState}, X::MatNum)
+    st = de.cache
+    @argcheck(length(st.cs[end]) == size(X, 2),
+              DimensionMismatch("the state of this RollingLogReturn carries $(length(st.cs[end])) assets, and the step brings $(size(X, 2))"))
+    return RollingLogReturnState(rolling_state_buffer(identity, st.cs),
+                                 rolling_state_buffer(identity, st.ac))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Folds the rows of a step into a [`RollingLogReturnState`](@ref) in place, and returns the Descriptor of each row.
+
+Each row adds its log returns and its active mask to the last carried row, with the arithmetic of the batch call [`descriptor`](@ref). Once the state holds `window + skip + 1` rows, the Descriptor of the new row is the difference of the row `skip` rows before the last and the oldest row, where the active count of the window equals `window`.
+
+# Arguments
+
+  - `st`: The state, changed in place.
+  - `de`: The estimator, which fixes the window, the skip and the sign.
+  - `X`: The returns of the step, `observations × assets`.
+  - `amsk`: The active mask of the step.
+
+# Returns
+
+  - `D::Matrix{<:Real}`: The Descriptor of each row of the step, `NaN` where the window is not complete.
+
+# Related
+
+  - [`descriptor_step`](@ref)
+  - [`RollingLogReturnState`](@ref)
+"""
+function rolling_state_fold!(st::RollingLogReturnState, de::RollingLogReturn, X::MatNum,
+                             amsk::AbstractMatrix{Bool})::Matrix{<:Real}
+    D = fill(eltype(X)(NaN), size(X))
+    (; cs, ac) = st
+    for t in axes(X, 1)
+        rolling_state_push!(st, view(X, t, :), view(amsk, t, :))
+        if DataStructures.isfull(cs)
+            rolling_state_value!(view(D, t, :), st, de)
+        end
+    end
+    return D
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Writes the Descriptor of the newest row of a full [`RollingLogReturnState`](@ref), where the active count of its window equals `window`.
+
+# Arguments
+
+  - `d`: The Descriptor of the row, changed in place.
+  - `st`: The state, which holds `window + skip + 1` rows.
+  - `de`: The estimator, which fixes the window, the skip and the sign.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`rolling_state_fold!`](@ref)
+"""
+function rolling_state_value!(d::AbstractVector{<:Real}, st::RollingLogReturnState,
+                              de::RollingLogReturn)::Nothing
+    (; cs, ac) = st
+    cs0, ce, as, ae = cs[1], cs[end - de.skip], ac[1], ac[end - de.skip]
+    for i in eachindex(d)
+        if ae[i] - as[i] == de.window
+            v = de.sign * (ce[i] - cs0[i])
+            d[i] = de.exponentiate ? expm1(v) : v
+        end
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Pushes the cumulative sums and the active counts of one observation onto a [`RollingLogReturnState`](@ref). Each new row is the last row plus the log returns and the active mask of the observation, with the arithmetic of the batch call [`descriptor`](@ref). A missing return adds zero.
+
+# Arguments
+
+  - `st`: The state, changed in place.
+  - `x`: The returns of the observation.
+  - `a`: The active mask of the observation.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`rolling_state_fold!`](@ref)
+"""
+function rolling_state_push!(st::RollingLogReturnState, x::AbstractVector{<:Real},
+                             a::AbstractVector{Bool})::Nothing
+    c0, a0 = st.cs[end], st.ac[end]
+    c, n = similar(c0), similar(a0)
+    for i in eachindex(c0)
+        xi = x[i]
+        c[i] = c0[i] + (isnan(xi) ? zero(eltype(c0)) : log1p(xi))
+        n[i] = a0[i] + a[i]
+    end
+    push!(st.cs, c)
+    push!(st.ac, n)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Folds the observations of a [`ReturnsResult`](@ref) into the carried state of a [`RollingLogReturn`](@ref), and returns the Descriptor of each one.
+
+The Descriptor of an observation equals the one of the batch call [`descriptor`](@ref) over every observation that the state folded and the observations before it, to the last bit, because the state takes the cumulative sums with the same arithmetic from the same first observation. The step copies the buffers of the state and no row, so the estimator it gets keeps its state.
+
+# Algorithm
+
+ 1. Take the returns and the Asset Panel with [`descriptor_returns`](@ref), and refuse a return at or below `-1` through [`assert_log_returns`](@ref).
+ 2. Take the state with [`rolling_state_seed`](@ref), and fold the rows into it with [`rolling_state_fold!`](@ref).
+ 3. Write `NaN` where an observation is inactive, with [`descriptor_active_fill!`](@ref).
+
+# Arguments
+
+  - `de`: The estimator, with or without a state.
+  - $(arg_dict[:rd]) It holds the new observations alone.
+
+# Validation
+
+  - The rules of [`descriptor_returns`](@ref), [`assert_log_returns`](@ref) and [`rolling_state_seed`](@ref).
+
+# Returns
+
+  - `step::NamedTuple`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
+
+# Related
+
+  - [`RollingLogReturn`](@ref)
+  - [`RollingLogReturnState`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`descriptor_carry`](@ref)
+"""
+function descriptor_step(de::RollingLogReturn, rd::ReturnsResult)
+    X, pnl = descriptor_returns(rd)
+    assert_log_returns(X)
+    st = rolling_state_seed(de, X)
+    D = rolling_state_fold!(st, de, X, pnl.amsk)
+    descriptor_active_fill!(D, pnl)
+    return (; de = RollingLogReturn(de.window, de.skip, de.sign, de.exponentiate, st),
+            D = D)
+end
+"""
+    partial_fit!(de::RollingLogReturn{<:Any, <:Any, <:Any, <:Any,
+                                      <:Option{<:RollingLogReturnState}},
+                 rd::ReturnsResult)
+
+Folds the observations of a [`ReturnsResult`](@ref) into the carried state of a [`RollingLogReturn`](@ref), and returns the estimator with the state after them in `cache`. [`descriptor_step`](@ref) states the fold, and also returns the Descriptor of each observation.
+
+# Arguments
+
+  - `de`: The estimator, with no state or with its state.
+  - $(arg_dict[:rd]) It holds the new observations alone.
+
+# Validation
+
+  - The rules of [`descriptor_step`](@ref).
+
+# Returns
+
+  - `de::RollingLogReturn`: The estimator, with its `cache` field set to the state after the observations.
+
+# Related
+
+  - [`descriptor_step`](@ref)
+  - [`RollingLogReturnState`](@ref)
+"""
+function partial_fit!(de::RollingLogReturn{<:Any, <:Any, <:Any, <:Any,
+                                           <:Option{<:RollingLogReturnState}},
+                      rd::ReturnsResult)
+    return descriptor_step(de, rd).de
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The Descriptor of the new observations of a step of the carry fold, read off a carried state.
+
+The carry fold of a [`CrossSectionalFactorPrior`](@ref) puts it in place of a Descriptor that carries a state, as [`descriptor_carry`](@ref) does, so the code of the batch fit computes the Factor Exposures of the new observations. It reads no panel row, so its [`lookback`](@ref) is one.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Related
+
+  - [`descriptor_carry`](@ref)
+  - [`descriptor_step`](@ref)
+"""
+@concrete struct CarriedDescriptor <: AbstractDescriptorEstimator
+    """
+    The Descriptor of the new observations, `observations × assets`.
+    """
+    D
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the Descriptor of a [`CarriedDescriptor`](@ref) on the rows of a [`ReturnsResult`](@ref). The carried rows are the last rows of `rd`, and every row before them is `NaN`.
+
+# Arguments
+
+  - `de`: The carried Descriptor.
+  - $(arg_dict[:rd])
+
+# Validation
+
+  - `rd` holds the assets of `de.D` and at least its rows. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `D::Matrix{<:Real}`: The Descriptor, `observations × assets`.
+
+# Related
+
+  - [`CarriedDescriptor`](@ref)
+"""
+function descriptor(de::CarriedDescriptor, rd::ReturnsResult)::Matrix{<:Real}
+    T, N = size(rd.X)
+    m = size(de.D, 1)
+    @argcheck(T >= m && N == size(de.D, 2),
+              DimensionMismatch("a carried Descriptor of $(size(de.D)) reads returns data of $((T, N))"))
+    if T == m
+        return de.D
+    end
+    D = fill(eltype(de.D)(NaN), T, N)
+    D[(T - m + 1):T, :] = de.D
+    return D
+end
+function lookback(::CarriedDescriptor)::Integer
+    return 1
+end
+"""
+    descriptor_carry(xe, rd::ReturnsResult, m)
+    descriptor_carry(de::RollingLogReturn, rd::ReturnsResult, m::Integer)
+    descriptor_carry(xe::CompositeExposure, rd::ReturnsResult, m::Integer)
+
+Folds the last `m` observations of a [`ReturnsResult`](@ref) into every Descriptor of an Exposure Estimator that carries a state, on the carry fold of a [`CrossSectionalFactorPrior`](@ref).
+
+The generic method returns the estimator as it is twice: it carries no state. A [`RollingLogReturn`](@ref) folds the observations with [`descriptor_step`](@ref), and the [`CompositeExposure`](@ref) method folds each of its Descriptors.
+
+# Arguments
+
+  - `xe`: The Exposure Estimator or the Descriptor, as the carry folded it so far.
+  - $(arg_dict[:rd]) It holds the panel rows that the carry carries, followed by the new observations.
+  - `m`: The number of new observations.
+
+# Returns
+
+  - `carry::NamedTuple`: `xf`, the estimator with the state after the new observations, and `xv`, the estimator whose stateful Descriptors are [`CarriedDescriptor`](@ref) of the new observations, which the code of the batch fit computes the Factor Exposures with.
+
+# Related
+
+  - [`carry_lookback`](@ref)
+  - [`CarriedDescriptor`](@ref)
+  - [`descriptor_step`](@ref)
+"""
+function descriptor_carry(xe, ::ReturnsResult, ::Any)
+    return (; xf = xe, xv = xe)
+end
+function descriptor_carry(de::RollingLogReturn, rd::ReturnsResult, m::Integer)
+    T = size(rd.X, 1)
+    (; de, D) = descriptor_step(de, port_opt_view(rd, (T - m + 1):T, :))
+    return (; xf = de, xv = CarriedDescriptor(D))
+end
+"""
+    carry_lookback(x)
+    carry_lookback(::RollingLogReturn)
+    carry_lookback(xe::CompositeExposure)
+    carry_lookback(pe::CrossSectionalFactorPrior)
+    carry_lookback(ests::AbstractVector)
+
+Returns the number of panel rows that an estimator reads to give the Factor Exposure of one new observation on the carry fold of a [`CrossSectionalFactorPrior`](@ref), or `nothing` for every row.
+
+A Descriptor that carries a state, as [`descriptor_carry`](@ref) folds it, reads the new observation alone, so a [`RollingLogReturn`](@ref) answers one. A [`CompositeExposure`](@ref) answers it over its Descriptors. Every other estimator answers its [`lookback`](@ref), and a vector answers the largest one of its members, or `nothing` when one member answers `nothing`. A [`CrossSectionalFactorPrior`](@ref) answers the look-back of its factors on the carry fold, as [`cross_sectional_lookback`](@ref) counts it, and [`cross_sectional_carry_rows`](@ref) reads it.
+
+# Arguments
+
+  - `x`: The estimator, or a vector of estimators.
+
+# Returns
+
+  - `n::Option{<:Integer}`: The number of rows, or `nothing`.
+
+# Related
+
+  - [`lookback`](@ref)
+  - [`descriptor_carry`](@ref)
+"""
+function carry_lookback(x)::Option{<:Integer}
+    return lookback(x)
+end
+function carry_lookback(::RollingLogReturn)::Integer
+    return 1
+end
+function carry_lookback(ests::AbstractVector)::Option{<:Integer}
+    return lookback_max(carry_lookback, ests)
 end
 """
     RollingMomentum(; window::Integer = 252, skip::Integer = 21, sign::Real = 1,

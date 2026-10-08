@@ -4,4 +4,4 @@ Description = "Target Return Forecast Step has no public API in PortfolioOptimis
 
 # Target Return Forecast Step
 
-This file defines no public name. The [private page](@ref private-api-target-return-forecast-step) lists the fold of the Target Return Forecast.
+This file defines no public name. The [private page](@ref private-api-target-return-forecast-step) lists the fold of [`TargetReturnForecast`](@ref).

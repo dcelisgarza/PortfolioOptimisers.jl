@@ -1,5 +1,5 @@
 ```@meta
-Description = "Target Return Forecast Step, private API of PortfolioOptimisers.jl: target_forecast_folds, target_forecast_design, return_forecast_step, …"
+Description = "Target Return Forecast Step, private API of PortfolioOptimisers.jl: target_forecast_folds, target_forecast_design, target_forecast_calibration_state, …"
 ```
 
 # [Target Return Forecast Step: private API](@id private-api-target-return-forecast-step)

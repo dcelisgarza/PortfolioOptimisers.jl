@@ -17,4 +17,5 @@ nan_fill_value
 descriptor_active_fill!
 positive_divide
 lookback
+lookback_max
 ```

@@ -1214,17 +1214,19 @@ end
                                     ivpa::Option{<:Num_VecNum} = nothing,
                                     kept::Option{<:NamedTuple} = nothing,
                                     g0::Integer = 0,
-                                    n::Option{<:Integer} = nothing) -> NamedTuple
+                                    n::Option{<:Integer} = nothing,
+                                    xf::Option{<:AbstractVector} = nothing) -> NamedTuple
 
 Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that give a value per observation: the benchmark weights, the observed factors, the returns that the regression reads, and the exposure history.
 
-[`cross_sectional_exposure_stage`](@ref) runs it over every observation, and then drops the Descriptor warm-up. The carry fold runs it over the rows that it carries and the rows of a step. The returns net of the observed factors are derived series: the batch fit derives each row from the observed exposures of the row `pe.lag` observations before it, and the first `pe.lag` rows of the sample from the exposure of the same row. So the carry gives the derived rows of its carried rows in `kept`, and the function derives the rows of the step alone. The carry gives the number of rows of the step in `n` too, so the exposure history holds those rows alone.
+[`cross_sectional_exposure_stage`](@ref) runs it over every observation, and then drops the Descriptor warm-up. The carry fold runs it over the rows that it carries and the rows of a step. The returns net of the observed factors are derived series: the batch fit derives each row from the observed exposures of the row `pe.lag` observations before it, and the first `pe.lag` rows of the sample from the exposure of the same row. So the carry gives the derived rows of its carried rows in `kept`, and the function derives the rows of the step alone. The carry gives the number of rows of the step in `n` too, so the exposure history holds those rows alone. A Descriptor that carries a state reads the rows of the step alone: the carry gives the estimated members as it folded them in `xf`, and the function folds the rows of the step into them with [`cross_sectional_descriptor_carry`](@ref).
 
 # Algorithm
 
  1. Rebuild the returns data, take the two universe masks and build the benchmark weights `BW` with [`cross_sectional_benchmark_stage`](@ref). Split the factor list into estimated and observed members with [`cross_sectional_factor_partition`](@ref).
  2. Read the observed factors with [`cross_sectional_observed`](@ref), and take the returns the regression reads, `Xl`, with [`cross_sectional_local_returns`](@ref). Both copy the rows of `kept` and derive the rows after them.
- 3. Build every estimated Factor Exposure with [`cross_sectional_exposure_history`](@ref), on the returns data `rde` whose returns are `Xl`. Under observed factors those are the net returns, so a Descriptor of the returns measures the move of an asset net of its currency, and not the move of the currency it holds.
+ 3. When `n` is an integer, fold the rows of the step into the Descriptors of the estimated members that carry a state with [`cross_sectional_descriptor_carry`](@ref).
+ 4. Build every estimated Factor Exposure with [`cross_sectional_exposure_history`](@ref), on the returns data `rde` whose returns are `Xl`. Under observed factors those are the net returns, so a Descriptor of the returns measures the move of an asset net of its currency, and not the move of the currency it holds.
 
 # Arguments
 
@@ -1239,6 +1241,7 @@ Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that give a v
   - `kept`: The derived rows of the first rows of `X`, `(; Xn, Xl)` as the field `der` of a [`CrossSectionalCarryState`](@ref) holds them, or `nothing`.
   - `g0`: Number of observations before the first row of `X`.
   - `n`: Number of last rows of `X` whose exposure history to compute, or `nothing` for every row. The carry fold gives the number of rows of a step.
+  - `xf`: The estimated members as the carry fold folded them, or `nothing` for the members of `pe`.
 
 # Validation
 
@@ -1246,7 +1249,7 @@ Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that give a v
 
 # Returns
 
-  - `st::NamedTuple`: The fields `amsk` and `emsk`, the active mask and the estimation mask; `mcap`, the market capitalisation or `nothing`; `BW`, the benchmark weights; `Xu`, the returns that the universe and the warm-up read; `cc`, the observed factors or `nothing`; `Xl`, the returns the regression reads; `rde`, the returns data that the estimated members read; and `Ms`, `nf` and `fam`, the exposure history of the estimated factors over the last `n` rows or every row, with their names and Factor Family labels.
+  - `st::NamedTuple`: The fields `amsk` and `emsk`, the active mask and the estimation mask; `mcap`, the market capitalisation or `nothing`; `BW`, the benchmark weights; `Xu`, the returns that the universe and the warm-up read; `cc`, the observed factors or `nothing`; `Xl`, the returns the regression reads; `rde`, the returns data that the estimated members read; `Ms`, `nf` and `fam`, the exposure history of the estimated factors over the last `n` rows or every row, with their names and Factor Family labels; and `xf`, the estimated members with the state of each Descriptor after the rows of the step.
 
 # Related
 
@@ -1262,7 +1265,8 @@ function cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNu
                                          iv::Option{<:MatNum} = nothing,
                                          ivpa::Option{<:Num_VecNum} = nothing,
                                          kept::Option{<:NamedTuple} = nothing,
-                                         g0::Integer = 0, n::Option{<:Integer} = nothing)
+                                         g0::Integer = 0, n::Option{<:Integer} = nothing,
+                                         xf::Option{<:AbstractVector} = nothing)
     (; amsk, emsk, mcap, BW, rdb, Xu) = cross_sectional_benchmark_stage(pe, X, F, pnl;
                                                                         ne = ne, E = E,
                                                                         iv = iv,
@@ -1277,9 +1281,10 @@ function cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNu
         ReturnsResult(; nx = rdb.nx, X = Xl, nf = rdb.nf, F = rdb.F, ne = rdb.ne, E = rdb.E,
                       iv = rdb.iv, ivpa = rdb.ivpa, pnl = rdb.pnl)
     end
-    (; Ms, nf, fam) = cross_sectional_exposure_history(est, rde, pe.ex; n = n)
+    dc = cross_sectional_descriptor_carry(something(xf, est), rde, n)
+    (; Ms, nf, fam) = cross_sectional_exposure_history(dc.xv, rde, pe.ex; n = n)
     return (; amsk = amsk, emsk = emsk, mcap = mcap, BW = BW, Xu = Xu, cc = cc, Xl = Xl,
-            rde = rde, Ms = Ms, nf = nf, fam = fam)
+            rde = rde, Ms = Ms, nf = nf, fam = fam, xf = dc.xf)
 end
 """
     cross_sectional_benchmark_stage(pe::CrossSectionalFactorPrior, X::MatNum,
@@ -1766,7 +1771,31 @@ function cross_sectional_live_factors(Z::Arr3Num, X::MatNum, W::MatNum)::BitVect
     return BitVector([any(c -> !iszero(Z[c[1], c[2], k]), act) for k in axes(Z, 3)])
 end
 function lookback(pe::CrossSectionalFactorPrior)::Option{<:Integer}
-    L = lookback(map(last, pe.factors))
+    return cross_sectional_lookback(pe, lookback(map(last, pe.factors)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the look-back of a [`CrossSectionalFactorPrior`](@ref) from the look-back of its factors: that look-back plus `lag`, or the look-back of its Return Forecast Estimator when that one is larger. `nothing` from either part gives `nothing`.
+
+[`lookback`](@ref) gives it the look-back of the factors of the batch fit, and [`carry_lookback`](@ref) the look-back of the factors on the carry fold.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - `L`: The look-back of its factors, or `nothing`.
+
+# Returns
+
+  - `n::Option{<:Integer}`: The look-back of the prior, or `nothing`.
+
+# Related
+
+  - [`lookback`](@ref)
+  - [`carry_lookback`](@ref)
+"""
+function cross_sectional_lookback(pe::CrossSectionalFactorPrior,
+                                  L::Option{<:Integer})::Option{<:Integer}
     lr = isnothing(pe.rfe) ? 1 : lookback(pe.rfe)
     return isnothing(L) || isnothing(lr) ? nothing : max(L + pe.lag, lr)
 end

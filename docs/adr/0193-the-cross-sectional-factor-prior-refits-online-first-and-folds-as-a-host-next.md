@@ -207,7 +207,11 @@ that moves refits every past date, and a pinned choice is recorded in the carry 
 
 Each Descriptor states its look-back: an `Integer`, or `nothing` for a recursion from the first row.
 The carry keeps the last `look-back + lag` panel rows when every look-back is finite, and every row
-otherwise. A Return Forecast that reads the panel keeps a value at every fitted observation in its
+otherwise. A Descriptor that folds from a state of its own counts as one row: a rolling return
+keeps the last `window + skip + 1` rows of its cumulative sums in its `cache`, and reads the
+Descriptor of a new row off them, equal to the batch fit to the last bit
+([#1583](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1583)). So a momentum factor
+with a look-back of 273 rows leaves the carry at `1 + lag` rows. A Return Forecast that reads the panel keeps a value at every fitted observation in its
 Result, and it aligns the fitted observations with the last rows of its returns data, so the carry
 keeps every row under it, unless the forecast folds. A forecast that folds reads the look-back of its
 Descriptors alone. The output is exact in every case.

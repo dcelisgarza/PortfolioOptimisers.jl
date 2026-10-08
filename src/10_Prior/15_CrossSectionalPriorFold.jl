@@ -27,6 +27,7 @@ $(DocStringExtensions.FIELDS)
                              ve = nothing, ve1 = nothing, pe = nothing,
                              seed::Integer = 0, hist = nothing, S = nothing,
                              Sc = nothing, fsc = nothing, fh = nothing, fst = nothing,
+                             xf = nothing,
                              tip::Base.RefValue{Int} = Ref(0)) -> CrossSectionalCarryState
 
 Keywords correspond to the struct's fields, and every field but `buf` and `tip` defaults to `nothing`, or to `0` for `seed`. `tip` defaults to a new counter at `0`. The default is the empty state that a first step builds.
@@ -169,6 +170,10 @@ Keywords correspond to the struct's fields, and every field but `buf` and `tip` 
     """
     fst
     """
+    The estimated members of the factor list, as [`cross_sectional_descriptor_carry`](@ref) folded them, so that each Descriptor that carries a state holds its state after the folded observations, or `nothing` before the first step. A step folds its new observations into them, and reads the Descriptors of those observations off them.
+    """
+    xf
+    """
     The number of observations that the newest state of this lineage folded. Every state that a step derives from this one shares the counter. A history appends in place only when the state is the newest one, as [`cross_sectional_carry_own`](@ref) checks.
     """
     tip
@@ -183,10 +188,11 @@ function CrossSectionalCarryState(; buf::SampleBufferState = SampleBufferState()
                                   vs = nothing, ve = nothing, ve1 = nothing, pe = nothing,
                                   seed::Integer = 0, hist = nothing, S = nothing,
                                   Sc = nothing, fsc = nothing, fh = nothing, fst = nothing,
+                                  xf = nothing,
                                   tip::Base.RefValue{Int} = Ref(0))::CrossSectionalCarryState
     return CrossSectionalCarryState(buf, win, der, nf, fam, Ms, X, Xl, obs, bw, mcap, amsk,
                                     emsk, sums, families, fcb, Z, csr, lv1, lv, W, vs, ve,
-                                    ve1, pe, seed, hist, S, Sc, fsc, fh, fst, tip)
+                                    ve1, pe, seed, hist, S, Sc, fsc, fh, fst, xf, tip)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -324,7 +330,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the number of panel rows that the carry fold of a Cross-Sectional Factor Prior carries, or `nothing` for every row.
 
-The Factor Exposures of a new observation read the last [`lookback`](@ref) rows of the panel, so the carry keeps them. Under a Return Forecast that reads the panel at the call with no data, as [`cross_sectional_forecast_reads_panel`](@ref) answers, the carry keeps every row. A forecast that computes its history one observation at a time reads its last [`lookback`](@ref) rows, which [`lookback`](@ref) of the prior counts. An unbounded look-back keeps every row too.
+The Factor Exposures of a new observation read the last rows of the panel that [`carry_lookback`](@ref) of the prior counts, so the carry keeps them. A Descriptor that carries a state reads the new observation alone, as [`descriptor_carry`](@ref) folds it, so it adds no row. Under a Return Forecast that reads the panel at the call with no data, as [`cross_sectional_forecast_reads_panel`](@ref) answers, the carry keeps every row. A forecast that computes its history one observation at a time reads its last [`lookback`](@ref) rows, which [`carry_lookback`](@ref) of the prior counts. An unbounded look-back keeps every row too.
 
 # Arguments
 
@@ -336,11 +342,46 @@ The Factor Exposures of a new observation read the last [`lookback`](@ref) rows 
 
 # Related
 
-  - [`lookback`](@ref)
+  - [`carry_lookback`](@ref)
   - [`CrossSectionalCarryState`](@ref)
 """
 function cross_sectional_carry_rows(pe::CrossSectionalFactorPrior)::Option{<:Integer}
-    return cross_sectional_forecast_reads_panel(pe.rfe) ? nothing : lookback(pe)
+    return cross_sectional_forecast_reads_panel(pe.rfe) ? nothing : carry_lookback(pe)
+end
+function carry_lookback(pe::CrossSectionalFactorPrior)::Option{<:Integer}
+    return cross_sectional_lookback(pe, carry_lookback(map(last, pe.factors)))
+end
+"""
+    cross_sectional_descriptor_carry(est::AbstractVector, rd::ReturnsResult, n::Nothing)
+    cross_sectional_descriptor_carry(est::AbstractVector, rd::ReturnsResult, n::Integer)
+
+Folds the last `n` observations of a [`ReturnsResult`](@ref) into the Descriptors of the estimated members of a factor list that carry a state, on the carry fold of a [`CrossSectionalFactorPrior`](@ref).
+
+Each member folds with [`descriptor_carry`](@ref). The batch fit gives `n = nothing`, and gets the members as they are twice.
+
+# Arguments
+
+  - `est`: The estimated members, pairs of `factor name => Exposure Estimator`, as the carry folded them so far.
+  - $(arg_dict[:rd]) It holds the panel rows that the carry carries, followed by the new observations.
+  - `n`: The number of new observations, or `nothing`.
+
+# Returns
+
+  - `carry::NamedTuple`: `xf`, the members with the state after the new observations, and `xv`, the members whose stateful Descriptors are [`CarriedDescriptor`](@ref) of the new observations.
+
+# Related
+
+  - [`descriptor_carry`](@ref)
+  - [`cross_sectional_exposure_series`](@ref)
+"""
+function cross_sectional_descriptor_carry(est::AbstractVector, ::ReturnsResult, ::Nothing)
+    return (; xf = est, xv = est)
+end
+function cross_sectional_descriptor_carry(est::AbstractVector, rd::ReturnsResult,
+                                          n::Integer)
+    cs = map(p -> descriptor_carry(last(p), rd, n), est)
+    return (; xf = map((p, c) -> first(p) => c.xf, est, cs),
+            xv = map((p, c) -> first(p) => c.xv, est, cs))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -863,7 +904,7 @@ The exposures of an observation read the last [`lookback`](@ref) rows of the pan
 
 # Returns
 
-  - `rows::NamedTuple`: `nf` and `fam`, the raw factor axis; the rows after the warm-up: `Ms`, `X`, `Xl`, `obs`, `bw`, `mcap`, `amsk` and `emsk`, with `Xl` and `obs` `nothing` without an observed factor; and `der`, the derived series of every row of `win`, or `nothing`.
+  - `rows::NamedTuple`: `nf` and `fam`, the raw factor axis; the rows after the warm-up: `Ms`, `X`, `Xl`, `obs`, `bw`, `mcap`, `amsk` and `emsk`, with `Xl` and `obs` `nothing` without an observed factor; `der`, the derived series of every row of `win`, or `nothing`; and `xf`, the estimated members with the state of each Descriptor after the rows of the step.
 
 # Related
 
@@ -873,15 +914,16 @@ The exposures of an observation read the last [`lookback`](@ref) rows of the pan
 function cross_sectional_fold_rows(pe::CrossSectionalFactorPrior,
                                    st::CrossSectionalCarryState, win::ReturnsResult,
                                    n::Integer, g0::Integer)
-    (; amsk, emsk, mcap, BW, Xu, cc, Xl, Ms, nf, fam) = cross_sectional_exposure_series(pe,
-                                                                                        win.X,
-                                                                                        nothing,
-                                                                                        win.pnl;
-                                                                                        ne = win.ne,
-                                                                                        E = win.E,
-                                                                                        kept = st.der,
-                                                                                        g0 = g0,
-                                                                                        n = n)
+    (; amsk, emsk, mcap, BW, Xu, cc, Xl, Ms, nf, fam, xf) = cross_sectional_exposure_series(pe,
+                                                                                            win.X,
+                                                                                            nothing,
+                                                                                            win.pnl;
+                                                                                            ne = win.ne,
+                                                                                            E = win.E,
+                                                                                            kept = st.der,
+                                                                                            g0 = g0,
+                                                                                            n = n,
+                                                                                            xf = st.xf)
     # `Ms` holds the last `n` rows of `win` alone: row `p[j]` of `Ms` is row `q[j]` of `win`.
     T = size(win.X, 1)
     q = (T - n + 1):T
@@ -906,7 +948,7 @@ function cross_sectional_fold_rows(pe::CrossSectionalFactorPrior,
     return (; nf = nf, fam = fam, Ms = Msn, X = win.X[q, :],
             Xl = isnothing(cc) ? nothing : Xl[q, :], obs = obs, bw = bwn,
             mcap = cross_sectional_rows(mcap, q), amsk = amsk[q, :], emsk = emsk[q, :],
-            der = isnothing(cc) ? nothing : (; Xn = cc.Xn, Xl = Xl))
+            der = isnothing(cc) ? nothing : (; Xn = cc.Xn, Xl = Xl), xf = xf)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1162,7 +1204,8 @@ function cross_sectional_carry_fold(pe::CrossSectionalFactorPrior,
                                                         active_mask = pnl.amsk,
                                                         estimation_mask = pnl.emsk, xk...),
                                      win = cross_sectional_window_trim(win, n),
-                                     der = cross_sectional_window_trim(rows.der, n)))
+                                     der = cross_sectional_window_trim(rows.der, n),
+                                     xf = rows.xf))
     Tf = isnothing(st.Ms) ? 0 : size(st.Ms, 1)
     if isnothing(st.csr)
         return if Tf - pe.lag < 2

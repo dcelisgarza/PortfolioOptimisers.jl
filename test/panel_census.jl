@@ -131,6 +131,7 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :check_asset_panel => "a check of the axes",
                                            :panel_axes => "reads the axes",
                                            :panel_is_static => "reads whether the masks exist",
+                                           :attribution_active_mask => "reads the active mask of the panel",
                                            :panel_feature_names => "reads the names",
                                            :panel_column_label => "reads the names",
                                            :feature_labels => "reads the names",
@@ -310,6 +311,17 @@ function census_cases(rd::ReturnsResult)
                 ((:RollingLogReturn,), "RollingLogReturn",
                  D(RollingLogReturn(; window = 7, skip = 2))),
                 ((:RollingMax,), "RollingMax", D(RollingMax(; window = 5))),
+                # The carry fold reads a rolling return off its carried state (#1583).
+                ((:CarriedDescriptor, :descriptor_step, :descriptor_carry,
+                  :cross_sectional_descriptor_carry), "folded from a carried state",
+                 r -> descriptor(last(only(CENSUS_PO.cross_sectional_descriptor_carry(["m" =>
+                                                                                           RollingLogReturn(;
+                                                                                                            window = 7,
+                                                                                                            skip = 2)],
+                                                                                      r,
+                                                                                      size(r.X,
+                                                                                           1)).xv)),
+                                 r)),
                 # The exposures.
                 ((:ConstantExposure,), "ConstantExposure", L(ConstantExposure())),
                 ((:OneHotExposure,), "OneHotExposure",

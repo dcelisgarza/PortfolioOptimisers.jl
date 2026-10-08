@@ -684,9 +684,31 @@ function lookback(::AbstractEstimator)::Nothing
     return nothing
 end
 function lookback(ests::AbstractVector)::Option{<:Integer}
+    return lookback_max(lookback, ests)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the largest look-back of a vector of estimators, as the verb `f` counts it, or `nothing` when one member answers `nothing`. An empty vector answers one.
+
+# Arguments
+
+  - `f`: The verb of the look-back, [`lookback`](@ref) or [`carry_lookback`](@ref).
+  - `ests`: A vector of estimators.
+
+# Returns
+
+  - `L::Option{<:Integer}`: The largest look-back, or `nothing`.
+
+# Related
+
+  - [`lookback`](@ref)
+  - [`carry_lookback`](@ref)
+"""
+function lookback_max(f, ests::AbstractVector)::Option{<:Integer}
     L = 1
     for est in ests
-        l = lookback(est)
+        l = f(est)
         if isnothing(l)
             return nothing
         end

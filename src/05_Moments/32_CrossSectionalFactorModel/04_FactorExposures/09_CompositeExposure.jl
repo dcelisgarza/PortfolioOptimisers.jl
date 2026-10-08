@@ -402,5 +402,13 @@ end
 function lookback(xe::CompositeExposure)::Option{<:Integer}
     return lookback(xe.descriptors)
 end
+function carry_lookback(xe::CompositeExposure)::Option{<:Integer}
+    return carry_lookback(xe.descriptors)
+end
+function descriptor_carry(xe::CompositeExposure, rd::ReturnsResult, m::Integer)
+    cs = map(de -> descriptor_carry(de, rd, m), xe.descriptors)
+    return (; xf = Accessors.@set(xe.descriptors = map(c -> c.xf, cs)),
+            xv = Accessors.@set(xe.descriptors = map(c -> c.xv, cs)))
+end
 
 export CompositeExposure

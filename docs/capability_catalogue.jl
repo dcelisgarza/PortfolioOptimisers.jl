@@ -179,7 +179,13 @@ const NOT_A_CHOICE = Dict{Symbol, Symbol}(
                                           # constructs at every step from the gradient mass
                                           # it has accrued (ADR 0168). The capability is
                                           # the rule, and a caller never holds the token.
-                                          :DiagonalProjection => :internal)
+                                          :DiagonalProjection => :internal,
+                                          # The values of a rolling return that the carry
+                                          # fold of a Cross-Sectional Factor Prior reads off
+                                          # the carried state of the Descriptor at each step
+                                          # (#1583). The capability is the Descriptor, and a
+                                          # caller never holds the carried values.
+                                          :CarriedDescriptor => :internal)
 
 """
     CATALOGUE
