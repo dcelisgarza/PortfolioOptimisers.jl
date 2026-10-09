@@ -1261,14 +1261,15 @@ end
 
 Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that give a value per observation: the benchmark weights, the observed factors, the returns that the regression reads, and the exposure history.
 
-[`cross_sectional_exposure_stage`](@ref) runs it over every observation, and then drops the Descriptor warm-up. The carry fold runs it over the rows that it carries and the rows of a step. The returns net of the observed factors are derived series: the batch fit derives each row from the observed exposures of the row `pe.lag` observations before it, and the first `pe.lag` rows of the sample from the exposure of the same row. So the carry gives the derived rows of its carried rows in `kept`, and the function derives the rows of the step alone. The carry gives the number of rows of the step in `n` too, so the exposure history holds those rows alone. A Descriptor that carries a state reads the rows of the step alone: the carry gives the estimated members as it folded them in `xf`, and the function folds the rows of the step into them with [`cross_sectional_descriptor_carry`](@ref).
+[`cross_sectional_exposure_stage`](@ref) runs it over every observation, and then drops the Descriptor warm-up. The carry fold runs it over the rows that it carries and the rows of a step. The returns net of the observed factors are derived series: the batch fit derives each row from the observed exposures of the row `pe.lag` observations before it, and the first `pe.lag` rows of the sample from the exposure of the same row. So the carry gives the derived rows of its carried rows in `kept`, and the function derives the rows of the step alone. The carry gives the number of rows of the step in `n` too, so the exposure history and the observed exposures hold those rows alone. A Descriptor that carries a state reads the rows of the step alone: the carry gives the members as it folded them in `xf`, and the function folds the rows of the step into them with [`cross_sectional_descriptor_carry`](@ref) and [`cross_sectional_observed`](@ref).
 
 # Algorithm
 
- 1. Rebuild the returns data, take the two universe masks and build the benchmark weights `BW` with [`cross_sectional_benchmark_stage`](@ref). Split the factor list into estimated and observed members with [`cross_sectional_factor_partition`](@ref).
- 2. Read the observed factors with [`cross_sectional_observed`](@ref), and take the returns the regression reads, `Xl`, with [`cross_sectional_local_returns`](@ref). Both copy the rows of `kept` and derive the rows after them.
+ 1. Rebuild the returns data, take the two universe masks and build the benchmark weights `BW` with [`cross_sectional_benchmark_stage`](@ref). Split the factor list `xf`, or the one of `pe`, into estimated and observed members with [`cross_sectional_factor_partition`](@ref).
+ 2. Read the observed factors with [`cross_sectional_observed`](@ref), and take the returns the regression reads, `Xl`, with [`cross_sectional_local_returns`](@ref). Both copy the rows of `kept` and derive the rows after them. When `n` is an integer, the observed members fold the rows of the step and compute their exposures alone.
  3. When `n` is an integer, fold the rows of the step into the Descriptors of the estimated members that carry a state with [`cross_sectional_descriptor_carry`](@ref).
  4. Build every estimated Factor Exposure with [`cross_sectional_exposure_history`](@ref), on the returns data `rde` whose returns are `Xl`. Under observed factors those are the net returns, so a Descriptor of the returns measures the move of an asset net of its currency, and not the move of the currency it holds.
+ 5. Join the folded members of both parts in the order of the factor list with [`cross_sectional_factor_join`](@ref).
 
 # Arguments
 
@@ -1280,10 +1281,10 @@ Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that give a v
   - `E`: The Exogenous Series, one observation per row. The observed factors read their returns from it.
   - `iv`: Implied volatilities, written onto the rebuilt returns data.
   - `ivpa`: Implied-volatility risk-premium adjustment, written onto the rebuilt returns data.
-  - `kept`: The derived rows of the first rows of `X`, `(; Xn, Xl)` as the field `der` of a [`CrossSectionalCarryState`](@ref) holds them, or `nothing`.
+  - `kept`: The derived rows of the first rows of `X` and the observed exposures of the last `pe.lag` of them, `(; Xn, Xl, Zo)` as the field `der` of a [`CrossSectionalCarryState`](@ref) holds them, or `nothing`.
   - `g0`: Number of observations before the first row of `X`.
   - `n`: Number of last rows of `X` whose exposure history to compute, or `nothing` for every row. The carry fold gives the number of rows of a step.
-  - `xf`: The estimated members as the carry fold folded them, or `nothing` for the members of `pe`.
+  - `xf`: The factor list as the carry fold folded it, or `nothing` for the factor list of `pe`.
 
 # Validation
 
@@ -1291,7 +1292,7 @@ Runs the steps of the fit of a [`CrossSectionalFactorPrior`](@ref) that give a v
 
 # Returns
 
-  - `st::NamedTuple`: The fields `amsk` and `emsk`, the active mask and the estimation mask; `mcap`, the market capitalisation or `nothing`; `BW`, the benchmark weights; `Xu`, the returns that the universe and the warm-up read; `cc`, the observed factors or `nothing`; `Xl`, the returns the regression reads; `rde`, the returns data that the estimated members read; `Ms`, `nf` and `fam`, the exposure history of the estimated factors over the last `n` rows or every row, with their names and Factor Family labels; and `xf`, the estimated members with the state of each Descriptor after the rows of the step.
+  - `st::NamedTuple`: The fields `amsk` and `emsk`, the active mask and the estimation mask; `mcap`, the market capitalisation or `nothing`; `BW`, the benchmark weights; `Xu`, the returns that the universe and the warm-up read; `cc`, the observed factors or `nothing`, whose exposures hold the last `n` rows and the `pe.lag` rows before them, or every row; `Xl`, the returns the regression reads; `rde`, the returns data that the estimated members read; `Ms`, `nf` and `fam`, the exposure history of the estimated factors over the last `n` rows or every row, with their names and Factor Family labels; and `xf`, the factor list with the state of each Descriptor after the rows of the step.
 
 # Related
 
@@ -1313,8 +1314,9 @@ function cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNu
                                                                         ne = ne, E = E,
                                                                         iv = iv,
                                                                         ivpa = ivpa)
-    (; est, obs) = cross_sectional_factor_partition(pe.factors)
-    cc = cross_sectional_observed(obs, rdb, pe.lag, isnothing(kept) ? nothing : kept.Xn, g0)
+    fl = something(xf, pe.factors)
+    (; est, obs) = cross_sectional_factor_partition(fl)
+    cc = cross_sectional_observed(obs, rdb, pe.lag, kept, g0, n)
     Xl = cross_sectional_local_returns(pe.lx, cc, X, rdb, pe.lag,
                                        isnothing(kept) ? nothing : kept.Xl, g0)
     rde = if isnothing(cc)
@@ -1323,10 +1325,11 @@ function cross_sectional_exposure_series(pe::CrossSectionalFactorPrior, X::MatNu
         ReturnsResult(; nx = rdb.nx, X = Xl, nf = rdb.nf, F = rdb.F, ne = rdb.ne, E = rdb.E,
                       iv = rdb.iv, ivpa = rdb.ivpa, pnl = rdb.pnl)
     end
-    dc = cross_sectional_descriptor_carry(something(xf, est), rde, n)
+    dc = cross_sectional_descriptor_carry(est, rde, n)
     (; Ms, nf, fam) = cross_sectional_exposure_history(dc.xv, rde, pe.ex; n = n)
     return (; amsk = amsk, emsk = emsk, mcap = mcap, BW = BW, Xu = Xu, cc = cc, Xl = Xl,
-            rde = rde, Ms = Ms, nf = nf, fam = fam, xf = dc.xf)
+            rde = rde, Ms = Ms, nf = nf, fam = fam,
+            xf = cross_sectional_factor_join(fl, dc.xf, isnothing(cc) ? obs : cc.xf))
 end
 """
     cross_sectional_benchmark_stage(pe::CrossSectionalFactorPrior, X::MatNum,

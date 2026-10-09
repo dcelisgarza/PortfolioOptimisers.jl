@@ -170,6 +170,14 @@ end
 function lookback(xe::ObservedExposure)::Option{<:Integer}
     return lookback(xe.xe)
 end
+function carry_lookback(xe::ObservedExposure)::Option{<:Integer}
+    return carry_lookback(xe.xe)
+end
+function descriptor_carry(xe::ObservedExposure, rd::ReturnsResult, m::Integer)
+    c = descriptor_carry(xe.xe, rd, m)
+    return (; xf = ObservedExposure(c.xf, xe.series, xe.family),
+            xv = ObservedExposure(c.xv, xe.series, xe.family))
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -423,6 +431,36 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Join the two parts of the factor list of a [`CrossSectionalFactorPrior`](@ref) that [`cross_sectional_factor_partition`](@ref) split, in the order of the list.
+
+The carry fold folds the members of each part, and keeps the folded list in its state, so a later step partitions it again.
+
+# Arguments
+
+  - `factors`: Pairs of `factor name => Exposure Estimator`, the list that was split.
+  - `est`: The Pairs of the estimated factors, in the order of `factors`.
+  - `obs`: The Pairs of the observed factors, in the order of `factors`.
+
+# Returns
+
+  - `factors::Vector{<:Pair}`: The Pairs of `est` and `obs`, each one at the place of its member in `factors`.
+
+# Related
+
+  - [`cross_sectional_factor_partition`](@ref)
+  - [`CrossSectionalCarryState`](@ref)
+"""
+function cross_sectional_factor_join(factors::AbstractVector{<:Pair},
+                                     est::AbstractVector{<:Pair},
+                                     obs::AbstractVector{<:Pair})
+    isobs = [isa(last(p), AbstractObservedExposureEstimator) for p in factors]
+    io = cumsum(isobs)
+    ie = cumsum(.!isobs)
+    return [isobs[i] ? obs[io[i]] : est[ie[i]] for i in eachindex(factors)]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Refuse a Factor Family of a [`CrossSectionalFactorPrior`](@ref) that holds both estimated and observed factors, or that a constrained family names although it is observed.
 
 The family label of an observed factor is a property of its member, so no label is reserved. A family is still one kind or the other: the attribution of a family states a standard error only for factors the fit estimated, and the zero-sum condition of a constrained family reaches only the regression. So a label that an estimated member and an observed member both carry is refused, and so is a constrained family whose label an observed member carries.
@@ -463,8 +501,8 @@ function assert_cross_sectional_observed_families(factors::AbstractVector{<:Pair
 end
 """
     cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult, lag::Integer,
-                             kept::Option{<:MatNum} = nothing, g0::Integer = 0)
-        -> Option{<:NamedTuple}
+                             kept::Option{<:NamedTuple} = nothing, g0::Integer = 0,
+                             n::Option{<:Integer} = nothing) -> Option{<:NamedTuple}
 
 Read the observed factors of a [`CrossSectionalFactorPrior`](@ref) off the returns data: their exposures, their names, their families and their returns.
 
@@ -472,23 +510,24 @@ A prior with no observed factor gets `nothing`. Otherwise each member gives its 
 
 The members are read in two stages, as [`observed_reads_returns`](@ref) sorts them. The members that read no returns, such as [`CurrencyExposure`](@ref), read `rd`. The members that can read returns read a copy of `rd` whose `X` is net of the factors of the first stage, derived with [`cross_sectional_local_returns`](@ref). So a Descriptor of the returns inside an [`ObservedExposure`](@ref) measures the local move of an asset, as the estimated members do, and never the net returns its own factor enters. The copy is derived also when `lx` names a Panel Field of net returns, because that field is net of every observed factor, the member's own among them. When one stage is empty, every member reads `rd`.
 
-The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads the rows that it carries and the rows of a step. It gives the derived rows of the carried rows in `kept`, and the number of observations before the first row of `rd` in `g0`. So the function derives the rows of the step alone, as the batch fit derives them.
+The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads the rows that it carries and the rows of a step. It gives the derived rows of the carried rows in `kept`, and the number of observations before the first row of `rd` in `g0`. So the function derives the rows of the step alone, as the batch fit derives them. The carry gives the number of rows of the step in `n` too, and the members as it folded them in `obs`. Each member folds the rows of the step into its Descriptors that carry a state, with [`descriptor_carry`](@ref), and computes the exposures of those rows alone, from the last rows of `rd` that [`cross_sectional_exposure_rows`](@ref) names. The derivation of a row reads the exposures of the row `lag` observations before it, and a Descriptor that carries a state cannot give a row before the step again. So `kept` holds the observed exposures of the last `lag` rows before the step too, and the exposures of the function are those rows followed by the rows of the step.
 
 # Algorithm
 
  1. `obs` is empty: return `nothing`.
- 2. Read the members for which [`observed_reads_returns`](@ref) answers `false` on `rd`.
+ 2. Read the members for which [`observed_reads_returns`](@ref) answers `false` on `rd`, with [`cross_sectional_observed_member`](@ref). When `n` is an integer, fold the rows of the step into each member with [`descriptor_carry`](@ref), compute the exposures of those rows alone with [`cross_sectional_observed_rows`](@ref), and put the columns of the member in `kept.Zo` before them.
  3. If a member answers `true` and a member answers `false`, stack the members of step 2 with [`cross_sectional_observed_stack`](@ref), and derive the returns net of their factors with [`cross_sectional_local_returns`](@ref). Copy `rd` with those returns in `X`.
- 4. Read the members for which [`observed_reads_returns`](@ref) answers `true` on the copy, or on `rd` when step 3 made no copy.
+ 4. Read the members for which [`observed_reads_returns`](@ref) answers `true` on the copy, or on `rd` when step 3 made no copy, as step 2 reads them.
  5. Stack every member, in the order of `obs`, with [`cross_sectional_observed_stack`](@ref).
 
 # Arguments
 
-  - `obs`: The Pairs of the observed factors, from [`cross_sectional_factor_partition`](@ref).
+  - `obs`: The Pairs of the observed factors, from [`cross_sectional_factor_partition`](@ref). The carry fold gives them as it folded them.
   - $(arg_dict[:rd]) It carries the Asset Panel and the Exogenous Series.
   - `lag`: Number of observations by which the exposures lag the returns.
-  - `kept`: The returns net of the first stage at the first rows of `rd`, which a carry fold carries, or `nothing`. The function derives the rows after them.
+  - `kept`: The derived series that a carry fold carries, `(; Xn, Xl, Zo)` as the field `der` of a [`CrossSectionalCarryState`](@ref) holds them, or `nothing`. `Xn` holds the returns net of the first stage at the first rows of `rd`, and the function derives the rows after them. `Zo` holds the observed exposures of the last `lag` rows before the step.
   - `g0`: Number of observations before the first row of `rd`.
+  - `n`: Number of last rows of `rd` whose exposures to compute, or `nothing` for every row. The carry fold gives the number of rows of a step.
 
 # Validation
 
@@ -498,7 +537,7 @@ The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads the rows that it c
 
 # Returns
 
-  - `cc::Option{<:NamedTuple}`: `nothing`, or `(; Z, R, lv, nf, fam, Xn)`: the exposures `observations × assets × factors`, the observed returns `observations × factors` over every observation of `rd`, the series names, the factor names, the family labels, and the returns net of the first stage that the second stage read, or `nothing` when step 3 derived none.
+  - `cc::Option{<:NamedTuple}`: `nothing`, or `(; Z, R, lv, nf, fam, Xn, xf)`: the exposures `observations × assets × factors` at the last rows of `rd`, or at every row when `n` is `nothing`; the observed returns `observations × factors` over every observation of `rd`; the series names; the factor names; the family labels; the returns net of the first stage that the second stage read, or `nothing` when step 3 derived none; and the Pairs of `obs` with the state of each Descriptor after the rows of the step.
 
 # Related
 
@@ -507,28 +546,27 @@ The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads the rows that it c
   - [`CrossSectionalFactorPrior`](@ref)
   - [`cross_sectional_local_returns`](@ref)
   - [`cross_sectional_observed_block`](@ref)
+  - [`cross_sectional_observed_rows`](@ref)
   - [`ReturnsResult`](@ref)
 """
 function cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult,
-                                  lag::Integer, kept::Option{<:MatNum} = nothing,
-                                  g0::Integer = 0)
+                                  lag::Integer, kept::Option{<:NamedTuple} = nothing,
+                                  g0::Integer = 0, n::Option{<:Integer} = nothing)
     if isempty(obs)
         return nothing
     end
-    function member(p, r)
-        (key, xe) = p
-        A = factor_exposure(xe, r)
-        A3 = ndims(A) == 2 ? reshape(A, size(A, 1), size(A, 2), 1) : A
-        n, f = exposure_axis_names(String(key), xe, r)
-        sr = observed_series(xe, r)
-        @argcheck(length(sr) == length(n) == size(A3, 3),
-                  DimensionMismatch("the observed factor \"$key\" gives $(size(A3, 3)) exposures and $(length(n)) names, and names $(length(sr)) series of the Exogenous Series; each factor reads one series"))
-        return (; Z = A3, lv = sr, nf = n, fam = f)
+    srs = [observed_series(last(p), rd) for p in obs]
+    # The carried exposures of the last `lag` rows hold the factors in the order of `obs`.
+    col = cumsum(vcat(0, length.(srs)))
+    kx = something(kept, (; Xn = nothing, Zo = nothing))
+    function member(k, r)
+        return cross_sectional_observed_member(obs[k], r, n, srs[k], kx.Zo,
+                                               (col[k] + 1):col[k + 1])
     end
     rr = [observed_reads_returns(last(p)) for p in obs]
     ms = Vector{Any}(undef, length(obs))
     for k in findall(!, rr)
-        ms[k] = member(obs[k], rd)
+        ms[k] = member(k, rd)
     end
     # The members that can read returns read the returns net of the members that read none,
     # so a Descriptor of the returns measures the local move of an asset, and no member reads
@@ -538,15 +576,137 @@ function cross_sectional_observed(obs::AbstractVector{<:Pair}, rd::ReturnsResult
     if any(rr) && !all(rr)
         Xn = cross_sectional_local_returns(nothing,
                                            cross_sectional_observed_stack(ms[.!rr], rd), rd.X,
-                                           rd, lag, kept, g0)
+                                           rd, lag, kx.Xn, g0)
         rdn = ReturnsResult(; nx = rd.nx, X = Xn, nf = rd.nf, F = rd.F, nb = rd.nb,
                             B = rd.B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv,
                             ivpa = rd.ivpa, pnl = rd.pnl)
     end
     for k in findall(rr)
-        ms[k] = member(obs[k], rdn)
+        ms[k] = member(k, rdn)
     end
-    return merge(cross_sectional_observed_stack(ms, rd), (; Xn = Xn))
+    return merge(cross_sectional_observed_stack(ms, rd),
+                 (; Xn = Xn, xf = [m.xf for m in ms]))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Read one observed member of a [`CrossSectionalFactorPrior`](@ref) for [`cross_sectional_observed`](@ref): its exposures, its names and its family labels.
+
+When `n` is an integer, the member folds the rows of the step into its Descriptors that carry a state with [`descriptor_carry`](@ref), and computes the exposures of those rows alone with [`cross_sectional_observed_rows`](@ref). The carried exposures of the last `lag` rows then come before them.
+
+# Arguments
+
+  - `p`: The Pair `factor name => observed member`.
+  - $(arg_dict[:rd])
+  - `n`: Number of last rows of `rd` whose exposures to compute, or `nothing` for every row.
+  - `sr`: The names of the series of the member, from [`observed_series`](@ref).
+  - `Zo`: The observed exposures of every member at the last `lag` rows before the step, or `nothing`.
+  - `cols`: The columns of the member in `Zo`.
+
+# Validation
+
+  - The member names one series per factor. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `m::NamedTuple`: `(; Z, lv, nf, fam, xf)`: the exposures `observations × assets × factors`, the series names, the factor names, the family labels, and the Pair `p` with the state of each Descriptor after the rows of the step.
+
+# Related
+
+  - [`cross_sectional_observed`](@ref)
+  - [`cross_sectional_observed_rows`](@ref)
+  - [`descriptor_carry`](@ref)
+"""
+function cross_sectional_observed_member(p::Pair, rd::ReturnsResult, n::Option{<:Integer},
+                                         sr::AbstractVector{<:AbstractString},
+                                         Zo::Option{<:AbstractArray{<:Any, 3}},
+                                         cols::AbstractVector{<:Integer})
+    (key, xe) = p
+    # The generic method of `descriptor_carry` returns the member twice for `n = nothing`.
+    c = descriptor_carry(xe, rd, n)
+    Z = cross_sectional_observed_rows(c.xv, rd, n)
+    nm, f = exposure_axis_names(String(key), xe, rd)
+    @argcheck(length(sr) == length(nm) == size(Z, 3),
+              DimensionMismatch("the observed factor \"$key\" gives $(size(Z, 3)) exposures and $(length(nm)) names, and names $(length(sr)) series of the Exogenous Series; each factor reads one series"))
+    if !isnothing(Zo)
+        Z = cat(Zo[:, :, cols], Z; dims = 1)
+    end
+    return (; Z = Z, lv = sr, nf = nm, fam = f, xf = key => c.xf)
+end
+"""
+    cross_sectional_observed_rows(xe::AbstractObservedExposureEstimator, rd::ReturnsResult,
+                                  n::Nothing) -> Array{<:Real, 3}
+    cross_sectional_observed_rows(xe::AbstractObservedExposureEstimator, rd::ReturnsResult,
+                                  n::Integer) -> Array{<:Real, 3}
+
+Compute the exposures of an observed member at every row of a [`ReturnsResult`](@ref), or at its last `n` rows alone, with a factor axis.
+
+The batch fit gives `n = nothing`, and the member reads every row. The carry fold of a [`CrossSectionalFactorPrior`](@ref) gives the number of rows of a step, and the member reads the last rows that [`cross_sectional_exposure_rows`](@ref) names, as an estimated member does. Those rows give the exposures of the batch fit at the rows of the step.
+
+# Arguments
+
+  - `xe`: Observed Exposure Estimator. On the carry fold, a Descriptor of it that carries a state is the [`CarriedDescriptor`](@ref) of the step, as [`descriptor_carry`](@ref) gives it.
+  - $(arg_dict[:rd])
+  - `n`: Number of last rows, or `nothing` for every row.
+
+# Validation
+
+  - The rules of [`factor_exposure`](@ref) of the member.
+
+# Returns
+
+  - `Z::Array{<:Real, 3}`: The exposures, `observations × assets × factors`.
+
+# Related
+
+  - [`cross_sectional_observed`](@ref)
+  - [`cross_sectional_exposure_rows`](@ref)
+"""
+function cross_sectional_observed_rows(xe::AbstractObservedExposureEstimator,
+                                       rd::ReturnsResult, ::Nothing)::Array{<:Real, 3}
+    A = factor_exposure(xe, rd)
+    return ndims(A) == 2 ? reshape(A, size(A, 1), size(A, 2), 1) : A
+end
+function cross_sectional_observed_rows(xe::AbstractObservedExposureEstimator,
+                                       rd::ReturnsResult, n::Integer)::Array{<:Real, 3}
+    (; rdi, k) = cross_sectional_exposure_rows(xe, rd, n)
+    A = cross_sectional_observed_rows(xe, rdi, nothing)
+    return k == n ? A : A[(k - n + 1):k, :, :]
+end
+"""
+    cross_sectional_observed_carry(cc::Nothing, Xl, n::Integer, lag::Integer) -> NamedTuple
+    cross_sectional_observed_carry(cc::NamedTuple, Xl::MatNum, n::Integer, lag::Integer)
+        -> NamedTuple
+
+Split the observed factors of a step of the carry fold of a [`CrossSectionalFactorPrior`](@ref) into the exposures of the rows of the step and the derived series that the state carries.
+
+On the carry fold, [`cross_sectional_observed`](@ref) gives the exposures of the rows of the step and of the `lag` rows before them. The fit of the step reads the rows of the step. The derivation of the next step reads the exposures of the last `lag` rows, and a Descriptor that carries a state cannot give them again, so the state carries them in `Zo`.
+
+# Arguments
+
+  - `cc`: The observed factors that [`cross_sectional_observed`](@ref) read, or `nothing`.
+  - `Xl`: The returns net of every observed factor, at every row of the window of the step.
+  - `n`: Number of rows of the step.
+  - `lag`: Number of observations by which the exposures lag the returns.
+
+# Returns
+
+  - `carry::NamedTuple`: `Zn`, the observed exposures of the `n` rows of the step, and `der`, the derived series `(; Xn, Xl, Zo)` that the field `der` of a [`CrossSectionalCarryState`](@ref) holds. Both are `nothing` without an observed factor.
+
+# Related
+
+  - [`cross_sectional_observed`](@ref)
+  - [`cross_sectional_fold_rows`](@ref)
+  - [`CrossSectionalCarryState`](@ref)
+"""
+function cross_sectional_observed_carry(::Nothing, ::Any, ::Integer, ::Integer)
+    return (; Zn = nothing, der = nothing)
+end
+function cross_sectional_observed_carry(cc::NamedTuple, Xl::MatNum, n::Integer,
+                                        lag::Integer)
+    T = size(cc.Z, 1)
+    return (; Zn = cc.Z[(T - n + 1):T, :, :],
+            der = (; Xn = cc.Xn, Xl = Xl, Zo = cc.Z[(T - min(lag, T) + 1):T, :, :]))
 end
 """
     cross_sectional_observed_stack(ms::AbstractVector, rd::ReturnsResult) -> NamedTuple
@@ -632,7 +792,7 @@ The exposures lag the returns, so the derivation removes each observed return th
 
 Under Currency Factors and simple returns the identity of the local return is not exact: the base-currency return of an asset also holds the cross term of its local return and the exchange-rate return, see [`currency_excess_index`](@ref), and the derived net return keeps it.
 
-The carry fold of a [`CrossSectionalFactorPrior`](@ref) gives the rows that it carries and the rows of a step. A window that derived its first rows again would take the exposure of the same row there, and the batch fit took the exposure of the row ``\\ell`` observations before. So the carry gives the derived rows of its carried rows in `kept`, and the number of observations before the first row of `X` in `g0`. The function copies `kept` and derives the rows after it.
+The carry fold of a [`CrossSectionalFactorPrior`](@ref) gives the rows that it carries and the rows of a step. A window that derived its first rows again would take the exposure of the same row there, and the batch fit took the exposure of the row ``\\ell`` observations before. So the carry gives the derived rows of its carried rows in `kept`, and the number of observations before the first row of `X` in `g0`. The function copies `kept` and derives the rows after it. The exposures `cc.Z` of the carry hold the last rows of `X` alone, the rows of the step and the `lag` rows before them, and the function reads each row of `cc.Z` at its row of `X`.
 
 # Arguments
 
@@ -672,11 +832,13 @@ function cross_sectional_local_returns(::Nothing, cc::NamedTuple, X::MatNum,
     K = something(kept, view(X, 1:0, :))
     k = size(K, 1)
     Xl[1:k, :] .= K
+    # On the carry fold `Z` holds the last rows of `X` alone.
+    zo = size(X, 1) - size(Z, 1)
     for t in (k + 1):size(X, 1), i in axes(X, 2)
         x = X[t, i]
         s = g0 + t > lag ? t - lag : t
         for c in axes(Z, 3)
-            z = Z[s, i, c]
+            z = Z[s - zo, i, c]
             if !iszero(z)
                 x -= z * R[t, c]
             end

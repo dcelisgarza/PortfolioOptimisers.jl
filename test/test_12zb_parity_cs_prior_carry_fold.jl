@@ -694,6 +694,50 @@ end
         @test agrees(s[4].pr, batch(pe, 4, rd, e))
     end
 
+    @testset "An observed member computes the exposures of its new rows alone (#1593)" begin
+        # An `ObservedExposure` folds the member that it wraps, as an estimated member does, so
+        # a Descriptor that carries a state reads the new rows alone, and the carry keeps the
+        # rows of the lag alone. A Descriptor that carries no state computes the new rows from
+        # the rows that it reads. The derivation of the net returns of a row reads the observed
+        # exposures of the row `lag` observations before it, so the state carries those of the
+        # last `lag` rows.
+        ccy = grid_config("Currency", rd)
+        function observed(d, nm)
+            return nm => ObservedExposure(;
+                                          xe = CompositeExposure(; descriptors = [d],
+                                                                 outlier = nothing,
+                                                                 scoring = nothing, family = nm),
+                                          series = "MACRO", family = nm)
+        end
+        e = (0, 90, 91, 92, 93, 250)
+        for (d, L) in ((Reversal(), 1), (EWMomentum(; half_life = 10, skip = 5), 1),
+                       (GrowthRate(; field = "sales_ttm", lag = 5), 1),
+                       (RollingMax(; window = 6), 6)), lag in (1, 2)
+
+            pe = CrossSectionalFactorPrior(; lambda = 1, ccy...,
+                                           factors = [ccy.factors; observed(d, "obs")],
+                                           lag = lag)
+            @test po.cross_sectional_carry_rows(pe) == L + lag
+            s = stream(pe, rd, e)
+            for (k, x) in enumerate(s)
+                b = batch(pe, k, rd, e)
+                @test relerr(x.pr.mu, b.mu) < 1e-12 &&
+                      relerr(x.pr.sigma, b.sigma) < 1e-12 &&
+                      relerr(x.pr.fpr.X, b.fpr.X) < 1e-12
+                @test isequal(isnan.(x.pr.sigma), isnan.(b.sigma))
+            end
+            st = last(s).pe.cache
+            @test size(st.win.X, 1) == L + lag
+            @test size(st.der.Zo) == (lag, N, size(st.obs.Z, 3))
+            @test isequal(st.der.Zo, st.obs.Z[(end - lag + 1):end, :, :])
+            # The state keeps the folded member at its place in the factor list.
+            @test [first(p) for p in st.xf] == [first(p) for p in pe.factors]
+            if L == 1
+                @test !isnothing(last(st.xf[end]).xe.descriptors[1].cache)
+            end
+        end
+    end
+
     @testset "An observed factor (#1479)" begin
         # The carry derives each row of the returns net of the observed factors one time, from
         # the observed exposures of the row `lag` observations before it, and carries the row.
@@ -731,15 +775,11 @@ end
             @test po.reads_exogenous_series(pe)
             @test all(((k, x),) -> agrees(x.pr, batch(pe, k)), enumerate(stream(pe)))
         end
-        # The `Reversal` exposure reads its last 21 rows, so the carry keeps 22 rows, and a
-        # rolling return over the cut rows is a difference of cumulative sums from another first
-        # row (#1470). Measured over the three steps, relative to the largest entry: mu 4.6e-16,
-        # sigma 4.3e-16, factor returns 1.8e-16; under `lag = 2`, 1.4e-16, 3.1e-16 and 1.8e-16.
-        # A fixed weighted forecast scores the net returns of the rows it reads, so it keeps the
-        # same rows and derived rows (#1573). Measured with it: mu 1.8e-15, sigma 4.3e-16,
-        # factor returns 1.8e-16, the forecast history 1.6e-15.
+        # The `Reversal` exposure of the observed member folds from its carried state, so the
+        # carry keeps the rows of the lag alone (#1593). A fixed weighted forecast scores the net
+        # returns of the rows it reads, and its `Reversal` score folds too (#1587).
         @test po.cross_sectional_carry_rows(CrossSectionalFactorPrior(; lambda = 1,
-                                                                      mixed...)) == 22
+                                                                      mixed...)) == 2
         for cfg in (mixed, (; mixed..., lag = 2), (; mixed..., rfe = rfr),
                     (; mixed..., rfe = rfr, lag = 2))
             pe = CrossSectionalFactorPrior(; lambda = 1, cfg...)

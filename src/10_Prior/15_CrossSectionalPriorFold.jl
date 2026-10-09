@@ -50,7 +50,7 @@ Keywords correspond to the struct's fields, and every field but `buf` and `tip` 
     """
     win
     """
-    The derived series of the carried rows, `(; Xn, Xl)`, or `nothing` without an observed factor. `Xn` holds the returns net of the observed members that read no returns, which the other observed members read, or `nothing` when no member needs them. `Xl` holds the returns net of every observed factor, which the estimated members read.
+    The derived series of the carried rows, `(; Xn, Xl, Zo)`, or `nothing` without an observed factor. `Xn` holds the returns net of the observed members that read no returns, which the other observed members read, or `nothing` when no member needs them. `Xl` holds the returns net of every observed factor, which the estimated members read. `Zo` holds the observed exposures of the last `lag` rows, `observations × assets × factors`, which the derivation of the rows of the next step reads.
     """
     der
     """
@@ -174,7 +174,7 @@ Keywords correspond to the struct's fields, and every field but `buf` and `tip` 
     """
     fst
     """
-    The estimated members of the factor list, as [`cross_sectional_descriptor_carry`](@ref) folded them, so that each Descriptor that carries a state holds its state after the folded observations, or `nothing` before the first step. A step folds its new observations into them, and reads the Descriptors of those observations off them.
+    The factor list, as [`cross_sectional_descriptor_carry`](@ref) and [`cross_sectional_observed`](@ref) folded its members, so that each Descriptor that carries a state holds its state after the folded observations, or `nothing` before the first step. A step folds its new observations into them, and reads the Descriptors of those observations off them.
     """
     xf
     """
@@ -405,7 +405,7 @@ Keeps the last `n` rows of the panel rows of a step, of their derived series, or
 
 # Arguments
 
-  - `rd`: The panel rows, an array whose first dimension is the rows, the derived series `(; Xn, Xl)` of the rows, the scores `(; S, w, g)`, or `nothing`.
+  - `rd`: The panel rows, an array whose first dimension is the rows, the derived series `(; Xn, Xl, Zo)` of the rows, the scores `(; S, w, g)`, or `nothing`. The carry keeps more rows than `lag`, so the cut keeps every row of `Zo`.
   - `n`: The number of rows to keep, or `nothing`.
 
 # Returns
@@ -899,12 +899,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Computes the neutralised Factor Exposures of the new observations of a step, and drops the rows of the Descriptor warm-up.
 
-The exposures of an observation read the last [`lookback`](@ref) rows of the panel, so the rows that the state carries give the exposures of the batch fit. The derived series of an observation read the observed exposures of the row `pe.lag` observations before it, which the carried rows hold too.
+The exposures of an observation read the last [`lookback`](@ref) rows of the panel, so the rows that the state carries give the exposures of the batch fit. The derived series of an observation read the observed exposures of the row `pe.lag` observations before it. A Descriptor that carries a state cannot give that row again, so the state carries the observed exposures of the last `pe.lag` rows in `der.Zo`.
 
 # Algorithm
 
  1. Run [`cross_sectional_exposure_series`](@ref) over the rows, with the derived series of the carried rows that the state holds. It gives the benchmark weights, the observed factors, the returns net of them and the exposures of the estimated factors. It derives the rows of the step alone, and it computes the exposures of the `n` rows of the step alone, each from the last [`lookback`](@ref) rows that the member reads.
- 2. Take the last `n` rows. Before the warm-up ends, drop the rows before the first one with an eligible asset on the estimated and the observed exposures together, as [`cross_sectional_warmup`](@ref) does.
+ 2. Take the last `n` rows, of the observed exposures with [`cross_sectional_observed_carry`](@ref) too. Before the warm-up ends, drop the rows before the first one with an eligible asset on the estimated and the observed exposures together, as [`cross_sectional_warmup`](@ref) does.
  3. Neutralise the exposures of the rows that remain with [`cross_sectional_neutralise!`](@ref).
 
 # Arguments
@@ -917,7 +917,7 @@ The exposures of an observation read the last [`lookback`](@ref) rows of the pan
 
 # Returns
 
-  - `rows::NamedTuple`: `nf` and `fam`, the raw factor axis; the rows after the warm-up: `Ms`, `X`, `Xl`, `obs`, `bw`, `mcap`, `amsk` and `emsk`, with `Xl` and `obs` `nothing` without an observed factor; `der`, the derived series of every row of `win`, or `nothing`; and `xf`, the estimated members with the state of each Descriptor after the rows of the step.
+  - `rows::NamedTuple`: `nf` and `fam`, the raw factor axis; the rows after the warm-up: `Ms`, `X`, `Xl`, `obs`, `bw`, `mcap`, `amsk` and `emsk`, with `Xl` and `obs` `nothing` without an observed factor; `der`, the derived series of every row of `win` and the observed exposures of its last `pe.lag` rows, or `nothing`; and `xf`, the factor list with the state of each Descriptor after the rows of the step.
 
 # Related
 
@@ -937,12 +937,14 @@ function cross_sectional_fold_rows(pe::CrossSectionalFactorPrior,
                                                                                             g0 = g0,
                                                                                             n = n,
                                                                                             xf = st.xf)
-    # `Ms` holds the last `n` rows of `win` alone: row `p[j]` of `Ms` is row `q[j]` of `win`.
+    # `Ms` and `Zn` hold the last `n` rows of `win` alone: row `p[j]` of each is row `q[j]` of
+    # `win`.
     T = size(win.X, 1)
     q = (T - n + 1):T
     p = 1:n
+    (; Zn, der) = cross_sectional_observed_carry(cc, Xl, n, pe.lag)
     if isnothing(st.Ms)
-        Mo = isnothing(cc) ? Ms : cat(Ms, cc.Z[q, :, :]; dims = 3)
+        Mo = isnothing(cc) ? Ms : cat(Ms, Zn[p, :, :]; dims = 3)
         elig = cross_sectional_eligible(Xu[q, :], Mo, emsk[q, :])
         s = something(findfirst(any, eachrow(elig)), n + 1)
         q = q[s:end]
@@ -956,12 +958,12 @@ function cross_sectional_fold_rows(pe::CrossSectionalFactorPrior,
     obs = if isnothing(cc)
         nothing
     else
-        (; Z = cc.Z[q, :, :], R = cc.R[q, :], lv = cc.lv, nf = cc.nf, fam = cc.fam)
+        (; Z = Zn[p, :, :], R = cc.R[q, :], lv = cc.lv, nf = cc.nf, fam = cc.fam)
     end
     return (; nf = nf, fam = fam, Ms = Msn, X = win.X[q, :],
             Xl = isnothing(cc) ? nothing : Xl[q, :], obs = obs, bw = bwn,
             mcap = cross_sectional_rows(mcap, q), amsk = amsk[q, :], emsk = emsk[q, :],
-            der = isnothing(cc) ? nothing : (; Xn = cc.Xn, Xl = Xl), xf = xf)
+            der = der, xf = xf)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

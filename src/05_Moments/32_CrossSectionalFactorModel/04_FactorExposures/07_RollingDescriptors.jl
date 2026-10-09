@@ -867,11 +867,12 @@ end
     descriptor_carry(xe, rd::ReturnsResult, m)
     descriptor_carry(de::AbstractDescriptorEstimator, rd::ReturnsResult, m::Integer)
     descriptor_carry(xe::CompositeExposure, rd::ReturnsResult, m::Integer)
+    descriptor_carry(xe::ObservedExposure, rd::ReturnsResult, m::Integer)
     descriptor_carry(ds::DescriptorScores, rd::ReturnsResult, m::Integer)
 
 Folds the last `m` observations of a [`ReturnsResult`](@ref) into every Descriptor of an Exposure Estimator that carries a state, on the carry fold of a [`CrossSectionalFactorPrior`](@ref).
 
-The generic method returns the estimator as it is twice: it carries no state. A Descriptor folds the observations with [`descriptor_step`](@ref) when that verb answers a step, as it does for a [`RollingLogReturn`](@ref), an [`EWMean`](@ref), an [`EWVolumeRatio`](@ref), a [`DaysToCover`](@ref) and the lag Descriptors, and [`descriptor_carried`](@ref) reads the answer. Every other Descriptor answers `nothing`, and stays as it is. The [`CompositeExposure`](@ref) method folds each of its Descriptors. The [`DescriptorScores`](@ref) method folds each Descriptor of the scores of a Return Forecast the same way, so the code of the batch fit scores the new observations.
+The generic method returns the estimator as it is twice: it carries no state. A Descriptor folds the observations with [`descriptor_step`](@ref) when that verb answers a step, as it does for a [`RollingLogReturn`](@ref), an [`EWMean`](@ref), an [`EWVolumeRatio`](@ref), a [`DaysToCover`](@ref) and the lag Descriptors, and [`descriptor_carried`](@ref) reads the answer. Every other Descriptor answers `nothing`, and stays as it is. The [`CompositeExposure`](@ref) method folds each of its Descriptors. The [`ObservedExposure`](@ref) method folds the member that it wraps, so an observed factor folds its Descriptors as an estimated one does. The [`DescriptorScores`](@ref) method folds each Descriptor of the scores of a Return Forecast the same way, so the code of the batch fit scores the new observations.
 
 # Arguments
 
@@ -927,6 +928,7 @@ end
     carry_lookback(::Union{RollingLogReturn, EWMean, EWVolumeRatio, DaysToCover, GrowthRate,
                            ChangeToScale, ChangeInIntensity})
     carry_lookback(xe::CompositeExposure)
+    carry_lookback(xe::ObservedExposure)
     carry_lookback(pe::CrossSectionalFactorPrior)
     carry_lookback(rfe::Union{FixedWeightedReturnForecast, ExpWeightedReturnForecast,
                               TargetReturnForecast})
@@ -934,7 +936,7 @@ end
 
 Returns the number of panel rows that an estimator reads to give the Factor Exposure of one new observation on the carry fold of a [`CrossSectionalFactorPrior`](@ref), or `nothing` for every row.
 
-A Descriptor that carries a state, as [`descriptor_carry`](@ref) folds it, reads the new observation alone, so a [`RollingLogReturn`](@ref), an [`EWMean`](@ref), an [`EWVolumeRatio`](@ref), a [`DaysToCover`](@ref) and the lag Descriptors [`GrowthRate`](@ref), [`ChangeToScale`](@ref) and [`ChangeInIntensity`](@ref) answer one. A [`CompositeExposure`](@ref) answers it over its Descriptors, and a Return Forecast with Descriptor Scores over the Descriptors of its scores. Every other estimator answers its [`lookback`](@ref), and a vector answers the largest one of its members, or `nothing` when one member answers `nothing`. A [`CrossSectionalFactorPrior`](@ref) answers the look-back of its factors on the carry fold, as [`cross_sectional_lookback`](@ref) counts it, and [`cross_sectional_carry_rows`](@ref) reads it.
+A Descriptor that carries a state, as [`descriptor_carry`](@ref) folds it, reads the new observation alone, so a [`RollingLogReturn`](@ref), an [`EWMean`](@ref), an [`EWVolumeRatio`](@ref), a [`DaysToCover`](@ref) and the lag Descriptors [`GrowthRate`](@ref), [`ChangeToScale`](@ref) and [`ChangeInIntensity`](@ref) answer one. A [`CompositeExposure`](@ref) answers it over its Descriptors, an [`ObservedExposure`](@ref) answers the member that it wraps, and a Return Forecast with Descriptor Scores over the Descriptors of its scores. Every other estimator answers its [`lookback`](@ref), and a vector answers the largest one of its members, or `nothing` when one member answers `nothing`. A [`CrossSectionalFactorPrior`](@ref) answers the look-back of its factors on the carry fold, as [`cross_sectional_lookback`](@ref) counts it, and [`cross_sectional_carry_rows`](@ref) reads it.
 
 # Arguments
 
