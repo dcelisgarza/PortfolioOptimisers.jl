@@ -196,10 +196,16 @@ columns and refits the factor prior over the selected history. It solves no row 
 of the Empty Factors of the family that moved are read again in the new basis, one observation at
 a time from the first one, until each member is marked. Under `SolvedUnseenMember()` a row with an
 Unseen Member stays rank-deficient, and its pseudo-inverse answer depends on the parametrisation.
-A `CrossSectionalTargetRegression` fits a target that the library does not know, and a target can
-penalise its coefficients. Under either one a move fits every carried observation again, as it did
-before the fold (#1605). A row whose design holds a dependent factor set is rank-deficient under
-every rule, and the fold keeps the answer of the old basis there. The
+So a move under it solves each such row again in the new basis, with the solve policy of the fit
+and the stored last-pass weights, and selects the columns of every other row
+([#1613](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1613)). The move finds those
+rows with the test of the Unseen Member rule, a scan of each fitted row at the move, so the state
+carries no field for them. Such rows are rare: one row of 300 on the panel of #1606. A
+`CrossSectionalTargetRegression` fits a target that the library does not know, and a target can
+penalise its coefficients. Under it a move fits every carried observation again, as it did before
+the fold (#1605). A row whose design holds a dependent factor set and no Unseen Member is
+rank-deficient under every rule, and the fold keeps the answer of the old basis there
+([#1617](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1617)). The
 default factor covariance reads every column at once, so a sub-block of a raw-axis state is not the
 batch answer. On the panel of #1592 (2520 rows, 500 assets), the step of the move costs 0.013 s,
 against 0.0036 s for a step with no move and 1.66 s for a refit of every row, and the carry still
@@ -361,7 +367,8 @@ The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton
   and holds the zero-sum condition over the other members, so a row whose factor returns depended
   on the dropped member is identified, and the fold of a move needs no second solve.
   `SolvedUnseenMember()` keeps the answer that depends on the dropped member, and a move under it
-  fits every carried observation again.
+  solves each row with an Unseen Member again
+  ([#1613](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1613)).
 - ADR 0136 and ADR 0039 carry amendments that point here.
 - A pinned choice and a seed window are two routes on which the online call with no data equals no batch fit.
   Each is documented, and each is tested against the oracle.

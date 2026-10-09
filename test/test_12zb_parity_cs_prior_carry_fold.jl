@@ -5,8 +5,9 @@ An unwrapped prior folds as a carry: its first step seeds a `CrossSectionalCarry
 step computes the exposures, the regression and the idiosyncratic variance of the new
 observations alone, from the panel rows that its Descriptors read. The factor prior and the
 idiosyncratic variance fold, and the Return Forecast and the idiosyncratic correlation refit at the
-call with no data. A batch choice that moves, or a factor that comes alive, fits every carried observation
-again.
+call with no data. A factor that comes alive fits every carried observation again. A batch choice
+that moves folds the move, and solves again each observation whose answer depends on the basis
+(#1605, #1613).
 
 A step folds the member states in place, as every fold does, so each stream reads the prior out
 right after its step.
@@ -119,19 +120,22 @@ end
                isequal(x.rr.edof, b.rr.edof) &&
                x.rr.idx == b.rr.idx
     end
-    # Equal to rounding, with the same `NaN` cells. A move of a batch choice keeps the factor
-    # returns of the old basis and selects their columns, where the batch fit solves each row
-    # in the new basis, so the two differ by rounding alone (#1605).
+    # Equal to rounding, with the same `NaN` cells. The gap over the largest finite entry, and
+    # zero when the two are equal, so a block with no finite entry other than zero compares.
+    function close_to(p, q; tol = 1e-12)
+        gap = maximum(abs, filter(isfinite, p - q); init = 0.0)
+        return size(p) == size(q) &&
+               isequal(isnan.(p), isnan.(q)) &&
+               (iszero(gap) || relerr(p, q) < tol)
+    end
+    # A move of a batch choice keeps the factor returns of the old basis and selects their
+    # columns, where the batch fit solves each row in the new basis, so the two differ by
+    # rounding alone (#1605, #1613).
     function near(x, b; tol = 1e-12)
-        # The gap over the largest finite entry, and zero when the two are equal, so a block
-        # with no finite entry other than zero compares.
-        gap(p, q) = maximum(abs, filter(isfinite, p - q); init = 0.0)
-        return all(((p, q),) -> size(p) == size(q) &&
-                                isequal(isnan.(p), isnan.(q)) &&
-                                (iszero(gap(p, q)) || relerr(p, q) < tol),
-                   ((x.mu, b.mu), (x.sigma, b.sigma), (x.X, b.X), (x.rr.csr.f, b.rr.csr.f),
-                    (x.rr.vs, b.rr.vs), (x.rr.Ms, b.rr.Ms), (x.rr.rw, b.rr.rw))) &&
-               x.rr.idx == b.rr.idx
+        return all(((p, q),) -> close_to(p, q; tol = tol),
+                   ((x.mu, b.mu), (x.sigma, b.sigma), (x.X, b.X), (x.o_X, b.o_X),
+                    (x.fpr.X, b.fpr.X), (x.rr.csr.f, b.rr.csr.f), (x.rr.vs, b.rr.vs),
+                    (x.rr.Ms, b.rr.Ms), (x.rr.rw, b.rr.rw))) && x.rr.idx == b.rr.idx
     end
     dropped(pr) = pr.rr.nf[po.dropped_factor_indices(pr.rr.fcb)]
     style = (; grid_config("Base", rd)..., families = ["style" => nothing])
@@ -149,11 +153,13 @@ end
                 @test agrees(x.pr, batch(pe, k))
             end
         end
-        # One observation at a time after the first fit.
+        # One observation at a time after the first fit. The batch choice of `style` moves at
+        # the last step, and the fold of the move equals the batch fit to rounding (#1605,
+        # #1613), so the configurations of `style` compare with `near` from here on.
         pe = CrossSectionalFactorPrior(; lambda = 1, style...)
         e = (0, 90, 91, 92, 93, 250)
         for (k, x) in enumerate(stream(pe, rd, e))
-            @test agrees(x.pr, batch(pe, k, rd, e))
+            @test near(x.pr, batch(pe, k, rd, e))
         end
         # The state keeps the standardised idiosyncratic returns, and a step appends the rows
         # of its new observations (#1565). A threshold above zero makes the step fold the
@@ -162,7 +168,7 @@ end
         # the carry equals the batch fit to the last bit (#1594).
         pe = CrossSectionalFactorPrior(; lambda = 1, th = 0.1, style...)
         for (k, x) in enumerate(stream(pe, rd, e))
-            @test agrees(x.pr, batch(pe, k, rd, e))
+            @test near(x.pr, batch(pe, k, rd, e))
             st = x.pe.cache
             @test size(st.S) == size(st.csr.eps)
             @test isnothing(st.Sc)
@@ -173,7 +179,7 @@ end
         pe = CrossSectionalFactorPrior(; lambda = 1, th = 0.1,
                                        ce = Covariance(; alg = SemiMoment()), style...)
         for (k, x) in enumerate(stream(pe, rd, e))
-            @test agrees(x.pr, batch(pe, k, rd, e))
+            @test near(x.pr, batch(pe, k, rd, e))
             st = x.pe.cache
             @test size(st.S) == size(st.Sc) == size(st.csr.eps)
             @test isnothing(st.ce)
@@ -187,14 +193,14 @@ end
             @test isnothing(x.pe.cache.Sc)
             @test relerr(x.pr.sigma, b.sigma) < 1e-12
             @test relerr(x.pr.mu, b.mu) < 1e-12
-            @test same(x.pr.X, b.X)
+            @test close_to(x.pr.X, b.X)
         end
         # The batch fit and the read-out of the carry fold run the same lift, so the carry
         # fold equals the batch fit under each Systematic Repair rule (#1576).
         for srep in (NoSystematicRepair(), SystematicRepair())
             pe = CrossSectionalFactorPrior(; lambda = 1, srep = srep, style...)
             for (k, x) in enumerate(stream(pe, rd, e))
-                @test agrees(x.pr, batch(pe, k, rd, e))
+                @test near(x.pr, batch(pe, k, rd, e))
             end
         end
         # A member that no asset of an observation loads on leaves the zero-sum condition of
@@ -237,19 +243,22 @@ end
         # A member that publishes no history is fitted again at each block row. The state
         # carries those rows, so a step fits the member once for each new observation, and
         # the history equals the one the batch fit makes over the same rows.
-        function history_case(cfg, e)
+        # A stream whose batch choice moves equals the batch fit to rounding, `exact = false`.
+        function history_case(cfg, e; exact = true)
             rl, rc = CarryHistoryShrinkage(), CarryHistoryScale()
             bl, bc = CarryHistoryShrinkage(), CarryHistoryScale()
             pc = CrossSectionalFactorPrior(; cfg..., lambda = rl, c = rc)
             pb = CrossSectionalFactorPrior(; cfg..., lambda = bl, c = bc)
             xs = stream(pc, rd, e)
+            eqn(p, q) = exact ? p == q : isapprox(p, q; rtol = 1e-12)
+            eqh(p, q) = exact ? same(p, q) : close_to(p, q)
             for (k, x) in enumerate(xs)
                 b = batch(pb, k, rd, e)
-                @test x.pr.rr.lambda == b.rr.lambda
-                @test x.pr.rr.c == b.rr.c
-                @test agrees(x.pr, b)
-                @test same(rl.seen[k], bl.seen[k])
-                @test same(rc.seen[k], bc.seen[k])
+                @test eqn(x.pr.rr.lambda, b.rr.lambda)
+                @test eqn(x.pr.rr.c, b.rr.c)
+                @test exact ? agrees(x.pr, b) : near(x.pr, b)
+                @test eqh(rl.seen[k], bl.seen[k])
+                @test eqh(rc.seen[k], bc.seen[k])
                 @test same(rl.seen[k], rc.seen[k])
             end
             return (; xs = xs, seen = rl.seen)
@@ -271,14 +280,16 @@ end
             end
             @test allunique([x.pr.rr.lambda for x in xs])
         end
-        # A batch choice that moves fits every observation again, and makes every row again.
-        # Measured: the move at the second step changes the old rows by up to 1.9e-17, so a
-        # carry that kept them would not equal the batch fit.
-        (; xs) = history_case((; target..., families = ["style" => nothing]), edges)
+        # A batch choice that moves folds the move, which keeps the old rows of the history
+        # (#1605, #1613). Measured when the move fitted every observation again: the move at
+        # the second step changes the old rows by up to 1.9e-17, so the carry equals the batch
+        # fit to rounding.
+        (; xs) = history_case((; target..., families = ["style" => nothing]), edges;
+                              exact = false)
         @test [only(x.pe.cache.families).second for x in xs] ==
               ["style1", "style2", "style2"]
         H1, H2 = xs[1].pe.cache.hist, xs[2].pe.cache.hist
-        @test !same(H1, H2[1:size(H1, 1), :])
+        @test same(H1, H2[1:size(H1, 1), :])
         # A member that publishes its history carries no row: the call with no data reads the
         # history of the Result it fits.
         (; xs) = history_case(grid_config("FcEW", rd), edges)
@@ -521,11 +532,11 @@ end
     end
 
     @testset "The Choice Rule" begin
-        # A batch choice that moves fits every observation again, and equals the batch fit.
+        # A batch choice that moves folds the move, and equals the batch fit to rounding.
         sb = stream(CrossSectionalFactorPrior(; lambda = 1, style...))
         @test [dropped(x.pr) for x in sb] == [["style1"], ["style2"], ["style2"]]
-        @test all(k -> agrees(sb[k].pr,
-                              batch(CrossSectionalFactorPrior(; lambda = 1, style...), k)),
+        @test all(k -> near(sb[k].pr,
+                            batch(CrossSectionalFactorPrior(; lambda = 1, style...), k)),
                   1:3)
         # A pinned choice is recorded in the state, and `families` stays as it is. Its
         # call with no data is the batch fit with the member stated.
@@ -547,60 +558,93 @@ end
     end
 
     @testset "A move of a batch choice folds and runs no regression again (#1605)" begin
-        # Under the default Unseen Member rule the raw factor returns do not depend on the
-        # dropped member, so a move selects their columns and folds the factor prior again.
-        # The residuals of the old observations are the ones of the step before, bit for bit.
-        # The `grid_config` cases take `SolvedUnseenMember()`, which refits on a move.
-        zs = (; style..., unseen = ZeroUnseenMember())
-        for pf in
+        # The raw factor returns of an observation of full rank do not depend on the dropped
+        # member, so a move selects their columns and folds the factor prior again. The
+        # residuals of the old observations are the ones of the step before, bit for bit. Under
+        # `SolvedUnseenMember()`, the rule of the `grid_config` cases, the move also solves each
+        # observation with an Unseen Member again (#1613).
+        for unseen in (ZeroUnseenMember(), SolvedUnseenMember()),
+            pf in
             (GRID_PE, EmpiricalPrior(; me = SimpleExpectedReturns(), ce = Covariance()))
-            pe = CrossSectionalFactorPrior(; lambda = 1, zs..., pe = pf)
+
+            pe = CrossSectionalFactorPrior(; lambda = 1, style..., unseen = unseen, pe = pf)
             sb = stream(pe)
             @test [dropped(x.pr) for x in sb] == [["style1"], ["style2"], ["style2"]]
             @test all(k -> dropped(batch(pe, k)) == dropped(sb[k].pr), 1:3)
             @test all(k -> near(sb[k].pr, batch(pe, k)), 1:3)
+            # A refit leaves a plain `Matrix`, and a step appends to a view of a backing.
+            @test sb[2].pe.cache.csr.f isa SubArray
             e1, e2 = sb[1].pe.cache.csr.eps, sb[2].pe.cache.csr.eps
             @test same(e2[1:size(e1, 1), :], e1)
             @test same(sb[2].pe.cache.W[1:size(e1, 1), :], sb[1].pe.cache.W)
         end
-        # The oracle's rule keeps a row with an Unseen Member rank-deficient, so a move fits
-        # every observation again, and the carry equals the batch fit exactly.
-        pe = CrossSectionalFactorPrior(; lambda = 1, style...)
-        @test pe.unseen === SolvedUnseenMember()
-        @test isnothing(po.cross_sectional_move_basis(pe.unseen, pe.cre, nothing, nothing))
+        @test CrossSectionalFactorPrior(; style...).unseen === SolvedUnseenMember()
+        # A target that the library does not know can penalise its coefficients, so a move
+        # under it fits every observation again.
         @test isnothing(po.cross_sectional_move_basis(ZeroUnseenMember(),
                                                       CrossSectionalTargetRegression(),
                                                       nothing, nothing))
         # The panel of #1606: the only asset in Utilities delists after data row 225, so row
-        # 226 has an Unseen Member. A larger market cap of Energy from row 150 moves the
-        # automatic member from Software to Energy at the second step, and the step of row 226
-        # comes after the move.
-        dl = parity_panel(; T = 300, N = 60, seed = 1601).rd
-        ind = [i == 3 ? "Utilities" : ["Banks", "Energy", "Software"][mod(i - 1, 3) + 1]
-               for i in 1:size(dl.X, 2)]
-        po.panel_field(dl.pnl, "market_cap").vals[150:end, ind .== "Energy"] .*= 4.0
-        de = (0, 150, 190, 225, 226, 300)
+        # 226 has an Unseen Member. A larger market cap of Energy moves the automatic member
+        # from Software to Energy. From row 150 the move comes before the step of row 226, and
+        # from row 229 it comes after it, so the move solves row 226 again under
+        # `SolvedUnseenMember()`.
         dlf = ["market" => ConstantExposure(),
                "industry" => OneHotExposure(; field = "industry", family = "industry"),
                "size" =>
                    CompositeExposure(; descriptors = [LogMarketCap()], family = "style")]
-        for (unseen, pf) in ((ZeroUnseenMember(), GRID_PE),
+        function energy_panel(from, x)
+            d = parity_panel(; T = 300, N = 60, seed = 1601).rd
+            lvl = ["Banks", "Energy", "Software"]
+            ind = [i == 3 ? "Utilities" : lvl[mod(i - 1, 3) + 1] for i in 1:size(d.X, 2)]
+            po.panel_field(d.pnl, "market_cap").vals[from:end, ind .== "Energy"] .*= x
+            return d
+        end
+        unseen_rows(st) = [s
+                           for s in axes(st.W, 1)
+                           if !isnothing(po.unseen_member_change(st.fcb,
+                                                                 view(st.Ms, s, :, :),
+                                                                 view(st.W, s, :) .> 0, s))]
+        for (dl, de, mv) in ((energy_panel(150, 4.0), (0, 150, 190, 225, 226, 300), 2),
+                             (energy_panel(229, 100.0), (0, 228, 260, 300), 2)),
+            (unseen, pf) in ((ZeroUnseenMember(), GRID_PE),
                              (ZeroUnseenMember(),
                               EmpiricalPrior(; me = SimpleExpectedReturns(), ce = Covariance())),
-                             (SolvedUnseenMember(), GRID_PE))
+                             (SolvedUnseenMember(), GRID_PE),
+                             (SolvedUnseenMember(),
+                              EmpiricalPrior(; me = SimpleExpectedReturns(), ce = Covariance())))
+
             pe = CrossSectionalFactorPrior(; factors = dlf,
                                            families = ["industry" => nothing], minra = 5,
                                            unseen = unseen, pe = pf)
             xs = stream(pe, dl, de)
             @test [only(dropped(x.pr)) for x in xs] ==
-                  ["industry=Software", "industry=Energy", "industry=Energy",
-                   "industry=Energy", "industry=Energy"]
+                  ["industry=Software"; fill("industry=Energy", length(xs) - 1)]
+            @test xs[mv].pe.cache.csr.f isa SubArray
             for (k, x) in enumerate(xs)
                 b = batch(pe, k, dl, de)
                 @test dropped(x.pr) == dropped(b)
-                @test unseen === SolvedUnseenMember() ? agrees(x.pr, b) : near(x.pr, b)
+                @test near(x.pr, b)
             end
         end
+        # Row 226 is the fitted observation 225, and the step before the move fits it. Under
+        # `SolvedUnseenMember()` its answer depends on the dropped member (#1613).
+        pe = CrossSectionalFactorPrior(; factors = dlf, families = ["industry" => nothing],
+                                       minra = 5, unseen = SolvedUnseenMember())
+        dl, de = energy_panel(229, 100.0), (0, 228, 260, 300)
+        xs = stream(pe, dl, de)
+        s1 = xs[1].pe.cache
+        @test unseen_rows(s1) == [225]
+        b = batch(pe, 2, dl, de)
+        # The columns of the old answer that the new basis keeps are not the batch answer at
+        # that row, and the row that the move solves again is.
+        Tf = size(s1.Ms, 1)
+        fr = po.cross_sectional_expand(s1.fcb, (pe.lag + 1):Tf, pe.lag, s1.csr.f)
+        old = fr[225, po.retained_factor_indices(b.rr.fcb)]
+        @test relerr(old, b.rr.csr.f[225, :]) > 1e-3
+        @test relerr(xs[2].pr.rr.csr.f[225, :], b.rr.csr.f[225, :]) < 1e-12
+        @test same(xs[2].pe.cache.csr.eps[1:size(s1.csr.eps, 1), :], s1.csr.eps)
+        @test same(xs[2].pe.cache.W[1:size(s1.W, 1), :], s1.W)
         # A new dropped member with a zero benchmark-weighted exposure at an observation has
         # no finite ratio, so the rebase answers `nothing`, and the fit of every observation
         # refuses the member as the batch fit does.
@@ -628,7 +672,7 @@ end
                                        pe = EntropyPoolingPrior(; pe = GRID_PE))
         sx = stream(pe)
         @test all(x -> isa(x.pe.cache.pe, EntropyPoolingPrior), sx)
-        @test all(k -> agrees(sx[k].pr, batch(pe, k)), 1:3)
+        @test all(k -> near(sx[k].pr, batch(pe, k)), 1:3)
     end
 
     @testset "Parity with the oracle's online update" begin
@@ -707,7 +751,7 @@ end
             o = partial_fit!(o, rows(rd, (edges[k] + 1):edges[k + 1]))
             bo, brd = po.batch_from_state(o)
             @test isa(o.pe.cache, po.CrossSectionalCarryState)
-            @test agrees(bo.pe, batch(pe, k))
+            @test near(bo.pe, batch(pe, k))
             @test isequal(brd.X, rd.X[1:edges[k + 1], :])
         end
         @test optimise(o).w == optimise(InverseVolatility(; pe = pe), rd).w
@@ -715,7 +759,7 @@ end
         e1 = partial_fit!(pe, rows(rd, 1:90))
         p1 = prior(e1)
         e2 = partial_fit(e1, rows(rd, 91:170))
-        @test agrees(prior(e1), p1) && agrees(prior(e2), batch(pe, 2))
+        @test agrees(prior(e1), p1) && near(prior(e2), batch(pe, 2))
     end
 
     @testset "A step appends to the histories in place (#1564)" begin

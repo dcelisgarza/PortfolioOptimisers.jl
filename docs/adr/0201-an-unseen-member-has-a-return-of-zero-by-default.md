@@ -108,4 +108,6 @@ before the block.
   sandwich took the pseudo-inverse of the rank-deficient Gram matrix.
 - Under `SolvedUnseenMember()`, the fold of a move of the dropped member
   ([#1605](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1605)) still solves each
-  row with an Unseen Member again. Under the default it solves no row again.
+  row with an Unseen Member again
+  ([#1613](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1613)). Under the default
+  it solves no row again.

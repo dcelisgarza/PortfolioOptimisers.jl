@@ -204,21 +204,22 @@ function cross_sectional_carry_with(st::CrossSectionalCarryState, kw::NamedTuple
                                           kw)...)
 end
 """
-    cross_sectional_move_basis(unseen::ZeroUnseenMember, cre::CrossSectionalLinearRegression,
-                               st, families) -> Option{<:FactorFamilyBasis}
+    cross_sectional_move_basis(unseen::Union{ZeroUnseenMember, SolvedUnseenMember},
+                               cre::CrossSectionalLinearRegression, st, families)
+        -> Option{<:FactorFamilyBasis}
     cross_sectional_move_basis(unseen::AbstractUnseenMemberRule,
                                cre::AbstractCrossSectionalRegressionEstimator, st, families)
         -> nothing
 
 Returns the basis of the fitted observations under the dropped members that moved, when the move folds on the carry fold of a Cross-Sectional Factor Prior, and `nothing` otherwise.
 
-The zero-sum condition of a family is the same set of factor returns for every dropped member. So a regression that minimises the weighted squared residuals gives the same raw factor returns in every basis, on each observation whose design has full rank. [`ZeroUnseenMember`](@ref) makes every observation with an Unseen Member identified, so its answer does not depend on the dropped member. [`SolvedUnseenMember`](@ref) keeps such an observation rank-deficient, and its pseudo-inverse answer depends on the dropped member. A [`CrossSectionalTargetRegression`](@ref) fits a target that the library does not know, and a target can penalise its coefficients. So a move folds under the default pair alone, and every other pair fits every observation again.
+The zero-sum condition of a family is the same set of factor returns for every dropped member. So a regression that minimises the weighted squared residuals gives the same raw factor returns in every basis, on each observation whose design has full rank. [`ZeroUnseenMember`](@ref) makes every observation with an Unseen Member identified, so its answer does not depend on the dropped member. [`SolvedUnseenMember`](@ref) keeps such an observation rank-deficient, and its pseudo-inverse answer depends on the dropped member, so [`cross_sectional_move_solve`](@ref) solves it again in the new basis. A [`CrossSectionalTargetRegression`](@ref) fits a target that the library does not know, and a target can penalise its coefficients. So a move folds under [`CrossSectionalLinearRegression`](@ref) with the two Unseen Member rules of the library, and every other pair fits every observation again.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. Under [`ZeroUnseenMember`](@ref) and [`CrossSectionalLinearRegression`](@ref), rewrite the basis with [`cross_sectional_rebase`](@ref).
+ 1. Under [`ZeroUnseenMember`](@ref) or [`SolvedUnseenMember`](@ref), with [`CrossSectionalLinearRegression`](@ref), rewrite the basis with [`cross_sectional_rebase`](@ref).
  2. Under any other pair, answer `nothing`.
 
 # Arguments
@@ -236,9 +237,11 @@ The method that Julia selects is the algorithm.
 
   - [`cross_sectional_fold_move`](@ref)
   - [`cross_sectional_rebase`](@ref)
+  - [`cross_sectional_move_solve`](@ref)
   - [`AbstractUnseenMemberRule`](@ref)
 """
-function cross_sectional_move_basis(::ZeroUnseenMember, ::CrossSectionalLinearRegression,
+function cross_sectional_move_basis(::Union{ZeroUnseenMember, SolvedUnseenMember},
+                                    ::CrossSectionalLinearRegression,
                                     st::CrossSectionalCarryState,
                                     families::AbstractVector{<:Pair})
     return cross_sectional_rebase(st.fcb, families, st.nf)
@@ -425,18 +428,19 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds a move of the dropped member of a Factor Family into the state of the carry fold of a Cross-Sectional Factor Prior, before the step fits its new observations.
 
-A move runs no regression again. The raw factor returns of a fitted observation do not depend on the dropped member, as [`cross_sectional_move_basis`](@ref) states, so the factor returns under the new members are the columns of the raw factor returns that the new basis keeps. The residuals, the regression weights, the idiosyncratic variance, the standardised idiosyncratic returns and the Return Forecast rows do not depend on the dropped member either, so the state keeps them. The factor prior folds again over the new factor returns, because the default factor covariance is not separable by column: its regime multiplier reads every column. That fold reads every fitted observation, so its cost grows with the stream, but it runs no regression and reads no exposure of an old observation. [`cross_sectional_move_marks`](@ref) gives the marks of the Empty Factors.
+A move runs no regression again over the observations of full rank. The raw factor returns of such an observation do not depend on the dropped member, as [`cross_sectional_move_basis`](@ref) states, so the factor returns under the new members are the columns of the raw factor returns that the new basis keeps. Under [`SolvedUnseenMember`](@ref), [`cross_sectional_move_solve`](@ref) solves each observation with an Unseen Member again in the new basis. Those observations are rare. The residuals, the regression weights, the idiosyncratic variance, the standardised idiosyncratic returns and the Return Forecast rows do not depend on the dropped member either, so the state keeps them. The factor prior folds again over the new factor returns, because the default factor covariance is not separable by column: its regime multiplier reads every column. That fold reads every fitted observation, so its cost grows with the stream, but it runs no regression and reads no exposure of an old observation. [`cross_sectional_move_marks`](@ref) gives the marks of the Empty Factors.
 
-The state equals the state of [`cross_sectional_fold_refit`](@ref) under the new members to rounding, on each fitted observation whose design has full rank on its columns that are not zero. A design with a dependent factor set has a pseudo-inverse answer that depends on the basis, and the fold keeps the answer of the old basis there.
+The state equals the state of [`cross_sectional_fold_refit`](@ref) under the new members to rounding, on each fitted observation whose design has full rank on its columns that are not zero, and on each observation that the fold solves again. A design with a dependent factor set and no Unseen Member has a pseudo-inverse answer that depends on the basis, and the fold keeps the answer of the old basis there.
 
 # Algorithm
 
  1. Answer `nothing` when `pe.ve` does not fold, as [`supports_partial_fit`](@ref) answers, because the step then fits every observation again. Answer `st` when no dropped member moved.
- 2. Rewrite the basis of the observations before the step with [`cross_sectional_move_basis`](@ref). Answer `nothing` when the move does not fold, or when a new dropped member has a zero benchmark-weighted exposure, so the fit of every observation refuses it as the batch fit does. [`cross_sectional_rebase_state`](@ref) takes steps 3 to 6.
+ 2. Rewrite the basis of the observations before the step with [`cross_sectional_move_basis`](@ref). Answer `nothing` when the move does not fold, or when a new dropped member has a zero benchmark-weighted exposure, so the fit of every observation refuses it as the batch fit does. [`cross_sectional_rebase_state`](@ref) takes steps 3 to 7.
  3. Expand the factor returns of the fitted observations onto the raw axis with [`cross_sectional_expand`](@ref), and keep the columns of the new basis.
  4. Mark the Empty Factors with [`cross_sectional_move_marks`](@ref).
- 5. Fold the factor prior over the factor returns of [`cross_sectional_fold_factor_returns`](@ref) with [`cross_sectional_refold_factors`](@ref).
- 6. Reduce the exposures of the last `lag` observations in the new basis, which the regression of the new observations reads.
+ 5. Solve the observations whose answer depends on the basis again, with [`cross_sectional_move_solve`](@ref).
+ 6. Fold the factor prior over the factor returns of [`cross_sectional_fold_factor_returns`](@ref) with [`cross_sectional_refold_factors`](@ref).
+ 7. Reduce the exposures of the last `lag` observations in the new basis, which the regression of the new observations reads.
 
 # Arguments
 
@@ -475,7 +479,7 @@ end
     cross_sectional_rebase_state(pe::CrossSectionalFactorPrior, st::CrossSectionalCarryState,
                                  fcb::FactorFamilyBasis, m::Integer) -> CrossSectionalCarryState
 
-Rewrites the state of the carry fold of a Cross-Sectional Factor Prior in a new Factor Family Basis, as steps 3 to 6 of [`cross_sectional_fold_move`](@ref) state. The state records the dropped members of the basis with [`cross_sectional_dropped_names`](@ref), as the fit of every observation records them.
+Rewrites the state of the carry fold of a Cross-Sectional Factor Prior in a new Factor Family Basis, as steps 3 to 7 of [`cross_sectional_fold_move`](@ref) state. The state records the dropped members of the basis with [`cross_sectional_dropped_names`](@ref), as the fit of every observation records them.
 
 # Arguments
 
@@ -492,6 +496,7 @@ Rewrites the state of the carry fold of a Cross-Sectional Factor Prior in a new 
 
   - [`cross_sectional_fold_move`](@ref)
   - [`cross_sectional_move_basis`](@ref)
+  - [`cross_sectional_move_solve`](@ref)
 """
 function cross_sectional_rebase_state(::CrossSectionalFactorPrior,
                                       ::CrossSectionalCarryState, ::Nothing, ::Integer)
@@ -504,8 +509,10 @@ function cross_sectional_rebase_state(pe::CrossSectionalFactorPrior,
     r = (pe.lag + 1):Tf
     z = (Tf - pe.lag + 1):Tf
     fr = cross_sectional_expand(st.fcb, r, pe.lag, st.csr.f)
-    f = fr[:, retained_factor_indices(fcb)]
     marks = cross_sectional_move_marks(pe, st, fcb)
+    f = cross_sectional_move_solve(pe.unseen, pe, st,
+                                   (; fcb = fcb, f = fr[:, retained_factor_indices(fcb)],
+                                    lv = marks.lv))
     cb = cross_sectional_observed_block(st.obs, 1:Tf, r, st.buf.n - size(st.Ms, 1))
     fo = cross_sectional_fold_factor_returns(f, marks.lv, cb)
     (; eps, n, b, h1) = st.csr
@@ -522,6 +529,65 @@ function cross_sectional_rebase_state(pe::CrossSectionalFactorPrior,
                                        lv1 = marks.lv1, lv = marks.lv,
                                        pe = cross_sectional_refold_factors(pe.pe, fo,
                                                                            st.seed)))
+end
+"""
+    cross_sectional_move_solve(unseen::ZeroUnseenMember, pe::CrossSectionalFactorPrior,
+                               st::CrossSectionalCarryState, mv::NamedTuple) -> MatNum
+    cross_sectional_move_solve(unseen::SolvedUnseenMember, pe::CrossSectionalFactorPrior,
+                               st::CrossSectionalCarryState, mv::NamedTuple) -> MatNum
+
+Solves again, in a new Factor Family Basis, each fitted observation whose factor returns depend on the dropped members, on the carry fold of a Cross-Sectional Factor Prior.
+
+A change of the dropped member is an invertible change of the coefficients of the family. So the old and the new reduced design of an observation span the same columns, and the fitted values, the residuals and the regression weights do not depend on the dropped member. On an observation of full rank, the factor returns do not depend on it either. Under [`ZeroUnseenMember`](@ref) every observation is identified, so the function changes no row.
+
+Under [`SolvedUnseenMember`](@ref) an observation with an Unseen Member is rank-deficient, and its pseudo-inverse answer depends on the dropped member. Such an observation has a member that no asset of positive weight loads on, while the lagged benchmark weights give it a ratio other than zero, as [`unseen_member_change`](@ref) tests it. The test does not depend on the basis. The function solves each such observation again with the last-pass weights `st.W`, which the stored regression read, on the factors that `mv.lv` marks, as the batch fit solves it. The residuals stay, because the fitted values are the same projection.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Under [`ZeroUnseenMember`](@ref), answer `mv.f`.
+ 2. Under [`SolvedUnseenMember`](@ref), test each fitted observation `s` with [`unseen_member_change`](@ref), on the lagged exposures `st.Ms[s, :, :]` and the assets of positive weight in `st.W[s, :]`.
+ 3. Reduce the lagged exposures of each such observation in `mv.fcb` with [`reduce_exposures`](@ref), and regress its returns on them with [`cross_sectional_live_regression`](@ref), under the policy of `pe.cre`. Write the factor returns into the row `s` of `mv.f`.
+
+# Arguments
+
+  - `unseen`: The Unseen Member rule of the prior.
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - `st`: The state, whose `fcb` is the basis of the last fit.
+  - `mv`: The move, `(; fcb, f, lv)`: the new basis over the rows of `st.fcb`; the factor returns of the fitted observations in `fcb`, the columns of the raw factor returns that `fcb` keeps, which the function modifies in place; and the mark of the factors that are not empty in the last pass, in `fcb`.
+
+# Returns
+
+  - `f::MatNum`: The factor returns in `mv.fcb`.
+
+# Related
+
+  - [`cross_sectional_rebase_state`](@ref)
+  - [`cross_sectional_move_basis`](@ref)
+  - [`cross_sectional_move_row_marks`](@ref)
+  - [`SolvedUnseenMember`](@ref)
+"""
+function cross_sectional_move_solve(::ZeroUnseenMember, ::CrossSectionalFactorPrior,
+                                    ::CrossSectionalCarryState, mv::NamedTuple)
+    return mv.f
+end
+function cross_sectional_move_solve(::SolvedUnseenMember, pe::CrossSectionalFactorPrior,
+                                    st::CrossSectionalCarryState, mv::NamedTuple)
+    (; fcb, f, lv) = mv
+    Xs = something(st.Xl, st.X)
+    for s in axes(f, 1)
+        at = view(st.W, s, :) .> zero(eltype(st.W))
+        if isnothing(unseen_member_change(st.fcb, view(st.Ms, s, :, :), at, s))
+            continue
+        end
+        t = s + pe.lag
+        Zl = @views reduce_exposures(factor_basis_slice(fcb, s:s), st.Ms[s:s, :, :])
+        fs = @views cross_sectional_live_regression(pe.cre, Zl, Xs[t:t, :], st.W[s:s, :],
+                                                    lv).csr.f
+        f[s, :] = view(fs, 1, :)
+    end
+    return f
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

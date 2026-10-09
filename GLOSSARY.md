@@ -57,7 +57,7 @@ The number of observations a fold-and-carry Prior Estimator keeps in its Result'
 
 **Choice Rule**
 How a choice that a fit makes over its whole sample behaves on the online step: the dropped member of a Factor Family, the factor set of a stepwise regression, the projection of a dimension-reduction regression. A **Batch Choice** chooses again over every observation at each fit, so the online call with no data equals the batch fit over the same rows; it is the default. A **Pinned Choice** keeps the choice of the first fit, so the basis of a fold stays fixed and each step stays cheap. The two agree in a batch fit. The rule is a field of the estimator that makes the choice. ADR 0193.
-On a Carry Fold, a Batch Choice that moves changes only the basis of the factor returns, so the step fits the factor prior again and no past regression. Under the Solved Unseen Member rule, or a regression estimator that fits a target, an observation can fail to fix its factor returns, so the step fits every observation again. #1601, #1605.
+On a Carry Fold, a Batch Choice that moves changes only the basis of the factor returns, so the step fits the factor prior again and no past regression. Under the Solved Unseen Member rule, an observation with an Unseen Member does not fix its factor returns, so the step solves that observation again in the new basis. Under a regression estimator that fits a target, the step fits every observation again. #1601, #1605, #1613.
 *Avoid*: reading a Pinned Choice as a state; a refit honours it by naming the chosen member in its configuration after the first fit.
 
 **Fold Context**
