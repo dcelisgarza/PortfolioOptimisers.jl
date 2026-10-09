@@ -74,7 +74,7 @@ Keywords correspond to the struct's fields, and every field but `buf` and `tip` 
     """
     Xl
     """
-    Observed factors of every observation after the warm-up, `(; Z, R, lv, nf, fam)` as [`cross_sectional_observed`](@ref) states them, or `nothing` without an observed factor. The factor prior reads the observed returns `R` beside the factor returns of the regression.
+    Observed factors of every observation after the warm-up, `(; Z, R, lv, nf, fam)` as [`cross_sectional_observed`](@ref) states them, or `nothing` without an observed factor. The factor prior reads the observed returns `R` beside the factor returns of the regression. The observed exposures `Z` and the exposure history `Ms` are views of one backing, as [`cross_sectional_fold_join`](@ref) appends them, so the call with no data reads the joined history with no copy.
     """
     obs
     """
@@ -245,8 +245,9 @@ Copies a [`CrossSectionalCarryState`](@ref), so that the copy shares no array an
 """
 function Base.copy(x::CrossSectionalCarryState)
     fns = fieldnames(CrossSectionalCarryState)
+    # One `deepcopy` of every field keeps two histories that share a backing together.
     c = CrossSectionalCarryState(;
-                                 NamedTuple{fns}(map(f -> deepcopy(getfield(x, f)), fns))...)
+                                 NamedTuple{fns}(deepcopy(map(f -> getfield(x, f), fns)))...)
     return cross_sectional_carry_with(c, (; tip = Ref(c.buf.n)))
 end
 """
@@ -1121,18 +1122,18 @@ Appends the rows of a step to the histories that the carry fold of a Cross-Secti
 # Related
 
   - [`cross_sectional_carry_fold`](@ref)
+  - [`cross_sectional_fold_join`](@ref)
 """
 function cross_sectional_fold_histories(pe::CrossSectionalFactorPrior,
                                         st::CrossSectionalCarryState, rows::NamedTuple)
     if iszero(size(rows.Ms, 1))
         return cross_sectional_carry_with(st, (; nf = rows.nf, fam = rows.fam))
     end
+    (; Ms, obs) = cross_sectional_fold_join(st.Ms, st.obs, rows.Ms, rows.obs)
     return cross_sectional_carry_with(st,
-                                      (; nf = rows.nf, fam = rows.fam,
-                                       Ms = cross_sectional_fold_append(st.Ms, rows.Ms),
+                                      (; nf = rows.nf, fam = rows.fam, Ms = Ms, obs = obs,
                                        X = cross_sectional_fold_append(st.X, rows.X),
                                        Xl = cross_sectional_fold_append(st.Xl, rows.Xl),
-                                       obs = cross_sectional_fold_append(st.obs, rows.obs),
                                        bw = cross_sectional_fold_append(st.bw, rows.bw),
                                        mcap = cross_sectional_fold_append(st.mcap,
                                                                           rows.mcap),
@@ -1152,7 +1153,7 @@ Appends the observed factors to the fitted factors of the carry fold of a Cross-
 # Algorithm
 
  1. Take the observed factors of the fitted observations with [`cross_sectional_observed_block`](@ref).
- 2. Append them to the fitted factors with [`cross_sectional_observed_append`](@ref), giving the raw exposures of the fitted observations and the reduced loadings of the last one.
+ 2. Append them to the fitted factors with [`cross_sectional_observed_append`](@ref), giving the raw exposures of the fitted observations and the reduced loadings of the last one. The two exposure histories share one backing, so the raw exposures are a view of it, as [`cross_sectional_joined_exposures`](@ref) states.
 
 # Arguments
 

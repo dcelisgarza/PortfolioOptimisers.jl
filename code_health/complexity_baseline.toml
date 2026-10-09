@@ -5,7 +5,7 @@
 julia = "1.13.1"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "e631fb02e9"
+commit = "03bc9d5044"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -250,7 +250,7 @@ commit = "e631fb02e9"
 "src/10_Prior/15_CrossSectionalPriorFold.jl" = { cyc = 9, cog = 14, arg = 5, cyc_sum = 93, cog_sum = 70, arg_sum = 120, macros = [] }
 "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { cyc = 6, cog = 8, arg = 6, cyc_sum = 38, cog_sum = 36, arg_sum = 41, macros = [] }
 "src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 47, cog_sum = 28, arg_sum = 82, macros = [] }
-"src/10_Prior/18_CrossSectionalCarryHistories.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 12, cog_sum = 9, arg_sum = 17, macros = [] }
+"src/10_Prior/18_CrossSectionalCarryHistories.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 15, cog_sum = 8, arg_sum = 31, macros = [] }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 63, cog_sum = 30, arg_sum = 92, macros = [] }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 11, cog_sum = 4, arg_sum = 34, macros = [] }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { cyc = 3, cog = 3, arg = 10, cyc_sum = 37, cog_sum = 10, arg_sum = 129, macros = [] }

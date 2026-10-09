@@ -17,4 +17,5 @@ cross_sectional_local_returns
 cross_sectional_observed_block
 cross_sectional_observed_gap
 cross_sectional_observed_append
+cross_sectional_joined_exposures
 ```

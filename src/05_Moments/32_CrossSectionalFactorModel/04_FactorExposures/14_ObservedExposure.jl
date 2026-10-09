@@ -711,7 +711,7 @@ A `NaN` marks a gap, such as a series that starts after the first fitted observa
 
 # Returns
 
-  - `cb::Option{<:NamedTuple}`: `nothing`, or `(; R, Zr, Zt, nf, fam)`: the observed returns of the fitted observations, the exposures of the fitted observations, those of the latest observation, the factor names and the family labels.
+  - `cb::Option{<:NamedTuple}`: `nothing`, or `(; R, Zr, Zt, nf, fam)`: the observed returns of the fitted observations, the exposures of the fitted observations as a view of `cc.Z`, those of the latest observation, the factor names and the family labels.
 
 # Related
 
@@ -730,7 +730,7 @@ function cross_sectional_observed_block(cc::NamedTuple, rw, r, o::Integer = 0)
         t = findfirst(t -> any(isinf, view(R, t, :)), axes(R, 1))
         throw(IsNonFiniteError("the observed factor returns must not be infinite on an observation the fit reads, and the series $(unique(cc.lv[bad])) are, first at observation $(o + rows[t]) of the returns data. A NaN marks a gap and is accepted."))
     end
-    return (; R = R, Zr = cc.Z[rows, :, :], Zt = cc.Z[rows[end], :, :], nf = cc.nf,
+    return (; R = R, Zr = view(cc.Z, rows, :, :), Zt = cc.Z[rows[end], :, :], nf = cc.nf,
             fam = cc.fam)
 end
 """
@@ -806,9 +806,50 @@ function cross_sectional_observed_append(cb::NamedTuple, f::MatNum, L::MatNum, M
     nfa = vcat(nf, cb.nf)
     @argcheck(allunique(nfa),
               ArgumentError("the factor axis repeats a name once the observed factors join it. Got $nfa"))
-    return (; f = hcat(f, cb.R), L = hcat(L, cb.Zt), Ms = cat(Ms, cb.Zr; dims = 3),
-            nf = nfa, fam = vcat(fam, cb.fam),
-            fcb = append_passthrough_factors(fcb, length(cb.nf)), fx = cb.R)
+    return (; f = hcat(f, cb.R), L = hcat(L, cb.Zt),
+            Ms = cross_sectional_joined_exposures(Ms, cb.Zr), nf = nfa,
+            fam = vcat(fam, cb.fam), fcb = append_passthrough_factors(fcb, length(cb.nf)),
+            fx = cb.R)
+end
+"""
+    cross_sectional_joined_exposures(Ms::AbstractArray{<:Any, 3}, Zo::AbstractArray{<:Any, 3})
+    cross_sectional_joined_exposures(Ms::SubArray{<:Any, 3}, Zo::SubArray{<:Any, 3})
+
+Join the exposure history of the estimated factors and the exposure history of the observed factors along the factor axis, the estimated factors first.
+
+The carry fold keeps the two histories as views of one backing, whose factor axis holds the estimated factors and then the observed ones, with [`cross_sectional_fold_join`](@ref). When `Ms` and `Zo` are views of the same rows and the same assets of one backing, and its factor axis holds `Ms` and then `Zo` and nothing else, the joined history is a view of that backing, and the method copies nothing. Any other pair joins by a copy, as the batch fit joins its histories.
+
+# Arguments
+
+  - `Ms`: The exposure history of the estimated factors, `observations × assets × factors`.
+  - `Zo`: The exposure history of the observed factors over the same observations and assets.
+
+# Returns
+
+  - `M::AbstractArray{<:Any, 3}`: `Ms` followed by `Zo` along the factor axis.
+
+# Related
+
+  - [`cross_sectional_observed_append`](@ref)
+  - [`cross_sectional_fold_join`](@ref)
+"""
+function cross_sectional_joined_exposures(Ms::AbstractArray{<:Any, 3},
+                                          Zo::AbstractArray{<:Any, 3})
+    return cat(Ms, Zo; dims = 3)
+end
+function cross_sectional_joined_exposures(Ms::SubArray{<:Any, 3}, Zo::SubArray{<:Any, 3})
+    P = parent(Ms)
+    i, j = parentindices(Ms), parentindices(Zo)
+    K = size(Ms, 3)
+    return if P === parent(Zo) &&
+              i[1] == j[1] &&
+              i[2] == j[2] &&
+              i[3] == 1:K &&
+              j[3] == (K + 1):size(P, 3)
+        view(P, i[1], i[2], :)
+    else
+        cat(Ms, Zo; dims = 3)
+    end
 end
 
 export ObservedExposure, CurrencyExposure

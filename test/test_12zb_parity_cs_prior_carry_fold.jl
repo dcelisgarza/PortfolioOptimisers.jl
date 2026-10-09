@@ -642,6 +642,33 @@ end
         @test agrees(s[4].pr, batch(pe, 4, rd, e))
     end
 
+    @testset "A step joins the observed exposures of its new rows alone (#1589)" begin
+        # Under observed factors the exposure history and the observed exposures are views of
+        # one backing, the estimated factors first. A step appends its joined rows in place, and
+        # the call with no data reads the joined history as a view of the backing.
+        pe = CrossSectionalFactorPrior(; lambda = 1, grid_config("Currency", rd)...)
+        e = (0, 90, 91, 92, 93)
+        s = stream(pe, rd, e)
+        st2, st4 = s[2].pe.cache, s[4].pe.cache
+        P = parent(st4.Ms)
+        @test P === parent(st4.obs.Z) && P === parent(st2.Ms)
+        @test size(P, 3) == size(st4.Ms, 3) + size(st4.obs.Z, 3)
+        @test parent(s[4].pr.rr.Ms) === P
+        @test all(k -> agrees(s[k].pr, batch(pe, k, rd, e)), 1:4)
+        # A copy keeps the two histories in one backing, and shares no array with the state.
+        c = copy(st4)
+        @test parent(c.Ms) === parent(c.obs.Z) && parent(c.Ms) !== P
+        # A second step of an earlier state copies its histories, so the later Result keeps
+        # its rows.
+        H = deepcopy(s[4].pr.rr.Ms)
+        rdz = deepcopy(rd)
+        rdz.X[92:93, :] .*= 1.5
+        b = partial_fit!(s[2].pe, rows(rdz, 92:93))
+        @test parent(b.cache.Ms) === parent(b.cache.obs.Z) && parent(b.cache.Ms) !== P
+        @test isequal(H, s[4].pr.rr.Ms)
+        @test agrees(s[4].pr, batch(pe, 4, rd, e))
+    end
+
     @testset "An observed factor (#1479)" begin
         # The carry derives each row of the returns net of the observed factors one time, from
         # the observed exposures of the row `lag` observations before it, and carries the row.
