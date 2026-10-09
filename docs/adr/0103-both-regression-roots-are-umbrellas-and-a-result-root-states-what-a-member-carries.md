@@ -161,3 +161,45 @@ design, and `MinimumNormSolve` parts from the other two only where the two toler
 - A loadings result fitted by any geometry reaches every loadings consumer with no further
   widening. That is what `CrossSectionalFactorModel` needs, and it is why the result roots split on
   the payload rather than on the geometry.
+
+## Amendment (2026-10-09)
+
+[Issue #1625](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1625) gave the
+rank-deficiency policy to both members. `CrossSectionalTargetRegression(tgt, alg, intercept, ex)`
+now carries `alg` too, and a member means the same thing under both estimators.
+
+Before, the target saw the full design. `GLM` then dropped a collinear column by its own pivot, and
+refused a factor set that is dependent to rounding alone with a `PosDefException`.
+[#1620](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1620) made the target drop the
+dependent columns by the rank test, always. That gave a dropped factor a return of zero, so a
+least-squares target and `CrossSectionalLinearRegression` agreed on the fitted values and not on the
+factor returns. On the panel of #1620 the asset `sigma` of the two differed by 9 %.
+
+A fifth member, `DependentColumnDrop()`, is the drop of #1620. Under the linear member it solves the
+kept columns with `\`. Each member on a target:
+
+| Member | On a rank-deficient design of a target |
+| --- | --- |
+| `PseudoInverseFallback()`, the default | Fit the kept columns, then project the answer onto the row space of the weighted design |
+| `DependentColumnDrop()` | Fit the kept columns, and give each dropped factor zero |
+| `RankDeficiencyRefusal()` | Refuse before the target fits, with the message of the linear member |
+| `UncheckedSolve()` | Hand the full design to the target, as before #1620 |
+| `MinimumNormSolve()` | Refused by the constructor |
+
+Every coefficient vector that differs from the fit by a vector of the null space gives the same
+linear predictor, and the projection is the one of least norm among them. For a least-squares target
+it is the answer of the pseudo-inverse: measured on #1625, the two agree to 2.2e-16, and the factor
+returns of the two estimators agree to 5.6e-16. `MinimumNormSolve()` would be a second name for the
+same answer, because the projection changes nothing at full rank. The projection holds only for a
+target that reads the design through the linear predictor alone, which is what `is_basis_invariant`
+states. So the constructor refuses `PseudoInverseFallback()` for a target that answers `false`, and
+its message names the other three members. Both library targets answer `true`.
+
+The carry fold needs no change. A move solves each rank-deficient row again through the estimator,
+so the new `alg` reaches it, and the answer of every member that answers such a row reads the basis.
+`RankDeficiencyRefusal()` refuses the stream at the step whose batch fit refuses, with the same rank.
+The stream names the position of the observation within its step
+([#1629](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1629)).
+
+The positional constructor of `CrossSectionalTargetRegression` takes four arguments in place of
+three. A caller who builds it by position must add `alg`.

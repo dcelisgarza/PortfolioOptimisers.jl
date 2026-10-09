@@ -1601,6 +1601,13 @@ function PortfolioOptimisers.StatsAPI.fit(::UnweightedTestTarget, A::AbstractMat
                                           y::AbstractVector)
     return HuberTestFit(A \ y)
 end
+# Both fits read the design through its residuals alone, so both are invariant to the basis,
+# and `CrossSectionalTargetRegression` takes them under its default `PseudoInverseFallback()`
+# (#1625).
+function PortfolioOptimisers.is_basis_invariant(::Union{HuberTestTarget,
+                                                        UnweightedTestTarget})
+    return true
+end
 
 @testset "A caller's own regression target runs through both cross-sectional consumers" begin
     PO = PortfolioOptimisers

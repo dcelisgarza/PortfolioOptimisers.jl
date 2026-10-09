@@ -20,6 +20,11 @@ leverage_one_nan
 cross_sectional_least_squares
 cross_sectional_rank
 cross_sectional_solve
+assert_cross_sectional_rank
+cross_sectional_column_drop
+cross_sectional_row_space
+cross_sectional_target_solve
+assert_cross_sectional_target_solve
 cross_sectional_systematic
 cross_sectional_foreach
 ```

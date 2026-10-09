@@ -597,9 +597,12 @@ end
         @test po.is_basis_invariant(LinearModel())
         @test po.is_basis_invariant(GeneralisedLinearModel())
         @test !po.is_basis_invariant(BasisBoundTarget())
+        # Such a target cannot take the projection of `PseudoInverseFallback()`, so it names
+        # another solve algorithm (#1625).
         pe = CrossSectionalFactorPrior(; lambda = 1, style...,
                                        cre = CrossSectionalTargetRegression(;
-                                                                            tgt = BasisBoundTarget()))
+                                                                            tgt = BasisBoundTarget(),
+                                                                            alg = DependentColumnDrop()))
         sb = stream(pe)
         @test [dropped(x.pr) for x in sb] == [["style1"], ["style2"], ["style2"]]
         @test sb[2].pe.cache.csr.f isa Matrix
@@ -693,18 +696,33 @@ end
         @test relerr(xs[2].pr.rr.csr.f[225, :], b.rr.csr.f[225, :]) < 1e-12
         @test same(xs[2].pe.cache.csr.eps[1:size(s1.csr.eps, 1), :], s1.csr.eps)
         @test same(xs[2].pe.cache.W[1:size(s1.W, 1), :], s1.W)
-        # Under a `LinearModel` target the move solves that row again through the target.
-        # On this panel the rank test drops the column of the Unseen Member by its pivot in
-        # both bases, so the old answer is the batch answer there too (#1614, #1620).
-        pt = CrossSectionalFactorPrior(; factors = dlf, families = ["industry" => nothing],
-                                       minra = 5, unseen = SolvedUnseenMember(),
-                                       cre = CrossSectionalTargetRegression())
-        xt = stream(pt, dl, de)
-        bt = batch(pt, 2, dl, de)
-        @test xt[2].pe.cache.csr.f isa SubArray
-        kept = bt.rr.nf[po.retained_factor_indices(bt.rr.fcb)]
-        @test iszero(bt.rr.csr.f[225, findfirst(==("industry=Utilities"), kept)])
-        @test relerr(xt[2].pr.rr.csr.f[225, :], bt.rr.csr.f[225, :]) < 1e-12
+        # Under a `LinearModel` target the move solves that row again through the target, and
+        # under the default `PseudoInverseFallback()` the target gives the answer of least
+        # norm, which is the answer of the linear member (#1614, #1625). Under
+        # `DependentColumnDrop()` the rank test drops the column of the Unseen Member by its
+        # pivot in both bases on this panel, so it returns zero there (#1620).
+        for (alg, own) in ((PseudoInverseFallback(), b),
+                           (DependentColumnDrop(),
+                            batch(CrossSectionalFactorPrior(; factors = dlf,
+                                                            families = ["industry" => nothing], minra = 5,
+                                                            unseen = SolvedUnseenMember(),
+                                                            cre = CrossSectionalLinearRegression(;
+                                                                                                 alg = DependentColumnDrop())),
+                                  2, dl, de)))
+            pt = CrossSectionalFactorPrior(; factors = dlf,
+                                           families = ["industry" => nothing], minra = 5,
+                                           unseen = SolvedUnseenMember(),
+                                           cre = CrossSectionalTargetRegression(;
+                                                                                alg = alg))
+            xt = stream(pt, dl, de)
+            bt = batch(pt, 2, dl, de)
+            @test xt[2].pe.cache.csr.f isa SubArray
+            kept = bt.rr.nf[po.retained_factor_indices(bt.rr.fcb)]
+            u = bt.rr.csr.f[225, findfirst(==("industry=Utilities"), kept)]
+            @test isa(alg, DependentColumnDrop) ? iszero(u) : !iszero(u)
+            @test relerr(xt[2].pr.rr.csr.f[225, :], bt.rr.csr.f[225, :]) < 1e-12
+            @test relerr(bt.rr.csr.f[225, :], own.rr.csr.f[225, :]) < 1e-12
+        end
         # A `GeneralisedLinearModel` target solves that row again through the target too
         # (#1615). Measured: each step equals the batch fit to 4.2e-16 or better.
         pg = CrossSectionalFactorPrior(; factors = dlf, families = ["industry" => nothing],
@@ -723,9 +741,9 @@ end
         # over `NaN`. A zero column has a return of zero in every basis, so under
         # `ZeroUnseenMember()` the stream with no beta solves no row again, and under
         # `SolvedUnseenMember()` it solves the rows with an Unseen Member alone. A `LinearModel`
-        # target fits the same streams: it drops the dependent columns by the rank test of
-        # `PseudoInverseFallback` before it fits, where its own factorisation refused the
-        # design with a `PosDefException` (#1620).
+        # target fits the same streams: it fits the columns that the rank test keeps, where its
+        # own factorisation refused the design with a `PosDefException` (#1620), and projects
+        # the answer onto the row space, as `PseudoInverseFallback()` does (#1625).
         function solved(pe, st)
             f = fill(NaN, size(st.csr.f))
             po.cross_sectional_move_solve(pe, st, (; fcb = st.fcb, f = f, lv = st.lv))
@@ -754,6 +772,51 @@ end
                 @test unseen === SolvedUnseenMember() || length(rs) == 131
                 @test issubset(unseen === ZeroUnseenMember() ? Int[] : unseen_rows(st), rs)
             end
+        end
+        # The pivot of `DependentColumnDrop()` reads the basis too, so the move solves each
+        # rank-deficient row again under it, and the two estimators agree (#1625).
+        for unseen in (ZeroUnseenMember(), SolvedUnseenMember())
+            pes = map((CrossSectionalLinearRegression(; alg = DependentColumnDrop()),
+                       CrossSectionalTargetRegression(; alg = DependentColumnDrop()))) do cre
+                return CrossSectionalFactorPrior(; factors = [dlf; beta],
+                                                 families = ["industry" => nothing],
+                                                 minra = 5, unseen = unseen, pe = GRID_PE,
+                                                 cre = cre)
+            end
+            for pe in pes
+                xs = stream(pe, dl, de)
+                @test xs[2].pe.cache.csr.f isa SubArray
+                @test all(k -> near(xs[k].pr, batch(pe, k, dl, de)), eachindex(xs))
+            end
+            k = length(de) - 1
+            @test near(batch(pes[2], k, dl, de), batch(pes[1], k, dl, de))
+        end
+        # `RankDeficiencyRefusal()` refuses in the stream at the step whose batch fit refuses,
+        # with the same rank: under `SolvedUnseenMember()`, the step that fits row 226, whose
+        # Unseen Member makes it rank-deficient. The stream names the position of the
+        # observation within the step, and the batch fit its position in the panel (#1629).
+        dr = de[1:5]
+        for cre in (CrossSectionalLinearRegression(; alg = RankDeficiencyRefusal()),
+                    CrossSectionalTargetRegression(; alg = RankDeficiencyRefusal()))
+            pe = CrossSectionalFactorPrior(; factors = dlf,
+                                           families = ["industry" => nothing], minra = 5,
+                                           unseen = SolvedUnseenMember(), pe = GRID_PE,
+                                           cre = cre)
+            ps, ms = pe, String[]
+            for k in 1:(length(dr) - 1)
+                m = try
+                    ps = partial_fit!(ps, rows(dl, (dr[k] + 1):dr[k + 1]))
+                    ""
+                catch err
+                    sprint(showerror, err)
+                end
+                push!(ms, m)
+            end
+            mb = [message(() -> batch(pe, k, dl, dr)) for k in eachindex(ms)]
+            @test isempty.(ms) == isempty.(mb) == [true, true, true, false]
+            rank = "has rank 4 over 5 factors and 59 eligible assets"
+            @test occursin(rank, ms[end]) && occursin(rank, mb[end])
+            @test occursin("observation 225", mb[end])
         end
         # A new dropped member with a zero benchmark-weighted exposure at an observation has
         # no finite ratio, so the rebase answers `nothing`, and the fit of every observation

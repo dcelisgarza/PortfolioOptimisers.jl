@@ -71,6 +71,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :dretgt => "`retgt`: Regression model target.",#
                  :drtgt => "`drtgt`: Dimension reduction target.",#
                  :csrint => "`intercept`: Whether a per-observation intercept is fitted. When `false`, the regression runs through the origin of the cross-section.",
+                 :csalg => "`alg`: Solve algorithm, an [`AbstractCrossSectionalSolveAlgorithm`](@ref). It decides what the fit does with a rank-deficient weighted design.",#
                  ## Gerber
                  :gerbalg => "`alg`: Gerber covariance algorithm.",#
                  :gerbce => "`ce`: Gerber covariance estimator.",#

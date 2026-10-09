@@ -11,6 +11,7 @@ PseudoInverseFallback
 RankDeficiencyRefusal
 UncheckedSolve
 MinimumNormSolve
+DependentColumnDrop
 AbstractUnseenMemberRule
 ZeroUnseenMember
 SolvedUnseenMember

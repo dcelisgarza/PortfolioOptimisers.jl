@@ -240,27 +240,91 @@ struct LeverageTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
         @test occursin("observation 1", msg)
         @test occursin("rank $(size(Zd, 3) - 1)", msg)
         @test occursin("$(size(Zd, 2)) eligible assets", msg)
-        # A target sees the columns that the rank test keeps, and a dropped column returns
-        # zero (#1620). The pivot keeps the doubled column, whose norm is larger. The fitted
-        # values are those of the linear member, and so is the intercept.
+        # A target refuses before it fits, with the message of the linear member.
+        tmsg = try
+            cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                      alg = RankDeficiencyRefusal()),
+                                       Zd, Xc, Wc)
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test tmsg == msg
+        # A member means the same thing under both estimators, so a least-squares target
+        # gives the factor returns of the linear member under each (#1625). Under the default
+        # `PseudoInverseFallback()` the target fits the columns that the rank test keeps, and
+        # the projection onto the row space gives the answer of least norm.
+        # `DependentColumnDrop()` gives the dropped column zero: the pivot keeps the doubled
+        # column, whose norm is larger (#1620). Every member gives the fitted values of the
+        # linear member, and its intercept. `UncheckedSolve()` hands the full design to `GLM`,
+        # whose own pivot drops a column.
         for intercept in (false, true)
-            target = cross_sectional_regression(CrossSectionalTargetRegression(;
-                                                                               intercept = intercept),
-                                                Zd, Xc, Wc)
             linear = cross_sectional_regression(CrossSectionalLinearRegression(;
                                                                                intercept = intercept),
                                                 Zd, Xc, Wc)
-            @test all(iszero, target.f[:, 1])
-            @test all(!iszero, target.f[:, 2])
-            @test target.f[:, 3:end] ≈ linear.f[:, 3:end]
-            @test target.eps ≈ linear.eps
-            @test intercept ? target.b ≈ linear.b : isnothing(target.b)
+            for alg in (PseudoInverseFallback(), DependentColumnDrop(), UncheckedSolve())
+                target = cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                                   alg = alg,
+                                                                                   intercept = intercept),
+                                                    Zd, Xc, Wc)
+                @test target.eps ≈ linear.eps
+                @test intercept ? target.b ≈ linear.b : isnothing(target.b)
+                if !isa(alg, UncheckedSolve)
+                    own = cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                                    alg = alg,
+                                                                                    intercept = intercept),
+                                                     Zd, Xc, Wc)
+                    @test target.f ≈ own.f
+                end
+            end
+            drop = cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                             alg = DependentColumnDrop(),
+                                                                             intercept = intercept),
+                                              Zd, Xc, Wc)
+            @test all(iszero, drop.f[:, 1])
+            @test all(!iszero, drop.f[:, 2])
+            @test drop.f[:, 3:end] ≈ linear.f[:, 3:end]
+            @test !isapprox(drop.f, linear.f)
+            @test drop.eps ≈ linear.eps
         end
-        # A design of rank zero leaves the target nothing to fit, so every factor returns zero.
-        zero_design = cross_sectional_regression(CrossSectionalTargetRegression(), zero(Zc),
-                                                 Xc, Wc)
-        @test all(iszero, zero_design.f)
-        @test zero_design.eps == Xc
+        # A design of rank zero leaves nothing to fit, so every factor returns zero.
+        for cre in (CrossSectionalTargetRegression(),
+                    CrossSectionalTargetRegression(; alg = DependentColumnDrop()),
+                    CrossSectionalLinearRegression(; alg = DependentColumnDrop()))
+            zero_design = cross_sectional_regression(cre, zero(Zc), Xc, Wc)
+            @test all(iszero, zero_design.f)
+            @test zero_design.eps == Xc
+        end
+        # The projection on its own keeps the linear predictor, and lands on the answer of
+        # the pseudo-inverse. At rank zero it returns its argument.
+        D = Zd[1, :, :] .* sqrt.(Wc[1, :])
+        r = PortfolioOptimisers.cross_sectional_rank(D)
+        f = randn(StableRNG(1625), size(D, 2))
+        p = PortfolioOptimisers.cross_sectional_row_space(f, D, r)
+        @test D * p ≈ D * f
+        @test p ≈ LinearAlgebra.pinv(D) * (D * f)
+        @test norm(p) < norm(f)
+        @test PortfolioOptimisers.cross_sectional_row_space(f, D, 0) === f
+    end
+
+    @testset "The solve algorithm of a target (#1625)" begin
+        # A target has no pseudo-inverse, so `MinimumNormSolve()` is refused, on both doors.
+        @test_throws "MinimumNormSolve() has no meaning" CrossSectionalTargetRegression(;
+                                                                                        alg = MinimumNormSolve())
+        @test_throws ArgumentError CrossSectionalTargetRegression(LinearModel(),
+                                                                  MinimumNormSolve(), false,
+                                                                  PortfolioOptimisers.FLoops.SequentialEx())
+        # The projection keeps the answer of a target only when the target reads the design
+        # through the linear predictor alone, which `is_basis_invariant` states. A target
+        # that keeps its default answer is refused under the default, and named.
+        @test !PortfolioOptimisers.is_basis_invariant(LeverageTestTarget())
+        @test_throws "fit of LeverageTestTarget" CrossSectionalTargetRegression(;
+                                                                                tgt = LeverageTestTarget())
+        for alg in (UncheckedSolve(), DependentColumnDrop(), RankDeficiencyRefusal())
+            cre = CrossSectionalTargetRegression(; tgt = LeverageTestTarget(), alg = alg)
+            @test cre.alg === alg
+        end
+        @test CrossSectionalTargetRegression().alg === PseudoInverseFallback()
     end
 
     @testset "The two members agree" begin

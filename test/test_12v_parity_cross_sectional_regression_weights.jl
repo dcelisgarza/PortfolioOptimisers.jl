@@ -343,7 +343,7 @@ end
             @test fit(PseudoInverseFallback(), x) == fm
             @test parity_compare(fit(UncheckedSolve(), x), fm; name = "Unchecked").ok
         end
-        # The refusal names the rank, and the answer of `UncheckedSolve`.
+        # The refusal names the rank, and the other members of the family (#1625).
         err = try
             fit(RankDeficiencyRefusal(), c)
         catch e
@@ -352,7 +352,9 @@ end
         @test err isa ArgumentError
         @test occursin("observation 1 has rank 4 over 5 factors and 20 eligible assets",
                        err.msg)
-        @test occursin("UncheckedSolve() to take whatever `\\` returns", err.msg)
+        @test occursin("DependentColumnDrop() to give the dependent factors a return of zero",
+                       err.msg)
+        @test occursin("UncheckedSolve() to take the answer unchecked", err.msg)
     end
 
     @testset "The weight policies alone, at parity" begin
