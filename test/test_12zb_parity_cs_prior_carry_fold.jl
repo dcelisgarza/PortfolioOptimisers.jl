@@ -141,14 +141,39 @@ end
         for (k, x) in enumerate(stream(pe, rd, e))
             @test agrees(x.pr, batch(pe, k, rd, e))
         end
-        # The state keeps the standardised idiosyncratic returns, and a threshold above zero
-        # makes it keep them with no fill too, which the correlation reads. A step appends
-        # the rows of its new observations to both (#1565).
+        # The state keeps the standardised idiosyncratic returns, and a step appends the rows
+        # of its new observations (#1565). A threshold above zero makes the step fold the
+        # rows with no fill into the `ce` of the prior, so the state keeps no row with no
+        # fill. The fold of the default `ExpWeightedCovariance` is its batch recursion, so
+        # the carry equals the batch fit to the last bit (#1594).
         pe = CrossSectionalFactorPrior(; lambda = 1, th = 0.1, style...)
         for (k, x) in enumerate(stream(pe, rd, e))
             @test agrees(x.pr, batch(pe, k, rd, e))
             st = x.pe.cache
+            @test size(st.S) == size(st.csr.eps)
+            @test isnothing(st.Sc)
+            @test isa(st.ce.cache, po.ExpWeightedCovarianceState)
+        end
+        # A `ce` that does not fold makes the state keep the rows with no fill, and the call
+        # with no data estimates the correlation over them again.
+        pe = CrossSectionalFactorPrior(; lambda = 1, th = 0.1,
+                                       ce = Covariance(; alg = SemiMoment()), style...)
+        for (k, x) in enumerate(stream(pe, rd, e))
+            @test agrees(x.pr, batch(pe, k, rd, e))
+            st = x.pe.cache
             @test size(st.S) == size(st.Sc) == size(st.csr.eps)
+            @test isnothing(st.ce)
+        end
+        # A `ce` with a finite fill value folds the filled rows with no mask, as the batch
+        # fit estimates them. Its fold is Welford's recursion, which equals the batch fit up
+        # to round-off.
+        pe = CrossSectionalFactorPrior(; lambda = 1, th = 0.1, ce = Covariance(), style...)
+        for (k, x) in enumerate(stream(pe, rd, e))
+            b = batch(pe, k, rd, e)
+            @test isnothing(x.pe.cache.Sc)
+            @test relerr(x.pr.sigma, b.sigma) < 1e-12
+            @test relerr(x.pr.mu, b.mu) < 1e-12
+            @test same(x.pr.X, b.X)
         end
         # The batch fit and the read-out of the carry fold run the same lift, so the carry
         # fold equals the batch fit under each Systematic Repair rule (#1576).

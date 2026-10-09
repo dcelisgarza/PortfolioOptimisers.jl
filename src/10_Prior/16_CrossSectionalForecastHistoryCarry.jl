@@ -173,6 +173,8 @@ Brings the standardised idiosyncratic returns of the carry fold of a Cross-Secti
 
 The standardised return of an observation reads the residual, the variance and the active mask of that observation alone, and the fill reads the other assets of the same observation. A step that fits the new observations alone changes no past residual and no past variance, so the state keeps its rows and appends the rows of the new observations. A step that fits every observation again can change every row, so it makes every row again. The call with no data then reads the rows as they are, and its cost does not grow with the history.
 
+Under a threshold `th` above zero, the idiosyncratic correlation reads the rows with no fill, and [`cross_sectional_carry_correlation`](@ref) brings them up. A `ce` that folds, as [`supports_partial_fit`](@ref) answers, folds the rows of the step with [`partial_fit!`](@ref), under the rule of [`cross_sectional_correlation_rows`](@ref) for the gaps. So the state keeps the folded `ce` and no row with no fill, and the call with no data reads the correlation from the state of `ce`. A step that fits every observation again folds every row into the `ce` of the prior again. A `ce` that does not fold makes the state keep the rows with no fill, and the call with no data estimates the correlation over them again.
+
 # Arguments
 
   - `pe`: Cross-Sectional Factor Prior estimator.
@@ -181,11 +183,13 @@ The standardised return of an observation reads the residual, the variance and t
 
 # Returns
 
-  - `st::CrossSectionalCarryState`: The state with `S`, and `Sc` when the threshold `th` of the prior is not zero, at every fitted observation. A state with no fit is returned as it is.
+  - `st::CrossSectionalCarryState`: The state with `S` at every fitted observation. When the threshold `th` of the prior is not zero, it also holds the folded `ce`, or `Sc` at every fitted observation when `ce` does not fold. A state with no fit is returned as it is.
 
 # Related
 
   - [`cross_sectional_standardised_residuals`](@ref)
+  - [`cross_sectional_carry_correlation`](@ref)
+  - [`cross_sectional_correlation_rows`](@ref)
   - [`cross_sectional_carry_fold`](@ref)
   - [`cross_sectional_assemble`](@ref)
 """
@@ -201,17 +205,159 @@ function cross_sectional_carry_standardised(pe::CrossSectionalFactorPrior,
     E = view(eps, rn, :)
     V = view(st.vs, rn, :)
     A = view(st.amsk, pe.lag .+ rn, :)
-    S = cross_sectional_standardised_residuals(E, V, A)
-    Sc = if iszero(pe.th)
-        nothing
-    else
-        cross_sectional_standardised_residuals(E, V, A; filled = false)
-    end
-    # A step that fits every observation again makes every row again.
-    S0, Sc0 = iszero(k) ? (nothing, nothing) : (st.S, st.Sc)
+    # A step that fits every observation again makes every row again, and folds them into
+    # the `ce` of the prior.
+    S0, Sc0, ce0 = iszero(k) ? (nothing, nothing, pe.ce) : (st.S, st.Sc, st.ce)
+    S = cross_sectional_fold_append(S0, cross_sectional_standardised_residuals(E, V, A))
     return cross_sectional_carry_with(st,
-                                      (; S = cross_sectional_fold_append(S0, S),
-                                       Sc = cross_sectional_fold_append(Sc0, Sc)))
+                                      (; S = S,
+                                       cross_sectional_carry_correlation(pe, Sc0, ce0, E, V,
+                                                                         A)...))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Brings the input of the idiosyncratic correlation of the carry fold of a Cross-Sectional Factor Prior up to its fitted observations.
+
+[`cross_sectional_carry_standardised`](@ref) calls it with the rows of a step. Under a threshold `th` above zero, the correlation reads the standardised idiosyncratic returns with no fill.
+
+# Algorithm
+
+ 1. Return no rows and no estimator when `th` is zero, because the correlation reads no residual.
+ 2. Standardise the rows of the step with no fill with [`cross_sectional_standardised_residuals`](@ref).
+ 3. When `pe.ce` does not fold, as [`supports_partial_fit`](@ref) answers, append the rows to `Sc0`. The call with no data estimates the correlation over them again.
+ 4. Otherwise, fold the rows into `ce0` with [`partial_fit!`](@ref), under the rule of [`cross_sectional_correlation_rows`](@ref) for the gaps, and keep no row. The call with no data reads the correlation from the state of `ce`.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - `Sc0`: The rows with no fill that the state carries, or `nothing`.
+  - `ce0`: The folded `ce` that the state carries, or `pe.ce` at a fit of every observation.
+  - `E`: The idiosyncratic returns of the rows of the step.
+  - `V`: The idiosyncratic variances of the rows of the step.
+  - `A`: The active mask of the rows of the step.
+
+# Returns
+
+  - `(; Sc, ce)::NamedTuple`: The fields `Sc` and `ce` of [`CrossSectionalCarryState`](@ref).
+
+# Related
+
+  - [`cross_sectional_carry_standardised`](@ref)
+  - [`cross_sectional_correlation_rows`](@ref)
+  - [`cross_sectional_idiosyncratic_covariance`](@ref)
+"""
+function cross_sectional_carry_correlation(pe::CrossSectionalFactorPrior, Sc0, ce0,
+                                           E::MatNum, V::MatNum, A::AbstractMatrix{<:Bool})
+    if iszero(pe.th)
+        return (; Sc = nothing, ce = nothing)
+    end
+    Sc = cross_sectional_standardised_residuals(E, V, A; filled = false)
+    if !supports_partial_fit(pe.ce)
+        return (; Sc = cross_sectional_fold_append(Sc0, Sc), ce = nothing)
+    end
+    # A `ce` that folds carries the correlation, so the state keeps no row with no fill (#1594).
+    (; X, kw) = cross_sectional_correlation_rows(ce0, Sc, A)
+    return (; Sc = nothing, ce = partial_fit!(ce0, X; dims = 1, kw...))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the rows and the keyword arguments with which a covariance estimator reads the standardised idiosyncratic returns.
+
+The batch fit passes them to `Statistics.cov`, and the carry fold passes the rows of each step to [`partial_fit!`](@ref). So the two routes read the gaps of the rows by one rule.
+
+# Algorithm
+
+ 1. Get `fv` from `ce` with [`gap_fill_value`](@ref). `fv` is the value that `ce` gives a gapped cell of `S`. A cell of `S` is non-finite where the asset is inactive, and where it is active with no finite standardised return: a missing return, or a variance in its warm-up.
+ 2. If `fv` is finite, write it over every non-finite cell of a copy of `S`, and give no keyword argument. The fallback `fv` is zero, which is the mean of a standardised series.
+ 3. If `fv` is not finite, give `S` as it stands, with `amsk` as the `active_mask`. A gap-aware `ce` then freezes the block of an inactive asset and does not decay it, and it takes an active non-finite cell as a holiday.
+
+# Arguments
+
+  - `ce`: Covariance estimator of the standardised idiosyncratic returns.
+  - `S`: Standardised idiosyncratic returns with no fill, `observations × assets`.
+  - `amsk`: The active mask of the rows of `S`, `observations × assets`.
+
+# Returns
+
+  - `(; X, kw)::NamedTuple`: The rows `X` that `ce` reads, and the keyword arguments `kw` that go with them.
+
+# Related
+
+  - [`cross_sectional_idiosyncratic_covariance`](@ref)
+  - [`cross_sectional_carry_standardised`](@ref)
+  - [`gap_fill_value`](@ref)
+"""
+function cross_sectional_correlation_rows(ce::StatsBase.CovarianceEstimator, S::MatNum,
+                                          amsk::AbstractMatrix{<:Bool})
+    fv = gap_fill_value(ce)
+    if !isfinite(fv)
+        return (; X = S, kw = (; active_mask = amsk))
+    end
+    Z = Matrix{real(eltype(S))}(S)
+    for k in CartesianIndices(Z)
+        if !isfinite(Z[k])
+            Z[k] = fv
+        end
+    end
+    return (; X = Z, kw = (;))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the idiosyncratic covariance of the latest observation from the covariance of the standardised idiosyncratic returns.
+
+[`cross_sectional_idiosyncratic_covariance`](@ref) states the definition. The batch fit and the carry fold estimate `C` by different routes, and both reach this function.
+
+# Algorithm
+
+ 1. Convert `C` to the correlation `R`.
+ 2. Set to zero every entry of `R` off the diagonal whose magnitude does not exceed `th`, and set the diagonal to one. This step also sets a non-finite correlation to zero.
+ 3. Rescale `R` by the latest idiosyncratic volatilities, giving `D`. Copy the lower triangle of `D` into the upper one, so `D` is exactly symmetric.
+ 4. Make the block of `D` over the assets with a finite variance positive definite with [`posdef!`](@ref).
+
+# Arguments
+
+  - `th`: The correlation threshold, above zero.
+  - `pdm`: Positive definite matrix estimator, or `nothing`.
+  - `C`: The covariance of the standardised idiosyncratic returns, `assets × assets`.
+  - `ev`: The latest idiosyncratic variances, one per asset.
+
+# Returns
+
+  - `D::MatNum`: The idiosyncratic covariance.
+
+# Related
+
+  - [`cross_sectional_idiosyncratic_covariance`](@ref)
+  - [`posdef!`](@ref)
+"""
+function cross_sectional_thresholded_covariance(th::Real,
+                                                pdm::Option{<:AbstractPosdefEstimator},
+                                                C::MatNum, ev::VecNum)
+    s = sqrt.(LinearAlgebra.diag(C))
+    R = StatsBase.cov2cor(Matrix(C), s)
+    for k in CartesianIndices(R)
+        if k[1] != k[2] && !(abs(R[k]) > th)
+            R[k] = zero(eltype(R))
+        end
+    end
+    for i in axes(R, 1)
+        R[i, i] = one(eltype(R))
+    end
+    se = sqrt.(ev)
+    # The two triangles multiply in a different order, so they differ by round-off. The clip
+    # accepts such a block, and its square root then refuses it as not Hermitian. Each repair
+    # reads the lower triangle, so the copy leaves the input of a repair as it was.
+    D = Matrix(LinearAlgebra.Symmetric(R .* se .* transpose(se), :L))
+    idx = findall(isfinite, ev)
+    if !isempty(idx)
+        B = D[idx, idx]
+        posdef!(pdm, B)
+        D[idx, idx] = B
+    end
+    return D
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

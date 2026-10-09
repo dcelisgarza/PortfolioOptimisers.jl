@@ -312,7 +312,7 @@ The Carry Rule `carry` states what the carry fold does with a part that has no f
   - A Return Forecast with no fold of its rows fits again over every row at each call with no data.
   - A `ve` that does not fold, as [`supports_partial_fit`](@ref) answers, fits every idiosyncratic return again at each step.
   - A factor prior `pe` that does not fold fits every factor return again at each call with no data.
-  - The idiosyncratic correlation under `th > 0` is estimated again over every standardised idiosyncratic return at each call with no data.
+  - The idiosyncratic correlation under `th > 0` with a `ce` that does not fold is estimated again over every standardised idiosyncratic return at each call with no data. A `ce` that folds, as the default `ExpWeightedCovariance` does, folds the rows of each step.
 
 [`FoldOnly`](@ref) makes the constructor refuse each of these parts, and names it. A batch fit and the refit under [`Online`](@ref) ignore the rule.
 
@@ -590,7 +590,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         assert_forecast_history_rule(lambda, rfe, :lambda)
         assert_forecast_history_rule(c, rfe, :c)
         assert_orthogonal_forecast_fit(ofit, rfe)
-        assert_carry_rule(carry, (; factors, pe, ve, rfe, th))
+        assert_carry_rule(carry, (; factors, pe, ve, rfe, th, ce))
         # One tuple of the fields gives both the type parameters and the values.
         fs = (factors, neutralise, families, unseen, cre, wa, pe, ve, ce, pdm, f_mp, mp,
               srep, th, bp, mcap, bw, lag, minra, rfe, lambda, c, ofit, lx, mtx_sqrt, ex,
@@ -868,7 +868,8 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
                                           strict = strict, kwargs...)
     fit = (; csr = csr, W = W, vs = vs, cnt = variance_count(pe.ve, csr.eps), amr = amr,
            bwr = bwr, Xo = Xw[r, :], r = r, hist = nothing, S = nothing, Sc = nothing,
-           idx = rw[r], ts = isnothing(ts) ? nothing : ts[rw[r]], rf = nothing)
+           ce = nothing, idx = rw[r], ts = isnothing(ts) ? nothing : ts[rw[r]],
+           rf = nothing)
     return cross_sectional_assemble(pe, f_pr, ca, fit, rde; kwargs...)
 end
 """
@@ -883,7 +884,7 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
 
  1. Take the ready factors of `f_pr` with [`cross_sectional_ready_factors`](@ref) and the determined assets with [`cross_sectional_determined`](@ref). Refuse a fit that determines no asset with [`assert_cross_sectional_factor_moments`](@ref).
  2. Record the degrees of freedom and the divisor of each variance with [`cross_sectional_variance_counts`](@ref), from the count `cnt`.
- 3. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`, unless `fit` carries them. Take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation, and repair it under `pe.pdm`.
+ 3. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`, unless `fit` carries them. Take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation, and repair it under `pe.pdm`. When `fit` carries the `ce` that the carry fold folded over those residuals, read the covariance from its state instead.
  4. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, a zero `b`, and the Unseen Member rule `pe.unseen`, which the diagnostics and the attribution read. Under a family re-basis, expand the factor returns onto the raw axis with [`cross_sectional_expand`](@ref), each row with the basis of its lagged exposures, and store them in `fr`.
  5. Fit the Return Forecast under the Orthogonal Forecast Fit `pe.ofit` with [`cross_sectional_return_forecast`](@ref) on `rde`, giving the spanned coefficients `g`, the orthogonal part `ap` before `c`, and the history when a slot answers `true` to [`reads_forecast_history`](@ref). The history extends the rows `hist` of `fit` when the carry fold carries them. The forecast is the Result `rf` of `fit` when the carry fold carries it.
  6. Resolve the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` with [`cross_sectional_calibration`](@ref), against the factor moments `f_pr` and the block `csfm`.
@@ -898,7 +899,7 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
   - `pe`: Cross-Sectional Factor Prior estimator.
   - `f_pr`: The factor moments that [`cross_sectional_factor_moments`](@ref) states over the combined reduced factor returns.
   - `ca`: The estimated factors with the observed factors appended, from [`cross_sectional_observed_append`](@ref).
-  - `fit`: The fitted observations: `csr`, the regression; `W`, its weights; `vs`, the idiosyncratic variance history; `cnt`, the answer of [`variance_count`](@ref) on the residuals; `amr`, the active mask; `bwr`, the benchmark weights; `Xo`, the base-currency returns; `r`, the fitted rows among the rows after the Descriptor warm-up; `hist`, the rows of the Return Forecast history that the carry fold carries, or `nothing`; `S` and `Sc`, the standardised idiosyncratic returns with and with no fill that the carry fold carries, or `nothing`; `idx`, the position of each fitted row in the returns data; `ts`, the timestamp of each fitted row, or `nothing`; and `rf`, the Return Forecast Result that the carry fold of a forecast that folds carries, or `nothing`.
+  - `fit`: The fitted observations: `csr`, the regression; `W`, its weights; `vs`, the idiosyncratic variance history; `cnt`, the answer of [`variance_count`](@ref) on the residuals; `amr`, the active mask; `bwr`, the benchmark weights; `Xo`, the base-currency returns; `r`, the fitted rows among the rows after the Descriptor warm-up; `hist`, the rows of the Return Forecast history that the carry fold carries, or `nothing`; `S` and `Sc`, the standardised idiosyncratic returns with and with no fill that the carry fold carries, or `nothing`; `ce`, the covariance estimator `ce` of the prior that the carry fold folded over `Sc`, or `nothing`; `idx`, the position of each fitted row in the returns data; `ts`, the timestamp of each fitted row, or `nothing`; and `rf`, the Return Forecast Result that the carry fold of a forecast that folds carries, or `nothing`.
   - `rde`: The returns data that the estimated members read, which the Return Forecast reads.
   - `kwargs...`: Additional keyword arguments passed to [`cross_sectional_lift`](@ref).
 
@@ -934,16 +935,17 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
     S = isnothing(fit.S) ? cross_sectional_standardised_residuals(csr.eps, vs, amr) : fit.S
     # The correlation reads the residuals with no fill: the fill of the scenarios writes the
     # mean of the other assets of an observation into a gap, and that value correlates the
-    # asset with each of them (#1384). The threshold of zero reads no residual.
-    Sc = if iszero(pe.th)
-        S
+    # asset with each of them (#1384). The threshold of zero reads no residual, and a `ce`
+    # that the carry fold folded reads its state alone (#1594).
+    Sc = if iszero(pe.th) || !isnothing(fit.ce)
+        nothing
     elseif isnothing(fit.Sc)
         cross_sectional_standardised_residuals(csr.eps, vs, amr; filled = false)
     else
         fit.Sc
     end
-    esigma = cross_sectional_idiosyncratic_covariance(pe.th, pe.ce, pe.pdm, Sc, vs[end, :],
-                                                      amr)
+    esigma = cross_sectional_idiosyncratic_covariance(pe.th, something(fit.ce, pe.ce),
+                                                      pe.pdm, Sc, vs[end, :], amr)
     fnow = cross_sectional_basis_now(ca.fcb, r)
     # The block's `fcb` covers its own rows alone, and the factor return of row `t` is stated
     # in the basis of row `t - lag`, so the raw-axis history is expanded here, where the basis

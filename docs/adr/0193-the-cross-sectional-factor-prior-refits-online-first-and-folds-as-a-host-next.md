@@ -239,8 +239,10 @@ in every case.
 
 Some members make the cost of a step grow with the stream: a Descriptor or an Exposure member with
 no finite look-back and no state, a Return Forecast that reads the panel, a `ve` that does not fold,
-a factor prior `pe` that does not fold, and the idiosyncratic correlation (`th > 0`) while it refits
-at each read-out. The oracle refuses each of them on its fold. Ours fits them again over the rows
+a factor prior `pe` that does not fold, and the idiosyncratic correlation (`th > 0`) when its `ce`
+does not fold, because it then refits at each read-out. A `ce` that folds, as the default
+`ExpWeightedCovariance` does, folds the standardised rows of each step, and the read-out reads its
+state ([#1594](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1594)). The oracle refuses each of them on its fold. Ours fits them again over the rows
 that they need, so the step stays exact
 ([#1590](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1590)).
 
@@ -327,12 +329,13 @@ The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton
   takes an observed factor).
 - [#1602](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1602) built the Carry
   Rule, a child of sub-map #1562. `carry_growing_parts` lists the parts that grow, and
-  `assert_carry_rule` applies the rule in the constructor. Until
+  `assert_carry_rule` applies the rule in the constructor.
   [#1594](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1594) folds the
-  idiosyncratic correlation, `FoldOnly()` refuses `th > 0`. Until
+  idiosyncratic correlation, so `FoldOnly()` refuses `th > 0` only with a `ce` that does not
+  fold. Until
   [#1595](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1595) makes the verb
   "this factor prior folds", `cross_sectional_factor_prior_folds` answers it: an `EmpiricalPrior`
-  whose `me` and `ce` fold. Each of the two builds changes one line of `carry_growing_parts`.
+  whose `me` and `ce` fold. That build changes one line of `carry_growing_parts`.
 - [#1605](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1605) builds the fold of a
   move of a batch choice and the refusal of an automatic member under `FoldOnly()`.
   [#1606](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1606) adds the Unseen

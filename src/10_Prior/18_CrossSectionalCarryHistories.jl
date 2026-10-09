@@ -179,3 +179,27 @@ A step appends to the histories and to the buffer `buf` in place, into the spare
 function cross_sectional_carry_own(st::CrossSectionalCarryState)
     return st.tip[] == st.buf.n ? st : copy(st)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuilds a [`CrossSectionalCarryState`](@ref) with some of its fields replaced.
+
+# Arguments
+
+  - `st`: The state.
+  - `kw`: The fields to replace, by name.
+
+# Returns
+
+  - `st::CrossSectionalCarryState`: The new state.
+
+# Related
+
+  - [`CrossSectionalCarryState`](@ref)
+"""
+function cross_sectional_carry_with(st::CrossSectionalCarryState, kw::NamedTuple)
+    fns = fieldnames(CrossSectionalCarryState)
+    return CrossSectionalCarryState(;
+                                    merge(NamedTuple{fns}(map(f -> getfield(st, f), fns)),
+                                          kw)...)
+end

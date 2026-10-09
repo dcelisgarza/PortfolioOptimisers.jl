@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the carry fold of a Cross-Sectional Factor Prior between two online steps.
 
-A [`CrossSectionalFactorPrior`](@ref) with no `cache` seeds this state at its first [`partial_fit!`](@ref), as the carry of [`EmpiricalPrior`](@ref) seeds a [`PriorCarryState`](@ref). The state applies the rule of the carry fold: it folds what folds and refits the rest. A new observation changes no past Factor Exposure, no past regression and no past idiosyncratic variance, so a step computes them for the new observations alone. The idiosyncratic variance and the factor prior fold exactly. The Return Forecast and the idiosyncratic correlation refit at the call with no data from the carried rows. A Return Forecast that computes its history one observation at a time, as [`folds_forecast_rows`](@ref) answers, folds too: the state carries its Descriptor scores and its rows, and a step computes the rows of its new observations alone.
+A [`CrossSectionalFactorPrior`](@ref) with no `cache` seeds this state at its first [`partial_fit!`](@ref), as the carry of [`EmpiricalPrior`](@ref) seeds a [`PriorCarryState`](@ref). The state applies the rule of the carry fold: it folds what folds and refits the rest. A new observation changes no past Factor Exposure, no past regression and no past idiosyncratic variance, so a step computes them for the new observations alone. The idiosyncratic variance and the factor prior fold exactly. So does the idiosyncratic correlation under `th > 0` when its `ce` folds, as [`supports_partial_fit`](@ref) answers. The Return Forecast, and a `ce` that does not fold, refit at the call with no data from the carried rows. A Return Forecast that computes its history one observation at a time, as [`folds_forecast_rows`](@ref) answers, folds too: the state carries its Descriptor scores and its rows, and a step computes the rows of its new observations alone.
 
 Two choices read every fitted observation: the automatic dropped member of a Factor Family under a [`BatchChoice`](@ref), and the mark of the Empty Factors. When a step moves either one, the step fits every carried observation again.
 
@@ -26,8 +26,8 @@ $(DocStringExtensions.FIELDS)
                              lv1 = nothing, lv = nothing, W = nothing, vs = nothing,
                              ve = nothing, ve1 = nothing, pe = nothing,
                              seed::Integer = 0, hist = nothing, S = nothing,
-                             Sc = nothing, fsc = nothing, fh = nothing, fst = nothing,
-                             xf = nothing, fds = nothing,
+                             Sc = nothing, ce = nothing, fsc = nothing, fh = nothing,
+                             fst = nothing, xf = nothing, fds = nothing,
                              tip::Base.RefValue{Int} = Ref(0)) -> CrossSectionalCarryState
 
 Keywords correspond to the struct's fields, and every field but `buf` and `tip` defaults to `nothing`, or to `0` for `seed`. `tip` defaults to a new counter at `0`. The default is the empty state that a first step builds.
@@ -154,9 +154,13 @@ Keywords correspond to the struct's fields, and every field but `buf` and `tip` 
     """
     S
     """
-    The standardised idiosyncratic returns of every fitted observation with no fill, which the idiosyncratic correlation reads, or `nothing` before the first fit and when the threshold `th` of the prior is zero.
+    The standardised idiosyncratic returns of every fitted observation with no fill, which the idiosyncratic correlation reads, or `nothing` before the first fit, when the threshold `th` of the prior is zero, and when `ce` folds them.
     """
     Sc
+    """
+    The covariance estimator `ce` of the prior, folded over the standardised idiosyncratic returns with no fill of every fitted observation, or `nothing` before the first fit, when the threshold `th` of the prior is zero, and when `ce` does not fold, as [`supports_partial_fit`](@ref) answers. A step folds the rows of its new observations into it, so the call with no data reads the correlation from its state.
+    """
+    ce
     """
     The Descriptor scores of the Return Forecast at every observation after the warm-up, `(; S, w, g)` as [`descriptor_panel_scores`](@ref) states them, or `nothing` when the forecast does not compute its history one observation at a time, as [`folds_forecast_rows`](@ref) answers. The scores of the last rows of the warm-up that [`cross_sectional_forecast_lead`](@ref) counts come first. A step appends the scores of its new observations, with [`cross_sectional_carry_scores`](@ref).
     """
@@ -191,36 +195,13 @@ function CrossSectionalCarryState(; buf::SampleBufferState = SampleBufferState()
                                   csr = nothing, lv1 = nothing, lv = nothing, W = nothing,
                                   vs = nothing, ve = nothing, ve1 = nothing, pe = nothing,
                                   seed::Integer = 0, hist = nothing, S = nothing,
-                                  Sc = nothing, fsc = nothing, fh = nothing, fst = nothing,
-                                  xf = nothing, fds = nothing,
+                                  Sc = nothing, ce = nothing, fsc = nothing, fh = nothing,
+                                  fst = nothing, xf = nothing, fds = nothing,
                                   tip::Base.RefValue{Int} = Ref(0))::CrossSectionalCarryState
     return CrossSectionalCarryState(buf, win, der, nf, fam, Ms, X, Xl, obs, bw, mcap, amsk,
                                     emsk, sums, families, fcb, Z, csr, lv1, lv, W, vs, ve,
-                                    ve1, pe, seed, hist, S, Sc, fsc, fh, fst, xf, fds, tip)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Rebuilds a [`CrossSectionalCarryState`](@ref) with some of its fields replaced.
-
-# Arguments
-
-  - `st`: The state.
-  - `kw`: The fields to replace, by name.
-
-# Returns
-
-  - `st::CrossSectionalCarryState`: The new state.
-
-# Related
-
-  - [`CrossSectionalCarryState`](@ref)
-"""
-function cross_sectional_carry_with(st::CrossSectionalCarryState, kw::NamedTuple)
-    fns = fieldnames(CrossSectionalCarryState)
-    return CrossSectionalCarryState(;
-                                    merge(NamedTuple{fns}(map(f -> getfield(st, f), fns)),
-                                          kw)...)
+                                    ve1, pe, seed, hist, S, Sc, ce, fsc, fh, fst, xf, fds,
+                                    tip)
 end
 function returns_buffer(state::CrossSectionalCarryState)
     return state.buf
@@ -1328,7 +1309,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a Cross-Sectional Factor Prior out of its carry fold, with no data.
 
-The call with no data builds the Prior Result with [`cross_sectional_assemble`](@ref), the code of the batch fit, from the histories that the state carries and the factor prior that it folded. The idiosyncratic correlation refits there from the carried rows, and so does the Return Forecast, unless the state carries its rows, as [`folds_forecast_rows`](@ref) answers. Then the call reads its Result off those rows with [`return_forecast_result`](@ref). The standardised idiosyncratic returns are the rows that the state carries, so the call does not standardise the history again.
+The call with no data builds the Prior Result with [`cross_sectional_assemble`](@ref), the code of the batch fit, from the histories that the state carries and the factor prior that it folded. The idiosyncratic correlation reads the `ce` that the state folded, or refits there from the carried rows when `ce` does not fold. The Return Forecast refits there too, unless the state carries its rows, as [`folds_forecast_rows`](@ref) answers. Then the call reads its Result off those rows with [`return_forecast_result`](@ref). The standardised idiosyncratic returns are the rows that the state carries, so the call does not standardise the history again.
 
 # Algorithm
 
@@ -1375,8 +1356,8 @@ function prior(pe::CrossSectionalFactorPrior, st::CrossSectionalCarryState;
     # the fold read, so the fitted rows sit at these positions of the folded returns.
     fit = (; csr = csr, W = st.W, vs = st.vs, cnt = variance_count(st.ve, csr.eps),
            amr = view(st.amsk, r, :), bwr = view(st.bw, r, :), Xo = view(st.X, r, :), r = r,
-           hist = st.hist, S = st.S, Sc = st.Sc, idx = (st.buf.n - Tf) .+ r, ts = nothing,
-           rf = if folds_forecast_rows(pe.rfe)
+           hist = st.hist, S = st.S, Sc = st.Sc, ce = st.ce, idx = (st.buf.n - Tf) .+ r,
+           ts = nothing, rf = if folds_forecast_rows(pe.rfe)
                return_forecast_result(pe.rfe, st.fh, st.fst)
            else
                nothing

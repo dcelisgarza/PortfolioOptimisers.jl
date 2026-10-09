@@ -1222,7 +1222,7 @@ The rule accepts every configuration. A part that does not fold, as [`carry_grow
   - A Return Forecast with no fold of its rows fits again over every row at each call with no data.
   - A `ve` that does not fold fits every idiosyncratic return again at each step.
   - A factor prior `pe` that does not fold fits every factor return again at each call with no data.
-  - The idiosyncratic correlation under `th > 0` is estimated again over every standardised idiosyncratic return at each call with no data.
+  - The idiosyncratic correlation under `th > 0` with a `ce` that does not fold is estimated again over every standardised idiosyncratic return at each call with no data. A `ce` that folds, as the default `ExpWeightedCovariance` does, folds the rows of each step.
 
 [`FoldOnly`](@ref) refuses such a prior in its constructor instead.
 
@@ -1285,11 +1285,11 @@ Each entry names the part and the method that it lacks. The test reads the confi
  2. List `rfe` when [`cross_sectional_forecast_reads_panel`](@ref) answers `true`, because the forecast fits again over every row. Otherwise list it when its [`carry_lookback`](@ref) is `nothing`, because the carry keeps every row under it.
  3. List `ve` when [`supports_partial_fit`](@ref) answers `false`.
  4. List `pe` when [`cross_sectional_factor_prior_folds`](@ref) answers `false`.
- 5. List `th` when it is positive, because the idiosyncratic correlation has no fold.
+ 5. List `th` when it is positive and [`supports_partial_fit`](@ref) answers `false` for `ce`, because the idiosyncratic correlation then has no fold.
 
 # Arguments
 
-  - `cfg`: The prior, or a `NamedTuple` of its fields `factors`, `pe`, `ve`, `rfe` and `th`.
+  - `cfg`: The prior, or a `NamedTuple` of its fields `factors`, `pe`, `ve`, `rfe`, `th` and `ce`.
 
 # Returns
 
@@ -1311,8 +1311,8 @@ function carry_growing_parts(cfg::Union{<:CrossSectionalFactorPrior, <:NamedTupl
                                    "`ve` ($(nameof(typeof(cfg.ve)))) does not fold, so each step fits every idiosyncratic return again. It needs a method of `partial_fit!` and of `supports_partial_fit`"),
                 carry_growing_part(!cross_sectional_factor_prior_folds(cfg.pe),
                                    "the factor prior `pe` ($(nameof(typeof(cfg.pe)))) does not fold, so it fits every factor return again. The carry folds an `EmpiricalPrior` whose `me` and `ce` answer `supports_partial_fit`"),
-                carry_growing_part(cfg.th > 0,
-                                   "`th = $(cfg.th)` estimates the idiosyncratic correlation again over every row, because the correlation has no fold. Set `th = 0`"))
+                carry_growing_part(cfg.th > 0 && !supports_partial_fit(cfg.ce),
+                                   "`th = $(cfg.th)` estimates the idiosyncratic correlation again over every row, because `ce` ($(nameof(typeof(cfg.ce)))) does not fold. Set `th = 0`, or give a `ce` that answers `supports_partial_fit`"))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1388,7 +1388,7 @@ The method that Julia selects is the algorithm.
 # Arguments
 
   - `carry`: The Carry Rule of the prior.
-  - `cfg`: The prior, or a `NamedTuple` of its fields `factors`, `pe`, `ve`, `rfe` and `th`.
+  - `cfg`: The prior, or a `NamedTuple` of its fields `factors`, `pe`, `ve`, `rfe`, `th` and `ce`.
 
 # Validation
 

@@ -56,6 +56,9 @@ end
     base = grid_config("Base", rd)
     wv = WindowedVariance(; ve = ExpWeightedVariance(; decay = 2.0^(-1 / 20), min_obs = 5),
                           window = 60)
+    # A covariance estimator with no fold, which the idiosyncratic correlation reads under
+    # `th > 0`.
+    semi = Covariance(; alg = SemiMoment())
     user = vcat(base.factors,
                 ["user" =>
                      CompositeExposure(; descriptors = [CarryRuleUserDescriptor("style1")],
@@ -66,7 +69,7 @@ end
         @test CrossSectionalFactorPrior(; base...).carry === FoldOrRefit()
         @test isempty(po.carry_growing_parts(CrossSectionalFactorPrior(; base...)))
         pe = CrossSectionalFactorPrior(; base..., factors = user, ve = wv, th = 0.2,
-                                       pe = EntropyPoolingPrior(; pe = GRID_PE))
+                                       ce = semi, pe = EntropyPoolingPrior(; pe = GRID_PE))
         @test length(po.carry_growing_parts(pe)) == 4
         @test isnothing(po.assert_carry_rule(FoldOrRefit(), pe))
     end
@@ -75,11 +78,13 @@ end
         cases = [(; factors = vcat(base.factors, ["beta" => CompositeExposure(; descriptors = [EWMarketBeta()])])) => "the factor \"beta\" (CompositeExposure) has no finite look-back",
                  (; factors = user) => "the factor \"user\" (CompositeExposure) has no finite look-back",
                  grid_config("FcTarget", rd) => "the Return Forecast `rfe` (TargetReturnForecast) has no fold of its rows",
-                 (; ofit = UnadjustedForecast(), rfe = ExpWeightedReturnForecast(; scores = DescriptorScores(; descriptors = [EWMomentum()]), half_life = 10.0)) => "the Return Forecast `rfe` (ExpWeightedReturnForecast) has no finite look-back",
+                 # A user Descriptor states no look-back and carries no state. `EWMomentum`
+                 # folds from a state since #1586, so it no longer makes the carry grow.
+                 (; ofit = UnadjustedForecast(), rfe = ExpWeightedReturnForecast(; scores = DescriptorScores(; descriptors = [CarryRuleUserDescriptor("style1")]), half_life = 10.0)) => "the Return Forecast `rfe` (ExpWeightedReturnForecast) has no finite look-back",
                  (; ve = wv) => "`ve` (WindowedVariance) does not fold",
                  (; pe = EntropyPoolingPrior(; pe = GRID_PE)) => "the factor prior `pe` (EntropyPoolingPrior) does not fold",
                  (; pe = EmpiricalPrior(; ce = Covariance(; alg = SemiMoment()))) => "the factor prior `pe` (EmpiricalPrior) does not fold",
-                 (; th = 0.2) => "`th = 0.2` estimates the idiosyncratic correlation again"]
+                 (; th = 0.2, ce = semi) => "`th = 0.2` estimates the idiosyncratic correlation again over every row, because `ce` (Covariance) does not fold"]
         for (cfg, part) in cases
             m = message(() -> CrossSectionalFactorPrior(; base..., cfg...,
                                                         carry = FoldOnly()))
@@ -92,7 +97,7 @@ end
         end
         # One error names every part that grows.
         m = message(() -> CrossSectionalFactorPrior(; base..., factors = user, ve = wv,
-                                                    th = 0.2,
+                                                    th = 0.2, ce = semi,
                                                     pe = EntropyPoolingPrior(;
                                                                              pe = GRID_PE),
                                                     carry = FoldOnly()))
@@ -126,6 +131,11 @@ end
         end
         @test p.carry === FoldOnly()
         @test agrees(prior(p), batch(pe, 3))
+        # The default `ce` folds the idiosyncratic correlation, so a threshold passes (#1594).
+        pt = CrossSectionalFactorPrior(; lambda = 1, base..., th = 0.2, carry = FoldOnly())
+        @test isempty(po.carry_growing_parts(pt))
+        st = stream(pt)
+        @test all(k -> agrees(st[k].pr, batch(pt, k)), 1:3)
         # The refit under `Online` seeds a sample buffer in `cache`, and ignores the rule.
         o = po.update_online_estimator(Online(pe))
         o = partial_fit!(o, rows(rd, 1:250))

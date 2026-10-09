@@ -825,20 +825,16 @@ Where:
 # Algorithm
 
  1. If `th` is zero, return `ev`, the latest idiosyncratic variances. The block then carries a vector, and the asset covariance takes a diagonal.
- 2. Otherwise, get `fv` from `ce` with [`gap_fill_value`](@ref). `fv` is the value that `ce` gives a gapped cell of `S`. A cell of `S` is non-finite where the asset is inactive, and where it is active with no finite standardised return: a missing return, or a variance in its warm-up.
- 3. If `fv` is finite, write it over every non-finite cell of a copy of `S`, and estimate the covariance `C` of that copy with `ce`. The fallback `fv` is zero, which is the mean of a standardised series.
- 4. If `fv` is not finite, estimate `C` from `S` as it stands, with `amsk` as the `active_mask`. A gap-aware `ce` then freezes the block of an inactive asset and does not decay it, and it takes an active non-finite cell as a holiday.
- 5. Convert `C` to the correlation `R`.
- 6. Set to zero every entry of `R` off the diagonal whose magnitude does not exceed `th`, and set the diagonal to one. This step also sets a non-finite correlation to zero.
- 7. Rescale `R` by the latest idiosyncratic volatilities, giving `D`. Copy the lower triangle of `D` into the upper one, so `D` is exactly symmetric.
- 8. Make the block of `D` over the assets with a finite variance positive definite with [`posdef!`](@ref).
+ 2. If `S` is `nothing`, the carry fold folded `ce` over the rows, so read `C` from the state of `ce` with the call of `Statistics.cov` with no data.
+ 3. Otherwise, take the rows and the keyword arguments of `ce` with [`cross_sectional_correlation_rows`](@ref), and estimate the covariance `C` of the rows with `ce`.
+ 4. Threshold, rescale and repair `C` with [`cross_sectional_thresholded_covariance`](@ref).
 
 # Arguments
 
   - `th`: The correlation threshold.
-  - `ce`: Covariance estimator of the standardised idiosyncratic returns.
+  - `ce`: Covariance estimator of the standardised idiosyncratic returns. When `S` is `nothing`, it is the estimator that the carry fold folded over them.
   - `pdm`: Positive definite matrix estimator, or `nothing`.
-  - `S`: Standardised idiosyncratic returns with no fill, `observations × assets`, from [`cross_sectional_standardised_residuals`](@ref) with `filled = false`.
+  - `S`: Standardised idiosyncratic returns with no fill, `observations × assets`, from [`cross_sectional_standardised_residuals`](@ref) with `filled = false`, or `nothing` when `ce` carries their fold.
   - `ev`: The latest idiosyncratic variances, one per asset.
   - `amsk`: The active mask, `observations × assets`. Only a `ce` with a non-finite [`gap_fill_value`](@ref) reads it.
 
@@ -850,6 +846,8 @@ Where:
 # Related
 
   - [`cross_sectional_standardised_residuals`](@ref)
+  - [`cross_sectional_correlation_rows`](@ref)
+  - [`cross_sectional_thresholded_covariance`](@ref)
   - [`gap_fill_value`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
@@ -863,40 +861,20 @@ function cross_sectional_idiosyncratic_covariance(th::Real,
     if iszero(th)
         return ev
     end
-    fv = gap_fill_value(ce)
-    C = if isfinite(fv)
-        Z = Matrix{real(eltype(S))}(S)
-        for k in CartesianIndices(Z)
-            if !isfinite(Z[k])
-                Z[k] = fv
-            end
-        end
-        Statistics.cov(ce, Z; dims = 1)
+    (; X, kw) = cross_sectional_correlation_rows(ce, S, amsk)
+    return cross_sectional_thresholded_covariance(th, pdm,
+                                                  Statistics.cov(ce, X; dims = 1, kw...),
+                                                  ev)
+end
+function cross_sectional_idiosyncratic_covariance(th::Real,
+                                                  ce::StatsBase.CovarianceEstimator,
+                                                  pdm::Option{<:AbstractPosdefEstimator},
+                                                  ::Nothing, ev::VecNum, ::Any)
+    return if iszero(th)
+        ev
     else
-        Statistics.cov(ce, S; dims = 1, active_mask = amsk)
+        cross_sectional_thresholded_covariance(th, pdm, Statistics.cov(ce), ev)
     end
-    s = sqrt.(LinearAlgebra.diag(C))
-    R = StatsBase.cov2cor(Matrix(C), s)
-    for k in CartesianIndices(R)
-        if k[1] != k[2] && !(abs(R[k]) > th)
-            R[k] = zero(eltype(R))
-        end
-    end
-    for i in axes(R, 1)
-        R[i, i] = one(eltype(R))
-    end
-    se = sqrt.(ev)
-    # The two triangles multiply in a different order, so they differ by round-off. The clip
-    # accepts such a block, and its square root then refuses it as not Hermitian. Each repair
-    # reads the lower triangle, so the copy leaves the input of a repair as it was.
-    D = Matrix(LinearAlgebra.Symmetric(R .* se .* transpose(se), :L))
-    idx = findall(isfinite, ev)
-    if !isempty(idx)
-        B = D[idx, idx]
-        posdef!(pdm, B)
-        D[idx, idx] = B
-    end
-    return D
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1542,7 +1520,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the Carry Rule of a [`CrossSectionalFactorPrior`](@ref), the rule that says whether the carry fold accepts a part whose step cost grows with the stream.
 
-The carry fold folds each part that has a fold of its own. It fits every other part again at each step, over every row that the part reads. That refit is exact, but its cost grows with the number of folded observations. Five kinds of part do that, as [`carry_growing_parts`](@ref) states: a factor with no finite look-back, a Return Forecast with no bounded fold, a `ve` that does not fold, a factor prior `pe` that does not fold, and the idiosyncratic correlation under `th > 0`. Every test reads the configuration alone, so the constructor of the prior applies the rule. A batch fit and the refit under [`Online`](@ref) ignore it.
+The carry fold folds each part that has a fold of its own. It fits every other part again at each step, over every row that the part reads. That refit is exact, but its cost grows with the number of folded observations. Five kinds of part do that, as [`carry_growing_parts`](@ref) states: a factor with no finite look-back, a Return Forecast with no bounded fold, a `ve` that does not fold, a factor prior `pe` that does not fold, and the idiosyncratic correlation under `th > 0` with a `ce` that does not fold. Every test reads the configuration alone, so the constructor of the prior applies the rule. A batch fit and the refit under [`Online`](@ref) ignore it.
 
 # Interfaces
 
