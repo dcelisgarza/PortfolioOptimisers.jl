@@ -96,7 +96,7 @@ Where:
 """
 function RRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, kappa::Number = 0.3,
              w::Option{<:ObsWeights} = nothing)
-    w = get_observation_weights(w, x)
+    w = checked_observation_weights(w, x)
     if isa(slv, VecSlv)
         @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
     end
@@ -267,7 +267,7 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `kappa` is a number: `0 < kappa < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -339,7 +339,7 @@ RelativisticValueatRisk
         end
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(kappa, :kappa)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa), typeof(w)}(settings,
                                                                                            slv,
                                                                                            alpha,
@@ -442,7 +442,7 @@ Keywords correspond to the struct's fields.
   - Each of `alpha` and `kappa_a` that is a number: `0 < val < 1`.
   - Each of `beta` and `kappa_b` that is a number: `0 < val < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -524,7 +524,7 @@ RelativisticValueatRiskRange
         assert_unit_interval(kappa_a, :kappa_a)
         assert_unit_interval(beta, :beta)
         assert_unit_interval(kappa_b, :kappa_b)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa_a),
                    typeof(beta), typeof(kappa_b), typeof(w)}(settings, slv, alpha, kappa_a,
                                                              beta, kappa_b, w)
@@ -671,7 +671,7 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `kappa` is a number: `0 < kappa < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -742,7 +742,7 @@ RelativisticDrawdownatRisk
         end
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(kappa, :kappa)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa), typeof(w)}(settings,
                                                                                            slv,
                                                                                            alpha,
@@ -862,7 +862,7 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `kappa` is a number: `0 < kappa < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -929,7 +929,7 @@ RelativeRelativisticDrawdownatRisk
         end
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(kappa, :kappa)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(kappa), typeof(w)}(settings,
                                                                                            slv,
                                                                                            alpha,

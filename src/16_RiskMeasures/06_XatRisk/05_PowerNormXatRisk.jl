@@ -30,7 +30,7 @@ Solves a convex optimisation problem to compute the PRM at confidence level `alp
 """
 function PRM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05, p::Number = 2.0,
              w::Option{<:ObsWeights} = nothing)
-    w = get_observation_weights(w, x)
+    w = checked_observation_weights(w, x)
     if isa(slv, VecSlv)
         @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
     end
@@ -132,7 +132,7 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - `p >= 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -202,7 +202,7 @@ PowerNormValueatRisk
         end
         assert_unit_interval(alpha, :alpha)
         @argcheck(p >= one(p), DomainError(p, "p must be >= 1"))
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,
                                                                                        alpha,
@@ -268,7 +268,7 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`. If `beta` is a number: `0 < beta < 1`.
   - `pa > 1`, `pb > 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -348,7 +348,7 @@ PowerNormValueatRiskRange
         assert_unit_interval(beta, :beta)
         @argcheck(pa > one(pa), DomainError(pa, "pa must be > 1"))
         @argcheck(pb > one(pb), DomainError(pb, "pb must be > 1"))
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(beta), typeof(pa),
                    typeof(pb), typeof(w)}(settings, slv, alpha, beta, pa, pb, w)
     end
@@ -437,7 +437,7 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - `p >= 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -507,7 +507,7 @@ PowerNormDrawdownatRisk
         end
         assert_unit_interval(alpha, :alpha)
         @argcheck(p >= one(p), DomainError(p, "p must be >= 1"))
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,
                                                                                        alpha,
@@ -587,7 +587,7 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - `p >= 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -654,7 +654,7 @@ RelativePowerNormDrawdownatRisk
         end
         assert_unit_interval(alpha, :alpha)
         @argcheck(p >= one(p), DomainError(p, "p must be >= 1"))
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(p), typeof(w)}(settings,
                                                                                        slv,
                                                                                        alpha,

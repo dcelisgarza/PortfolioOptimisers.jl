@@ -86,7 +86,7 @@ Keywords correspond to the struct's fields.
       + `::Number`: `isfinite(mu)`.
       + `::VecNum`: `!isempty(mu)` and `all(isfinite, mu)`.
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
   - If `kt` is not `nothing`:
 
@@ -205,7 +205,7 @@ Kurtosis
         elseif isa(mu, Number)
             @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
         end
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         if kt_flag
             @argcheck(!isempty(kt), IsEmptyError("kt cannot be empty"))
             assert_matrix_issquare(kt, :kt)

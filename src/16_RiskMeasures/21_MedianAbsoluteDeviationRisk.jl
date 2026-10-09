@@ -99,7 +99,7 @@ Keywords correspond to the struct's fields.
 
   - If `mu` is a `VecNum`: `!isempty(mu)` and `all(isfinite, mu)`.
   - If `mu` is a `Number`: `isfinite(mu)`.
-  - $(val_dict[:oow])
+  - $(val_dict[:oow_rm])
 
 !!! warning
 
@@ -173,7 +173,7 @@ MedianAbsoluteDeviation
         elseif isa(mu, Number)
             @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
         end
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(w), typeof(mu), typeof(flag)}(settings, w, mu,
                                                                           flag)
     end
@@ -257,7 +257,7 @@ function calc_moment_target(::MedianAbsoluteDeviation{<:Any, Nothing, <:MeanCent
 end
 function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:ObsWeights, <:MeanCentering,
                                                        <:Any}, ::Any, x::VecNum)
-    w = get_observation_weights(r.w, x)
+    w = checked_observation_weights(r.w, x)
     return Statistics.mean(x, w)
 end
 function calc_moment_target(::MedianAbsoluteDeviation{<:Any, Nothing, <:MedianCentering,
@@ -267,7 +267,7 @@ end
 function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:ObsWeights,
                                                        <:MedianCentering, <:Any}, ::Any,
                             x::VecNum)
-    w = get_observation_weights(r.w, x)
+    w = checked_observation_weights(r.w, x)
     return Statistics.median(x, w)
 end
 function calc_moment_target(r::MedianAbsoluteDeviation{<:Any, <:Any, <:VecNum, <:Any},

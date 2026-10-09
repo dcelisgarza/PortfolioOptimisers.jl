@@ -120,7 +120,7 @@ Keywords correspond to the struct's fields. A `w` that is not `nothing` is passe
 
   - If `sk` is not `nothing`: `!isempty(sk)` and `size(sk, 1)^2 == size(sk, 2)`.
   - If `mu` is a `VecNum`: `!isempty(mu)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 !!! warning
 
@@ -210,7 +210,7 @@ Skewness
             @argcheck(size(sk, 1)^2 == size(sk, 2),
                       DimensionMismatch("size(sk, 1)^2 ($(size(sk, 1)^2)) must equal size(sk, 2) ($(size(sk, 2)))"))
         end
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end

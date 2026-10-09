@@ -120,7 +120,7 @@ function set_power_norm_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeas
     state_set!(model, prefix, keys.slack, i, slack)
     state_set!(model, prefix, keys.v, i, v)
     wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, pr.X)
+    wi = checked_observation_weights(wi, pr.X)
     iaT = if isnothing(wi)
         state_set!(model, prefix, keys.budget, i,
                    JuMP.@constraint(model, sc * (sum(v) - t) <= 0))

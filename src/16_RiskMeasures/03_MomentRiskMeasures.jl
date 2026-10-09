@@ -539,7 +539,7 @@ Keywords correspond to the struct's fields. A `w` that is not `nothing` is passe
       + `::Number`: `isfinite(mu)`.
       + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 !!! warning
 
@@ -906,9 +906,7 @@ LowOrderMoment
         elseif isa(mu, Number)
             @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
         end
-        if !isnothing(w)
-            @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
-        end
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings, w, mu,
                                                                          alg)
     end
@@ -1028,7 +1026,7 @@ Keywords correspond to the struct's fields. A `w` that is not `nothing` is passe
       + `::Number`: `isfinite(mu)`.
       + `::AbstractVector`: `!isempty(mu)` and `all(isfinite, mu)`.
 
-  - If `w` is not `nothing`, `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 !!! warning
 
@@ -1098,7 +1096,7 @@ HighOrderMoment
         elseif isa(mu, Number)
             @argcheck(isfinite(mu), IsNonFiniteError("mu must be finite, got $mu"))
         end
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(w), typeof(mu), typeof(alg)}(settings, w, mu,
                                                                          alg)
     end

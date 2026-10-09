@@ -3,9 +3,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add Ulcer Index risk constraints to `model`.
 
-Introduces a scalar variable `uci` and the SOC constraint
-`[sc * uci; sc * dd[2:T+1]] in SecondOrderCone()`, then defines
-`uci_risk = uci / sqrt(T)`. Returns the existing expression if already present.
+Introduces a scalar variable `uci` and one second-order cone over the drawdowns, then defines the risk expression `uci_risk`. Without observation weights, the cone is `[sc * uci; sc * dd[2:T+1]] in SecondOrderCone()` and `uci_risk = uci / sqrt(T)`. With observation weights `w`, each drawdown is scaled by `sqrt(w_t)` inside the cone and `uci_risk = uci / sqrt(sum(w))`. The keys are indexed by `i`, because two Ulcer Index measures with different weights are two expressions.
 
 # Mathematical definition
 
@@ -22,42 +20,60 @@ Where:
   - $(math_dict[:T])
   - ``dd_t``: Portfolio drawdown at time ``t``.
 
-where ``dd_t`` is the portfolio drawdown at time ``t``.
+With observation weights, the weighted mean of the squared drawdowns is used instead:
+
+```math
+\\begin{align}
+\\mathrm{UCI}(\\boldsymbol{w}) &= \\sqrt{\\frac{1}{W_{T}}\\sum_{t=1}^T w_{t} dd_t^2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_t_obs])
+  - $(math_dict[:W_T_total])
 
 # Arguments
 
   - $(arg_dict[:model])
+  - $(arg_dict[:ci])
   - `r::UlcerIndex`: Ulcer index risk measure instance.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Validation
+
+  - The observation weights pass [`checked_observation_weights`](@ref).
+
 # Returns
 
-  - `nothing`.
+  - `uci_risk`: The Ulcer Index risk expression.
 
 # Related
 
   - [`set_drawdown_constraints!`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
+  - [`checked_observation_weights`](@ref)
 """
-function set_risk_constraints!(model::JuMP.Model, ::Any, r::UlcerIndex,
+function set_risk_constraints!(model::JuMP.Model, i::Any, r::UlcerIndex,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
-    # The pre-migration guard tested `:uci` but returned `:uci_risk`; the two are always
-    # registered together in this block, so keying the memo on the returned entry is
-    # equivalent.
-    return state_build!(model, prefix, :uci_risk) do
-        sc = get_constraint_scale(model)
-        dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
-        T = length(dd) - 1
-        uci = state_set!(model, prefix, :uci, JuMP.@variable(model))
-        uci_risk = JuMP.@expression(model, uci / sqrt(T))
-        state_set!(model, prefix, :cuci_soc,
-                   JuMP.@constraint(model,
-                                    [sc * uci; sc * view(dd, 2:(T + 1))] in
-                                    JuMP.SecondOrderCone()))
-        set_risk_bounds_and_expression!(model, opt, uci_risk, r.settings, :uci_risk;
-                                        prefix = prefix)
-        return uci_risk
+    sc = get_constraint_scale(model)
+    dd = set_drawdown_constraints!(model, pr.X; prefix = prefix)
+    T = length(dd) - 1
+    wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = checked_observation_weights(wi, pr.X)
+    uci = state_set!(model, prefix, :uci_, i, JuMP.@variable(model))
+    ddt = view(dd, 2:(T + 1))
+    uci_risk, cone = if isnothing(wi)
+        JuMP.@expression(model, uci / sqrt(T)), [sc * uci; sc * ddt]
+    else
+        JuMP.@expression(model, uci / sqrt(sum(wi))), [sc * uci; sc * (sqrt.(wi) .* ddt)]
     end
+    state_set!(model, prefix, :cuci_soc_, i,
+               JuMP.@constraint(model, cone in JuMP.SecondOrderCone()))
+    state_set!(model, prefix, :uci_risk_, i, uci_risk)
+    set_risk_bounds_and_expression!(model, opt, uci_risk, r.settings, :uci_risk_, i;
+                                    prefix = prefix)
+    return uci_risk
 end

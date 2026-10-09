@@ -59,7 +59,7 @@
              ("Range", Range(), opt, w0, rd, [:range_risk, :br_risk, :cbr, :wr_risk]),
              ("MaximumDrawdown", MaximumDrawdown(), opt, w0, rd,
               [:dd, :mdd_risk, :cmdd_risk]),
-             ("UlcerIndex", UlcerIndex(), opt, w0, rd, [:dd, :uci, :uci_risk, :cuci_soc]),
+             ("UlcerIndex", UlcerIndex(), opt, w0, rd, [:dd]),
              ("OrderedWeightsArray", OrderedWeightsArray(), opt, w0, rd, [:net_X]),
              ("TurnoverRiskMeasure", TurnoverRiskMeasure(; w = w0), opt, w0, rd, Symbol[]),
              ("Kurtosis", Kurtosis(), opt3, w03, rd3, [:W, :M, :M_PSD, :L2W]),

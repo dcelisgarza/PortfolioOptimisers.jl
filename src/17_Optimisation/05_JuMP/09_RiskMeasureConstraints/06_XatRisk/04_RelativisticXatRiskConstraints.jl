@@ -134,7 +134,7 @@ function set_relativistic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
     state_set!(model, prefix, keys.theta, i, theta)
     state_set!(model, prefix, keys.epsilon, i, epsilon)
     wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, pr.X)
+    wi = checked_observation_weights(wi, pr.X)
     lnk = kappa_log(inv(alpha * T), kappa)
     risk = if isnothing(wi)
         JuMP.@expression(model, t + lnk * z + sum(psi + theta))

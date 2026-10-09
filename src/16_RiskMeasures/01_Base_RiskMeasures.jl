@@ -268,6 +268,155 @@ function (r::AbstractBaseRiskMeasure)(::VecNum)
     return throw(ArgumentError("`$(typeof(r))` has no precomputed-return-series form `r(x::VecNum)`: its risk depends on portfolio weights and/or per-asset data (e.g. a variance-carrying composite such as `VarianceSkewKurtosis`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
 end
 """
+    assert_observation_weights(w::VecNum, w_sym::Sym_Str = :w)
+    assert_observation_weights(args...)
+
+Validate the observation weights of a risk measure.
+
+A risk measure divides by the sum of its observation weights, so a weight vector that sums to zero has no value to give. This assertion refuses it with the rules of [`assert_nonempty_nonneg_finite_val`](@ref) and one rule more. A [`DynamicAbstractWeights`](@ref) has no values until it resolves against the data, so it selects the `args...` method, and [`checked_observation_weights`](@ref) validates its values after it resolves.
+
+# Arguments
+
+  - `w`: Observation weights.
+  - `w_sym`: Symbolic name used in the error messages.
+
+# Validation
+
+  - `w` is not empty, finite and nonnegative, through [`assert_nonempty_nonneg_finite_val`](@ref).
+  - `sum(w) > 0`, so at least one observation carries weight. Otherwise a `DomainError` is raised.
+  - Any other type, `nothing` and a [`DynamicAbstractWeights`](@ref) among them, passes.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`checked_observation_weights`](@ref)
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+  - [`ObsWeights`](@ref)
+"""
+function assert_observation_weights(w::VecNum, w_sym::Sym_Str = :w)::Nothing
+    assert_nonempty_nonneg_finite_val(w, w_sym)
+    sw = sum(w)
+    @argcheck(zero(sw) < sw,
+              DomainError(sw,
+                          "0 < sum($w_sym) must hold, so that at least one observation carries weight. Got\nsum($w_sym) => $sw"))
+    return nothing
+end
+function assert_observation_weights(args...)::Nothing
+    return nothing
+end
+"""
+    checked_observation_weights(w::Option{<:ObsWeights}, X::VecNum_MatNum) -> Option{<:VecNum}
+
+Resolve the observation weights of a risk measure against its data, and check that they fit the data.
+
+The rows of `X`, or the entries of a return series `X`, are the observations. A risk measure reads one weight for each of them, and a weighted quantile reads the weights through the sort permutation of the returns. A weight vector with the wrong length therefore gives a wrong value in silence, or an error that does not name the weights. This function names them.
+
+# Algorithm
+
+ 1. Resolve `w` with [`get_observation_weights`](@ref). `nothing` stays `nothing`.
+ 2. Validate the values of the resolved weights with [`assert_observation_weights`](@ref). A `StatsBase.AbstractWeights` was validated by the constructor of its measure, but a [`DynamicAbstractWeights`](@ref) and the weights of a prior result were not.
+ 3. Check that the length of the weights equals `size(X, 1)`.
+
+# Arguments
+
+  - $(arg_dict[:oow])
+  - `X`: Returns matrix `observations × assets`, or a return series of length `observations`.
+
+# Validation
+
+  - The resolved weights pass [`assert_observation_weights`](@ref).
+  - `length(w) == size(X, 1)`. Otherwise a `DimensionMismatch` is raised.
+
+# Returns
+
+  - `w::Option{<:VecNum}`: The resolved observation weights, or `nothing` when `w` is `nothing`. The vector is borrowed, as [`get_observation_weights`](@ref) states.
+
+# Related
+
+  - [`get_observation_weights`](@ref)
+  - [`assert_observation_weights`](@ref)
+  - [`ObsWeights`](@ref)
+"""
+function checked_observation_weights(w::Option{<:Union{<:ObsWeights, <:VecNum}},
+                                     X::VecNum_MatNum)
+    w = get_observation_weights(w, X)
+    if isnothing(w)
+        return w
+    end
+    assert_observation_weights(w, :w)
+    T = size(X, 1)
+    @argcheck(length(w) == T,
+              DimensionMismatch("length(w) == size(X, 1) must hold: a risk measure reads one observation weight for each observation. Got\nlength(w) => $(length(w))\nsize(X, 1) => $T"))
+    return w
+end
+"""
+    assert_half_open_unit_interval(val::Number, sym::Sym_Str = :val)
+    assert_half_open_unit_interval(args...)
+
+Validate that `0 <= val < 1`.
+
+The significance level of a tail measure whose limit at zero is defined takes this interval. At `val = 0` the tail holds only the worst observation with positive weight, which [`worst_positive_weight_loss`](@ref) gives. A level of one would hold the whole sample, so it stays open. A Calibration Rule has no value until it resolves, so it selects the `args...` method, and the rebuild after the resolution checks the number.
+
+# Arguments
+
+  - `val`: Input value to validate.
+  - `sym`: Symbolic name used in the error messages.
+
+# Validation
+
+  - `0 <= val < 1`. Otherwise a `DomainError` is raised.
+  - Any other type passes.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_unit_interval`](@ref)
+  - [`assert_closed_unit_interval`](@ref)
+  - [`worst_positive_weight_loss`](@ref)
+"""
+function assert_half_open_unit_interval(val::Number, sym::Sym_Str = :val)::Nothing
+    @argcheck(zero(val) <= val < one(val),
+              DomainError(val, "0 <= $sym < 1 must hold. Got\n$sym => $val"))
+    return nothing
+end
+function assert_half_open_unit_interval(args...)::Nothing
+    return nothing
+end
+"""
+    worst_positive_weight_loss(x::VecNum, ::Nothing) -> Number
+    worst_positive_weight_loss(x::VecNum, w::VecNum) -> Number
+
+Return the largest loss of `x` among the observations with positive weight.
+
+This is the value of a tail measure at significance level zero. [`ConditionalValueatRisk`](@ref) and [`EntropicValueatRisk`](@ref) read it on the returns, and [`ConditionalDrawdownatRisk`](@ref) and [`EntropicDrawdownatRisk`](@ref) read it on the drawdowns. An observation with zero weight has no probability, so it cannot be the worst outcome. [`WorstRealisation`](@ref) and [`MaximumDrawdown`](@ref) read every observation instead.
+
+# Arguments
+
+  - `x`: Return or drawdown series. A loss is a negative entry. Not modified.
+  - `w`: Resolved observation weights from [`checked_observation_weights`](@ref), or `nothing`. The weights have at least one positive entry.
+
+# Returns
+
+  - `Number`: The largest loss, `-minimum(x[t] for t with w[t] > 0)`.
+
+# Related
+
+  - [`assert_half_open_unit_interval`](@ref)
+  - [`checked_observation_weights`](@ref)
+"""
+function worst_positive_weight_loss(x::VecNum, ::Nothing)
+    return -minimum(x)
+end
+function worst_positive_weight_loss(x::VecNum, w::VecNum)
+    return -minimum(x[t] for t in axes(x, 1) if zero(w[t]) < w[t])
+end
+"""
     supports_precomputed_returns(r::AbstractBaseRiskMeasure) -> Bool
     supports_precomputed_returns(rk::RiskInputKind, r::AbstractBaseRiskMeasure) -> Bool
 

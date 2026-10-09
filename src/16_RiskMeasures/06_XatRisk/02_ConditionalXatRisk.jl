@@ -76,8 +76,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `alpha` is a number: `0 < alpha < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:alpha_tail0])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -131,8 +131,8 @@ ConditionalValueatRisk
     @pprop w
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Num_SigCal,
                                     w::Option{<:ObsWeights})
-        assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_half_open_unit_interval(alpha, :alpha)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
@@ -218,7 +218,7 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `l` is a number: `l > 0` and finite.
   - If `r` is a number: `r > 0` and finite.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -289,7 +289,7 @@ DistributionallyRobustConditionalValueatRisk
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_gt0_finite_val(l, :l)
         assert_nonempty_gt0_finite_val(r, :r)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(l), typeof(r), typeof(w)}(settings,
                                                                                      alpha,
                                                                                      l, r,
@@ -367,6 +367,9 @@ const RMCVaR{T} = Union{<:ConditionalValueatRisk{<:Any, <:Any, T},
                         <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
                                                                        <:Any, T}}
 function (r::RMCVaR{Nothing})(x::VecNum)
+    if iszero(r.alpha)
+        return worst_positive_weight_loss(x, nothing)
+    end
     x = copy(x)
     aT = r.alpha * length(x)
     idx = min(floor(Int, aT) + 1, length(x))
@@ -379,7 +382,10 @@ function (r::RMCVaR{Nothing})(x::VecNum)
     return var - sum_var / aT
 end
 function (r::RMCVaR{<:ObsWeights})(x::VecNum)
-    w = get_observation_weights(r.w, x)
+    w = checked_observation_weights(r.w, x)
+    if iszero(r.alpha)
+        return worst_positive_weight_loss(x, w)
+    end
     sw = sum(w)
     order = sortperm(x)
     sorted_x = view(x, order)
@@ -457,7 +463,7 @@ Keywords correspond to the struct's fields.
 
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `beta` is a number: `0 < beta < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -517,7 +523,7 @@ ConditionalValueatRiskRange
                                          beta::Num_SigCal, w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w)}(settings,
                                                                              alpha, beta, w)
     end
@@ -587,7 +593,7 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `beta` is a number: `0 < beta < 1`.
   - Each of `l_a`, `r_a`, `l_b` and `r_b` that is a number: `> 0` and finite.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -679,7 +685,7 @@ DistributionallyRobustConditionalValueatRiskRange
         assert_nonempty_gt0_finite_val(r_a, :r_a)
         assert_nonempty_gt0_finite_val(l_b, :l_b)
         assert_nonempty_gt0_finite_val(r_b, :r_b)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(l_a), typeof(r_a), typeof(beta),
                    typeof(l_b), typeof(r_b), typeof(w)}(settings, alpha, l_a, r_a, beta,
                                                         l_b, r_b, w)
@@ -814,7 +820,7 @@ function (r::RMCVaRRg{Nothing})(x::VecNum)
     return loss - gain
 end
 function (r::RMCVaRRg{<:ObsWeights})(x::VecNum)
-    w = get_observation_weights(r.w, x)
+    w = checked_observation_weights(r.w, x)
     sw = sum(w)
     order = sortperm(x)
     sorted_x = view(x, order)
@@ -907,8 +913,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `alpha` is a number: `0 < alpha < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:alpha_tail0])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -962,8 +968,8 @@ ConditionalDrawdownatRisk
     @pprop w
     function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Num_SigCal,
                                        w::Option{<:ObsWeights})
-        assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_half_open_unit_interval(alpha, :alpha)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
@@ -1035,7 +1041,7 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `l` is a number: `l > 0` and finite.
   - If `r` is a number: `r > 0` and finite.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -1108,7 +1114,7 @@ DistributionallyRobustConditionalDrawdownatRisk
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_gt0_finite_val(l, :l)
         assert_nonempty_gt0_finite_val(r, :r)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(l), typeof(r), typeof(w)}(settings,
                                                                                      alpha,
                                                                                      l, r,
@@ -1256,6 +1262,9 @@ A weights vector `w`:
   - [`empirical_value_at_risk`](@ref)
 """
 function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing)
+    if iszero(alpha)
+        return worst_positive_weight_loss(dd, nothing)
+    end
     aT = alpha * length(dd)
     idx = min(floor(Int, aT) + 1, length(dd))
     partialsort!(dd, 1:idx)
@@ -1267,6 +1276,9 @@ function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing)
     return var - sum_var / aT
 end
 function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum)
+    if iszero(alpha)
+        return worst_positive_weight_loss(dd, w)
+    end
     sw = sum(w)
     order = sortperm(dd)
     sorted_dd = view(dd, order)
@@ -1286,7 +1298,7 @@ function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum)
 end
 function (r::RMCDaR)(x::VecNum)
     return conditional_drawdown_at_risk(absolute_drawdown_vec(x), r.alpha,
-                                        get_observation_weights(r.w, x))
+                                        checked_observation_weights(r.w, x))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1341,8 +1353,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `alpha` is a number: `0 < alpha < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:alpha_tail0])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -1393,8 +1405,8 @@ RelativeConditionalDrawdownatRisk
     @pprop w
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                alpha::Num_SigCal, w::Option{<:ObsWeights})
-        assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_half_open_unit_interval(alpha, :alpha)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
@@ -1408,7 +1420,7 @@ end
 calibration_slots(x::RelativeConditionalDrawdownatRisk) = (; alpha = x.alpha)
 function (r::RelativeConditionalDrawdownatRisk)(x::VecNum)
     return conditional_drawdown_at_risk(relative_drawdown_vec(x), r.alpha,
-                                        get_observation_weights(r.w, x))
+                                        checked_observation_weights(r.w, x))
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

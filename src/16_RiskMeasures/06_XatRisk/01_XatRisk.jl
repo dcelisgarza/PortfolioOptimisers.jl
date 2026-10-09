@@ -605,7 +605,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 ## Propagated parameters
 
@@ -682,7 +682,7 @@ ValueatRisk
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Num_SigCal,
                          w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
         assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w), typeof(alg)}(settings, alpha,
                                                                             w, alg)
     end
@@ -729,7 +729,7 @@ calibration_slots(x::ValueatRisk) = (; alpha = x.alpha)
 # which no rule of specificity can order.
 function (r::ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk})(x::VecNum)
     _, s = mip_var_bounds(r.alg.b, r.alg.s)
-    w = get_observation_weights(r.w, x)
+    w = checked_observation_weights(r.w, x)
     return empirical_value_at_risk(isnothing(w) ? copy(x) : x, r.alpha, s, w)
 end
 # The parametric formulation is a different estimand from the empirical order statistic
@@ -802,7 +802,7 @@ Keywords correspond to the struct's fields.
 
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `beta` is a number: `0 < beta < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 ## Propagated parameters
 
@@ -884,7 +884,7 @@ ValueatRiskRange
                               alg::ValueatRiskFormulation)
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w), typeof(alg)}(settings,
                                                                                           alpha,
                                                                                           beta,
@@ -954,7 +954,7 @@ end
 # model builds it over the negated series.
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:MIPValueatRisk})(x::VecNum)
     _, s = mip_var_bounds(r.alg.b, r.alg.s)
-    w = get_observation_weights(r.w, x)
+    w = checked_observation_weights(r.w, x)
     loss = empirical_value_at_risk(isnothing(w) ? copy(x) : x, r.alpha, s, w)
     gain = empirical_value_at_risk(-x, r.beta, s, w)
     return loss + gain
@@ -1029,7 +1029,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
   - If `b` is not `nothing`: `b > 0` and finite.
   - If `s` is not `nothing`: `s > 0` and finite.
   - If both `b` and `s` are not `nothing`: `b > s`.
@@ -1098,7 +1098,7 @@ DrawdownatRisk
                             w::Option{<:ObsWeights}, b::Option{<:Number},
                             s::Option{<:Number})
         assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         bflag = !isnothing(b)
         sflag = !isnothing(s)
         if bflag
@@ -1255,7 +1255,7 @@ end
 function (r::DrawdownatRisk)(x::VecNum)
     _, s = mip_var_bounds(r.b, r.s)
     return empirical_value_at_risk(absolute_drawdown_vec(x), r.alpha, s,
-                                   get_observation_weights(r.w, x))
+                                   checked_observation_weights(r.w, x))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1314,7 +1314,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -1365,7 +1365,7 @@ RelativeDrawdownatRisk
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                     alpha::Num_SigCal, w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
@@ -1435,7 +1435,7 @@ end
 function (r::RelativeDrawdownatRisk)(x::VecNum)
     _, s = mip_var_bounds(nothing, nothing)
     return empirical_value_at_risk(relative_drawdown_vec(x), r.alpha, s,
-                                   get_observation_weights(r.w, x))
+                                   checked_observation_weights(r.w, x))
 end
 
 """

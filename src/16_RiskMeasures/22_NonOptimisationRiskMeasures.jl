@@ -53,7 +53,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - $(val_dict[:oow])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -96,7 +96,7 @@ MeanReturn
     flag
     function MeanReturn(settings::HierarchicalRiskMeasureSettings, w::Option{<:ObsWeights},
                         flag::Bool)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(w), typeof(flag)}(settings, w, flag)
     end
 end
@@ -109,7 +109,7 @@ function (r::MeanReturn)(x::VecNum)
     if r.flag
         x = log1p.(x)
     end
-    w = get_observation_weights(r.w, x)
+    w = checked_observation_weights(r.w, x)
     return isnothing(w) ? Statistics.mean(x) : Statistics.mean(x, w)
 end
 """
@@ -300,7 +300,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `mu` is a `VecNum`: `!isempty(mu)`.
-  - $(val_dict[:oow])
+  - $(val_dict[:oow_rm])
 
 !!! warning
 
@@ -355,7 +355,7 @@ ThirdCentralMoment
     @pprop @vprop mu
     function ThirdCentralMoment(settings::HierarchicalRiskMeasureSettings,
                                 w::Option{<:ObsWeights}, mu::Option{<:MuSlot})
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end

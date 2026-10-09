@@ -315,7 +315,7 @@
 "src/13_Fees.jl" = { map = 8, units = 39, algorithm = 33, swept = true, bindings = ["AbstractFeeAmortisation", "AmortisedFees", "Fees", "FeesE_Fees", "FeesEstimator", "FirstObservationFees", "add_liquidation_terms", "assert_short_fee_convex", "calc_asset_fees", "calc_asset_fees", "calc_asset_fees", "calc_asset_fixed_fees", "calc_asset_fixed_liquidation_fees", "calc_asset_liquidation_fees", "calc_asset_one_off_fees", "calc_asset_periodic_fees", "calc_fees", "calc_fees", "calc_fees", "calc_fixed_fees", "calc_fixed_liquidation_fees", "calc_liquidation_fees", "calc_one_off_fees", "calc_periodic_fees", "calc_total_asset_fees", "calc_total_fees", "fees_constraints", "fees_constraints", "investable_fees_view", "lift_fee_rate", "lift_fees", "lift_turnover", "mark_fees", "needs_previous_weights", "override_fee_amortisation", "port_opt_view", "show_fields", "strip_liquidation_charges", "two_axis_fees_view"] }
 "src/14_NetReturnsDrawdowns.jl" = { map = 8, units = 49, algorithm = 11, swept = false }
 "src/15_Tracking.jl" = { map = 8, units = 14, algorithm = 4, swept = true, bindings = ["AbstractTracking", "AbstractTrackingAlgorithm", "DependentVariableTracking", "IndependentVariableTracking", "ReturnsTracking", "Tr_VecTr", "TrackingError", "VariableTracking", "VecTr", "WeightsTracking", "factory", "needs_previous_weights", "tracking_benchmark", "tracking_benchmark"] }
-"src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 91, swept = false }
+"src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { map = 9, units = 95, swept = false }
 "src/16_RiskMeasures/02_Variance.jl" = { map = 9, units = 24, algorithm = 3, swept = true, bindings = ["NSkeQuadFormulations", "QuadRiskExpr", "QuadSecondMomentFormulations", "RSOCRiskExpr", "SOCRiskExpr", "SecondMomentFormulation", "SquaredSOCRiskExpr", "StandardDeviation", "UncertaintySetVariance", "UncertaintySetVariance", "Variance", "VarianceFormulation", "_no_bounds_no_risk_expr_risk_measure", "_no_bounds_risk_measure", "factory", "factory", "factory", "factory", "factory", "resolve_deferred_quantities", "resolve_deferred_quantities", "resolve_deferred_quantities", "ucs_risk_measure", "ucs_variance"] }
 "src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { map = 9, units = 32, swept = false }
 "src/16_RiskMeasures/04_Kurtosis.jl" = { map = 9, units = 9, swept = false }
@@ -328,7 +328,7 @@
 "src/16_RiskMeasures/07_OWARiskMeasures_a.jl" = { map = 9, units = 45, swept = false }
 "src/16_RiskMeasures/07_OWARiskMeasures_b.jl" = { map = 9, units = 3, swept = false }
 "src/16_RiskMeasures/08_AverageDrawdown.jl" = { map = 9, units = 3, swept = false }
-"src/16_RiskMeasures/09_UlcerIndex.jl" = { map = 9, units = 2, swept = false }
+"src/16_RiskMeasures/09_UlcerIndex.jl" = { map = 9, units = 3, swept = false }
 "src/16_RiskMeasures/10_MaximumDrawdown.jl" = { map = 9, units = 2, swept = false }
 "src/16_RiskMeasures/11_BrownianDistanceVariance.jl" = { map = 9, units = 5, swept = false }
 "src/16_RiskMeasures/12_WorstRealisation.jl" = { map = 9, units = 1, swept = false }
@@ -408,7 +408,7 @@
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/04_KurtosisConstraints.jl" = { map = 11, units = 5, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/05_NegativeSkewnessConstraints.jl" = { map = 11, units = 3, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/01_XatRiskConstraints.jl" = { map = 11, units = 9, swept = false }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/02_ConditionalXatRiskConstraints.jl" = { map = 11, units = 8, swept = false }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/02_ConditionalXatRiskConstraints.jl" = { map = 11, units = 9, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/03_EntropicXatRiskConstraints.jl" = { map = 11, units = 4, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/04_RelativisticXatRiskConstraints.jl" = { map = 11, units = 4, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/05_PowerNormXatRiskConstraints.jl" = { map = 11, units = 4, swept = false }

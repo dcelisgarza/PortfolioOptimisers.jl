@@ -1220,7 +1220,7 @@ function measure_gradient(r::StandardDeviation, w::VecNum, X::MatNum, fees::Opti
 end
 function measure_gradient(r::MeanReturn, w::VecNum, X::MatNum, ::Nothing; kwargs...)
     x = X * w
-    ow = get_observation_weights(r.w, x)
+    ow = checked_observation_weights(r.w, x)
     omega = isnothing(ow) ? fill(inv(length(x)), length(x)) : ow ./ sum(ow)
     if r.flag
         omega = omega ./ (one(eltype(x)) .+ x)

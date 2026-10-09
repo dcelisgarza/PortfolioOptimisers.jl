@@ -1014,6 +1014,7 @@ The sign convention that lets a Range be a sum. The gain tail is the base measur
 
 **Significance Level**
 The probability mass in one end of the return distribution that a tail measure prices: `alpha` in the loss end, `beta` in the gain end, both in `(0, 1)`. At sample length `T` a tail at `alpha` holds `ceil(alpha * T)` of the sample's scenarios. The two ends are the **tail**, which is the lower one, and the **head**, which is the upper one. A Calibration Slot (§3.9) names its own end, so one rule serves both.
+Six tail measures also take `alpha = 0`: `ConditionalValueatRisk`, `EntropicValueatRisk`, `ConditionalDrawdownatRisk`, `EntropicDrawdownatRisk` and the two relative drawdown variants. Their tail then holds only the largest loss among the observations with positive weight, which is the weighted form of `WorstRealisation` and `MaximumDrawdown` (ADR 0202).
 *Avoid*: Deformation Parameter (below), which shares the range `(0, 1)` and nothing else.
 
 **Deformation Parameter**

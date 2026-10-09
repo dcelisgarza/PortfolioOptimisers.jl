@@ -133,7 +133,7 @@ function set_mip_quantile_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
     state_set!(model, prefix, keys.z, i, z)
     alpha = r.alpha
     wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, pr.X)
+    wi = checked_observation_weights(wi, pr.X)
     if isnothing(wi)
         state_set!(model, prefix, keys.cardinality, i,
                    JuMP.@constraint(model, sc * (sum(z) - alpha * T - s * T) <= 0))
