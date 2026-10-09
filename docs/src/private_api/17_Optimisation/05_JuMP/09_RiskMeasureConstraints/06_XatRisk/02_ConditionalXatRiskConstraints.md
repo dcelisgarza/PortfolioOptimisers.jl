@@ -1,5 +1,5 @@
 ```@meta
-Description = "Conditional XatRisk Constraints, private API of PortfolioOptimisers.jl: set_risk_constraints!, set_conditional_risk_constraints!, …"
+Description = "Conditional XatRisk Constraints, private API of PortfolioOptimisers.jl: set_risk_constraints!, set_worst_loss_constraints!, …"
 ```
 
 # [Conditional XatRisk Constraints: private API](@id private-api-conditional-xatrisk-constraints)

@@ -627,3 +627,101 @@ function cross_sectional_refold_factors(pe::AbstractPriorEstimator, f::MatNum,
     end
     return pf
 end
+"""
+    cross_sectional_alive_folds(cre::AbstractCrossSectionalRegressionEstimator) -> Bool
+    cross_sectional_alive_folds(cre::Union{CrossSectionalLinearRegression,
+                                           CrossSectionalTargetRegression}) -> Bool
+    cross_sectional_alive_folds(alg::AbstractCrossSectionalSolveAlgorithm) -> Bool
+    cross_sectional_alive_folds(alg::Union{PseudoInverseFallback, MinimumNormSolve,
+                                           DependentColumnDrop}) -> Bool
+
+Answers whether a step of the carry fold of a Cross-Sectional Factor Prior folds a factor that comes alive, under the regression estimator `cre`, or under its solve algorithm `alg`.
+
+A factor that comes alive at a step was empty at every fitted observation: its exposure was zero at every pair of positive weight. So the batch fit regresses each fitted observation over a design with a zero column, where the step fitted it without that column. The fold keeps the answer of the step when the zero column does not change it.
+
+  - Under [`PseudoInverseFallback`](@ref) the design with the zero column is rank-deficient, and the solve takes its answer of least norm. A zero column adds nothing to the norm or to the fit, so that answer equals the answer without the column to rounding, and gives the column a return of zero. [`MinimumNormSolve`](@ref) takes the same answer. A [`CrossSectionalTargetRegression`](@ref) under [`PseudoInverseFallback`](@ref) projects its answer onto the row space of the weighted design, which holds a zero at the zero column, so it gives the same answer.
+  - [`DependentColumnDrop`](@ref) drops the zero column by the pivot of its rank test, and gives it a return of zero. It fits the columns that remain, in their order, which are the columns of the step.
+  - [`RankDeficiencyRefusal`](@ref) refuses the design with the zero column. [`UncheckedSolve`](@ref) throws on such a design when it is square, and hands it to the target of a [`CrossSectionalTargetRegression`](@ref) unchecked. So the batch fit can refuse, or answer otherwise, where the fold would keep the answer. Every other estimator and algorithm is not known to keep the answer. The function answers `false` for them, and the step fits every carried observation again, as the batch fit does.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`CrossSectionalLinearRegression`](@ref) or a [`CrossSectionalTargetRegression`](@ref) answers for its solve algorithm `cre.alg`: `true` under [`PseudoInverseFallback`](@ref), [`MinimumNormSolve`](@ref) and [`DependentColumnDrop`](@ref), and `false` under every other algorithm.
+ 2. Every other estimator answers `false`.
+
+# Arguments
+
+  - `cre`: The cross-sectional regression estimator of the prior.
+  - `alg`: Its solve algorithm.
+
+# Returns
+
+  - `folds::Bool`: `true` when the step keeps the fitted observations.
+
+# Related
+
+  - [`cross_sectional_fold_mark`](@ref)
+  - [`cross_sectional_step_factors`](@ref)
+  - [`cross_sectional_solve`](@ref)
+"""
+function cross_sectional_alive_folds(::AbstractCrossSectionalRegressionEstimator)::Bool
+    return false
+end
+function cross_sectional_alive_folds(cre::Union{CrossSectionalLinearRegression,
+                                                CrossSectionalTargetRegression})::Bool
+    return cross_sectional_alive_folds(cre.alg)
+end
+function cross_sectional_alive_folds(::AbstractCrossSectionalSolveAlgorithm)::Bool
+    return false
+end
+function cross_sectional_alive_folds(::Union{PseudoInverseFallback, MinimumNormSolve,
+                                             DependentColumnDrop})::Bool
+    return true
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Folds the factor returns of a step into the factor prior of the carry fold of a Cross-Sectional Factor Prior.
+
+The factor prior folds the factor returns of the factors that are not empty. A step that marks no other factor folds the factor returns of its new observations into the folded prior. A step where a factor comes alive adds a column to the factor returns. The default factor covariance is not separable by column, so the function folds the factor prior again over every fitted factor return, with a return of zero for the new factor at each observation before the step. That fold reads every fitted observation, so its cost grows with the stream, and it happens at most once for each factor.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - `st`: The state before the step, whose histories hold the new observations as their last rows.
+  - `csr`: The regression of every fitted observation, the new observations last.
+  - `lv`: The mark of the factors that are not empty in the last pass, after the step.
+
+# Returns
+
+  - `pe`: The factor prior after the step.
+
+# Related
+
+  - [`cross_sectional_fold_step`](@ref)
+  - [`cross_sectional_fold_factors`](@ref)
+  - [`cross_sectional_refold_factors`](@ref)
+  - [`cross_sectional_alive_folds`](@ref)
+"""
+function cross_sectional_step_factors(pe::CrossSectionalFactorPrior,
+                                      st::CrossSectionalCarryState,
+                                      csr::CrossSectionalRegression,
+                                      lv::AbstractVector{Bool})
+    Tf = size(st.Ms, 1)
+    if lv != st.lv
+        cb = cross_sectional_observed_block(st.obs, 1:Tf, (pe.lag + 1):Tf, st.buf.n - Tf)
+        return cross_sectional_refold_factors(pe.pe,
+                                              cross_sectional_fold_factor_returns(csr.f, lv,
+                                                                                  cb),
+                                              st.seed)
+    end
+    s = size(st.csr.f, 1)
+    cb = cross_sectional_observed_block(st.obs, 1:Tf, (pe.lag + s + 1):Tf, st.buf.n - Tf)
+    return cross_sectional_fold_factors(st.pe,
+                                        cross_sectional_fold_factor_returns(view(csr.f,
+                                                                                 (s + 1):size(csr.f,
+                                                                                              1),
+                                                                                 :), lv,
+                                                                            cb))
+end

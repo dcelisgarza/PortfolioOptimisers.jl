@@ -41,8 +41,8 @@ A Pipeline under `Online` buffers its **input data**, because its refit is the w
 
 **Carry Fold**
 The online route of an estimator that folds what folds and refits the rest over the rows it carries, the rule of ADR 0136. The Cross-Sectional Factor Prior folds as a carry when no `Online` wraps it: a new observation changes no past exposure, regression or idiosyncratic variance, so each step computes them for the new observations alone, folds the factor prior and the idiosyncratic variance, and refits the Return Forecast and the idiosyncratic correlation at the call with no data. It carries the panel rows that its Descriptors read, or every row when one of them, or a Return Forecast that reads the panel, has no finite look-back. ADR 0193, #1471.
-A factor that comes alive makes the step fit every carried observation again, so the call with no data equals the batch fit. A Batch Choice of a dropped member that moves changes only the basis of the factor returns, so the step fits the factor prior again and no past regression (#1601). A Pinned Choice and a Seed Window keep a value of the first fit, so under either one the call with no data equals no batch fit.
-*Avoid*: reading it as a refit; it fits no past observation again unless a factor comes alive or a member does not fold.
+A factor that comes alive had a return of zero at every fitted observation, so the step keeps them and folds the factor prior again over every fitted factor return (#1627); a regression estimator that refuses the zero column of such an observation fits every carried observation again. A Batch Choice of a dropped member that moves changes only the basis of the factor returns, so the step fits the factor prior again and no past regression (#1601). A Pinned Choice and a Seed Window keep a value of the first fit, so under either one the call with no data equals no batch fit.
+*Avoid*: reading it as a refit; it fits no past observation again unless a member does not fold.
 A scheme under `Online` buffers nothing: the same word there declares an Online Scheme, and the loop steps instead of refitting. ADR 0167.
 
 **Carry Rule**

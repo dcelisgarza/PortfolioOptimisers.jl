@@ -5,7 +5,7 @@ Carries the carry fold of a Cross-Sectional Factor Prior between two online step
 
 A [`CrossSectionalFactorPrior`](@ref) with no `cache` seeds this state at its first [`partial_fit!`](@ref), as the carry of [`EmpiricalPrior`](@ref) seeds a [`PriorCarryState`](@ref). The state applies the rule of the carry fold: it folds what folds and refits the rest. A new observation changes no past Factor Exposure, no past regression and no past idiosyncratic variance, so a step computes them for the new observations alone. The idiosyncratic variance and the factor prior fold exactly. So does the idiosyncratic correlation under `th > 0` when its `ce` folds, as [`supports_partial_fit`](@ref) answers. The Return Forecast, and a `ce` that does not fold, refit at the call with no data from the carried rows. A Return Forecast that computes its history one observation at a time, as [`folds_forecast_rows`](@ref) answers, folds too: the state carries its Descriptor scores and its rows, and a step computes the rows of its new observations alone.
 
-Two choices read every fitted observation: the automatic dropped member of a Factor Family under a [`BatchChoice`](@ref), and the mark of the Empty Factors. A step that moves the dropped member solves no observation of full rank again: [`cross_sectional_fold_move`](@ref) selects the columns of the raw factor returns that the new member keeps, and folds the factor prior again over them. That fold reads every fitted factor return, so its cost grows with the stream. The move solves each rank-deficient observation again with [`cross_sectional_move_solve`](@ref): an observation with an Unseen Member under [`SolvedUnseenMember`](@ref), or one with a dependent factor set. Under a [`CrossSectionalTargetRegression`](@ref) whose target answers `false` to [`is_basis_invariant`](@ref), a move fits every carried observation again, as [`cross_sectional_move_basis`](@ref) states. Under a [`GeneralisedLinearModel`](@ref) target the move folds too, because its iterative fit takes the same iterates in every basis. A step that moves the mark of the Empty Factors fits every carried observation again.
+Two choices read every fitted observation: the automatic dropped member of a Factor Family under a [`BatchChoice`](@ref), and the mark of the Empty Factors. A step that moves the dropped member solves no observation of full rank again: [`cross_sectional_fold_move`](@ref) selects the columns of the raw factor returns that the new member keeps, and folds the factor prior again over them. That fold reads every fitted factor return, so its cost grows with the stream. The move solves each rank-deficient observation again with [`cross_sectional_move_solve`](@ref): an observation with an Unseen Member under [`SolvedUnseenMember`](@ref), or one with a dependent factor set. Under a [`CrossSectionalTargetRegression`](@ref) whose target answers `false` to [`is_basis_invariant`](@ref), a move fits every carried observation again, as [`cross_sectional_move_basis`](@ref) states. Under a [`GeneralisedLinearModel`](@ref) target the move folds too, because its iterative fit takes the same iterates in every basis. A step where an Empty Factor comes alive solves no fitted observation again: the factor has a return of zero at each of them, and [`cross_sectional_step_factors`](@ref) folds the factor prior again over every fitted factor return. That fold reads every fitted observation, so its cost grows with the stream, and it happens at most once for each factor. Under a regression estimator that changes the answer of an observation whose design gains a zero column, as [`cross_sectional_alive_folds`](@ref) answers, that step fits every carried observation again.
 
 A prior whose tree reads the Exogenous Series, as [`reads_exogenous_series`](@ref) answers, folds an observed factor too. The buffer and the carried rows hold the series. The returns net of the observed factors are derived series: the batch fit derives each row from the observed exposures of the row `lag` observations before it, and the first `lag` rows of the sample from the exposure of the same row. So the state derives each row one time, and carries it.
 
@@ -576,7 +576,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Runs the regression passes of a Cross-Sectional Factor Prior over a block of observations.
 
-The batch fit runs the same passes over every observation. Each observation is fitted on its own row, so a block gives the rows that the batch fit gives, when the masks of the Empty Factors are the masks of every fitted observation. A first fit or a fit of every carried observation states no mark, and the function takes the mark of the block. A step states the marks of the observations it fitted. The function answers `nothing` when the block marks a factor that those marks leave empty, because every observation must then be fitted again.
+The batch fit runs the same passes over every observation. Each observation is fitted on its own row, so a block gives the rows that the batch fit gives, when the masks of the Empty Factors are the masks of every fitted observation. A first fit or a fit of every carried observation states no mark, and the function takes the mark of the block. A step states the marks of the observations it fitted, and regresses the block over those marks joined to the mark of the block. A factor that the block marks and those marks leave empty comes alive at the block. The function answers `nothing` when the regression estimator does not fold such a factor, as [`cross_sectional_alive_folds`](@ref) answers, because every observation must then be fitted again.
 
 # Algorithm
 
@@ -596,7 +596,7 @@ The batch fit runs the same passes over every observation. Each observation is f
 
 # Returns
 
-  - `fit::Option{<:NamedTuple}`: `csr`, `W`, `lv1`, `lv` and `ve1`, or `nothing` when the block marks a new factor.
+  - `fit::Option{<:NamedTuple}`: `csr`, `W`, `lv1`, `lv` and `ve1`, or `nothing` when a factor comes alive and the regression estimator does not fold it.
 
 # Related
 
@@ -671,7 +671,7 @@ Runs one regression pass of the carry fold of a Cross-Sectional Factor Prior ove
 # Algorithm
 
  1. Take the design of the regression under the Unseen Member rule `pe.unseen` with [`unseen_member_design`](@ref), giving `Z`.
- 2. Join the mark of the factors that are not empty over `Z` to `old` with [`cross_sectional_fold_mark`](@ref). Answer `nothing` when the block marks a new factor.
+ 2. Join the mark of the factors that are not empty over `Z` to `old` with [`cross_sectional_fold_mark`](@ref). Answer `nothing` when a factor comes alive at the block and the regression estimator does not fold it.
  3. Regress `Z` on the marked factors with [`cross_sectional_live_regression`](@ref), map its coefficients back with [`unseen_member_returns`](@ref), and refuse an intercept with [`assert_cross_sectional_no_intercept`](@ref).
 
 # Arguments
@@ -693,7 +693,7 @@ function cross_sectional_fold_pass(pe::CrossSectionalFactorPrior, blk::NamedTupl
                                    W::MatNum, old::Option{<:BitVector})
     (; Zl, Xr, fcb, B) = blk
     ud = unseen_member_design(pe.unseen, fcb, B, Zl, W)
-    lv = cross_sectional_fold_mark(old, cross_sectional_live_factors(ud.Z, Xr, W))
+    lv = cross_sectional_fold_mark(old, cross_sectional_live_factors(ud.Z, Xr, W), pe.cre)
     return if isnothing(lv)
         nothing
     else
@@ -736,10 +736,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Joins the mark of the factors that are not empty over a block to the mark of the fitted observations.
 
+A factor that the block marks and the fitted observations leave empty comes alive at the block. Its exposure is zero at every pair of positive weight of each fitted observation, so the batch fit regresses each such observation over a design with a zero column. The regression estimator decides if that column changes the answer of the observation, as [`cross_sectional_alive_folds`](@ref) answers. When it does not, the join keeps the fitted observations, and the step folds. When it does, the function answers `nothing`, and every observation must be fitted again.
+
 # Arguments
 
   - `old`: The mark of the fitted observations, or `nothing` for a first fit.
   - `new`: The mark of the block.
+  - `cre`: The cross-sectional regression estimator of the prior.
 
 # Validation
 
@@ -747,20 +750,23 @@ Joins the mark of the factors that are not empty over a block to the mark of the
 
 # Returns
 
-  - `lv::Option{BitVector}`: `new` for a first fit, `old` when the block marks no other factor, and `nothing` when it does.
+  - `lv::Option{BitVector}`: `new` for a first fit, `old .| new` when no factor comes alive or `cre` folds it, and `nothing` otherwise.
 
 # Related
 
   - [`cross_sectional_fold_regression`](@ref)
   - [`cross_sectional_live_factors`](@ref)
+  - [`cross_sectional_alive_folds`](@ref)
 """
-function cross_sectional_fold_mark(::Nothing, new::BitVector)
+function cross_sectional_fold_mark(::Nothing, new::BitVector, ::Any)
     @argcheck(any(new),
               ArgumentError("every one of the $(length(new)) factors is empty: no factor has a nonzero exposure at an (observation, asset) pair of positive weight, so the regression has nothing to fit. Widen the eligible cross-section, or give factors that the assets load on."))
     return new
 end
-function cross_sectional_fold_mark(old::BitVector, new::BitVector)
-    return any(i -> new[i] && !old[i], eachindex(new, old)) ? nothing : old
+function cross_sectional_fold_mark(old::BitVector, new::BitVector,
+                                   cre::AbstractCrossSectionalRegressionEstimator)
+    lv = old .| new
+    return lv == old || cross_sectional_alive_folds(cre) ? lv : nothing
 end
 """
     cross_sectional_fold_factor_returns(f::MatNum, lv::AbstractVector{Bool}, cb::Nothing)
@@ -972,7 +978,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Fits every observation that the carry fold of a Cross-Sectional Factor Prior carries after the warm-up.
 
-This is the first fit, and the fit after a step that moves the mark of the Empty Factors, or that moves the automatic choice of a dropped member where [`cross_sectional_fold_move`](@ref) does not fold it. It runs the steps of the batch fit over the carried histories. The idiosyncratic variance and the factor prior fold the first `seed` observations as one block, and every later observation alone, so a [`SeedWindow`](@ref) cuts the rows that it cut at the first fit.
+This is the first fit, and the fit after a step where a factor comes alive and the regression estimator does not fold it, as [`cross_sectional_alive_folds`](@ref) answers, or that moves the automatic choice of a dropped member where [`cross_sectional_fold_move`](@ref) does not fold it. It runs the steps of the batch fit over the carried histories. The idiosyncratic variance and the factor prior fold the first `seed` observations as one block, and every later observation alone, so a [`SeedWindow`](@ref) cuts the rows that it cut at the first fit.
 
 # Algorithm
 
@@ -1031,15 +1037,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Fits the new observations of a step of the carry fold of a Cross-Sectional Factor Prior, and folds them into its state.
 
-Each output of a fitted observation reads no later observation, so the step fits the new observations alone and appends their outputs. It answers `nothing` when the new observations mark a factor that the fitted observations leave empty.
+Each output of a fitted observation reads no later observation, so the step fits the new observations alone and appends their outputs. A factor that the new observations mark and the fitted observations leave empty comes alive at the step. Its exposure is zero at every pair of positive weight of each fitted observation, so its column adds nothing to the fit of that observation, and the answer of least norm gives it a return of zero there, as [`cross_sectional_live_regression`](@ref) states. So the step keeps every fitted output, and regresses the new observations over the joined marks. It folds the factor prior again over every fitted factor return, with [`cross_sectional_step_factors`](@ref), because the factor prior folds the factors that are not empty. The step answers `nothing` when the regression estimator does not fold a factor that comes alive, as [`cross_sectional_alive_folds`](@ref) answers.
 
 # Algorithm
 
  1. Reduce the exposures of the new observations with [`cross_sectional_family_basis`](@ref) under `families`, and lag them behind the reduced exposures of the last `lag` observations.
  2. Take the observed factors of the new observations with [`cross_sectional_observed_block`](@ref), which refuses an infinite observed return.
  3. Run the regression passes over the new observations with [`cross_sectional_fold_regression`](@ref), under the marks of the fitted observations, on the returns net of the observed factors.
- 4. Fold `ve` over the new residuals with [`cross_sectional_fold_variance`](@ref), and the factor prior over the new factor returns of [`cross_sectional_fold_factor_returns`](@ref) with [`cross_sectional_fold_factors`](@ref).
- 5. Append every output to the state with [`cross_sectional_fold_append`](@ref).
+ 4. Fold `ve` over the new residuals with [`cross_sectional_fold_variance`](@ref), and fold the factor prior with [`cross_sectional_step_factors`](@ref).
+ 5. Append every output to the state with [`cross_sectional_fold_append`](@ref), and record the marks of the step.
 
 # Arguments
 
@@ -1076,15 +1082,14 @@ function cross_sectional_fold_step(pe::CrossSectionalFactorPrior,
         return nothing
     end
     (; V, ve) = cross_sectional_fold_variance(st.ve, reg.csr.eps, blk.em, blk.am, 0)
-    pf = cross_sectional_fold_factors(st.pe,
-                                      cross_sectional_fold_factor_returns(reg.csr.f, reg.lv,
-                                                                          cb))
+    csr = cross_sectional_fold_append(st.csr, reg.csr)
     return cross_sectional_carry_with(st,
-                                      (; fcb = fcb, Z = Zc[(m + 1):end, :, :],
-                                       csr = cross_sectional_fold_append(st.csr, reg.csr),
+                                      (; fcb = fcb, Z = Zc[(m + 1):end, :, :], csr = csr,
                                        W = cross_sectional_fold_append(st.W, reg.W),
                                        vs = cross_sectional_fold_append(st.vs, V), ve = ve,
-                                       ve1 = reg.ve1, pe = pf))
+                                       ve1 = reg.ve1, lv1 = reg.lv1, lv = reg.lv,
+                                       pe = cross_sectional_step_factors(pe, st, csr,
+                                                                         reg.lv)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1174,7 +1179,7 @@ This is the step of a prior that carries a [`CrossSectionalCarryState`](@ref). I
  2. Append the rows of the step and their series to the carried panel rows with [`cross_sectional_window_append`](@ref).
  3. Compute the neutralised exposures, the observed factors and the derived series of the new observations with [`cross_sectional_fold_rows`](@ref), and append the rows after the warm-up to the histories with [`cross_sectional_fold_histories`](@ref), and their Descriptor scores with [`cross_sectional_carry_scores`](@ref). Append the returns, both masks and the series to the buffer `buf`. Keep the panel rows and their derived series that [`cross_sectional_carry_rows`](@ref) names.
  4. Before the first fit, fit every observation with [`cross_sectional_fold_refit`](@ref) once `lag + 2` observations follow the warm-up, as the batch fit needs.
- 5. After it, apply the Choice Rule with [`cross_sectional_fold_choice`](@ref). When the choice moves, fold the move into the state with [`cross_sectional_fold_move`](@ref). Then fit the new observations with [`cross_sectional_fold_step`](@ref). Fit every observation again with [`cross_sectional_fold_refit`](@ref) when either one answers `nothing`. A variance estimator `pe.ve` that does not fold, as [`supports_partial_fit`](@ref) answers, carries no state, so every step fits every observation again.
+ 5. After it, apply the Choice Rule with [`cross_sectional_fold_choice`](@ref). When the choice moves, fold the move into the state with [`cross_sectional_fold_move`](@ref). Then fit the new observations with [`cross_sectional_fold_step`](@ref), which folds a factor that comes alive. Fit every observation again with [`cross_sectional_fold_refit`](@ref) when either one answers `nothing`. A variance estimator `pe.ve` that does not fold, as [`supports_partial_fit`](@ref) answers, carries no state, so every step fits every observation again.
  6. Bring the outputs that read the fit up to the fitted observations with [`cross_sectional_carry_outputs`](@ref): the Return Forecast history that a slot reads, the rows of a Return Forecast that folds, and the standardised idiosyncratic returns. Each keeps the carried rows after a step of [`cross_sectional_fold_step`](@ref), and makes every row again after a fit of every observation.
 
 # Arguments

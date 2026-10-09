@@ -5,7 +5,8 @@ An unwrapped prior folds as a carry: its first step seeds a `CrossSectionalCarry
 step computes the exposures, the regression and the idiosyncratic variance of the new
 observations alone, from the panel rows that its Descriptors read. The factor prior and the
 idiosyncratic variance fold, and the Return Forecast and the idiosyncratic correlation refit at the
-call with no data. A factor that comes alive fits every carried observation again. A batch choice
+call with no data. A factor that comes alive keeps every fitted observation, and folds the factor
+prior again (#1627). A batch choice
 that moves folds the move, and solves again each observation whose answer depends on the basis
 (#1605, #1613). It folds the same way under a target that gives the same coefficients in every
 basis, as `is_basis_invariant` answers (#1614), and under a `GeneralisedLinearModel` target (#1615).
@@ -555,14 +556,15 @@ end
         stated = CrossSectionalFactorPrior(; lambda = 1, style...,
                                            families = ["style" => "style1"])
         @test all(k -> agrees(sp[k].pr, batch(stated, k)), 1:3)
-        # A factor that is empty at the first fit and comes alive fits every observation
-        # again.
+        # A factor that is empty at the first fit and comes alive folds (#1627), and equals
+        # the batch fit to rounding.
         rdz = deepcopy(rd)
         po.panel_field(rdz.pnl, "style1").vals[1:120, :] .= 0.0
         pe = CrossSectionalFactorPrior(; lambda = 1, grid_config("Base", rdz)...)
         sz = stream(pe, rdz)
         @test [x.pe.cache.lv for x in sz] == [[true, false, true], trues(3), trues(3)]
-        @test all(k -> agrees(sz[k].pr, batch(pe, k, rdz)), 1:3)
+        @test sz[2].pe.cache.csr.f isa SubArray
+        @test all(k -> near(sz[k].pr, batch(pe, k, rdz)), 1:3)
     end
 
     @testset "A move of a batch choice folds and solves no row of full rank again (#1605)" begin
@@ -828,6 +830,133 @@ end
         @test rb.di == [2] && rb.ratios ≈ [2.0 0.0; 4.0 8.0]
         @test po.cross_sectional_rebase(fcb, ["ind" => "a"], ["a", "b", "c"]).ratios ==
               fcb.ratios
+    end
+
+    @testset "A step where an Empty Factor comes alive folds (#1627)" begin
+        # `style1` is zero on the first 120 rows, so its factor comes alive at the second
+        # block. It had a zero exposure at every pair of positive weight of each fitted
+        # observation, so the step keeps every fitted output, gives the factor a return of zero
+        # there, and folds the factor prior again. The batch fit solves those observations
+        # with a zero column, through the rank-deficient branch of `PseudoInverseFallback()`
+        # and `MinimumNormSolve()`, so the two agree to rounding: measured 8.2e-16 or better.
+        # A target under `PseudoInverseFallback()` projects its answer onto the row space of
+        # the weighted design, and agrees to rounding too (2.5e-16). `DependentColumnDrop()`
+        # drops the zero column by its pivot and fits the columns of the step in their
+        # order, so it agrees to the bit under both estimators (#1625).
+        rdz = deepcopy(rd)
+        po.panel_field(rdz.pnl, "style1").vals[1:120, :] .= 0.0
+        for unseen in (ZeroUnseenMember(), SolvedUnseenMember()),
+            cre in (CrossSectionalLinearRegression(),
+                    CrossSectionalLinearRegression(; alg = MinimumNormSolve()),
+                    CrossSectionalLinearRegression(; alg = DependentColumnDrop()),
+                    CrossSectionalTargetRegression(),
+                    CrossSectionalTargetRegression(; alg = DependentColumnDrop()),
+                    CrossSectionalTargetRegression(; tgt = GeneralisedLinearModel()))
+
+            pe = CrossSectionalFactorPrior(; lambda = 1, grid_config("Base", rdz)...,
+                                           unseen = unseen, cre = cre)
+            sz = stream(pe, rdz)
+            @test [x.pe.cache.lv for x in sz] == [[true, false, true], trues(3), trues(3)]
+            # A refit leaves a plain `Matrix`, and a step appends to a view of a backing.
+            @test sz[2].pe.cache.csr.f isa SubArray
+            s1, s2 = sz[1].pe.cache, sz[2].pe.cache
+            n = size(s1.csr.f, 1)
+            @test same(s2.csr.eps[1:n, :], s1.csr.eps) && same(s2.W[1:n, :], s1.W)
+            @test all(iszero, s2.csr.f[1:n, 2])
+            fit = cre.alg isa DependentColumnDrop ? agrees : near
+            @test all(k -> fit(sz[k].pr, batch(pe, k, rdz)), 1:3)
+        end
+        # `RankDeficiencyRefusal()` refuses a design with a zero column, and `UncheckedSolve()`
+        # throws on a square one or hands it to a target unchecked, so under either one the
+        # step fits every observation again, and gives the answer or the refusal of the batch
+        # fit.
+        unchecked(alg) = CrossSectionalFactorPrior(; lambda = 1,
+                                                   grid_config("Base", rdz)...,
+                                                   unseen = ZeroUnseenMember(),
+                                                   cre = CrossSectionalLinearRegression(;
+                                                                                        alg = alg))
+        @test !po.cross_sectional_alive_folds(CrossSectionalLinearRegression(;
+                                                                             alg = UncheckedSolve()))
+        @test !po.cross_sectional_alive_folds(CrossSectionalLinearRegression(;
+                                                                             alg = RankDeficiencyRefusal()))
+        pe = unchecked(UncheckedSolve())
+        sz = stream(pe, rdz)
+        @test sz[2].pe.cache.csr.f isa Matrix
+        @test all(k -> agrees(sz[k].pr, batch(pe, k, rdz)), 1:3)
+        pe = unchecked(RankDeficiencyRefusal())
+        p1 = partial_fit!(pe, rows(rdz, 1:90))
+        m = message(() -> partial_fit!(p1, rows(rdz, 91:170)))
+        @test occursin("has rank 2 over 3 factors", m)
+        @test m == message(() -> batch(pe, 2, rdz))
+        @test po.cross_sectional_alive_folds(CrossSectionalLinearRegression())
+        @test po.cross_sectional_alive_folds(CrossSectionalTargetRegression())
+        @test !po.cross_sectional_alive_folds(CrossSectionalTargetRegression(;
+                                                                             alg = UncheckedSolve()))
+        # The only asset of Utilities joins it at data row 200, so that level comes alive at
+        # the step of row 201, which the exposures of row 200 explain, under the industry
+        # family of a batch choice. The asset delists after row 225, where Utilities becomes an
+        # Unseen Member. The same stream folds under a Target Return Forecast and under an
+        # observed factor. Measured: 4.0e-14 or better.
+        dlf = ["market" => ConstantExposure(),
+               "industry" => OneHotExposure(; field = "industry", family = "industry"),
+               "size" =>
+                   CompositeExposure(; descriptors = [LogMarketCap()], family = "style")]
+        function late_panel(L; from = nothing, x = 4.0)
+            d = parity_panel(; T = 300, N = 60, seed = 1601).rd
+            po.panel_field(d.pnl, "industry").codes[1:(L - 1), 3] .= 1
+            if !isnothing(from)
+                lvl = ["Banks", "Energy", "Software"]
+                ind = [i == 3 ? "Utilities" : lvl[mod(i - 1, 3) + 1]
+                       for i in 1:size(d.X, 2)]
+                po.panel_field(d.pnl, "market_cap").vals[from:end, ind .== "Energy"] .*= x
+            end
+            return d
+        end
+        rev = "rev" => ObservedExposure(;
+                                        xe = CompositeExposure(; descriptors = [Reversal()],
+                                                               outlier = nothing, scoring = nothing,
+                                                               family = "rev"), series = "MACRO",
+                                        family = "rev")
+        dsl = DescriptorScores(;
+                               descriptors = [Passthrough(; field = "net_income_ttm"),
+                                              Passthrough(; field = "sales_ttm")])
+        dl, de = late_panel(200), (0, 150, 200, 201, 260, 300)
+        for (unseen, cre, kw) in
+            ((ZeroUnseenMember(), CrossSectionalLinearRegression(), (;)),
+             (SolvedUnseenMember(), CrossSectionalLinearRegression(), (;)),
+             (ZeroUnseenMember(), CrossSectionalTargetRegression(), (;)),
+             (SolvedUnseenMember(), CrossSectionalTargetRegression(), (;)),
+             (ZeroUnseenMember(), CrossSectionalLinearRegression(),
+              (; lambda = 0.4, c = 0.6,
+               rfe = TargetReturnForecast(; scores = dsl, scale = 0.02))),
+             (SolvedUnseenMember(), CrossSectionalTargetRegression(),
+              (; factors = [dlf; rev])))
+            pe = CrossSectionalFactorPrior(; factors = dlf,
+                                           families = ["industry" => nothing], minra = 5,
+                                           pe = GRID_PE, ve = GRID_VE, unseen = unseen,
+                                           cre = cre, kw...)
+            xs = stream(pe, dl, de)
+            @test [count(x.pe.cache.lv) for x in xs] == [4, 4, 5, 5, 5]
+            @test all(x -> x.pe.cache.csr.f isa SubArray, xs[2:end])
+            @test all(k -> near(xs[k].pr, batch(pe, k, dl, de)), eachindex(xs))
+        end
+        # A move of the dropped member and a factor that comes alive at one step: the move
+        # folds first, and the step then folds the new factor. Measured: 1.2e-15 or better.
+        dm, dem = late_panel(170; from = 150), (0, 150, 190, 226, 300)
+        for unseen in (ZeroUnseenMember(), SolvedUnseenMember()),
+            cre in (CrossSectionalLinearRegression(), CrossSectionalTargetRegression())
+
+            pe = CrossSectionalFactorPrior(; factors = dlf,
+                                           families = ["industry" => nothing], minra = 5,
+                                           pe = GRID_PE, ve = GRID_VE, unseen = unseen,
+                                           cre = cre)
+            xs = stream(pe, dm, dem)
+            @test [count(x.pe.cache.lv) for x in xs] == [4, 5, 5, 5]
+            @test [only(dropped(x.pr)) for x in xs] ==
+                  ["industry=Software"; fill("industry=Energy", 3)]
+            @test xs[2].pe.cache.csr.f isa SubArray
+            @test all(k -> near(xs[k].pr, batch(pe, k, dm, dem)), eachindex(xs))
+        end
     end
 
     @testset "Folds the members that fold, and refits the rest" begin

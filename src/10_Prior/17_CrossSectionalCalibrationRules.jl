@@ -1251,7 +1251,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Accepts only a [`CrossSectionalFactorPrior`](@ref) whose every step of the carry fold has a cost that does not grow with the stream.
 
-The constructor of the prior refuses a configuration that holds a part from [`carry_growing_parts`](@ref), and names each such part and the method that it lacks. A bounded window passes: a factor whose Descriptors state a finite [`lookback`](@ref) makes the carry keep that many rows alone. On the configurations that the rule accepts, the carry fold runs the same step as under [`FoldOrRefit`](@ref), so the call with no data equals the batch fit.
+The constructor of the prior refuses a configuration that holds a part from [`carry_growing_parts`](@ref), and names each such part and the method that it lacks. A bounded window passes: a factor whose Descriptors state a finite [`lookback`](@ref) makes the carry keep that many rows alone. On the configurations that the rule accepts, the carry fold runs the same step as under [`FoldOrRefit`](@ref), so the call with no data equals the batch fit. A step where an Empty Factor comes alive folds the factor prior again over every carried factor return, at most once for each factor, as [`cross_sectional_step_factors`](@ref) states. The data decide that step and the configuration does not, so the rule does not refuse it.
 
 # Constructors
 

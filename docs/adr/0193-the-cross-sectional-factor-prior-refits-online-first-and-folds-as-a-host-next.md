@@ -234,6 +234,27 @@ of #1562 (2237 fitted rows), where no row is rank-deficient
 ([#1618](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1618)). `BatchChoice()` stays
 the default.
 
+A step where an Empty Factor comes alive folds too
+([#1627](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1627)). The factor had a zero
+exposure at every pair of positive weight of each fitted row, so the batch fit regresses that row
+over a design with a zero column. The column adds nothing to the fit, and the answer of least norm
+gives the factor a return of zero there. So the step keeps every fitted row, joins the new mark to
+the old mark in both passes, and regresses the new rows over the joined mark. The factor prior
+folds again over every fitted factor return, as for a move, because the default factor covariance
+is not separable by column. A row with a zero column goes through the rank-deficient branch of the
+solve in the batch fit, so the carry equals the batch fit to rounding, not to the bit, under
+`PseudoInverseFallback()` and `MinimumNormSolve()`, under both regression estimators: the target
+regression of `PseudoInverseFallback()` projects its answer onto the row space of the weighted
+design, which holds a zero at the zero column. `DependentColumnDrop()` drops the zero column by its
+pivot and fits the columns of the step. `RankDeficiencyRefusal()` refuses such a row, and
+`UncheckedSolve()` throws on a square one or hands it to a target unchecked, so under either one
+the step fits every carried row again, as the batch fit does. The private verb
+`cross_sectional_alive_folds` answers for the solve algorithm of the estimator. The oracle solves each date alone, and its one-hot
+column exists, as zeros, from the seed onward, so it folds the same step at its normal cost. On the
+probe of #1591 (2510 fitted rows, 500 assets), the step where the factor comes alive costs 0.025 s
+with its read-out, against 0.017 s for a normal step, 1.55 s for the refit that it replaces, and
+about 0.03 s for the step of the oracle. The carry equals the batch fit to 5.7e-15.
+
 ### The selection regressions of a factor prior
 
 - `StepwiseRegression` holds the factor set of each asset in `included`, one entry per asset, and

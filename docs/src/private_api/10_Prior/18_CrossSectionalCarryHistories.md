@@ -28,3 +28,10 @@ PortfolioOptimisers.cross_sectional_move_row_marks
 PortfolioOptimisers.cross_sectional_move_solve
 PortfolioOptimisers.cross_sectional_refold_factors
 ```
+
+A step where a factor that was empty at every fitted observation comes alive keeps those observations, because the factor had a return of zero at each of them. The functions below decide whether the regression estimator keeps the answer of an observation whose design gains a zero column, and fold the factor prior over the factor returns of the step, or again over every fitted factor return when a factor comes alive.
+
+```@docs
+PortfolioOptimisers.cross_sectional_alive_folds
+PortfolioOptimisers.cross_sectional_step_factors
+```
