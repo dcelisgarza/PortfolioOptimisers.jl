@@ -240,6 +240,27 @@ struct LeverageTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
         @test occursin("observation 1", msg)
         @test occursin("rank $(size(Zd, 3) - 1)", msg)
         @test occursin("$(size(Zd, 2)) eligible assets", msg)
+        # A target sees the columns that the rank test keeps, and a dropped column returns
+        # zero (#1620). The pivot keeps the doubled column, whose norm is larger. The fitted
+        # values are those of the linear member, and so is the intercept.
+        for intercept in (false, true)
+            target = cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                               intercept = intercept),
+                                                Zd, Xc, Wc)
+            linear = cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                               intercept = intercept),
+                                                Zd, Xc, Wc)
+            @test all(iszero, target.f[:, 1])
+            @test all(!iszero, target.f[:, 2])
+            @test target.f[:, 3:end] ≈ linear.f[:, 3:end]
+            @test target.eps ≈ linear.eps
+            @test intercept ? target.b ≈ linear.b : isnothing(target.b)
+        end
+        # A design of rank zero leaves the target nothing to fit, so every factor returns zero.
+        zero_design = cross_sectional_regression(CrossSectionalTargetRegression(), zero(Zc),
+                                                 Xc, Wc)
+        @test all(iszero, zero_design.f)
+        @test zero_design.eps == Xc
     end
 
     @testset "The two members agree" begin

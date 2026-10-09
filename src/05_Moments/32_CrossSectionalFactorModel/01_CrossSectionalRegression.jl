@@ -460,12 +460,14 @@ Fits one external regression model per observation across the assets.
 
 The cross-sectional weights reach the model as observation weights, through [`factory`](@ref) and the target's own `kwargs`, so any target the library carries — a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref) — runs here unchanged. A caller's own target runs here too, when it states the methods of the `# Interfaces` section of [`AbstractRegressionTarget`](@ref). A target with no weight method is refused, because its fit would ignore the cross-sectional weights. Unlike [`CrossSectionalLinearRegression`](@ref), the fit **refuses** an observation with no eligible asset, because an external model has no cross-section to read.
 
+A target never sees a dependent factor set. The rank test of [`PseudoInverseFallback`](@ref) reads the weighted design of each observation, and a rank-deficient design loses the columns that its column-pivoted `QR` puts after the rank. Each dropped factor takes a return of zero, which is what `GLM` gives a column it drops by its own pivot. The test is needed because a factor set can be dependent to rounding alone, such as a beta that shrinks fully to the mean of its industry, and the factorisation of `GLM` refuses such a design with a `PosDefException`. The drop is silent and is not a degenerate case: under [`SolvedUnseenMember`](@ref) the design of an observation with an Unseen Member is rank-deficient by construction. For a least-squares target the fitted values and the residuals equal those of [`CrossSectionalLinearRegression`](@ref), and the factor returns differ from its answer of least norm, because the dropped factors take zero.
+
 # Algorithm
 
  1. Check `Z`, `X` and `W`, and take the eligibility mask, per `# Validation` of [`cross_sectional_regression`](@ref).
  2. For each observation `t`, gather the eligible assets, their weights `w`, their exposures `A` and their returns `y`. Refuse when no asset is eligible.
  3. When `intercept` is `true`, subtract the weighted means `ybar` and `xbar` from `y` and from `A`. The target fits no intercept column of its own, so the intercept is recovered from the centroid rather than fitted.
- 4. Build the per-observation target with `factory(tgt, StatsBase.aweights(w))`, fit it to `A` and `y`, and read its coefficients into the row `t` of `f`.
+ 4. Build the per-observation target with `factory(tgt, StatsBase.aweights(w))`, fit it to the columns of `A` that the rank test keeps and to `y`, and read its coefficients into the row `t` of `f`. A dropped column takes zero.
  5. When `intercept` is `true`, set the entry `t` of `b` to `ybar - dot(f[t, :], xbar)`.
  6. Subtract the systematic part from `X`, giving `eps`.
 
@@ -665,7 +667,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the factor returns of one observation, through the member's own solve.
 
-[`CrossSectionalLinearRegression`](@ref) scales the design and the target by `sqrt.(w)` and hands them to [`cross_sectional_solve`](@ref). The square root of a `Rational` weight is a float, so that solve runs in floating point for a `Rational` panel. [`CrossSectionalTargetRegression`](@ref) hands the unscaled pair to the target, with `w` as the observation weights, and refuses an empty cross-section.
+[`CrossSectionalLinearRegression`](@ref) scales the design and the target by `sqrt.(w)` and hands them to [`cross_sectional_solve`](@ref). The square root of a `Rational` weight is a float, so that solve runs in floating point for a `Rational` panel. [`CrossSectionalTargetRegression`](@ref) hands the unscaled pair to the target, with `w` as the observation weights, and refuses an empty cross-section. It reads the rank of the weighted design `sqrt.(w) .* A` through [`cross_sectional_rank`](@ref), as [`PseudoInverseFallback`](@ref) does. When the rank falls short of the factor count, it keeps the columns that the first `r` pivots of the column-pivoted `QR` of that design name, fits the target on them, and gives every other column a return of zero.
 
 # Arguments
 
@@ -699,7 +701,21 @@ function cross_sectional_coefficients(cre::CrossSectionalTargetRegression, A::Ma
                                       y::VecNum, w::VecNum, t::Integer)
     @argcheck(!isempty(y),
               ArgumentError("observation $t has no asset with a positive cross-sectional weight, and $(nameof(typeof(cre.tgt))) has no cross-section to fit. Widen the eligible cross-section, or use CrossSectionalLinearRegression, which answers an empty observation with zero factor returns"))
-    return StatsAPI.coef(StatsAPI.fit(factory(cre.tgt, StatsBase.aweights(w)), A, y))
+    tgt = factory(cre.tgt, StatsBase.aweights(w))
+    # A target's own factorisation can refuse a dependent factor set, so it sees the columns
+    # that the rank test of `PseudoInverseFallback` keeps, and a dropped column returns zero
+    # (#1620).
+    D = A .* sqrt.(w)
+    r = cross_sectional_rank(D)
+    if r == size(A, 2)
+        return StatsAPI.coef(StatsAPI.fit(tgt, A, y))
+    end
+    f = zeros(eltype(A), size(A, 2))
+    if !iszero(r)
+        keep = sort!(LinearAlgebra.qr(D, LinearAlgebra.ColumnNorm()).p[1:r])
+        f[keep] = StatsAPI.coef(StatsAPI.fit(tgt, A[:, keep], y))
+    end
+    return f
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

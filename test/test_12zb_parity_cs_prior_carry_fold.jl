@@ -694,8 +694,8 @@ end
         @test same(xs[2].pe.cache.csr.eps[1:size(s1.csr.eps, 1), :], s1.csr.eps)
         @test same(xs[2].pe.cache.W[1:size(s1.W, 1), :], s1.W)
         # Under a `LinearModel` target the move solves that row again through the target.
-        # On this panel `GLM` drops the column of the Unseen Member by its pivot in both
-        # bases, so the old answer is the batch answer there too (#1614).
+        # On this panel the rank test drops the column of the Unseen Member by its pivot in
+        # both bases, so the old answer is the batch answer there too (#1614, #1620).
         pt = CrossSectionalFactorPrior(; factors = dlf, families = ["industry" => nothing],
                                        minra = 5, unseen = SolvedUnseenMember(),
                                        cre = CrossSectionalTargetRegression())
@@ -722,7 +722,10 @@ end
         # differed by 1 %. The rows that the scan solves again are the rows that it writes
         # over `NaN`. A zero column has a return of zero in every basis, so under
         # `ZeroUnseenMember()` the stream with no beta solves no row again, and under
-        # `SolvedUnseenMember()` it solves the rows with an Unseen Member alone.
+        # `SolvedUnseenMember()` it solves the rows with an Unseen Member alone. A `LinearModel`
+        # target fits the same streams: it drops the dependent columns by the rank test of
+        # `PseudoInverseFallback` before it fits, where its own factorisation refused the
+        # design with a `PosDefException` (#1620).
         function solved(pe, st)
             f = fill(NaN, size(st.csr.f))
             po.cross_sectional_move_solve(pe, st, (; fcb = st.fcb, f = f, lv = st.lv))
@@ -733,10 +736,12 @@ end
                                                                        group = "industry")],
                                            family = "style")
         dl, de = energy_panel(150, 4.0), (0, 150, 190, 225, 226, 300)
-        for unseen in (ZeroUnseenMember(), SolvedUnseenMember()), fs in (dlf, [dlf; beta])
+        for unseen in (ZeroUnseenMember(), SolvedUnseenMember()), fs in (dlf, [dlf; beta]),
+            cre in (CrossSectionalLinearRegression(), CrossSectionalTargetRegression())
+
             pe = CrossSectionalFactorPrior(; factors = fs,
                                            families = ["industry" => nothing], minra = 5,
-                                           unseen = unseen, pe = GRID_PE)
+                                           unseen = unseen, pe = GRID_PE, cre = cre)
             xs = stream(pe, dl, de)
             @test only(dropped(xs[2].pr)) == "industry=Energy"
             @test xs[2].pe.cache.csr.f isa SubArray
