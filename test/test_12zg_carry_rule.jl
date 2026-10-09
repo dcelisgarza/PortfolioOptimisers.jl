@@ -103,8 +103,12 @@ end
     end
 
     @testset "FoldOnly refuses each part that grows in the constructor, and names it" begin
-        cases = [(; factors = vcat(base.factors, ["beta" => CompositeExposure(; descriptors = [EWMarketBeta()])])) => "the factor \"beta\" (CompositeExposure) has no finite look-back",
-                 (; factors = user) => "the factor \"user\" (CompositeExposure) has no finite look-back",
+        # `EWMarketBeta` folds from a state since #1608, so it no longer makes the carry grow.
+        beta = vcat(base.factors,
+                    ["beta" => CompositeExposure(; descriptors = [EWMarketBeta()])])
+        @test isa(CrossSectionalFactorPrior(; base..., factors = beta, carry = FoldOnly()),
+                  CrossSectionalFactorPrior)
+        cases = [(; factors = user) => "the factor \"user\" (CompositeExposure) has no finite look-back",
                  grid_config("FcTarget", rd) => "the Return Forecast `rfe` (TargetReturnForecast) has no fold of its rows",
                  # A user Descriptor states no look-back and carries no state. `EWMomentum`
                  # folds from a state since #1586, so it no longer makes the carry grow.

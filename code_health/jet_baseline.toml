@@ -8,7 +8,7 @@ jet = "0.12.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "be176ad877"
+commit = "81d611cb08"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -149,7 +149,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/03_LagDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/05_EWVolatilityDescriptors.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_a.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_b.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/08_Base_Exposure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/09_CompositeExposure.jl" = { raw = 0, reviewed = 0 }
@@ -557,7 +558,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/03_LagDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/05_EWVolatilityDescriptors.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_a.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_b.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/08_Base_Exposure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/09_CompositeExposure.jl" = { raw = 0, reviewed = 0 }

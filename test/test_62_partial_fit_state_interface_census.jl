@@ -182,7 +182,8 @@ const NO_VIEW_HOSTS = (ExpWeightedExpectedReturns, ExpWeightedVariance,
                        RegimeAdjustedExpWeightedCovariance, PricesToReturns, PriceGapFill,
                        MissingDataFilter, RollingLogReturn, EWMean, EWVolumeRatio,
                        DaysToCover, GrowthRate, ChangeToScale, ChangeInIntensity,
-                       EWVolatility, EWResidualVolatility)
+                       EWVolatility, EWResidualVolatility, EWBeta, EWMacroSensitivity,
+                       EWDownsideBeta)
 
 # Hosts whose `port_opt_view` refuses outright, so a cache never travels a view of them. A
 # `Pipeline`'s asset universe is fitted state, which ADR 0028 says a view cannot select.
@@ -207,7 +208,10 @@ const UNVIEWED_STATES = (po.ExpWeightedExpectedReturnsState => ExpWeightedExpect
                          po.RollingLogReturnState => RollingLogReturn,
                          po.EWMeanState => EWMean, po.LagDescriptorState => GrowthRate,
                          po.EWVolatilityState => EWVolatility,
-                         po.EWBetaState => EWResidualVolatility)
+                         po.EWBetaState => EWResidualVolatility,
+                         po.EWBlockState => EWBeta,
+                         po.EWMacroSensitivityState => EWMacroSensitivity,
+                         po.EWDownsideBetaState => EWDownsideBeta)
 
 # ------------------------------------------------------------------------------ the census
 

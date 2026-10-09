@@ -1,5 +1,5 @@
 #=
-Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl`, the residual half of
+Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_a.jl` and `_b.jl`, the residual half of
 `05_EWVolatilityDescriptors.jl`, and the market-return builder and beta recursion they share
 in `01_Base_Descriptor.jl`, against the contract their docstrings state and against the
 oracle. Issue #719, map #643.
@@ -1053,20 +1053,24 @@ end
                       [NaN NaN; 1.0 2.0; 1.0 2.0])
         @test PortfolioOptimisers.ew_beta_expand([1//2 1//3; 1//4 1//5], 2, 1) ==
               [1//2 1//3; 1//4 1//5]
-        B = PortfolioOptimisers.ew_downside_beta_series([1 2; -1 0], [1, -1], 0.5, 1, 0,
-                                                        1e-12)
+        # The kernels run from a new state, as the batch call does.
+        function downside(X, rm, mar)
+            st = PortfolioOptimisers.ew_downside_beta_state(nothing, X, rm, 0.5)
+            return PortfolioOptimisers.ew_downside_beta_series!(st, X, rm, 0.5, 1, mar,
+                                                                1e-12).B
+        end
+        B = downside([1 2; -1 0], [1, -1], 0)
         @test eltype(B) == Float64
-        @test B ≈
-              PortfolioOptimisers.ew_downside_beta_series([1.0 2.0; -1.0 0.0], [1.0, -1.0],
-                                                          0.5, 1, 0.0, 1e-12) nans = true
-        M = PortfolioOptimisers.ew_macro_sensitivity_series([1 2; -1 0; 2 1], [1, -1, 0],
-                                                            [1, 0, 2], 0.5, 1, 1e-12)
+        @test B ≈ downside([1.0 2.0; -1.0 0.0], [1.0, -1.0], 0.0) nans = true
+        function partial(X, rm, rf)
+            st = PortfolioOptimisers.ew_macro_sensitivity_state(X, rm, rf, 0.5)
+            return PortfolioOptimisers.ew_macro_sensitivity_series!(st, X, rm, rf, 0.5, 1,
+                                                                    1e-12).B
+        end
+        M = partial([1 2; -1 0; 2 1], [1, -1, 0], [1, 0, 2])
         @test isequal(M,
-                      PortfolioOptimisers.ew_macro_sensitivity_series([1.0 2.0; -1.0 0.0;
-                                                                       2.0 1.0],
-                                                                      [1.0, -1.0, 0.0],
-                                                                      [1.0, 0.0, 2.0], 0.5,
-                                                                      1, 1e-12))
+                      partial([1.0 2.0; -1.0 0.0; 2.0 1.0], [1.0, -1.0, 0.0],
+                              [1.0, 0.0, 2.0]))
         Bi, Vi = PortfolioOptimisers.ew_beta_series([1 2; -1 0; 2 1], [1, -1, 0], 0.5, 1,
                                                     1e-12)
         Bf, Vf = PortfolioOptimisers.ew_beta_series([1.0 2.0; -1.0 0.0; 2.0 1.0],

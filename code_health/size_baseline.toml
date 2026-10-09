@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.1"
 julia_syntax = "1.0.2"
-commit = "790afc3ec4"
+commit = "2586e269f6"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -144,7 +144,8 @@ commit = "790afc3ec4"
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/03_LagDescriptors.jl" = { code = 109, doc = 324, comment = 0, blank = 132, total = 565 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl" = { code = 196, doc = 484, comment = 0, blank = 182, total = 862 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/05_EWVolatilityDescriptors.jl" = { code = 111, doc = 369, comment = 0, blank = 142, total = 622 }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl" = { code = 383, doc = 754, comment = 0, blank = 264, total = 1401 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_a.jl" = { code = 286, doc = 586, comment = 0, blank = 216, total = 1088 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_b.jl" = { code = 355, doc = 594, comment = 0, blank = 228, total = 1177 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl" = { code = 117, doc = 298, comment = 0, blank = 128, total = 543 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/08_Base_Exposure.jl" = { code = 56, doc = 149, comment = 0, blank = 82, total = 287 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/09_CompositeExposure.jl" = { code = 107, doc = 214, comment = 0, blank = 79, total = 400 }

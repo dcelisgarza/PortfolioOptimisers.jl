@@ -5,7 +5,7 @@
 julia = "1.13.1"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "768a2a2f42"
+commit = "2586e269f6"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -143,7 +143,8 @@ commit = "768a2a2f42"
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/03_LagDescriptors.jl" = { cyc = 4, cog = 5, arg = 5, cyc_sum = 37, cog_sum = 12, arg_sum = 32, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl" = { cyc = 5, cog = 9, arg = 7, cyc_sum = 52, cog_sum = 25, arg_sum = 42, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/05_EWVolatilityDescriptors.jl" = { cyc = 4, cog = 4, arg = 7, cyc_sum = 32, cog_sum = 11, arg_sum = 36, macros = [] }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl" = { cyc = 9, cog = 13, arg = 8, cyc_sum = 69, cog_sum = 84, arg_sum = 36, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_a.jl" = { cyc = 9, cog = 11, arg = 9, cyc_sum = 57, cog_sum = 58, arg_sum = 60, macros = [] }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_b.jl" = { cyc = 7, cog = 13, arg = 8, cyc_sum = 56, cog_sum = 51, arg_sum = 64, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl" = { cyc = 6, cog = 11, arg = 5, cyc_sum = 60, cog_sum = 41, arg_sum = 33, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/08_Base_Exposure.jl" = { cyc = 4, cog = 4, arg = 0, cyc_sum = 15, cog_sum = 7, arg_sum = 0, macros = [] }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/09_CompositeExposure.jl" = { cyc = 4, cog = 5, arg = 8, cyc_sum = 21, cog_sum = 16, arg_sum = 11, macros = [] }

@@ -477,8 +477,9 @@ end
                                                                       grid_config("FcCustom",
                                                                                   rd)...)) ==
               2
-        # A finite look-back keeps its last rows, an exponentially weighted Descriptor keeps
-        # every row, and a rolling return keeps none, because it folds from its state (#1583). The synthetic panel lists, delists and leaves gaps.
+        # A finite look-back keeps its last rows, and a rolling return and an exponentially
+        # weighted beta keep none beyond the lag, because they fold from their state (#1583,
+        # #1608). The synthetic panel lists, delists and leaves gaps.
         syn = synthetic_asset_panel(; n_assets = 60, n_observations = 160, n_industries = 4,
                                     rng = StableRNG(1471)).rd
         bounded = ["market" => ConstantExposure(),
@@ -495,7 +496,7 @@ end
         # type of error. Inside the warm-up the batch fit refuses in its warm-up and the fold at
         # its call with no data, so the two messages differ there.
         e = (0, 10, 40, 41, 80, 81, 120, 160)
-        for (factors, kept) in ((bounded, 2), (ew, 160), (derived, 2))
+        for (factors, kept) in ((bounded, 2), (ew, 2), (derived, 2))
             pe = CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                            families = ["industry" => nothing], minra = 5,
                                            pe = GRID_PE, ve = GRID_VE)
@@ -886,11 +887,11 @@ end
         pc = CrossSectionalFactorPrior(; panel..., lambda = CarryHistoryShrinkage())
         pb = CrossSectionalFactorPrior(; panel..., lambda = CarryHistoryShrinkage())
         @test all(((k, x),) -> agrees(x.pr, batch(pb, k)), enumerate(stream(pc)))
-        # A macro sensitivity is a recursion from the first row and states no look-back, so the
-        # carry keeps every row.
-        @test isnothing(po.cross_sectional_carry_rows(CrossSectionalFactorPrior(;
-                                                                                lambda = 1,
-                                                                                exact.Sensitivity...)))
+        # A macro sensitivity is a recursion from the first row, and it folds from its state, so
+        # the carry keeps the rows of the lag alone (#1608).
+        @test po.cross_sectional_carry_rows(CrossSectionalFactorPrior(; lambda = 1,
+                                                                      exact.Sensitivity...)) ==
+              2
         # One observation at a time after the first fit.
         pe = CrossSectionalFactorPrior(; lambda = 1, ccy...)
         e = (0, 90, 91, 92, 93, 250)
@@ -1568,6 +1569,142 @@ end
         @test occursin("the factor \"volatility\" (CompositeExposure) has no finite look-back",
                        message(() -> CrossSectionalFactorPrior(; factors = wf, minra = 5,
                                                                carry = FoldOnly())))
+    end
+
+    @testset "An EW beta Descriptor folds one row from its carried state (#1608)" begin
+        # The state runs each recursion from the first observation with the arithmetic of the
+        # batch call, so each folded row equals the batch call to the last bit, in blocks of
+        # any size. With `agg_obs > 1` the state carries the observations of the window that
+        # is not complete, so a block that ends inside a window gives the same rows, and the
+        # shrinkage of a group reads the labels and the weights of the row that closes the
+        # window. A second step from the same state gives the same rows, because a step
+        # copies the state.
+        blocks = ((1, 1), (2, 3), (4, 30), (31, 31), (32, 33), (34, 100), (101, 101),
+                  (102, 250))
+        # A copy is equal and shares no array with the original, at every level.
+        function copied(c, s)
+            return all(fieldnames(typeof(c))) do f
+                x, y = getfield(c, f), getfield(s, f)
+                if isa(x, po.AbstractPartialFitState)
+                    copied(x, y)
+                else
+                    isequal(x, y) && (!isa(x, AbstractArray) || x !== y)
+                end
+            end
+        end
+        for de in
+            (EWMarketBeta(; half_life = 10), EWMarketBeta(; half_life = 10, agg_obs = 3),
+             EWMarketBeta(; half_life = 10, group = "industry", min_group_size = 3),
+             EWBeta(; decay = 0.8, min_obs = 30, agg_obs = 4, group = "industry",
+                    min_group_size = 3), EWDownsideBeta(; half_life = 7, mar = 0.001),
+             EWMacroSensitivity(; series = "MACRO", half_life = 8),
+             EWMacroSensitivity(; series = "MACRO", half_life = 8, agg_obs = 3))
+            full = descriptor(de, rd)
+            st = de
+            for (a, b) in blocks
+                r = po.descriptor_step(st, rows(rd, a:b))
+                @test same(r.D, full[a:b, :])
+                @test same(po.descriptor_step(st, rows(rd, a:b)).D, r.D)
+                @test copied(partial_fit!(st, rows(rd, a:b)).cache, r.de.cache)
+                st = r.de
+            end
+            @test count(isfinite, full) > 4000
+            @test copied(copy(st.cache), st.cache)
+            @test occursin("cannot merge two states fitted on disjoint blocks",
+                           message(() -> po.merge_states(st.cache, st.cache)))
+            @test occursin("carries $N assets, and the step brings 5",
+                           message(() -> po.descriptor_step(st,
+                                                            po.port_opt_view(rows(rd, 1:2),
+                                                                             1:5))))
+        end
+        # A step refuses the gap and the infinite value of the batch call, and names the same
+        # observations, counted from the first one that the state folded.
+        j = findfirst(==("MACRO"), rd.ne)
+        withE(E) = ReturnsResult(; nx = rd.nx, X = rd.X, ne = rd.ne, E = E, pnl = rd.pnl)
+        E = copy(rd.E)
+        E[120, j] = NaN
+        dm = EWMacroSensitivity(; series = "MACRO", half_life = 8)
+        @test occursin("none at observation 120", message(() -> descriptor(dm, withE(E))))
+        @test occursin("none at observation 120",
+                       message(() -> partial_fit!(partial_fit!(dm, rows(withE(E), 1:100)),
+                                                  rows(withE(E), 101:140))))
+        E[120, j] = 0.0
+        E[118:120, j] .= NaN
+        d3 = EWMacroSensitivity(; series = "MACRO", half_life = 8, agg_obs = 3)
+        @test occursin("none at observations 118 to 120",
+                       message(() -> descriptor(d3, withE(E))))
+        @test occursin("none at observations 118 to 120",
+                       message(() -> partial_fit!(partial_fit!(d3, rows(withE(E), 1:119)),
+                                                  rows(withE(E), 120:140))))
+        # The window of observations 148 to 150 holds two finite values, so the gap is
+        # accepted, and the infinite value is refused.
+        E[118:120, j] .= 0.0
+        E[150, j] = Inf
+        @test occursin("infinite at observation 150",
+                       message(() -> descriptor(d3, withE(E))))
+        @test occursin("infinite at observation 150",
+                       message(() -> partial_fit!(partial_fit!(d3, rows(withE(E), 1:100)),
+                                                  rows(withE(E), 101:200))))
+        # The state of the other Descriptor is refused.
+        b = partial_fit!(EWMarketBeta(; half_life = 10), rows(rd, 1:20)).cache
+        m = partial_fit!(dm, rows(rd, 1:20)).cache
+        @test occursin("holds no reference return, so it belongs to another Descriptor",
+                       message(() -> partial_fit!(EWMacroSensitivity(; series = "MACRO",
+                                                                     cache = b),
+                                                  rows(rd, 21:22))))
+        @test occursin("holds a reference return, so it belongs to another Descriptor",
+                       message(() -> partial_fit!(EWBeta(; decay = 0.9, min_obs = 5,
+                                                         cache = m), rows(rd, 21:22))))
+        @test occursin("hold one market return and one reference return each",
+                       message(() -> po.EWBlockState(; st = b.st, X = zeros(1, 2),
+                                                     m = Float64[])))
+        @test occursin("hold one entry per asset, got 2 and 1",
+                       message(() -> po.EWDownsideBetaState(; cd = [0.0, 0.0], n = [0],
+                                                            vd = 0.0, t = 0)))
+        @test po.show_fields(EWDownsideBeta()) == (:mcap, :decay, :min_obs, :mar, :min_val)
+        # On the carry fold each Descriptor counts as one row, so the carry keeps the rows of
+        # the lag alone, and the exposures of every step equal those of the batch fit.
+        ewb = ["market" => ConstantExposure(),
+               "beta" => CompositeExposure(;
+                                           descriptors = [EWMarketBeta(; half_life = 10,
+                                                                       agg_obs = 3,
+                                                                       group = "industry",
+                                                                       min_group_size = 3),
+                                                          EWDownsideBeta(; half_life = 7)]),
+               "macro" => CompositeExposure(;
+                                            descriptors = [EWMacroSensitivity(; series = "MACRO",
+                                                                              half_life = 8,
+                                                                              agg_obs = 2),
+                                                           BookToPrice()]),
+               "industry" => OneHotExposure(; field = "industry", family = "industry")]
+        pe = CrossSectionalFactorPrior(; lambda = 1, factors = ewb,
+                                       families = ["industry" => nothing], minra = 5,
+                                       pe = GRID_PE, ve = GRID_VE)
+        @test isnothing(po.lookback(pe))
+        @test po.cross_sectional_carry_rows(pe) == 2
+        e = (0, 50, 80, 81, 120, 121, 160, 250)
+        s = stream(pe, rd, e)
+        fitted = 0
+        for (k, x) in enumerate(s)
+            b = try
+                batch(pe, k, rd, e)
+            catch err
+                err
+            end
+            if isa(b, LowOrderPrior)
+                fitted += 1
+                @test same(x.pr.rr.Ms, b.rr.Ms)
+                @test same(x.pr.mu, b.mu) && same(x.pr.sigma, b.sigma)
+            else
+                @test typeof(x.pr) == typeof(b)
+            end
+        end
+        # The case reads out at least once, so the loop is not vacuous.
+        @test fitted >= 3
+        @test size(last(s).pe.cache.win.X, 1) == 2
+        @test all(d -> isa(d.cache, Union{po.EWBlockState, po.EWDownsideBetaState}),
+                  last(last(s).pe.cache.xf[2]).descriptors)
+        @test isa(first(last(last(s).pe.cache.xf[3]).descriptors).cache, po.EWBlockState)
     end
 
     @testset "The Descriptor scores of a Return Forecast fold their stateful Descriptors (#1587)" begin

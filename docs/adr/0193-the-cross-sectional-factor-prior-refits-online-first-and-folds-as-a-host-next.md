@@ -276,8 +276,12 @@ The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton
   weighted volatility Descriptors are its fourth
   ([#1607](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1607)): their state holds
   the state of the variance estimator `ce`, so they fold only where `ce` folds, and refit under
-  `FoldOrRefit()` or are refused under `FoldOnly()` otherwise. A subtype that
-  implements both verbs folds on the carry with no change to the prior.
+  `FoldOrRefit()` or are refused under `FoldOnly()` otherwise. The exponentially weighted beta
+  Descriptors are its fifth
+  ([#1608](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1608)). A Descriptor
+  that reads one aggregated row per window of observations keeps the observations of the window
+  that is not complete in its state. A subtype that implements both verbs folds on the carry with
+  no change to the prior.
 
 ## Considered options
 

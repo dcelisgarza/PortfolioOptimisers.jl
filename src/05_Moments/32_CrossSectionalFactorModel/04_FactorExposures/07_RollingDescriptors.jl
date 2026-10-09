@@ -755,7 +755,7 @@ end
 
 Answers `nothing`: a Descriptor carries no state unless it implements this verb.
 
-`descriptor_step` is the verb of a Descriptor that folds new observations from a carried state, and it is `public`. A subtype of [`AbstractDescriptorEstimator`](@ref) that folds implements it, with the contract of the methods of [`RollingLogReturn`](@ref), of the exponentially weighted mean Descriptors and of the lag Descriptors: it takes the estimator with its state in a field, and the returns data of the new observations alone, and it answers `(; de, D)`, the estimator with the state after them and the Descriptor of each one, equal to the batch call [`descriptor`](@ref) over every observation from the first one. It also makes [`carry_lookback`](@ref) answer one. The carry fold of a [`CrossSectionalFactorPrior`](@ref) then reads the Descriptor off the state with [`descriptor_carry`](@ref), and keeps no panel row for it.
+`descriptor_step` is the verb of a Descriptor that folds new observations from a carried state, and it is `public`. A subtype of [`AbstractDescriptorEstimator`](@ref) that folds implements it, with the contract of the methods of [`RollingLogReturn`](@ref), of the exponentially weighted mean Descriptors, of the lag Descriptors and of the exponentially weighted beta Descriptors: it takes the estimator with its state in a field, and the returns data of the new observations alone, and it answers `(; de, D)`, the estimator with the state after them and the Descriptor of each one, equal to the batch call [`descriptor`](@ref) over every observation from the first one. It also makes [`carry_lookback`](@ref) answer one. The carry fold of a [`CrossSectionalFactorPrior`](@ref) then reads the Descriptor off the state with [`descriptor_carry`](@ref), and keeps no panel row for it.
 
 # Arguments
 
@@ -872,7 +872,7 @@ end
 
 Folds the last `m` observations of a [`ReturnsResult`](@ref) into every Descriptor of an Exposure Estimator that carries a state, on the carry fold of a [`CrossSectionalFactorPrior`](@ref).
 
-The generic method returns the estimator as it is twice: it carries no state. A Descriptor folds the observations with [`descriptor_step`](@ref) when that verb answers a step, as it does for a [`RollingLogReturn`](@ref), an [`EWMean`](@ref), an [`EWVolumeRatio`](@ref), a [`DaysToCover`](@ref), the lag Descriptors and the volatility Descriptors whose `ce` folds, and [`descriptor_carried`](@ref) reads the answer. Every other Descriptor answers `nothing`, and stays as it is. The [`CompositeExposure`](@ref) method folds each of its Descriptors. The [`ObservedExposure`](@ref) method folds the member that it wraps, so an observed factor folds its Descriptors as an estimated one does. The [`DescriptorScores`](@ref) method folds each Descriptor of the scores of a Return Forecast the same way, so the code of the batch fit scores the new observations.
+The generic method returns the estimator as it is twice: it carries no state. A Descriptor folds the observations with [`descriptor_step`](@ref) when that verb answers a step, as it does for a [`RollingLogReturn`](@ref), an [`EWMean`](@ref), an [`EWVolumeRatio`](@ref), a [`DaysToCover`](@ref), the lag Descriptors, the volatility Descriptors whose `ce` folds and the exponentially weighted beta Descriptors, and [`descriptor_carried`](@ref) reads the answer. Every other Descriptor answers `nothing`, and stays as it is. The [`CompositeExposure`](@ref) method folds each of its Descriptors. The [`ObservedExposure`](@ref) method folds the member that it wraps, so an observed factor folds its Descriptors as an estimated one does. The [`DescriptorScores`](@ref) method folds each Descriptor of the scores of a Return Forecast the same way, so the code of the batch fit scores the new observations.
 
 # Arguments
 
@@ -928,7 +928,8 @@ end
     carry_lookback(::Union{RollingLogReturn, EWMean, EWVolumeRatio, DaysToCover, GrowthRate,
                            ChangeToScale, ChangeInIntensity,
                            EWVolatility{<:RegimeAdjustedExpWeightedVariance},
-                           EWResidualVolatility{<:Any, <:RegimeAdjustedExpWeightedVariance}})
+                           EWResidualVolatility{<:Any, <:RegimeAdjustedExpWeightedVariance},
+                           EWBeta, EWMacroSensitivity, EWDownsideBeta})
     carry_lookback(xe::CompositeExposure)
     carry_lookback(xe::ObservedExposure)
     carry_lookback(pe::CrossSectionalFactorPrior)
@@ -938,7 +939,7 @@ end
 
 Returns the number of panel rows that an estimator reads to give the Factor Exposure of one new observation on the carry fold of a [`CrossSectionalFactorPrior`](@ref), or `nothing` for every row.
 
-A Descriptor that carries a state, as [`descriptor_carry`](@ref) folds it, reads the new observation alone, so a [`RollingLogReturn`](@ref), an [`EWMean`](@ref), an [`EWVolumeRatio`](@ref), a [`DaysToCover`](@ref), the lag Descriptors [`GrowthRate`](@ref), [`ChangeToScale`](@ref) and [`ChangeInIntensity`](@ref), and an [`EWVolatility`](@ref) or an [`EWResidualVolatility`](@ref) whose `ce` is a [`RegimeAdjustedExpWeightedVariance`](@ref) answer one. A volatility Descriptor with any other `ce` carries no state, so it answers its [`lookback`](@ref). A [`CompositeExposure`](@ref) answers it over its Descriptors, an [`ObservedExposure`](@ref) answers the member that it wraps, and a Return Forecast with Descriptor Scores over the Descriptors of its scores. Every other estimator answers its [`lookback`](@ref), and a vector answers the largest one of its members, or `nothing` when one member answers `nothing`. A [`CrossSectionalFactorPrior`](@ref) answers the look-back of its factors on the carry fold, as [`cross_sectional_lookback`](@ref) counts it, and [`cross_sectional_carry_rows`](@ref) reads it.
+A Descriptor that carries a state, as [`descriptor_carry`](@ref) folds it, reads the new observation alone, so a [`RollingLogReturn`](@ref), an [`EWMean`](@ref), an [`EWVolumeRatio`](@ref), a [`DaysToCover`](@ref), the lag Descriptors [`GrowthRate`](@ref), [`ChangeToScale`](@ref) and [`ChangeInIntensity`](@ref), the exponentially weighted beta Descriptors [`EWBeta`](@ref), [`EWMacroSensitivity`](@ref) and [`EWDownsideBeta`](@ref), and an [`EWVolatility`](@ref) or an [`EWResidualVolatility`](@ref) whose `ce` is a [`RegimeAdjustedExpWeightedVariance`](@ref) answer one. A volatility Descriptor with any other `ce` carries no state, so it answers its [`lookback`](@ref). A [`CompositeExposure`](@ref) answers it over its Descriptors, an [`ObservedExposure`](@ref) answers the member that it wraps, and a Return Forecast with Descriptor Scores over the Descriptors of its scores. Every other estimator answers its [`lookback`](@ref), and a vector answers the largest one of its members, or `nothing` when one member answers `nothing`. A [`CrossSectionalFactorPrior`](@ref) answers the look-back of its factors on the carry fold, as [`cross_sectional_lookback`](@ref) counts it, and [`cross_sectional_carry_rows`](@ref) reads it.
 
 # Arguments
 
@@ -960,7 +961,8 @@ function carry_lookback(::Union{RollingLogReturn, EWMean, EWVolumeRatio, DaysToC
                                 GrowthRate, ChangeToScale, ChangeInIntensity,
                                 EWVolatility{<:RegimeAdjustedExpWeightedVariance},
                                 EWResidualVolatility{<:Any,
-                                                     <:RegimeAdjustedExpWeightedVariance}})::Integer
+                                                     <:RegimeAdjustedExpWeightedVariance},
+                                EWBeta, EWMacroSensitivity, EWDownsideBeta})::Integer
     return 1
 end
 function carry_lookback(ests::AbstractVector)::Option{<:Integer}
