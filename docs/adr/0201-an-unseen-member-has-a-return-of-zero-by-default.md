@@ -110,4 +110,6 @@ before the block.
   ([#1605](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1605)) still solves each
   row with an Unseen Member again
   ([#1613](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1613)). Under the default
-  it solves no row again.
+  it solves no row with an Unseen Member again. Under both rules it solves each row with a
+  dependent factor set again
+  ([#1616](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1616)).

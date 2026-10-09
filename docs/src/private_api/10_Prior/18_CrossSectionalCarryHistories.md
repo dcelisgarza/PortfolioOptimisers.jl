@@ -15,7 +15,7 @@ PortfolioOptimisers.cross_sectional_carry_own
 PortfolioOptimisers.cross_sectional_carry_with
 ```
 
-A step that moves the dropped member of a Factor Family under a [`BatchChoice`](@ref) rewrites the histories in the new basis, and runs no regression again. The functions below decide whether the move folds, rewrite the basis from its own ratios, mark the Empty Factors in the new basis, solve again each observation whose answer depends on the basis, and fold the factor prior again over the factor returns of the new basis.
+A step that moves the dropped member of a family of factors under a [`BatchChoice`](@ref) rewrites the histories in the new basis, and solves again only the observations that are rank-deficient. The functions below decide whether the move folds, rewrite the basis from its own ratios, mark the Empty Factors in the new basis, solve again each observation whose answer depends on the basis, and fold the factor prior again over the factor returns of the new basis.
 
 ```@docs
 PortfolioOptimisers.cross_sectional_fold_move

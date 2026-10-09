@@ -533,7 +533,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     ex
     """
-    Choice Rule of the dropped member of each Factor Family whose member is `nothing` in `families`. Under [`BatchChoice`](@ref), the default, each fit chooses again over every observation. Under [`PinnedChoice`](@ref), the online step writes the choice of the first fit into `families` of the estimator that it returns. The two agree in a batch fit. On the carry fold, a step that moves the member under [`BatchChoice`](@ref) runs no regression again: it selects the columns of the raw factor returns that the new member keeps, and folds the factor prior again over every carried factor return, as [`cross_sectional_fold_move`](@ref) states. So [`FoldOnly`](@ref) refuses [`BatchChoice`](@ref) with an automatic member.
+    Choice Rule of the dropped member of each Factor Family whose member is `nothing` in `families`. Under [`BatchChoice`](@ref), the default, each fit chooses again over every observation. Under [`PinnedChoice`](@ref), the online step writes the choice of the first fit into `families` of the estimator that it returns. The two agree in a batch fit. On the carry fold, a step that moves the member under [`BatchChoice`](@ref) solves no observation of full rank again: it selects the columns of the raw factor returns that the new member keeps, and folds the factor prior again over every carried factor return, as [`cross_sectional_fold_move`](@ref) states. So [`FoldOnly`](@ref) refuses [`BatchChoice`](@ref) with an automatic member.
     """
     choice
     """

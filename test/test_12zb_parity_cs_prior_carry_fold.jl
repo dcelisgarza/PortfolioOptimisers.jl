@@ -557,7 +557,7 @@ end
         @test all(k -> agrees(sz[k].pr, batch(pe, k, rdz)), 1:3)
     end
 
-    @testset "A move of a batch choice folds and runs no regression again (#1605)" begin
+    @testset "A move of a batch choice folds and solves no row of full rank again (#1605)" begin
         # The raw factor returns of an observation of full rank do not depend on the dropped
         # member, so a move selects their columns and folds the factor prior again. The
         # residuals of the old observations are the ones of the step before, bit for bit. Under
@@ -645,6 +645,41 @@ end
         @test relerr(xs[2].pr.rr.csr.f[225, :], b.rr.csr.f[225, :]) < 1e-12
         @test same(xs[2].pe.cache.csr.eps[1:size(s1.csr.eps, 1), :], s1.csr.eps)
         @test same(xs[2].pe.cache.W[1:size(s1.W, 1), :], s1.W)
+        # A beta that shrinks to the mean of its industry is a function of the industry
+        # columns where every industry shrinks fully, so the design of such an observation has
+        # a dependent factor set under every rule. Its answer of least norm reads the basis, so
+        # the move solves it again in the new basis (#1616). Without that, the factor returns
+        # differed by 1 %. The rows that the scan solves again are the rows that it writes
+        # over `NaN`. A zero column has a return of zero in every basis, so under
+        # `ZeroUnseenMember()` the stream with no beta solves no row again, and under
+        # `SolvedUnseenMember()` it solves the rows with an Unseen Member alone.
+        function solved(pe, st)
+            f = fill(NaN, size(st.csr.f))
+            po.cross_sectional_move_solve(pe, st, (; fcb = st.fcb, f = f, lv = st.lv))
+            return findall(r -> all(isfinite, r), collect(eachrow(f)))
+        end
+        beta = "beta" => CompositeExposure(;
+                                           descriptors = [EWMarketBeta(; half_life = 10, agg_obs = 5,
+                                                                       group = "industry")],
+                                           family = "style")
+        dl, de = energy_panel(150, 4.0), (0, 150, 190, 225, 226, 300)
+        for unseen in (ZeroUnseenMember(), SolvedUnseenMember()), fs in (dlf, [dlf; beta])
+            pe = CrossSectionalFactorPrior(; factors = fs,
+                                           families = ["industry" => nothing], minra = 5,
+                                           unseen = unseen, pe = GRID_PE)
+            xs = stream(pe, dl, de)
+            @test only(dropped(xs[2].pr)) == "industry=Energy"
+            @test xs[2].pe.cache.csr.f isa SubArray
+            @test all(k -> near(xs[k].pr, batch(pe, k, dl, de)), eachindex(xs))
+            st = xs[end].pe.cache
+            rs = solved(pe, st)
+            if fs === dlf
+                @test rs == (unseen === ZeroUnseenMember() ? Int[] : unseen_rows(st))
+            else
+                @test unseen === SolvedUnseenMember() || length(rs) == 131
+                @test issubset(unseen === ZeroUnseenMember() ? Int[] : unseen_rows(st), rs)
+            end
+        end
         # A new dropped member with a zero benchmark-weighted exposure at an observation has
         # no finite ratio, so the rebase answers `nothing`, and the fit of every observation
         # refuses the member as the batch fit does.

@@ -1876,7 +1876,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Makes the choice again over every observation at each fit. This is the default rule.
 
-On the online step a refit reads every row of its buffer, so the choice can move from one step to the next, and the call with no data after any stream of blocks equals the batch fit over the same rows. On the carry fold of a [`CrossSectionalFactorPrior`](@ref), a step that moves the dropped member of a Factor Family runs no regression again. The raw factor returns do not depend on the dropped member, so the step selects the columns that the new member keeps, and folds the factor prior again over them.
+On the online step a refit reads every row of its buffer, so the choice can move from one step to the next, and the call with no data after any stream of blocks equals the batch fit over the same rows. On the carry fold of a [`CrossSectionalFactorPrior`](@ref), a step that moves the dropped member of a Factor Family solves no observation of full rank again. The raw factor returns of such an observation do not depend on the dropped member, so the step selects the columns that the new member keeps, and folds the factor prior again over them.
 
 # Constructors
 

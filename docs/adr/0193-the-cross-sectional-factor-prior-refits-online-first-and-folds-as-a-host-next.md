@@ -183,7 +183,7 @@ after the Descriptor warm-up. The step runs the part of the fit that the choice 
 buffer, so the member that it writes is the member that the call with no data of that step drops. In the carry fold, a pinned
 choice is recorded in the carry state.
 
-A batch choice that moves the dropped member on the carry fold runs no regression again
+A batch choice that moves the dropped member on the carry fold solves no row of full rank again
 ([#1601](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1601)). The zero-sum
 condition of a family is the same set for every dropped member. So the raw-axis factor returns, the
 residuals and the idiosyncratic variances do not depend on the member, and the reduced history under
@@ -192,24 +192,32 @@ Member rule `ZeroUnseenMember()`, an Unseen Member has a return of zero, and the
 of its observation holds over the other members
 ([#1606](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1606)). So every row is
 identified, and its raw-axis answer does not depend on the member either. A move selects those
-columns and refits the factor prior over the selected history. It solves no row again. The marks
+columns and refits the factor prior over the selected history. It solves no row of full rank again. The marks
 of the Empty Factors of the family that moved are read again in the new basis, one observation at
 a time from the first one, until each member is marked. Under `SolvedUnseenMember()` a row with an
 Unseen Member stays rank-deficient, and its pseudo-inverse answer depends on the parametrisation.
 So a move under it solves each such row again in the new basis, with the solve policy of the fit
 and the stored last-pass weights, and selects the columns of every other row
-([#1613](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1613)). The move finds those
-rows with the test of the Unseen Member rule, a scan of each fitted row at the move, so the state
-carries no field for them. Such rows are rare: one row of 300 on the panel of #1606. A
-`CrossSectionalTargetRegression` fits a target that the library does not know, and a target can
-penalise its coefficients. Under it a move fits every carried observation again, as it did before
-the fold (#1605). A row whose design holds a dependent factor set and no Unseen Member is
-rank-deficient under every rule, and the fold keeps the answer of the old basis there
-([#1617](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1617)). The
+([#1613](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1613)). A row whose design
+holds a dependent factor set is rank-deficient under every rule, and its answer of least norm reads
+the coordinates of the basis too, so a move solves it again in the same way
+([#1616](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1616),
+[#1617](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1617)). A beta that shrinks to
+the mean of its industry makes such rows: where every industry shrinks fully, the style column is a
+function of the industry columns. The move finds every rank-deficient row by the rank test of the
+solve on the columns that are not zero, a scan of each fitted row at the move, so the state carries
+no field for them. A zero column, such as an Unseen Member under `ZeroUnseenMember()`, has a return
+of zero in every basis. A `CrossSectionalTargetRegression` fits a target that the library does not
+know, and a target can penalise its coefficients. Under it a move fits every carried observation
+again, as it did before the fold (#1605). The
 default factor covariance reads every column at once, so a sub-block of a raw-axis state is not the
 batch answer. On the panel of #1592 (2520 rows, 500 assets), the step of the move costs 0.013 s,
 against 0.0036 s for a step with no move and 1.66 s for a refit of every row, and the carry still
-equals the batch fit to rounding (7.3e-15 on `sigma`). `BatchChoice()` stays the default.
+equals the batch fit to rounding (7.3e-15 on `sigma`). The scan of the rank of #1616 reads the
+exposures of every fitted row, and it raises the step of the move to 0.26 s on the first benchmark
+of #1562 (2237 fitted rows), where no row is rank-deficient
+([#1618](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1618)). `BatchChoice()` stays
+the default.
 
 ### The selection regressions of a factor prior
 
