@@ -141,6 +141,7 @@ A fit that warmed up on the first observations keeps fewer than the caller's ser
   - `rw::Option{<:MatNum}`: The lag-aligned regression weights, or `nothing`.
   - `vs::Option{<:MatNum}`: The lag-aligned idiosyncratic variances, `NaN` where the block states none, or `nothing`.
   - `fcb::Option{<:AbstractFactorFamilyBasis}`: The family re-basis over the aligned axis, or `nothing`.
+  - `unseen::AbstractUnseenMemberRule`: The Unseen Member rule the fit regressed under, from [`attribution_unseen_rule`](@ref).
   - `rows::UnitRange{Int}`: The rows of the caller's series the aligned history describes.
   - `no::Int`: The number of observed factors, the last factors of the axis, from [`attribution_observed_count`](@ref).
 
@@ -171,8 +172,8 @@ function attribution_align(blk::NamedTuple, T::Integer)
     return (; B = za.B, f = attribution_finite(f[brows, :]), eps = za.eps, act = za.act,
             rw = attribution_finite_rows(attribution_trim_rows(blk.rw, brows)),
             vs = attribution_trim_rows(blk.vs, brows),
-            fcb = attribution_trim_basis(blk.fcb, Tb - lag), rows = rows, no = blk.no,
-            h1 = attribution_trim_rows(blk.h1, brows))
+            fcb = attribution_trim_basis(blk.fcb, Tb - lag), unseen = blk.unseen,
+            rows = rows, no = blk.no, h1 = attribution_trim_rows(blk.h1, brows))
 end
 """
     attribution_trim_exposures(B::MatNum, lag::Integer)
@@ -376,8 +377,8 @@ function attribution_window(al::NamedTuple, rows)
             eps = al.eps[rows, :], act = al.act[rows, :],
             rw = attribution_trim_rows(al.rw, rows),
             vs = attribution_trim_rows(al.vs, rows),
-            fcb = attribution_window_basis(al.fcb, rows), rows = rows, no = al.no,
-            h1 = attribution_trim_rows(al.h1, rows))
+            fcb = attribution_window_basis(al.fcb, rows), unseen = al.unseen, rows = rows,
+            no = al.no, h1 = attribution_trim_rows(al.h1, rows))
 end
 """
     attribution_window_exposures(B::MatNum, rows)
@@ -894,6 +895,8 @@ Under a family re-basis the raw Gram matrix is singular by construction, so the 
 
 The systematic and the idiosyncratic errors are equal. The portfolio return is observed, so the two estimation errors sum to zero.
 
+**An Unseen Member changes the design.** At an observation with an Unseen Member, the fit regressed on the reduced exposures times a change ``\\mathbf{P}_{t}``, and the factor returns are ``\\mathbf{P}_{t}`` times its coefficients. So the sandwich is taken on the changed design, and [`attribution_changed_covariance`](@ref) maps it to ``\\mathbf{P}_{t} \\mathbf{V}_{t} \\mathbf{P}_{t}^{\\intercal}``. The standard errors then do not depend on the member that the family drops, and an Unseen Member has an error of zero, because the rule states its return.
+
 **An unknown variance makes the error unknown.** The sandwich of an observation reads the idiosyncratic variance of every active pair with a non-zero regression weight. Where the block states no such variance, in the warm-up of the variance estimate for example, ``\\mathbf{V}_{t}`` is unknown, and every answer that sums over the observation is `NaN`. A zero variance would understate the error, and dropping the pair would give the covariance of a regression the fit did not run. A window after the warm-up, or a variance estimate with a shorter warm-up, states every entry. A pair outside the regression, or inactive, reads no variance.
 
 **A Leverage-One Pair makes the error unknown where the sandwich reads it.** The fit reproduces the return of a marked pair, so the variance of the pair is not identified, and the plug-in variance of the block is one of many values that fit the data. Under [`EntrywiseUnknown`](@ref) every answer whose sandwich gives a marked pair of the regression a coefficient that is not zero is `NaN`, through [`attribution_leverage_errors`](@ref). The pair stays in the sandwich. [`ZeroUnknown`](@ref) reads the plug-in variance, which is the answer of the oracle. One reduction, [`attribution_error_pass`](@ref), gives the answer and the two indicator sums of the test.
@@ -950,7 +953,7 @@ function attribution_standard_errors(g::MatNum, al::NamedTuple, fam::Option{<:Ve
                                      s1::Number, T::Integer, rule::AbstractUnknownEntryRule)
     rw = assert_attribution_field(al.rw, :rw)
     vs = assert_attribution_field(al.vs, :vs)
-    red = attribution_reduce_for_errors(al.fcb, al.B, g, al.no, T)
+    red = attribution_reduce_for_errors(al.fcb, al.unseen, al.B, rw, g, al.no, T)
     reg = al.act .& .!iszero.(rw)
     pass(s2) = attribution_error_pass(s2, g, al, red, fam, s1)
     # An active pair of the regression reads its variance, `NaN` when unknown; any other pair
@@ -984,17 +987,21 @@ function attribution_observed_indices(no::Integer, K::Integer)::UnitRange{Int}
     return (K - no + 1):K
 end
 """
-    attribution_reduce_for_errors(fcb::Nothing, B, g::MatNum, no::Integer, T::Integer)
-    attribution_reduce_for_errors(fcb::FactorFamilyBasis, B, g::MatNum, no::Integer, T::Integer)
+    attribution_reduce_for_errors(fcb::Nothing, rule::AbstractUnseenMemberRule, B,
+                                  rw::MatNum, g::MatNum, no::Integer, T::Integer)
+    attribution_reduce_for_errors(fcb::FactorFamilyBasis, rule::AbstractUnseenMemberRule, B,
+                                  rw::MatNum, g::MatNum, no::Integer, T::Integer)
 
 Return the exposures and the portfolio exposure the sandwich covariance is taken in.
 
-A block that constrains no family is regressed on its raw axis, and the function returns the two inputs unchanged. A block that constrains a family has a singular raw Gram matrix, so the sandwich is taken in the reduced full-rank basis.
+A block that constrains no family is regressed on its raw axis, and the function returns the two inputs unchanged. A block that constrains a family has a singular raw Gram matrix, so the sandwich is taken in the reduced full-rank basis. At an observation with an Unseen Member, the fit regressed on a changed design, so the function changes the reduced exposures with [`unseen_member_design`](@ref) under the rule of the block, on the pairs of positive regression weight.
 
 # Arguments
 
   - `fcb`: The family re-basis, or `nothing`.
+  - `rule`: The Unseen Member rule of the block.
   - `B`: The static loadings, or the aligned exposure history.
+  - `rw`: The aligned regression weights.
   - `g`: The per-observation portfolio exposure on the raw axis.
   - `no`: The number of observed factors, the last columns of both axes.
   - `T`: The number of aligned observations.
@@ -1005,24 +1012,30 @@ A block that constrains no family is regressed on its raw axis, and the function
   - `g::MatNum`: The portfolio exposure in the regression basis.
   - `observed::Vector{Bool}`: Whether each column of the regression basis is an observed factor.
   - `nr::Int`: The number of columns of the regression basis.
+  - `P`: The `t => P_t` pairs of [`unseen_member_design`](@ref), empty or `()` when the rule changes no observation.
 
 # Related
 
   - [`attribution_standard_errors`](@ref)
   - [`reduce_exposures`](@ref)
   - [`project_factor_coordinates`](@ref)
+  - [`unseen_member_design`](@ref)
 """
-function attribution_reduce_for_errors(::Nothing, B, g::MatNum, no::Integer, T::Integer)
+function attribution_reduce_for_errors(::Nothing, ::AbstractUnseenMemberRule, B, ::MatNum,
+                                       g::MatNum, no::Integer, T::Integer)
     K = size(g, 2)
     return (; B = attribution_broadcast_exposures(B, T), g = g,
-            observed = attribution_observed_flags(no, K), nr = K)
+            observed = attribution_observed_flags(no, K), nr = K, P = ())
 end
-function attribution_reduce_for_errors(fcb::FactorFamilyBasis, B, g::MatNum, no::Integer,
-                                       T::Integer)
-    Br = reduce_exposures(fcb, attribution_broadcast_exposures(B, T))
+function attribution_reduce_for_errors(fcb::FactorFamilyBasis,
+                                       rule::AbstractUnseenMemberRule, B, rw::MatNum,
+                                       g::MatNum, no::Integer, T::Integer)
+    Bb = attribution_broadcast_exposures(B, T)
+    ud = unseen_member_design(rule, fcb, Bb, reduce_exposures(fcb, Bb), rw)
     gr = project_factor_coordinates(fcb, g)
-    nr = size(Br, 3)
-    return (; B = Br, g = gr, observed = attribution_observed_flags(no, nr), nr = nr)
+    nr = size(ud.Z, 3)
+    return (; B = ud.Z, g = gr, observed = attribution_observed_flags(no, nr), nr = nr,
+            P = ud.P)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1132,6 +1145,39 @@ function attribution_sandwich(Bt::MatNum, q::VecNum, s2::VecNum,
     end
     Gi = LinearAlgebra.pinv(Matrix(G))
     return Gi * S * Gi
+end
+"""
+    attribution_changed_covariance(Pt::Nothing, V::MatNum, keep::AbstractVector{<:Integer})
+    attribution_changed_covariance(Pt::AbstractMatrix, V::MatNum,
+                                   keep::AbstractVector{<:Integer})
+
+Return the sandwich covariance of one observation on the factor returns, mapped by the change of an observation with an Unseen Member.
+
+The fit of such an observation regressed on the reduced exposures times ``\\mathbf{P}_{t}``, and its factor returns are ``\\mathbf{P}_{t}`` times the coefficients. [`attribution_sandwich`](@ref) states the covariance of the coefficients, so the covariance of the factor returns is ``\\mathbf{P}_{t} \\mathbf{V}_{t} \\mathbf{P}_{t}^{\\intercal}``. The observed factors are not in a family, so the block of ``\\mathbf{P}_{t}`` on the estimated factors is the whole change. A zero row of ``\\mathbf{P}_{t}``, an Unseen Member, gives a zero row and a zero column. An observation without a change keeps `V`.
+
+# Arguments
+
+  - `Pt`: The change of the observation from [`unseen_member_design`](@ref), or `nothing`.
+  - `V`: The covariance of the coefficients over the estimated factors, from [`attribution_sandwich`](@ref).
+  - `keep`: The factors the regression estimates.
+
+# Returns
+
+  - `V::MatNum`: The covariance of the estimated factor returns.
+
+# Related
+
+  - [`attribution_sandwich`](@ref)
+  - [`attribution_error_pass`](@ref)
+  - [`unseen_member_design`](@ref)
+"""
+function attribution_changed_covariance(::Nothing, V::MatNum, ::AbstractVector{<:Integer})
+    return V
+end
+function attribution_changed_covariance(Pt::AbstractMatrix, V::MatNum,
+                                        keep::AbstractVector{<:Integer})
+    Q = view(Pt, keep, keep)
+    return Q * V * transpose(Q)
 end
 """
     attribution_expand_errors(fcb::Nothing, V::Arr3Num)

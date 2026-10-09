@@ -258,11 +258,14 @@ function cs_gram_slice!(Gt::AbstractMatrix, G::Arr3Num, t::Integer)::Nothing
     return nothing
 end
 """
-    cs_inverse_diagonal!(D::AbstractMatrix, Gt::AbstractMatrix, t::Integer)
+    cs_inverse_diagonal!(D::AbstractMatrix, Gt::AbstractMatrix, t::Integer,
+                         Pt::Option{<:AbstractMatrix} = nothing)
 
 Write the diagonal of the inverse of one Gram slice into the answer.
 
 The inverse is the sum over the singular directions of the outer product of the two singular vectors, scaled by the reciprocal singular value. The verb drops a direction whose singular value falls under the tolerance. So the answer is the inverse of a full-rank slice, and the pseudo-inverse of a collinear one on each coefficient the slice identifies. A coefficient whose unit vector the dropped directions hold by more than the square root of the machine epsilon is not identified, and its entry is `Inf`. [`cs_gram_inverse_diagonal`](@ref) states the rule.
+
+At an observation with an Unseen Member, the slice is the Gram matrix of the changed design, and the factor returns are ``\\mathbf{P}_{t}`` times its coefficients. The verb then writes the diagonal of ``\\mathbf{P}_{t} \\mathbf{G}_{t}^{+} \\mathbf{P}_{t}^{\\intercal}``. It changes both singular vectors by ``\\mathbf{P}_{t}``, and it measures the share of row ``k`` of ``\\mathbf{P}_{t}`` that the dropped directions hold against the squared norm of the row. A zero row, an Unseen Member, has a variance of zero, because the rule states its return.
 
 The count of the kept directions is the numeric rank of the slice. The standard error of a factor return subtracts it from the asset count, so the verb returns it rather than a second decomposition finding it again.
 
@@ -271,6 +274,7 @@ The count of the kept directions is the numeric rank of the slice. The standard 
   - `D`: Answer `observations × factors`, written in place.
   - `Gt`: One Gram slice `factors × factors`.
   - `t`: Observation to write.
+  - `Pt`: The change of the observation from [`unseen_member_design`](@ref), or `nothing` when it has none.
 
 # Returns
 
@@ -280,10 +284,13 @@ The count of the kept directions is the numeric rank of the slice. The standard 
 
   - [`cs_gram_inverse_diagonal`](@ref)
   - [`cs_gram_slice!`](@ref)
+  - [`unseen_member_design`](@ref)
 """
-function cs_inverse_diagonal!(D::AbstractMatrix, Gt::AbstractMatrix, t::Integer)::Int
+function cs_inverse_diagonal!(D::AbstractMatrix, Gt::AbstractMatrix, t::Integer,
+                              Pt::Option{<:AbstractMatrix} = nothing)::Int
     Tf = eltype(D)
     F = LinearAlgebra.svd(Gt)
+    U, V = isnothing(Pt) ? (F.U, F.V) : (Pt * F.U, Pt * F.V)
     tol = minimum(size(Gt)) * eps(Tf) * maximum(F.S)
     # The share of a coordinate that the null directions hold is round-off when the design
     # identifies the coefficient, and of order one when it does not.
@@ -291,14 +298,17 @@ function cs_inverse_diagonal!(D::AbstractMatrix, Gt::AbstractMatrix, t::Integer)
     for k in axes(D, 2)
         d = zero(Tf)
         m = zero(Tf)
+        s = zero(Tf)
         for i in eachindex(F.S)
+            s += Tf(V[k, i])^2
             if F.S[i] > tol
-                d += Tf(F.U[k, i]) * Tf(F.V[k, i]) / Tf(F.S[i])
+                d += Tf(U[k, i]) * Tf(V[k, i]) / Tf(F.S[i])
             else
-                m += Tf(F.V[k, i])^2
+                m += Tf(V[k, i])^2
             end
         end
-        D[t, k] = m > idtol ? Tf(Inf) : d
+        # `s` is the squared norm of the row of the change, one without a change.
+        D[t, k] = m > idtol * s ? Tf(Inf) : d
     end
     return count(>(tol), F.S)
 end
@@ -313,7 +323,7 @@ Every block method of this file starts here. The verb trims the exposures at the
 
  1. Refuse a block that carries no exposure history, or no cross-sectional fit.
  2. Trim the exposure history at the tail by `csfm.lag`, and the factor returns, the residuals and the regression weights at the head by the same count.
- 3. Map the exposures onto the design of the regression with [`cs_regression_design`](@ref): onto the reduced axis when `csfm.fcb` is set, and without the observed factors that `csfm.fx` states. The factor returns `csr.f` are already on that axis.
+ 3. Map the exposures onto the design of the regression with [`cs_regression_design`](@ref): onto the reduced axis when `csfm.fcb` is set, changed under the Unseen Member rule `csfm.unseen`, and without the observed factors that `csfm.fx` states. The factor returns `csr.f` are already on that axis.
 
 # Arguments
 
@@ -326,7 +336,7 @@ Every block method of this file starts here. The verb trims the exposures at the
 
 # Returns
 
-  - `data::NamedTuple`: `(; B, f, eps, w)`, the lag-aligned exposures, factor returns, residuals and regression weights, on the design of the regression. `w` is `nothing` when the block carries no regression weight history.
+  - `data::NamedTuple`: `(; B, f, eps, w, P)`, the lag-aligned exposures, factor returns, residuals and regression weights, on the design of the regression, and the `t => P_t` pairs of [`unseen_member_design`](@ref) on the rows of the answer. `w` is `nothing` when the block carries no regression weight history.
 
 # Validation
 
@@ -360,10 +370,11 @@ function cs_regression_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
     f = csr.f[rows, :]
     eps = csr.eps[rows, :]
     w = cs_lagged_rows(csfm.rw, rows)
-    Br = cs_regression_design(csfm.fcb, B, isnothing(csfm.fx) ? 0 : size(csfm.fx, 2), lag)
-    @argcheck(size(Br, 3) == size(f, 2),
-              DimensionMismatch("the regression of the block ran on $(size(Br, 3)) factors, the reduced axis less the observed ones, and csr.f carries $(size(f, 2)). A block states csr.f on the axis the fit estimated, which is the reduced axis under a family re-basis"))
-    return (; B = Br, f = f, eps = eps, w = w)
+    rd = cs_regression_design(csfm.fcb, csfm.unseen, B, w,
+                              isnothing(csfm.fx) ? 0 : size(csfm.fx, 2))
+    @argcheck(size(rd.B, 3) == size(f, 2),
+              DimensionMismatch("the regression of the block ran on $(size(rd.B, 3)) factors, the reduced axis less the observed ones, and csr.f carries $(size(f, 2)). A block states csr.f on the axis the fit estimated, which is the reduced axis under a family re-basis"))
+    return (; B = rd.B, f = f, eps = eps, w = w, P = rd.P)
 end
 """
     cs_regression_lag(lag::Nothing)
@@ -418,38 +429,50 @@ function cs_lagged_rows(A::MatNum, rows)
     return A[rows, :]
 end
 """
-    cs_regression_design(fcb::Nothing, B::Arr3Num, no::Integer, lag::Integer)
-    cs_regression_design(fcb::FactorFamilyBasis, B::Arr3Num, no::Integer, lag::Integer)
+    cs_regression_design(fcb::Nothing, rule::AbstractUnseenMemberRule, B::Arr3Num,
+                         w::Option{<:MatNum}, no::Integer)
+    cs_regression_design(fcb::FactorFamilyBasis, rule::AbstractUnseenMemberRule, B::Arr3Num,
+                         w::Option{<:MatNum}, no::Integer)
 
 Map a lag-aligned exposure history onto the design the cross-sectional regression ran on.
 
-A block that carries a family re-basis has a rank-deficient design on the raw axis, because every constrained family sums to zero, so the regression ran on the reduced axis, and the diagnostics answer there too. The verb slices the basis to the trimmed observation axis before the basis maps the exposures, because [`cs_regression_data`](@ref) trimmed the exposures at the tail. A block that carries no re-basis is already on its own axis. The observed factors are the last `no` columns of either axis, and the regression did not estimate them, so the verb drops them.
+A block that carries a family re-basis has a rank-deficient design on the raw axis, because every constrained family sums to zero, so the regression ran on the reduced axis, and the diagnostics answer there too. The basis has the rows of the exposure history, and [`cs_regression_data`](@ref) trimmed the exposures at the tail, so the verb slices the basis to the rows of `B` before the basis maps the exposures. A block that carries no re-basis is already on its own axis. The observed factors are the last `no` columns of either axis, and the regression did not estimate them, so the verb drops them.
+
+At an observation with an Unseen Member, the fit regressed on the reduced exposures times a change ``\\mathbf{P}_{t}``, so the verb changes the design with [`unseen_member_design`](@ref) under the rule of the block. The sample of each observation is its pairs of positive regression weight, as in the fit. The observed factors are not in a family, so the verb keeps the block of ``\\mathbf{P}_{t}`` on the estimated factors.
 
 # Arguments
 
   - `fcb`: The `fcb` field of a [`CrossSectionalFactorModel`](@ref), or `nothing`.
+  - `rule`: The `unseen` field of the block.
   - `B`: Lag-aligned exposure history `observations × assets × factors`, on the raw axis.
+  - `w`: Lag-aligned regression weight history `observations × assets`, or `nothing` for equal weights.
   - `no`: The number of observed factors.
-  - `lag`: Number of observations by which the exposures lag the returns.
 
 # Returns
 
-  - `B::Arr3Num`: The exposure history of the factors the regression estimated.
+  - `B::Arr3Num`: The exposure history of the factors the regression estimated, changed at each observation with an Unseen Member.
+  - `P`: The `t => P_t` pairs of [`unseen_member_design`](@ref) on the estimated factors, empty or `()` when the rule changes no observation.
 
 # Related
 
   - [`FactorFamilyBasis`](@ref)
   - [`reduce_exposures`](@ref)
+  - [`unseen_member_design`](@ref)
   - [`cs_regression_data`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
-function cs_regression_design(::Nothing, B::Arr3Num, no::Integer, ::Integer)
-    return B[:, :, 1:(size(B, 3) - no)]
+function cs_regression_design(::Nothing, ::AbstractUnseenMemberRule, B::Arr3Num,
+                              ::Option{<:MatNum}, no::Integer)
+    return (; B = B[:, :, 1:(size(B, 3) - no)], P = ())
 end
-function cs_regression_design(fcb::FactorFamilyBasis, B::Arr3Num, no::Integer, lag::Integer)
-    Tb = size(fcb.ratios, 1) - lag
-    Br = reduce_exposures(factor_basis_slice(fcb, 1:Tb), B)
-    return Br[:, :, 1:(size(Br, 3) - no)]
+function cs_regression_design(fcb::FactorFamilyBasis, rule::AbstractUnseenMemberRule,
+                              B::Arr3Num, w::Option{<:MatNum}, no::Integer)
+    fb = factor_basis_slice(fcb, axes(B, 1))
+    u = cs_estimation_weights_only(w, size(B, 1), size(B, 2),
+                                   float_if_integer(real(eltype(B))))
+    ud = unseen_member_design(rule, fb, B, reduce_exposures(fb, B), u)
+    ke = 1:(size(ud.Z, 3) - no)
+    return (; B = ud.Z[:, :, ke], P = map(p -> first(p) => last(p)[ke, ke], ud.P))
 end
 """
     exposure_vif(G::Arr3Num) -> Matrix{<:Real}
@@ -485,7 +508,7 @@ Where:
   - `G`: Gram history `observations × factors × factors`, which [`cs_gram`](@ref) returns.
   - `B`: Exposure history `observations × assets × factors`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
-  - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis.
+  - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis. At an observation with an Unseen Member the answer reads the design that the fit regressed on, which [`cs_regression_design`](@ref) changes. An Unseen Member has a zero column there, and so has the member that carries the condition when the family drops an Unseen Member, so their factor is `NaN`.
 
 # Validation
 
@@ -594,7 +617,7 @@ Where:
   - `G`: Gram history `observations × factors × factors`, which [`cs_gram`](@ref) returns.
   - `B`: Exposure history `observations × assets × factors`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
-  - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis.
+  - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis. At an observation with an Unseen Member the answer reads the design that the fit regressed on, which [`cs_regression_design`](@ref) changes.
 
 # Validation
 
@@ -717,7 +740,8 @@ end
         f::MatNum,
         eps::MatNum,
         w::Option{<:MatNum} = nothing;
-        G::Option{<:Arr3Num} = nothing
+        G::Option{<:Arr3Num} = nothing,
+        P = ()
     ) -> Matrix{<:Real}
     cs_regression_t_stats(csfm::CrossSectionalFactorModel) -> FactorDiagnosticResult
 
@@ -740,7 +764,7 @@ Where:
 
   - ``f_{t,k}``: Factor return of factor ``k`` at observation ``t``, which is the coefficient of the cross-sectional fit.
   - ``\\mathbf{G}_{t}``: Gram matrix of observation ``t``, which [`cs_gram`](@ref) defines.
-  - ``(\\mathbf{G}_{t}^{-1})_{kk}``: Diagonal of the inverse of ``\\mathbf{G}_{t}``, which [`cs_gram_inverse_diagonal`](@ref) defines. On a collinear slice it is the diagonal of the pseudo-inverse for a coefficient the design identifies, and `Inf` for another.
+  - ``(\\mathbf{G}_{t}^{-1})_{kk}``: Diagonal of the inverse of ``\\mathbf{G}_{t}``, which [`cs_gram_inverse_diagonal`](@ref) defines. On a collinear slice it is the diagonal of the pseudo-inverse for a coefficient the design identifies, and `Inf` for another. At an observation with an Unseen Member it is the diagonal of ``\\mathbf{P}_{t} \\mathbf{G}_{t}^{+} \\mathbf{P}_{t}^{\\intercal}``, which [`cs_inverse_diagonal!`](@ref) states, because the factor returns are ``\\mathbf{P}_{t}`` times the coefficients of the changed design.
   - ``r_{t}``: Numeric rank of ``\\mathbf{G}_{t}``, which is ``K`` on a full-rank slice. The residuals of a collinear fit span ``n_{t} - r_{t}`` dimensions, so the unbiased variance divides by that count.
   - ``u_{t,i}``: Resolved regression weight of asset ``i`` at observation ``t``, zero outside the mask.
   - ``\\varepsilon_{t,i}``: Residual of asset ``i`` at observation ``t``.
@@ -751,10 +775,10 @@ Where:
 
  1. Resolve the mask and the weights with [`cs_diagnostic_mask_weights`](@ref), which also excludes a pair whose residual is not finite.
  2. Build the Gram history with [`cs_gram_from_weights`](@ref), or take the one the caller supplied through `G`.
- 3. Take the diagonal of the inverse and the rank of every slice with [`cs_inverse_diagonal!`](@ref).
+ 3. Take the diagonal of the inverse and the rank of every slice with [`cs_inverse_diagonal!`](@ref), mapped by the change of the observation in `P` when it has one.
  4. Take the residual sum of squares of every observation, and divide it by the degrees of freedom.
  5. Scale the diagonal by that variance, and take the square root, which is the standard error.
- 6. Divide the factor returns by the standard errors. Answer `NaN` where the degrees of freedom are not positive, where a factor return of that observation is not finite, and where the standard error is zero or `Inf`. A coefficient that a collinear design does not identify has no t-statistic, because the fit states no value of it.
+ 6. Divide the factor returns by the standard errors. Answer `NaN` where the degrees of freedom are not positive, where a factor return of that observation is not finite, and where the standard error is zero or `Inf`. A coefficient that a collinear design does not identify has no t-statistic, because the fit states no value of it. An Unseen Member has a standard error of zero, so it has no t-statistic either, because the rule states its return and the data do not estimate it.
 
 # Arguments
 
@@ -763,6 +787,7 @@ Where:
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
   - `G`: Gram history `observations × factors × factors` the caller already holds, or `nothing` to build it. A caller that supplies one states that it built the history from the same mask. The verb does not check this.
+  - `P`: The `t => P_t` pairs of [`unseen_member_design`](@ref) on the rows of `B`, where `B` is the changed design and `f` holds the factor returns. The block method passes the pairs of [`cs_regression_data`](@ref). It is `()` for a design that no rule changed.
   - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis.
 
 # Validation
@@ -795,7 +820,7 @@ julia> round.(cs_regression_t_stats(B, [2.0 1.0], [0.1 -0.1 0.05]); digits = 4)
 """
 function cs_regression_t_stats(B::Arr3Num, f::MatNum, eps::MatNum,
                                w::Option{<:MatNum} = nothing;
-                               G::Option{<:Arr3Num} = nothing)
+                               G::Option{<:Arr3Num} = nothing, P = ())
     K = size(B, 3)
     @argcheck(size(f, 1) == size(B, 1) && size(f, 2) == K,
               DimensionMismatch("f ($(size(f, 1))×$(size(f, 2))) must match B ($(size(B, 1)) observations, $K factors)"))
@@ -811,7 +836,8 @@ function cs_regression_t_stats(B::Arr3Num, f::MatNum, eps::MatNum,
     t = fill(convert(Tf, NaN), T, K)
     for tt in 1:T
         cs_gram_slice!(Gt, Gh, tt)
-        dof = count(view(mask, tt, :)) - cs_inverse_diagonal!(D, Gt, tt)
+        dof = count(view(mask, tt, :)) -
+              cs_inverse_diagonal!(D, Gt, tt, unseen_member_change_at(P, tt))
         if dof > zero(dof) && cs_row_is_finite(f, tt)
             s2 = cs_weighted_rss(eps, u, mask, tt, Tf) / Tf(dof)
             cs_t_stat_row!(t, f, D, s2, tt)
@@ -821,7 +847,9 @@ function cs_regression_t_stats(B::Arr3Num, f::MatNum, eps::MatNum,
 end
 function cs_regression_t_stats(csfm::CrossSectionalFactorModel)
     data = cs_regression_data(csfm)
-    return cs_design_result(csfm, cs_regression_t_stats(data.B, data.f, data.eps, data.w))
+    return cs_design_result(csfm,
+                            cs_regression_t_stats(data.B, data.f, data.eps, data.w;
+                                                  P = data.P))
 end
 """
     cs_row_is_finite(A::MatNum, t::Integer)

@@ -441,11 +441,12 @@
         @test_throws IsEmptyError FeesEstimator(; l = Dict{String, Number}())
         @test_throws IsEmptyError FeesEstimator(; l = Pair{String, Number}[])
 
-        @test_throws DomainError FeesEstimator(; s = "a" => -1)
+        # A negative short rate is a credit, which `Fees` checks against `l` (#1518).
+        @test FeesEstimator(; s = "a" => -1) isa FeesEstimator
         @test_throws DomainError FeesEstimator(; s = "a" => Inf)
-        @test_throws DomainError FeesEstimator(; s = ["a" => -1])
+        @test FeesEstimator(; s = ["a" => -1]) isa FeesEstimator
         @test_throws DomainError FeesEstimator(; s = ["a" => Inf])
-        @test_throws DomainError FeesEstimator(; s = Dict("a" => -1))
+        @test FeesEstimator(; s = Dict("a" => -1)) isa FeesEstimator
         @test_throws DomainError FeesEstimator(; s = Dict("a" => Inf))
         @test_throws IsEmptyError FeesEstimator(; s = Dict{String, Number}())
         @test_throws IsEmptyError FeesEstimator(; s = Pair{String, Number}[])

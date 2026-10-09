@@ -11,6 +11,9 @@ PseudoInverseFallback
 RankDeficiencyRefusal
 UncheckedSolve
 MinimumNormSolve
+AbstractUnseenMemberRule
+ZeroUnseenMember
+SolvedUnseenMember
 CrossSectionalLinearRegression
 CrossSectionalTargetRegression
 CrossSectionalRegression

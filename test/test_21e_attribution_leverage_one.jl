@@ -256,7 +256,8 @@ end
             g = reduce(vcat,
                        [transpose(transpose(PO.attribution_slice(al.B, t)) * w)
                         for t in axes(al.f, 1)])
-            red = PO.attribution_reduce_for_errors(al.fcb, al.B, g, al.no, size(g, 1))
+            red = PO.attribution_reduce_for_errors(al.fcb, al.unseen, al.B, al.rw, g, al.no,
+                                                   size(g, 1))
             pass(s2) = PO.attribution_error_pass(s2, g, al, red, blk.fam, 1)
             l, s = pass(reg .& al.h1), pass(reg)
             return (; sys = abs2(l.sys) / abs2(s.sys),

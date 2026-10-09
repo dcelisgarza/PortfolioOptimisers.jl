@@ -14,6 +14,7 @@ attribution_lag
 attribution_row_key
 attribution_families
 attribution_family_basis
+attribution_unseen_rule
 attribution_regression_weights
 attribution_idiosyncratic_variances
 assert_attribution_field

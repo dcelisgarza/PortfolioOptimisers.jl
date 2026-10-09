@@ -553,6 +553,7 @@ $(DocStringExtensions.FIELDS)
         nf::Option{<:VecStr} = nothing,
         fam::Option{<:VecStr} = nothing,
         fcb::Option{<:AbstractFactorFamilyBasis} = nothing,
+        unseen::AbstractUnseenMemberRule = SolvedUnseenMember(),
         lag::Option{<:Integer} = nothing,
         rf::Option{<:AbstractReturnForecastResult} = nothing,
         fx::Option{<:MatNum} = nothing,
@@ -595,7 +596,7 @@ Keywords correspond to the struct's fields.
   - `esigma` is sliced by [`idiosyncratic_covariance_view`](@ref), on one axis or on both.
   - `edof` and `ediv` are sliced on their only axis, which is the asset axis.
   - `rf` is viewed by its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
-  - `nf`, `fam`, `fcb`, `lag`, `fx`, `fr`, `lambda`, `c`, `idx` and `ts` pass through unchanged. Each is indexed by factor, by observation, or by nothing at all, and none follows an asset selection.
+  - `nf`, `fam`, `fcb`, `unseen`, `lag`, `fx`, `fr`, `lambda`, `c`, `idx` and `ts` pass through unchanged. Each is indexed by factor, by observation, or by nothing at all, and none follows an asset selection.
 
 # Examples
 
@@ -617,6 +618,7 @@ CrossSectionalFactorModel
       nf ┼ nothing
      fam ┼ Vector{String}: ["style", "style"]
      fcb ┼ nothing
+  unseen ┼ SolvedUnseenMember()
      lag ┼ Int64: 1
       rf ┼ nothing
       fx ┼ nothing
@@ -694,6 +696,10 @@ CrossSectionalFactorModel
     """
     fcb
     """
+    The Unseen Member rule the fit regressed under. A consumer that rebuilds the design of each observation, the regression diagnostics and the standard errors of a [`factor_attribution`](@ref), calls [`unseen_member_design`](@ref) of the rule on `Ms`, `fcb` and `rw`, so it reads the design that the fit regressed on. A block without a family re-basis has no Unseen Member, so the rule changes nothing there.
+    """
+    unseen
+    """
     Number of observations by which the exposures lag the returns.
     """
     lag
@@ -733,6 +739,7 @@ CrossSectionalFactorModel
                                        rw::Option{<:MatNum}, bw::Option{<:MatNum},
                                        nf::Option{<:VecStr}, fam::Option{<:VecStr},
                                        fcb::Option{<:AbstractFactorFamilyBasis},
+                                       unseen::AbstractUnseenMemberRule,
                                        lag::Option{<:Integer},
                                        rf::Option{<:AbstractReturnForecastResult},
                                        fx::Option{<:MatNum}, fr::Option{<:MatNum},
@@ -785,12 +792,9 @@ CrossSectionalFactorModel
         assert_cs_history_obs(trw, tvs, :rw, :vs)
         assert_cs_history_obs(tbw, tvs, :bw, :vs)
         assert_cs_block_rows(idx, ts, csr)
-        return new{typeof(M), typeof(L), typeof(b), typeof(csr), typeof(Ms), typeof(vs),
-                   typeof(esigma), typeof(edof), typeof(ediv), typeof(rw), typeof(bw),
-                   typeof(nf), typeof(fam), typeof(fcb), typeof(lag), typeof(rf),
-                   typeof(fx), typeof(fr), typeof(lambda), typeof(c), typeof(idx),
-                   typeof(ts)}(M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw, nf, fam,
-                               fcb, lag, rf, fx, fr, lambda, c, idx, ts)
+        fs = (M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw, nf, fam, fcb, unseen, lag,
+              rf, fx, fr, lambda, c, idx, ts)
+        return new{map(typeof, fs)...}(fs...)
     end
 end
 function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b::VecNum,
@@ -805,6 +809,7 @@ function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b
                                    nf::Option{<:VecStr} = nothing,
                                    fam::Option{<:VecStr} = nothing,
                                    fcb::Option{<:AbstractFactorFamilyBasis} = nothing,
+                                   unseen::AbstractUnseenMemberRule = SolvedUnseenMember(),
                                    lag::Option{<:Integer} = nothing,
                                    rf::Option{<:AbstractReturnForecastResult} = nothing,
                                    fx::Option{<:MatNum} = nothing,
@@ -814,7 +819,7 @@ function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b
                                    idx::Option{<:VecInt} = nothing,
                                    ts::Option{<:VecDate} = nothing)::CrossSectionalFactorModel
     return CrossSectionalFactorModel(M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw, nf,
-                                     fam, fcb, lag, rf, fx, fr, lambda, c, idx, ts)
+                                     fam, fcb, unseen, lag, rf, fx, fr, lambda, c, idx, ts)
 end
 """
     cross_sectional_factor_returns(csfm::CrossSectionalFactorModel) -> MatNum
@@ -1043,7 +1048,8 @@ function port_opt_view(csfm::CrossSectionalFactorModel, i,
                                      rw = isnothing(rw) ? nothing : view(rw, :, i),
                                      bw = isnothing(bw) ? nothing : view(bw, :, i),
                                      nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,
-                                     lag = csfm.lag, rf = if isnothing(rf)
+                                     unseen = csfm.unseen, lag = csfm.lag,
+                                     rf = if isnothing(rf)
                                          nothing
                                      else
                                          port_opt_view(rf, i, args...)

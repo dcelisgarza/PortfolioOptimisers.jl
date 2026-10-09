@@ -366,6 +366,7 @@ An estimated factor of a Cross-Sectional Factor Prior whose exposure is zero at 
 
 **Unseen Member**
 A member of a constrained Factor Family that no asset of positive regression weight loads on at one observation of a Cross-Sectional Factor Prior. The exposures lag the returns, so the zero-sum condition of the observation reads earlier benchmark weights, which can still weight the member after its last asset delists. The data state nothing about its return there. The Unseen Member rule of the prior states it: by default a return of zero at that observation, with the zero-sum condition held over the other members, so the observation is identified and its factor returns do not depend on the dropped member (#1606).
+The Cross-Sectional Factor Model block stores the rule, so the regression diagnostics and the standard errors of a factor attribution read the design that the fit regressed on, and they do not depend on the dropped member either (#1609).
 *Avoid*: an Empty Factor, which no asset loads on at any observation of the fit.
 
 **Currency Excess Index**

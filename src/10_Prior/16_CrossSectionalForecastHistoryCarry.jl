@@ -151,7 +151,8 @@ function cross_sectional_carry_history(pe::CrossSectionalFactorPrior,
                                      b = zeros(real(eltype(st.vs)), size(st.X, 2)),
                                      csr = st.csr, Ms = ca.Ms, vs = st.vs, rw = st.W,
                                      bw = view(st.bw, r, :), nf = ca.nf, fam = ca.fam,
-                                     fcb = fnow, lag = pe.lag, fx = ca.fx)
+                                     fcb = fnow, unseen = pe.unseen, lag = pe.lag,
+                                     fx = ca.fx)
     rows = return_forecast_rows(rd, csfm)
     # The rows are the history of the member that the batch fit reads under its Orthogonal
     # Forecast Fit, so the carried rows and the appended one come from the same member.
@@ -378,7 +379,7 @@ function cross_sectional_carry_forecast(pe::CrossSectionalFactorPrior,
                                                                                                                  :)),
                                      Ms = ca.Ms[j, :, :], vs = st.vs[j, :], rw = st.W[j, :],
                                      bw = st.bw[r[j], :], nf = ca.nf, fam = ca.fam,
-                                     fcb = fnow, lag = pe.lag,
+                                     fcb = fnow, unseen = pe.unseen, lag = pe.lag,
                                      fx = nothing_scalar_array_getindex_odd_order(ca.fx, j,
                                                                                   :))
     rfo = orthogonal_forecast_member(pe.ofit, pe.rfe, csfm)

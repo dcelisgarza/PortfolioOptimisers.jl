@@ -1129,7 +1129,7 @@ end
     function fit(d)
         fcb = basis(d)
         Zl = PO.reduce_exposures(fcb, B)
-        ud = PO.unseen_member_design(ZeroUnseenMember(), fcb, B, Zl, X, W)
+        ud = PO.unseen_member_design(ZeroUnseenMember(), fcb, B, Zl, W)
         csr = PO.unseen_member_returns(PO.cross_sectional_live_regression(cre, ud.Z, X, W).csr,
                                        ud.P)
         return (; Zl = Zl, ud = ud, csr = csr, f = PO.expand_factor_returns(fcb, csr.f))
@@ -1186,26 +1186,26 @@ end
         W0 = copy(W)
         W0[2, :] .= 0.0
         Pt = last(only(PO.unseen_member_design(ZeroUnseenMember(), fcb, B,
-                                               PO.reduce_exposures(fcb, B), X, W0).P))
+                                               PO.reduce_exposures(fcb, B), W0).P))
         @test all(iszero, Pt[:, 2:3]) && Pt[1, 1] == 1
         # When each member the sample sees has no benchmark weight, the dropped member is
         # alone in the condition, so its zero return leaves the others free.
         fz = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [3],
                                ratios = [1.5 2.0; 0.0 0.0], K = 4)
         Pt = last(only(PO.unseen_member_design(ZeroUnseenMember(), fz, B,
-                                               PO.reduce_exposures(fz, B), X, W).P))
+                                               PO.reduce_exposures(fz, B), W).P))
         @test Pt == LinearAlgebra.I
     end
     @testset "No basis, the solved rule and no unseen member change nothing" begin
         for rule in (ZeroUnseenMember(), SolvedUnseenMember())
-            ud = PO.unseen_member_design(rule, nothing, B, B, X, W)
+            ud = PO.unseen_member_design(rule, nothing, B, B, W)
             @test ud.Z === B && ud.P == ()
         end
         fcb = basis(1)
         Zl = PO.reduce_exposures(fcb, B)
-        ud = PO.unseen_member_design(SolvedUnseenMember(), fcb, B, Zl, X, W)
+        ud = PO.unseen_member_design(SolvedUnseenMember(), fcb, B, Zl, W)
         @test ud.Z === Zl && ud.P == ()
-        ud = PO.unseen_member_design(ZeroUnseenMember(), fcb, B, Zl, X, ones(2, N))
+        ud = PO.unseen_member_design(ZeroUnseenMember(), fcb, B, Zl, ones(2, N))
         @test ud.Z === Zl && isempty(ud.P)
         csr = PO.cross_sectional_live_regression(cre, Zl, X, ones(2, N)).csr
         @test PO.unseen_member_returns(csr, ud.P) === csr
@@ -1213,20 +1213,20 @@ end
         fz = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [1],
                                ratios = [4/3 2/3; 4/3 0.0], K = 4)
         @test isempty(PO.unseen_member_design(ZeroUnseenMember(), fz, B,
-                                              PO.reduce_exposures(fz, B), X, W).P)
+                                              PO.reduce_exposures(fz, B), W).P)
     end
     @testset "The number type of the ratios is kept" begin
         fq = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [3],
                                ratios = [3//2 2//1; 3//2 2//1], K = 4)
         Bq = Rational{Int}.(B)
         P = PO.unseen_member_design(ZeroUnseenMember(), fq, Bq, PO.reduce_exposures(fq, Bq),
-                                    X, W).P
+                                    W).P
         @test eltype(last(only(P))) == Rational{Int}
         @test last(only(P))[3, 2] == -3//4
         fi = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [3],
                                ratios = [1 2; 1 2], K = 4)
         P = PO.unseen_member_design(ZeroUnseenMember(), fi, B, PO.reduce_exposures(fi, B),
-                                    X, W).P
+                                    W).P
         @test eltype(last(only(P))) == Float64
     end
     @testset "The fitted prior of the delisting panel does not depend on the dropped member" begin
@@ -1240,8 +1240,10 @@ end
                                          family = "style")]
         mk(fam; kw...) = CrossSectionalFactorPrior(; factors = factors, families = fam,
                                                    minra = 5, kw...)
-        a = prior(mk(["industry" => nothing]), fx.rd).rr
-        b = prior(mk(["industry" => "industry=Energy"]), fx.rd).rr
+        pa = prior(mk(["industry" => nothing]), fx.rd)
+        pb = prior(mk(["industry" => "industry=Energy"]), fx.rd)
+        a = pa.rr
+        b = pb.rr
         # Asset 3 is the only asset in Utilities, and it delists after data row 225. The
         # condition of row 226 reads the benchmark weights of row 225, which still weight it.
         t = findfirst(==(226), a.idx)
@@ -1262,5 +1264,101 @@ end
         @test maximum(abs, sa.fr[t, :] .- sb.fr[t, :]) > 1e-4
         @test maximum(abs, sa.fr[others, :] .- sb.fr[others, :]) < 1e-15
         @test sa.fr[t, u] != 0
+        @testset "The diagnostics and the attribution read the design of the fit (#1609)" begin
+            @test a.unseen === ZeroUnseenMember() && sa.unseen === SolvedUnseenMember()
+            same(x, y) = all(map((p, q) -> isequal(p, q) ||
+                                           isapprox(p, q; rtol = 1e-10, atol = 1e-12), x,
+                                 y))
+            # The diagnostics drop the first `lag` rows of the fit.
+            td = t - a.lag
+            @test first.(PO.cs_regression_data(a).P) == [td]
+            @test PO.cs_regression_data(sa).P == ()
+            ta = cs_regression_t_stats(a)
+            tb = cs_regression_t_stats(b)
+            com = intersect(ta.nf, tb.nf)
+            ia = indexin(com, ta.nf)
+            ib = indexin(com, tb.nf)
+            cu = findfirst(==("industry=Utilities"), com)
+            seen = setdiff(eachindex(com), cu)
+            # The old design gave no t-statistic to the market, Banks and Utilities at this
+            # row. Utilities is unseen, so the rule states its return and it has none still.
+            @test isnan(ta.X[td, ia[cu]]) && isnan(tb.X[td, ib[cu]])
+            @test all(isfinite, ta.X[td, ia[seen]])
+            @test same(ta.X[:, ia], tb.X[:, ib])
+            tsa = cs_regression_t_stats(sa)
+            od = setdiff(axes(ta.X, 1), td)
+            @test same(ta.X[od, :], tsa.X[od, :])
+            @test count(isnan, tsa.X[td, :]) == 4
+            # The VIF reads the changed design, whose column of Utilities is zero. The old
+            # design was rank-deficient, so every member and the market had an infinite VIF.
+            va = exposure_vif(a).X
+            ua = findfirst(==("industry=Utilities"), ta.nf)
+            @test isnan(va[td, ua]) && all(isfinite, va[td, setdiff(axes(va, 2), ua)])
+            @test count(isinf, exposure_vif(sa).X[td, :]) == 4
+            @test same(va[od, :], exposure_vif(sa).X[od, :])
+            # The standard errors of the row do not depend on the dropped member: before
+            # #1609 they differed by 1.6e-6 on the industry family.
+            function row_errors(pr)
+                al = PO.attribution_window(PO.attribution_align(pr.rr, pr,
+                                                                size(fx.rd.X, 1)), td:td)
+                g = dropdims(sum(al.B; dims = 2); dims = 2) ./ size(al.B, 2)
+                return PO.attribution_standard_errors(g, al, PO.attribution_families(pr.rr),
+                                                      1.0, 1, ZeroUnknown())
+            end
+            ea = row_errors(pa)
+            eb = row_errors(pb)
+            @test ea.sys≈eb.sys rtol=1e-12
+            @test ea.factor≈eb.factor rtol=1e-12
+            @test ea.family≈eb.family rtol=1e-12
+            @test ea.factor[u] == 0
+        end
     end
+end
+
+@testset "The consumers of a block map the change of an Unseen Member (#1609)" begin
+    PO = PortfolioOptimisers
+    Zl = randn(StableRNG(1_609), 8, 3)
+    # The dropped member is unseen, so the condition moves onto member 3: its column is zero,
+    # and its row holds the condition over member 2.
+    P = [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 -0.5 0.0]
+    G = (Zl * P)' * (Zl * P)
+    D = zeros(1, 3)
+    @test PO.cs_inverse_diagonal!(D, G, 1, P) == 2
+    @test D[1, :]≈LinearAlgebra.diag(P * LinearAlgebra.pinv(G) * P') atol=1e-12
+    @test all(x -> 0 < x < Inf, D)
+    # A zero row of the change is an Unseen Member, whose return the rule states.
+    P0 = [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 0.0]
+    PO.cs_inverse_diagonal!(D, (Zl * P0)' * (Zl * P0), 1, P0)
+    @test D[1, 3] == 0 && all(isfinite, D)
+    # Without a change the slice keeps its own answer.
+    PO.cs_inverse_diagonal!(D, Zl' * Zl, 1)
+    @test D[1, :] ≈ LinearAlgebra.diag(inv(Zl' * Zl))
+    # A coefficient that the change keeps in the null space stays unidentified.
+    Zc = copy(Zl)
+    Zc[:, 1] .= 0
+    PO.cs_inverse_diagonal!(D, Zc' * Zc, 1, Matrix(1.0LinearAlgebra.I, 3, 3))
+    @test isinf(D[1, 1]) && isfinite(D[1, 2])
+    @test isnothing(PO.unseen_member_change_at((), 1))
+    @test PO.unseen_member_change_at([2 => P], 2) === P
+    @test isnothing(PO.unseen_member_change_at([2 => P], 1))
+    V = [2.0 0.5 0.1; 0.5 1.0 0.2; 0.1 0.2 3.0]
+    @test PO.attribution_changed_covariance(nothing, V, 1:3) === V
+    @test PO.attribution_changed_covariance(P, V, 1:3) ≈ P * V * P'
+    # An observed factor is not in a family, so the change is the block on `keep`.
+    Pf = [P zeros(3); zeros(1, 3) 1.0]
+    @test PO.attribution_changed_covariance(Pf, V, 1:3) ≈ P * V * P'
+    # A block that a caller builds without a rule reads its own design.
+    blk = CrossSectionalFactorModel(; M = [1.0 2.0; 3.0 4.0], b = [0.1, 0.2])
+    @test blk.unseen === SolvedUnseenMember()
+    @test PO.attribution_unseen_rule(blk) === SolvedUnseenMember()
+    @test PO.attribution_unseen_rule(Regression(; M = [1.0 2.0; 3.0 4.0], b = [0.1, 0.2])) ===
+          SolvedUnseenMember()
+    zb = CrossSectionalFactorModel(; M = [1.0 2.0; 3.0 4.0], b = [0.1, 0.2],
+                                   unseen = ZeroUnseenMember())
+    @test PO.port_opt_view(zb, [1]).unseen === ZeroUnseenMember()
+    kw = PO.attribution_array_keywords(pairs((; unseen = ZeroUnseenMember(), se = true)))
+    @test kw.blk.unseen === ZeroUnseenMember() && keys(kw.entry) == (:se,)
+    @test PO.attribution_array_block(ones(2, 2), ones(3, 2), ones(3, 2);
+                                     unseen = ZeroUnseenMember()).unseen ===
+          ZeroUnseenMember()
 end

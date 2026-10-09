@@ -829,7 +829,7 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     # asset of an observation loads on (#1606).
     Bl = Msw[r .- pe.lag, :, :]
     fbl = cross_sectional_basis_now(fb.fcb, r .- pe.lag)
-    ud = unseen_member_design(pe.unseen, fbl, Bl, Zl, Xr, W)
+    ud = unseen_member_design(pe.unseen, fbl, Bl, Zl, W)
     (; csr, lv) = cross_sectional_live_regression(pe.cre, ud.Z, Xr, W)
     csr = unseen_member_returns(csr, ud.P)
     assert_cross_sectional_no_intercept(csr)
@@ -841,7 +841,7 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     if needs_second_pass(pe.wa)
         W = cs_weights_refine(pe.wa, W, csr.eps, pe.ve, msk; estimation_mask = emr,
                               active_mask = amr)
-        ud = unseen_member_design(pe.unseen, fbl, Bl, Zl, Xr, W)
+        ud = unseen_member_design(pe.unseen, fbl, Bl, Zl, W)
         (; csr, lv) = cross_sectional_live_regression(pe.cre, ud.Z, Xr, W)
         csr = unseen_member_returns(csr, ud.P)
     end
@@ -884,7 +884,7 @@ The returns-matrix method of [`prior`](@ref) calls it after the variance history
  1. Take the ready factors of `f_pr` with [`cross_sectional_ready_factors`](@ref) and the determined assets with [`cross_sectional_determined`](@ref). Refuse a fit that determines no asset with [`assert_cross_sectional_factor_moments`](@ref).
  2. Record the degrees of freedom and the divisor of each variance with [`cross_sectional_variance_counts`](@ref), from the count `cnt`.
  3. Standardise the idiosyncratic returns by `vs` with [`cross_sectional_standardised_residuals`](@ref), giving `S`, unless `fit` carries them. Take the latest idiosyncratic covariance `esigma` with [`cross_sectional_idiosyncratic_covariance`](@ref), from the same residuals with no fill, so a gap stays a gap for the correlation, and repair it under `pe.pdm`.
- 4. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, and a zero `b`. Under a family re-basis, expand the factor returns onto the raw axis with [`cross_sectional_expand`](@ref), each row with the basis of its lagged exposures, and store them in `fr`.
+ 4. Build the [`CrossSectionalFactorModel`](@ref) block `csfm`, with the raw exposures of the latest observation in `M`, the reduced ones `L` beside them, a zero `b`, and the Unseen Member rule `pe.unseen`, which the diagnostics and the attribution read. Under a family re-basis, expand the factor returns onto the raw axis with [`cross_sectional_expand`](@ref), each row with the basis of its lagged exposures, and store them in `fr`.
  5. Fit the Return Forecast under the Orthogonal Forecast Fit `pe.ofit` with [`cross_sectional_return_forecast`](@ref) on `rde`, giving the spanned coefficients `g`, the orthogonal part `ap` before `c`, and the history when a slot answers `true` to [`reads_forecast_history`](@ref). The history extends the rows `hist` of `fit` when the carry fold carries them. The forecast is the Result `rf` of `fit` when the carry fold carries it.
  6. Resolve the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` with [`cross_sectional_calibration`](@ref), against the factor moments `f_pr` and the block `csfm`.
  7. Write `b = c ap`, the Return Forecast Result and the resolved `lambda` and `c` onto the block with [`cross_sectional_forecast_block`](@ref), giving `rr`. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref) under the resolved `lambda`, and keep the mean of the observed factors, giving `f_mu`.
@@ -957,8 +957,8 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
                                      b = zeros(Tb, size(Xo, 2)), csr = csr, Ms = Msr,
                                      vs = vs, esigma = esigma, edof = edof, ediv = ediv,
                                      rw = W, bw = bwr, nf = ca.nf, fam = ca.fam, fcb = fnow,
-                                     lag = pe.lag, fx = ca.fx, fr = fr, idx = fit.idx,
-                                     ts = fit.ts)
+                                     unseen = pe.unseen, lag = pe.lag, fx = ca.fx, fr = fr,
+                                     idx = fit.idx, ts = fit.ts)
     # The forecast reads the returns the estimated members read, so under observed factors it
     # forecasts the net return, which the split measures against loadings of the same returns.
     # The split comes first and the scale after it, because a rule in `c` reads the unscaled
@@ -1104,8 +1104,9 @@ function cross_sectional_forecast_block(csfm::CrossSectionalFactorModel, sp::Nam
                                      esigma = csfm.esigma, edof = csfm.edof,
                                      ediv = csfm.ediv, rw = csfm.rw, bw = csfm.bw,
                                      nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,
-                                     lag = csfm.lag, rf = sp.rf, fx = csfm.fx, fr = csfm.fr,
-                                     lambda = lambda, c = c, idx = csfm.idx, ts = csfm.ts)
+                                     unseen = csfm.unseen, lag = csfm.lag, rf = sp.rf,
+                                     fx = csfm.fx, fr = csfm.fr, lambda = lambda, c = c,
+                                     idx = csfm.idx, ts = csfm.ts)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

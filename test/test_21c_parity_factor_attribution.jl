@@ -170,7 +170,8 @@ end
 function fa_real_arrays(pr)
     b = PortfolioOptimisers.attribution_block_arrays(pr.rr, pr)
     return (b.B, b.f, b.eps),
-           (; lag = b.lag, rw = b.rw, vs = b.vs, fcb = b.fcb, observed = b.no, fam = b.fam)
+           (; lag = b.lag, rw = b.rw, vs = b.vs, fcb = b.fcb, unseen = b.unseen,
+            observed = b.no, fam = b.fam)
 end
 
 @testset "Factor attribution at parity with the oracle (#1388)" begin
@@ -188,8 +189,12 @@ end
                                             regime_lohi_mult = (0.7, 1.6), min_val = 1e-12,
                                             min_obs = 1)
     lz = KindwiseUnknown(; leverage = ZeroUnknown())
+    # The oracle keeps an Unseen Member in the zero-sum condition of its observation, so every
+    # case states the solved rule, as `grid_config` does (#1606).
     fit(; kw...) = prior(CrossSectionalFactorPrior(; lambda = 1, factors = base, minra = 5,
-                                                   pe = GRID_PE, ve = GRID_VE, kw...), rd)
+                                                   pe = GRID_PE, ve = GRID_VE,
+                                                   unseen = SolvedUnseenMember(), kw...),
+                         rd)
     load(c, o) = parity_load(FA_UNIT, replace(c, "Arr" => ""), o)
     cmp(a, b, name; kw...) = parity_compare(a, b; name = name, kw...).ok
     prb = fit()

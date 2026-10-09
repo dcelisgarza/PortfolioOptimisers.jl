@@ -215,7 +215,7 @@ The block keywords describe the arrays, and [`attribution_array_block`](@ref) ta
 
 # Returns
 
-  - `kw::NamedTuple`: The block keywords `blk`, among `lag`, `trim`, `rw`, `vs`, `fcb`, `observed`, `fam` and `h1`, and the other keywords `entry`.
+  - `kw::NamedTuple`: The block keywords `blk`, among `lag`, `trim`, `rw`, `vs`, `fcb`, `unseen`, `observed`, `fam` and `h1`, and the other keywords `entry`.
 
 # Related
 
@@ -224,7 +224,7 @@ The block keywords describe the arrays, and [`attribution_array_block`](@ref) ta
 """
 function attribution_array_keywords(kwargs)
     nt = values(kwargs)
-    ks = filter(in((:lag, :trim, :rw, :vs, :fcb, :observed, :fam, :h1)), keys(nt))
+    ks = filter(in((:lag, :trim, :rw, :vs, :fcb, :unseen, :observed, :fam, :h1)), keys(nt))
     return (; blk = NamedTuple{ks}(nt), entry = Base.structdiff(nt, NamedTuple{ks}))
 end
 function factor_attribution(W::VecNum_MatNum, B::MatNum_Arr3Num, f::MatNum, eps::MatNum,
@@ -582,14 +582,14 @@ end
 
 Return the standard errors of the mean return contributions for one matrix of idiosyncratic variances.
 
-The sandwich of each observation reads `s2`, and the function sums it over the observations through the portfolio exposure. [`attribution_standard_errors`](@ref) calls it with the variances of the regression pairs. [`attribution_leverage_errors`](@ref) calls it with an indicator in place of the variances, so one reduction gives the answer and the weight that each output puts on a set of pairs.
+The sandwich of each observation reads `s2`, and the function sums it over the observations through the portfolio exposure. [`attribution_standard_errors`](@ref) calls it with the variances of the regression pairs. [`attribution_leverage_errors`](@ref) calls it with an indicator in place of the variances, so one reduction gives the answer and the weight that each output puts on a set of pairs. At an observation with an Unseen Member, [`attribution_changed_covariance`](@ref) maps the sandwich of the changed design to the covariance of the factor returns.
 
 # Arguments
 
   - `s2`: The idiosyncratic variance of each pair, `observations × assets`, zero outside the regression.
   - `g`: The per-observation portfolio exposure on the raw axis, `observations × factors`.
   - `al`: The aligned factor model history, with the regression weights `rw`.
-  - `red`: The regression basis, from [`attribution_reduce_for_errors`](@ref).
+  - `red`: The regression basis and the changes `P` of the observations with an Unseen Member, from [`attribution_reduce_for_errors`](@ref).
   - `fam`: The family label of each raw factor, or `nothing`.
   - `s1`: The factor a mean takes under the annualisation.
 
@@ -611,8 +611,11 @@ function attribution_error_pass(s2::AbstractMatrix, g::MatNum, al::NamedTuple,
     cur = attribution_observed_indices(al.no, K)
     keep = findall(!, red.observed)
     se(v) = s1 * sqrt(max(zero(v), v)) / T
-    V = [attribution_sandwich(view(red.B, t, :, :), view(al.rw, t, :), view(s2, t, :),
-                              keep) for t in 1:T]
+    V = [attribution_changed_covariance(unseen_member_change_at(red.P, t),
+                                        attribution_sandwich(view(red.B, t, :, :),
+                                                             view(al.rw, t, :),
+                                                             view(s2, t, :), keep), keep)
+         for t in 1:T]
     sys = se(sum(LinearAlgebra.dot(view(red.g, t, keep), V[t], view(red.g, t, keep))
                  for t in 1:T))
     Vf = attribution_expand_errors(al.fcb, attribution_scatter(V, keep, red.nr))

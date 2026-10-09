@@ -1,16 +1,8 @@
 ```@meta
-Description = "Factor Family Basis Transforms, public API of PortfolioOptimisers.jl: AbstractUnseenMemberRule, ZeroUnseenMember, SolvedUnseenMember, reduce_factor_names, …"
+Description = "Factor Family Basis Transforms, public API of PortfolioOptimisers.jl: reduce_factor_names, reduce_exposures, reduce_loadings, reduce_factor_returns, …"
 ```
 
 # [Factor Family Basis Transforms](@id api-factor-family-basis-transforms)
-
-## Types
-
-```@docs
-AbstractUnseenMemberRule
-ZeroUnseenMember
-SolvedUnseenMember
-```
 
 ## Functions
 

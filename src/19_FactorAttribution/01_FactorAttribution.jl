@@ -640,6 +640,34 @@ function attribution_family_basis(rr::CrossSectionalFactorModel)
     return rr.fcb
 end
 """
+    attribution_unseen_rule(rr::AbstractLoadingsRegressionResult)
+    attribution_unseen_rule(rr::CrossSectionalFactorModel)
+
+Return the Unseen Member rule the block's fit regressed under.
+
+The standard errors of a realised attribution rebuild the design of each observation, and at an observation with an Unseen Member the fit regressed on a changed design. A block type that constrains no family has no Unseen Member, so the root answers [`SolvedUnseenMember`](@ref), which changes no design.
+
+# Arguments
+
+  - `rr`: A loadings regression result.
+
+# Returns
+
+  - `rule::AbstractUnseenMemberRule`: The Unseen Member rule.
+
+# Related
+
+  - [`factor_attribution`](@ref)
+  - [`attribution_family_basis`](@ref)
+  - [`unseen_member_design`](@ref)
+"""
+function attribution_unseen_rule(::AbstractLoadingsRegressionResult)::SolvedUnseenMember
+    return SolvedUnseenMember()
+end
+function attribution_unseen_rule(rr::CrossSectionalFactorModel)
+    return rr.unseen
+end
+"""
     attribution_regression_weights(rr::AbstractLoadingsRegressionResult)
     attribution_regression_weights(rr::CrossSectionalFactorModel)
 
@@ -1300,8 +1328,9 @@ end
                        ret::VecNum; lag::Integer = B isa Arr3Num ? 1 : 0,
                        trim::Bool = false, rw::Option{<:MatNum} = nothing,
                        vs::Option{<:MatNum} = nothing,
-                       fcb::Option{<:FactorFamilyBasis} = nothing, observed::Integer = 0,
-                       fam::Option{<:VecStr} = nothing,
+                       fcb::Option{<:FactorFamilyBasis} = nothing,
+                       unseen::AbstractUnseenMemberRule = SolvedUnseenMember(),
+                       observed::Integer = 0, fam::Option{<:VecStr} = nothing,
                        h1::Option{<:AbstractMatrix{Bool}} = nothing, assets::Bool = false,
                        se::Bool = false, ppy::Number = 1, ddof::Integer = 1,
                        unknown::AbstractUnknownEntryRule = EntrywiseUnknown())
@@ -1432,6 +1461,7 @@ The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\
   - `rw`: Regression weight history, `observations × assets`, which `se = true` reads, or `nothing`.
   - `vs`: Idiosyncratic variance history, `observations × assets`, which `se = true` reads, or `nothing`.
   - `fcb`: Family re-basis the regression was written in, or `nothing`.
+  - `unseen`: The Unseen Member rule the regression ran under. The default changes no design, so the standard errors read the reduced exposures themselves.
   - `observed`: Number of observed factors, the last columns of `f`. The fit takes their returns as given, so they leave the standard errors.
   - `fees`: Fees the net series is formed against.
   - `window`: Size of the rolling window, in observations.
@@ -1517,7 +1547,7 @@ The block states its histories through the reads of [`factor_attribution`](@ref)
 
 # Returns
 
-  - `blk::NamedTuple`: The fields `B`, `f`, `eps`, `lag`, `rw`, `vs`, `fcb`, `no` and `fam`, from [`attribution_exposures`](@ref), [`attribution_factor_returns`](@ref), [`attribution_idiosyncratic_returns`](@ref), [`attribution_lag`](@ref), [`attribution_regression_weights`](@ref), [`attribution_idiosyncratic_variances`](@ref), [`attribution_family_basis`](@ref), [`attribution_observed_count`](@ref) and [`attribution_families`](@ref), and the fields `idx` and `ts` of [`attribution_row_key`](@ref).
+  - `blk::NamedTuple`: The fields `B`, `f`, `eps`, `lag`, `rw`, `vs`, `fcb`, `unseen`, `no` and `fam`, from [`attribution_exposures`](@ref), [`attribution_factor_returns`](@ref), [`attribution_idiosyncratic_returns`](@ref), [`attribution_lag`](@ref), [`attribution_regression_weights`](@ref), [`attribution_idiosyncratic_variances`](@ref), [`attribution_family_basis`](@ref), [`attribution_unseen_rule`](@ref), [`attribution_observed_count`](@ref) and [`attribution_families`](@ref), and the fields `idx` and `ts` of [`attribution_row_key`](@ref).
 
 # Related
 
@@ -1530,15 +1560,16 @@ function attribution_block_arrays(rr::AbstractLoadingsRegressionResult,
             eps = attribution_idiosyncratic_returns(rr, pr), lag = attribution_lag(rr),
             rw = attribution_regression_weights(rr),
             vs = attribution_idiosyncratic_variances(rr),
-            fcb = attribution_family_basis(rr), no = attribution_observed_count(rr),
-            fam = attribution_families(rr), h1 = attribution_leverage_marks(rr),
-            attribution_row_key(rr)...)
+            fcb = attribution_family_basis(rr), unseen = attribution_unseen_rule(rr),
+            no = attribution_observed_count(rr), fam = attribution_families(rr),
+            h1 = attribution_leverage_marks(rr), attribution_row_key(rr)...)
 end
 """
     attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
                             lag::Integer = B isa Arr3Num ? 1 : 0, trim::Bool = false,
                             rw::Option{<:MatNum} = nothing, vs::Option{<:MatNum} = nothing,
                             fcb::Option{<:FactorFamilyBasis} = nothing,
+                            unseen::AbstractUnseenMemberRule = SolvedUnseenMember(),
                             observed::Integer = 0, fam::Option{<:VecStr} = nothing)
         -> NamedTuple
 
@@ -1556,6 +1587,7 @@ The exposures, the factor returns and the idiosyncratic returns are the model, s
   - `rw`: Regression weight history, or `nothing`.
   - `vs`: Idiosyncratic variance history, or `nothing`.
   - `fcb`: Family re-basis the regression was written in, or `nothing`.
+  - `unseen`: The Unseen Member rule the regression ran under. The default changes no design, so the standard errors read the reduced exposures themselves.
   - `observed`: Number of observed factors, the last columns of `f`.
   - `fam`: Family label of each factor, or `nothing`.
 
@@ -1577,14 +1609,15 @@ function attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
                                  rw::Option{<:MatNum} = nothing,
                                  vs::Option{<:MatNum} = nothing,
                                  fcb::Option{<:FactorFamilyBasis} = nothing,
+                                 unseen::AbstractUnseenMemberRule = SolvedUnseenMember(),
                                  observed::Integer = 0, fam::Option{<:VecStr} = nothing,
                                  h1::Option{<:AbstractMatrix{Bool}} = nothing)
     @argcheck(lag >= zero(lag),
               DomainError(lag,
                           "the exposure lag must be non-negative: a negative lag pairs each return with an exposure from after it"))
     return (; B = B, f = f, eps = eps, lag = ifelse((B isa Arr3Num) | trim, lag, zero(lag)),
-            rw = rw, vs = vs, fcb = fcb, no = observed, fam = fam, h1 = h1, idx = nothing,
-            ts = nothing)
+            rw = rw, vs = vs, fcb = fcb, unseen = unseen, no = observed, fam = fam, h1 = h1,
+            idx = nothing, ts = nothing)
 end
 """
     attribution_array_model(B::MatNum, F::MatNum, d::VecNum_MatNum;

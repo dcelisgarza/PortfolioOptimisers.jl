@@ -103,6 +103,98 @@ struct MinimumNormSolve <: AbstractCrossSectionalSolveAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for the Unseen Member rule of a [`CrossSectionalFactorPrior`](@ref), the rule that says what return an Unseen Member gets at an observation.
+
+An Unseen Member is a member of a constrained Factor Family that no asset of positive regression weight loads on at one observation. The exposures lag the returns, so the zero-sum condition of an observation reads the benchmark weights of an earlier one, which can still weight the member after its last asset delists. The data state nothing about its return there. The rule states the return, and with it the zero-sum condition of the observation.
+
+The fit stores the rule on its [`CrossSectionalFactorModel`](@ref) block. The regression diagnostics and the standard errors of a [`factor_attribution`](@ref) call the verb of the rule on the stored exposures and weights, so they read the design that the fit regressed on.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractUnseenMemberRule` and implement the following method:
+
+## `unseen_member_design`
+
+  - `unseen_member_design(rule::MyUnseenMemberRule, fcb::FactorFamilyBasis, B::Arr3Num, Zl::Arr3Num, W::MatNum) -> NamedTuple`: Returns the design that the regression of the prior solves, and the change of each observation that maps its coefficients back to the reduced factor returns.
+
+### Arguments
+
+  - `rule`: The member of the family.
+  - `fcb`: The Factor Family Basis of the lagged exposures, one row per observation of `Zl`.
+  - `B`: Lagged exposures on the raw axis, `observations × assets × factors`.
+  - `Zl`: Lagged exposures on the reduced axis, which `fcb` gives from `B`.
+  - `W`: Cross-sectional weights matrix `observations × assets`. The pairs of positive weight are the sample of each observation.
+
+### Returns
+
+  - `Z::Arr3Num`: The design to regress on.
+  - `P`: One `t => P_t` pair per observation that the rule changes, where `P_t` is a `reduced factors × reduced factors` matrix, and the factor returns of `t` are `P_t` times the coefficients of `t`. It is empty when the rule changes no observation.
+
+# Related
+
+  - [`ZeroUnseenMember`](@ref)
+  - [`SolvedUnseenMember`](@ref)
+  - [`unseen_member_design`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+abstract type AbstractUnseenMemberRule <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The Unseen Member rule that gives an Unseen Member a return of zero at its observation, and holds the zero-sum condition of the observation over the other members of its family.
+
+The data state nothing about the return of the member, so the rule states the value that an Empty Factor gets, and that the member gets at an observation that gives it no benchmark weight. The condition over the whole family still holds, because the member adds a zero term to it. The observation is identified again, so its factor returns do not depend on the member that the family drops. [`unseen_member_design`](@ref) states the change of the design.
+
+# Constructors
+
+    ZeroUnseenMember() -> ZeroUnseenMember
+
+# Examples
+
+```jldoctest
+julia> ZeroUnseenMember()
+ZeroUnseenMember()
+```
+
+# Related
+
+  - [`AbstractUnseenMemberRule`](@ref)
+  - [`SolvedUnseenMember`](@ref)
+  - [`unseen_member_design`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+struct ZeroUnseenMember <: AbstractUnseenMemberRule end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The Unseen Member rule that keeps an Unseen Member in the zero-sum condition of its observation, and lets the solve algorithm of the regression state its return.
+
+The member keeps the benchmark weight of the lagged exposures in the condition. Its own column of the raw design is zero, so the member fixes the condition by itself, the condition no longer identifies the other members of the family, and the reduced design of the observation is rank-deficient. The solve algorithm of the Cross-Sectional Regression Estimator then gives the answer. Under [`PseudoInverseFallback`](@ref) it is the minimum-norm answer on the reduced axis, which depends on the member that the family drops. The residuals of the pairs of positive weight are the residuals of [`ZeroUnseenMember`](@ref) when the members that the sample sees span the same fitted values, which they do for a one-hot family.
+
+A [`CrossSectionalFactorModel`](@ref) that a caller builds without a rule takes this one, because its design is then the reduced exposures themselves.
+
+# Constructors
+
+    SolvedUnseenMember() -> SolvedUnseenMember
+
+# Examples
+
+```jldoctest
+julia> SolvedUnseenMember()
+SolvedUnseenMember()
+```
+
+# Related
+
+  - [`AbstractUnseenMemberRule`](@ref)
+  - [`ZeroUnseenMember`](@ref)
+  - [`unseen_member_design`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+struct SolvedUnseenMember <: AbstractUnseenMemberRule end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Holds the factor returns, the residuals, the eligible asset counts and the optional intercepts of a fitted cross-sectional regression.
 
 The result is a sibling of [`Regression`](@ref) rather than a widening of it, because the two disagree on what an asset index means: a [`Regression`](@ref) holds one row per asset and [`port_opt_view`](@ref) slices its rows, whereas this result holds one row per observation and one column per asset, so the same index slices its columns. It carries no loadings matrix, because the exposures are the regression's input and an Exposure Estimator produces them.
@@ -1166,5 +1258,6 @@ end
 
 export CrossSectionalRegression, CrossSectionalLinearRegression,
        CrossSectionalTargetRegression, PseudoInverseFallback, RankDeficiencyRefusal,
-       UncheckedSolve, MinimumNormSolve, cross_sectional_regression, cross_sectional_r2,
-       mean_cross_sectional_r2
+       UncheckedSolve, MinimumNormSolve, ZeroUnseenMember, SolvedUnseenMember,
+       cross_sectional_regression, cross_sectional_r2, mean_cross_sectional_r2
+public AbstractUnseenMemberRule

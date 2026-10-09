@@ -1304,7 +1304,7 @@ end
         al = PO.attribution_align(rr, pr, length(ret))
         T = size(al.f, 1)
         g = reduce(vcat, [transpose(transpose(al.B[t, :, :]) * w) for t in 1:T])
-        red = PO.attribution_reduce_for_errors(al.fcb, al.B, g, al.no, T)
+        red = PO.attribution_reduce_for_errors(al.fcb, al.unseen, al.B, al.rw, g, al.no, T)
         @test red.nr < size(g, 2)
         keep = findall(!, red.observed)
         V = [PO.attribution_sandwich(view(red.B, t, :, :), view(al.rw, t, :),

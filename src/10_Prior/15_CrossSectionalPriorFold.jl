@@ -709,7 +709,7 @@ Runs one regression pass of the carry fold of a Cross-Sectional Factor Prior ove
 function cross_sectional_fold_pass(pe::CrossSectionalFactorPrior, blk::NamedTuple,
                                    W::MatNum, old::Option{<:BitVector})
     (; Zl, Xr, fcb, B) = blk
-    ud = unseen_member_design(pe.unseen, fcb, B, Zl, Xr, W)
+    ud = unseen_member_design(pe.unseen, fcb, B, Zl, W)
     lv = cross_sectional_fold_mark(old, cross_sectional_live_factors(ud.Z, Xr, W))
     return if isnothing(lv)
         nothing
