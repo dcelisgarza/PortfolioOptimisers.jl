@@ -8,7 +8,7 @@ idiosyncratic variance fold, and the Return Forecast and the idiosyncratic corre
 call with no data. A factor that comes alive fits every carried observation again. A batch choice
 that moves folds the move, and solves again each observation whose answer depends on the basis
 (#1605, #1613). It folds the same way under a target that gives the same coefficients in every
-basis, as `is_basis_invariant` answers (#1614).
+basis, as `is_basis_invariant` answers (#1614), and under a `GeneralisedLinearModel` target (#1615).
 
 A step folds the member states in place, as every fold does, so each stream reads the prior out
 right after its step.
@@ -595,7 +595,7 @@ end
         # coefficients, so a move under it fits every observation again, and equals the batch
         # fit exactly (#1614). A refit leaves a plain `Matrix`.
         @test po.is_basis_invariant(LinearModel())
-        @test !po.is_basis_invariant(GeneralisedLinearModel())
+        @test po.is_basis_invariant(GeneralisedLinearModel())
         @test !po.is_basis_invariant(BasisBoundTarget())
         pe = CrossSectionalFactorPrior(; lambda = 1, style...,
                                        cre = CrossSectionalTargetRegression(;
@@ -604,6 +604,33 @@ end
         @test [dropped(x.pr) for x in sb] == [["style1"], ["style2"], ["style2"]]
         @test sb[2].pe.cache.csr.f isa Matrix
         @test all(k -> agrees(sb[k].pr, batch(pe, k)), 1:3)
+        # A `GeneralisedLinearModel` target folds a move too (#1615). Its fit is iterative, but
+        # each iteration is a weighted least-squares fit and the start reads the response alone,
+        # so the two bases take the same iterates and stop at the same one. Measured: the
+        # default `Normal()` family gives 5.9e-16, and a log link on gross returns gives
+        # 1.4e-15 under `Normal()` and 6.3e-16 under `Gamma()`. A tolerance near the rounding
+        # of the deviance lets rounding stop the two bases at different iterates: under
+        # `Gamma()` with `rtol = atol = 1e-12` the gap is 7.6e-10, on the factor returns of
+        # one row, and `1e-14` makes `GLM` throw. So a tighter `kwargs` brings each fit nearer to
+        # the maximum-likelihood answer, and it does not shrink the gap.
+        glm(args, kw = (;)) = CrossSectionalTargetRegression(;
+                                                             tgt = GeneralisedLinearModel(;
+                                                                                          args = args,
+                                                                                          kwargs = kw))
+        rdp = deepcopy(rd)
+        rdp.X .+= 1
+        loglink = po.GLM.LogLink()
+        tight = (; rtol = 1e-12, atol = 1e-12)
+        for (r, cre, tol) in ((rd, glm((Distributions.Normal(),)), 1e-12),
+                              (rdp, glm((Distributions.Normal(), loglink)), 1e-12),
+                              (rdp, glm((Distributions.Gamma(), loglink)), 1e-12),
+                              (rdp, glm((Distributions.Gamma(), loglink), tight), 1e-8))
+            pe = CrossSectionalFactorPrior(; lambda = 1, style..., cre = cre)
+            sb = stream(pe, r)
+            @test [dropped(x.pr) for x in sb] == [["style1"], ["style2"], ["style2"]]
+            @test sb[2].pe.cache.csr.f isa SubArray
+            @test all(k -> near(sb[k].pr, batch(pe, k, r); tol = tol), 1:3)
+        end
         # The panel of #1606: the only asset in Utilities delists after data row 225, so row
         # 226 has an Unseen Member. A larger market cap of Energy moves the automatic member
         # from Software to Energy. From row 150 the move comes before the step of row 226, and
@@ -678,6 +705,16 @@ end
         kept = bt.rr.nf[po.retained_factor_indices(bt.rr.fcb)]
         @test iszero(bt.rr.csr.f[225, findfirst(==("industry=Utilities"), kept)])
         @test relerr(xt[2].pr.rr.csr.f[225, :], bt.rr.csr.f[225, :]) < 1e-12
+        # A `GeneralisedLinearModel` target solves that row again through the target too
+        # (#1615). Measured: each step equals the batch fit to 4.2e-16 or better.
+        pg = CrossSectionalFactorPrior(; factors = dlf, families = ["industry" => nothing],
+                                       minra = 5, unseen = SolvedUnseenMember(),
+                                       cre = CrossSectionalTargetRegression(;
+                                                                            tgt = GeneralisedLinearModel()))
+        xg = stream(pg, dl, de)
+        @test xg[2].pe.cache.csr.f isa SubArray
+        @test only(dropped(xg[2].pr)) == "industry=Energy"
+        @test all(k -> near(xg[k].pr, batch(pg, k, dl, de)), eachindex(xg))
         # A beta that shrinks to the mean of its industry is a function of the industry
         # columns where every industry shrinks fully, so the design of such an observation has
         # a dependent factor set under every rule. Its answer of least norm reads the basis, so

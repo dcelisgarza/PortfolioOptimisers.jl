@@ -213,8 +213,18 @@ of `AbstractRegressionTarget` answers whether it does. `LinearModel` answers `tr
 it folds as under `CrossSectionalLinearRegression`, and solves each rank-deficient row again
 through the target ([#1614](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1614)).
 Every other target answers `false` by default, and a move under it fits every carried observation
-again, as it did before the fold (#1605). `GeneralisedLinearModel` agrees in every basis only to
-the tolerance of its iterative fit, so it answers `false` too. The
+again, as it did before the fold (#1605). `GeneralisedLinearModel` answers `true` too
+([#1615](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1615)). Its fit is
+iterative, but each iteration is a weighted least-squares fit and the start reads the response
+alone, so the two bases take the same iterates and stop at the same one. The decision expected a
+gap of the size of the tolerance of `GLM.fit!` (`rtol` and `atol`, `1e-6` each by default, set
+through the `kwargs` of the target). The build measured rounding instead: 6.3e-16 under `Gamma()`
+with a log link, 5.9e-16 under the default `Normal()`. A tolerance near the rounding of the
+deviance lets rounding stop the two bases one iteration apart at one observation: under `Gamma()`
+with `rtol = atol = 1e-12` the gap was 7.6e-10, on one fitted row, and `1e-14` made `GLM` throw.
+So a tighter `kwargs` brings each fit nearer to the maximum-likelihood answer, and not the fold
+nearer to the batch fit. No rule or singleton chooses between a fold and a refit here.
+The
 default factor covariance reads every column at once, so a sub-block of a raw-axis state is not the
 batch answer. On the panel of #1592 (2520 rows, 500 assets), the step of the move costs 0.013 s,
 against 0.0036 s for a step with no move and 1.66 s for a refit of every row, and the carry still

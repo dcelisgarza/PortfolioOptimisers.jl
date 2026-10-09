@@ -545,7 +545,7 @@ The cross-sectional regression fits every observation under its cross-sectional 
 
   - `is_basis_invariant(tgt::MyRegressionTarget) -> Bool`: Return whether the fit of `tgt` gives the same coefficients under an invertible change of the columns of the design, mapped back to the original columns.
 
-The carry fold of [`CrossSectionalFactorPrior`](@ref) reads it when a [`BatchChoice`](@ref) moves the dropped member of a Factor Family. That move is an invertible change of the columns. A target that answers `true` lets the fold keep the factor returns of each past observation, so the move runs no regression again. The default answers `false`, and the move then fits every past observation again. A fit that minimises a loss of the fitted values alone, such as the weighted squared residuals, can answer `true`. A penalty on the coefficients, such as a ridge, makes the answer depend on the basis, so such a target keeps the default.
+The carry fold of [`CrossSectionalFactorPrior`](@ref) reads it when a [`BatchChoice`](@ref) moves the dropped member of a Factor Family. That move is an invertible change of the columns. A target that answers `true` lets the fold keep the factor returns of each past observation, so the move runs no regression again. The default answers `false`, and the move then fits every past observation again. A fit that minimises a loss of the fitted values alone, such as the weighted squared residuals, can answer `true`. An iterative fit of such a loss, such as [`GeneralisedLinearModel`](@ref), answers `true` when each of its iterates is invariant too. The fold then equals the batch fit to rounding, unless rounding stops the two bases at different iterates. A penalty on the coefficients, such as a ridge, makes the answer depend on the basis, so such a target keeps the default.
 
 ### Arguments
 
@@ -802,6 +802,8 @@ Fits each response by a generalised linear model through `GLM.GeneralizedLinearM
 
 The `args` field carries the response distribution and, optionally, the link function; `kwargs` carries the remaining `GLM` options. The default `args = (Normal(),)` with the canonical identity link reproduces ordinary least squares. `GLM` defines ``R^2`` for a fitted [`LinearModel`](@ref) only, so `variant` names the pseudo-``R^2`` a maximisation criterion reads instead, and it supplies it to the `:r2` and `:adjr2` members of [`STEPWISE_REGRESSION_CRITERIA`](@ref). A `nothing` `variant` takes the default of the criterion, which [`default_regression_criterion_variant`](@ref) states. The field is dead under a minimisation criterion, which reads no variant at all.
 
+The fit is iterative, and `kwargs` sets where it stops. `GLM` stops when the change in the deviance falls below `max(rtol * deviance, atol)`, with `rtol = 1e-6`, `atol = 1e-6` and `maxiter = 30` by default. A tighter tolerance, such as `kwargs = (; rtol = 1e-12, atol = 1e-12)`, brings the fit nearer to the maximum-likelihood answer at the cost of more iterations, and a tolerance below the rounding of the deviance makes `GLM` throw. [`is_basis_invariant`](@ref) answers `true`, so a move of the dropped member of a Factor Family folds on the carry fold of [`CrossSectionalFactorPrior`](@ref). The fold keeps the coefficients of the old basis, where the batch fit iterates in the new basis. The two take the same iterates and agree to rounding, unless the tolerance is near the rounding of the deviance: then rounding can stop them one iteration apart at an observation, and they differ by that iteration.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -841,6 +843,7 @@ GeneralisedLinearModel
   - [`default_regression_criterion_variant`](@ref)
   - [`regression_criterion_func`](@ref)
   - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
+  - [`is_basis_invariant`](@ref)
 
 # References
 
@@ -989,14 +992,16 @@ function regression_target_weights(tgt::Union{LinearModel, GeneralisedLinearMode
     return get(tgt.kwargs, :weights, nothing)
 end
 """
-    is_basis_invariant(tgt::LinearModel) -> Bool
+    is_basis_invariant(tgt::Union{LinearModel, GeneralisedLinearModel}) -> Bool
     is_basis_invariant(tgt::AbstractRegressionTarget) -> Bool
 
 Return whether the fit of a regression target gives the same coefficients under an invertible change of the columns of the design, mapped back to the original columns.
 
 Take the columns of the design times an invertible matrix as a new design. A target is invariant to the basis when its coefficients on the new design, times that matrix, are its coefficients on the old design. Then the fitted values do not change either.
 
-A weighted least-squares fit projects the response onto the span of the design, and the change keeps the span. So [`LinearModel`](@ref) answers `true`, on each design of full rank. On a rank-deficient design `GLM` drops a collinear column by a pivot, so the answer depends on the basis there, and a caller that reads the verb solves such a design again. Every other target answers `false`: [`GeneralisedLinearModel`](@ref), whose iterative fit gives the same answer in every basis only to the tolerance of its convergence, and a target that this verb does not know, which can penalise its coefficients.
+A weighted least-squares fit projects the response onto the span of the design, and the change keeps the span. So [`LinearModel`](@ref) answers `true`, on each design of full rank. A maximum-likelihood fit reads the design through the linear predictor alone, and the change keeps the set of linear predictors. So [`GeneralisedLinearModel`](@ref) answers `true` too. Its fit is iterative, but each iteration is a weighted least-squares fit, and the start reads the response alone. So the two bases take the same iterates and stop at the same one, and they agree to rounding. `GLM` stops when the change in the deviance falls below `max(rtol * deviance, atol)`, with `rtol = 1e-6`, `atol = 1e-6` and `maxiter = 30` by default, and the `kwargs` of the target set them. A tolerance near the rounding of the deviance lets rounding stop the two bases one iteration apart, so the two answers then differ by that iteration. A tighter tolerance brings each fit nearer to the maximum-likelihood answer, and it does not bring the two bases nearer to each other.
+
+On a rank-deficient design `GLM` drops a collinear column by a pivot, so the answer depends on the basis there, and a caller that reads the verb solves such a design again. Every other target answers `false`, because a target that this verb does not know can penalise its coefficients.
 
 The carry fold of [`CrossSectionalFactorPrior`](@ref) reads the verb on the target of a [`CrossSectionalTargetRegression`](@ref), when a [`BatchChoice`](@ref) moves the dropped member of a Factor Family. A caller's own target states its answer with its own method, as the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states.
 
@@ -1015,6 +1020,11 @@ julia> PortfolioOptimisers.is_basis_invariant(LinearModel())
 true
 
 julia> PortfolioOptimisers.is_basis_invariant(GeneralisedLinearModel())
+true
+
+julia> struct RidgeTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+
+julia> PortfolioOptimisers.is_basis_invariant(RidgeTarget())
 false
 ```
 
@@ -1025,7 +1035,7 @@ false
   - [`GeneralisedLinearModel`](@ref)
   - [`CrossSectionalTargetRegression`](@ref)
 """
-function is_basis_invariant(::LinearModel)::Bool
+function is_basis_invariant(::Union{LinearModel, GeneralisedLinearModel})::Bool
     return true
 end
 function is_basis_invariant(::AbstractRegressionTarget)::Bool
