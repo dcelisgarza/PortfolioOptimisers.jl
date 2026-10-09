@@ -162,6 +162,7 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            # Steps whose public caller has a case below.
                                            :descriptor_active_fill! => "a step of every Descriptor",
                                            :ew_active_returns => "a step of the exponentially weighted Descriptors",
+                                           :ew_volatility_variance => "a step of the exponentially weighted volatility Descriptors",
                                            :exposure_active_fill! => "a step of every exposure",
                                            :exposure_weight_fill! => "a step of the benchmark weights of an exposure",
                                            :coverage_panel_moment => "a step of the moments with a Coverage Policy",
