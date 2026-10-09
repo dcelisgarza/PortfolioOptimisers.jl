@@ -392,14 +392,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Restores a positive semidefinite matrix from a block whose pairs are each divided by their own weight, and keeps its diagonal.
 
-Where every asset has the same valid observations, the division by the weight is a congruence of a sum of outer products, and the block is positive semidefinite. After a holiday it need not be, whatever the weights are: a weight that saturates at one does not show which observations its pair read. So the method tests the block itself. Where its correlation has an eigenvalue below `-n eps` times the largest, it clips the negative eigenvalues to zero, which is the nearest positive semidefinite matrix in the Frobenius norm, and restores the unit diagonal and the variances. A smaller negative eigenvalue is round-off, and the block is returned unchanged.
+Where every asset has the same valid observations, the division by the weight is a congruence of a sum of outer products, and the block is positive semidefinite. After a holiday it need not be, whatever the weights are: a weight that saturates at one does not show which observations its pair read. So the method tests the block itself. A correlation with a Cholesky factor is positive definite to working precision, and the block is returned unchanged with no eigen decomposition. Otherwise, where the correlation has an eigenvalue below `-n eps` times the largest, the method clips the negative eigenvalues to zero, which is the nearest positive semidefinite matrix in the Frobenius norm, and restores the unit diagonal and the variances. A smaller negative eigenvalue is round-off, and the block is returned unchanged.
+
+The Cholesky test runs first because it costs a fraction of the decomposition. It can accept a correlation whose smallest eigenvalue is slightly below `-n eps` times the largest, because the backward error of the factor is about `n^2 eps`. Such an eigenvalue is round-off, and the block is kept as it is.
 
 # Algorithm
 
  1. Take `s` as the root of the diagonal of `sigma`, floored at zero, and `pos` as the assets whose `s` is above zero. Return `sigma` when `pos` is empty.
- 2. Take the correlation `R = sigma[pos, pos] ./ (s * s')` and its eigen decomposition. Return `sigma` when the smallest eigenvalue is at least `-length(pos) * eps` times the largest magnitude.
- 3. Rebuild `R` with its eigenvalues floored at zero, divide it by the root of its diagonal on both sides, clamp it to `[-1, 1]`, symmetrise it and set its diagonal to one.
- 4. Write `R .* (s * s')` into `sigma[pos, pos]`, and return `sigma`.
+ 2. Take the correlation `R = sigma[pos, pos] ./ (s * s')`. Return `sigma` when `R` has a Cholesky factor.
+ 3. Take the eigen decomposition of `R`. Return `sigma` when the smallest eigenvalue is at least `-length(pos) * eps` times the largest magnitude.
+ 4. Rebuild `R` with its eigenvalues floored at zero, divide it by the root of its diagonal on both sides, clamp it to `[-1, 1]`, symmetrise it and set its diagonal to one.
+ 5. Write `R .* (s * s')` into `sigma[pos, pos]`, and return `sigma`.
 
 # Arguments
 
@@ -424,6 +427,12 @@ function restore_psd!(sigma::MatNum)
     end
     sp = s[pos]
     R = sigma[pos, pos] ./ (sp .* transpose(sp))
+    # A Cholesky factor costs a fraction of the decomposition, and a correlation that has one is
+    # positive definite to working precision, so the test below would keep it (#1612).
+    if LinearAlgebra.issuccess(LinearAlgebra.cholesky(LinearAlgebra.Symmetric(R);
+                                                      check = false))
+        return sigma
+    end
     vals, vecs = LinearAlgebra.eigen(LinearAlgebra.Symmetric(R))
     if vals[1] >= -length(pos) * eps(T) * maximum(abs, vals)
         return sigma

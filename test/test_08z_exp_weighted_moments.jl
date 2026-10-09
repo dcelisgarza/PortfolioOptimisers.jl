@@ -759,9 +759,13 @@ end
     # The report is positive semidefinite for every pattern of holidays, resets and listings.
     # The division by the weight of each pair need not be: on these panels the state divided by
     # its weights reaches a smallest eigenvalue far below zero, and the repair restores it.
+    # A block whose correlation has a Cholesky factor is returned as it is, with no eigen
+    # decomposition, and the eigenvalue test that follows it would keep that block too (#1612).
     rng = StableRNG(1343)
     worst = Inf
     worst_raw = Inf
+    n_chol = 0
+    n_fixed = 0
     for _ in 1:300
         T, N = rand(rng, 5:40), rand(rng, 2:6)
         Xr = randn(rng, T, N) / 100
@@ -781,10 +785,25 @@ end
             Pr = PortfolioOptimisers.pair_weighted_block(st.covariance, st.weight, f)
             worst_raw = min(worst_raw,
                             minimum(eigvals(Symmetric((Pr + transpose(Pr)) / 2))) / m)
+            Ps = (Pr + transpose(Pr)) / 2
+            p = findall(>(0), diag(Ps))
+            isempty(p) && continue
+            sp = sqrt.(diag(Ps)[p])
+            Rp = Ps[p, p] ./ (sp .* transpose(sp))
+            if issuccess(cholesky(Symmetric(Rp); check = false))
+                n_chol += 1
+                vals = eigvals(Symmetric(Rp))
+                @test vals[1] >= -length(p) * eps() * maximum(abs, vals)
+                Pc = copy(Ps)
+                @test PortfolioOptimisers.restore_psd!(Pc) === Pc && Pc == Ps
+            else
+                n_fixed += PortfolioOptimisers.restore_psd!(copy(Ps)) != Ps
+            end
         end
     end
     @test worst > -1e-14
     @test worst_raw < -0.01
+    @test n_chol > 100 && n_fixed > 100
 
     # The fold S = λ^{n_b} S_a + S_b is exact under `PreCentred` over a complete block and not
     # under the estimated location, which is why a merge is refused.

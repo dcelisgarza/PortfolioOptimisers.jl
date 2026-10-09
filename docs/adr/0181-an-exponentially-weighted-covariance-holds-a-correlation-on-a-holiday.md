@@ -156,8 +156,10 @@ W[V, V] <- λ W[V, V] + (1 - λ)
   congruence of decision 1, and the estimate is positive semidefinite by construction. Otherwise
   the report clips the negative eigenvalues of its correlation to zero, restores the unit
   diagonal and keeps the variances, where the smallest eigenvalue is below `-n eps` times the
-  largest. The repair reads the block of the assets that the report returns, so an asset in its
-  warm-up moves nothing.
+  largest. A correlation with a Cholesky factor is kept with no eigen decomposition, because it
+  is positive definite to working precision and the factor costs a fraction of the
+  decomposition (#1612). The repair reads the block of the assets that the report returns, so an
+  asset in its warm-up moves nothing.
 - The block that the regime statistic reads takes the division and no repair, because the
   Cholesky factor of the Mahalanobis target refuses a block that is not positive definite. A
   `variance_series` reads the diagonal, which the repair keeps, so it skips the repair.
