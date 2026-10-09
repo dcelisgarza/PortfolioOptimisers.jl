@@ -1,5 +1,5 @@
 ```@meta
-Description = "Cross-Sectional Carry Histories, private API of PortfolioOptimisers.jl: cross_sectional_fold_append, cross_sectional_spare_backing, …"
+Description = "Cross-Sectional Carry Histories, private API of PortfolioOptimisers.jl: cross_sectional_fold_append, cross_sectional_fold_join, cross_sectional_fold_split, …"
 ```
 
 # [Cross-Sectional Carry Histories: private API](@id private-api-cross-sectional-carry-histories)

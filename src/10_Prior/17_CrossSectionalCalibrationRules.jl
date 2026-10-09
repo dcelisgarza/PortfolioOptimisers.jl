@@ -1285,7 +1285,7 @@ Each entry names the part and the method that it lacks. The test reads the confi
  1. For each factor `name => xe`, list the factor when [`carry_lookback`](@ref) of `xe` is `nothing`. The carry then keeps every panel row.
  2. List `rfe` when [`cross_sectional_forecast_reads_panel`](@ref) answers `true`, because the forecast fits again over every row. Otherwise list it when its [`carry_lookback`](@ref) is `nothing`, because the carry keeps every row under it.
  3. List `ve` when [`supports_partial_fit`](@ref) answers `false`.
- 4. List `pe` when [`cross_sectional_factor_prior_folds`](@ref) answers `false`.
+ 4. List `pe` when [`carry_folds`](@ref) answers `false`.
  5. List `th` when it is positive and [`supports_partial_fit`](@ref) answers `false` for `ce`, because the idiosyncratic correlation then has no fold.
  6. List `choice` with [`carry_choice_parts`](@ref): a [`BatchChoice`](@ref) with an automatic dropped member, because a step that moves the member folds the factor prior again over every carried factor return.
 
@@ -1311,8 +1311,8 @@ function carry_growing_parts(cfg::Union{<:CrossSectionalFactorPrior, <:NamedTupl
                  for (name, xe) in cfg.factors)..., carry_forecast_parts(cfg.rfe),
                 carry_growing_part(!supports_partial_fit(cfg.ve),
                                    "`ve` ($(nameof(typeof(cfg.ve)))) does not fold, so each step fits every idiosyncratic return again. It needs a method of `partial_fit!` and of `supports_partial_fit`"),
-                carry_growing_part(!cross_sectional_factor_prior_folds(cfg.pe),
-                                   "the factor prior `pe` ($(nameof(typeof(cfg.pe)))) does not fold, so it fits every factor return again. The carry folds an `EmpiricalPrior` whose `me` and `ce` answer `supports_partial_fit`"),
+                carry_growing_part(!carry_folds(cfg.pe),
+                                   "the factor prior `pe` ($(nameof(typeof(cfg.pe)))) does not fold, so it fits every factor return again. It needs a method of `carry_folds`, beside `partial_fit!` and `prior` with no data. An `EmpiricalPrior` folds when its `me` and `ce` answer `supports_partial_fit`"),
                 carry_growing_part(cfg.th > 0 && !supports_partial_fit(cfg.ce),
                                    "`th = $(cfg.th)` estimates the idiosyncratic correlation again over every row, because `ce` ($(nameof(typeof(cfg.ce)))) does not fold. Set `th = 0`, or give a `ce` that answers `supports_partial_fit`"),
                 carry_choice_parts(cfg.choice, cfg.families))

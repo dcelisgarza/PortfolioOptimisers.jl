@@ -1,5 +1,5 @@
 ```@meta
-Description = "Cross-Sectional Prior Fold, public API of PortfolioOptimisers.jl: partial_fit!, prior, merge_states, port_opt_view."
+Description = "Cross-Sectional Prior Fold, public API of PortfolioOptimisers.jl: partial_fit!, prior, merge_states, port_opt_view, carry_folds."
 ```
 
 # Cross-Sectional Prior Fold
@@ -11,4 +11,10 @@ PortfolioOptimisers.partial_fit!(pe::CrossSectionalFactorPrior{<:Any, <:Any, <:A
 prior(pe::CrossSectionalFactorPrior, st::PortfolioOptimisers.CrossSectionalCarryState; strict::Bool = false, kwargs...)
 merge_states(::PortfolioOptimisers.CrossSectionalCarryState, ::PortfolioOptimisers.CrossSectionalCarryState)
 PortfolioOptimisers.port_opt_view(::PortfolioOptimisers.CrossSectionalCarryState, i, args...)
+```
+
+The carry folds its factor prior one row at a time when [`PortfolioOptimisers.carry_folds`](@ref) answers `true` for it. A user prior implements that verb to fold on the carry and to pass [`FoldOnly`](@ref).
+
+```@docs
+PortfolioOptimisers.carry_folds
 ```

@@ -62,8 +62,8 @@ tenth to the EW moments, which already fold exactly.
    applies the rule of ADR 0136: a carry folds what folds and refits the rest. At each step it computes
    the exposures of the new rows from the carried panel, runs the regression on the new dates only,
    and folds `pe` and `ve`. The return forecast and the idiosyncratic correlation `ce` refit from the
-   carried rows at the call with no data. A member that does not fold refits over the carried histories: a factor prior that
-   is not an `EmpiricalPrior` at each call with no data, and a variance estimator that does not fold, such as
+   carried rows at the call with no data. A member that does not fold refits over the carried histories: a factor prior for
+   which `carry_folds` answers `false` at each call with no data, and a variance estimator that does not fold, such as
    a rolling window, by a fit of every carried observation at each step. The call with no data builds the
    result with the code of the batch fit, so the two routes differ only in how they reach its inputs.
    A step appends its rows to the histories in place, into the spare rows of a backing array, as
@@ -338,10 +338,14 @@ The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton
   `assert_carry_rule` applies the rule in the constructor.
   [#1594](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1594) folds the
   idiosyncratic correlation, so `FoldOnly()` refuses `th > 0` only with a `ce` that does not
-  fold. Until
-  [#1595](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1595) makes the verb
-  "this factor prior folds", `cross_sectional_factor_prior_folds` answers it: an `EmpiricalPrior`
-  whose `me` and `ce` fold. That build changes one line of `carry_growing_parts`.
+  fold.
+  [#1595](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1595) made the verb
+  "this factor prior folds", the `public` function `carry_folds`. An `EmpiricalPrior` on its carry
+  route answers `true` when its `me` and `ce` fold, and every other prior answers `false`. The
+  carry folds the factor prior and reads it out by the verb, not by its type, so a user prior that
+  implements `carry_folds`, `partial_fit!` and `prior` with no data folds and passes `FoldOnly()`.
+  The verb is not `supports_partial_fit`, which answers `false` for an `EmpiricalPrior` because an
+  outer estimator that holds the rows refits it from them.
 - [#1605](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1605) builds the fold of a
   move of a batch choice and the refusal of an automatic member under `FoldOnly()`.
   [#1606](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1606) adds the Unseen

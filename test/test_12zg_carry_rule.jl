@@ -20,6 +20,34 @@ function PortfolioOptimisers.descriptor(de::CarryRuleUserDescriptor, rd::Returns
     return descriptor(Passthrough(; field = de.field), rd)
 end
 
+# A user factor prior that folds: it wraps a prior, and states `carry_folds` beside the fold and
+# the read with no data (#1595).
+struct CarryRuleUserPrior{P} <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_A
+    pe::P
+end
+function PortfolioOptimisers.prior(pe::CarryRuleUserPrior, X::PortfolioOptimisers.MatNum,
+                                   args...; kwargs...)
+    return prior(pe.pe, X; kwargs...)
+end
+function PortfolioOptimisers.prior(pe::CarryRuleUserPrior; kwargs...)
+    return prior(pe.pe; kwargs...)
+end
+function PortfolioOptimisers.partial_fit!(pe::CarryRuleUserPrior,
+                                          f::PortfolioOptimisers.MatNum)
+    return CarryRuleUserPrior(partial_fit!(pe.pe, f))
+end
+function PortfolioOptimisers.carry_folds(pe::CarryRuleUserPrior)
+    return PortfolioOptimisers.carry_folds(pe.pe)
+end
+# The same prior with no `carry_folds`, so the carry refits it.
+struct NoCarryUserPrior{P} <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_A
+    pe::P
+end
+function PortfolioOptimisers.prior(pe::NoCarryUserPrior, X::PortfolioOptimisers.MatNum,
+                                   args...; kwargs...)
+    return prior(pe.pe, X; kwargs...)
+end
+
 @testset "The Carry Rule of the Cross-Sectional Factor Prior (#1602)" begin
     po = PortfolioOptimisers
     rd = grid_fixture(parity_large_panel())
@@ -105,13 +133,37 @@ end
         for part in ("\"user\"", "`ve`", "`pe`", "`th = 0.2`")
             @test occursin(part, m)
         end
-        # The predicate of the factor prior reads the members of an `EmpiricalPrior`.
-        @test po.cross_sectional_factor_prior_folds(GRID_PE)
-        @test po.cross_sectional_factor_prior_folds(EmpiricalPrior())
-        @test !po.cross_sectional_factor_prior_folds(EmpiricalPrior(;
-                                                                    ce = Covariance(;
-                                                                                    alg = SemiMoment())))
-        @test !po.cross_sectional_factor_prior_folds(EntropyPoolingPrior(; pe = GRID_PE))
+        # The verb of the factor prior reads the members of an `EmpiricalPrior` (#1595).
+        @test Base.ispublic(po, :carry_folds)
+        @test po.carry_folds(GRID_PE)
+        @test po.carry_folds(EmpiricalPrior())
+        @test !po.carry_folds(EmpiricalPrior(; ce = Covariance(; alg = SemiMoment())))
+        @test !po.carry_folds(EntropyPoolingPrior(; pe = GRID_PE))
+        # A sample buffer refits over every row, so it does not fold on the carry.
+        @test !po.carry_folds(po.update_online_estimator(Online(EmpiricalPrior())))
+        # The verb is not `supports_partial_fit`, which keeps its answer for the prior.
+        @test !po.supports_partial_fit(EmpiricalPrior())
+    end
+
+    @testset "A user factor prior that states carry_folds folds on the carry and passes FoldOnly (#1595)" begin
+        up = CarryRuleUserPrior(GRID_PE)
+        @test po.carry_folds(up)
+        pe = CrossSectionalFactorPrior(; lambda = 1, base..., pe = up, carry = FoldOnly())
+        @test isempty(po.carry_growing_parts(pe))
+        s = stream(pe)
+        @test all(k -> agrees(s[k].pr, batch(pe, k)), 1:3)
+        # The carry folded the prior, so the state of the carry holds the state of the prior.
+        @test all(x -> isa(x.pe.cache.pe.pe.cache, po.PriorCarryState), s)
+        # The same prior without the verb is refused, and its carry refits it.
+        np = NoCarryUserPrior(GRID_PE)
+        @test !po.carry_folds(np)
+        m = message(() -> CrossSectionalFactorPrior(; base..., pe = np, carry = FoldOnly()))
+        @test occursin("the factor prior `pe` (NoCarryUserPrior) does not fold", m)
+        @test occursin("It needs a method of `carry_folds`", m)
+        pn = CrossSectionalFactorPrior(; lambda = 1, base..., pe = np)
+        sn = stream(pn)
+        @test all(k -> agrees(sn[k].pr, batch(pn, k)), 1:3)
+        @test all(x -> isnothing(x.pe.cache.pe.pe.cache), sn)
     end
 
     @testset "FoldOnly refuses a BatchChoice with an automatic member (#1605)" begin
@@ -180,5 +232,25 @@ end
         @test !po.supports_partial_fit(pe.ve)
         s = stream(pe)
         @test all(k -> agrees(s[k].pr, batch(pe, k)), 1:3)
+        # An `EmpiricalPrior` whose `ce` does not fold is refitted over every factor return.
+        # Its moments differ from the batch fit by round-off alone, about 1e-19, as those of a
+        # folded `EmpiricalPrior()` do. The factor returns are equal to the bit.
+        pf = CrossSectionalFactorPrior(; lambda = 1, base...,
+                                       pe = EmpiricalPrior(;
+                                                           ce = Covariance(;
+                                                                           alg = SemiMoment())))
+        sf = stream(pf)
+        near(a, b) = size(a) == size(b) &&
+                     all(((x, y),) -> isequal(x, y) || isapprox(x, y; atol = 1e-15),
+                         zip(a, b))
+        @test all(1:3) do k
+            x, b = sf[k].pr, batch(pf, k)
+            return near(x.mu, b.mu) &&
+                   near(x.sigma, b.sigma) &&
+                   same(x.X, b.X) &&
+                   same(x.rr.csr.f, b.rr.csr.f) &&
+                   same(x.rr.vs, b.rr.vs)
+        end
+        @test all(x -> isnothing(x.pe.cache.pe.cache), sf)
     end
 end

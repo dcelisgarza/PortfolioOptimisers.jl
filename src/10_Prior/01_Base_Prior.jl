@@ -32,6 +32,12 @@ The [`ReturnsResult`](@ref) method of [`prior`](@ref) is supplied by this file a
 
   - `pr::AbstractPriorResult`: Result object containing the estimated prior.
 
+## `carry_folds` (optional)
+
+  - `carry_folds(pe::MyPriorEstimator) -> Bool`: Returns `true` when the carry fold of a [`CrossSectionalFactorPrior`](@ref) folds the prior as its factor prior, one row at a time.
+
+A prior that returns `true` also implements `partial_fit!(pe, f::MatNum) -> pe`, which folds factor returns into a state that the prior holds, and `prior(pe; strict::Bool = false) -> LowOrderPrior`, which reads that state. The fallback returns `false`, which is exact for every prior. Its cost is on the carry fold. [`FoldOrRefit`](@ref) fits the factor prior again over every carried factor return at each step, and [`FoldOnly`](@ref) refuses the prior.
+
 # Examples
 
 We can create a dummy prior estimator as follows:
@@ -68,6 +74,7 @@ LowOrderPrior
   - [`AbstractPriorResult`](@ref)
   - [`prior`](@ref)
   - [`forward_prior`](@ref)
+  - [`carry_folds`](@ref)
 """
 abstract type AbstractPriorEstimator <: AbstractEstimator end
 """

@@ -311,7 +311,7 @@ The Carry Rule `carry` states what the carry fold does with a part that has no f
   - A factor or a Return Forecast with no finite [`lookback`](@ref) makes the carry keep every panel row, and each step computes the Factor Exposures over all of them.
   - A Return Forecast with no fold of its rows fits again over every row at each call with no data.
   - A `ve` that does not fold, as [`supports_partial_fit`](@ref) answers, fits every idiosyncratic return again at each step.
-  - A factor prior `pe` that does not fold fits every factor return again at each call with no data.
+  - A factor prior `pe` that does not fold, as [`carry_folds`](@ref) answers, fits every factor return again at each call with no data.
   - The idiosyncratic correlation under `th > 0` with a `ce` that does not fold is estimated again over every standardised idiosyncratic return at each call with no data. A `ce` that folds, as the default `ExpWeightedCovariance` does, folds the rows of each step.
 
 [`FoldOnly`](@ref) makes the constructor refuse each of these parts, and names it. A batch fit and the refit under [`Online`](@ref) ignore the rule.

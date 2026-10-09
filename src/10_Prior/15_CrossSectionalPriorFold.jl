@@ -490,7 +490,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds the factor returns of new observations into the factor prior of the carry fold.
 
-An [`EmpiricalPrior`](@ref) folds on its carry route. Any other factor prior does not fold, and the call with no data refits it over the factor returns that the state carries.
+A factor prior for which [`carry_folds`](@ref) answers `true` folds the rows with [`partial_fit!`](@ref). Any other factor prior stays as it is, and the call with no data refits it over the factor returns that the state carries.
 
 # Arguments
 
@@ -503,21 +503,24 @@ An [`EmpiricalPrior`](@ref) folds on its carry route. Any other factor prior doe
 
 # Related
 
+  - [`carry_folds`](@ref)
   - [`cross_sectional_factor_prior`](@ref)
   - [`CrossSectionalCarryState`](@ref)
 """
-function cross_sectional_fold_factors(pe::EmpiricalPrior, f::MatNum)
-    return partial_fit!(pe, f)
-end
-function cross_sectional_fold_factors(pe::AbstractPriorEstimator, ::MatNum)
-    return pe
+function cross_sectional_fold_factors(pe::AbstractPriorEstimator, f::MatNum)
+    return carry_folds(pe) ? partial_fit!(pe, f) : pe
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    carry_folds(pe)
+    carry_folds(pe::EmpiricalPrior)
 
-Answers whether the factor prior of a [`CrossSectionalFactorPrior`](@ref) folds on the carry fold, at a cost that does not grow with the stream.
+Answers whether the carry fold of a [`CrossSectionalFactorPrior`](@ref) folds the factor prior `pe` one row at a time, at a cost that does not grow with the stream.
 
-[`cross_sectional_fold_factors`](@ref) folds an [`EmpiricalPrior`](@ref) alone. Its fold refits each member that does not fold over every carried factor return, as [`fold_member`](@ref) states, so the prior folds only when `me` and `ce` both answer [`supports_partial_fit`](@ref). Every other factor prior fits again over every factor return at each call with no data. [`carry_growing_parts`](@ref) reads this predicate.
+This is the verb of a factor prior that folds, and it is `public`. A prior that answers `true` keeps the contract of [`EmpiricalPrior`](@ref) on its carry route. [`partial_fit!`](@ref) folds the factor returns of the new observations, `observations × factors`, into a state that the prior holds, and the first call starts from a prior with no state. A step costs the same however many rows the prior folded before. `prior(pe; strict)` with no data then reads the [`LowOrderPrior`](@ref) of every folded row, equal to the batch call over them. The carry fold folds such a prior with [`cross_sectional_fold_factors`](@ref), and reads it with [`cross_sectional_factor_prior`](@ref). It fits any other prior again over every carried factor return at each call with no data, and [`carry_growing_parts`](@ref) lists that prior.
+
+The verb is not [`supports_partial_fit`](@ref). That verb answers `false` for an `EmpiricalPrior`, because the prior keeps its rows, and an outer estimator that holds the rows already refits it from them. The carry fold gives the factor prior its rows and reads its state, so it folds the prior.
+
+An `EmpiricalPrior` on its carry route answers `true` when `me` and `ce` both answer [`supports_partial_fit`](@ref). Its fold refits a member that does not fold over every carried row, as [`fold_member`](@ref) states. Every other prior answers `false`, an `EmpiricalPrior` that holds a [`SampleBufferState`](@ref) included.
 
 # Arguments
 
@@ -525,25 +528,29 @@ Answers whether the factor prior of a [`CrossSectionalFactorPrior`](@ref) folds 
 
 # Returns
 
-  - `folds::Bool`: `true` when the factor prior folds.
+  - `folds::Bool`: `true` when the carry fold folds the factor prior.
 
 # Related
 
   - [`cross_sectional_fold_factors`](@ref)
+  - [`cross_sectional_factor_prior`](@ref)
   - [`carry_growing_parts`](@ref)
+  - [`supports_partial_fit`](@ref)
+  - [`carry_lookback`](@ref)
 """
-function cross_sectional_factor_prior_folds(pe::EmpiricalPrior)::Bool
-    return supports_partial_fit(pe.me) && supports_partial_fit(pe.ce)
-end
-function cross_sectional_factor_prior_folds(::AbstractPriorEstimator)::Bool
+function carry_folds(::AbstractPriorEstimator)::Bool
     return false
+end
+function carry_folds(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                        <:Option{<:PriorCarryState}})::Bool
+    return supports_partial_fit(pe.me) && supports_partial_fit(pe.ce)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the factor prior of the carry fold out of its state.
 
-A folded [`EmpiricalPrior`](@ref) answers from its carry state. Any other factor prior refits over the factor returns `f`.
+A factor prior for which [`carry_folds`](@ref) answers `true` answers from the state that [`cross_sectional_fold_factors`](@ref) folded. Any other factor prior refits over the factor returns `f`.
 
 # Arguments
 
@@ -560,14 +567,9 @@ A folded [`EmpiricalPrior`](@ref) answers from its carry state. Any other factor
   - [`cross_sectional_fold_factors`](@ref)
   - [`cross_sectional_factor_moments`](@ref)
 """
-function cross_sectional_factor_prior(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                         <:PriorCarryState}, ::MatNum;
-                                      strict::Bool = false)
-    return prior(pe; strict = strict)
-end
 function cross_sectional_factor_prior(pe::AbstractPriorEstimator, f::MatNum;
                                       strict::Bool = false)
-    return prior(pe, f; strict = strict)
+    return carry_folds(pe) ? prior(pe; strict = strict) : prior(pe, f; strict = strict)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1391,3 +1393,4 @@ function cross_sectional_carry_forecast_returns(pe::CrossSectionalFactorPrior,
     end
     return cross_sectional_forecast_window(pe, st.win, st.der)
 end
+public carry_folds
