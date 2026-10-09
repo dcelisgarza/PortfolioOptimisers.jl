@@ -806,8 +806,8 @@ end
     @testset "A fixed weighted Return Forecast folds its rows (#1573)" begin
         # A row of the history reads the scores and the block of its observation alone, so the
         # state carries the scores and the rows, and keeps the panel rows of the look-back.
-        # The Reversal score folds from its carried state (#1587), so the carry keeps the six
-        # rows that the GrowthRate score reads.
+        # The Reversal and the GrowthRate scores fold from their carried states (#1587,
+        # #1598), so the carry keeps the rows of the lag of the prior alone.
         sharpe = IdiosyncraticSharpeUnit()
         ind = grid_config("FamOne", rd).factors
         scores(nm) = DescriptorScores(;
@@ -833,11 +833,11 @@ end
                           ((; style..., fk..., rfe = fw(["style1"], sharpe)), edges),
                           ((; style..., fk..., ve = wv, rfe = fw(["style1"], sharpe)), edges))
             pe = CrossSectionalFactorPrior(; cfg...)
-            @test po.lookback(pe) == 30 && po.cross_sectional_carry_rows(pe) == 6
+            @test po.lookback(pe) == 30 && po.cross_sectional_carry_rows(pe) == pe.lag + 1
             for (k, x) in enumerate(stream(pe, rd, ee))
                 b = batch(pe, k, rd, ee)
                 st = x.pe.cache
-                @test size(x.pe.cache.win.X, 1) == 6
+                @test size(x.pe.cache.win.X, 1) == pe.lag + 1
                 @test size(st.fh) == size(st.vs) == size(b.rr.rf.hist)
                 @test size(st.fsc.S, 1) == size(st.Ms, 1)
                 @test relerr(x.pr.mu, b.mu) < 1e-14 &&
@@ -852,9 +852,9 @@ end
     @testset "An exponentially weighted Return Forecast folds its rows (#1574)" begin
         # The batch fit is a forward recursion over the rows whose target is known. A step
         # reads its new rows and the `lag + horizon - 1` rows before them, whose targets
-        # mature at the step, from the carried state of the recursion. The Reversal score folds
-        # from its carried state (#1587), so the carry keeps the six rows that the GrowthRate
-        # score reads.
+        # mature at the step, from the carried state of the recursion. The Reversal and the
+        # GrowthRate scores fold from their carried states (#1587, #1598), so the carry keeps
+        # the rows of the lag of the prior alone.
         sharpe = IdiosyncraticSharpeUnit()
         ind = grid_config("FamOne", rd).factors
         scores(nm) = DescriptorScores(;
@@ -905,7 +905,7 @@ end
         for (cfg, ee) in cases
             pe = CrossSectionalFactorPrior(; cfg...)
             @test po.lookback(pe) == (cfg === early ? 2 : 30)
-            @test po.cross_sectional_carry_rows(pe) == (cfg === early ? 2 : 6)
+            @test po.cross_sectional_carry_rows(pe) == pe.lag + 1
             for (k, x) in enumerate(stream(pe, rd, ee))
                 # A block too short for a fit refuses on both sides.
                 b = try
@@ -946,8 +946,8 @@ end
         # and a step run one fold, `return_forecast_step`. The state carries the normal
         # equations, the two calibration regressions and the coefficients of the rows whose
         # target has not matured, so the carry keeps the panel rows of the look-back alone.
-        # The Reversal score folds from its carried state (#1587), so the carry keeps the six
-        # rows that the GrowthRate score reads.
+        # The Reversal and the GrowthRate scores fold from their carried states (#1587,
+        # #1598), so the carry keeps the rows of the lag of the prior alone.
         sharpe = IdiosyncraticSharpeUnit()
         ind = grid_config("FamOne", rd).factors
         ds = DescriptorScores(;
@@ -1004,9 +1004,9 @@ end
              (; style..., fk..., rfe = tf()), (; style..., fk..., ve = wv, rfe = tf()))
             pe = CrossSectionalFactorPrior(; cfg...)
             @test po.folds_forecast_rows(pe.rfe)
-            @test po.lookback(pe) == 30 && po.cross_sectional_carry_rows(pe) == 6
+            @test po.lookback(pe) == 30 && po.cross_sectional_carry_rows(pe) == pe.lag + 1
             xs = check(pe, e)
-            @test all(x -> size(x.pe.cache.win.X, 1) == 6, xs)
+            @test all(x -> size(x.pe.cache.win.X, 1) == pe.lag + 1, xs)
         end
         # Under `whole_history` a row before the block trains the fit when its forward window
         # reaches into the block. With a gap of four rows the first row before the block
@@ -1023,7 +1023,7 @@ end
         # rows of the look-back alone.
         h2 = CrossSectionalFactorPrior(; fk..., factors = ind, rfe = tf(; horizon = 2))
         @test po.folds_forecast_rows(h2.rfe)
-        @test po.cross_sectional_carry_rows(h2) == 6
+        @test po.cross_sectional_carry_rows(h2) == 2
         # A slot that reads the history reads the rows of the fold: the row of an
         # observation is the forecast of a fit through that observation.
         rl, bl = CarryHistoryShrinkage(), CarryHistoryShrinkage()
@@ -1186,6 +1186,101 @@ end
         @test size(last(s).pe.cache.win.X, 1) == 2
         @test all(d -> isa(d.cache, po.EWMeanState),
                   last(last(s).pe.cache.xf[3]).descriptors)
+    end
+
+    @testset "A lag Descriptor folds one row from its carried state (#1598)" begin
+        # The state carries the lagged quantity of the last `lag` observations with the bits
+        # of the batch call, so each folded row equals the batch call to the last bit, in
+        # blocks of any size, also blocks shorter than the lag. A second step from the same
+        # state gives the same rows, because a step copies the state.
+        syn = synthetic_asset_panel(; n_assets = 60, n_observations = 160, n_industries = 4,
+                                    rng = StableRNG(1598)).rd
+        blocks = ((1, 1), (2, 3), (4, 30), (31, 31), (32, 100), (101, 160))
+        for de in (GrowthRate(; field = "sales_ttm", lag = 7), SalesGrowthRate(; lag = 1),
+                   ChangeToScale(; field = "net_income_ttm", scale = "market_cap", lag = 5),
+                   EarningsChangeToPrice(; lag = 40),
+                   ChangeInIntensity(; field = "capex_ttm", scale = "total_assets", lag = 9),
+                   CapexToAssetsChangeInIntensity(; lag = 3))
+            full = descriptor(de, syn)
+            st = de
+            for (a, b) in blocks
+                r = po.descriptor_step(st, rows(syn, a:b))
+                @test same(r.D, full[a:b, :])
+                @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
+                @test same(partial_fit!(st, rows(syn, a:b)).cache.q[end], r.de.cache.q[end])
+                st = r.de
+            end
+            @test count(isfinite, full) > 6000
+            @test length(st.cache.q) == de.lag
+            # A merge of the states of two consecutive blocks is the state of both blocks.
+            a = partial_fit!(de, rows(syn, 1:50)).cache
+            m = po.merge_states(a, partial_fit!(de, rows(syn, 51:52)).cache)
+            @test all(((x, y),) -> same(x, y),
+                      zip(m.q, partial_fit!(de, rows(syn, 1:52)).cache.q))
+            c = copy(a)
+            @test same(c.q[end], a.q[end]) && c.q[end] !== a.q[end]
+            @test occursin("carries 60 assets, and the step brings 5",
+                           message(() -> po.descriptor_step(st,
+                                                            po.port_opt_view(rows(syn, 1:2),
+                                                                             1:5))))
+        end
+        g = partial_fit!(GrowthRate(; field = "sales_ttm", lag = 4), rows(syn, 1:9))
+        @test occursin("carries the rows of a lag of 4, and the lag of the Descriptor is 3",
+                       message(() -> po.descriptor_step(GrowthRate(; field = "sales_ttm",
+                                                                   lag = 3,
+                                                                   cache = g.cache),
+                                                        rows(syn, 10:11))))
+        @test occursin("got the lags 4 and 3",
+                       message(() -> po.merge_states(g.cache,
+                                                     partial_fit!(GrowthRate(;
+                                                                             field = "sales_ttm",
+                                                                             lag = 3),
+                                                                  rows(syn, 1:2)).cache)))
+        q = po.DataStructures.CircularBuffer{Vector{Float64}}(2)
+        push!(q, [0.0, 0.0])
+        push!(q, [0.0])
+        @test occursin("got rows of [2, 1] assets",
+                       message(() -> po.LagDescriptorState(; q = q)))
+        @test po.show_fields(EarningsChangeToPrice()) == (:field, :scale, :lag, :gt0)
+        # On the carry fold each lag Descriptor counts as one row, so the carry keeps the
+        # rows of the lag of the prior alone, and every step equals the batch fit.
+        lagf = ["market" => ConstantExposure(),
+                "growth" => CompositeExposure(;
+                                              descriptors = [SalesGrowthRate(; lag = 20),
+                                                             EarningsChangeToPrice(; lag = 15)]),
+                "intensity" => CompositeExposure(;
+                                                 descriptors = [CapexToAssetsChangeInIntensity(; lag = 25),
+                                                                BookToPrice()]),
+                "industry" => OneHotExposure(; field = "industry", family = "industry")]
+        pe = CrossSectionalFactorPrior(; lambda = 1, factors = lagf,
+                                       families = ["industry" => nothing], minra = 5,
+                                       pe = GRID_PE, ve = GRID_VE)
+        @test po.lookback(pe) == 27
+        @test po.cross_sectional_carry_rows(pe) == 2
+        e = (0, 50, 80, 81, 120, 121, 160)
+        s = stream(pe, syn, e)
+        fitted = 0
+        for (k, x) in enumerate(s)
+            b = try
+                batch(pe, k, syn, e)
+            catch err
+                err
+            end
+            if isa(b, LowOrderPrior)
+                fitted += 1
+                @test same(x.pr.rr.Ms, b.rr.Ms)
+                @test same(x.pr.mu, b.mu) && same(x.pr.sigma, b.sigma)
+            else
+                @test typeof(x.pr) == typeof(b)
+            end
+        end
+        # The case reads out at least once, so the loop is not vacuous.
+        @test fitted >= 3
+        @test size(last(s).pe.cache.win.X, 1) == 2
+        @test all(d -> isa(d.cache, po.LagDescriptorState),
+                  last(last(s).pe.cache.xf[2]).descriptors)
+        @test isa(first(last(last(s).pe.cache.xf[3]).descriptors).cache,
+                  po.LagDescriptorState)
     end
 
     @testset "The Descriptor scores of a Return Forecast fold their stateful Descriptors (#1587)" begin

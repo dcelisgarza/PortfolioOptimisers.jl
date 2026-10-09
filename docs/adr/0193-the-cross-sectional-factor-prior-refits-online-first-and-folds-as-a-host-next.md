@@ -262,7 +262,9 @@ The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton
   pass `FoldOnly()`. The stateful seam of a Descriptor is `public` too: `descriptor_step` and
   `carry_lookback`, with the state in a field of the Descriptor. The exponentially weighted mean
   Descriptors are its second family, after the rolling return
-  ([#1586](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1586)). A subtype that
+  ([#1586](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1586)), and the lag
+  Descriptors are its third
+  ([#1598](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1598)). A subtype that
   implements both verbs folds on the carry with no change to the prior.
 
 ## Considered options
