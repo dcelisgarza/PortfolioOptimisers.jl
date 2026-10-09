@@ -114,6 +114,38 @@ end
         @test !po.cross_sectional_factor_prior_folds(EntropyPoolingPrior(; pe = GRID_PE))
     end
 
+    @testset "FoldOnly refuses a BatchChoice with an automatic member (#1605)" begin
+        # A move folds the factor prior again over every carried factor return, so its cost
+        # grows with the stream. The message names both ways out.
+        for name in ("FamOne", "FamTwo", "NeutFam")
+            m = message(() -> CrossSectionalFactorPrior(; grid_config(name, rd)...,
+                                                        carry = FoldOnly()))
+            @test startswith(m, "ArgumentError: carry = FoldOnly() refuses")
+            @test occursin("`choice = BatchChoice()` chooses the dropped member", m)
+            @test occursin("Set `choice = PinnedChoice()`", m)
+            @test occursin("\"industry\" => \"industry=<member>\"", m)
+            @test count("\n  - ", m) == 1
+            @test isa(CrossSectionalFactorPrior(; grid_config(name, rd)...,
+                                                choice = PinnedChoice(),
+                                                carry = FoldOnly()),
+                      CrossSectionalFactorPrior)
+        end
+        @test occursin("[\"industry\", \"region\"]",
+                       message(() -> CrossSectionalFactorPrior(;
+                                                               grid_config("FamTwo", rd)...,
+                                                               carry = FoldOnly())))
+        # A named member never moves, and a prior with no family has no choice to make.
+        @test isa(CrossSectionalFactorPrior(; grid_config("FamStated", rd)...,
+                                            carry = FoldOnly()), CrossSectionalFactorPrior)
+        @test isempty(po.carry_choice_parts(BatchChoice(), nothing))
+        @test isempty(po.carry_choice_parts(BatchChoice(),
+                                            ["industry" => "industry=Banks"]))
+        @test isempty(po.carry_choice_parts(PinnedChoice(), ["industry" => nothing]))
+        @test length(po.carry_choice_parts(BatchChoice(),
+                                           ["industry" => "industry=Banks",
+                                            "region" => nothing])) == 1
+    end
+
     @testset "A bounded window and a ve that folds pass FoldOnly, and the carry equals the batch fit" begin
         pe = CrossSectionalFactorPrior(; lambda = 1, base..., carry = FoldOnly())
         @test po.cross_sectional_carry_rows(pe) == 2

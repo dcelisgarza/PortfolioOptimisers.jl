@@ -1222,6 +1222,7 @@ The rule accepts every configuration. A part that does not fold, as [`carry_grow
   - A Return Forecast with no fold of its rows fits again over every row at each call with no data.
   - A `ve` that does not fold fits every idiosyncratic return again at each step.
   - A factor prior `pe` that does not fold fits every factor return again at each call with no data.
+  - A [`BatchChoice`](@ref) with an automatic dropped member folds the factor prior again over every carried factor return at each step that moves the member.
   - The idiosyncratic correlation under `th > 0` with a `ce` that does not fold is estimated again over every standardised idiosyncratic return at each call with no data. A `ce` that folds, as the default `ExpWeightedCovariance` does, folds the rows of each step.
 
 [`FoldOnly`](@ref) refuses such a prior in its constructor instead.
@@ -1286,10 +1287,11 @@ Each entry names the part and the method that it lacks. The test reads the confi
  3. List `ve` when [`supports_partial_fit`](@ref) answers `false`.
  4. List `pe` when [`cross_sectional_factor_prior_folds`](@ref) answers `false`.
  5. List `th` when it is positive and [`supports_partial_fit`](@ref) answers `false` for `ce`, because the idiosyncratic correlation then has no fold.
+ 6. List `choice` with [`carry_choice_parts`](@ref): a [`BatchChoice`](@ref) with an automatic dropped member, because a step that moves the member folds the factor prior again over every carried factor return.
 
 # Arguments
 
-  - `cfg`: The prior, or a `NamedTuple` of its fields `factors`, `pe`, `ve`, `rfe`, `th` and `ce`.
+  - `cfg`: The prior, or a `NamedTuple` of its fields `factors`, `pe`, `ve`, `rfe`, `th`, `ce`, `choice` and `families`.
 
 # Returns
 
@@ -1312,7 +1314,48 @@ function carry_growing_parts(cfg::Union{<:CrossSectionalFactorPrior, <:NamedTupl
                 carry_growing_part(!cross_sectional_factor_prior_folds(cfg.pe),
                                    "the factor prior `pe` ($(nameof(typeof(cfg.pe)))) does not fold, so it fits every factor return again. The carry folds an `EmpiricalPrior` whose `me` and `ce` answer `supports_partial_fit`"),
                 carry_growing_part(cfg.th > 0 && !supports_partial_fit(cfg.ce),
-                                   "`th = $(cfg.th)` estimates the idiosyncratic correlation again over every row, because `ce` ($(nameof(typeof(cfg.ce)))) does not fold. Set `th = 0`, or give a `ce` that answers `supports_partial_fit`"))
+                                   "`th = $(cfg.th)` estimates the idiosyncratic correlation again over every row, because `ce` ($(nameof(typeof(cfg.ce)))) does not fold. Set `th = 0`, or give a `ce` that answers `supports_partial_fit`"),
+                carry_choice_parts(cfg.choice, cfg.families))
+end
+"""
+    carry_choice_parts(choice::AbstractChoiceRule, families) -> Vector{String}
+    carry_choice_parts(choice::BatchChoice, families::AbstractVector{<:Pair})
+        -> Vector{String}
+
+Describes the Choice Rule of a [`CrossSectionalFactorPrior`](@ref) when its step cost on the carry fold grows with the stream.
+
+A [`BatchChoice`](@ref) chooses each automatic dropped member again at each step. A step that moves it folds the factor prior again over every carried factor return, as [`cross_sectional_fold_move`](@ref) states, so the cost of that step grows with the stream. A named member, or a [`PinnedChoice`](@ref), never moves.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A rule other than [`BatchChoice`](@ref), or a prior with no constrained Factor Family, does not grow.
+ 2. A [`BatchChoice`](@ref) grows when a family names no dropped member.
+
+# Arguments
+
+  - `choice`: The Choice Rule of the prior.
+  - `families`: The constrained Factor Families of the prior, or `nothing`.
+
+# Returns
+
+  - `parts::Vector{String}`: One description when the choice grows, and an empty vector otherwise.
+
+# Related
+
+  - [`carry_growing_parts`](@ref)
+  - [`cross_sectional_fold_choice`](@ref)
+"""
+function carry_choice_parts(::AbstractChoiceRule, ::Any)::Vector{String}
+    return String[]
+end
+function carry_choice_parts(::BatchChoice, families::AbstractVector{<:Pair})::Vector{String}
+    auto = [String(first(p)) for p in families if isnothing(last(p))]
+    if isempty(auto)
+        return String[]
+    end
+    return ["`choice = BatchChoice()` chooses the dropped member of the Factor Families $(auto) again at each step, and a step that moves it folds the factor prior again over every carried factor return. Set `choice = PinnedChoice()`, or name the member to drop, as in \"$(first(auto))\" => \"$(first(auto))=<member>\""]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1388,7 +1431,7 @@ The method that Julia selects is the algorithm.
 # Arguments
 
   - `carry`: The Carry Rule of the prior.
-  - `cfg`: The prior, or a `NamedTuple` of its fields `factors`, `pe`, `ve`, `rfe`, `th` and `ce`.
+  - `cfg`: The prior, or a `NamedTuple` of its fields `factors`, `pe`, `ve`, `rfe`, `th`, `ce`, `choice` and `families`.
 
 # Validation
 

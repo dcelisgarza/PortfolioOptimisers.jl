@@ -119,6 +119,20 @@ end
                isequal(x.rr.edof, b.rr.edof) &&
                x.rr.idx == b.rr.idx
     end
+    # Equal to rounding, with the same `NaN` cells. A move of a batch choice keeps the factor
+    # returns of the old basis and selects their columns, where the batch fit solves each row
+    # in the new basis, so the two differ by rounding alone (#1605).
+    function near(x, b; tol = 1e-12)
+        # The gap over the largest finite entry, and zero when the two are equal, so a block
+        # with no finite entry other than zero compares.
+        gap(p, q) = maximum(abs, filter(isfinite, p - q); init = 0.0)
+        return all(((p, q),) -> size(p) == size(q) &&
+                                isequal(isnan.(p), isnan.(q)) &&
+                                (iszero(gap(p, q)) || relerr(p, q) < tol),
+                   ((x.mu, b.mu), (x.sigma, b.sigma), (x.X, b.X), (x.rr.csr.f, b.rr.csr.f),
+                    (x.rr.vs, b.rr.vs), (x.rr.Ms, b.rr.Ms), (x.rr.rw, b.rr.rw))) &&
+               x.rr.idx == b.rr.idx
+    end
     dropped(pr) = pr.rr.nf[po.dropped_factor_indices(pr.rr.fcb)]
     style = (; grid_config("Base", rd)..., families = ["style" => nothing])
     industry = grid_config("FamOne", rd)
@@ -529,6 +543,73 @@ end
         sz = stream(pe, rdz)
         @test [x.pe.cache.lv for x in sz] == [[true, false, true], trues(3), trues(3)]
         @test all(k -> agrees(sz[k].pr, batch(pe, k, rdz)), 1:3)
+    end
+
+    @testset "A move of a batch choice folds and runs no regression again (#1605)" begin
+        # Under the default Unseen Member rule the raw factor returns do not depend on the
+        # dropped member, so a move selects their columns and folds the factor prior again.
+        # The residuals of the old observations are the ones of the step before, bit for bit.
+        # The `grid_config` cases take `SolvedUnseenMember()`, which refits on a move.
+        zs = (; style..., unseen = ZeroUnseenMember())
+        for pf in
+            (GRID_PE, EmpiricalPrior(; me = SimpleExpectedReturns(), ce = Covariance()))
+            pe = CrossSectionalFactorPrior(; lambda = 1, zs..., pe = pf)
+            sb = stream(pe)
+            @test [dropped(x.pr) for x in sb] == [["style1"], ["style2"], ["style2"]]
+            @test all(k -> dropped(batch(pe, k)) == dropped(sb[k].pr), 1:3)
+            @test all(k -> near(sb[k].pr, batch(pe, k)), 1:3)
+            e1, e2 = sb[1].pe.cache.csr.eps, sb[2].pe.cache.csr.eps
+            @test same(e2[1:size(e1, 1), :], e1)
+            @test same(sb[2].pe.cache.W[1:size(e1, 1), :], sb[1].pe.cache.W)
+        end
+        # The oracle's rule keeps a row with an Unseen Member rank-deficient, so a move fits
+        # every observation again, and the carry equals the batch fit exactly.
+        pe = CrossSectionalFactorPrior(; lambda = 1, style...)
+        @test pe.unseen === SolvedUnseenMember()
+        @test isnothing(po.cross_sectional_move_basis(pe.unseen, pe.cre, nothing, nothing))
+        @test isnothing(po.cross_sectional_move_basis(ZeroUnseenMember(),
+                                                      CrossSectionalTargetRegression(),
+                                                      nothing, nothing))
+        # The panel of #1606: the only asset in Utilities delists after data row 225, so row
+        # 226 has an Unseen Member. A larger market cap of Energy from row 150 moves the
+        # automatic member from Software to Energy at the second step, and the step of row 226
+        # comes after the move.
+        dl = parity_panel(; T = 300, N = 60, seed = 1601).rd
+        ind = [i == 3 ? "Utilities" : ["Banks", "Energy", "Software"][mod(i - 1, 3) + 1]
+               for i in 1:size(dl.X, 2)]
+        po.panel_field(dl.pnl, "market_cap").vals[150:end, ind .== "Energy"] .*= 4.0
+        de = (0, 150, 190, 225, 226, 300)
+        dlf = ["market" => ConstantExposure(),
+               "industry" => OneHotExposure(; field = "industry", family = "industry"),
+               "size" =>
+                   CompositeExposure(; descriptors = [LogMarketCap()], family = "style")]
+        for (unseen, pf) in ((ZeroUnseenMember(), GRID_PE),
+                             (ZeroUnseenMember(),
+                              EmpiricalPrior(; me = SimpleExpectedReturns(), ce = Covariance())),
+                             (SolvedUnseenMember(), GRID_PE))
+            pe = CrossSectionalFactorPrior(; factors = dlf,
+                                           families = ["industry" => nothing], minra = 5,
+                                           unseen = unseen, pe = pf)
+            xs = stream(pe, dl, de)
+            @test [only(dropped(x.pr)) for x in xs] ==
+                  ["industry=Software", "industry=Energy", "industry=Energy",
+                   "industry=Energy", "industry=Energy"]
+            for (k, x) in enumerate(xs)
+                b = batch(pe, k, dl, de)
+                @test dropped(x.pr) == dropped(b)
+                @test unseen === SolvedUnseenMember() ? agrees(x.pr, b) : near(x.pr, b)
+            end
+        end
+        # A new dropped member with a zero benchmark-weighted exposure at an observation has
+        # no finite ratio, so the rebase answers `nothing`, and the fit of every observation
+        # refuses the member as the batch fit does.
+        fcb = FactorFamilyBasis(; fnm = ["ind"], fi = [[1, 2, 3]], di = [1],
+                                ratios = [0.5 0.0; 0.25 2.0], K = 3)
+        @test isnothing(po.cross_sectional_rebase(fcb, ["ind" => "c"], ["a", "b", "c"]))
+        rb = po.cross_sectional_rebase(fcb, ["ind" => "b"], ["a", "b", "c"])
+        @test rb.di == [2] && rb.ratios ≈ [2.0 0.0; 4.0 8.0]
+        @test po.cross_sectional_rebase(fcb, ["ind" => "a"], ["a", "b", "c"]).ratios ==
+              fcb.ratios
     end
 
     @testset "Folds the members that fold, and refits the rest" begin

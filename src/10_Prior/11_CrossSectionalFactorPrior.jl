@@ -533,7 +533,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     ex
     """
-    Choice Rule of the dropped member of each Factor Family whose member is `nothing` in `families`. Under [`BatchChoice`](@ref), the default, each fit chooses again over every observation. Under [`PinnedChoice`](@ref), the online step writes the choice of the first fit into `families` of the estimator that it returns. The two agree in a batch fit.
+    Choice Rule of the dropped member of each Factor Family whose member is `nothing` in `families`. Under [`BatchChoice`](@ref), the default, each fit chooses again over every observation. Under [`PinnedChoice`](@ref), the online step writes the choice of the first fit into `families` of the estimator that it returns. The two agree in a batch fit. On the carry fold, a step that moves the member under [`BatchChoice`](@ref) runs no regression again: it selects the columns of the raw factor returns that the new member keeps, and folds the factor prior again over every carried factor return, as [`cross_sectional_fold_move`](@ref) states. So [`FoldOnly`](@ref) refuses [`BatchChoice`](@ref) with an automatic member.
     """
     choice
     """
@@ -590,7 +590,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         assert_forecast_history_rule(lambda, rfe, :lambda)
         assert_forecast_history_rule(c, rfe, :c)
         assert_orthogonal_forecast_fit(ofit, rfe)
-        assert_carry_rule(carry, (; factors, pe, ve, rfe, th, ce))
+        assert_carry_rule(carry, (; factors, pe, ve, rfe, th, ce, choice, families))
         # One tuple of the fields gives both the type parameters and the values.
         fs = (factors, neutralise, families, unseen, cre, wa, pe, ve, ce, pdm, f_mp, mp,
               srep, th, bp, mcap, bw, lag, minra, rfe, lambda, c, ofit, lx, mtx_sqrt, ex,

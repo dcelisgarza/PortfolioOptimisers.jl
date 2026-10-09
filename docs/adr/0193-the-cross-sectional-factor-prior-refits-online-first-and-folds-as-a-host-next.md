@@ -192,12 +192,18 @@ Member rule `ZeroUnseenMember()`, an Unseen Member has a return of zero, and the
 of its observation holds over the other members
 ([#1606](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1606)). So every row is
 identified, and its raw-axis answer does not depend on the member either. A move selects those
-columns and refits the factor prior over the selected history. It solves no row again. Under
-`SolvedUnseenMember()` a row with an Unseen Member stays rank-deficient, and its pseudo-inverse
-answer depends on the parametrisation, so a move solves each such row again in the new basis. The
+columns and refits the factor prior over the selected history. It solves no row again. The marks
+of the Empty Factors of the family that moved are read again in the new basis, one observation at
+a time from the first one, until each member is marked. Under `SolvedUnseenMember()` a row with an
+Unseen Member stays rank-deficient, and its pseudo-inverse answer depends on the parametrisation.
+A `CrossSectionalTargetRegression` fits a target that the library does not know, and a target can
+penalise its coefficients. Under either one a move fits every carried observation again, as it did
+before the fold (#1605). A row whose design holds a dependent factor set is rank-deficient under
+every rule, and the fold keeps the answer of the old basis there. The
 default factor covariance reads every column at once, so a sub-block of a raw-axis state is not the
-batch answer. The move then costs about one millisecond on 2520 rows, against 1.66 s for a refit of
-every row, and the carry still equals the batch fit to rounding. `BatchChoice()` stays the default.
+batch answer. On the panel of #1592 (2520 rows, 500 assets), the step of the move costs 0.013 s,
+against 0.0036 s for a step with no move and 1.66 s for a refit of every row, and the carry still
+equals the batch fit to rounding (7.3e-15 on `sigma`). `BatchChoice()` stays the default.
 
 ### The selection regressions of a factor prior
 
@@ -293,7 +299,7 @@ The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton
 - **A pinned choice by default.** Rejected. It breaks the identity of the online call with no data and the batch
   fit when the choice moves. It stays one keyword away.
 - **A refit of every row when a batch choice moves.** Rejected. It is exact, but it costs about half
-  a batch fit at each move, and the fold of the move is exact to rounding at about one millisecond.
+  a batch fit at each move, and the fold of the move is exact to rounding at about 0.013 s a step.
 - **A pinned choice by default on the carry fold alone.** Rejected. One field serves the batch fit
   and the carry, so a default that differs by mode makes the two disagree for one estimator. With
   the fold of a move, the batch choice costs about the same as the pinned choice.
@@ -343,7 +349,7 @@ The rule is a field of the prior, `carry::AbstractCarryRule`, with two singleton
   and holds the zero-sum condition over the other members, so a row whose factor returns depended
   on the dropped member is identified, and the fold of a move needs no second solve.
   `SolvedUnseenMember()` keeps the answer that depends on the dropped member, and a move under it
-  solves such a row again.
+  fits every carried observation again.
 - ADR 0136 and ADR 0039 carry amendments that point here.
 - A pinned choice and a seed window are two routes on which the online call with no data equals no batch fit.
   Each is documented, and each is tested against the oracle.

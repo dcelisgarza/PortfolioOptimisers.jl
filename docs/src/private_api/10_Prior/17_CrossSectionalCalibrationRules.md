@@ -17,4 +17,5 @@ PortfolioOptimisers.carry_growing_parts
 PortfolioOptimisers.assert_carry_rule
 PortfolioOptimisers.carry_growing_part
 PortfolioOptimisers.carry_forecast_parts
+PortfolioOptimisers.carry_choice_parts
 ```
