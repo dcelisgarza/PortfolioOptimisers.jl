@@ -1429,6 +1429,147 @@ end
                   po.LagDescriptorState)
     end
 
+    @testset "An EW volatility Descriptor folds one row from its carried state (#1607)" begin
+        # The state carries the state of the variance estimator and, for a residual form, the
+        # state of the beta recursion. Both run the arithmetic of the batch call from the first
+        # observation, so each folded row equals the batch call to the last bit, in blocks of
+        # any size, also with a regime adjustment and HAC lags. A second step from the same
+        # state gives the same rows, because a step copies the state.
+        syn = synthetic_asset_panel(; n_assets = 60, n_observations = 160, n_industries = 4,
+                                    rng = StableRNG(1607)).rd
+        blocks = ((1, 1), (2, 30), (31, 31), (32, 100), (101, 160))
+        for de in (EWVolatility(; half_life = 10),
+                   EWDownsideVolatility(; half_life = 5, mar = 0.001),
+                   EWResidualVolatility(; half_life = 5, beta_half_life = 8),
+                   EWResidualDownsideVolatility(; half_life = 7, beta_half_life = 3),
+                   EWVolatility(;
+                                ce = RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 3,
+                                                                       regime_min_obs = 4)),
+                   EWResidualVolatility(;
+                                        ce = RegimeAdjustedExpWeightedVariance(; decay = 0.8,
+                                                                               min_obs = 2,
+                                                                               hac_lags = 2)))
+            full = descriptor(de, syn)
+            st = de
+            for (a, b) in blocks
+                r = po.descriptor_step(st, rows(syn, a:b))
+                @test same(r.D, full[a:b, :])
+                @test same(po.descriptor_step(st, rows(syn, a:b)).D, r.D)
+                @test same(partial_fit!(st, rows(syn, a:b)).cache.ve.variance,
+                           r.de.cache.ve.variance)
+                st = r.de
+            end
+            @test count(isfinite, full) > 8000
+            c = copy(st.cache)
+            @test c.ve.variance == st.cache.ve.variance &&
+                  c.ve.variance !== st.cache.ve.variance
+            @test isnothing(c.beta) == isnothing(st.cache.beta)
+            @test occursin("cannot merge two states fitted on disjoint blocks",
+                           message(() -> po.merge_states(c, st.cache)))
+            # A residual form checks its beta state first.
+            @test occursin(r"the state holds 60 assets, and `X` holds 5|the beta state carries 60 assets, and the step brings 5",
+                           message(() -> po.descriptor_step(st,
+                                                            po.port_opt_view(rows(syn, 1:2),
+                                                                             1:5))))
+        end
+        # The beta recursion folds by itself too: a step from the carried state equals the
+        # batch call, also where `min_obs` counts observations across the cut.
+        rm = po.market_return_series(syn, "market_cap")
+        B, Vm = po.ew_beta_series(syn.X, rm, 0.8, 7, 1e-12, syn.pnl.amsk)
+        b1 = po.ew_beta_series!(po.ew_beta_state(nothing, syn.X, rm, 0.8), syn.X[1:4, :],
+                                rm[1:4], 0.8, 7, 1e-12, syn.pnl.amsk[1:4, :])
+        b2 = po.ew_beta_series!(po.ew_beta_state(b1.st, syn.X, rm, 0.8), syn.X[5:160, :],
+                                rm[5:160], 0.8, 7, 1e-12, syn.pnl.amsk[5:160, :])
+        @test same([b1.B; b2.B], B) && same([b1.Vm; b2.Vm], Vm) && b2.st.t == 160
+        @test occursin("cannot merge two states fitted on disjoint blocks",
+                       message(() -> po.merge_states(b1.st, b2.st)))
+        @test occursin("the beta state carries 60 assets, and the step brings 5",
+                       message(() -> po.ew_beta_state(b1.st, syn.X[:, 1:5], rm, 0.8)))
+        @test occursin("hold one entry per asset",
+                       message(() -> po.EWBetaState(; b = [0.0], mu = [0.0, 0.0],
+                                                    cv = [0.0], n = [0], act = trues(1),
+                                                    mu_m = 0.0, var_m = 0.0, t = 0)))
+        # A state of the other form is refused.
+        res = partial_fit!(EWResidualVolatility(), rows(syn, 1:5)).cache
+        vol = partial_fit!(EWVolatility(), rows(syn, 1:5)).cache
+        @test occursin("holds a beta state",
+                       message(() -> po.descriptor_step(EWVolatility(; cache = res),
+                                                        rows(syn, 6:7))))
+        @test occursin("holds no beta state",
+                       message(() -> po.descriptor_step(EWResidualVolatility(; cache = vol),
+                                                        rows(syn, 6:7))))
+        @test po.EWVolatilityState(; ve = vol.ve).ve === vol.ve
+        @test po.show_fields(EWVolatility()) == (:ce, :alg, :mar)
+        @test po.show_fields(EWResidualVolatility()) ==
+              (:mcap, :ce, :beta_decay, :alg, :mar, :min_val)
+        # A `ce` with no fold has no state: the Descriptor answers no step, and its batch
+        # call is the variance series of `ce`.
+        wv = EWVolatility(; ce = WindowedVariance(; window = 20))
+        @test isnothing(po.descriptor_step(wv, rows(syn, 1:5)))
+        @test isnothing(po.carry_lookback(wv))
+        @test isnothing(po.ew_volatility_fold(wv, syn, nothing).st)
+        # On the carry fold each Descriptor counts as one row, so the carry keeps the rows of
+        # the lag alone, and every step equals the batch fit.
+        vf = ["market" => ConstantExposure(),
+              "volatility" => CompositeExposure(;
+                                                descriptors = [EWVolatility(; half_life = 10),
+                                                               EWDownsideVolatility(; half_life = 5)]),
+              "residual" => CompositeExposure(;
+                                              descriptors = [EWResidualVolatility(; half_life = 5,
+                                                                                  beta_half_life = 8),
+                                                             BookToPrice()]),
+              "industry" => OneHotExposure(; field = "industry", family = "industry")]
+        pe = CrossSectionalFactorPrior(; lambda = 1, factors = vf,
+                                       families = ["industry" => nothing], minra = 5,
+                                       pe = GRID_PE, ve = GRID_VE)
+        @test isnothing(po.lookback(pe))
+        @test po.cross_sectional_carry_rows(pe) == 2
+        e = (0, 50, 80, 81, 120, 121, 160)
+        s = stream(pe, syn, e)
+        fitted = 0
+        for (k, x) in enumerate(s)
+            b = try
+                batch(pe, k, syn, e)
+            catch err
+                err
+            end
+            if isa(b, LowOrderPrior)
+                fitted += 1
+                @test dropped(x.pr) == dropped(b)
+                @test same(x.pr.rr.Ms, b.rr.Ms)
+                # The dropped member of the industry family moves at the fourth step. A move
+                # folds, and equals the batch fit to rounding alone (#1605).
+                if k < 4
+                    @test same(x.pr.mu, b.mu) && same(x.pr.sigma, b.sigma)
+                else
+                    @test near(x.pr, b)
+                end
+            else
+                @test typeof(x.pr) == typeof(b)
+            end
+        end
+        # The case reads out at least once, so the loop is not vacuous.
+        @test fitted >= 3
+        @test [only(dropped(x.pr)) for x in s] ==
+              ["industry=Banks", "industry=Banks", "industry=Banks", "industry=Real Estate",
+               "industry=Real Estate", "industry=Real Estate"]
+        @test size(last(s).pe.cache.win.X, 1) == 2
+        @test all(d -> isa(d.cache, po.EWVolatilityState),
+                  last(last(s).pe.cache.xf[2]).descriptors)
+        @test isa(first(last(last(s).pe.cache.xf[3]).descriptors).cache,
+                  po.EWVolatilityState)
+        # A `ce` with no fold makes the carry keep every row, and the strict carry rule
+        # refuses it in the constructor.
+        wf = ["market" => ConstantExposure(),
+              "volatility" => CompositeExposure(; descriptors = [wv])]
+        @test isnothing(po.cross_sectional_carry_rows(CrossSectionalFactorPrior(;
+                                                                                factors = wf,
+                                                                                minra = 5)))
+        @test occursin("the factor \"volatility\" (CompositeExposure) has no finite look-back",
+                       message(() -> CrossSectionalFactorPrior(; factors = wf, minra = 5,
+                                                               carry = FoldOnly())))
+    end
+
     @testset "The Descriptor scores of a Return Forecast fold their stateful Descriptors (#1587)" begin
         # A Descriptor of the scores that carries a state reads the rows of the step alone, so
         # the carry keeps the rows of the lag alone, and every step equals the batch fit to the

@@ -493,7 +493,7 @@ Where:
   - $(math_dict[:min_val_ewb])
   - $(math_dict[:n_i_ew])
 
-Every state starts from zero, and each deviation uses the mean of the previous observation. This is the exponentially weighted form of Welford's recursion, and it has none of the downward bias of a deviation from the updated mean. The states of asset ``i`` advance only at an observation where its return is valid, and they hold their values at every other observation. ``n_i`` counts the observations where they advance. The market states advance at every observation.
+Every state starts from zero, and each deviation uses the mean of the previous observation. This is the exponentially weighted form of Welford's recursion, and it has none of the downward bias of a deviation from the updated mean. The states of asset ``i`` advance only at an observation where its return is valid, and they hold their values at every other observation. ``n_i`` counts the observations where they advance. The market states advance at every observation. The call is [`ew_beta_series!`](@ref) from a new state at zero, so a step of the carry fold from an [`EWBetaState`](@ref) runs the same arithmetic.
 
 # Algorithm
 
@@ -540,17 +540,208 @@ julia> B
 function ew_beta_series(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real}, decay::Real,
                         min_obs::Integer, min_val::Real,
                         amsk::Option{<:AbstractMatrix{Bool}} = nothing)
+    (; B, Vm) = ew_beta_series!(ew_beta_state(nothing, X, rm, decay), X, rm, decay, min_obs,
+                                min_val, amsk)
+    return B, Vm
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The carried state of the exponentially weighted market beta recursion of [`ew_beta_series`](@ref), after the observations that it folded.
+
+The state holds every quantity that the recursion reads from the observation before: the held beta, the mean, the covariance with the market, the count and the activity of each asset, the mean and the variance of the market, and the count of the observations. [`ew_beta_series!`](@ref) folds new observations from it with the arithmetic of the batch call.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    EWBetaState(; b::AbstractVector{<:Real}, mu::AbstractVector{<:Real},
+                cv::AbstractVector{<:Real}, n::AbstractVector{<:Integer},
+                act::AbstractVector{Bool}, mu_m::Real, var_m::Real, t::Integer) -> EWBetaState
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `b`, `mu`, `cv`, `n` and `act` hold the same number of assets. A `DimensionMismatch` is thrown otherwise.
+
+# Related
+
+  - [`ew_beta_series`](@ref)
+  - [`ew_beta_series!`](@ref)
+  - [`EWVolatilityState`](@ref)
+"""
+@concrete struct EWBetaState <: AbstractPartialFitState
+    """
+    The last beta ``\\beta_{t,i}`` of each asset, `NaN` before the asset reaches `min_obs`.
+    """
+    b
+    """
+    The exponentially weighted mean ``\\mu_{t,i}`` of each asset.
+    """
+    mu
+    """
+    The exponentially weighted covariance ``C_{t,i}`` of each asset with the market.
+    """
+    cv
+    """
+    The count ``n_i`` of the valid observations of each asset since its last restart.
+    """
+    n
+    """
+    The activity of each asset at the last observation.
+    """
+    act
+    """
+    The exponentially weighted mean ``\\mu_{m,t}`` of the market.
+    """
+    mu_m
+    """
+    $(math_dict[:V_mt_ewb])
+    """
+    var_m
+    """
+    The count of the observations that the state folded.
+    """
+    t
+    function EWBetaState(b::AbstractVector{<:Real}, mu::AbstractVector{<:Real},
+                         cv::AbstractVector{<:Real}, n::AbstractVector{<:Integer},
+                         act::AbstractVector{Bool}, mu_m::Real, var_m::Real, t::Integer)
+        @argcheck(length(b) == length(mu) == length(cv) == length(n) == length(act),
+                  DimensionMismatch("the vectors of an EWBetaState hold one entry per asset, got $(map(length, (b, mu, cv, n, act)))"))
+        return new{typeof(b), typeof(mu), typeof(cv), typeof(n), typeof(act), typeof(mu_m),
+                   typeof(var_m), typeof(t)}(b, mu, cv, n, act, mu_m, var_m, t)
+    end
+end
+function EWBetaState(; b::AbstractVector{<:Real}, mu::AbstractVector{<:Real},
+                     cv::AbstractVector{<:Real}, n::AbstractVector{<:Integer},
+                     act::AbstractVector{Bool}, mu_m::Real, var_m::Real,
+                     t::Integer)::EWBetaState
+    return EWBetaState(b, mu, cv, n, act, mu_m, var_m, t)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Copies an [`EWBetaState`](@ref), so that the copy shares no vector with the original.
+
+# Arguments
+
+  - `x`: The state to copy.
+
+# Returns
+
+  - `state::EWBetaState`: A new state, equal to `x`.
+
+# Related
+
+  - [`EWBetaState`](@ref)
+"""
+function Base.copy(x::EWBetaState)
+    return EWBetaState(copy(x.b), copy(x.mu), copy(x.cv), copy(x.n), copy(x.act), x.mu_m,
+                       x.var_m, x.t)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses to merge two [`EWBetaState`](@ref): the recursion of the second block starts from the state after the first one, so two states fitted on disjoint blocks do not give the state of their union to the last bit.
+
+# Validation
+
+  - Always throws an `ArgumentError`.
+
+# Related
+
+  - [`EWBetaState`](@ref)
+  - [`ew_beta_series!`](@ref)
+"""
+function merge_states(::EWBetaState, ::EWBetaState)
+    return throw(ArgumentError("an EWBetaState cannot merge two states fitted on disjoint blocks: the recursion of the second block starts from the state after the first one. Fold the second block into the state of the first with ew_beta_series!."))
+end
+"""
+    ew_beta_state(::Nothing, X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
+                  decay::Real)
+    ew_beta_state(st::EWBetaState, X::AbstractMatrix{<:Real}, ::AbstractVector{<:Real},
+                  ::Real)
+
+Returns the state that a fold of the beta recursion of [`ew_beta_series!`](@ref) starts from: a new state at zero for no carried state, or a copy of the carried state.
+
+The vectors of a new state take the type of the returns and of the market return, and its two market scalars also take the type of the decay, as the recursion gives them after its first observation. The first observation reads the same values from both, so the batch call keeps every bit.
+
+# Arguments
+
+  - `st`: The carried state, or `nothing`.
+  - `X`: The returns of the step, `observations × assets`.
+  - `rm`: The market return of the step, one entry per observation.
+  - `decay`: The decay factor of the recursion.
+
+# Validation
+
+  - A carried state holds the assets of `X`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `st::EWBetaState`: The state to fold into.
+
+# Related
+
+  - [`EWBetaState`](@ref)
+  - [`ew_beta_series!`](@ref)
+"""
+function ew_beta_state(::Nothing, X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
+                       decay::Real)::EWBetaState
     Tf = float_if_integer(promote_type(eltype(X), eltype(rm)))
+    N = size(X, 2)
+    Tm = promote_type(Tf, typeof(decay))
+    return EWBetaState(fill(Tf(NaN), N), zeros(Tf, N), zeros(Tf, N), zeros(Int, N),
+                       trues(N), zero(Tm), zero(Tm), 0)
+end
+function ew_beta_state(st::EWBetaState, X::AbstractMatrix{<:Real}, ::AbstractVector{<:Real},
+                       ::Real)::EWBetaState
+    @argcheck(length(st.b) == size(X, 2),
+              DimensionMismatch("the beta state carries $(length(st.b)) assets, and the step brings $(size(X, 2))"))
+    return copy(st)
+end
+"""
+    ew_beta_series!(st::EWBetaState, X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
+                    decay::Real, min_obs::Integer, min_val::Real,
+                    amsk::Option{<:AbstractMatrix{Bool}})
+
+Runs the exponentially weighted market beta recursion of [`ew_beta_series`](@ref) over the observations of `X` from a state, and returns the betas, the market variance and the state after them.
+
+The batch call [`ew_beta_series`](@ref) is this function from a new state at zero, and a step of the carry fold is this function from the carried state, so a step equals the batch call by construction. The test against `min_obs` counts the observations from the first one that the state folded, not from the first row of `X`.
+
+# Arguments
+
+  - `st`: The state to fold into. Its vectors change in place.
+  - `X`: The returns, `observations × assets`.
+  - `rm`: The market return, one entry per observation.
+  - $(arg_dict[:decay])
+  - $(arg_dict[:min_obs])
+  - $(arg_dict[:min_val])
+  - `amsk`: Optional active mask of the rows of `X`, `observations × assets`.
+
+# Returns
+
+  - `fold::NamedTuple`: `B` and `Vm`, as [`ew_beta_series`](@ref) states them, and `st`, the state after the observations.
+
+# Related
+
+  - [`ew_beta_series`](@ref)
+  - [`EWBetaState`](@ref)
+  - [`ew_beta_reset!`](@ref)
+"""
+function ew_beta_series!(st::EWBetaState, X::AbstractMatrix{<:Real},
+                         rm::AbstractVector{<:Real}, decay::Real, min_obs::Integer,
+                         min_val::Real, amsk::Option{<:AbstractMatrix{Bool}})
+    (; b, mu, cv, n, act) = st
+    Tf = eltype(b)
     T, N = size(X)
-    B = fill(Tf(NaN), T, N)
+    B = Matrix{Tf}(undef, T, N)
     Vm = Vector{Tf}(undef, T)
-    b = fill(Tf(NaN), N)
-    mu = zeros(Tf, N)
-    cv = zeros(Tf, N)
-    n = zeros(Int, N)
-    act = trues(N)
-    mu_m = zero(Tf)
-    var_m = zero(Tf)
+    mu_m = st.mu_m
+    var_m = st.var_m
     om = one(Tf) - decay
     for t in 1:T
         ew_beta_reset!(amsk, mu, cv, n, act, t)
@@ -559,6 +750,7 @@ function ew_beta_series(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real}, d
         mu_m = decay * mu_m + om * r
         var_m = decay * var_m + om * dm * dm
         Vm[t] = var_m
+        k = st.t + t
         for i in 1:N
             x = X[t, i]
             if isfinite(x) && act[i]
@@ -566,14 +758,14 @@ function ew_beta_series(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real}, d
                 mu[i] = decay * mu[i] + om * x
                 cv[i] = decay * cv[i] + om * d * dm
                 n[i] += 1
-                if t >= min_obs && n[i] >= min_obs
+                if k >= min_obs && n[i] >= min_obs
                     b[i] = cv[i] / (var_m + min_val)
                 end
             end
             B[t, i] = b[i]
         end
     end
-    return B, Vm
+    return (; B = B, Vm = Vm, st = EWBetaState(b, mu, cv, n, act, mu_m, var_m, st.t + T))
 end
 """
     ew_beta_reset!(amsk::Nothing, mu::AbstractVector{<:Number},
