@@ -7,7 +7,8 @@ observations alone, from the panel rows that its Descriptors read. The factor pr
 idiosyncratic variance fold, and the Return Forecast and the idiosyncratic correlation refit at the
 call with no data. A factor that comes alive fits every carried observation again. A batch choice
 that moves folds the move, and solves again each observation whose answer depends on the basis
-(#1605, #1613).
+(#1605, #1613). It folds the same way under a target that gives the same coefficients in every
+basis, as `is_basis_invariant` answers (#1614).
 
 A step folds the member states in place, as every fold does, so each stream reads the prior out
 right after its step.
@@ -69,6 +70,13 @@ PortfolioOptimisers.reads_forecast_history(::ContextRecordScale) = true
 function (r::ContextRecordScale)(key, pr, w, slv, ctx)
     push!(r.seen, ctx.cs)
     return 1.0
+end
+# A test-local target that fits as a `LinearModel` and keeps the default answer of
+# `is_basis_invariant`, so a move of the dropped member under it fits every observation again
+# (#1614).
+struct BasisBoundTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+function PortfolioOptimisers.factory(::BasisBoundTarget, w::PortfolioOptimisers.ObsWeights)
+    return factory(LinearModel(), w)
 end
 
 @testset "The carry fold of the Cross-Sectional Factor Prior (#1471)" begin
@@ -562,12 +570,16 @@ end
         # member, so a move selects their columns and folds the factor prior again. The
         # residuals of the old observations are the ones of the step before, bit for bit. Under
         # `SolvedUnseenMember()`, the rule of the `grid_config` cases, the move also solves each
-        # observation with an Unseen Member again (#1613).
+        # observation with an Unseen Member again (#1613). A `LinearModel` target gives the
+        # same raw factor returns in every basis, so a move under it folds too, and solves
+        # each such observation again through the target (#1614).
         for unseen in (ZeroUnseenMember(), SolvedUnseenMember()),
             pf in
-            (GRID_PE, EmpiricalPrior(; me = SimpleExpectedReturns(), ce = Covariance()))
+            (GRID_PE, EmpiricalPrior(; me = SimpleExpectedReturns(), ce = Covariance())),
+            cre in (CrossSectionalLinearRegression(), CrossSectionalTargetRegression())
 
-            pe = CrossSectionalFactorPrior(; lambda = 1, style..., unseen = unseen, pe = pf)
+            pe = CrossSectionalFactorPrior(; lambda = 1, style..., unseen = unseen, pe = pf,
+                                           cre = cre)
             sb = stream(pe)
             @test [dropped(x.pr) for x in sb] == [["style1"], ["style2"], ["style2"]]
             @test all(k -> dropped(batch(pe, k)) == dropped(sb[k].pr), 1:3)
@@ -579,11 +591,19 @@ end
             @test same(sb[2].pe.cache.W[1:size(e1, 1), :], sb[1].pe.cache.W)
         end
         @test CrossSectionalFactorPrior(; style...).unseen === SolvedUnseenMember()
-        # A target that the library does not know can penalise its coefficients, so a move
-        # under it fits every observation again.
-        @test isnothing(po.cross_sectional_move_basis(ZeroUnseenMember(),
-                                                      CrossSectionalTargetRegression(),
-                                                      nothing, nothing))
+        # A target that keeps the default answer of `is_basis_invariant` can penalise its
+        # coefficients, so a move under it fits every observation again, and equals the batch
+        # fit exactly (#1614). A refit leaves a plain `Matrix`.
+        @test po.is_basis_invariant(LinearModel())
+        @test !po.is_basis_invariant(GeneralisedLinearModel())
+        @test !po.is_basis_invariant(BasisBoundTarget())
+        pe = CrossSectionalFactorPrior(; lambda = 1, style...,
+                                       cre = CrossSectionalTargetRegression(;
+                                                                            tgt = BasisBoundTarget()))
+        sb = stream(pe)
+        @test [dropped(x.pr) for x in sb] == [["style1"], ["style2"], ["style2"]]
+        @test sb[2].pe.cache.csr.f isa Matrix
+        @test all(k -> agrees(sb[k].pr, batch(pe, k)), 1:3)
         # The panel of #1606: the only asset in Utilities delists after data row 225, so row
         # 226 has an Unseen Member. A larger market cap of Energy moves the automatic member
         # from Software to Energy. From row 150 the move comes before the step of row 226, and
@@ -612,11 +632,12 @@ end
                               EmpiricalPrior(; me = SimpleExpectedReturns(), ce = Covariance())),
                              (SolvedUnseenMember(), GRID_PE),
                              (SolvedUnseenMember(),
-                              EmpiricalPrior(; me = SimpleExpectedReturns(), ce = Covariance())))
+                              EmpiricalPrior(; me = SimpleExpectedReturns(), ce = Covariance()))),
+            cre in (CrossSectionalLinearRegression(), CrossSectionalTargetRegression())
 
             pe = CrossSectionalFactorPrior(; factors = dlf,
                                            families = ["industry" => nothing], minra = 5,
-                                           unseen = unseen, pe = pf)
+                                           unseen = unseen, pe = pf, cre = cre)
             xs = stream(pe, dl, de)
             @test [only(dropped(x.pr)) for x in xs] ==
                   ["industry=Software"; fill("industry=Energy", length(xs) - 1)]
@@ -645,6 +666,18 @@ end
         @test relerr(xs[2].pr.rr.csr.f[225, :], b.rr.csr.f[225, :]) < 1e-12
         @test same(xs[2].pe.cache.csr.eps[1:size(s1.csr.eps, 1), :], s1.csr.eps)
         @test same(xs[2].pe.cache.W[1:size(s1.W, 1), :], s1.W)
+        # Under a `LinearModel` target the move solves that row again through the target.
+        # On this panel `GLM` drops the column of the Unseen Member by its pivot in both
+        # bases, so the old answer is the batch answer there too (#1614).
+        pt = CrossSectionalFactorPrior(; factors = dlf, families = ["industry" => nothing],
+                                       minra = 5, unseen = SolvedUnseenMember(),
+                                       cre = CrossSectionalTargetRegression())
+        xt = stream(pt, dl, de)
+        bt = batch(pt, 2, dl, de)
+        @test xt[2].pe.cache.csr.f isa SubArray
+        kept = bt.rr.nf[po.retained_factor_indices(bt.rr.fcb)]
+        @test iszero(bt.rr.csr.f[225, findfirst(==("industry=Utilities"), kept)])
+        @test relerr(xt[2].pr.rr.csr.f[225, :], bt.rr.csr.f[225, :]) < 1e-12
         # A beta that shrinks to the mean of its industry is a function of the industry
         # columns where every industry shrinks fully, so the design of such an observation has
         # a dependent factor set under every rule. Its answer of least norm reads the basis, so

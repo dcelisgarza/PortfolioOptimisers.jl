@@ -207,20 +207,24 @@ end
     cross_sectional_move_basis(unseen::Union{ZeroUnseenMember, SolvedUnseenMember},
                                cre::CrossSectionalLinearRegression, st, families)
         -> Option{<:FactorFamilyBasis}
+    cross_sectional_move_basis(unseen::Union{ZeroUnseenMember, SolvedUnseenMember},
+                               cre::CrossSectionalTargetRegression, st, families)
+        -> Option{<:FactorFamilyBasis}
     cross_sectional_move_basis(unseen::AbstractUnseenMemberRule,
                                cre::AbstractCrossSectionalRegressionEstimator, st, families)
         -> nothing
 
 Returns the basis of the fitted observations under the dropped members that moved, when the move folds on the carry fold of a Cross-Sectional Factor Prior, and `nothing` otherwise.
 
-The zero-sum condition of a family is the same set of factor returns for every dropped member. So a regression that minimises the weighted squared residuals gives the same raw factor returns in every basis, on each observation whose design has full rank. [`ZeroUnseenMember`](@ref) makes every observation with an Unseen Member identified, so its answer does not depend on the dropped member. [`SolvedUnseenMember`](@ref) keeps such an observation rank-deficient, and a dependent factor set makes an observation rank-deficient under every rule. The pseudo-inverse answer of a rank-deficient observation depends on the dropped member, so [`cross_sectional_move_solve`](@ref) solves it again in the new basis. A [`CrossSectionalTargetRegression`](@ref) fits a target that the library does not know, and a target can penalise its coefficients. So a move folds under [`CrossSectionalLinearRegression`](@ref) with the two Unseen Member rules of the library, and every other pair fits every observation again.
+The zero-sum condition of a family is the same set of factor returns for every dropped member. So a regression that minimises the weighted squared residuals gives the same raw factor returns in every basis, on each observation whose design has full rank. [`ZeroUnseenMember`](@ref) makes every observation with an Unseen Member identified, so its answer does not depend on the dropped member. [`SolvedUnseenMember`](@ref) keeps such an observation rank-deficient, and a dependent factor set makes an observation rank-deficient under every rule. The pseudo-inverse answer of a rank-deficient observation depends on the dropped member, so [`cross_sectional_move_solve`](@ref) solves it again in the new basis. A [`CrossSectionalTargetRegression`](@ref) fits a target, and a target can penalise its coefficients, so its answer can depend on the basis. [`is_basis_invariant`](@ref) answers for the target. A target that answers `true`, such as [`LinearModel`](@ref), gives the same raw factor returns in every basis on an observation of full rank, as a least-squares fit does. On a rank-deficient observation it drops a collinear column by a pivot, so its answer depends on the basis there, and [`cross_sectional_move_solve`](@ref) solves such an observation again through the target. So a move folds under [`CrossSectionalLinearRegression`](@ref), and under a target that answers `true`, with the two Unseen Member rules of the library. Every other pair fits every observation again.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. Under [`ZeroUnseenMember`](@ref) or [`SolvedUnseenMember`](@ref), with [`CrossSectionalLinearRegression`](@ref), rewrite the basis with [`cross_sectional_rebase`](@ref).
- 2. Under any other pair, answer `nothing`.
+ 2. Under the same rules, with [`CrossSectionalTargetRegression`](@ref), rewrite the basis as step 1 does when [`is_basis_invariant`](@ref) answers `true` for `cre.tgt`, and answer `nothing` otherwise.
+ 3. Under any other pair, answer `nothing`.
 
 # Arguments
 
@@ -239,11 +243,21 @@ The method that Julia selects is the algorithm.
   - [`cross_sectional_rebase`](@ref)
   - [`cross_sectional_move_solve`](@ref)
   - [`AbstractUnseenMemberRule`](@ref)
+  - [`is_basis_invariant`](@ref)
 """
 function cross_sectional_move_basis(::Union{ZeroUnseenMember, SolvedUnseenMember},
                                     ::CrossSectionalLinearRegression,
                                     st::CrossSectionalCarryState,
                                     families::AbstractVector{<:Pair})
+    return cross_sectional_rebase(st.fcb, families, st.nf)
+end
+function cross_sectional_move_basis(::Union{ZeroUnseenMember, SolvedUnseenMember},
+                                    cre::CrossSectionalTargetRegression,
+                                    st::CrossSectionalCarryState,
+                                    families::AbstractVector{<:Pair})
+    if !is_basis_invariant(cre.tgt)
+        return nothing
+    end
     return cross_sectional_rebase(st.fcb, families, st.nf)
 end
 function cross_sectional_move_basis(::AbstractUnseenMemberRule,

@@ -437,7 +437,7 @@ In order to implement a new regression target that works seamlessly with the reg
 
 | Estimator                                | Methods it reads                                                                                                               |
 |:---------------------------------------- |:------------------------------------------------------------------------------------------------------------------------------ |
-| [`CrossSectionalTargetRegression`](@ref) | `factory`, `StatsAPI.fit`, `StatsAPI.coef`                                                                                     |
+| [`CrossSectionalTargetRegression`](@ref) | `factory`, `StatsAPI.fit`, `StatsAPI.coef`, `is_basis_invariant`                                                               |
 | [`TargetReturnForecast`](@ref)           | `StatsAPI.fit`, `StatsAPI.predict`                                                                                             |
 | [`ImpliedVolatilityRegression`](@ref)    | `StatsAPI.fit`, `StatsAPI.predict`                                                                                             |
 | [`StepwiseRegression`](@ref)             | `StatsAPI.fit`, and `StatsAPI.coeftable` under [`PValue`](@ref) or the score verb of its criterion under every other criterion |
@@ -541,6 +541,20 @@ The cross-sectional regression fits every observation under its cross-sectional 
 
   - `w::Option{ObsWeights}`: The weights that `factory(tgt, w)` stored in `tgt`, or `nothing` when `tgt` carries none.
 
+## `is_basis_invariant`
+
+  - `is_basis_invariant(tgt::MyRegressionTarget) -> Bool`: Return whether the fit of `tgt` gives the same coefficients under an invertible change of the columns of the design, mapped back to the original columns.
+
+The carry fold of [`CrossSectionalFactorPrior`](@ref) reads it when a [`BatchChoice`](@ref) moves the dropped member of a Factor Family. That move is an invertible change of the columns. A target that answers `true` lets the fold keep the factor returns of each past observation, so the move runs no regression again. The default answers `false`, and the move then fits every past observation again. A fit that minimises a loss of the fitted values alone, such as the weighted squared residuals, can answer `true`. A penalty on the coefficients, such as a ridge, makes the answer depend on the basis, so such a target keeps the default.
+
+### Arguments
+
+  - `tgt`: The new regression target.
+
+### Returns
+
+  - `flag::Bool`: `true` when the coefficients of the fit do not depend on the basis of the design.
+
 # Related
 
   - [`AbstractRegressionAlgorithm`](@ref)
@@ -553,6 +567,7 @@ The cross-sectional regression fits every observation under its cross-sectional 
   - [`DimensionReductionRegression`](@ref)
   - [`factory`](@ref)
   - [`regression_target_weights`](@ref)
+  - [`is_basis_invariant`](@ref)
 """
 abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
 """
@@ -972,6 +987,49 @@ Both targets keep the weights under the `weights` key of `tgt.kwargs`, where [`f
 """
 function regression_target_weights(tgt::Union{LinearModel, GeneralisedLinearModel})
     return get(tgt.kwargs, :weights, nothing)
+end
+"""
+    is_basis_invariant(tgt::LinearModel) -> Bool
+    is_basis_invariant(tgt::AbstractRegressionTarget) -> Bool
+
+Return whether the fit of a regression target gives the same coefficients under an invertible change of the columns of the design, mapped back to the original columns.
+
+Take the columns of the design times an invertible matrix as a new design. A target is invariant to the basis when its coefficients on the new design, times that matrix, are its coefficients on the old design. Then the fitted values do not change either.
+
+A weighted least-squares fit projects the response onto the span of the design, and the change keeps the span. So [`LinearModel`](@ref) answers `true`, on each design of full rank. On a rank-deficient design `GLM` drops a collinear column by a pivot, so the answer depends on the basis there, and a caller that reads the verb solves such a design again. Every other target answers `false`: [`GeneralisedLinearModel`](@ref), whose iterative fit gives the same answer in every basis only to the tolerance of its convergence, and a target that this verb does not know, which can penalise its coefficients.
+
+The carry fold of [`CrossSectionalFactorPrior`](@ref) reads the verb on the target of a [`CrossSectionalTargetRegression`](@ref), when a [`BatchChoice`](@ref) moves the dropped member of a Factor Family. A caller's own target states its answer with its own method, as the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states.
+
+# Arguments
+
+  - `tgt`: Regression target.
+
+# Returns
+
+  - `flag::Bool`: `true` when the coefficients of the fit do not depend on the basis of a design of full rank.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.is_basis_invariant(LinearModel())
+true
+
+julia> PortfolioOptimisers.is_basis_invariant(GeneralisedLinearModel())
+false
+```
+
+# Related
+
+  - [`AbstractRegressionTarget`](@ref)
+  - [`LinearModel`](@ref)
+  - [`GeneralisedLinearModel`](@ref)
+  - [`CrossSectionalTargetRegression`](@ref)
+"""
+function is_basis_invariant(::LinearModel)::Bool
+    return true
+end
+function is_basis_invariant(::AbstractRegressionTarget)::Bool
+    return false
 end
 """
     MIN_VAL_STEPWISE_REGRESSION_CRITERIA
@@ -1704,5 +1762,6 @@ public AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEs
 public AbstractOrthogonalityMetric, orthogonality_weights, cs_diagnostic_weights
 # The `# Interfaces`-marked type of #1397 (ADR 0154): a caller's own regression target. The
 # verbs its section names are `factory`, which is exported, `StatsAPI` verbs, and
-# `regression_target_weights`, which #1441 added for the time-series estimators.
-public AbstractRegressionTarget, regression_target_weights
+# `regression_target_weights`, which #1441 added for the time-series estimators, and
+# `is_basis_invariant`, which #1614 added for the carry fold of the cross-sectional prior.
+public AbstractRegressionTarget, regression_target_weights, is_basis_invariant

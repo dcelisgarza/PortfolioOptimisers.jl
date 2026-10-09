@@ -207,9 +207,14 @@ the mean of its industry makes such rows: where every industry shrinks fully, th
 function of the industry columns. The move finds every rank-deficient row by the rank test of the
 solve on the columns that are not zero, a scan of each fitted row at the move, so the state carries
 no field for them. A zero column, such as an Unseen Member under `ZeroUnseenMember()`, has a return
-of zero in every basis. A `CrossSectionalTargetRegression` fits a target that the library does not
-know, and a target can penalise its coefficients. Under it a move fits every carried observation
-again, as it did before the fold (#1605). The
+of zero in every basis. A `CrossSectionalTargetRegression` fits a target, and a target can penalise
+its coefficients, so its answer can depend on the basis. The public trait `is_basis_invariant(tgt)`
+of `AbstractRegressionTarget` answers whether it does. `LinearModel` answers `true`, so a move under
+it folds as under `CrossSectionalLinearRegression`, and solves each rank-deficient row again
+through the target ([#1614](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1614)).
+Every other target answers `false` by default, and a move under it fits every carried observation
+again, as it did before the fold (#1605). `GeneralisedLinearModel` agrees in every basis only to
+the tolerance of its iterative fit, so it answers `false` too. The
 default factor covariance reads every column at once, so a sub-block of a raw-axis state is not the
 batch answer. On the panel of #1592 (2520 rows, 500 assets), the step of the move costs 0.013 s,
 against 0.0036 s for a step with no move and 1.66 s for a refit of every row, and the carry still
