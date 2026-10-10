@@ -115,8 +115,11 @@ end
 function panel_family_census()
     fams = (CENSUS_PO.AbstractDescriptorEstimator, CENSUS_PO.AbstractExposureEstimator,
             CENSUS_PO.AbstractForecastUnit, CENSUS_PO.AbstractForecastTarget)
+    # A test file defines its own members, `CarryRuleUserDescriptor` of `test_12zg` for one,
+    # and they stay in the session after it. The census reads the members of the library.
     return Set{Symbol}(nameof(T) for F in fams
-                       for T in CENSUS_PO.traverse_concrete_subtypes(F))
+                       for T in CENSUS_PO.traverse_concrete_subtypes(F)
+                       if parentmodule(T) === CENSUS_PO)
 end
 
 # The functions of the signature census that no case runs, and why no inactive cell reaches

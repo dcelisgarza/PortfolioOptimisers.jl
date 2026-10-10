@@ -313,12 +313,23 @@ end
         # and the weights of its row, so they resolve on the carry fold as on the batch fit.
         rules = (; lambda = PrecisionBlend(; err = ForecastHistoryError()),
                  c = ForecastCalibrationSlope(; wu = ThresholdWarmUp(; min_obs = 2)))
-        for cfg in (target, (; target..., families = ["style" => nothing]))
+        # The batch choice moves under the second config, so it equals the batch fit to
+        # rounding, as in `history_case`.
+        for (cfg, exact) in
+            ((target, true), ((; target..., families = ["style" => nothing]), false))
             pr_rules = CrossSectionalFactorPrior(; cfg..., rules...)
             for (k, x) in enumerate(stream(pr_rules))
                 b = batch(pr_rules, k)
-                @test x.pr.rr.lambda == b.rr.lambda
-                @test x.pr.rr.c == b.rr.c
+                @test if exact
+                    x.pr.rr.lambda == b.rr.lambda
+                else
+                    isapprox(x.pr.rr.lambda, b.rr.lambda; rtol = 1e-12)
+                end
+                @test if exact
+                    x.pr.rr.c == b.rr.c
+                else
+                    isapprox(x.pr.rr.c, b.rr.c; rtol = 1e-12)
+                end
                 @test 0 <= x.pr.rr.lambda <= 1
                 @test x.pr.rr.c != 1
             end
