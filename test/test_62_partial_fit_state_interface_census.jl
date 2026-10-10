@@ -208,8 +208,7 @@ const UNVIEWED_STATES = (po.ExpWeightedExpectedReturnsState => ExpWeightedExpect
                          po.RollingLogReturnState => RollingLogReturn,
                          po.EWMeanState => EWMean, po.LagDescriptorState => GrowthRate,
                          po.EWVolatilityState => EWVolatility,
-                         po.EWBetaState => EWResidualVolatility,
-                         po.EWBlockState => EWBeta,
+                         po.EWBetaState => EWResidualVolatility, po.EWBlockState => EWBeta,
                          po.EWMacroSensitivityState => EWMacroSensitivity,
                          po.EWDownsideBetaState => EWDownsideBeta)
 
