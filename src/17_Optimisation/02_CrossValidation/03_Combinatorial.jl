@@ -482,9 +482,7 @@ function Base.split(ccv::CombinatorialCrossValidation, rd::Prices_RR)
     @argcheck(purged_size + embargo_size < min_fold_size,
               DomainError(purged_size + embargo_size,
                           "purged_size + embargo_size ($(purged_size + embargo_size)) must be less than the minimum fold size ($min_fold_size)"))
-    fold_idx_num = div.(0:(T - 1), min_fold_size)
-    fold_idx_num[fold_idx_num .== n_folds] .= n_folds - 1
-    fold_idx_num .+= 1
+    fold_idx_num = min.(div.(0:(T - 1), min_fold_size), n_folds - 1) .+ 1
     num_splits = n_splits(ccv)
     test_set_idx = test_set_index(ccv)
     rcp = recombined_paths(ccv)

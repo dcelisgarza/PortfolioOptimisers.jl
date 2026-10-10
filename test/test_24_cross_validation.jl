@@ -1729,6 +1729,25 @@
             end
         end
     end
+    @testset "Combinatorial puts every trailing row in the last fold" begin
+        # When `mod(T, n_folds) >= div(T, n_folds)`, the fold index of a trailing row
+        # used to pass `n_folds`. Only the value `n_folds` itself was clipped, so the rows
+        # past it joined no fold: every split trained on them and none tested them.
+        for (T, nf, ntf, sizes) in ((10, 5, 2, fill(2, 5)), (11, 5, 2, [2, 2, 2, 2, 3]),
+                                    (12, 5, 2, [2, 2, 2, 2, 4]), (13, 5, 2, [2, 2, 2, 2, 5]),
+                                    (89, 10, 2, [fill(8, 9); 17]), (17, 4, 3, [4, 4, 4, 5]))
+            rdT = ReturnsResult(; nx = rd.nx, X = rd.X[1:T, :])
+            cv = CombinatorialCrossValidation(; n_folds = nf, n_test_folds = ntf)
+            res = split(cv, rdT)
+            blocks = unique(reduce(vcat, res.test_idx))
+            sort!(blocks; by = first)
+            @test length.(blocks) == sizes
+            @test reduce(vcat, blocks) == 1:T
+            for j in eachindex(res.train_idx)
+                @test sort!([res.train_idx[j]; reduce(vcat, res.test_idx[j])]) == 1:T
+            end
+        end
+    end
     @testset "Purging and embargoing leave the documented gap" begin
         T = size(rd.X, 1)
         # A training row must never sit within `purged_size` rows before a test block,
