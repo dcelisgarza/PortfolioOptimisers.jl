@@ -529,8 +529,8 @@ end
 
 #=
 The doors that take a caller's series take no finiteness check, so what is pinned here is the
-documented compaction identity: dropping the gaps first is what reproduces the reference
-implementation's drop-per-column answer. One measure of each kernel class.
+documented compaction identity: dropping the gaps first is what reproduces the oracle's
+drop-per-column answer. One measure of each kernel class.
 =#
 @testset "The Precomputed-returns contract: compaction is the documented cure" begin
     xc = collect(range(; start = -0.05, stop = 0.05, length = 20))

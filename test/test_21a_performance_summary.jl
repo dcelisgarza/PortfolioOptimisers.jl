@@ -17,12 +17,12 @@ The other statistics are pinned here too, because nothing else pins them.
 
 @testset "performance_summary: the statistics" begin
     ret = [0.01, -0.02, 0.03, 0.005, -0.01, 0.02, -0.005, 0.015]
-    ps = performance_summary(ret; periods_per_year = 4, alpha = 0.25)
+    ps = performance_summary(ret; ppy = 4, alpha = 0.25)
     T = length(ret)
     m = mean(ret)
     s = std(ret)
     @test ps.n_periods == T
-    @test ps.periods_per_year == 4
+    @test ps.ppy == 4
     @test ps.alpha == 0.25
     @test !ps.compound
     @test isapprox(ps.ann_return, m * 4)
@@ -40,9 +40,29 @@ The other statistics are pinned here too, because nothing else pins them.
     @test ps.cvar <= 0
 end
 
+@testset "performance_summary: the default ppy states each figure per period" begin
+    # `ppy = 1` is the identity of the annualisation, so it is right at any data frequency.
+    # A default of 252 assumed daily data and scaled a monthly mean 21 times too much (#1517).
+    ret = [0.01, -0.02, 0.03, 0.005, -0.01, 0.02, -0.005, 0.015]
+    ps = performance_summary(ret)
+    @test ps.ppy == 1
+    for f in fieldnames(PerformanceSummaryResult)
+        @test isequal(getproperty(ps, f), getproperty(performance_summary(ret; ppy = 1), f))
+    end
+    @test isapprox(ps.ann_return, mean(ret))
+    @test isapprox(ps.ann_volatility, std(ret))
+    # The old default is one keyword away.
+    ps252 = performance_summary(ret; ppy = 252)
+    @test ps252.ppy == 252
+    @test isapprox(ps252.ann_return, 252 * mean(ret))
+    @test isapprox(ps252.ann_volatility, sqrt(252) * std(ret))
+    @test isapprox(ps252.sharpe, sqrt(252) * ps.sharpe)
+    @test isapprox(ps252.calmar, 252 * ps.calmar)
+end
+
 @testset "performance_summary: the Sharpe ratio standard error" begin
     ret = [0.01, -0.02, 0.03, 0.005, -0.01, 0.02, -0.005, 0.015]
-    ps = performance_summary(ret; periods_per_year = 4)
+    ps = performance_summary(ret; ppy = 4)
     T = length(ret)
     sr_p = mean(ret) / std(ret)
     g1 = StatsBase.skewness(ret)
@@ -78,7 +98,7 @@ end
     ret = [0.01, -0.02, 0.03, 0.005]
     @test_throws DomainError performance_summary(ret; alpha = 0.0)
     @test_throws DomainError performance_summary(ret; alpha = 1.0)
-    @test_throws DomainError performance_summary(ret; periods_per_year = 0)
+    @test_throws DomainError performance_summary(ret; ppy = 0)
     # A constant series has no drawdown, no losing period and no volatility, so every ratio
     # that divides by one of them is `NaN`.
     flat = performance_summary(fill(0.01, 10))
@@ -97,7 +117,7 @@ end
     # and greatest entry, which makes it the common value. A length of 3 rounds; a length of
     # 2, 4 or 8 divides exactly and passes by luck.
     @test mean(fill(0.1, 3)) != 0.1
-    ps = performance_summary(fill(0.1, 3); periods_per_year = 12, benchmark = fill(0.05, 3))
+    ps = performance_summary(fill(0.1, 3); ppy = 12, benchmark = fill(0.05, 3))
     @test ps.ann_return == 0.1 * 12
     @test iszero(ps.ann_volatility)
     @test isnan(ps.sharpe)
@@ -484,19 +504,17 @@ end
 
 @testset "#549: every `performance_summary` route reaches the same statistics" begin
     ret = vec(ER_X * ER_W)
-    base = performance_summary(ret; periods_per_year = 12)
+    base = performance_summary(ret; ppy = 12)
     rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = ER_X)
 
     @testset "the weights-and-matrix routes" begin
-        @test performance_summary(ER_W, ER_X; periods_per_year = 12).ann_return ==
-              base.ann_return
-        @test performance_summary(ER_W, rd; periods_per_year = 12).ann_return ==
-              base.ann_return
+        @test performance_summary(ER_W, ER_X; ppy = 12).ann_return == base.ann_return
+        @test performance_summary(ER_W, rd; ppy = 12).ann_return == base.ann_return
         # `l` is a rate per period, so it is charged on every observation and moves the
-        # annualised return by `periods_per_year` times the per period charge. A fixed fee
+        # annualised return by `ppy` times the per period charge. A fixed fee
         # would not, because it is charged one time for the whole holding period.
         fees = Fees(; l = 0.01)
-        net = performance_summary(ER_W, ER_X, fees; periods_per_year = 12)
+        net = performance_summary(ER_W, ER_X, fees; ppy = 12)
         @test isapprox(net.ann_return,
                        base.ann_return - 12 * first(calc_fees(ER_W, size(ER_X, 1), fees)))
     end
@@ -507,8 +525,8 @@ end
         res = NaiveOptimisationResult(; pr = nothing, wb = nothing,
                                       retcode = OptimisationSuccess(), w = [0.5, 0.5],
                                       fb = nothing)
-        @test performance_summary(res, rd2; periods_per_year = 12).ann_return ==
-              performance_summary([0.5, 0.5], X2; periods_per_year = 12).ann_return
+        @test performance_summary(res, rd2; ppy = 12).ann_return ==
+              performance_summary([0.5, 0.5], X2; ppy = 12).ann_return
     end
 
     @testset "the prediction-result routes read the realised series" begin
@@ -523,10 +541,10 @@ end
         predvv = PredictionResult(; res = res, rd = rdvv)
         mpred = MultiPeriodPredictionResult(; pred = [predv])
         # 0.025 = mean([0.01, -0.02, 0.03, 0.005]) * 4.
-        @test isapprox(performance_summary(predv; periods_per_year = 4).ann_return, 0.025)
+        @test isapprox(performance_summary(predv; ppy = 4).ann_return, 0.025)
         # A vector of vectors takes the first one: mean([0.01, -0.02]) * 4 = -0.02.
-        @test isapprox(performance_summary(predvv; periods_per_year = 4).ann_return, -0.02)
-        @test isapprox(performance_summary(mpred; periods_per_year = 4).ann_return, 0.025)
+        @test isapprox(performance_summary(predvv; ppy = 4).ann_return, -0.02)
+        @test isapprox(performance_summary(mpred; ppy = 4).ann_return, 0.025)
     end
 end
 
@@ -544,27 +562,25 @@ end
 
     # A path is scored as the series that path produces, on the method that already takes a
     # series. Every statistic agrees, not only the first.
-    ps_path = performance_summary(U, X, fees; periods_per_year = 4)
-    ps_ret = performance_summary(calc_net_returns(U, X, fees); periods_per_year = 4)
+    ps_path = performance_summary(U, X, fees; ppy = 4)
+    ps_ret = performance_summary(calc_net_returns(U, X, fees); ppy = 4)
     for f in fieldnames(typeof(ps_path))
         @test isequal(getfield(ps_path, f), getfield(ps_ret, f))
     end
 
     # It is the series the drift route forms from the same window under the same drift.
     @test isapprox(ps_path.ann_return,
-                   performance_summary(calc_net_returns(w, X, fees, wd);
-                                       periods_per_year = 4).ann_return)
+                   performance_summary(calc_net_returns(w, X, fees, wd); ppy = 4).ann_return)
 
     # A drifted path moves the statistics, and a constant path reproduces the target read.
-    ps_target = performance_summary(w, X, fees; periods_per_year = 4)
+    ps_target = performance_summary(w, X, fees; ppy = 4)
     @test ps_path.ann_return != ps_target.ann_return
-    @test isapprox(performance_summary(Uc, X, fees; periods_per_year = 4).ann_return,
+    @test isapprox(performance_summary(Uc, X, fees; ppy = 4).ann_return,
                    ps_target.ann_return)
 
     # The returns-result route forwards its weights to the same base verb.
     rd = ReturnsResult(; nx = ["A", "B"], X = X)
-    @test performance_summary(U, rd, fees; periods_per_year = 4).ann_return ==
-          ps_path.ann_return
+    @test performance_summary(U, rd, fees; ppy = 4).ann_return == ps_path.ann_return
 
     # The caveat rides in both of the places #772 named: the field text every renderer
     # inherits, and the docstring beside the non-normality paragraph. `sharpe_stderr`

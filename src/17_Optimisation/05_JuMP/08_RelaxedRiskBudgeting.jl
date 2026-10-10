@@ -128,10 +128,11 @@ $(DocStringExtensions.FIELDS)
         rba::TD{<:RiskBudgetingAlgorithm} = AssetRiskBudgeting(),
         wi::TD_Option{<:VecNum} = nothing,
         alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
-        fb::TDO_Option{<:OptE_Opt} = nothing
+        fb::TDO_Option{<:OptE_Opt} = nothing,
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot()
     ) -> RelaxedRiskBudgeting
 
-Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the budgeting algorithm (and with it the risk budget), warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `wi` and `fb`). The relaxation variant `alg` is formulation control and stays static.
+Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value: the budgeting algorithm (and with it the risk budget), warm start and fallback are problem definition, so a cross-validation fold loop resolves them per fold, and a fold-less `optimise` runs with each at its static default (`nothing` for `wi` and `fb`). The relaxation variant `alg` and the square-root algorithm `mtx_sqrt` are formulation control and stay static.
 
 ## Validation
 
@@ -140,7 +141,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 
 # Mathematical definition
 
-The Relaxed Risk Budgeting (RRB) formulation replaces the non-convex risk-parity constraint with a second-order cone (SOC) relaxation. Let ``\\mathbf{G}`` be the Cholesky factor of ``\\mathbf{\\Sigma}`` (so ``\\mathbf{G}^\\intercal\\mathbf{G} = \\mathbf{\\Sigma}``). Introduce auxiliary variables ``\\boldsymbol{\\zeta} = \\mathbf{\\Sigma}\\boldsymbol{w}``, ``\\psi \\geq 0``, ``\\gamma \\geq 0``:
+The Relaxed Risk Budgeting (RRB) formulation replaces the non-convex risk-parity constraint with a second-order cone (SOC) relaxation. Let ``\\mathbf{G}`` be the prior's `chol`, or the transpose of the square root of ``\\mathbf{\\Sigma}`` that [`matrix_square_root`](@ref) takes under `mtx_sqrt` (so ``\\mathbf{G}^\\intercal\\mathbf{G} = \\mathbf{\\Sigma}``). Introduce auxiliary variables ``\\boldsymbol{\\zeta} = \\mathbf{\\Sigma}\\boldsymbol{w}``, ``\\psi \\geq 0``, ``\\gamma \\geq 0``:
 
 ```math
 \\begin{align}
@@ -184,7 +185,7 @@ Where:
   - ``\\gamma``: Lower bound of the risk contribution of every asset.
   - ``\\boldsymbol{\\zeta}``: Auxiliary vector equal to ``\\mathbf{\\Sigma}\\boldsymbol{w}``.
   - ``b_i``: Risk budget for asset ``i``.
-  - ``\\mathbf{G}``: Cholesky factor of ``\\mathbf{\\Sigma}`` (so ``\\mathbf{G}^\\intercal\\mathbf{G} = \\mathbf{\\Sigma}``).
+  - ``\\mathbf{G}``: The prior's `chol`, or the transpose of the square root of ``\\mathbf{\\Sigma}`` under `mtx_sqrt` (so ``\\mathbf{G}^\\intercal\\mathbf{G} = \\mathbf{\\Sigma}``).
   - ``\\mathbf{\\Sigma}``: Covariance matrix.
   - ``\\mathbf{\\Theta}``: Diagonal matrix of the individual standard deviations.
   - ``\\rho``: Scalar auxiliary variable of the two regularised variants.
@@ -242,7 +243,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - The method reads the returns matrix `X` as its third argument. When `opt.pe` already holds a prior **result**, the method replaces `X` with `opt.pe.X`, so the children are viewed against the prior's own observations rather than the caller's matrix.
   - `opt` recurses through [`port_opt_view`](@ref) with that matrix. `rba` recurses with the index alone.
   - `wi` is sliced to the selected assets.
-  - `alg` and `fb` are carried through unchanged.
+  - `alg`, `fb` and `mtx_sqrt` are carried through unchanged.
 
 # Related
 
@@ -282,27 +283,32 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     $(field_dict[:fb])
     """
     @fprop fb
+    """
+    Square-root algorithm of the covariance matrix that the cones read, when the prior carries no `chol`, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. The default takes the square root of the eigendecomposition of a singular positive semidefinite matrix. [`matrix_square_root`](@ref) states each algorithm.
+    """
+    mtx_sqrt
     function RelaxedRiskBudgeting(opt::JuMPOptimiser, rba::TD{<:RiskBudgetingAlgorithm},
                                   wi::TD_Option{<:VecNum},
                                   alg::RelaxedRiskBudgetingAlgorithm,
-                                  fb::TDO_Option{<:OptE_Opt})
+                                  fb::TDO_Option{<:OptE_Opt},
+                                  mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :RelaxedRiskBudgeting)
         if isa(wi, VecNum)
             @argcheck(!isempty(wi), IsEmptyError("wi cannot be empty"))
         end
         assert_time_dependent_substitution(RelaxedRiskBudgeting, (; opt, rba, wi, alg, fb),
                                            relaxed_risk_budgeting_td_defaults())
-        return new{typeof(opt), typeof(rba), typeof(wi), typeof(alg), typeof(fb)}(opt, rba,
-                                                                                  wi, alg,
-                                                                                  fb)
+        return new{typeof(opt), typeof(rba), typeof(wi), typeof(alg), typeof(fb),
+                   typeof(mtx_sqrt)}(opt, rba, wi, alg, fb, mtx_sqrt)
     end
 end
 function RelaxedRiskBudgeting(; opt::JuMPOptimiser,
                               rba::TD{<:RiskBudgetingAlgorithm} = AssetRiskBudgeting(),
                               wi::TD_Option{<:VecNum} = nothing,
                               alg::RelaxedRiskBudgetingAlgorithm = BasicRelaxedRiskBudgeting(),
-                              fb::TDO_Option{<:OptE_Opt} = nothing)::RelaxedRiskBudgeting
-    return RelaxedRiskBudgeting(opt, rba, wi, alg, fb)
+                              fb::TDO_Option{<:OptE_Opt} = nothing,
+                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::RelaxedRiskBudgeting
+    return RelaxedRiskBudgeting(opt, rba, wi, alg, fb, mtx_sqrt)
 end
 function time_dependent_field_defaults(::RelaxedRiskBudgeting)::NamedTuple
     return relaxed_risk_budgeting_td_defaults()
@@ -418,7 +424,7 @@ function port_opt_view(rrb::RelaxedRiskBudgeting, i, X::MatNum,
     rba = port_opt_view(rrb.rba, i)
     wi = nothing_scalar_array_view(rrb.wi, i)
     return RelaxedRiskBudgeting(; opt = opt, rba = rba, wi = wi, alg = rrb.alg,
-                                fb = view_child(rrb.fb, i, X))
+                                fb = view_child(rrb.fb, i, X), mtx_sqrt = rrb.mtx_sqrt)
 end
 function non_investable_universe(rrb::RelaxedRiskBudgeting,
                                  ni::VecStr)::RelaxedRiskBudgeting
@@ -426,7 +432,7 @@ function non_investable_universe(rrb::RelaxedRiskBudgeting,
 end
 """
     set_relaxed_risk_budgeting_alg_constraints!(alg, model, w, sigma, chol = nothing,
-                                                z = w, sigma_z = sigma)
+                                                z = w, sigma_z = sigma, mtx_sqrt = EigenFallbackSquareRoot())
 
 Add algorithm-specific second-order cone constraints for Relaxed Risk Budgeting.
 
@@ -440,9 +446,10 @@ The portfolio cones read `w` and `sigma`. The penalty of [`RegularisedPenalisedR
   - `model::JuMP.Model`: JuMP optimisation model.
   - `w::VecJuMPScalar`: Portfolio weight variables.
   - `sigma::MatNum`: Covariance matrix.
-  - `chol::Option{<:MatNum}`: Optional pre-computed Cholesky factor.
+  - `chol::Option{<:MatNum}`: Optional pre-computed factor, with `chol' * chol == sigma`.
   - `z::VecJuMPScalar`: The decision vector that the penalty reads.
   - `sigma_z::MatNum`: The covariance matrix of `z`.
+  - `mtx_sqrt`: Square-root algorithm of `sigma` when `chol` is `nothing`, the `mtx_sqrt` of the [`RelaxedRiskBudgeting`](@ref). [`matrix_square_root`](@ref) states each algorithm.
 
 # Returns
 
@@ -458,10 +465,11 @@ function set_relaxed_risk_budgeting_alg_constraints!(::BasicRelaxedRiskBudgeting
                                                      sigma::MatNum,
                                                      chol::Option{<:MatNum} = nothing,
                                                      z::VecJuMPScalar = w,
-                                                     sigma_z::MatNum = sigma)
+                                                     sigma_z::MatNum = sigma,
+                                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     sc = get_constraint_scale(model)
     psi = shared_get(model, :psi)
-    G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
+    G = isnothing(chol) ? transpose(matrix_square_root(mtx_sqrt, sigma)) : chol
     JuMP.@constraint(model, cbasic_rrp, [sc * psi; sc * G * w] in JuMP.SecondOrderCone())
     return nothing
 end
@@ -470,10 +478,11 @@ function set_relaxed_risk_budgeting_alg_constraints!(::RegularisedRelaxedRiskBud
                                                      sigma::MatNum,
                                                      chol::Option{<:MatNum} = nothing,
                                                      z::VecJuMPScalar = w,
-                                                     sigma_z::MatNum = sigma)
+                                                     sigma_z::MatNum = sigma,
+                                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     sc = get_constraint_scale(model)
     psi = shared_get(model, :psi)
-    G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
+    G = isnothing(chol) ? transpose(matrix_square_root(mtx_sqrt, sigma)) : chol
     JuMP.@variable(model, rho >= 0)
     JuMP.@constraints(model,
                       begin
@@ -490,10 +499,11 @@ function set_relaxed_risk_budgeting_alg_constraints!(alg::RegularisedPenalisedRe
                                                      sigma::MatNum,
                                                      chol::Option{<:MatNum} = nothing,
                                                      z::VecJuMPScalar = w,
-                                                     sigma_z::MatNum = sigma)
+                                                     sigma_z::MatNum = sigma,
+                                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     sc = get_constraint_scale(model)
     psi = shared_get(model, :psi)
-    G = isnothing(chol) ? LinearAlgebra.cholesky(sigma).U : chol
+    G = isnothing(chol) ? transpose(matrix_square_root(mtx_sqrt, sigma)) : chol
     theta = LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(sigma_z)))
     p = alg.p
     JuMP.@variable(model, rho >= 0)
@@ -531,7 +541,7 @@ Each budgeted weight ``x_i`` takes a rotated cone with its marginal risk ``\\zet
   - `A::MatNum`: The matrix that maps `w` to the marginal risks of `x`.
   - `w::VecJuMPScalar`: The weights whose standard deviation bounds ``\\psi``.
   - `sigma::MatNum`: The covariance matrix of `w`.
-  - `chol::Option{<:MatNum}`: Optional upper Cholesky factor of `sigma`.
+  - `chol::Option{<:MatNum}`: Optional pre-computed factor of `sigma`, with `chol' * chol == sigma`.
   - `z::VecJuMPScalar`: The decision vector that the penalty of [`RegularisedPenalisedRelaxedRiskBudgeting`](@ref) reads: `w`, or the factor weights followed by the off-factor weights when `flag = true`.
   - `sigma_z::MatNum`: The covariance matrix of `z`.
 
@@ -576,7 +586,8 @@ function _set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                            sc * (2 * gamma * sqrt(rb[i]))
                            sc * (x[i] - zeta[i])] in JuMP.SecondOrderCone()
                       end)
-    set_relaxed_risk_budgeting_alg_constraints!(rrb.alg, model, w, sigma, chol, z, sigma_z)
+    set_relaxed_risk_budgeting_alg_constraints!(rrb.alg, model, w, sigma, chol, z, sigma_z,
+                                                rrb.mtx_sqrt)
     return rkb
 end
 """

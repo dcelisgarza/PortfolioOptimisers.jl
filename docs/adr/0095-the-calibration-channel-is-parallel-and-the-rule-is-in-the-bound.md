@@ -470,3 +470,97 @@ beside the geometry it depends on, which is what ADR 0070 already permits for a 
 Nothing in this channel changes: the five families, the five bounds, the eleven rules and the five
 verbs are as stated above. [ADR 0127](0127-the-compact-covariance-radius-is-sized-in-family-not-through-the-calibration-channel.md)
 carries the decision and states the whole reading.
+
+## Amendment (2026-10-05)
+
+Two quantities of the Cross-Sectional Factor Prior join the channel, and a third route resolves them
+inside `prior`. The grilling of
+[#740](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/740) decided it, and
+[#1481](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1481) built it.
+
+**Two families, one per quantity.** `lambda` of `CrossSectionalFactorPrior` is the **Spanned
+Shrinkage**: it blends the fitted factor mean with the spanned part `g` of the Return Forecast, and
+it lies in `[0, 1]`. `c` is the **Orthogonal Forecast Scale**: it multiplies the part `α⊥` of the
+forecast that the latest exposures do not span. Each takes its own family and bound, on the same
+terms as the five families above.
+
+| Rule family | Bound | Slot |
+| :--- | :--- | :--- |
+| `AbstractSpannedShrinkageCalibrationAlgorithm` | `Num_SpanShrinkCal` | `lambda` |
+| `AbstractOrthogonalForecastScaleCalibrationAlgorithm` | `Num_OrthFcScaleCal` | `c` |
+
+One shared family "a weight in `[0, 1]`" was refused: it names a range, not a quantity, so a rule
+in the wrong slot would construct. "Orthogonal Scale" alone was refused because
+`orthogonal_scaling` of the orthogonal uncertainty sets already names a different scale. The first
+rules of the two families gave each family an `# Interfaces` section and a `public` declaration,
+under ADR 0154, and `reads_forecast_history` is public with them.
+
+**The root moved.** The prior's struct bound needs the two families at definition, and
+`src/11_UncertaintySets/` loads after `src/10_Prior/`. So `AbstractCalibrationAlgorithm` now lives
+in `src/01_Base/02_TypeRoots.jl`, and the two families in
+`src/10_Prior/11_CrossSectionalFactorPrior.jl`, above the struct. The Consequences bullet that says
+the root did not move describes the state before this amendment. The five older families stay
+where they are.
+
+**The range of `c` is `[0, ∞)`.** It was `[0, 1]`, a confidence. The slope of the forward
+idiosyncratic return on `α⊥` is the scale with the lowest mean squared error, and it can be above
+one, so `c` is a scale. A stated `c` and a resolved `c` are refused when negative or not finite.
+`lambda` keeps `[0, 1]`. The constructor checks a stated number, and the prior checks a resolved
+number, because the prior holds the slot and never rebuilds itself on the resolved value.
+
+**A third route, inside `prior`.** `cross_sectional_assemble` resolves both slots after the split
+of the Return Forecast and before the mean, through `cross_sectional_calibration`. The batch fit,
+the refit and each step of the carry fold call that function, so every fit resolves the rules. The
+split now returns the unscaled `α⊥`, and `b = c α⊥` is formed after `c` is resolved. A rule gets:
+
+- `pr`: the factor moments of the nested factor prior as a `LowOrderPrior`, on the reduced factor
+  axis, so it reads `mu`, `sigma`, `ens` and `w`;
+- `w = pr.w` and `slv = nothing`;
+- a `CalibrationContext` with one new field, `cs = (; g, ap, csfm, hist, cre)`: the spanned
+  coefficients `g`, the unscaled `α⊥` as `ap`, the block `csfm` with a zero `b`, which carries the
+  idiosyncratic variance history `vs` and the regression weights `rw`, the Return Forecast history
+  `hist`, and the Cross-Sectional Regression Estimator `cre` of the prior, with which a rule splits
+  a row of the history as the prior splits the latest forecast.
+
+The ticket listed the six quantities as fields of their own. The block already carries `vs` and
+`rw`, so the context does not copy them. The other four travel in one field because the context
+is shared by every calibration site, and only this one states them: four fields would widen the
+type that every other site builds, for one site.
+
+**The history is made once, on demand.** `reads_forecast_history(rule)` answers `false` by default,
+so a stated number and a plain function never get the history. When a slot answers `true`, the
+prior makes the history once with `forecast_history` and hands it to both slots in `cs.hist`.
+The constructor refuses a rule that answers `true` when `rfe` is `nothing` or a
+`CustomValueReturnForecast`, because neither has a history.
+
+**The block records the numbers.** `CrossSectionalFactorModel` gains `lambda` and `c`, filled with
+the resolved number for a rule and for a stated number alike. `g` is not on the block, so a caller
+cannot compute the number again and reads it there.
+
+The prior declares both slots in `calibration_slots`, so the two `assert_` walks read them. It
+resolves them itself, as `JuMPOptimiser` resolves its four norm slots at their site, so no
+`resolve_calibration_slots` method is derived for it.
+
+**The rules.** The grilling of
+[#1482](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1482) chose them, and
+[#1483](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1483) built them in
+`src/10_Prior/17_CrossSectionalCalibrationRules.jl`. Every variation of a rule is a field type with
+one default.
+
+| Rule | Family | Default | Variations |
+| :--- | :--- | :--- | :--- |
+| `PrecisionBlend` | Spanned Shrinkage | the default of `lambda` | `err = CurrentForecastError()` reads the latest `g`; `ForecastHistoryError()` reads the history |
+| `SteinShrinkage` | Spanned Shrinkage | opt-in | `alg` is any `AbstractShrunkExpectedReturnsAlgorithm`, `BayesStein()` by default |
+| `ForecastCalibrationSlope` | Orthogonal Forecast Scale | opt-in, `c` stays `1` | `wu = ThresholdWarmUp(; min_obs = 252)`, `PlugInWarmUp()`, `PositivePartWarmUp()`; `target = 1` |
+
+`SteinShrinkage` carries the quantity in its name, because `BayesStein` and `JamesStein` name
+algorithms of `ShrunkExpectedReturns`, and it joins the table of names that earn the quantity.
+`PrecisionBlend` and `ForecastCalibrationSlope` name a method and stop there. `fb` was not taken for
+the number a slope falls back to, because it names the fallback chain of an optimiser, so that
+field is `target`.
+
+A Spanned Shrinkage rule reads the factor covariance of the estimated factors through its
+pseudo-inverse, and counts its rank as the dimension `K`. A market factor beside a full one-hot
+industry block makes that covariance singular, because the market exposure is the sum of the
+industry exposures, and the fitted factor returns and `g` both lie in the range of the covariance.
+An inverse there gives a meaningless weight.

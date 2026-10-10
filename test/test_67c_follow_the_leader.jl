@@ -578,11 +578,13 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test eltype(S32) == Float32 && isapprox(S32, S; rtol = 1e-4)
         # The factor: bitwise the Cholesky where it exists, a PSD factor where it does not.
         A = cov(R)
-        @test po.covariance_factor(A) == cholesky(A).U
-        G = po.covariance_factor(S)
-        @test isapprox(G' * G, S; atol = 1e-12)
-        @test_throws LinearAlgebra.PosDefException po.covariance_factor([1.0 0.5; 0.4 1.0])
-        @test_throws LinearAlgebra.PosDefException po.covariance_factor(-A)
+        ef = EigenFallbackSquareRoot()
+        @test matrix_square_root(ef, A) == cholesky(A).L
+        L = matrix_square_root(ef, S)
+        @test isapprox(L * L', S; atol = 1e-12)
+        @test_throws LinearAlgebra.PosDefException matrix_square_root(ef,
+                                                                      [1.0 0.5; 0.4 1.0])
+        @test_throws LinearAlgebra.PosDefException matrix_square_root(ef, -A)
     end
 
     @testset "ShortTermLossControlPortfolio" begin
@@ -829,7 +831,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                 string(@doc(RankOneCovariance)),
                 string(@doc(ShortTermLossControlPortfolio)),
                 string(@doc(po.AllocationSetConstraint)),
-                string(@doc(po.AbstractSampleSelector)), string(@doc(po.covariance_factor))]
+                string(@doc(po.AbstractSampleSelector)), string(@doc(matrix_square_root))]
         @test all(d -> !occursin("No documentation found", d), docs)
         @test occursin("follow-the-leader rule", docs[1])
     end

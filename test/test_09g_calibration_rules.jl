@@ -109,8 +109,11 @@ const PR120 = prior(EmpiricalPrior(), randn(RNG, 120, 4))
     @test isa(CalibrationContext().series, ReturnsSeries)
     @test isnothing(CalibrationContext().alpha)
     @test isnothing(CalibrationContext().p)
-    @test isa(CalibrationContext(-1, AbsoluteDrawdownSeries(), 2).series,
+    @test isa(CalibrationContext(-1, AbsoluteDrawdownSeries(), 2, nothing).series,
               AbsoluteDrawdownSeries)
+    # `cs` belongs to the Cross-Sectional Factor Prior, so a site that names none leaves it
+    # unset.
+    @test isnothing(CalibrationContext().cs)
 
     # `kmin` is a count of order statistics, so a rule that states none is refused at
     # construction. It is a check on the rule's OWN parameter, and not on the parameter the
@@ -1342,11 +1345,13 @@ end
                               :RateRadius => "The same collision, read from the other end.",
                               :DimensionalRateRadius => "The same `Rate` stem under a prefix.",
                               :ConcentrationRadius => "`Concentration` names the weight concentration of a portfolio.",
-                              :DualNormRadius => "`DualNorm` names a mathematical object.")
+                              :DualNormRadius => "`DualNorm` names a mathematical object.",
+                              :SteinShrinkage => "`BayesStein` and `JamesStein` name algorithms of `ShrunkExpectedReturns`.")
 
     # The words the five families name their quantities with. A rule that ends in one of
     # them states the quantity, whatever method word stands in front of it.
-    quantity_words = ("Significance", "Deformation", "Radius", "TailWeight", "NormCeiling")
+    quantity_words = ("Significance", "Deformation", "Radius", "TailWeight", "NormCeiling",
+                      "Shrinkage", "ForecastScale")
 
     # `traverse_concrete_subtypes` walks the whole root, and `parentmodule` drops the probe
     # rules that `test_09f_calibration_slot.jl` defines, which reach this census whenever
@@ -1355,7 +1360,7 @@ end
                         PO.traverse_concrete_subtypes(PO.AbstractCalibrationAlgorithm))
     rule_names = Set(nameof.(rule_types))
     @test ("the rules this census reads", length(rule_names)) ==
-          ("the rules this census reads", 11)
+          ("the rules this census reads", 14)
 
     stated = Set(n for n in rule_names if any(w -> endswith(string(n), w), quantity_words))
     named = Set(keys(earns_the_quantity))
@@ -1370,15 +1375,15 @@ end
     @test ("list entries that no rule carries", stale) ==
           ("list entries that no rule carries", Symbol[])
 
-    # The other six name a method and stop there, which is the default the rule states.
+    # The other eight name a method and stop there, which is the default the rule states.
     @test ("rules named for the method alone",
            sort!(collect(setdiff(rule_names, stated)))) ==
           ("rules named for the method alone",
-           [:EffectiveAssetFloor, :EntropyBudget, :HillTailDecay, :RadialTailDecay,
-            :ScenarioCount, :TailTermParity])
+           [:EffectiveAssetFloor, :EntropyBudget, :ForecastCalibrationSlope, :HillTailDecay,
+            :PrecisionBlend, :RadialTailDecay, :ScenarioCount, :TailTermParity])
 end
 
-@testset "Calibration rules: nine construct bare, and two name the quantity they refuse" begin
+@testset "Calibration rules: twelve construct bare, and two name the quantity they refuse" begin
     #=
     A caller who meets nine rules that construct bare learns that a rule constructs bare.
     Two cannot, because the keyword each takes is the whole content of the rule, and a
@@ -1394,7 +1399,8 @@ end
     =#
     for R in
         (RateSignificance, HillTailDecay, RadialTailDecay, ConcentrationRadius, RateRadius,
-         DimensionalRateRadius, DualNormRadius, TailTermParity, EffectiveAssetFloor)
+         DimensionalRateRadius, DualNormRadius, TailTermParity, EffectiveAssetFloor,
+         PrecisionBlend, SteinShrinkage, ForecastCalibrationSlope)
         @test isa(R(), R)
     end
 

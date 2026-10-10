@@ -1,17 +1,17 @@
 #=
 The exposure group of the cross-sectional diagnostics, decided by #709 and built by #799.
 
-The oracle is the reference implementation. The block of `# the reference oracle` below was
-built from the very arrays this file builds, run in the reference implementation's own
-environment, and its answers are written out as literals. Rebuild them by generating the
-same fixture, exporting it, and running the reference's factor model block on it.
+The testset `the stored oracle` compares with literals that the oracle gave on the very
+arrays this file builds. Rebuild them by an export of the same fixture and a run of the
+oracle's factor model block on it. Each comparison is cell by cell (`parity_compare`), and
+states the worst value measured beside its tolerance.
 =#
 using Statistics
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 @testset "Cross-sectional exposure diagnostics" begin
-    # The fixture the reference oracle was measured on. Every mutation below drives one
-    # branch, so a change to any of them invalidates the literals in `# the reference
-    # oracle`.
+    # The fixture the oracle was measured on. Every mutation below drives one branch, so a
+    # change to any of them invalidates the literals of `the stored oracle`.
     rng = StableRNG(24680)
     T, N, K = 10, 6, 4
     Ms = randn(rng, T, N, K)
@@ -48,17 +48,15 @@ using Statistics
                                       Ms = Ms[:, :, 1:3], vs = vs, rw = rw, bw = bw,
                                       lag = 1)
 
-    # A `NaN` compares unequal to itself, so the pattern of the absent answers is asserted
-    # separately from the values.
-    function exposure_agrees(a, b; rtol = 1e-10)
-        if isnan.(a) != isnan.(b)
-            return false
-        end
-        m = .!isnan.(a)
-        return isapprox(a[m], b[m]; rtol = rtol)
+    # Cell by cell: the pattern of the absent answers agrees exactly, and each finite cell
+    # lies within `rtol` of its own size. The worst value measured against the oracle is
+    # 6.3e-15, and all but one check measure 6.6e-16 or less, so `1e-14` is about ten
+    # times the round-off of a weighted mean of another order.
+    function exposure_agrees(a, b, label = ""; rtol = 1e-14)
+        return parity_compare(a, b; rtol = rtol, name = label).ok
     end
 
-    @testset "the reference oracle" begin
+    @testset "the stored oracle" begin
         ref_corr_bw = [ 1.0 -0.11910774310012738 0.0 NaN;
                        -0.11910774310012745 1.0 0.0 NaN;
                        0.0 0.0 1.0 NaN;
@@ -100,7 +98,7 @@ using Statistics
         ref_mean_ic = [0.057142857142857204, 0.2392857142857143, -0.23571428571428568]
         ref_std_ic = [0.733695466730492, 0.4584006929917067, 0.23843513154179433]
         ref_ic_ir = [0.07788361756887816, 0.5220012053734906, -0.9885887377002087]
-        # The reference's exposure summary reads `nanmean(ic > 0)`, and the comparison turns
+        # The oracle's exposure summary reads `nanmean(ic > 0)`, and the comparison turns
         # a `NaN` into `false` before the mean sees it, so it counts the one silenced date of
         # nine as a miss: 5/9, 7/9, 1/9. Its evaluation summary drops a `NaN`, as every
         # summary of this library does, so the port reads the eight dates that carried a
@@ -127,57 +125,73 @@ using Statistics
                           0.6332267854890944 0.3970126344357655 2.220446049250313e-16 0.01635061891197087]
         ref_coverage = [0.9833333333333334, 0.9333333333333332, 1.0, 0.32]
 
-        @test exposure_agrees(exposure_correlation(csfm), ref_corr_bw)
-        @test exposure_agrees(exposure_correlation(csfm; weighting = IdentityMetric()),
+        # Measured maxrel 3.5e-16, 6.6e-16 and 3.4e-16.
+        @test exposure_agrees(exposure_correlation(csfm).X, ref_corr_bw)
+        @test exposure_agrees(exposure_correlation(csfm; weighting = IdentityMetric()).X,
                               ref_corr_id)
         @test exposure_agrees(exposure_correlation(csfm;
-                                                   weighting = RegressionWeightMetric()),
+                                                   weighting = RegressionWeightMetric()).X,
                               ref_corr_rw)
         # The third factor is the constant intercept, so every asset of it is in one tie. The
-        # reference breaks a tie by its sort, which on this fixture is the order of the asset
+        # oracle breaks a tie by its sort, which on this fixture is the order of the asset
         # axis, and it scores a rank coefficient there. `ties = :ordinal` reproduces it.
-        @test exposure_agrees(exposure_ic(csfm3; ties = :ordinal), ref_ic_spearman)
-        @test exposure_agrees(exposure_ic(csfm3; rank = false), ref_ic_pearson)
-        @test exposure_agrees(exposure_ic(csfm3; horizon = 2, ties = :ordinal), ref_ic_h2)
+        # Every rank coefficient below is bit-equal.
+        @test exposure_agrees(exposure_ic(csfm3; ties = :ordinal).X, ref_ic_spearman)
+        # Measured maxrel 6.3e-15 on the cell `0.0177`, maxscaled 9.3e-16: a correlation
+        # near zero is a cancellation of the centred cross-products, so its error scales
+        # with the largest cell.
+        @test exposure_agrees(exposure_ic(csfm3; rank = false).X, ref_ic_pearson,
+                              "linear ic"; rtol = 5e-14)
+        @test exposure_agrees(exposure_ic(csfm3; horizon = 2, ties = :ordinal).X, ref_ic_h2)
         # Under the default `ties = :average`, a constant exposure has constant ranks, so it
         # has no rank coefficient, as it has no Pearson one. The two factors with no tie keep
-        # the reference's numbers.
-        ica = exposure_ic(csfm3)
+        # the oracle's numbers.
+        ica = exposure_ic(csfm3).X
         @test all(isnan, ica[:, 3])
         @test exposure_agrees(ica[:, 1:2], ref_ic_spearman[:, 1:2])
-        ica2 = exposure_ic(csfm3; horizon = 2)
+        ica2 = exposure_ic(csfm3; horizon = 2).X
         @test all(isnan, ica2[:, 3])
         @test exposure_agrees(ica2[:, 1:2], ref_ic_h2[:, 1:2])
         @test isequal(exposure_ic_summary(csfm3).mean_ic[1:2],
                       exposure_ic_summary(csfm3; ties = :ordinal).mean_ic[1:2])
         @test isnan(exposure_ic_summary(csfm3).mean_ic[3])
+        # The summary is bit-equal, and the scaled hit rate measures maxrel 1.4e-16.
         s = exposure_ic_summary(csfm3; ties = :ordinal)
         @test exposure_agrees(s.mean_ic, ref_mean_ic)
         @test exposure_agrees(s.std_ic, ref_std_ic)
         @test exposure_agrees(s.ic_ir, ref_ic_ir)
         @test exposure_agrees(s.hit_rate, port_hit_rate)
-        @test count(isfinite, exposure_ic(csfm3)[:, 1]) == 8
-        @test size(exposure_ic(csfm3), 1) == 9
+        @test count(isfinite, exposure_ic(csfm3).X[:, 1]) == 8
+        @test size(exposure_ic(csfm3).X, 1) == 9
         @test exposure_agrees(port_hit_rate .* (8 / 9), ref_hit_rate)
-        @test exposure_agrees(exposure_stability(csfm; step = 2), ref_stability)
-        @test exposure_agrees(exposure_dispersion(csfm), ref_dispersion)
-        # The reference's summary reads the regression weights for the universe of the
-        # coverage, where this verb reads the weighting the caller names. The benchmark
-        # weighting is the default, so the reference's answer is the one under
-        # `RegressionWeightMetric()`.
-        @test exposure_agrees(exposure_coverage(csfm; weighting = RegressionWeightMetric()),
-                              ref_coverage)
-        @test exposure_coverage(csfm)[4] == 0.34
+        # Measured maxrel 4.2e-16.
+        @test exposure_agrees(exposure_stability(csfm; step = 2).X, ref_stability)
+        # The intercept is constant, so its dispersion is exactly zero. The oracle reads the
+        # round-off `2.2e-16` of a mean that is not clamped to the range of the values, and
+        # this library clamps it (#842, as in #1045): a Better answer, which `a constant
+        # cross-section has no spread at any scale` pins. The other three columns agree
+        # with the oracle, cell by cell: measured maxrel 1.5e-16.
+        disp = copy(ref_dispersion)
+        disp[:, 3] .= 0
+        @test exposure_agrees(exposure_dispersion(csfm).X, disp, "dispersion")
+        # The coverage reads the regression weights by default, so its universe is the
+        # estimation universe of the fit, as the oracle's summary reads it. The benchmark
+        # universe is one keyword away, and it gives a different answer here. Bit-equal.
+        @test exposure_agrees(exposure_coverage(csfm).X, ref_coverage)
+        @test exposure_coverage(csfm).X ==
+              exposure_coverage(csfm; weighting = RegressionWeightMetric()).X
+        @test exposure_coverage(csfm; weighting = BenchmarkWeightMetric()).X[4] == 0.34
     end
 
     @testset "the answers carry the axes the verbs state" begin
-        @test size(exposure_correlation(csfm)) == (K, K)
-        @test size(exposure_ic(csfm3)) == (T - 1, 3)
-        @test size(exposure_ic(csfm3; horizon = 3)) == (T - 3, 3)
-        @test size(exposure_stability(csfm; step = 4)) == (T - 4, K)
-        @test size(exposure_dispersion(csfm)) == (T, K)
-        @test length(exposure_coverage(csfm)) == K
-        for v in exposure_ic_summary(csfm3)
+        @test size(exposure_correlation(csfm).X) == (K, K)
+        @test size(exposure_ic(csfm3).X) == (T - 1, 3)
+        @test size(exposure_ic(csfm3; horizon = 3).X) == (T - 3, 3)
+        @test size(exposure_stability(csfm; step = 4).X) == (T - 4, K)
+        @test size(exposure_dispersion(csfm).X) == (T, K)
+        @test length(exposure_coverage(csfm).X) == K
+        s3 = exposure_ic_summary(csfm3)
+        for v in (s3.mean_ic, s3.std_ic, s3.ic_ir, s3.t_stat, s3.hit_rate)
             @test length(v) == 3
         end
     end
@@ -186,7 +200,7 @@ using Statistics
         # `exposure_ic` scores every observation, so a window of `h` observations overlaps
         # its `h - 1` neighbours and the block method hands `h - 1` lags to the kernel. At
         # the default window there is no overlap and the bare method's default agrees.
-        ic2 = exposure_ic(csfm3; horizon = 2)
+        ic2 = exposure_ic(csfm3; horizon = 2).X
         s2 = exposure_ic_summary(csfm3; horizon = 2)
         # The constant third factor has no rank coefficient, so its column is `NaN`, and
         # the comparisons read `isequal`.
@@ -195,7 +209,7 @@ using Statistics
         @test isequal(s2.mean_ic, exposure_ic_summary(ic2).mean_ic)
         @test isequal(s2.ic_ir, exposure_ic_summary(ic2).ic_ir)
         @test isequal(exposure_ic_summary(csfm3).t_stat,
-                      exposure_ic_summary(exposure_ic(csfm3)).t_stat)
+                      exposure_ic_summary(exposure_ic(csfm3).X).t_stat)
         @test_throws DomainError exposure_ic_summary(ic2; lags = -1)
     end
 
@@ -203,7 +217,7 @@ using Statistics
         # The third factor is constant across the assets, so its correlation against any
         # other is `0` by convention. The fourth is never finite on three common assets,
         # so its correlation is `NaN`. The diagonal is `1` in both cases.
-        C = exposure_correlation(csfm)
+        C = exposure_correlation(csfm).X
         @test all(isone, LinearAlgebra.diag(C))
         @test C[1, 3] == C[3, 1] == 0
         @test C[2, 3] == C[3, 2] == 0
@@ -310,10 +324,10 @@ using Statistics
         @test isnothing(PortfolioOptimisers.cs_diagnostic_weights(IdentityMetric(), csfm))
         # The answer under a member is the answer under the history it names.
         @test exposure_agrees(exposure_dispersion(csfm;
-                                                  weighting = RegressionWeightMetric()),
+                                                  weighting = RegressionWeightMetric()).X,
                               exposure_dispersion(Ms, rw))
         @test exposure_agrees(exposure_stability(csfm; step = 2,
-                                                 weighting = IdentityMetric()),
+                                                 weighting = IdentityMetric()).X,
                               exposure_stability(Ms; step = 2))
         # A block that carries no such field refuses, and the refusal names the field.
         bare = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr,
@@ -325,7 +339,17 @@ using Statistics
         end
         @test_throws PortfolioOptimisers.IsNothingError exposure_stability(bare; step = 2)
         @test_throws PortfolioOptimisers.IsNothingError exposure_dispersion(bare)
-        @test_throws PortfolioOptimisers.IsNothingError exposure_coverage(bare)
+        for metric in (BenchmarkWeightMetric(), InverseIdiosyncraticVarianceMetric())
+            @test_throws PortfolioOptimisers.IsNothingError exposure_coverage(bare;
+                                                                              weighting = metric)
+        end
+        # The coverage alone reads an absent regression weight history as a fit on every
+        # asset, so its universe is every asset, and it refuses nothing.
+        @test isnothing(PortfolioOptimisers.exposure_coverage_weights(RegressionWeightMetric(),
+                                                                      bare))
+        @test exposure_coverage(bare).X ==
+              exposure_coverage(bare; weighting = IdentityMetric()).X ==
+              exposure_coverage(Ms)
     end
 
     @testset "a block that carries no history refuses by name" begin
@@ -429,7 +453,8 @@ using Statistics
         rng6 = StableRNG(864213579)
         Tr, Nr, Kr = 6, 5, 3
         Msr = randn(rng6, Tr, Nr, Kr)
-        fr = 0.02 * randn(rng6, Tr, Kr)
+        # A fit under a re-basis estimates its factor returns on the reduced axis.
+        fr = 0.02 * randn(rng6, Tr, Kr - 1)
         epsr = 0.01 * randn(rng6, Tr, Nr)
         rwr = abs.(randn(rng6, Tr, Nr)) .+ 0.1
         fcb = FactorFamilyBasis(; fnm = ["industry"], fi = [[1, 2]], di = [2],
@@ -438,19 +463,90 @@ using Statistics
         csr_r = CrossSectionalRegression(; f = fr, eps = epsr, n = fill(Nr, Tr))
         L = PortfolioOptimisers.reduce_loadings(fcb, Msr[Tr, :, :])
         blk = CrossSectionalFactorModel(; M = Msr[Tr, :, :], L = L, b = zeros(Nr),
-                                        csr = csr_r, Ms = Msr, rw = rwr, fcb = fcb, lag = 1)
+                                        csr = csr_r, Ms = Msr, rw = rwr, fcb = fcb, lag = 1,
+                                        nf = ["tech", "bank", "value"],
+                                        fam = ["industry", "industry", "style"])
         Kred = PortfolioOptimisers.reduced_factor_count(fcb)
         @test Kred == 2
         # The exposure group answers on the raw axis, because it reads the exposure history
         # and never the design of the fit.
-        @test size(exposure_correlation(blk; weighting = IdentityMetric())) == (Kr, Kr)
-        @test size(exposure_dispersion(blk; weighting = IdentityMetric())) == (Tr, Kr)
-        @test size(exposure_ic(blk)) == (Tr - 1, Kr)
+        @test size(exposure_correlation(blk; weighting = IdentityMetric()).X) == (Kr, Kr)
+        @test size(exposure_dispersion(blk; weighting = IdentityMetric()).X) == (Tr, Kr)
+        @test size(exposure_ic(blk).X) == (Tr - 1, Kr)
         # `reduced` is the one mode that maps the exposures through the re-basis first.
-        @test size(exposure_ic(blk; reduced = true)) == (Tr - 1, Kred)
+        @test size(exposure_ic(blk; reduced = true).X) == (Tr - 1, Kred)
         @test size(exposure_ic_summary(blk; reduced = true).mean_ic) == (Kred,)
         # A block that carries no re-basis has one axis, whatever `reduced` states.
-        @test exposure_agrees(exposure_ic(csfm3; reduced = true), exposure_ic(csfm3))
+        @test exposure_agrees(exposure_ic(csfm3; reduced = true).X, exposure_ic(csfm3).X)
+
+        # Each answer carries the names and the families of its own axis: the raw axis, or
+        # the reduced axis, which drops the second industry.
+        PO = PortfolioOptimisers
+        raw = (exposure_correlation(blk; weighting = IdentityMetric()),
+               exposure_dispersion(blk; weighting = IdentityMetric()), exposure_ic(blk),
+               exposure_stability(blk; step = 2, weighting = IdentityMetric()),
+               exposure_coverage(blk; weighting = IdentityMetric()))
+        for r in raw
+            @test r.nf == ["tech", "bank", "value"]
+            @test r.fam == ["industry", "industry", "style"]
+            v = PO.port_opt_view(r, LabelGroup("industry"))
+            @test v.nf == ["tech", "bank"]
+            @test isequal(PO.port_opt_view(r, ["value"]).X,
+                          PO.port_opt_view(r, LabelGroup("style")).X)
+        end
+        red = exposure_ic(blk; reduced = true)
+        @test red.nf == ["tech", "value"] && red.fam == ["industry", "style"]
+        @test isequal(PO.port_opt_view(red, LabelGroup("style")).X, red.X[:, 2:2])
+        @test_throws ArgumentError PO.port_opt_view(red, ["bank"])
+        # The correlation selects the rows and the columns of a family together.
+        C = raw[1]
+        @test C.dims == (1, 2)
+        Ci = PO.port_opt_view(C, LabelGroup("industry"))
+        @test isequal(Ci.X, C.X[1:2, 1:2])
+        @test isequal(PO.port_opt_view(C, ["value", "tech"]).X, C.X[[3, 1], [3, 1]])
+        # The summary of a view is the view of the summary, and it keeps the labels.
+        s = exposure_ic_summary(blk; reduced = true)
+        @test s isa ExposureICSummaryResult
+        @test s.nf == ["tech", "value"] && s.fam == ["industry", "style"]
+        sv = PO.port_opt_view(s, LabelGroup("style"))
+        sr = exposure_ic_summary(PO.port_opt_view(red, LabelGroup("style")))
+        for f in (:mean_ic, :std_ic, :ic_ir, :t_stat, :hit_rate, :nf, :fam)
+            @test isequal(getfield(sv, f), getfield(s, f)[2:2])
+            @test isequal(getfield(sr, f), getfield(s, f)[2:2])
+        end
+        # The summary reads a series, not a matrix of factor pairs.
+        @test_throws ArgumentError exposure_ic_summary(C)
+    end
+
+    @testset "a diagnostic answer checks its axis, and a view refuses what it cannot find" begin
+        PO = PortfolioOptimisers
+        X = [1.0 2.0 3.0; 4.0 5.0 6.0]
+        @test FactorDiagnosticResult(; X = X).dims == (2,)
+        @test_throws DomainError FactorDiagnosticResult(; X = X, dims = ())
+        @test_throws DomainError FactorDiagnosticResult(; X = X, dims = (3,))
+        @test_throws DomainError FactorDiagnosticResult(; X = X, dims = (2, 2))
+        @test_throws DimensionMismatch FactorDiagnosticResult(; X = X, dims = (1, 2))
+        @test_throws DimensionMismatch FactorDiagnosticResult(; X = X, nf = ["a", "b"])
+        @test_throws ArgumentError FactorDiagnosticResult(; X = X, nf = ["a", "b", "a"])
+        @test_throws DimensionMismatch FactorDiagnosticResult(; X = X, fam = ["f"])
+        # A view by name needs names, and a view by family needs families.
+        bare = FactorDiagnosticResult(; X = X)
+        @test_throws ArgumentError PO.port_opt_view(bare, ["a"])
+        @test_throws ArgumentError PO.port_opt_view(bare, LabelGroup("style"))
+        @test isequal(PO.port_opt_view(bare, [3, 1]).X, X[:, [3, 1]])
+        @test isnothing(PO.port_opt_view(bare, 2:3).nf)
+        named = FactorDiagnosticResult(; X = X, nf = ["value", "size", "tech"],
+                                       fam = ["style", "style", "industry"])
+        err = try
+            PO.port_opt_view(named, LabelGroup("styl"))
+        catch e
+            e
+        end
+        @test occursin("did you mean `style`", err.msg)
+        @test_throws ArgumentError PO.port_opt_view(named, ["valu"])
+        # A view of a view selects on the axis the first view kept.
+        vv = PO.port_opt_view(PO.port_opt_view(named, LabelGroup("style")), ["size"])
+        @test vv.X == X[:, 2:2] && vv.fam == ["style"]
     end
 
     @testset "an asset enters only on a finite positive weight" begin
@@ -484,8 +580,8 @@ using Statistics
             @test iszero(exposure_dispersion(fill(x, 1, n, 1), rand(rng8, 1, n))[1, 1])
         end
         # The intercept of the fixture is constant, so its dispersion is exactly zero, where
-        # the reference reads the round-off `2.2e-16`.
-        @test all(iszero, exposure_dispersion(csfm)[:, 3])
+        # the oracle reads the round-off `2.2e-16`.
+        @test all(iszero, exposure_dispersion(csfm).X[:, 3])
     end
 
     @testset "the verbs agree with the textbook estimators" begin
@@ -582,4 +678,101 @@ using Statistics
         @test eltype(exposure_dispersion(B32)) == Float32
         @test eltype(exposure_ic_summary(exposure_ic(B32, R32)).t_stat) == Float32
     end
+end
+
+@testset "The information coefficient reconstructs the returns the observed factors carry (#1367)" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1_367_09)
+    T, N = 8, 6
+    Ms = randn(rng, T, N, 3)
+    f = 0.02 * randn(rng, T, 2)
+    fx = 0.01 * randn(rng, T, 1)
+    eps = 0.01 * randn(rng, T, N)
+    csr = CrossSectionalRegression(; f = f, eps = eps, n = fill(N, T))
+    blk = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+                                    lag = 1, fx = fx)
+    B, R, _ = PO.exposure_ic_data(blk, nothing, false)
+    F = hcat(f, fx)
+    for t in 2:T
+        @test R[t, :] ≈ Ms[t - 1, :, :] * F[t, :] + eps[t, :]
+    end
+    @test size(exposure_ic(blk).X) == (T - 1, 3)
+    # The returns the reconstruction gives back, observed part included, score every factor
+    # as the reconstruction does (#1524).
+    rd = ReturnsResult(; nx = string.(1:N), X = R)
+    @test isequal(exposure_ic(blk, rd).X, exposure_ic(blk).X)
+end
+
+@testset "The information coefficient over the returns data scores each factor alone (#1524)" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1_524)
+    T, N, K = 10, 6, 4
+    Ms = randn(rng, T, N, K)
+    f = 0.02 * randn(rng, T, K)
+    eps = 0.01 * randn(rng, T, N)
+    rw = abs.(randn(rng, T, N)) .+ 0.1
+    # The fourth factor is finite on two assets alone.
+    Ms[:, 3:6, 4] .= NaN
+    csr = CrossSectionalRegression(; f = f, eps = eps, n = fill(N, T))
+    csfm = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+                                     rw = rw, lag = 1)
+    csr3 = CrossSectionalRegression(; f = f[:, 1:3], eps = eps, n = fill(N, T))
+    csfm3 = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N), csr = csr3,
+                                      Ms = Ms[:, :, 1:3], rw = rw, lag = 1)
+    # The reconstruction reads the sparse factor, so four assets of six lose their return,
+    # and no factor keeps the three assets a coefficient needs.
+    @test all(isnan, exposure_ic(csfm).X)
+    # The returns of the three dense factors. Their first row has no lagged exposure, and
+    # no score reads it, because a score reads the returns after its observation.
+    _, R3, _ = PO.exposure_ic_data(csfm3, nothing, false)
+    rd3 = ReturnsResult(; nx = string.(1:N), X = R3)
+    ic = exposure_ic(csfm, rd3)
+    @test size(ic.X) == (T - 1, K)
+    @test ic.nf == csfm.nf
+    @test isequal(ic.X[:, 1:3], exposure_ic(csfm3).X)
+    @test all(isfinite, ic.X[:, 1:2])
+    @test isequal(exposure_ic(csfm, rd3; rank = false).X[:, 1:3],
+                  exposure_ic(csfm3; rank = false).X)
+    # Two assets are too few for a coefficient of the sparse factor itself.
+    @test all(isnan, ic.X[:, 4])
+    # On the dense block, the returns the reconstruction gives back score as it does.
+    @test isequal(exposure_ic(csfm3, rd3).X, exposure_ic(csfm3).X)
+    # The summary derives its lags from the window on both forms.
+    @test isequal(exposure_ic_summary(csfm, rd3; horizon = 2).t_stat[1:3],
+                  exposure_ic_summary(csfm3; horizon = 2).t_stat)
+
+    # A block that records the position of each row reads those rows of the returns data.
+    pos = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N), csr = csr3,
+                                    Ms = Ms[:, :, 1:3], rw = rw, lag = 1,
+                                    idx = collect(3:(T + 2)))
+    rdp = ReturnsResult(; nx = string.(1:N), X = vcat(randn(rng, 2, N), R3))
+    @test isequal(exposure_ic(pos, rdp).X, exposure_ic(csfm3).X)
+    # The returns data form reads no fit.
+    no_fit = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N),
+                                       Ms = Ms[:, :, 1:3], rw = rw, lag = 1)
+    @test_throws PO.IsNothingError exposure_ic(no_fit)
+    @test isequal(exposure_ic(no_fit, rd3).X, exposure_ic(csfm3).X)
+
+    # The reconstruction starts at row `lag` of the block. The returns data has every row,
+    # so it scores the rows before that too.
+    lag2 = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N), csr = csr3,
+                                     Ms = Ms[:, :, 1:3], rw = rw, lag = 2)
+    R = 0.01 * randn(rng, T, N)
+    rdr = ReturnsResult(; nx = string.(1:N), X = R)
+    @test size(exposure_ic(lag2).X) == (T - 2, 3)
+    @test isequal(exposure_ic(lag2, rdr).X, exposure_ic(Ms[:, :, 1:3], R))
+    @test isequal(exposure_ic(lag2, rdr; rank = false, horizon = 2).X,
+                  exposure_ic(Ms[:, :, 1:3], R, rw; rank = false, horizon = 2))
+
+    # The refusals name what is missing.
+    @test_throws PO.IsNothingError exposure_ic(csfm,
+                                               ReturnsResult(; nf = ["a"],
+                                                             F = randn(rng, T, 1)))
+    @test_throws PO.IsNothingError exposure_ic(CrossSectionalFactorModel(; M = Ms[T, :, :],
+                                                                         b = zeros(N)), rdr)
+    @test_throws DimensionMismatch exposure_ic(csfm,
+                                               ReturnsResult(; nx = string.(1:N),
+                                                             X = R[1:(T - 1), :]))
+    @test_throws DimensionMismatch PO.exposure_ic_returns(1:3, R, T)
+    @test_throws BoundsError PO.exposure_ic_returns(collect(2:(T + 1)), R, T)
 end

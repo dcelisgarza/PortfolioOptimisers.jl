@@ -182,6 +182,16 @@ end
         @test mirror_description(public, :public) ==
               "Asset turnover, public API of PortfolioOptimisers.jl: Turnover."
         @test_throws ArgumentError mirror_description("no heading\n", :public)
+        # A mirror subject names its file: the words of the file name, separated as needed.
+        @test names_its_file("Base Online Portfolio Selection",
+                             "01_Base_OnlinePortfolioSelection.md")
+        @test names_its_file("X at risk", "01_XatRisk.md")
+        @test names_its_file("Gerber IQ covariance (a)", "03_GerberIQCovariance_a.md")
+        @test names_its_file("Turnover", "12_Turnover.md")
+        @test !names_its_file("Online selection rules: the first set",
+                              "02_OnlineSelectionRules.md")
+        @test !names_its_file("Asset turnover", "12_Turnover.md")
+        @test !names_its_file("ℓ1 uncertainty sets", "05_L1UncertaintySets.md")
         @test mirror_side(joinpath("docs", "src", "public_api", "12_Turnover.md")) ==
               :public
         @test mirror_side(joinpath("docs", "src", "private_api", "x", "y.md")) == :private
@@ -315,6 +325,21 @@ end
                 suffixed == (side === :private) || push!(wrong, page)
             end
             @test wrong == String[]
+        end
+        @testset "$(MIRROR_TREES[side]): the H1 names the page's file" begin
+            # The navigation of the site lists each page by its H1, next to the groups that
+            # `docs/make.jl` labels by their directory names. An H1 that is a description
+            # hides the file the page documents.
+            unnamed = String[]
+            for (page, path) in sort(collect(pages); by = first)
+                h1 = page_h1(read(path, String))
+                !isnothing(h1) && names_its_file(mirror_subject(h1, side), page) ||
+                    push!(unnamed, page)
+            end
+            if !isempty(unnamed)
+                @warn "Mirror pages whose H1 does not name the file: $(join(unnamed, ", "))"
+            end
+            @test unnamed == String[]
         end
     end
 

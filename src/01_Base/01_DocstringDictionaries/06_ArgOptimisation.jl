@@ -44,9 +44,10 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ignargs => "`args`: Additional positional arguments (ignored).",
                  :ignkwargs => "`kwargs`: Additional keyword arguments (ignored).",
                  :rd => "`rd`: The returns result to use.",
-                 :pnl_prior => "`pnl`: Optional [`AssetPanel`](@ref), the panel the carrier held. A wrapping prior forwards it unchanged, so that it can compose an estimator that is fitted on a panel. An estimator that reads no panel ignores it.",
+                 :pnl_prior => "`pnl`: Optional [`AssetPanel`](@ref), the panel that the returns data held. A wrapping prior forwards it unchanged, so that it can compose an estimator that is fitted on a panel. An estimator that reads no panel ignores it.",
                  :pnl_moment => "`pnl`: Optional [`AssetPanel`](@ref), whose active mask the Coverage Universe of the fit is derived from. `nothing` makes the rule finiteness alone.",
                  :window => "`window`: Observation window. An integer selects the last `window` observations, and a vector of indices selects those observations.",
+                 :window_rule => "`rule`: [`AbstractWindowRule`](@ref) that says which observations the window keeps on the online step. [`RollingWindow`](@ref) keeps the window at every fit, and [`SeedWindow`](@ref) keeps it at the first fit alone.",
                  # Frontier.
                  :N_fr => "`N`: Number of sweep points on the efficient frontier. The sweep solves the model `N` times, at `N` evenly spaced bound values.",#
                  :factor_fr => "`factor`: Multiplier applied to both ends of the sweep span after `bound` has transformed them. It carries a formulation's own correction factor, such as the `inv(1 / (T - ddof))` of a second-moment bound.",#
@@ -117,6 +118,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :reso => "`reso`: Outer optimisation results.",#
                  :opti => "`opti`: Inner optimiser.",#
                  :opto => "`opto`: Outer optimiser.",#
+                 :pcol => "`pcol`: Rule of the panel collapse, an [`AbstractPanelCollapseAlgorithm`](@ref). It states how the collapse of the Asset Panel onto the sub-portfolios weighs a member at an observation where the member is outside the universe. [`RenormaliseActive`](@ref) divides by the weight of the active members, and [`InactiveAsCash`](@ref) reads the missing weight as cash with a zero feature.",#
                  # Cross-validation.
                  :n_folds => "`n`: Number of folds.",#
                  :n_test_folds => "`n_test_folds`: Number of folds held out for testing in each combination. The remaining `n_folds - n_test_folds` folds train.",#
@@ -134,7 +136,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :reduce_test => "`reduce_test`: Whether to allow the last test window to be smaller.",#
                  :subset_size => "`subset_size`: Size of each random subset.",#
                  :n_subsets => "`n_subsets`: Number of random subsets.",#
-                 :max_comb => "`max_comb`: Maximum number of unique asset subsets.",#
+                 :max_comb => "`max_comb`: Largest number of possible asset subsets for which the draw is exact. When `binomial(N, subset_size)` is larger, the draw takes each subset alone, and two subsets can be equal.",#
                  :window_size => "`window_size`: Rolling window size for randomised cross-validation.",#
                  :n_iter => "`n_iter`: Number of random iterations.",#
                  :cv => "`cv`: Cross-validation estimator.",#
@@ -154,15 +156,21 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :p_cv => "`p`: Hyperparameter search grid.",#
                  :wd => "`wd`: Weight drift the fold's return series is read under, or `nothing` to read it at the target weights of the fold.",#
                  :fa_cv => "`fa`: Fee amortisation algorithm the fold's realised series charges the two fixed fee terms on, or `nothing` to inherit the clock the fee itself states. It overrides `Fees.fa` for that series alone, and it reaches the fit not at all.",#
-                 :pws => "`pws`: Previous-weights source the fold loop threads into the next fold, or `nothing` to thread the target weights of the previous fold.",#
+                 :pws => "`pws`: Previous-weights source the fold loop threads into the next fold, or `nothing` to follow `wd`: the target weights of the previous fold when `wd` is `nothing`, and its drifted weights when `wd` is set.",#
                  :store_weight_path => "`store_weight_path`: If `true`, the fold stores the weight path it computed; if `false`, a reader rebuilds it on demand.",#
                  :cv_strict => "`strict`: If `true`, a Held Gap raises an `ArgumentError`; if `false`, it warns and the pair contributes zero. A Held Gap is an (observation, asset) pair at which the fold's weight is non-zero and the asset's return is missing, which is what a delisting inside a test window makes.",#
                  :pws_wd => "`wd`: Weight drift the held weights are computed under when the return series carries no drift of its own.",#
+                 # The covariance forecast evaluation summary and its figures.
+                 :cfe_step_weighting => "`step_weighting`: [`AbstractStepWeighting`](@ref) that weights each scored step in the mean of a calibration ratio and in its Gaussian band. [`DofStepWeighting`](@ref) weights a step by the degrees of freedom of its ratio, and [`EqualStepWeighting`](@ref) gives every step the same weight.",#
+                 :cfe_scored_steps => "`scored_steps`: If `false`, the window of a point is the last `window` steps of the walk-forward, and a step with no active asset adds nothing to it. If `true`, the window is the last `window` scored steps, so it stretches over a step with no active asset, and a point sits only at a scored step.",#
+                 :cfe_whole_windows => "`whole_windows`: If `false`, the series covers every step of the evaluation, and a point with no whole window is `NaN` and drawn blank. If `true`, the series starts at its first whole window.",#
                  # Prediction result fields.
                  :pred_nx => "`nx`: Asset name vector.",#
                  :pred_nf => "`nf`: Factor name vector.",#
                  :pred_nb => "`nb`: Benchmark name vector.",#
                  :pred_B => "`B`: Benchmark returns.",#
+                 :pred_ne => "`ne`: Exogenous Series name vector.",#
+                 :pred_E => "`E`: Exogenous Series, `observations × series`, whose columns a consumer reads by name. `NaN` marks an absent value.",#
                  :ts => "`ts`: Timestamp vector.",#
                  :iv_ret => "`iv`: Implied volatilities.",#
                  :ivpa => "`ivpa`: Implied volatility risk premium adjustment.",#
@@ -198,7 +206,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Iterative solvers.
                  :tol => "`tol`: Convergence tolerance.",#
                  :lambda_sspo => "`lambda`: The weight of the ``L_1`` penalty of the short-term sparse portfolio.",#
-                 :gamma_sspo => "`gamma`: The soft-threshold width. The ratio `lambda / gamma` is the quadratic coupling of the paper's iteration.",#
+                 :gamma_sspo => "`gamma`: The soft-threshold width. The ratio `lambda / gamma` is the quadratic coupling of the iteration of [lai2018sspo](@cite).",#
                  :iter => "`iter`: Maximum number of iterations.",#
                  # Near optimal centering.
                  :w_opt_noc => "`w_opt`: Optimal portfolio weights.",#
@@ -247,7 +255,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :b_sim => "`b_sim`: Number of integration points for the upper tail Gini approximation.",#
                  # Portfolio summary statistics.
                  :ps_n_periods => "`n_periods`: Number of observations in the return series.",#
-                 :ps_ppy => "`periods_per_year`: Annualisation factor. 252 for daily, 52 for weekly, 12 for monthly returns.",#
+                 :ps_ppy => "`ppy`: Periods per year, the annualisation factor. 252 for daily, 52 for weekly, 12 for monthly returns, and 1 states each figure per period.",#
                  :ps_alpha => "`alpha`: Tail probability used for the CVaR, ``\\alpha \\in (0, 1)``.",#
                  :ps_compound => "`compound`: Whether the wealth path behind the drawdown statistics was compounded.",#
                  :ps_ann_return => "`ann_return`: Annualised arithmetic mean return.",#
@@ -259,5 +267,5 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ps_max_drawdown => "`max_drawdown`: Maximum drawdown, in return space, so it is non-positive.",#
                  :ps_cvar => "`cvar`: Conditional Value-at-Risk at `alpha`, in return space, so a tail loss is negative.",#
                  # The fold context of the online step.
-                 :cache_opt => "`cache`: Optional [`ReturnsBufferState`](@ref), the fold context of the online step. It is `nothing` until [`partial_fit!`](@ref) writes one, and `optimise(opt)` with no returns reads it. The returns themselves are carried by the prior, which owns the rows once; this holds every other column of the carrier and the context pinned at the first step. [`factory`](@ref) carries it unchanged and [`port_opt_view`](@ref) slices it to the selected assets.",#
-                 :cache_rows => "`cache`: Optional [`ReturnsBufferState`](@ref), the fold context of the online step. It is `nothing` until [`partial_fit!`](@ref) writes one, and `optimise(opt)` with no returns reads it. This head holds no prior, so it is the bottom of the chain and its state carries the returns themselves, beside every other column of the carrier and the context pinned at the first step. [`factory`](@ref) carries it unchanged and [`port_opt_view`](@ref) slices it to the selected assets.")
+                 :cache_opt => "`cache`: Optional [`ReturnsBufferState`](@ref), the fold context of the online step. It is `nothing` until [`partial_fit!`](@ref) writes one, and `optimise(opt)` with no returns reads it. The returns themselves are carried by the prior, which owns the rows once; this holds every other column of the returns data and the context pinned at the first step. [`factory`](@ref) carries it unchanged and [`port_opt_view`](@ref) slices it to the selected assets.",#
+                 :cache_rows => "`cache`: Optional [`ReturnsBufferState`](@ref), the fold context of the online step. It is `nothing` until [`partial_fit!`](@ref) writes one, and `optimise(opt)` with no returns reads it. This head holds no prior, so it is the bottom of the chain and its state carries the returns themselves, beside every other column of the returns data and the context pinned at the first step. [`factory`](@ref) carries it unchanged and [`port_opt_view`](@ref) slices it to the selected assets.")

@@ -63,7 +63,7 @@ rather than here, because [`logo!`](@ref) reads only the cliques and is unaffect
 
 # The checks are a backstop, not the enforcement
 
-Every estimator that reaches this function — [`NetworkEstimator`](@ref), [`DBHT`](@ref) and [`LoGo`](@ref) — bounds its similarity field by [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) and calls [`assert_similarity_domain`](@ref) before it transforms, so a shipped configuration that would fail here fails earlier, at construction or at the seam, with a message that names the configuration rather than `W`.
+Every estimator that reaches this function — [`NetworkEstimator`](@ref), [`DBHT`](@ref) and [`LoGo`](@ref) — bounds its similarity field by [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) and calls [`assert_similarity_domain`](@ref) before it transforms, so a shipped configuration that would fail here fails earlier, at construction or in `assert_similarity_domain`, with a message that names the configuration rather than `W`.
 
 These two checks are kept for the case those cannot cover: that family is open **by declaration**, so an extension can subtype it and return a negative anyway. The failure downstream is silent — `DirectHb` sums signed mass and a cancelling row manufactures a separating bubble — so a wrong clustering would come back with no error at all.
 

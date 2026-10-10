@@ -170,7 +170,7 @@ One docs ticket ships after the last build and blocks the map's verification tic
 
 ## Consequences
 
-- `CONTEXT.md` gains *Log-Wealth Regret* and *Hindsight Comparator*; the §4.1 roster names
+- `GLOSSARY.md` gains *Log-Wealth Regret* and *Hindsight Comparator*; the §4.1 roster names
   `BestConstantRebalancedPortfolio` as the naive head beside the family.
 - The evaluation-surface build ticket owes `log_wealth_regret`, `LogWealthRegretResult`,
   `BestConstantRebalancedPortfolio` with a parity test against `MeanRisk` under

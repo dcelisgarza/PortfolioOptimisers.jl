@@ -3,12 +3,11 @@ Issue #777 builds `OrthogonalUncertaintySet`, the one member of the prior arm of
 triple that #776 opened. It reads the factor model of the optimisation's own prior and
 confines both of its sets to the directions the loadings do not span.
 
-The literals below are the reference implementation's own output on one fixed synthetic
-case, taken by driving it in a Python environment built for the purpose. They are the
-oracle of the port, and they are stored as the two invariant products `L * L'` and `Q * Q'`
-rather than as `L` and `Q` themselves: a singular vector and a QR factor each carry an
-arbitrary sign, so the maps differ between the two implementations where the subspaces they
-span do not.
+The literals below are the oracle's own output on one fixed synthetic case, taken by driving
+it in a Python environment built for the purpose. They are stored as the two invariant
+products `L * L'` and `Q * Q'` rather than as `L` and `Q` themselves: a singular vector and a
+QR factor each carry an arbitrary sign, so the maps differ between the two implementations
+where the subspaces they span do not.
 
 `The geometry is the orthogonal complement of the weighted span` re-derives the same
 subspace in plain Julia by a different route -- a pseudo-inverse projector rather than a
@@ -17,13 +16,14 @@ file against itself.
 =#
 # The synthetic point-in-time Asset Panel of the last testset.
 include(joinpath(@__DIR__, "test06c_setup.jl"))
+include(joinpath(@__DIR__, "parity_harness.jl"))
 @testset "Orthogonal uncertainty sets" begin
     using PortfolioOptimisers, Test, StableRNGs, Random, Clarabel, Statistics,
           LinearAlgebra, Distributions
     using PortfolioOptimisers: orthogonal_factor_span, orthogonality_weights,
                                orthogonal_scaling
 
-    # The reference implementation's fixed case: six assets, two factors.
+    # The oracle's fixed case: six assets, two factors.
     B = [1.3554269999999999 -1.0825450000000001;
          0.145787 0.265851;
          0.36465999999999998 1.1712560000000001;
@@ -41,7 +41,7 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
 
     # `rr` and `fpr` travel together on a `LowOrderPrior`, so the factor block comes with a
     # factor-axis prior. Neither the fit nor the sets read `fpr`, and the factor covariance
-    # is the one the reference's case used.
+    # is the one the oracle's case used.
     function prior777(Bm, dv; rw = nothing, bw = nothing, esigma = dv)
         K = size(Bm, 2)
         rr = CrossSectionalFactorModel(; M = Bm, b = zeros(size(Bm, 1)), esigma = esigma,
@@ -89,8 +89,8 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         end
     end
 
-    @testset "The port reproduces the reference implementation" begin
-        # `L * L'` and `Q * Q'` of the reference's own fit on the case above.
+    @testset "The port reproduces the stored oracle" begin
+        # `L * L'` and `Q * Q'` of the oracle's own fit on the case above.
         LLt_inv_idio_identity = [0.11358862792337392 -0.10042660828263195 0.027492390721669847 0.17947653852694018 0.072346980909459874 -0.22890828469670357;
                                  -0.10042660828263195 0.64267960183902639 -0.20473902747961212 0.28777903056481913 -0.17685759609006041 0.25207851647259433;
                                  0.027492390721669847 -0.20473902747961212 0.87426181348351339 0.15512341386912093 -0.1134306090674099 0.17413907500422537;
@@ -127,7 +127,7 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
                                 0.0011334294439515624 0.00089844812483163747 0.0013934599539521619 0.0040830818024392155 0.0010115451512762597 -0.0010947776534619641;
                                 0.00038420372223206778 -0.00050262617046211518 -0.00097161442700997066 0.0010115451512762597 0.0049605532722933757 0.00097695094346104917;
                                 -0.00093205507746635472 0.0003480198240005325 0.0012277298375759171 -0.0010947776534619641 0.00097695094346104917 0.0030544090896761642]
-        # The reference's radius at `q = 0.05` and a rank of four.
+        # The oracle's radius at `q = 0.05` and a rank of four.
         radius_ref = 3.0802157451680481
 
         for (metric, scaling, LLt, QQt, C) in
@@ -141,10 +141,19 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
             mu_set, sigma_set = ucs(ue, pr777)
             @test isa(mu_set, NormBallUncertaintySet)
             @test isa(sigma_set, CompactCovarianceUncertaintySet)
-            @test isapprox(mu_set.kappa, radius_ref; rtol = 1e-12)
-            @test isapprox(mu_set.L * transpose(mu_set.L), LLt; atol = 1e-10)
-            @test isapprox(sigma_set.Q * transpose(sigma_set.Q), QQt; atol = 1e-12)
-            @test isapprox(collect(sigma_set.C), C; rtol = 1e-12)
+            # Measured, over the three cases: maxrel 1.4e-16 on the radius; maxscaled 2.8e-15
+            # on `L L'` and 1.2e-16 on `Q Q'`; `C` exact. A small cell of a projector is a
+            # cancellation of entries of order one, so the products compare against the
+            # largest entry (maxrel 1.4e-14 cell by cell). The margin is for the singular value
+            # and the eigen decompositions, whose round-off moves with the host.
+            tag = "$(nameof(typeof(metric))) $(nameof(typeof(scaling)))"
+            @test parity_compare([mu_set.kappa], [radius_ref]; rtol = 1e-14,
+                                 name = "$(tag) radius").ok
+            @test parity_compare(mu_set.L * transpose(mu_set.L), LLt; rtol = 1e-13,
+                                 scale = :array, name = "$(tag) LLt").ok
+            @test parity_compare(sigma_set.Q * transpose(sigma_set.Q), QQt; rtol = 1e-13,
+                                 scale = :array, name = "$(tag) QQt").ok
+            @test parity_compare(collect(sigma_set.C), C; rtol = 1e-14, name = "$(tag) C").ok
             @test mu_set.p == 2
             @test isa(mu_set.class, MuUncertaintySetClass)
             @test size(mu_set.L) == (N777, 4)
@@ -279,7 +288,7 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @testset "The idiosyncratic scaling reads a stored covariance whole" begin
             # A cross-sectional prior with a correlation threshold writes a full
             # idiosyncratic covariance. The scaling is `G' * E * G` over all of it, as the
-            # reference implementation reads it, and not over its diagonal alone.
+            # oracle reads it, and not over its diagonal alone.
             rho = [1.0 0.3 0.0 0.0 0.2 0.0;
                    0.3 1.0 0.1 0.0 0.0 0.0;
                    0.0 0.1 1.0 0.4 0.0 0.0;
@@ -1027,13 +1036,18 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
             wg = aweights(rand(rng1334, T1334))
             @test PO.variance_count(SimpleVariance(; w = wg), Xg).n[2] ≈
                   sum(wg[6:end])^2 / sum(abs2, wg[6:end])
-            # The exponential weights sum to one, so the count is also the divisor.
-            for ve in (ExpWeightedVariance(), RegimeAdjustedExpWeightedVariance())
-                lam = ve.decay
-                a = lam .^ (0:(T1334 - 1))
-                c = PO.variance_count(ve, X1334)
-                @test c.n ≈ fill(sum(a)^2 / sum(abs2, a), N1334)
-                @test c.m == c.n
+            # The exponential weights sum to one, so under `PreCentred` the count is also the
+            # divisor. Under the estimated location the terms start at the second row, and the
+            # location spends one observation, as the mean of a sample variance does (#1507).
+            for E in (ExpWeightedVariance, RegimeAdjustedExpWeightedVariance)
+                for (centring, lag) in ((PreCentred(), 0), (EstimatedCentring(), 1))
+                    ve = E(; centring = centring)
+                    lam = ve.decay
+                    a = lam .^ (0:(T1334 - 1 - lag))
+                    c = PO.variance_count(ve, X1334)
+                    @test c.m ≈ fill(sum(a)^2 / sum(abs2, a), N1334)
+                    @test c.n == c.m .+ lag
+                end
             end
             c = PO.variance_count(WindowedVariance(; window = 20), X1334)
             @test c.n == fill(20, N1334)
@@ -1122,7 +1136,7 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @testset "A cross-sectional fit charges each asset its share of the spend" begin
             rdp = synthetic_asset_panel(; n_assets = 40, n_observations = 200,
                                         n_industries = 3, rng = StableRNG(725_001)).rd
-            pe = CrossSectionalFactorPrior(;
+            pe = CrossSectionalFactorPrior(; lambda = 1,
                                            factors = ["market" => ConstantExposure(),
                                                       "industry" => OneHotExposure(;
                                                                                    field = "industry",
@@ -1179,7 +1193,7 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         # the fixture.
         rdp = synthetic_asset_panel(; n_assets = 40, n_observations = 200, n_industries = 3,
                                     rng = StableRNG(725_001)).rd
-        pe = CrossSectionalFactorPrior(;
+        pe = CrossSectionalFactorPrior(; lambda = 1,
                                        factors = ["market" => ConstantExposure(),
                                                   "industry" =>
                                                       OneHotExposure(; field = "industry",
@@ -1216,9 +1230,8 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @test mu_ucs(ue, prp).L == mu_f.L
         @test sigma_ucs(ue, prp).Q == sg_f.Q
         # The reduced prior is what an optimiser hands the fit, and the expanded set viewed
-        # at the mask is that fit: `L` and `C` row for row, the basis as a projector, because
-        # the view re-orthonormalises the slice through a pivoted QR that may permute or
-        # flip its columns, and the radii untouched.
+        # at the mask is that fit: `L`, `C` and `Q` row for row, and the radii untouched. The
+        # rows outside the mask are zero, so the view puts no row into `R` (ADR 0189).
         prr = PO.port_opt_view(prp, idx)
         mu_r, sg_r = ucs(ue, prr)
         @test size(mu_r.L, 1) == count(msk)
@@ -1230,8 +1243,8 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
         @test sg_v.C == sg_r.C
         @test sg_v.kappa == sg_r.kappa
         @test sg_v.val == sg_r.val
-        @test size(sg_v.Q, 2) == size(sg_r.Q, 2)
-        @test isapprox(sg_v.Q * transpose(sg_v.Q), sg_r.Q * transpose(sg_r.Q); atol = 1e-12)
+        @test sg_v.Q == sg_r.Q
+        @test size(sg_v.R, 1) == 0
         # A non-finite loading inside the mask is a defect of the prior, and the span still
         # refuses it by name.
         # The block is rebuilt from a fresh fit and poisoned in place: `Accessors.@set`

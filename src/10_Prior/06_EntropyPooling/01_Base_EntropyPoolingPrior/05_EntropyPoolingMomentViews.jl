@@ -676,7 +676,7 @@ function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
         #! the guard below raised, called a view of no pairs one of several, and named an
         #! equation with no variable in it. The drop is silent: an unknown name was already
         #! named by `replace_coprior_views`, and a departed one is silent by ADR 0125 and
-        #! has already told the door's ledger.
+        #! is already recorded in the Departure Ledger.
         if isempty(cov_view.vars)
             continue
         end

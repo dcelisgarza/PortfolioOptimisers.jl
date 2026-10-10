@@ -1,5 +1,5 @@
 ```@meta
-Description = "Preprocessing partial fit, private API of PortfolioOptimisers.jl: PricesToReturnsState, PriceGapFillState, MissingDataFilterState, vcat_carrier_rows, …"
+Description = "Preprocessing partial fit, private API of PortfolioOptimisers.jl: PricesToReturnsState, PriceGapFillState, MissingDataFilterState, vcat_observations, …"
 ```
 
 # Preprocessing partial fit: private API
@@ -15,11 +15,10 @@ PortfolioOptimisers.MissingDataFilterState
 ## Functions
 
 ```@docs
-PortfolioOptimisers.vcat_carrier_rows
-PortfolioOptimisers.assert_pinned_carrier
+PortfolioOptimisers.vcat_observations
+PortfolioOptimisers.assert_pinned_value
 PortfolioOptimisers.vcat_optional
-PortfolioOptimisers.vcat_panel_rows
-PortfolioOptimisers.carrier_rows
+PortfolioOptimisers.data_row_count
 PortfolioOptimisers.partial_fit_transform
 PortfolioOptimisers.series_values
 PortfolioOptimisers.advance_anchor

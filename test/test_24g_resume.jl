@@ -395,9 +395,17 @@ assets is what keeps the JuMP families cheap.
         gs = GridSearchCrossValidation(["opt.l1" => [0.0002, 0.002]]; cv = online_cv,
                                        r = ConditionalValueatRisk())
         @test_throws ArgumentError search_cross_validation(Resume(old), gs, rd)
+        # A population scheme and its split reach the refusal, not a MethodError on `id`
+        # (#1496). The split carries no Online Scheme, so `Online(pipe)` refuses it too.
+        mo = MultipleRandomised(online_cv; subset_size = 4, n_subsets = 2, seed = 7)
+        for cv in (mo, split(mo, rd))
+            @test occursin("is not one", msg(() -> cross_val_predict(Resume(old), rd, cv)))
+        end
+        @test occursin("not an Online Scheme",
+                       msg(() -> cross_val_predict(wrapped, rd, split(mo, rd))))
         # A price-level pipeline aligns by the prices' timestamps: the returns' are the
         # prices' from the second row on, so the held span equals its rows of the price
-        # carrier under the host route and under the refit route alike.
+        # carrier under the fold route and under the refit route alike.
         P = 100 .* exp.(cumsum(X; dims = 1))
         pr = price_ingestion(PriceIngestion(), TimeSeries.TimeArray(ts, P, nx))
         pr_T = po.pipeline_data_view(pr, 1:T0)

@@ -189,14 +189,13 @@ end
 function PortfolioOptimisers.plot_performance_summary(x::Union{<:ArrNum,
                                                                <:OptimisationResult,
                                                                <:PortfolioOptimisers.PredRes_MultiPredRes},
-                                                      args...;
-                                                      periods_per_year::Number = 252,
+                                                      args...; ppy::Number = 1,
                                                       alpha::Number = 0.05,
                                                       compound::Bool = false,
                                                       benchmark::Option{<:VecNum} = nothing,
                                                       kwargs...)
-    ps = performance_summary(x, args...; periods_per_year = periods_per_year, alpha = alpha,
-                             compound = compound, benchmark = benchmark)
+    ps = performance_summary(x, args...; ppy = ppy, alpha = alpha, compound = compound,
+                             benchmark = benchmark)
     return PortfolioOptimisers.plot_performance_summary(ps; kwargs...)
 end
 ## ────────────────────────────────────────────────────────────────────────────

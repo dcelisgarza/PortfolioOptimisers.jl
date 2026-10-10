@@ -141,7 +141,7 @@ and an `ExpertMixture` over `FollowTheLeader` experts apply both rulings per exp
   to point here; ADR 0159's mechanism sentence gains that a solved rule's programme takes the set
   as its feasible region and does not project its optimum; ADR 0161's roster line on the
   solver-free `opt` gains "on the default set".
-- `CONTEXT.md`'s *Constrained Update* loses "a solve of the rule's own objective, which no member
+- `GLOSSARY.md`'s *Constrained Update* loses "a solve of the rule's own objective, which no member
   of the family does" and states the solved rule's meeting; *Sample Selector* and the
   `BestConstantRebalancedPortfolio` roster line gain the set's route; a new term *Allocation Set
   Constraint* names the adapter.

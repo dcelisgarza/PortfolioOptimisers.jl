@@ -33,7 +33,7 @@ rename the `Lx*` types from `*Tracking` to `*Norm`.**
 - The three roles now share the one family: tracking risk measures/constraints, risk-measure
   targets, and `EntropyPoolingPrior` gain `err::Option{<:NormError} = nothing` (default = L2)
   used to reconcile multiple CVaR views via `norm_error(...)` instead of a hard-coded `norm`.
-- `CONTEXT.md` is updated: the glossary gains an **"LxNorm error family"** entry and the
+- `GLOSSARY.md` is updated: the glossary gains an **"LxNorm error family"** entry and the
   **Tracking Error** entry is reworded to point return-tracking formulations at the LxNorm family
   rather than owning `L*Tracking` names.
 

@@ -190,7 +190,7 @@ bump means the version is never bumped and the gate rots.
 
 ## Consequences
 
-**The vocabulary stays out of `CONTEXT.md`.** That file's preamble scopes it to the library's
+**The vocabulary stays out of `GLOSSARY.md`.** That file's preamble scopes it to the library's
 domain, the workflow from data to post-processing, and states that decisions live here. A
 static-analysis dismissal is repository process and sits beside no entry in any of its sections.
 The three nouns are defined in this ADR alone.

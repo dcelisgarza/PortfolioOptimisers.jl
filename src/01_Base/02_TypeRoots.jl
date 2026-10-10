@@ -50,7 +50,7 @@ Abstract supertype for the running state of an incremental fit.
 
 All partial-fit state objects should subtype `AbstractPartialFitState`.
 
-A partial-fit state carries the quantities an estimator needs to fold one more observation into an estimate without reading the sample again. It subtypes [`AbstractResult`](@ref), so it inherits the length-1 iteration protocol and the pretty `show`, but it is not consumable: the rest of the library reads an ordinary Result, so a read-out verb turns a state into one first. It is the one kind of Result an estimator holds.
+A partial-fit state carries the quantities an estimator needs to fold one more observation into an estimate without reading the sample again. It subtypes [`AbstractResult`](@ref), so it inherits the length-1 iteration protocol and the pretty `show`, but it is not consumable: the rest of the library reads an ordinary Result, so the batch verb called with no data turns a state into one first. It is the one kind of Result an estimator holds.
 
 # Interfaces
 
@@ -91,7 +91,7 @@ In order to implement a new partial-fit state which will work seamlessly with th
 
 ### Algorithm
 
- 1. Name the state's own constructor, and pass `copy` of each array field and each scalar field unchanged. The constructor is named here rather than recovered by reflection, the way the prior carriers name theirs, so a family the library has never seen gets a `MethodError` naming this method rather than a state built by machinery.
+ 1. Name the state's own constructor, and pass `copy` of each array field and each scalar field unchanged. The constructor is named here rather than recovered by reflection, the way the prior results name theirs, so a family the library has never seen gets a `MethodError` naming this method rather than a state built by machinery.
 
 # Related
 
@@ -372,5 +372,106 @@ function Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm,
                                   <:AbstractResult}, i::Int)
     return i == 1 ? obj : throw(BoundsError(obj, i))
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Computes a calibrated quantity from the data a prior result carries, so that the quantity refits whenever the sample moves.
+
+The quantity is a tail probability, a deformation parameter, an ambiguity radius, an Esfahani-Kuhn tail weight, a norm ceiling, a Spanned Shrinkage or an Orthogonal Forecast Scale. The root lives with the other roots, because the slots of a [`CrossSectionalFactorPrior`](@ref) are bound before the calibration rules load.
+
+All concrete subtypes should subtype one of the families under this root rather than the root itself, and `# Related` names them. A plain number in place of a rule is the quantity itself, exactly as it is today.
+
+A rule is named for the **method** it runs, and carries the name of the quantity as a suffix only where the bare method word is already claimed. [`ScenarioCount`](@ref), [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref) and [`EffectiveAssetFloor`](@ref) name a method and stop there. Five names carry the quantity, and each of the five earns it. [`RateSignificance`](@ref) and [`RateRadius`](@ref) are one method over two quantities, so neither may hold the bare word `Rate`, and [`DimensionalRateRadius`](@ref) carries that same stem under a prefix. [`ConcentrationRadius`](@ref) and [`DualNormRadius`](@ref) are each named after a mathematical object, so the bare word would name the object rather than the rule.
+
+A rule states a default for every keyword it can, so a bare call constructs. Two rules state none, because the quantity the keyword takes is the whole content of the rule and no value suits every sample. [`ScenarioCount`](@ref) and [`EntropyBudget`](@ref) are those two. The keyword of each stands at `nothing`, which is not a value of the quantity, so a bare call is refused with a message that names the quantity, the reason there is no default, and a value to start from.
+
+A rule states the **method** and nothing else. The **slot** states the quantity: `alpha` names the lower tail, `kappa` names the deformation parameter, `r` names an ambiguity radius and `l2c` names a norm ceiling. So the caller writes the rule alone, and each slot's `Num_` bound names the one family that has a reading in that slot. A rule of another family is refused at construction, by the bound.
+
+A **Calibration Rule** is not a [`DeferredQuantity`](@ref), and the two mechanisms stay parallel end to end. A Deferred Quantity is *fitted* and the quantity is read off the fit; a rule fits nothing, and reads the sample size and the moments the prior result already carries. A rule also sees the effective observation weights, which [`resolve_slot`](@ref) does not carry. So a rule resolves through [`resolve_calibration_slot`](@ref), is declared through [`calibration_slots`](@ref), and is refused at a value-level entry point by [`assert_calibrated_slots`](@ref).
+
+# Related
+
+  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
+  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
+  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
+  - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
+  - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
+  - [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref)
+  - [`AbstractOrthogonalForecastScaleCalibrationAlgorithm`](@ref)
+  - [`resolve_calibration_slot`](@ref)
+  - [`DeferredQuantity`](@ref)
+"""
+abstract type AbstractCalibrationAlgorithm <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the centring of an exponentially weighted moment, the rule that says which location each deviation is taken from.
+
+The four exponentially weighted moment estimators hold a centring in their `centring` field: [`ExpWeightedVariance`](@ref), [`ExpWeightedCovariance`](@ref), [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). [`EstimatedCentring`](@ref) estimates the location and corrects the bias that the estimate puts in each deviation. [`PreCentred`](@ref) takes the returns as deviations from a mean of zero. [`ZeroStartCentring`](@ref) takes the location of a recursion from zero that is not divided by its weight. The root lives with the other roots, because the estimators bind their field before the members load.
+
+# Interfaces
+
+A centring is a marker for dispatch, and it holds no data. A new centring needs a method of each verb that the members implement: [`centring_lag`](@ref), [`centring_deviation_mask`](@ref), [`centring_location!`](@ref), [`centring_report_location`](@ref), [`centring_factor`](@ref), [`centring_overlap`](@ref), [`centring_lag_records`](@ref) and [`centring_lag_factor`](@ref).
+
+# Related
+
+  - [`EstimatedCentring`](@ref)
+  - [`PreCentred`](@ref)
+  - [`ZeroStartCentring`](@ref)
+"""
+abstract type AbstractCentring <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the debias rule of a regime statistic, the rule that says whether the statistic corrects the bias of the estimated variance it reads.
+
+The two regime-adjusted estimators hold a debias rule in their `debias` field: [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). The root lives with the other roots, because the estimators bind their field before the members load.
+
+# Interfaces
+
+A debias rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`debiases`](@ref) and of [`reads_dependence`](@ref).
+
+# Related
+
+  - [`ExactDebias`](@ref)
+  - [`LawDebias`](@ref)
+  - [`RawStatistic`](@ref)
+"""
+abstract type AbstractRegimeDebias <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the floor of a HAC term, the rule that says whether each HAC-adjusted product is floored at zero before it enters the variance recursion.
+
+The two regime-adjusted estimators hold a floor rule in their `hac_floor` field: [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). The rule acts only where `hac_lags` is not `nothing`. The root lives with the other roots, because the estimators bind their field before the members load.
+
+# Interfaces
+
+A floor rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`hac_floor!`](@ref).
+
+# Related
+
+  - [`NoHacFloor`](@ref)
+  - [`PerTermHacFloor`](@ref)
+"""
+abstract type AbstractHacFloor <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the volatility that standardises a row of the separate correlation path under HAC, the rule that says whether the row is divided by the volatility before or after its own update.
+
+[`RegimeAdjustedExpWeightedCovariance`](@ref) holds the rule in its `hac_vol_before` field. The rule acts only where `hac_lags` is not `nothing` and `cor_decay` differs from `decay`. The root lives with the other roots, because the estimator binds its field before the members load.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`volatility_before_update`](@ref).
+
+# Related
+
+  - [`VolatilityBeforeUpdate`](@ref)
+  - [`VolatilityAfterUpdate`](@ref)
+"""
+abstract type AbstractHacVolatilityTiming <: AbstractAlgorithm end
 public AbstractPartialFitState, DynamicAbstractWeights, AbstractOptimisationEstimator,
-       OptimisationEstimator, NonFiniteAllocationOptimisationEstimator
+       OptimisationEstimator, NonFiniteAllocationOptimisationEstimator, AbstractCentring,
+       AbstractRegimeDebias, AbstractHacFloor, AbstractHacVolatilityTiming

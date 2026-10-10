@@ -107,7 +107,7 @@ Keywords correspond to the struct's fields.
 
 ## Composition: what this estimator forwards
 
-This estimator **merges two** priors rather than forwarding one along its own axis, so it builds its carrier directly; the same posterior-versus-structural pattern still governs which source each field takes. It solves one augmented Black-Litterman system over `[assets; factors]` and reports both halves:
+This estimator **merges two** priors rather than forwarding one along its own axis, so it builds its prior result directly; the same posterior-versus-structural pattern still governs which source each field takes. It solves one augmented Black-Litterman system over `[assets; factors]` and reports both halves:
 
   - `mu` and `sigma` are the asset half of the augmented posterior; the factor block `fpr` is the **factor half**, so both are posterior. `chol` is dropped on both sides, because the posterior covariances supersede the ones they factorise.
   - `w`, `ens`, `kld` and `ow` come from the **asset** prior, and `fpr`'s own come from the **factor** prior. Two priors disagreeing about observation weights is a legitimate configuration, and the nested block is what keeps the two weightings distinguishable rather than forcing a choice.
@@ -229,11 +229,13 @@ AugmentedBlackLittermanPrior
                │     alg ┼ nothing
                │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
             re ┼ StepwiseRegression
-               │   crit ┼ PValue
-               │        │   t ┴ Float64: 0.05
-               │    alg ┼ ForwardSelection()
-               │    tgt ┼ LinearModel
-               │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+               │       crit ┼ PValue
+               │            │   t ┴ Float64: 0.05
+               │        alg ┼ ForwardSelection()
+               │        tgt ┼ LinearModel
+               │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
+               │     choice ┼ BatchChoice()
+               │   included ┴ nothing
        a_views ┼ LinearConstraintEstimator
                │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
                │   key ┴ nothing
@@ -452,7 +454,7 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
  4. Fit `pe.a_pe` on `X`, giving `a_prior`.
  5. Derive the Investable Mask and the reduced asset view universe with [`investable_views`](@ref), refuse a precomputed asset view matrix over a gapped universe with [`assert_bl_precomputed_universe`](@ref), and view `a_prior` at the mask with [`investable_prior`](@ref). `N` is the reduced asset count from here on.
  6. Fit `pe.f_pe` on `F`, giving `f_prior`.
- 7. Regress the reduced `X` — [`reduce_columns`](@ref) at the mask — on `F` with [`factor_reconstruction`](@ref) under `pe.re`, giving `rr` and the reconstructed returns `posterior_X`, both on the reduced asset axis.
+ 7. Regress the reduced `X` — [`reduce_columns`](@ref) at the mask — on `F` with [`factor_reconstruction`](@ref) under `pe.re` viewed to the same mask with [`coverage_regression`](@ref), giving `rr` and the reconstructed returns `posterior_X`, both on the reduced asset axis.
  8. Assemble the asset views with [`bl_preroll`](@ref) at the default `:xkey`, over the reduced asset prior covariance, and the factor views at `:tfkey`, over the factor prior covariance. Either half can be emptied, and [`bl_view_block`](@ref) then gives that half no row rather than collapsing the stack — the joint posterior is still conditioned by whatever the other half kept. Only the asset half can be emptied by a *departure*: a factor axis holds no asset name. When **both** halves empty there is nothing left to condition on, and step 12 takes the joint prior.
  9. Build ``\\boldsymbol{\\Sigma}_{aug}``, whose off-diagonal blocks are the model-implied cross-covariance ``\\mathbf{M}\\boldsymbol{\\Sigma}_f`` and its transpose.
 10. Stack ``\\mathbf{P}_{aug}`` block-diagonally, ``\\boldsymbol{q}_{aug}`` and ``\\boldsymbol{\\Omega}_{aug}`` to match, the asset rows above the factor rows.
@@ -462,7 +464,7 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
 14. Truncate the asset half from `1:N`. Nothing is added to it: the intercept and the rate went into the prior mean at step 11, and the update is affine in that mean.
 15. Truncate the factor half from `N+1:N+K`, and forward the factor block with [`forward_prior`](@ref), dropping `chol`. The half takes no intercept, because the intercept is the regression's and hence asset-only, no rate, because the stack reached the update carrying the one it needed, and no second processing pass, because a principal submatrix of a processed matrix is already processed. It is not expanded: the reduction never touched the factor axis.
 16. Announce the departures once with [`announce_bl_departures`](@ref).
-17. Build the carrier directly, taking `w`, its diagnostics and `Z` from `a_prior`, and writing every asset-axis block back onto the full universe on the way: the moment pair with [`expand_moment`](@ref), the reconstruction with [`expand_columns`](@ref) and the regression with [`expand_regression`](@ref).
+17. Build the prior result directly, taking `w`, its diagnostics and `Z` from `a_prior`, and writing every asset-axis block back onto the full universe on the way: the moment pair with [`expand_moment`](@ref), the reconstruction with [`expand_columns`](@ref) and the regression with [`expand_regression`](@ref).
 
 # Related
 
@@ -511,7 +513,8 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     # Black litterman on the factors. Only the reconstruction is shared with `FactorPrior`:
     # the asset moments here come out of the augmented system, not out of a lift. It runs on
     # the reduced returns, so `M` and `b` land on the same axis as `a_prior_sigma`.
-    rr, posterior_X = factor_reconstruction(pe.re, reduce_columns(X, imsk), F)
+    rr, posterior_X = factor_reconstruction(coverage_regression(pe.re, imsk),
+                                            reduce_columns(X, imsk), F)
     (; b, M) = rr
     dt = eltype(posterior_X)
     T = size(X, 1)
@@ -619,8 +622,8 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     # configuration, and there are two slots to hold them. The diagnostics follow their
     # weights (ADR 0046), so `ens`/`kld`/`ow` come from `a_prior` too. `chol` is dropped:
     # `posterior_sigma` supersedes the covariance `a_prior.chol` factorises. This site merges
-    # two priors rather than forwarding one along its own axis, so it builds the carrier
-    # directly instead of going through [`forward_prior`](@ref).
+    # two priors rather than forwarding one along its own axis, so it builds the prior
+    # result directly instead of going through [`forward_prior`](@ref).
     announce_bl_departures(ni, ledger, viewless)
     # The expansion, onto the caller's own universe. The moment pair goes back through
     # [`expand_moment`](@ref), the reconstruction through [`expand_columns`](@ref) and the
@@ -628,7 +631,7 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     # FULL asset axis with a `NaN` in `mu` and on the diagonal of `sigma` for an asset that
     # is not investable, and the next layer derives the same mask this one did. `o_X` is the
     # caller's own `X` and was never reduced. There is no `chol` here to drop: the augmented
-    # system produces the asset moments whole and this carrier never held one.
+    # system produces the asset moments whole and this prior result never held one.
     return LowOrderPrior(; X = expand_columns(posterior_X, imsk), o_X = X,
                          mu = expand_moment(posterior_mu, imsk, 1),
                          sigma = expand_moment(posterior_sigma, imsk), w = a_prior.w,

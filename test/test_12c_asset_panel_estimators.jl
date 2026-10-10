@@ -117,7 +117,7 @@ end
                    CompositeExposure(; descriptors = [LogMarketCap()], family = "style"),
                "value" =>
                    CompositeExposure(; descriptors = [BookToPrice()], family = "style")]
-    prp = prior(CrossSectionalFactorPrior(; factors = factors), rdp)
+    prp = prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors), rdp)
     msk = PO.investable_mask(prp)
     @test count(msk) < length(msk)
     nnf = count(i -> !all(isfinite, view(prp.rr.L, i, :)), axes(prp.rr.L, 1))
@@ -140,11 +140,17 @@ end
     # The view at the mask recovers the reduced panel, and `:observed` is the mask as a column.
     @test PO.panel_field(PO.port_opt_view(pf, idx), "loadings").vals == prr.rr.L
     @test vec(feature_matrix(pf, ["loadings" => :observed])) == msk
-    # A zero row is a zero feature vector, so an excluded asset sits at distance one from
-    # every asset with loadings under the default metric.
-    D = distance(FeatureDistance(; ape = RegressionPanel()), nothing, rdp.X; pr = prp,
-                 rd = rdp)
-    @test all(isone, D[.!msk, msk])
+    # A zero row outside the mask is a placeholder with a false observed mask, not a zero
+    # feature vector, so a direct call refuses each excluded asset by name (#1508). The view
+    # at the mask, which an optimiser hands the producer, measures the reduced loadings.
+    @test_throws "FeatureDistance has no value to read for the assets $(rdp.nx[.!msk])" distance(FeatureDistance(;
+                                                                                                                 ape = RegressionPanel()),
+                                                                                                 nothing,
+                                                                                                 rdp.X;
+                                                                                                 pr = prp,
+                                                                                                 rd = rdp)
+    @test distance(FeatureDistance(; ape = RegressionPanel()), nothing, rdr.X; pr = prr,
+                   rd = rdr) == distance(FeatureDistance(), prr.rr.L)
 
     # Reduced to the mask, the panel builds over the reduced universe with no mask, and the
     # labels are the block's own raw factor names: no family re-basis, so `L` is `M` and the
@@ -163,7 +169,7 @@ end
     # Under a family re-basis `L` is narrower than `M`, and the labels follow the reduced
     # axis: the dropped member of the constrained family is absent, and the rest keep their
     # names.
-    prf = PO.port_opt_view(prior(CrossSectionalFactorPrior(; factors = factors,
+    prf = PO.port_opt_view(prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                                            families = ["industry" =>
                                                                            nothing]), rdp),
                            idx)
@@ -176,7 +182,9 @@ end
 
     # The routed path: the optimiser reduces the prior before the kernel runs, so the
     # producer never meets the unreduced block, and no weight lands outside the mask.
-    opt = HierarchicalOptimiser(; pe = CrossSectionalFactorPrior(; factors = factors),
+    opt = HierarchicalOptimiser(;
+                                pe = CrossSectionalFactorPrior(; lambda = 1,
+                                                               factors = factors),
                                 cle = ClustersEstimator(;
                                                         de = FeatureDistance(;
                                                                              ape = RegressionPanel())))

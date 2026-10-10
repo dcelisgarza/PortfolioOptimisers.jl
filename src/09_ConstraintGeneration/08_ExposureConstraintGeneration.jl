@@ -112,7 +112,7 @@ Keywords correspond to the struct's fields.
   - [`ExposureConstraintEstimator`](@ref)
   - [`UniverseSets`](@ref)
   - [`Regression`](@ref)
-  - [`factor_space_regression`](@ref): ranks the three carriers `re` competes with, and states the order.
+  - [`factor_space_regression`](@ref): ranks the three sources of loadings that `re` competes with, and states the order.
   - [`resolve_factor_regression`](@ref): the shared precedence, which [`FactorRiskContribution`](@ref) and [`FactorRiskBudgeting`](@ref) read too.
 
 # References
@@ -316,9 +316,9 @@ end
                             rd::Option{<:ReturnsResult})
         -> Option{<:AbstractLoadingsRegressionResult}
 
-Apply [`resolve_factor_regression`](@ref)'s precedence to the three carriers a [`FactorSpace`](@ref) can read its loadings from, and return `nothing` when none of them holds any.
+Apply [`resolve_factor_regression`](@ref)'s precedence to the three sources a [`FactorSpace`](@ref) can read its loadings from, and return `nothing` when none of them holds any.
 
-The precedence is the one [`FactorRiskContribution`](@ref) already uses — a stated result, then the prior's own `rr`, then a refit — and the refit arm delegates to [`resolve_factor_regression`](@ref) rather than repeating it. What differs is the carriers: constraint generation is handed the loadings as `rr`, already read off the prior, so the prior arm is a plain argument rather than a field read, and both `re` and `rd` are optional here because a space that names no source and a route that carries no returns are both ordinary.
+The precedence is the one [`FactorRiskContribution`](@ref) already uses — a stated result, then the prior's own `rr`, then a refit — and the refit arm delegates to [`resolve_factor_regression`](@ref) rather than repeating it. What differs is the sources: constraint generation is handed the loadings as `rr`, already read off the prior, so the prior arm is a plain argument rather than a field read, and both `re` and `rd` are optional here because a space that names no source and a route that carries no returns are both ordinary.
 
 Returning `nothing` rather than throwing is deliberate: the diagnosis for "no basis anywhere" belongs to [`constraint_space_basis`](@ref), which knows it is assembling a constraint.
 
@@ -326,7 +326,7 @@ Returning `nothing` rather than throwing is deliberate: the diagnosis for "no ba
 
  1. Return `re` when it is a precomputed [`Regression`](@ref). The caller has stated the basis, and no data is needed.
  2. Otherwise return `rr` when the prior carries one. This is what a `re === nothing` always resolves to, and it is the behaviour of every [`FactorSpace`](@ref) written before the field existed.
- 3. Otherwise return `nothing` when `re` is `nothing` too. No carrier holds a basis, and [`constraint_space_basis`](@ref) writes the diagnosis.
+ 3. Otherwise return `nothing` when `re` is `nothing` too. No source holds a basis, and [`constraint_space_basis`](@ref) writes the diagnosis.
  4. Otherwise `re` is an estimator. Raise when `rd` is `nothing`, and return `resolve_factor_regression(re, rd)` when it is not, which refits the loadings from the returns.
 
 Step 4 is a capability the field adds rather than a fallback: `FactorSpace(; re = StepwiseRegression())` is **a factor mandate on a prior that carries no loadings**, which previously threw.
@@ -343,7 +343,7 @@ Step 4 is a capability the field adds rather than a fallback: `FactorSpace(; re 
 
 # Returns
 
-  - `rr::Option{<:AbstractLoadingsRegressionResult}`: The loadings the highest-ranked carrier holds, or `nothing` when none of the three holds any.
+  - `rr::Option{<:AbstractLoadingsRegressionResult}`: The loadings the highest-ranked source holds, or `nothing` when none of the three holds any.
 
 # Related
 
@@ -373,14 +373,14 @@ end
 
 Resolve the basis a re-based constraint projects through, and the key its names resolve against, throwing if either is unusable.
 
-Every check a space needs before a single row is assembled lives here, so the assembly loop can assume a consistent basis. For [`FactorSpace`](@ref) that is: the loadings resolve from one of the three carriers [`factor_space_regression`](@ref) ranks, and — via [`factor_universe`](@ref), shared with every other consumer of the declared axis — the factor axis is declared and agrees with those loadings on how many factors there are.
+Every check a space needs before a single row is assembled lives here, so the assembly loop can assume a consistent basis. For [`FactorSpace`](@ref) that is: the loadings resolve from one of the three sources [`factor_space_regression`](@ref) ranks, and — via [`factor_universe`](@ref), shared with every other consumer of the declared axis — the factor axis is declared and agrees with those loadings on how many factors there are.
 
 `rd` is the returns the space may refit from. It is threaded from the [`JuMPOptimiser`](@ref) and from the [`Pipeline`](@ref) step, and is `nothing` on the standalone route.
 
 # Algorithm
 
- 1. Resolve `rr`, the loadings, with [`factor_space_regression`](@ref) over the three carriers `space.re`, `rr` and `rd`.
- 2. Raise when `rr` is `nothing`. No carrier holds a basis, and no row can be assembled.
+ 1. Resolve `rr`, the loadings, with [`factor_space_regression`](@ref) over the three sources `space.re`, `rr` and `rd`.
+ 2. Raise when `rr` is `nothing`. No source holds a basis, and no row can be assembled.
  3. Check the declared factor axis with [`factor_universe`](@ref), against `size(rr.M, 2)`. The call raises and returns no value the assembly reads.
  4. Return `rr` and the factor axis key [`factor_axis_key`](@ref) reads off `rr`, which is the key the row's names resolve against.
 
@@ -395,7 +395,7 @@ Every check a space needs before a single row is assembled lives here, so the as
 
 The names are looked up on the factor axis, but the *basis* comes from the prior, so the two can disagree in ways a single object cannot check. That is why all three of these are checked here and not at construction.
 
-  - **A missing basis throws, ignoring `strict`.** `strict` governs unknown *names*: a per-row, recoverable condition where the offending row is dropped and the rest of the problem is still the problem the caller described. A missing regression is not that — it makes every row unbuildable, and dropping them silently yields a feasible, plausible-looking portfolio carrying none of the requested exposure. "Missing" means no carrier holds any: the space can supply its own through [`FactorSpace`](@ref)'s `re`, which is what makes a factor mandate legal on a prior with no factor block. Raises an [`IsNothingError`](@ref).
+  - **A missing basis throws, ignoring `strict`.** `strict` governs unknown *names*: a per-row, recoverable condition where the offending row is dropped and the rest of the problem is still the problem the caller described. A missing regression is not that — it makes every row unbuildable, and dropping them silently yields a feasible, plausible-looking portfolio carrying none of the requested exposure. "Missing" means no source holds any: the space can supply its own through [`FactorSpace`](@ref)'s `re`, which is what makes a factor mandate legal on a prior with no factor block. Raises an [`IsNothingError`](@ref).
   - **A missing factor axis throws**, naming the key [`factor_axis_key`](@ref) chose. The axis is optional on [`UniverseSets`](@ref); it is not optional for a constraint written against it. [`factor_universe`](@ref) raises a `KeyError`.
   - **`size(rr.M, 2) == length(sets.dict[key])` always.** [`factor_universe`](@ref) raises a `DimensionMismatch` otherwise. The name-level cross-check against `rd.nf` needs the returns and lives at the optimiser.
 
@@ -416,7 +416,7 @@ function constraint_space_basis(space::FactorSpace, sets::UniverseSets,
                                 rd::Option{<:ReturnsResult} = nothing)
     rr = factor_space_regression(space.re, rr, rd)
     @argcheck(!isnothing(rr),
-              IsNothingError("a factor exposure constraint is written in factor names and re-based through the regression loadings, so it needs a source for them, and none of the three carriers holds any: the space states none (`space.re === nothing`) and the prior carries none (`rr === nothing`). Unlike an unknown name, this is not recoverable per row and is not governed by `strict`: every row of the constraint would be dropped, leaving a feasible portfolio with none of the requested exposure.\nState the basis on the space instead, `FactorSpace(; re = Regression(; M = ...))` to pin it or `FactorSpace(; re = StepwiseRegression())` to refit it from the returns. $prior_regression_remedy"))
+              IsNothingError("a factor exposure constraint is written in factor names and re-based through the regression loadings, so it needs a source for them, and none of the three sources holds any: the space states none (`space.re === nothing`) and the prior carries none (`rr === nothing`). Unlike an unknown name, this is not recoverable per row and is not governed by `strict`: every row of the constraint would be dropped, leaving a feasible portfolio with none of the requested exposure.\nState the basis on the space instead, `FactorSpace(; re = Regression(; M = ...))` to pin it or `FactorSpace(; re = StepwiseRegression())` to refit it from the returns. $prior_regression_remedy"))
     key = factor_axis_key(sets, rr)
     factor_universe(sets, key, size(rr.M, 2), "a $(FactorSpace) constraint", "rr.M")
     return rr, key

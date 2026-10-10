@@ -1,5 +1,5 @@
 ```@meta
-Description = "Type roots, public API of PortfolioOptimisers.jl: AbstractPartialFitState, DynamicAbstractWeights, Base.iterate, Base.getindex."
+Description = "Type roots, public API of PortfolioOptimisers.jl: AbstractPartialFitState, DynamicAbstractWeights, AbstractCentring, AbstractRegimeDebias, AbstractHacFloor, …"
 ```
 
 # Type roots
@@ -9,6 +9,10 @@ Every estimator, algorithm and result iterates as a collection of one element, a
 ```@docs
 AbstractPartialFitState
 DynamicAbstractWeights
+AbstractCentring
+AbstractRegimeDebias
+AbstractHacFloor
+AbstractHacVolatilityTiming
 Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, state)
 Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, i::Int)
 ```

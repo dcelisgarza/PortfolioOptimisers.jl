@@ -21,7 +21,7 @@ previous fold's *target* weights, so `Turnover`, `TurnoverEstimator`, `WeightsTr
 not trade the change in the decision. It trades the distance from what it holds to what it now
 wants, and that distance is larger, because the holdings moved while the decision stood still.
 
-A reference implementation of the drifted series exists, and it answers both questions with one
+The oracle computes the drifted series too, and it answers both questions with one
 flag. Turning that flag on makes a fold report the drifted series **and** carry its held weights
 into the next fold. The two answers arrive together, and there is no way to take one without the
 other.
@@ -90,7 +90,7 @@ switches: a caller can drift without amortising, and amortise without drifting.
 - **A drifted run stays parallel.** `needs_previous_weights` did not move, and neither switch
   reaches it. A caller who wants the fund's reading of the return series pays no run-time for it.
   Under the bundle the same caller would pay a sequential run.
-- **Four settings exist where the reference implementation has two.** Off/off is the decision's
+- **Four settings exist where the oracle has two.** Off/off is the decision's
   reading. On/off reads the fund's series while it measures the change in the decision. Off/on is
   the setting a caller reaches for when the trades matter and the series does not. On/on is the
   fund's reading of both.
@@ -104,13 +104,12 @@ switches: a caller can drift without amortising, and amortise without drifting.
   zero or turns negative has no return series, so the drift refuses to form one. Under a
   population the failing member takes an `OptimisationFailure` retcode and the existing filters
   drop it; a single weight vector is a population of one, so it raises `NonPositiveWealthError`.
-- **The reproduction is exact.** With both switches on, the library reproduces the reference
-  implementation's return series, held weights and executed turnover at the reference's own
+- **The reproduction is exact.** With both switches on, the library reproduces the oracle's return series, held weights and executed turnover at the oracle's own
   tolerance, at any panel size.
 
 ## Alternatives considered
 
-- **One flag for both questions, as the reference implementation has.** Refused. It is one
+- **One flag for both questions, as the oracle has.** Refused. It is one
   switch fewer to explain and two capabilities fewer to offer, and it makes a drifted run
   sequential for a dependency the drift does not have.
 - **One typed block carrying both axes, held as one field on every scheme.** Refused after it was
@@ -125,3 +124,32 @@ switches: a caller can drift without amortising, and amortise without drifting.
 - **A new fee type for the smoothed charge, beside the existing one.** Refused on a measured
   cost: 201 `Option{<:Fees}` type bounds across 29 files would have had to widen. A field on the
   two existing fee types moves no bound.
+
+## Amendment (2026-10-07)
+
+**An unset Previous-Weights Source follows the Weight Drift.** The two switches stay two fields,
+and each one stays `nothing` by default. But `pws = nothing` no longer means *the target weights*
+on its own. It means *follow `wd`*: the target weights when `wd` is `nothing`, and
+`DriftedWeights(wd)` when `wd` is set. `resolve_previous_weights_source` applies the rule, and
+the three timeline schemes call it in `fold_evaluation`, so every route to the fold loop reads the
+resolved source.
+
+The reason is consistency. If the series drifts, the fund holds the drifted weights at the end of
+the fold, so the trade it places next is `w_new - w_drifted`. A turnover charged against the
+targets while the series drifts, or the reverse, prices a trade that no one placed. So the two
+consistent pairs are (no drift, targets) and (drift, drifted weights). Under the old default, `wd`
+alone gave an inconsistent pair: the turnover cases of `test_11b` stood `3.5e-3` from the oracle,
+which carries one flag for the consistent drifted pair.
+
+**The mixed pairs stay one keyword away.** A new leaf, `TargetWeights()`, states the target weights
+explicitly, and an explicit `pws` overrides the rule. `wd` with `pws = TargetWeights()` drifts the
+series and measures the change in the decision. That separates the turnover of the decision from
+the turnover the fund executes, which is the one use the mixed pairs keep. The resolution maps
+`TargetWeights()` to `nothing`, the target read of the fold loop, so no reader of the source grows
+a third arm.
+
+This changes the numbers of a run that sets `wd`, sets no `pws`, and reads previous weights. The
+first consequence above still holds. Such a run was sequential already, because its optimiser reads
+previous weights. A run whose optimiser reads no previous weights stays parallel, and its numbers do
+not move. The table of the decision now reads
+"Off (`nothing`): follows `wd`" for `pws`. Recorded by #1518, from row R102 of #1416.

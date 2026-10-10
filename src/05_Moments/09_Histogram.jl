@@ -354,6 +354,8 @@ Where:
   - ``\\mathrm{IQR}(x)``: Interquartile range of the data.
   - ``n``: Number of observations.
 
+A zero interquartile range gives a zero width, and so an infinite bin count. Data with many repeated values do this, for example a return series that is zero on most observations. The width is then the range of `x` divided by five, so the range holds five bins.
+
 # Arguments
 
   - `x`: Data vector.
@@ -374,7 +376,14 @@ Where:
 """
 function bin_width(::FreedmanDiaconis, x::VecNum)
     q25, q75 = Statistics.quantile(x, [0.25, 0.75])
-    return 2 * (q75 - q25) / cbrt(length(x))
+    dx = 2 * (q75 - q25) / cbrt(length(x))
+    if !iszero(dx)
+        return dx
+    end
+    # A zero interquartile range, as in a return series that is mostly zero, gives no width.
+    # Five bins over the range replace it, so the count stays finite.
+    xl, xu = extrema(x)
+    return (xu - xl) / 5
 end
 """
     bin_width(bins::Knuth, x::VecNum)
@@ -401,12 +410,12 @@ The maximiser is an integer, so no closed form gives it. The method searches for
 
 # Algorithm
 
- 1. Read the range of `x` into `rx`, the difference of its two extrema.
- 2. Build the objective `f`, which takes a one-element vector `Ms`, floors its entry into the bin count `M`, and returns `Inf` when `M` is not positive.
+ 1. Read the range of `x` into `rx`, the difference of its two extrema. A constant `x` has a zero `rx`, and the method returns it as the width.
+ 2. Build the objective `f`, which takes a one-element vector `Ms`, floors its entry into the bin count `M`, and returns `Inf` when `M` is outside ``[1, n]``. Data with many repeated values, such as a return series that is zero on most observations, make the posterior rise as the bins narrow, and the bound stops the count at one bin per observation.
  3. Inside `f`, bin the data into the counts `nk` over `M` equal-width bins of the range, and return the negated posterior of the mathematical definition. The optimiser minimises, so the sign is flipped.
- 4. Take the starting point `M0` from the bin count that the Freedman-Diaconis rule implies for `x`, plus one.
+ 4. Take the start point `M0` from the bin count that the Freedman-Diaconis rule implies for `x`, plus one, and cap it at ``n + 1/2``, so that it floors to at most ``n``.
  5. Minimise `f` from `M0` with `Optim.optimize`, passing `bins.args` and `bins.kwargs`. The default `args` is a Nelder-Mead simplex.
- 6. Floor the minimiser into a bin count, and return the range divided by it.
+ 6. Floor the minimiser into a bin count, clamp it to ``[1, n]``, and return the range divided by it.
 
 # Arguments
 
@@ -434,9 +443,12 @@ function bin_width(bins::Knuth, x::VecNum)
     rx = xu - xl
     lg_half = SpecialFunctions.loggamma(0.5)
     nk = Vector{Int}(undef, 0)
+    if iszero(rx)
+        return rx
+    end
     function f(Ms)
         M = floor(Int, first(Ms))
-        if M <= 0
+        if !(1 <= M <= n)
             return Inf
         end
         resize!(nk, M)
@@ -449,9 +461,9 @@ function bin_width(bins::Knuth, x::VecNum)
                  SpecialFunctions.loggamma(n + M / 2) +
                  sum(SpecialFunctions.loggamma, nk .+ 0.5))
     end
-    M0 = max(1.0, rx / bin_width(FreedmanDiaconis(), x)) + 1
+    M0 = min(max(1.0, rx / bin_width(FreedmanDiaconis(), x)) + 1, n + 0.5)
     res = Optim.optimize(f, [M0], bins.args...; bins.kwargs...)
-    return rx / floor(Int, first(Optim.minimizer(res)))
+    return rx / clamp(floor(Int, first(Optim.minimizer(res))), 1, n)
 end
 """
     calc_num_bins(bins::BinWidthBins, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
@@ -468,7 +480,7 @@ This function determines the number of bins to use for histogram-based calculati
 
 The [`BinWidthBins`](@ref) method turns a bin width into a bin count.
 
- 1. Read the range of `xj` into `xju - xjl`, and divide it by [`bin_width`](@ref) of `xj`, giving `k1`.
+ 1. Read the range of `xj` into `rxj`, and divide it by [`bin_width`](@ref) of `xj`. The result is `k1`. A constant `xj` has a zero range and a zero width, and their quotient is `NaN`, so `k1` is one bin.
  2. When `j` and `i` differ, repeat step 1 for `xi`, giving `k2`, and select the larger of `k1` and `k2`. The joint histogram is square, so one count serves both axes, and the larger of the two keeps the finer resolution. When `j` and `i` are equal, the pair is a variable against itself, so select `k1` and read `xi` no further.
  3. Round the selected value to the nearest integer, and return it.
 
@@ -506,12 +518,14 @@ The `Integer` method returns `bins` unchanged.
 """
 function calc_num_bins(bins::BinWidthBins, xj::VecNum, xi::VecNum, j::Integer, i::Integer,
                        args...)
+    # A constant column has a zero range and a zero width, and 0 / 0 is NaN. One bin holds it.
     xjl, xju = extrema(xj)
-    k1 = (xju - xjl) / bin_width(bins, xj)
+    rxj = xju - xjl
+    k1 = iszero(rxj) ? one(rxj) : rxj / bin_width(bins, xj)
     return round(Int, if j != i
                      xil, xiu = extrema(xi)
-                     k2 = (xiu - xil) / bin_width(bins, xi)
-                     max(k1, k2)
+                     rxi = xiu - xil
+                     max(k1, iszero(rxi) ? one(rxi) : rxi / bin_width(bins, xi))
                  else
                      k1
                  end)

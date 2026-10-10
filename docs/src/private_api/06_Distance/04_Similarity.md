@@ -1,8 +1,8 @@
 ```@meta
-Description = "Similarity Matrices, private API of PortfolioOptimisers.jl: AbstractSimilarityMatrixAlgorithm, AbstractNonNegativeSimilarityMatrixAlgorithm, …"
+Description = "Similarity, private API of PortfolioOptimisers.jl: AbstractSimilarityMatrixAlgorithm, AbstractNonNegativeSimilarityMatrixAlgorithm, distance_to_similarity, …"
 ```
 
-# Similarity Matrices: private API
+# Similarity: private API
 
 ```@docs
 AbstractSimilarityMatrixAlgorithm

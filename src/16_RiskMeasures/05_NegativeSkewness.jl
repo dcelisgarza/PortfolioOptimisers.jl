@@ -48,7 +48,8 @@ $(DocStringExtensions.FIELDS)
         sk::Option{<:SkSlot} = nothing,
         V::Option{<:MatNum} = nothing,
         alg::NSkeFormulations = SOCRiskExpr(),
-        window::Option{<:Int_VecInt} = nothing
+        window::Option{<:Int_VecInt} = nothing,
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot()
     ) -> NegativeSkewness
 
 Keywords correspond to the struct's fields.
@@ -97,7 +98,8 @@ NegativeSkewness
         sk ┼ nothing
          V ┼ nothing
        alg ┼ SOCRiskExpr()
-    window ┴ nothing
+    window ┼ nothing
+  mtx_sqrt ┴ EigenFallbackSquareRoot()
 ```
 
 # Related
@@ -139,10 +141,15 @@ NegativeSkewness
     $(field_dict[:window])
     """
     window
+    """
+    Square-root algorithm of ``\\mathbf{V}`` that the SOC formulation reads, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. ``\\mathbf{V}`` keeps only the negative spectral parts of the coskewness slices, so it is often singular, and the default takes the square root of its eigendecomposition then. [`matrix_square_root`](@ref) states each algorithm. The quadratic formulation reads no square root.
+    """
+    mtx_sqrt
     function NegativeSkewness(settings::RiskMeasureSettings,
                               mp::AbstractMatrixProcessingEstimator, sk::Option{<:SkSlot},
                               V::Option{<:MatNum}, alg::NSkeFormulations,
-                              window::Option{<:Int_VecInt})
+                              window::Option{<:Int_VecInt},
+                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
         if isa(sk, DeferredQuantity)
             assert_derived_slot_has_source(V, sk, :V, :sk)
         else
@@ -162,15 +169,17 @@ NegativeSkewness
         end
         assert_nonempty_nonneg_finite_val(window, :window)
         return new{typeof(settings), typeof(mp), typeof(sk), typeof(V), typeof(alg),
-                   typeof(window)}(settings, mp, sk, V, alg, window)
+                   typeof(window), typeof(mtx_sqrt)}(settings, mp, sk, V, alg, window,
+                                                     mtx_sqrt)
     end
 end
 function NegativeSkewness(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                           mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                           sk::Option{<:SkSlot} = nothing, V::Option{<:MatNum} = nothing,
                           alg::NSkeFormulations = SOCRiskExpr(),
-                          window::Option{<:Int_VecInt} = nothing)::NegativeSkewness
-    return NegativeSkewness(settings, mp, sk, V, alg, window)
+                          window::Option{<:Int_VecInt} = nothing,
+                          mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::NegativeSkewness
+    return NegativeSkewness(settings, mp, sk, V, alg, window, mtx_sqrt)
 end
 function (r::NegativeSkewness{<:Any, <:Any, <:Any, <:Any, <:SOCRiskExpr})(w::VecNum)
     return sqrt(LinearAlgebra.dot(w, r.V, w))
@@ -236,7 +245,7 @@ function factory(r::NegativeSkewness, pr::HighOrderPrior, args...;
     sk = nothing_scalar_array_selector(r.sk, pr.sk)
     V = nothing_scalar_array_selector(r.V, pr.V)
     return NegativeSkewness(; settings = r.settings, mp = r.mp, sk = sk, V = V, alg = r.alg,
-                            window = r.window)
+                            window = r.window, mtx_sqrt = r.mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -268,7 +277,7 @@ function port_opt_view(r::NegativeSkewness{<:Any, <:Any, <:MatNum, <:MatNum}, i,
     window = get_window(r.window, X)
     V = negative_spectral_coskewness(sk, view(X, window, i), r.mp)
     return NegativeSkewness(; settings = r.settings, alg = r.alg, mp = r.mp, sk = sk, V = V,
-                            window = r.window)
+                            window = r.window, mtx_sqrt = r.mtx_sqrt)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

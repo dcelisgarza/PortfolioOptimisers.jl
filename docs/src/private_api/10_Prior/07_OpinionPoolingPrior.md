@@ -1,8 +1,8 @@
 ```@meta
-Description = "Opinion Pooling, private API of PortfolioOptimisers.jl: robust_probabilities, show_fields."
+Description = "Opinion pooling Prior, private API of PortfolioOptimisers.jl: robust_probabilities, show_fields."
 ```
 
-# Opinion Pooling: private API
+# Opinion pooling Prior: private API
 
 ```@docs
 robust_probabilities

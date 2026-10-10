@@ -641,7 +641,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits the path of per-row allocations with the largest log wealth whose summed step length is at most `L`.
 
-Dynamic regret at a budget is the gap to this path, the comparator of Zinkevich's (2003) Definition 7. Neither per-row comparator that a [`HindsightSplit`](@ref) builds is this path: be-the-leader is one point at its own path length, and the per-period minimiser is the limit with no budget. The fit is one concave programme over the whole panel. The Lagrangian form, which puts a penalty on the path length in place of the budget, is the same programme with one term moved, and the library does not build it.
+Dynamic regret at a budget is the gap to this path. This path is the comparator of Definition 7 of [zinkevich2003](@cite). Neither per-row comparator that a [`HindsightSplit`](@ref) builds is this path: be-the-leader is one point at its own path length, and the per-period minimiser is the limit with no budget. The fit is one concave programme over the whole panel. The Lagrangian form, which puts a penalty on the path length in place of the budget, is the same programme with one term moved, and the library does not build it.
 
 The estimator follows the Hindsight Comparator rule of [`log_wealth_regret`](@ref), as every other comparator does. [`optimise`](@ref) returns a [`BudgetedHindsightPathResult`](@ref), which holds the path. [`predict`](@ref) over the same rows returns one fold per row, and it refuses any other rows. So `predict(optimise(est, rd_test), rd_test)` is a prediction result that the regret verb reads unchanged, and the verb reports its Euclidean path length beside the regret.
 
@@ -992,7 +992,7 @@ end
 
 Solves the budgeted path programme of [`BudgetedHindsightPath`](@ref) over the rows of `rd`.
 
-[`optimise`](@ref) is the door, and it walks `est.fb` on a failure. The value of a variable fixed at zero is the solver's zero, so the fit writes an exact zero at every entry outside a row's mask.
+Every call reaches this method through [`optimise`](@ref), which walks `est.fb` on a failure. The value of a variable fixed at zero is the solver's zero, so the fit writes an exact zero at every entry outside a row's mask.
 
 # Algorithm
 
@@ -1141,6 +1141,8 @@ end
 
 One fold of a budgeted path's prediction result: row `t`'s allocation as a [`NaiveOptimisationResult`](@ref) on the resolved bounds, predicted over row `t` of `rd` alone.
 
+The fold is predicted at the test rows `t:t`, so it records the position `t`, as a fold of a cross-validation records its test rows. A realised [`factor_attribution`](@ref) of the path then matches each fold to the row of the factor model block by that position.
+
 A row with a gap carries its Investable Mask, so `predict` views the row and the weights at the mask and never reads the gap. A row with no gap carries `nothing`, as a fit on the full universe does.
 
 # Related
@@ -1153,7 +1155,7 @@ function path_row_fold(res::BudgetedHindsightPathResult, rd::ReturnsResult, t::I
     wt = isnothing(mt) ? res.w[t, :] : res.w[t, mt]
     return predict(NaiveOptimisationResult(; pr = nothing, wb = res.wb,
                                            retcode = res.retcode, w = wt, imsk = mt,
-                                           fb = nothing), port_opt_view(rd, t:t, :))
+                                           fb = nothing), rd, t:t)
 end
 
 export log_wealth_regret, LogWealthRegretResult, BudgetedHindsightPath,

@@ -2181,6 +2181,40 @@
               PO.calc_num_bins(HacineGharbiRavier(), xh, xh, 1, 1, Th)
         @test !isnan(PO.mutual_info(hcat(xh, -xh))[1, 2])
         @test size(PO.variation_info(hcat(xh, -xh))) == (2, 2)
+        #=
+        Repeated values. A series that is zero on 80 % of its observations has a zero
+        interquartile range, so Freedman-Diaconis gave a zero width and an infinite count,
+        and Knuth, which starts from that count, raised `InexactError: Int64(Inf)`. Freedman-
+        Diaconis now puts five bins over the range. Knuth's posterior also keeps rising as
+        the bins narrow on such data, and nothing stopped the count above one bin per
+        observation, so the joint histogram could hold billions of cells. Knuth is now
+        bounded to [1, n]. A constant column has a zero range AND a zero width, so its count
+        was 0 / 0; it is now one bin.
+        =#
+        knuth_count(x) = round(Int, (maximum(x) - minimum(x)) / PO.bin_width(Knuth(), x))
+        rngz = StableRNG(42)
+        xz = randn(rngz, 1000)
+        xz[1:800] .= 0
+        @test iszero(quantile(xz, 0.75) - quantile(xz, 0.25))
+        @test PO.bin_width(FreedmanDiaconis(), xz) ≈ (maximum(xz) - minimum(xz)) / 5
+        @test PO.calc_num_bins(FreedmanDiaconis(), xz, xz, 1, 1) == 5
+        @test 1 <= knuth_count(xz) <= length(xz)
+        xs = randn(rngz, 1000)
+        xs[11:end] .*= 1e-3
+        @test 1 <= knuth_count(xs) <= length(xs)
+        @test knuth_count([-2.6, -1.7, 1.5, 1.8, 2.2]) == 5
+        yz = randn(rngz, 1000)
+        xc = fill(0.3, 1000)
+        for bins in (Knuth(), FreedmanDiaconis(), Scott())
+            @test PO.calc_num_bins(bins, xc, xc, 1, 1) == 1
+            @test PO.calc_num_bins(bins, xc, yz, 1, 2) ==
+                  PO.calc_num_bins(bins, yz, yz, 2, 2)
+            # Unnormalised: the normalised form divides by the zero entropy of `xc`.
+            miz = PO.mutual_info(hcat(xz, yz, xc), bins, false)
+            @test all(isfinite, miz)
+            @test all(x -> isapprox(x, 0; atol = 1e-12), miz[3, :])
+            @test all(isfinite, PO.variation_info(hcat(xz, yz, xc), bins, true))
+        end
         # --- the two direct routes to a bin count ---
         # An `Integer` is returned unchanged and reads no other argument.
         @test PO.calc_num_bins(11, xh, yh, 1, 2, Th) == 11
@@ -2427,12 +2461,12 @@ end
     win = 1:50
 
     # Every member of the family carries the same shape: the inner estimator under its
-    # conventional field name, `w`, `window` — and nothing else.
-    @test propertynames(WindowedExpectedReturns()) == (:me, :w, :window)
-    @test propertynames(WindowedCovariance()) == (:ce, :w, :window)
-    @test propertynames(WindowedVariance()) == (:ve, :w, :window)
-    @test propertynames(WindowedCoskewness()) == (:ske, :w, :window)
-    @test propertynames(WindowedCokurtosis()) == (:kte, :w, :window)
+    # conventional field name, `w`, `window`, `rule` — and nothing else.
+    @test propertynames(WindowedExpectedReturns()) == (:me, :w, :window, :rule)
+    @test propertynames(WindowedCovariance()) == (:ce, :w, :window, :rule)
+    @test propertynames(WindowedVariance()) == (:ve, :w, :window, :rule)
+    @test propertynames(WindowedCoskewness()) == (:ske, :w, :window, :rule)
+    @test propertynames(WindowedCokurtosis()) == (:kte, :w, :window, :rule)
 
     # Each answers a different generic, so each must keep its own supertype (ADR 0039).
     @test WindowedExpectedReturns() isa PortfolioOptimisers.AbstractExpectedReturnsEstimator
@@ -2511,8 +2545,9 @@ end
 module WindowedEstimatorProbe
 using Statistics, StatsBase, PortfolioOptimisers
 using PortfolioOptimisers: MatNum, VecNum, Option, Int_VecInt, ObsWeights,
-                           AbstractVarianceEstimator, arg_dict, field_dict, ret_dict,
-                           val_dict, assert_nonempty_nonneg_finite_val, factory_child,
+                           AbstractVarianceEstimator, AbstractWindowRule, arg_dict,
+                           field_dict, ret_dict, val_dict,
+                           assert_nonempty_nonneg_finite_val, factory_child,
                            windowed_preamble, _wprop, @concrete, @propagatable,
                            @windowed_estimator
 import PortfolioOptimisers: factory, port_opt_view
@@ -2774,8 +2809,8 @@ end
         idx = [2, 7, 11, 40]
         W = WindowedEstimatorProbe.ProbeWindowedVariance
 
-        # One declared field; the macro supplies `w` and `window`, and nothing else.
-        @test fieldnames(W) == (:ve, :w, :window)
+        # One declared field; the macro supplies `w`, `window` and `rule`, and nothing else.
+        @test fieldnames(W) == (:ve, :w, :window, :rule)
         @test W <: PortfolioOptimisers.AbstractVarianceEstimator
         # The generated `export` makes the type reachable from the declaring module.
         @test :ProbeWindowedVariance in names(WindowedEstimatorProbe)
@@ -2786,6 +2821,7 @@ end
         @test w0.ve isa SimpleVariance
         @test isnothing(w0.w)
         @test isnothing(w0.window)
+        @test w0.rule === RollingWindow()
         @test isconcretetype(typeof(w0))
         @test isconcretetype(typeof(W(; w = ew, window = idx)))
 
@@ -3003,11 +3039,19 @@ end
                 v = dot(b, isigma460, b)
                 w = dot(vm, isigma460, b)
                 a_bop = ((u - N460 / (T460 - N460)) * v - w^2) / (u * v - w^2)
-                b_bop = (1 - a_bop) * w / u
-                @test isapprox(vec(mean(ShrunkExpectedReturns(;
-                                                              alg = BodnarOkhrinParolya(;
-                                                                                        tgt = tgt)),
-                                        X460)), a_bop * vm + b_bop * b)
+                # Equation 7 of the paper divides `beta` by the target's quadratic form `v`.
+                # Equation 3.45 of Cajas (2025) divides by `u`, and the method copied it.
+                b_bop = (1 - a_bop) * w / v
+                r_bop = vec(mean(ShrunkExpectedReturns(;
+                                                       alg = BodnarOkhrinParolya(;
+                                                                                 tgt = tgt)),
+                                 X460))
+                @test isapprox(r_bop, a_bop * vm + b_bop * b)
+                # `beta * b` is the projection of `(1 - alpha) * mu` onto the target in the
+                # `inv(S)` inner product, so the residual is orthogonal to the target. The
+                # quotient over `u` leaves a residual that is not.
+                @test isapprox(dot((1 - a_bop) * vm - (r_bop - a_bop * vm), isigma460, b),
+                               0; atol = 1e-10 * v)
             end
         end
 
@@ -3072,8 +3116,9 @@ end
 
         @testset "the Bodnar-Okhrin-Parolya coefficient does not read the target scale" begin
             # Every target of this file is a multiple of the vector of ones, so the
-            # multiplier cancels in `alpha` and survives in `beta * b`. The coefficient is
-            # therefore one number per sample, and the three results still differ.
+            # multiplier cancels in `alpha` and in `beta * b`. `beta * b` is a projection
+            # onto the line through the target, and it reads the direction only. The three
+            # targets therefore return the same estimate on one sample.
             u = dot(vec(mu460), isigma460, vec(mu460))
             alphas = map(tgts460) do tgt
                 b = vec(collect(PortfolioOptimisers.target_mean(tgt, mu460, sigma460,
@@ -3089,8 +3134,8 @@ end
                                                                                 tgt = tgt)),
                                 X460))
             end
-            @test !isapprox(results[1], results[2])
-            @test !isapprox(results[1], results[3])
+            @test isapprox(results[1], results[2])
+            @test isapprox(results[1], results[3])
         end
 
         @testset "the James-Stein intensity is negative for two assets or fewer" begin

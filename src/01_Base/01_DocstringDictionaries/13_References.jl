@@ -5,6 +5,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :brinson_attribution => "[brinson_attribution](@cite) G. P. Brinson and N. Fachler. *Measuring non-US. equity portfolio performance*. The Journal of Portfolio Management 11, 73–76 (1985).",#
                  :bergstra2012 => "[bergstra2012](@cite) J. Bergstra and Y. Bengio. *Random search for hyper-parameter optimization*. Journal of Machine Learning Research 13, 281–305 (2012).",#
                  :chan1983 => "[chan1983](@cite) T. F. Chan, G. H. Golub and R. J. LeVeque. *Algorithms for computing the sample variance: Analysis and recommendations*. The American Statistician 37, 242–247 (1983).",#
+                 :barjoseph2001 => "[barjoseph2001](@cite) Z. Bar-Joseph, D. K. Gifford and T. S. Jaakkola. *Fast optimal leaf ordering for hierarchical clustering*. Bioinformatics 17, S22–S29 (2001).",#
                  :DBHTs => "[DBHTs](@cite) W.-M. Song, T. Di Matteo and T. Aste. *Hierarchical information clustering by means of topologically embedded graphs*. PloS one 7, e31929 (2012).",#
                  :drcvar => "[drcvar](@cite) P. Mohajerin Esfahani and D. Kuhn. *Data-driven distributionally robust optimization using the Wasserstein metric: performance guarantees and tractable reformulations*. Mathematical Programming 171, 115–166 (2018).",#
                  :freedman1981 => "[freedman1981](@cite) D. Freedman and P. Diaconis. *On the histogram as a density estimator: L2 theory*. Zeitschrift für Wahrscheinlichkeitstheorie und verwandte Gebiete 57, 453–476 (1981).",#
@@ -16,6 +17,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :fabozzi2007 => "[fabozzi2007](@cite) F. J. Fabozzi, P. N. Kolm, D. A. Pachamanova and S. M. Focardi. *Robust Portfolio Optimization and Management* (John Wiley & Sons, Hoboken, NJ, 2007).",#
                  :sousalobo2000 => "[sousalobo2000](@cite) M. Sousa Lobo and S. Boyd. *The worst-case risk of a portfolio*. Technical report, Stanford University (2000).",#
                  :higham2002 => "[higham2002](@cite) N. J. Higham. *Computing the nearest correlation matrix—a problem from finance*. IMA Journal of Numerical Analysis 22, 329–343 (2002).",#
+                 :rebonato2000 => "[rebonato2000](@cite) R. Rebonato and P. Jäckel. *The most general methodology for creating a valid correlation matrix for risk management and option pricing purposes*. Journal of Risk 2, 17–27 (2000).",#
                  :qisun2006 => "[qisun2006](@cite) H. Qi and D. Sun. *A quadratically convergent Newton method for computing the nearest correlation matrix*. SIAM Journal on Matrix Analysis and Applications 28, 360–385 (2006).",#
                  :gmd => "[gmd](@cite) S. Yitzhaki. *Stochastic dominance, mean variance, and Gini's mean difference*. The American Economic Review 72, 178–185 (1982).",#
                  :knuth2019 => "[knuth2019](@cite) K. H. Knuth. *Optimal data-based binning for histograms and histogram-based probability density models*. Digital Signal Processing 95, 102581 (2019).",#
@@ -23,6 +25,9 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :markowitz1952 => "[markowitz1952](@cite) H. Markowitz. *Modern portfolio theory*. Journal of Finance 7, 77–91 (1952).",#
                  :mlp1 => "[mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020).",#
                  :lopezdeprado2018 => "[lopezdeprado2018](@cite) M. López de Prado. *Advances in Financial Machine Learning* (John Wiley & Sons, Hoboken, NJ, 2018).",#
+                 :laloux1999 => "[laloux1999](@cite) L. Laloux, P. Cizeau, J.-P. Bouchaud and M. Potters. *Noise dressing of financial correlation matrices*. Phys. Rev. Lett. 83, 1467–1470 (1999).",#
+                 :plerou2002 => "[plerou2002](@cite) V. Plerou, P. Gopikrishnan, B. Rosenow, L. A. Amaral, T. Guhr and H. E. Stanley. *Random matrix approach to cross correlations in financial data*. Phys. Rev. E 65, 066126 (2002).",#
+                 :kim2005 => "[kim2005](@cite) D.-H. Kim and H. Jeong. *Systematic analysis of group identification in stock markets*. Phys. Rev. E 72, 046133 (2005).",#
                  :mpdist => "[mpdist](@cite) V. A. Marčenko and L. A. Pastur. *Distribution of eigenvalues for some sets of random matrices*. Mathematics of the USSR-Sbornik 1, 457 (1967).",#
                  :NHPG => "[NHPG](@cite) W.-M. Song, T. Di Matteo and T. Aste. *Nested hierarchies in planar graphs*. Discrete Applied Mathematics 159, 2135–2146 (2011).",#
                  :owa1 => "[owa1](@cite) D. Cajas. *OWA portfolio optimization: A disciplined convex programming framework*. Available at SSRN 3988927 (2021).",#
@@ -44,6 +49,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :vorobets2021 => "[vorobets2021](@cite) A. Vorobets. *Sequential entropy pooling heuristics*. Available at SSRN 3936392 (2021).",#
                  :cvar => "[cvar](@cite) R. T. Rockafellar and S. Uryasev. *Optimization of conditional value-at-risk*. Journal of Risk 2, 21–41 (2000).",#
                  :evar => "[evar](@cite) A. Ahmadi-Javid. *Entropic value-at-risk: A new coherent risk measure*. Journal of Optimization Theory and Applications 155, 1105–1123 (2012).",#
+                 :kaniadakis2001 => "[kaniadakis2001](@cite) G. Kaniadakis. *Non-linear kinetics underlying generalized statistics*. Physica A: Statistical Mechanics and its Applications 296, 405–425 (2001).",#
                  :rlvar => "[rlvar](@cite) D. Cajas. *Portfolio Optimization of Relativistic Value at Risk*. Available at SSRN 4378498 (2023).",#
                  :cdar => "[cdar](@cite) A. Chekhlov, S. Uryasev and M. Zabarankin. *Drawdown measure in portfolio optimization*. International Journal of Theoretical and Applied Finance 8, 13–58 (2005).",#
                  :pnvar => "[pnvar](@cite) P. A. Krokhmal. *Higher moment coherent risk measures*. Quantitative Finance 7, 373–387 (2007).",#
@@ -63,6 +69,8 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :lpm => "[lpm](@cite) P. C. Fishburn. *Mean-risk analysis with risk associated with below-target returns*. The American Economic Review 67, 116–126 (1977).",#
                  :palomar2025 => "[palomar2025](@cite) D. P. Palomar. *Portfolio Optimization: Theory and Application* (Cambridge University Press, 2025).",#
                  :benidis2018 => "[benidis2018](@cite) K. Benidis, Y. Feng and D. P. Palomar. *Optimization Methods for Financial Index Tracking: From Theory to Practice*. Foundations and Trends in Optimization 3, 171–279 (2018).",#
+                 :beasley2003 => "[beasley2003](@cite) J. E. Beasley, N. Meade and T.-J. Chang. *An evolutionary heuristic for the index tracking problem*. European Journal of Operational Research 148, 621–643 (2003).",#
+                 :rudolf1999 => "[rudolf1999](@cite) M. Rudolf, H.-J. Wolter and H. Zimmermann. *A linear model for tracking error minimization*. Journal of Banking & Finance 23, 85–103 (1999).",#
                  :cajas2025 => "[cajas2025](@cite) D. Cajas. *Advanced Portfolio Optimization: A Cutting-edge Quantitative Approach* (Springer Nature Switzerland, 2025).",#
                  :goldfarbiyengar2003 => "[goldfarbiyengar2003](@cite) D. Goldfarb and G. Iyengar. *Robust Portfolio Selection Problems*. Mathematics of Operations Research 28, 1–38 (2003).",#
                  :bentalnemirovski1998 => "[bentalnemirovski1998](@cite) A. Ben-Tal and A. Nemirovski. *Robust Convex Optimization*. Mathematics of Operations Research 23, 769–805 (1998).",#
@@ -115,6 +123,13 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :luca2011 => "[luca2011](@cite) G. De Luca and P. Zuccolotto. *A tail dependence-based dissimilarity measure for financial time series clustering*. Advances in Data Analysis and Classification 5, 323–340 (2011).",#
                  :hacinegharbi2012 => "[hacinegharbi2012](@cite) A. Hacine-Gharbi, P. Ravier, R. Harba and T. Mohamadi. *Low bias histogram-based estimation of mutual information for feature selection*. Pattern Recognition Letters 33, 1302–1308 (2012).",#
                  :hacinegharbi2018 => "[hacinegharbi2018](@cite) A. Hacine-Gharbi and P. Ravier. *A binning formula of bi-histogram for joint entropy estimation using mean square error minimization*. Pattern Recognition Letters 101, 21–28 (2018).",#
+                 :charikar2002 => "[charikar2002](@cite) M. S. Charikar. *Similarity estimation techniques from rounding algorithms*. In: *Proceedings of the Thirty-Fourth Annual ACM Symposium on Theory of Computing* (2002); pp. 380–388.",#
+                 :kraskov2005 => "[kraskov2005](@cite) A. Kraskov, H. Stögbauer, R. G. Andrzejak and P. Grassberger. *Hierarchical clustering using mutual information*. Europhysics Letters 70, 278–284 (2005).",#
+                 :meila2007 => "[meila2007](@cite) M. Meilă. *Comparing clusterings—an information based distance*. Journal of Multivariate Analysis 98, 873–895 (2007).",#
+                 :rajski1961 => "[rajski1961](@cite) C. Rajski. *A metric space of discrete probability distributions*. Information and Control 4, 371–377 (1961).",#
+                 :gower1966 => "[gower1966](@cite) J. C. Gower. *Some distance properties of latent root and vector methods used in multivariate analysis*. Biometrika 53, 325–338 (1966).",#
+                 :rousseeuw1993transformation => "[rousseeuw1993transformation](@cite) P. J. Rousseeuw and G. Molenberghs. *Transformation of non positive semidefinite correlation matrices*. Communications in Statistics - Theory and Methods 22, 965–984 (1993).",#
+                 :no_original_source => "The original source of this formulation was not found. The formulation follows this work and is not checked against the original.",#
                  :vandongen2012 => "[vandongen2012](@cite) S. Van Dongen and A. J. Enright. *Metric distances derived from cosine similarity and Pearson and Spearman correlations*. arXiv preprint arXiv:1208.3145 (2012).",#
                  :rousseeuw1987 => "[rousseeuw1987](@cite) P. J. Rousseeuw. *Silhouettes: a graphical aid to the interpretation and validation of cluster analysis*. Journal of Computational and Applied Mathematics 20, 53–65 (1987).",#
                  :lopezdeprado2019 => "[lopezdeprado2019](@cite) M. López de Prado and M. J. Lewis. *Detection of false investment strategies using unsupervised learning methods*. Quantitative Finance 19, 1555–1565 (2019).",#
@@ -200,6 +215,9 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :li2013cwmr => "[li2013cwmr](@cite) B. Li, S. C. H. Hoi, P. Zhao and V. Gopalkrishnan. *Confidence weighted mean reversion strategy for online portfolio selection*. ACM Transactions on Knowledge Discovery from Data 7(1), 4:1–4:38 (2013).",#
                  :borodin2004 => "[borodin2004](@cite) A. Borodin, R. El-Yaniv and V. Gogan. *Can we learn to beat the best stock*. Journal of Artificial Intelligence Research 21, 579–594 (2004).",#
                  :helmbold1997 => "[helmbold1997](@cite) D. P. Helmbold, R. E. Schapire, Y. Singer and M. K. Warmuth. *A comparison of new and old algorithms for a mixture estimation problem*. Machine Learning 27(1), 97–119 (1997).",#
+                 :herbsterwarmuth1998 => "[herbsterwarmuth1998](@cite) M. Herbster and M. K. Warmuth. *Tracking the best expert*. Machine Learning 32(2), 151–178 (1998).",#
+                 :rubinovsporns2010 => "[rubinovsporns2010](@cite) M. Rubinov and O. Sporns. *Complex network measures of brain connectivity: Uses and interpretations*. NeuroImage 52(3), 1059–1069 (2010).",#
+                 :li2016olps => "[li2016olps](@cite) B. Li, D. Sahoo and S. C. H. Hoi. *OLPS: A toolbox for on-line portfolio selection*. Journal of Machine Learning Research 17(35), 1–5 (2016).",#
                  :orseau2017 => "[orseau2017](@cite) L. Orseau, T. Lattimore and S. Legg. *Soft-Bayes: Prod for mixtures of experts with log-loss*. In: Proceedings of the 28th International Conference on Algorithmic Learning Theory, PMLR 76, 372–399 (2017).",#
                  :vovkwatkins1998 => "[vovkwatkins1998](@cite) V. Vovk and C. Watkins. *Universal portfolio selection*. In: Proceedings of the 11th Annual Conference on Computational Learning Theory, 12–23 (1998).",#
                  :li2011corn => "[li2011corn](@cite) B. Li, S. C. H. Hoi and V. Gopalkrishnan. *CORN: Correlation-driven nonparametric learning approach for portfolio selection*. ACM Transactions on Intelligent Systems and Technology 2(3), 21:1–21:29 (2011).",#

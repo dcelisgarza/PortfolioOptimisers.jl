@@ -674,6 +674,21 @@
         @test IndexWalkForward(100, 1) isa IndexWalkForward
         @test DateWalkForward(12, 1; period = Month(1)) isa DateWalkForward
     end
+    @testset "A split keeps a training fold, and a gap is not negative" begin
+        # With every fold held out, the one split had an empty training set and no error.
+        @test_throws DomainError CombinatorialCrossValidation(; n_folds = 3,
+                                                              n_test_folds = 3)
+        @test_throws DomainError CombinatorialCrossValidation(; n_folds = 2,
+                                                              n_test_folds = 2)
+        @test CombinatorialCrossValidation(; n_folds = 3, n_test_folds = 2) isa
+              CombinatorialCrossValidation
+        # A negative purge or embargo was accepted by both constructors.
+        @test_throws DomainError CombinatorialCrossValidation(; purged_size = -1)
+        @test_throws DomainError CombinatorialCrossValidation(; embargo_size = -1)
+        @test_throws DomainError KFold(; purged_size = -1)
+        @test_throws DomainError KFold(; embargo_size = -1)
+        @test KFold(; purged_size = 0, embargo_size = 0) isa KFold
+    end
     @testset "MultipleRandomised" begin
         cv = IndexWalkForward(127, 171)
         res = split(cv, rd)
@@ -798,6 +813,26 @@
                                      window_size = ws)
             @test n_splits(cvn, rd) == length(split(cvn, rd).path_ids)
         end
+
+        # A window of `w` rows fits at `T - w + 1` starts. The draw must reach the last one,
+        # which ends on row `T`, and a window of all `T` rows has the one start `1`.
+        Xw = randn(StableRNG(393), 10, 4) ./ 100
+        rdw = ReturnsResult(; nx = string.('A':'D'), X = Xw)
+        resf = split(MultipleRandomised(IndexWalkForward(8, 2); rng = StableRNG(1),
+                                        n_subsets = 3, subset_size = 2, window_size = 10),
+                     rdw)
+        @test resf.train_idx == fill(1:8, 3)
+        @test resf.test_idx == fill(9:10, 3)
+        starts = Set{Int}()
+        for s in 1:100
+            resw = split(MultipleRandomised(IndexWalkForward(2, 2); rng = StableRNG(s),
+                                            n_subsets = 2, subset_size = 2,
+                                            window_size = 4), rdw)
+            for p in 1:2
+                push!(starts, minimum(first.(resw.train_idx[resw.path_ids .== p])))
+            end
+        end
+        @test starts == Set(1:7)
     end
     #=
     Issue #860, ADR 0120: a random asset subset is drawn from the Coverage Universe of its
@@ -1694,6 +1729,25 @@
             end
         end
     end
+    @testset "Combinatorial puts every trailing row in the last fold" begin
+        # When `mod(T, n_folds) >= div(T, n_folds)`, the fold index of a trailing row
+        # used to pass `n_folds`. Only the value `n_folds` itself was clipped, so the rows
+        # past it joined no fold: every split trained on them and none tested them.
+        for (T, nf, ntf, sizes) in ((10, 5, 2, fill(2, 5)), (11, 5, 2, [2, 2, 2, 2, 3]),
+                                    (12, 5, 2, [2, 2, 2, 2, 4]), (13, 5, 2, [2, 2, 2, 2, 5]),
+                                    (89, 10, 2, [fill(8, 9); 17]), (17, 4, 3, [4, 4, 4, 5]))
+            rdT = ReturnsResult(; nx = rd.nx, X = rd.X[1:T, :])
+            cv = CombinatorialCrossValidation(; n_folds = nf, n_test_folds = ntf)
+            res = split(cv, rdT)
+            blocks = unique(reduce(vcat, res.test_idx))
+            sort!(blocks; by = first)
+            @test length.(blocks) == sizes
+            @test reduce(vcat, blocks) == 1:T
+            for j in eachindex(res.train_idx)
+                @test sort!([res.train_idx[j]; reduce(vcat, res.test_idx[j])]) == 1:T
+            end
+        end
+    end
     @testset "Purging and embargoing leave the documented gap" begin
         T = size(rd.X, 1)
         # A training row must never sit within `purged_size` rows before a test block,
@@ -2009,10 +2063,16 @@
             w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
             optn = JuMPOptimiser(; slv = slv, tn = Turnover(; w = w0, val = 0.02))
             mrt = MeanRisk(; opt = optn)
-            a = cross_val_predict(mrt, rd, IndexWalkForward(500, 250; wd = sfd))
+            a = cross_val_predict(mrt, rd,
+                                  IndexWalkForward(500, 250; wd = sfd,
+                                                   pws = TargetWeights()))
             b = cross_val_predict(mrt, rd, IndexWalkForward(500, 250; wd = sfd, pws = dw))
             @test a.pred[1].res.w == b.pred[1].res.w
             @test a.pred[2].res.w != b.pred[2].res.w
+            # An unset source follows the drift (#1518), so `wd` alone threads the held
+            # weights, as the explicit source does.
+            c = cross_val_predict(mrt, rd, IndexWalkForward(500, 250; wd = sfd))
+            @test c.pred[2].res.w == b.pred[2].res.w
         end
         @testset "The drift reaches the pipeline entry point" begin
             pipe = Pipeline(; steps = (EmpiricalPrior(), ivol))
@@ -2130,7 +2190,7 @@
             catch e
                 sprint(showerror, e)
             end
-            @test occursin("neither `wd` nor `pws`", msg)
+            @test occursin("neither `wd` nor a `DriftedWeights` source", msg)
 
             # The fold-taking form hands the fold's bare asset returns to the free
             # function, so a moment measure whose slot is unfilled is refused by name there
@@ -2216,11 +2276,11 @@
         end
     end
     @testset "A failed fold holds (#1021)" begin
-        # The reference's online loop leaves its previous weights where they were on a failed
+        # The oracle's online loop leaves its previous weights where they were on a failed
         # step, so the next step reads the last successful ones; its batch loop threads the
         # failed step's `NaN`. Here both arms thread the last threadable fold, a failed fold
         # under a drift holds the weights it was handed, and `PreviousWeights` is the
-        # reference's `fallback = "previous_weights"`.
+        # oracle's `fallback = "previous_weights"`.
         PO = PortfolioOptimisers
         N = size(rd.X, 2)
         ok = WeightBounds(; lb = zeros(N), ub = ones(N))
@@ -2232,7 +2292,8 @@
         dw = DriftedWeights()
         cv = IndexWalkForward(250, 250)
         cvd = IndexWalkForward(250, 250; wd = sfd, pws = dw)
-        cvw = IndexWalkForward(250, 250; wd = sfd, store_weight_path = true)
+        cvw = IndexWalkForward(250, 250; wd = sfd, pws = TargetWeights(),
+                               store_weight_path = true)
         n = n_splits(cv, rd)
         @test n >= 3
         sched(k) = TimeDependent([i in k ? bad : ok for i in 1:n])
@@ -2291,19 +2352,19 @@
             @test !PO.threads_weights(dw, res1.pred[1])
             @test threaded(res1.pred[2]) == tn.w
         end
-        @testset "under a drift alone, a failed fold holds the last target" begin
+        @testset "under a drift and the target source, a failed fold holds the last target" begin
             res = cross_val_predict(mk(2), rd, cvw)
             p1, p2, p3 = res.pred[1], res.pred[2], res.pred[3]
             @test isa(p2.res.retcode, OptimisationFailure)
             @test p2.hw.w0 == p1.res.w
             @test all(isfinite, p2.hw.U)
             @test p2.hw.w == PO.held_weights(sfd, p1.res.w, p2.hw.X)
-            # No source, so the target read skips the failed fold and reads fold 1, and the
-            # solve is the one the undrifted run made: a drift moves no target.
+            # The target source, so the target read skips the failed fold and reads fold 1,
+            # and the solve is the one the undrifted run made: a drift moves no target.
             @test threaded(p3) == p1.res.w
             @test p3.res.w == cross_val_predict(mk(2), rd, cv).pred[3].res.w
         end
-        @testset "PreviousWeights is the reference's previous-weights fallback" begin
+        @testset "PreviousWeights is the oracle's previous-weights fallback" begin
             @test PO.needs_previous_weights(PreviousWeights())
             @test PO.needs_previous_weights(mk(()))
             @test PO.needs_previous_weights(MeanRisk(; opt = JuMPOptimiser(; slv = slv),

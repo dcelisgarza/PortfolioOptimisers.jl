@@ -1,6 +1,6 @@
 #=
 Check `src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl` against the contract its docstrings
-state, and against the reference implementation the map of issue #643 ports. Issue #706.
+state, and against the stored oracle of map #643. Issue #706.
 
 THREE FACTS SHAPE THE PROBES.
 
@@ -16,7 +16,7 @@ THREE FACTS SHAPE THE PROBES.
    all four against a hand-written slice, and it reorders the assets so that a probe cannot
    pass on a shape alone.
 
-3. THE REFERENCE IMPLEMENTATION'S OWN SELECTION TESTS ARE THE ORACLE. They state which field
+3. THE ORACLE'S OWN SELECTION TESTS SET THE RULES. They state which field
    moves under an asset selection and which passes through, that a full idiosyncratic
    covariance is cut on both axes while a diagonal one is cut once, and that a model may drop
    its exposure history, its idiosyncratic returns, its idiosyncratic variance history and its
@@ -27,6 +27,7 @@ THREE FACTS SHAPE THE PROBES.
 This file probes only the rule this result states: `L` and `fcb` are present together or
 absent together.
 =#
+using Dates
 
 @testset "CrossSectionalFactorModel" begin
     # One fixture, written out rather than generated: 4 observations, 3 assets, 2 factors.
@@ -72,7 +73,7 @@ absent together.
         # Every optional field after `b` reads back as `nothing` when it was not given.
         @test all(isnothing,
                   (csfm.csr, csfm.Ms, csfm.vs, csfm.esigma, csfm.rw, csfm.bw, csfm.fam,
-                   csfm.fcb, csfm.lag, csfm.rf))
+                   csfm.fcb, csfm.lag, csfm.rf, csfm.fx, csfm.fr))
     end
 
     @testset "A re-basis makes L narrower than M" begin
@@ -129,6 +130,21 @@ absent together.
                                                                  esigma = esigma_full[1:2,
                                                                                       1:2])
         @test_throws DomainError CrossSectionalFactorModel(; M = M, b = b, lag = -1)
+        # `fr` is the raw-axis history of a re-based fit: it needs the re-basis and the fit,
+        # and it has the rows of the fit and the columns of `M` (#1422).
+        fr = zeros(size(csr.f, 1), size(M, 2))
+        @test CrossSectionalFactorModel(; M = M, L = L, b = b, csr = csr, fcb = fcb,
+                                        fr = fr).fr === fr
+        @test_throws ArgumentError CrossSectionalFactorModel(; M = M, b = b, csr = csr,
+                                                             fr = fr)
+        @test_throws ArgumentError CrossSectionalFactorModel(; M = M, L = L, b = b,
+                                                             fcb = fcb, fr = fr)
+        @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M, L = L, b = b,
+                                                                 csr = csr, fcb = fcb,
+                                                                 fr = fr[1:3, :])
+        @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M, L = L, b = b,
+                                                                 csr = csr, fcb = fcb,
+                                                                 fr = fr[:, 1:1])
         @test_throws PortfolioOptimisers.IsEmptyError CrossSectionalFactorModel(; M = M,
                                                                                 b = b,
                                                                                 vs = Matrix{Float64}(undef,
@@ -144,8 +160,8 @@ absent together.
         full_esigma_model = full_model(; esigma = esigma_full)
         @test diag_model.esigma === esigma_diag
         @test full_esigma_model.esigma === esigma_full
-        # A diagonal covariance is cut once, and a full one on both axes. The reference
-        # implementation's own selection tests state the pair.
+        # A diagonal covariance is cut once, and a full one on both axes. The oracle's
+        # own selection tests state the pair.
         i = [3, 1]
         @test PortfolioOptimisers.port_opt_view(diag_model, i).esigma == esigma_diag[i]
         @test PortfolioOptimisers.port_opt_view(full_esigma_model, i).esigma ==
@@ -175,6 +191,29 @@ absent together.
         @test v.fam === fam
         @test v.fcb === fcb
         @test v.lag === 1
+    end
+
+    @testset "The row key names the observation of each fit row (#1493)" begin
+        PO = PortfolioOptimisers
+        ts = Dates.Date(2020, 1, 1) .+ Dates.Day.(1:4)
+        @test isnothing(full_model().idx) && isnothing(full_model().ts)
+        csfm = full_model(; idx = 3:6, ts = ts)
+        @test csfm.idx == 3:6 && csfm.ts == ts
+        # An asset view keeps the observation axis, and a time-cut cuts the key with it.
+        v = PO.port_opt_view(csfm, [3, 1])
+        @test v.idx === csfm.idx && v.ts === csfm.ts
+        h = PO.forecast_history_block(csfm, 2)
+        @test h.idx == 3:4 && h.ts == ts[1:2]
+        @test PO.attribution_row_key(csfm) == (; idx = 3:6, ts = ts)
+        # A key names the rows of the fit, so it needs one, with one entry for each row.
+        @test_throws ArgumentError CrossSectionalFactorModel(; M = M, b = b, idx = 1:4)
+        @test_throws ArgumentError CrossSectionalFactorModel(; M = M, b = b, ts = ts)
+        @test_throws DimensionMismatch full_model(; idx = 1:3)
+        @test_throws DimensionMismatch full_model(; ts = ts[1:3])
+        # Positions are positive and increase strictly, and so do timestamps.
+        @test_throws ArgumentError full_model(; idx = [1, 2, 2, 3])
+        @test_throws ArgumentError full_model(; idx = 0:3)
+        @test_throws ArgumentError full_model(; ts = reverse(ts))
     end
 
     @testset "The Return Forecast is cut on the asset axis, whatever member holds it" begin
@@ -212,7 +251,7 @@ absent together.
     end
 
     @testset "A slim model keeps its loadings and drops its histories" begin
-        # The fields the reference implementation's own slim mode drops.
+        # The fields the oracle's own slim mode drops.
         csfm = CrossSectionalFactorModel(; M = M, b = b, esigma = esigma_full, rw = rw,
                                          L = L, fcb = fcb, lag = 1)
         @test all(isnothing, (csfm.csr, csfm.Ms, csfm.vs, csfm.bw))
@@ -305,4 +344,42 @@ absent together.
         # The two messages are not one message: each names its own block.
         @test !occursin("rsd", cs_err.msg)
     end
+end
+
+@testset "Observed factor returns ride in fx (#1367)" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1_367)
+    T, N = 5, 4
+    Ms = randn(rng, T, N, 3)
+    f = randn(rng, T, 2)
+    fx = randn(rng, T, 1)
+    csr = CrossSectionalRegression(; f = f, eps = randn(rng, T, N), n = fill(N, T))
+    blk = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+                                    nf = ["a", "b", "usd"], fam = ["s", "s", "currency"],
+                                    fx = fx)
+    @test cross_sectional_factor_returns(blk) == hcat(f, fx)
+    @test cross_sectional_factor_returns(CrossSectionalFactorModel(; M = Ms[T, :, 1:2],
+                                                                   b = zeros(N), csr = csr)) ===
+          f
+    # A view on the assets keeps the observed returns, which have no asset axis.
+    @test PO.port_opt_view(blk, [1, 3]).fx === fx
+    # The label of an observed factor is free; only the count is structural.
+    @test CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, fx = fx,
+                                    fam = ["s", "t", "anything"]) isa
+          CrossSectionalFactorModel
+    @test_throws PO.IsNothingError CrossSectionalFactorModel(; M = Ms[T, :, :],
+                                                             b = zeros(N), fx = fx)
+    @test_throws DimensionMismatch CrossSectionalFactorModel(; M = Ms[T, :, :],
+                                                             b = zeros(N), csr = csr,
+                                                             fx = fx[1:4, :])
+    @test_throws DimensionMismatch CrossSectionalFactorModel(; M = Ms[T, :, :],
+                                                             b = zeros(N), csr = csr,
+                                                             fx = hcat(fx, fx))
+    @test_throws PO.IsEmptyError CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N),
+                                                           csr = csr, fx = zeros(T, 0))
+    @test_throws PO.IsNothingError cross_sectional_factor_returns(CrossSectionalFactorModel(;
+                                                                                            M = Ms[T,
+                                                                                                   :,
+                                                                                                   :],
+                                                                                            b = zeros(N)))
 end

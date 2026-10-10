@@ -1,15 +1,15 @@
 # PortfolioOptimisers.jl — working agreements
 
 A Julia portfolio-optimisation library. Estimators are configuration, Results are data, and the
-domain vocabulary is normative — read `CONTEXT.md` before touching anything you cannot already name.
+domain vocabulary is normative — read `GLOSSARY.md` before touching anything you cannot already name.
 
 ## Orientation
 
-- **`STANDARDS.md` is the map.** It routes a subject — a docstring, an `export`, a constructor, a
+- **`CODING_STANDARDS.md` is the map.** It routes a subject — a docstring, an `export`, a constructor, a
   test — to the file that owns the rule and to the check that fails when the rule breaks. Start
   there when you do not know which file governs what you are about to change. It carries no rules
   of its own, so it never overrides the file it points at. `/improve-standards` audits it.
-- **`CONTEXT.md` is the glossary.** It defines the domain language (Prior, Constraint Space,
+- **`GLOSSARY.md` is the glossary.** It defines the domain language (Prior, Constraint Space,
   Universe Sets, Feature Matrix, Objective Penalty, …) and is hand-written. When you introduce or
   rename a concept, update it in the same change.
 - **`docs/adr/` records decisions.** An ADR whose decision reached `main` is **amended, never
@@ -48,14 +48,17 @@ before you merge so you lower the number that is current.
 
 ## Running Julia
 
-- **Go through the kaimon MCP tools**, not `julia` on Bash. `ex(e="…")` evaluates in a REPL the
-  user shares live. Start a REPL for your own worktree with `start_session(project_path=…)`, and
-  pass its session key to every `ex` call. A REPL that another session opened is not yours to
-  restart.
+- **Go through the kaimon MCP tools** to explore and probe, not `julia` on Bash. `ex(e="…")`
+  evaluates in a REPL the user shares live. Start a REPL for your own worktree with
+  `start_session(project_path=…)`, and pass its session key to every `ex` call. A REPL that another
+  session opened is not yours to restart. Test files, doctests and the `code_health/` gates run in
+  a fresh bare process instead.
 - **Single-threaded**: `julia -t 1`, `BLAS.set_num_threads(1)`. Never kick off the full test suite
   or a docs build — those are the maintainer's to run.
-- Run **targeted** `test_*.jl` files for the area you changed. `test/runtests.jl` supplies a shared
-  `init_code` preamble; reproduce it if you include a test file directly.
+- Run **targeted** `test_*.jl` files for the area you changed with
+  `julia -t 1 --project=test test/run_files.jl --done=<path> test_X.jl …`, as a background Bash
+  command. It runs each file after the `init_code` preamble of `test/runtests.jl`,
+  prints one `RESULT` line per file, and writes the verdict to `<path>` when it ends.
 - On a Revise world-age warning, **restart the session and cold-load**. If a session wedges, shut it
   down and start a new one rather than fighting it.
 
@@ -107,13 +110,21 @@ before you merge so you lower the number that is current.
   permitted is stated by
   [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md),
   which owns that rule.
-- **Never export an abstract type unless explicitly told to.** All but a handful of the abstract
-  types in `src/` are unexported, so unexported is the convention. An open family, a sibling family
-  that exports its supertype, and an existing API-page entry are none of them a reason to add one in
-  passing — an export is public API, and widening it is the maintainer's call. Ask instead.
-  `test/test_43_exported_abstract_type_census.jl` gates the rule against the allow-list in that
-  file, so an export is a deliberate edit to that list. **Do not restate the count here or
-  anywhere else.** It has moved four times, and each written copy went stale where it stood.
+- **A user-facing name is declared without approval (#1489).** A name that users are meant to
+  extend is `public`: an abstract type they subtype, and a verb that a subtype implements. A name
+  that users are meant to use directly is exported: a type they construct, a function they call.
+  When a name is unambiguously one of the two, declare it in the change that adds it. Ask the
+  maintainer only when it is ambiguous whether users extend or use the name at all.
+  - An `# Interfaces` section marks an extension point (ADR 0154), so its type and the verbs it
+    names are `public`. A family whose concrete members are exported is an extension point.
+  - An abstract type is extended, not used, so it is `public`, not exported. Export one only when
+    users plainly write it by name in their own code, and ask when that is not plain.
+  - Internal machinery stays undeclared. A name that only the library calls is neither.
+
+  `test/test_43_exported_abstract_type_census.jl` holds every exported and every `public` abstract
+  type on an allow-list, so a declared abstract type is an edit to that list in the same change.
+  **Do not restate the count here or anywhere else.** It has moved four times, and each written
+  copy went stale where it stood.
 
 ## Defects you find
 
@@ -160,6 +171,9 @@ child map's *Not yet specified* section, and take steps 3 and 4 when the design 
 - Branch before committing if you are on the default branch.
 - **A session that works an issue commits without being asked.** It commits, rebases and pushes
   `dev` as § *Parallel sessions* states. Any other session commits only when asked.
+- **Assign an issue to your `gh` account when you start to fix it.** Run
+  `gh issue edit <number> --add-assignee @me` before your first edit. Every issue you fix, close or
+  leave open with a part of the work done, carries your account as an assignee.
 - **Close an issue yourself after you commit the work that resolves it.** This holds for every kind
   of issue: a defect, a feature, a sweep sub-issue, a map. Name the issue in the commit message, for
   example `Fix #493: …`. A closing keyword does not close the issue: GitHub acts on the keyword only

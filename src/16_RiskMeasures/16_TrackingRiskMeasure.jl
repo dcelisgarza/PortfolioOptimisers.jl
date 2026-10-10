@@ -76,7 +76,8 @@ RiskTrackingError
       │            │      ub ┼ nothing
       │            │     rke ┴ Bool: false
       │      sigma ┼ nothing
-      │       chol ┴ nothing
+      │       chol ┼ nothing
+      │   mtx_sqrt ┴ EigenFallbackSquareRoot()
   err ┼ Float64: 0.05
   alg ┴ IndependentVariableTracking()
 ```
@@ -489,7 +490,8 @@ RiskTrackingRiskMeasure
            │      sigma ┼ nothing
            │       chol ┼ nothing
            │         rc ┼ nothing
-           │        alg ┴ SquaredSOCRiskExpr()
+           │        alg ┼ SquaredSOCRiskExpr()
+           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
        alg ┴ IndependentVariableTracking()
 ```
 

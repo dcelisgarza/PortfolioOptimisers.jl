@@ -1104,6 +1104,7 @@ function scan(args)
     end
     m = isempty(files) ? measure() : measure(; files)
     found = reduce(vcat, (m.findings[f] for f in m.files); init = Finding[])
+    shown = 0
     for (r, statement) in RULES
         if !(rule === nothing || rule == r)
             continue
@@ -1112,6 +1113,7 @@ function scan(args)
         if isempty(hits)
             continue
         end
+        shown += length(hits)
         println("## ", r, " (", length(hits), ")\n", statement, "\n")
         for x in hits
             println(x.file, ":", x.line, "  [", x.definition, "]  ", x.code)
@@ -1119,6 +1121,8 @@ function scan(args)
         end
         println()
     end
+    # A scan that finds nothing must still say so. Silence reads as a run that did not happen.
+    println(shown, " Finding(s) in ", length(m.files), " file(s).")
     return 0
 end
 

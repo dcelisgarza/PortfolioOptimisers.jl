@@ -10,7 +10,6 @@ PredictionResult
 MultiPeriodPredictionResult
 PopulationPredictionResult
 Base.split(res::CrossValidationResult, args...)
-predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
 sort_by_measure
 previous_weights
 ```

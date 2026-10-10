@@ -662,7 +662,7 @@ end
                                         f_views = LinearConstraintEstimator(;
                                                                             val = ["MTUM == 0.0001",
                                                                                    "QUAL - USMV == -0.0003"]))]
-    # The fixture is the published reference this estimator was ported from, and the
+    # The fixture is the output of oracle 2, which this estimator was ported from, and the
     # covariance still matches it exactly: ADR 0063's amendment moves the intercept and the
     # rate into the prior stack, and the covariance path never reads the prior mean.
     for (i, pe) in enumerate(pes)
@@ -675,17 +675,17 @@ end
         @test success
     end
 
-    # `mu` departs from the reference, deliberately and by a stated amount (#570).
+    # `mu` departs from oracle 2, deliberately and by a stated amount (#570).
     #
-    # Column 1, `l === nothing`: the reference adds the loadings constant to a historical
+    # Column 1, `l === nothing`: oracle 2 adds the loadings constant to a historical
     # mean that already contains it, because least squares with an intercept makes the mean
-    # of `X` equal `M * mu_f + b`. Ours is the reference less `rr.b`, entry by entry.
+    # of `X` equal `M * mu_f + b`. Ours is oracle 2 less `rr.b`, entry by entry.
     pr1 = prior(pes[1], rd)
     @test isapprox(pr1.mu, df[1:20, 1] .- pr1.rr.b; atol = 1e-16)
     @test isapprox(maximum(abs, pr1.rr.b), 0.0016160796925727256; rtol = 1e-6)
 
     # Column 2, `l = 2`: the equilibrium premium carries no intercept, so only the *place*
-    # differs. Ours blends the views against a prior that carries `b`, and the reference
+    # differs. Ours blends the views against a prior that carries `b`, and oracle 2
     # adds `b` whole afterwards, so the departure is `(I - G*P)b - b` on the asset half.
     # That is not a plain offset, so it is pinned here as one measured number.
     pr2 = prior(pes[2], rd)
@@ -908,8 +908,8 @@ end
     # The view is a constraint on the posterior tail mass, so that mass is what the solve meets.
     @test isapprox(sum(pr.w[i] for i in axes(rd.X, 1) if rd.X[i, 1] <= -var_tgt), 0.05,
                    rtol = 1e-6)
-    # The reported value at risk is a sample order statistic, and the mass lands about `1e-8`
-    # short of `0.05`, which reads one observation further down the tail. `var_view_floor` is
+    # The reported value at risk is a sample order statistic, and a mass of `0.05`, or about
+    # `1e-8` short of it, reads one observation further down the tail. `var_view_floor` is
     # that observation. See issues #573 and #695.
     @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) >= var_view_floor(rd.X[:, 1], var_tgt)
     @test isapprox(pr.w,
@@ -2320,10 +2320,10 @@ end
 
 #=
 The residual comoments of `src/10_Prior/08_HighOrderFactorPriorEstimator.jl`, checked against
-hand-built matrices rather than read. Sweep ticket #534. Riskfolio-Lib carries the reference
-implementation of both, and this library's branch chain matches it entry for entry; what differs
-is that the reference builds the systematic covariance itself from the loadings, while this
-library takes it as an argument and asks the caller to remove the residual block first.
+hand-built matrices rather than read. Sweep ticket #534. Oracle 2 implements both, and this
+library's branch chain matches it entry for entry; what differs is that oracle 2 builds the
+systematic covariance itself from the loadings, while this library takes it as an argument and
+asks the caller to remove the residual block first.
 =#
 @testset "Residual coskewness and cokurtosis" begin
     PO = PortfolioOptimisers
@@ -2405,7 +2405,7 @@ library takes it as an argument and asks the caller to remove the residual block
     #=
     The docstring used to say that every pattern with a lone index is zero. It is not: only
     the pattern whose four indices are ALL DISTINCT vanishes. A pair with two singles gives
-    `e2[a] * sigma[b, c]`, which is what the reference implementation gives too. Sweep ticket
+    `e2[a] * sigma[b, c]`, which is what oracle 2 gives too. Sweep ticket
     #534 moved the documentation, not the code.
     =#
     N4 = 4
@@ -3009,4 +3009,18 @@ Sweep ticket #536.
     end
     # This estimator adds no residual block, so it declares none.
     @test isnothing(PO.factor_residual_config(pv))
+end
+
+@testset "LowOrderPrior refuses a non-finite covariance between investable assets" begin
+    X = [0.01 0.02 0.03; -0.01 0.0 0.01; 0.02 -0.01 0.0]
+    mu = [0.001, 0.002, 0.003]
+    sigma = [1.0 0.1 0.0; 0.1 1.0 0.2; 0.0 0.2 1.0]
+    s = copy(sigma)
+    s[1, 2] = s[2, 1] = NaN
+    @test_throws PortfolioOptimisers.IsNonFiniteError LowOrderPrior(; X = X, mu = mu,
+                                                                    sigma = s)
+    # An asset outside the investable set, here one with no mean, may carry a `NaN` row.
+    m = copy(mu)
+    m[1] = NaN
+    @test LowOrderPrior(; X = X, mu = m, sigma = s) isa LowOrderPrior
 end

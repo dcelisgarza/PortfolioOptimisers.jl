@@ -87,7 +87,7 @@ end
 
 Fits the prior result that a programme set's row-reading slots are built on.
 
-The set fits its `pe` on the head's rows carrier the same way a batch head fits a prior on any carrier. The fit reads the rows as they are and the Asset Panel beside them, so the result answers `NaN` at an asset outside the prior's Coverage Universe. A set that reads no rows fits nothing, and a bounded set never fits anything.
+The set fits its `pe` on the rows that the head holds, the same way a batch head fits a prior on any returns data. The fit reads the rows as they are and the Asset Panel beside them, so the result answers `NaN` at an asset outside the prior's Coverage Universe. A set that reads no rows fits nothing, and a bounded set never fits anything.
 
 # Algorithm
 
@@ -99,7 +99,7 @@ The set fits its `pe` on the head's rows carrier the same way a batch head fits 
 # Arguments
 
   - `set`: The resolved Allocation Set.
-  - `X`: The head's rows carrier, a [`ReturnsResult`](@ref), or `nothing` outside an Online Update.
+  - `X`: The rows that the head holds, a [`ReturnsResult`](@ref), or `nothing` outside an Online Update.
 
 # Validation
 
@@ -169,7 +169,7 @@ The projection programme reduces the model to the prior's Investable Mask before
 # Arguments
 
   - `pr`: The set's prior result, or `nothing` when the set fitted none.
-  - `X`: The head's rows carrier, or `nothing`.
+  - `X`: The rows that the head holds, or `nothing`.
 
 # Validation
 

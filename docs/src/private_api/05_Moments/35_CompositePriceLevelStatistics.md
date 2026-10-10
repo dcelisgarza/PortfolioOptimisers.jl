@@ -9,3 +9,10 @@ PortfolioOptimisers.elastic_net_path
 PortfolioOptimisers.elastic_net_polish
 PortfolioOptimisers.trend_reverting_fraction
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

@@ -3,9 +3,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the forecaster of a forecast-reading rule, with the Partial Fit State of the rows that it folded.
 
-A rule seeds this carrier when its forecaster has an exact fold. [`SimpleExpectedReturns`](@ref), [`ExpWeightedExpectedReturns`](@ref), a [`PriceLevelExpectedReturns`](@ref) over a folding statistic and a [`PriorExpectedReturns`](@ref) over a prior that folds all have one. [`supports_partial_fit`](@ref) answers the question once, at the seed.
+A rule seeds it as the state of the rule when its forecaster has an exact fold. [`SimpleExpectedReturns`](@ref), [`ExpWeightedExpectedReturns`](@ref), a [`PriceLevelExpectedReturns`](@ref) over a folding statistic and a [`PriorExpectedReturns`](@ref) over a prior that folds all have one. [`supports_partial_fit`](@ref) answers the question once, at the seed.
 
-The rule folds the forecaster on every row and reads the forecast from its state, so the head holds one row for it. The fold reads that row as the head received it, with its gaps and its active mask, and not the finite price relative of the step. The rule fits a forecaster with no exact fold again on the rows that the head holds, and its carrier is then `nothing`.
+The rule folds the forecaster on every row and reads the forecast from its state, so the head holds one row for it. The fold reads that row as the head received it, with its gaps and its active mask, and not the finite price relative of the step. The rule fits a forecaster with no exact fold again on the rows that the head holds, and the state of the rule is then `nothing`.
 
 # Fields
 
@@ -25,7 +25,7 @@ $(DocStringExtensions.FIELDS)
     me
 end
 function merge_states(::ForecasterState, ::ForecasterState)
-    return throw(ArgumentError("a `ForecasterState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the carrier follows it."))
+    return throw(ArgumentError("a `ForecasterState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the state of the rule follows it."))
 end
 function Base.copy(x::ForecasterState)
     return ForecasterState(copy_forecaster(x.me))
@@ -104,9 +104,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Returns the carrier that a forecast-reading rule seeds.
+Returns the state that a forecast-reading rule seeds.
 
-The carrier is a [`ForecasterState`](@ref) over a forecaster that folds, and `nothing` for a forecaster that the rule fits again from the rows of the head.
+The state is a [`ForecasterState`](@ref) over a forecaster that folds, and `nothing` for a forecaster that the rule fits again from the rows of the head.
 
 # Validation
 
@@ -132,11 +132,11 @@ end
 
 Advances the forecaster of a rule by the row `x`, and returns its Price Relative Forecast.
 
-The fold arm folds a forecaster on a [`ForecasterState`](@ref) on the row, and reads the forecast from its state. The refit arm fits a forecaster with no carrier again on the rows that the head holds, which include the row. Outside the head, with no rows carrier, the fold arm folds the finite `x .- 1`, and the refit arm fits the row alone.
+The fold arm folds a forecaster on a [`ForecasterState`](@ref) on the row, and reads the forecast from its state. The refit arm fits a forecaster with no state again on the rows that the head holds, which include the row. Outside the head, with no rows, the fold arm folds the finite `x .- 1`, and the refit arm fits the row alone.
 
-Both arms read the rows carrier of the head as the batch verb reads it, with the gaps and the active mask. The refit arm reduces to the Coverage Universe of the window. So a plain forecaster gives `NaN`, and the step holds the asset, when the asset has a gap anywhere in the window. A mask-aware forecaster gives the forecast from the rows that it has.
+Both arms read the rows that the head holds, a [`ReturnsResult`](@ref), as the batch verb reads them, with the gaps and the active mask. The refit arm reduces to the Coverage Universe of the window. So a plain forecaster gives `NaN`, and the step holds the asset, when the asset has a gap anywhere in the window. A mask-aware forecaster gives the forecast from the rows that it has.
 
-The fold arm folds the last row of the carrier, which is the current row as the head received it, under its active mask. The running statistic of a plain moment forecaster is then `NaN` from the first gap on, which is the Coverage Universe of the prefix. A mask-aware forecaster freezes, resets or admits the asset again by its own policy. A folding price-level statistic resets the asset that the mask turns off, and gives `NaN` until it has folded a level, so a relisted asset starts cold.
+The fold arm folds the last of those rows, which is the current row as the head received it, under its active mask. The running statistic of a plain moment forecaster is then `NaN` from the first gap on, which is the Coverage Universe of the prefix. A mask-aware forecaster freezes, resets or admits the asset again by its own policy. A folding price-level statistic resets the asset that the mask turns off, and gives `NaN` until it has folded a level, so a relisted asset starts cold.
 
 # Mathematical definition
 
@@ -156,7 +156,7 @@ A forecast of one in every asset is flat, and the step of every rule holds on a 
 
 # Algorithm
 
-With no carrier, the refit arm:
+With no state, the refit arm:
 
  1. Take the returns `X` and the Asset Panel `pnl` with [`refit_rows`](@ref).
  2. When `X` has fewer rows than [`forecast_min_rows`](@ref), return `nothing` and a flat forecast. Stop.
@@ -165,20 +165,20 @@ With no carrier, the refit arm:
 
 With a [`ForecasterState`](@ref), the fold arm:
 
- 1. Fold the forecaster `st.me` with [`partial_fit!`](@ref). With a rows carrier, fold the last row of `rows.X` under the mask of [`last_active_mask`](@ref). Without one, fold `x .- 1`.
+ 1. Fold the forecaster `st.me` with [`partial_fit!`](@ref). When `rows` holds the rows, fold the last row of `rows.X` under the mask of [`last_active_mask`](@ref). When `rows` is `nothing`, fold `x .- 1`.
  2. Read the expected returns from the state of the folded forecaster.
  3. Return the new [`ForecasterState`](@ref) and one plus the expected returns, through [`flat_where_undefined`](@ref).
 
 # Arguments
 
   - `me`: The forecaster on the slot of the rule.
-  - `st`: The carrier of the rule, or `nothing`.
+  - `st`: The state of the rule, which is what the rule keeps from one update to the next. It is a [`ForecasterState`](@ref), or `nothing` for a rule that keeps nothing.
   - `x`: The price relative of the row.
-  - `rows`: The rows carrier that the head holds through the row, a [`ReturnsResult`](@ref), or `nothing`.
+  - `rows`: The rows that the head holds through the row, as a [`ReturnsResult`](@ref), or `nothing`.
 
 # Returns
 
-  - `(st', x̂)::Tuple`: The carrier after the row, and the forecast as a new vector.
+  - `(st', x̂)::Tuple`: The state of the rule after the row, and the forecast as a new vector.
 
 # Related
 
@@ -308,7 +308,7 @@ end
 
 Returns the returns that the refit arm fits a forecaster on, and the Asset Panel that explains them.
 
-With a rows carrier these are its `X` and its `pnl`. Without one, they are the current row as a matrix of one row, and no panel.
+When `rows` is a [`ReturnsResult`](@ref), these are its `X` and its `pnl`. Without one, they are the current row as a matrix of one row, and no panel.
 
 # Related
 
@@ -326,7 +326,7 @@ end
 
 Returns the diagonal of the preconditioner of a [`ForecastReversion`](@ref) step, or `nothing` for the identity.
 
-The diagonal is the Price Relative Forecast of the `scale` statistic, fit on the rows that the head holds, or on the current row alone without a rows carrier. An entry that the statistic cannot give is one, through [`flat_where_undefined`](@ref), so the step on that asset is not scaled.
+The diagonal is the Price Relative Forecast of the `scale` statistic, fit on the rows that the head holds, or on the current row alone when `rows` is `nothing`. An entry that the statistic cannot give is one, through [`flat_where_undefined`](@ref), so the step on that asset is not scaled.
 
 # Related
 
@@ -365,7 +365,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Moves the allocation by the least amount that gives a forecast return of at least `eps`, then projects.
 
-Five papers share this passive-aggressive step: the moving average reversion of Li and Hoi (2012), the robust median reversion of Huang, Zhou, Li, Hoi and Zhou (2016), the reweighted price relative tracking of Lai, Yang, Fang and Wu (2020), the Gaussian weighting reversion of Cai and Ye (2019) and the local adaptive learning of Guan and An (2019). The papers differ only in the statistic on the `me` slot. [`MovingAverageReversion`](@ref), [`ExponentialMovingAverageReversion`](@ref), [`RobustMedianReversion`](@ref), [`ReweightedPriceRelativeTracking`](@ref), [`GaussianWeightingReversion`](@ref) and [`LocalAdaptiveLearning`](@ref) fill the slot with the statistic of each paper.
+Five rules share this passive-aggressive step: the moving average reversion of [lihoi2012](@citet), the robust median reversion of [huang2016](@citet), the reweighted price relative tracking of [lai2018rprt](@citet), the Gaussian weighting reversion of [caiye2019](@citet) and the local adaptive learning of [guanan2019](@citet). The five rules differ only in the statistic on the `me` slot. [`MovingAverageReversion`](@ref), [`ExponentialMovingAverageReversion`](@ref), [`RobustMedianReversion`](@ref), [`ReweightedPriceRelativeTracking`](@ref), [`GaussianWeightingReversion`](@ref) and [`LocalAdaptiveLearning`](@ref) fill the slot with the statistic of each rule.
 
 Any expected-returns estimator can sit on the slot, for example a mean of past returns, a shrunk mean, or the mean of a Prior through [`PriorExpectedReturns`](@ref). [`forecast_relative`](@ref) advances it. The rule fits a forecaster that does not fold again on every row that the head holds, because [`rows_needed`](@ref) returns `nothing` for it. So each step costs one fit over the whole prefix.
 
@@ -391,7 +391,7 @@ Where:
   - ``\\mathbf{D}_{t+1}``: Diagonal preconditioner. It is the identity when `scale` is `nothing`, and otherwise the diagonal matrix of the Price Relative Forecast of the `scale` statistic.
   - $(math_dict[:Proj_W_euclid])
 
-Without a preconditioner, the vector inside the projection solves the programme that the papers state, ``\\underset{\\boldsymbol{w}}{\\min} \\; \\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{w}_t \\rVert^2`` subject to ``\\langle \\boldsymbol{w}, \\hat{\\boldsymbol{x}}_{t+1} \\rangle \\geq \\epsilon`` and ``\\boldsymbol{1}^\\intercal \\boldsymbol{w} = 1``. The projection then restores the bounds. The reweighted price relative tracking keeps the same ``\\lambda_t`` with the preconditioner. In general its vector then leaves the budget hyperplane and misses the target ``\\epsilon``, and the projection restores the budget.
+Without a preconditioner, the vector inside the projection solves the programme of [lihoi2012](@cite), [huang2016](@cite), [lai2018rprt](@cite), [caiye2019](@cite) and [guanan2019](@cite), ``\\underset{\\boldsymbol{w}}{\\min} \\; \\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{w}_t \\rVert^2`` subject to ``\\langle \\boldsymbol{w}, \\hat{\\boldsymbol{x}}_{t+1} \\rangle \\geq \\epsilon`` and ``\\boldsymbol{1}^\\intercal \\boldsymbol{w} = 1``. The projection then restores the bounds. The reweighted price relative tracking keeps the same ``\\lambda_t`` with the preconditioner. In general its vector then leaves the budget hyperplane and misses the target ``\\epsilon``, and the projection restores the budget.
 
 The sign of the step is opposite to the sign of [`PassiveAggressiveMeanReversion`](@ref), because ``\\hat{\\boldsymbol{x}}_{t+1}`` forecasts the next price relative, where that rule reads the last one.
 
@@ -399,7 +399,7 @@ The sign of the step is opposite to the sign of [`PassiveAggressiveMeanReversion
 
 [`online_update!`](@ref) runs these steps at the row `x` of the period, from the allocation `w`.
 
- 1. Advance the forecaster with [`forecast_relative`](@ref), which gives the carrier `st` and the forecast `xhat`.
+ 1. Advance the forecaster with [`forecast_relative`](@ref), which gives `st` and the forecast `xhat`. `st` is the state of the rule: what the rule keeps from one update to the next, a [`ForecasterState`](@ref), or `nothing` for a rule that keeps nothing.
  2. Centre the forecast, which gives `dev`, and take its squared norm `denom`.
  3. Form the multiplier `lam`: zero when `denom` is zero, and ``\\lambda_t`` otherwise.
  4. Form the diagonal `D` of the preconditioner with [`scale_relative`](@ref), or `nothing`.
@@ -463,26 +463,23 @@ ForecastReversion
   - $(ref_dict[:caiye2019])
   - $(ref_dict[:guanan2019])
 """
-struct ForecastReversion{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real,
-                         T3 <: Option{<:AbstractPriceLevelStatistic},
-                         T4 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct ForecastReversion <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:forecaster])
     """
-    me::T1
+    me
     """
     Target of the forecast return. A larger target gives a longer step.
     """
-    eps::T2
+    eps
     """
     The statistic whose Price Relative Forecast preconditions the step, or `nothing` for the identity.
     """
-    scale::T3
+    scale
     """
     $(field_dict[:proj])
     """
-    proj::T4
+    proj
     function ForecastReversion(me::AbstractExpectedReturnsEstimator, eps::Real,
                                scale::Option{<:AbstractPriceLevelStatistic},
                                proj::EuclideanProjection)
@@ -530,11 +527,11 @@ end
 """
     MovingAverageReversion(; window::Integer = 5, eps::Real = 10, proj::EuclideanProjection = EuclideanProjection())
 
-Builds the on-line moving average reversion of Li and Hoi (2012), OLMAR.
+Builds the on-line moving average reversion, OLMAR.
 
-It is a [`ForecastReversion`](@ref) whose forecast is the [`MovingAverage`](@ref) of the last `window` price levels over the last price. The defaults `window = 5` and `eps = 10` are the paper's. `window` is the horizon of the reversion, and a search over `"alg.me.alg.window"` tunes it.
+It is the rule of [lihoi2012](@citet). It is a [`ForecastReversion`](@ref) whose forecast is the [`MovingAverage`](@ref) of the last `window` price levels over the last price. The defaults `window = 5` and `eps = 10` are the values of [lihoi2012](@cite). `window` is the horizon of the reversion, and a search over `"alg.me.alg.window"` tunes it.
 
-The algorithm of the 2012 paper takes `eps > 1` and `window >= 3`, and the algorithm of Li, Hoi, Sahoo and Liu (2015) takes `window >= 2`. At two levels the average is the mean of the current price and the previous price. The step is defined for any positive `eps`, so the constructor admits `eps > 0` and `window >= 2`. With `eps <= 1` the step moves only when the forecast return of the held allocation is below `eps`, which is a forecast loss.
+The algorithm of [lihoi2012](@citet) takes `eps > 1` and `window >= 3`, and the algorithm of [li2015olmar](@citet) takes `window >= 2`. At two levels the average is the mean of the current price and the previous price. The step is defined for any positive `eps`, so the constructor admits `eps > 0` and `window >= 2`. With `eps <= 1` the step moves only when the forecast return of the held allocation is below `eps`, which is a forecast loss.
 
 # Examples
 
@@ -572,11 +569,11 @@ end
 """
     ExponentialMovingAverageReversion(; alpha::Real = 0.5, eps::Real = 10, proj::EuclideanProjection = EuclideanProjection())
 
-Builds the second form of the on-line moving average reversion of Li, Hoi, Sahoo and Liu (2015), OLMAR-2.
+Builds the second form of the on-line moving average reversion, OLMAR-2.
 
-It is a [`ForecastReversion`](@ref) whose forecast is the [`ExponentialMovingAverage`](@ref) of the price levels over the last price. `eps = 10` is the paper's. The paper gives no default `alpha`, and its sensitivity study scans `alpha` from 0 to 1. The library takes `0.5`, the middle of that range.
+It is the rule of [li2015olmar](@citet). It is a [`ForecastReversion`](@ref) whose forecast is the [`ExponentialMovingAverage`](@ref) of the price levels over the last price. `eps = 10` is the value of [li2015olmar](@cite). [li2015olmar](@citet) give no default `alpha`, and the sensitivity study of [li2015olmar](@cite) scans `alpha` from 0 to 1. The library takes `0.5`, the middle of that range.
 
-The average starts at the first price, as the expansion of the paper does, so the forecast after one level is one. The statistic folds, so the rule carries one vector and the head holds only the current row.
+The average starts at the first price, as the expansion of [li2015olmar](@cite) does, so the forecast after one level is one. The statistic folds, so the rule carries one vector and the head holds only the current row.
 
 # Examples
 
@@ -612,11 +609,11 @@ end
 """
     RobustMedianReversion(; window::Integer = 5, eps::Real = 5, iters::Integer = 100, tol::Real = 1e-8, proj::EuclideanProjection = EuclideanProjection())
 
-Builds the robust median reversion of Huang, Zhou, Li, Hoi and Zhou (2016), RMR.
+Builds the robust median reversion, RMR.
 
-It is a [`ForecastReversion`](@ref) whose forecast is the [`SpatialMedian`](@ref) of the last `window` price levels over the last price. The defaults `window = 5` and `eps = 5` are the paper's. One extreme price moves a mean without limit, and it moves a spatial median very little.
+It is the rule of [huang2016](@citet). It is a [`ForecastReversion`](@ref) whose forecast is the [`SpatialMedian`](@ref) of the last `window` price levels over the last price. The defaults `window = 5` and `eps = 5` are the values of [huang2016](@cite). One extreme price moves a mean without limit, and it moves a spatial median very little.
 
-The library reads the median on the rebuilt price path, with the last level of each asset at one. Its iteration stops by a rule different from the rule of the paper. [`SpatialMedian`](@ref) states both differences.
+The library reads the median on the rebuilt price path, with the last level of each asset at one. Its iteration stops by a rule different from the rule of [huang2016](@cite). [`SpatialMedian`](@ref) states both differences.
 
 # Examples
 
@@ -657,11 +654,11 @@ end
 """
     ReweightedPriceRelativeTracking(; window::Integer = 5, theta::Real = 0.8, eps::Real = 50, proj::EuclideanProjection = EuclideanProjection())
 
-Builds the reweighted price relative tracking of Lai, Yang, Fang and Wu (2020), RPRT.
+Builds the reweighted price relative tracking, RPRT.
 
-It is a [`ForecastReversion`](@ref) whose forecast is the [`ReweightedPriceRelative`](@ref) recursion. The [`MovingAverage`](@ref) forecast of the same `window` preconditions its step.
+It is the rule of [lai2018rprt](@citet). It is a [`ForecastReversion`](@ref) whose forecast is the [`ReweightedPriceRelative`](@ref) recursion. The [`MovingAverage`](@ref) forecast of the same `window` preconditions its step.
 
-The paper is not open access. Li, Luo and Xu (2023, eqs. 8 to 11) restate its forecast and its step, and the MATLAB code that the authors publish runs the same recursion. The code seeds the forecast at one, and the restatement seeds it at the first price relative, which [`ReweightedPriceRelative`](@ref) follows. The defaults `theta = 0.8`, `eps = 50` and `window = 5` are the values of that code. In its first `window` periods the code preconditions with the last price relative, and the library uses the moving average of the levels that it has.
+Equations (8) to (11) of [liluoxu2023](@cite) restate the forecast and the step of [lai2018rprt](@cite), which is not open access. The MATLAB code that accompanies [lai2018rprt](@cite) runs the same recursion. The code seeds the forecast at one, and the restatement seeds it at the first price relative, which [`ReweightedPriceRelative`](@ref) follows. The defaults `theta = 0.8`, `eps = 50` and `window = 5` are the values of that code. In its first `window` periods the code preconditions with the last price relative, and the library uses the moving average of the levels that it has.
 
 With `eps = 50` the forecast return is below the target at every step, so the step always moves. The projected answer is then almost one-hot, as the answers of the tracking rules at their defaults are.
 
@@ -703,11 +700,11 @@ end
 """
     GaussianWeightingReversion(; tau::Real = 2.8, cutoff::Real = 0.005, eps::Real = 50, proj::EuclideanProjection = EuclideanProjection())
 
-Builds the Gaussian weighting reversion of Cai and Ye (2019), GWR.
+Builds the Gaussian weighting reversion, GWR.
 
-It is a [`ForecastReversion`](@ref) whose forecast is the [`GaussianWeightedDoubleEstimate`](@ref) over the last price. The defaults `tau = 2.8`, `cutoff = 0.005` and `eps = 50` are the paper's. The paper names the target ``\\delta`` and the cutoff ``\\epsilon``.
+It is the rule of [caiye2019](@citet). It is a [`ForecastReversion`](@ref) whose forecast is the [`GaussianWeightedDoubleEstimate`](@ref) over the last price. The defaults `tau = 2.8`, `cutoff = 0.005` and `eps = 50` are the values of [caiye2019](@cite). [caiye2019](@citet) name the target ``\\delta`` and the cutoff ``\\epsilon``.
 
-The adaptive variant of the paper, GWR-A, chooses `tau` online with a bandit over the reward. The library does not build it, because the family has no seam for a parameter that the reward chooses online.
+The adaptive variant of [caiye2019](@cite), GWR-A, chooses `tau` online with a bandit over the reward. The library does not build it, because the family has no interface for a parameter that the reward chooses online.
 
 # Examples
 
@@ -744,11 +741,11 @@ end
 """
     LocalAdaptiveLearning(; window::Integer = 5, alpha::Real = 0.5, threshold::Real = 0.1, lambda::Real = 0, eps::Real = 10, proj::EuclideanProjection = EuclideanProjection())
 
-Builds the local adaptive learning of Guan and An (2019), LOAD.
+Builds the local adaptive learning, LOAD.
 
-It is a [`ForecastReversion`](@ref) whose forecast is a [`TrendSwitch`](@ref) on the [`RegressionSlope`](@ref). An asset whose slope exceeds `threshold` takes its [`WindowPeak`](@ref), and every other asset takes its [`ExponentialMovingAverage`](@ref). The defaults `window = 5`, `alpha = 0.5` and `threshold = 0.1` are the paper's.
+It is the rule of [guanan2019](@citet). It is a [`ForecastReversion`](@ref) whose forecast is a [`TrendSwitch`](@ref) on the [`RegressionSlope`](@ref). An asset whose slope exceeds `threshold` takes its [`WindowPeak`](@ref), and every other asset takes its [`ExponentialMovingAverage`](@ref). The defaults `window = 5`, `alpha = 0.5` and `threshold = 0.1` are the values of [guanan2019](@cite).
 
-The paper states neither the target `eps` nor the ridge weight `lambda`. The defaults are the `eps = 10` of the moving average reversion and plain least squares. The paper fits the slope on the prices. The library fits it on the rebuilt price path, with the last level at one, so `threshold` compares with a slope in units of the current price. The exponential average reads the full history, as the recursion of the paper does, so the head holds every row for this rule.
+[guanan2019](@citet) state neither the target `eps` nor the ridge weight `lambda`. The defaults are the `eps = 10` of the moving average reversion and plain least squares. [guanan2019](@citet) fit the slope on the prices. The library fits it on the rebuilt price path, with the last level at one, so `threshold` compares with a slope in units of the current price. The exponential average reads the full history, as the recursion of [guanan2019](@cite) does, so the head holds every row for this rule.
 
 # Examples
 
@@ -798,7 +795,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Moves the allocation a fixed distance `eps` along the centred Price Relative Forecast, then projects.
 
-Three papers share this step: the peak price tracking of Lai, Dai, Ren and Huang (2018), the adaptive input and composite trend representation of the same authors (2018), and the trend promote price tracing of Dai, Liang, Dai, Huang and Adnan (2022). It is the mirror of [`ForecastReversion`](@ref). `eps` is a step length and not a rate, so the forecast sets the direction alone.
+Three rules share this step: the peak price tracking of [lai2018ppt](@citet), the adaptive input and composite trend representation of [lai2018aictr](@citet), and the trend promote price tracing of [dai2022tppt](@citet). It is the mirror of [`ForecastReversion`](@ref). `eps` is a step length and not a rate, so the forecast sets the direction alone.
 
 # Mathematical definition
 
@@ -819,15 +816,15 @@ Where:
 
 When ``\\tilde{\\boldsymbol{x}}_{t+1} = \\boldsymbol{0}`` the step is zero, and ``\\boldsymbol{w}_{t+1} = \\mathrm{Proj}_{\\mathcal{W}}(\\boldsymbol{w}_t)``.
 
-The vector inside the projection maximises ``\\langle \\boldsymbol{w}, \\hat{\\boldsymbol{x}}_{t+1} \\rangle`` over the ball ``\\lVert \\boldsymbol{w} - \\boldsymbol{w}_t \\rVert \\leq \\epsilon`` in the budget hyperplane ``\\boldsymbol{1}^\\intercal \\boldsymbol{w} = 1``, which is the programme of the papers. The projection then restores the bounds, as it does after the reversion step.
+The vector inside the projection maximises ``\\langle \\boldsymbol{w}, \\hat{\\boldsymbol{x}}_{t+1} \\rangle`` over the ball ``\\lVert \\boldsymbol{w} - \\boldsymbol{w}_t \\rVert \\leq \\epsilon`` in the budget hyperplane ``\\boldsymbol{1}^\\intercal \\boldsymbol{w} = 1``, which is the programme of [lai2018ppt](@cite), [lai2018aictr](@cite) and [dai2022tppt](@cite). The projection then restores the bounds, as it does after the reversion step.
 
-On the simplex, the projection is one-hot on asset ``i`` whenever ``\\epsilon (u_i - u_j) \\geq 2`` for every other asset ``j``, with ``\\boldsymbol{u} = \\tilde{\\boldsymbol{x}}_{t+1} / \\lVert \\tilde{\\boldsymbol{x}}_{t+1} \\rVert``. At ``\\epsilon = 100`` that gap is 0.02, so at the defaults of the papers the step puts all the wealth on the asset with the largest forecast, except when the forecasts of two assets are almost equal.
+On the simplex, the projection is one-hot on asset ``i`` whenever ``\\epsilon (u_i - u_j) \\geq 2`` for every other asset ``j``, with ``\\boldsymbol{u} = \\tilde{\\boldsymbol{x}}_{t+1} / \\lVert \\tilde{\\boldsymbol{x}}_{t+1} \\rVert``. At ``\\epsilon = 100`` that gap is 0.02, so at the defaults of [lai2018ppt](@cite), [lai2018aictr](@cite) and [dai2022tppt](@cite) the step puts all the wealth on the asset with the largest forecast, except when the forecasts of two assets are almost equal.
 
 # Algorithm
 
 [`online_update!`](@ref) runs these steps at the row `x` of the period, from the allocation `w`.
 
- 1. Advance the forecaster with [`forecast_relative`](@ref), which gives the carrier `st` and the forecast `xhat`.
+ 1. Advance the forecaster with [`forecast_relative`](@ref), which gives `st` and the forecast `xhat`. `st` is the state of the rule: what the rule keeps from one update to the next, a [`ForecasterState`](@ref), or `nothing` for a rule that keeps nothing.
  2. Centre the forecast, which gives `dev`, and take its norm `nrm`.
  3. Form the raw step `q`, which is `w` when `nrm` is zero and `w .+ eps .* dev ./ nrm` otherwise.
  4. Project `q` onto the set with [`project`](@ref), with the [`price_adjusted_allocation`](@ref) of `w` after the row. Return `st` and the new allocation.
@@ -880,21 +877,19 @@ ForecastTracking
   - $(ref_dict[:lai2018aictr])
   - $(ref_dict[:dai2022tppt])
 """
-struct ForecastTracking{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real,
-                        T3 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct ForecastTracking <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:forecaster])
     """
-    me::T1
+    me
     """
     Euclidean length of the step along the centred forecast.
     """
-    eps::T2
+    eps
     """
     $(field_dict[:proj])
     """
-    proj::T3
+    proj
     function ForecastTracking(me::AbstractExpectedReturnsEstimator, eps::Real,
                               proj::EuclideanProjection)
         assert_forecaster(me)
@@ -933,11 +928,11 @@ end
 """
     PeakPriceTracking(; window::Integer = 5, eps::Real = 100, proj::EuclideanProjection = EuclideanProjection())
 
-Builds the peak price tracking of Lai, Dai, Ren and Huang (2018), PPT.
+Builds the peak price tracking, PPT.
 
-It is a [`ForecastTracking`](@ref) whose forecast is the [`WindowPeak`](@ref) of the last `window` price levels over the last price. The defaults `window = 5` and `eps = 100` are the paper's, and the MATLAB code that the authors publish uses the same step.
+It is the rule of [lai2018ppt](@citet). It is a [`ForecastTracking`](@ref) whose forecast is the [`WindowPeak`](@ref) of the last `window` price levels over the last price. The defaults `window = 5` and `eps = 100` are the values of [lai2018ppt](@cite), and the MATLAB code that accompanies [lai2018ppt](@cite) uses the same step.
 
-At `eps = 100` the answer almost always puts all the wealth on the asset with the highest ratio of peak to last price. The sensitivity study of the paper (its Fig. 4) shows a flat wealth for `eps >= 50`, and this saturation is the cause.
+At `eps = 100` the answer almost always puts all the wealth on the asset with the highest ratio of peak to last price. The sensitivity study in Figure 4 of [lai2018ppt](@cite) shows a flat wealth for `eps >= 50`, and this saturation is the cause.
 
 # Examples
 
@@ -971,11 +966,11 @@ end
 """
     AdaptiveInputCompositeTrend(; window::Integer = 5, alpha::Real = 0.5, sigma2::Real = 0.0025, eps::Real = 1000, proj::EuclideanProjection = EuclideanProjection())
 
-Builds the adaptive input and composite trend representation of Lai, Dai, Ren and Huang (2018), AICTR.
+Builds the adaptive input and composite trend representation, AICTR.
 
-It is a [`ForecastTracking`](@ref) whose forecast is the [`CompositeTrend`](@ref) of the [`MovingAverage`](@ref), the [`ExponentialMovingAverage`](@ref) and the [`WindowPeak`](@ref) over `window` levels. The defaults `window = 5`, `sigma2 = 0.0025` and `eps = 1000` are the paper's.
+It is the rule of [lai2018aictr](@citet). It is a [`ForecastTracking`](@ref) whose forecast is the [`CompositeTrend`](@ref) of the [`MovingAverage`](@ref), the [`ExponentialMovingAverage`](@ref) and the [`WindowPeak`](@ref) over `window` levels. The defaults `window = 5`, `sigma2 = 0.0025` and `eps = 1000` are the values of [lai2018aictr](@cite).
 
-The paper gives no smoothing weight for its exponential average, so the library sets `alpha = 0.5`. The exponential average reads the full history, so the head holds every row for this rule.
+[lai2018aictr](@citet) give no smoothing weight for the exponential average, so the library sets `alpha = 0.5`. The exponential average reads the full history, so the head holds every row for this rule.
 
 # Examples
 
@@ -1017,11 +1012,11 @@ end
 """
     TrendPromotePriceTracking(; window::Integer = 5, alpha::Real = 0.5, eps::Real = 100, proj::EuclideanProjection = EuclideanProjection())
 
-Builds the trend promote price tracing of Dai, Liang, Dai, Huang and Adnan (2022), TPPT.
+Builds the trend promote price tracing, TPPT.
 
-It is a [`ForecastTracking`](@ref) whose forecast is a [`TrendSwitch`](@ref) on the [`PairwiseSlopeSum`](@ref). A rising asset takes its [`TruncatedExponentialMovingAverage`](@ref), a flat asset takes its current price, and a falling asset takes its [`WindowPeak`](@ref). The defaults `window = 5`, `alpha = 0.5` and `eps = 100` are the paper's.
+It is the rule of [dai2022tppt](@citet). It is a [`ForecastTracking`](@ref) whose forecast is a [`TrendSwitch`](@ref) on the [`PairwiseSlopeSum`](@ref). A rising asset takes its [`TruncatedExponentialMovingAverage`](@ref), a flat asset takes its current price, and a falling asset takes its [`WindowPeak`](@ref). The defaults `window = 5`, `alpha = 0.5` and `eps = 100` are the values of [dai2022tppt](@cite).
 
-The rising branch of the paper cannot be computed as printed, because it reads the price of the next period, which is the quantity that it forecasts. [`TruncatedExponentialMovingAverage`](@ref) states the reading that the library takes, so a parity test against the numbers of the paper is not possible.
+The rising branch of [dai2022tppt](@cite) cannot be computed as printed, because it reads the price of the next period, which is the quantity that it forecasts. [`TruncatedExponentialMovingAverage`](@ref) states the reading that the library takes, so a parity test against the numbers of [dai2022tppt](@cite) is not possible.
 
 # Examples
 
@@ -1069,7 +1064,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Moves the allocation along the kernel-scaled centred Price Relative Forecast at a fixed rate `eta`, then projects.
 
-This is the step of the kernel-based trend pattern tracking of Lai, Yang, Wu and Fang (2018). Unlike the step of [`ForecastTracking`](@ref), it is not normalised, so `eta` is a rate on the centred forecast and not a step length. [`forecast_relative`](@ref) advances the forecaster on `me`, and [`KernelTrendPatternTracking`](@ref) fills that slot with the [`KernelTrendPattern`](@ref) of the paper.
+This is the step of the kernel-based trend pattern tracking of [lai2018ktpt](@citet). Unlike the step of [`ForecastTracking`](@ref), it is not normalised, so `eta` is a rate on the centred forecast and not a step length. [`forecast_relative`](@ref) advances the forecaster on `me`, and [`KernelTrendPatternTracking`](@ref) fills that slot with the [`KernelTrendPattern`](@ref) of [lai2018ktpt](@cite).
 
 # Mathematical definition
 
@@ -1095,7 +1090,7 @@ Where:
 
 When ``\\tilde{\\boldsymbol{x}}_{t+1} = \\boldsymbol{0}`` the step is zero, and ``\\boldsymbol{w}_{t+1} = \\mathrm{Proj}_{\\mathcal{W}}(\\boldsymbol{w}_t)``.
 
-The kernel is the similarity of the paper between the allocation and the forecast. ``K_i`` is largest where the centred weight of asset ``i`` already matches its centred forecast. The vector inside the projection maximises ``\\langle \\boldsymbol{w}, \\mathbf{K}^{-1} \\tilde{\\boldsymbol{x}}_{t+1} \\rangle`` over the ellipsoid ``(\\boldsymbol{w} - \\boldsymbol{w}_t)^\\intercal \\mathbf{K}^{-2} (\\boldsymbol{w} - \\boldsymbol{w}_t) \\leq \\eta^2 \\lVert \\tilde{\\boldsymbol{x}}_{t+1} \\rVert^2``, which is the programme of the paper at the radius that it sets. The radius grows with the forecast, so the normalisation of [`ForecastTracking`](@ref) cancels.
+The kernel is the similarity of [lai2018ktpt](@cite) between the allocation and the forecast. ``K_i`` is largest where the centred weight of asset ``i`` already matches its centred forecast. The vector inside the projection maximises ``\\langle \\boldsymbol{w}, \\mathbf{K}^{-1} \\tilde{\\boldsymbol{x}}_{t+1} \\rangle`` over the ellipsoid ``(\\boldsymbol{w} - \\boldsymbol{w}_t)^\\intercal \\mathbf{K}^{-2} (\\boldsymbol{w} - \\boldsymbol{w}_t) \\leq \\eta^2 \\lVert \\tilde{\\boldsymbol{x}}_{t+1} \\rVert^2``, which is the programme of [lai2018ktpt](@cite) at the radius that it sets. The radius grows with the forecast, so the normalisation of [`ForecastTracking`](@ref) cancels.
 
 On the simplex, the projection is one-hot on asset ``i`` whenever ``\\eta (K_i \\tilde{x}_{t+1, i} - K_j \\tilde{x}_{t+1, j}) \\geq 2`` for every other asset ``j``. At ``\\eta = 1000`` that gap is 0.002. Below that gap the answer can hold two assets. From a book on one asset, a gap of ``1.5 / \\eta`` gives the weights 0.75 and 0.25.
 
@@ -1103,7 +1098,7 @@ On the simplex, the projection is one-hot on asset ``i`` whenever ``\\eta (K_i \
 
 [`online_update!`](@ref) runs these steps at the row `x` of the period, from the allocation `w`.
 
- 1. Advance the forecaster with [`forecast_relative`](@ref), which gives the carrier `st` and the forecast `xhat`.
+ 1. Advance the forecaster with [`forecast_relative`](@ref), which gives `st` and the forecast `xhat`. `st` is the state of the rule: what the rule keeps from one update to the next, a [`ForecasterState`](@ref), or `nothing` for a rule that keeps nothing.
  2. Centre the forecast, which gives `dev`.
  3. When every entry of `dev` is zero, take the raw step `q = w` and go to step 5.
  4. Form the kernel `K` from the centred `w` and `dev`, and the raw step `q = w .+ eta .* K .* dev`.
@@ -1122,7 +1117,7 @@ $(DocStringExtensions.FIELDS)
         proj::EuclideanProjection = EuclideanProjection()
     ) -> KernelTrendTracking
 
-Keywords correspond to the struct's fields, and the defaults `eta = 1000` and `q = 6` are the paper's. The rule needs the rows that `me` needs.
+Keywords correspond to the struct's fields, and the defaults `eta = 1000` and `q = 6` are the values of [lai2018ktpt](@cite). The rule needs the rows that `me` needs.
 
 ## Validation
 
@@ -1160,25 +1155,23 @@ KernelTrendTracking
 
   - $(ref_dict[:lai2018ktpt])
 """
-struct KernelTrendTracking{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real, T3 <: Real,
-                           T4 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct KernelTrendTracking <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:forecaster])
     """
-    me::T1
+    me
     """
     Rate of the step on the centred forecast after the kernel scales it.
     """
-    eta::T2
+    eta
     """
     Shape of the kernel. The kernel raises the distance between the centred weight and the centred forecast of an asset to the power `1 / q`, so a larger `q` gives a flatter similarity.
     """
-    q::T3
+    q
     """
     $(field_dict[:proj])
     """
-    proj::T4
+    proj
     function KernelTrendTracking(me::AbstractExpectedReturnsEstimator, eta::Real, q::Real,
                                  proj::EuclideanProjection)
         assert_forecaster(me)
@@ -1222,11 +1215,11 @@ end
 """
     KernelTrendPatternTracking(; window::Integer = 5, nu::Real = 0.5, theta::Real = 0.99, iters::Integer = 10_000, tol::Real = 1e-10, q::Real = 6, eta::Real = 1000, proj::EuclideanProjection = EuclideanProjection())
 
-Builds the kernel-based trend pattern tracking of Lai, Yang, Wu and Fang (2018), KTPT.
+Builds the kernel-based trend pattern tracking, KTPT.
 
-It is a [`KernelTrendTracking`](@ref) whose forecast is the [`KernelTrendPattern`](@ref) over `window` levels. `nu` mixes its initial state, and an [`ElasticNetPath`](@ref) at `theta` gives its intermediate state, with at most `iters` sweeps stopped at `tol`. The defaults `window = 5`, `nu = 0.5`, `theta = 0.99`, `q = 6` and `eta = 1000` are the paper's.
+It is the rule of [lai2018ktpt](@citet). It is a [`KernelTrendTracking`](@ref) whose forecast is the [`KernelTrendPattern`](@ref) over `window` levels. `nu` mixes its initial state, and an [`ElasticNetPath`](@ref) at `theta` gives its intermediate state, with at most `iters` sweeps stopped at `tol`. The defaults `window = 5`, `nu = 0.5`, `theta = 0.99`, `q = 6` and `eta = 1000` are the values of [lai2018ktpt](@cite).
 
-The paper reports that the wealth is robust to `eta` from 800 to 1300 and stable for `q` near 6. The statistic folds with a memory, so the head holds only the current row for this rule.
+[lai2018ktpt](@citet) report that the wealth is robust to `eta` from 800 to 1300 and stable for `q` near 6. The statistic folds with a memory, so the head holds only the current row for this rule.
 
 # Examples
 
@@ -1273,7 +1266,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Takes one soft-thresholded, linearised step of the log forecast return from the Price-Adjusted Allocation (TCO).
 
-This is the transaction cost optimisation of Li, Wang, Huang and Hoi (2018). The threshold is a multiple of the cost rate, and it leaves each small trade at zero. The first form of the paper reads the reciprocal of the last price relative, [`LaggedPrice`](@ref) at `lag = 1`, which is the default. The second form reads the moving average of the price levels over the last price. The paper does not give its window, and Moon (2019) uses five levels, the default of [`MovingAverage`](@ref).
+This is the transaction cost optimisation of [li2018tco](@citet). The threshold is a multiple of the cost rate, and it leaves each small trade at zero. The first form of [li2018tco](@cite) reads the reciprocal of the last price relative, [`LaggedPrice`](@ref) at `lag = 1`, which is the default. The second form reads the moving average of the price levels over the last price. [li2018tco](@citet) do not give its window, and [moon2019](@citet) uses five levels, the default of [`MovingAverage`](@ref).
 
 # Mathematical definition
 
@@ -1299,15 +1292,15 @@ Where:
   - $(math_dict[:t_period])
   - $(math_dict[:Proj_W_euclid])
 
-The paper states the programme ``\\underset{\\boldsymbol{w}}{\\min} \\; -\\log \\langle \\boldsymbol{w}, \\hat{\\boldsymbol{x}}_{t+1} \\rangle + \\lambda \\lVert \\boldsymbol{w} - \\hat{\\boldsymbol{w}}_t \\rVert_1`` on the simplex. Its Proposition 4.2 linearises the log at ``\\hat{\\boldsymbol{w}}_t``, adds the proximal term ``\\lVert \\boldsymbol{w} - \\hat{\\boldsymbol{w}}_t \\rVert^2 / (2 \\eta)``, and takes ``\\bar{g}`` as the multiplier of the budget. The vector inside the projection is the exact minimiser of that proximal programme without the bounds, and the projection restores them. When ``\\eta \\lambda`` exceeds every entry of ``\\lvert \\boldsymbol{v} \\rvert``, the rule holds ``\\hat{\\boldsymbol{w}}_t``.
+[li2018tco](@citet) state the programme ``\\underset{\\boldsymbol{w}}{\\min} \\; -\\log \\langle \\boldsymbol{w}, \\hat{\\boldsymbol{x}}_{t+1} \\rangle + \\lambda \\lVert \\boldsymbol{w} - \\hat{\\boldsymbol{w}}_t \\rVert_1`` on the simplex. Proposition 4.2 of [li2018tco](@cite) linearises the log at ``\\hat{\\boldsymbol{w}}_t``, adds the proximal term ``\\lVert \\boldsymbol{w} - \\hat{\\boldsymbol{w}}_t \\rVert^2 / (2 \\eta)``, and takes ``\\bar{g}`` as the multiplier of the budget. The vector inside the projection is the exact minimiser of that proximal programme without the bounds, and the projection restores them. When ``\\eta \\lambda`` exceeds every entry of ``\\lvert \\boldsymbol{v} \\rvert``, the rule holds ``\\hat{\\boldsymbol{w}}_t``.
 
-The proof of Proposition 4.2 renames the threshold ``\\eta \\lambda`` as ``\\lambda``, and the experiments of the paper set that renamed threshold to ``10 \\gamma``. Moon (2019) records that the code of the authors applies the threshold ``10 \\eta \\gamma``, and that the published results rest on it. The library takes that threshold, so ``\\lambda = 10 \\gamma`` is the weight of the ``L_1`` penalty.
+The proof of Proposition 4.2 renames the threshold ``\\eta \\lambda`` as ``\\lambda``, and the experiments of [li2018tco](@cite) set that renamed threshold to ``10 \\gamma``. [moon2019](@citet) records that the code that accompanies [li2018tco](@cite) applies the threshold ``10 \\eta \\gamma``, and that the published results rest on it. The library takes that threshold, so ``\\lambda = 10 \\gamma`` is the weight of the ``L_1`` penalty.
 
 # Algorithm
 
 [`online_update!`](@ref) runs these steps at the row `x` of the period, from the allocation `w`.
 
- 1. Advance the forecaster with [`forecast_relative`](@ref), which gives the carrier `st` and the forecast `xhat`.
+ 1. Advance the forecaster with [`forecast_relative`](@ref), which gives `st` and the forecast `xhat`. `st` is the state of the rule: what the rule keeps from one update to the next, a [`ForecasterState`](@ref), or `nothing` for a rule that keeps nothing.
  2. Form the Price-Adjusted Allocation `what` of `w` after the row, with [`price_adjusted_allocation`](@ref).
  3. Form the gradient `g` at `what`.
  4. Form the centred step `v`.
@@ -1328,7 +1321,7 @@ $(DocStringExtensions.FIELDS)
         proj::EuclideanProjection = EuclideanProjection()
     ) -> TransactionCostOptimisation
 
-Keywords correspond to the struct's fields. The rule needs the rows that `me` needs. `eta = 10` is the paper's. `gamma` is the proportional cost rate that the trader pays, which the paper leaves to the market. The paper tests `gamma = 0.0025` and `gamma = 0.005`.
+Keywords correspond to the struct's fields. The rule needs the rows that `me` needs. `eta = 10` is the value of [li2018tco](@cite). `gamma` is the proportional cost rate that the trader pays, which [li2018tco](@citet) leave to the market. [li2018tco](@citet) test `gamma = 0.0025` and `gamma = 0.005`.
 
 ## Validation
 
@@ -1362,25 +1355,23 @@ TransactionCostOptimisation
   - $(ref_dict[:li2018tco])
   - $(ref_dict[:moon2019])
 """
-struct TransactionCostOptimisation{T1 <: AbstractExpectedReturnsEstimator, T2 <: Real,
-                                   T3 <: Real, T4 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct TransactionCostOptimisation <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:forecaster])
     """
-    me::T1
+    me
     """
     Step size of the linearised step. It also scales the soft threshold.
     """
-    eta::T2
+    eta
     """
     Proportional transaction cost rate. The soft threshold is `10 * eta * gamma`.
     """
-    gamma::T3
+    gamma
     """
     $(field_dict[:proj])
     """
-    proj::T4
+    proj
     function TransactionCostOptimisation(me::AbstractExpectedReturnsEstimator, eta::Real,
                                          gamma::Real, proj::EuclideanProjection)
         assert_forecaster(me)
@@ -1448,7 +1439,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves a linear programme on the log of the forecast with an ``L_1`` penalty, then projects the scaled solution (SSPO).
 
-This is the short-term sparse portfolio optimisation of Lai, Yang, Fang and Wu (2018). The forecast is the window peak over the last price by default, so every entry of the forecast is at least one. `alg` finds the iterate, and the scale of the iterate before the projection makes the allocation sparse.
+This is the short-term sparse portfolio optimisation of [lai2018sspo](@citet). The forecast is the window peak over the last price by default, so every entry of the forecast is at least one. `alg` finds the iterate, and the scale of the iterate before the projection makes the allocation sparse.
 
 # Mathematical definition
 
@@ -1473,25 +1464,25 @@ Where:
   - $(math_dict[:t_period])
   - $(math_dict[:Proj_W_euclid])
 
-The first programme is the programme that the paper states. The paper solves it by an alternating direction iteration, which couples ``\\boldsymbol{b}`` to its soft threshold ``\\boldsymbol{g}`` by a quadratic term with no multiplier. So the fixed point of that iteration solves the second programme. `alg` chooses the iterate ``\\boldsymbol{b}``:
+The first programme is the programme that [lai2018sspo](@citet) state. [lai2018sspo](@citet) solve it by an alternating direction iteration, which couples ``\\boldsymbol{b}`` to its soft threshold ``\\boldsymbol{g}`` by a quadratic term with no multiplier. So the fixed point of that iteration solves the second programme. `alg` chooses the iterate ``\\boldsymbol{b}``:
 
-| `alg`                                | The iterate                                              | Parameters                               | Cost of a step                                 |
-|:------------------------------------ |:-------------------------------------------------------- |:---------------------------------------- |:---------------------------------------------- |
-| [`L1Optimum`](@ref)                  | the optimum of the stated programme                      | none                                     | ``O(N)``                                       |
-| [`HuberOptimum`](@ref)               | the fixed point of the paper's iteration, in closed form | `lambda`, `gamma`                        | ``O(N)``, or ``O(N^2)`` when ``N \\gamma > 1`` |
-| [`AlternatingDirectionMethod`](@ref) | the paper's iteration at the paper's stop                | `lambda`, `gamma`, `eta`, `iters`, `tol` | up to `iters` iterations of ``O(N)``           |
+| `alg`                                | The iterate                                       | Parameters                               | Cost of a step                                 |
+|:------------------------------------ |:------------------------------------------------- |:---------------------------------------- |:---------------------------------------------- |
+| [`L1Optimum`](@ref)                  | the optimum of the stated programme               | none                                     | ``O(N)``                                       |
+| [`HuberOptimum`](@ref)               | the fixed point of that iteration, in closed form | `lambda`, `gamma`                        | ``O(N)``, or ``O(N^2)`` when ``N \\gamma > 1`` |
+| [`AlternatingDirectionMethod`](@ref) | that iteration at its published stop              | `lambda`, `gamma`, `eta`, `iters`, `tol` | up to `iters` iterations of ``O(N)``           |
 
-The first programme puts the whole budget on the largest forecast. The fixed point gives every other asset at most ``\\gamma``. So its scaled projection also puts the whole budget on the largest forecast while ``N \\gamma \\leq 1 - 1 / \\zeta``, with ``N`` the number of assets. At the paper's `gamma = 0.01` and `zeta = 500` that is up to 99 assets. With more assets, the projection of the fixed point can hold a few assets.
+The first programme puts the whole budget on the largest forecast. The fixed point gives every other asset at most ``\\gamma``. So its scaled projection also puts the whole budget on the largest forecast while ``N \\gamma \\leq 1 - 1 / \\zeta``, with ``N`` the number of assets. At `gamma = 0.01` and `zeta = 500`, the values of [lai2018sspo](@cite), that is up to 99 assets. With more assets, the projection of the fixed point can hold a few assets.
 
-The iteration of the paper approaches the fixed point slowly. It stops when the budget residual is below its tolerance, which it can reach at a sign change of the residual while the iterate is still tenths away from the fixed point. So its projection is usually the projection of the fixed point, but not always. [`HuberOptimum`](@ref) is the default, because the method of the paper converges to its answer. Take [`L1Optimum`](@ref) for the programme that the paper states, and [`AlternatingDirectionMethod`](@ref) for the loop of the paper with its stop.
+The iteration of [lai2018sspo](@cite) approaches the fixed point slowly. It stops when the budget residual is below its tolerance, which it can reach at a sign change of the residual while the iterate is still tenths away from the fixed point. So its projection is usually the projection of the fixed point, but not always. [`HuberOptimum`](@ref) is the default, because the method of [lai2018sspo](@cite) converges to its answer. Take [`L1Optimum`](@ref) for the programme that [lai2018sspo](@citet) state, and [`AlternatingDirectionMethod`](@ref) for the loop of [lai2018sspo](@cite) with its stop.
 
-Both programmes have a minimum only when ``\\max \\boldsymbol{\\phi} - \\min \\boldsymbol{\\phi} \\leq 2 \\lambda``. At ``\\lambda = 1/2`` that is ``\\max \\hat{\\boldsymbol{x}}_{t+1} / \\min \\hat{\\boldsymbol{x}}_{t+1} \\leq e^{1 / 1.1}``. Past that bound the objective decreases without limit as the budget moves to the largest forecast. [`L1Optimum`](@ref) and [`HuberOptimum`](@ref) take that limit, and the iteration of the paper returns its last iterate.
+Both programmes have a minimum only when ``\\max \\boldsymbol{\\phi} - \\min \\boldsymbol{\\phi} \\leq 2 \\lambda``. At ``\\lambda = 1/2`` that is ``\\max \\hat{\\boldsymbol{x}}_{t+1} / \\min \\hat{\\boldsymbol{x}}_{t+1} \\leq e^{1 / 1.1}``. Past that bound the objective decreases without limit as the budget moves to the largest forecast. [`L1Optimum`](@ref) and [`HuberOptimum`](@ref) take that limit, and the iteration of [lai2018sspo](@cite) returns its last iterate.
 
 # Algorithm
 
 [`online_update!`](@ref) runs these steps at the row `x` of the period, from the allocation `w`.
 
- 1. Advance the forecaster with [`forecast_relative`](@ref), which gives the carrier `st` and the forecast `xhat`.
+ 1. Advance the forecaster with [`forecast_relative`](@ref), which gives `st` and the forecast `xhat`. `st` is the state of the rule: what the rule keeps from one update to the next, a [`ForecasterState`](@ref), or `nothing` for a rule that keeps nothing.
  2. Check that every entry of `xhat` is positive.
  3. Form the objective vector `phi` from `xhat`.
  4. Find the iterate `b` with [`sparse_portfolio_iterate`](@ref), from `phi` and the seed `w`.
@@ -1510,7 +1501,7 @@ $(DocStringExtensions.FIELDS)
         proj::EuclideanProjection = EuclideanProjection()
     ) -> ShortTermSparsePortfolio
 
-Keywords correspond to the struct's fields. The defaults of `zeta` and of the parameters of `alg` are the paper's. The rule needs the rows that `me` needs.
+Keywords correspond to the struct's fields. The defaults of `zeta` and of the parameters of `alg` are the values of [lai2018sspo](@cite). The rule needs the rows that `me` needs.
 
 ## Validation
 
@@ -1548,26 +1539,23 @@ ShortTermSparsePortfolio
 
   - $(ref_dict[:lai2018sspo])
 """
-struct ShortTermSparsePortfolio{T1 <: AbstractExpectedReturnsEstimator,
-                                T2 <: AbstractSparsePortfolioAlgorithm, T3 <: Real,
-                                T4 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct ShortTermSparsePortfolio <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:forecaster])
     """
-    me::T1
+    me
     """
     Algorithm that finds the iterate.
     """
-    alg::T2
+    alg
     """
     Scale of the iterate before the projection.
     """
-    zeta::T3
+    zeta
     """
     $(field_dict[:proj])
     """
-    proj::T4
+    proj
     function ShortTermSparsePortfolio(me::AbstractExpectedReturnsEstimator,
                                       alg::AbstractSparsePortfolioAlgorithm, zeta::Real,
                                       proj::EuclideanProjection)

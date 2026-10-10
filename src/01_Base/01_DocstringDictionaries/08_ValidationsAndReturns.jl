@@ -6,7 +6,7 @@ unique_key_dict!(err_name_dict, :err_name_dict, :kt => "cokurtosis", :sk => "cos
                  :V => "negative spectral coskewness", :D2 => "duplication matrix",
                  :L2 => "elimination matrix", :S2 => "summation matrix")
 unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempty(w)`.",
-                 :oow_nonneg => "If `w` is a `StatsBase.AbstractWeights`, it is not empty, and each entry is finite and `>= 0`. A [`DynamicAbstractWeights`](@ref) is not checked here, because it holds no weights until it reads the data.",#
+                 :oow_rm => "If `w` is a `StatsBase.AbstractWeights`, it is not empty, each entry is finite and `>= 0`, and `sum(w) > 0`, through [`assert_observation_weights`](@ref). A [`DynamicAbstractWeights`](@ref) holds no weights until it reads the data, so [`checked_observation_weights`](@ref) checks it at evaluation, and also checks there that the weights have one entry for each observation.",#
                  :gerbt => "`0 <= t`.",#
                  :t => "`0 < t < 1`.",#
                  :c1 => "`0 <= c1`.",#
@@ -19,6 +19,7 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :fd_panel => "The panel resolves. [`asset_panel`](@ref) raises an [`IsNothingError`](@ref) naming the site when it does not.",#
                  :fd_strict => "Under `de.strict = true`, every entry of `de.sel` names a Panel Field, a level or a label that the panel holds. Raises an `ArgumentError`. Under `de.strict = false`, such an entry warns and is dropped.",#
                  :alpha => "`0 < alpha < 1`.",#
+                 :alpha_tail0 => "If `alpha` is a number: `0 <= alpha < 1`. At `alpha = 0` the measure is the largest loss among the observations with positive weight, [`worst_positive_weight_loss`](@ref), and an observation with zero weight cannot set it.",#
                  :beta => "`0 < beta < 1`.",#
                  :bins => "If `bins` is an integer, `0 < bins <= RESOURCE_LIMITS[].max_bins` (the joint histogram is `bins × bins`; see [`RESOURCE_LIMITS`](@ref)).",#
                  :ep_gridK => "`isodd(K)` and `1 <= K <= RESOURCE_LIMITS[].max_ep_grid` (every grid point is one binary variable of the mixed-integer program an upper-bound or equality view builds; see [`RESOURCE_LIMITS`](@ref)).",#

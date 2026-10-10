@@ -70,12 +70,14 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     rd = returns_result_picker(rd, opt.brt)
     assert_universe_axis_order(opt.sets, rd)
     pr = prior(opt.pe, rd)
-    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
-    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
-    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
+    # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    imsk = investable_mask(pr)
+    # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    imsk = feature_readable_mask((opt.ple, opt.cte), investable_mask(pr), rd)
     fees = investable_fees_view(fees_constraints(opt.fees, opt.sets;
                                                  datatype = eltype(pr.X),
                                                  strict = opt.strict), imsk, pr.X)
@@ -97,9 +99,9 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                  x_src = opt.x_src, strict = opt.strict, kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
     sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
-    # A name-keyed estimator follows the door: a name that left resolves on the
-    # Non-Investable Axis. A precomputed constraint cannot, because its `A` is bound to its
-    # columns by position. Say so here rather than let the model meet two numbers.
+    # A name-keyed estimator follows `investable_reduction`: a name that left resolves on
+    # the Non-Investable Axis. A precomputed constraint cannot, because its `A` is bound to
+    # its columns by position. Say so here rather than let the model meet two numbers.
     # `sgcardr` is not checked: its columns are the rows of `sgmtx`, one for each sub-group,
     # and a departed asset removes a column of `sgmtx`, never a sub-group.
     if !isnothing(imsk)
@@ -379,7 +381,7 @@ Run the invariant model-assembly sequence shared by all single-JuMP-model optimi
 Executes the constraint-builder pipeline — from `set_linear_weight_constraints!` through
 `add_custom_constraint!` — that sits between the per-optimiser *head* (weight variables)
 and *tail* (objective + solve). The head must have populated Model State (`w`/`k` variables)
-before calling this function. See `Model Assembly` in `CONTEXT.md` and
+before calling this function. See `Model Assembly` in `GLOSSARY.md` and
 `0008-jump-model-assembly.md`.
 
 The tail of the sequence is [`assert_frontier_sweep_cap`](@ref): both frontier registries are

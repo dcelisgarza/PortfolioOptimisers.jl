@@ -163,6 +163,8 @@ When every eigenvalue is at or below ``\\lambda_+``, ``\\mathbf{C}_{\\mathrm{sig
 
 No signal survives, so every asset keeps its own variance and no pair keeps a correlation. [`FixedDenoise`](@ref) returns the identity on the same input, so the two tags agree on this case.
 
+Section VIII of [plerou2002](@cite) sets the noise eigenvalues to zero, and then it overwrites the diagonal with one. This tag rescales the reconstruction instead, as Equation 3.55 of [cajas2025](@cite) states. The book names [mlp1](@cite) as the source of the method, but that work does not state it. Its Section 2.5 gives only the constant residual eigenvalue and the targeted shrinkage, and Exercise 6 of its Section 2.9 only asks what happens when the components below the threshold are dropped. No work that states the rescale after the zeroed eigenvalues was found, so the rescale follows the book.
+
 # Algorithm
 
 The branch of [`_denoise!`](@ref) that this tag selects runs these steps.
@@ -191,9 +193,10 @@ SpectralDenoise()
 
 # References
 
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:mpdist])
-  - $(ref_dict[:cajas2025]) Section 3.5.2.2, Equations 3.54 and 3.55.
+  - $(ref_dict[:plerou2002]) Section VIII.
+  - $(ref_dict[:mpdist]) Section 1, Example 1.
+  - $(ref_dict[:cajas2025]) Section 3.5.2.2, Equations 3.54 and 3.55. $(ref_dict[:no_original_source])
+  - $(ref_dict[:mlp1]) Section 2.9, Exercise 6.
 """
 struct SpectralDenoise <: AbstractDenoiseAlgorithm end
 """
@@ -225,6 +228,8 @@ Where:
 
 Flattening the noise eigenvalues preserves the trace but not the diagonal, so the rescaling is not cosmetic: it changes every entry.
 
+Page 1469 of [laloux1999](@cite) gives each noise eigenvector one constant eigenvalue, chosen so that the trace is kept, and that constant is the mean of the noise eigenvalues. That work does not rescale. Snippet 3 of Section 4.2 of [lopezdeprado2019robust](@cite) first adds the rescale to unit diagonal, and Section 2.5.1 of [mlp1](@cite) states the method as an equation.
+
 # Algorithm
 
 The branch of [`_denoise!`](@ref) that this tag selects runs these steps.
@@ -252,9 +257,10 @@ FixedDenoise()
 
 # References
 
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:mpdist])
-  - $(ref_dict[:cajas2025]) Section 3.5.2.1, Equations 3.52 and 3.53.
+  - $(ref_dict[:laloux1999]) Page 1469.
+  - $(ref_dict[:lopezdeprado2019robust]) Section 4.2, Snippet 3.
+  - $(ref_dict[:mlp1]) Section 2.5.1, Snippet 2.5.
+  - $(ref_dict[:mpdist]) Section 1, Example 1.
 """
 struct FixedDenoise <: AbstractDenoiseAlgorithm end
 """
@@ -288,6 +294,8 @@ Where:
   - $(math_dict[:X_denoised])
 
 The two ``\\alpha`` weights sum to one on the diagonal, so the reconstruction preserves it in exact arithmetic.
+
+Section 2.5.2 of [mlp1](@cite) states this method, with ``\\alpha \\to 0`` for total shrinkage, and no earlier work that states it was found. That section does not pin the diagonal, which the reconstruction keeps in exact arithmetic.
 
 # Algorithm
 
@@ -331,9 +339,8 @@ ShrunkDenoise
 
 # References
 
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:mpdist])
-  - $(ref_dict[:cajas2025]) Section 3.5.2.3, Equation 3.56.
+  - $(ref_dict[:mlp1]) Section 2.5.2, Snippet 2.6.
+  - $(ref_dict[:mpdist]) Section 1, Example 1.
 """
 @concrete struct ShrunkDenoise <: AbstractDenoiseAlgorithm
     """
@@ -419,9 +426,10 @@ Denoise
 
 # References
 
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:mpdist])
-  - $(ref_dict[:cajas2025]) Section 3.5.2.
+  - $(ref_dict[:mpdist]) Section 1, Example 1.
+  - $(ref_dict[:laloux1999]) Equation 3.
+  - $(ref_dict[:lopezdeprado2019robust]) Section 4.2, Snippet 2.
+  - $(ref_dict[:mlp1]) Section 2.4, Snippet 2.4.
 """
 @concrete struct Denoise <: AbstractDenoiseEstimator
     """
@@ -519,9 +527,11 @@ Every branch writes into `X` and returns it.
 
 # References
 
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:mpdist])
-  - $(ref_dict[:cajas2025]) Section 3.5.2.
+  - $(ref_dict[:plerou2002]) Section VIII.
+  - $(ref_dict[:laloux1999]) Page 1469.
+  - $(ref_dict[:lopezdeprado2019robust]) Section 4.2, Snippet 3.
+  - $(ref_dict[:mlp1]) Sections 2.5.1 and 2.5.2.
+  - $(ref_dict[:cajas2025]) Section 3.5.2.2, Equation 3.55. $(ref_dict[:no_original_source])
 """
 function _denoise!(::SpectralDenoise, X::MatNum, vals::VecNum, vecs::MatNum,
                    num_factors::Integer)
@@ -631,6 +641,8 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:N])
 
+The density is the unnumbered display of Example 1 of Section 1 of [mpdist](@cite), with their concentration ``c = q`` and their scale ``\\tau = \\sigma^2 / q``. Equation 3 of [laloux1999](@cite) states it in the form above. That work treats ``\\sigma^2`` as a parameter to fit, and it names no criterion for the fit. Snippet 2 of Section 4.2 of [lopezdeprado2019robust](@cite) first states the fit by the sum of squared errors, and Section 2.4 of [mlp1](@cite) restates it. That fit reads a Gaussian kernel density estimate of the eigenvalues on the grid of the theoretical density, searches ``\\sigma^2 \\in [10^{-5}, 1 - 10^{-5}]``, and takes ``\\sigma^2 = 1`` when the search fails. This function reads an average shifted histogram instead of a kernel density estimate, and it searches ``[0, 1]``.
+
 # Algorithm
 
  1. Compute the two edge factors of a unit variance, `op_sqrt_iq_sq` for ``\\lambda_+`` and `om_sqrt_iq_sq` for ``\\lambda_-``.
@@ -666,9 +678,10 @@ Where:
 
 # References
 
-  - $(ref_dict[:mpdist])
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:cajas2025]) Section 3.5.1, Equation 3.51.
+  - $(ref_dict[:mpdist]) Section 1, Example 1.
+  - $(ref_dict[:laloux1999]) Equation 3.
+  - $(ref_dict[:lopezdeprado2019robust]) Section 4.2, Snippet 2.
+  - $(ref_dict[:mlp1]) Section 2.4, Snippet 2.4.
 """
 function find_max_eval(vals::VecNum, q::Number,
                        kernel::Any = AverageShiftedHistograms.Kernels.gaussian,
@@ -805,9 +818,10 @@ julia> denoise!(Denoise(), X, 10 / 5)
 
 # References
 
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:mpdist])
-  - $(ref_dict[:cajas2025]) Section 3.5.2.
+  - $(ref_dict[:mpdist]) Section 1, Example 1.
+  - $(ref_dict[:laloux1999]) Equation 3.
+  - $(ref_dict[:lopezdeprado2019robust]) Section 4.2, Snippet 2.
+  - $(ref_dict[:mlp1]) Section 2.4, Snippet 2.4.
 """
 function denoise!(::Nothing, X::MatNum, args...)::MatNum
     return X
@@ -882,9 +896,10 @@ julia> size(Xd)
 
 # References
 
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:mpdist])
-  - $(ref_dict[:cajas2025]) Section 3.5.2.
+  - $(ref_dict[:mpdist]) Section 1, Example 1.
+  - $(ref_dict[:laloux1999]) Equation 3.
+  - $(ref_dict[:lopezdeprado2019robust]) Section 4.2, Snippet 2.
+  - $(ref_dict[:mlp1]) Section 2.4, Snippet 2.4.
 """
 function denoise(::Nothing, X::MatNum, args...)::MatNum
     return X

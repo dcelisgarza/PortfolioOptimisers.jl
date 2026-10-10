@@ -111,7 +111,7 @@ The estimator fits on the assets whose returns pass [`coverage_mask`](@ref), and
 
 The second input narrows the asset universe. It adds no second mask and no second Coverage Universe. The result names no entry of the implied volatility axis, and each consumer of the expanded moment reads a `NaN` of this method as it reads the `NaN` of an absent return.
 
-The narrowing is in the reduce-and-expand of the estimator, not in the carrier that assembled `iv`. A caller of `Statistics.cov(ce, X; iv = …)` with its own surface passes through no carrier, and a nested estimator that receives the forwarded `iv` passes through none either. Both come after this reduction, so both see a block whose implied volatilities are complete.
+The narrowing is in the reduce-and-expand of the estimator, not in the [`ReturnsResult`](@ref) that holds `iv`. A caller of `Statistics.cov(ce, X; iv = …)` with its own surface passes through no `ReturnsResult`, and a nested estimator that receives the forwarded `iv` passes through none either. Both come after this reduction, so both see a block whose implied volatilities are complete.
 
 # Mathematical definition
 
@@ -273,22 +273,22 @@ end
     coverage_reduction(cmsk::BitVector,
                        rd::AbstractReturnsResult) -> Tuple{BitVector, AbstractReturnsResult}
 
-Reduce a returns carrier to the Coverage Universe of its own window.
+Reduce a returns result to the Coverage Universe of its own window.
 
-[`coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel})`](@ref) gives a moment estimator a clean block. This method gives a consumer of the whole carrier a clean carrier. [`port_opt_view`](@ref) slices `nx`, `X`, the benchmark, the implied volatility surface and the [`AssetPanel`](@ref) at the same asset index. The caller is pre-selection. [`fit_preprocessing`](@ref) over an [`AbstractAssetSelector`](@ref) reduces the carrier here, so each selector ranks the live assets alone.
+[`coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel})`](@ref) gives a moment estimator a clean block. This method gives a consumer of the whole returns result a clean returns result. [`port_opt_view`](@ref) slices `nx`, `X`, the benchmark, the implied volatility surface and the [`AssetPanel`](@ref) at the same asset index. The caller is pre-selection. [`fit_preprocessing`](@ref) over an [`AbstractAssetSelector`](@ref) reduces the returns result here, so each selector ranks the live assets alone.
 
-The four methods choose each branch by dispatch, not by a condition, as [`coverage_reduction(opt::AbstractOptimisationEstimator, rd::ReturnsResult)`](@ref) does. The first method passes the returns matrix of the carrier as the first argument of the second. The second method derives the mask. The `nothing` method is the path where every asset is covered, and it returns the carrier unchanged. The `BitVector` method takes the view.
+The four methods choose each branch by dispatch, not by a condition, as [`coverage_reduction(opt::AbstractOptimisationEstimator, rd::ReturnsResult)`](@ref) does. The first method passes the returns matrix of the returns result as the first argument of the second. The second method derives the mask. The `nothing` method is the path where every asset is covered, and it gives back the returns result unchanged. The `BitVector` method takes the view.
 
-The split between the first two methods is the refusal of the family. A carrier whose `X` is not an `observations × assets` matrix has no asset axis to reduce. [`PredictionReturnsResult`](@ref) holds one portfolio return series, for example. Such a carrier matches no method, and the call throws a `MethodError` that names the carrier. The refusal comes before the method reads the panel. So the error names the returns matrix of a carrier that has neither the fields `nx` and `X` nor the fields `nx`, `X` and `pnl`, not a missing field.
+The split between the first two methods is the refusal of the family. A returns result whose `X` is not an `observations × assets` matrix has no asset axis to reduce. [`PredictionReturnsResult`](@ref) holds one portfolio return series, for example. Such a returns result matches no method, and the call throws a `MethodError` that names the returns result. The refusal comes before the method reads the panel. So the error names the returns matrix of a returns result that has neither the fields `nx` and `X` nor the fields `nx`, `X` and `pnl`, not a missing field.
 
 A window with no covered asset throws an `IsEmptyError` in [`coverage_mask`](@ref), which derives the mask, so every caller gets the same refusal.
 
 # Algorithm
 
- 1. Pass `rd.X` as the first argument of the second method, which refuses a carrier with no asset axis.
- 2. Derive the Coverage Universe of `X` and `rd.pnl` with [`coverage_mask`](@ref), with `dims = 1`, because a carrier holds its observations along the rows.
- 3. Return the mask and the carrier unchanged when the mask is `nothing`.
- 4. Otherwise return the mask beside a [`port_opt_view`](@ref) of the carrier at `findall(cmsk)`.
+ 1. Pass `rd.X` as the first argument of the second method, which refuses a returns result with no asset axis.
+ 2. Derive the Coverage Universe of `X` and `rd.pnl` with [`coverage_mask`](@ref), with `dims = 1`, because a returns result holds its observations along the rows.
+ 3. Return the mask and the returns result unchanged when the mask is `nothing`.
+ 4. Otherwise return the mask beside a [`port_opt_view`](@ref) of the returns result at `findall(cmsk)`.
 
 # Arguments
 
@@ -298,12 +298,12 @@ A window with no covered asset throws an `IsEmptyError` in [`coverage_mask`](@re
 
 # Validation
 
-  - The carrier must hold an `observations × assets` returns matrix.
+  - The returns result must hold an `observations × assets` returns matrix.
   - At least one asset must be in the Coverage Universe.
 
 # Returns
 
-  - `(cmsk, rdc)::Tuple{Option{BitVector}, AbstractReturnsResult}`: The Coverage Universe, and the carrier reduced to it.
+  - `(cmsk, rdc)::Tuple{Option{BitVector}, AbstractReturnsResult}`: The Coverage Universe, and the returns result reduced to it.
 
 # Related
 
@@ -606,7 +606,7 @@ end
 
 Write a regression result fitted on the Coverage Universe back onto the full asset universe.
 
-A Prior Result has no mask field, so every block that it carries is on the full asset universe, and its regression result is one of those blocks. The loadings, the intercepts, the idiosyncratic covariance and the counts `edof` and `ediv` of that covariance are all per asset, so each expands along its asset axis. An asset outside the Coverage Universe reads zero in each count, through [`expand_count`](@ref).
+A Prior Result has no mask field, so every block that it carries is on the full asset universe, and its regression result is one of those blocks. The loadings, the intercepts, the idiosyncratic covariance and the counts `edof` and `ediv` of that covariance are all per asset, so each expands along its asset axis. An asset outside the Coverage Universe reads zero in each count, through [`expand_count`](@ref). The row key `idx` and `ts` names observations, not assets, so it passes through unchanged.
 
 The method reads `L` with `getfield`, as [`port_opt_view`](@ref) does. The property rule `swap(L, M)` makes `re.L` return `re.M` when `L` is `nothing`. A read through the property writes a copy of `M` into the `L` of the expanded result, and the result no longer shows that `L` is unset.
 
@@ -638,7 +638,7 @@ function expand_regression(re::Regression, cmsk::BitVector)
                       b = isnothing(b) ? nothing : expand_vector(b, cmsk),
                       esigma = expand_idiosyncratic_covariance(re.esigma, cmsk),
                       edof = expand_count(re.edof, cmsk),
-                      ediv = expand_count(re.ediv, cmsk))
+                      ediv = expand_count(re.ediv, cmsk), idx = re.idx, ts = re.ts)
 end
 """
     expand_idiosyncratic_covariance(esigma::Nothing, cmsk) -> nothing
@@ -684,7 +684,7 @@ end
 
 Write a moment estimated on the Coverage Universe back into a `NaN` frame of the full width.
 
-A Prior Result is on the full asset universe, and an asset that the prior cannot estimate carries `NaN`. So the prior expands every block of a reduced fit before it stores the block. [`coverage_reduction`](@ref) is the first half of the seam, and this function is the second half. The `nothing` sentinel returns the argument unchanged.
+A Prior Result is on the full asset universe, and an asset that the prior cannot estimate carries `NaN`. So the prior expands every block of a reduced fit before it stores the block. [`coverage_reduction`](@ref) is the first half of the reduce-and-expand, and this function is the second half. The `nothing` sentinel returns the argument unchanged.
 
 The four shapes need four methods, and their types do not tell them apart. A covariance matrix and a cokurtosis matrix are both square, and a mean and a coskewness tensor are both rectangular. The number of arguments and the `Val` marker tell them apart.
 
@@ -946,7 +946,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The correlation root of the Asset Panel seam. It is the reduce-and-expand of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), which states the rule and its cost.
+The correlation root of the Asset Panel methods of the moment verbs. It is the reduce-and-expand of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), which states the rule and its cost.
 
 # Related
 
@@ -962,7 +962,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The variance root of the Asset Panel seam. It is the reduce-and-expand of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), which states the rule and its cost. The result is a marginal, so it expands along its asset axis alone.
+The variance root of the Asset Panel methods of the moment verbs. It is the reduce-and-expand of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), which states the rule and its cost. The result is a marginal, so it expands along its asset axis alone.
 
 # Related
 
@@ -978,7 +978,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The standard deviation root of the Asset Panel seam. It is the reduce-and-expand of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), which states the rule and its cost. The result is a marginal, so it expands along its asset axis alone.
+The standard deviation root of the Asset Panel methods of the moment verbs. It is the reduce-and-expand of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), which states the rule and its cost. The result is a marginal, so it expands along its asset axis alone.
 
 # Related
 
@@ -994,7 +994,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The expected returns root of the Asset Panel seam. It is the reduce-and-expand of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), which states the rule and its cost. The result is a marginal, so it expands along its asset axis alone.
+The expected returns root of the Asset Panel methods of the moment verbs. It is the reduce-and-expand of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), which states the rule and its cost. The result is a marginal, so it expands along its asset axis alone.
 
 # Related
 
@@ -1010,7 +1010,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The coskewness root of the Asset Panel seam. It is the reduce-and-expand of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), which states the rule and its cost. The result is a pair, so the tensor expands at the pair index and the negative spectral skewness matrix expands as a covariance-like matrix.
+The coskewness root of the Asset Panel methods of the moment verbs. It is the reduce-and-expand of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), which states the rule and its cost. The result is a pair, so the tensor expands at the pair index and the negative spectral skewness matrix expands as a covariance-like matrix.
 
 # Related
 
@@ -1027,7 +1027,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The cokurtosis root of the Asset Panel seam. It is the reduce-and-expand of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), which states the rule and its cost. The result is `assets² × assets²`, so it expands at the pair index on both axes.
+The cokurtosis root of the Asset Panel methods of the moment verbs. It is the reduce-and-expand of [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), which states the rule and its cost. The result is `assets² × assets²`, so it expands at the pair index on both axes.
 
 # Related
 
@@ -1098,9 +1098,9 @@ end
 """
     coverage_panel_moment(f, est, cvg, X, pnl, expand; dims::Int = 1, kwargs...)
 
-Route the Asset Panel method of a moment verb to the Coverage Universe seam or to the available-case seam.
+Choose the Coverage Universe route or the available-case route for the Asset Panel method of a moment verb.
 
-An estimator that carries a [`CoveragePolicy`](@ref) is a mask-aware estimator, in the sense of the root method of `cov` in this file. It takes the whole window and reads `pnl.amsk` itself. So the panel method must give it the mask, and must not reduce the window to its Coverage Universe. The caller passes the `cvg` field as the third argument, so dispatch chooses the seam. The `Nothing` method is the reduce-and-expand of the root methods.
+An estimator that carries a [`CoveragePolicy`](@ref) is a mask-aware estimator, in the sense of the root method of `cov` in this file. It takes the whole window and reads `pnl.amsk` itself. So the panel method must give it the mask, and must not reduce the window to its Coverage Universe. The caller passes the `cvg` field as the third argument, so dispatch chooses the route. The `Nothing` method is the reduce-and-expand of the root methods.
 
 `expand` is the framing that the verb needs, because the four moment shapes frame differently. A covariance frames as a matrix, a marginal along its asset axis alone, and a co-moment at the pair index. The verb passes the framing, so the file holds one copy of this routing for every verb.
 
@@ -1108,10 +1108,10 @@ An estimator that carries a [`CoveragePolicy`](@ref) is a mask-aware estimator, 
 
   - `f`: The plain, panel-free method of the verb.
   - `est`: The estimator.
-  - `cvg`: The policy the estimator carries, which selects the seam.
+  - `cvg`: The policy the estimator carries, which selects the route.
   - $(arg_dict[:X])
   - $(arg_dict[:pnl_moment])
-  - `expand`: The framing, called as `expand(val, cmsk)` on the Coverage Universe seam and unused on the other.
+  - `expand`: The framing, called as `expand(val, cmsk)` on the Coverage Universe route and unused on the other.
   - $(arg_dict[:dims])
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
@@ -1131,7 +1131,7 @@ function coverage_panel_moment end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of [`coverage_panel_moment`](@ref), the Coverage Universe seam. It reduces the window with [`coverage_reduction`](@ref), fits the plain estimator on the clean block, and frames the result with `expand`.
+`Nothing` method of [`coverage_panel_moment`](@ref), the Coverage Universe route. It reduces the window with [`coverage_reduction`](@ref), fits the plain estimator on the clean block, and frames the result with `expand`.
 
 # Related
 
@@ -1146,7 +1146,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of [`coverage_panel_moment`](@ref), the available-case seam. It gives the estimator the whole window and the active mask of the panel, turned to the orientation of `X`, and the estimator writes its own frame.
+[`CoveragePolicy`](@ref) method of [`coverage_panel_moment`](@ref), the available-case route. It gives the estimator the whole window and the active mask of the panel, turned to the orientation of `X`, and the estimator writes its own frame.
 
 # Related
 
@@ -1280,7 +1280,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Asset Panel method of [`coskewness`](@ref) for a [`Coskewness`](@ref), which routes on its `cvg` field with [`coverage_panel_moment`](@ref). The result is a pair, so the Coverage Universe seam frames the tensor at the pair index and the negative spectral skewness matrix as a covariance-like matrix.
+Asset Panel method of [`coskewness`](@ref) for a [`Coskewness`](@ref), which routes on its `cvg` field with [`coverage_panel_moment`](@ref). The result is a pair, so the Coverage Universe route frames the tensor at the pair index and the negative spectral skewness matrix as a covariance-like matrix.
 
 # Related
 
@@ -1296,7 +1296,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Asset Panel method of [`cokurtosis`](@ref) for a [`Cokurtosis`](@ref), which routes on its `cvg` field with [`coverage_panel_moment`](@ref). The result is `assets² × assets²`, so the Coverage Universe seam frames it at the pair index on both axes.
+Asset Panel method of [`cokurtosis`](@ref) for a [`Cokurtosis`](@ref), which routes on its `cvg` field with [`coverage_panel_moment`](@ref). The result is `assets² × assets²`, so the Coverage Universe route frames it at the pair index on both axes.
 
 # Related
 
@@ -1313,14 +1313,14 @@ end
 """
     coverage_variance_series(ce, cvg, X, pnl; dims::Int = 1, kwargs...) -> MatNum
 
-Route a point-in-time variance series to the Coverage Universe seam or to the available-case seam.
+Choose the Coverage Universe route or the available-case route for a point-in-time variance series.
 
 This is the series counterpart of [`coverage_panel_moment`](@ref). It is a separate function because the series refits the estimator at each observation and writes the frame one row at a time, not once at the end.
 
 # Arguments
 
   - $(arg_dict[:ce])
-  - `cvg`: The policy the estimator carries, which selects the seam.
+  - `cvg`: The policy the estimator carries, which selects the route.
   - $(arg_dict[:X])
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
@@ -1345,7 +1345,7 @@ function coverage_variance_series end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of [`coverage_variance_series`](@ref), the Coverage Universe seam.
+`Nothing` method of [`coverage_variance_series`](@ref), the Coverage Universe route.
 
 It reduces each window to its own Coverage Universe, and fits the estimator on that block. [`variance_series(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref) states the rule and its mathematics.
 
@@ -1385,9 +1385,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of [`coverage_variance_series`](@ref), the available-case seam.
+[`CoveragePolicy`](@ref) method of [`coverage_variance_series`](@ref), the available-case route.
 
-It fits each window over the whole universe, and does not reduce it to its own Coverage Universe. An asset that lists after the first row therefore carries a number once the estimator admits it, where the Coverage Universe seam leaves its column at `NaN`.
+It fits each window over the whole universe, and does not reduce it to its own Coverage Universe. An asset that lists after the first row therefore carries a number once the estimator admits it, where the Coverage Universe route leaves its column at `NaN`.
 
 # Algorithm
 

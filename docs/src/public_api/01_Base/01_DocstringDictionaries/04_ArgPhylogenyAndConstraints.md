@@ -1,7 +1,7 @@
 ```@meta
-Description = "Phylogeny and constraint arguments has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Arg phylogeny and constraints has no public API in PortfolioOptimisers.jl; its names are in the private API."
 ```
 
-# Phylogeny and constraint arguments
+# Arg phylogeny and constraints
 
-This file defines no name. The [private page](@ref private-api-phylogeny-and-constraint-arguments) says which table it fills.
+This file defines no name. The [private page](@ref private-api-arg-phylogeny-and-constraints) says which table it fills.

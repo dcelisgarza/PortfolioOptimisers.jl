@@ -172,14 +172,15 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `k_ucs`
 
-  - `k_ucs(km::AbstractUncertaintyKAlgorithm, q::Number, X, sigma_X::MatNum) -> Number`: Returns the radius.
+  - `k_ucs(km::AbstractUncertaintyKAlgorithm, q::Number, X, sigma_X::MatNum, df::Integer) -> Number`: Returns the radius.
 
 ### Arguments
 
   - `km`: The concrete subtype instance.
   - `q`: Significance level.
   - `X`: Matrix of sampled estimation errors, one row per sample. An algorithm that runs no simulation absorbs it.
-  - `sigma_X`: Shape matrix of the ellipsoid, whose first dimension is the dimension of the ellipsoid.
+  - `sigma_X`: Shape matrix of the ellipsoid.
+  - `df`: Dimension of the set, which [`ucs_dimension`](@ref) gives. It is less than the first dimension of `sigma_X` on a full covariance shape, because a symmetric matrix has ``N(N+1)/2`` free entries of its ``N^{2}``. An algorithm that reads no dimension absorbs it.
 
 ### Returns
 
@@ -710,9 +711,9 @@ end
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     ucs_prior(::Nothing, X::MatNum, F::Option{<:MatNum} = nothing; kwargs...)
 
-Fits the prior an uncertainty set calibrates itself on, or refuses by name when the set holds none.
+Fits the prior an uncertainty set calibrates itself on, or throws an error that names `pe` when the set holds none.
 
-The one door through which every returns-data verb of the four families — [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) — fits its `pe`, so the refusal is written once rather than once per verb per family. A set whose `pe` is `nothing` is calibrated on a prior result it is handed, and `nothing` says that one thing: it does not resolve to an empirical prior over `X` at the fit, because that would calibrate the same estimator on two different priors depending on the call site. The returns-data form therefore raises and points at the prior-result form, `ucs(ue, pr)`, and at `pe`.
+The one function through which every returns-data verb of the four families — [`DeltaUncertaintySet`](@ref), [`NormalUncertaintySet`](@ref), [`ARCHUncertaintySet`](@ref) and [`CharacteristicUncertaintySet`](@ref) — fits its `pe`, so the refusal is written once rather than once per verb per family. A set whose `pe` is `nothing` is calibrated on a prior result it is handed, and `nothing` says that one thing: it does not resolve to an empirical prior over `X` at the fit, because that would calibrate the same estimator on two different priors depending on the call site. The returns-data form therefore raises and points at the prior-result form, `ucs(ue, pr)`, and at `pe`.
 
 # Arguments
 
@@ -1215,21 +1216,45 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes the ellipsoid radius `k` as the square root of the `1 - q` chi-squared quantile, the closed form that holds when the estimation errors are normal.
 
-The degrees of freedom is read from `size(sigma_X, 1)`, the first dimension of the shape matrix. That is ``N`` on the mean axis, where the shape matrix is the asymptotic covariance of the mean, and ``N^{2}`` on the covariance axis, where it is the asymptotic covariance of the vectorised covariance. The same algorithm therefore gives a different radius on each axis.
+The degrees of freedom are the dimension of the set, the number of free coordinates the estimation error spans. That is ``N`` on the mean axis. On the covariance axis the error is a vectorised **symmetric** ``N \\times N`` matrix: the entries ``(i, j)`` and ``(j, i)`` are one number, so the error spans ``N(N+1)/2`` coordinates of the ``N^{2}``, and the shape of the normal method, ``\\left(\\mathbf{I} + \\mathbf{K}\\right) \\left(\\mathbf{\\Sigma} \\otimes \\mathbf{\\Sigma}\\right) / T``, has exactly that rank. The squared Mahalanobis distance of a normal error is chi-squared at the rank of its shape, so a full covariance shape reads ``N(N+1)/2``. A diagonal shape reads ``N^{2}``, because its statistic sums ``N^{2}`` terms of unit mean. [`ucs_dimension`](@ref) states the rule, and the set builders pass its value to [`k_ucs`](@ref) and [`k_norm_ball`](@ref).
 
-**The source states this closed form for the mean axis only.** Equation 11.23 defines ``\\kappa^{2}_{\\boldsymbol{\\mu}}`` with ``n`` degrees of freedom, ``n`` being the number of assets, and obtains ``\\kappa^{2}_{\\mathbf{\\Sigma}}`` by simulation rather than in closed form. Applying the same form on the covariance axis is this library's extension of it, and the extension is **conservative**: a symmetric ``N \\times N`` matrix has ``N(N+1)/2`` free entries, and the normal method's shape matrix ``T \\left(\\mathbf{I} + \\mathbf{K}\\right) \\left(\\mathbf{\\Sigma}_{\\boldsymbol{\\mu}} \\otimes \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}\\right)`` has exactly that rank, so ``N^{2}`` overstates the dimension of the ellipsoid it calibrates. At ``N = 20`` and ``q = 0.05`` the radius is ``21.157`` where the free-entry count gives ``15.646``. Use [`NormalKUncertaintyAlgorithm`](@ref) on the covariance axis to calibrate the radius on the sampled errors instead.
+**`ambient = true` reads the dimension of the ambient space instead**, the first dimension of the shape matrix or of the geometry map: ``N^{2}`` on every covariance shape. That radius is too large for its level. At ``N = 5`` and ``q = 0.05`` it is ``6.136`` where the set dimension gives ``5.000``, and the set covers ``0.999`` of the errors, not ``0.95``. The ratio of the two radii falls to ``1 / \\sqrt{2}`` as ``N`` increases. The field keeps that rule one keyword away, for a comparison with a caller that counts every entry of the vectorised matrix.
+
+**The source states this closed form for the mean axis only.** Equation 11.23 defines ``\\kappa^{2}_{\\boldsymbol{\\mu}}`` with ``n`` degrees of freedom, ``n`` being the number of assets, and obtains ``\\kappa^{2}_{\\mathbf{\\Sigma}}`` by simulation rather than in closed form. The form on the covariance axis is this library's extension of it. [`NormalKUncertaintyAlgorithm`](@ref) on the same errors gives the empirical counterpart, and the two agree up to the noise of the simulation.
 
 # Mathematical definition
 
 ```math
-k = \\sqrt{\\chi^{2,\\,-1}_{p}(1 - q)}\\,, \\qquad p = \\operatorname{size}(\\mathbf{\\Sigma}_{\\boldsymbol{\\delta}}, 1)\\,.
+\\begin{align}
+k &= \\sqrt{\\chi^{2,\\,-1}_{p}(1 - q)}\\,.
+\\end{align}
 ```
 
 Where:
 
   - ``\\chi^{2,\\,-1}_{p}``: Inverse cumulative distribution function of the chi-squared distribution with ``p`` degrees of freedom.
-  - ``\\mathbf{\\Sigma}_{\\boldsymbol{\\delta}}``: Shape matrix of the ellipsoid.
+  - ``p``: Degrees of freedom, the dimension of the set, or the first dimension of the shape matrix under `ambient = true`.
   - ``q``: Significance level.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    ChiSqKUncertaintyAlgorithm(;
+        ambient::Bool = false
+    )
+
+Keyword arguments correspond to the field above.
+
+# Examples
+
+```jldoctest
+julia> ChiSqKUncertaintyAlgorithm()
+ChiSqKUncertaintyAlgorithm
+  ambient ┴ Bool: false
+```
 
 # Related
 
@@ -1237,17 +1262,32 @@ Where:
   - [`NormalKUncertaintyAlgorithm`](@ref)
   - [`GeneralKUncertaintyAlgorithm`](@ref)
   - [`k_ucs`](@ref)
+  - [`k_norm_ball`](@ref)
+  - [`ucs_dimension`](@ref)
 
 # References
 
   - $(ref_dict[:cajas2025]) Equation 11.23.
   - $(ref_dict[:fabozzi2007])
 """
-struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
+@concrete struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm
+    """
+    Whether the degrees of freedom are the first dimension of the shape matrix, ``N^{2}`` on every covariance shape, rather than the dimension of the set. `false` by default.
+    """
+    ambient
+    function ChiSqKUncertaintyAlgorithm(ambient::Bool)
+        return new{typeof(ambient)}(ambient)
+    end
+end
+function ChiSqKUncertaintyAlgorithm(; ambient::Bool = false)::ChiSqKUncertaintyAlgorithm
+    return ChiSqKUncertaintyAlgorithm(ambient)
+end
 """
-    k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum)
+    k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum,
+          ::Integer = size(sigma_X, 1))
     k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
-    k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, sigma_X::MatNum)
+    k_ucs(km::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, sigma_X::MatNum,
+          df::Integer = size(sigma_X, 1))
     k_ucs(type::Number, args...)
 
 Compute the radius `k` of an ellipsoidal uncertainty set at significance level `q`.
@@ -1269,7 +1309,7 @@ The first three methods each run one procedure. The fourth, `k_ucs(type::Number,
 
 [`ChiSqKUncertaintyAlgorithm`](@ref):
 
- 1. Read the degrees of freedom from `size(sigma_X, 1)`, the dimension of the ellipsoid.
+ 1. Read the degrees of freedom from `df`, the dimension of the set, or from `size(sigma_X, 1)` when `km.ambient` is `true`.
  2. Return the square root of the `1 - q` chi-squared quantile at that many degrees of freedom, the radius. The method runs no simulation, so it ignores the sample container.
 
 # Arguments
@@ -1278,6 +1318,7 @@ The first three methods each run one procedure. The fourth, `k_ucs(type::Number,
   - `q`: Significance level.
   - `X`: Matrix of estimation errors, one row per sample. **Every caller passes centred deviations, not levels**: each row is a deviation from the point estimate, and the method cannot check it. An uncentred sample makes the distance non-central and inflates the radius.
   - `sigma_X`: Shape matrix of the ellipsoid, and the shape the distances are measured against. It is ``N \\times N`` on the mean axis and ``N^{2} \\times N^{2}`` on the covariance axis. [`ellipsoidal_set`](@ref) passes the diagonal of the asymptotic covariance under its `diagonal = true` default, so the quantile is taken against that diagonal and not against the full matrix.
+  - `df`: Dimension of the set, which [`ucs_dimension`](@ref) gives. The default `size(sigma_X, 1)` holds on a shape of full rank. It overstates a full covariance shape, whose rank is ``N(N+1)/2``, so [`ellipsoidal_set`](@ref) always passes it. [`NormalKUncertaintyAlgorithm`](@ref) absorbs it, because its sampled distances carry the dimension themselves.
   - `args...`: Additional arguments, which the algorithms that need no sample absorb.
   - `type`: Number value for direct scaling.
 
@@ -1291,13 +1332,15 @@ The first three methods each run one procedure. The fourth, `k_ucs(type::Number,
   - [`GeneralKUncertaintyAlgorithm`](@ref)
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
   - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
+  - [`ucs_dimension`](@ref)
 
 # References
 
   - $(ref_dict[:cajas2025]) Section 11.3.2.
   - $(ref_dict[:fabozzi2007])
 """
-function k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum)
+function k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum,
+               ::Integer = size(sigma_X, 1))
     A = sigma_X \ transpose(X)
     k_mus = [transpose(view(X, i, :)) * view(A, :, i) for i in axes(X, 1)]
     return sqrt(Statistics.quantile(k_mus, one(q) - q; km.kwargs...))
@@ -1305,11 +1348,11 @@ end
 function k_ucs(::GeneralKUncertaintyAlgorithm, q::Number, args...)
     return sqrt((one(q) - q) / q)
 end
-function k_ucs(::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, sigma_X::MatNum)
-    # The degrees of freedom is the dimension of the ellipsoid, which the shape matrix
-    # carries: N on the mean axis, N^2 on the covariance axis. The sample container is
-    # unused, because this route runs no simulation.
-    return sqrt(Distributions.cquantile(Distributions.Chisq(size(sigma_X, 1)), q))
+function k_ucs(km::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, sigma_X::MatNum,
+               df::Integer = size(sigma_X, 1))
+    # The sample container is unused, because this route runs no simulation.
+    p = km.ambient ? size(sigma_X, 1) : df
+    return sqrt(Distributions.cquantile(Distributions.Chisq(p), q))
 end
 function k_ucs(type::Number, args...)::Number
     return type
@@ -1340,7 +1383,8 @@ $(DocStringExtensions.FIELDS)
 ```jldoctest
 julia> EllipsoidalUncertaintySetAlgorithm()
 EllipsoidalUncertaintySetAlgorithm
-    method ┼ ChiSqKUncertaintyAlgorithm()
+    method ┼ ChiSqKUncertaintyAlgorithm
+           │   ambient ┴ Bool: false
   diagonal ┴ Bool: true
 ```
 
@@ -1389,7 +1433,8 @@ $(DocStringExtensions.FIELDS)
     NormBallUncertaintySetAlgorithm(;
         method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
         diagonal::Bool = true,
-        p::Number = 2
+        p::Number = 2,
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot()
     ) -> NormBallUncertaintySetAlgorithm
 
 Keywords correspond to the struct's fields.
@@ -1403,9 +1448,11 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> NormBallUncertaintySetAlgorithm()
 NormBallUncertaintySetAlgorithm
-    method ┼ ChiSqKUncertaintyAlgorithm()
+    method ┼ ChiSqKUncertaintyAlgorithm
+           │   ambient ┴ Bool: false
   diagonal ┼ Bool: true
-         p ┴ Int64: 2
+         p ┼ Int64: 2
+  mtx_sqrt ┴ EigenFallbackSquareRoot()
 ```
 
 # Related
@@ -1436,15 +1483,23 @@ NormBallUncertaintySetAlgorithm
     Norm order ``p \\geq 1`` of the ball, `Inf` admitted. It reaches the set unchanged, and the consumer raises the cone of the dual order.
     """
     p
-    function NormBallUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool, p::Number)
+    """
+    Square-root algorithm of the full asymptotic covariance that gives the geometry map, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. The covariance of the covariance is singular by construction and positive definite only after the repair of `pdm`. The default takes the square root of its eigendecomposition when the repair is off. A [`NormalKUncertaintyAlgorithm`](@ref) radius applies the pseudo-inverse of the map, so it reads the eigen square root of a singular matrix, in the subspace that the cut of [`norm_ball_coordinates`](@ref) keeps. A ridge gives a map of full rank and a different set. A diagonal shape reads no square root.
+    """
+    mtx_sqrt
+    function NormBallUncertaintySetAlgorithm(method::Num_UcSK, diagonal::Bool, p::Number,
+                                             mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
         @argcheck(!isnan(p) && p >= one(p), DomainError(p, "p must be >= 1"))
-        return new{typeof(method), typeof(diagonal), typeof(p)}(method, diagonal, p)
+        return new{typeof(method), typeof(diagonal), typeof(p), typeof(mtx_sqrt)}(method,
+                                                                                  diagonal,
+                                                                                  p,
+                                                                                  mtx_sqrt)
     end
 end
 function NormBallUncertaintySetAlgorithm(; method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
-                                         diagonal::Bool = true,
-                                         p::Number = 2)::NormBallUncertaintySetAlgorithm
-    return NormBallUncertaintySetAlgorithm(method, diagonal, p)
+                                         diagonal::Bool = true, p::Number = 2,
+                                         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::NormBallUncertaintySetAlgorithm
+    return NormBallUncertaintySetAlgorithm(method, diagonal, p, mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1542,6 +1597,7 @@ Keywords correspond to the struct's fields.
 
   - `!isempty(sigma)`.
   - `size(sigma, 1) == size(sigma, 2)`.
+  - `!(k isa Bool)`, else an `ArgumentError`. The converter to [`NormBallUncertaintySet`](@ref) carries `k` into its radius `kappa`, which refuses a `Bool` too.
   - `k > 0`.
   - If `val` is provided: `length(val) == size(sigma, 1)`. The rule reads a length rather than a size, so it holds on both axes: `val` is a characteristic vector of length ``N`` beside an ``N \\times N`` shape matrix, and an ``N \\times N`` covariance matrix beside an ``N^{2} \\times N^{2}`` one.
 
@@ -1590,6 +1646,8 @@ EllipsoidalUncertaintySet
                                        val::Option{<:ArrNum})
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
         assert_matrix_issquare(sigma, :sigma)
+        @argcheck(!isa(k, Bool),
+                  ArgumentError("k is a radius, so it must be a number and not a Bool. Got\nk => $k."))
         @argcheck(k > zero(k), DomainError(k, "k must be positive"))
         if isa(val, ArrNum)
             @argcheck(length(val) == size(sigma, 1),
@@ -1856,31 +1914,101 @@ function vec_quantile_bounds(mus::MatNum, q::Number, kwargs)
     return lb, ub
 end
 """
-    ellipsoidal_set(diagonal::Bool, method, q::Number, samples, cov::MatNum,
-                    class::AbstractUncertaintySetClass,
-                    val::Option{<:ArrNum} = nothing)
+    ucs_dimension(::MuUncertaintySetClass, ::Bool, m::Integer)
+    ucs_dimension(::SigmaUncertaintySetClass, diagonal::Bool, m::Integer)
+    ucs_dimension(class::AbstractUncertaintySetClass, diagonal::Bool, m::Integer,
+                  M::Integer)
+
+Dimension of an uncertainty set built on a shape of side `m`, the degrees of freedom of its chi-squared radius.
+
+The dimension is the number of free coordinates the estimation error spans, and the squared Mahalanobis distance of a normal error is chi-squared at that number. On the mean axis it is `m`, the number of assets. On the covariance axis the error is a vectorised symmetric matrix, so the entries ``(i, j)`` and ``(j, i)`` are one number. A full shape then has rank ``N(N+1)/2`` of its ``N^{2}``, and the positive definite repair that gives it a nominal full rank adds ``N(N-1)/2`` flat directions, the antisymmetric matrices, that no error fills. A diagonal shape keeps ``N^{2}``: its statistic sums ``N^{2}`` terms of unit mean, so its expected value is ``N^{2}``.
+
+The four-argument method serves a full shape that is the sample covariance of ``M`` sampled errors. That shape has rank at most ``M - 1``, because the sample is centred, so the method caps the dimension there. The cap binds when ``M - 1`` is less than ``N`` on the mean axis, or less than ``N(N+1)/2`` on the covariance axis. A diagonal shape of sample variances has full rank and takes no cap. The cap assumes a plain sample covariance: a shrinkage estimator gives a shape of full rank, and the cap then understates its dimension.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+d &= \\begin{cases}
+m & \\text{mean axis, or a diagonal shape}\\,, \\\\
+\\dfrac{N(N+1)}{2}\\,, \\quad N = \\sqrt{m} & \\text{full covariance shape}\\,,
+\\end{cases} \\\\
+d_{M} &= \\begin{cases}
+d & \\text{diagonal shape}\\,, \\\\
+\\min(d, M - 1) & \\text{full shape}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``d``: Dimension of the set.
+  - ``d_{M}``: Dimension of a set whose full shape is the sample covariance of ``M`` errors.
+  - ``M``: Number of sampled errors.
+  - ``m``: Side of the shape matrix, or row count of the geometry map.
+  - $(math_dict[:N])
+
+# Arguments
+
+  - `class`: Axis tag of the set.
+  - `diagonal`: Whether the shape is the diagonal of the asymptotic covariance.
+  - `m`: Side of the shape matrix, ``N`` on the mean axis and ``N^{2}`` on the covariance axis.
+  - `M`: Number of sampled errors the shape is the sample covariance of.
+
+# Returns
+
+  - `d::Integer`: Dimension of the set.
+
+# Related
+
+  - [`ChiSqKUncertaintyAlgorithm`](@ref)
+  - [`k_ucs`](@ref)
+  - [`k_norm_ball`](@ref)
+  - [`ellipsoidal_set`](@ref)
+  - [`norm_ball_set`](@ref)
+"""
+function ucs_dimension(::MuUncertaintySetClass, ::Bool, m::Integer)
+    return m
+end
+function ucs_dimension(::SigmaUncertaintySetClass, diagonal::Bool, m::Integer)
+    if diagonal
+        return m
+    end
+    N = isqrt(m)
+    return div(N * (N + 1), 2)
+end
+function ucs_dimension(class::AbstractUncertaintySetClass, diagonal::Bool, m::Integer,
+                       M::Integer)
+    d = ucs_dimension(class, diagonal, m)
+    return diagonal ? d : min(d, M - 1)
+end
+"""
+    ellipsoidal_set(alg::EllipsoidalUncertaintySetAlgorithm, q::Number, samples,
+                    cov::MatNum, class::AbstractUncertaintySetClass,
+                    val::Option{<:ArrNum} = nothing;
+                    df::Integer = ucs_dimension(class, alg.diagonal, size(cov, 1)))
 
 Assemble an [`EllipsoidalUncertaintySet`](@ref) from an already-computed asymptotic covariance `cov`.
 
-Shared by every ellipsoidal [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) construction across estimator families. [`k_ucs`](@ref) absorbs the trailing arguments its own algorithm does not read, so `samples` may be the deviation matrix, a `1:n_sim` range, or `nothing`, whichever the caller has.
+Shared by every ellipsoidal [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@ref) construction across estimator families. It is the ellipsoidal twin of [`norm_ball_set`](@ref), and takes the set algorithm in the same place. [`k_ucs`](@ref) absorbs the trailing arguments its own algorithm does not read, so `samples` may be the deviation matrix, a `1:n_sim` range, or `nothing`, whichever the caller has.
 
 **The order of the two steps below is load-bearing.** The diagonal is taken *before* the radius is fitted, so under the `diagonal = true` default an empirical radius is a quantile of Mahalanobis distances measured against the diagonal shape and not against the full one, and neither shape reliably gives the larger radius. Taking the diagonal afterwards would pair a radius calibrated on one shape with a different shape, and the set would not hold the coverage its significance level names.
 
 # Algorithm
 
- 1. When `diagonal` is `true`, replace `cov` with `LinearAlgebra.Diagonal(cov)`, discarding the estimation-error correlations between entries. The result is stored as a `Diagonal`, not as a dense matrix.
- 2. Compute `k = k_ucs(method, q, samples, cov)`, the radius, measured against whichever shape step 1 left.
+ 1. When `alg.diagonal` is `true`, replace `cov` with `LinearAlgebra.Diagonal(cov)`, discarding the estimation-error correlations between entries. The result is stored as a `Diagonal`, not as a dense matrix.
+ 2. Compute `k = k_ucs(alg.method, q, samples, cov, df)`, the radius, measured against whichever shape step 1 left. `df` is the dimension of the set, ``N(N+1)/2`` on a full covariance shape, and not the side of the shape.
  3. Build an [`EllipsoidalUncertaintySet`](@ref) from `cov`, `k`, `class` and `val`.
 
 # Arguments
 
-  - `diagonal`: Whether to restrict `cov` to its diagonal before the radius is fitted.
-  - `method`: Radius algorithm, or the radius itself as a `Number`.
+  - `alg`: Ellipsoidal uncertainty set algorithm, which carries the radius algorithm `alg.method` and the diagonal switch `alg.diagonal`.
   - `q`: Significance level.
-  - `samples`: Sampled estimation errors, or whatever container `method` reads. An algorithm that runs no simulation absorbs it.
+  - `samples`: Sampled estimation errors, or whatever container `alg.method` reads. An algorithm that runs no simulation absorbs it.
   - `cov`: Asymptotic covariance of the statistic, which becomes the shape matrix.
   - `class`: Axis tag, which fixes the size of the shape matrix and the index a view applies.
   - `val`: Quantity the set is a neighbourhood of — the fitted characteristic vector on the mean axis, the fitted covariance on the covariance axis. Every caller has it in hand, because every one of them fits a prior before it calls here.
+  - `df`: Dimension of the set, the degrees of freedom of a chi-squared radius. The default is the dimension of the shape of the statistic. A caller whose shape is the sample covariance of ``M`` errors passes the dimension capped at ``M - 1``, the rank of that shape.
 
 # Returns
 
@@ -1891,15 +2019,18 @@ Shared by every ellipsoidal [`ucs`](@ref), [`mu_ucs`](@ref) and [`sigma_ucs`](@r
   - [`EllipsoidalUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySetAlgorithm`](@ref)
   - [`k_ucs`](@ref)
+  - [`ucs_dimension`](@ref)
+  - [`norm_ball_set`](@ref)
   - [`ucs`](@ref)
 """
-function ellipsoidal_set(diagonal::Bool, method, q::Number, samples, cov::MatNum,
-                         class::AbstractUncertaintySetClass,
-                         val::Option{<:ArrNum} = nothing)
-    if diagonal
+function ellipsoidal_set(alg::EllipsoidalUncertaintySetAlgorithm, q::Number, samples,
+                         cov::MatNum, class::AbstractUncertaintySetClass,
+                         val::Option{<:ArrNum} = nothing;
+                         df::Integer = ucs_dimension(class, alg.diagonal, size(cov, 1)))
+    if alg.diagonal
         cov = LinearAlgebra.Diagonal(cov)
     end
-    k = k_ucs(method, q, samples, cov)
+    k = k_ucs(alg.method, q, samples, cov, df)
     return EllipsoidalUncertaintySet(; sigma = cov, k = k, class = class, val = val)
 end
 

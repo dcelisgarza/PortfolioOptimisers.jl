@@ -5,7 +5,7 @@ Preprocessing estimator that drops the assets and the observations of a price wi
 
 The fit decides the asset universe. An asset survives when its share of missing observations over the training window does not exceed `col_thr`. The apply step replays that universe by name on a later window, in the fitted order, and refuses a window that lacks a fitted asset. The train weights and the test returns therefore name the same assets in the same order. The row filter reads each window alone. The apply step drops an observation when its share of missing assets, over the fitted universe, exceeds `row_thr`.
 
-This estimator is the only missing-data filter of the library. [`prices_to_returns`](@ref) removes no observation and no asset, because a deletion is a **Universe Policy**. A policy needs a fit on a training window and a replay by name on later windows, and a stateless conversion has no fit to replay. Only the asset series `X` decides what survives. The factor, benchmark and implied volatility series, and the Asset Panel, follow the surviving assets and observations, because the carrier states one clock.
+This estimator is the only missing-data filter of the library. [`prices_to_returns`](@ref) removes no observation and no asset, because a deletion is a **Universe Policy**. A policy needs a fit on a training window and a replay by name on later windows, and a stateless conversion has no fit to replay. Only the asset series `X` decides what survives. The factor, benchmark and implied volatility series, and the Asset Panel, follow the surviving assets and observations, because the [`PricesResult`](@ref) states one clock.
 
 A share is the count of missing entries divided by the count of entries, computed in the type of the threshold. `29 / 100` is `0.29` in `Float64` and `29f0 / 100f0` is `0.29f0` in `Float32`, so a threshold written as a decimal keeps an asset or an observation whose share equals it. A `Rational` threshold compares the exact share.
 
@@ -21,7 +21,7 @@ A share is the count of missing entries divided by the count of entries, compute
 
  1. Find the column of each fitted asset in the window, in the fitted order. Raise an `ArgumentError` that names the first absent asset.
  2. Count the missing assets of each observation over those columns. Keep the observations whose share of missing assets does not exceed `row_thr`. Raise an `IsEmptyError` when no observation survives.
- 3. Return [`port_opt_view`](@ref) of the carrier at the kept timestamps and the fitted columns. It reads the factor, benchmark and implied volatility series at the kept timestamps, subsets a per-asset benchmark, the implied volatilities and a vector `ivpa` to the fitted columns, and views the Asset Panel and the Listing Span at the kept rows and columns.
+ 3. Return [`port_opt_view`](@ref) of the `PricesResult` at the kept timestamps and the fitted columns. It reads the factor, benchmark and implied volatility series at the kept timestamps, subsets a per-asset benchmark, the implied volatilities and a vector `ivpa` to the fitted columns, and views the Asset Panel and the Listing Span at the kept rows and columns.
 
 The two thresholds count opposite axes. `col_thr` counts the missing observations of an asset and drops assets. `row_thr` counts the missing assets of an observation and drops observations.
 
@@ -46,7 +46,7 @@ Keywords correspond to the struct's fields. Both thresholds admit zero. `col_thr
 
 # Online form
 
-The column filter changes only the universe. A stepped filter counts the missing observations of every block in `cache` through [`partial_fit_transform`](@ref) and passes the rows through. [`fit_preprocessing`](@ref) with no data reads the [`MissingDataFilterResult`](@ref) of the whole history out of that count, and a [`Pipeline`](@ref) applies that universe as a view at its read-out. The row filter has an online form only at `row_thr = 1`, where it drops nothing. At a lower threshold, the filter can drop a row at a later step that it kept at an earlier step, when an asset leaves the universe. [`supports_partial_fit`](@ref) answers `false` for it, and a Pipeline refuses it by name at warm-up.
+The column filter changes only the universe. A stepped filter counts the missing observations of every block in `cache` through [`partial_fit_transform`](@ref) and passes the rows through. [`fit_preprocessing`](@ref) with no data reads the [`MissingDataFilterResult`](@ref) of the whole history out of that count, and a [`Pipeline`](@ref) applies that universe as a view in `fit(pipe)` with no data. The row filter has an online form only at `row_thr = 1`, where it drops nothing. At a lower threshold, the filter can drop a row at a later step that it kept at an earlier step, when an asset leaves the universe. [`supports_partial_fit`](@ref) answers `false` for it, and a Pipeline refuses it at warm-up with a message that names the step.
 
 # Examples
 
@@ -168,7 +168,7 @@ function apply_preprocessing(res::MissingDataFilterResult, pr::PricesResult)::Pr
     rows = findall(share_at_most.(miss, length(cols), res.row_thr))
     @argcheck(!isempty(rows),
               IsEmptyError("MissingDataFilter with row_thr = $(res.row_thr) drops every observation of the window"))
-    #! The carrier states one clock, so every series it holds is read at the surviving
+    #! The PricesResult states one clock, so every series it holds is read at the surviving
     #! timestamps and the fitted columns, by the view that owns that rule.
     return port_opt_view(pr, TimeSeries.timestamp(pr.X)[rows], cols)
 end

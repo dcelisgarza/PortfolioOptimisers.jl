@@ -39,7 +39,7 @@ there widens and this method never reaches it" — which was never true.
 
 **A Norm Ceiling is its own quantity, and it takes its own rule family and bound.**
 
-The domain noun is a **Norm Ceiling** (`CONTEXT.md` section 3.9), defined against the
+The domain noun is a **Norm Ceiling** (`GLOSSARY.md` section 3.9), defined against the
 Ambiguity Radius it is not. The mechanism is ADR 0095's, unchanged: a family of rules under
 `AbstractCalibrationAlgorithm`, and a `Num_` bound that pairs that family with `Number` and a
 plain `Function`.

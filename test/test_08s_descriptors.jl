@@ -1,7 +1,7 @@
 #=
 Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl`,
 `02_PanelFieldDescriptors.jl` and `03_LagDescriptors.jl` against the contract their docstrings
-state, and against the reference implementation's own descriptor tests. Issue #717, map #643.
+state, and against the oracle's own descriptor tests. Issue #717, map #643.
 
 THREE CONVENTIONS SHAPE THE PROBES.
 
@@ -13,10 +13,13 @@ THREE CONVENTIONS SHAPE THE PROBES.
 2. AN INACTIVE CELL IS `NaN`, whatever its Panel Fields hold. The hand panels below carry a
    value on an inactive cell on purpose, so a Descriptor that forgets the active mask fails.
 
-3. A NON-POSITIVE DENOMINATOR IS `NaN`, NEVER AN ERROR. The reference implementation raises on
-   some of them and returns `NaN` on others; the port answers `NaN` on every one, and the
-   `nonneg` guard is the one refusal it keeps. `GrowthRate` refuses a negative field, as the
-   reference does.
+3. A DATA ERROR REFUSES, AN UNDEFINED RATIO IS `NaN` (#1379, ADR 0108). A field that is
+   positive by construction (a price, a market capitalisation, a share count, a total of
+   assets) refuses a value at or below zero through the `gt0` guard, and a field that is
+   non-negative by construction refuses a negative value through `nonneg`. A denominator that
+   valid data can make zero or negative (a book equity, an enterprise value) carries no guard,
+   and its ratio is `NaN`. The archetypes with no guard give `NaN` in every such cell, so the
+   probes of the `NaN` rule use them. `GrowthRate` refuses a negative field.
 
 The synthetic panel of `test06c_setup.jl` carries every Panel Field the named descriptors
 read, so the last testset runs all of them on it and checks each against the field arithmetic
@@ -79,6 +82,21 @@ const DESCRIPTOR_LAG_CONSTRUCTORS = (AssetsGrowthRate, SalesGrowthRate, Issuance
         @test BookToPrice().den == "market_cap"
         @test isnothing(BookToPrice().nonneg)
         @test isnothing(BookToPrice().pos)
+        @test BookToPrice().gt0 == ["market_cap"]
+        @test DividendToPrice().gt0 == ["market_cap"]
+        @test ForwardEarningsToPrice().gt0 == ["adj_close"]
+        @test ShortInterest().gt0 == ["adj_shares_outstanding"]
+        @test DebtToAssets().gt0 == ["total_assets"]
+        @test AccrualsCashFlow().gt0 == ["total_assets"]
+        # A denominator that valid data can make zero or negative carries no guard.
+        @test isnothing(ReturnOnEquity().gt0)
+        @test isnothing(EbitdaToEnterpriseValue().gt0)
+        @test isnothing(SalesToEnterpriseValue().gt0)
+        @test isnothing(BookLeverage().gt0)
+        @test BookLeverage().nonneg == ["total_debt"]
+        @test GrossMargin().nonneg == ["sales_ttm"]
+        @test isnothing(GrossMargin().gt0)
+        @test isnothing(PanelFieldRatio(; num = "a", den = "b").gt0)
         @test DividendToPrice().nonneg == ["dividends_ttm"]
         @test ForwardDividendToPrice().nonneg == ["dps_ntm"]
         @test AnalystDispersionToPrice().nonneg == ["eps_ntm_std"]
@@ -87,7 +105,9 @@ const DESCRIPTOR_LAG_CONSTRUCTORS = (AssetsGrowthRate, SalesGrowthRate, Issuance
         @test ShareholderYield().nonneg == ["dividends_ttm"]
         @test BookLeverage().den == ["total_debt" => 1, "book_equity" => 1]
         @test MarketLeverage().den == ["total_debt" => 1, "market_cap" => 1]
-        @test MarketLeverage().pos == ["market_cap"]
+        @test isnothing(MarketLeverage().pos)
+        @test MarketLeverage().gt0 == ["market_cap"]
+        @test MarketLeverage().nonneg == ["total_debt"]
         @test GrossMargin().num == ["sales_ttm" => 1, "cost_of_revenue_ttm" => -1]
         @test GrossMargin().den == "sales_ttm"
         @test GrossProfitability().num == ["sales_ttm" => 1, "cost_of_revenue_ttm" => -1]
@@ -95,6 +115,8 @@ const DESCRIPTOR_LAG_CONSTRUCTORS = (AssetsGrowthRate, SalesGrowthRate, Issuance
               ["net_income_ttm" => 1, "operating_cash_flow_ttm" => -1]
         @test isa(LogMarketCap(), PanelFieldLog)
         @test LogMarketCap().field == "market_cap"
+        @test LogMarketCap().gt0
+        @test !PanelFieldLog(; field = "market_cap").gt0
         @test Passthrough(; field = "eps_ntm").field == "eps_ntm"
     end
     @testset "A keyword override renames the field, and the guard follows the rename" begin
@@ -103,7 +125,8 @@ const DESCRIPTOR_LAG_CONSTRUCTORS = (AssetsGrowthRate, SalesGrowthRate, Issuance
         @test de.den == "mc"
         @test DividendToPrice(; num = "div").nonneg == ["div"]
         @test MarketLeverage(; debt = "d", mcap = "m").den == ["d" => 1, "m" => 1]
-        @test MarketLeverage(; debt = "d", mcap = "m").pos == ["m"]
+        @test MarketLeverage(; debt = "d", mcap = "m").gt0 == ["m"]
+        @test BookToPrice(; den = "mc").gt0 == ["mc"]
         @test GrossMargin(; sales = "s", cogs = "c").num == ["s" => 1, "c" => -1]
         @test GrossMargin(; sales = "s", cogs = "c").den == "s"
         @test LogMarketCap(; field = "cap").field == "cap"
@@ -119,6 +142,10 @@ const DESCRIPTOR_LAG_CONSTRUCTORS = (AssetsGrowthRate, SalesGrowthRate, Issuance
         @test isa(CapexToAssetsChangeInIntensity(), ChangeInIntensity)
         @test CapexToAssetsChangeInIntensity().field == "capex_ttm"
         @test CapexToAssetsChangeInIntensity().scale == "total_assets"
+        @test EarningsChangeToPrice().gt0
+        @test CapexToAssetsChangeInIntensity().gt0
+        @test !ChangeToScale(; field = "a", scale = "b", lag = 1).gt0
+        @test !ChangeInIntensity(; field = "a", scale = "b", lag = 1).gt0
         for C in DESCRIPTOR_LAG_CONSTRUCTORS
             @test C().lag == 252
             @test C(; lag = 21).lag == 21
@@ -136,6 +163,8 @@ const DESCRIPTOR_LAG_CONSTRUCTORS = (AssetsGrowthRate, SalesGrowthRate, Issuance
         @test_throws ArgumentError PanelFieldRatio(; num = "a", den = "b", pos = ["c"])
         @test_throws IsEmptyError PanelFieldRatio(; num = "a", den = "b", nonneg = String[])
         @test_throws IsEmptyError PanelFieldRatio(; num = "a", den = "b", pos = String[])
+        @test_throws ArgumentError PanelFieldRatio(; num = "a", den = "b", gt0 = ["c"])
+        @test_throws IsEmptyError PanelFieldRatio(; num = "a", den = "b", gt0 = String[])
         # A guard may name a denominator field, and it may name a field of a combination.
         @test PanelFieldRatio(; num = "a", den = ["a" => 1, "b" => 1], pos = ["b"]).pos ==
               ["b"]
@@ -158,40 +187,45 @@ const DESCRIPTOR_LAG_CONSTRUCTORS = (AssetsGrowthRate, SalesGrowthRate, Issuance
         @test isnan(PortfolioOptimisers.positive_divide(1.0, NaN))
         @test isnan(PortfolioOptimisers.positive_divide(NaN, 2.0))
         @test PortfolioOptimisers.positive_divide(1, 4) == 0.25
+        # A quotient of two finite values that overflows is NaN, not an infinity (#1379).
+        @test isnan(PortfolioOptimisers.positive_divide(1.0e300, 1.0e-10))
+        @test isnan(PortfolioOptimisers.positive_divide(-1.0e300, 1.0e-10))
+        @test PortfolioOptimisers.positive_divide(1.0e300, 1.0e10) == 1.0e290
     end
 end
 
-@testset "The shared read: a fill reads back as NaN, and the active mask fills" begin
+@testset "The shared read: a fill and an inactive cell read back as NaN (#1411)" begin
     amsk = [true true true; true false true; true true true]
     rd = descriptor_hand_panel(["mcap" => [1.0 2.0 3.0; NaN 5.0 6.0; 7.0 8.0 9.0],
                                 "debt" => [0.5 1.0 1.5; 2.0 2.5 3.0; 3.5 4.0 4.5]];
                                amsk = amsk)
-    V = PortfolioOptimisers.panel_field_values(rd, "mcap")
+    V = PortfolioOptimisers.descriptor_field_values(rd, "mcap")
     @test isa(V, Matrix{Float64})
     @test isnan(V[2, 1])
     @test V[1, :] == [1.0, 2.0, 3.0]
-    # The read itself does not touch the active mask: cell (2, 2) is inactive but observed.
-    @test V[2, 2] == 5.0
-    W = PortfolioOptimisers.panel_field_values(rd, ["mcap" => 1, "debt" => -2])
+    # Cell (2, 2) is inactive but observed, and it reads as NaN too: a lag or a recursion
+    # that reaches it must not read the finite value the panel keeps there (#1411).
+    @test isnan(V[2, 2])
+    W = PortfolioOptimisers.descriptor_field_values(rd, ["mcap" => 1, "debt" => -2])
     @test W[1, :] == [0.0, 0.0, 0.0]
     @test W[3, 3] == 9.0 - 9.0
     @test isnan(W[2, 1])
-    @test_throws IsEmptyError PortfolioOptimisers.panel_field_values(rd,
-                                                                     Pair{String, Int}[])
-    @test_throws KeyError PortfolioOptimisers.panel_field_values(rd, "mcp")
+    @test_throws IsEmptyError PortfolioOptimisers.descriptor_field_values(rd,
+                                                                          Pair{String, Int}[])
+    @test_throws KeyError PortfolioOptimisers.descriptor_field_values(rd, "mcp")
     # A carrier with no panel cannot be read, and a categorical field is not one number.
     bare = ReturnsResult(; nx = ["A1", "A2", "A3"], X = zeros(3, 3))
-    @test_throws IsNothingError PortfolioOptimisers.panel_field_values(bare, "mcap")
+    @test_throws IsNothingError PortfolioOptimisers.descriptor_field_values(bare, "mcap")
     @test_throws IsNothingError descriptor(BookToPrice(), bare)
     res = asset_panel([NumericPanelInput(; name = "mcap", vals = ones(2, 2)),
                        CategoricalPanelInput(; name = "sector", vals = ["a" "b"; "a" "b"],
                                              levels = ["a", "b"])]; amsk = trues(2, 2),
                       emsk = trues(2, 2))
     rdc = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = res)
-    @test_throws ArgumentError PortfolioOptimisers.panel_field_values(rdc, "sector")
+    @test_throws ArgumentError PortfolioOptimisers.descriptor_field_values(rdc, "sector")
     @test_throws ArgumentError descriptor(Passthrough(; field = "sector"), rdc)
     # A field that cannot blank carries no observed-mask column, and reads back whole.
-    @test PortfolioOptimisers.panel_field_values(rdc, "mcap") == ones(2, 2)
+    @test PortfolioOptimisers.descriptor_field_values(rdc, "mcap") == ones(2, 2)
     # The read lands in the type a division of the field lands in, which is the one that
     # carries a NaN: an exact integer field reads in Float64, a Float32 field stays Float32,
     # and every archetype that reads it can then write NaN on an inactive or blank cell.
@@ -203,12 +237,12 @@ end
                         NumericPanelInput(; name = "f32", vals = Float32[1 2; 3 4])];
                        amsk = ami, emsk = ami)
     rdi = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = pint)
-    Vi = PortfolioOptimisers.panel_field_values(rdi, "shares")
+    Vi = PortfolioOptimisers.descriptor_field_values(rdi, "shares")
     @test eltype(Vi) === Float64
-    @test Vi == [10.0 20.0; 30.0 40.0]
-    Vg = PortfolioOptimisers.panel_field_values(rdi, "gap")
+    @test isequal(Vi, [10.0 20.0; 30.0 NaN])
+    Vg = PortfolioOptimisers.descriptor_field_values(rdi, "gap")
     @test isnan(Vg[1, 2])
-    @test eltype(PortfolioOptimisers.panel_field_values(rdi, "f32")) === Float32
+    @test eltype(PortfolioOptimisers.descriptor_field_values(rdi, "f32")) === Float32
     Dp = descriptor(Passthrough(; field = "shares"), rdi)
     @test isnan(Dp[2, 2])
     @test Dp[1, :] == [10.0, 20.0]
@@ -227,7 +261,10 @@ end
 
 @testset "Point-in-time ratios on a hand panel" begin
     # Column 3 carries a zero and a negative market capitalisation, row 2 an unobserved book
-    # equity, and cell (3, 2) is inactive with values in every field.
+    # equity, and cell (3, 2) is inactive with values in every field. A named constructor
+    # refuses the market capitalisation of column 3, so the probes of the NaN rule read the
+    # archetype with no guard, and `mp` is a market capitalisation that is positive
+    # wherever it is active.
     amsk = [true true true; true true true; true false true]
     be = [2.0 3.0 4.0; NaN 6.0 7.0; 8.0 9.0 10.0]
     mcap = [4.0 6.0 0.0; 10.0 12.0 -1.0; 16.0 18.0 20.0]
@@ -237,8 +274,13 @@ end
     rd = descriptor_hand_panel(["book_equity" => be, "market_cap" => mcap,
                                 "total_debt" => debt, "dividends_ttm" => div,
                                 "net_buybacks_ttm" => bb]; amsk = amsk)
+    mp = [4.0 6.0 2.0; 10.0 12.0 1.0; 16.0 -18.0 20.0]
+    rdp = descriptor_hand_panel(["book_equity" => be, "market_cap" => mp,
+                                 "total_debt" => debt, "dividends_ttm" => div,
+                                 "net_buybacks_ttm" => bb]; amsk = amsk)
+    btp = PanelFieldRatio(; num = "book_equity", den = "market_cap")
     @testset "A ratio equals the field arithmetic, and NaN where the docstring says so" begin
-        D = descriptor(BookToPrice(), rd)
+        D = descriptor(btp, rd)
         @test isa(D, Matrix{Float64})
         @test size(D) == (3, 3)
         @test D[1, 1] == 0.5
@@ -250,9 +292,35 @@ end
         @test D[3, 1] == 0.5
         @test D[3, 3] == 0.5
         @test isequal(D, descriptor_expected_ratio(be, mcap, amsk))
+        # The named constructor refuses the zero and the negative market capitalisation.
+        @test_throws DomainError descriptor(BookToPrice(), rd)
+        # On `mp` the guard passes, the negative value of the inactive cell is not read, and
+        # the named constructor equals the archetype.
+        @test isequal(descriptor(BookToPrice(), rdp), descriptor(btp, rdp))
+    end
+    @testset "The gt0 guard refuses a non-positive field, and only an observed active one" begin
+        for C in (BookToPrice, DividendToPrice, ShareholderYield, MarketLeverage)
+            @test_throws DomainError descriptor(C(), rd)
+        end
+        @test_throws DomainError descriptor(LogMarketCap(), rd)
+        err = try
+            descriptor(BookToPrice(), rd)
+        catch e
+            e
+        end
+        @test occursin("strictly positive", err.msg)
+        @test occursin("observation 1 for asset 3", err.msg)
+        # An unobserved cell reads back as NaN and is not checked.
+        m2 = copy(mp)
+        m2[1, 1] = NaN
+        rdu = descriptor_hand_panel(["book_equity" => be, "market_cap" => m2]; amsk = amsk)
+        @test isnan(descriptor(BookToPrice(), rdu)[1, 1])
     end
     @testset "A combination numerator sums its terms with their coefficients" begin
-        D = descriptor(ShareholderYield(), rd)
+        D = descriptor(PanelFieldRatio(;
+                                       num = ["dividends_ttm" => 1,
+                                              "net_buybacks_ttm" => 1], den = "market_cap",
+                                       nonneg = ["dividends_ttm"]), rd)
         @test D[1, 1] == (0.1 + 0.05) / 4.0
         @test D[2, 2] == (0.5 + 0.25) / 12.0
         @test isnan(D[1, 3])
@@ -264,10 +332,13 @@ end
         @test D[1, 1] == 1.0 / 3.0
         @test isnan(D[2, 1])
         @test isnan(D[3, 2])
-        # Market leverage: the total capital at (1, 3) is 3 > 0, but the market
-        # capitalisation is 0, so the pos guard writes NaN where the denominator alone would
-        # not. At (2, 3) the total is 5 > 0 and the capitalisation is -1.
-        D = descriptor(MarketLeverage(), rd)
+        # Market leverage with the pos guard: the total capital at (1, 3) is 3 > 0, but the
+        # market capitalisation is 0, so the pos guard writes NaN where the denominator alone
+        # would not. At (2, 3) the total is 5 > 0 and the capitalisation is -1.
+        # `MarketLeverage()` refuses both cells through its gt0 guard instead.
+        D = descriptor(PanelFieldRatio(; num = "total_debt",
+                                       den = ["total_debt" => 1, "market_cap" => 1],
+                                       pos = ["market_cap"]), rd)
         @test D[1, 1] == 1.0 / 5.0
         @test isnan(D[1, 3])
         @test isnan(D[2, 3])
@@ -279,29 +350,29 @@ end
         @test descriptor(de, rd)[2, 3] == 6.0 / 5.0
     end
     @testset "The nonneg guard refuses a negative dividend, and only an observed active one" begin
-        @test isa(descriptor(DividendToPrice(), rd), Matrix{Float64})
+        @test isa(descriptor(DividendToPrice(), rdp), Matrix{Float64})
         neg = copy(div)
         neg[2, 2] = -0.1
-        rdn = descriptor_hand_panel(["dividends_ttm" => neg, "market_cap" => mcap];
+        rdn = descriptor_hand_panel(["dividends_ttm" => neg, "market_cap" => mp];
                                     amsk = amsk)
         @test_throws DomainError descriptor(DividendToPrice(), rdn)
         # A negative value on an inactive cell is not a data error the estimator reads.
         neg[2, 2] = 0.1
         neg[3, 2] = -0.1
-        rdi = descriptor_hand_panel(["dividends_ttm" => neg, "market_cap" => mcap];
+        rdi = descriptor_hand_panel(["dividends_ttm" => neg, "market_cap" => mp];
                                     amsk = amsk)
         @test isa(descriptor(DividendToPrice(), rdi), Matrix{Float64})
         # Neither is an unobserved one.
         neg[3, 2] = 0.1
         neg[1, 1] = NaN
-        rdu = descriptor_hand_panel(["dividends_ttm" => neg, "market_cap" => mcap];
+        rdu = descriptor_hand_panel(["dividends_ttm" => neg, "market_cap" => mp];
                                     amsk = amsk)
         @test isnan(descriptor(DividendToPrice(), rdu)[1, 1])
         # The buybacks may be negative: the guard names the dividends alone.
-        @test isa(descriptor(ShareholderYield(), rd), Matrix{Float64})
+        @test isa(descriptor(ShareholderYield(), rdp), Matrix{Float64})
     end
     @testset "The logarithm and the passthrough" begin
-        D = descriptor(LogMarketCap(), rd)
+        D = descriptor(PanelFieldLog(; field = "market_cap"), rd)
         @test D[1, 1] == log(4.0)
         @test isnan(D[1, 3])
         @test isnan(D[2, 3])
@@ -316,7 +387,7 @@ end
         @test P[1, 1] == 2.0
     end
     @testset "The estimator holds no data: two carriers, one estimator" begin
-        de = BookToPrice()
+        de = btp
         D1 = descriptor(de, rd)
         rd2 = descriptor_hand_panel(["book_equity" => 2 .* be, "market_cap" => mcap];
                                     amsk = amsk)
@@ -365,7 +436,7 @@ end
         rd = descriptor_hand_panel(["sales_ttm" => s, "market_cap" => mcap])
         @test descriptor(GrowthRate(; field = "sales_ttm", lag = 3), rd)[5, 2] == -1.0
     end
-    @testset "GrowthRate refuses a negative field, as the reference implementation does" begin
+    @testset "GrowthRate refuses a negative field" begin
         s = copy(sales)
         s[5, 1] = -100.0
         rd = descriptor_hand_panel(["sales_ttm" => s, "market_cap" => mcap])
@@ -397,7 +468,11 @@ end
         m[7, 1] = -5.0
         ni = sales .- 120.0                     # a field that turns negative
         rd = descriptor_hand_panel(["net_income_ttm" => ni, "market_cap" => m])
-        D = descriptor(EarningsChangeToPrice(; lag = 2), rd)
+        # The named constructor refuses the zero and the negative capitalisation; the
+        # archetype with no guard gives NaN there.
+        @test_throws DomainError descriptor(EarningsChangeToPrice(; lag = 2), rd)
+        D = descriptor(ChangeToScale(; field = "net_income_ttm", scale = "market_cap",
+                                     lag = 2), rd)
         @test all(isnan, D[1:2, :])
         @test D[3, 1] == (ni[3, 1] - ni[1, 1]) / m[3, 1]
         @test D[5, 2] == (ni[5, 2] - ni[3, 2]) / m[5, 2]
@@ -413,7 +488,9 @@ end
         ta = 2 .* sales
         ta[4, 2] = 0.0
         rd = descriptor_hand_panel(["capex_ttm" => capex, "total_assets" => ta])
-        D = descriptor(CapexToAssetsChangeInIntensity(; lag = 2), rd)
+        @test_throws DomainError descriptor(CapexToAssetsChangeInIntensity(; lag = 2), rd)
+        D = descriptor(ChangeInIntensity(; field = "capex_ttm", scale = "total_assets",
+                                         lag = 2), rd)
         @test all(isnan, D[1:2, :])
         @test D[3, 1] ≈ capex[3, 1] / ta[3, 1] - capex[1, 1] / ta[1, 1] atol = 1e-15
         @test isnan(D[4, 2])                    # the current scale is zero
@@ -432,7 +509,10 @@ end
                    ChangeInIntensity(; field = "sales_ttm", scale = "market_cap", lag = 1))
             D = descriptor(de, rd)
             @test isnan(D[6, 2])
-            @test count(isnan, D) == N + 1
+            # Observation 7 lags into the inactive cell, which reads as missing, so it is
+            # NaN too: the panel keeps a finite value there, and no lag may read it (#1411).
+            @test isnan(D[7, 2])
+            @test count(isnan, D) == N + 2
         end
     end
 end
@@ -657,13 +737,13 @@ end
                        NumericPanelInput(; name = "f64", vals = [1e-9 0.0; 0.0 2.5])];
                       amsk = trues(2, 2), emsk = trues(2, 2))
     rd = ReturnsResult(; nx = ["A1", "A2"], X = zeros(2, 2), pnl = pnl)
-    V1 = PortfolioOptimisers.panel_field_values(rd, ["f32" => 1, "f64" => 1])
-    V2 = PortfolioOptimisers.panel_field_values(rd, ["f64" => 1, "f32" => 1])
+    V1 = PortfolioOptimisers.descriptor_field_values(rd, ["f32" => 1, "f64" => 1])
+    V2 = PortfolioOptimisers.descriptor_field_values(rd, ["f64" => 1, "f32" => 1])
     @test eltype(V1) === Float64 && eltype(V2) === Float64
     @test V1 == V2
     @test V1[1, 1] == 1.0 + 1e-9
     # One Float32 term with an integer coefficient stays Float32.
-    V3 = PortfolioOptimisers.panel_field_values(rd, ["f32" => 2])
+    V3 = PortfolioOptimisers.descriptor_field_values(rd, ["f32" => 2])
     @test eltype(V3) === Float32
     @test V3 == Float32[2 4; 6 8]
 end

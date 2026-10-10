@@ -1,5 +1,5 @@
 ```@meta
-Description = "Cross-Sectional Factor Model, private API of PortfolioOptimisers.jl: assert_idiosyncratic_covariance, idiosyncratic_covariance_view, …"
+Description = "Cross-Sectional Factor Model, private API of PortfolioOptimisers.jl: assert_observed_factor_returns, assert_idiosyncratic_covariance, …"
 ```
 
 # Cross-Sectional Factor Model: private API
@@ -7,6 +7,7 @@ Description = "Cross-Sectional Factor Model, private API of PortfolioOptimisers.
 ## Functions
 
 ```@docs
+assert_observed_factor_returns
 assert_idiosyncratic_covariance
 idiosyncratic_covariance_view
 assert_idiosyncratic_count
@@ -16,5 +17,13 @@ assert_cs_history_obs
 assert_exposure_history
 assert_cs_regression_assets
 assert_return_forecast_assets
+assert_row_key_part
+assert_row_key_length
+row_key_length
+assert_cs_block_rows
 has_family_rebasis(csfm::CrossSectionalFactorModel)
+factor_axis_positions
+factor_table_fields
+cs_design_labels
+cs_design_result
 ```

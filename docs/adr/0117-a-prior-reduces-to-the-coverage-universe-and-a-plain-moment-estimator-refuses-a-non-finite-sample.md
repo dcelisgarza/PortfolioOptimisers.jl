@@ -26,10 +26,10 @@ sample whose fourth asset lists at observation 31:
 - `MutualInfoCovariance` throws `InexactError: Int64(NaN)`.
 - `RegimeAdjustedExpWeightedVariance` handles the gap through its `active_mask` keyword.
 
-The reference implementation refuses a `NaN` in every plain estimator and handles a gap in its
+The oracle refuses a `NaN` in every plain estimator and handles a gap in its
 exponentially weighted family alone, through an `active_mask` input, a per-asset observation count,
 a freeze on a holiday, a reset on an inactive period, a warm-up `NaN` and a bias correction. Its
-prior reduces nowhere. A caller of the reference cannot fit a Gerber or a sample covariance on a
+prior reduces nowhere. A caller of the oracle cannot fit a Gerber or a sample covariance on a
 gapped panel at all.
 
 The glossary already says that a Prior Estimator fits on the coverage universe and returns a result
@@ -53,9 +53,9 @@ includes a regression result: its rows outside the Coverage Universe are `NaN`.
 ### The Coverage Universe is finite and active at every row
 
 An asset is in the Coverage Universe of one fit when its return is finite and the panel's active
-mask is `true` at every row of the window. That is the reference's per-cell rule,
+mask is `true` at every row of the window. That is the oracle's per-cell rule,
 `valid = isfinite(X) & active_mask`, taken over the whole window. The estimation mask is not read:
-the reference reads it for a regime signal only, never for a moment. With no panel, or a panel
+the oracle reads it for a regime signal only, never for a moment. With no panel, or a panel
 with no masks, the rule is finiteness alone.
 
 A complete window yields `nothing`, and that sentinel skips the slice and the expansion, as the
@@ -157,7 +157,7 @@ Two assets whose observed rows do not intersect — each quoting on rows the oth
 at the last row — are each admitted on their own share and share no observation, so their pair is
 `NaN` while both diagonals are finite. The refusal therefore cannot live only in the framed branch:
 a matrix whose diagonal is finite everywhere still reaches it, and the caller is told which pair and
-why. The reference's own peel is defensive for a pairwise estimator, which the library does not
+why. The oracle's own peel is defensive for a pairwise estimator, which the library does not
 have.
 
 ### The third and fourth order take the policy, and the block rule is one law
@@ -205,7 +205,7 @@ named.
 
 ### The exponentially weighted family is ported on the same seam
 
-The reference's three exponentially weighted estimators, and the fit that
+The oracle's three exponentially weighted estimators, and the fit that
 [#692](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/692) found missing on
 `RegimeAdjustedExpWeightedCovariance`, are the mask-aware answer for a young asset. They enter
 through the panel override, and the identities the census of
@@ -233,7 +233,7 @@ for a covariance.
 | The third and fourth order | Filling an empty cell before the spectral step, with zero or the complete-case value. | It fabricates a number, which is what the plain path refuses to do, and the library has just removed its last silent fill. |
 | The mixed configuration | Refusing a policy on the low order without one on `ske` and `kte`. | The configuration is well defined once the mask reads every order, and refusing it would make an opt-in field mandatory in a place the caller did not ask for it. |
 | The block repair | `matrix_processing!` derives the block for every caller. | Every plain path then accepts a frame, which relaxes a finiteness check in advance. |
-| The block repair | The reference's greedy peel. | No estimator can make it fire, and a peel hides a defect. |
+| The block repair | The oracle's greedy peel. | No estimator can make it fire, and a peel hides a defect. |
 
 ## Consequences
 
@@ -261,7 +261,7 @@ for a covariance.
   derived at every optimiser entry and a derivation owes no side effect, so `assert_matched_coverage`
   runs once, where the high-order prior is assembled, and the mask narrows in silence.
 - Under the exponentially weighted family a young asset is investable while its early scenario
-  rows are `NaN`. The reference zero-fills those rows and warns. What the library does with them
+  rows are `NaN`. The oracle zero-fills those rows and warns. What the library does with them
   is the measures decision of the map.
 - `prices_to_returns` dropped every row that still held a missing entry when this was decided, so
   a gapped panel reached the moments only through a hand-built `ReturnsResult`. Map
@@ -272,3 +272,124 @@ for a covariance.
   own fell to the generic `cor`, which called `cov` again. A defect of the fallback chain and not of
   this decision; `c42ec32d12` gave `AbstractVarianceEstimator` a `cov` and a `cor` that throw a
   `MethodError` naming the verb, and a `std` that resolves from `var` alone.
+
+## Amendment (2026-09-29)
+
+**The block holds the variances that are finite and not zero.** A variance that is exactly zero
+belongs to a constant variable, such as cash at a zero return or a bootstrap deviation that every
+resample reproduces to the bit. It is finite, so it stayed inside the block, and every step that
+converts to a correlation, the positive definite repair, the denoising and the detoning, divided
+its row by zero and met LAPACK's `matrix contains Infs or NaNs`.
+[#1429](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1429) found it on the
+circular bootstrap ellipsoid at `block_size >= T`.
+
+The answer is forced, not chosen. The repair keeps the diagonal, and every 2×2 principal minor of a
+positive semidefinite matrix is non-negative, `Σᵢᵢ Σⱼⱼ − Σᵢⱼ² ≥ 0`, so `Σᵢᵢ = 0` forces a zero row
+and column. The maintainer chose that rule over a named refusal and over an invented variance.
+
+- `zero_variance_rows!` sets the row and column of each zero variance to zero, inside the finite
+  rows alone, and returns the block of the others. The test is `iszero`, with no tolerance.
+- `matrix_processing_block!`, both methods, takes its block from that helper. Every step runs on
+  the positive block, and the `NaN` frame around it stays as it is.
+- The bare `posdef!` applies the same rule above its algorithm, so every direct caller and every
+  `Posdef` algorithm gets it. This is the one change to the sentence above that the bare
+  `posdef!` keeps its whole-matrix refusal: it still refuses a `NaN`, and no longer a zero variance.
+- The result is positive semidefinite and not positive definite. No warning comes for the zero
+  rows, because they are the correct answer. The docstrings state the rule, and the warning of
+  `posdef!` fires only when the positive block stays indefinite.
+
+The oracle of map [#1375](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1375)
+refuses a variance that is not positive, so this is a **Better** row of that map. A negative
+variance is out of scope and keeps its `DomainError`.
+
+## Amendment (2026-10-07)
+
+**The factor side of the Cross-Sectional Factor Prior gates each asset, as its idiosyncratic side
+already did.** The prior states `mu_i = b_i + B_i' mu_f` and `sigma_ij = B_i' F B_j + D_ij`. Entry
+`i` reads the factor moments only on the support of `B_i`, the factors where its loading is not
+zero. So a factor that the factor prior states no moment for cannot change an entry of an asset
+with a zero loading on it. Before this amendment, the prior refused the whole fit when one factor
+moment was not finite, and the oracle of map
+[#1375](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1375) does the same. The
+maintainer chose the third rule on row R83 of
+[#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416), and
+[#1510](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1510) built it.
+
+- A factor is **ready** when its mean and its variance are finite, which is the rule of the
+  Investable Mask read over the factors. `cross_sectional_ready_factors` states it, and refuses a
+  non-finite covariance between two ready factors by name. A factor prior that is a
+  `LowOrderPrior` already keeps that rule, so only a processing step or a direct call reaches the
+  refusal.
+- An asset is **determined** when its loadings are finite and its support holds only ready
+  factors. `cross_sectional_determined` states it. The Investable Mask of the prior holds a
+  determined asset only, so an asset that loads on a factor with no moment leaves through it, as an
+  asset with no idiosyncratic variance does.
+- Every product of the loadings with a factor moment reads the support alone, through
+  `support_product`, because `0 * NaN` is `NaN`. An entry is `NaN` exactly where its product reads
+  a `NaN` factor moment. The same product expands the factor covariance under a constrained family,
+  so a `NaN` of one family does not reach a dropped factor of another.
+- The factor covariance is processed with `matrix_processing_block!`: the block of the finite
+  variances is processed, and the `NaN` frame stays as it is. A hole inside that block takes the
+  refusal of that verb.
+- The named `IsNonFiniteError` of `assert_cross_sectional_factor_moments` fires only when no asset
+  is determined. It keeps the counts of the non-finite factor means and covariance entries, and the
+  advice about the cumulative warm-ups.
+- A Spanned Shrinkage rule reads the estimated factors with a finite mean and a finite variance
+  alone, and the blend at `lambda = 0` reads no factor mean.
+
+The observed factors keep their own refusal: an observed factor return that is not finite on a
+fitted observation still refuses the fit before the factor prior runs. So a gap in one factor
+reaches this rule only through the factor prior itself.
+[#1530](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1530) holds the decision on
+a late observed series.
+
+**A repair that leaves the block indefinite refuses, and it does not warn.** The amendment of
+2026-09-29 says that the warning of `posdef!` fires when the positive block stays indefinite.
+[#1506](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1506) removed that warning.
+Every `Posdef` repair now ends with `assert_posdef_repair`, which raises a `PosdefRepairError`
+when the result is not finite or its smallest eigenvalue is below the tolerance of the eigen square
+root. A result that passes returns with no message, singular or not, so the zero rows of a zero
+variance still pass. [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-seven-differences-are-deliberate.md)
+states the rule.
+
+## Amendment (2026-10-07, #1511)
+
+**A Coverage Policy peels the assets of an undetermined pair at admission.** The sentence "There
+is no peel" above describes the library up to this date. Row R86 of
+[#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416) replaced it with a
+family of rules, and [#1511](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1511)
+built it.
+
+A pair is **undetermined** when both of its assets are admitted and have a variance, and the pair
+shares too few observations for a covariance (`nu_ij - corrected < 1`). The undetermined pairs
+make a graph, and a set of assets removes every pair exactly when it is a vertex cover of that
+graph. The smallest cover keeps the most assets.
+
+- `CoveragePolicy` has a field `peel`, bound to the public abstract type `AbstractPeel`. Its verb
+  `peel_assets(peel, U)` returns the vertices to remove from the adjacency matrix `U`.
+- `MinimalPeel()` is the default. It is the exact minimum vertex cover. It returns the greedy
+  cover when that cover is minimum, and the lexicographically smallest minimum cover otherwise.
+- `GreedyPeel()` is the oracle's rule: the asset with the most undetermined pairs first, the
+  smallest index on a tie. It can remove more than the minimum. On the star X-(A1, A2, A3) whose
+  leaves each carry one edge Ai-Li it removes four assets, where three suffice.
+- `NoPeel()` removes nothing. The `NaN` reaches `matrix_processing_block!`, which refuses it with
+  the `IsNonFiniteError` and the message it had before.
+
+**The peel runs at admission, not in the matrix repair.** `coverage_peel` runs after
+`coverage_admission` in each available-case covariance: the state arm, which the batch
+`FullMoment` arm reads, and the two-pass `SemiMoment` arm. A peeled asset is `NaN` across its row
+and column, so the Investable Mask drops it, and every consumer of the result reads one universe.
+A peel inside `matrix_processing_block!` would remove the asset from the covariance and keep it in
+the Coverage Universe. The refusal of that function stays for every other source of the `NaN`.
+
+**A peel removes data, so the caller is told.** `coverage_peel` reports through
+`strict_diagnostic`: a warning names the peeled assets, the count of undetermined pairs and the
+rule, and `strict = true` refuses with an `ArgumentError`. The covariance verbs take `strict`, and
+`EmpiricalPrior` passes its own `strict` to its covariance, in the batch fit and in the readout of
+a fold. The second argument of this decision, that a peel is a second silent universe rule, holds
+no more: the peel is part of admission, and it is never silent.
+
+A mean and a variance have no pairs, so the rule binds on a covariance and a correlation alone.
+The third and fourth co-moments keep the refusal of the block rule for an undetermined triple or
+quadruple. The table row "The block repair" of *Considered options* records the choice of that
+date.

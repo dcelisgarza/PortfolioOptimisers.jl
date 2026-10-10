@@ -118,14 +118,19 @@ end
     # The variance read-out and the covariance diagonal are the same numbers.
     @test LinearAlgebra.diag(sigma) == vec(var(Covariance(; cvg = cvg), X))
 end
-@testset "A pair with no shared observation is NaN, and the assets around it are not" begin
+@testset "A pair with no shared observation is NaN under NoPeel, and the assets around it are not" begin
     X = [1.0 NaN; NaN 2.0; 3.0 NaN; NaN 4.0]
-    cvg = CoveragePolicy()
+    cvg = CoveragePolicy(; peel = NoPeel())
     sigma = cov(Covariance(; cvg = cvg), X)
     @test isfinite(sigma[1, 1])
     @test isfinite(sigma[2, 2])
     @test isnan(sigma[1, 2])
     @test isnan(sigma[2, 1])
+    # The default peel removes asset 1, the smallest index of the tie, and keeps asset 2.
+    peeled = @test_logs (:warn, r"indices \[1\]") cov(Covariance(; cvg = CoveragePolicy()),
+                                                      X)
+    @test all(isnan, peeled[1, :])
+    @test peeled[2, 2] == sigma[2, 2]
 end
 @testset "Online equals batch to the last bit, over a listing and a delisting" begin
     rng = StableRNG(20260909)
@@ -453,8 +458,9 @@ end
     @test_throws PortfolioOptimisers.IsNonFiniteError coskewness(Coskewness(; cvg = cvg), X)
     # The same law on a covariance frame: an empty pair among fully admitted assets reaches the
     # named refusal rather than LAPACK, which is what a complete diagonal used to short-circuit.
+    # `NoPeel` keeps the pair, which the default peel would remove at admission.
     Xp = [1.0 NaN 3.0; NaN 2.0 5.0; 3.0 NaN 7.0; NaN 4.0 9.0]
-    sigma = cov(Covariance(; cvg = cvg), Xp)
+    sigma = cov(Covariance(; cvg = CoveragePolicy(; peel = NoPeel())), Xp)
     @test all(isfinite, LinearAlgebra.diag(sigma))
     @test isnan(sigma[1, 2])
     @test_throws PortfolioOptimisers.IsNonFiniteError PortfolioOptimisers.matrix_processing_block!(MatrixProcessing(),

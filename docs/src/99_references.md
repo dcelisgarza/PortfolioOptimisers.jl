@@ -1,5 +1,5 @@
 ```@meta
-Description = "The bibliography of PortfolioOptimisers.jl: every paper and book the docstrings cite, and the contributors to the library."
+Description = "The bibliography of PortfolioOptimisers.jl: every work that the docstrings and the pages cite, and the contributors to the library."
 ```
 
 # [References](@id references)

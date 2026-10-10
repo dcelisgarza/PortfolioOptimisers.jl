@@ -13,7 +13,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## `factor_exposure`
 
-  - [`factor_exposure(xe::AbstractExposureEstimator, rd::ReturnsResult)`](@ref): Computes the Factor Exposure of a carrier.
+  - [`factor_exposure(xe::AbstractExposureEstimator, rd::ReturnsResult)`](@ref): Computes the Factor Exposure of a [`ReturnsResult`](@ref).
 
 ### Arguments
 
@@ -24,10 +24,17 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - `L::Array{<:Real}`: The Factor Exposure, `observations × assets` for a member producing one factor, `observations × assets × factors` for a member expanding one Panel Field into many, `NaN` wherever the active mask is `false`.
 
+## `lookback` (optional)
+
+  - `lookback(xe::MyExposure) -> Option{<:Integer}`: The number of trailing observations that the Factor Exposure at one observation reads, or `nothing` when the number is unbounded.
+
+The fallback returns `nothing`, which is exact for every Exposure Estimator. Its cost is on the carry fold of a [`CrossSectionalFactorPrior`](@ref). With no finite look-back, [`FoldOrRefit`](@ref) keeps every panel row, and computes the Factor Exposures over all of them at each step. [`FoldOnly`](@ref) refuses the prior.
+
 # Related
 
   - [`AbstractEstimator`](@ref)
   - [`factor_exposure`](@ref)
+  - [`lookback`](@ref)
   - [`CompositeExposure`](@ref)
   - [`DerivedExposure`](@ref)
   - [`OneHotExposure`](@ref)
@@ -39,7 +46,7 @@ abstract type AbstractExposureEstimator <: AbstractEstimator end
 """
     factor_exposure(xe::AbstractExposureEstimator, rd::ReturnsResult) -> Array{<:Real}
 
-Compute the Factor Exposure of a carrier.
+Compute the Factor Exposure of a [`ReturnsResult`](@ref).
 
 This is the verb every Exposure Estimator answers. A member that produces one factor returns an `observations × assets` matrix, and a member that expands one Panel Field into many returns an `observations × assets × factors` array. Every member follows two conventions: the value at an observation uses information up to and including that observation, and every cell where the active mask of the Asset Panel is `false` is `NaN`.
 
@@ -96,46 +103,60 @@ function assert_exposure_family(family::AbstractString)::Nothing
     return nothing
 end
 """
-    exposure_benchmark_weights(rd::ReturnsResult, name::AbstractString) -> Matrix{<:Real}
+    exposure_benchmark_weights(rd::ReturnsResult, name::AbstractString;
+                               strict::Bool = false) -> Matrix{<:Real}
 
 Read the benchmark weights a cross-sectional transform of an exposure is weighted by.
 
-A benchmark weight is a selector first and a weight second, so a cell that carries no weight is out of the estimation set of its observation rather than in it with an unknown weight. This reads the named Panel Field through [`panel_field_values`](@ref) and writes a zero into every cell the Asset Panel does not observe and every cell it does not activate, which is the one shape [`cross_sectional_transform`](@ref) accepts.
+A benchmark weight is a selector first and a weight second, so a cell that carries no weight is out of the estimation set of its observation rather than in it with an unknown weight. This reads the named Panel Field through [`descriptor_field_values`](@ref) and writes a zero into every cell that is not finite and every cell the Asset Panel does not activate, which is the one shape [`cross_sectional_transform`](@ref) accepts.
+
+An inactive cell is outside the estimation set, so its zero is exact and silent. An active cell that is not finite carries an unknown weight, and its zero takes the asset out of the estimation set of that observation. That is an assumption about absent data, so a warning names the cells, and `strict = true` refuses them. A [`CrossSectionalFactorPrior`](@ref) writes a finite weight on every active cell, so its fit never warns.
 
 # Algorithm
 
  1. Read the named numeric Panel Field.
- 2. Write a zero into every cell that is not finite, and into every cell where the active mask is `false`.
+ 2. Write a zero into every cell that is not finite, and into every cell where the active mask is `false`, with [`exposure_weight_fill!`](@ref).
+ 3. Report the active cells that were not finite through [`strict_diagnostic`](@ref): their count, the first observation and the assets of that observation.
 
 # Arguments
 
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
   - `name`: Name of the numeric Panel Field holding the benchmark weights.
+  - $(arg_dict[:strict_bw])
 
 # Validation
 
-  - The rules of [`panel_field_values`](@ref).
+  - The rules of [`descriptor_field_values`](@ref).
+  - Every active cell carries a finite weight when `strict` is `true`. Raises an `ArgumentError`.
 
 # Returns
 
-  - `W::Matrix{<:Real}`: The benchmark weights, `observations × assets`, zero where the cell is unobserved or inactive.
+  - `W::Matrix{<:Real}`: The benchmark weights, `observations × assets`, zero where the cell is not finite or inactive.
 
 # Related
 
   - [`CompositeExposure`](@ref)
   - [`DerivedExposure`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
   - [`cross_sectional_transform`](@ref)
+  - [`strict_diagnostic`](@ref)
 """
-function exposure_benchmark_weights(rd::ReturnsResult, name::AbstractString)::Matrix{<:Real}
-    W = panel_field_values(rd, name)
-    exposure_weight_fill!(W, rd.pnl)
+function exposure_benchmark_weights(rd::ReturnsResult, name::AbstractString;
+                                    strict::Bool = false)::Matrix{<:Real}
+    W = descriptor_field_values(rd, name)
+    blank = exposure_weight_fill!(W, rd.pnl)
+    if !isempty(blank)
+        t = minimum(first, blank)
+        nx = [rd.nx[last(k)] for k in blank if first(k) == t]
+        strict_diagnostic("the benchmark weight \"$name\" is not finite on $(length(blank)) active cell(s) of the Asset Panel, first at observation $t for the assets $nx. An active cell is in the estimation set of its observation, so the weight is unknown there, and it reads as zero, which takes the asset out of that set. Fill the Panel Field, or set the active mask to false where the asset carries no weight. Under strict = true such a cell raises this message as an error.",
+                          strict)
+    end
     return W
 end
 """
-    exposure_weight_fill!(W::AbstractMatrix{<:Real}, pnl::AssetPanel) -> nothing
+    exposure_weight_fill!(W::AbstractMatrix{<:Real}, pnl::AssetPanel) -> Vector{Tuple{Int, Int}}
 
-Write a zero into every benchmark weight the Asset Panel does not observe or does not activate, in place.
+Write a zero into every benchmark weight that is not finite or that the Asset Panel does not activate, in place, and return the active cells that were not finite.
 
 # Arguments
 
@@ -148,24 +169,29 @@ Write a zero into every benchmark weight the Asset Panel does not observe or doe
 
 # Returns
 
-  - `nothing`. `W` carries the filled weights.
+  - `blank::Vector{Tuple{Int, Int}}`: The `(observation, asset)` pairs of the active cells that were not finite, in the order of the assets. `W` carries the filled weights.
 
 # Related
 
   - [`exposure_benchmark_weights`](@ref)
   - [`AssetPanel`](@ref)
 """
-function exposure_weight_fill!(W::AbstractMatrix{<:Real}, pnl::AssetPanel)::Nothing
+function exposure_weight_fill!(W::AbstractMatrix{<:Real},
+                               pnl::AssetPanel)::Vector{Tuple{Int, Int}}
     amsk = pnl.amsk
     @argcheck(size(W) == size(amsk),
               DimensionMismatch("the benchmark weights are observations × assets, so they must match the active mask of the Asset Panel, got size(W) = $(size(W)) and size(pnl.amsk) = $(size(amsk))"))
     Tf = eltype(W)
-    for k in CartesianIndices(W)
-        if !isfinite(W[k]) || !amsk[k]
-            W[k] = zero(Tf)
+    blank = Tuple{Int, Int}[]
+    for i in axes(W, 2), t in axes(W, 1)
+        if !amsk[t, i]
+            W[t, i] = zero(Tf)
+        elseif !isfinite(W[t, i])
+            W[t, i] = zero(Tf)
+            push!(blank, (t, i))
         end
     end
-    return nothing
+    return blank
 end
 """
     exposure_group_labels(rd::ReturnsResult, group::Nothing) -> nothing

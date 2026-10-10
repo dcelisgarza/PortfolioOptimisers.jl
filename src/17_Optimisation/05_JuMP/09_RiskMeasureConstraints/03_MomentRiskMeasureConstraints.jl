@@ -138,7 +138,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = length(net_X)
     flm = state_set!(model, prefix, :flm_, i, JuMP.@variable(model, [1:T], lower_bound = 0))
     wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, net_X)
+    wi = checked_observation_weights(wi, net_X)
     flm_risk = if isnothing(wi)
         JuMP.@expression(model, Statistics.mean(flm))
     else
@@ -192,7 +192,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     T = length(net_X)
     mad = state_set!(model, prefix, :mad_, i, JuMP.@variable(model, [1:T], lower_bound = 0))
     wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, net_X)
+    wi = checked_observation_weights(wi, net_X)
     mad_risk = if isnothing(wi)
         JuMP.@expression(model, 2 * Statistics.mean(mad))
     else
@@ -369,7 +369,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
         second_moment = second_lower_moment
     end
     wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, net_X)
+    wi = checked_observation_weights(wi, net_X)
     second_moment_risk, factor = if isnothing(wi)
         factor = StatsBase.varcorrection(T, r.alg.ve.corrected)
         set_second_moment_risk!(model, r.alg.alg2, i, factor, second_moment,
@@ -474,7 +474,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     even_moment = state_set!(model, prefix, :even_moment_, i,
                              JuMP.@expression(model, net_X .- tgt))
     wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, net_X)
+    wi = checked_observation_weights(wi, net_X)
     state_set!(model, prefix, :ceven_moment_s_, i,
                if isnothing(wi)
                    JuMP.@constraint(model,

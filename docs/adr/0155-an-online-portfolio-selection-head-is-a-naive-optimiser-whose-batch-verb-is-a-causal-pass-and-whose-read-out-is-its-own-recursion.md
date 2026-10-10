@@ -236,9 +236,9 @@ Derived from the rulings above, not decided separately:
 
 ## Consequences
 
-- ADR 0137 carries an amendment naming the two kinds of read-out. `CONTEXT.md`'s *Fold Context*
+- ADR 0137 carries an amendment naming the two kinds of read-out. `GLOSSARY.md`'s *Fold Context*
   entry, which said nothing above the prior takes a step of its own, gains the sibling sentence.
-- `CONTEXT.md` gains *Online Portfolio Selection*, *Online Update*, *Next-Period Allocation*,
+- `GLOSSARY.md` gains *Online Portfolio Selection*, *Online Update*, *Next-Period Allocation*,
   *Causal Pass* and *Recursion Read-out*, and the naive section lists the head.
 - The map's remaining decision tickets build on this one: the state's field list and the block
   step of a `test_size > 1` fold; the Prior slot for the thirteen forecast-reading rules; the

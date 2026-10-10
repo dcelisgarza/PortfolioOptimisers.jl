@@ -1,14 +1,17 @@
 ```@meta
-Description = "Cross-Sectional Factor Prior internals, private API of PortfolioOptimisers.jl: cross_sectional_prior_pairs, cross_sectional_benchmark_carrier, …"
+Description = "Base cross-sectional factor Prior, private API of PortfolioOptimisers.jl: cross_sectional_prior_pairs, cross_sectional_benchmark_returns, …"
 ```
 
-# [Cross-Sectional Factor Prior internals: private API](@id private-api-cross-sectional-factor-prior-internals)
+# [Base cross-sectional factor Prior: private API](@id private-api-base-cross-sectional-factor-prior)
 
 The functions below are the steps of a [`CrossSectionalFactorPrior`](@ref) fit. They compute these parts of it.
 
-- The benchmark weights that its exposure estimators read, which the prior computes from the market capitalisation.
+- The benchmark weights that its exposure estimators read, which the prior computes from the market capitalisation, and the check that each exposure estimator reads them from the field the prior writes.
 - The history of each factor exposure, in an order that puts each exposure after the exposures it is derived from.
 - The active mask and the estimation mask of the asset panel.
+- The regression of each observation on the factors that are not empty, and the moments of the factors, with no mean and no variance for a factor whose exposure is zero at every asset that the fit weights.
+- The factors whose mean and variance the factor prior states, and the assets whose loadings read only those factors. An asset that loads on another factor has no moment, and the fit refuses only when no asset has a moment.
+- The scenario weights of the factors, divided by their sum.
 - The idiosyncratic covariance of the latest observation, and the degrees of freedom and the divisor of each idiosyncratic variance.
 - The return scenarios of the assets.
 - The moments of the assets, from the moments of the factors and the loadings.
@@ -16,16 +19,20 @@ The functions below are the steps of a [`CrossSectionalFactorPrior`](@ref) fit. 
 
 ```@docs
 PortfolioOptimisers.cross_sectional_prior_pairs
-PortfolioOptimisers.cross_sectional_benchmark_carrier
+PortfolioOptimisers.cross_sectional_benchmark_returns
+PortfolioOptimisers.assert_cross_sectional_benchmark_field
 PortfolioOptimisers.cross_sectional_exposure_order
 PortfolioOptimisers.cross_sectional_exposure_widths
 PortfolioOptimisers.cross_sectional_exposure_write!
+PortfolioOptimisers.cross_sectional_exposure_rows
 PortfolioOptimisers.cross_sectional_exposure_history
-PortfolioOptimisers.cross_sectional_exposures_finite
-PortfolioOptimisers.cross_sectional_warmup
 PortfolioOptimisers.cross_sectional_eligible
 PortfolioOptimisers.assert_cross_sectional_coverage
+PortfolioOptimisers.cross_sectional_ready_factors
+PortfolioOptimisers.cross_sectional_determined
 PortfolioOptimisers.assert_cross_sectional_factor_moments
+PortfolioOptimisers.cross_sectional_factor_moments
+PortfolioOptimisers.cross_sectional_scenario_weights
 PortfolioOptimisers.cross_sectional_idiosyncratic_covariance
 PortfolioOptimisers.cross_sectional_variance_counts
 PortfolioOptimisers.cross_sectional_finite_mean

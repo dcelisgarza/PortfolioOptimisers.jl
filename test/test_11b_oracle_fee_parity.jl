@@ -1,0 +1,669 @@
+include(joinpath(@__DIR__, "parity_harness.jl"))
+@testset "Oracle fee parity" begin
+    using PortfolioOptimisers, Test, LinearAlgebra
+
+    # Every expected number in this file was measured by RUNNING the oracle, not by reading
+    # it. The fixture below is stated as literals on both sides, so the two languages parse
+    # identical `Float64` bits and no data file is exchanged.
+    #
+    # The oracle's cost model, which this file pins:
+    #
+    #   total_cost = sum(transaction_costs .* abs.(previous_weights - weights)) + liquidation
+    #   total_fee  = sum(management_fees .* weights)
+    #   returns    = X * weights .- total_cost .- total_fee
+    #
+    # The whole cost is subtracted from **every** observation. That is the same clock this
+    # library puts `l`, `s` and `tn` on, so the two agree term for term:
+    #
+    #   | the oracle          | this library                        |
+    #   | ------------------- | ----------------------------------- |
+    #   | `transaction_costs` | `tn`, a `Turnover` carrier          |
+    #   | `management_fees`   | `l` on a long book, `s` on a short  |
+    #   | `liquidation_cost`  | the `lq` carrier of ADR 0121        |
+    #
+    # The oracle has no fixed fee, so `fl`, `fs` and the `flq` carrier of ADR 0121 have
+    # no counterpart there and are pinned by the hand oracles of `test_11_fees_and_returns`.
+    #
+    # Two conventions differ:
+    #
+    #  1. The oracle charges its proportional fee as `management_fees .* weights` over
+    #     every asset, so a short position earns a **credit**. This library splits the term
+    #     into `l` over `w .>= 0` and `s` over `w .< 0`, and negates the short half. A
+    #     non-negative `s` makes it a charge, and `s = -l` makes it the same credit (#1518).
+    #     The testset on a short book pins that case against the oracle.
+    #  2. The oracle stores `compounded` as an attribute of its portfolio object. Here it
+    #     is the positional `compound` argument of `cumulative_returns` and `drawdowns`.
+    #     Same switch, same default, different carrier.
+    #
+    # Tolerances. Every value below was measured **bit-for-bit equal** to the oracle
+    # except the three noted at their assertions, which are sums that cancel to within a few
+    # ulp of zero and so carry an absolute error near `1e-16` with no meaningful relative
+    # one. `atol` guards those, and guards the row sums against a BLAS that reassociates.
+    #
+    # **Every weight vector here is stated, never solved.** That is what buys the tolerance
+    # above: the file compares fee arithmetic on identical inputs, so no solver enters it.
+    # A test that first optimises cannot hold this tolerance, because the oracle reaches
+    # its weights through a different build of the solver. Extend this file that way only
+    # with a tolerance sized to the weights, and note that `max_step_fraction = 0.75` brings
+    # this library's solver settings close to the oracle's defaults.
+    # The arithmetic below measured maxabs 3.5e-18 at most against the oracle's literals.
+    atol = 1e-15
+
+    X = [0.010 -0.020 0.005 0.030
+         -0.015 0.025 -0.010 0.012
+         0.020 0.010 0.015 -0.008
+         -0.005 -0.030 0.020 0.018
+         0.008 0.014 -0.025 0.006]
+    # Asset names, in this order, are "a", "b", "c", "d" on the oracle side.
+    tc = [0.001, 0.002, 0.010, 0.003]
+    mf = [0.0005, 0.0004, 0.0003, 0.0002]
+    prev = fill(0.25, 4)
+
+    @testset "The turnover charge on a long-short book" begin
+        w = [0.4, -0.3, 0.5, 0.4]
+        fees = Fees(; tn = Turnover(; w = prev, val = tc))
+        # The oracle reported `total_cost = 0.0042`.
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, fees), 0.0042; atol = atol)
+        # `tn` is a per period rate, so the charge lands on every observation, which is what
+        # the oracle does with its `total_cost`.
+        @test isapprox(PortfolioOptimisers.calc_one_off_fees(w, fees), 0.0; atol = atol)
+        @test parity_compare(calc_net_returns(w, X, fees),
+                             [0.020300000000000002, -0.0179, 0.0050999999999999995, 0.02,
+                              -0.015299999999999998]; rtol = 0.0, atol = atol,
+                             name = "long-short net").ok
+        # The per asset split sums to the series the scalar verb charges. It is one matrix
+        # on the caller's universe, and this book has no forced exit, so every column of it
+        # is an investable one.
+        A = calc_net_asset_returns(w, X, fees)
+        @test size(A) == size(X)
+        @test isapprox(vec(sum(A; dims = 2)), calc_net_returns(w, X, fees); atol = atol)
+    end
+
+    @testset "The proportional charge on a long-only book" begin
+        w = [0.4, 0.1, 0.2, 0.3]
+        fees = Fees(; tn = Turnover(; w = prev, val = tc), l = mf)
+        # The oracle reported `total_cost = 0.0011` and `total_fee = 0.00036`.
+        @test isapprox(calc_fees(w, Turnover(; w = prev, val = tc)), 0.0010999999999999998;
+                       atol = atol)
+        @test isapprox(calc_fees(w, mf, .>=), 0.00036; atol = atol)
+        # The book is long, so `s` is unused and the two conventions coincide.
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, fees),
+                       0.0010999999999999998 + 0.00036; atol = atol)
+        # The last entry is the one that cancels: the oracle reported
+        # `-6.000000000000097e-5` where this library reports `-6.0000000000001025e-5`.
+        @test parity_compare(calc_net_returns(w, X, fees),
+                             [0.01054, -0.0033599999999999997, 0.00814,
+                              0.0029399999999999995, -6.000000000000097e-5]; rtol = 0.0,
+                             atol = atol, name = "long-short mf net").ok
+    end
+
+    @testset "A short book earns the linear fee's credit under `s = -l`" begin
+        # #1518, row R101 of #1416. The proportional fee `l max(w, 0) - s min(w, 0)` is
+        # convex if and only if `s >= -l`, and `s = -l` is the linear `l w` the oracle
+        # charges. Every number below was measured by running the oracle on these literals.
+        w = [0.4, -0.3, 0.5, 0.4]
+        fees = Fees(; l = mf, s = -mf)
+        # The oracle reported `total_fee = 0.00031`.
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, fees), 0.00031;
+                       atol = atol)
+        @test parity_compare(calc_net_returns(w, X, fees),
+                             [0.02419, -0.014009999999999998, 0.00899, 0.023889999999999998,
+                              -0.01141]; rtol = 0.0, atol = atol, name = "short fee net").ok
+        A = calc_net_asset_returns(w, X, fees)
+        @test isapprox(vec(sum(A; dims = 2)), calc_net_returns(w, X, fees); atol = atol)
+        # With its transaction cost too, the oracle reported `total_cost = 0.0042`.
+        fees_tn = Fees(; tn = Turnover(; w = prev, val = tc), l = mf, s = -mf)
+        @test parity_compare(calc_net_returns(w, X, fees_tn),
+                             [0.01999, -0.01821, 0.004789999999999999, 0.01969, -0.01561];
+                             rtol = 0.0, atol = atol, name = "short fee tn net").ok
+        # The book of the ticket: `w = (1.5, -0.5)` and `f = 0.01`. The oracle reported
+        # `total_fee = 0.009999999999999998`. The long side pays 0.015 and the short earns
+        # 0.005.
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees([1.5, -0.5],
+                                                              Fees(; l = 0.01, s = -0.01)),
+                       0.009999999999999998; atol = atol)
+        # `s = l` is the carry reading, which charges both sides.
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees([1.5, -0.5],
+                                                              Fees(; l = 0.01, s = 0.01)),
+                       0.02; atol = atol)
+        # Below `-l` the fee is not convex, so the constructor refuses it, entry by entry.
+        # A `nothing` `l` reads as zero.
+        @test_throws DomainError Fees(; l = 0.01, s = -0.02)
+        @test_throws DomainError Fees(; s = -0.01)
+        @test_throws DomainError Fees(; l = [0.01, 0.02], s = [-0.01, -0.03])
+        @test Fees(; l = [0.01, 0.02], s = -0.01).s == -0.01
+        # The estimator resolves `s` by asset name, so it accepts a credit and `Fees` checks
+        # the bound after the resolution.
+        @test FeesEstimator(; l = 0.01, s = -0.01, ds = -0.01).s == -0.01
+        @test_throws DomainError FeesEstimator(; s = Inf)
+    end
+
+    @testset "The cumulative summaries under both settings of `compound`" begin
+        w = [0.4, 0.1, 0.2, 0.3]
+        fees = Fees(; tn = Turnover(; w = prev, val = tc), l = mf)
+        r = calc_net_returns(w, X, fees)
+        # `compound = false` is the oracle's `compounded=False`, and `true` its `True`.
+        # The compounded pair matched bit-for-bit; the simple pair differs in the last ulp
+        # of its final entry, which is a sum that cancels.
+        @test parity_compare(cumulative_returns(r),
+                             [0.01054, 0.007180000000000001, 0.01532, 0.01826,
+                              0.018199999999999997]; rtol = 0.0, atol = atol,
+                             name = "cumulative").ok
+        @test cumulative_returns(r, true) ==
+              [1.01054, 1.0071445855999999, 1.0153427425267838, 1.0183278501898125,
+               1.0182667505188012]
+        @test parity_compare(drawdowns(r),
+                             [0.0, -0.00336, 0.0, 0.0, -6.0000000000001025e-5]; rtol = 0.0,
+                             atol = atol, name = "drawdowns").ok
+        @test drawdowns(r, true) ==
+              [0.0, -0.0033600000000001407, 0.0, 0.0, -5.999999999994898e-5]
+    end
+
+    @testset "A forced liquidation is charged through a reduced `Fees`" begin
+        # ADR 0121 charges an asset that leaves the Investable Mask through a `Turnover`
+        # carrier on the complement of the mask. This testset walks the path a caller
+        # actually takes: a reduced `Fees` carrying `lq`, read by the ordinary fee verbs.
+        # The oracle meets the same charge the same way — it holds a named
+        # `previous_weights` that includes an asset absent from `X`, and reports the cost
+        # through the portfolio's `total_cost`.
+        #
+        # Asset "c" leaves a four-asset universe holding a quarter of the book in each.
+        # `w` is the surviving book. The liquidation term does not read it, because the
+        # exiting asset sits on the other axis, and that independence is itself contract.
+        w = [0.4, -0.3, 0.9]
+
+        # A per asset rate. The oracle reported turnover `0.25` and cost `0.0025`.
+        lq = Turnover(; w = [0.25], val = [0.010])
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, Fees(; lq = lq)), 0.0025;
+                       atol = atol)
+        @test isapprox(sum(abs, lq.w), 0.25; atol = atol)
+        # `lq` is a rate per period, so it never lands in the one-off half.
+        @test isapprox(PortfolioOptimisers.calc_one_off_fees(w, Fees(; lq = lq)), 0.0;
+                       atol = atol)
+
+        # One scalar rate over every exit. The oracle reported cost `0.001`.
+        sc = Fees(; lq = Turnover(; w = [0.25], val = 0.004))
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, sc), 0.001; atol = atol)
+
+        # Two exits of opposite sign: "b" short at `-0.4` and "c" long at `0.25`. The
+        # oracle reported turnover `0.65` and cost `0.0033`, so the charge reads the
+        # absolute previous weight and does not credit the short.
+        lq2 = Turnover(; w = [-0.4, 0.25], val = [0.002, 0.010])
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, Fees(; lq = lq2)), 0.0033;
+                       atol = atol)
+        @test isapprox(sum(abs, lq2.w), 0.65; atol = atol)
+
+        # A position already at zero is not traded, so it is charged nothing.
+        z = Fees(; lq = Turnover(; w = [0.0, 0.25], val = [0.002, 0.010]))
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(w, z), 0.0025; atol = atol)
+
+        # The arithmetic underneath is the established `Turnover` method priced at a zero
+        # target, which is why the charge took no verb of its own.
+        @test isapprox(calc_fees(zeros(2), lq2), 0.0033; atol = atol)
+        @test isapprox(calc_asset_fees(zeros(2), lq2), [0.0008, 0.0025]; atol = atol)
+        @test isapprox(sum(calc_asset_fees(zeros(2), lq2)), calc_fees(zeros(2), lq2);
+                       atol = atol)
+    end
+
+    @testset "A reduced fit charges the exit on every observation" begin
+        # The whole of ADR 0121's clock decision, walked end to end through the ordinary
+        # verbs. A fit that reduced to the three investable assets still owes the exit, and
+        # the charge rides on every observation beside the reduced turnover rather than one
+        # time.
+        #
+        # This is the oracle's own reduced portfolio: it was handed `X` for "a", "b" and
+        # "d" with a named `previous_weights` still naming "c", and it reported
+        # `total_cost = 0.0057` — the reduced turnover `0.0032` plus the exit `0.0025` —
+        # subtracted from each of the five observations.
+        Xred = X[:, [1, 2, 4]]
+        wred = [0.4, -0.3, 0.9]
+        fees = Fees(; tn = Turnover(; w = fill(0.25, 3), val = [0.001, 0.002, 0.003]),
+                    lq = Turnover(; w = [0.25], val = [0.010]))
+
+        @test isapprox(PortfolioOptimisers.calc_periodic_fees(wred, fees), 0.0057;
+                       atol = atol)
+        # The two halves of that total, so a regression names which one moved.
+        @test isapprox(calc_fees(wred, fees.tn), 0.0032; atol = atol)
+        @test isapprox(PortfolioOptimisers.calc_liquidation_fees(fees.lq), 0.0025;
+                       atol = atol)
+
+        # The whole charge lands on every observation, which is the oracle's series.
+        @test parity_compare(calc_net_returns(wred, Xred, fees),
+                             [0.031299999999999994, -0.0084, -0.0079, 0.017499999999999998,
+                              -0.001299999999999999]; rtol = 0.0, atol = atol,
+                             name = "liquidation net").ok
+
+        # Charging the exit one time instead would leave four of the five observations
+        # short by the whole charge, so the two clocks are distinguishable here.
+        notn = Fees(; tn = Turnover(; w = fill(0.25, 3), val = [0.001, 0.002, 0.003]))
+        @test !isapprox(calc_net_returns(wred, Xred, notn),
+                        calc_net_returns(wred, Xred, fees); atol = atol)
+        # And the gap between them is exactly the exit, on every observation.
+        @test isapprox(calc_net_returns(wred, Xred, notn) .-
+                       calc_net_returns(wred, Xred, fees), fill(0.0025, 5); atol = atol)
+    end
+
+    @testset "A solved walk-forward" begin
+        using Clarabel
+
+        # The testsets above compare arithmetic on stated weights, which is why they hold a
+        # `1e-15` tolerance. This one solves, so it cannot: the oracle reaches its weights
+        # through a different build of the solver. `max_step_fraction = 0.75` brings this
+        # library's Clarabel close to the one the oracle drives through its modelling
+        # layer, and the residual gap measured `1.5e-4` on a weight and `2.9e-5` on a summed
+        # return series, so the tolerances below are sized to that and not to the arithmetic.
+        w_atol = 1e-3
+        s_atol = 2e-4
+
+        # A deterministic panel from an integer LCG, so both languages hold identical bits
+        # with no data file between them. Every element matched the oracle exactly.
+        T, N = 120, 5
+        seed = 12345
+        vals = Vector{Float64}(undef, T * N)
+        for i in 1:(T * N)
+            seed = mod(1103515245 * seed + 12345, 2^31)
+            vals[i] = (seed / 2^31 - 0.5) * 0.04
+        end
+        Xcv = permutedims(reshape(vals, N, T))
+        rdcv = ReturnsResult(; nx = ["a", "b", "c", "d", "e"], X = Xcv)
+        slv = Solver(; name = :cl, solver = Clarabel.Optimizer,
+                     check_sol = (; allow_local = true, allow_almost = true),
+                     settings = Dict("verbose" => false, "max_step_fraction" => 0.75))
+
+        tccv = [0.001, 0.002, 0.010, 0.003, 0.004]
+        mgmt = [0.0005, 0.0004, 0.0003, 0.0002, 0.0006]
+        z5 = zeros(5)
+
+        # Three folds of a rolling sixty-observation window and a twenty-observation test,
+        # which is the oracle's `train_size = 60, test_size = 20`. `expand_train` is
+        # `false` by default on both sides, so the window rolls rather than expands.
+        #
+        # **`wd` alone reproduces the oracle's drift (#1518, row R102 of #1416).** The oracle
+        # carries one flag: with it set, the series drifts *and* the next fold budgets its
+        # turnover against the drifted ending weights. Here those are two switches, `wd` and
+        # `pws`, and an unset `pws` follows `wd`, so `wd` alone gives the same consistent
+        # pair. Before #1518 an unset `pws` meant the targets, and `wd` alone left the
+        # turnover cases `3.5e-3` from the oracle. `pws = TargetWeights()` keeps that mixed
+        # pair one keyword away.
+        flat = () -> IndexWalkForward(60, 20)
+        drift = () -> IndexWalkForward(60, 20; wd = SelfFinancingDrift())
+        mixed = () -> IndexWalkForward(60, 20; wd = SelfFinancingDrift(),
+                                       pws = TargetWeights())
+
+        # Every proportional term this library carries, against its counterpart in the
+        # oracle: `l` is the oracle's per asset holding fee, and `tn` its transaction
+        # cost. `s` has no counterpart, because the oracle credits a short holding fee
+        # where this library charges it, so the books below are long only. The two
+        # liquidation carriers of ADR 0121 are pinned by the two testsets above, which is as
+        # far as they can be taken until issue #897 puts them on `Fees`.
+        fee_cases = ["nofee" => nothing, "mgmt" => Fees(; l = mgmt),
+                     "tn" => Fees(; tn = Turnover(; w = z5, val = tccv)),
+                     "both" => Fees(; l = mgmt, tn = Turnover(; w = z5, val = tccv))]
+
+        # Measured from the oracle, per case: the summed net return series, then the last
+        # cumulative return under `compound = false` and under `compound = true`.
+        expected = Dict("nofee_flat" => (-0.007998610740968356, -0.007998610740968363,
+                                         0.9912156849257472),
+                        "nofee_drift" => (-0.004617355100166587, -0.004617355100166587,
+                                          0.9945679659411881),
+                        "mgmt_flat" => (-0.03298586309675567, -0.03298586309675567,
+                                        0.9667460115983989),
+                        "mgmt_drift" => (-0.029604607455953905, -0.029604607455953898,
+                                         0.9700169059029946),
+                        "tn_flat" => (-0.10175505628719284, -0.10175505628719285,
+                                      0.9022776888821106),
+                        "tn_drift" =>
+                            (-0.1019142888775082, -0.10191428887750799, 0.9021280010875558),
+                        "both_flat" => (-0.12674230864298017, -0.12674230864298017,
+                                        0.8799688762453504),
+                        "both_drift" => (-0.12690154123329553, -0.12690154123329575,
+                                         0.8798228692359749))
+
+        # The oracle solved the same weights in all four fee cases, because its default
+        # objective minimises risk and a proportional cost enters the return expression
+        # alone. This library's default objective is the same, so it agrees.
+        ref_w0 = [0.23892993656480035, 0.1412161727402494, 0.18064324954439945,
+                  0.18706231534627446, 0.2521483258042763]
+        ref_w1 = [0.19560053837766128, 0.1632418491720253, 0.19383371557461357,
+                  0.1665127842983928, 0.28081111257730695]
+        ref_w2 = [0.1441611559065762, 0.21862818311983637, 0.18954337007604785,
+                  0.19378709425730659, 0.2538801966402329]
+
+        for (fl, fe) in fee_cases, (dl, cvf) in ["flat" => flat, "drift" => drift]
+            mr = MeanRisk(;
+                          opt = JuMPOptimiser(; wb = WeightBounds(; lb = 0, ub = 1),
+                                              bgt = 1, fees = fe, slv = slv))
+            pred = cross_val_predict(mr, rdcv, cvf())
+            r = pred.mrd.X
+            ret_sum, smp_last, cmp_last = expected[fl * "_" * dl]
+
+            @test length(pred.pred) == 3
+            @test parity_compare(pred.pred[1].res.w, ref_w0; rtol = 0.0, atol = w_atol,
+                                 name = "cv w0 $(fl) $(dl)").ok
+            @test parity_compare(pred.pred[2].res.w, ref_w1; rtol = 0.0, atol = w_atol,
+                                 name = "cv w1 $(fl) $(dl)").ok
+            @test parity_compare(pred.pred[3].res.w, ref_w2; rtol = 0.0, atol = w_atol,
+                                 name = "cv w2 $(fl) $(dl)").ok
+
+            @test isapprox(sum(r), ret_sum; atol = s_atol)
+            # `compound = false` is the oracle's `compounded=False`, `true` its `True`.
+            @test isapprox(cumulative_returns(r)[end], smp_last; atol = s_atol)
+            @test isapprox(cumulative_returns(r, true)[end], cmp_last; atol = s_atol)
+        end
+
+        # The resolution of the two switches, on each timeline scheme's `fold_evaluation`.
+        resolve = PortfolioOptimisers.resolve_previous_weights_source
+        sfd = SelfFinancingDrift()
+        @test isnothing(resolve(nothing, nothing))
+        @test resolve(nothing, sfd) isa DriftedWeights
+        @test isnothing(resolve(TargetWeights(), sfd))
+        @test isnothing(resolve(TargetWeights(), nothing))
+        @test resolve(DriftedWeights(), nothing) isa DriftedWeights
+        @test PortfolioOptimisers.fold_evaluation(drift()).pws isa DriftedWeights
+        @test isnothing(PortfolioOptimisers.fold_evaluation(mixed()).pws)
+        @test isnothing(PortfolioOptimisers.fold_evaluation(flat()).pws)
+        @test PortfolioOptimisers.fold_evaluation(OnlineIndexWalkForward(60, 20; wd = sfd)).pws isa
+              DriftedWeights
+        @test PortfolioOptimisers.fold_evaluation(HindsightSplit(; wd = sfd)).pws isa
+              DriftedWeights
+
+        # An explicit source overrides the rule. With the drifted source stated, the run is
+        # the run of `wd` alone, bit for bit. With the targets stated, a case that reads
+        # previous weights keeps the mixed pair, `3.5e-3` from the oracle, and a case that
+        # reads none does not move.
+        mr_tn = MeanRisk(;
+                         opt = JuMPOptimiser(; wb = WeightBounds(; lb = 0, ub = 1), bgt = 1,
+                                             fees = Fees(;
+                                                         tn = Turnover(; w = z5,
+                                                                       val = tccv)),
+                                             slv = slv))
+        r_drift = cross_val_predict(mr_tn, rdcv, drift()).mrd.X
+        r_both = cross_val_predict(mr_tn, rdcv,
+                                   IndexWalkForward(60, 20; wd = sfd,
+                                                    pws = DriftedWeights())).mrd.X
+        r_mixed = cross_val_predict(mr_tn, rdcv, mixed()).mrd.X
+        @test r_both == r_drift
+        @test abs(sum(r_mixed) - expected["tn_drift"][1]) > 1e-3
+        mr_l = MeanRisk(;
+                        opt = JuMPOptimiser(; wb = WeightBounds(; lb = 0, ub = 1), bgt = 1,
+                                            fees = Fees(; l = mgmt), slv = slv))
+        @test cross_val_predict(mr_l, rdcv, mixed()).mrd.X ==
+              cross_val_predict(mr_l, rdcv, drift()).mrd.X
+    end
+
+    @testset "A walk-forward over a delisting, with a liquidation carrier" begin
+        using StableRNGs, LinearAlgebra, Clarabel
+
+        # The test that verifies the port end to end. An asset delists inside the last test
+        # fold, so the mask derives itself from the data, the fold that loses it charges a
+        # forced exit, and the folds that lose nothing charge none.
+        #
+        # **What can and cannot be compared.** The oracle reaches a delisting only
+        # through its exponentially weighted moments with `active_mask` routing, because its
+        # plain prior refuses a `NaN`. This library's plain prior handles the gap natively.
+        # The two therefore fit different moments and solve to different weights, so the
+        # series cannot be compared. What can be compared exactly is the **charge**, which
+        # is arithmetic on the weights: the first half below feeds this library's fee verbs
+        # the oracle's own per fold weights and matches its reported cost to rounding.
+        # The second half then drives this library's whole pipeline and pins the invariants
+        # the oracle cannot speak to.
+
+        T3, N3 = 120, 5
+        seed3 = 12345
+        v3 = Vector{Float64}(undef, T3 * N3)
+        for i in 1:(T3 * N3)
+            seed3 = mod(1103515245 * seed3 + 12345, 2^31)
+            v3[i] = (seed3 / 2^31 - 0.5) * 0.04
+        end
+        X3 = permutedims(reshape(v3, N3, T3))
+        k3 = 3
+        X3[81:end, k3] .= NaN          # asset "c" delists inside the last test fold
+        nx3 = ["a", "b", "c", "d", "e"]
+        rd3 = ReturnsResult(; nx = nx3, X = X3)
+        inv3 = [1, 2, 4, 5]
+        tc3 = [0.001, 0.002, 0.010, 0.003, 0.004]
+        mgmt3 = [0.0005, 0.0004, 0.0003, 0.0002, 0.0006]
+        slv3 = Solver(; name = :cl, solver = Clarabel.Optimizer,
+                      check_sol = (; allow_local = true, allow_almost = true),
+                      settings = Dict("verbose" => false, "max_step_fraction" => 0.75))
+
+        @testset "The parity matrix, over the delisting" begin
+            # The matrix the port is verified by: every fee the oracle supports, against
+            # both weight-drift settings, summarised under both settings of `compound` —
+            # all of it over a panel where an asset delists, so every cell charges a forced
+            # exit at the fold that loses it.
+            #
+            # The comparison is driven from the **oracle's own per fold weights**. That
+            # is not a shortcut, it is the only way the cells are comparable: the oracle
+            # reaches a delisting solely through its exponentially weighted moments with
+            # `active_mask` routing, because its plain prior refuses a `NaN`, while this
+            # library's plain prior handles the gap natively. The two therefore fit
+            # different moments and solve to different weights. Holding the weights fixed
+            # removes that difference and leaves exactly what is being verified: the fee
+            # arithmetic, the clock, the drift and the two cumulative conventions.
+            #
+            # The oracle solved the same weights in all six cells, because its default
+            # objective minimises risk and a proportional cost does not move that argmin.
+            W = [[0.23372395184635317, 0.14070442963485008, 0.18641912894883597,
+                  0.17987749947299542, 0.2592749900969653],
+                 [0.17137301967228055, 0.1666189142652727, 0.1961303186945051,
+                  0.1587711481740035, 0.30710659919393823],
+                 [0.16730556399117805, 0.26717172952111706, 0.0, 0.2450269918497811,
+                  0.32049571463792387]]
+            # Budgeting against the targets threads the previous fold's target; threading
+            # the drifted holdings threads what was actually held. The exit is priced
+            # against whichever the scheme names, so the two columns differ.
+            PW = Dict("flat" => [zeros(5), W[1], W[2]],
+                      "drift" => [zeros(5),
+                                  [0.2433787797334486, 0.13742235801900893, 0.18262568039164098,
+                                   0.1665151048099047, 0.27005807704599694],
+                                  [0.17016331410170402, 0.16136630292859214, 0.19165843402333646,
+                                   0.13656907313225372, 0.34024287581411367]])
+            # The last fold loses asset "c"; the first two keep every asset, because the
+            # mask is derived from each fold's own training window.
+            iv = [[1, 2, 3, 4, 5], [1, 2, 3, 4, 5], [1, 2, 4, 5]]
+            rows = [61:80, 81:100, 101:120]
+            @test iszero(W[3][k3])
+
+            # Per fold `total_cost` and `total_fee` as the oracle reported them.
+            cost = Dict("tn_flat" => [0.003956056559411261, 0.0004659372891764765,
+                                      0.002478800265941117],
+                        "tn_drift" => [0.003956056559411261, 0.0004368712140818054,
+                                       0.0025354153443862817], "mgmt_flat" => zeros(3),
+                        "mgmt_drift" => zeros(3))
+            cost["both_flat"] = cost["tn_flat"]
+            cost["both_drift"] = cost["tn_drift"]
+            mfee = [0.0004206099804145457, 0.0004271913603017645, 0.0004318243009567464]
+            fee = Dict("tn_flat" => zeros(3), "tn_drift" => zeros(3), "mgmt_flat" => mfee,
+                       "mgmt_drift" => mfee, "both_flat" => mfee, "both_drift" => mfee)
+            # The last cumulative return of the whole path, simple and compounded.
+            smp = Dict("tn_flat" => -0.11758386526314575,
+                       "tn_drift" => -0.11615253012097801,
+                       "mgmt_flat" => -0.005160495806029792,
+                       "mgmt_drift" => -0.0031781805968521953,
+                       "both_flat" => -0.1431763780966069,
+                       "both_drift" => -0.14174504295443915)
+            cmp = Dict("tn_flat" => 0.8881733007938063, "tn_drift" => 0.889433288044936,
+                       "mgmt_flat" => 0.994108461599983, "mgmt_drift" => 0.9960704820919892,
+                       "both_flat" => 0.8656826445068109,
+                       "both_drift" => 0.8669112374385091)
+
+            # The fee a fold charges: the five per asset fields on the assets it keeps, and
+            # the liquidation carrier on the ones it lost, priced at the previous weights.
+            fold_fee = function (f, pw, use_tn, use_mg)
+                keep = iv[f]
+                gone = setdiff(1:N3, keep)
+                return Fees(; tn = if use_tn
+                                Turnover(; w = pw[keep], val = tc3[keep])
+                            else
+                                nothing
+                            end, l = use_mg ? mgmt3[keep] : nothing,
+                            lq = if (use_tn && !isempty(gone))
+                                Turnover(; w = pw[gone], val = tc3[gone])
+                            else
+                                nothing
+                            end)
+            end
+
+            for (fl, use_tn, use_mg) in
+                (("tn", true, false), ("mgmt", false, true), ("both", true, true)),
+                (dl, wd) in (("flat", nothing), ("drift", SelfFinancingDrift()))
+
+                tag = fl * "_" * dl
+                pw = PW[dl]
+                r = Float64[]
+                for f in 1:3
+                    keep = iv[f]
+                    fe = fold_fee(f, pw[f], use_tn, use_mg)
+                    wf = W[f][keep]
+
+                    # The charge this library computes for the fold, against the two
+                    # numbers the oracle reported for it.
+                    # Measured maxrel 1.7e-16, one rounding of a sum over five assets.
+                    @test parity_compare([PortfolioOptimisers.calc_periodic_fees(wf, fe)],
+                                         [cost[tag][f] + fee[tag][f]]; rtol = 1e-15,
+                                         name = "$(tag) fold $(f) charge").ok
+
+                    # Only the fold that loses an asset owes an exit, and it owes the rate
+                    # times the previous weight the scheme threaded.
+                    if f == 3 && use_tn
+                        @test isapprox(PortfolioOptimisers.calc_liquidation_fees(fe.lq),
+                                       tc3[k3] * pw[3][k3]; atol = atol)
+                    else
+                        @test isnothing(fe.lq)
+                    end
+
+                    # The fold's realised series. A fold may hold an asset over a window
+                    # where it has no return — fold two holds "c" after it delists — and
+                    # the fold zeroes that Held Gap once, which this reconstruction does
+                    # through the same verb.
+                    Xc = PortfolioOptimisers.filter_held_gaps(wf, X3[rows[f], keep], false)
+                    append!(r, if isnothing(wd)
+                                calc_net_returns(wf, Xc, fe)
+                            else
+                                calc_net_returns(wf, Xc, fe, wd)
+                            end)
+                end
+
+                @test length(r) == 60
+                @test all(isfinite, r)
+                # Both cumulative conventions, against the oracle's own summaries.
+                # Measured maxrel 1.6e-15 on the simple return, a sum of 60 returns that
+                # cancels to a total near 3e-3 (`mgmt_drift`), and 1.3e-16 on the compounded
+                # one, a product of 60 factors near one.
+                @test parity_compare([cumulative_returns(r)[end]], [smp[tag]]; rtol = 1e-14,
+                                     name = "$(tag) simple").ok
+                @test parity_compare([cumulative_returns(r, true)[end]], [cmp[tag]];
+                                     rtol = 1e-15, name = "$(tag) compounded").ok
+            end
+        end
+
+        @testset "This library's pipeline, across drift and compound" begin
+            w03 = fill(0.2, N3)
+            cases = ["tn" => Fees(; tn = Turnover(; w = w03, val = tc3),
+                                  lq = Turnover(; w = w03, val = tc3)),
+                     "mgmt" => Fees(; l = mgmt3, lq = Turnover(; w = w03, val = tc3)),
+                     "both" => Fees(; tn = Turnover(; w = w03, val = tc3), l = mgmt3,
+                                    lq = Turnover(; w = w03, val = tc3))]
+            schemes = ["flat" => IndexWalkForward(60, 20),
+                       "drift" => IndexWalkForward(60, 20; wd = SelfFinancingDrift(),
+                                                   pws = DriftedWeights())]
+
+            for (_, fee) in cases, (sl, cv) in schemes
+                mr3 = MeanRisk(;
+                               opt = JuMPOptimiser(; wb = WeightBounds(; lb = 0, ub = 1),
+                                                   bgt = 1, fees = fee, slv = slv3))
+                pred = cross_val_predict(mr3, rd3, cv)
+                @test length(pred.pred) == 3
+
+                # The mask derives itself: the first two folds see every asset, the last
+                # loses one.
+                @test isnothing(pred.pred[1].res.imsk)
+                @test isnothing(pred.pred[2].res.imsk)
+                @test pred.pred[3].res.imsk == BitVector([1, 1, 0, 1, 1])
+
+                # A fold that loses nothing carries no carrier and owes no exit. This is
+                # the defect the end-to-end run found: the carrier is stated on the full
+                # universe, and without the strip it was charged in full here.
+                for i in 1:2
+                    @test isnothing(pred.pred[i].res.fees.lq)
+                    @test isapprox(PortfolioOptimisers.calc_liquidation_fees(pred.pred[i].res.fees.lq),
+                                   0.0; atol = atol)
+                end
+
+                # The fold that loses the asset expands its weight to zero, and carries the
+                # carrier on the complement, holding the previous fold's weight in it.
+                exit_res = pred.pred[3].res
+                @test length(exit_res.w) == N3
+                @test iszero(exit_res.w[k3])
+                @test length(exit_res.fees.lq.w) == 1
+                held = only(exit_res.fees.lq.w)
+                # The charge is the rate times the weight the fold actually threaded, which
+                # is the oracle's arithmetic on this library's own weights.
+                @test isapprox(PortfolioOptimisers.calc_liquidation_fees(exit_res.fees.lq),
+                               tc3[k3] * held; atol = atol)
+                # **Which** weight that is, is the `pws` switch, and the exit obeys it like
+                # every other turnover term. Budgeting against the targets charges the exit
+                # at the previous fold's target; threading the drifted holdings charges it
+                # at what was actually held when the asset left, which is a different
+                # number.
+                if sl == "flat"
+                    @test isapprox(held, pred.pred[2].res.w[k3]; atol = atol)
+                else
+                    @test !isapprox(held, pred.pred[2].res.w[k3]; atol = 1e-6)
+                    @test isapprox(held, pred.pred[2].res.w[k3]; atol = 5e-3)
+                end
+
+                # The series is finite under both schemes, and the two cumulative
+                # conventions agree with their own definitions on it.
+                r3 = pred.mrd.X
+                @test all(isfinite, r3)
+                @test isapprox(cumulative_returns(r3)[end], sum(r3); atol = 1e-12)
+                @test isapprox(cumulative_returns(r3, true)[end],
+                               prod(one(eltype(r3)) .+ r3); atol = 1e-12)
+            end
+        end
+    end
+
+    @testset "The drawdown peak includes the starting capital" begin
+        # Found while pinning the walk-forward above, where the cost-heavy cases disagreed
+        # on the maximum drawdown by `1.1e-2` while their return series agreed to `7e-6`.
+        #
+        # A drawdown is the decline from a **historical peak of the equity curve**, and the
+        # capital the portfolio starts with is a point on that curve. So the running peak at
+        # observation `t` is the maximum over `V₀, V₁, …, Vₜ`, and `V₀` is the starting
+        # capital. This library computes exactly that: `relative_drawdown_arr` seeds its
+        # running peak with `init = one(eltype(X))`, and its additive twin with a zero, so a
+        # series that opens down is already in drawdown at its first observation.
+        #
+        # The oracle seeded its peak at the first observation at the tag this file was
+        # measured at, so it understated this case by `1.1e-2`. At the tag on disk it seeds
+        # the peak at the starting capital too, and it gives `-0.10915360082646582` on the
+        # series below (#1416, row R73). The rule is now at parity.
+
+        # The first fold of the oracle's own transaction-cost walk-forward. Its cost drags
+        # the curve under water on the first observation and it never recovers.
+        r = [-0.011788105221992843, -0.0051264818462376655, 0.005458948749114548,
+             -0.00755922174545086, 0.0006201259574699089, -0.011913393832684459,
+             -0.0059727004038226846, -0.01222042003663268, -0.0010357568565395724,
+             -0.01310603346857926, -0.002531933330607626, 0.0009395572155512719,
+             -0.0006490986796599128, 0.003105318463142509, -0.009275028041584244,
+             -0.007481291914784366, -0.012652588370685482, -0.006639243004377236,
+             -0.011326254458105164, 0.005205429707888839]
+        cr = cumulative_returns(r)
+
+        # The definition: the peak runs over the curve with the starting capital included.
+        by_definition = minimum(cr .- accumulate(max, vcat(zero(eltype(cr)), cr))[2:end])
+        @test isapprox(minimum(drawdowns(r)), by_definition; atol = atol)
+        @test isapprox(by_definition, -0.10915360082646583; atol = atol)
+
+        # The curve never recovers above its start, so the deepest drawdown is the deepest
+        # cumulative loss itself.
+        @test isapprox(minimum(drawdowns(r)), minimum(cr); atol = atol)
+
+        # The two coincide once the series rises above where it opened.
+        up = [0.01054, -0.00336, 0.00814]
+        cup = cumulative_returns(up)
+        @test isapprox(drawdowns(up), cup .- accumulate(max, cup); atol = atol)
+    end
+end

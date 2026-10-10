@@ -167,7 +167,8 @@ HierarchicalRiskParity
       │      sigma ┼ nothing
       │       chol ┼ nothing
       │         rc ┼ nothing
-      │        alg ┴ SquaredSOCRiskExpr()
+      │        alg ┼ SquaredSOCRiskExpr()
+      │   mtx_sqrt ┴ EigenFallbackSquareRoot()
   sca ┼ SumScalariser()
    fb ┴ nothing
 ```
@@ -353,7 +354,7 @@ Run the Hierarchical Risk Parity optimisation for a single risk measure.
  2. Pick the returns `rd` that `opt.brt` selects, with [`returns_result_picker`](@ref).
  3. Fit the prior `pr` with `opt.pe`.
  4. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk`.
- 5. Remove the liquidation carriers from `fees`, giving `cfees`, the fees that the risks read.
+ 5. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the risks read.
  6. Reduce `pr`, `hrp` and `rd` to the assets of `imsk`, with [`investable_reduction`](@ref). `X` is the returns matrix of the reduced `pr`.
  7. Cluster the assets with `opt.cle`, giving `clr`. The call passes no `branchorder`, so the leaf order `clr.res.order` keeps the default optimal order, because a different order changes the allocation.
  8. Resolve the risk measure `r` against `pr` and `opt.slv`, with [`factory`](@ref).
@@ -378,22 +379,24 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     hrp = reset_time_dependent_estimator(hrp)
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd)
-    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
-    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
-    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
+    # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
     # A weight is a quotient of two risks, so an integer sample takes a float weight type,
     # and every other sample keeps its own type.
     T = float_if_integer(eltype(pr.X))
-    imsk = investable_mask(pr)
+    # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    imsk = feature_readable_mask(hrp.opt.cle, investable_mask(pr), rd)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
-    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # rebuilds, so only the result charges it. No sub-problem below holds that vector —
     # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
-    cfees = strip_liquidation_carriers(fees, nothing)
+    cfees = strip_liquidation_charges(fees, nothing)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
     # the distance the clustering is built from never sees a `NaN`, and the cluster count
@@ -541,22 +544,24 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     hrp = reset_time_dependent_estimator(hrp)
     rd = returns_result_picker(rd, hrp.opt.brt)
     pr = prior(hrp.opt.pe, rd)
-    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
-    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
-    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
+    # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
     # A weight is a quotient of two risks, so an integer sample takes a float weight type,
     # and every other sample keeps its own type.
     T = float_if_integer(eltype(pr.X))
-    imsk = investable_mask(pr)
+    # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    imsk = feature_readable_mask(hrp.opt.cle, investable_mask(pr), rd)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
-    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # rebuilds, so only the result charges it. No sub-problem below holds that vector —
     # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
-    cfees = strip_liquidation_carriers(fees, nothing)
+    cfees = strip_liquidation_charges(fees, nothing)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
     # the distance the clustering is built from never sees a `NaN`, and the cluster count

@@ -1,5 +1,5 @@
 ```@meta
-Description = "Lag Descriptors, public API of PortfolioOptimisers.jl: GrowthRate, ChangeToScale, ChangeInIntensity, descriptor, AssetsGrowthRate, SalesGrowthRate, …"
+Description = "Lag Descriptors, public API of PortfolioOptimisers.jl: GrowthRate, ChangeToScale, ChangeInIntensity, descriptor, partial_fit!, merge_states, …"
 ```
 
 # [Lag Descriptors](@id api-lag-descriptors)
@@ -15,7 +15,9 @@ ChangeInIntensity
 ## Functions
 
 ```@docs
-descriptor(de::GrowthRate, rd::ReturnsResult)
+descriptor(de::Union{GrowthRate, ChangeToScale, ChangeInIntensity}, rd::ReturnsResult)
+PortfolioOptimisers.partial_fit!(de::Union{GrowthRate, ChangeToScale, ChangeInIntensity}, rd::ReturnsResult)
+merge_states(a::PortfolioOptimisers.LagDescriptorState, b::PortfolioOptimisers.LagDescriptorState)
 AssetsGrowthRate
 SalesGrowthRate
 IssuanceGrowthRate

@@ -676,7 +676,7 @@ The returns-level counterpart of [`MissingDataFilter`](@ref)'s column threshold,
 
 Every selector of the family is fitted on the Coverage Universe, so this one is the **identity** on the window it receives, and it is the explicit step that asks for the reduction and for nothing else. It drops an asset whose return is non-finite at any row of the window, and an asset the [`AssetPanel`](@ref) reports inactive at any row of it.
 
-A returns carrier binds `X` to a matrix of numbers, so a `missing` never reaches this selector: [`ReturnsResult`](@ref) rejects a `Matrix{Union{Missing, Float64}}` at construction. [`MissingDataFilter`](@ref) removes a `missing` from the price data upstream.
+A [`ReturnsResult`](@ref) binds `X` to a matrix of numbers, so a `missing` never reaches this selector: its constructor rejects a `Matrix{Union{Missing, Float64}}` at construction. [`MissingDataFilter`](@ref) removes a `missing` from the price data upstream.
 
 # Constructors
 
@@ -703,7 +703,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Select the assets a [`CompleteAssetSelector`](@ref) keeps: **every** asset column of the reduced window.
 
-This selector is the identity on the Coverage Universe. [`fit_preprocessing`](@ref) reduces the training window before it calls this method, so the columns that reach here are already the ones that are finite at every row and active at every row of the [`AssetPanel`](@ref). The dropping is the funnel's, and this selector is the explicit step that asks for it and for nothing else.
+This selector is the identity on the Coverage Universe. [`fit_preprocessing`](@ref) reduces the training window before it calls this method, so the columns that reach here are already the ones that are finite at every row and active at every row of the [`AssetPanel`](@ref). `fit_preprocessing` does the dropping, and this selector is the explicit step that asks for it and for nothing else.
 
 Reading the panel's active mask is what the reduction adds: a stale finite price during an inactive spell leaves the asset out, where the released selector, which read finiteness alone, kept it.
 
@@ -734,7 +734,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the algorithms that decide which assets a [`RedundancySelector`](@ref) discards as redundant.
 
-Each algorithm answers the same question — *given the data and, optionally, a per-asset score, which columns survive?* — and returns a keep-mask. The keep-mask, not a partition into groups, is the seam: [`PairwiseCorrelation`](@ref) drops one asset at a time and may keep two members of the same correlated blob, which "partition, then keep the best of each group" cannot express.
+Each algorithm answers the same question — *given the data and, optionally, a per-asset score, which columns survive?* — and returns a keep-mask. The keep-mask, not a partition into groups, is what the interface returns: [`PairwiseCorrelation`](@ref) drops one asset at a time and may keep two members of the same correlated blob, which "partition, then keep the best of each group" cannot express.
 
 Two algorithms do partition, and share [`groups_argbest`](@ref):
 
@@ -1227,7 +1227,7 @@ A cluster whose best score is tied keeps nobody (see [`groups_argbest`](@ref)).
 
 ## Clustering on a feature matrix
 
-A [`FeatureDistance`](@ref) in the `cle`'s distance slot measures a Feature Matrix rather than the returns, and it derives that matrix from the [`AssetPanel`](@ref) on `rd` — the data carrier the selector is fitted on. Preselection is a *pre-prior* site, so it passes `rd` alone: a selector is fitted by [`fit_preprocessing`](@ref) from the returns data alone and never sees a prior result, and in a [`Pipeline`](@ref) it writes `:returns`, which invalidates any `:prior` already computed. A producer that needs a prior therefore raises here, and it names the site. Supply an [`AssetPanel`](@ref) on the [`ReturnsResult`](@ref) — for instance from [`asset_panel`](@ref) — or the clustering throws (see [`asset_panel`](@ref)).
+A [`FeatureDistance`](@ref) in the `cle`'s distance slot measures a Feature Matrix rather than the returns, and it derives that matrix from the [`AssetPanel`](@ref) on `rd` — the returns data the selector is fitted on. Preselection is a *pre-prior* site, so it passes `rd` alone: a selector is fitted by [`fit_preprocessing`](@ref) from the returns data alone and never sees a prior result, and in a [`Pipeline`](@ref) it writes `:returns`, which invalidates any `:prior` already computed. A producer that needs a prior therefore raises here, and it names the site. Supply an [`AssetPanel`](@ref) on the [`ReturnsResult`](@ref) — for instance from [`asset_panel`](@ref) — or the clustering throws (see [`asset_panel`](@ref)).
 
 The selection is decided on the *full* universe and the surviving columns are sliced only afterwards, so `Z` is measured over every asset before any is dropped.
 
@@ -1274,12 +1274,12 @@ Keep one representative of each cluster under [`ClusterGroups`](@ref).
 
 # Algorithm
 
- 1. Cluster the assets with [`clusterise`](@ref) on `rd.X`, passing `rd` so that a [`FeatureDistance`](@ref) resolves its panel off the data carrier, giving the clustering result `clr`.
+ 1. Cluster the assets with [`clusterise`](@ref) on `rd.X`, passing `rd` so that a [`FeatureDistance`](@ref) resolves its panel off `rd`, giving the clustering result `clr`.
  2. Read the cluster assignment of every asset into `idx`.
  3. Collect the asset indices of each of the `clr.k` clusters into `groups`.
  4. Return the mask [`groups_argbest`](@ref) admits for those groups under `scores` and `bib`.
 
-Only `rd` is passed, because preselection runs before any prior exists, so the data carrier is the only reachable source of a Feature Matrix. [`ClusterGroups`](@ref) states why the type carries no source selector.
+Only `rd` is passed, because preselection runs before any prior exists, so `rd` is the only reachable source of a Feature Matrix. [`ClusterGroups`](@ref) states why the type carries no source selector.
 
 # Arguments
 

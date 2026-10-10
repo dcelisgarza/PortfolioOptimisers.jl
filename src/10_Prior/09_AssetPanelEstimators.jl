@@ -137,7 +137,7 @@ Turn a graph source or a partition source into a square `assets × assets` featu
 
 This is the kernel of [`PhylogenyPanel`](@ref). Every method returns a matrix of element type `float_if_integer(eltype(X))`, which is the element type of the returns, or `Float64` for integer returns. It is never the `Int` or `BitMatrix` that the phylogeny routines give, so [`AngularDist`](@ref) keeps its BLAS `gemm` path, a `Float32` history gives a `Float32` matrix, and a fractional score fits into the matrix of an integer history.
 
-`pl` is an estimator, a [`NetworkEstimator`](@ref) or a [`ClustersEstimator`](@ref). It is never a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref), because an Estimator does not hold a Result, as `CONTEXT.md` §1 states. So each call builds the structure from `X`, and the structure follows a cross-validation fold or the subproblem of a meta-optimiser.
+`pl` is an estimator, a [`NetworkEstimator`](@ref) or a [`ClustersEstimator`](@ref). It is never a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref), because an Estimator does not hold a Result. So each call builds the structure from `X`, and the structure follows a cross-validation fold or the subproblem of a meta-optimiser.
 
 A graph has separations, and `alg` decays them. A partition has none, because two assets are in one cluster or they are not. So every algorithm gives the same co-membership matrix of a partition, and `alg` has no effect there. `FeatureDistance` treats its collapse `alg` the same way on a static feature matrix. `sep` is a field of [`NetworkEstimator`](@ref) alone, so no other field loses its effect on a partition.
 
@@ -280,11 +280,11 @@ end
     panel_axis_labels(names::Nothing, n::Integer) -> Vector{String}
     panel_axis_labels(names::VecStr, n::Integer) -> Vector{String}
 
-Name the trailing axis of a [`TensorPanelField`](@ref) that a producer builds, from the carrier or by position.
+Name the trailing axis of a [`TensorPanelField`](@ref) that a producer builds, from the returns data or by position.
 
-The field of a producer has a labelled trailing axis, and neither a loadings matrix nor a proximity matrix holds names for that axis. The data carrier is the one place that holds them. `rd.nx` names the assets of a proximity field, and `rd.nf` names the factors of a loadings field. When the carrier gives no names, or a wrong number of them, the labels are the positions `"1"` to `"n"`.
+The field of a producer has a labelled trailing axis, and neither a loadings matrix nor a proximity matrix holds names for that axis. The returns data is the one place that holds them. `rd.nx` names the assets of a proximity field, and `rd.nf` names the factors of a loadings field. When the returns data gives no names, or a wrong number of them, the labels are the positions `"1"` to `"n"`.
 
-The function checks the count. A reduced or re-based `L` has fewer columns than the carrier has factors, and the carrier's names then belong to other columns.
+The function checks the count. A reduced or re-based `L` has fewer columns than the returns data has factors, and the names of the returns data then belong to other columns.
 
 # Algorithm
 
@@ -295,7 +295,7 @@ The method that Julia selects is the algorithm.
 
 # Arguments
 
-  - `names`: The names that the carrier gives the axis, or `nothing`.
+  - `names`: The names that the returns data gives the axis, or `nothing`.
   - `n`: Length of the axis to label.
 
 # Returns
@@ -316,12 +316,12 @@ function panel_axis_labels(names::VecStr, n::Integer)
     return length(names) == n ? String[String(s) for s in names] : [string(k) for k in 1:n]
 end
 """
-    carrier_asset_names(rd::Nothing) -> nothing
-    carrier_asset_names(rd::AbstractReturnsResult) -> Option{<:VecStr}
+    returns_asset_names(rd::Nothing) -> nothing
+    returns_asset_names(rd::AbstractReturnsResult) -> Option{<:VecStr}
 
 Read the asset names that label the trailing axis of a producer's field, or `nothing`.
 
-The kernel hands a producer the two carriers that it received. Only the data carrier names the assets, so this function reads the data carrier, and returns `nothing` when there is none.
+The kernel hands a producer the two values that it received, `pr` and `rd`. Only `rd` names the assets, so this function reads `rd`, and returns `nothing` when there is none.
 
 # Algorithm
 
@@ -329,7 +329,7 @@ The method that Julia selects is the algorithm.
 
 # Arguments
 
-  - `rd`: The data carrier, or `nothing`.
+  - `rd`: The returns data, or `nothing`.
 
 # Returns
 
@@ -341,10 +341,10 @@ The method that Julia selects is the algorithm.
   - [`panel_axis_labels`](@ref)
   - [`ReturnsResult`](@ref)
 """
-function carrier_asset_names(::Nothing)
+function returns_asset_names(::Nothing)
     return nothing
 end
-function carrier_asset_names(rd::AbstractReturnsResult)
+function returns_asset_names(rd::AbstractReturnsResult)
     return rd.nx
 end
 """
@@ -357,8 +357,8 @@ Read the factor names that label the loadings axis of a [`RegressionPanel`](@ref
 
 The function reads a name wherever one exists for the axis that `pr.rr.L` spans. Otherwise [`panel_axis_labels`](@ref) labels the axis by position.
 
-  - A time-series [`Regression`](@ref) holds no factor names, so the names are the `nf` of the carrier. The function reads them only when the loadings axis is the factor axis of the carrier. That is a `Regression` whose `L` is unset, so that its loadings are the raw `M`, with one column for each factor of the carrier. A reduced or re-based `L` has an axis of its own, and no data names it.
-  - A [`CrossSectionalFactorModel`](@ref) names its own factors. The prior derives the raw axis from its Exposure Estimators and stores it as `nf` on the block. When the block holds a family re-basis, [`cs_diagnostic_factor_names`](@ref) maps that list onto the reduced axis, which is the axis that `L` spans. So the names come from the block, and the function does not read the data carrier.
+  - A time-series [`Regression`](@ref) holds no factor names, so the names are the `nf` of the returns data. The function reads them only when the loadings axis is the factor axis of the returns data. That is a `Regression` whose `L` is unset, so that its loadings are the raw `M`, with one column for each factor of the returns data. A reduced or re-based `L` has an axis of its own, and no data names it.
+  - A [`CrossSectionalFactorModel`](@ref) names its own factors. The prior derives the raw axis from its Exposure Estimators and stores it as `nf` on the block. When the block holds a family re-basis, [`cs_diagnostic_factor_names`](@ref) maps that list onto the reduced axis, which is the axis that `L` spans. So the names come from the block, and the function does not read the returns data.
 
 # Algorithm
 
@@ -367,7 +367,7 @@ The method that Julia selects is the algorithm. The `Nothing` type parameter of 
 # Arguments
 
   - `rr`: The regression result that holds the loadings.
-  - `rd`: The data carrier, or `nothing`.
+  - `rd`: The returns data, or `nothing`.
 
 # Returns
 
@@ -387,7 +387,7 @@ function regression_factor_names(::Regression{<:Any, Nothing, <:Any, <:Any},
     return rd.nf
 end
 function regression_factor_names(rr::CrossSectionalFactorModel, ::Any)
-    return cs_diagnostic_factor_names(rr)
+    return cs_diagnostic_factor_names(rr.fcb, rr.nf)
 end
 function regression_factor_names(::Any, ::Any)
     return nothing
@@ -403,7 +403,7 @@ Builds an Asset Panel that holds the factor loadings of the wrapped prior.
 
 `L` is `assets × reduced_dimensions`, and [`DimensionReductionRegression`](@ref) sets it. It holds the coordinates of each asset in the reduced space. `M` holds the loadings on every factor, rebuilt from `L`. `pr.rr.L` always has a value, because [`Regression`](@ref) returns `M` when `L` is unset. So this producer needs no branch, and it works behind the time-series and the cross-sectional regression estimators alike.
 
-Both matrices have one row per asset, so the asset axis of the panel is the asset axis of the carrier, with no transpose. The trailing axis holds factors or reduced dimensions, not assets, so a loadings panel is never square in the sense of [`features_are_assets`](@ref).
+Both matrices have one row per asset, so the asset axis of the panel is the asset axis of the returns data, with no transpose. The trailing axis holds factors or reduced dimensions, not assets, so a loadings panel is never square in the sense of [`features_are_assets`](@ref).
 
 # Validation
 
@@ -435,7 +435,7 @@ Builds an Asset Panel that holds a square proximity matrix, graded from a graph 
 
 In an `assets × assets` proximity matrix, feature `k` of a row reads "is close to asset `k`". So a metric over the rows measures the overlap of two neighbourhoods, which is a standard measure of topological similarity, and it needs almost no new estimation code. `PhylogenyPanel` returns the matrix as one tensor Panel Field, `"proximity"` on the axis `"asset"`.
 
-It is the one producer whose trailing axis is the asset axis, and it needs no flag for that. It refits, so a subproblem gets its own square matrix over its own assets, not a slice of a larger matrix. Where a panel supplied by hand meets a view, [`features_are_assets`](@ref) compares the labels of the field with the asset names of the carrier.
+It is the one producer whose trailing axis is the asset axis, and it needs no flag for that. It refits, so a subproblem gets its own square matrix over its own assets, not a slice of a larger matrix. Where a panel supplied by hand meets a view, [`features_are_assets`](@ref) compares the labels of the field with the asset names of the returns data.
 
 # Fields
 
@@ -487,7 +487,7 @@ A clustering of a feature matrix built from a clustering gives back much the sam
 
 # Provenance
 
-The source is a [`NetworkEstimator`](@ref) and never a precomputed [`PhylogenyResult`](@ref), because an Estimator does not hold a Result, as `CONTEXT.md` §1 states. The producer is therefore endogenous. It filters the graph from the correlation of the returns, so it measures the topology that the correlation implies and no structure outside it. It refits on every fold and on every subproblem.
+The source is a [`NetworkEstimator`](@ref) and never a precomputed [`PhylogenyResult`](@ref), because an Estimator does not hold a Result. The producer is therefore endogenous. It filters the graph from the correlation of the returns, so it measures the topology that the correlation implies and no structure outside it. It refits on every fold and on every subproblem.
 
 It reads no prior result, so it is the one producer that runs where no prior exists yet, for example in preselection.
 
@@ -559,7 +559,7 @@ end
 
 Build the static [`AssetPanel`](@ref) of a producer, at the point of use.
 
-Each method returns a panel that holds one [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled third axis. The labels of the trailing axis come from the data carrier or from the regression block where a name exists, and are positions otherwise. [`panel_axis_labels`](@ref) and [`regression_factor_names`](@ref) state the rule.
+Each method returns a panel that holds one [`TensorPanelField`](@ref), because a loadings matrix and a proximity matrix are each one quantity with a labelled third axis. The labels of the trailing axis come from the returns data or from the regression block where a name exists, and are positions otherwise. [`panel_axis_labels`](@ref) and [`regression_factor_names`](@ref) state the rule.
 
 A producer runs on the prior and the returns of its own subproblem, so no view reads the panel that it builds, and a fold refits it. Called on its own, on a prior fitted on a point-in-time Asset Panel, a [`RegressionPanel`](@ref) reads the loadings on the Investable Mask of the prior and answers for the full universe. Outside the mask each asset gets a zero row and a false observed mask, so an optimiser can take the panel back. [`expand_investable_loadings`](@ref) states the rule.
 
@@ -578,7 +578,7 @@ A [`RegressionPanel`](@ref) takes seven steps:
 A [`PhylogenyPanel`](@ref) takes three steps:
 
  1. Grade the structure into an `assets × assets` matrix with [`phylogeny_features`](@ref), giving `Zp`.
- 2. Label the trailing axis with [`panel_axis_labels`](@ref), from [`carrier_asset_names`](@ref).
+ 2. Label the trailing axis with [`panel_axis_labels`](@ref), from [`returns_asset_names`](@ref).
  3. Return the panel that holds `Zp` as the field `"proximity"` on the axis `"asset"`.
 
 # Arguments
@@ -614,14 +614,15 @@ function asset_panel(ape::RegressionPanel, pr, rd, ::Any)
     L = prr.rr.L
     nnf = count(i -> !all(isfinite, view(L, i, :)), axes(L, 1))
     @argcheck(iszero(nnf),
-              IsNonFiniteError("`RegressionPanel` reads the factor loadings `pr.rr.L` as a Panel Field, and $(nnf) of the $(size(L, 1)) assets inside the prior's Investable Mask carry a loading that is not finite, so the field cannot be built over them. An asset outside the mask is written as a zero row with a false observed mask and never reaches this check, so every asset it counts has a finite moment and a loadings row that is not: a defect of the regression, not of the universe.\nGot\npr => $(nameof(typeof(pr)))\nrr => $(nameof(typeof(pr.rr)))\nassets with a non-finite loading => $(nnf)"))
+              IsNonFiniteError("`RegressionPanel` reads the factor loadings `pr.rr.L` as a Panel Field, and $(nnf) of the $(size(L, 1)) assets inside the prior's Investable Mask carry a loading that is not finite, so the field cannot be built over them. An asset outside the mask is written as a zero placeholder row and never reaches this check, so every asset it counts has a finite moment and a loadings row that is not: a defect of the regression, not of the universe.\nGot\npr => $(nameof(typeof(pr)))\nrr => $(nameof(typeof(pr.rr)))\nassets with a non-finite loading => $(nnf)"))
     vals, omsk = expand_investable_loadings(L, imsk)
     return AssetPanel(;
                       pf = [TensorPanelField(; name = "loadings", axis = "factor",
                                              labels = panel_axis_labels(regression_factor_names(prr.rr,
                                                                                                 rd),
                                                                         size(L, 2)),
-                                             vals = vals, omsk = omsk)])
+                                             vals = vals, omsk = omsk,
+                                             pmsk = isnothing(omsk) ? nothing : .!omsk)])
 end
 """
     expand_investable_loadings(L::MatNum, imsk::Nothing) -> (L, nothing)
@@ -629,9 +630,9 @@ end
 
 Write the loadings that a [`RegressionPanel`](@ref) read on the Investable Mask back onto the full asset universe.
 
-A prior fitted on a point-in-time Asset Panel writes `NaN` into the loadings of every asset outside its Investable Mask, and a Panel Field admits no `NaN`. So the producer reads the loadings on the mask, and this function expands them. Each asset outside the mask gets a zero row and a false observed mask. Every uncertainty set that a caller fits on its own on such a prior follows the same rule, and a Panel Field already has that shape for a cell that a fill policy wrote.
+A prior fitted on a point-in-time Asset Panel writes `NaN` into the loadings of every asset outside its Investable Mask, and a Panel Field admits no `NaN`. So the producer reads the loadings on the mask, and this function expands them. Each asset outside the mask gets a zero row and a false observed mask. Every uncertainty set that a caller fits on its own on such a prior follows the same rule. The producer marks the row as a placeholder too: its placeholder mask is the negation of the observed mask, because no loading exists there.
 
-A zero row is a zero feature vector. [`AngularDist`](@ref) puts it at distance `1` from every asset that has loadings, and at distance `0` from every other asset that has none. The selector `"loadings" => :observed` reads the mask as a column.
+A zero row is a placeholder, not a zero feature vector. A [`FeatureDistance`](@ref) reads no placeholder: a direct call refuses such an asset by name. An optimiser hands the producer the prior reduced to the mask, so a fit meets no such row. The selector `"loadings" => :observed` reads the mask as a column.
 
 # Mathematical definition
 
@@ -695,7 +696,7 @@ function asset_panel(ape::PhylogenyPanel, ::Any, rd, X::MatNum)
     Zp = phylogeny_features(ape.alg, ape.pl, X)
     return AssetPanel(;
                       pf = [TensorPanelField(; name = "proximity", axis = "asset",
-                                             labels = panel_axis_labels(carrier_asset_names(rd),
+                                             labels = panel_axis_labels(returns_asset_names(rd),
                                                                         size(Zp, 2)),
                                              vals = Zp)])
 end
@@ -705,11 +706,11 @@ end
 
 Check that a producer that reads a prior result received one, and name the call site when it did not.
 
-A producer runs wherever the estimator that holds it runs, and one of those sites has no prior. Preselection fits from the returns alone, before a prior exists. The shortest public call, `clusterise(cle, rd)`, also has none, because it puts a data carrier in the `pr` slot. This function turns both into an error that names the site, in place of a field access on `nothing` or a `MethodError`.
+A producer runs wherever the estimator that holds it runs, and one of those sites has no prior. Preselection fits from the returns alone, before a prior exists. The shortest public call, `clusterise(cle, rd)`, also has none, because it puts the returns data in the `pr` slot. This function turns both into an error that names the site, in place of a field access on `nothing` or a `MethodError`.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. A prior result returns. Anything else, `nothing` and a data carrier alike, raises.
+The method that Julia selects is the algorithm. A prior result returns. Anything else, `nothing` and the returns data alike, raises.
 
 # Arguments
 
@@ -736,7 +737,7 @@ function assert_producer_prior(::AbstractAssetPanelEstimator,
     return nothing
 end
 function assert_producer_prior(ape::AbstractAssetPanelEstimator, ::Any)::Nothing
-    return throw(IsNothingError("$(nameof(typeof(ape))) reads the prior result it is handed, and this call supplied none. A pre-prior site supplies none by construction: preselection is fitted from the returns data alone, and `clusterise(cle, rd)` puts a data carrier in the prior slot. Two ways forward:\n  1. Build the Asset Panel from data and put it on the `ReturnsResult`, then leave `FeatureDistance.ape` at `nothing`.\n  2. Use a producer that reads no prior, such as `PhylogenyPanel`."))
+    return throw(IsNothingError("$(nameof(typeof(ape))) reads the prior result it is handed, and this call supplied none. A pre-prior site supplies none by construction: preselection is fitted from the returns data alone, and `clusterise(cle, rd)` puts the returns data in the prior slot. Two ways forward:\n  1. Build the Asset Panel from data and put it on the `ReturnsResult`, then leave `FeatureDistance.ape` at `nothing`.\n  2. Use a producer that reads no prior, such as `PhylogenyPanel`."))
 end
 
 export Proximity, phylogeny_features, RegressionPanel, PhylogenyPanel

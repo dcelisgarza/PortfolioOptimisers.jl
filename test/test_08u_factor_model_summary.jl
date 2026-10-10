@@ -1,31 +1,30 @@
 #=
 The summary of the cross-sectional diagnostics, decided by #709 and built by #801.
 
-The oracle is the reference implementation. The blocks of `# the reference oracle` below were
-built from the very arrays this file builds, run in the reference implementation's own
-environment, and its answers are written out as literals. Rebuild them by generating the
-same fixtures, exporting them, and running the reference's factor model block on them.
+The two testsets `the stored oracle` compare with literals that the oracle gave on the very
+arrays this file builds. Rebuild them by an export of the same fixtures and a run of the
+oracle's factor model block on them. Each comparison is cell by cell (`parity_compare`).
 
 The first fixture is the one `test_08r_cs_regression_diagnostics.jl` uses, whose design is
-well conditioned, so its Gram columns carry values. The second is the one
+well conditioned on every observation but one, so its Gram columns carry values. The second is the one
 `test_08s_exposure_diagnostics.jl` uses, whose third factor is a constant intercept, so it
 drives the patch that reads a constant exposure as perfectly stable.
 =#
 using Statistics
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 @testset "Factor model summary" begin
-    # A `NaN` compares unequal to itself, so the pattern of the absent answers is asserted
-    # separately from the values.
-    function summary_agrees(a, b; rtol = 1e-10)
-        if isnan.(a) != isnan.(b)
-            return false
-        end
-        m = .!isnan.(a)
-        return isapprox(a[m], b[m]; rtol = rtol)
+    # Cell by cell: the pattern of the absent answers agrees exactly, and each finite cell
+    # lies within `rtol` of its own size. Against the oracle, every column of both fixtures
+    # measures maxrel 4.3e-16 or less, and the rates and the coverage are bit-equal. The
+    # tolerance `1e-14` is about twenty times the worst value: the
+    # round-off of a mean and a deviation that sum in another order.
+    function summary_agrees(a, b, label = ""; rtol = 1e-14)
+        return parity_compare(a, b; rtol = rtol, name = label).ok
     end
 
     # The first fixture. Every mutation drives one branch of the regression group, so a
-    # change to any of them invalidates the literals in `# the reference oracle`.
+    # change to any of them invalidates the literals of `the stored oracle`.
     rngA = StableRNG(987654321)
     TA, NA, KA = 8, 6, 3
     MsA = randn(rngA, TA, NA, KA)
@@ -50,14 +49,22 @@ using Statistics
     csfmA = CrossSectionalFactorModel(; M = MsA[TA, :, :], b = zeros(NA), csr = csrA,
                                       Ms = MsA, rw = rwA, bw = bwA, lag = 1)
 
-    @testset "the reference oracle, the well-conditioned fixture" begin
+    @testset "the stored oracle, the well-conditioned fixture" begin
         ref_ann_return = [1.7688020592276463, -4.704611043276863, 0.06102501991895286]
         ref_ann_vol = [0.2500971159903252, 0.30449966488269103, 0.2801176875443828]
         ref_sharpe = [7.07246084075624, -15.450299576156583, 0.21785493252468693]
         ref_autocorr = [-0.5425646747475837, NaN, -0.39620089475439907]
-        ref_mean_abs_t = [1.3761850065112538, 4.764397545417589, 3.9180561817454196]
-        ref_t_rate = [0.4, 0.6, 0.4]
-        ref_mean_vif = [2.0598549319598916, 1.8428351056716823, 1.652400329922471]
+        # Observation 6 is collinear, and it identifies the second coefficient alone
+        # (#1421). The oracle's three columns that read the t-statistics and the factors
+        # count its pseudo-inverse answers there. Ours drop the t-statistics of the pair
+        # (`0.6639470271883212` and `7.300135695412292` in the oracle), scale the second
+        # (`14.363795117368108`) by `sqrt(4 / 3)` for a variance over `n - 2`, and give the
+        # pair an infinite factor. `test_08r_cs_regression_diagnostics.jl` pins each row.
+        ref_mean_abs_t = [(5 * 1.3761850065112538 - 0.6639470271883212) / 4,
+                          4.764397545417589 + 14.363795117368108 * (sqrt(4 / 3) - 1) / 5,
+                          (5 * 3.9180561817454196 - 7.300135695412292) / 4]
+        ref_t_rate = [2 / 4, 3 / 5, 1 / 4]
+        ref_mean_vif = [Inf, 1.8428351056716823, Inf]
         ref_stability = [-0.4257338194977316, 0.11924492275222029, 0.1814524979202049]
         ref_coverage = [0.9791666666666667, 1.0, 1.0]
 
@@ -89,7 +96,7 @@ using Statistics
         @test summary_agrees(fs1.coverage, ref_coverage)
 
         # The stability reads the weight history the caller names, and the coverage does
-        # not: the reference wires its universe to the regression weights alone.
+        # not: the oracle wires its universe to the regression weights alone.
         ref_stability_id = [-0.4257338194977314, 0.11924492275222023, 0.18145249792020487]
         ref_stability_rw = [-0.25229769514274375, 0.0032308107079838436,
                             0.26713295230303086]
@@ -108,7 +115,8 @@ using Statistics
         @test summary_agrees(fs21.coverage, ref_coverage)
 
         # The threshold steers the exceedance rate alone.
-        ref_t_rate_1 = [0.4, 0.8, 0.6]
+        # The oracle's `[2 / 5, 4 / 5, 3 / 5]`, less observation 6 on the pair.
+        ref_t_rate_1 = [2 / 4, 4 / 5, 2 / 4]
         fst = factor_model_summary(csfmA; ppy = 252, step = 3, threshold = 1)
         @test summary_agrees(fst.t_rate, ref_t_rate_1)
         @test summary_agrees(fst.mean_abs_t, ref_mean_abs_t)
@@ -138,7 +146,7 @@ using Statistics
     csfmB = CrossSectionalFactorModel(; M = MsB[TB, :, :], b = zeros(NB), csr = csrB,
                                       Ms = MsB, vs = vsB, rw = rwB, bw = bwB, lag = 1)
 
-    @testset "the reference oracle, the constant-exposure fixture" begin
+    @testset "the stored oracle, the constant-exposure fixture" begin
         ref_ann_return = [-0.4907810529445153, 1.7641281876800439, 3.287865325954306,
                           2.112811248657294]
         ref_ann_vol = [0.33405767428380584, 0.3481792051822995, 0.27711562516097665,
@@ -175,23 +183,23 @@ using Statistics
         # first three columns are `performance_summary` on the series itself.
         fs = factor_model_summary(csfmA; ppy = 252, step = 3)
         for k in (1, 3)
-            ps = performance_summary(fA[:, k]; periods_per_year = 252)
+            ps = performance_summary(fA[:, k]; ppy = 252)
             @test isapprox(fs.ann_return[k], ps.ann_return)
             @test isapprox(fs.ann_volatility[k], ps.ann_volatility)
             @test isapprox(fs.sharpe[k], ps.sharpe)
         end
         # The second series carries an absent observation. The summary drops it and
         # `performance_summary` does not, so only the summary answers there.
-        ps2 = performance_summary(fA[:, 2]; periods_per_year = 252)
+        ps2 = performance_summary(fA[:, 2]; ppy = 252)
         @test isnan(ps2.ann_return)
         @test isfinite(fs.ann_return[2])
     end
 
     @testset "the Gram columns are the means of the level-2 series" begin
         fs = factor_model_summary(csfmA; ppy = 252, step = 3)
-        t = cs_regression_t_stats(csfmA)
-        vif = exposure_vif(csfmA)
-        rate = cs_regression_t_stat_exceedance_rate(csfmA; threshold = 2)
+        t = cs_regression_t_stats(csfmA).X
+        vif = exposure_vif(csfmA).X
+        rate = cs_regression_t_stat_exceedance_rate(csfmA; threshold = 2).X
         for k in 1:KA
             at = filter(!isnan, abs.(t[:, k]))
             av = filter(!isnan, vif[:, k])
@@ -200,11 +208,26 @@ using Statistics
         end
         @test fs.t_rate == rate
         # The stability column is the MEDIAN of the series, and not its mean.
-        S = exposure_stability(csfmA; step = 3)
+        S = exposure_stability(csfmA; step = 3).X
         for k in 1:KA
             @test isapprox(fs.stability[k], Statistics.median(filter(!isnan, S[:, k])))
         end
-        @test fs.coverage == exposure_coverage(csfmA; weighting = RegressionWeightMetric())
+        # The standalone verb reads the regression weights by default, as the summary
+        # does, so the two give one coverage.
+        @test fs.coverage == exposure_coverage(csfmA).X
+        @test fs.coverage ==
+              exposure_coverage(csfmA; weighting = RegressionWeightMetric()).X
+    end
+
+    @testset "a block with no regression weights covers every asset" begin
+        # The block was fitted on every asset, so the universe of the coverage is every
+        # asset, in the summary and in the standalone verb.
+        blk = CrossSectionalFactorModel(; M = MsA[TA, :, :], b = zeros(NA), csr = csrA,
+                                        Ms = MsA, bw = bwA, lag = 1)
+        fs = factor_model_summary(blk; ppy = 252, step = 3)
+        @test fs.coverage == exposure_coverage(blk).X
+        @test fs.coverage == exposure_coverage(MsA)
+        @test fs.coverage == exposure_coverage(blk; weighting = IdentityMetric()).X
     end
 
     @testset "a block with no exposure history carries five absent columns" begin
@@ -222,13 +245,19 @@ using Statistics
         @test summary_agrees(fs.ann_volatility, full.ann_volatility)
         @test summary_agrees(fs.sharpe, full.sharpe)
         @test summary_agrees(fs.autocorr, full.autocorr)
+        # A view keeps an absent column absent, and a block that names no factor is
+        # selected by position.
+        fv = PortfolioOptimisers.port_opt_view(fs, 1:2)
+        @test isnothing(fv.mean_abs_t) && isnothing(fv.nf) && isnothing(fv.fam)
+        @test fv.ann_return == fs.ann_return[1:2]
     end
 
     @testset "a re-based block writes NaN on the factor the basis dropped" begin
         rng5 = StableRNG(19283746)
         Tr, Nr, Kr = 6, 5, 3
         Msr = randn(rng5, Tr, Nr, Kr)
-        fr = 0.02 * randn(rng5, Tr, Kr)
+        # A fit under a re-basis estimates its factor returns on the reduced axis.
+        fr = 0.02 * randn(rng5, Tr, Kr - 1)
         epsr = 0.01 * randn(rng5, Tr, Nr)
         rwr = abs.(randn(rng5, Tr, Nr)) .+ 0.1
         # One constrained family holds factors 1 and 2, and drops the second of them.
@@ -239,20 +268,37 @@ using Statistics
         L = PortfolioOptimisers.reduce_loadings(fcb, Msr[Tr, :, :])
         blk = CrossSectionalFactorModel(; M = Msr[Tr, :, :], L = L, b = zeros(Nr),
                                         csr = csr_r, Ms = Msr, rw = rwr, fcb = fcb, lag = 1,
-                                        nf = ["value", "size", "momentum"])
+                                        nf = ["value", "size", "momentum"],
+                                        fam = ["industry", "industry", "style"])
         fs = factor_model_summary(blk; ppy = 1, step = 2,
                                   weighting = RegressionWeightMetric())
         # The answer is on the raw axis, which is wider than the reduced one.
         @test length(fs.ann_return) == Kr
+        # It carries the names and the families of the raw axis, and a view selects every
+        # column of the factors it keeps, the dropped member included.
+        @test fs.nf == ["value", "size", "momentum"]
+        @test fs.fam == ["industry", "industry", "style"]
+        fi = PortfolioOptimisers.port_opt_view(fs, LabelGroup("industry"))
+        @test fi.ppy == fs.ppy
+        for f in fieldnames(FactorSummaryResult)
+            f == :ppy && continue
+            @test isequal(getfield(fi, f), getfield(fs, f)[1:2])
+            @test isequal(getfield(PortfolioOptimisers.port_opt_view(fs, ["momentum"]), f),
+                          getfield(fs, f)[3:3])
+        end
+        @test_throws ArgumentError PortfolioOptimisers.port_opt_view(fs, ["beta"])
         @test length(fs.mean_abs_t) == Kr
-        # "size" is the dropped member, so it carries no Gram answer.
+        # "size" is the dropped member, so it carries no Gram answer and no return series.
+        @test isnan(fs.ann_return[2])
+        @test isnan(fs.autocorr[2])
+        @test fs.ann_return[[1, 3]] ≈ vec(Statistics.mean(fr; dims = 1))
         @test isnan(fs.mean_abs_t[2])
         @test isnan(fs.t_rate[2])
         @test isnan(fs.mean_vif[2])
         # The retained members carry the reduced answers, in the reduced order.
-        t = cs_regression_t_stats(blk)
-        vif = exposure_vif(blk)
-        rate = cs_regression_t_stat_exceedance_rate(blk)
+        t = cs_regression_t_stats(blk).X
+        vif = exposure_vif(blk).X
+        rate = cs_regression_t_stat_exceedance_rate(blk).X
         @test size(t, 2) == 2
         for (raw, red) in ((1, 1), (3, 2))
             @test isapprox(fs.mean_abs_t[raw],
@@ -263,6 +309,41 @@ using Statistics
         # The exposure columns read the raw axis, so they carry an answer at every factor.
         @test !any(isnothing, (fs.stability, fs.coverage))
         @test length(fs.coverage) == Kr
+    end
+    @testset "a re-based block that carries fr states the returns of the dropped factor (#1422)" begin
+        # The constraint of the family fixes the return of the dropped factor, so a block that
+        # carries the raw-axis history states its four return statistics.
+        rng6 = StableRNG(56473829)
+        Tr, Nr, Kr = 6, 5, 3
+        Msr = randn(rng6, Tr, Nr, Kr)
+        fred = 0.02 * randn(rng6, Tr, Kr - 1)
+        fcb = FactorFamilyBasis(; fnm = ["industry"], fi = [[1, 2]], di = [2],
+                                ratios = reshape(collect(range(0.4, 0.9; length = Tr)), Tr,
+                                                 1), K = Kr)
+        fraw = PortfolioOptimisers.expand_factor_returns(fcb, fred)
+        csr_r = CrossSectionalRegression(; f = fred, eps = 0.01 * randn(rng6, Tr, Nr),
+                                         n = fill(Nr, Tr))
+        kw = (; M = Msr[Tr, :, :],
+              L = PortfolioOptimisers.reduce_loadings(fcb, Msr[Tr, :, :]), b = zeros(Nr),
+              csr = csr_r, Ms = Msr, rw = abs.(randn(rng6, Tr, Nr)) .+ 0.1, fcb = fcb,
+              lag = 1, nf = ["value", "size", "momentum"])
+        blk = CrossSectionalFactorModel(; kw..., fr = fraw)
+        fs = factor_model_summary(blk; ppy = 1, step = 2,
+                                  weighting = RegressionWeightMetric())
+        @test fs.ann_return ≈ vec(Statistics.mean(fraw; dims = 1)) rtol = 1e-14
+        @test isequal(fs.autocorr, PortfolioOptimisers.factor_summary_autocorrelation(fraw))
+        @test all(isfinite, fs.ann_volatility) && all(isfinite, fs.sharpe)
+        # The Gram columns still read the reduced axis, where the dropped factor has none.
+        @test isnan(fs.mean_abs_t[2]) && isnan(fs.t_rate[2]) && isnan(fs.mean_vif[2])
+        # The same block without `fr` states no return of the dropped factor, and agrees on
+        # every other column.
+        fs0 = factor_model_summary(CrossSectionalFactorModel(; kw...); ppy = 1, step = 2,
+                                   weighting = RegressionWeightMetric())
+        @test isnan(fs0.ann_return[2])
+        for cn in fieldnames(typeof(fs))
+            cn in (:ann_return, :ann_volatility, :sharpe, :autocorr) && continue
+            @test isequal(getfield(fs, cn), getfield(fs0, cn))
+        end
     end
 
     @testset "the refusals" begin
@@ -387,4 +468,24 @@ using Statistics
         @test eltype(PortfolioOptimisers.factor_summary_autocorrelation(Float32.(fi))) ==
               Float32
     end
+end
+
+@testset "A summary of an observed factor states its returns and no regression column (#1367)" begin
+    rng = StableRNG(1_367_10)
+    T, N = 30, 6
+    Ms = randn(rng, T, N, 3)
+    f = 0.02 * randn(rng, T, 2)
+    fx = 0.01 * randn(rng, T, 1)
+    csr = CrossSectionalRegression(; f = f, eps = 0.01 * randn(rng, T, N), n = fill(N, T))
+    rw = abs.(randn(rng, T, N)) .+ 0.1
+    blk = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), csr = csr, Ms = Ms,
+                                    rw = rw, bw = rw, lag = 1,
+                                    nf = ["value", "size", "usd"], fx = fx)
+    fs = factor_model_summary(blk; step = 2, weighting = RegressionWeightMetric())
+    @test length(fs.ann_return) == 3
+    @test fs.ann_return ≈ vec(Statistics.mean(hcat(f, fx); dims = 1))
+    @test all(isfinite, fs.ann_volatility)
+    @test isnan(fs.mean_abs_t[3]) && isnan(fs.t_rate[3]) && isnan(fs.mean_vif[3])
+    @test all(isfinite, fs.mean_abs_t[1:2])
+    @test length(fs.coverage) == 3
 end

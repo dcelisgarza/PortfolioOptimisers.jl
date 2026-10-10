@@ -171,7 +171,7 @@ that returns another type, which is the shape refused below.
   option 5 is taken with the meaning it feared given a definition instead, and option 2's
   forwarding cost is paid on the reused struct. ADRs 0141 to 0144 are history and stand. ADR
   0155, a draft, is rewritten at its one line that spells the old declaration.
-- `CONTEXT.md`: **Fold Fit** is struck, **Online Scheme** is written, the *Sample Buffer*,
+- `GLOSSARY.md`: **Fold Fit** is struck, **Online Scheme** is written, the *Sample Buffer*,
   *Covariance Forecast Evaluation*, *Online Portfolio Selection*, *Online Update* and *Resume*
   entries lose the old spelling, and the `Online` wrapper gains its third referent: on an
   estimator it seeds a refit buffer, on a Pipeline it declares the workflow's refit, on a scheme

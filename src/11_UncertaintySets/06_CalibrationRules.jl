@@ -1,32 +1,6 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes a calibrated quantity — a tail probability, a deformation parameter, an ambiguity radius, an Esfahani-Kuhn tail weight or a norm ceiling — from the data a prior result carries, so that the quantity refits whenever the sample moves.
-
-All concrete subtypes should subtype one of the families under this root rather than the root itself, and `# Related` names them. A plain number in place of a rule is the quantity itself, exactly as it is today.
-
-A rule is named for the **method** it runs, and carries the name of the quantity as a suffix only where the bare method word is already claimed. [`ScenarioCount`](@ref), [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref) and [`EffectiveAssetFloor`](@ref) name a method and stop there. Five names carry the quantity, and each of the five earns it. [`RateSignificance`](@ref) and [`RateRadius`](@ref) are one method over two quantities, so neither may hold the bare word `Rate`, and [`DimensionalRateRadius`](@ref) carries that same stem under a prefix. [`ConcentrationRadius`](@ref) and [`DualNormRadius`](@ref) are each named after a mathematical object, so the bare word would name the object rather than the rule.
-
-A rule states a default for every keyword it can, so a bare call constructs. Two rules state none, because the quantity the keyword takes is the whole content of the rule and no value suits every sample. [`ScenarioCount`](@ref) and [`EntropyBudget`](@ref) are those two. The keyword of each stands at `nothing`, which is not a value of the quantity, so a bare call is refused with a message that names the quantity, the reason there is no default, and a value to start from.
-
-A rule states the **method** and nothing else. The **slot** states the quantity: `alpha` names the lower tail, `kappa` names the deformation parameter, `r` names an ambiguity radius and `l2c` names a norm ceiling. So the caller writes the rule alone, and each slot's `Num_` bound names the one family that has a reading in that slot. A rule of another family is refused at construction, by the bound.
-
-A **Calibration Rule** is not a [`DeferredQuantity`](@ref), and the two mechanisms stay parallel end to end. A Deferred Quantity is *fitted* and the quantity is read off the fit; a rule fits nothing, and reads the sample size and the moments the prior result already carries. A rule also sees the effective observation weights, which [`resolve_slot`](@ref) does not carry. So a rule resolves through [`resolve_calibration_slot`](@ref), is declared through [`calibration_slots`](@ref), and is refused at a value-level entry point by [`assert_calibrated_slots`](@ref).
-
-# Related
-
-  - [`AbstractSignificanceCalibrationAlgorithm`](@ref)
-  - [`AbstractDeformationCalibrationAlgorithm`](@ref)
-  - [`AbstractAmbiguityRadiusCalibrationAlgorithm`](@ref)
-  - [`AbstractAmbiguityTailWeightCalibrationAlgorithm`](@ref)
-  - [`AbstractNormCeilingCalibrationAlgorithm`](@ref)
-  - [`resolve_calibration_slot`](@ref)
-  - [`DeferredQuantity`](@ref)
-"""
-abstract type AbstractCalibrationAlgorithm <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
 Computes a significance level, the tail probability that an `alpha` or a `beta` slot holds.
 
 All concrete subtypes should subtype `AbstractSignificanceCalibrationAlgorithm`, and should be **callable**, because [`resolve_calibration_slot`](@ref) runs a rule by calling it. A plain `Function` of the same five arguments is therefore a rule as well, and needs no type at all. [`Num_SigCal`](@ref) is the bound of every significance slot, and it names this family. So a deformation rule in a significance slot is refused at construction, and the same rule serves the lower tail and the upper tail, because the slot names the end.
@@ -240,7 +214,7 @@ Refuse a type that declares a calibration slot and no way to resolve it.
 
 `slots` is what the resolution produced. A **Calibration Rule** that survives it names a type that declared the slot in [`calibration_slots`](@ref) and then wrote no resolution for it, so the rule would reach the model builders and be multiplied as though it were a number. This is where the declaration and the resolver are paired.
 
-The two channels check alike. [`assert_declared_slot_resolver`](@ref) is the Deferred-Quantity half, and the two-argument method here carries its shape: the resolver holds the slots it produced and hands them over. The one-argument method reads them off `x` instead, and is what a funnel takes, which holds a resolved value and not the slots that made it.
+The two channels check alike. [`assert_declared_slot_resolver`](@ref) is the Deferred-Quantity half, and the two-argument method here carries its shape: the resolver holds the slots it produced and hands them over. The one-argument method reads them off `x` instead. A caller that holds a resolved value, and not the slots that made it, calls this method.
 
 The walk is the one [`assert_calibrated_slots`](@ref) makes, and the message is the other half of the pair. That one names a caller who reached a value-level entry point, and this one names a slot the library itself left unresolved. So one message never has to serve two failures.
 
@@ -512,17 +486,20 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries what a calibration site knows and the slot's key does not, from [`resolve_calibration_slot`](@ref) into the rule it runs.
 
-A rule is run by calling it, as `alg(key, pr, w, slv, ctx)`. `key` names the **slot** and not the quantity: `:kappa` serves both [`RelativisticValueatRisk`](@ref) and [`RelativisticDrawdownatRisk`](@ref), and those two price different series. Three quantities a rule may read are therefore properties of the site rather than of the key, and this type is how the site states them.
+A rule is run by calling it, as `alg(key, pr, w, slv, ctx)`. `key` names the **slot** and not the quantity: `:kappa` serves both [`RelativisticValueatRisk`](@ref) and [`RelativisticDrawdownatRisk`](@ref), and those two price different series. The quantities below are therefore properties of the site rather than of the key, and this type is how the site states them.
 
-| Field    | The site that states it                                  | The rules that read it                                                                                                                                                 |
-|:-------- |:-------------------------------------------------------- |:---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `alpha`  | the slot owner, off a **sibling slot** it resolved first | [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref)                                                                  |
-| `series` | the slot owner, through [`calibration_series`](@ref)     | [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`ConcentrationRadius`](@ref), [`DimensionalRateRadius`](@ref), [`DualNormRadius`](@ref), [`TailTermParity`](@ref) |
-| `p`      | the constraint or the penalty the quantity stands in     | [`EffectiveAssetFloor`](@ref), [`DualNormRadius`](@ref)                                                                                                                |
+| Field    | The site that states it                                                       | The rules that read it                                                                                                                                                 |
+|:-------- |:----------------------------------------------------------------------------- |:---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alpha`  | the slot owner, off a **sibling slot** it resolved first                      | [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref)                                                                  |
+| `series` | the slot owner, through [`calibration_series`](@ref)                          | [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`ConcentrationRadius`](@ref), [`DimensionalRateRadius`](@ref), [`DualNormRadius`](@ref), [`TailTermParity`](@ref) |
+| `p`      | the constraint or the penalty the quantity stands in                          | [`EffectiveAssetFloor`](@ref), [`DualNormRadius`](@ref)                                                                                                                |
+| `cs`     | a [`CrossSectionalFactorPrior`](@ref), after the split of its Return Forecast | [`PrecisionBlend`](@ref), [`SteinShrinkage`](@ref), [`ForecastCalibrationSlope`](@ref)                                                                                 |
 
-**No rule holds a field for any of the three.** Each belongs to the site, and a rule cannot know which site it reached, so there is no value on the rule for a site to overwrite and no precedence between the two to state. A caller who runs a rule outside a measure builds the context the site would have built, and that context is the only place the three are ever written.
+**No rule holds a field for any of them.** Each belongs to the site, and a rule cannot know which site it reached, so there is no value on the rule for a site to overwrite and no precedence between the two to state. A caller who runs a rule outside a measure builds the context the site would have built, and that context is the only place these quantities are ever written.
 
-The default is the context a site with nothing to say hands over: no sibling significance level, no norm order, and the [`ReturnsSeries`](@ref) that [`calibration_series`](@ref) answers for every owner that names no other. A rule that needs a field the default leaves at `nothing` refuses, and its message names the field it wanted.
+**`cs` comes from the Cross-Sectional Factor Prior alone.** Its Spanned Shrinkage `lambda` and its Orthogonal Forecast Scale `c` resolve inside [`prior`](@ref), after the Return Forecast is split and before the mean is formed. The prior states `cs = (; g, ap, csfm, hist, cre)`: the spanned coefficients `g`, the unscaled orthogonal part `ap`, the factor-model block `csfm`, the Return Forecast history `hist` and the Cross-Sectional Regression Estimator `cre` of the prior. The block carries the idiosyncratic variance history `vs` and the regression weights `rw`, so a rule reads them off `csfm`. The block holds a zero `b` and no Return Forecast, because the scale is not resolved yet. No other site states `cs`.
+
+The default is the context a site with nothing to say hands over: no sibling significance level, no norm order, no `cs`, and the [`ReturnsSeries`](@ref) that [`calibration_series`](@ref) answers for every owner that names no other. A rule that needs a field the default leaves at `nothing` refuses, and its message names the field it wanted.
 
 **The order between two slots of one owner is what makes `alpha` reachable.** A deformation rule reads the significance level of a sibling slot, so the owner's own [`resolve_deferred_quantities`](@ref) method resolves `alpha` first and puts the number in the context of the slot that reads it. No derivation can find that order, which is the reason the resolution is written per type.
 
@@ -535,7 +512,8 @@ $(DocStringExtensions.FIELDS)
     CalibrationContext(;
         alpha::Option{<:Number} = nothing,
         series::AbstractCalibrationSeries = ReturnsSeries(),
-        p::Option{<:Number} = nothing
+        p::Option{<:Number} = nothing,
+        cs::Option{<:NamedTuple} = nothing
     ) -> CalibrationContext
 
 Keywords correspond to the struct's fields. Every field defaults to the state a site that names nothing hands over.
@@ -548,6 +526,7 @@ Keywords correspond to the struct's fields. Every field defaults to the state a 
   - [`calibration_series`](@ref)
   - [`calibration_slots`](@ref)
   - [`ReturnsSeries`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
 """
 @concrete struct CalibrationContext <: AbstractResult
     """
@@ -562,15 +541,21 @@ Keywords correspond to the struct's fields. Every field defaults to the state a 
     $(field_dict[:cal_ctx_p])
     """
     p
+    """
+    $(field_dict[:cal_ctx_cs])
+    """
+    cs
     function CalibrationContext(alpha::Option{<:Number}, series::AbstractCalibrationSeries,
-                                p::Option{<:Number})
-        return new{typeof(alpha), typeof(series), typeof(p)}(alpha, series, p)
+                                p::Option{<:Number}, cs::Option{<:NamedTuple})
+        return new{typeof(alpha), typeof(series), typeof(p), typeof(cs)}(alpha, series, p,
+                                                                         cs)
     end
 end
 function CalibrationContext(; alpha::Option{<:Number} = nothing,
                             series::AbstractCalibrationSeries = ReturnsSeries(),
-                            p::Option{<:Number} = nothing)
-    return CalibrationContext(alpha, series, p)
+                            p::Option{<:Number} = nothing,
+                            cs::Option{<:NamedTuple} = nothing)
+    return CalibrationContext(alpha, series, p, cs)
 end
 """
     resolve_calibration_slot(slot, key::Symbol, pr::AbstractPriorResult, w, slv = nothing,
@@ -592,7 +577,7 @@ This is the parallel of [`resolve_slot`](@ref), and it is a second verb rather t
 
 The caller computes `w` itself, as `sel(r.w, pr.w)`, and threads it with the measure's own `slv`. A parent that carries no observation weights of its own passes `pr.w`, and one that carries no solver leaves `slv` at its default.
 
-**A [`TimeDependent`](@ref) reaches the host that holds the slot, and no further.** A schedule varies a *field of an estimator*, and it is consumed by [`update_time_dependent_fields`](@ref) before any prior is fitted. A rule is never standalone: it stands in a slot of a host, so the host is what a schedule swaps. Where the host is a [`JuMPOptimiser`](@ref) the four norm fields are themselves schedulable, and a schedule over them selects a rule per fold. Where the host is a risk measure the slot's own bound admits no schedule, and the caller varies the whole measure instead, through the schedulable risk-measure field of the optimiser. Both routes land in the same place, because the selection runs first and the rule then resolves against the prior of the period that was selected. A schedule *inside* a rule is therefore not a gap: it would name a fold the rule cannot see, and it would duplicate the channel the host already carries.
+**A [`TimeDependent`](@ref) reaches the estimator that holds the slot, and no further.** A schedule varies a *field of an estimator*, and it is consumed by [`update_time_dependent_fields`](@ref) before any prior is fitted. A rule is never standalone: it stands in a slot of an estimator, so that estimator is what a schedule swaps. Where the estimator is a [`JuMPOptimiser`](@ref) the four norm fields are themselves schedulable, and a schedule over them selects a rule per fold. Where the estimator is a risk measure the slot's own bound admits no schedule, and the caller varies the whole measure instead, through the schedulable risk-measure field of the optimiser. Both routes land in the same place, because the selection runs first and the rule then resolves against the prior of the period that was selected. A schedule *inside* a rule is therefore not a gap: it would name a fold the rule cannot see, and it would duplicate the channel the estimator already carries.
 
 # Algorithm
 
@@ -2069,13 +2054,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes an ambiguity radius that shrinks at the dimensional rate a Wasserstein ball earns, not at the square-root rate.
 
-The radius is the Esfahani-Kuhn [drcvar](@cite) form, a scale in the units of the series the slot owner prices times the sample factor `log(1 / (1 - confidence)) / T` raised to the power `1 / max(N, 2)`. A ball of probability measures must hold the true **measure**, and not merely the true mean, and the measure-concentration result the form is read off charges that exponent for it. At `N = 2` the rule returns the square-root rate that [`ConcentrationRadius`](@ref) and [`RateRadius`](@ref) both carry, so the family's existing behaviour is the two-dimensional corner of this one.
+The radius is the form of [drcvar](@cite): a scale in the units of the series the slot owner prices times the sample factor `log(1 / (1 - confidence)) / T` raised to the power `1 / max(N, 2)`. A ball of probability measures must hold the true **measure**, and not merely the true mean, and the measure-concentration result the form is read off charges that exponent for it. At `N = 2` the rule returns the square-root rate that [`ConcentrationRadius`](@ref) and [`RateRadius`](@ref) both carry, so the family's existing behaviour is the two-dimensional corner of this one.
 
 **The ball hardly shrinks over a wide universe, and that is the model speaking rather than a defect.** At `N = 20` and `T = 250` the factor `T^(-1/20)` is `0.76`, so a record ten times longer buys almost nothing. This is the curse of dimensionality of the Wasserstein ball. A caller who reads a square-root rate and expects an estimation error reads a statement about a *mean*, and this rule makes one about a *measure*.
 
-**The radius is conservative in practice, and its source recommends a cross-validation over the radius in its place.** A portfolio priced against a ball this wide can hold nothing but cash. [`RateRadius`](@ref) is the shape such a grid moves over, so calibrate there and read this rule as the statement of what the rate is.
+**The radius is conservative in practice, and [drcvar](@cite) recommends a cross-validation over the radius in its place.** A portfolio priced against a ball this wide can hold nothing but cash. [`RateRadius`](@ref) is the shape such a grid moves over, so calibrate there and read this rule as the statement of what the rate is.
 
-The source result carries a second branch for a short record, whose exponent is `1 / a` for a tail-decay exponent `a` rather than `1 / max(N, 2)`. That branch binds only below a threshold that depends on constants the source leaves to the caller, so this rule drops it and ships the one branch. A reader who holds the paper beside this form finds the difference stated here, rather than by deriving it.
+The result of [drcvar](@cite) carries a second branch for a short record, whose exponent is `1 / a` for a tail-decay exponent `a` rather than `1 / max(N, 2)`. That branch binds only below a threshold that depends on constants that [drcvar](@cite) leaves to the caller, so this rule drops it and ships the one branch. A reader who compares this form with [drcvar](@cite) finds the difference stated here, and does not have to derive it.
 
 **The branch stays dropped, and [`HillTailDecay`](@ref) does not supply it.** That rule estimates the tail index of a **power law**, which is the heavy-tailed regime. The `a` of the second branch is the exponent of the **light-tail** moment condition the concentration result assumes, and the same condition carries the two constants that place the threshold. So the two exponents share a letter and nothing else, and a rule that read one for the other would state a rate the result does not give. The threshold is also unreachable in practice: it puts the short branch below a record of a few dozen rows, which no fold of a portfolio problem uses.
 
@@ -2217,7 +2202,7 @@ The sampling error of the mean vector is the part a linear loss sees, and its pe
 
 `confidence` is a **per-coordinate** level, and it is not corrected for the number of assets. The ∞-norm case is a maximum over `N` coordinates, so a per-coordinate level understates it, and a caller who wants a level over the whole vector states the corrected number themselves, as `1 - (1 - c) / N`.
 
-**The correction stays with the caller, and it is not a rounding.** A Bonferroni step from `0.95` to `1 - 0.05 / N` moves the quantile by about a third at four assets and by more at twenty. It is also one choice of several: a level over the vector read off `N` correlated coordinates and one read off `N` independent ones disagree by an amount only the correlation states. The source result states a per-coordinate level and no correction, so the rule ships what the result states and names the corrected number in prose. A rule that corrected silently would give a caller a level they did not ask for and cannot see.
+**The correction stays with the caller, and it is not a rounding.** A Bonferroni step from `0.95` to `1 - 0.05 / N` moves the quantile by about a third at four assets and by more at twenty. It is also one choice of several: a level over the vector read off `N` correlated coordinates and one read off `N` independent ones disagree by an amount only the correlation states. The normal quantile that the radius reads is stated at a per-coordinate level with no correction. The rule ships that level and names the corrected number in prose. A rule that corrected silently would give a caller a level they did not ask for and cannot see.
 
 The 1-norm case sums the per-asset errors, which prices them as if they moved together. That is the worst case over the correlations, and it is therefore the conservative reading for a radius. A correlation-aware form would give a smaller ball, and this rule does not compute one.
 

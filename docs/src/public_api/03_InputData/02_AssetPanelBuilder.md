@@ -23,7 +23,9 @@ BackwardPanelFill
 ```@docs
 asset_panel
 panel_fill
+panel_placeholder
 panel_resolve
 panel_input_field
+panel_input_placeholder
 panel_input_is_static
 ```

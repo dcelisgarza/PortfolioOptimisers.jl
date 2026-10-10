@@ -243,6 +243,7 @@ $(DocStringExtensions.FIELDS)
         chol::Option{<:MatNum} = nothing,
         rc::Option{<:LcE_Lc} = nothing,
         alg::VarianceFormulation = SquaredSOCRiskExpr(),
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
     ) -> Variance
 
 Keywords correspond to the struct's fields.
@@ -264,7 +265,7 @@ Keywords correspond to the struct's fields.
   - The method slices a stated `sigma` to the selected assets on both axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
   - The method slices `chol` on its columns alone. Its rows index the factorisation, which the asset selection does not address.
   - The method refuses an `rc` that is a [`LinearConstraint`](@ref). A group constraint cannot be restricted to a part of its own group, and the restriction would break factor risk contribution.
-  - `settings`, `rc` and `alg` pass through unchanged.
+  - `settings`, `rc`, `alg` and `mtx_sqrt` pass through unchanged.
 
 # Functor
 
@@ -293,7 +294,8 @@ Variance
      sigma ┼ 3×3 Matrix{Float64}
       chol ┼ nothing
         rc ┼ nothing
-       alg ┴ SquaredSOCRiskExpr()
+       alg ┼ SquaredSOCRiskExpr()
+  mtx_sqrt ┴ EigenFallbackSquareRoot()
 
 julia> r(w)
 1.3421705804186579
@@ -344,9 +346,14 @@ julia> r(w)
     $(field_dict[:alg])
     """
     alg
+    """
+    Square-root algorithm of the covariance matrix that the cone of the variance reads when no `chol` is at hand, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. The default takes the square root of the eigendecomposition of a singular positive semidefinite matrix, such as a rank-one estimate. [`matrix_square_root`](@ref) states each algorithm.
+    """
+    mtx_sqrt
     function Variance(settings::RiskMeasureSettings, sigma::Option{<:SigmaSlot},
                       chol::Option{<:MatNum}, rc::Option{<:LcE_Lc},
-                      alg::VarianceFormulation)::Variance
+                      alg::VarianceFormulation,
+                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})::Variance
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
@@ -355,18 +362,16 @@ julia> r(w)
             @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
         end
         assert_derived_slot_has_source(chol, sigma, :chol, :sigma)
-        return new{typeof(settings), typeof(sigma), typeof(chol), typeof(rc), typeof(alg)}(settings,
-                                                                                           sigma,
-                                                                                           chol,
-                                                                                           rc,
-                                                                                           alg)
+        return new{typeof(settings), typeof(sigma), typeof(chol), typeof(rc), typeof(alg),
+                   typeof(mtx_sqrt)}(settings, sigma, chol, rc, alg, mtx_sqrt)
     end
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   sigma::Option{<:SigmaSlot} = nothing, chol::Option{<:MatNum} = nothing,
                   rc::Option{<:LcE_Lc} = nothing,
-                  alg::VarianceFormulation = SquaredSOCRiskExpr())::Variance
-    return Variance(settings, sigma, chol, rc, alg)
+                  alg::VarianceFormulation = SquaredSOCRiskExpr(),
+                  mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::Variance
+    return Variance(settings, sigma, chol, rc, alg, mtx_sqrt)
 end
 function (r::Variance)(w::VecNum)
     return LinearAlgebra.dot(w, r.sigma, w)
@@ -409,7 +414,7 @@ The method selects `sigma` and `chol` as one pair, not field by field. A stated 
 
  1. Resolve a **Deferred Quantity** in `sigma` with [`resolve_deferred_quantities`](@ref), giving `r`.
  2. Select the pair `sigma`, `chol` with [`sigma_chol_selector`](@ref). A measure that states neither takes `pr.sigma` and `pr.chol`, and every other measure keeps its own pair.
- 3. Build a new `Variance` from the pair and from the `settings`, `rc` and `alg` of `r`.
+ 3. Build a new `Variance` from the pair and from the `settings`, `rc`, `alg` and `mtx_sqrt` of `r`.
 
 # Related
 
@@ -421,7 +426,7 @@ function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
     r = resolve_deferred_quantities(r, pr)
     sigma, chol = sigma_chol_selector(r.sigma, r.chol, pr)
     return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
-                    alg = r.alg)
+                    alg = r.alg, mtx_sqrt = r.mtx_sqrt)
 end
 function port_opt_view(r::Variance, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
@@ -429,7 +434,7 @@ function port_opt_view(r::Variance, i, args...)
     @argcheck(!isa(r.rc, LinearConstraint),
               "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
     return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
-                    alg = r.alg)
+                    alg = r.alg, mtx_sqrt = r.mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -461,6 +466,7 @@ $(DocStringExtensions.FIELDS)
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         sigma::Option{<:SigmaSlot} = nothing,
         chol::Option{<:MatNum} = nothing,
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
     ) -> StandardDeviation
 
 Keywords correspond to the struct's fields.
@@ -481,7 +487,7 @@ Keywords correspond to the struct's fields.
 
   - The method slices a stated `sigma` to the selected assets on both axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
   - The method slices `chol` on its columns alone. Its rows index the factorisation, which the asset selection does not address.
-  - `settings` passes through unchanged.
+  - `settings` and `mtx_sqrt` pass through unchanged.
 
 # Functor
 
@@ -508,7 +514,8 @@ StandardDeviation
            │      ub ┼ nothing
            │     rke ┴ Bool: true
      sigma ┼ 3×3 Matrix{Float64}
-      chol ┴ nothing
+      chol ┼ nothing
+  mtx_sqrt ┴ EigenFallbackSquareRoot()
 
 julia> r(w)
 1.1585208588621345
@@ -541,8 +548,13 @@ julia> r(w)
     $(field_dict[:chol_slot])
     """
     chol
+    """
+    Square-root algorithm of the covariance matrix that the cone of the standard deviation reads when no `chol` is at hand, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. The default takes the square root of the eigendecomposition of a singular positive semidefinite matrix. [`matrix_square_root`](@ref) states each algorithm.
+    """
+    mtx_sqrt
     function StandardDeviation(settings::RiskMeasureSettings, sigma::Option{<:SigmaSlot},
-                               chol::Option{<:MatNum})::StandardDeviation
+                               chol::Option{<:MatNum},
+                               mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})::StandardDeviation
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
@@ -551,13 +563,17 @@ julia> r(w)
             @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
         end
         assert_derived_slot_has_source(chol, sigma, :chol, :sigma)
-        return new{typeof(settings), typeof(sigma), typeof(chol)}(settings, sigma, chol)
+        return new{typeof(settings), typeof(sigma), typeof(chol), typeof(mtx_sqrt)}(settings,
+                                                                                    sigma,
+                                                                                    chol,
+                                                                                    mtx_sqrt)
     end
 end
 function StandardDeviation(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                            sigma::Option{<:SigmaSlot} = nothing,
-                           chol::Option{<:MatNum} = nothing)::StandardDeviation
-    return StandardDeviation(settings, sigma, chol)
+                           chol::Option{<:MatNum} = nothing,
+                           mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::StandardDeviation
+    return StandardDeviation(settings, sigma, chol, mtx_sqrt)
 end
 function (r::StandardDeviation)(w::VecNum)
     return sqrt(LinearAlgebra.dot(w, r.sigma, w))
@@ -600,7 +616,7 @@ The method selects `sigma` and `chol` as one pair, as [`factory(r::Variance, pr:
 
  1. Resolve a **Deferred Quantity** in `sigma` with [`resolve_deferred_quantities`](@ref), giving `r`.
  2. Select the pair `sigma`, `chol` with [`sigma_chol_selector`](@ref). A measure that states neither takes `pr.sigma` and `pr.chol`, and every other measure keeps its own pair.
- 3. Build a new `StandardDeviation` from the pair and from the `settings` of `r`.
+ 3. Build a new `StandardDeviation` from the pair and from the `settings` and `mtx_sqrt` of `r`.
 
 # Related
 
@@ -611,12 +627,14 @@ The method selects `sigma` and `chol` as one pair, as [`factory(r::Variance, pr:
 function factory(r::StandardDeviation, pr::AbstractPriorResult, args...; kwargs...)
     r = resolve_deferred_quantities(r, pr)
     sigma, chol = sigma_chol_selector(r.sigma, r.chol, pr)
-    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
+    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol,
+                             mtx_sqrt = r.mtx_sqrt)
 end
 function port_opt_view(r::StandardDeviation, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
     chol = isnothing(r.chol) ? nothing : view(r.chol, :, i)
-    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol)
+    return StandardDeviation(; settings = r.settings, sigma = sigma, chol = chol,
+                             mtx_sqrt = r.mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -633,7 +651,7 @@ Measures the worst-case portfolio variance over an uncertainty set of covariance
 R_{\\mathrm{box}}(\\boldsymbol{w}) &= \\langle \\mathbf{\\Sigma}_u, (\\boldsymbol{w} \\boldsymbol{w}^\\intercal)_{+} \\rangle - \\langle \\mathbf{\\Sigma}_l, (-\\boldsymbol{w} \\boldsymbol{w}^\\intercal)_{+} \\rangle\\,,\\\\
 R_{\\mathrm{ell}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + k_{e} \\lVert \\mathbf{G}_{\\Omega} \\, \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal) \\rVert_{2}\\,,\\\\
 R_{\\mathrm{nb}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa_{b} \\lVert \\mathbf{L}^\\intercal \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal) \\rVert_{p^{*}}\\,,\\\\
-R_{\\mathrm{cpt}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa \\lVert (\\mathbf{I} - \\mathbf{Q} \\mathbf{Q}^{+}) \\mathbf{C} \\boldsymbol{w} \\rVert_{2}^{2}\\,.
+R_{\\mathrm{cpt}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa \\underset{\\boldsymbol{z}}{\\min} \\left( \\lVert \\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z} \\rVert_{2}^{2} + \\lVert \\mathbf{R} \\boldsymbol{z} \\rVert_{2}^{2} \\right)\\,.
 \\end{align}
 ```
 
@@ -645,9 +663,9 @@ Where:
   - ``\\mathbf{\\Sigma}_l``, ``\\mathbf{\\Sigma}_u``: Lower and upper bounds of the box, `lb` and `ub`.
   - ``(\\cdot)_{+}``: Positive part, entry by entry.
   - ``\\hat{\\mathbf{\\Sigma}}``: Centre of the set, the `val` of the set when it states one and the `sigma` of the measure otherwise.
-  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the upper Cholesky factor of its matrix ``\\mathbf{\\Omega}``, `sigma`.
+  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the transpose of the square root of its matrix ``\\mathbf{\\Omega}``, `sigma`, that [`matrix_square_root`](@ref) takes under `mtx_sqrt`, so ``\\mathbf{G}_{\\Omega}^\\intercal \\mathbf{G}_{\\Omega} = \\mathbf{\\Omega}``.
   - ``\\kappa_{b}``, ``\\mathbf{L}``, ``p^{*}``: Radius of the norm ball, its map, and the dual order of its norm.
-  - ``\\mathbf{C}``, ``\\mathbf{Q}``: Diagonal metric of the compact set and its basis. ``\\mathbf{Q}^{+}`` is the pseudo-inverse, so ``\\mathbf{Q} \\mathbf{Q}^{+}`` projects onto the span of ``\\mathbf{Q}``.
+  - ``\\mathbf{C}``, ``\\mathbf{Q}``, ``\\mathbf{R}``, ``\\boldsymbol{z}``: Diagonal metric of the compact set, its basis, the factor of the rows a view dropped from the basis, and the free coefficients of the basis. A fitted set has no row in ``\\mathbf{R}``, and its value is ``\\lVert (\\mathbf{I} - \\mathbf{Q} \\mathbf{Q}^{+}) \\mathbf{C} \\boldsymbol{w} \\rVert_{2}^{2}``, with ``\\mathbf{Q}^{+}`` the pseudo-inverse.
   - $(math_dict[:kappa_cpt])
   - ``\\langle \\mathbf{X}, \\mathbf{Y} \\rangle = \\mathrm{Tr}(\\mathbf{X}^\\intercal \\mathbf{Y})``: Inner product of two matrices.
 
@@ -663,6 +681,7 @@ $(DocStringExtensions.FIELDS)
         settings::RiskMeasureSettings = RiskMeasureSettings(),
         ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
         sigma::Option{<:SigmaSlot} = nothing,
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
     ) -> UncertaintySetVariance
 
 Keywords correspond to the struct's fields.
@@ -742,8 +761,10 @@ UncertaintySetVariance
            │      pdm ┼ Posdef
            │          │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
            │          │   kwargs ┴ @NamedTuple{}: NamedTuple()
+           │       dc ┼ DiagonalOfShape()
            │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     sigma ┴ 3×3 Matrix{Float64}
+     sigma ┼ 3×3 Matrix{Float64}
+  mtx_sqrt ┴ EigenFallbackSquareRoot()
 
 julia> r(w)
 1.3421705804186579
@@ -780,19 +801,28 @@ julia> r(w)
     $(field_dict[:sigma_slot])
     """
     sigma
+    """
+    Square-root algorithm of the matrix of an [`EllipsoidalUncertaintySet`](@ref) in `ucs`, and of the centre of a [`CompactCovarianceUncertaintySet`](@ref), or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. The default takes the square root of the eigendecomposition of a singular positive semidefinite matrix. [`matrix_square_root`](@ref) states each algorithm. The box and the norm ball read no square root.
+    """
+    mtx_sqrt
     function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},
-                                    sigma::Option{<:SigmaSlot})
+                                    sigma::Option{<:SigmaSlot},
+                                    mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
         end
-        return new{typeof(settings), typeof(ucs), typeof(sigma)}(settings, ucs, sigma)
+        return new{typeof(settings), typeof(ucs), typeof(sigma), typeof(mtx_sqrt)}(settings,
+                                                                                   ucs,
+                                                                                   sigma,
+                                                                                   mtx_sqrt)
     end
 end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
-                                sigma::Option{<:SigmaSlot} = nothing)
-    return UncertaintySetVariance(settings, ucs, sigma)
+                                sigma::Option{<:SigmaSlot} = nothing,
+                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
+    return UncertaintySetVariance(settings, ucs, sigma, mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -832,13 +862,14 @@ A fitted [`AbstractUncertaintySetResult`](@ref) in `r.ucs` gives [`ucs_variance`
   - [`ucs_variance`](@ref)
 """
 function (r::UncertaintySetVariance{<:Any, <:AbstractUncertaintySetResult, <:Any})(w::VecNum)
-    return ucs_variance(r.ucs, r.sigma, w)
+    return ucs_variance(r.ucs, r.sigma, w, r.mtx_sqrt)
 end
 function (r::UncertaintySetVariance)(w::VecNum)
     return LinearAlgebra.dot(w, r.sigma, w)
 end
 """
-    ucs_variance(ucs::AbstractUncertaintySetResult, sigma::MatNum, w::VecNum)
+    ucs_variance(ucs::AbstractUncertaintySetResult, sigma::MatNum, w::VecNum,
+                 mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
 
 Compute the worst-case portfolio variance of the weights `w` over a fitted uncertainty set.
 
@@ -851,7 +882,7 @@ It is the value level of the risk expression that [`set_ucs_variance_risk!`](@re
 R_{\\mathrm{box}}(\\boldsymbol{w}) &= \\langle \\mathbf{\\Sigma}_u, (\\boldsymbol{w} \\boldsymbol{w}^\\intercal)_{+} \\rangle - \\langle \\mathbf{\\Sigma}_l, (-\\boldsymbol{w} \\boldsymbol{w}^\\intercal)_{+} \\rangle\\,,\\\\
 R_{\\mathrm{ell}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + k_{e} \\lVert \\mathbf{G}_{\\Omega} \\, \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal) \\rVert_{2}\\,,\\\\
 R_{\\mathrm{nb}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa_{b} \\lVert \\mathbf{L}^\\intercal \\mathrm{vec}(\\boldsymbol{w} \\boldsymbol{w}^\\intercal) \\rVert_{p^{*}}\\,,\\\\
-R_{\\mathrm{cpt}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa \\underset{\\boldsymbol{z}}{\\min} \\lVert \\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z} \\rVert_{2}^{2}\\,.
+R_{\\mathrm{cpt}}(\\boldsymbol{w}) &= \\boldsymbol{w}^\\intercal \\hat{\\mathbf{\\Sigma}} \\boldsymbol{w} + \\kappa \\underset{\\boldsymbol{z}}{\\min} \\left( \\lVert \\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z} \\rVert_{2}^{2} + \\lVert \\mathbf{R} \\boldsymbol{z} \\rVert_{2}^{2} \\right)\\,.
 \\end{align}
 ```
 
@@ -862,9 +893,9 @@ Where:
   - ``\\mathbf{\\Sigma}_l``, ``\\mathbf{\\Sigma}_u``: Lower and upper bounds of the box, `lb` and `ub`.
   - ``(\\cdot)_{+}``: Positive part, entry by entry.
   - ``\\hat{\\mathbf{\\Sigma}}``: Centre of the set, the `val` of the set when it states one and `sigma` otherwise.
-  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the upper Cholesky factor of its matrix ``\\mathbf{\\Omega}``, `sigma`.
+  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the transpose of the square root of its matrix ``\\mathbf{\\Omega}``, `sigma`, that [`matrix_square_root`](@ref) takes under `mtx_sqrt`, so ``\\mathbf{G}_{\\Omega}^\\intercal \\mathbf{G}_{\\Omega} = \\mathbf{\\Omega}``.
   - ``\\kappa_{b}``, ``\\mathbf{L}``, ``p^{*}``: Radius of the norm ball, its map, and the dual order of its norm. A map with no column adds nothing.
-  - ``\\mathbf{C}``, ``\\mathbf{Q}``, ``\\boldsymbol{z}``: Diagonal metric of the compact set, its basis, and the free coefficients of the basis. A basis with no column leaves ``\\lVert \\mathbf{C} \\boldsymbol{w} \\rVert_{2}^{2}``.
+  - ``\\mathbf{C}``, ``\\mathbf{Q}``, ``\\mathbf{R}``, ``\\boldsymbol{z}``: Diagonal metric of the compact set, its basis, the factor of the rows a view dropped from the basis, and the free coefficients of the basis. A fitted set has no row in ``\\mathbf{R}``. A basis with no column leaves ``\\lVert \\mathbf{C} \\boldsymbol{w} \\rVert_{2}^{2}``.
   - $(math_dict[:kappa_cpt])
   - ``\\langle \\mathbf{X}, \\mathbf{Y} \\rangle = \\mathrm{Tr}(\\mathbf{X}^\\intercal \\mathbf{Y})``: Inner product of two matrices.
 
@@ -875,6 +906,11 @@ The least-squares problem of the compact line projects onto the span of ``\\math
   - `ucs`: Fitted uncertainty set.
   - `sigma::MatNum`: Fallback centre of the set. The `val` of the set wins over it, and the box reads neither.
   - `w::VecNum`: Asset weights.
+  - `mtx_sqrt`: Square-root algorithm of the matrix of an ellipsoid, or `nothing` for the plain Cholesky factor. The other sets ignore it, because the value level of the compact set takes no square root.
+
+# Validation
+
+  - Ellipsoid: `ucs.sigma` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`.
 
 # Returns
 
@@ -889,24 +925,28 @@ The least-squares problem of the compact line projects onto the span of ``\\math
   - [`CompactCovarianceUncertaintySet`](@ref)
   - [`set_ucs_variance_risk!`](@ref): The model expression, whose optimum is at or below this value.
 """
-function ucs_variance(ucs::BoxUncertaintySet, ::Any, w::VecNum)
+function ucs_variance(ucs::BoxUncertaintySet, ::Any, w::VecNum, ::Any = nothing)
     W = w * transpose(w)
     z = zero(eltype(W))
     return sum(ucs.ub[i] * max(W[i], z) for i in eachindex(ucs.ub, W)) -
            sum(ucs.lb[i] * max(-W[i], z) for i in eachindex(ucs.lb, W))
 end
-function ucs_variance(ucs::EllipsoidalUncertaintySet, sigma::MatNum, w::VecNum)
+function ucs_variance(ucs::EllipsoidalUncertaintySet, sigma::MatNum, w::VecNum,
+                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     W = w * transpose(w)
     # The set names its own centre; `sigma` is the fallback (ADR 0050).
     sigma = something(ucs.val, sigma)
-    G = LinearAlgebra.cholesky(ucs.sigma).U
+    G = transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
     return LinearAlgebra.dot(w, sigma, w) + ucs.k * LinearAlgebra.norm(G * vec(W))
 end
-function ucs_variance(ucs::CompactCovarianceUncertaintySet, sigma::MatNum, w::VecNum)
+function ucs_variance(ucs::CompactCovarianceUncertaintySet, sigma::MatNum, w::VecNum,
+                      ::Any = nothing)
     # The set names its own centre; `sigma` is the fallback (ADR 0050).
     sigma = something(ucs.val, sigma)
-    Cw = ucs.C .* w
-    Q = ucs.Q
+    # The rows a view dropped enter as `R` against a zero target, so the stacked residual
+    # is the one the model's `x_cucs` states.
+    Cw = vcat(ucs.C .* w, zeros(eltype(ucs.R), size(ucs.R, 1)))
+    Q = vcat(ucs.Q, ucs.R)
     # The left division is the least-squares solve the model's `z_cucs` performs, so it
     # projects onto the span of `Q` whether or not the columns of `Q` are orthonormal.
     res = size(Q, 2) > zero(Int) ? Cw - Q * (Q \ Cw) : Cw
@@ -914,7 +954,7 @@ function ucs_variance(ucs::CompactCovarianceUncertaintySet, sigma::MatNum, w::Ve
 end
 function ucs_variance(ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
                                                   <:SigmaUncertaintySetClass},
-                      sigma::MatNum, w::VecNum)
+                      sigma::MatNum, w::VecNum, ::Any = nothing)
     W = w * transpose(w)
     # The set names its own centre; `sigma` is the fallback (ADR 0050).
     sigma = something(ucs.val, sigma)
@@ -951,13 +991,13 @@ function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Union{Val{true}, N
     return UncertaintySetVariance(;
                                   settings = RiskMeasureSettings(; rke = r.settings.rke,
                                                                  scale = r.settings.scale),
-                                  r.ucs, sigma = r.sigma)
+                                  r.ucs, sigma = r.sigma, mtx_sqrt = r.mtx_sqrt)
 end
 function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Val{false})
     return Variance(;
                     settings = RiskMeasureSettings(; rke = r.settings.rke,
                                                    scale = r.settings.scale),
-                    sigma = r.sigma)
+                    sigma = r.sigma, mtx_sqrt = r.mtx_sqrt)
 end
 function no_bounds_risk_measure(r::UncertaintySetVariance,
                                 flag::Union{Val{false}, Val{true}, Nothing} = nothing)
@@ -992,13 +1032,13 @@ function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
     return UncertaintySetVariance(;
                                   settings = RiskMeasureSettings(; rke = false,
                                                                  scale = one(r.settings.scale)),
-                                  r.ucs, sigma = r.sigma)
+                                  r.ucs, sigma = r.sigma, mtx_sqrt = r.mtx_sqrt)
 end
 function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Val{false})
     return Variance(;
                     settings = RiskMeasureSettings(; rke = false,
                                                    scale = one(r.settings.scale)),
-                    rc = nothing, sigma = r.sigma)
+                    rc = nothing, sigma = r.sigma, mtx_sqrt = r.mtx_sqrt)
 end
 function no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
                                              flag::Union{Val{false}, Val{true}, Nothing} = nothing)
@@ -1045,7 +1085,8 @@ function factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,
     r = resolve_deferred_quantities(r, pr)
     ucs = ucs_selector(r.ucs, ucs)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
+    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma,
+                                  mtx_sqrt = r.mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1066,7 +1107,8 @@ function factory(r::UncertaintySetVariance, pr::AbstractPriorResult,
     r = resolve_deferred_quantities(r, pr)
     ucs = ucs_selector(r.ucs, ucs)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
-    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
+    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma,
+                                  mtx_sqrt = r.mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1090,7 +1132,8 @@ function factory(r::UncertaintySetVariance, ucs::UcSE_UcS,
     else
         nothing_scalar_array_selector(resolve_deferred_quantities(r, pr).sigma, pr.sigma)
     end
-    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
+    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma,
+                                  mtx_sqrt = r.mtx_sqrt)
 end
 """
     ucs_risk_measure(r, rd::ReturnsResult)
@@ -1117,7 +1160,7 @@ function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult)
         r
     else
         UncertaintySetVariance(; settings = r.settings, ucs = sigma_ucs(r.ucs, rd),
-                               sigma = r.sigma)
+                               sigma = r.sigma, mtx_sqrt = r.mtx_sqrt)
     end
 end
 function ucs_risk_measure(r::Any, ::ReturnsResult)
@@ -1129,7 +1172,8 @@ end
 function port_opt_view(r::UncertaintySetVariance, i, args...)
     ucs = port_opt_view(r.ucs, i)
     sigma = nothing_scalar_array_view(r.sigma, i)
-    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma)
+    return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma,
+                                  mtx_sqrt = r.mtx_sqrt)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

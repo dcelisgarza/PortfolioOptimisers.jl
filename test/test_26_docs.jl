@@ -88,7 +88,7 @@ function -- cannot host.
         @testset "every choice is catalogued" begin
             # `choice_surface_names` comes from the generator this file includes, so
             # the coverage rule is stated once and the docs build cannot disagree
-            # with the test. It is the Choice Surface of CONTEXT.md § 1: every
+            # with the test. It is the Choice Surface of GLOSSARY.md § 1: every
             # concrete type the package declares that is a leaf estimator, a leaf
             # algorithm, a leaf covariance estimator, or an export under its own
             # name, less the Results and the errors, which a caller receives
@@ -255,10 +255,11 @@ nothing raises `@error "File exists but no references were collected"` in
     bib_keys = Set(m.captures[1]
                    for m in eachmatch(r"^@\w+\{([A-Za-z0-9_]+),"m, read(BIB, String)))
 
-    # A citation is `[key](@cite)` or `[key1,key2](@cite)`.
+    # A citation is `[key](@cite)` or `[key1,key2](@cite)`, and `@citet` in place of `@cite`
+    # when the authors are the subject of the sentence.
     function cited_keys(text)
         acc = Set{String}()
-        for m in eachmatch(r"\[([A-Za-z0-9_][A-Za-z0-9_,\s]*)\]\(@cite\)", text)
+        for m in eachmatch(r"\[([A-Za-z0-9_][A-Za-z0-9_,\s]*)\]\(@citet?\)", text)
             foreach(k -> push!(acc, strip(k)), split(m.captures[1], ','))
         end
         return acc
@@ -274,6 +275,8 @@ nothing raises `@error "File exists but no references were collected"` in
 
     @testset "every ref_dict entry has a user" begin
         for key in keys(PO.ref_dict)
+            # The standard note is the one key that names no work.
+            key === :no_original_source && continue
             @test string(key) in bib_keys
         end
         users = Set{Symbol}()
@@ -316,26 +319,74 @@ nothing raises `@error "File exists but no references were collected"` in
     # A bullet under `# References` must be one interpolation of `ref_dict`, optionally
     # followed by a locator such as `Chapter 2.`. Anything else is a pasted copy of the
     # reference prose, which is what this table exists to stop.
+    # The line numbers of the bullets of every `# References` section of `lines`.
+    function references_bullets(lines)
+        acc = Int[]
+        i = 1
+        while i <= length(lines)
+            if strip(lines[i]) == "# References"
+                j = i + 1
+                while j <= length(lines) && isempty(strip(lines[j]))
+                    j += 1
+                end
+                while j <= length(lines) && startswith(strip(lines[j]), "- ")
+                    push!(acc, j)
+                    j += 1
+                end
+                i = j
+            else
+                i += 1
+            end
+        end
+        return acc
+    end
+
     @testset "no # References bullet carries inline reference prose" begin
         bullet = r"^\s*- \$\(ref_dict\[:[A-Za-z0-9_]+\]\)"
         for f in source_files
             lines = split(read(f, String), '\n')
-            i = 1
-            while i <= length(lines)
-                if strip(lines[i]) == "# References"
-                    j = i + 1
-                    while j <= length(lines) && isempty(strip(lines[j]))
-                        j += 1
-                    end
-                    while j <= length(lines) && startswith(strip(lines[j]), "- ")
-                        @test occursin(bullet, lines[j])
-                        j += 1
-                    end
-                    i = j
-                else
-                    i += 1
-                end
+            for j in references_bullets(lines)
+                @test occursin(bullet, lines[j])
             end
+        end
+    end
+
+    #=
+    The standard note marks a formulation whose original source was not found. It closes the
+    `# References` bullet of the secondary source the docstring follows, after a locator that
+    names the equation the code follows, because a later search starts there. A note anywhere
+    else, or one with no locator before it, cannot be read that way. The note is the honest
+    result of a search, so nothing counts the notes: this check reads their form alone.
+    =#
+    note_bullet = r"^\s*- \$\(ref_dict\[:([A-Za-z0-9_]+)\]\)\s+[^$]*[^$\s]\s+\$\(ref_dict\[:no_original_source\]\)\s*$"
+    function note_offenders(text)
+        lines = split(text, '\n')
+        bullets = Set(references_bullets(lines))
+        acc = String[]
+        for (k, line) in pairs(lines)
+            occursin("ref_dict[:no_original_source]", line) || continue
+            m = match(note_bullet, line)
+            ok = k in bullets && !isnothing(m) && m.captures[1] != "no_original_source"
+            ok || push!(acc, strip(line))
+        end
+        return acc
+    end
+
+    @testset "the standard note closes a # References bullet after a locator" begin
+        # The check is vacuous until a docstring carries the note, so it is pinned on text.
+        refs = "# References\n\n  - \$(ref_dict[:cajas2025])"
+        note = "\$(ref_dict[:no_original_source])"
+        @test isempty(note_offenders("$(refs) Equation 3.45. $(note)\n"))
+        # No locator, text after the note, a note outside a bullet, a note as the reference.
+        bad = ("$(refs) $(note)\n", "$(refs) Equation 3.45. $(note) Page 2.\n",
+               "$(refs) Equation 3.45.\n\nThe formula. $(note)\n",
+               "# References\n\n  - $(note) Equation 3.45. $(note)\n")
+        for text in bad
+            @test length(note_offenders(text)) == 1
+        end
+        for f in source_files
+            f == dict_file && continue
+            @test isempty(note_offenders(read(f, String))) || f
         end
     end
 
@@ -431,8 +482,9 @@ nothing raises `@error "File exists but no references were collected"` in
         for p in reduce(vcat, files_under.(API, ".md"))
             text = read(p, String)
             has_block = occursin("```@bibliography", text)
-            cites = occursin("(@cite)", text) ||
-                    any(n -> occursin("(@cite)", docstring_text(n)), docs_block_names(text))
+            cites = occursin(r"\(@citet?\)", text) ||
+                    any(n -> occursin(r"\(@citet?\)", docstring_text(n)),
+                        docs_block_names(text))
             if cites && !has_block
                 push!(missing_block, relpath(p, DOCS))
             elseif !cites && has_block
@@ -489,6 +541,24 @@ nothing raises `@error "File exists but no references were collected"` in
                 push!(at_random, "$b: $n_exact of $(length(md.docs)) docstrings")
         end
         @test sort!(at_random) == String[]
+    end
+
+    #=
+    The same check fails the build on a docstring that no `@docs` block lists at all. The
+    testset above reads only the bindings that a page lists, so it is blind to that case.
+    Seven bindings were in it until #1475, and the Docs build failed on the fifteen links to
+    them. A binding is listed when an entry of any page names it, by its bare name or with a
+    signature; the testset above judges an entry with a signature.
+    =#
+    @testset "every documented binding is listed on a page" begin
+        listed = Set{Symbol}()
+        for p in files_under(DOCS, ".md"), name in docs_block_names(read(p, String))
+            ex = Meta.parse(name; raise = false)
+            sym = leaf_name(isa(ex, Expr) && ex.head === :call ? ex.args[1] : ex)
+            isa(sym, Symbol) && push!(listed, sym)
+        end
+        unlisted = sort!([string(b) for b in keys(Base.Docs.meta(PO)) if !(b.var in listed)])
+        @test unlisted == String[]
     end
 end
 
@@ -759,7 +829,7 @@ The CONTENT of a subsection. Nothing compares the model keys a docstring names w
 the body registers, and nothing reads a `## Relaxation` at all -- an inexact encoding is a
 fact about the mathematics, not a token. ADR 0081 records the key census as the largest build
 of this area and leaves it in the map's *Not yet specified*. `## Relaxation` holds by review,
-in the sense of `STANDARDS.md`.
+in the sense of `CODING_STANDARDS.md`.
 =#
 @testset "Swept file section completeness" begin
     using Test, TOML
@@ -816,12 +886,10 @@ in the sense of `STANDARDS.md`.
     # `test_47_alias_and_module_census.jl` read one reader.
     docstring_text = CH.docstring_text
 
-    # Julia strips the indentation of a `"""` block, so a section heading sits at column 0.
-    # The count, not the flag, is the primitive: one string block can document several
-    # methods, separated by horizontal rules, and then carries one heading per method that
-    # holds the section. `port_opt_view` in `src/03_InputData/10_ReturnsResult.jl` is such a
-    # block.
-    count_section(text, name) = count(==(string("# ", name)), rstrip.(split(text, '\n')))
+    # The count of `# name` headings, not the flag, is the primitive, and it is
+    # `CodeHealth`'s, so the `# Algorithm` floor below and `code_health/sweep_check.jl` read
+    # one reader.
+    count_section = CH.count_section
     has_section(text, name) = count_section(text, name) > 0
     has_subsection(text, name) = count(==(string("## ", name)),
                                        rstrip.(split(text, '\n'))) > 0
@@ -968,8 +1036,9 @@ in the sense of `STANDARDS.md`.
         fallen = Tuple{String, Int, Int}[]
         for f in swept
             haskey(rows[f], "algorithm") || continue
-            _, texts, _ = scan(joinpath(ROOT, f))
-            measured = count(t -> has_section(t, "Algorithm"), texts)
+            # `CodeHealth.algorithm_sections` is the one measure, and
+            # `code_health/sweep_check.jl` prints the same number before the commit (#1491).
+            measured = CH.algorithm_sections(joinpath(ROOT, f))
             measured < rows[f]["algorithm"] &&
                 push!(fallen, (f, rows[f]["algorithm"], measured))
         end
@@ -1024,7 +1093,7 @@ in the sense of `STANDARDS.md`.
     edit and not a silent one.
     =#
     @testset "# Details is abolished" begin
-        DETAILS_TOTAL = 24
+        DETAILS_TOTAL = 21
 
         @testset "a swept file carries no # Details section" begin
             offenders = Tuple{String, Int}[]
@@ -1308,7 +1377,7 @@ in the sense of `STANDARDS.md`.
 
     The FAMILY half of the rule -- siblings of one leaf abstract supertype state a shared
     quantity in the same form -- is not gated here or anywhere. An equation's form is not a
-    token. It holds by review, in the sense of `STANDARDS.md`.
+    token. It holds by review, in the sense of `CODING_STANDARDS.md`.
 
     ---------------------------------------------------------------------- the two checks
 

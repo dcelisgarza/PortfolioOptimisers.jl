@@ -41,7 +41,7 @@ Three kinds of check run here, and the first two are what catch a drift no invar
 
   - AN INDEPENDENT FIT. The log-linear regression is re-derived here from the normal
     equations through `\`, not through `GLM`, and the two must agree. This is the assertion
-    the reference implementation makes of itself -- rebuild the prediction from the
+    the oracle makes of itself -- rebuild the prediction from the
     coefficients, the last implied volatility and the last window's realised volatility --
     so one solver's bug cannot hide behind the other's.
 
@@ -54,7 +54,7 @@ data, so `make_implied_vol` below derives one from the returns themselves: a 20-
 realised volatility, annualised, lifted by a fixed 1.15 volatility risk premium and
 perturbed by a seeded log-normal shock. The result runs from about 9 % to about 120 %
 annualised, and the predicted realised volatilities it produces sit between 0.0093 and
-0.049 daily, which is the range the reference implementation's own fixture reaches. THE
+0.049 daily, which is the range the oracle's own fixture reaches. THE
 RECIPE MUST NOT CHANGE without regenerating `assets/ImpliedVolatility.csv.gz`.
 =#
 using PortfolioOptimisers, Statistics, StatsBase
@@ -118,24 +118,26 @@ end
 
     @testset "Reference values" begin
         # One entry per column of `assets/ImpliedVolatility.csv.gz`, in order.
-        ces = [(ImpliedVolatility(), (;)),
-               (ImpliedVolatility(; alg = ImpliedVolatilityRegression(; ws = 30)), (;)),
-               (ImpliedVolatility(; alg = ImpliedVolatilityRegression(; ws = 25), af = 63),
+        ces = [(ImpliedVolatility(; ppy = 252), (;)),
+               (ImpliedVolatility(; ppy = 252,
+                                  alg = ImpliedVolatilityRegression(; ws = 30)), (;)),
+               (ImpliedVolatility(; alg = ImpliedVolatilityRegression(; ws = 25), ppy = 63),
                 (;)),
-               (ImpliedVolatility(;
+               (ImpliedVolatility(; ppy = 252,
                                   alg = ImpliedVolatilityRegression(;
                                                                     ve = SimpleVariance(;
                                                                                         corrected = false))),
-                (;)), (ImpliedVolatility(; ce = SpearmanCovariance()), (;)),
-               (ImpliedVolatility(;
+                (;)), (ImpliedVolatility(; ppy = 252, ce = SpearmanCovariance()), (;)),
+               (ImpliedVolatility(; ppy = 252,
                                   mp = MatrixProcessing(;
                                                         dn = Denoise(;
                                                                      alg = SpectralDenoise()))),
                 (;)),
-               (ImpliedVolatility(; alg = ImpliedVolatilityPremium()), (; ivpa = 1.2)),
-               (ImpliedVolatility(; alg = ImpliedVolatilityPremium(), af = 63),
+               (ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium()),
+                (; ivpa = 1.2)),
+               (ImpliedVolatility(; alg = ImpliedVolatilityPremium(), ppy = 63),
                 (; ivpa = ivpav)),
-               (ImpliedVolatility(; alg = ImpliedVolatilityPremium(),
+               (ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium(),
                                   ce = KendallCovariance()), (; ivpa = ivpav))]
         df = CSV.read(joinpath(@__DIR__, "./assets/ImpliedVolatility.csv.gz"), DataFrame)
         @test length(ces) == size(df, 2)
@@ -158,7 +160,7 @@ end
     @testset "The regression reproduces an independent least-squares fit" begin
         # The estimator fits through `GLM`. This rebuilds the same model from the normal
         # equations and predicts from the coefficients by hand.
-        function hand_predict(ve, X, iv, ws, af)
+        function hand_predict(ve, X, iv, ws, ppy)
             T, N = size(X)
             chunk = div(T, ws)
             offset = T - chunk * ws
@@ -167,7 +169,7 @@ end
                                         view(X,
                                              (offset + (c - 1) * ws + 1):(offset + c * ws),
                                              :); dims = 1) for c in 1:chunk])
-            ivw = (iv / sqrt(af))[(T - (chunk - 1) * ws):ws:T, :]
+            ivw = (iv / sqrt(ppy))[(T - (chunk - 1) * ws):ws:T, :]
             lrv, liv = log.(rv), log.(ivw)
             out = Vector{Float64}(undef, N)
             for i in 1:N
@@ -178,14 +180,14 @@ end
             return out
         end
 
-        for (ve, ws, af) in
+        for (ve, ws, ppy) in
             [(SimpleVariance(), 20, 252), (SimpleVariance(; corrected = false), 30, 252),
              (SimpleVariance(), 25, 63)]
             alg = ImpliedVolatilityRegression(; ve = ve, ws = ws)
-            got = PortfolioOptimisers.predict_realised_vols(alg, iv / sqrt(af), X, nothing)
-            @test isapprox(got, hand_predict(ve, X, iv, ws, af))
+            got = PortfolioOptimisers.predict_realised_vols(alg, iv / sqrt(ppy), X, nothing)
+            @test isapprox(got, hand_predict(ve, X, iv, ws, ppy))
             # The prediction is the diagonal of the covariance the estimator returns.
-            sigma = cov(ImpliedVolatility(; alg = alg, af = af), X; iv = iv)
+            sigma = cov(ImpliedVolatility(; alg = alg, ppy = ppy), X; iv = iv)
             @test isapprox(sqrt.(diag(sigma)), got)
         end
     end
@@ -194,9 +196,9 @@ end
         rho = cor(Covariance(), X)
         for (alg, kwargs) in [(ImpliedVolatilityRegression(), (;)),
                               (ImpliedVolatilityPremium(), (; ivpa = 1.2))]
-            ce = ImpliedVolatility(; alg = alg)
+            ce = ImpliedVolatility(; ppy = 252, alg = alg)
             sigma = cov(ce, X; iv = iv, kwargs...)
-            sd = PortfolioOptimisers.predict_realised_vols(alg, iv / sqrt(ce.af), X,
+            sd = PortfolioOptimisers.predict_realised_vols(alg, iv / sqrt(ce.ppy), X,
                                                            get(kwargs, :ivpa, nothing))
             # The diagonal is the predicted realised volatility, never a unit.
             @test isapprox(sqrt.(diag(sigma)), sd)
@@ -209,13 +211,13 @@ end
     end
 
     @testset "ImpliedVolatilityPremium divides the latest implied volatility" begin
-        ce = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        ce = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium())
         for ivpa in (1.2, ivpav)
             sd = sqrt.(diag(cov(ce, X; iv = iv, ivpa = ivpa)))
-            @test isapprox(sd, vec(iv[end, :]) ./ sqrt(ce.af) ./ ivpa)
+            @test isapprox(sd, vec(iv[end, :]) ./ sqrt(ce.ppy) ./ ivpa)
         end
-        # `af` rescales the whole diagonal by sqrt(af).
-        ce2 = ImpliedVolatility(; alg = ImpliedVolatilityPremium(), af = 63)
+        # `ppy` rescales the whole diagonal by sqrt(ppy).
+        ce2 = ImpliedVolatility(; alg = ImpliedVolatilityPremium(), ppy = 63)
         @test isapprox(sqrt.(diag(cov(ce2, X; iv = iv, ivpa = 1.2))) * sqrt(63),
                        sqrt.(diag(cov(ce, X; iv = iv, ivpa = 1.2))) * sqrt(252))
     end
@@ -243,18 +245,18 @@ end
         # A window of 2 or fewer observations carries no usable standard deviation.
         @test_throws DomainError ImpliedVolatilityRegression(; ws = 2)
         # The regression needs more than two windows: two of them leave one training row.
-        @test_throws DomainError cov(ImpliedVolatility(;
+        @test_throws DomainError cov(ImpliedVolatility(; ppy = 252,
                                                        alg = ImpliedVolatilityRegression(;
                                                                                          ws = 126)),
                                      X; iv = iv)
         # Three windows is the smallest the fit accepts, and it stays finite there. This is
-        # the reference implementation's own floor of three folds.
+        # the oracle's own floor of three folds.
         @test all(isfinite,
-                  diag(cov(ImpliedVolatility(;
+                  diag(cov(ImpliedVolatility(; ppy = 252,
                                              alg = ImpliedVolatilityRegression(; ws = 84)),
                            X; iv = iv)))
         # The premium algorithm has no default factor.
-        @test_throws ArgumentError cov(ImpliedVolatility(;
+        @test_throws ArgumentError cov(ImpliedVolatility(; ppy = 252,
                                                          alg = ImpliedVolatilityPremium()),
                                        X; iv = iv)
         #=
@@ -267,9 +269,9 @@ end
         `matrix_processing!` found nothing to repair and the optimiser was handed an asset
         whose correlations all pointed the wrong way. A `NaN` was refused, but only by
         accident, and by `NearestCorrelationMatrix`, which named neither `ivpa` nor the
-        estimator. The reference implementation refuses all three at the fit.
+        estimator. The oracle refuses all three at the fit.
         =#
-        cep = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        cep = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium())
         ivpam = copy(ivpav)
         ivpam[1] = -ivpam[1]
         for bad in (-1.2, zero(eltype(ivpav)), NaN, Inf, ivpam)
@@ -280,7 +282,15 @@ end
         # The positive factor the bad ones were derived from still answers.
         @test all(isfinite, cov(cep, X; iv = iv, ivpa = ivpav))
         # The implied volatility series itself is mandatory.
-        @test_throws UndefKeywordError cov(ImpliedVolatility(), X)
+        @test_throws UndefKeywordError cov(ImpliedVolatility(; ppy = 252), X)
+        # The periods per year are mandatory too. The implied volatility is annual, and
+        # `iv / sqrt(ppy)` is the identity only on annual data, so no default fits every
+        # frequency (#1517).
+        @test_throws UndefKeywordError ImpliedVolatility()
+        @test_throws UndefKeywordError ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        for bad in (0, -252)
+            @test_throws DomainError ImpliedVolatility(; ppy = bad)
+        end
         # A custom variance estimator that carries observation weights and implements no
         # `obs_weights_view` method keeps its full-sample weights against a window. This is
         # the documented fallback, and it is what every weighted estimator did before the
@@ -391,11 +401,12 @@ end
     end
 
     @testset "ImpliedVolatility accepts a weighted variance estimator" begin
-        base = cov(ImpliedVolatility(), X; iv = iv)
+        base = cov(ImpliedVolatility(; ppy = 252), X; iv = iv)
         for ve in (SimpleVariance(; w = aw),
                    SimpleVariance(; me = SimpleExpectedReturns(; w = aw), w = aw),
                    SimpleVariance(; me = SimpleExpectedReturns(; w = ew), corrected = false, w = ew), WindowedVariance(; w = aw, window = 15))
-            ce = ImpliedVolatility(; alg = ImpliedVolatilityRegression(; ve = ve))
+            ce = ImpliedVolatility(; ppy = 252,
+                                   alg = ImpliedVolatilityRegression(; ve = ve))
             sigma = cov(ce, X; iv = iv)
             @test all(isfinite, sigma)
             @test isposdef(sigma)
@@ -419,9 +430,9 @@ end
         rho = cor(Covariance(), X)
         for (alg, kwargs) in [(ImpliedVolatilityRegression(), (;)),
                               (ImpliedVolatilityPremium(), (; ivpa = 1.2))]
-            ce = ImpliedVolatility(; alg = alg)
+            ce = ImpliedVolatility(; ppy = 252, alg = alg)
             sigma = cov(ce, X; iv = iv, kwargs...)
-            sd = PortfolioOptimisers.predict_realised_vols(alg, iv / sqrt(ce.af), X,
+            sd = PortfolioOptimisers.predict_realised_vols(alg, iv / sqrt(ce.ppy), X,
                                                            get(kwargs, :ivpa, nothing))
             # `cov`'s `# Mathematical definition`. Measured at 1.1e-19 for the regression
             # route and 5.4e-20 for the premium route, against entries of order 1e-4.
@@ -440,7 +451,7 @@ end
     end
 
     @testset "cov and cor refuse an iv that is not shaped like X" begin
-        ce = ImpliedVolatility()
+        ce = ImpliedVolatility(; ppy = 252)
         #=
         A LONGER `iv` used to pass silently and answer a covariance built from the wrong
         rows. `implied_vol` is handed the row count of `X`, so with more rows in `iv` it
@@ -459,7 +470,7 @@ end
         @test_throws DimensionMismatch cov(ce, X; iv = iv[:, 1:10])
         @test_throws DimensionMismatch cor(ce, X; iv = iv[:, 1:10])
         # The premium branch reads no window at all, so nothing there ever raised.
-        cep = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        cep = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium())
         @test_throws DimensionMismatch cov(cep, X; iv = iv_long, ivpa = 1.2)
         @test_throws DimensionMismatch cor(cep, X; iv = iv_long, ivpa = 1.2)
         # The guard runs AFTER `dims_oriented`, so a bad `dims` still answers `DomainError`.
@@ -480,30 +491,31 @@ end
         Both tags are in place now, so one `factory` call reaches every estimator the type
         holds.
         =#
-        f = PortfolioOptimisers.factory(ImpliedVolatility(), aw)
+        f = PortfolioOptimisers.factory(ImpliedVolatility(; ppy = 252), aw)
         @test !isnothing(f.ce.ce.w)
         @test f.alg.ve.w === aw
         @test f.alg.ve.me.w === aw
         # The tag names one field, so everything else the algorithm holds is rebuilt as it
         # stood.
-        @test f.alg.ws == ImpliedVolatility().alg.ws
+        @test f.alg.ws == ImpliedVolatility(; ppy = 252).alg.ws
         @test f.alg.re isa LinearModel
         # The algorithm answers the same weighted estimator on its own.
         @test PortfolioOptimisers.factory(ImpliedVolatilityRegression(), aw).ve.w === aw
         # `factory` writes the incoming value over a hand-set one, as it does on every
         # `@wprop` field.
         uw = AnalyticWeights(fill(inv(length(aw)), length(aw)))
-        g = PortfolioOptimisers.factory(ImpliedVolatility(;
+        g = PortfolioOptimisers.factory(ImpliedVolatility(; ppy = 252,
                                                           alg = ImpliedVolatilityRegression(;
                                                                                             ve = SimpleVariance(;
                                                                                                                 w = uw))),
                                         aw)
         @test g.alg.ve.w === aw
         # `ImpliedVolatilityPremium` holds no estimator, so it comes back unchanged.
-        p = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        p = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium())
         @test PortfolioOptimisers.factory(p, aw).alg === p.alg
         # A `factory` call that carries no weights leaves every estimator alone.
-        @test PortfolioOptimisers.factory(ImpliedVolatility(), nothing).alg.ve.w === nothing
+        @test PortfolioOptimisers.factory(ImpliedVolatility(; ppy = 252), nothing).alg.ve.w ===
+              nothing
     end
 
     @testset "the base estimator receives the oriented iv" begin
@@ -512,8 +524,8 @@ end
         its own `kwargs...` and ignores it; a nested `ImpliedVolatility` reads it, which is
         the reason the keyword is forwarded rather than dropped.
         =#
-        nested = ImpliedVolatility(;
-                                   ce = ImpliedVolatility(;
+        nested = ImpliedVolatility(; ppy = 252,
+                                   ce = ImpliedVolatility(; ppy = 252,
                                                           alg = ImpliedVolatilityRegression(;
                                                                                             ws = 30)))
         sigma = cov(nested, X; iv = iv)
@@ -523,7 +535,7 @@ end
         # diagonal.
         @test isapprox(sqrt.(diag(sigma)),
                        PortfolioOptimisers.predict_realised_vols(nested.alg,
-                                                                 iv / sqrt(nested.af), X,
+                                                                 iv / sqrt(nested.ppy), X,
                                                                  nothing))
         # `implied_vol` answers a view, as its `# Algorithm` step 2 says.
         v = PortfolioOptimisers.implied_vol(iv, 20)
@@ -548,23 +560,25 @@ end
         correlation and nothing else, so no volatility reaches the answer at all.
         =#
         base = cor(Covariance(), X)
-        cep = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+        cep = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium())
         # The answer does not move with the volatilities, at ANY scale, and is bit-exact.
         for ivpa in (1.2, 1.7, ivpav, 1e-6, 1e6)
             @test cor(cep, X; iv = iv, ivpa = ivpa) == base
         end
         for ws in (20, 25, 30)
-            @test cor(ImpliedVolatility(; alg = ImpliedVolatilityRegression(; ws = ws)), X;
+            @test cor(ImpliedVolatility(; ppy = 252,
+                                        alg = ImpliedVolatilityRegression(; ws = ws)), X;
                       iv = iv) == base
         end
         #=
-        A zero implied volatility. `cov` cannot answer it: the covariance it builds is
-        singular, and the posdef step forms a correlation from a zero diagonal entry. `cor`
-        can, because that covariance is never built.
+        A zero implied volatility. The covariance that `cov` builds is singular, and a zero
+        variance has a zero row and column in a PSD matrix, so the posdef step keeps that row
+        and repairs the others (#1429). `cor` never builds that covariance.
         =#
         iv0 = copy(iv)
         iv0[end, 3] = 0
-        @test_throws ArgumentError cov(cep, X; iv = iv0, ivpa = 1.2)
+        s0 = cov(cep, X; iv = iv0, ivpa = 1.2)
+        @test iszero(s0[3, :]) && iszero(s0[:, 3]) && all(isfinite, s0)
         @test cor(cep, X; iv = iv0, ivpa = 1.2) == base
         #=
         The model still runs, which is why the discarded call is kept rather than deleted.
@@ -572,7 +586,7 @@ end
         =#
         @test_throws ArgumentError cor(cep, X; iv = iv)
         @test_throws ArgumentError cov(cep, X; iv = iv)
-        few = ImpliedVolatility(; alg = ImpliedVolatilityRegression(; ws = 100))
+        few = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityRegression(; ws = 100))
         @test_throws DomainError cor(few, X; iv = iv)
         @test_throws DomainError cov(few, X; iv = iv)
     end
@@ -602,8 +616,8 @@ end
         side of, and the last -- so that a mask derived from ANY absent cell excludes the
         column under both.
         =#
-        cep = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
-        creg = ImpliedVolatility()
+        cep = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium())
+        creg = ImpliedVolatility(; ppy = 252)
         keep = [i != 3 for i in 1:N]
 
         # A complete surface narrows nothing, and takes the `nothing` sentinel.

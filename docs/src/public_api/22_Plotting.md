@@ -77,4 +77,7 @@ plot_forecast_ic_decay
 plot_forecast_portfolio_decay
 plot_forecast_factor_correlation
 plot_forecast_evaluation_summary
+plot_covariance_calibration
+plot_covariance_qlike
+plot_covariance_exceedance
 ```

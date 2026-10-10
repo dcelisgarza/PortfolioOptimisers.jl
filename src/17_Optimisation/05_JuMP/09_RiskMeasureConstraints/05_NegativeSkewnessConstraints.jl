@@ -3,13 +3,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Retrieve or compute and cache the square-root matrix of the co-skewness matrix `V`.
 
-If `model` does not yet contain `GV`, attempts a Cholesky factorisation of `pr.V` and falls
-back to `sqrt(pr.V)` for positive-semidefinite matrices. Stores the result as the `:GV` Model State entry.
+If `model` does not yet contain `GV`, computes the transpose of the square root of `pr.V` under
+`mtx_sqrt` with [`matrix_square_root`](@ref), and stores it as the `:GV` Model State entry.
+Every measure of the model that reads the prior's matrix reads this one factor, so the first
+measure sets the algorithm. On a positive definite matrix every algorithm gives the Cholesky
+factor.
 
 # Arguments
 
   - $(arg_dict[:model])
   - `pr::HighOrderPrior`: High-order prior containing `V`.
+  - `mtx_sqrt`: Square-root algorithm, or `nothing` for the plain Cholesky factor.
 
 # Returns
 
@@ -20,17 +24,10 @@ back to `sqrt(pr.V)` for positive-semidefinite matrices. Stores the result as th
   - [`set_negative_skewness_risk!`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
-function get_chol_or_V_pm(model::JuMP.Model, pr::HighOrderPrior)
+function get_chol_or_V_pm(model::JuMP.Model, pr::HighOrderPrior,
+                          mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     if !shared_has(model, :GV)
-        G = try
-            LinearAlgebra.cholesky(pr.V).U
-        catch err
-            if isa(err, LinearAlgebra.PosDefException)
-                sqrt(pr.V)
-            else
-                rethrow(err)
-            end
-        end
+        G = transpose(matrix_square_root(mtx_sqrt, pr.V))
         JuMP.@expression(model, GV, G)
     end
     return shared_get(model, :GV)
@@ -118,14 +115,14 @@ from the prior.
 ```math
 \\begin{align}
 \\mathrm{NSkew}(\\boldsymbol{w}) &= \\lVert \\mathbf{G}_V \\boldsymbol{w} \\rVert_2\\,, \\\\
-\\mathbf{G}_V &= \\mathrm{chol}(\\mathbf{V})\\,.
+\\mathbf{G}_V^\\intercal \\mathbf{G}_V &= \\mathbf{V}\\,.
 \\end{align}
 ```
 
 Where:
 
   - ``\\mathrm{NSkew}(\\boldsymbol{w})``: Negative skewness risk measure.
-  - ``\\mathbf{G}_V``: Cholesky factor of the projected co-skewness matrix ``\\mathbf{V}``.
+  - ``\\mathbf{G}_V``: Transpose of the square root of the projected co-skewness matrix ``\\mathbf{V}`` that [`matrix_square_root`](@ref) takes under the `mtx_sqrt` of the measure.
   - $(math_dict[:w_port])
 
 where ``\\mathbf{V}`` is the co-skewness matrix projected onto the weight space.
@@ -157,9 +154,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::NegativeSkewness,
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     V, G = if isnothing(r.V)
-        (pr.V, get_chol_or_V_pm(model, pr))
+        (pr.V, get_chol_or_V_pm(model, pr, r.mtx_sqrt))
     else
-        (r.V, LinearAlgebra.cholesky(r.V).U)
+        (r.V, transpose(matrix_square_root(r.mtx_sqrt, r.V)))
     end
     nskew_risk = state_set!(model, prefix, :nskew_risk_, i, JuMP.@variable(model))
     state_set!(model, prefix, :cnskew_soc_, i,

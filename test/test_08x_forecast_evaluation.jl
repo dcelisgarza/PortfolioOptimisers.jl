@@ -7,7 +7,7 @@ Check `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/07_Forecas
 `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl`,
 `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl` and
 `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl` against the contract their
-docstrings state, and against the reference implementation the map of issue #931 ports.
+docstrings state, and against the stored oracle of map #931.
 Issues #934, #935, #936, #937, #938, #939, #940 and #941.
 
 ELEVEN CONVENTIONS SHAPE THE PROBES.
@@ -36,17 +36,17 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
    information coefficient is a measurement rather than noise. Both are asserted, because a
    positive coefficient means nothing without the fixture that reports none.
 
-5. THE STATISTICS ARE ORACLED BY RUNNING THE REFERENCE, NOT BY READING IT. `IC_ALPHA` and
-   its gapped variant were put through the reference's own diagnostic and its correlation
+5. THE STATISTICS ARE MEASURED BY RUNNING THE ORACLE, NOT BY READING IT. `IC_ALPHA` and
+   its gapped variant were put through the oracle's own diagnostic and its correlation
    summary, and the literals below are what it answered. The one place the port diverges is
    the hit rate: the library reads it against the dates that carried a coefficient, where
-   the reference's exposure summary counts a date with no coefficient as a miss. That is
+   the oracle's exposure summary counts a date with no coefficient as a miss. That is
    `exposure_ic_factor_summary`'s convention, which both summaries share, and it is
    asserted as a divergence rather than papered over. The second divergence is the
-   t-statistic: the reference scales the ratio by the root of the date count wherever it
+   t-statistic: the oracle scales the ratio by the root of the date count wherever it
    is read, and the port's standard error reads the overlap of the forward windows through
    `forecast_ic_lags`, so the two agree only where the windows are disjoint. The
-   holding-period table at a stride of one is where they part, and the reference's number
+   holding-period table at a stride of one is where they part, and the oracle's number
    is asserted there as the plain ratio beside the corrected column.
 
 6. THE TWO ALPHA PORTFOLIOS ARE PINNED BY THEIR INVARIANTS, NOT BY A STORED NUMBER. Both
@@ -70,18 +70,20 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
    permutation whose centred values and whose ordinal ranks are both orthogonal to
    `[1, 2, 3, 4]`, which an arbitrary orthogonal vector would not be -- a tied vector such
    as `[1, -1, -1, 1]` is Pearson-orthogonal and reads 0.4 under ordinal ranks. The
-   `ExposureNeutralisation` probe is the one that reads a real fixture, and it is
-   DIRECTIONAL rather than near-zero: issue #950 records that a Neutralisation fits a
-   cross-sectional regression with no intercept, so its residual is orthogonal to the
-   target in the UNCENTRED sense and keeps a large Pearson correlation with it. The probe
-   asserts the un-neutralised correlation above 0.9, the neutralised one below it and
-   still above 0.5, and it is tightened when #950 is settled.
+   `ExposureNeutralisation` probe is the one that reads a real fixture. Since #1521 the
+   Neutralisation of `DescriptorScores` fits an intercept by default, so its residual is
+   orthogonal to the constant and to the target, hence uncorrelated with the target. The
+   probe pins that to round-off on the scores themselves, under the weights of the
+   Neutralisation. Through the evaluation it is DIRECTIONAL: the grouped scoring step
+   rescales each industry on its own, and the evaluation weighs the active assets that the
+   estimation mask leaves out, so the correlation falls far but not to zero. The
+   oracle's rule, `intercept = false`, keeps a correlation above 0.5.
 
-9. A FORWARD-WINDOW TABLE IS PINNED ROW BY ROW AGAINST THE REFERENCE, AND ITS DATE RULE IS
-   PINNED SEPARATELY. `WINDOW_ALPHA` was put through the reference's own holding-period and
-   decay diagnostics and the twenty-two literals below are what it answered, to every digit
-   it printed. The date rule is the one thing those literals cannot pin, because the
-   reference and the port agree on it: every row of a table is read on the dates every
+9. A FORWARD-WINDOW TABLE IS PINNED ROW BY ROW AGAINST THE ORACLE, AND ITS DATE RULE IS
+   PINNED SEPARATELY. `WINDOW_ALPHA` was put through the oracle's own holding-period and
+   decay diagnostics and the literals below are what it answered, to every digit (#1558;
+   before it, to the six digits it printed). The date rule is the one thing those literals cannot pin, because the
+   oracle and the port agree on it: every row of a table is read on the dates every
    window of the grid can be scored at, so `n` sets the sample as well as the depth. The
    ticket asked for the opposite -- that shortening `n` leave the rows that remain -- and
    that is FALSE in general and asserted as false. It holds only when the base evaluation
@@ -97,7 +99,7 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
     two readings it does not move.
 
 11. THE SUMMARY IS ORACLED WHOLE, AND ITS PLUMBING IS PINNED SEPARATELY. Every column of
-    `ForecastSummaryResult` was put through the reference implementation's own five
+    `ForecastSummaryResult` was put through the oracle's own five
     summary methods over `IC_ALPHA` and over the gapped variant, and `FS_REF` and
     `FS_REF_GAP` are what it answered, to every digit -- the coefficients, both books,
     the calibration, the coverage and the quantile spread alike. Beside those literals
@@ -109,68 +111,9 @@ ELEVEN CONVENTIONS SHAPE THE PROBES.
     and 7 meet here with one denominator: a date with no coefficient and a date with no
     trade are both unmeasured, and the coverage columns count them.
 =#
+include(joinpath(@__DIR__, "parity_harness.jl"))
 include(joinpath(@__DIR__, "test06c_setup.jl"))
-
-# The synthetic panel of issue #656, with a factor-model block fitted on a strict suffix of
-# the carrier so every probe of the cut has something to cut.
-#
-# `planted` drives the idiosyncratic return off the composite score instead of off a
-# sinusoid, so a member refitted at each date has a relation to find. Convention 4.
-function evaluation_fixture(; n_observations::Integer = 60, drop::Integer = 8,
-                            planted::Bool = false)
-    sp = synthetic_asset_panel(; n_assets = 20, n_observations = n_observations,
-                               n_industries = 4, late_listing_proba = 0.3,
-                               delisting_proba = 0.3, missing_ratio = 0.08,
-                               rng = StableRNG(987654321))
-    rd = sp.rd
-    pnl = rd.pnl
-    T, N = size(pnl.amsk)
-    rows = (drop + 1):T
-    Tb = length(rows)
-    ct_out = CrossSectionalWinsoriser()
-    ct_sco = CrossSectionalStandardiser(; min_group_size = 2)
-    xc = CompositeExposure(;
-                           descriptors = [Passthrough(; field = "book_equity"),
-                                          Passthrough(; field = "market_cap")],
-                           weights = [0.4, 0.6], min_coverage = 0.5, outlier = ct_out,
-                           scoring = ct_sco, group = "industry", bw = "market_cap")
-    Lo = factor_exposure(OneHotExposure(; field = "industry", family = "industry"), rd)
-    K = 1 + size(Lo, 3)
-    Ms = Array{Float64, 3}(undef, T, N, K)
-    Z = factor_exposure(xc, rd)
-    Ms[:, :, 1] = Z
-    for k in 1:size(Lo, 3)
-        Ms[:, :, k + 1] = Lo[:, :, k]
-    end
-    nf = ["style"; ["ind$k" for k in 1:size(Lo, 3)]]
-    fam = ["style"; fill("industry", size(Lo, 3))]
-    vs = [pnl.amsk[t, i] ? 0.0004 * (1.5 + sin(0.3 * t + 0.7 * i)) : NaN
-          for t in rows, i in 1:N]
-    rng = StableRNG(24680)
-    eps = if planted
-        [if pnl.amsk[t, i] && isfinite(Z[t, i])
-             0.01 * Z[t, i] + 0.003 * randn(rng)
-         else
-             NaN
-         end
-         for t in rows, i in 1:N]
-    else
-        [if pnl.amsk[t, i]
-             0.01 * sin(0.7 * t + 0.29 * i) + 0.004 * cos(0.11 * t * i)
-         else
-             NaN
-         end
-         for t in rows, i in 1:N]
-    end
-    csr = CrossSectionalRegression(; f = zeros(Tb, K), eps = eps, n = fill(N, Tb))
-    csfm = CrossSectionalFactorModel(; M = Ms[end, :, :], b = zeros(N), csr = csr,
-                                     Ms = Ms[rows, :, :], vs = vs, nf = nf, fam = fam)
-    scores = DescriptorScores(;
-                              descriptors = [Passthrough(; field = "book_equity"),
-                                             Passthrough(; field = "market_cap")],
-                              outlier = ct_out, scoring = ct_sco, group = "industry")
-    return (; rd = rd, csfm = csfm, scores = scores, rows = rows, T = T, N = N, Tb = Tb)
-end
+include(joinpath(@__DIR__, "forecast_evaluation_fixture.jl"))
 
 @testset "The forward target family reads the history each member names" begin
     PO = PortfolioOptimisers
@@ -600,8 +543,8 @@ end
     end
 end
 
-# The oracle of the information coefficients, measured by running the reference
-# implementation on the same two matrices. `IC_ALPHA` is a forecast whose ordering of the
+# The stored oracle of the information coefficients, measured by running the oracle
+# on the same two matrices. `IC_ALPHA` is a forecast whose ordering of the
 # four assets is good at the first date, mixed at the second and wrong at the third, and
 # whose *spacing* is uneven, so the rank column and the level column disagree — which is the
 # whole reason both are answered. Issue #936.
@@ -621,16 +564,19 @@ function ic_gap_fixture()
     return alpha
 end
 
-@testset "The information coefficients reproduce the reference implementation" begin
+@testset "The information coefficients reproduce the stored oracle" begin
     PO = PortfolioOptimisers
     y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
     fe = forecast_evaluation(IC_ALPHA, y)
 
-    @testset "Both columns are answered, and both match the reference" begin
+    @testset "Both columns are answered, and both match the oracle" begin
         ic = forecast_ic(fe)
         @test size(ic) == (length(fe.dates), 2)
-        @test ic[:, 1] ≈ IC_REF_SPEARMAN
-        @test ic[:, 2] ≈ IC_REF_PEARSON
+        # Every IC, IC summary and coverage literal of the oracle in this file measures
+        # bit-equal, cell by cell (#1558). `rtol = 1e-14` only leaves room for a `sqrt` or a
+        # sum that rounds one ulp apart on another host.
+        @test parity_compare(ic[:, 1], IC_REF_SPEARMAN; rtol = 1e-14, name = "ic spearman").ok
+        @test parity_compare(ic[:, 2], IC_REF_PEARSON; rtol = 1e-14, name = "ic pearson").ok
         # The two columns disagree, which is why the verb answers both rather than one.
         @test !isapprox(ic[:, 1], ic[:, 2])
     end
@@ -648,8 +594,10 @@ end
 
     @testset "A weighting moves the Pearson column and leaves the Spearman one" begin
         ic = forecast_ic(fe, IC_W)
-        @test ic[:, 1] ≈ IC_REF_SPEARMAN
-        @test ic[:, 2] ≈ IC_REF_PEARSON_W
+        @test parity_compare(ic[:, 1], IC_REF_SPEARMAN; rtol = 1e-14,
+                             name = "ic w spearman").ok
+        @test parity_compare(ic[:, 2], IC_REF_PEARSON_W; rtol = 1e-14,
+                             name = "ic w pearson").ok
         @test !isapprox(ic[:, 2], IC_REF_PEARSON)
     end
 
@@ -671,12 +619,14 @@ end
                                                    weighting = BenchmarkWeightMetric())
     end
 
-    @testset "A gap in the panel moves both columns, as it does in the reference" begin
+    @testset "A gap in the panel moves both columns, as it does in the oracle" begin
         gap = ic_gap_fixture()
         fg = forecast_evaluation(gap, PO.forward_mean_returns(gap, 1, 1); min_count = 2)
         ic = forecast_ic(fg)
-        @test ic[:, 1] ≈ IC_REF_GAP_SPEARMAN
-        @test ic[:, 2] ≈ IC_REF_GAP_PEARSON
+        @test parity_compare(ic[:, 1], IC_REF_GAP_SPEARMAN; rtol = 1e-14,
+                             name = "ic gap spearman").ok
+        @test parity_compare(ic[:, 2], IC_REF_GAP_PEARSON; rtol = 1e-14,
+                             name = "ic gap pearson").ok
     end
 end
 
@@ -686,19 +636,17 @@ end
     ic = forecast_ic(forecast_evaluation(IC_ALPHA, y))
     s = forecast_ic_summary(ic)
 
-    @testset "The five figures of each series match the reference" begin
+    @testset "The five figures of each series match the oracle" begin
         @test keys(s) == (:spearman, :pearson)
         @test keys(s.spearman) == (:mean_ic, :std_ic, :ic_ir, :t_stat, :hit_rate)
-        @test s.spearman.mean_ic ≈ 0.3333333333333333
-        @test s.spearman.std_ic ≈ 0.7023769168568493
-        @test s.spearman.ic_ir ≈ 0.4745789978762494
-        @test s.spearman.t_stat ≈ 0.8219949365267862
-        @test s.spearman.hit_rate ≈ 0.6666666666666666
-        @test s.pearson.mean_ic ≈ 0.2567790285367673
-        @test s.pearson.std_ic ≈ 0.6206266852224849
-        @test s.pearson.ic_ir ≈ 0.4137415207093715
-        @test s.pearson.t_stat ≈ 0.7166213350694421
-        @test s.pearson.hit_rate ≈ 0.6666666666666666
+        @test parity_compare(collect(values(s.spearman)),
+                             [0.3333333333333333, 0.7023769168568493, 0.4745789978762494,
+                              0.8219949365267862, 0.6666666666666666]; rtol = 1e-14,
+                             name = "ic summary spearman").ok
+        @test parity_compare(collect(values(s.pearson)),
+                             [0.2567790285367673, 0.6206266852224849, 0.4137415207093715,
+                              0.7166213350694421, 0.6666666666666666]; rtol = 1e-14,
+                             name = "ic summary pearson").ok
     end
 
     @testset "The t-statistic is the mean over the standard error of the mean" begin
@@ -762,7 +710,7 @@ end
               1
     end
 
-    @testset "At no lag the statistic is the one the reference states, bit for bit" begin
+    @testset "At no lag the statistic is the one the oracle states, bit for bit" begin
         y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
         ic = forecast_ic(forecast_evaluation(IC_ALPHA, y))
         for k in 1:2
@@ -931,7 +879,7 @@ end
     @testset "Every figure of the summary, the hit rate included, drops a NaN" begin
         # A `NaN` coefficient is a date at which nothing was measured, not a miss, so the hit
         # rate is read against the dates that carried a score, as the mean, the ratio and the
-        # t-statistic beside it are, and as the reference reads it. Until 2026-09-14 the hit
+        # t-statistic beside it are, and as the oracle reads it. Until 2026-09-14 the hit
         # rate alone counted every date and reported 1/4 here.
         ic = forecast_ic(fe)
         s = forecast_ic_summary(ic)
@@ -960,10 +908,10 @@ end
     gap = ic_gap_fixture()
     fg = forecast_evaluation(gap, PO.forward_mean_returns(gap, 1, 1); min_count = 2)
 
-    @testset "It matches the reference, one entry per evaluation date" begin
+    @testset "It matches the oracle, one entry per evaluation date" begin
         c = forecast_coverage(fg)
         @test length(c) == length(fg.dates)
-        @test c ≈ IC_REF_GAP_COVERAGE
+        @test parity_compare(c, IC_REF_GAP_COVERAGE; rtol = 1e-14, name = "coverage gap").ok
     end
 
     @testset "It counts the assets carrying a finite pair over the universe" begin
@@ -1050,7 +998,7 @@ end
         # from 10 to 19 over the evaluation dates. Every listed asset is scored at every date,
         # so the share is one throughout and the count is what moves. Divided by every asset
         # the panel ever held, the same dates read as low as one half, which is the port's
-        # defect the reference does not share.
+        # defect the oracle does not share.
         px = evaluation_fixture(; planted = true)
         fw = FixedWeightedReturnForecast(; scores = px.scores, scale = 1.0,
                                          weights = [0.4, 0.6])
@@ -1272,7 +1220,7 @@ end
     @testset "The portfolio summary scales and the turnover does not" begin
         p1 = forecast_portfolio(fe1)
         p4 = forecast_portfolio(fe4)
-        @test p4.summary.periods_per_year == 4
+        @test p4.summary.ppy == 4
         @test p4.summary.ann_return ≈ 4 * p1.summary.ann_return
         @test p4.summary.ann_volatility ≈ 2 * p1.summary.ann_volatility
         @test p4.summary.sharpe ≈ 2 * p1.summary.sharpe
@@ -1368,14 +1316,13 @@ end
         @test isnan(p.ret[2])
         @test count(isfinite, p.ret) == 4
         @test p.summary.n_periods == 4
-        @test p.summary ==
-              performance_summary(p.ret[isfinite.(p.ret)]; periods_per_year = 1)
+        @test p.summary == performance_summary(p.ret[isfinite.(p.ret)]; ppy = 1)
     end
 
     @testset "The uncompressed series is what the compression avoids" begin
         # `performance_summary`'s Precomputed-returns contract: a `NaN` makes the mean and
         # the drawdown non-finite, and the tail figure answers a number rather than a `NaN`.
-        raw = performance_summary(p.ret; periods_per_year = 1)
+        raw = performance_summary(p.ret; ppy = 1)
         @test isnan(raw.ann_return)
         @test isnan(raw.max_drawdown)
         @test isfinite(raw.cvar)
@@ -1570,27 +1517,40 @@ end
     fb = forecast_evaluation(fw, rd, csfm; horizon = 2, lag = 1)
 
     @testset "The exposure history is the block's own, unlagged" begin
-        @test isequal(forecast_factor_correlation(fb, csfm),
+        @test isequal(forecast_factor_correlation(fb, csfm).X,
                       forecast_factor_correlation(fb, PO.cs_diagnostic_exposures(csfm)))
-        @test size(forecast_factor_correlation(fb, csfm)) ==
+        @test size(forecast_factor_correlation(fb, csfm).X) ==
               (size(fb.alpha, 1), length(csfm.nf))
     end
 
+    @testset "The answer carries the names and the families of the raw axis" begin
+        c = forecast_factor_correlation(fb, csfm)
+        @test c.nf == csfm.nf && isequal(c.fam, csfm.fam)
+        # The summary of the answer keeps the labels, and a view by name selects one
+        # factor of both.
+        s = exposure_ic_summary(c)
+        @test s.nf == csfm.nf
+        k = csfm.nf[end]
+        cv = PO.port_opt_view(c, [k])
+        @test isequal(cv.X, c.X[:, end:end])
+        @test isequal(exposure_ic_summary(cv).mean_ic, PO.port_opt_view(s, [k]).mean_ic)
+    end
+
     @testset "The row set passes through to the bare method" begin
-        @test isequal(forecast_factor_correlation(fb, csfm; dates = fb.dates),
+        @test isequal(forecast_factor_correlation(fb, csfm; dates = fb.dates).X,
                       forecast_factor_correlation(fb, PO.cs_diagnostic_exposures(csfm);
                                                   dates = fb.dates))
-        @test isequal(forecast_factor_correlation(fb, csfm; dates = fb.dates),
-                      forecast_factor_correlation(fb, csfm)[fb.dates, :])
+        @test isequal(forecast_factor_correlation(fb, csfm; dates = fb.dates).X,
+                      forecast_factor_correlation(fb, csfm).X[fb.dates, :])
     end
 
     @testset "A weighting moves the weighted form and leaves the rank one" begin
         cw = forecast_factor_correlation(fb, csfm;
-                                         weighting = InverseIdiosyncraticVarianceMetric())
-        @test !isequal(cw, forecast_factor_correlation(fb, csfm))
+                                         weighting = InverseIdiosyncraticVarianceMetric()).X
+        @test !isequal(cw, forecast_factor_correlation(fb, csfm).X)
         @test isequal(forecast_factor_correlation(fb, csfm; rank = true,
-                                                  weighting = InverseIdiosyncraticVarianceMetric()),
-                      forecast_factor_correlation(fb, csfm; rank = true))
+                                                  weighting = InverseIdiosyncraticVarianceMetric()).X,
+                      forecast_factor_correlation(fb, csfm; rank = true).X)
         # A metric naming a history the block does not carry refuses by name.
         @test_throws PO.IsNothingError forecast_factor_correlation(fb, csfm;
                                                                    weighting = BenchmarkWeightMetric())
@@ -1615,8 +1575,8 @@ end
                           outlier = ds.outlier, scoring = ds.scoring, group = ds.group)
     raw = FixedWeightedReturnForecast(; scores = ds, scale = 1.0, weights = [0.4, 0.6])
     neu = FixedWeightedReturnForecast(; scores = dn, scale = 1.0, weights = [0.4, 0.6])
-    cr = forecast_factor_correlation(forecast_evaluation(raw, rd, csfm; horizon = 2), csfm)
-    cn = forecast_factor_correlation(forecast_evaluation(neu, rd, csfm; horizon = 2), csfm)
+    cr = forecast_factor_correlation(forecast_evaluation(raw, rd, csfm; horizon = 2), csfm).X
+    cn = forecast_factor_correlation(forecast_evaluation(neu, rd, csfm; horizon = 2), csfm).X
     mraw = abs(sum(filter(isfinite, view(cr, :, 1))) / count(isfinite, view(cr, :, 1)))
     mneu = abs(sum(filter(isfinite, view(cn, :, 1))) / count(isfinite, view(cn, :, 1)))
 
@@ -1624,31 +1584,66 @@ end
         @test mraw > 0.9
     end
 
-    @testset "The neutralised one is less correlated with it, and not near zero" begin
-        # THE ASSERTION IS DIRECTIONAL, AND ISSUE #950 IS WHY. `DescriptorScores`'s `cre`
-        # defaults to `CrossSectionalLinearRegression()`, whose `intercept` defaults to
-        # `false` to reproduce the reference implementation, so the residual is exactly
-        # orthogonal to the target in the UNCENTRED sense and keeps a large Pearson
-        # correlation with it. This is the library's default behaviour, not a bug left
-        # open: see the next testset for the opt-in fix.
-        @test mneu < mraw
-        @test mneu > 0.5
+    @testset "The neutralised one is far less correlated with it (#1521)" begin
+        # THE ASSERTION IS DIRECTIONAL. The default `cre` fits an intercept, so each score
+        # leaves the regression uncorrelated with the style exposure, as the next testset
+        # pins. The grouped scoring step after the fit rescales each industry on its own,
+        # and the evaluation weighs the active assets that the estimation mask leaves out,
+        # so the forecast keeps a small correlation.
+        @test dn.cre.intercept
+        @test mneu < 0.4
     end
 
-    @testset "`cre = CrossSectionalLinearRegression(; intercept = true)` narrows it further (#950)" begin
-        # An opt-in fix, not a changed default: the re-standardisation and the grouping
-        # after the fit reintroduce some correlation, so this does not reach zero, but it
-        # is well below the no-intercept default's floor.
-        dni = DescriptorScores(; descriptors = ds.descriptors, neutralise = "style",
-                               cre = CrossSectionalLinearRegression(; intercept = true),
+    @testset "`intercept = false`, the oracle's rule, keeps a large correlation (#950)" begin
+        # The residual is orthogonal to the target in the UNCENTRED sense alone, so it keeps
+        # a large Pearson correlation with it.
+        dn0 = DescriptorScores(; descriptors = ds.descriptors, neutralise = "style",
+                               cre = CrossSectionalLinearRegression(; intercept = false),
                                outlier = ds.outlier, scoring = ds.scoring, group = ds.group)
-        nei = FixedWeightedReturnForecast(; scores = dni, scale = 1.0, weights = [0.4, 0.6])
-        cni = forecast_factor_correlation(forecast_evaluation(nei, rd, csfm; horizon = 2),
-                                          csfm)
-        mnei = abs(sum(filter(isfinite, view(cni, :, 1))) /
-                   count(isfinite, view(cni, :, 1)))
-        @test mnei < mneu
-        @test mnei < 0.4
+        ne0 = FixedWeightedReturnForecast(; scores = dn0, scale = 1.0, weights = [0.4, 0.6])
+        cn0 = forecast_factor_correlation(forecast_evaluation(ne0, rd, csfm; horizon = 2),
+                                          csfm).X
+        mne0 = abs(sum(filter(isfinite, view(cn0, :, 1))) /
+                   count(isfinite, view(cn0, :, 1)))
+        @test mneu < mne0 < mraw
+        @test mne0 > 0.5
+    end
+
+    @testset "Each default score is uncorrelated with the target to round-off (#1521)" begin
+        # The scores themselves, under the weights of the Neutralisation, with an ungrouped
+        # standardiser after the fit: it maps each cross-section by one affine map, so it
+        # keeps the zero weighted mean and the orthogonality that the intercept gives.
+        PO = PortfolioOptimisers
+        X = csfm.Ms[:, :, 1]
+        function worst(cre)
+            d = DescriptorScores(; descriptors = ds.descriptors, neutralise = "style",
+                                 cre = cre, outlier = ds.outlier, scoring = ds.scoring)
+            r = descriptor_scores(d, rd, csfm)
+            w = PO.return_forecast_weights(rd)[r.rows, :]
+            wc = 0.0
+            wo = 0.0
+            for k in axes(r.S, 3), t in axes(X, 1)
+                s = r.S[r.rows[t], :, k]
+                m = isfinite.(s) .& isfinite.(view(X, t, :)) .& (view(w, t, :) .> 0)
+                u, s, x = w[t, m], s[m], X[t, m]
+                sc = s .- sum(u .* s) / sum(u)
+                xc = x .- sum(u .* x) / sum(u)
+                wc = max(wc,
+                         abs(sum(u .* sc .* xc)) /
+                         sqrt(sum(u .* sc .^ 2) * sum(u .* xc .^ 2)))
+                wo = max(wo,
+                         abs(sum(u .* s .* x)) / sqrt(sum(u .* s .^ 2) * sum(u .* x .^ 2)))
+            end
+            return (; corr = wc, orth = wo)
+        end
+        d1 = worst(CrossSectionalLinearRegression(; intercept = true))
+        d0 = worst(CrossSectionalLinearRegression(; intercept = false))
+        @test d1.corr < 1e-12
+        @test d1.orth < 1e-12
+        # Without the intercept the standardiser re-centres a residual whose weighted mean
+        # is not zero, so neither property survives it.
+        @test d0.corr > 0.5
+        @test d0.orth > 0.3
     end
 end
 
@@ -1707,7 +1702,7 @@ end
     end
 end
 
-# The reference implementation's factor diagnostics on the planted fixture of the testset
+# The oracle's factor diagnostics on the planted fixture of the testset
 # below, run on 2026-09-14 through its own `_compute_factor_correlation_diagnostics` and
 # `_correlation_stats` over the fixture's exported forecast history, exposure history and
 # estimation mask, with equal weights, Pearson and `min_count = 3`. The style factor's
@@ -1735,9 +1730,9 @@ const FC_REF_SUMMARY = (; mean = 0.9835597986375235, std = 0.004192196953212379,
                         ir = 234.61679153309947, t_stat = 1691.8457439148713,
                         hit_rate = 1.0)
 
-@testset "A contemporaneous statistic is read on every observation, as the reference reads it" begin
+@testset "A contemporaneous statistic is read on every observation, as the oracle reads it" begin
     PO = PortfolioOptimisers
-    # Issue #1071. The reference implementation correlates the forecast against every
+    # Issue #1071. The oracle correlates the forecast against every
     # exposure over the whole forecast history and summarises it over that count; it has no
     # evaluation grid for a statistic that looks nowhere forward. The port read `fe.dates`
     # only, so under `step = horizon` it saw `1 / horizon` of the observations and its
@@ -1748,8 +1743,8 @@ const FC_REF_SUMMARY = (; mean = 0.9835597986375235, std = 0.004192196953212379,
     fw = FixedWeightedReturnForecast(; scores = px.scores, scale = 1.0,
                                      weights = [0.4, 0.6])
     fe = forecast_evaluation(fw, px.rd, px.csfm; horizon = 5, lag = 1)
-    c = forecast_factor_correlation(fe, px.csfm)
-    cg = forecast_factor_correlation(fe, px.csfm; dates = fe.dates)
+    c = forecast_factor_correlation(fe, px.csfm).X
+    cg = forecast_factor_correlation(fe, px.csfm; dates = fe.dates).X
     s = exposure_ic_summary(c)
     sg = exposure_ic_summary(cg)
 
@@ -1767,22 +1762,24 @@ const FC_REF_SUMMARY = (; mean = 0.9835597986375235, std = 0.004192196953212379,
         @test s.t_stat[1] > 2 * sg.t_stat[1]
     end
 
-    @testset "The reference implementation's factor diagnostics are reproduced" begin
+    @testset "The oracle's factor diagnostics are reproduced" begin
         # The default of the verb is parity: the same kernel over the same axis answers
-        # the reference's column to the last bit, and the shared summary kernel its four
-        # figures. The one figure the port reads on its own terms is the hit rate, which
-        # counts a `NaN` row as a miss where the reference drops it from the denominator;
-        # ADR 0149 rules that a date the forecast could not rank is a miss, and this
-        # fixture scores every row, so the two agree here and the assertion says why.
-        # The reference masks the forecast by the estimation mask before it correlates,
+        # the oracle's column to the last bit, and the shared summary kernel its five
+        # figures. The hit rate leaves a `NaN` coefficient out of its denominator on both
+        # sides (ADR 0149); this fixture scores every row, so the last assertion states
+        # that no row is left out.
+        # The oracle masks the forecast by the estimation mask before it correlates,
         # and the pairing writes the forecast onto that mask once (#1074); the fixture
         # carries one active asset off the mask, so the pins would miss by up to `0.098`
         # in a cell were either side to read it.
-        @test c[:, 1] ≈ FC_REF_STYLE rtol = 1e-12
-        @test s.mean_ic[1] ≈ FC_REF_SUMMARY.mean rtol = 1e-12
-        @test s.std_ic[1] ≈ FC_REF_SUMMARY.std rtol = 1e-12
-        @test s.ic_ir[1] ≈ FC_REF_SUMMARY.ir rtol = 1e-12
-        @test s.t_stat[1] ≈ FC_REF_SUMMARY.t_stat rtol = 1e-12
+        # Measured cell by cell, with and without the flags of `Pkg.test` (#1558): the column
+        # 5.6e-16 at most, the summary 7.9e-15 at most. The column
+        # sits near 0.98 with a spread of 0.004, so its standard deviation cancels: the ratio
+        # is 235 and the ratio and the t-statistic carry about 235 times the round-off.
+        @test parity_compare(c[:, 1], FC_REF_STYLE; rtol = 1e-14, name = "factor column").ok
+        @test parity_compare([s.mean_ic[1], s.std_ic[1], s.ic_ir[1], s.t_stat[1]],
+                             [FC_REF_SUMMARY.mean, FC_REF_SUMMARY.std, FC_REF_SUMMARY.ir,
+                              FC_REF_SUMMARY.t_stat]; rtol = 5e-14, name = "factor summary").ok
         @test s.hit_rate[1] == FC_REF_SUMMARY.hit_rate
         @test count(isfinite, view(c, :, 1)) == size(c, 1)
     end
@@ -1797,7 +1794,7 @@ const FC_REF_SUMMARY = (; mean = 0.9835597986375235, std = 0.004192196953212379,
         tgt = TargetReturnForecast(; scores = px.scores, horizon = 2, lag = 1,
                                    calibrate = false)
         ft = forecast_evaluation(tgt, px.rd, px.csfm; horizon = 2, lag = 1)
-        ct = forecast_factor_correlation(ft, px.csfm)
+        ct = forecast_factor_correlation(ft, px.csfm).X
         T = size(ft.alpha, 1)
         written = [any(isfinite, view(ft.alpha, t, :)) for t in 1:T]
         @test findall(written) == collect(1:ft.step:T)
@@ -1807,7 +1804,7 @@ const FC_REF_SUMMARY = (; mean = 0.9835597986375235, std = 0.004192196953212379,
         @test findall(isfinite, view(ct, :, 1)) == findall(written)
         # The grid reads the style column finite on every date, and the whole axis reads
         # the same entries there.
-        cg = forecast_factor_correlation(ft, px.csfm; dates = ft.dates)
+        cg = forecast_factor_correlation(ft, px.csfm; dates = ft.dates).X
         @test all(isfinite, view(cg, :, 1))
         @test isequal(cg, ct[ft.dates, :])
     end
@@ -1815,7 +1812,7 @@ end
 
 @testset "The forecast is written onto the estimation universe at the pairing" begin
     PO = PortfolioOptimisers
-    # Issue #1074. The reference implementation masks the forecast by the estimation mask
+    # Issue #1074. The oracle masks the forecast by the estimation mask
     # before every statistic; the pairing does it once, so every verb above it inherits
     # the universe from `fe.alpha` and none carries a mask of its own.
     y = PO.forward_mean_returns(FC_ALPHA, 1, 1)
@@ -1947,10 +1944,10 @@ end
     end
 end
 
-@testset "The two tables reproduce the reference implementation" begin
+@testset "The two tables reproduce the stored oracle" begin
     PO = PortfolioOptimisers
     alpha = WINDOW_ALPHA
-    # The forward means of a longer window tie on this fixture, and the reference breaks a
+    # The forward means of a longer window tie on this fixture, and the oracle breaks a
     # tie by the asset order here, so `ties = :ordinal` reproduces its numbers.
     fe = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1,
                              ties = :ordinal)
@@ -1960,8 +1957,9 @@ end
     @testset "Under the default tie rule, the rows whose targets tie move and the first does not" begin
         fa = forecast_evaluation(alpha, PO.forward_mean_returns(alpha, 1, 1); step = 1)
         ha = forecast_holding_period(fa, alpha; n = 3)
-        @test ha.spearman_mean_ic[1] ≈ h.spearman_mean_ic[1]
-        @test ha.pearson_mean_ic ≈ h.pearson_mean_ic
+        @test parity_compare([ha.spearman_mean_ic[1]; ha.pearson_mean_ic],
+                             [h.spearman_mean_ic[1]; h.pearson_mean_ic]; rtol = 1e-14,
+                             name = "untied rows").ok
         @test !isapprox(ha.spearman_mean_ic[2:3], h.spearman_mean_ic[2:3])
     end
 
@@ -1980,22 +1978,29 @@ end
         @test h.dates == d.dates == [1, 2, 3, 4, 5]
     end
 
-    @testset "The holding-period table is what the reference answered" begin
-        @test isapprox(h.spearman_mean_ic, [0.4, 0.12, 0.28])
-        @test isapprox(h.spearman_ic_ir, [1.414214, 0.395628, 0.639010]; rtol = 1e-6)
-        @test isapprox(h.pearson_mean_ic, [0.4, 0.180180, 0.400988]; rtol = 1e-5)
-        @test isapprox(h.pearson_ic_ir, [1.414214, 0.371014, 0.605921]; rtol = 1e-6)
-        # The reference's t-statistic is the ratio times the root of the five dates at every
+    @testset "The holding-period table is what the oracle answered" begin
+        # The literals of both tables are the oracle's full digits (#1558; the six-digit
+        # printouts before it held the tables to `rtol = 1e-5`). Every cell measures
+        # bit-equal, and so do the hand literals of the overlap rows.
+        @test parity_compare(hcat(h.spearman_mean_ic, h.spearman_ic_ir, h.pearson_mean_ic,
+                                  h.pearson_ic_ir),
+                             [0.4 1.414213562373095 0.4 1.414213562373095;
+                              0.12 0.39562828403747213 0.18017986772428515 0.37101420854458156;
+                              0.27999999999999997 0.6390096504226938 0.40098776003427916 0.6059206450877959];
+                             rtol = 1e-14, name = "holding ic").ok
+        # The oracle's t-statistic is the ratio times the root of the five dates at every
         # row. The port answers that at the first row alone: at a stride of one, row `p`'s
         # windows overlap their `p - 1` neighbours, and the port's standard error reads the
-        # overlap where the reference's does not. That is a deliberate divergence, asserted
-        # here beside the reference's number rather than papered over.
-        @test isapprox(h.spearman_ic_ir .* sqrt(5), [3.162278, 0.884652, 1.428869];
-                       rtol = 1e-6)
-        @test isapprox(h.pearson_ic_ir .* sqrt(5), [3.162278, 0.829613, 1.354880];
-                       rtol = 1e-6)
-        @test h.spearman_t_stat[1] ≈ 3.162278 rtol = 1e-6
-        @test h.pearson_t_stat[1] ≈ 3.162278 rtol = 1e-6
+        # overlap where the oracle's does not. That is a deliberate divergence, asserted
+        # here beside the oracle's number rather than papered over.
+        @test parity_compare(hcat(h.spearman_ic_ir, h.pearson_ic_ir) .* sqrt(5),
+                             [3.162277660168379 3.162277660168379;
+                              0.8846517369293827 0.8296129909239677;
+                              1.4288690166235205 1.3548797513868356]; rtol = 1e-14,
+                             name = "holding oracle t").ok
+        @test parity_compare([h.spearman_t_stat[1], h.pearson_t_stat[1]],
+                             [3.162277660168379, 3.162277660168379]; rtol = 1e-14,
+                             name = "holding t first row").ok
         for p in 2:3
             fp = PO.ForecastEvaluationResult(alpha,
                                              PO.forward_mean_returns(alpha, h.horizon[p],
@@ -2006,30 +2011,39 @@ end
             @test isequal(h.spearman_t_stat[p], s.spearman.t_stat)
             @test isequal(h.pearson_t_stat[p], s.pearson.t_stat)
         end
-        @test h.spearman_t_stat[2] ≈ 0.8624393618641034
-        @test h.pearson_t_stat[2] ≈ 0.7453765425294355
+        @test parity_compare([h.spearman_t_stat[2], h.pearson_t_stat[2],
+                              h.pearson_t_stat[3]],
+                             [0.8624393618641034, 0.7453765425294355, 1.9491738847880407];
+                             rtol = 1e-14, name = "holding t overlap").ok
         # Five dates at two lags sum the Spearman series' long-run variance to a
         # non-positive number, and the statistic is NaN there rather than clamped.
         @test isnan(h.spearman_t_stat[3])
-        @test h.pearson_t_stat[3] ≈ 1.9491738847880407
-        @test isapprox(h.rank_ann_return, [1.0, 0.55, 0.733333]; rtol = 1e-6)
-        @test isapprox(h.rank_sharpe, [1.414214, 0.792825, 0.964764]; rtol = 1e-6)
-        @test isapprox(h.zscore_ann_return, h.rank_ann_return)
-        @test isapprox(h.zscore_sharpe, h.rank_sharpe)
+        @test parity_compare(hcat(h.rank_ann_return, h.rank_sharpe),
+                             [1.0 1.414213562373095; 0.55 0.7928249671720919;
+                              0.7333333333333332 0.964763821237732]; rtol = 1e-14,
+                             name = "holding rank book").ok
+        @test parity_compare(hcat(h.zscore_ann_return, h.zscore_sharpe),
+                             hcat(h.rank_ann_return, h.rank_sharpe); rtol = 1e-14,
+                             name = "holding zscore book").ok
         @test h.mean_coverage == [1.0, 1.0, 1.0]
     end
 
-    @testset "The decay table is what the reference answered" begin
-        @test isapprox(d.spearman_mean_ic, [0.4, 0.04, 0.44])
-        @test isapprox(d.spearman_ic_ir, [1.414214, 0.121716, 1.073490]; rtol = 1e-6)
-        @test isapprox(d.spearman_t_stat, [3.162278, 0.272166, 2.400397]; rtol = 1e-6)
-        @test isapprox(d.pearson_mean_ic, d.spearman_mean_ic)
-        @test isapprox(d.pearson_ic_ir, d.spearman_ic_ir)
-        @test isapprox(d.pearson_t_stat, d.spearman_t_stat)
-        @test isapprox(d.rank_ann_return, [1.0, 0.1, 1.1]; rtol = 1e-6)
-        @test isapprox(d.rank_sharpe, [1.414214, 0.121716, 1.073490]; rtol = 1e-6)
-        @test isapprox(d.zscore_ann_return, d.rank_ann_return)
-        @test isapprox(d.zscore_sharpe, d.rank_sharpe)
+    @testset "The decay table is what the oracle answered" begin
+        @test parity_compare(hcat(d.spearman_mean_ic, d.spearman_ic_ir, d.spearman_t_stat),
+                             [0.4 1.414213562373095 3.162277660168379;
+                              0.040000000000000015 0.12171612389003696 0.2721655269759088;
+                              0.43999999999999995 1.0734900802433864 2.400396792595916];
+                             rtol = 1e-14, name = "decay spearman").ok
+        @test parity_compare(hcat(d.pearson_mean_ic, d.pearson_ic_ir, d.pearson_t_stat),
+                             hcat(d.spearman_mean_ic, d.spearman_ic_ir, d.spearman_t_stat);
+                             rtol = 1e-14, name = "decay pearson").ok
+        @test parity_compare(hcat(d.rank_ann_return, d.rank_sharpe),
+                             [1.0 1.414213562373095; 0.1 0.12171612389003691;
+                              1.1 1.0734900802433864]; rtol = 1e-14,
+                             name = "decay rank book").ok
+        @test parity_compare(hcat(d.zscore_ann_return, d.zscore_sharpe),
+                             hcat(d.rank_ann_return, d.rank_sharpe); rtol = 1e-14,
+                             name = "decay zscore book").ok
         @test d.mean_coverage == [1.0, 1.0, 1.0]
     end
 end
@@ -2154,7 +2168,7 @@ end
 
     @testset "An empty grid is refused" begin
         @test_throws PO.IsEmptyError PO.forecast_window_table(fe, alpha, nothing,
-                                                              Tuple{Int, Int}[], 3)
+                                                              Tuple{Int, Int}[], 3, 1)
     end
 
     @testset "A grid deeper than the sample prints a table of NaN" begin
@@ -2196,7 +2210,7 @@ end
     end
 end
 
-# The oracle of the calibration, measured by running the reference implementation on
+# The stored oracle of the calibration, measured by running the oracle on
 # `IC_ALPHA` and its forward target -- the same two matrices the information coefficients
 # are oracled on, so the two sets of literals describe one forecast. `IC_ALPHA` spaces its
 # assets very unevenly, which is what makes a scale statistic worth taking on it: the
@@ -2208,7 +2222,7 @@ const CAL_REF_MEAN_ALPHA = 6.333333333333333
 const CAL_REF_STD_ALPHA = 10.790006599823858
 const CAL_REF_MEAN_Y = 6.083333333333333
 const CAL_REF_STD_Y = 10.799480907839406
-# The reference numbers its buckets from zero and the library from one, so the indices below
+# The oracle numbers its buckets from zero and the library from one, so the indices below
 # are its `[0, 2, 4, 5, 7, 8]` shifted by one. The four bins it never fills are dropped by
 # both.
 const CAL_REF_BIN = [1, 3, 5, 6, 8, 9]
@@ -2216,19 +2230,19 @@ const CAL_REF_BIN_ALPHA = [1.0, 2.0, 3.0, 4.0, 5.0, 24.0]
 const CAL_REF_BIN_Y = [2.5, 2.0, 5.5, 5.0, 1.5, 21.5]
 const CAL_REF_BIN_COUNT = [2, 3, 2, 1, 2, 2]
 
-@testset "The calibration reproduces the reference implementation" begin
+@testset "The calibration reproduces the stored oracle" begin
     PO = PortfolioOptimisers
     y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
     fe = forecast_evaluation(IC_ALPHA, y)
     c = forecast_calibration(fe)
 
     @testset "The slope and the pooled moments match, weighted and unweighted" begin
-        @test c.slope ≈ CAL_REF_SLOPE
-        @test forecast_calibration(fe, IC_W).slope ≈ CAL_REF_SLOPE_W
-        @test c.mean_alpha ≈ CAL_REF_MEAN_ALPHA
-        @test c.std_alpha ≈ CAL_REF_STD_ALPHA
-        @test c.mean_y ≈ CAL_REF_MEAN_Y
-        @test c.std_y ≈ CAL_REF_STD_Y
+        # Measured bit-equal, cell by cell, here and on the curve (#1558).
+        @test parity_compare([c.slope, forecast_calibration(fe, IC_W).slope, c.mean_alpha,
+                              c.std_alpha, c.mean_y, c.std_y],
+                             [CAL_REF_SLOPE, CAL_REF_SLOPE_W, CAL_REF_MEAN_ALPHA,
+                              CAL_REF_STD_ALPHA, CAL_REF_MEAN_Y, CAL_REF_STD_Y];
+                             rtol = 1e-14, name = "calibration").ok
         # A good ordering and a bad scale: the coefficients of #936 are positive at the
         # first two dates and the slope is a third of one all the same.
         @test c.slope < 0.5
@@ -2237,8 +2251,9 @@ const CAL_REF_BIN_COUNT = [2, 3, 2, 1, 2, 2]
     @testset "The curve matches bin for bin, and the empty bins are dropped" begin
         @test c.n_bins == length(CAL_REF_BIN)
         @test c.curve.bin == CAL_REF_BIN
-        @test c.curve.mean_alpha ≈ CAL_REF_BIN_ALPHA
-        @test c.curve.mean_y ≈ CAL_REF_BIN_Y
+        @test parity_compare(hcat(c.curve.mean_alpha, c.curve.mean_y),
+                             hcat(CAL_REF_BIN_ALPHA, CAL_REF_BIN_Y); rtol = 1e-14,
+                             name = "calibration curve").ok
         @test c.curve.count == CAL_REF_BIN_COUNT
         @test c.n_bins < 10
     end
@@ -2267,7 +2282,9 @@ end
             @test forecast_calibration(forecast_evaluation(k * IC_ALPHA, y)).slope ≈
                   forecast_calibration(fe).slope / k
         end
-        @test forecast_calibration(forecast_evaluation(-IC_ALPHA, y)).slope ≈ -CAL_REF_SLOPE
+        # Measured maxrel 0.0: the negation is exact.
+        @test parity_compare([forecast_calibration(forecast_evaluation(-IC_ALPHA, y)).slope],
+                             [-CAL_REF_SLOPE]; rtol = 1e-14, name = "negated slope").ok
     end
 
     @testset "The line is pinned through the origin" begin
@@ -2289,7 +2306,7 @@ end
     @testset "The edges are the quantiles, and they are answered once each" begin
         # The cut writes out the linear interpolation `Statistics.quantile` applies by
         # default, so it answers what that verb answers to rounding. That keeps the curve at
-        # parity with the reference implementation.
+        # parity with the oracle.
         for x in ([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], [1.0, 1.0, 2.0, 40.0],
                   collect(range(-3.0, 5.0, 17)))
             for bins in (1, 2, 3, 10)
@@ -2545,7 +2562,7 @@ end
     end
 end
 
-# The oracle of the summary, measured by running the reference implementation's own
+# The stored oracle of the summary, measured by running the oracle's own
 # `ic_summary`, `portfolio_summary`, `quantile_summary`, `calibration_summary` and
 # `coverage_summary` over `IC_ALPHA` and over the gapped variant, on the evaluation dates
 # both agree on. Convention 11. Issue #941.
@@ -2590,7 +2607,8 @@ const FS_REF_GAP = (; spearman_mean_ic = 0.8333333333333334,
                     spread_ann_volatility = 1.1547005383792515,
                     spread_sharpe = 2.0207259421636903, spread_hit_rate = 1.0)
 
-# The thirty columns whose axis is the forecast, in the order the Result declares them.
+# The thirty columns of the oracle's summary whose axis is the forecast, in the order the
+# Result declares them. The three scored-coverage columns of #1512 follow them.
 const FS_CORE = (:spearman_mean_ic, :spearman_std_ic, :spearman_ic_ir, :spearman_t_stat,
                  :spearman_hit_rate, :pearson_mean_ic, :pearson_std_ic, :pearson_ic_ir,
                  :pearson_t_stat, :pearson_hit_rate, :rank_ann_return, :rank_ann_volatility,
@@ -2602,7 +2620,7 @@ const FS_CORE = (:spearman_mean_ic, :spearman_std_ic, :spearman_ic_ir, :spearman
 const FS_SPREAD = (:spread_ann_return, :spread_ann_volatility, :spread_sharpe,
                    :spread_hit_rate)
 
-@testset "The summary reproduces the reference implementation, column for column" begin
+@testset "The summary reproduces the stored oracle, column for column" begin
     PO = PortfolioOptimisers
 
     @testset "Every core column matches, bit for bit" begin
@@ -2610,15 +2628,14 @@ const FS_SPREAD = (:spread_ann_return, :spread_ann_volatility, :spread_sharpe,
                                                              PO.forward_mean_returns(IC_ALPHA,
                                                                                      1, 1));
                                          quantiles = (0.1,))
-        for f in FS_CORE
-            @test getfield(fs, f)[1] ≈ getfield(FS_REF, f)
-        end
-        for f in FS_SPREAD
-            @test getfield(fs, f)[1, 1] ≈ getfield(FS_REF, f)
-        end
+        # Every column measures bit-equal, on this panel and on the gapped one (#1558).
+        @test parity_compare([[getfield(fs, f)[1] for f in FS_CORE];
+                              [getfield(fs, f)[1, 1] for f in FS_SPREAD]],
+                             [getfield(FS_REF, f) for f in (FS_CORE..., FS_SPREAD...)];
+                             rtol = 1e-14, name = "summary").ok
     end
 
-    @testset "A gapped panel moves the coverage block, and the reference agrees" begin
+    @testset "A gapped panel moves the coverage block, and the oracle agrees" begin
         # Two gaps thin two of the three cross-sections, so the coverage columns stop
         # reading the whole universe and the count columns say how far they fell. This is
         # the fixture that separates `mean_coverage` from `min_coverage`, which a full
@@ -2629,15 +2646,14 @@ const FS_SPREAD = (:spread_ann_return, :spread_ann_volatility, :spread_sharpe,
                                                                                      1);
                                                              min_count = 2);
                                          quantiles = (0.25,))
-        for f in FS_CORE
-            @test getfield(fs, f)[1] ≈ getfield(FS_REF_GAP, f)
-        end
-        for f in FS_SPREAD
-            @test getfield(fs, f)[1, 1] ≈ getfield(FS_REF_GAP, f)
-        end
-        @test fs.mean_coverage[1] ≈ sum(IC_REF_GAP_COVERAGE) / 3
-        @test fs.min_coverage[1] ≈ minimum(IC_REF_GAP_COVERAGE)
-        @test fs.mean_n_scored[1] ≈ sum(IC_REF_GAP_COVERAGE .* 4) / 3
+        @test parity_compare([[getfield(fs, f)[1] for f in FS_CORE];
+                              [getfield(fs, f)[1, 1] for f in FS_SPREAD]],
+                             [getfield(FS_REF_GAP, f) for f in (FS_CORE..., FS_SPREAD...)];
+                             rtol = 1e-14, name = "summary gap").ok
+        @test parity_compare([fs.mean_coverage[1], fs.min_coverage[1], fs.mean_n_scored[1]],
+                             [sum(IC_REF_GAP_COVERAGE) / 3, minimum(IC_REF_GAP_COVERAGE),
+                              sum(IC_REF_GAP_COVERAGE .* 4) / 3]; rtol = 1e-14,
+                             name = "summary gap coverage").ok
         @test fs.min_n_scored[1] == 2
     end
 end
@@ -2738,6 +2754,67 @@ end
     @testset "A vector method with no evaluation has nothing to summarise" begin
         @test_throws PO.IsEmptyError forecast_evaluation_summary(ForecastEvaluationResult[])
     end
+end
+
+@testset "A listing stacks the summary of each evaluation, and a comparison refuses it" begin
+    # R90 of #1416, built by #1512. A comparison of skill is paired: one estimand, one sample
+    # and one unit. `paired = false` is a listing, the oracle's table of evaluations.
+    PO = PortfolioOptimisers
+    fe1 = forecast_evaluation(IC_ALPHA, PO.forward_mean_returns(IC_ALPHA, 1, 1))
+    fe2 = forecast_evaluation(IC_ALPHA, PO.forward_mean_returns(IC_ALPHA, 2, 1);
+                              horizon = 2, ppy = 12)
+    @test_throws PO.ConflictingArgumentError forecast_evaluation_summary([fe1, fe2])
+    ls = forecast_evaluation_summary([fe1, fe2]; paired = false, names = ["h1", "h2"],
+                                     quantiles = (0.25,))
+    s1 = forecast_evaluation_summary(fe1; quantiles = (0.25,))
+    s2 = forecast_evaluation_summary(fe2; quantiles = (0.25,))
+    @test ls.names == ["h1", "h2"]
+    for f in (FS_CORE..., :n_silenced, :mean_coverage_scored, :min_coverage_scored,
+              FS_SPREAD...)
+        @test isequal(getfield(ls, f), vcat(getfield(s1, f), getfield(s2, f)))
+    end
+    @test ls.ppy == [1, 12]
+    err = try
+        forecast_evaluation_summary([fe1, fe2]; paired = false, align = true)
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, PO.ConflictingArgumentError)
+    @test occursin("`paired = false`", err.msg) && occursin("`align = true`", err.msg)
+    # On a comparable pair the listing has the rows of the comparison.
+    cp = forecast_evaluation_summary([fe1, fe1])
+    lp = forecast_evaluation_summary([fe1, fe1]; paired = false)
+    for f in FS_CORE
+        @test isequal(getfield(cp, f), getfield(lp, f))
+    end
+    @test cp.ppy == 1 && lp.ppy == [1, 1]
+    @test_throws PO.IsEmptyError forecast_evaluation_summary(ForecastEvaluationResult[];
+                                                             paired = false)
+end
+
+@testset "A silenced date counts in the coverage, and the scored coverage leaves it out" begin
+    # R87 of #1416, built by #1512. The middle date scores no asset of a full universe.
+    PO = PortfolioOptimisers
+    alpha = copy(IC_ALPHA)
+    alpha[2, :] .= NaN
+    fe = forecast_evaluation(alpha, PO.forward_mean_returns(IC_ALPHA, 1, 1))
+    @test fe.dates == [1, 2, 3]
+    c = forecast_coverage(fe)
+    @test c == [1, 0, 1]
+    cv = PO.forecast_summary_coverage(fe, nothing)
+    @test cv.n_silenced == 1
+    @test cv.mean_coverage ≈ 2 / 3 && cv.min_coverage == 0
+    @test cv.mean_coverage_scored == 1 && cv.min_coverage_scored == 1
+    @test cv.mean_coverage_scored ≈ cv.mean_coverage * 3 / (3 - cv.n_silenced)
+    # A date whose universe is empty has no coverage, so it is neither scored nor silenced.
+    umsk = trues(size(alpha))
+    umsk[2, :] .= false
+    cu = PO.forecast_summary_coverage(forecast_evaluation(alpha,
+                                                          PO.forward_mean_returns(IC_ALPHA,
+                                                                                  1, 1);
+                                                          umsk = umsk), nothing)
+    @test cu.n_silenced == 0 && cu.mean_coverage == 1 && cu.mean_coverage_scored == 1
 end
 
 @testset "An incomparable pair is refused, and the message names the field" begin
@@ -3223,9 +3300,9 @@ end
               a.sharpe ≈ b.sharpe
         @test a.sortino ≈ b.sortino && a.cvar ≈ b.cvar && a.sharpe_stderr ≈ b.sharpe_stderr
         @test !(a.max_drawdown ≈ b.max_drawdown)
-        @test length(PO.forecast_summary_row(fe, nothing, 10)) == 30
+        @test length(PO.forecast_summary_row(fe, nothing, 10)) == 33
         @test collect(keys(PO.forecast_summary_row(fe, nothing, 10))) ==
-              collect(fieldnames(ForecastSummaryResult)[2:31])
+              collect(fieldnames(ForecastSummaryResult)[2:34])
     end
 
     @testset "The aligned grid is the set the definition states, on the later phase" begin
@@ -3600,7 +3677,7 @@ end
             p = forecast_portfolio(fe; kind = :rank)
             held = copy(p.ret)
             held[2] = sum(p.w[2, i] * gap_y(g)[2, i] for i in 1:4)
-            full = performance_summary(held; periods_per_year = 1)
+            full = performance_summary(held; ppy = 1)
             @test p.summary.max_drawdown ≈ -0.15
             @test (p.summary.max_drawdown < full.max_drawdown) == deeper
         end

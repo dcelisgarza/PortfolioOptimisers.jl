@@ -126,7 +126,7 @@ what keeps the JuMP families cheap.
                 est, out = po.partial_fit_transform(est, rows(data, b))
                 push!(parts, out)
             end
-            return est, reduce(po.vcat_carrier_rows, parts)
+            return est, reduce(po.vcat_observations, parts)
         end
         for ptr in
             (PricesToReturns(), PricesToReturns(; gap_return_alg = CatchUpGapReturn()),
@@ -229,7 +229,7 @@ what keeps the JuMP families cheap.
                 est, out = po.partial_fit_transform(est, rows(prfb, b))
                 push!(parts, out)
             end
-            online = reduce(po.vcat_carrier_rows, parts)
+            online = reduce(po.vcat_observations, parts)
             batch = apply_preprocessing(ptr, prfb)
             @test same_carrier(online, batch)
             @test isequal(Matrix(online.F), Matrix(batch.F))
@@ -247,13 +247,13 @@ what keeps the JuMP families cheap.
         b = po.partial_fit!(PricesToReturns(), rows(pr, 71:160)).cache
         @test isnothing(po.merge_states(a, b).anchor)
         static = AssetPanel(; pf = [NumericPanelField(; name = "size", vals = ones(N))])
-        @test po.vcat_panel_rows(static, static) === static
-        @test_throws ArgumentError po.vcat_panel_rows(static, nothing)
-        @test isnothing(po.vcat_panel_rows(nothing, nothing))
+        @test vcat(static, static) === static
+        @test_throws ArgumentError po.vcat_optional(static, nothing, :pnl)
+        @test isnothing(po.vcat_optional(nothing, nothing, :pnl))
         rds = ReturnsResult(; nx = nx, X = rd.X[1:10, :], pnl = static)
-        @test po.vcat_carrier_rows(rds, rds).pnl === static
-        @test_throws ArgumentError po.vcat_carrier_rows(rds, rows(rd, 1:10))
-        @test_throws ArgumentError po.vcat_carrier_rows(rd,
+        @test po.vcat_observations(rds, rds).pnl === static
+        @test_throws ArgumentError po.vcat_observations(rds, rows(rd, 1:10))
+        @test_throws ArgumentError po.vcat_observations(rd,
                                                         ReturnsResult(; nx = nx,
                                                                       X = rd.X[1:10, :]))
     end
@@ -387,8 +387,8 @@ what keeps the JuMP families cheap.
         end
     end
 
-    @testset "Online(pipe; max_history = w) is the rolling batch walk-forward; Online(pipe) is the host route" begin
-        # A statistic fill is window-valued, which the host route refuses and the refit
+    @testset "Online(pipe; max_history = w) is the rolling batch walk-forward; Online(pipe) is the fold route" begin
+        # A statistic fill is window-valued, which the fold route refuses and the refit
         # route admits: every fold is a batch fit over the buffer.
         pipe = Pipeline(;
                         steps = (PriceGapFill(; fill = MeanValue()), PricesToReturns(),
@@ -403,7 +403,7 @@ what keeps the JuMP families cheap.
         o = cross_val_predict(po.Online(pipe), pr, online_cv)
         @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
                   for (pb, po_) in zip(b.pred, o.pred))
-        # The refit route equals the host route where both run.
+        # The refit route equals the fold route where both run.
         hpipe = Pipeline(;
                          steps = (PriceGapFill(), PricesToReturns(), EmpiricalPrior(), hrp))
         h = cross_val_predict(hpipe, pr, online_cv)
@@ -417,7 +417,7 @@ what keeps the JuMP families cheap.
         @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
                   for (pb, po_) in zip(b.pred, o.pred))
         # A capped owner on returns input, behind a universe-only step alone, stays on the
-        # host route and equals the rolling batch walk-forward: the read-out refits the
+        # fold route and equals the rolling batch walk-forward: the read-out refits the
         # selector over the owner's capped rows (#1076).
         sel = ScoreSelector(; score = MeanReturn(), rule = RankRule(; best = 4))
         b = cross_val_predict(Pipeline(; steps = (sel, EmpiricalPrior(), hrp)), rd, rolling)
@@ -430,7 +430,7 @@ what keeps the JuMP families cheap.
                   for (pb, po_) in zip(b.pred, o.pred))
         # #1076's fixture: asset 2 gapped over rows 5:40, so fold 2's window starts inside
         # the gap. The rolling batch fit seeds no price the window did not see and the column
-        # filter drops asset 2; the refit route drops it too. A capped owner on the host route
+        # filter drops asset 2; the refit route drops it too. A capped owner on the fold route
         # would have kept it, filled from row 4 at fold 1, and is refused below.
         P2 = copy(P)
         P2[5:40, 2] .= NaN
@@ -456,7 +456,7 @@ what keeps the JuMP families cheap.
         @test isa(opipe.cache, po.PipelineBufferState)
         @test_throws ArgumentError fit(opipe)
         opipe = po.partial_fit!(po.partial_fit!(opipe, rows(pr, 1:20)), rows(pr, 21:50))
-        @test po.carrier_rows(opipe.cache.data) == 30
+        @test po.data_row_count(opipe.cache.data) == 30
         @test isapprox(fit(opipe).w, fit(pipe, rows(pr, 21:50)).w; atol = 1e-10)
         half = po.partial_fit!(po.PipelineBufferState(), rows(pr, 1:20))
         @test isequal(values(po.merge_states(half,
@@ -545,7 +545,7 @@ what keeps the JuMP families cheap.
         @test occursin("opt.opt.pe", msg)
         # A capped owner behind a row-local step (#1076): each of the three steps by name, on
         # a prior owner and on an optimisation owner's prior; the cap is read through
-        # `step_online_cap`, and an uncapped owner stays on the host route.
+        # `step_online_cap`, and an uncapped owner stays on the fold route.
         cpe = po.Online(EmpiricalPrior(); max_history = w)
         for (steps, name) in ((PricesToReturns(),) => "PricesToReturns",
                               (PriceGapFill(), PricesToReturns()) => "PriceGapFill",
@@ -695,7 +695,7 @@ what keeps the JuMP families cheap.
         # assets and for the factors, and a factor column that one block lacks by presence.
         other = price_ingestion(PriceIngestion(),
                                 TimeArray(ts[11:20], P[11:20, :], ["B$i" for i in 1:N]))
-        msg = message(() -> po.vcat_carrier_rows(rows(pr, 1:10), other))
+        msg = message(() -> po.vcat_observations(rows(pr, 1:10), other))
         @test occursin("the columns of `X`", msg) && occursin("\"B1\"", msg)
         @test occursin("the columns of `X`",
                        message(() -> po.partial_fit_transform(po.partial_fit!(PricesToReturns(),
@@ -707,10 +707,10 @@ what keeps the JuMP families cheap.
         prf1 = price_ingestion(PriceIngestion(), TimeArray(ts, P, nx); F = F1)
         prf2 = price_ingestion(PriceIngestion(), TimeArray(ts, P, nx); F = F2)
         @test occursin("the columns of `F`",
-                       message(() -> po.vcat_carrier_rows(rows(prf1, 1:10),
+                       message(() -> po.vcat_observations(rows(prf1, 1:10),
                                                           rows(prf2, 11:20))))
         @test occursin("the `F` column",
-                       message(() -> po.vcat_carrier_rows(rows(prf1, 1:10), rows(pr, 11:20))))
+                       message(() -> po.vcat_observations(rows(prf1, 1:10), rows(pr, 11:20))))
 
         # A first block of one price row has no return without padding, and the batch
         # conversion of that row refuses it as empty rather than out of bounds. With
@@ -724,7 +724,7 @@ what keeps the JuMP families cheap.
                     PricesToReturns(; padding = true, gap_return_alg = CatchUpGapReturn()))
             e1, o1 = po.partial_fit_transform(ptr, rows(pr, 1:1))
             e2, o2 = po.partial_fit_transform(e1, rows(pr, 2:160))
-            @test same_carrier(po.vcat_carrier_rows(o1, o2), apply_preprocessing(ptr, pr))
+            @test same_carrier(po.vcat_observations(o1, o2), apply_preprocessing(ptr, pr))
         end
 
         # A caller's Gap Return rule that reads the next price. The batch writes a zero at
@@ -747,7 +747,7 @@ what keeps the JuMP families cheap.
         msg = message(() -> po.partial_fit!(nptr, rows(pr, 1:97)))
         @test occursin("NextPriceGapReturn", msg) && occursin("no online form", msg)
 
-        # A caller's own row-local step joins the host route with three methods and no
+        # A caller's own row-local step joins the fold route with three methods and no
         # `partial_fit!`: the stepped pipeline reads out as the batch fit.
         struct PriceDoubler{C} <: po.AbstractPricesPreprocessingEstimator
             cache::C

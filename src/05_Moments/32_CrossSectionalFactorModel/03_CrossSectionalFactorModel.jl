@@ -1,4 +1,48 @@
 """
+    assert_observed_factor_returns(fx::Nothing, csr, K::Integer) -> nothing
+    assert_observed_factor_returns(fx::MatNum, csr, K::Integer) -> nothing
+
+Check the observed factor returns of a [`CrossSectionalFactorModel`](@ref) against the fit and the factor axis.
+
+The observed factors are the trailing columns of the reduced axis, after the factors that the fit estimated. So `csr.f` and `fx` together fill the reduced axis, row for row, and every consumer that reads the two side by side with [`cross_sectional_factor_returns`](@ref) meets one matrix of the width of the loadings. A block with no observed factor takes the method over `Nothing`.
+
+# Arguments
+
+  - `fx`: The observed factor returns, `observations × factors`, or `nothing`.
+  - `csr`: The nested cross-sectional regression result, or `nothing`.
+  - `K`: Number of factors on the reduced axis, the column count of `L`, or of `M` when `L` is unset.
+
+# Validation
+
+  - `csr` is not `nothing`. Raises an [`IsNothingError`](@ref).
+  - `!isempty(fx)`, and `size(fx, 1) == size(csr.f, 1)`.
+  - `size(csr.f, 2) + size(fx, 2) == K`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`cross_sectional_factor_returns`](@ref)
+  - [`AbstractObservedExposureEstimator`](@ref)
+"""
+function assert_observed_factor_returns(::Nothing, ::Any, ::Integer)::Nothing
+    return nothing
+end
+function assert_observed_factor_returns(fx::MatNum, csr::Option{<:CrossSectionalRegression},
+                                        K::Integer)::Nothing
+    @argcheck(!isnothing(csr),
+              IsNothingError("fx holds the returns of the observed factors beside the factor returns of the fit, so it needs the fit: csr cannot be nothing when fx is given"))
+    @argcheck(!isempty(fx), IsEmptyError("fx cannot be empty"))
+    @argcheck(size(fx, 1) == size(csr.f, 1),
+              DimensionMismatch("fx ($(size(fx, 1)) rows) must match csr.f ($(size(csr.f, 1)) rows), because the observed factors are observed on the rows the fit estimated"))
+    @argcheck(size(csr.f, 2) + size(fx, 2) == K,
+              DimensionMismatch("csr.f ($(size(csr.f, 2)) columns) and fx ($(size(fx, 2)) columns) must fill the reduced factor axis ($K columns), because the observed factors are its trailing columns"))
+    return nothing
+end
+"""
     assert_idiosyncratic_covariance(esigma::Nothing, N::Integer)
     assert_idiosyncratic_covariance(esigma::VecNum, N::Integer)
     assert_idiosyncratic_covariance(esigma::MatNum, N::Integer)
@@ -313,6 +357,147 @@ function assert_return_forecast_assets(rf::AbstractReturnForecastResult,
     return nothing
 end
 """
+    assert_row_key_part(key::Nothing, T, sym::Symbol)
+    assert_row_key_part(key::VecInt, T::Option{<:Integer}, sym::Symbol)
+    assert_row_key_part(key::VecDate, T::Option{<:Integer}, sym::Symbol)
+
+Check one part of the row key of a factor model block.
+
+A row key names the observation of the returns data that each row of a factor model block describes. It has two parts: the position of each row in the returns data that the prior read, and the timestamp of each row. [`CrossSectionalFactorModel`](@ref) and [`Regression`](@ref) carry both parts, and each one checks them with this function. A [`factor_attribution`](@ref) of a cross-validation reads the key in the order of time, so each part must increase strictly.
+
+# Arguments
+
+  - `key`: The positions or the timestamps of the rows, or `nothing`.
+  - `T`: The number of rows that the key describes, or `nothing` when the block does not state it.
+  - `sym`: The name of the field that holds `key`, for the error message.
+
+# Validation
+
+  - [`assert_row_key_length`](@ref) on `key` and `T`.
+  - The entries of a vector of positions are positive and increase strictly. Raises an `ArgumentError`.
+  - The entries of a vector of timestamps increase strictly. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_cs_block_rows`](@ref)
+  - [`attribution_row_key`](@ref)
+"""
+function assert_row_key_part(::Nothing, ::Any, ::Symbol)::Nothing
+    return nothing
+end
+function assert_row_key_part(key::VecInt, T::Option{<:Integer}, sym::Symbol)::Nothing
+    assert_row_key_length(key, T, sym)
+    @argcheck(isempty(key) || (first(key) >= 1 && all(>(0), diff(key))),
+              ArgumentError("$sym must hold positive positions that increase strictly"))
+    return nothing
+end
+function assert_row_key_part(key::VecDate, T::Option{<:Integer}, sym::Symbol)::Nothing
+    assert_row_key_length(key, T, sym)
+    @argcheck(issorted(key; lt = <=), ArgumentError("$sym must increase strictly"))
+    return nothing
+end
+"""
+    assert_row_key_length(key::AbstractVector, T::Option{<:Integer}, sym::Symbol)
+
+Check that one part of a row key has one entry for each row that it describes.
+
+# Arguments
+
+  - `key`: The positions or the timestamps of the rows.
+  - `T`: The number of rows that the key describes, or `nothing` when the block does not state it.
+  - `sym`: The name of the field that holds `key`, for the error message.
+
+# Validation
+
+  - When `T` is an integer, `length(key) == T`. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_row_key_part`](@ref)
+"""
+function assert_row_key_length(key::AbstractVector, T::Option{<:Integer},
+                               sym::Symbol)::Nothing
+    @argcheck(isnothing(T) || length(key) == T,
+              DimensionMismatch("$sym ($(length(key))) must have one entry for each of the $T rows that the key describes"))
+    return nothing
+end
+"""
+    row_key_length(key::Nothing)
+    row_key_length(key::AbstractVector)
+
+Return the number of rows that one part of a row key describes, or `nothing` when the part is absent.
+
+A block that states no row count of its own, such as a [`Regression`](@ref), checks the timestamps of its key against the length of its positions. This function gives that length.
+
+# Arguments
+
+  - `key`: The positions or the timestamps of the rows, or `nothing`.
+
+# Returns
+
+  - `T::Option{<:Integer}`: `length(key)`, or `nothing`.
+
+# Related
+
+  - [`assert_row_key_part`](@ref)
+  - [`Regression`](@ref)
+"""
+function row_key_length(::Nothing)::Nothing
+    return nothing
+end
+function row_key_length(key::AbstractVector)::Int
+    return length(key)
+end
+"""
+    assert_cs_block_rows(idx::Option{<:VecInt}, ts::Option{<:VecDate},
+                         csr::Option{<:CrossSectionalRegression})
+
+Check the row key of a [`CrossSectionalFactorModel`](@ref) against its fit.
+
+The row key names the observation of the returns data that each row of the block describes. `idx` holds the position of each row in the returns data that the prior read, and `ts` holds its timestamp. A key describes the rows of the fit, so a block that carries a key carries a fit, and the key has one entry for each row of the fit.
+
+# Arguments
+
+  - `idx`: Position of each block row in the returns data, or `nothing`.
+  - `ts`: Timestamp of each block row, or `nothing`.
+  - `csr`: The cross-sectional fit of the block, or `nothing`.
+
+# Validation
+
+  - When `idx` or `ts` is present, `csr` is present. Raises an `ArgumentError`.
+  - [`assert_row_key_part`](@ref) on `idx` and on `ts`, with the `size(csr.f, 1)` rows of the fit.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+  - [`assert_row_key_part`](@ref)
+"""
+function assert_cs_block_rows(idx::Option{<:VecInt}, ts::Option{<:VecDate},
+                              csr::Option{<:CrossSectionalRegression})::Nothing
+    if isnothing(idx) && isnothing(ts)
+        return nothing
+    end
+    @argcheck(!isnothing(csr),
+              ArgumentError("idx and ts name the observation of each row of the fit, so a block that carries either one must carry csr"))
+    Tb = size(csr.f, 1)
+    assert_row_key_part(idx, Tb, :idx)
+    assert_row_key_part(ts, Tb, :ts)
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Holds the loadings, the factor-orthogonal expected return and the fitted history of a factor model fitted per observation across the assets.
@@ -368,8 +553,15 @@ $(DocStringExtensions.FIELDS)
         nf::Option{<:VecStr} = nothing,
         fam::Option{<:VecStr} = nothing,
         fcb::Option{<:AbstractFactorFamilyBasis} = nothing,
+        unseen::AbstractUnseenMemberRule = SolvedUnseenMember(),
         lag::Option{<:Integer} = nothing,
-        rf::Option{<:AbstractReturnForecastResult} = nothing
+        rf::Option{<:AbstractReturnForecastResult} = nothing,
+        fx::Option{<:MatNum} = nothing,
+        fr::Option{<:MatNum} = nothing,
+        lambda::Option{<:Number} = nothing,
+        c::Option{<:Number} = nothing,
+        idx::Option{<:VecInt} = nothing,
+        ts::Option{<:VecDate} = nothing
     ) -> CrossSectionalFactorModel
 
 Keywords correspond to the struct's fields.
@@ -389,6 +581,9 @@ Keywords correspond to the struct's fields.
   - If provided, `edof` and `ediv` each carry `size(M, 1)` entries.
   - If provided, `lag >= 0`.
   - If provided, `length(rf.mu) == size(M, 1)`, and `rf.hist` carries `size(M, 1)` columns when the member computes one.
+  - If provided, `fx` passes [`assert_observed_factor_returns`](@ref): `csr` is given, `fx` has the rows of `csr.f`, and the two fill the column count of `L` (or of `M` when `L` is unset).
+  - If provided, `fr` needs `fcb` and `csr`, and `size(fr) == (size(csr.f, 1), size(M, 2))`.
+  - The rules of [`assert_cs_block_rows`](@ref) on `idx` and `ts`.
 
 ## View parameters
 
@@ -401,7 +596,7 @@ Keywords correspond to the struct's fields.
   - `esigma` is sliced by [`idiosyncratic_covariance_view`](@ref), on one axis or on both.
   - `edof` and `ediv` are sliced on their only axis, which is the asset axis.
   - `rf` is viewed by its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
-  - `nf`, `fam`, `fcb` and `lag` pass through unchanged. Each is indexed by factor, or by nothing at all, and neither follows an asset selection.
+  - `nf`, `fam`, `fcb`, `unseen`, `lag`, `fx`, `fr`, `lambda`, `c`, `idx` and `ts` pass through unchanged. Each is indexed by factor, by observation, or by nothing at all, and none follows an asset selection.
 
 # Examples
 
@@ -423,8 +618,15 @@ CrossSectionalFactorModel
       nf ┼ nothing
      fam ┼ Vector{String}: ["style", "style"]
      fcb ┼ nothing
+  unseen ┼ SolvedUnseenMember()
      lag ┼ Int64: 1
-      rf ┴ nothing
+      rf ┼ nothing
+      fx ┼ nothing
+      fr ┼ nothing
+  lambda ┼ nothing
+       c ┼ nothing
+     idx ┼ nothing
+      ts ┴ nothing
 ```
 
 # Related
@@ -490,9 +692,13 @@ CrossSectionalFactorModel
     """
     fam
     """
-    The family re-basis `L` is written in. It is present exactly when `L` is present, and this result states no other rule about it.
+    The family re-basis `L` is written in. It is present exactly when `L` is present. Its rows are the rows of `Ms`, one basis for the exposures of each observation, and its last row re-bases `M` into `L`. The factor return of row `t` of `csr.f` was fitted on the exposures of row `t - lag`, so it is written in the basis of row `t - lag`: a transform of a factor-return history reads the basis rows `1:(T - lag)` against the return rows `(1 + lag):T`.
     """
     fcb
+    """
+    The Unseen Member rule the fit regressed under. A consumer that rebuilds the design of each observation, the regression diagnostics and the standard errors of a [`factor_attribution`](@ref), calls [`unseen_member_design`](@ref) of the rule on `Ms`, `fcb` and `rw`, so it reads the design that the fit regressed on. A block without a family re-basis has no Unseen Member, so the rule changes nothing there.
+    """
+    unseen
     """
     Number of observations by which the exposures lag the returns.
     """
@@ -501,6 +707,30 @@ CrossSectionalFactorModel
     The Return Forecast the prior fitted, or `nothing`. Its `mu` is the forecast `b` was split out of, so a consumer reads the forecast the split consumed rather than refitting it.
     """
     rf
+    """
+    Returns of the observed factors, `observations × factors`, on the rows of `csr.f`, or `nothing` when the model has no observed factor. The fit observes them, for example the Currency Excess Returns of the Currency Factors, and does not estimate them, so `csr` does not carry them. The observed factors are the trailing columns of the raw axis and of the reduced axis, and [`cross_sectional_factor_returns`](@ref) reads them beside `csr.f`.
+    """
+    fx
+    """
+    Factor returns on the raw factor axis, `observations × factors`, on the rows of `csr.f` and with one column per column of `M`, or `nothing`. A block with a family re-basis carries it, and a block with none leaves it `nothing`, because its raw axis is the axis of [`cross_sectional_factor_returns`](@ref). The fit states the factor returns in the reduced basis of row `t - lag`, and `fcb` holds the basis of the rows of the block alone, so it cannot expand the first `lag` rows. The prior expands every row with the basis of its own history, and a consumer that needs a dropped factor's return, for example [`factor_model_summary`](@ref) and [`factor_attribution`](@ref), reads it here.
+    """
+    fr
+    """
+    Spanned Shrinkage the prior resolved, or `nothing` when the block was not built by a prior. A rule in the slot and a stated number are recorded alike, so a caller reads back the number the mean used.
+    """
+    lambda
+    """
+    Orthogonal Forecast Scale the prior resolved, or `nothing` when the block was not built by a prior. `b` is this scale times the unscaled orthogonal part of the Return Forecast.
+    """
+    c
+    """
+    Position of each row of the fit in the returns data that the prior read, or `nothing`. The fit drops the Descriptor warm-up and the exposure lag, so its first row is a later row of the data. A [`factor_attribution`](@ref) of a cross-validation reads it to find the rows of the block that each fold covers. A prior folded online counts the positions over every observation it folded.
+    """
+    idx
+    """
+    Timestamp of each row of the fit, or `nothing` when the returns data that the prior read carries no timestamps. When the folds of a cross-validation carry timestamps too, a [`factor_attribution`](@ref) matches the two by timestamp, so a prior fitted on other returns data still finds its rows.
+    """
+    ts
     function CrossSectionalFactorModel(M::MatNum, L::Option{<:MatNum}, b::VecNum,
                                        csr::Option{<:CrossSectionalRegression},
                                        Ms::Option{<:Arr3Num}, vs::Option{<:MatNum},
@@ -509,8 +739,12 @@ CrossSectionalFactorModel
                                        rw::Option{<:MatNum}, bw::Option{<:MatNum},
                                        nf::Option{<:VecStr}, fam::Option{<:VecStr},
                                        fcb::Option{<:AbstractFactorFamilyBasis},
+                                       unseen::AbstractUnseenMemberRule,
                                        lag::Option{<:Integer},
-                                       rf::Option{<:AbstractReturnForecastResult})
+                                       rf::Option{<:AbstractReturnForecastResult},
+                                       fx::Option{<:MatNum}, fr::Option{<:MatNum},
+                                       lambda::Option{<:Number}, c::Option{<:Number},
+                                       idx::Option{<:VecInt}, ts::Option{<:VecDate})
         @argcheck(!isempty(M), IsEmptyError("M cannot be empty"))
         @argcheck(!isempty(b), IsEmptyError("b cannot be empty"))
         N = size(M, 1)
@@ -544,23 +778,23 @@ CrossSectionalFactorModel
         assert_idiosyncratic_count(edof, N, :edof)
         assert_idiosyncratic_count(ediv, N, :ediv)
         assert_return_forecast_assets(rf, N)
+        assert_observed_factor_returns(fx, csr, isnothing(L) ? K : size(L, 2))
+        if !isnothing(fr)
+            @argcheck(!isnothing(fcb) && !isnothing(csr),
+                      ArgumentError("fr is the raw-axis factor return history of a re-based fit, so it needs fcb and csr"))
+            @argcheck(size(fr) == (size(csr.f, 1), K),
+                      DimensionMismatch("fr ($(size(fr))) must have the rows of csr.f ($(size(csr.f, 1))) and the columns of M ($K)"))
+        end
         tvs = cs_history_assets(vs, N, :vs)
         trw = cs_history_assets(rw, N, :rw)
         tbw = cs_history_assets(bw, N, :bw)
         assert_cs_history_obs(trw, tbw, :rw, :bw)
         assert_cs_history_obs(trw, tvs, :rw, :vs)
         assert_cs_history_obs(tbw, tvs, :bw, :vs)
-        return new{typeof(M), typeof(L), typeof(b), typeof(csr), typeof(Ms), typeof(vs),
-                   typeof(esigma), typeof(edof), typeof(ediv), typeof(rw), typeof(bw),
-                   typeof(nf), typeof(fam), typeof(fcb), typeof(lag), typeof(rf)}(M, L, b,
-                                                                                  csr, Ms,
-                                                                                  vs,
-                                                                                  esigma,
-                                                                                  edof,
-                                                                                  ediv, rw,
-                                                                                  bw, nf,
-                                                                                  fam, fcb,
-                                                                                  lag, rf)
+        assert_cs_block_rows(idx, ts, csr)
+        fs = (M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw, nf, fam, fcb, unseen, lag,
+              rf, fx, fr, lambda, c, idx, ts)
+        return new{map(typeof, fs)...}(fs...)
     end
 end
 function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b::VecNum,
@@ -575,10 +809,59 @@ function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b
                                    nf::Option{<:VecStr} = nothing,
                                    fam::Option{<:VecStr} = nothing,
                                    fcb::Option{<:AbstractFactorFamilyBasis} = nothing,
+                                   unseen::AbstractUnseenMemberRule = SolvedUnseenMember(),
                                    lag::Option{<:Integer} = nothing,
-                                   rf::Option{<:AbstractReturnForecastResult} = nothing)::CrossSectionalFactorModel
+                                   rf::Option{<:AbstractReturnForecastResult} = nothing,
+                                   fx::Option{<:MatNum} = nothing,
+                                   fr::Option{<:MatNum} = nothing,
+                                   lambda::Option{<:Number} = nothing,
+                                   c::Option{<:Number} = nothing,
+                                   idx::Option{<:VecInt} = nothing,
+                                   ts::Option{<:VecDate} = nothing)::CrossSectionalFactorModel
     return CrossSectionalFactorModel(M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw, nf,
-                                     fam, fcb, lag, rf)
+                                     fam, fcb, unseen, lag, rf, fx, fr, lambda, c, idx, ts)
+end
+"""
+    cross_sectional_factor_returns(csfm::CrossSectionalFactorModel) -> MatNum
+
+Return the factor returns of a [`CrossSectionalFactorModel`](@ref) on the axis of its loadings `L`: the factors the fit estimated, then the observed factors.
+
+The fit estimates `csr.f` on its own design axis, which is the reduced axis less the observed factors, and it observes the returns `fx`. The two side by side are the factor returns that the loadings `L` (or `M` when the model has no family re-basis) multiply. So the loadings of observation `t - lag` times row `t` of the answer, plus the idiosyncratic return of `t`, give the returns of observation `t` in the base currency.
+
+# Algorithm
+
+ 1. Refuse a block that carries no fit.
+ 2. Return `csr.f` when `fx` is `nothing`, and `hcat(csr.f, fx)` otherwise.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+
+# Validation
+
+  - `csfm.csr` is not `nothing`. Raises an [`IsNothingError`](@ref).
+
+# Returns
+
+  - `f::MatNum`: The factor returns, `observations × factors`, on the axis of `L`.
+
+# Related
+
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`AbstractObservedExposureEstimator`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+"""
+function cross_sectional_factor_returns(csfm::CrossSectionalFactorModel)
+    return cross_sectional_factor_returns(csfm.csr, csfm.fx)
+end
+function cross_sectional_factor_returns(::Nothing, ::Any)
+    return throw(IsNothingError("csr cannot be nothing: the factor returns of a cross-sectional factor model are the returns its fit estimated, and this block carries no fit"))
+end
+function cross_sectional_factor_returns(csr::CrossSectionalRegression, ::Nothing)
+    return csr.f
+end
+function cross_sectional_factor_returns(csr::CrossSectionalRegression, fx::MatNum)
+    return hcat(csr.f, fx)
 end
 """
     idiosyncratic_variances(rr::AbstractLoadingsRegressionResult)
@@ -647,7 +930,8 @@ end
 # `Nothing` specialisation needs a rule (see [`@forward_properties`](@ref)'s `swap`).
 @forward_properties CrossSectionalFactorModel{<:Any, Nothing, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
-                                              <:Any, <:Any, <:Any, <:Any} begin
+                                              <:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
+                                              <:Any} begin
     swap(L, M)
 end
 """
@@ -703,7 +987,7 @@ Return a view of a [`CrossSectionalFactorModel`](@ref) result, selecting only th
  4. Take a view of `Ms` on its second axis, and of `vs`, `rw` and `bw` on their second axis, giving the histories of the selected assets.
  5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape, and view `edof` and `ediv` with [`nothing_scalar_array_view`](@ref).
  6. View the Return Forecast with its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
- 7. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `nf`, `fam`, `fcb` and `lag` through, which re-runs every guard of the constructor.
+ 7. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `nf`, `fam`, `fcb`, `lag`, `fx`, `fr`, `lambda`, `c`, `idx` and `ts` through, which re-runs every guard of the constructor.
 
 # Arguments
 
@@ -764,11 +1048,13 @@ function port_opt_view(csfm::CrossSectionalFactorModel, i,
                                      rw = isnothing(rw) ? nothing : view(rw, :, i),
                                      bw = isnothing(bw) ? nothing : view(bw, :, i),
                                      nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,
-                                     lag = csfm.lag, rf = if isnothing(rf)
+                                     unseen = csfm.unseen, lag = csfm.lag,
+                                     rf = if isnothing(rf)
                                          nothing
                                      else
                                          port_opt_view(rf, i, args...)
-                                     end)
+                                     end, fx = csfm.fx, fr = csfm.fr, lambda = csfm.lambda,
+                                     c = csfm.c, idx = csfm.idx, ts = csfm.ts)
 end
 """
     regression(csfm::CrossSectionalFactorModel, args...)
@@ -794,5 +1080,355 @@ This method is a pass-through for [`CrossSectionalFactorModel`](@ref) results, a
 function regression(csfm::CrossSectionalFactorModel, args...)
     return csfm
 end
+"""
+$(DocStringExtensions.TYPEDEF)
 
-export CrossSectionalFactorModel
+Holds the answer of a Factor Model Diagnostic together with the names and the family labels of its factor axis.
+
+A diagnostic verb called on a [`CrossSectionalFactorModel`](@ref) returns it. The method of the same verb over bare histories returns the bare array, because it has no names to carry. [`port_opt_view`](@ref) selects factors of the answer by position, by name, or by family with a [`LabelGroup`](@ref). It cuts every factor dimension of `X`, and `nf` and `fam` with it. So a caller computes a diagnostic once, over every factor, and then selects the factors it reads.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    FactorDiagnosticResult(;
+        X::AbstractArray,
+        nf::Option{<:VecStr} = nothing,
+        fam::Option{<:VecStr} = nothing,
+        dims::Tuple{Vararg{Integer}} = (ndims(X),)
+    ) -> FactorDiagnosticResult
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `!isempty(dims)`, and `dims` names distinct dimensions of `X`. Raises a `DomainError` otherwise.
+  - Every dimension of `X` that `dims` names has one length, the factor count `K`. Raises a `DimensionMismatch` otherwise.
+  - If provided, `length(nf) == K`, and `nf` repeats no name.
+  - If provided, `length(fam) == K`.
+
+# Examples
+
+```jldoctest
+julia> r = FactorDiagnosticResult(; X = [1.0 2.0 3.0; 4.0 5.0 6.0], nf = [\"value\", \"size\", \"tech\"],
+                                  fam = [\"style\", \"style\", \"industry\"]);
+
+julia> PortfolioOptimisers.port_opt_view(r, LabelGroup(\"style\")).X
+2×2 view(::Matrix{Float64}, :, [1, 2]) with eltype Float64:
+ 1.0  2.0
+ 4.0  5.0
+
+julia> PortfolioOptimisers.port_opt_view(r, [\"tech\"]).nf
+1-element view(::Vector{String}, [3]) with eltype String:
+ "tech"
+```
+
+# Related
+
+  - [`port_opt_view`](@ref)
+  - [`LabelGroup`](@ref)
+  - [`cs_diagnostic_factor_names`](@ref)
+  - [`FactorSummaryResult`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+@concrete struct FactorDiagnosticResult <: AbstractResult
+    """
+    The answer of the diagnostic: a vector with one entry per factor, a matrix `observations × factors`, or a matrix `factors × factors`.
+    """
+    X
+    """
+    $(field_dict[:fd_nf])
+    """
+    nf
+    """
+    $(field_dict[:fd_fam])
+    """
+    fam
+    """
+    The dimensions of `X` that run over the factors: `(ndims(X),)` for a series of the factors, and `(1, 2)` for a matrix of factor pairs.
+    """
+    dims
+    function FactorDiagnosticResult(X::AbstractArray, nf::Option{<:VecStr},
+                                    fam::Option{<:VecStr}, dims::Tuple{Vararg{Integer}})
+        @argcheck(!isempty(dims) && allunique(dims) && all(d -> 1 <= d <= ndims(X), dims),
+                  DomainError(dims,
+                              "dims must name distinct dimensions of X, which has $(ndims(X))"))
+        K = size(X, first(dims))
+        @argcheck(all(d -> size(X, d) == K, dims),
+                  DimensionMismatch("every factor dimension of X must have one length. Got size(X) => $(size(X)) and dims => $(dims)"))
+        if !isnothing(nf)
+            @argcheck(length(nf) == K,
+                      DimensionMismatch("nf ($(length(nf))) must match the factor axis of X ($K)"))
+            @argcheck(allunique(nf), ArgumentError("nf must not repeat a factor name"))
+        end
+        if !isnothing(fam)
+            @argcheck(length(fam) == K,
+                      DimensionMismatch("fam ($(length(fam))) must match the factor axis of X ($K)"))
+        end
+        return new{typeof(X), typeof(nf), typeof(fam), typeof(dims)}(X, nf, fam, dims)
+    end
+end
+function FactorDiagnosticResult(; X::AbstractArray, nf::Option{<:VecStr} = nothing,
+                                fam::Option{<:VecStr} = nothing,
+                                dims::Tuple{Vararg{Integer}} = (ndims(X),))
+    return FactorDiagnosticResult(X, nf, fam, dims)
+end
+"""
+    factor_axis_positions(nf::Option{<:VecStr}, fam::Option{<:VecStr}, i) -> typeof(i)
+    factor_axis_positions(nf::Option{<:VecStr}, fam::Option{<:VecStr}, i::Integer) -> UnitRange{Int}
+    factor_axis_positions(nf::Option{<:VecStr}, fam::Nothing, i::LabelGroup) -> Union{}
+    factor_axis_positions(nf::Option{<:VecStr}, fam::VecStr, i::LabelGroup) -> Vector{Int}
+
+Turn the factor index of a view of a diagnostic answer into positions on its factor axis.
+
+A position, a range and a `Colon` pass through. A vector of names goes through [`label_positions`](@ref), which refuses a name it cannot find. One integer becomes a range of one position, so the answer keeps its factor axis. A [`LabelGroup`](@ref) selects every factor whose family label is the group, in the order of the axis.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `i` is not an integer and not a [`LabelGroup`](@ref): return [`label_positions`](@ref) of `nf` and `i`.
+ 2. `i` is an integer: return `i:i`.
+ 3. `i` is a [`LabelGroup`](@ref) and `fam` is `nothing`: throw.
+ 4. `i` is a [`LabelGroup`](@ref): return the positions of the entries of `fam` that equal the group, and throw when there is none.
+
+# Arguments
+
+  - $(arg_dict[:fd_nf])
+  - $(arg_dict[:fd_fam])
+  - `i`: The factor index of the view: positions, a range, a `Colon`, a vector of names, or a [`LabelGroup`](@ref).
+
+# Validation
+
+  - `nf` is not `nothing` when `i` is a vector of names. Raises an `ArgumentError`.
+  - Every name of `i` is in `nf`. Raises an `ArgumentError` that suggests the nearest name.
+  - `fam` is not `nothing` when `i` is a [`LabelGroup`](@ref). Raises an `ArgumentError`.
+  - At least one entry of `fam` is the group of `i`. Raises an `ArgumentError` that suggests the nearest family.
+
+# Returns
+
+  - `pos`: The positions of the selected factors, or `i` unchanged.
+
+# Related
+
+  - [`FactorDiagnosticResult`](@ref)
+  - [`label_positions`](@ref)
+  - [`LabelGroup`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function factor_axis_positions(nf::Option{<:VecStr}, ::Option{<:VecStr}, i)
+    return label_positions(nf, i, "factor")
+end
+function factor_axis_positions(::Option{<:VecStr}, ::Option{<:VecStr}, i::Integer)
+    return i:i
+end
+function factor_axis_positions(::Option{<:VecStr}, ::Nothing, i::LabelGroup)
+    return throw(ArgumentError("the view selects the factors of the family $(i.group), but the answer carries no family labels. Build the block with its family labels `fam`, or select the factors by position or by name."))
+end
+function factor_axis_positions(::Option{<:VecStr}, fam::VecStr, i::LabelGroup)
+    pos = findall(==(i.group), fam)
+    @argcheck(!isempty(pos),
+              ArgumentError("the view selects the factors of the family $(i.group), and no factor of the answer carries that label. The families are $(join(unique(fam), ", "))." *
+                            did_you_mean(i.group, unique(fam))))
+    return pos
+end
+"""
+    port_opt_view(r::FactorDiagnosticResult, i, args...)
+
+Return a view of a [`FactorDiagnosticResult`](@ref) that keeps only the factors that `i` selects.
+
+# Algorithm
+
+ 1. Turn `i` into positions on the factor axis with [`factor_axis_positions`](@ref).
+ 2. View `X` at those positions on each dimension that `dims` names, and in full on each other dimension.
+ 3. View `nf` and `fam` at those positions with [`nothing_scalar_array_view`](@ref).
+ 4. Build a new [`FactorDiagnosticResult`](@ref) from the views, which runs the guards of the constructor again.
+
+# Arguments
+
+  - `r`: A diagnostic answer.
+  - `i`: The factor index: positions, a range, a `Colon`, a vector of names, or a [`LabelGroup`](@ref).
+  - `args...`: Additional positional arguments (ignored).
+
+# Validation
+
+  - The rules of [`factor_axis_positions`](@ref).
+
+# Returns
+
+  - `r::FactorDiagnosticResult`: The answer on the selected factors.
+
+# Examples
+
+```jldoctest
+julia> r = FactorDiagnosticResult(; X = [1.0 0.5; 0.5 1.0], nf = [\"value\", \"size\"], dims = (1, 2));
+
+julia> PortfolioOptimisers.port_opt_view(r, 2).X
+1×1 view(::Matrix{Float64}, 2:2, 2:2) with eltype Float64:
+ 1.0
+```
+
+# Related
+
+  - [`FactorDiagnosticResult`](@ref)
+  - [`factor_axis_positions`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function port_opt_view(r::FactorDiagnosticResult, i, args...)::FactorDiagnosticResult
+    p = factor_axis_positions(r.nf, r.fam, i)
+    idx = ntuple(d -> d in r.dims ? p : Colon(), ndims(r.X))
+    return FactorDiagnosticResult(view(r.X, idx...), nothing_scalar_array_view(r.nf, p),
+                                  nothing_scalar_array_view(r.fam, p), r.dims)
+end
+"""
+    factor_table_fields(r::AbstractResult, i) -> Tuple
+
+Return every field of a per-factor table, cut to the factors that `i` selects.
+
+A per-factor table is a Result whose fields are vectors with one entry per factor, scalars, or `nothing`, and which carries the names `nf` and the family labels `fam` of its factors. The answer is in the order of the fields, so the positional constructor of the table takes it.
+
+# Algorithm
+
+ 1. Turn `i` into positions on the factor axis with [`factor_axis_positions`](@ref).
+ 2. View each field at those positions with [`nothing_scalar_array_view`](@ref), which keeps a scalar and `nothing` unchanged.
+
+# Arguments
+
+  - `r`: A per-factor table.
+  - `i`: The factor index: positions, a range, a `Colon`, a vector of names, or a [`LabelGroup`](@ref).
+
+# Validation
+
+  - The rules of [`factor_axis_positions`](@ref).
+
+# Returns
+
+  - `fields::Tuple`: One entry per field of `r`, in the order of the fields.
+
+# Related
+
+  - [`FactorSummaryResult`](@ref)
+  - [`ExposureICSummaryResult`](@ref)
+  - [`factor_axis_positions`](@ref)
+"""
+function factor_table_fields(r::AbstractResult, i)
+    p = factor_axis_positions(r.nf, r.fam, i)
+    return ntuple(k -> nothing_scalar_array_view(getfield(r, k), p), fieldcount(typeof(r)))
+end
+"""
+    cs_diagnostic_factor_names(csfm::CrossSectionalFactorModel)
+    cs_diagnostic_factor_names(fcb::Option{<:AbstractFactorFamilyBasis}, nf::Nothing)
+    cs_diagnostic_factor_names(fcb::Nothing, nf::VecStr)
+    cs_diagnostic_factor_names(fcb::AbstractFactorFamilyBasis, nf::VecStr)
+
+Return the factor names of the axis a cross-sectional regression diagnostic answers on.
+
+A regression diagnostic that carries a factor axis answers on the design of the regression: the reduced axis when the block carries a family re-basis, less the observed factors, which are its last columns and which the regression did not estimate. So the names of the raw axis do not label it. The one-argument verb maps them, and the [`FactorDiagnosticResult`](@ref) of a regression diagnostic carries its answer. The two-argument verb maps the names onto the whole reduced axis, observed factors included, which is the axis of the loadings `L`. It maps family labels the same way. A block that names no factor answers `nothing`.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `fcb`: The family re-basis of the block, or `nothing`.
+  - `nf`: The names, or the family labels, of the raw factor axis, or `nothing`.
+
+# Returns
+
+  - `nf::Option{<:Vector{String}}`: The names of the answer's factor axis, or `nothing` when the block names no factor.
+
+# Examples
+
+```jldoctest
+julia> csfm = CrossSectionalFactorModel(; M = [1.0 2.0; 3.0 4.0], b = [0.1, 0.2],
+                                        esigma = [0.4, 0.5], nf = [\"value\", \"size\"]);
+
+julia> PortfolioOptimisers.cs_diagnostic_factor_names(csfm)
+2-element Vector{String}:
+ "value"
+ "size"
+```
+
+# Related
+
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`FactorDiagnosticResult`](@ref)
+  - [`reduce_factor_names`](@ref)
+  - [`cs_design_labels`](@ref)
+  - [`cs_regression_t_stats`](@ref)
+  - [`exposure_vif`](@ref)
+"""
+function cs_diagnostic_factor_names(csfm::CrossSectionalFactorModel)
+    return cs_design_labels(csfm, csfm.nf)
+end
+function cs_diagnostic_factor_names(::Option{<:AbstractFactorFamilyBasis},
+                                    ::Nothing)::Nothing
+    return nothing
+end
+function cs_diagnostic_factor_names(::Nothing, nf::VecStr)::Vector{String}
+    return String[String(n) for n in nf]
+end
+function cs_diagnostic_factor_names(fcb::AbstractFactorFamilyBasis,
+                                    nf::VecStr)::Vector{String}
+    return reduce_factor_names(fcb, nf)
+end
+"""
+    cs_design_labels(csfm::CrossSectionalFactorModel, labels::Option{<:VecStr})
+
+Map labels of the raw factor axis onto the design axis of the cross-sectional regression.
+
+The design axis is the reduced axis less the observed factors, which [`cs_diagnostic_factor_names`](@ref) states. The labels are the names or the family labels of the raw axis.
+
+# Algorithm
+
+ 1. Map the labels onto the whole reduced axis with the two-argument [`cs_diagnostic_factor_names`](@ref).
+ 2. Drop the last `size(csfm.fx, 2)` entries when the block carries observed factor returns.
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `labels`: The names or the family labels of the raw factor axis, or `nothing`.
+
+# Returns
+
+  - `labels::Option{<:Vector{String}}`: The labels of the design axis, or `nothing` when `labels` is `nothing`.
+
+# Related
+
+  - [`cs_diagnostic_factor_names`](@ref)
+  - [`cs_design_result`](@ref)
+"""
+function cs_design_labels(csfm::CrossSectionalFactorModel, labels::Option{<:VecStr})
+    lb = cs_diagnostic_factor_names(csfm.fcb, labels)
+    return isnothing(lb) || isnothing(csfm.fx) ? lb : lb[1:(end - size(csfm.fx, 2))]
+end
+"""
+    cs_design_result(csfm::CrossSectionalFactorModel, X::AbstractArray)
+
+Wrap the answer of a regression diagnostic of a block in a [`FactorDiagnosticResult`](@ref) on the design axis.
+
+The last dimension of `X` is the factor axis. The names and the family labels are those of the design axis, from [`cs_design_labels`](@ref).
+
+# Arguments
+
+  - `csfm`: A cross-sectional factor model block.
+  - `X`: The answer of the diagnostic, with the factors on its last dimension.
+
+# Returns
+
+  - `r::FactorDiagnosticResult`: The answer with the labels of its factor axis.
+
+# Related
+
+  - [`FactorDiagnosticResult`](@ref)
+  - [`cs_design_labels`](@ref)
+  - [`exposure_vif`](@ref)
+  - [`cs_regression_t_stats`](@ref)
+"""
+function cs_design_result(csfm::CrossSectionalFactorModel, X::AbstractArray)
+    return FactorDiagnosticResult(X, cs_design_labels(csfm, csfm.nf),
+                                  cs_design_labels(csfm, csfm.fam), (ndims(X),))
+end
+
+export CrossSectionalFactorModel, cross_sectional_factor_returns, FactorDiagnosticResult
+public cs_diagnostic_factor_names

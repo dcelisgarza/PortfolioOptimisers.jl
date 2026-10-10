@@ -6,7 +6,7 @@ status: accepted — adopt C (@propagatable macro)
 
 ## Context
 
-`factory` is the library's variable propagation mechanism: because all configuration structs are immutable and heavily composed, `factory(x, runtime_data...)` returns a new, fully-configured copy of `x` with runtime-computed values (observation weights, previous portfolio weights, a prior result, a solver, an uncertainty set) threaded down into the fields that need them. See `[[factory]]` in `CONTEXT.md`.
+`factory` is the library's variable propagation mechanism: because all configuration structs are immutable and heavily composed, `factory(x, runtime_data...)` returns a new, fully-configured copy of `x` with runtime-computed values (observation weights, previous portfolio weights, a prior result, a solver, an uncertainty set) threaded down into the fields that need them. See `[[factory]]` in `GLOSSARY.md`.
 
 There are ~180 hand-written `factory` methods. They fall into two kinds:
 

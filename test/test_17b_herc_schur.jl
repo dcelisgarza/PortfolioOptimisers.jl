@@ -1,4 +1,5 @@
 include(joinpath(@__DIR__, "test17_setup.jl"))
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 @testset "HierarchicalEqualRiskContribution" begin
     w1 = [0.02771765212089022, 0.009402158178351775, 0.03331519584748935,
@@ -186,7 +187,7 @@ end
     @test rk >= rk0
 
     # The variance is not monotonic in gamma. On this panel it falls to a turning point
-    # near 0.11, then rises.
+    # near 0.044, then rises. The heuristic leaf order put the turning point near 0.11.
     gs = range(; start = 0.0, stop = 0.20, length = 10)
     rks = [expected_risk(r,
                          optimise(SchurComplementHierarchicalRiskParity(;
@@ -196,7 +197,7 @@ end
                                                                         opt = opt)).w, pr)
            for g in gs]
     k = argmin(rks)
-    @test k == 6
+    @test k == 3
     @test issorted(rks[1:k]; rev = true)
     @test issorted(rks[k:end])
     # The monotonic search stops at the turning point, below every value of the scan.
@@ -270,7 +271,11 @@ end
                                                                                                        items,
                                                                                                        wb,
                                                                                                        p)
-        @test isapprox(gamma, gtp; atol = 1e-12)
+        # A search returns a point of its scan or its bisection, and another branch moves it
+        # by a step of the search, far above the bound. So the bound asks for the same point.
+        # Measured 0.0 on every case.
+        @test parity_compare([gamma], [gtp]; rtol = 0.0, atol = 1e-12,
+                             name = "Schur gamma $(seed) $(g)").ok
         @test w == nm_weights(pr, gamma)
     end
 
@@ -304,7 +309,9 @@ end
                                                                                                    wb,
                                                                                                    p)
     @test 8 / 9 < gamma < 1
-    @test isapprox(gamma, 0.9555121527777777; atol = 1e-12)
+    # The same point of the search as above. Measured 0.0.
+    @test parity_compare([gamma], [0.9555121527777777]; rtol = 0.0, atol = 1e-12,
+                         name = "Schur gamma interpolated").ok
     @test w == nm_weights(pr, gamma)
     # A maximum gamma of zero runs the allocation at zero.
     w, gamma, _ = PortfolioOptimisers.schur_complement_weights(pr, items, wb,
@@ -313,10 +320,133 @@ end
     @test gamma == 0
     @test w == nm_weights(pr, 0)
 end
+@testset "The Schur bisection refines below tol and evaluates only gamma in [0, gamma]" begin
+    PO = PortfolioOptimisers
+    bs = PO.schur_complement_binary_search
+    # The variance falls up to t and rises after it. A turning point below tol is still
+    # found above zero: the bracket halves towards its start until a midpoint passes. No
+    # probe of the slope evaluates a negative gamma.
+    for t in (1e-7, 1e-5, 0.025, 0.03)
+        calls = Float64[]
+        obj = g -> (push!(calls, g); ([g], (g - t)^2))
+        w, g = bs(obj, 0.0, 0.1, t^2, [0.0])
+        @test 0 < g && abs(g - t) <= min(1e-4, t)
+        @test w == [g]
+        @test all(c -> 0 <= c <= 0.1, calls)
+    end
+    # The variance rises from the start, or every allocation fails. A rejected midpoint
+    # takes no probe of the slope, so the derived budget of 21 bisections costs 21 calls.
+    for feasible in (true, false)
+        calls = Float64[]
+        obj = g -> (push!(calls, g); feasible ? ([g], g^2) : (nothing, Inf))
+        w0 = feasible ? [0.0] : nothing
+        w, g = bs(obj, 0.0, 0.1, feasible ? 0.0 : Inf, w0)
+        @test w === w0
+        @test g == 0
+        @test length(calls) == 21
+    end
+    # The variance falls up to 0.08, and the allocation fails above b. The answer is the
+    # largest value at which the allocation exists, to within tol.
+    for b in (0.025, 0.03, 0.034)
+        obj = g -> g > b ? (nothing, Inf) : ([g], (g - 0.08)^2)
+        w, g = bs(obj, 0.0, 0.1, 0.08^2, [0.0])
+        @test 0 <= b - g <= 1e-4
+        @test w == [g]
+    end
+    # A nine-asset panel whose augmented block stops being positive definite between
+    # 0.26275 and 0.2628, while the variance still falls. The bisection continues past a
+    # failed midpoint until a midpoint exists. An independent implementation of the same
+    # search, with the same scan grid, gives 0.262744140625. A bisection that stops at the
+    # first bracket of width tol gives 0.2626953125, at a higher variance.
+    rng = StableRNG(123)
+    F = randn(rng, 200, 1) * 0.01
+    B = randn(rng, 9, 1) * 0.9
+    E = randn(rng, 200, 9) * 0.01 * 0.3
+    pr = prior(EmpiricalPrior(), F * B' + E)
+    items = [collect(1:9)]
+    wb = WeightBounds(; lb = zeros(9), ub = ones(9))
+    p = SchurComplementParams(; gamma = 0.5, alg = MonotonicSchurComplement(; N = 6))
+    w, gamma, _ = PO.schur_complement_weights(pr, items, wb, p)
+    # The same point of the bisection. Measured 0.0.
+    @test parity_compare([gamma], [0.262744140625]; rtol = 0.0, atol = 1e-12,
+                         name = "Schur gamma nine").ok
+    pn = SchurComplementParams(; gamma = 0.5, alg = NonMonotonicSchurComplement(),
+                               flag = false)
+    @test w == PO.schur_complement_weights(pr, items, wb, pn, gamma)[1]
+    @test isnothing(PO.schur_complement_weights(pr, items, wb, pn, 0.2628)[1])
+    # A range narrower than tol checks the slope at its top against the variance at zero.
+    p = SchurComplementParams(; gamma = 5e-5, alg = MonotonicSchurComplement(; N = 2))
+    w, gamma, _ = PO.schur_complement_weights(pr, items, wb, p)
+    @test gamma == 5e-5
+    @test w == PO.schur_complement_weights(pr, items, wb, pn, 5e-5)[1]
+end
+@testset "A later Schur split reads the repaired blocks" begin
+    #=
+    With `flag = true` the recursion repairs each augmented block before it reads the risk.
+    It wrote the block back into `sigma` BEFORE the repair, so a later split augmented the
+    unrepaired block. The write-back now follows the repair. The oracle below runs the
+    recursion with the write-back on either side of the repair, and the panel is one where
+    the two orders give different weights.
+    =#
+    PO = PortfolioOptimisers
+    function schur_oracle(pr, gamma, pdm, repaired_writeback)
+        sigma = copy(pr.sigma)
+        w = ones(size(sigma, 1))
+        items = [collect(axes(sigma, 1))]
+        while !isempty(items)
+            items = [i[j:k] for i in items
+                     for (j, k) in
+                         ((1, div(length(i), 2)), (div(length(i), 2) + 1, length(i)))
+                     if length(i) > 1]
+            for i in 1:2:length(items)
+                lc, rc = items[i], items[i + 1]
+                A, C = sigma[lc, lc], sigma[rc, rc]
+                if length(lc) > 1
+                    B = sigma[lc, rc]
+                    A = PO.schur_augmentation(A, B, C, gamma)
+                    C = PO.schur_augmentation(C, transpose(B), sigma[lc, lc], gamma)
+                end
+                if !repaired_writeback
+                    sigma[lc, lc], sigma[rc, rc] = A, C
+                end
+                PO.posdef!(pdm, A)
+                PO.posdef!(pdm, C)
+                if repaired_writeback
+                    sigma[lc, lc], sigma[rc, rc] = A, C
+                end
+                # Inverse-variance weights and the variance of each half, as the default
+                # `Variance` measure takes them.
+                la, lcw = inv.(diag(A)), inv.(diag(C))
+                la ./= sum(la)
+                lcw ./= sum(lcw)
+                lr, rr = dot(la, A, la), dot(lcw, C, lcw)
+                alpha = 1 - lr / (lr + rr)
+                w[lc] .*= alpha
+                w[rc] .*= 1 - alpha
+            end
+        end
+        return w
+    end
+    # The oracle assigns `w`, `B` and other names, and a function inside a testset assigns
+    # the testset's local of the same name. So no name here is one the oracle assigns.
+    rng = StableRNG(279)
+    Fp = randn(rng, 300, 2)
+    Bp = randn(rng, 8, 2)
+    Ep = randn(rng, 300, 8) * 0.3
+    prs = prior(EmpiricalPrior(), Fp * Bp' + Ep)
+    ps = SchurComplementParams(; gamma = 0.5, alg = NonMonotonicSchurComplement(),
+                               flag = true)
+    w_lib = PO.schur_complement_weights(prs, [collect(1:8)],
+                                        WeightBounds(; lb = zeros(8), ub = ones(8)), ps)[1]
+    w_fixed = schur_oracle(prs, 0.5, ps.pdm, true)
+    w_old = schur_oracle(prs, 0.5, ps.pdm, false)
+    @test isapprox(w_lib, w_fixed; rtol = 1e-12)
+    @test maximum(abs, w_fixed - w_old) > 0.02
+end
 @testset "The docstrings of 03_SchurComplementHierarchicalRiskParity.jl against numbers" begin
     PO = PortfolioOptimisers
-    # A six-asset covariance matrix, its leaf order, and the weights of the reference
-    # implementation at three values of gamma and after its monotonic search.
+    # A six-asset covariance matrix, its leaf order, and the weights of the oracle at three
+    # values of gamma and after its monotonic search.
     sigma = [7.782724171567788e-05 2.972127065997405e-05 -1.0114668612318741e-05 -2.9250463659699806e-05 -7.148034104575605e-06 1.2420446918541947e-05;
              2.972127065997405e-05 0.00010677258384304971 -2.5656442592669714e-05 2.2799233426940835e-06 -3.1371817657803e-05 -3.333868821011886e-05;
              -1.0114668612318741e-05 -2.5656442592669714e-05 4.5654013279841325e-05 -1.7069599855629958e-06 8.902017870314719e-06 1.321778381265861e-05;
@@ -338,18 +468,23 @@ end
         p = SchurComplementParams(; gamma = g, alg = NonMonotonicSchurComplement(),
                                   flag = false)
         w, gamma, r = PO.schur_complement_weights(prs, [order], wb6, p)
-        @test isapprox(w, wref[g]; atol = 1e-15)
+        # Measured maxabs 1.1e-16 (maxrel 5.8e-16), and 0 on the monotonic search below. The
+        # weights sum to one, so an absolute bound reads each one on the scale of the whole
+        # portfolio.
+        @test parity_compare(w, wref[g]; rtol = 0.0, atol = 1e-15,
+                             name = "Schur nonmonotonic w $(g)").ok
         # The weights of the recursion sum to one before any finaliser.
         @test isapprox(sum(w), 1; atol = 1e-15)
         @test gamma == g
         @test r.sigma === sigma
     end
-    # The reference returns the weights of the last midpoint it evaluated, and this search
+    # The oracle returns the weights of the last midpoint it evaluated, and this search
     # returns the weights of the value it reports. Both find the same value here.
     p = SchurComplementParams(; gamma = 1.0, alg = MonotonicSchurComplement(; N = 11))
     w, gamma, _ = PO.schur_complement_weights(prs, [order], wb6, p)
     @test gamma == 1.0
-    @test isapprox(w, wmono; atol = 1e-15)
+    # Measured maxabs 0, under the bound of the weights above.
+    @test parity_compare(w, wmono; rtol = 0.0, atol = 1e-15, name = "Schur monotonic w").ok
 
     # symmetric_step_up_matrix: the identity, the average of the insertions, and the
     # scaled transpose. Every row sums to one.
@@ -457,8 +592,8 @@ end
     @test_throws ArgumentError PO.schur_complement_weights(prx, [collect(1:10)], wbx, pft)
     @test isnothing(PO.assert_schur_weights(ones(2), 0.5))
 
-    # A bracket already narrower than tol ends the bisection with no warning, even when the
-    # derived budget is zero or less.
+    # A bracket already narrower than tol still takes one bisection, with no warning. The
+    # variance falls up to 5e-8, so the midpoint is the answer and not the start.
     obj(x) = (fill(x, 1), (x - 5e-8)^2)
     @test (@test_logs min_level = Logging.Warn PO.schur_complement_binary_search(obj, 0.0,
                                                                                  1e-7,
@@ -467,7 +602,7 @@ end
                                                                                  1e-4,
                                                                                  nothing,
                                                                                  true)) ==
-          ([0.0], 0.0)
+          ([5e-8], 5e-8)
 
     # port_opt_view of a bundle views the measure and keeps the other fields.
     pv = SchurComplementParams(; r = Variance(; sigma = sigma), gamma = 0.4,

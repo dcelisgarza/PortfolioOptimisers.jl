@@ -7,6 +7,7 @@ Description = "Factor Prior, public API of PortfolioOptimisers.jl: FactorPrior, 
 ```@docs
 FactorPrior
 prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false, kwargs...)
+prior(pe::FactorPrior, rd::ReturnsResult; kwargs...)
 ```
 
 ## References

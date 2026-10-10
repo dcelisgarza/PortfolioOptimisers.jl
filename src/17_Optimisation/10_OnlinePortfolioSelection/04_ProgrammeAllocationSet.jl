@@ -17,7 +17,7 @@ The kinds read their data at two times. Once per fold, [`resolve_allocation_set`
 
 At every step [`factory`](@ref) replaces the reference of a turnover ceiling, and of a [`WeightsTracking`](@ref), with the Price-Adjusted Allocation of the step. That is the book the fund trades from. A `fixed` object keeps the caller's reference.
 
-A set that reads the rows, for which [`rows_needed`](@ref) returns `nothing`, fits its prior once over the whole prefix at every step, and then solves its programme. A caller who wants a window states it on `pe`. A covariance of one observation does not exist. So while the head holds fewer than two rows, the set fits no prior, and the step is a Held Step with its reason recorded ([`allocation_set_ready`](@ref)). A caller who wants a covariance ceiling from the first row gives `r` its matrix. A MIP projection is not unique. So the identity between the Causal Pass and the Recursion Read-out is a property of the code path, the same solves in the same order on the same rows, and it holds exactly only with a deterministic solver.
+A set that reads the rows, for which [`rows_needed`](@ref) returns `nothing`, fits its prior once over the whole prefix at every step, and then solves its programme. A caller who wants a window states it on `pe`. A covariance of one observation does not exist. So while the head holds fewer than two rows, the set fits no prior, and the step is a Held Step with its reason recorded ([`allocation_set_ready`](@ref)). A caller who wants a covariance ceiling from the first row gives `r` its matrix. A MIP projection is not unique. So the identity between the Causal Pass and the Recursion Result is a property of the code path, the same solves in the same order on the same rows, and it holds exactly only with a deterministic solver.
 
 The set has no field for a budget, fees, the return term as an objective, the scalariser, the execution settings of the optimiser or a `TimeDependent` schedule. At construction [`assert_risk_ceiling`](@ref) refuses a frontier or a per-asset `ub` on a measure, because a ceiling is one number. The set does not read the `rke` or the `scale` of a measure. The ceiling is a constraint, and the objective is the divergence plus the penalties. The Euclidean, Gram and diagonal geometries admit a negative lower bound. The entropic, Tsallis and log-barrier geometries refuse it, at the head's construction when the bound is a value ([`assert_geometry_admits_set`](@ref)) and at the projection when an estimator resolves it. The wealth factor of a leveraged allocation can reach zero on an extreme day. At that point the log wealth and the next gradient are undefined, and the set does not guard against it.
 
@@ -723,7 +723,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Projects the raw step onto the Allocation Set in the Bregman divergence of the Tsallis potential of power `alpha`.
 
-This is the geometry of the Tsallis-entropy steps of Abernethy, Lee and Tewari (2015) and of the Tsallis-INF algorithm of Zimmert and Seldin (2021). The potential of the first paper is ``\\alpha \\Psi_\\alpha`` plus a constant, and the potential of the second is ``\\Psi_\\alpha`` plus an affine term. So each divergence is ``D_{\\Psi_\\alpha}`` times a constant factor, which a learning rate absorbs. Both papers bound the regret of the multi-armed bandit with bounded losses. At the tuned rate the expected regret is at most ``\\sqrt{2 T N / (\\alpha (1 - \\alpha))}`` (Abernethy, Lee and Tewari, 2015, Corollary 3.2). The log-wealth loss of a portfolio has no bounded gradient, so that bound does not apply to it as it stands. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the potential is undefined below zero.
+This is the geometry of the Tsallis-entropy steps of [abernethy2015](@citet) and of the Tsallis-INF algorithm of [zimmertseldin2021](@citet). The potential of [abernethy2015](@citet) is ``\\alpha \\Psi_\\alpha`` plus a constant, and the potential of [zimmertseldin2021](@citet) is ``\\Psi_\\alpha`` plus an affine term. So each divergence is ``D_{\\Psi_\\alpha}`` times a constant factor, which a learning rate absorbs. [abernethy2015](@citet) and [zimmertseldin2021](@citet) both bound the regret of the multi-armed bandit with bounded losses. At the tuned rate, Corollary 3.2 of [abernethy2015](@cite) bounds the expected regret by ``\\sqrt{2 T N / (\\alpha (1 - \\alpha))}``. The log-wealth loss of a portfolio has no bounded gradient, so that bound does not apply to it as it stands. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the potential is undefined below zero.
 
 # Mathematical definition
 
@@ -759,7 +759,7 @@ $(DocStringExtensions.FIELDS)
 
     TsallisProjection(; alpha::Real = 0.5) -> TsallisProjection
 
-Keywords correspond to the struct's fields. The default is the ``\\alpha = 1/2`` of Zimmert and Seldin (2021).
+Keywords correspond to the struct's fields. The default is the ``\\alpha = 1/2`` of [zimmertseldin2021](@cite).
 
 ## Validation
 
@@ -786,11 +786,11 @@ TsallisProjection
   - $(ref_dict[:abernethy2015])
   - $(ref_dict[:zimmertseldin2021])
 """
-struct TsallisProjection{T1 <: Real} <: AbstractProjectionGeometry
+@concrete struct TsallisProjection <: AbstractProjectionGeometry
     """
     The power of the potential, in `(0, 1)`.
     """
-    alpha::T1
+    alpha
     function TsallisProjection(alpha::Real)
         @argcheck(zero(alpha) < alpha < one(alpha),
                   DomainError(alpha, "alpha must be in (0, 1)"))
@@ -805,7 +805,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Projects the raw step onto the Allocation Set in the Itakura–Saito divergence, the Bregman divergence of the Burg entropy.
 
-Orseau, Lattimore and Legg (2017, §7) name the Burg entropy as the natural regulariser of mirror descent on the log loss, the alternative to their Soft-Bayes step. They state, without a proof in the paper, that its regret is ``O(\\sqrt{N T \\log (T / N)})`` and does not depend on the largest gradient. For a portfolio, this means that the bound needs no lower bound on the price relatives. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the logarithm is undefined below zero.
+In Section 7 of [orseau2017](@cite), the Burg entropy is the natural regulariser of mirror descent on the log loss, the alternative to the Soft-Bayes step of [orseau2017](@cite). [orseau2017](@citet) state without a proof that its regret is ``O(\\sqrt{N T \\log (T / N)})`` and does not depend on the largest gradient. For a portfolio, this means that the bound needs no lower bound on the price relatives. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the logarithm is undefined below zero.
 
 # Mathematical definition
 

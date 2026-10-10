@@ -224,7 +224,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Signed ``\\ell_1`` uncertainty set on the characteristic vector, with a separate error budget per sign.
 
-The set is ``\\mathcal{A}_2 = \\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{e} : \\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{+} \\leq \\epsilon_{+},\\, -\\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{-} \\leq \\epsilon_{-}\\}``. It bounds a *mean/characteristic* vector alone, and has no covariance analogue. [quintile](@cite) introduces it in order to *decouple* the long-short problem into two independent problems (its equations 27 and 28), which its Remark 12 then recombines only when the two legs happen to have complementary support; modelling the worst case below directly keeps the problem coupled, so that caveat does not arise.
+The set is ``\\mathcal{A}_2 = \\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{e} : \\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{+} \\leq \\epsilon_{+},\\, -\\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{-} \\leq \\epsilon_{-}\\}``. It bounds a *mean/characteristic* vector alone, and has no covariance analogue. [quintile](@cite) introduces it in order to *decouple* the long-short problem into two independent problems, Equations 27 and 28 of [quintile](@cite). Remark 12 of [quintile](@cite) then recombines them only when the two legs happen to have complementary support. The worst case below models the coupled problem directly, so that caveat does not arise.
 
 # Mathematical definition
 
@@ -388,7 +388,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Shape algorithm selecting a joint ``\\ell_1`` uncertainty set.
 
-`scaled` picks between the two sets of [quintile](@cite): `false` gives ``\\mathcal{S}`` (its equation 5) and `true` gives ``\\mathcal{A}_1`` (its equation 18). It defaults to `false` because ``\\mathcal{S}`` is the base construction of the paper, the one whose closed forms give the ``1/N`` and quintile portfolios. [`SignedL1UncertaintySetAlgorithm`](@ref) defaults the other way, because the paper defines its set only in the scaled form.
+`scaled` picks between the two sets of [quintile](@cite). `false` gives ``\\mathcal{S}`` of Equation 5 of [quintile](@cite), and `true` gives ``\\mathcal{A}_1`` of Equation 18 of [quintile](@cite). It defaults to `false` because ``\\mathcal{S}`` is the base construction of [quintile](@cite), the one whose closed forms give the ``1/N`` and quintile portfolios. [`SignedL1UncertaintySetAlgorithm`](@ref) defaults the other way, because [quintile](@cite) defines its set only in the scaled form.
 
 # Fields
 
@@ -464,7 +464,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Shape algorithm selecting a signed ``\\ell_1`` uncertainty set.
 
-The two ladders are fixed by the construction of [quintile](@cite) and need no `paired` flag: ``\\epsilon_{-}`` governs the long leg and is calibrated against the top of the ranking, ``\\epsilon_{+}`` governs the short leg and is calibrated against the bottom (its Corollary 13). `scaled` defaults to `true` because the paper defines ``\\mathcal{A}_2`` only in the volatility-scaled form, and states Corollary 13 in that form alone. [`L1UncertaintySetAlgorithm`](@ref) defaults the other way, because its base set carries no scaling.
+The two ladders are fixed by the construction of [quintile](@cite) and need no `paired` flag: ``\\epsilon_{-}`` governs the long leg and is calibrated against the top of the ranking, ``\\epsilon_{+}`` governs the short leg and is calibrated against the bottom, as Corollary 13 of [quintile](@cite) states. `scaled` defaults to `true` because [quintile](@cite) defines ``\\mathcal{A}_2`` only in the volatility-scaled form, and states Corollary 13 in that form alone. [`L1UncertaintySetAlgorithm`](@ref) defaults the other way, because its base set carries no scaling.
 
 # Fields
 
@@ -645,9 +645,9 @@ Where:
   - $(math_dict[:sigma_i_ucs])
   - $(math_dict[:N])
 
-This is the threshold of Lemma 2 (``\\sigma_i = 1``) and of Lemma 9 (scaled) of [quintile](@cite). Both lemmas state that the number of active assets is the largest ``k`` with ``L_k < \\epsilon``, so a radius in the open interval ``(L_q,\\, L_{q+1})`` activates exactly ``q`` assets, and the active weights are equal (Lemma 2) or inverse-volatility (Lemma 9). Corollaries 4 and 11 read this off at the quintile.
+This is the threshold of Lemma 2 (``\\sigma_i = 1``) and of Lemma 9 (scaled) of [quintile](@cite). Both lemmas state that the number of active assets is the largest ``k`` with ``L_k < \\epsilon``, so a radius in the open interval ``(L_q,\\, L_{q+1})`` activates exactly ``q`` assets, and the active weights are equal (Lemma 2) or inverse-volatility (Lemma 9). Corollaries 4 and 11 of [quintile](@cite) read this off at the quintile.
 
-Two consequences bound the sequence. Every summand of ``L_1`` is zero, so ``L_1 = 0``: a strictly positive radius always activates at least one asset. And ``L_{k+1} - L_k = \\sum_{i=1}^{k+1} (\\hat{\\mu}_k - \\hat{\\mu}_{k+1}) / \\sigma_i \\geq 0`` because the ranking is non-increasing, so the sequence is non-decreasing and its rungs bracket. Equality holds exactly when ``\\hat{\\mu}_k = \\hat{\\mu}_{k+1}``, which is the tie Assumption 1 of the paper excludes.
+Two consequences bound the sequence. Every summand of ``L_1`` is zero, so ``L_1 = 0``: a strictly positive radius always activates at least one asset. And ``L_{k+1} - L_k = \\sum_{i=1}^{k+1} (\\hat{\\mu}_k - \\hat{\\mu}_{k+1}) / \\sigma_i \\geq 0`` because the ranking is non-increasing, so the sequence is non-decreasing and its rungs bracket. Equality holds exactly when ``\\hat{\\mu}_k = \\hat{\\mu}_{k+1}``, which is the tie that Assumption 1 of [quintile](@cite) excludes.
 
 # Algorithm
 

@@ -1,7 +1,7 @@
 """
     const MatNum_Pr = Union{<:MatNum, <:AbstractPriorResult, <:ReturnsResult}
 
-Groups the three carriers of a returns matrix that the value-level risk functions accept as their data argument.
+Groups the three types that hold a returns matrix and that the value-level risk functions accept as their data argument.
 
 A caller can hold a bare matrix, a prior result or a returns result, and each one carries the matrix that a risk measure is evaluated on. [`resolve_risk_inputs`](@ref) turns any of the three into the pair of a measure and a matrix, so one method of a function such as [`risk_contribution`](@ref) serves all three.
 
@@ -55,7 +55,7 @@ The composite measures keep methods of their own. [`RiskRatio`](@ref) returns `e
 
 Every public method takes one risk measure or a vector of them, which is the bound [`BaseRM_VecBaseRM`](@ref). A vector gives one number, by the three rules that the docstring of the vector method states.
 
-A prior result and a bare returns matrix give different answers for one measure. The prior route puts the measure through [`factory`](@ref), so the figure is the one that the optimiser optimises. A Deferred Quantity resolves against the prior, and a slot that the measure leaves unstated takes the field of the prior. The matrix route has no prior to read, so it leaves every slot as the measure holds it. To fill one, it would have to pick an estimator that the caller never named. It refuses a Deferred Quantity by name through [`assert_resolved_slots`](@ref), and an empty slot that the functor reads through [`functor_slots`](@ref). `Variance()` holds `sigma = nothing` and its functor is `dot(w, r.sigma, w)`, so the matrix route refuses it by name and `LinearAlgebra` never raises a `MethodError`. [`assert_calibrated_slots`](@ref) refuses a Calibration Rule on the same terms, because a rule reads the sample size, the moments and the observation weights of a prior result.
+A prior result and a bare returns matrix give different answers for one measure. The prior route puts the measure through [`factory`](@ref), so the figure is the one that the optimiser optimises. A Deferred Quantity resolves against the prior, and a slot that the measure leaves unstated takes the field of the prior. The matrix route has no prior to read, so it leaves every slot as the measure holds it. To fill one, it would have to pick an estimator that the caller never named. It refuses a Deferred Quantity with an error that names it, through [`assert_resolved_slots`](@ref), and an empty slot that the functor reads through [`functor_slots`](@ref). `Variance()` holds `sigma = nothing` and its functor is `dot(w, r.sigma, w)`, so the matrix route refuses it with an error that names it, and `LinearAlgebra` never raises a `MethodError`. [`assert_calibrated_slots`](@ref) refuses a Calibration Rule on the same terms, because a rule reads the sample size, the moments and the observation weights of a prior result.
 
 The prior route reduces to the Investable Mask. A prior result holds every asset of the universe, and an asset that it could not estimate carries `NaN` in `mu`, on the diagonal of `sigma` and down its column of `pr.X`. On the whole universe, `dot(w, pr.sigma, w)` and `pr.X * w` are `NaN` at every weight, a zero weight included. The prior route therefore reduces the prior, the weights and the fees before it evaluates the measure. A bare matrix and a [`ReturnsResult`](@ref) carry no moments, so no mask exists and they pass through unchanged.
 
@@ -87,7 +87,7 @@ The prior route, `expected_risk(r, w, pr, fees)`:
 
 # Validation
 
-  - A measure that reads a return series and gets no returns carrier, `X = nothing`, raises an [`IsNothingError`](@ref). The message names the measure and the four calls that carry one. A caller meets it when it scores a result that carries no carrier of its own, which is every optimiser whose fit keeps no returns.
+  - A measure that reads a return series and gets no returns data, `X = nothing`, raises an [`IsNothingError`](@ref). The message names the measure and the four calls that pass the returns data. A caller meets it when it scores a result that holds no returns data of its own, which is every optimiser whose fit keeps no returns.
   - A Deferred Quantity that is not resolved raises through [`assert_resolved_slots`](@ref), and an empty slot that the functor reads raises through [`functor_slots`](@ref).
   - A Calibration Rule that is not calibrated raises through [`assert_calibrated_slots`](@ref).
   - Under `strict = true`, a held non-investable asset raises through [`investable_reduction`](@ref).
@@ -116,15 +116,15 @@ function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, args...; kwargs...
     return expected_risk(risk_input_kind(r), r, w, args...; kwargs...)
 end
 """
-    missing_returns_carrier_message(r::AbstractBaseRiskMeasure)
+    missing_returns_data_message(r::AbstractBaseRiskMeasure)
 
-Build the error message that refuses a `nothing` returns carrier to a measure that reads a return series.
+Build the error message that refuses `nothing` as the returns data of a measure that reads a return series.
 
-Two methods raise this refusal, one for a weight vector and one for a weight path, and both take the text from here. The message names the measure and the four calls that carry a returns carrier, two on a weight vector and two on an [`OptimisationResult`](@ref).
+Two methods raise this refusal, one for a weight vector and one for a weight path, and both take the text from here. The message names the measure and the four calls that pass the returns data, two on a weight vector and two on an [`OptimisationResult`](@ref).
 
 # Arguments
 
-  - `r`: The measure that was given no carrier.
+  - `r`: The measure that was given no returns data.
 
 # Returns
 
@@ -136,8 +136,8 @@ Two methods raise this refusal, one for a weight vector and one for a weight pat
   - [`IsNothingError`](@ref)
   - [`risk_input_kind`](@ref)
 """
-function missing_returns_carrier_message(r::AbstractBaseRiskMeasure)
-    return "`$(nameof(typeof(r)))` is evaluated on a return series, and no returns carrier was given. Either the call named none, or the result it was taken from carries none of its own. Pass one: `expected_risk(r, w, X)` or `expected_risk(r, res, X)` for a returns matrix, `expected_risk(r, w, pr)` or `expected_risk(r, res, pr)` for a prior result."
+function missing_returns_data_message(r::AbstractBaseRiskMeasure)
+    return "`$(nameof(typeof(r)))` is evaluated on a return series, and no returns data was given. Either the call named none, or the result it was taken from carries none of its own. Pass one: `expected_risk(r, w, X)` or `expected_risk(r, res, X)` for a returns matrix, `expected_risk(r, w, pr)` or `expected_risk(r, res, pr)` for a prior result."
 end
 """
     expected_risk(rs::VecBaseRM, w::VecNum, args...; sca::Scalariser = SumScalariser(),
@@ -179,7 +179,7 @@ Where:
 
   - `rs::VecBaseRM`: Vector of risk measures.
   - `w::VecNum`: Portfolio weights vector `assets × 1`.
-  - `args...`: The returns carrier and the fees, forwarded to each element.
+  - `args...`: The returns data and the fees, forwarded to each element.
 
 # Keyword Arguments
 
@@ -215,17 +215,18 @@ function expected_risk(::WeightsInput, r::AbstractBaseRiskMeasure, w::VecNum, ar
                        kwargs...)
     return r(w)
 end
-# The two kinds above read a return series, so a `nothing` carrier reaches no method of
-# theirs. The call that lands here is the documented `expected_risk(r, res)` on a result
-# that carries no carrier of its own: `result_investable_view` falls back to `res.pr`, and
-# `nothing` arrives as `X`. Without this method that call raised a `MethodError` naming the
-# kind singleton, which names neither the measure nor the missing argument. It is refused by
-# name on the same terms as an unstated slot, and it states the ways out. `WeightsInput` is
-# absent: it reads no series, so its `args...` method already answers a carrier-free call.
+# The two kinds above read a return series, so `nothing` as the returns data reaches no
+# method of theirs. The call that lands here is the documented `expected_risk(r, res)` on a
+# result that holds no returns data of its own: `result_investable_view` falls back to
+# `res.pr`, and `nothing` arrives as `X`. Without this method that call raised a
+# `MethodError` naming the kind singleton, which names neither the measure nor the missing
+# argument. It is refused with an error that names the measure, on the same terms as an
+# unstated slot, and it states the ways out. `WeightsInput` is absent: it reads no series,
+# so its `args...` method already answers a call with no returns data.
 function expected_risk(::Union{<:NetReturnsInput, <:WeightsReturnsFeesInput},
                        r::AbstractBaseRiskMeasure, w::VecNum, X::Nothing = nothing,
                        fees::Option{<:Fees} = nothing; kwargs...)
-    return throw(IsNothingError(missing_returns_carrier_message(r)))
+    return throw(IsNothingError(missing_returns_data_message(r)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -304,7 +305,7 @@ end
 
 Turn the data argument of a value-level function into the measure to evaluate and the returns matrix to evaluate it on.
 
-The method depends on the carrier.
+The method depends on the type of `X`.
 
   - A prior result resolves the measure through [`factory`](@ref) and returns `pr.X`. A Deferred Quantity becomes a value, and a slot that the measure leaves unstated takes the field of the prior.
   - A [`ReturnsResult`](@ref) carries no moments, so the measure stays as it is and the method returns `rd.X`.
@@ -340,7 +341,7 @@ end
 """
     original_returns(X::MatNum_Pr)
 
-Return the returns matrix that the caller supplied, from the carrier that holds it.
+Return the returns matrix that the caller supplied, from the argument that holds it.
 
 A prior result returns `pr.original_X`, a [`ReturnsResult`](@ref) returns its `X`, and a matrix returns itself. The three agree when the prior did not come from a factor model, because then `pr.original_X === pr.X`. A factor prior sets `pr.X` to the reconstruction `F * transpose(M) .+ transpose(b)`, and the two differ.
 
@@ -399,7 +400,7 @@ end
     resolve_factor_regression(re::RegE_Reg, rd::ReturnsResult,
                               pr::Option{<:AbstractPriorResult} = nothing)
 
-Pick the factor loadings that a factor attribution decomposes against, from the three carriers that can supply them.
+Pick the factor loadings that a factor attribution decomposes against, from the three arguments `re`, `pr` and `rd` that can supply them.
 
 The order of precedence is fixed. A precomputed result is an answer that the caller states, so it needs no data. The loadings of a prior were fitted on `pr.original_X`, which is the matrix that the attribution measures the risk on, so the loadings and the returns agree.
 
@@ -443,14 +444,15 @@ function resolve_factor_regression(re::RegE_Reg, rd::ReturnsResult,
         return pr.rr
     end
     @argcheck(!isnothing(rd.X) && !isnothing(rd.F),
-              IsNothingError("a factor decomposition needs loadings, and none of the three carriers holds any. `re` is an estimator (`$(nameof(typeof(re)))`), so it must fit them from `rd.X` and `rd.F`; the prior carries no factor block to read them from instead.\nSupply the data as `rd`, or pass a precomputed `Regression` as `re`, or pass a prior fitted through a factor model (e.g. `FactorPrior`), which carries its own loadings in `rr`.\nGot\nisnothing(rd.X) => $(isnothing(rd.X))\nisnothing(rd.F) => $(isnothing(rd.F))\nisnothing(pr) => $(isnothing(pr))"))
+              IsNothingError("a factor decomposition needs loadings, and none of the three arguments `re`, `pr` and `rd` holds any. `re` is an estimator (`$(nameof(typeof(re)))`), so it must fit them from `rd.X` and `rd.F`; the prior carries no factor block to read them from instead.\nSupply the data as `rd`, or pass a precomputed `Regression` as `re`, or pass a prior fitted through a factor model (e.g. `FactorPrior`), which carries its own loadings in `rr`.\nGot\nisnothing(rd.X) => $(isnothing(rd.X))\nisnothing(rd.F) => $(isnothing(rd.F))\nisnothing(pr) => $(isnothing(pr))"))
     return regression(re, rd)
 end
-# The value-level door. A non-investable asset carries `NaN` in `mu`, on the diagonal of
-# `sigma` and down its column of `pr.X`, so the figure is `NaN` at any weight, the
-# optimiser's own zero included. `investable_reduction` reduces the prior, the weights and
-# the fees once here, which is ADR 0115's rule at the door a caller reaches by hand. A bare
-# matrix and a `ReturnsResult` carry no moments, so the same call passes them through.
+# The prior route of the value-level `expected_risk`. A non-investable asset carries `NaN`
+# in `mu`, on the diagonal of `sigma` and down its column of `pr.X`, so the figure is `NaN`
+# at any weight, the optimiser's own zero included. `investable_reduction` reduces the
+# prior, the weights and the fees once here, which is ADR 0115's rule at the entry point
+# that a caller calls by hand. A bare matrix and a `ReturnsResult` carry no moments, so the
+# same call passes them through.
 function expected_risk(r::AbstractBaseRiskMeasure, w::VecNum, pr::Pr_RR,
                        fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
@@ -484,7 +486,7 @@ The type of the weight argument picks the method. A [`VecNum`](@ref) is one targ
 The three input kinds treat a path differently.
 
   - [`NetReturnsInput`](@ref) computes `r(calc_net_returns(w, X, fees))`. [`calc_net_returns(w::MatNum, X::MatNum, args...)`](@ref) reads the path, so the kernel of the measure does not change.
-  - [`WeightsReturnsFeesInput`](@ref) and [`WeightsInput`](@ref) refuse a path by name. Their kernels read a weight vector as one cross-section, and a path gives one number for each observation, which is a different quantity.
+  - [`WeightsReturnsFeesInput`](@ref) and [`WeightsInput`](@ref) refuse a path with an `ArgumentError` that names the measure. Their kernels read a weight vector as one cross-section, and a path gives one number for each observation, which is a different quantity.
 
 The library can score a measure that refuses a path under a drift. The question of such a measure is about the weights and not about the series, so score it against the target weights.
 
@@ -501,7 +503,7 @@ The library can score a measure that refuses a path under a drift. The question 
   - `X::MatNum`: Returns matrix `observations × assets`.
   - `pr::Pr_RR`: Prior result, or [`ReturnsResult`](@ref) that carries the returns matrix.
   - `fees`: Optional [`Fees`](@ref) structure.
-  - `args...`: The returns carrier and the fees, forwarded to the method of the input kind.
+  - `args...`: The returns data and the fees, forwarded to the method of the input kind.
 
 # Keyword Arguments
 
@@ -511,7 +513,7 @@ The library can score a measure that refuses a path under a drift. The question 
 # Validation
 
   - A measure that declares [`WeightsReturnsFeesInput`](@ref) or [`WeightsInput`](@ref) raises an `ArgumentError` that names the measure and its kind.
-  - A measure that reads a return series and gets no returns carrier raises an [`IsNothingError`](@ref).
+  - A measure that reads a return series and gets no returns data raises an [`IsNothingError`](@ref).
 
 # Returns
 
@@ -553,12 +555,13 @@ function expected_risk(::WeightsInput, r::AbstractBaseRiskMeasure, w::MatNum, ar
                        kwargs...)
     return throw(ArgumentError("`$(typeof(r))` declares `WeightsInput`, so its kernel reads `w` as one cross-section of weights and is called as `r(w)`. A `w::MatNum` is a weight path, one row of weights per observation, which is a different quantity and not a wider input to that kernel.\nScore this measure against the target weight vector, `w::VecNum`, which is the first row of the path.\nGot\nsize(w) => $(size(w))"))
 end
-# The carrier-free refusal of the `VecNum` block, for a weight path. Only `NetReturnsInput`
-# needs it: the other two kinds refuse **any** path above, through an `args...` method that
-# a carrier-free call already reaches, and that refusal is the more fundamental one.
+# The refusal of the `VecNum` block for a call with no returns data, for a weight path. Only
+# `NetReturnsInput` needs it: the other two kinds refuse **any** path above, through an
+# `args...` method that a call with no returns data already reaches, and that refusal is the
+# more fundamental one.
 function expected_risk(::NetReturnsInput, r::AbstractBaseRiskMeasure, w::MatNum,
                        X::Nothing = nothing, fees::Option{<:Fees} = nothing; kwargs...)
-    return throw(IsNothingError(missing_returns_carrier_message(r)))
+    return throw(IsNothingError(missing_returns_data_message(r)))
 end
 # The three ratio composites split by type for the same reason their `VecNum` twins do:
 # `NonOptimisationRiskRatio` names `sca1` and `sca2`, and `RiskRatio` carries neither.
@@ -577,8 +580,8 @@ function expected_risk(r::MeanReturnRiskRatio, w::MatNum, X::MatNum,
     return (expected_risk(r.rt, w, X, fees; kwargs...) - r.rf) /
            expected_risk(r.rk, w, X, fees; kwargs..., sca = r.sca)
 end
-# The path's value-level door, and it reduces by the rule the vector's door reduces by: the
-# mask selects the columns of the path and every row keeps its own observation.
+# The prior route for a weight path, and it reduces by the rule of the prior route for a
+# vector: the mask selects the columns of the path and every row keeps its own observation.
 function expected_risk(r::AbstractBaseRiskMeasure, w::MatNum, pr::Pr_RR,
                        fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
@@ -970,7 +973,7 @@ function risk_contribution(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum_Pr,
                            fees::Option{<:Fees} = nothing; delta::Number = 1e-6,
                            marginal::Bool = false, sca::Scalariser = SumScalariser(),
                            strict::Bool = false, kwargs...)
-    # The value-level door reduces once, before the finite difference, so no perturbed
+    # The function reduces once, before the finite difference, so no perturbed
     # weight ever meets a `NaN` moment. The per asset answer expands back into a zero
     # vector of the full length, so a dead asset reports exactly `0`.
     imsk, X, w, fees = investable_reduction(X, w, fees, strict)
@@ -1217,7 +1220,7 @@ function measure_gradient(r::StandardDeviation, w::VecNum, X::MatNum, fees::Opti
 end
 function measure_gradient(r::MeanReturn, w::VecNum, X::MatNum, ::Nothing; kwargs...)
     x = X * w
-    ow = get_observation_weights(r.w, x)
+    ow = checked_observation_weights(r.w, x)
     omega = isnothing(ow) ? fill(inv(length(x)), length(x)) : ow ./ sum(ow)
     if r.flag
         omega = omega ./ (one(eltype(x)) .+ x)
@@ -1395,7 +1398,7 @@ Where:
 
 # Validation
 
-  - When no carrier supplies the loadings, [`resolve_factor_regression`](@ref) raises an [`IsNothingError`](@ref).
+  - When none of `re`, `X` and `rd` supplies the loadings, [`resolve_factor_regression`](@ref) raises an [`IsNothingError`](@ref).
   - Under `strict = true`, a held non-investable asset raises through [`investable_reduction`](@ref).
 
 # Returns
@@ -1423,7 +1426,7 @@ function factor_risk_contribution(r::BaseRM_VecBaseRM, w::VecNum, X::MatNum_Pr,
                                   rd::ReturnsResult = ReturnsResult(), delta::Number = 1e-6,
                                   sca::Scalariser = SumScalariser(), strict::Bool = false,
                                   kwargs...)
-    # The value-level door reduces once, and the loadings come from the reduced prior or
+    # The function reduces once, and the loadings come from the reduced prior or
     # from the reduced data, so the regression is fitted over the live assets alone. The
     # answer is per factor rather than per asset, so nothing expands.
     imsk, X, w, fees = investable_reduction(X, w, fees, strict)

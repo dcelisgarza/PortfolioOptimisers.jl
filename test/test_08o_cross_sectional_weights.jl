@@ -1,6 +1,6 @@
 #=
 Check `src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl` against the mathematics its docstrings
-state, and against the reference implementation the map of issue #643 ports. Issue #681.
+state, and against the oracle that the map of issue #643 ports. Issue #681.
 
 THREE FACTS SHAPE THE PROBES.
 
@@ -17,14 +17,14 @@ THREE FACTS SHAPE THE PROBES.
    over different universes would drift away from the number the caller wrote.
    `The realised blend equals the nominal shrinkage` measures both halves.
 
-3. THE STORED WEIGHTS COME FROM THE REFERENCE IMPLEMENTATION. `REFERENCE_W1_A` and
-   `REFERENCE_W1_B` were produced by the reference implementation's own winsoriser and
-   blend, on the inputs written beside them, and they are the oracle of the port. The plain
+3. THE STORED WEIGHTS COME FROM THE ORACLE. `ORACLE_W1_A` and `ORACLE_W1_B` were produced by
+   the oracle's own winsoriser and blend, on the inputs written beside them. The plain
    Julia `reference_blended_weights` below re-derives the same quantity a second way, so a
    testset never compares the file against itself.
 =#
 
 using Statistics
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 # The blend written out one observation at a time, from the variance series alone. It shares
 # no code with the implementation: the winsorisation, the median cap and the two
@@ -92,11 +92,11 @@ const MCAP_A = [100.0 200.0 300.0
                 100.0 200.0 300.0
                 100.0 200.0 300.0]
 # `MarketCapWeights(; p = 1.0)` and `BlendedInverseVarianceWeights(; p = 1.0, lambda = 0.5,
-# ratio = 20.0, wins = (0.025, 0.975))`, as the reference implementation answers them.
-const REFERENCE_W1_A = [0.16666666666666666 0.3333333333333333 0.5
-                        0.16666666666666666 0.3333333333333333 0.5
-                        0.5055487368313388 0.21576148102689985 0.27868978214176127
-                        0.20074844833880978 0.350675428988682 0.4485761226725082]
+# ratio = 20.0, wins = (0.025, 0.975))`, as the oracle answers them.
+const ORACLE_W1_A = [0.16666666666666666 0.3333333333333333 0.5
+                     0.16666666666666666 0.3333333333333333 0.5
+                     0.5055487368313388 0.21576148102689985 0.27868978214176127
+                     0.20074844833880978 0.350675428988682 0.4485761226725082]
 
 # Five observations of four assets, one pair excluded per observation.
 const EPS_B = [0.010 -0.020 0.030 0.005
@@ -115,12 +115,12 @@ const MCAP_B = [400.0 100.0 900.0 1600.0
                 400.0 100.0 900.0 1600.0
                 400.0 100.0 900.0 1600.0]
 # `BlendedInverseVarianceWeights(; p = 0.5, lambda = 1.0, ratio = 2.0, wins = (0.1, 0.9))`,
-# as the reference implementation answers it.
-const REFERENCE_W1_B = [0.3333333333333333 0.16666666666666666 0.5 0.0
-                        0.2857142857142857 0.14285714285714285 0.0 0.5714285714285714
-                        0.45699777848302126 0.050777530942557915 0.035226912091399554 0.45699777848302126
-                        0.0 0.23828125 0.25390625 0.5078125
-                        0.15288220551378442 0.0 0.3258145363408521 0.5213032581453634]
+# as the oracle answers it.
+const ORACLE_W1_B = [0.3333333333333333 0.16666666666666666 0.5 0.0
+                     0.2857142857142857 0.14285714285714285 0.0 0.5714285714285714
+                     0.45699777848302126 0.050777530942557915 0.035226912091399554 0.45699777848302126
+                     0.0 0.23828125 0.25390625 0.5078125
+                     0.15288220551378442 0.0 0.3258145363408521 0.5213032581453634]
 
 @testset "Cross-sectional weights" begin
     @testset "The type tree" begin
@@ -279,14 +279,17 @@ const REFERENCE_W1_B = [0.3333333333333333 0.16666666666666666 0.5 0.0
                                                                                        1.0))
     end
 
-    @testset "The port reproduces the reference implementation" begin
+    @testset "The port reproduces the stored oracle" begin
         rwA = BlendedInverseVarianceWeights(; p = 1.0, lambda = 0.5, ratio = 20.0,
                                             wins = (0.025, 0.975))
         W0A = PortfolioOptimisers.cs_weights_initial(rwA, MCAP_A, MASK_A)
         @test W0A == MCAP_A
         W1A = PortfolioOptimisers.cs_weights_refine(rwA, W0A, EPS_A, SimpleVariance(),
                                                     MASK_A)
-        @test W1A ≈ REFERENCE_W1_A
+        # Cell by cell. Measured maxrel 2.2e-16 and 3.4e-16 on the two cases: the round-off
+        # of the two normalisations, summed in another order. `1e-14` is about thirty times
+        # the worst value.
+        @test parity_compare(W1A, ORACLE_W1_A; rtol = 1e-14, name = "case A").ok
 
         rwB = BlendedInverseVarianceWeights(; p = 0.5, lambda = 1.0, ratio = 2.0,
                                             wins = (0.1, 0.9))
@@ -298,7 +301,7 @@ const REFERENCE_W1_B = [0.3333333333333333 0.16666666666666666 0.5 0.0
                       20.0 0.0 30.0 40.0]
         W1B = PortfolioOptimisers.cs_weights_refine(rwB, W0B, EPS_B, SimpleVariance(),
                                                     MASK_B)
-        @test W1B ≈ REFERENCE_W1_B
+        @test parity_compare(W1B, ORACLE_W1_B; rtol = 1e-14, name = "case B").ok
         # An ineligible pair carries no weight at all.
         @test all(iszero, W1B[.!MASK_B])
     end
@@ -314,7 +317,9 @@ const REFERENCE_W1_B = [0.3333333333333333 0.16666666666666666 0.5 0.0
                                                         mask)
             W1 = PortfolioOptimisers.cs_weights_refine(alg, W0, eps, SimpleVariance(), mask)
             V = reference_variance_series(eps)
-            @test W1 ≈ reference_blended_weights(V, W0, mask, lambda, ratio, wins)
+            # Cell by cell. Measured maxrel 1.3e-16 or less on the three cases.
+            E = reference_blended_weights(V, W0, mask, lambda, ratio, wins)
+            @test parity_compare(W1, E; rtol = 1e-14, name = "blend p = $(p)").ok
         end
     end
 

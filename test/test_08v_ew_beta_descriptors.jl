@@ -1,8 +1,8 @@
 #=
-Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl`, the residual half of
+Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_a.jl` and `_b.jl`, the residual half of
 `05_EWVolatilityDescriptors.jl`, and the market-return builder and beta recursion they share
 in `01_Base_Descriptor.jl`, against the contract their docstrings state and against the
-reference implementation. Issue #719, map #643.
+oracle. Issue #719, map #643.
 
 FIVE CONVENTIONS SHAPE THE PROBES, and the first three are `test_08u_ew_descriptors.jl`'s.
 
@@ -12,7 +12,7 @@ FIVE CONVENTIONS SHAPE THE PROBES, and the first three are `test_08u_ew_descript
    observation neither advances its state nor resets it, and the observation does not count
    toward its warm-up.
 
-3. AN INACTIVE CELL IS ALSO A GAP. The reference implementation's own container refuses a
+3. AN INACTIVE CELL IS ALSO A GAP. The oracle's own container refuses a
    return outside the active mask, so no member ever advances a state there. The library
    masks the returns through `ew_active_returns` before the recursion starts, which is the
    same rule stated on this side.
@@ -25,7 +25,7 @@ FIVE CONVENTIONS SHAPE THE PROBES, and the first three are `test_08u_ew_descript
    asset turns inactive. The three beta Descriptors freeze instead, so an asset that
    re-enters the universe resumes from the state it left.
 
-THE STORED CASES ARE THE REFERENCE IMPLEMENTATION'S OWN OUTPUT. `assets/EWMarketBeta.csv.gz`
+THE STORED CASES ARE THE ORACLE'S OWN OUTPUT. `assets/EWMarketBeta.csv.gz`
 is `EWMarketBeta(half_life = 5, group = "industry", min_group_size = 2,
 bounds = (0.1, 0.9))`, and `assets/EWMacroSensitivity.csv.gz` is
 `EWMacroSensitivity(half_life = 5, agg_obs = 3)`. Both were produced on the panel the last
@@ -35,6 +35,7 @@ an aggregated clock. All thirteen cases of the diff agreed with no difference in
 pattern and a worst relative difference of 2.5e-13 over the finite cells.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 # A small hand panel carrying a market capitalisation beside the returns, and optionally an
 # industry classification. Every numeric field takes a forward fill, so each earns an
@@ -521,6 +522,166 @@ end
     end
 end
 
+# Returns driven by the market and by one macro series, with the macro series in the Exogenous
+# Series of the returns data under the name "FX" (#1365, ADR 0184).
+function ewb_macro_fixture(; T::Integer = 120, N::Integer = 10, fx = nothing)
+    rng = StableRNGs.StableRNG(1365)
+    m = 0.01 .* randn(rng, T)
+    f = isnothing(fx) ? 0.005 .* randn(rng, T) : fx
+    bm = collect(range(0.6, 1.4; length = N))
+    bf = collect(range(-1.0, 1.0; length = N))
+    X = m .* transpose(bm) .+ ifelse.(isfinite.(f), f, 0.0) .* transpose(bf) .+
+        0.002 .* randn(rng, T, N)
+    W = 1.0 .+ rand(rng, T, N)
+    pnl = asset_panel([NumericPanelInput(; name = "market_cap", vals = W)];
+                      amsk = trues(T, N), emsk = trues(T, N))
+    return ReturnsResult(; nx = ["A" * string(i) for i in 1:N], X = X, ne = ["SPX", "FX"],
+                         E = hcat(m, f), pnl = pnl)
+end
+
+@testset "EW beta descriptors: EWMacroSensitivity reads the Exogenous Series (#1365)" begin
+    PO = PortfolioOptimisers
+    rd = ewb_macro_fixture()
+    ref = rd.E[:, 2]
+    @testset "The named column gives the partial beta of the keyword" begin
+        for agg_obs in (1, 3)
+            de = EWMacroSensitivity(; series = "FX", half_life = 5, agg_obs = agg_obs)
+            dr = EWMacroSensitivity(; half_life = 5, agg_obs = agg_obs)
+            @test isequal(descriptor(de, rd), descriptor(dr, rd; ref = ref))
+        end
+        # The column is found by its name, not by its place.
+        rds = ReturnsResult(; nx = rd.nx, X = rd.X, ne = ["FX", "SPX"], E = rd.E[:, [2, 1]],
+                            pnl = rd.pnl)
+        @test isequal(descriptor(EWMacroSensitivity(; series = "FX", half_life = 5), rds),
+                      descriptor(EWMacroSensitivity(; series = "FX", half_life = 5), rd))
+    end
+    @testset "A gap in the warm-up is accepted, and the recursion skips it" begin
+        # The warm-up of a half-life of 5 is more than four observations, and three of its
+        # values are missing.
+        de = EWMacroSensitivity(; series = "FX", half_life = 5)
+        f = copy(ref)
+        f[[1, 2, 4]] .= NaN
+        rdg = ewb_macro_fixture(; fx = f)
+        @test isequal(descriptor(de, rdg),
+                      descriptor(EWMacroSensitivity(; half_life = 5), rdg; ref = f))
+        # With agg_obs = 3, a window of the warm-up averages its finite values.
+        da = EWMacroSensitivity(; series = "FX", half_life = 5, agg_obs = 3)
+        @test isequal(descriptor(da, rdg),
+                      descriptor(EWMacroSensitivity(; half_life = 5, agg_obs = 3), rdg;
+                                 ref = f))
+        # With agg_obs = 7, the 17 complete windows end at observation 119, so the recursion
+        # does not read observation 120, and a gap there is accepted.
+        f = copy(ref)
+        f[120] = NaN
+        rdt = ewb_macro_fixture(; fx = f)
+        dt = EWMacroSensitivity(; series = "FX", half_life = 5, agg_obs = 7)
+        @test isequal(descriptor(dt, rdt),
+                      descriptor(EWMacroSensitivity(; half_life = 5, agg_obs = 7), rdt;
+                                 ref = f))
+    end
+    @testset "The refusals" begin
+        de = EWMacroSensitivity(; series = "FX", half_life = 5)
+        # Both sources of the series.
+        @test_throws ArgumentError descriptor(de, rd; ref = ref)
+        # Neither source.
+        @test_throws PO.IsNothingError descriptor(EWMacroSensitivity(; half_life = 5), rd)
+        # No Exogenous Series.
+        rd0 = ReturnsResult(; nx = rd.nx, X = rd.X, pnl = rd.pnl)
+        @test_throws PO.IsNothingError descriptor(de, rd0)
+        # A name the Exogenous Series does not hold is named in the message.
+        err = try
+            descriptor(EWMacroSensitivity(; series = "JPY", half_life = 5), rd)
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("\"JPY\"", err.msg)
+        # A value that is not finite after the warm-up, at observation 50.
+        f = copy(ref)
+        f[50] = NaN
+        rdn = ewb_macro_fixture(; fx = f)
+        err = try
+            descriptor(de, rdn)
+        catch e
+            e
+        end
+        @test err isa PO.IsNonFiniteError
+        @test occursin("\"FX\"", err.msg)
+        @test occursin("observation 50", err.msg)
+        # With agg_obs = 3, the window of observations 49 to 51 still holds two finite
+        # values, and the recursion reads their mean, so the gap is accepted.
+        da = EWMacroSensitivity(; series = "FX", half_life = 5, agg_obs = 3)
+        @test isequal(descriptor(da, rdn),
+                      descriptor(EWMacroSensitivity(; half_life = 5, agg_obs = 3), rdn;
+                                 ref = f))
+        # A window with no finite value is refused, and the message names the window.
+        f3 = copy(ref)
+        f3[49:51] .= NaN
+        err = try
+            descriptor(da, ewb_macro_fixture(; fx = f3))
+        catch e
+            e
+        end
+        @test err isa PO.IsNonFiniteError
+        @test occursin("observations 49 to 51", err.msg)
+        # The keyword keeps the rule of the recursion: the state holds its value there.
+        D = descriptor(EWMacroSensitivity(; half_life = 5), rdn; ref = f)
+        @test isequal(D[50, :], D[49, :])
+        # An infinite value is refused on both paths, in the warm-up too, because it is
+        # not a gap.
+        fi = copy(ref)
+        fi[2] = -Inf
+        rdi = ewb_macro_fixture(; fx = fi)
+        @test_throws PO.IsNonFiniteError descriptor(de, rdi)
+        @test_throws PO.IsNonFiniteError descriptor(EWMacroSensitivity(; half_life = 5),
+                                                    rdi; ref = fi)
+        # An empty name is refused by the constructor.
+        err = try
+            EWMacroSensitivity(; series = "")
+        catch e
+            e
+        end
+        @test err isa PO.IsEmptyError
+        @test occursin("Exogenous Series", err.msg)
+    end
+    @testset "An observation view reads the rows of E that it keeps" begin
+        de = EWMacroSensitivity(; series = "FX", half_life = 5)
+        rows, cols = 21:100, [1, 3, 4, 8]
+        rdv = PO.port_opt_view(rd, rows, cols)
+        @test isequal(descriptor(de, rdv),
+                      descriptor(EWMacroSensitivity(; half_life = 5), rdv; ref = ref[rows]))
+    end
+    @testset "Inside CrossSectionalFactorPrior" begin
+        de = EWMacroSensitivity(; series = "FX", half_life = 5)
+        xe = CompositeExposure(; descriptors = [de], outlier = nothing, scoring = nothing,
+                               family = "macro")
+        # The exposure is the Descriptor of a direct call with the same series. A direct call
+        # of the member reads the benchmark weights from the panel, where the prior writes them.
+        pnl = rd.pnl
+        rdb = ReturnsResult(; nx = rd.nx, X = rd.X, ne = rd.ne, E = rd.E,
+                            pnl = AssetPanel(;
+                                             pf = [pnl.pf...,
+                                                   NumericPanelField(;
+                                                                     name = "benchmark_weights",
+                                                                     vals = ones(size(rd.X)))],
+                                             amsk = pnl.amsk, emsk = pnl.emsk))
+        L = factor_exposure(xe, rdb)
+        @test isequal(L, descriptor(EWMacroSensitivity(; half_life = 5), rd; ref = ref))
+        for f in (xe, ObservedExposure(; xe = xe, series = "FX"))
+            pe = CrossSectionalFactorPrior(; lambda = 1,
+                                           factors = ["market" => ConstantExposure(),
+                                                      "fx" => f], minra = 3, bp = 0,
+                                           wa = MarketCapWeights(; p = 0))
+            pr = prior(pe, rd)
+            k = findfirst(==("fx"), pr.rr.nf)
+            @test !isnothing(k)
+            @test all(isfinite, pr.mu)
+            @test all(isfinite, pr.sigma)
+            @test pr.rr.M[:, k] ≈ L[end, :]
+        end
+    end
+end
+
 @testset "EW beta descriptors: EWDownsideBeta" begin
     X = [0.10 0.20 -0.05
          -0.10 -0.02 0.03
@@ -705,14 +866,14 @@ end
     end
 end
 
-@testset "EW beta descriptors: the stored reference cases" begin
+@testset "EW beta descriptors: the stored oracle cases" begin
     res = synthetic_asset_panel(; n_assets = 12, n_observations = 300, n_industries = 3,
                                 rng = StableRNGs.StableRNG(719))
     rd0 = res.rd
     pnl = rd0.pnl
     amsk = Matrix{Bool}(pnl.amsk)
     T, N = size(amsk)
-    # The same forty gaps the reference implementation was driven on. The generator leaves
+    # The same forty gaps the oracle was driven on. The generator leaves
     # none inside the active mask, and a gap is what holds a recursion.
     Xg = Matrix{Float64}(rd0.X)
     let g = StableRNGs.StableRNG(7192), holes = 0
@@ -752,17 +913,22 @@ end
         D = descriptor(EWMarketBeta(; half_life = 5, group = "industry", min_group_size = 2,
                                     bounds = (0.1, 0.9)), rd)
         E = Matrix(CSV.read(joinpath(@__DIR__, "assets/EWMarketBeta.csv.gz"), DataFrame))
-        @test size(D) == size(E)
-        @test isequal(isnan.(D), isnan.(E))
-        @test D[isfinite.(E)] ≈ E[isfinite.(E)]
+        # rtol = 1e-12 cell by cell; measured maxrel 1.7e-15 (#1380).
+        @test parity_compare(D, E; name = "EWMarketBeta").ok
     end
     @testset "The aggregated macro sensitivity matches the stored case cell by cell" begin
         D = descriptor(EWMacroSensitivity(; half_life = 5, agg_obs = 3), rd; ref = ref)
         E = Matrix(CSV.read(joinpath(@__DIR__, "assets/EWMacroSensitivity.csv.gz"),
                             DataFrame))
-        @test size(D) == size(E)
-        @test isequal(isnan.(D), isnan.(E))
-        @test D[isfinite.(E)] ≈ E[isfinite.(E)]
+        # rtol = 1e-12 cell by cell; measured maxrel 3.1e-14 (#1380).
+        @test parity_compare(D, E; name = "EWMacroSensitivity").ok
+        # The same series named in the Exogenous Series gives the same case (#1365). Its
+        # gap at observation 123 falls in a window that holds two finite values.
+        rde = ReturnsResult(; nx = rd.nx, X = rd.X, ne = ["FX"], E = reshape(ref, :, 1),
+                            pnl = rd.pnl)
+        Ds = descriptor(EWMacroSensitivity(; series = "FX", half_life = 5, agg_obs = 3),
+                        rde)
+        @test parity_compare(Ds, E; name = "EWMacroSensitivity series").ok
     end
 end
 
@@ -887,20 +1053,24 @@ end
                       [NaN NaN; 1.0 2.0; 1.0 2.0])
         @test PortfolioOptimisers.ew_beta_expand([1//2 1//3; 1//4 1//5], 2, 1) ==
               [1//2 1//3; 1//4 1//5]
-        B = PortfolioOptimisers.ew_downside_beta_series([1 2; -1 0], [1, -1], 0.5, 1, 0,
-                                                        1e-12)
+        # The kernels run from a new state, as the batch call does.
+        function downside(X, rm, mar)
+            st = PortfolioOptimisers.ew_downside_beta_state(nothing, X, rm, 0.5)
+            return PortfolioOptimisers.ew_downside_beta_series!(st, X, rm, 0.5, 1, mar,
+                                                                1e-12).B
+        end
+        B = downside([1 2; -1 0], [1, -1], 0)
         @test eltype(B) == Float64
-        @test B ≈
-              PortfolioOptimisers.ew_downside_beta_series([1.0 2.0; -1.0 0.0], [1.0, -1.0],
-                                                          0.5, 1, 0.0, 1e-12) nans = true
-        M = PortfolioOptimisers.ew_macro_sensitivity_series([1 2; -1 0; 2 1], [1, -1, 0],
-                                                            [1, 0, 2], 0.5, 1, 1e-12)
+        @test B ≈ downside([1.0 2.0; -1.0 0.0], [1.0, -1.0], 0.0) nans = true
+        function partial(X, rm, rf)
+            st = PortfolioOptimisers.ew_macro_sensitivity_state(X, rm, rf, 0.5)
+            return PortfolioOptimisers.ew_macro_sensitivity_series!(st, X, rm, rf, 0.5, 1,
+                                                                    1e-12).B
+        end
+        M = partial([1 2; -1 0; 2 1], [1, -1, 0], [1, 0, 2])
         @test isequal(M,
-                      PortfolioOptimisers.ew_macro_sensitivity_series([1.0 2.0; -1.0 0.0;
-                                                                       2.0 1.0],
-                                                                      [1.0, -1.0, 0.0],
-                                                                      [1.0, 0.0, 2.0], 0.5,
-                                                                      1, 1e-12))
+                      partial([1.0 2.0; -1.0 0.0; 2.0 1.0], [1.0, -1.0, 0.0],
+                              [1.0, 0.0, 2.0]))
         Bi, Vi = PortfolioOptimisers.ew_beta_series([1 2; -1 0; 2 1], [1, -1, 0], 0.5, 1,
                                                     1e-12)
         Bf, Vf = PortfolioOptimisers.ew_beta_series([1.0 2.0; -1.0 0.0; 2.0 1.0],

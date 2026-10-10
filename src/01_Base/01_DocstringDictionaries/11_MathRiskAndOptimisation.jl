@@ -6,7 +6,7 @@ unique_key_dict!(math_dict, :math_dict,
                  # Risk measure parameters.
                  :alpha_rm => "``\\alpha``: Significance level (left tail probability), ``\\alpha \\in (0, 1)``.",#
                  :w_port => "``\\boldsymbol{w}``: Portfolio weights vector ``N \\times 1``.",#
-                 # The divergence Ambiguity Set reading, in the sense CONTEXT.md
+                 # The divergence Ambiguity Set reading, in the sense GLOSSARY.md
                  # gives the noun. `EntropicValueatRisk` is the Kullback-Leibler
                  # ball and `RelativisticValueatRisk` is its Kaniadakis
                  # counterpart, so the two state one set of symbols.
@@ -47,15 +47,15 @@ unique_key_dict!(math_dict, :math_dict,
                  # The conditional tail family of `02_ConditionalXatRisk.jl`. The
                  # value-at-risk and drawdown measures share the tail average and its
                  # sorted form, and the two robust measures share the Esfahani-Kuhn loss.
-                 :nu_ru => "``\\nu``: Rockafellar-Uryasev threshold, the variable the tail average is minimised over. At a minimiser it is the lower ``\\alpha``-quantile of the series.",#
+                 :nu_ru => "``\\nu``: Rockafellar-Uryasev threshold, the variable the tail average is minimised over. The minimisers run from the lower to the upper ``\\alpha``-quantile of the series, which differ when ``\\alpha W_{T}`` is a cumulative weight. Minus the largest minimiser, the upper ``\\alpha``-quantile, is the Value-at-Risk.",#
                  :x_k_sorted => "``x_{(k)}``: ``k``-th smallest entry of the series, and ``w_{(k)}`` its observation weight.",#
                  :W_k_cum => "``W_{k} = \\sum_{j=1}^{k} w_{(j)}``: Cumulative weight of the ``k`` smallest entries, with ``W_{0} = 0``.",#
-                 :k_star_tail => "``k^{\\star} = \\min\\{k : W_{k} \\geq \\alpha W_{T}\\}``: Boundary index, the position of the one entry that the tail holds in part.",#
+                 :k_star_tail => "``k^{\\star} = \\min\\{k : W_{k} > \\alpha W_{T}\\}``: Boundary index, the position of the one entry that the tail holds in part. It is the position of the upper ``\\alpha``-quantile of the series, the order statistic of the Value-at-Risk.",#
                  :W_T_total => "``W_{T} = \\sum_{t=1}^{T} w_{t}``: Total observation weight.",#
                  # The empirical quantile family of `01_XatRisk.jl`: the mixed-integer
                  # programme and the functors select one order statistic by one rule.
-                 :s_mip_slack => "``s``: Cardinality slack of the mixed-integer quantile programme, ``0 < s < \\alpha``.",#
-                 :k_var_mip => "``k = \\min\\{k : W_{k} > (\\alpha - s) W_{T}\\}``: Quantile index, the position of the order statistic that the mixed-integer quantile programme selects.",#
+                 :s_mip_slack => "``s``: Cardinality slack of the mixed-integer quantile programme, ``s > 0``. It absorbs the rounding error of ``\\alpha W_{T}``.",#
+                 :k_var_mip => "``k = \\min\\{k : W_{k} > (\\alpha + s) W_{T}\\}``: Quantile index, the position of the order statistic that the mixed-integer quantile programme selects.",#
                  :l_ek => "``l``: Tail-term weight of the Esfahani-Kuhn loss, ``l > 0``. It does not scale the mean term.",#
                  :tau_ek => "``\\tau``: Esfahani-Kuhn level, the variable the worst-case expected loss is minimised over.",#
                  :pos_part => "``(\\cdot)_{+} = \\max(\\cdot, 0)``: Positive part.",#
@@ -105,6 +105,18 @@ unique_key_dict!(math_dict, :math_dict,
                  :c_t_one_off => "``c_t``: Charge fraction of observation ``t``, the part of ``f_o`` that the observation pays. Under a `nothing` or [`FirstObservationFees`](@ref) clock ``c_1 = 1`` and ``c_t = 0`` for ``t > 1``. Under an [`AmortisedFees`](@ref) clock ``c_t = 1 / T``.",#
                  :dd_t_model => "``dd_t``: Drawdown variable of observation ``t``, with ``dd_0 = 0``. The rows hold it at or above the drawdown ``-d_t``.",#
                  :s_t_series => "``s_t``: Entry ``t`` of the series that a conic risk measure reduces. It carries the sign of a return, so a loss is a negative entry.",#
+                 # The return layer of a JuMP model, and the objectives that read it.
+                 :ret_model => "``\\mathrm{ret}``: Return expression of the model, the model's `:ret`. It is the sum of the scaled expressions of the return terms whose `rte` is `true`.",#
+                 :ret_i_term => "``\\mathrm{ret}_i``: Expression of return term ``i``, the model's `:ret_i`, net of the charges that the term flags.",#
+                 :s_i_ret => "``s_i``: Term scale, the `scale` of return term ``i``, which is its weight in the return expression.",#
+                 :rhat_worst => "``\\hat{r}(\\boldsymbol{w})``: Worst-case expected return, the least value of ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}`` over the uncertainty set.",#
+                 :mu_hat_ucs => "``\\hat{\\boldsymbol{\\mu}}``: Centre of the mean uncertainty set, ``N \\times 1``. It is the centre that the set carries, else the `mu` of the term, else the expected returns of the prior.",#
+                 :r_f_ratio => "``r_f``: Risk-free rate of the ratio objective, the `rf` field of [`MaximumRatio`](@ref).",#
+                 :ohf_ratio => "``\\mathrm{ohf}``: Normalisation factor of the ratio problem, the model's `:ohf`. It is positive.",#
+                 :k_min_ratio => "``k_{\\min}``: Lower bound on the homogenisation variable ``k`` of the ratio problem. It is positive.",#
+                 :y_homog => "``\\boldsymbol{y} = k \\boldsymbol{w}``: Homogenised weights, the weight variable of the model under the ratio objective.",#
+                 :l_utility => "``l``: Risk aversion of the utility objective, the `l` field of [`MaximumUtility`](@ref). It is non-negative.",#
+                 :op_penalty => "``\\mathrm{op}``: Penalty term of the objective, the model's `:op`, which holds the Objective Penalty. The regularisation, soft-constraint and custom-term builders add to it, and it is zero when none of them does.",#
                  # Second-moment formulations.
                  :d_secmom => "``\\boldsymbol{d}``: Deviation vector ``T \\times 1`` that the formulation squares. The risk measure supplies it.",#
                  :c_secmom => "``c``: Correction factor that the risk measure supplies. It is ``1`` when the co-moment matrix already carries it.",#
@@ -153,12 +165,26 @@ unique_key_dict!(math_dict, :math_dict,
                  :K_sub => "``K``: Sub-portfolio count of a meta-optimiser, which is also the number of synthetic assets of its outer problem.",#
                  :W_inner => "``\\mathbf{W}``: Inner weight matrix `assets × sub-portfolios`. Column ``k`` holds the weights of sub-portfolio ``k`` over all ``N`` assets, and zero at an asset outside the sub-portfolio.",#
                  :W_tilde_syn => "``\\tilde{\\mathbf{W}}``: Normalised inner weight matrix, ``\\tilde{W}_{ik} = |W_{ik}| / \\sum_{j=1}^{N} |W_{jk}|``. A column of zeros stays a column of zeros.",#
+                 :m_active_panel => "``m_{ti}``: Active mask of the Asset Panel, ``1`` when asset ``i`` is in the universe at observation ``t`` and ``0`` otherwise.",#
                  :v_outer => "``\\boldsymbol{v}``: Outer weight vector, the weights that the outer optimiser gives the ``K`` synthetic assets.",#
                  :s_k_comb => "``s_k``: Combination Weight of sub-portfolio ``k``.",#
                  :c_k_comb => "``c_k``: Coefficient of sub-portfolio ``k`` in the combination.",#
                  # A search over a parameter grid. The two methods of the grid search score
                  # folds and paths, and both select the winner by one rule.
-                 :Theta_grid => "``\\Theta``: Search grid, the sequence of grid points that [`lens_val_grid`](@ref) builds from `p`.",#
+                 :Theta_grid => "``\\Theta``: Search grid, the sequence of grid points that [`lens_val_grid`](@ref) builds from `p`. For a [`Pipeline`](@ref), [`pipeline_lens_val_grid`](@ref) builds it.",#
+                 :V_j_grid => "``V_j``: Candidate values of the ``j``-th key of one parameter set, the value vector that the set gives the key.",#
+                 :k_grid_keys => "``k``: Key count of one parameter set.",#
+                 :Theta_l_grid => "``\\Theta^{(l)}``: Grid of the ``l``-th parameter set, by the first two equations.",#
+                 :m_grid_sets => "``m``: Parameter set count, the count of the parameter sets that the search concatenates.",#
+                 :Vert_concat => "``\\Vert``: Concatenation of two sequences.",#
+                 :S_fi_search => "``S_{fi}``: Fold score, the test score of candidate ``i`` on fold ``f``, and the entry of the score matrix ``\\mathbf{S}``, ``F \\times |\\Theta|``.",#
+                 :P_f_search => "``\\hat{P}_{f}(\\theta_i)``: Fold prediction, the returns over the test window of fold ``f`` of the weights that ``\\theta_i`` fits on the training window of the fold.",#
+                 :F_folds_search => "``F``: Fold count, the count of the folds that `split` enumerates.",#
+                 :S_pi_search => "``S_{pi}``: Path score, the test score of candidate ``i`` on path ``p``, and the entry of the score matrix ``\\mathbf{S}``, ``n_{p} \\times |\\Theta|``.",#
+                 :P_p_search => "``\\hat{P}_{p}(\\theta_i)``: Path prediction, the predictions of candidate ``i`` for the test groups that path ``p`` holds, pooled into one series. The weights that ``\\theta_i`` fits on the training window of the fold that tests a group predict that group.",#
+                 :n_p_search => "``n_{p}``: Path count, the greatest entry of `path_ids` of the split.",#
+                 :S_C_search => "``\\mathbf{S}_{:,\\,\\mathcal{C}}``: Finite columns, the columns of ``\\mathbf{S}`` at the finite candidates, in grid order.",#
+                 :c_j_search => "``c_j``: Finite candidate ``j``, the ``j``-th smallest entry of ``\\mathcal{C}``.",#
                  :theta_i_cand => "``\\theta_i``: Candidate ``i``, the estimator with each tuned parameter set to its value at grid point ``i``. Column ``i`` of every score matrix belongs to it.",#
                  :s_orient_search => "``s \\in \\{1, -1\\}``: Orientation of the score, ``1`` when [`bigger_is_better`](@ref) holds for `r` and ``-1`` otherwise, so a higher score is always better.",#
                  :R_search => "``\\mathcal{R}``: Expected risk under `r`, as [`expected_risk`](@ref) computes it with the keyword arguments `kwargs`.",#

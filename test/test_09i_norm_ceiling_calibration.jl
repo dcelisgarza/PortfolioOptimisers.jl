@@ -457,7 +457,9 @@ and ADR 0095 grants none.
     # no family, so it bounds no slot and is skipped.
     families = filter(T -> parentmodule(T) === PO,
                       InteractiveUtils.subtypes(PO.AbstractCalibrationAlgorithm))
-    @test length(families) == 5
+    # Seven families: the five of the risk measures and the optimiser, and the Spanned Shrinkage
+    # and the Orthogonal Forecast Scale of the Cross-Sectional Factor Prior.
+    @test length(families) == 7
     counted = Dict{Symbol, Int}()
     for n in names(PO; all = true)
         # `names(; all = true)` also answers the compiler's own bindings, and a gensym
@@ -476,7 +478,7 @@ and ADR 0095 grants none.
             counted[n] = c
         end
     end
-    @test length(counted) == 6
+    @test length(counted) == 8
     @test sort([k for (k, c) in counted if c > 1]) == [:Num_AmbRadNormCeilCal]
     @test counted[:Num_AmbRadNormCeilCal] == 2
     @test all(==(1), [c for (k, c) in counted if k !== :Num_AmbRadNormCeilCal])

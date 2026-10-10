@@ -5,6 +5,8 @@
                                      timestamp = :Date)[(end - 252):end])
     pr = prior(EmpiricalPrior(), rd)
     wt = pweights(fill(inv(size(pr.X, 1)), size(pr.X, 1)))
+    # The sum of the distances between adjacent leaves of an order.
+    adjacent_leaf_sum(D, o) = sum(D[o[i], o[i + 1]] for i in 1:(length(o) - 1))
     @testset "Similarity matrix tests" begin
         _, D = cor_and_dist(Distance(), PortfolioOptimisersCovariance(), pr.X)
         Sc = PortfolioOptimisers.distance_to_similarity(ComplementSimilarity(); D = D)
@@ -808,7 +810,11 @@
                                  1.0707389175241802],
                                 [5, 20, 17, 3, 9, 6, 2, 1, 13, 7, 4, 19, 14, 10, 16, 18, 11,
                                  8, 12, 15], :ward)
-        @test clr.res.merges == clr_t.merges
+        # The pin is the tree. The exact leaf order flips merges of it, so each merge keeps
+        # its two children, and its adjacent sum is at most that of the pinned order.
+        @test sort.(eachrow(clr.res.merges)) == sort.(eachrow(clr_t.merges))
+        @test adjacent_leaf_sum(clr.D, clr.res.order) <=
+              adjacent_leaf_sum(clr.D, clr_t.order) + 1e-12
         @test isapprox(clr.res.heights, clr_t.heights)
         @test clr.res.labels == clr_t.labels
         @test clr.res.linkage == clr_t.linkage
@@ -927,7 +933,11 @@
                                  0.25, 0.3333333333333333, 0.5, 1.0, 2.0],
                                 [5, 20, 17, 3, 9, 6, 2, 1, 13, 7, 4, 19, 14, 10, 16, 18, 11,
                                  8, 12, 15], :DBHT)
-        @test clr.res.merges == clr_t.merges
+        # The pin is the tree. The exact leaf order flips merges of it, so each merge keeps
+        # its two children, and its adjacent sum is at most that of the pinned order.
+        @test sort.(eachrow(clr.res.merges)) == sort.(eachrow(clr_t.merges))
+        @test adjacent_leaf_sum(clr.D, clr.res.order) <=
+              adjacent_leaf_sum(clr.D, clr_t.order) + 1e-12
         @test isapprox(clr.res.heights, clr_t.heights)
         @test clr.res.labels == clr_t.labels
         @test clr.res.linkage == clr_t.linkage
@@ -1113,7 +1123,11 @@
                                  0.8716917373925989, 1.033182981547855, 1.1992052386632663],
                                 [17, 20, 5, 6, 9, 3, 2, 1, 13, 7, 4, 19, 14, 18, 10, 16, 15,
                                  8, 12, 11], :ward)
-        @test clr.res.merges == clr_t.merges
+        # The pin is the tree. The exact leaf order flips merges of it, so each merge keeps
+        # its two children, and its adjacent sum is at most that of the pinned order.
+        @test sort.(eachrow(clr.res.merges)) == sort.(eachrow(clr_t.merges))
+        @test adjacent_leaf_sum(clr.P, clr.res.order) <=
+              adjacent_leaf_sum(clr.P, clr_t.order) + 1e-12
         @test isapprox(clr.res.heights, clr_t.heights)
         @test clr.res.labels == clr_t.labels
         @test clr.res.linkage == clr_t.linkage
@@ -1124,10 +1138,10 @@
                                                   alg = DBHT()), pr.X)
         #=
         `P` is zero on every PMFG edge here, so `DBHTs` sees a graph with no edge, and 380
-        of the 400 shortest path lengths are `Inf`. The reference `DBHTs.m` drops the same
-        edges. The pin below was the output of a `NaN` that `Inf * 0` made in
-        `BubbleCluster8s` until #1314. The discrete clusters `T8` are the ones `DBHTs.m`
-        returns on these two matrices under Octave.
+        of the 400 shortest path lengths are `Inf`. The original DBHT code of Song, Di Matteo and Aste drops the same edges. The
+        pin below was the output of a `NaN` that `Inf * 0` made in `BubbleCluster8s` until
+        #1314. The discrete clusters `T8` are the ones that original code returns on these two
+        matrices under Octave.
         =#
         @test PortfolioOptimisers.DBHTs(clr.P, clr.S)[1] ==
               [1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1]
@@ -1142,7 +1156,11 @@
                                  2.0],
                                 [1, 13, 19, 9, 3, 7, 4, 15, 12, 17, 5, 20, 6, 2, 11, 16, 10,
                                  14, 8, 18], :DBHT)
-        @test clr.res.merges == clr_t.merges
+        # The pin is the tree. The exact leaf order flips merges of it, so each merge keeps
+        # its two children, and its adjacent sum is at most that of the pinned order.
+        @test sort.(eachrow(clr.res.merges)) == sort.(eachrow(clr_t.merges))
+        @test adjacent_leaf_sum(clr.P, clr.res.order) <=
+              adjacent_leaf_sum(clr.P, clr_t.order) + 1e-12
         @test isapprox(clr.res.heights, clr_t.heights)
         @test clr.res.labels == clr_t.labels
         @test clr.res.linkage == clr_t.linkage
@@ -1592,18 +1610,29 @@
               [17, 5, 20, 4, 7, 2, 1, 13, 6, 3, 9, 19, 10, 14, 12, 15, 16, 18, 8, 11]
         @test dbht2d.order ==
               [17, 5, 20, 8, 11, 12, 15, 16, 19, 10, 14, 1, 18, 2, 13, 4, 7, 6, 3, 9]
+        # `:optimal` takes the least adjacent sum that the tree permits. The heuristic order
+        # of `:barjoseph`, which was the pin of `:optimal` before, sums higher on each tree:
+        # 7.925 against 7.905, and 8.179 against 8.034.
         @test dbht1o.order ==
-              [5, 20, 17, 3, 9, 6, 2, 1, 13, 7, 4, 19, 14, 10, 16, 18, 11, 8, 12, 15]
+              [17, 20, 5, 3, 9, 6, 2, 1, 13, 7, 4, 19, 14, 10, 16, 18, 11, 8, 12, 15]
         @test dbht2o.order ==
-              [5, 20, 17, 4, 7, 3, 9, 6, 2, 13, 1, 18, 19, 14, 10, 16, 15, 12, 8, 11]
+              [17, 20, 5, 15, 12, 8, 11, 18, 1, 13, 2, 6, 3, 9, 4, 7, 16, 10, 14, 19]
+        @test adjacent_leaf_sum(dist, dbht1o.order) <
+              adjacent_leaf_sum(dist,
+                                [5, 20, 17, 3, 9, 6, 2, 1, 13, 7, 4, 19, 14, 10, 16, 18, 11,
+                                 8, 12, 15]) - 0.01
+        @test adjacent_leaf_sum(dist, dbht2o.order) <
+              adjacent_leaf_sum(dist,
+                                [5, 20, 17, 4, 7, 3, 9, 6, 2, 13, 1, 18, 19, 14, 10, 16, 15,
+                                 12, 8, 11]) - 0.1
         @test dbht1o.merges ==
-              reshape([-1, -7, -3, -5, 4, -2, 3, 7, 8, 5, -14, -19, -11, -12, -18, -16, 16,
-                       12, 10, -13, -4, -9, -20, -17, 1, -6, 6, 2, 9, -10, 11, -8, -15, 13,
+              reshape([-1, -7, -3, -20, -17, -2, 3, 7, 8, 5, -14, -19, -11, -12, -18, -16,
+                       16, 12, 10, -13, -4, -9, -5, 4, 1, -6, 6, 2, 9, -10, 11, -8, -15, 13,
                        15, 14, 17, 18], 19, 2)
         @test dbht2o.merges ==
-              reshape([-1, -2, -4, -14, -19, -3, -8, -5, 8, -15, 6, 10, 2, 5, 3, 15, 16, 17,
-                       9, -18, -13, -7, -10, 4, -9, -11, -20, -17, -12, -6, 7, 1, -16, 11,
-                       13, 14, 12, 18], 19, 2)
+              reshape([-18, -13, -4, -10, 4, -3, -8, -20, -17, -15, -6, 10, 1, -16, 11, 13,
+                       16, 12, 9, -1, -2, -7, -14, -19, -9, -11, -5, 8, -12, 6, 7, 2, 5, 3,
+                       15, 14, 17, 18], 19, 2)
     end
     # The reference columns are re-recorded from a run of this code, as the values in the
     # testset above are. The assertion that carries its own authority here is the sparsity
@@ -1685,10 +1714,9 @@
     end
     # The three defects that the documentation sweep of the DBHT family, issue #469, found on
     # the `EqualRoot` path: #507, #508 and #509. That path is now
-    # `src/08_Phylogeny/06_DBHT/04_CliqueHierarchy.jl`. The reference implementation
-    # is `DBHTs.m`, MATLAB Central File Exchange submission 46750 by Won-Min Song and Tomaso
-    # Aste, and it carries all three. The papers it cites are Song, Di Matteo and Aste,
-    # *Nested hierarchies in planar graphs*, Discrete Applied Mathematics 159 (2011)
+    # `src/08_Phylogeny/06_DBHT/04_CliqueHierarchy.jl`. The original code of
+    # the two papers below carries all three. The papers are Song, Di Matteo and
+    # Aste, *Nested hierarchies in planar graphs*, Discrete Applied Mathematics 159 (2011)
     # 2135-2146, and Song, Di Matteo and Aste, *Hierarchical information clustering by means
     # of topologically embedded graphs*, PLoS ONE 7 (2012) e31929.
     @testset "The EqualRoot path of #507, #508 and #509" begin
@@ -3821,8 +3849,8 @@ end
 
     @testset "The three `branchorder` values each take their own arm" begin
         #=
-        `:optimal` and `:barjoseph` both call `orderbranches_barjoseph!`, `:r` calls
-        `orderbranches_r!`, and anything else leaves the merge order as
+        `:optimal` calls `optimal_leaf_order!`, `:barjoseph` calls `orderbranches_barjoseph!`,
+        `:r` calls `orderbranches_r!`, and anything else leaves the merge order as
         `HierarchyConstruct4s` wrote it. The reordering permutes the leaves and leaves the
         clustering alone, so the cut is the invariant across all four.
         =#
@@ -3838,7 +3866,9 @@ end
             @test sort(-hcl.merges[hcl.merges .< 0]) == collect(1:size(dist, 1))
             @test sort(hcl.merges[hcl.merges .> 0]) == collect(1:(size(dist, 1) - 2))
         end
-        @test res[:optimal][7].merges == res[:barjoseph][7].merges
+        # The two flip the same merges, each child pair in an order of its own.
+        @test sort.(eachrow(res[:optimal][7].merges)) ==
+              sort.(eachrow(res[:barjoseph][7].merges))
         @test res[:r][7].merges != res[:default][7].merges
         @test res[:optimal][7].heights == res[:default][7].heights
     end

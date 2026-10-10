@@ -15,4 +15,5 @@ IntPeriodDateRange
 special_div(a::Integer, b::Integer)
 walk_forward_date_range
 date_index_positions
+resolve_previous_weights_source
 ```

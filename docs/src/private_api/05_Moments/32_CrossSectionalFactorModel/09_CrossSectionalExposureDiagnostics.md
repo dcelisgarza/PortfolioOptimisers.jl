@@ -12,16 +12,12 @@ cs_weighted_correlation
 cs_correlation_enters
 cs_ranks
 cs_spearman_correlation
-exposure_forward_mean_return
 exposure_pair_correlation
 exposure_pair_observation
 exposure_pair_sums
-exposure_ic_factor_summary
-exposure_ic_t_stat
 exposure_cross_section_std
 exposure_universe_size
 exposure_covered_count
+exposure_coverage_weights
 cs_diagnostic_exposures
-exposure_ic_data
-exposure_ic_exposures
 ```

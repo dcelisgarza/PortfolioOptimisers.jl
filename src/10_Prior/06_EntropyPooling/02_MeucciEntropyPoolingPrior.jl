@@ -19,7 +19,7 @@ The comparison operator a view accepts depends on the moment it constrains: `var
 
 !!! warning "A feasible view can be missed in silence"
 
-    The CVaR search reports on its own variable, and the view rides on a solve it never reads. With one view `Roots.find_zero` root-finds the posterior tail mass minus `alpha` over the candidate value at risk, and it stops when that residual is small. The view itself is the constraint the inner [`entropy_pooling`](@ref) solve carries, and how closely that solve met it is read nowhere. With more than one view the guard is `Optim.converged`, which accepts a solve that stopped on the step in `x` rather than on stationarity. A **feasible** view set can therefore return a posterior that misses its target, with no raise. It is not the answer the warning above describes: `ens` is healthy, `kld` is small, and the statistic the view named is the only thing that is short.
+    The CVaR search reports on its own variable, and the view is a constraint of an inner solve that the search never checks. With one view `Roots.find_zero` root-finds the posterior tail mass minus `alpha` over the candidate value at risk, and it stops when that residual is small. The view itself is the constraint the inner [`entropy_pooling`](@ref) solve carries, and how closely that solve met it is read nowhere. With more than one view the guard is `Optim.converged`, which accepts a solve that stopped on the step in `x` rather than on stationarity. A **feasible** view set can therefore return a posterior that misses its target, with no raise. It is not the answer the warning above describes: `ens` is healthy, `kld` is small, and the statistic the view named is the only thing that is short.
 
     The size of the miss is a property of the run and not of the estimator, and it is not reproducible: a case that meets its target closely when solved alone can miss it by orders of magnitude when solved after other cases in the same process. The residual has also been observed to move for reasons as unrelated as an edit to a comment elsewhere in the file, so the cause is not the search alone and it is not settled.
 
@@ -841,7 +841,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
         pe = factory(pe, w0)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
-    # See the note at the same seam in `EntropyPoolingPrior`'s staged `ep_prior`: every row
+    # See the note at the same step in `EntropyPoolingPrior`'s staged `ep_prior`: every row
     # is built on the investable columns, because `0 * NaN` is `NaN`, and the mask does not
     # move between stages. ADR 0115 and ADR 0125.
     imsk, vsets, ni = investable_views(pr, pe.sets)
@@ -1017,7 +1017,7 @@ Posterior moments are then read as probability-weighted sample statistics under 
 function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatNum,
                   F::Option{<:MatNum}, pnl::Option{<:AssetPanel} = nothing;
                   strict::Bool = false, kwargs...)
-    # See the note at the same seam in the staged method: the nested prior is fitted
+    # See the note at the same step in the staged method: the nested prior is fitted
     # first, and the prior probabilities are read on the rows it answered. ADR 0116.
     pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     w0 = ep_prior_probabilities(pe.w, pr, size(X, 1))
@@ -1029,7 +1029,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
         pe = factory(pe, w0)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
-    # See the note at the same seam in the staged method: every row is built on the
+    # See the note at the same step in the staged method: every row is built on the
     # investable columns, because `0 * NaN` is `NaN`. ADR 0115 and ADR 0125.
     imsk, vsets, ni = investable_views(pr, pe.sets)
     led = String[]

@@ -196,6 +196,31 @@ deliberate act.
 julia --project=code_health code_health/complexity.jl refresh --accept-rise
 ```
 
+## [Scope a check to a branch](@id code_health_scope)
+
+A baseline can lag `dev`. When another commit raised a number and did not record it, a plain
+`check` on your branch reports that row too, and you cannot tell it from your own. Every entry
+script therefore takes one of two scopes after its verb.
+
+```bash
+julia --project=code_health code_health/complexity.jl check --against origin/dev
+julia --project=code_health code_health/size.jl check --files src/10_Prior/01_Base_Prior.jl
+julia --project=code_health code_health/jet.jl refresh --accept-rise --against origin/dev
+```
+
+`--against <ref>` answers for the files your branch changes since its merge-base with `<ref>`:
+the commits, the staged and unstaged edits, and the untracked files. `--files <path>...` answers
+for the paths you name. A row outside the scope does not fail the run, and the run names each one
+under "outside that scope". A key that is not a path, such as a macro of the Expansion Bound, is
+always in scope.
+
+A scoped refresh records the rows in scope and keeps every other row as the baseline has it, so
+your commit carries your rows alone.
+
+The scope is a tool for a branch, not a verdict. A rise in a file you did not touch can still be
+yours: a JET report moves to a caller in another file, and a Declaration Macro raises every file
+that calls it. Read the foreign rows the run names. CI runs the plain `check`.
+
 ## Run each check in a fresh process
 
 Run every check in a **fresh `julia` process**, never in a working REPL, and never two checks in one

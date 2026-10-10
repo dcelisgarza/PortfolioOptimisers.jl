@@ -134,7 +134,7 @@ to skip a step, and the job does not cover the open-map case anyway.
 - ADR 0073 and ADR 0078 are neither amended nor superseded. ADR 0078's title names a rise and its
   refile clause reads git history; this job does neither, so folding it in would make one ADR
   describe two mechanisms.
-- `STANDARDS.md` routes the subject of a late addition to `Sweep.yml` beside the census.
+- `CODING_STANDARDS.md` routes the subject of a late addition to `Sweep.yml` beside the census.
 
 ## Verification
 
@@ -160,12 +160,12 @@ no row it printed the one map for `src/11_Phylogeny/07_NewThing.jl` and the five
 
 ## Amendment (2026-08-24)
 
-The body carries a fixed `## Routing` block above its Destination. It names `STANDARDS.md`, the two
-Authorities a sweeper reads, and `CONTEXT.md`, each one directly.
+The body carries a fixed `## Routing` block above its Destination. It names `CODING_STANDARDS.md`, the two
+Authorities a sweeper reads, and `GLOSSARY.md`, each one directly.
 
 The original body routed through #404 alone: *"Every rule for this effort lives on #404. Read it
 first."* #404 does name those files, inside five thousand words. Measured over the six open sweep
-tickets on 2026-08-24, three named an Authority and none named `STANDARDS.md`. A standard that the
+tickets on 2026-08-24, three named an Authority and none named `CODING_STANDARDS.md`. A standard that the
 sweeper is never routed to does not hold, however well it is written.
 
 The block is constant text, so the sentence *"Every field of its body is generated, so the job

@@ -316,11 +316,10 @@ pretty_table(DataFrame("Forecast" => [b[1] for b in books],
 
 #=
 The second question has the same answer as the first. The signal composite's two books earn a high
-Sharpe ratio. The trait regression's rank book earns a fraction of that, and its z-score book earns
-nothing you could tell from zero. Look at the turnover column as well. Both forecasts turn over
-close to their whole gross at every date, because a rank book rebuilt from each cross-section trades
-whatever the ranks moved, and `mean_turnover` is there so you can see that cost before an optimiser
-with a turnover constraint does.
+Sharpe ratio. The trait regression's two books earn nothing you could tell from zero. Look at the
+turnover column as well. Both forecasts turn over close to their whole gross at every date, because
+a rank book rebuilt from each cross-section trades whatever the ranks moved, and `mean_turnover` is
+there so you can see that cost before an optimiser with a turnover constraint does.
 
 !!! note "Every hit rate counts against the dates that scored"
     The hit rate in this table counts against the dates the book scored, because a date the book
@@ -459,18 +458,23 @@ block, the rows before the common grid of section 2 included, because the alignm
 and not its forecast. The trait regression has a forecast on its grid only. Its column is `NaN`
 between two refits, and the mean below is taken over the rows it was fitted on. Pass
 `dates = fe.dates` for the correlations on the same dates as the coefficients.
+
+The answer is a [`FactorDiagnosticResult`](@ref). It holds the correlations in `X` and the names and
+the families of the factors in `nf` and `fam`, so the table below reads the names off the answer.
+`PortfolioOptimisers.port_opt_view(fc_signal, LabelGroup("industry"))` keeps the columns of one
+family.
 =#
 
 fc_signal = forecast_factor_correlation(fe_signal, csfm)
 fc_trait = forecast_factor_correlation(fe_trait, csfm)
 
-fc_mean(fc, k) = mean(filter(isfinite, view(fc, :, k)))
+fc_mean(fc, k) = mean(filter(isfinite, view(fc.X, :, k)))
 
-pretty_table(DataFrame("Factor" => csfm.nf,
+pretty_table(DataFrame("Factor" => fc_signal.nf,
                        "signal composite" =>
-                           [fc_mean(fc_signal, k) for k in axes(fc_signal, 2)],
+                           [fc_mean(fc_signal, k) for k in axes(fc_signal.X, 2)],
                        "trait regression" =>
-                           [fc_mean(fc_trait, k) for k in axes(fc_trait, 2)]);
+                           [fc_mean(fc_trait, k) for k in axes(fc_trait.X, 2)]);
              formatters = [numfmt], title = "Mean correlation with each factor exposure")
 
 #=
@@ -480,12 +484,15 @@ exactly what the exposures do not explain. It passes this check and fails the fi
 That is why the questions have an order, and why this question is last. A low correlation alone does
 not make a forecast useful.
 
-!!! note "Neutralising a score does not decorrelate it"
-    A forecast whose descriptor scores are neutralised against a factor family does not give zero in
-    that family's columns. Both neutralisation sites build a cross-sectional regression whose
-    `intercept` is `false`, so the residual is orthogonal to its target in the uncentred sense and
-    keeps a real correlation with it. Set `cre` to a regression with `intercept = true` when you
-    want an uncorrelated residual.
+!!! note "A neutralised score is uncorrelated with its targets, and the forecast nearly so"
+    The Neutralisation of [`DescriptorScores`](@ref) fits a cross-sectional regression with an
+    intercept by default, so each score leaves it uncorrelated with its targets. A forecast built
+    from those scores still gives small numbers in the targets' columns, not zero: a grouped scoring
+    step after the fit rescales each group on its own, and this check weighs every scored asset,
+    also those outside the estimation universe that the fit weighs. A Neutralisation under
+    `cre = CrossSectionalLinearRegression(; intercept = false)` fits no intercept. Its residual is
+    then orthogonal to its target in the uncentred sense alone, and keeps a real correlation with it. The Neutralisation of a Factor
+    Exposure reads the regression of the prior, whose `intercept` is `false` by default.
 =#
 
 #=

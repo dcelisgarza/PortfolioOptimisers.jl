@@ -248,7 +248,7 @@ tickets that were filed before it existed.
 It names the map, the Authority of each rule the sweeper touches, and the glossary **directly**.
 Before it existed the only route was one long hop: this body pointed at #404, and #404 named the
 four files inside five thousand words. Three of the six open sweep tickets measured on 2026-08-24
-named an Authority, and none named `STANDARDS.md`.
+named an Authority, and none named `CODING_STANDARDS.md`.
 
 The block is constant text, so it costs the job no judgement, and it is never machine-read. #404
 keeps the rules of this effort alone; every rule of the tree itself lives at one of these four
@@ -259,13 +259,13 @@ const ROUTING = """
 
 Read before you start:
 
-- `STANDARDS.md` — which file owns the rule you are about to apply, and which check holds it.
+- `CODING_STANDARDS.md` — which file owns the rule you are about to apply, and which check holds it.
 - `.github/instructions/julia-docstrings.instructions.md` — the Authority for a docstring rule.
 - `.github/instructions/julia-source-code.instructions.md` — the Authority for a rule about code
   under `src/` and `ext/`.
-- `CONTEXT.md` — the domain vocabulary. Use its words, and add a word you introduce.
+- `GLOSSARY.md` — the domain vocabulary. Use its words, and add a word you introduce.
 
-`STANDARDS.md` is the map. Open it first when you do not know which file governs the change.
+`CODING_STANDARDS.md` is the map. Open it first when you do not know which file governs the change.
 """
 
 function title_of(c::Candidate)
@@ -279,7 +279,8 @@ number_or_dash(x) = x === nothing ? "—" : string(x)
 
 The sub-issue of ADR 0084. It mirrors the child map that owns it, one file wide: the fixed
 `ROUTING` block, a Destination naming the file and its measured row, the five conditions of #404
-restated compactly, the sentence that the committed files are the authority, and Notes that point
+restated compactly (condition 2 names the original source of a formulation and the standard note
+of `.github/instructions/julia-docstrings.instructions.md` § *The original source*), the sentence that the committed files are the authority, and Notes that point
 at #404 without copying a rule.
 
 **Every field is generated**, so the job needs no judgement: the path, `map` and `units` from
@@ -306,7 +307,9 @@ function body_of(c::Candidate, commit::AbstractString)
             number_or_dash(c.lines), " |\n")
     println(io, "Five conditions, from #", UMBRELLA, ":\n")
     println(io, "1. Its documentation states the mathematics.")
-    println(io, "2. Its code agrees with that statement, checked with real numbers.")
+    println(io, "2. Its code agrees with that statement, checked with real numbers. Each ",
+            "formulation is checked against its original source, the work that first states ",
+            "it, and a formulation whose original was not found carries the standard note.")
     println(io, "3. Its lines are covered, or exempted with a reason.")
     println(io, "4. Its prose passes `/unslop`.")
     println(io, "5. Its code carries no performance trap: `code_health/perf.jl scan ",

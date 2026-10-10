@@ -14,5 +14,4 @@ PortfolioOptimisers.geodesic_point
 PortfolioOptimisers.geodesic_shrinkage!
 PortfolioOptimisers.frame_cov2cor!
 gap_fill_value(::GeodesicShrinkageCovariance)
-PortfolioOptimisers.supports_partial_fit(ce::GeodesicShrinkageCovariance)
 ```

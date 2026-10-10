@@ -53,6 +53,8 @@ const PO = PortfolioOptimisers
 const GLM = PortfolioOptimisers.GLM
 const StatsAPI = PortfolioOptimisers.StatsAPI
 
+# `Accessors.@set` expands when the test set is lowered, before a `using` inside it runs.
+using Accessors: Accessors
 @testset "Base regression: criteria, targets and the Regression result" begin
     using Test, PortfolioOptimisers, StableRNGs, StatsBase, LinearAlgebra, Distributions
 
@@ -294,6 +296,18 @@ const StatsAPI = PortfolioOptimisers.StatsAPI
         # factors when `L` is unset, and the reduced basis when it is set.
         @test size(unset.L, 2) == size(M, 2)
         @test size(set.L, 2) == 3
+
+        # `Accessors.@set` rebuilds the result from its fields, so an unset `L` stays unset
+        # and is never written as a copy of `M` (#1497).
+        moved = Accessors.@set unset.b = [1.0, 2.0]
+        @test isnothing(getfield(moved, :L))
+        @test moved.b == [1.0, 2.0]
+        @test moved.M === unset.M
+        # The keyword constructor runs, so its guards refuse a bad patch.
+        @test_throws DimensionMismatch Accessors.@set unset.b = [1.0]
+        # A `CrossSectionalFactorModel` keeps an unset `L` the same way.
+        csfm = PO.CrossSectionalFactorModel(; M = M, b = [0.0, 0.0])
+        @test isnothing(getfield(Accessors.@set(csfm.esigma = [0.1, 0.2]), :L))
     end
 
     @testset "Regression validation" begin

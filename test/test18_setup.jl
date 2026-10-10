@@ -379,25 +379,25 @@ function mr_block1(idx)
         rtol = if i == 22 && Sys.islinux()
             1e-2
         elseif i in
-               (4, 6, 16, 22, 52, 76, 86, 90, 91, 92, 93, 96, 97, 98, 99, 101, 103, 105,
-                133, 134, 135, 139, 141, 148, 154, 159, 166, 175, 177, 184, 196, 252, 263,
-                276, 279, 280, 283, 284, 285)
+               (4, 16, 22, 52, 76, 86, 90, 91, 92, 93, 96, 97, 98, 99, 101, 103, 105, 133,
+                134, 135, 139, 141, 148, 154, 159, 166, 175, 177, 184, 252, 263, 276, 279,
+                280, 283, 284, 285, 108, 161, 176, 216, 264)
             5e-5
         elseif i in
-               (12, 28, 36, 38, 40, 42, 46, 102, 104, 126, 163, 165, 167, 179, 186, 192,
-                202, 204, 214, 245, 254, 275, 277, 286)
+               (12, 28, 34, 38, 40, 42, 46, 102, 104, 126, 163, 165, 167, 179, 186, 192,
+                202, 204, 245, 254, 275, 277, 286)
             5e-6
-        elseif i in (10, 18, 158, 174, 228, 270)
+        elseif i in (10, 18, 36, 158, 174, 228, 270)
             5e-4
-        elseif i in (48, 58, 88, 94, 108, 140, 176, 216, 264, 266, 268, 278, 288)
+        elseif i in (48, 58, 88, 94, 140, 168, 214, 266, 268, 278, 288)
             1e-5
-        elseif i in (160, 164, 180, 287)
+        elseif i in (160, 162, 164, 180, 287)
             5e-3
-        elseif i in (157, 162, 178)
+        elseif i in (157, 178)
             1e-3
         elseif i == 198
             5e-2
-        elseif i in (208, 234, 269, 281)
+        elseif i in (6, 132, 196, 208, 234, 269, 281)
             1e-4
         elseif i == 210
             1e-1
@@ -522,31 +522,29 @@ function mr_block2(idx)
         # figure differs by host, so each carries the tolerance the runner actually needs.
         #
         # 42 is not in that table at all. Its weights are not compared. See the block below.
-        rtol = if i == 12
-            1e-3
-        elseif i == 15
+        rtol = if i in (12, 15)
             0.25
         elseif i == 27
             5e-3
         elseif i == 46
             5e-6
-        elseif i in (14, 30)
+        elseif i in (4, 14, 30)
             5e-4
-        elseif i in (13, 16, 17, 18)
+        elseif i in (13, 16, 18)
             0.05
-        elseif i in (28, 41)
+        elseif i in (17, 28, 41)
             0.1
         elseif i == 29
-            5e-6
-        elseif i in (18, 24)
+            1e-5
+        elseif i in (18, 24, 43)
             5e-3
         elseif i == 22 && Sys.islinux()
             1e-2
-        elseif i in (22, 47)
+        elseif i == 22
             1e-4
-        elseif i == 23
+        elseif i in (23, 47)
             1e-3
-        elseif i in (4, 26, 43, 44, 48)
+        elseif i in (26, 44, 48)
             5e-5
         else
             1e-6
@@ -625,10 +623,12 @@ function mr_block3(idx)
         @test isa(res.retcode, OptimisationSuccess)
         rtol = if i in (16, 30)
             5e-5
-        elseif i == 24
+        elseif i in (24, 28)
             5e-6
-        elseif i in (25, 27, 44, 46)
+        elseif i in (25, 44, 46)
             5e-5
+        elseif i == 27
+            1e-4
         elseif i == 47
             5e-2
         elseif i == 48

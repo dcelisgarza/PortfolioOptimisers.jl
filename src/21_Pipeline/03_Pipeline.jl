@@ -1,14 +1,22 @@
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Validate that a [`TrainTestSplit`](@ref) appears only as the first step of a [`Pipeline`](@ref), and never inside a nested one.
+Validate that a [`TrainTestSplit`](@ref) is the first step of a [`Pipeline`](@ref), and that no nested step contains one.
 
-The holdout exists to keep the test window away from every fitted step. A stateful step fitted *before* the split — a [`MissingDataFilter`](@ref) choosing the universe, a [`PriceGapFill`](@ref) computing fill values — would have read the held-out rows, so its fitted state leaks test data into the training workflow. Position one is the only place that cannot happen, and a nested pipeline is never step one of itself.
+The split keeps the test window away from every fitted step. A stateful step before the split reads the rows of the test window. A [`MissingDataFilter`](@ref) selects the universe from them, and a [`PriceGapFill`](@ref) computes fill values from them, so the fitted state carries test data into the training workflow. At the first position, no step runs before the split. The check refuses a split inside a nested pipeline at any position, because [`holdout_window`](@ref) reads the steps of the outer pipeline only.
 
-## Validation
+# Arguments
 
-  - At most one `TrainTestSplit`, and only at index 1.
-  - No `TrainTestSplit` inside a nested `Pipeline` or a [`PipelineStep`](@ref).
+  - `ests`: The step estimators.
+
+# Validation
+
+  - A `TrainTestSplit` step is at index 1. Raises an `ArgumentError`.
+  - No nested `Pipeline` and no [`PipelineStep`](@ref) contains a `TrainTestSplit`. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -30,13 +38,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Validate that an optimisation step, if present, is the last step of a [`Pipeline`](@ref).
+Validate that an optimisation step of a [`Pipeline`](@ref) is the last step.
 
-A pipeline's optimiser writes the terminal `:opt` slot — the workflow's output. Nothing is derived from `:opt`, so a step running *after* an optimiser could only strand those weights: a later data or estimator step would leave `:opt` computed on a since-changed context, and no later step reads `:opt` to catch it. Pinning the optimiser last keeps `:opt` genuinely terminal, which is also what lets [`PIPELINE_INVALIDATES`](@ref) omit it from the invalidatable slots. A terminal optimiser is optional (a prior-only pipeline is legal); when absent the rule is vacuous.
+The optimiser writes the `:opt` slot, which is the output of the workflow. No step reads `:opt`. A step after the optimiser changes the context after the weights were computed, so the weights no longer describe the context. With the optimiser last, [`PIPELINE_INVALIDATES`](@ref) can omit `:opt` from the slots that a write makes stale. A pipeline with no optimiser, such as a prior-only pipeline, passes.
 
-## Validation
+# Arguments
 
-  - No step writes `:opt` unless it is the final step. A nested [`Pipeline`](@ref) reports the slot its own last step writes and is validated at its own construction, so a non-terminal optimiser hidden inside one is caught there.
+  - `ests`: The step estimators.
+
+# Validation
+
+  - Only the last step writes `:opt`. Raises an `ArgumentError`. A nested [`Pipeline`](@ref) writes the slot of its own last step, and its own constructor checks the steps inside it.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -56,18 +72,18 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Validate that every constraint step of a [`Pipeline`](@ref) resolves to exactly one [routing target](@ref PIPELINE_ROUTING_TARGETS).
+Validate that each constraint step of a [`Pipeline`](@ref) resolves to one [routing target](@ref PIPELINE_ROUTING_TARGETS).
 
-Runs [`resolve_constraint_target`](@ref) on each constraint step, which is the same call [`run_constraint_step`](@ref) makes when the step runs. Doing it here moves three failures from the fold loop to the constructor: a family that computes nothing for the `constraints` slot and is therefore not a step, a family that names several targets and was not told which, and a declared target that belongs to another family.
-
-## Validation
-
-  - Each constraint step's family declares at least one target (see [`pipe_constraint_targets`](@ref)).
-  - A family declaring several has a [`PipelineStep`](@ref) `target` naming one of them.
+The check calls [`resolve_constraint_target`](@ref) on each constraint step. [`run_constraint_step`](@ref) makes the same call when the step runs, so three failures move from the fold loop to the constructor. The first is a family that computes nothing for the `constraints` slot. The second is a family that names several targets when the step names none. The third is a declared target that another family owns.
 
 # Arguments
 
   - `ests`: The step estimators.
+
+# Validation
+
+  - The family of each constraint step declares at least one target, see [`pipe_constraint_targets`](@ref).
+  - When the family declares several targets, the `target` of the [`PipelineStep`](@ref) names one of them.
 
 # Returns
 
@@ -92,13 +108,99 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The [routing targets](@ref PIPELINE_ROUTING_TARGETS) a step is *known at construction* to produce.
+Validate that each step of a [`Pipeline`](@ref) declares the slot and the target that the step writes when it runs.
 
-An uncertainty-set step qualifies. It must declare which parameters it bounds through its [`PipelineStep`](@ref) wrapper, and that declaration is a field of the step rather than a property of a computed result, so the targets it will write are known before anything runs.
+[`run_step`](@ref) selects the method for a [`PipelineStep`](@ref) that wraps an estimator from the family of that estimator. So the family decides the slot that the step writes, and the `writes` field does not. An uncertainty-set step computes the halves that its `target` names, and it stops the fit when it has no such target. The constructor calls this check, so a wrong declaration stops the construction and not the first fold.
 
-A constraint step qualifies for the same reason, one step removed: its target is declared by its *family* through [`pipe_constraint_targets`](@ref), and where the family names several, by the step's own `target` field. Both are known before anything runs, and [`run_constraint_step`](@ref) resolves the destination from the same declaration, so the target checked here is the target the step will write.
+# Arguments
 
-Everything else returns an empty tuple. A callable step writing `:constraints` declares no family, and a precomputed result carried in by the pipeline input names its target only by its type.
+  - `ests`: The step estimators.
+
+# Validation
+
+  - An uncertainty-set estimator is wrapped in a `PipelineStep` whose `target` is `:mu`, `:sigma` or `:both`. Raises an `ArgumentError`.
+  - A `PipelineStep` that wraps a preprocessing, prior, phylogeny, uncertainty-set, constraint or optimisation estimator declares the slot of that family in `writes`, see [`pipe_writes`](@ref). Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`PipelineStep`](@ref)
+  - [`pipe_writes`](@ref)
+  - [`run_uncertainty_step`](@ref)
+  - [`assert_constraint_targets`](@ref)
+"""
+function assert_step_declarations(ests)::Nothing
+    n = length(ests)
+    families = Union{<:AbstractPricesPreprocessingEstimator,
+                     <:AbstractReturnsPreprocessingEstimator, <:AbstractPriorEstimator,
+                     <:AbstractPhylogenyEstimator, <:AbstractUncertaintySetEstimator,
+                     <:AbstractConstraintEstimator, <:OptimisationEstimator}
+    for (i, e) in enumerate(ests)
+        est = isa(e, PipelineStep) ? e.est : e
+        if isa(est, AbstractUncertaintySetEstimator)
+            target = isa(e, PipelineStep) ? e.target : nothing
+            @argcheck(target in (:mu, :sigma, :both),
+                      ArgumentError("step $i of $n is a $(Base.typename(typeof(est)).wrapper) uncertainty-set step with target $(repr(target)); wrap it in a PipelineStep with target = :mu, :sigma or :both, which names the parameter the set bounds"))
+        end
+        if isa(e, PipelineStep) && isa(est, families)
+            slot = pipe_writes(est)
+            @argcheck(e.writes === slot,
+                      ArgumentError("step $i of $n wraps a $(Base.typename(typeof(est)).wrapper) in a PipelineStep that declares writes = :$(e.writes), but the step writes the :$slot slot of its family when it runs; declare writes = :$slot"))
+        end
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Validate that a nested [`Pipeline`](@ref) step changes no Data Slot that the outer pipeline does not receive.
+
+A nested pipeline gives one slot to the outer Pipeline Context, the slot of its last step. Assume that a step inside it rewrites `:prices` or `:returns`, and that its last step writes a different slot. Then the outer pipeline receives a result for assets that its own Data Slot does not hold. The weights and the prior then describe two different universes, and a prediction fails at [`assert_universe_aligned`](@ref).
+
+# Arguments
+
+  - `ests`: The step estimators.
+
+# Validation
+
+  - A nested `Pipeline` whose last step writes a slot outside [`PIPELINE_DATA_SLOTS`](@ref) contains no step that writes a Data Slot. Raises an `ArgumentError`. Put such a step in the outer pipeline.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`Pipeline`](@ref)
+  - [`PIPELINE_DATA_SLOTS`](@ref)
+  - [`pipe_writes`](@ref)
+"""
+function assert_nested_data_slots(ests)::Nothing
+    n = length(ests)
+    for (i, e) in enumerate(ests)
+        p = isa(e, PipelineStep) ? e.est : e
+        if !isa(p, Pipeline) || pipe_writes(p) in PIPELINE_DATA_SLOTS
+            continue
+        end
+        for s in p.steps
+            slot = pipe_writes(s)
+            @argcheck(!(slot in PIPELINE_DATA_SLOTS),
+                      ArgumentError("step $i of $n is a nested Pipeline that writes the :$(pipe_writes(p)) slot, and one of its steps rewrites the :$slot slot, which the outer pipeline never receives; the :$(pipe_writes(p)) result would describe other assets than the outer :$slot slot. Move the $(Base.typename(typeof(s)).wrapper) step into the outer pipeline"))
+        end
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the [routing targets](@ref PIPELINE_ROUTING_TARGETS) of a step that are known before any step runs.
+
+Two kinds of step have such targets. An uncertainty-set step declares the parameters that it bounds in the `target` field of its [`PipelineStep`](@ref). A constraint step takes its target from its family through [`pipe_constraint_targets`](@ref), or from the `target` field of its `PipelineStep` when the family names several. [`run_constraint_step`](@ref) resolves the target from the same declaration, so this function returns the target that the step writes.
+
+Every other step returns an empty tuple. A callable step declares no family, and a precomputed result names its target only by its type.
 
 # Arguments
 
@@ -106,7 +208,9 @@ Everything else returns an empty tuple. A callable step writing `:constraints` d
 
 # Returns
 
-  - A tuple of routing targets, empty when nothing is statically known.
+  - `(:mu_ucs,)`, `(:sigma_ucs,)` or `(:mu_ucs, :sigma_ucs)` for a step that writes `:uncertainty` with the target `:mu`, `:sigma` or `:both`.
+  - A tuple of one routing target for a constraint step.
+  - `()` for every other step. This includes a callable step that writes `:uncertainty` with no such target.
 
 # Related
 
@@ -138,17 +242,26 @@ pipe_required_targets(::Any) = ()
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reject at construction a pipeline whose terminal optimiser cannot receive a target an earlier step will write.
+Refuse at construction a pipeline whose last optimiser cannot receive a target that an earlier step writes.
 
-Without this, an unroutable uncertainty set is discovered by [`inject_context`](@ref) at injection time — which, under [`cross_val_predict`](@ref), is after the fold loop has already fitted every earlier step of the first fold. The check asks the optimiser directly via [`pipe_accepts`](@ref), so it stays honest as optimisers gain or lose fields.
+Without this check, [`inject_context`](@ref) finds a target that it cannot route when the optimisation step runs. Under [`cross_val_predict`](@ref), that is after the fold loop fitted every earlier step of the first fold. The check asks the optimiser through [`pipe_accepts`](@ref), so it follows the fields that the optimiser has.
 
-It is deliberately structural: it establishes that the optimiser *family* can receive the target at all, not that this particular configuration will accept the value. A [`JuMPOptimiser`](@ref) always accepts `:mu_ucs`, but one carrying a non-[`ArithmeticReturn`](@ref) estimator still fails at injection — that condition belongs to [`pipe_route`](@ref) and is not duplicated here.
+The check is structural. It finds whether the optimiser family can receive the target, and not whether this configuration accepts the value. A [`JuMPOptimiser`](@ref) always accepts `:mu_ucs`, but one with a return estimator other than [`ArithmeticReturn`](@ref) fails at injection. [`pipe_route`](@ref) owns that condition.
 
-Skipped when the terminal step is a [`TimeDependent`](@ref) schedule or a precomputed result, since the optimiser is then not known until the fold loop resolves it.
+# Algorithm
+
+ 1. Stop when the pipeline has one step, or when its last step writes a slot other than `:opt`.
+ 2. Read the optimiser `opt` from the last step, without its [`PipelineStep`](@ref) wrapper. Stop when `opt` is not an [`OptimisationEstimator`](@ref). A [`TimeDependent`](@ref) schedule and a precomputed result are such steps, and the fold loop resolves them later.
+ 3. Read the targets of each earlier step with [`pipe_required_targets`](@ref).
+ 4. Check each target with [`pipe_accepts`](@ref).
 
 # Arguments
 
-  - `ests`: The step estimators, optimisation step last (see [`assert_opt_last`](@ref)).
+  - `ests`: The step estimators, with the optimisation step last, see [`assert_opt_last`](@ref).
+
+# Validation
+
+  - `pipe_accepts(opt, Val(target))` holds for each target of each earlier step. Raises an `ArgumentError`.
 
 # Returns
 
@@ -184,8 +297,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the first element that repeats an earlier one, for a name-uniqueness error
-that names the offending token without dumping the whole collection. Only ever called on the failing path.
+Return the first element of `xs` that repeats an earlier element.
+
+The error for a repeated step name shows this element, and not the whole collection. Only the failure path of the [`Pipeline`](@ref) constructor calls this function.
 
 # Arguments
 
@@ -217,11 +331,22 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-A reified end-to-end portfolio workflow: an ordered list of steps executed left-to-right over a [`PipelineContext`](@ref).
+Runs an ordered list of steps as one end-to-end portfolio workflow.
 
-Steps are ordinary estimators — preprocessing, prior, phylogeny, uncertainty-set, constraint-generation, and optimisation estimators, nested `Pipeline`s, or [`PipelineStep`](@ref) wrappers — mapped to context slots by their family via [`pipe_writes`](@ref)/[`pipe_reads`](@ref). Fitting a pipeline with [`fit`](@ref) walks the steps in order; computed slots override the terminal optimiser's internal configuration (see [`inject_context`](@ref)), and absent steps fall back to whatever the optimiser computes internally, so every stage is optional.
+The steps run from left to right over a [`PipelineContext`](@ref). A step is an ordinary estimator. It is a preprocessing, prior, phylogeny, uncertainty-set, constraint or optimisation estimator, a nested `Pipeline`, or a [`PipelineStep`](@ref) wrapper. [`pipe_writes`](@ref) and [`pipe_reads`](@ref) give the slots that the family of a step writes and reads. [`fit`](@ref) runs the steps in order, and the computed slots replace the configuration of the last optimiser, see [`inject_context`](@ref). When the pipeline has no step for a stage, the optimiser computes that value itself, so each stage is optional.
 
-A terminal optimiser is not required: a prior-only pipeline is legal; prediction is what needs weights.
+A last optimiser is optional too. A prior-only pipeline is valid, but a prediction needs weights.
+
+# Algorithm
+
+The keyword constructor runs these steps.
+
+ 1. Split each element of `steps` into its explicit name, or `nothing`, and its estimator, giving `explicit` and `ests`.
+ 2. Run on `ests` each check of `## Validation` that has a function of its own.
+ 3. Walk `ests` in order. Check each slot that a step reads against `avail`, which holds the Data Slots and the slots of the earlier steps. Check each slot that the write of the step makes stale against `written`, which holds the slots of the earlier steps.
+ 4. Count the steps that write each slot, giving `counts`. The count includes the steps with an explicit name.
+ 5. Name each step, giving `names`. A step keeps its explicit name. A step whose slot no other step writes takes the slot name, such as `"prior"`. Every other step takes the slot name and its position among the steps of that slot, such as `"prices_1"` and `"prices_2"`.
+ 6. Call the positional constructor, which checks that the names are unique.
 
 # Fields
 
@@ -232,20 +357,31 @@ $(DocStringExtensions.FIELDS)
     Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
                cache::Option{<:AbstractPartialFitState} = nothing) -> Pipeline
 
-Steps are given in execution order. Each element is either a step estimator or a `"name" => estimator` pair; unnamed steps are auto-named from the slot they write (`"prior"`), suffixed in order of appearance when a slot repeats (`"prices_1"`, `"prices_2"`).
+Give the steps in the order of execution. Each element is a step estimator or a `"name" => estimator` pair.
 
 ## Validation
 
-  - `!isempty(steps)`.
-  - Every step must be steppable ([`pipe_writes`](@ref) must be defined for it).
-  - Every slot a step reads must be written by an earlier step or fillable by the pipeline input (`prices` or `returns`).
-  - No step may write a slot that invalidates a slot an earlier step already wrote (see [`PIPELINE_INVALIDATES`](@ref)). A step that rewrites `:returns` after a prior, phylogeny, uncertainty, or constraint step would leave that result computed on a stale asset universe.
-  - An optimisation step, if present, must be the last step (see [`assert_opt_last`](@ref)): it writes the terminal `:opt` slot, and no step may run after it.
-  - Step names must be unique.
+  - `!isempty(steps)`. Raises an `IsEmptyError`.
+  - [`pipe_writes`](@ref) is defined for each step. Raises an `ArgumentError`.
+  - A [`TrainTestSplit`](@ref) is the first step only, see [`assert_split_position`](@ref).
+  - An optimisation step is the last step only, see [`assert_opt_last`](@ref). It writes the `:opt` slot, and no step runs after it.
+  - Each step declares the slot and the target that it writes, see [`assert_step_declarations`](@ref).
+  - A nested pipeline changes no Data Slot that the outer pipeline does not receive, see [`assert_nested_data_slots`](@ref).
+  - Each constraint step resolves to one routing target, see [`assert_constraint_targets`](@ref).
+  - The last optimiser can receive each target that an earlier step writes, see [`assert_routable`](@ref).
+  - An earlier step writes each slot that a step reads, or the pipeline input fills it with `prices` or `returns`. Raises an `ArgumentError`.
+  - No step writes a slot that makes stale a slot that an earlier step wrote, see [`PIPELINE_INVALIDATES`](@ref). A step that rewrites `:returns` after a prior, phylogeny, uncertainty or constraint step leaves that result on an old asset universe. Raises an `ArgumentError`.
+  - The step names are unique. Raises an `ArgumentError`.
 
 # Online form
 
-A Pipeline is a host of the online step: [`partial_fit!`](@ref) walks the steps in order, folding each block of observations through them into the **row owner** — the prior step, else the optimiser step — and `fit(pipe)` with no data reads the fitted [`PipelineResult`](@ref) out. Every step before the owner belongs to one of three classes. A **row-local** step ([`PricesToReturns`](@ref), [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref), [`MissingDataFilter`](@ref) at `row_thr = 1`) folds and emits the transformed rows. A **universe-only** step (an [`AbstractAssetSelector`](@ref), and the column filter of a `MissingDataFilter`) folds nothing and is refitted at the read-out over the owner's rows, its universe applied as a view. A **window-valued** step, and any other step that writes a data slot, is refused at warm-up by name, and `Online(pipe)` is the declared refit that admits it. A cap on the row owner alone, `Online(pe; max_history = w)`, is a window counted in the owner's rows, and a row-local step before it folds a state across that window's front edge, so the pair is refused at warm-up by name too: the rolling window through a Pipeline is `Online(pipe; max_history = w)`, which refits every step over the window. `cache` is the Fold Context the Pipeline keeps when a prior step owns the rows, or the input-carrier buffer `Online(pipe)` seeds; it is `nothing` until a step writes one. See [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref) and [`fit(pipe::Pipeline)`](@ref).
+A Pipeline takes the online step. [`partial_fit!`](@ref) runs the steps in order, and folds each block of observations through them into the **row owner**. The row owner is the prior step, or the optimiser step when the pipeline has no prior step. `fit(pipe)` with no data returns the fitted [`PipelineResult`](@ref). Each step before the row owner is one of three kinds.
+
+  - A row-local step folds its rows and emits the transformed rows. [`PricesToReturns`](@ref), [`PriceGapFill`](@ref) with a [`CarriedPrice`](@ref), and [`MissingDataFilter`](@ref) at `row_thr = 1` are row-local.
+  - A universe-only step folds nothing. An [`AbstractAssetSelector`](@ref) and the column filter of a `MissingDataFilter` are universe-only. `fit(pipe)` with no data fits such a step again over the rows of the row owner, and applies its universe as a view.
+  - A window-valued step, and every other step that writes a Data Slot, stops the warm-up with an error that names it. `Online(pipe)` is the declared refit that accepts such a step.
+
+A cap on the row owner alone, `Online(pe; max_history = w)`, is a window that counts the rows of the row owner. A row-local step before it folds a state across the front edge of that window, so the warm-up refuses that pair with an error that names it. The rolling window through a Pipeline is `Online(pipe; max_history = w)`, which fits every step again over the window. `cache` holds the Fold Context of the Pipeline when a prior step owns the rows, or the buffer of the input data that `Online(pipe)` seeds. It is `nothing` until a step writes one. See [`partial_fit!(pipe::Pipeline{<:Any, <:Any, <:Option{<:Union{<:PipelineBufferState, <:ReturnsBufferState}}}, data::Prices_RR)`](@ref) and [`fit(pipe::Pipeline)`](@ref).
 
 # Examples
 
@@ -265,11 +401,11 @@ julia> pipe.names
 """
 @concrete struct Pipeline <: AbstractPipelineEstimator
     """
-    Step names, aligned with `steps`.
+    The name of each step, in the order of `steps`.
     """
     names
     """
-    The step estimators, in execution order.
+    The step estimators, in the order of execution.
     """
     steps
     """
@@ -301,6 +437,8 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
     end
     assert_split_position(ests)
     assert_opt_last(ests)
+    assert_step_declarations(ests)
+    assert_nested_data_slots(ests)
     assert_constraint_targets(ests)
     assert_routable(ests)
     slots = Symbol[pipe_writes(e) for e in ests]
@@ -342,9 +480,13 @@ pipe_reads(p::Pipeline) = pipe_reads(p.steps[1])
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether a step is, or contains, a [`TrainTestSplit`](@ref).
+Return whether a step is a [`TrainTestSplit`](@ref), or contains one.
 
-A nested [`Pipeline`](@ref) is searched recursively: a split hidden inside one would be fitted on data an outer step had already touched, which is exactly what pinning it to the first position prevents. The same recursion answers whether a whole pipeline carries a holdout, which is what the cross-validation entry points check before running.
+The search enters each nested [`Pipeline`](@ref) and each [`PipelineStep`](@ref). A split inside a nested pipeline sees data that an outer step already changed, and the first position of the split exists to prevent that. The same search tells whether a whole pipeline has a Holdout Split, which the cross-validation functions check before they run.
+
+# Returns
+
+  - `true` for a `TrainTestSplit`, and for a `Pipeline` or a `PipelineStep` that contains one. `false` for every other step.
 
 # Related
 
@@ -352,16 +494,28 @@ A nested [`Pipeline`](@ref) is searched recursively: a split hidden inside one w
   - [`assert_no_holdout`](@ref)
   - [`TrainTestSplit`](@ref)
 """
-has_split(::Any) = false
-has_split(::TrainTestSplit) = true
+has_split(::Any)::Bool = false
+has_split(::TrainTestSplit)::Bool = true
 has_split(p::Pipeline) = any(has_split, p.steps)
 has_split(ps::PipelineStep) = has_split(ps.est)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reject a [`Pipeline`](@ref) carrying a [`TrainTestSplit`](@ref) from the cross-validation machinery.
+Refuse a [`Pipeline`](@ref) that contains a [`TrainTestSplit`](@ref) in the cross-validation functions.
 
-A holdout split and a cross-validator are two evaluation protocols, and cross-validation already defines the train/test windows of every fold. A split left in the pipeline would shave a second, redundant holdout off each fold's training window and stash a test window nobody reads — a silent loss of training data. One protocol per call: this throws instead.
+A Holdout Split and a cross-validation scheme are two methods of evaluation. The scheme sets the training and the test window of each fold. A split in the pipeline takes a second holdout from the training window of each fold, and keeps a test window that no function reads. So each fold loses training data without a message. One call uses one method of evaluation.
+
+# Arguments
+
+  - `pipe`: The pipeline.
+
+# Validation
+
+  - `!has_split(pipe)`. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
 
 # Related
 
@@ -377,9 +531,13 @@ end
 """
     port_opt_view(pipe::Pipeline, i, args...; kwargs...)
 
-Deliberately unsupported: a [`Pipeline`](@ref) cannot be sub-selected by asset view.
+Refuse an asset view of a [`Pipeline`](@ref).
 
-Meta-optimisers (`NestedClustered`, `Stacking`, `SubsetResampling`) build asset sub-portfolios by taking a `port_opt_view` of their inner estimator. A pipeline's asset universe is *fitted state* — the missing-data filter decides it from the training window — so an asset view taken before fitting is not well defined. Wrapping a `Pipeline` in a meta-optimiser is therefore unsupported for now; a meta-optimiser may still be the *optimisation step of* a pipeline.
+A meta-optimiser such as [`NestedClustered`](@ref), [`Stacking`](@ref) or [`SubsetResampling`](@ref) takes a `port_opt_view` of its inner estimator to build a portfolio over a subset of the assets. The asset universe of a pipeline is fitted state, because a missing-data filter selects it from the training window. So an asset view before the fit has no defined meaning. A meta-optimiser cannot wrap a `Pipeline`, but it can be the optimisation step of one.
+
+# Validation
+
+  - Each call raises an `ArgumentError`.
 
 # Related
 
@@ -392,11 +550,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Fitted result of a [`Pipeline`](@ref).
+Holds the fitted result of each step of a pipeline, and the last Pipeline Context.
 
-Carries the fitted per-step results (named, in step order), and the final [`PipelineContext`](@ref) whose slots hold the computed data, prior, phylogeny, uncertainty, constraints, and terminal optimisation result.
+The context is a [`PipelineContext`](@ref). Its slots hold the computed data, prior, phylogeny, uncertainty sets, constraints and optimisation result of the [`Pipeline`](@ref).
 
-Step results are accessed by name with `getindex` (`res["prior"]`) or by position through the `results` field (`res.results[2]`); integer indexing keeps the package-wide length-1 container semantics. The `w` property forwards to the terminal optimisation result's weights (`res.ctx.opt.w`) and throws a [`PropertyPathError`](@ref) when the pipeline produced no optimisation result.
+Read the result of a step by its name with `getindex`, as in `res["prior"]`, or by its position through the `results` field, as in `res.results[2]`. A name that no step has raises an `ArgumentError` that suggests the nearest name. An integer index keeps the length-1 container behaviour of the package, so `res[1] === res`. The `w` property returns the weights of the optimisation result, `res.ctx.opt.w`. It raises a [`PropertyPathError`](@ref) when the pipeline has no optimisation result.
 
 # Fields
 
@@ -410,15 +568,15 @@ $(DocStringExtensions.FIELDS)
 """
 @concrete struct PipelineResult <: AbstractPipelineResult
     """
-    Step names, aligned with `results`.
+    The name of each step, in the order of `results`.
     """
     names
     """
-    Fitted per-step results, in step order.
+    The fitted result of each step, in step order.
     """
     results
     """
-    The final [`PipelineContext`](@ref).
+    The last [`PipelineContext`](@ref).
     """
     ctx
 end
@@ -436,15 +594,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Iterate the elements of the `constraints` slot uniformly.
+Return the elements of the `constraints` slot as one iterable.
 
 # Arguments
 
-  - `x`: `nothing`, a single [`AbstractConstraintResult`](@ref), or a vector of them.
+  - `x`: `nothing`, one [`AbstractConstraintResult`](@ref), or a vector of them.
 
 # Returns
 
-  - An iterable of constraint results (empty for `nothing`).
+  - An iterable of constraint results. It is empty for `nothing`, and holds one element for one result.
 
 # Related
 
@@ -456,11 +614,11 @@ constraint_results(c::AbstractVector{<:AbstractConstraintResult}) = c
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The [routing target](@ref PIPELINE_ROUTING_TARGETS) a constraint result names by its type alone, or `nothing`.
+Return the [routing target](@ref PIPELINE_ROUTING_TARGETS) that a constraint result names by its type alone, or `nothing`.
 
-Four result types name exactly one optimiser field, so a value of one of those types places itself: a [`WeightBounds`](@ref) can only be `:wb`, a [`LinearConstraint`](@ref) only `:lcse`, a phylogeny constraint result only `:ple`, a [`RiskBudget`](@ref) only `:rkb`. Everything else answers `nothing`, and needs a target carried alongside it — see [`TargetedConstraint`](@ref).
+Four result types name one optimiser field each. A [`WeightBounds`](@ref) goes to `:wb`, a [`LinearConstraint`](@ref) to `:lcse`, a phylogeny constraint result to `:ple`, and a [`RiskBudget`](@ref) to `:rkb`. Every other type returns `nothing`, and needs a target beside it, see [`TargetedConstraint`](@ref).
 
-This is the *only* type-driven half of the fan-out, and it is also what decides whether a step's value needs a wrapper at all: [`add_constraint_result`](@ref) wraps exactly when the value cannot name its own destination, so the `constraints` slot holds a bare result wherever it can.
+This function is the only part of the fan-out that the type decides. It also decides whether the value of a step needs a wrapper. [`add_constraint_result`](@ref) wraps a value only when the value cannot name its own target, so the `constraints` slot holds a bare result where it can.
 
 # Arguments
 
@@ -475,23 +633,26 @@ This is the *only* type-driven half of the fan-out, and it is also what decides 
   - [`constraint_target_of`](@ref)
   - [`TargetedConstraint`](@ref)
 """
-implicit_constraint_target(::WeightBounds) = :wb
-implicit_constraint_target(::LinearConstraint) = :lcse
-implicit_constraint_target(::AbstractPhylogenyConstraintResult) = :ple
-implicit_constraint_target(::RiskBudget) = :rkb
+implicit_constraint_target(::WeightBounds)::Symbol = :wb
+implicit_constraint_target(::LinearConstraint)::Symbol = :lcse
+implicit_constraint_target(::AbstractPhylogenyConstraintResult)::Symbol = :ple
+implicit_constraint_target(::RiskBudget)::Symbol = :rkb
 implicit_constraint_target(::Any) = nothing
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The [routing target](@ref PIPELINE_ROUTING_TARGETS) one element of the `constraints` slot lands in.
+Return the [routing target](@ref PIPELINE_ROUTING_TARGETS) that one element of the `constraints` slot goes to.
 
-An element a constraint step could not place by type carries its target — [`run_constraint_step`](@ref) paired the two — and it is read straight off. Everything else is placed by [`implicit_constraint_target`](@ref).
-
-Two cases throw. A [`Threshold`](@ref) names six optimiser fields, so its type cannot place it; the error names the declaration that would. A result of any other unplaceable type has no target at all, and is rejected here rather than at an optimiser.
+[`run_constraint_step`](@ref) pairs a value that its type cannot place with its target, and this function reads that target. [`implicit_constraint_target`](@ref) places every other element.
 
 # Arguments
 
   - `c`: One element of the `constraints` slot.
+
+# Validation
+
+  - A [`Threshold`](@ref) without a target raises an `ArgumentError`. It names six optimiser fields, so its type cannot place it. The error names the declaration that places it.
+  - A result of any other type that names no target raises an `ArgumentError`. The function refuses it here, before it reaches an optimiser.
 
 # Returns
 
@@ -520,7 +681,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The value one element of the `constraints` slot delivers, with the routing wrapper removed.
+Return the value that one element of the `constraints` slot delivers, without its routing wrapper.
 
 # Arguments
 
@@ -540,18 +701,22 @@ constraint_value_of(c::TargetedConstraint) = c.res
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Combine the several values that reached one [accumulating](@ref PIPELINE_ACCUMULATING_TARGETS) routing target.
+Combine the values that reached one [accumulating](@ref PIPELINE_ACCUMULATING_TARGETS) routing target.
 
-The default packs them into a vector in write order, which is the shape every field holding one result per estimator expects.
+The default puts the values in a vector, in write order. Each field that holds one result per estimator reads this shape.
 
-`:cte` is the exception, and it is what this seam exists for. Its field takes a vector of [`CentralityConstraint`](@ref) *estimators*, and [`centrality_constraints`](@ref) appends every row of every estimator into **one** [`LinearConstraint`](@ref). Separate steps therefore merge rather than pack, so *n* centrality steps in a [`Pipeline`](@ref) reach the optimiser with the value one `cte` field holding *n* estimators would have produced.
+`:cte` is different. Its field takes a vector of [`CentralityConstraint`](@ref) estimators, and [`centrality_constraints`](@ref) appends every row of every estimator into one [`LinearConstraint`](@ref). So the values of separate steps merge through [`merge_linear_constraints`](@ref). Then *n* centrality steps in a [`Pipeline`](@ref) give the optimiser the value that one `cte` field with *n* estimators gives.
 
-Only ever called with more than one value; a single value is unwrapped by [`constraint_targets`](@ref) before it gets here.
+[`constraint_targets`](@ref) calls this function with more than one value only, because it unwraps a single value first.
 
 # Arguments
 
-  - `::Val{target}`: The routing target the values reached.
+  - `::Val{target}`: The routing target that the values reached.
   - `vals`: The values, in write order.
+
+# Validation
+
+  - For `:cte`, each value is a `LinearConstraint`. Raises an `ArgumentError`.
 
 # Returns
 
@@ -574,17 +739,25 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Fan the `constraints` slot out into [routing targets](@ref PIPELINE_ROUTING_TARGETS).
+Split the `constraints` slot into [routing targets](@ref PIPELINE_ROUTING_TARGETS).
 
-Each element is placed by [`constraint_target_of`](@ref) and unwrapped by [`constraint_value_of`](@ref). Several results reaching one [accumulating](@ref PIPELINE_ACCUMULATING_TARGETS) target are combined by [`accumulate_constraint_values`](@ref) — packed into a vector in write order, or, for `:cte`, merged into the one constraint that holds all their rows. A group of one is unwrapped, matching the scalar-or-vector shape those fields accept everywhere else. A second result reaching any other target is refused, because that field holds one value and the second would silently replace the first.
+# Algorithm
+
+ 1. For each element `c` of the `constraints` slot, in write order, read its target with [`constraint_target_of`](@ref) and its value with [`constraint_value_of`](@ref).
+ 2. Add the value to the group of its target in `out`. A target seen for the first time starts a new group.
+ 3. Return the value itself for a group of one value. This is the scalar shape that the fields accept outside a pipeline. For a larger group, combine the values with [`accumulate_constraint_values`](@ref). It puts them in a vector in write order, or merges them into one constraint for `:cte`.
 
 # Arguments
 
   - `cs`: The `constraints` slot.
 
+# Validation
+
+  - A second value for a target outside [`PIPELINE_ACCUMULATING_TARGETS`](@ref) raises an `ArgumentError`. Such a field holds one value, and the second value replaces the first without a message.
+
 # Returns
 
-  - A vector of `target => value` pairs, in the order the results were written.
+  - A vector of `target => value` pairs, in the order of the first write to each target.
 
 # Related
 
@@ -617,11 +790,20 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Override an optimisation step's internal configuration with the computed slots of the pipeline context, immediately before the step runs.
+Replace the configuration of an optimisation step with the computed slots of the Pipeline Context, immediately before the step runs.
 
-This is the pipeline-owned half of the injection seam. It resolves everything that depends on the *slots* — which halves of the uncertainty pair are populated, which result types the `constraints` slot holds, how many of each — into a flat sequence of [routing targets](@ref PIPELINE_ROUTING_TARGETS), then hands each one to [`pipe_route`](@ref) without knowing where it lands. Which optimiser field receives a target is the optimiser's business, so a field rename is a local edit rather than a break here.
+This function is the pipeline half of the routing. It turns the slots into a flat sequence of [routing targets](@ref PIPELINE_ROUTING_TARGETS). To do this, it finds which halves of the uncertainty pair are present, which result types the `constraints` slot holds, and how many of each. Then it gives each target to [`pipe_route`](@ref), which finds the field that receives the target. The optimiser owns that choice, so a field rename is a local change.
 
-Targets an optimiser has no home for are handled by [`unroutable_target`](@ref): `:pe` and `:cle` pass by, everything else throws rather than being silently dropped. This is why a naive or meta-optimiser accepts a computed prior it can use while still rejecting an uncertainty set it cannot.
+[`unroutable_target`](@ref) handles a target that an optimiser has no field for. `:pe` and `:cle` pass without a change, and every other target raises an error. So a naive optimiser or a meta-optimiser accepts a computed prior that it can use, and refuses an uncertainty set that it cannot use.
+
+# Algorithm
+
+ 1. Return `opt` unchanged when the `prior`, `phylogeny`, `uncertainty` and `constraints` slots are all `nothing`.
+ 2. Route the `prior` slot to `:pe`.
+ 3. Route the `phylogeny` slot to `:cle` when it is an [`AbstractClusteringResult`](@ref). A phylogeny result of another type has no `:cle` target, so this step skips it.
+ 4. Route the mean half of the `uncertainty` slot to `:mu_ucs`, and its covariance half to `:sigma_ucs`, when the half is present.
+ 5. Route each `target => value` pair of [`constraint_targets`](@ref) to its target.
+ 6. Return the rebuilt optimiser `opt′`.
 
 # Arguments
 
@@ -630,7 +812,7 @@ Targets an optimiser has no home for are handled by [`unroutable_target`](@ref):
 
 # Returns
 
-  - `opt′`: The (possibly rebuilt) estimator actually run.
+  - `opt′`: The estimator that runs. It is `opt` itself when no slot applies, and a rebuilt copy otherwise.
 
 # Related
 
@@ -673,20 +855,22 @@ end
     maybe_inject_step(opt::OptimisationEstimator, ctx::PipelineContext)
     maybe_inject_step(ps::PipelineStep, ctx::PipelineContext)
 
-Either return the step estimator unchanged, inject the context into the optimiser, or inject the context into the optimiser and create a pipeline step.
+Return the step that runs, with the Pipeline Context injected when the step is an optimiser.
+
+A step that is not an optimiser runs unchanged. An optimiser takes the context through [`inject_context`](@ref). For a [`PipelineStep`](@ref) that wraps an optimiser, the function builds a new `PipelineStep` around the injected optimiser, with the same `reads`, `writes` and `target`.
 
 # Arguments
 
   - `est`: A step estimator.
   - `opt`: An optimisation step estimator.
-  - `ps`: A [`PipelineStep`](@ref) wrapping an optimisation step estimator.
+  - `ps`: A [`PipelineStep`](@ref). A `PipelineStep` that wraps no optimiser runs unchanged.
   - `ctx`: The pipeline context.
 
 # Returns
 
-  - `est′`: The step estimator to run.
-  - `opt`: The optimiser with its configuration overridden by the context.
-  - `ps`: The pipeline step with its optimiser overridden by the context.
+  - `est`: The step estimator, unchanged.
+  - `opt′`: The optimiser with the configuration that the context replaced.
+  - `ps′`: The pipeline step with the injected optimiser.
 """
 maybe_inject_step(est, ::PipelineContext) = est
 function maybe_inject_step(opt::OptimisationEstimator, ctx::PipelineContext)
@@ -695,9 +879,23 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Injection rules for a precomputed optimisation result standing in the optimisation step — the predict-only fold of a mixed [`TimeDependent`](@ref) schedule.
+Apply the injection rules to a precomputed optimisation result in the optimisation step.
 
-A result is already solved, so it has no configuration to override; this reuses the non-injectable pattern of [`inject_context`](@ref): computed `prior` and `phylogeny` slots pass by (the result was fitted with its own), but populated `uncertainty` or `constraints` slots throw an `ArgumentError` rather than being silently dropped — a computed constraint that never reaches a solve is a fail-closed error, not a no-op.
+The predict-only fold of a mixed [`TimeDependent`](@ref) schedule puts a result in the optimisation step. A result is solved, so it has no configuration to replace. It follows the rule of [`inject_context`](@ref) for an optimiser without a field for the target. The computed `prior` and `phylogeny` slots pass, because the result has its own. A computed uncertainty set or constraint must not disappear without a solve, so a populated `uncertainty` or `constraints` slot stops the fit.
+
+# Arguments
+
+  - `res`: The precomputed optimisation result.
+  - `ctx`: The pipeline context.
+
+# Validation
+
+  - `isnothing(ctx.uncertainty)`. Raises an `ArgumentError`.
+  - `isnothing(ctx.constraints)`. Raises an `ArgumentError`.
+
+# Returns
+
+  - `res`, unchanged.
 
 # Related
 
@@ -721,20 +919,25 @@ end
 """
     StatsAPI.fit(pipe::Pipeline, data::Prices_RR) -> PipelineResult
 
-Fit a [`Pipeline`](@ref) on price- or returns-level data.
+Fit a [`Pipeline`](@ref) on price data or returns data.
 
-The context slot matching the input type is filled (`PricesResult` → `prices`, `ReturnsResult` → `returns`, so passing returns-level data skips the price stages), then the steps run left-to-right via [`run_step`](@ref). Immediately before an optimisation step runs, the computed slots override its internal configuration via [`inject_context`](@ref).
+`fit` has no folds, so each [`TimeDependent`](@ref) schedule step resolves to its explicit `default`, see [`reset_time_dependent_estimator`](@ref). A schedule with no `default` raises a [`TimeDependentDefaultError`](@ref). Backtest such a pipeline with [`cross_val_predict`](@ref), whose folds resolve the schedule. Inside a fold loop the reset changes nothing, because the loop first replaces each schedule with its value for the fold.
 
-`fit` is a fold-less entry point, so [`TimeDependent`](@ref) schedule steps are inert here: each resolves to its explicit `default` (see [`reset_time_dependent_estimator`](@ref)) before the steps run, and a schedule with no `default` throws a [`TimeDependentDefaultError`](@ref) — backtest the pipeline with [`cross_val_predict`](@ref), whose folds the schedule resolves against. Inside a fold loop this reset is a no-op, because the loop swaps every schedule for its per-fold value first.
+# Algorithm
+
+ 1. When the pipeline has a schedule step, reset each schedule to its `default`.
+ 2. Fill the slot of the input type, giving `ctx`. A [`PricesResult`](@ref) fills `prices`, and a [`ReturnsResult`](@ref) fills `returns`. So a pipeline for returns data has no price steps, because a price step raises an `IsNothingError` when the `prices` slot is empty.
+ 3. For each step in order, inject `ctx` into an optimisation step with [`maybe_inject_step`](@ref). Then run the step with [`run_step`](@ref), giving its fitted result and the new `ctx`.
+ 4. Return the step names, the fitted results in step order and the last `ctx` as a [`PipelineResult`](@ref).
 
 # Arguments
 
   - `pipe`: The pipeline.
-  - `data`: The input data ([`PricesResult`](@ref) or [`ReturnsResult`](@ref)).
+  - `data`: The input data, a [`PricesResult`](@ref) or a [`ReturnsResult`](@ref).
 
 # Returns
 
-  - `res::PipelineResult`: Named per-step fitted results and the final context.
+  - `res::PipelineResult`: The named fitted result of each step, and the last context.
 
 # Examples
 
@@ -778,25 +981,26 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that a test window came from the same ingestion as the training window.
+Check that a test window and the training window come from the same ingestion.
 
-This is a **provenance** check. The terminal weights are indexed by the *training* universe, so a test window carrying a different asset set — or the same set described by a different universe statement — would silently misalign weights and returns, and it is reported here by name rather than surfacing as a dimension mismatch inside the risk calculation.
+The last weights use the asset axis of the training window. A test window with a different asset set, or with the same set from a different universe statement, misaligns the weights and the returns. This check reports that case with an error that names both universes. Without the check, the case shows as a dimension mismatch inside the risk calculation.
 
-It reads two things. `nx` equality answers the asset axis, and [`check_asset_panel`](@ref) binds an [`AssetPanel`](@ref)'s asset axis to its carrier's at construction, so `nx` equality compares the panel's axis transitively and no separate assertion is owed. Panel-presence parity answers where the universe was stated: a window with a panel and a fitted context without one, or the reverse, did not come from one ingestion.
+The check reads two things. Equality of `nx` checks the asset axis. [`check_asset_panel`](@ref) binds the asset axis of an [`AssetPanel`](@ref) to the `nx` of the result that holds it, so equality of `nx` also compares the axes of the panels. Parity of panel presence checks where the universe was stated. A window with a panel and a fitted context without one, or the reverse, do not come from one ingestion.
 
-The alignment guarantee it once carried alone has since split, and both halves are now held elsewhere. **The axis half is structural.** The ingestion layer fixes the asset axis before the split and [`port_opt_view`](@ref) slices it, so every window of every fold carries every asset, reduce-and-expand always expands onto a fixed axis, and no policy of the layer's own drops a row or a column. **The semantic half was never this check's**: an asset present in both windows and non-investable in one is a **Held Gap**, which `filter_held_gaps` reads off the weights and the returns under the strictness policy.
+Two other parts of the library hold the rest of the alignment. The ingestion layer fixes the asset axis before the split, and [`port_opt_view`](@ref) slices it. So each window of each fold carries every asset, and no policy of the layer drops a row or a column. An asset that is present in both windows and not investable in one is a Held Gap, which `filter_held_gaps` reads from the weights and the returns under the strictness policy.
 
-What is left is the population that can still break the invariant, and its message names both: a carrier built outside the layer, and a third-party step that changes the asset set. On the layer's path neither can arise, so no remedy is prescribed here.
+Two cases remain, and the error message names both. The first is returns data built outside the ingestion layer. The second is a step of the caller that changes the asset set.
 
 # Arguments
 
   - `res`: The fitted [`PipelineResult`](@ref).
-  - `rd`: The transformed test-window returns.
+  - `rd`: The returns of the test window, after the fitted steps.
 
 # Validation
 
-  - `rd.nx == train.nx`. Raises an `ArgumentError`.
-  - The window and the fitted context either both carry an [`AssetPanel`](@ref) or neither does. Raises an `ArgumentError`.
+  - When the fitted context has no `returns` slot, the check passes.
+  - `rd.nx == train.nx`, where `train` is the `returns` slot of the fitted context. Raises an `ArgumentError`.
+  - Both `rd` and `train` carry an [`AssetPanel`](@ref), or neither does. Raises an `ArgumentError`.
 
 # Returns
 
@@ -815,26 +1019,28 @@ function assert_universe_aligned(res::PipelineResult, rd::AbstractReturnsResult)
         return nothing
     end
     @argcheck(rd.nx == train.nx,
-              ArgumentError("the pipeline's fitted steps produced a test-window universe $(rd.nx) that differs from the training universe $(train.nx), so the weights and the test returns would not be aligned. The ingestion layer fixes the asset axis before the split, so this reaches two situations only: a returns carrier built outside it, and a step of your own that changes the asset set. Build the carrier with price_ingestion(PriceIngestion(), X)."))
+              ArgumentError("the pipeline's fitted steps produced a test-window universe $(rd.nx) that differs from the training universe $(train.nx), so the weights and the test returns would not be aligned. The ingestion layer fixes the asset axis before the split, so this reaches two situations only: returns data built outside it, and a step of your own that changes the asset set. Build the returns data with price_ingestion(PriceIngestion(), X)."))
     @argcheck(isnothing(rd.pnl) == isnothing(train.pnl),
-              ArgumentError("the pipeline's fitted steps produced a test window that $(isnothing(rd.pnl) ? "states no universe" : "states a universe") while the training window $(isnothing(train.pnl) ? "states none" : "states one"), so the two did not come from one ingestion. A returns carrier the ingestion layer built always carries an Asset Panel, so pnl === nothing on one of them says that one was built outside it."))
+              ArgumentError("the pipeline's fitted steps produced a test window that $(isnothing(rd.pnl) ? "states no universe" : "states a universe") while the training window $(isnothing(train.pnl) ? "states none" : "states one"), so the two did not come from one ingestion. A ReturnsResult the ingestion layer built always carries an Asset Panel, so pnl === nothing on one of them says that one was built outside it."))
     return nothing
 end
 """
     apply_fitted_step(fitted, data) -> data′
 
-Replay one fitted pipeline step on a data window during prediction.
+Apply one fitted step of a pipeline to a data window for a prediction.
 
-Preprocessing steps transform the window at the data level they apply to: price-level fitted objects ([`AbstractPricesPreprocessingResult`](@ref), [`AbstractPricesPreprocessingEstimator`](@ref)) transform price-level windows, returns-level ones transform returns-level windows, and [`PricesToReturns`](@ref) converts the window from prices to returns. A fitted object whose data level does not match the current window passes it through unchanged — mirroring fit, where such a step cannot affect the data that reaches the optimiser. Non-preprocessing fitted results (priors, phylogeny, uncertainty, constraints, optimisation) pass the window through untouched, and a nested [`PipelineResult`](@ref) replays its own steps recursively.
+A preprocessing step changes the window at its own data level. A price-level fitted object, an [`AbstractPricesPreprocessingResult`](@ref) or an [`AbstractPricesPreprocessingEstimator`](@ref), changes a price window. A returns-level fitted object changes a returns window. [`PricesToReturns`](@ref) converts a price window to returns.
+
+A fitted object of the other data level returns the window unchanged. So a pipeline that was fitted on prices can predict on a returns window, and [`assert_universe_aligned`](@ref) then checks the asset axis of that window. The result of every other step, such as a prior, a phylogeny, an uncertainty set, a constraint or an optimisation result, returns the window unchanged. A nested [`PipelineResult`](@ref) applies its own steps with [`apply_fitted_steps`](@ref).
 
 # Arguments
 
-  - `fitted`: A fitted per-step result from a [`PipelineResult`](@ref).
-  - `data`: The current data window ([`AbstractPricesResult`](@ref) or [`AbstractReturnsResult`](@ref)).
+  - `fitted`: The fitted result of one step, from a [`PipelineResult`](@ref).
+  - `data`: The data window, an [`AbstractPricesResult`](@ref) or an [`AbstractReturnsResult`](@ref).
 
 # Returns
 
-  - `data′`: The transformed (or untouched) data window.
+  - `data′`: The changed data window, or `data` itself.
 
 # Related
 
@@ -875,16 +1081,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Replay the fitted preprocessing steps of a pipeline on a data window, in step order.
+Apply the fitted steps of a pipeline to a data window, in step order.
+
+# Algorithm
+
+ 1. For each fitted result `f` in `results`, in step order, replace `data` with `apply_fitted_step(f, data)`, see [`apply_fitted_step`](@ref).
+ 2. Return the last `data`.
 
 # Arguments
 
-  - `results`: The fitted per-step results of a [`PipelineResult`](@ref).
-  - `data`: The data window to transform.
+  - `results`: The fitted result of each step, from a [`PipelineResult`](@ref).
+  - `data`: The data window.
 
 # Returns
 
-  - `data′`: The transformed data window (returns-level when the steps include a [`PricesToReturns`](@ref) conversion).
+  - `data′`: The changed data window. It is returns data when the steps include a [`PricesToReturns`](@ref) step.
 
 # Related
 
@@ -901,32 +1112,50 @@ end
     predict(res::PipelineResult, data::AbstractPricesResult,
                           test_idx = Colon(), cols = Colon()) -> PredictionResult
 
-
     predict(res::PipelineResult, data::AbstractPricesResult,
-                          test_idxs::VecVecInt, cols = Colon()) -> PredictionResult
+                          test_idxs::VecVecInt, cols = Colon()) -> Vector{<:PredictionResult}
 
     predict(res::PipelineResult, data::AbstractReturnsResult,
                           test_idx = Colon(), cols = Colon()) -> PredictionResult
 
-Apply a fitted pipeline to an unseen window of data and produce the same [`PredictionResult`](@ref) the weights-level machinery consumes.
+    predict(res::PipelineResult, data::AbstractReturnsResult,
+                          test_idxs::VecVecInt, cols = Colon()) -> Vector{<:PredictionResult}
 
-`test_idx` selects the observation rows of the window and `cols` selects its asset columns. The window is transformed by replaying the fitted preprocessing steps in step order — the *training* universe subset, the *training* imputation parameters, then the returns conversion — so no statistic of the test window leaks into the transformation. The result is then handed to the existing weights-level `predict`, so scorers and risk measures carry over untouched.
+Apply a fitted pipeline to a new data window, and return the [`PredictionResult`](@ref) that the weight-level functions read.
 
-Price-level data requires the pipeline to contain a [`PricesToReturns`](@ref) step; a pipeline that produced no optimisation result cannot predict.
+`test_idx` selects the rows of the window, and `cols` selects its asset columns. The fitted preprocessing steps change the window in step order. They use the universe, the imputation parameters and the returns conversion of the training window, so no statistic of the test window changes the window. The weight-level `predict` then reads the window, so the scorers and the risk measures apply without a change.
 
-A vector of index vectors predicts on each window in turn and returns one result per window, which is the shape the cross-validation machinery consumes.
+A vector of index vectors predicts on each window and returns one result per window. The cross-validation functions read this shape.
+
+# Algorithm
+
+ 1. Read the optimisation result `opt` of the pipeline.
+ 2. Take the rows `test_idx` and the columns `cols` of `data` with [`port_opt_view`](@ref), giving the window. Returns data with `:` for both is the window as it is.
+ 3. Apply the fitted steps to the window with [`apply_fitted_steps`](@ref), giving `rd`. For price data, check that `rd` is returns data.
+ 4. Check the asset axis of `rd` with [`assert_universe_aligned`](@ref).
+ 5. Return `predict(opt, rd)`, with the keyword arguments. For returns data, apply the steps with [`apply_fitted_steps_keeping`](@ref) in step 3, and record `test_idx` on the prediction with [`pipeline_fold_prediction`](@ref) when every step keeps the observations, see [`keeps_observations`](@ref). Price data records no rows, because [`PricesToReturns`](@ref) drops the first price row, so the positions of the returns are not those of `test_idx`. Price data carries timestamps, and the timestamps name the rows instead.
 
 # Arguments
 
   - `res`: The fitted [`PipelineResult`](@ref).
-  - `data`: Price- or returns-level data containing the window ([`PricesResult`](@ref) or [`ReturnsResult`](@ref)).
-  - `test_idx`: Observation window into the rows of `data`. Integer indices, timestamps, or `:` (all rows).
+  - `data`: Price data or returns data that contains the window, a [`PricesResult`](@ref) or a [`ReturnsResult`](@ref).
+  - `test_idx`: The rows of `data` in the window, as integer indices or `:` for all rows. Price data also takes a vector of timestamps.
   - `test_idxs`: Several such windows, as a vector of index vectors.
-  - `cols`: Asset window into the columns of `data`. Integer indices, or `:` (all assets).
+  - `cols`: The columns of `data` in the window, as integer indices or `:` for all assets. The columns must give the training universe. So a subset of the columns needs a fit on the same subset, as `fit_and_predict(pipe, data; cols)` does.
+
+# Keyword Arguments
+
+  - `wd`, `hwd`, `fa`, `store_weight_path`, `strict`, `w_prev`: The keywords of [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref), passed on.
+
+# Validation
+
+  - `!isnothing(res.ctx.opt)`. Raises an `IsNothingError`.
+  - For price data, the fitted steps convert the window to returns, so the pipeline contains a [`PricesToReturns`](@ref) step. Raises an `ArgumentError`.
+  - The window passes [`assert_universe_aligned`](@ref).
 
 # Returns
 
-  - `pred::PredictionResult`: The weights-level prediction on the transformed window, or one such result per window when several are given.
+  - `pred::PredictionResult`: The weight-level prediction on the changed window, or one such result per window when several are given.
 
 # Related
 
@@ -974,27 +1203,24 @@ function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
     else
         port_opt_view(data, test_idx, cols)
     end
-    rd = apply_fitted_steps(res.results, rd)
+    rd, kept = apply_fitted_steps_keeping(res.results, rd)
     assert_universe_aligned(res, rd)
-    return StatsAPI.predict(opt, rd; wd = wd, hwd = hwd, fa = fa,
+    pred = StatsAPI.predict(opt, rd; wd = wd, hwd = hwd, fa = fa,
                             store_weight_path = store_weight_path, strict = strict,
                             w_prev = w_prev)
+    return pipeline_fold_prediction(pred, test_idx, kept)
 end
 function StatsAPI.predict(res::PipelineResult, data::AbstractReturnsResult,
                           test_idxs::VecVecInt, cols = Colon(); kwargs...)
     return [StatsAPI.predict(res, data, test_idx, cols; kwargs...)
             for test_idx in test_idxs]
 end
-function fit_and_predict(res::PipelineResult, data::AbstractReturnsResult;
-                         test_idx::VecInt_VecVecInt, cols = :,
-                         wd::Option{<:AbstractWeightDrift} = nothing,
+function fit_and_predict(res::PipelineResult, data::Prices_RR; test_idx::VecInt_VecVecInt,
+                         cols = :, wd::Option{<:AbstractWeightDrift} = nothing,
                          hwd::Option{<:AbstractWeightDrift} = wd,
                          fa::Option{<:AbstractFeeAmortisation} = nothing,
                          store_weight_path::Bool = false, strict::Bool = false,
                          w_prev::Option{<:VecNum_VecVecNum} = nothing, kwargs...)
-    opt = res.ctx.opt
-    @argcheck(!isnothing(opt),
-              IsNothingError("the pipeline produced no optimisation result; add a terminal optimisation step before predicting"))
     return StatsAPI.predict(res, data, test_idx, cols; wd = wd, hwd = hwd, fa = fa,
                             store_weight_path = store_weight_path, strict = strict,
                             w_prev = w_prev)
@@ -1014,7 +1240,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the held-out window stashed by a pipeline's [`TrainTestSplit`](@ref) step, or `nothing` when it has none.
+Return the test window that the [`TrainTestSplit`](@ref) step of a fitted pipeline keeps, or `nothing` when the pipeline has no split.
+
+The function reads the steps of the outer pipeline only. [`assert_split_position`](@ref) keeps a split there.
+
+# Arguments
+
+  - `res`: The fitted [`PipelineResult`](@ref).
+
+# Returns
+
+  - The `test` window of the [`TrainTestSplitResult`](@ref), or `nothing`.
 
 # Related
 
@@ -1026,21 +1262,26 @@ function holdout_window(res::PipelineResult)
     return isnothing(i) ? nothing : getfield(res, :results)[i].test
 end
 """
-    fit_predict(opt::Pipeline, data::Prices_RR)
+    fit_predict(pipe::Pipeline, data::Prices_RR) -> PredictionResult
 
-Fit pipeline estimator `opt` on data `data` and immediately produce a
-[`PredictionResult`](@ref).
+Fit a pipeline on `data`, and predict with it at once.
 
-The prediction is made on `data` itself — *in-sample* — unless the pipeline begins with a [`TrainTestSplit`](@ref), in which case it is made on the held-out window that step reserved and no fitted step has seen. That is the one-line holdout evaluation: fit on the training rows, score on the test rows.
+When the pipeline starts with a [`TrainTestSplit`](@ref), the prediction uses the test window of the split, which no fitted step saw. Otherwise the prediction uses `data` itself, in sample. So one call with a split fits on the training rows and scores on the test rows.
+
+# Algorithm
+
+ 1. Fit `pipe` on `data` with [`fit`](@ref), giving `res`.
+ 2. Read the test window of the split with [`holdout_window`](@ref), giving `test`.
+ 3. Predict with `res` on `test`, or on `data` when `test` is `nothing`.
 
 # Arguments
 
-  - `opt`: Optimisation estimator or result.
-  - `data::Prices_RR`: Price- or returns-level data.
+  - `pipe`: The pipeline.
+  - `data::Prices_RR`: Price data or returns data.
 
 # Returns
 
-  - [`PredictionResult`](@ref): On the held-out window when the pipeline splits, on `data` otherwise.
+  - `pred::PredictionResult`: The prediction on the test window when the pipeline has a split, and on `data` otherwise.
 
 # Related
 

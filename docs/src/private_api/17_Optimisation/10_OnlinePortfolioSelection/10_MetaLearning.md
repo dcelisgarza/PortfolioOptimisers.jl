@@ -1,8 +1,8 @@
 ```@meta
-Description = "Online selection rules: the meta-learning rows, private API of PortfolioOptimisers.jl: rate_grid_experts."
+Description = "Meta-learning, private API of PortfolioOptimisers.jl: rate_grid_experts."
 ```
 
-# Online selection rules: the meta-learning rows: private API
+# Meta-learning: private API
 
 ```@docs
 PortfolioOptimisers.rate_grid_experts

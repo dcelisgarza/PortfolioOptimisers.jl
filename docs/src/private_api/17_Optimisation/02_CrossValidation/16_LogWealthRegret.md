@@ -1,8 +1,8 @@
 ```@meta
-Description = "Log-wealth regret against a comparator, private API of PortfolioOptimisers.jl: regret_series, first_member, fold_target, fold_held, stacked_fold_weights, …"
+Description = "Log-wealth regret, private API of PortfolioOptimisers.jl: regret_series, first_member, fold_target, fold_held, stacked_fold_weights, comparator_path_length, …"
 ```
 
-# Log-wealth regret against a comparator: private API
+# Log-wealth regret: private API
 
 ```@docs
 PortfolioOptimisers.regret_series

@@ -1,8 +1,8 @@
 ```@meta
-Description = "Scoped configuration, private API of PortfolioOptimisers.jl: RESOURCE_LIMITS, COMPACT_SHOW, SHOW_NOTHING_FIELDS, STRING_DISTANCE, EQUATION_LIMITS, …"
+Description = "Scoped config, private API of PortfolioOptimisers.jl: RESOURCE_LIMITS, COMPACT_SHOW, SHOW_NOTHING_FIELDS, STRING_DISTANCE, EQUATION_LIMITS, ScopedConfig, …"
 ```
 
-# Scoped configuration: private API
+# Scoped config: private API
 
 Five settings apply to the whole package. Each is in a [`ScopedConfig`](@ref), which many threads can read at once.
 

@@ -120,14 +120,14 @@ Where:
 
  1. For each asset column, find `t`, the row of the last observed price of the training window. The step leaves out every entry that [`is_missing_value`](@ref) accepts.
  2. Skip an asset whose column holds no observed price. The asset gets no fitted value and no entry in the result, so the apply step does not change it.
- 3. Collect the observed prices of the column into `obs`. Read with [`PortfolioOptimisers.gap_fill_open`](@ref) whether the Listing Span of the carrier holds from `t` to the end of the training window. A carrier that states no span states no absence.
+ 3. Collect the observed prices of the column into `obs`. Read with [`PortfolioOptimisers.gap_fill_open`](@ref) whether the Listing Span of the price data holds from `t` to the end of the training window. Price data that states no span states no absence.
  4. Reduce `obs` to one value with [`PortfolioOptimisers.gap_fill_seed`](@ref), giving the fitted value of the asset. Under [`CarriedPrice`](@ref) the value is `missing` when the span does not hold from `t` to the end.
  5. Return a [`PriceGapFillResult`](@ref) that holds the fitted asset names, their values, the last timestamp of the training window, the convention and `strict`.
 
 ## Apply
 
  1. Copy the price values of the window into `vals`, so the input does not change.
- 2. Read the Listing Span `span` that bounds the fill with [`PortfolioOptimisers.gap_fill_span`](@ref). A carrier that states no span gives an all-`false` span, and the fill writes no cell.
+ 2. Read the Listing Span `span` that bounds the fill with [`PortfolioOptimisers.gap_fill_span`](@ref). Price data that states no span gives an all-`false` span, and the fill writes no cell.
  3. Find `t0`, the first observation of the window after the end of the training window. On the training window itself `t0` is one past the last row. On a window that follows the training window, `t0` is the first row.
  4. For each fitted asset name, find its column `j` in the window. Skip a name that the window does not carry.
  5. Fill column `j` of `vals` with [`PortfolioOptimisers.gap_fill_column!`](@ref), with the fitted value as the seed from `t0` and `span` as the bound. A `missing` seed fills the gaps of the column from the prices of the window alone.
@@ -237,27 +237,27 @@ $(DocStringExtensions.FIELDS)
     strict
 end
 """
-    carrier_listing_span(pr::AbstractPricesResult) -> Nothing
-    carrier_listing_span(pr::PricesResult) -> Option{<:AbstractMatrix{Bool}}
+    prices_listing_span(pr::AbstractPricesResult) -> Nothing
+    prices_listing_span(pr::PricesResult) -> Option{<:AbstractMatrix{Bool}}
 
-Read the Listing Span that a price carrier states, or `nothing` when it states none.
+Read the Listing Span that the price data `pr` states, or `nothing` when it states none.
 
-The price carrier holds the Listing Span, so a step that needs a span asks the carrier and does not derive one. A [`PricesResult`](@ref) returns its `span` field. [`price_ingestion`](@ref) fills that field, and a carrier that a caller builds by hand leaves it `nothing`. Every other member of the family returns `nothing`, because it states no listing calendar. The step that asked then uses its fallback and reports it.
+The price data holds the Listing Span, so a step that needs a span reads it from `pr` and does not derive one. A [`PricesResult`](@ref) returns its `span` field. [`price_ingestion`](@ref) fills that field, and a `PricesResult` that a caller builds by hand leaves it `nothing`. Every other member of the family returns `nothing`, because it states no listing calendar. The step that asked then uses its fallback and reports it.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. Any other price carrier: return `nothing`, because the family states no span of its own.
+ 1. Any other subtype of `AbstractPricesResult`: return `nothing`, because the family states no span of its own.
  2. A [`PricesResult`](@ref): return its `span` field.
 
 # Arguments
 
-  - `pr`: The price carrier that the fill reads.
+  - `pr`: The price data that the fill reads.
 
 # Returns
 
-  - `span::Option{<:AbstractMatrix{Bool}}`: The Listing Span of the carrier, or `nothing`.
+  - `span::Option{<:AbstractMatrix{Bool}}`: The Listing Span of `pr`, or `nothing`.
 
 # Related
 
@@ -267,10 +267,10 @@ The method that Julia selects is the algorithm.
   - [`PricesResult`](@ref)
   - [`Option`](@ref)
 """
-function carrier_listing_span(::AbstractPricesResult)
+function prices_listing_span(::AbstractPricesResult)
     return nothing
 end
-function carrier_listing_span(pr::PricesResult)
+function prices_listing_span(pr::PricesResult)
     return pr.span
 end
 """
@@ -279,7 +279,7 @@ end
 
 Resolve the Listing Span that bounds a [`PriceGapFill`](@ref) over one window.
 
-The span comes from the carrier, because a listing calendar is a fact about the instruments and a window cannot see all of it. A carrier that states no span leaves only the window, and the window cannot give the span. A suspension across the edge of a window reads there as an inception or a delisting, so a span derived from the window fills the wrong cells, not fewer cells. The fill therefore takes an all-`false` span, under which every cell lies outside a listing and the fill writes no price. The function reports this with a warning, or with an error under `strict`. It reports only when the window holds a gap, because a window with no gap has nothing to fill.
+The span comes from the price data, because a listing calendar is a fact about the instruments and a window cannot see all of it. Price data that states no span leaves only the window, and the window cannot give the span. A suspension across the edge of a window reads there as an inception or a delisting, so a span derived from the window fills the wrong cells, not fewer cells. The fill therefore takes an all-`false` span, under which every cell lies outside a listing and the fill writes no price. The function reports this with a warning, or with an error under `strict`. It reports only when the window holds a gap, because a window with no gap has nothing to fill.
 
 [`strict_diagnostic`](@ref) raises the warning or the error. It is the one strictness policy of the library.
 
@@ -292,23 +292,23 @@ The method that Julia selects is the algorithm.
 
 # Arguments
 
-  - `span`: The listing statement that the carrier holds, `observations × assets`, or `nothing`.
+  - `span`: The listing statement that the price data holds, `observations × assets`, or `nothing`.
   - `X`: The price values of the window that the fill transforms, `observations × assets`.
   - $(arg_dict[:strict_span])
 
 # Validation
 
   - `size(span) == size(X)`. Raises a `DimensionMismatch`.
-  - The carrier states a span when `X` holds a gap. Raises an `ArgumentError` under `strict`.
+  - The price data states a span when `X` holds a gap. Raises an `ArgumentError` under `strict`.
 
 # Returns
 
-  - `span`: The listing statement on the price clock of `X`, or an all-`false` span when the carrier states none.
+  - `span`: The listing statement on the price clock of `X`, or an all-`false` span when the price data states none.
 
 # Related
 
   - [`PriceGapFill`](@ref)
-  - [`PortfolioOptimisers.carrier_listing_span`](@ref)
+  - [`PortfolioOptimisers.prices_listing_span`](@ref)
   - [`listing_span`](@ref)
   - [`strict_diagnostic`](@ref)
 """
@@ -319,7 +319,7 @@ function gap_fill_span(span::AbstractMatrix{Bool}, X::AbstractMatrix, ::Bool)
 end
 function gap_fill_span(::Nothing, X::AbstractMatrix, strict::Bool)
     if any(is_missing_value, X)
-        strict_diagnostic("`PriceGapFill` is bounded by the Listing Span, and the price carrier states none, so nothing was filled. The window cannot supply one: a suspension straddling its edge reads there as an inception or a delisting, so a window-local derivation fills the wrong cells rather than fewer of them. Build the carrier through the ingestion layer, which states a span.",
+        strict_diagnostic("`PriceGapFill` is bounded by the Listing Span, and the price data states none, so nothing was filled. The window cannot supply one: a suspension straddling its edge reads there as an inception or a delisting, so a window-local derivation fills the wrong cells rather than fewer of them. Build the PricesResult through the ingestion layer, which states a span.",
                           strict)
     end
     return falses(size(X))
@@ -353,11 +353,11 @@ Where:
 The method that Julia selects is the algorithm.
 
  1. `span` is an `AbstractMatrix{Bool}`: return `true` when every entry of column `j` from row `t` to the last row is `true`.
- 2. `span` is `nothing`: return `true`. A carrier that states no span states no absence.
+ 2. `span` is `nothing`: return `true`. Price data that states no span states no absence.
 
 # Arguments
 
-  - `span`: The listing statement of the carrier, `observations × assets`, or `nothing`.
+  - `span`: The listing statement of the price data, `observations × assets`, or `nothing`.
   - `j`: Index of the column.
   - `t`: Row of the price that seeds the next window. It is `1` when the window observes no price of the column and the seed comes from an earlier window.
 
@@ -369,7 +369,7 @@ The method that Julia selects is the algorithm.
 
   - [`PriceGapFill`](@ref)
   - [`PortfolioOptimisers.gap_fill_seed`](@ref)
-  - [`PortfolioOptimisers.carrier_listing_span`](@ref)
+  - [`PortfolioOptimisers.prices_listing_span`](@ref)
 """
 function gap_fill_open(span::AbstractMatrix{Bool}, j::Integer, t::Integer)
     return all(view(span, t:size(span, 1), j))
@@ -562,7 +562,7 @@ function fit_preprocessing(est::PriceGapFill, pr::PricesResult)::PriceGapFillRes
     keep = Vector{Int}(undef, 0)
     v = Vector{Any}(undef, 0)
     obs = Vector{nonmissingtype(eltype(vals))}(undef, 0)
-    span = carrier_listing_span(pr)
+    span = prices_listing_span(pr)
     for i in axes(vals, 2)
         t = findlast(!is_missing_value, view(vals, :, i))
         if isnothing(t)
@@ -580,7 +580,7 @@ end
 function apply_preprocessing(res::PriceGapFillResult, pr::PricesResult)::PricesResult
     names = TimeSeries.colnames(pr.X)
     vals = copy(values(pr.X))
-    span = gap_fill_span(carrier_listing_span(pr), vals, res.strict)
+    span = gap_fill_span(prices_listing_span(pr), vals, res.strict)
     #! The seed is a training price, so it is written only after the training window. A
     #! `TimeArray`'s clock is sorted, so the first observation past `te` is the first the
     #! seed precedes; on the training window itself that is one past the end.
@@ -596,7 +596,7 @@ function apply_preprocessing(res::PriceGapFillResult, pr::PricesResult)::PricesR
     #! A fill states a price, not a listing, so the span passes through untouched: it is
     #! what bounded the fill, and the Span Rule reads the same listing off the filled
     #! panel as off the raw one.
-    return PricesResult(; X = X, F = pr.F, B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
+    return PricesResult(; X = X, F = pr.F, B = pr.B, E = pr.E, iv = pr.iv, ivpa = pr.ivpa,
                         pnl = pr.pnl, span = pr.span)
 end
 

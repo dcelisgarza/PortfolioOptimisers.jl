@@ -1,0 +1,21 @@
+```@meta
+Description = "Cross-Sectional Calibration Rules, private API of PortfolioOptimisers.jl: cross_sectional_reduced_history, cross_sectional_split_history, …"
+```
+
+# Cross-Sectional Calibration Rules: private API
+
+```@docs
+PortfolioOptimisers.cross_sectional_reduced_history
+PortfolioOptimisers.cross_sectional_split_history
+PortfolioOptimisers.cross_sectional_context
+PortfolioOptimisers.spanned_shrinkage_moments
+PortfolioOptimisers.stein_spanned_shrinkage
+PortfolioOptimisers.forecast_scale_distance
+PortfolioOptimisers.orthogonal_forecast_pairs
+PortfolioOptimisers.forecast_calibration_slope_se
+PortfolioOptimisers.carry_growing_parts
+PortfolioOptimisers.assert_carry_rule
+PortfolioOptimisers.carry_growing_part
+PortfolioOptimisers.carry_forecast_parts
+PortfolioOptimisers.carry_choice_parts
+```

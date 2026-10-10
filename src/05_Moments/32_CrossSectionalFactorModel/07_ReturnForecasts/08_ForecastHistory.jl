@@ -6,15 +6,15 @@ Return the factor-model block truncated to its first `tb` observations.
 
 [`forecast_history_refit`](@ref) refits a member that computes no history at each row of a grid, and the fit at a row must read nothing after that row. This function gives the block that such a fit reads. It cuts every history of the block to the rows `1:tb`, and it sets the loadings `M` to the last slice of the cut exposure history.
 
-The function keeps the per-asset summaries `b`, `esigma`, `edof` and `ediv` unchanged. They describe the assets and not the observations, and no Return Forecast Estimator reads either of them. The function drops the family re-basis `L`, its basis `fcb` and the fitted forecast `rf` of the prior. A re-basis of the truncated block does not follow from the block, and an unset `L` reads back as `M`. The history of `rf` covers the rows after `tb`.
+The function keeps the per-asset summaries `b`, `esigma`, `edof` and `ediv` unchanged. They describe the assets and not the observations, and no Return Forecast Estimator reads either of them. The function drops the family re-basis `L`, its basis `fcb`, the Currency Excess Returns `fx` and the fitted forecast `rf` of the prior. A re-basis of the truncated block does not follow from the block, and an unset `L` reads back as `M`. `fx` fills the reduced axis beside `csr.f`, so it leaves with the re-basis, and no Return Forecast Estimator reads a factor return. The history of `rf` covers the rows after `tb`.
 
 # Algorithm
 
  1. Cut the exposure history `Ms` to the rows `1:tb`, into `Mb`, when the block carries one.
  2. Take the last slice of `Mb` as the loadings `M`, or keep the loadings of the block when it carries no exposure history.
  3. Cut the factor returns `f`, the residuals `eps`, the counts `n` and the intercepts `b` of the cross-sectional fit `csr` to the rows `1:tb`.
- 4. Cut the variance history `vs`, the regression weight history `rw` and the benchmark weight history `bw` to the rows `1:tb`.
- 5. Build the block from these histories, with `b`, `esigma`, `edof`, `ediv`, `nf`, `fam` and `lag` unchanged, and with no `L`, `fcb` or `rf`.
+ 4. Cut the variance history `vs`, the regression weight history `rw`, the benchmark weight history `bw`, and the row key `idx` and `ts`, to the rows `1:tb`.
+ 5. Build the block from these histories, with `b`, `esigma`, `edof`, `ediv`, `nf`, `fam` and `lag` unchanged, and with no `L`, `fcb`, `fx` or `rf`.
 
 # Arguments
 
@@ -52,14 +52,19 @@ function forecast_history_block(csfm::CrossSectionalFactorModel,
                                                                       nothing
                                                                   else
                                                                       csr.b[1:tb]
-                                                                  end)
+                                                                  end,
+                                                                  h1 = nothing_scalar_array_getindex_odd_order(csr.h1,
+                                                                                                               1:tb,
+                                                                                                               :))
                                      end, Ms = Mb,
                                      vs = isnothing(vs) ? nothing : vs[1:tb, :],
                                      esigma = csfm.esigma, edof = csfm.edof,
                                      ediv = csfm.ediv,
                                      rw = isnothing(rw) ? nothing : rw[1:tb, :],
                                      bw = isnothing(bw) ? nothing : bw[1:tb, :],
-                                     nf = csfm.nf, fam = csfm.fam, lag = csfm.lag)
+                                     nf = csfm.nf, fam = csfm.fam, lag = csfm.lag,
+                                     idx = nothing_scalar_array_getindex(csfm.idx, 1:tb),
+                                     ts = nothing_scalar_array_getindex(csfm.ts, 1:tb))
 end
 """
     forecast_history_refit(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
@@ -72,7 +77,7 @@ A member that publishes only the latest cross-section gives one row of the histo
 
 [`forecast_evaluation_dates`](@ref) scores on the same grid when the evaluation has the same `step`. A row off the grid carries no finite forecast, so the first evaluation date is a row of the grid, and each later date is a stride of `step` after it. So every evaluation date is a row at which the function fitted the member.
 
-The fit at row `t` of the block reads the carrier through the carrier row of that observation, and the block through its row `t`. It reads nothing after the observation that it forecasts. At the last row of the block the fit reads the whole sample, and `mu` is that fit. The function writes `mu` into the last row when the last row is on the grid, and does not fit the member again. When the last row is off the grid, it carries `NaN` as every other row off the grid does.
+The fit at row `t` of the block reads the returns data through the row that holds that observation, and the block through its row `t`. It reads nothing after the observation that it forecasts. At the last row of the block the fit reads the whole sample, and `mu` is that fit. The function writes `mu` into the last row when the last row is on the grid, and does not fit the member again. When the last row is off the grid, it carries `NaN` as every other row off the grid does.
 
 # Mathematical definition
 
@@ -86,19 +91,19 @@ r_{t} &= T_{c} - T_{b} + t\\,.
 Where:
 
   - $(math_dict[:alpha_t_fc])
-  - ``\\hat{\\boldsymbol{\\mu}}^{(t)}``: Forecast of the member fitted on the carrier rows ``1`` to ``r_{t}`` and on the block rows ``1`` to ``t``.
-  - ``r_{t}``: Carrier row of block row ``t``. The block is a suffix of the carrier, so ``r_{T_{b}} = T_{c}``, and ``\\hat{\\boldsymbol{\\mu}}^{(T_{b})}`` is the fit on the whole sample.
+  - ``\\hat{\\boldsymbol{\\mu}}^{(t)}``: Forecast of the member fitted on the rows of the returns data ``1`` to ``r_{t}`` and on the block rows ``1`` to ``t``.
+  - ``r_{t}``: Row of the returns data that holds block row ``t``. The block is a suffix of the returns data, so ``r_{T_{b}} = T_{c}``, and ``\\hat{\\boldsymbol{\\mu}}^{(T_{b})}`` is the fit on the whole sample.
   - ``s``: Number of observations between two refits.
-  - ``T_{c}``: Number of observations of the carrier.
+  - ``T_{c}``: Number of observations of the returns data.
   - ``T_{b}``: Number of observations of the block, ``1 \\le t \\le T_{b}``.
 
 # Algorithm
 
- 1. Find the carrier rows of the block with [`return_forecast_rows`](@ref), into `rows`, and their number, into `Tb`.
+ 1. Find the rows of the returns data that the block lives on with [`return_forecast_rows`](@ref), into `rows`, and their number, into `Tb`.
  2. Fill the history `hist`, `Tb × assets`, with `NaN` in the element type of `mu`.
- 3. At each row `tb` of the grid `1:step:Tb`, cut the carrier to the rows `1:rows[tb]` with [`port_opt_view`](@ref).
+ 3. At each row `tb` of the grid `1:step:Tb`, cut the returns data to the rows `1:rows[tb]` with [`port_opt_view`](@ref).
  4. Cut the block to its rows `1:tb` with [`forecast_history_block`](@ref).
- 5. Fit the member on the cut carrier and the cut block with [`return_forecast`](@ref), and write its forecast into row `tb` of `hist`. At `tb == Tb`, write `mu` and fit nothing.
+ 5. Fit the member on the cut returns data and the cut block with [`return_forecast`](@ref), and write its forecast into row `tb` of `hist`. At `tb == Tb`, write `mu` and fit nothing.
 
 # Arguments
 

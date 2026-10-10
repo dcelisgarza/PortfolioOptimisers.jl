@@ -1,7 +1,7 @@
 ```@meta
-Description = "Prior and network notation has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Math priors and networks has no public API in PortfolioOptimisers.jl; its names are in the private API."
 ```
 
-# Prior and network notation
+# Math priors and networks
 
-This file defines no name. The [private page](@ref private-api-prior-and-network-notation) says which table it fills.
+This file defines no name. The [private page](@ref private-api-math-priors-and-networks) says which table it fills.

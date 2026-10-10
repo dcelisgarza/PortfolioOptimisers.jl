@@ -45,12 +45,15 @@ $(DocStringExtensions.FIELDS)
         class::AbstractUncertaintySetClass,
         val::Option{<:ArrNum} = nothing
     ) -> NormBallUncertaintySet
-    NormBallUncertaintySet(ucs::EllipsoidalUncertaintySet) -> NormBallUncertaintySet
+    NormBallUncertaintySet(ucs::EllipsoidalUncertaintySet,
+                           mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
+        -> NormBallUncertaintySet
 
-Keywords correspond to the struct's fields. The second constructor converts a built [`EllipsoidalUncertaintySet`](@ref) with one Cholesky factorisation at construction time: `L = LinearAlgebra.cholesky(ucs.sigma).L`, `p = 2`, and `kappa`, `class` and `val` carried through from `k`, `class` and `val`. It is the route through which every estimator that emits an ellipsoid reaches this type.
+Keywords correspond to the struct's fields. The second constructor converts a built [`EllipsoidalUncertaintySet`](@ref) with one square root at construction time: `L = matrix_square_root(mtx_sqrt, ucs.sigma)`, `p = 2`, and `kappa`, `class` and `val` carried through from `k`, `class` and `val`. It is the route through which every estimator that emits an ellipsoid reaches this type. The default `mtx_sqrt = EigenFallbackSquareRoot()` takes the Cholesky factor where it exists, and the square root of the eigendecomposition of a singular positive semidefinite matrix otherwise. `mtx_sqrt = nothing` takes the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm. At `p = 2` the set reads `L` only through ``\\mathbf{L}\\mathbf{L}^{\\intercal}``, so the eigen square root of a singular shape gives the same set as the ellipsoid.
 
 ## Validation
 
+  - `!(kappa isa Bool)`, else an `ArgumentError`.
   - `isfinite(kappa)` and `kappa >= 0`.
   - `!isnan(p)` and `p >= 1`. `Inf` is admitted.
   - `size(L, 1) > 0` and `all(isfinite, L)`. A map with no column is admitted.
@@ -116,6 +119,8 @@ NormBallUncertaintySet
     function NormBallUncertaintySet(kappa::Number, L::MatNum, p::Number, class::C,
                                     val::Option{<:ArrNum}) where {C <:
                                                                   AbstractUncertaintySetClass}
+        @argcheck(!isa(kappa, Bool),
+                  ArgumentError("kappa is a radius, so it must be a number and not a Bool. Got\nkappa => $kappa."))
         @argcheck(isfinite(kappa) && kappa >= zero(kappa),
                   DomainError(kappa, "kappa must be finite and >= 0"))
         @argcheck(!isnan(p) && p >= one(p), DomainError(p, "p must be >= 1"))
@@ -136,9 +141,10 @@ function NormBallUncertaintySet(; kappa::Number, L::MatNum, p::Number = 2,
                                 val::Option{<:ArrNum} = nothing)::NormBallUncertaintySet
     return NormBallUncertaintySet(kappa, L, p, class, val)
 end
-function NormBallUncertaintySet(ucs::EllipsoidalUncertaintySet)::NormBallUncertaintySet
-    return NormBallUncertaintySet(ucs.k, LinearAlgebra.cholesky(ucs.sigma).L, 2, ucs.class,
-                                  ucs.val)
+function NormBallUncertaintySet(ucs::EllipsoidalUncertaintySet,
+                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::NormBallUncertaintySet
+    return NormBallUncertaintySet(ucs.k, matrix_square_root(mtx_sqrt, ucs.sigma), 2,
+                                  ucs.class, ucs.val)
 end
 """
     assert_norm_ball_axis(::MuUncertaintySetClass, L::MatNum)
@@ -398,21 +404,26 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Factorise an asymptotic covariance into the geometry map of a [`NormBallUncertaintySet`](@ref).
 
-The map is square and of full column rank, because `cov` reaches this method already repaired to positive definiteness, so a caller reads its degrees of freedom off `size(L, 2)` and needs no rank measurement. Its sibling [`norm_ball_deviation_factor`](@ref) builds the map from a sample instead, and factorises nothing.
+The map is square. It is of full column rank when `cov` reaches this method repaired to positive definiteness, which the `pdm` of the estimator does. Full rank does not make `size(L, 2)` the dimension of the set: on a full covariance shape the repair adds ``N(N-1)/2`` flat directions that no error fills, so a caller reads its degrees of freedom from [`ucs_dimension`](@ref). Its sibling [`norm_ball_deviation_factor`](@ref) builds the map from a sample instead, and factorises nothing.
 
 # Algorithm
 
- 1. When `diagonal` is `true`, return `LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(cov)))`, the square root of the diagonal shape. The result is stored as a `Diagonal`, not as a dense matrix.
- 2. Otherwise return `LinearAlgebra.cholesky(cov).L`, the lower Cholesky factor, which satisfies ``\\mathbf{L}\\mathbf{L}^{\\intercal} = \\mathbf{S}`` and is the map the converter constructor of [`NormBallUncertaintySet`](@ref) builds.
+ 1. When `diagonal` is `true`, return `LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(cov)))`, the square root of the diagonal shape. The result is stored as a `Diagonal`, not as a dense matrix. A [`NormalUncertaintySet`](@ref) hands it a diagonal shape already, built under its `dc` by [`diagonal_sigma_shape`](@ref), so the diagonal is the one that rule states.
+ 2. Otherwise return `matrix_square_root(mtx_sqrt, cov)`, which satisfies ``\\mathbf{L}\\mathbf{L}^{\\intercal} = \\mathbf{S}`` and is the map the converter constructor of [`NormBallUncertaintySet`](@ref) builds.
 
 # Arguments
 
   - `diagonal`: Whether to discard the off-diagonal entries of `cov` before the factorisation.
-  - `cov`: Asymptotic covariance of the statistic, positive definite.
+  - `cov`: Asymptotic covariance of the statistic.
+  - `mtx_sqrt`: Square-root algorithm of `cov`, the `mtx_sqrt` of the [`NormBallUncertaintySetAlgorithm`](@ref), or `nothing` for the plain Cholesky factor.
+
+# Validation
+
+  - When `diagonal` is `false`, `cov` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`. The asymptotic covariance of a covariance, ``T (\\mathbf{I} + \\mathbf{K}) (\\mathbf{\\Sigma}_{\\mu} \\otimes \\mathbf{\\Sigma}_{\\mu})``, has rank ``N(N+1)/2`` of ``N^{2}``, so with `pdm = nothing` the plain Cholesky factor refuses it, and the default eigen square root reads it.
 
 # Returns
 
-  - `L::MatNum`: Geometry map, square and of full column rank.
+  - `L::MatNum`: Geometry map, square.
 
 # Related
 
@@ -421,11 +432,12 @@ The map is square and of full column rank, because `cov` reaches this method alr
   - [`norm_ball_deviation_factor`](@ref)
   - [`norm_ball_set`](@ref)
 """
-function norm_ball_factor(diagonal::Bool, cov::MatNum)
+function norm_ball_factor(diagonal::Bool, cov::MatNum,
+                          mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     return if diagonal
         LinearAlgebra.Diagonal(sqrt.(LinearAlgebra.diag(cov)))
     else
-        LinearAlgebra.cholesky(cov).L
+        matrix_square_root(mtx_sqrt, cov)
     end
 end
 """
@@ -452,7 +464,7 @@ Where:
 # Algorithm
 
  1. When `diagonal` is `true`, return `LinearAlgebra.Diagonal(sqrt.(vec(Statistics.var(X; dims = 1))))`, the square root of the entrywise variances. It is ``m \\times m`` and of full rank.
- 2. Otherwise subtract the column means from `X`, transpose the result, and divide by `sqrt(size(X, 1) - 1)`. A sample of one row divides by zero and the [`NormBallUncertaintySet`](@ref) constructor then refuses the non-finite map.
+ 2. Otherwise subtract the column means from `X`, transpose the result, and divide by `sqrt(size(X, 1) - 1)`. The map needs at least two rows, because a sample of one row divides by zero. [`ARCHUncertaintySet`](@ref) refuses `n_sim < 2` for a norm ball when it is built, so its resample always has two rows.
 
 # Arguments
 
@@ -478,14 +490,70 @@ function norm_ball_deviation_factor(diagonal::Bool, X::MatNum)
     end
 end
 """
+    norm_ball_coordinates(L::Union{LinearAlgebra.LowerTriangular, LinearAlgebra.UpperTriangular}, X::MatNum)
+    norm_ball_coordinates(L::LinearAlgebra.Diagonal, X::MatNum)
+    norm_ball_coordinates(L::MatNum, X::MatNum)
+
+Ball coordinates of each sampled error under the pseudo-inverse of a geometry map, one column per error.
+
+**Only a map that can be singular pays for a rank decision.** A triangular map is a Cholesky factor, and the factorisation that made it found the shape positive definite, so a triangular solve is the pseudo-inverse. A map that is not square is the deviation map of [`norm_ball_deviation_factor`](@ref), and Julia solves it with a column-pivoted QR that returns the minimum-norm solution. A square dense map is the eigen square root of [`EigenFallbackSquareRoot`](@ref), which the library takes only when the shape has no Cholesky factor, or a square deviation map, whose rank is at most `size(L, 1) - 1`. A dense square map from a square-root algorithm of the caller takes the same route. On such a map Julia's `\\` takes an LU factorisation, which raises a `LinearAlgebra.SingularException` on a zero pivot and divides by a pivot of round-off size. So this method takes the singular value decomposition and drops each direction whose squared singular value is round-off.
+
+# Algorithm
+
+ 1. On a triangular map, and on a map that is not square, return `L \\ transpose(X)`.
+ 2. On a diagonal map with no zero entry, return `L \\ transpose(X)`. Otherwise divide each row of `transpose(X)` by its entry, and give a zero coordinate where the entry is zero, which is the pseudo-inverse of a diagonal map.
+ 3. On any other square map, take the singular value decomposition ``\\mathbf{L} = \\mathbf{U}\\mathbf{S}\\mathbf{V}^{\\intercal}``. Keep the ``r`` singular values ``s_{i}`` with ``s_{i}^{2} > m \\epsilon s_{1}^{2}``, where ``m`` is `size(L, 1)` and ``\\epsilon`` is the machine epsilon of the singular values. The squares ``s_{i}^{2}`` are the eigenvalues of ``\\mathbf{L}\\mathbf{L}^{\\intercal}``, so this is the tolerance under which [`matrix_square_root`](@ref) reads a negative eigenvalue of [`EigenFallbackSquareRoot`](@ref) as round-off of zero.
+ 4. Return ``\\mathbf{S}_{r}^{-1}\\mathbf{U}_{r}^{\\intercal}\\mathbf{X}^{\\intercal}``. A column is ``\\mathbf{L}^{+}\\mathbf{x}`` written in the first ``r`` right singular vectors, so it has the norm of ``\\mathbf{L}^{+}\\mathbf{x}`` and ``r`` entries. The squared column norms are ``\\mathbf{x}^{\\intercal}\\left(\\mathbf{L}\\mathbf{L}^{\\intercal}\\right)^{+}\\mathbf{x}`` under that cut. A zero map keeps no direction, and every coordinate column is empty.
+
+# Arguments
+
+  - `L`: Geometry map.
+  - `X`: Sample of estimation errors, one row per simulation.
+
+# Returns
+
+  - `Z::MatNum`: Ball coordinates, one column per row of `X`. Under step 3 it has ``r`` rows.
+
+# Related
+
+  - [`k_norm_ball`](@ref)
+  - [`norm_ball_factor`](@ref)
+  - [`norm_ball_deviation_factor`](@ref)
+  - [`EigenFallbackSquareRoot`](@ref)
+"""
+function norm_ball_coordinates(L::Union{LinearAlgebra.LowerTriangular,
+                                        LinearAlgebra.UpperTriangular}, X::MatNum)
+    return L \ transpose(X)
+end
+function norm_ball_coordinates(L::LinearAlgebra.Diagonal, X::MatNum)
+    d = L.diag
+    if all(!iszero, d)
+        return L \ transpose(X)
+    end
+    dinv = [iszero(di) ? zero(inv(oneunit(di))) : inv(di) for di in d]
+    return LinearAlgebra.Diagonal(dinv) * transpose(X)
+end
+function norm_ball_coordinates(L::MatNum, X::MatNum)
+    if size(L, 1) != size(L, 2)
+        return L \ transpose(X)
+    end
+    F = LinearAlgebra.svd(L)
+    T = eltype(F.S)
+    tol = size(L, 1) * eps(T) * abs2(maximum(F.S; init = zero(T)))
+    r = count(s -> abs2(s) > tol, F.S)
+    Z = transpose(view(F.U, :, 1:r)) * transpose(X)
+    Z ./= view(F.S, 1:r)
+    return Z
+end
+"""
     k_norm_ball(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, L::MatNum, ::Integer)
     k_norm_ball(::GeneralKUncertaintyAlgorithm, q::Number, args...)
-    k_norm_ball(::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, ::MatNum, df::Integer)
+    k_norm_ball(km::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, L::MatNum, df::Integer)
     k_norm_ball(type::Number, args...)
 
 Radius ``\\kappa`` of a [`NormBallUncertaintySet`](@ref), read against a geometry map rather than against a shape matrix.
 
-It is the norm-ball twin of [`k_ucs`](@ref), and the two differ on the two algorithms that read the geometry. [`NormalKUncertaintyAlgorithm`](@ref) solves in the factor rather than inverting a shape, so it serves a rank-deficient map, where a shape matrix would have to be repaired first. [`ChiSqKUncertaintyAlgorithm`](@ref) takes its degrees of freedom from `df`, the dimension of the ball, and not from the side of a shape matrix, because a flat set is a confidence region of its own subspace and not of the ambient space. [`GeneralKUncertaintyAlgorithm`](@ref) and a plain number read neither, and absorb the trailing arguments.
+It is the norm-ball twin of [`k_ucs`](@ref), and the two differ on the two algorithms that read the geometry. [`NormalKUncertaintyAlgorithm`](@ref) solves in the factor rather than inverting a shape, so it serves a rank-deficient map, where a shape matrix would have to be repaired first. [`ChiSqKUncertaintyAlgorithm`](@ref) takes its degrees of freedom from `df`, the dimension of the ball, and not from the row count of the map, because a flat set is a confidence region of its own subspace and not of the ambient space. Under `ambient = true` it reads the row count `size(L, 1)` instead. [`GeneralKUncertaintyAlgorithm`](@ref) and a plain number read neither, and absorb the trailing arguments.
 
 # Mathematical definition
 
@@ -500,7 +568,7 @@ It is the norm-ball twin of [`k_ucs`](@ref), and the two differ on the two algor
 Where:
 
   - ``\\kappa``: Radius of the ball.
-  - ``\\mathbf{L}^{+}``: Moore-Penrose pseudo-inverse of the geometry map, applied by a least-squares solve.
+  - ``\\mathbf{L}^{+}``: Moore-Penrose pseudo-inverse of the geometry map. [`norm_ball_coordinates`](@ref) applies it, and on a singular square map it drops each direction whose squared singular value is at most ``m \\epsilon`` times the largest, where ``m`` is the row count of the map and ``\\epsilon`` is the machine epsilon.
   - ``\\mathbf{x}_{i}``: One sampled estimation error, the ``i``-th row of ``\\mathbf{X}``.
   - ``Q_{1-q}``: Empirical quantile at ``1 - q``.
   - ``\\mathrm{df}``: Degrees of freedom, the dimension of the ball.
@@ -510,9 +578,9 @@ Where:
 
 # Algorithm
 
- 1. On [`NormalKUncertaintyAlgorithm`](@ref), solve `L \\ transpose(X)`, giving one column of ball coordinates per sampled error. Julia returns the minimum-norm solution, which is the pseudo-inverse applied to each error.
+ 1. On [`NormalKUncertaintyAlgorithm`](@ref), take the ball coordinates of each sampled error with [`norm_ball_coordinates`](@ref), one column per error.
  2. Take the squared column norms, giving one squared distance per sample, and return the square root of their `1 - q` quantile.
- 3. On [`ChiSqKUncertaintyAlgorithm`](@ref), return the square root of the `1 - q` chi-squared quantile at `df` degrees of freedom.
+ 3. On [`ChiSqKUncertaintyAlgorithm`](@ref), return the square root of the `1 - q` chi-squared quantile at `df` degrees of freedom, or at `size(L, 1)` when `km.ambient` is `true`.
  4. On [`GeneralKUncertaintyAlgorithm`](@ref), return `sqrt((1 - q) / q)`, Cantelli's bound, which reads no geometry.
  5. On a `Number`, return it unchanged.
 
@@ -522,7 +590,7 @@ Where:
   - `q`: Significance level.
   - `X`: Sample of estimation errors, one row per simulation.
   - `L`: Geometry map.
-  - `df`: Degrees of freedom, the dimension of the ball. Its caller reads `size(L, 2)` from a full-rank map and `LinearAlgebra.rank(L)` from a deviation map.
+  - `df`: Degrees of freedom, the dimension of the ball. Its caller reads [`ucs_dimension`](@ref) for a map factorised from a shape, ``N(N+1)/2`` on a full covariance shape, and `LinearAlgebra.rank(L)` for a deviation map.
 
 # Returns
 
@@ -533,6 +601,7 @@ Where:
   - [`NormBallUncertaintySet`](@ref)
   - [`NormBallUncertaintySetAlgorithm`](@ref)
   - [`k_ucs`](@ref)
+  - [`ucs_dimension`](@ref)
   - [`norm_ball_set`](@ref)
   - [`norm_ball_deviation_set`](@ref)
 
@@ -542,14 +611,16 @@ Where:
 """
 function k_norm_ball(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, L::MatNum,
                      ::Integer)
-    k_mus = vec(sum(abs2, L \ transpose(X); dims = 1))
+    k_mus = vec(sum(abs2, norm_ball_coordinates(L, X); dims = 1))
     return sqrt(Statistics.quantile(k_mus, one(q) - q; km.kwargs...))
 end
 function k_norm_ball(::GeneralKUncertaintyAlgorithm, q::Number, args...)
     return sqrt((one(q) - q) / q)
 end
-function k_norm_ball(::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, ::MatNum, df::Integer)
-    return sqrt(Distributions.cquantile(Distributions.Chisq(df), q))
+function k_norm_ball(km::ChiSqKUncertaintyAlgorithm, q::Number, ::Any, L::MatNum,
+                     df::Integer)
+    p = km.ambient ? size(L, 1) : df
+    return sqrt(Distributions.cquantile(Distributions.Chisq(p), q))
 end
 function k_norm_ball(type::Number, args...)::Number
     return type
@@ -559,12 +630,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assemble a [`NormBallUncertaintySet`](@ref) from an already-computed asymptotic covariance `cov`.
 
-It is the norm-ball twin of [`ellipsoidal_set`](@ref), and it takes the same two steps in the same order: the diagonal is taken before the radius is fitted, so an empirical radius is measured against whichever geometry the set carries. The map is square and of full column rank, so the degrees of freedom are `size(L, 2)`. Its sibling [`norm_ball_deviation_set`](@ref) reads a sample instead of a covariance, and is the route that spares the ``N^{2} \\times N^{2}`` matrix.
+It is the norm-ball twin of [`ellipsoidal_set`](@ref), and it takes the same two steps in the same order: the diagonal is taken before the radius is fitted, so an empirical radius is measured against whichever geometry the set carries. The degrees of freedom are the dimension of the set, which [`ucs_dimension`](@ref) gives: ``N(N+1)/2`` on a full covariance shape, although the repaired map has ``N^{2}`` columns. Its sibling [`norm_ball_deviation_set`](@ref) reads a sample instead of a covariance, and is the route that spares the ``N^{2} \\times N^{2}`` matrix.
 
 # Algorithm
 
- 1. Build the map with [`norm_ball_factor`](@ref) under `alg.diagonal`, giving `L`.
- 2. Fit the radius with [`k_norm_ball`](@ref) on `alg.method`, passing `size(L, 2)` as the degrees of freedom.
+ 1. Build the map with [`norm_ball_factor`](@ref) under `alg.diagonal` and `alg.mtx_sqrt`, giving `L`.
+ 2. Fit the radius with [`k_norm_ball`](@ref) on `alg.method`, passing `ucs_dimension(class, alg.diagonal, size(L, 1))` as the degrees of freedom.
  3. Build a [`NormBallUncertaintySet`](@ref) from `alg.p`, `L`, the radius, `class` and `val`.
 
 # Arguments
@@ -572,7 +643,7 @@ It is the norm-ball twin of [`ellipsoidal_set`](@ref), and it takes the same two
   - `alg`: Norm-ball uncertainty set algorithm, which carries the radius algorithm, the diagonal switch and the norm order.
   - `q`: Significance level.
   - `samples`: Sampled estimation errors, or whatever container `alg.method` reads. An algorithm that runs no simulation absorbs it.
-  - `cov`: Asymptotic covariance of the statistic, positive definite.
+  - `cov`: Asymptotic covariance of the statistic. It has a square root under `alg.mtx_sqrt`.
   - `class`: Axis tag, which fixes the row count of the map and the index a view applies.
   - `val`: Quantity the set is a neighbourhood of, the fitted characteristic vector on the mean axis and the fitted covariance on the covariance axis.
 
@@ -587,16 +658,18 @@ It is the norm-ball twin of [`ellipsoidal_set`](@ref), and it takes the same two
   - [`norm_ball_factor`](@ref)
   - [`norm_ball_deviation_set`](@ref)
   - [`k_norm_ball`](@ref)
+  - [`ucs_dimension`](@ref)
   - [`ellipsoidal_set`](@ref)
 """
 function norm_ball_set(alg::NormBallUncertaintySetAlgorithm, q::Number, samples,
                        cov::MatNum, class::AbstractUncertaintySetClass,
                        val::Option{<:ArrNum} = nothing)
-    L = norm_ball_factor(alg.diagonal, cov)
+    L = norm_ball_factor(alg.diagonal, cov, alg.mtx_sqrt)
     return NormBallUncertaintySet(;
                                   kappa = k_norm_ball(alg.method, q, samples, L,
-                                                      size(L, 2)), L = L, p = alg.p,
-                                  class = class, val = val)
+                                                      ucs_dimension(class, alg.diagonal,
+                                                                    size(L, 1))), L = L,
+                                  p = alg.p, class = class, val = val)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

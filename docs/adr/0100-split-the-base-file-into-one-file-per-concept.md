@@ -93,7 +93,7 @@ rows rather than hidden inside a file maximum.
 
 The directory is a new shape for a top-level `src/` entry that was a file. A reader who knows the
 old path finds nothing at it. Every reference under `src/`, `test/`, `code_health/`, `CLAUDE.md`,
-`STANDARDS.md`, `.github/` and `docs/` moves with the split. An ADR that names the old path in
+`CODING_STANDARDS.md`, `.github/` and `docs/` moves with the split. An ADR that names the old path in
 prose keeps it: such an ADR describes released behaviour, and the statement was true when it was
 written.
 

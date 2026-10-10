@@ -34,7 +34,7 @@ of use, with refusal methods in the kernel.
 ## Decision
 
 **A prior-derived slot admits the value or the Estimator that computes it.** The domain noun is a
-**Deferred Quantity** (`CONTEXT.md` §1). Four quantities defer — `mu`, `sigma`, `kt`, `sk` — and
+**Deferred Quantity** (`GLOSSARY.md` §1). Four quantities defer — `mu`, `sigma`, `kt`, `sk` — and
 each has a field-bound alias: `MuSlot`, `SigmaSlot`, `KtSlot`, `SkSlot`. `DeferredQuantity` names
 the dynamic half alone: the four moment-estimator families, plus `AbstractPriorEstimator`, which
 computes every quantity at once.

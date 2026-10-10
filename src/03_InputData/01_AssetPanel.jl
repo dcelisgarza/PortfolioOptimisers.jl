@@ -197,6 +197,60 @@ function assert_panel_field_mask(vals::AbstractArray, omsk::AbstractArray{Bool},
     return nothing
 end
 """
+    assert_panel_field_placeholder(omsk, pmsk::Nothing, name::AbstractString) -> nothing
+    assert_panel_field_placeholder(omsk, pmsk::AbstractArray{Bool}, name::AbstractString) -> nothing
+
+Check that a Panel Field's placeholder mask marks only cells that the raw source did not observe.
+
+A placeholder is the value that the builder stores in a blank that no fill reaches. Only a blank holds one, so an observed cell is never a placeholder, and a Panel Field that cannot blank holds none.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `pmsk` is `nothing`: no cell holds a placeholder, so there is nothing to check.
+ 2. `pmsk` is an array: check that the Panel Field carries an observed mask of the same size, and that no cell is `true` in both masks.
+
+# Arguments
+
+  - `omsk`: The observed mask, or `nothing`.
+  - `pmsk`: The placeholder mask, or `nothing`.
+  - `name`: The Panel Field's name, displayed in the error message.
+
+# Validation
+
+  - `omsk` is not `nothing`. Raises an `ArgumentError`.
+  - `size(pmsk) == size(omsk)`. Raises a `DimensionMismatch`.
+  - `!any(omsk .& pmsk)`. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_panel_field_mask`](@ref)
+  - [`NumericPanelField`](@ref)
+  - [`CategoricalPanelField`](@ref)
+  - [`TensorPanelField`](@ref)
+"""
+function assert_panel_field_placeholder(::Option{<:AbstractArray{Bool}}, ::Nothing,
+                                        ::AbstractString)::Nothing
+    return nothing
+end
+function assert_panel_field_placeholder(omsk::Option{<:AbstractArray{Bool}},
+                                        pmsk::AbstractArray{Bool},
+                                        name::AbstractString)::Nothing
+    @argcheck(!isnothing(omsk),
+              ArgumentError("the Panel Field \"$name\" carries a placeholder mask (pmsk) and no observed mask (omsk). A placeholder fills a blank, and a Panel Field with no observed mask cannot blank, so give the observed mask, or pass pmsk = nothing."))
+    @argcheck(size(pmsk) == size(omsk),
+              DimensionMismatch("the placeholder mask (pmsk) of the Panel Field \"$name\" marks one cell of its values, so it is the same size as its observed mask (omsk), got size(pmsk) = $(size(pmsk)) and size(omsk) = $(size(omsk))"))
+    i = findfirst(k -> omsk[k] && pmsk[k], CartesianIndices(pmsk))
+    @argcheck(isnothing(i),
+              ArgumentError("the Panel Field \"$name\" marks the cell $(isnothing(i) ? "" : string(Tuple(i))) as observed (omsk) and as a placeholder (pmsk). A placeholder fills a blank, and an observed cell is not blank."))
+    return nothing
+end
+"""
     assert_panel_finite(vals::AbstractArray{<:Real}, name::AbstractString) -> nothing
 
 Check that a resolved Panel Field carries no non-finite value.
@@ -247,7 +301,8 @@ $(DocStringExtensions.FIELDS)
 # Constructor
 
     NumericPanelField(name::AbstractString, vals::AbstractArray{<:Real},
-                      omsk::Option{<:AbstractArray{Bool}} = nothing)
+                      omsk::Option{<:AbstractArray{Bool}} = nothing,
+                      pmsk::Option{<:AbstractArray{Bool}} = nothing)
 
 # Validation
 
@@ -255,6 +310,7 @@ $(DocStringExtensions.FIELDS)
   - `!isempty(vals)`. Raises an [`IsEmptyError`](@ref).
   - `ndims(vals) in (1, 2)`. Raises a `DimensionMismatch`.
   - `size(omsk) == size(vals)` when `omsk` is given. Raises a `DimensionMismatch`.
+  - `pmsk` marks only unobserved cells. See [`assert_panel_field_placeholder`](@ref).
 
 # Related
 
@@ -274,21 +330,33 @@ $(DocStringExtensions.FIELDS)
     """
     vals
     """
-    Observed mask, the same size as the values, or `nothing` when the Panel Field cannot blank.
+    Observed mask, the same size as the values, or `nothing` when the Panel Field cannot blank. A cell is `true` where the raw input carried a value, and `false` where a fill policy wrote one.
     """
     omsk
+    """
+    Placeholder mask, the same size as the values, or `nothing` when no cell holds a placeholder. A cell is `true` where it holds the placeholder of a blank that no fill reached. No reader reads such a cell.
+    """
+    pmsk
     function NumericPanelField(name::AbstractString, vals::AbstractArray{<:Real},
-                               omsk::Option{<:AbstractArray{Bool}})
+                               omsk::Option{<:AbstractArray{Bool}},
+                               pmsk::Option{<:AbstractArray{Bool}})
         assert_panel_field_name(name)
         assert_panel_field_shape(vals, name, 1, 2)
         assert_panel_finite(vals, name)
         assert_panel_field_mask(vals, omsk, name)
-        return new{typeof(name), typeof(vals), typeof(omsk)}(name, vals, omsk)
+        assert_panel_field_placeholder(omsk, pmsk, name)
+        return new{typeof(name), typeof(vals), typeof(omsk), typeof(pmsk)}(name, vals, omsk,
+                                                                           pmsk)
     end
 end
+function NumericPanelField(name::AbstractString, vals::AbstractArray{<:Real},
+                           omsk::Option{<:AbstractArray{Bool}})::NumericPanelField
+    return NumericPanelField(name, vals, omsk, nothing)
+end
 function NumericPanelField(; name::AbstractString, vals::AbstractArray{<:Real},
-                           omsk::Option{<:AbstractArray{Bool}} = nothing)::NumericPanelField
-    return NumericPanelField(name, vals, omsk)
+                           omsk::Option{<:AbstractArray{Bool}} = nothing,
+                           pmsk::Option{<:AbstractArray{Bool}} = nothing)::NumericPanelField
+    return NumericPanelField(name, vals, omsk, pmsk)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -305,7 +373,8 @@ $(DocStringExtensions.FIELDS)
 
     CategoricalPanelField(name::AbstractString, levels::VecStr,
                           codes::AbstractArray{<:Integer},
-                          omsk::Option{<:AbstractArray{Bool}} = nothing)
+                          omsk::Option{<:AbstractArray{Bool}} = nothing,
+                          pmsk::Option{<:AbstractArray{Bool}} = nothing)
 
 # Validation
 
@@ -315,6 +384,7 @@ $(DocStringExtensions.FIELDS)
   - `ndims(codes) in (1, 2)`. Raises a `DimensionMismatch`.
   - Every code lies in `1:length(levels)`. Raises a `DomainError`.
   - `size(omsk) == size(codes)` when `omsk` is given. Raises a `DimensionMismatch`.
+  - `pmsk` marks only unobserved cells. See [`assert_panel_field_placeholder`](@ref).
 
 # Related
 
@@ -340,12 +410,17 @@ $(DocStringExtensions.FIELDS)
     """
     codes
     """
-    Observed mask, the same size as the codes, or `nothing` when the Panel Field cannot blank.
+    Observed mask, the same size as the codes, or `nothing` when the Panel Field cannot blank. A cell is `true` where the raw input carried a label, and `false` where a fill policy wrote one.
     """
     omsk
+    """
+    Placeholder mask, the same size as the codes, or `nothing` when no cell holds a placeholder. A cell is `true` where it holds the placeholder of a blank that no fill reached. No reader reads such a cell.
+    """
+    pmsk
     function CategoricalPanelField(name::AbstractString, levels::VecStr,
                                    codes::AbstractArray{<:Integer},
-                                   omsk::Option{<:AbstractArray{Bool}})
+                                   omsk::Option{<:AbstractArray{Bool}},
+                                   pmsk::Option{<:AbstractArray{Bool}})
         assert_panel_field_name(name)
         assert_panel_labels(levels, :levels)
         assert_panel_field_shape(codes, name, 1, 2)
@@ -355,14 +430,24 @@ $(DocStringExtensions.FIELDS)
                   DomainError(nl,
                               "the codes of the categorical Panel Field \"$name\" index its $nl level(s), so every code lies in 1:$nl; the first offending code is at $(isnothing(i) ? "" : string(Tuple(i)))"))
         assert_panel_field_mask(codes, omsk, name)
-        return new{typeof(name), typeof(levels), typeof(codes), typeof(omsk)}(name, levels,
-                                                                              codes, omsk)
+        assert_panel_field_placeholder(omsk, pmsk, name)
+        return new{typeof(name), typeof(levels), typeof(codes), typeof(omsk), typeof(pmsk)}(name,
+                                                                                            levels,
+                                                                                            codes,
+                                                                                            omsk,
+                                                                                            pmsk)
     end
+end
+function CategoricalPanelField(name::AbstractString, levels::VecStr,
+                               codes::AbstractArray{<:Integer},
+                               omsk::Option{<:AbstractArray{Bool}})::CategoricalPanelField
+    return CategoricalPanelField(name, levels, codes, omsk, nothing)
 end
 function CategoricalPanelField(; name::AbstractString, levels::VecStr,
                                codes::AbstractArray{<:Integer},
-                               omsk::Option{<:AbstractArray{Bool}} = nothing)::CategoricalPanelField
-    return CategoricalPanelField(name, levels, codes, omsk)
+                               omsk::Option{<:AbstractArray{Bool}} = nothing,
+                               pmsk::Option{<:AbstractArray{Bool}} = nothing)::CategoricalPanelField
+    return CategoricalPanelField(name, levels, codes, omsk, pmsk)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -370,6 +455,8 @@ $(DocStringExtensions.TYPEDEF)
 A Panel Field whose trailing axis carries its own labels, and optionally its own groups.
 
 A factor exposure tensor is this kind: its trailing axis is the factors, and its groups are the Factor Families. It contributes one column per label to a derived Feature Matrix, named `"<field>=<label>"`.
+
+A Feature Selector entry `name => LabelGroup(g)` selects the labels of one group, see [`LabelGroup`](@ref). The values of one group are a slice of the trailing axis, `selectdim(f.vals, ndims(f.vals), f.groups .== g)`, which is `f.vals[:, :, f.groups .== g]` on a time-varying field and `f.vals[:, f.groups .== g]` on a static one. No function wraps the slice.
 
 # Fields
 
@@ -379,7 +466,8 @@ $(DocStringExtensions.FIELDS)
 
     TensorPanelField(name::AbstractString, axis::AbstractString, labels::VecStr,
                      groups::Option{<:VecStr}, vals::AbstractArray{<:Real},
-                     omsk::Option{<:AbstractArray{Bool}} = nothing)
+                     omsk::Option{<:AbstractArray{Bool}} = nothing,
+                     pmsk::Option{<:AbstractArray{Bool}} = nothing)
 
 # Validation
 
@@ -391,6 +479,26 @@ $(DocStringExtensions.FIELDS)
   - `ndims(vals) in (2, 3)`. Raises a `DimensionMismatch`.
   - `size(vals, ndims(vals)) == length(labels)`. Raises a `DimensionMismatch`.
   - `size(omsk) == size(vals)` when `omsk` is given. Raises a `DimensionMismatch`.
+  - `pmsk` marks only unobserved cells. See [`assert_panel_field_placeholder`](@ref).
+
+# Examples
+
+```jldoctest
+julia> f = TensorPanelField(; name = \"exposures\", axis = \"factor\",
+                            labels = [\"mom_12\", \"value\", \"mom_6\"],
+                            groups = [\"momentum\", \"value\", \"momentum\"],
+                            vals = reshape(collect(1.0:12.0), 2, 2, 3));
+
+julia> f.vals[:, :, f.groups .== \"momentum\"]
+2×2×2 Array{Float64, 3}:
+[:, :, 1] =
+ 1.0  3.0
+ 2.0  4.0
+
+[:, :, 2] =
+  9.0  11.0
+ 10.0  12.0
+```
 
 # Related
 
@@ -398,6 +506,7 @@ $(DocStringExtensions.FIELDS)
   - [`NumericPanelField`](@ref)
   - [`CategoricalPanelField`](@ref)
   - [`AssetPanel`](@ref)
+  - [`LabelGroup`](@ref)
   - [`assert_panel_labels`](@ref)
   - [`Option`](@ref)
   - [`VecStr`](@ref)
@@ -424,12 +533,17 @@ $(DocStringExtensions.FIELDS)
     """
     vals
     """
-    Observed mask, the same size as the values, or `nothing` when the Panel Field cannot blank.
+    Observed mask, the same size as the values, or `nothing` when the Panel Field cannot blank. A cell is `true` where the raw input carried a value, and `false` where a fill policy wrote one.
     """
     omsk
+    """
+    Placeholder mask, the same size as the values, or `nothing` when no cell holds a placeholder. A cell is `true` where it holds the placeholder of a blank that no fill reached. No reader reads such a cell.
+    """
+    pmsk
     function TensorPanelField(name::AbstractString, axis::AbstractString, labels::VecStr,
                               groups::Option{<:VecStr}, vals::AbstractArray{<:Real},
-                              omsk::Option{<:AbstractArray{Bool}})
+                              omsk::Option{<:AbstractArray{Bool}},
+                              pmsk::Option{<:AbstractArray{Bool}})
         assert_panel_field_name(name)
         @argcheck(!isempty(axis),
                   IsEmptyError("the trailing-axis name (axis) of the tensor Panel Field \"$name\" cannot be empty: it names what the axis represents, such as \"factor\""))
@@ -443,14 +557,21 @@ $(DocStringExtensions.FIELDS)
         @argcheck(size(vals, ndims(vals)) == length(labels),
                   DimensionMismatch("the tensor Panel Field \"$name\" needs one label per trailing-axis entry of vals, got $(size(vals, ndims(vals))) trailing entries and length(labels) = $(length(labels))"))
         assert_panel_field_mask(vals, omsk, name)
+        assert_panel_field_placeholder(omsk, pmsk, name)
         return new{typeof(name), typeof(axis), typeof(labels), typeof(groups), typeof(vals),
-                   typeof(omsk)}(name, axis, labels, groups, vals, omsk)
+                   typeof(omsk), typeof(pmsk)}(name, axis, labels, groups, vals, omsk, pmsk)
     end
+end
+function TensorPanelField(name::AbstractString, axis::AbstractString, labels::VecStr,
+                          groups::Option{<:VecStr}, vals::AbstractArray{<:Real},
+                          omsk::Option{<:AbstractArray{Bool}})::TensorPanelField
+    return TensorPanelField(name, axis, labels, groups, vals, omsk, nothing)
 end
 function TensorPanelField(; name::AbstractString, axis::AbstractString, labels::VecStr,
                           groups::Option{<:VecStr} = nothing, vals::AbstractArray{<:Real},
-                          omsk::Option{<:AbstractArray{Bool}} = nothing)::TensorPanelField
-    return TensorPanelField(name, axis, labels, groups, vals, omsk)
+                          omsk::Option{<:AbstractArray{Bool}} = nothing,
+                          pmsk::Option{<:AbstractArray{Bool}} = nothing)::TensorPanelField
+    return TensorPanelField(name, axis, labels, groups, vals, omsk, pmsk)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -582,45 +703,6 @@ function Base.show(io::IO, msk::AllTrueMask)
 end
 function Base.show(io::IO, ::MIME"text/plain", msk::AllTrueMask)
     return show(io, msk)
-end
-"""
-    panel_field_lift(f::NumericPanelField, n::Integer) -> NumericPanelField
-    panel_field_lift(f::CategoricalPanelField, n::Integer) -> CategoricalPanelField
-    panel_field_lift(f::TensorPanelField, n::Integer) -> TensorPanelField
-
-Lift a static Panel Field onto `n` observations, lazily.
-
-A static input that meets a time-varying one, or that meets the two universe masks, joins the panel at the panel's observation count. The values are wrapped in a [`RepeatedLeading`](@ref), which stores them once, and the observed mask is dropped: every cell of a static input was observed, so `nothing` is the mask that says so.
-
-# Algorithm
-
-The method that Julia selects is the algorithm. Each kind rebuilds itself with its value array wrapped in a [`RepeatedLeading`](@ref) and its observed mask set to `nothing`.
-
-# Arguments
-
-  - `f`: The static Panel Field.
-  - `n`: Length of the observation axis to lift onto.
-
-# Returns
-
-  - A Panel Field of the same kind, over `n` observations.
-
-# Related
-
-  - [`RepeatedLeading`](@ref)
-  - [`asset_panel`](@ref)
-  - [`AbstractPanelField`](@ref)
-"""
-function panel_field_lift(f::NumericPanelField, n::Integer)
-    return NumericPanelField(; name = f.name, vals = RepeatedLeading(f.vals, n))
-end
-function panel_field_lift(f::CategoricalPanelField, n::Integer)
-    return CategoricalPanelField(; name = f.name, levels = f.levels,
-                                 codes = RepeatedLeading(f.codes, n))
-end
-function panel_field_lift(f::TensorPanelField, n::Integer)
-    return TensorPanelField(; name = f.name, axis = f.axis, labels = f.labels,
-                            groups = f.groups, vals = RepeatedLeading(f.vals, n))
 end
 """
     panel_field_axes(f::NumericPanelField) -> Tuple{Vararg{Int}}
@@ -1061,7 +1143,7 @@ Return a view of one Panel Field over the observations `i` and the assets `j`.
 
 A static Panel Field has no observation axis, so its caller passes a `Colon` for `i`.
 
-**The square case is derived here, by name.** A tensor Panel Field whose labels are the carrier's asset names ([`features_are_assets`](@ref)) is sliced on its label axis by the same asset index, together with its labels and its groups: a group belongs to one label, so the labels that survive keep theirs. Every other field's trailing axis addresses features, and an asset view does not reach it.
+**The square case is derived here, by name.** A tensor Panel Field whose labels are the asset names of the input data ([`features_are_assets`](@ref)) is sliced on its label axis by the same asset index, together with its labels and its groups: a group belongs to one label, so the labels that survive keep theirs. Every other field's trailing axis addresses features, and an asset view does not reach it.
 
 # Algorithm
 
@@ -1072,7 +1154,7 @@ The method that Julia selects is the algorithm, and each kind views its own valu
   - `f`: The Panel Field.
   - `i`: Observation index.
   - `j`: Asset index.
-  - `nx`: The carrier's asset names, or `nothing`. Read for the square case alone.
+  - `nx`: The asset names of the input data, or `nothing`. Read for the square case alone.
 
 # Returns
 
@@ -1087,12 +1169,14 @@ The method that Julia selects is the algorithm, and each kind views its own valu
 """
 function panel_field_view(f::NumericPanelField, i, j, ::Any)
     return NumericPanelField(; name = f.name, vals = panel_array_view(f.vals, i, j),
-                             omsk = panel_array_view(f.omsk, i, j))
+                             omsk = panel_array_view(f.omsk, i, j),
+                             pmsk = panel_array_view(f.pmsk, i, j))
 end
 function panel_field_view(f::CategoricalPanelField, i, j, ::Any)
     return CategoricalPanelField(; name = f.name, levels = f.levels,
                                  codes = panel_array_view(f.codes, i, j),
-                                 omsk = panel_array_view(f.omsk, i, j))
+                                 omsk = panel_array_view(f.omsk, i, j),
+                                 pmsk = panel_array_view(f.pmsk, i, j))
 end
 function panel_field_view(f::TensorPanelField, i, j, nx::Option{<:VecStr})
     sq = features_are_assets(f, nx)
@@ -1101,7 +1185,8 @@ function panel_field_view(f::TensorPanelField, i, j, nx::Option{<:VecStr})
                             labels = sq ? f.labels[j] : f.labels,
                             groups = panel_groups_view(f.groups, j, sq),
                             vals = panel_tensor_view(f.vals, i, j, k),
-                            omsk = panel_tensor_view(f.omsk, i, j, k))
+                            omsk = panel_tensor_view(f.omsk, i, j, k),
+                            pmsk = panel_tensor_view(f.pmsk, i, j, k))
 end
 """
     panel_groups_view(::Nothing, j, sq::Bool) -> nothing
@@ -1139,7 +1224,7 @@ end
 
 Report whether one Panel Field's trailing axis *is* the asset axis, so a view must slice both.
 
-True when a tensor Panel Field's labels equal the asset names, which is what a square phylogeny or adjacency matrix put on a carrier produces: an `assets × assets` block whose labels are "adjacent to asset ``k``". Subselecting assets without also subselecting that axis would leave the columns pointing at the full universe while the rows point at the subset — a silently wrong distance rather than an error.
+True when a tensor Panel Field's labels equal the asset names, which is what a square phylogeny or adjacency matrix put on a `PricesResult` or a `ReturnsResult` produces: an `assets × assets` block whose labels are "adjacent to asset ``k``". Subselecting assets without also subselecting that axis would leave the columns pointing at the full universe while the rows point at the subset — a silently wrong distance rather than an error.
 
 The fact is **derived**, never recorded. Comparing the names rather than the axis lengths is what makes it derivable: a rectangular-by-accident coincidence of counts is not a claim that the two axes mean the same thing, and the comparison stays correct under repeated views, since both name vectors are sliced by the same indices. A numeric or categorical Panel Field has no trailing axis, so it is never square.
 
@@ -1148,13 +1233,13 @@ The fact is **derived**, never recorded. Comparing the names rather than the axi
 The method that Julia selects is the algorithm.
 
  1. The field is not a tensor: return `false`.
- 2. `nx` is `nothing`: return `false`. A carrier that does not name its assets makes no claim.
+ 2. `nx` is `nothing`: return `false`. Input data that does not name its assets makes no claim.
  3. Return `f.labels == nx`.
 
 # Arguments
 
   - `f`: The Panel Field.
-  - `nx`: The carrier's asset names, or `nothing`.
+  - `nx`: The asset names of the input data, or `nothing`.
 
 # Returns
 
@@ -1178,7 +1263,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The Asset Panel: the Panel Fields of one universe, and the two point-in-time universe masks.
 
-The two universe masks are the panel's **defining content**, and the Panel Fields are optional payload. A panel with fields owns their values, so nothing else on a carrier holds a feature matrix, and the Feature Matrix a distance measures is derived from the panel by [`panel_feature_matrix`](@ref) and stored nowhere. A panel with **no** field is the ingestion layer's common case: a caller holding only prices has no market capitalisation and no sector, and the panel states a universe and nothing else. A panel with neither a field nor a mask carries nothing at all and is refused.
+The two universe masks are the panel's **defining content**, and the Panel Fields are optional payload. A panel with fields owns their values, so nothing else on a `PricesResult` or a `ReturnsResult` holds a feature matrix, and the Feature Matrix a distance measures is derived from the panel by [`panel_feature_matrix`](@ref) and stored nowhere. A panel with **no** field is the ingestion layer's common case: a caller holding only prices has no market capitalisation and no sector, and the panel states a universe and nothing else. A panel with neither a field nor a mask carries nothing at all and is refused.
 
 One panel takes one of two shapes, and its type parameters say which.
 
@@ -1205,6 +1290,70 @@ $(DocStringExtensions.FIELDS)
   - Every Panel Field shares one [`panel_field_axes`](@ref). Raises a `DimensionMismatch`.
   - The masks are both `nothing` when the Panel Fields are static, and both given when they are time-varying. See [`assert_panel_masks`](@ref).
 
+# Examples
+
+A panel is a Result, so an edit makes a new panel through this constructor, which checks the new panel again. Each edit below starts from this panel.
+
+```jldoctest asset_panel_edits
+julia> pnl = AssetPanel(;
+                        pf = [NumericPanelField(; name = \"mcap\",
+                                                vals = [1.0 2.0 3.0; 4.0 5.0 6.0]),
+                              CategoricalPanelField(; name = \"sector\", levels = [\"Tech\", \"Energy\"],
+                                                    codes = [1 2 1; 1 2 1])], amsk = trues(2, 3),
+                        emsk = trues(2, 3));
+
+```
+
+To rename a Panel Field, make the field again with the new name and its values and observed mask. A categorical or a tensor Panel Field also keeps its levels, or its axis, labels and groups.
+
+```jldoctest asset_panel_edits
+julia> f = panel_field(pnl, \"mcap\");
+
+julia> renamed = AssetPanel(;
+                            pf = [NumericPanelField(; name = \"size\", vals = f.vals, omsk = f.omsk);
+                                  filter(g -> g.name != \"mcap\", pnl.pf)], amsk = pnl.amsk,
+                            emsk = pnl.emsk);
+
+julia> [g.name for g in renamed.pf]
+2-element Vector{String}:
+ \"size\"
+ \"sector\"
+```
+
+To drop a Panel Field, keep the other fields.
+
+```jldoctest asset_panel_edits
+julia> dropped = AssetPanel(; pf = filter(g -> g.name != \"sector\", pnl.pf), amsk = pnl.amsk,
+                            emsk = pnl.emsk);
+
+julia> [g.name for g in dropped.pf]
+1-element Vector{String}:
+ \"mcap\"
+```
+
+To drop observations or assets, view the panel over the complement indices with [`port_opt_view`](@ref).
+
+```jldoctest asset_panel_edits
+julia> kept = PortfolioOptimisers.port_opt_view(pnl, setdiff(1:2, [1]), setdiff(1:3, [2]));
+
+julia> panel_field(kept, \"mcap\").vals
+1×2 view(::Matrix{Float64}, [2], [1, 3]) with eltype Float64:
+ 4.0  6.0
+```
+
+To edit the masks, make the panel with the new masks. The estimation mask must stay a subset of the active mask, so intersect it with the new active mask. [`panel_align_active`](@ref) makes one edit of the active mask from the observed masks of the Panel Fields.
+
+```jldoctest asset_panel_edits
+julia> amsk = Bool[1 1 0; 1 1 1];
+
+julia> edited = AssetPanel(; pf = pnl.pf, amsk = amsk, emsk = pnl.emsk .& amsk);
+
+julia> edited.emsk
+2×3 BitMatrix:
+ 1  1  0
+ 1  1  1
+```
+
 # Related
 
   - [`AbstractPanelField`](@ref)
@@ -1217,6 +1366,9 @@ $(DocStringExtensions.FIELDS)
   - [`assert_panel_masks`](@ref)
   - [`ReturnsResult`](@ref)
   - [`port_opt_view`](@ref)
+  - [`DataFrames.describe(pnl::AssetPanel)`](@ref)
+  - [`panel_info`](@ref)
+  - [`panel_align_active`](@ref)
   - [`Option`](@ref)
 """
 @concrete struct AssetPanel <: AbstractResult
@@ -1464,7 +1616,7 @@ end
 
 Derive the Feature Matrix an [`AssetPanel`](@ref)'s Panel Fields stack into, and name its columns.
 
-A carrier that holds no panel derives nothing, so the `nothing` method answers with two of them and no consumer needs a branch of its own.
+Input data that holds no panel derives nothing, so the `nothing` method answers with two of them and no consumer needs a branch of its own.
 
 Nothing stores the result. A Feature Matrix is what a distance measures, so it is built where it is measured and thrown away after: the panel is the data, and the matrix is one view of it.
 
@@ -1555,7 +1707,7 @@ Return a view of the [`AssetPanel`](@ref) over the observations `i` and the asse
 
 Every Panel Field owns its values, so an asset view reaches them all: the one-argument arity keeps every observation and selects assets, and the three-argument arity selects both. A static panel has no observation axis and ignores the observation index, which is the same asymmetry the two [`port_opt_view`](@ref) arities have for `ivpa`.
 
-`nx` is the carrier's asset names, and it is what makes the **square case** derivable: a tensor Panel Field whose labels are those names is sliced on its label axis by the same asset index. Nothing records the fact, and no carrier carries a flag for it; [`features_are_assets`](@ref) states the comparison.
+`nx` holds the asset names of the input data, and it is what makes the **square case** derivable: a tensor Panel Field whose labels are those names is sliced on its label axis by the same asset index. Nothing records the fact, and no `PricesResult` or `ReturnsResult` holds a flag for it; [`features_are_assets`](@ref) states the comparison.
 
 # Algorithm
 
@@ -1567,7 +1719,7 @@ Every Panel Field owns its values, so an asset view reaches them all: the one-ar
   - `pnl`: The Asset Panel.
   - `i`: Observation index.
   - `j`: Asset index.
-  - `nx`: The carrier's asset names, or `nothing`.
+  - `nx`: The asset names of the input data, or `nothing`.
 
 # Returns
 
@@ -1597,22 +1749,22 @@ end
     check_asset_panel(pnl::Nothing, na, nobs, na_sym) -> nothing
     check_asset_panel(pnl::AssetPanel, na, nobs, na_sym) -> nothing
 
-Check an [`AssetPanel`](@ref) against the asset and observation axes of the carrier that holds it.
+Check an [`AssetPanel`](@ref) against the asset and observation axes of the `PricesResult` or the `ReturnsResult` that holds it.
 
-The panel owns its own values, so this is the only check a carrier owes it: that the universe it describes is the carrier's universe.
+The panel owns its own values, so this is the only check that the input data owes it: that the universe it describes is the universe of the input data.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `pnl` is `nothing`: the carrier has no panel, so there is nothing to check.
+ 1. `pnl` is `nothing`: the input data has no panel, so there is nothing to check.
  2. `pnl` is an [`AssetPanel`](@ref): read its shape from [`panel_axes`](@ref), check the asset axis against `na`, and check the observation axis against `nobs` when the panel is time-varying.
 
 # Arguments
 
   - `pnl`: The Asset Panel, or `nothing`.
-  - `na`: Asset count of the carrier.
-  - `nobs`: Observation count of the carrier.
+  - `na`: Asset count of the input data.
+  - `nobs`: Observation count of the input data.
   - `na_sym`: Symbolic name of the asset axis, displayed in the error messages.
 
 # Validation
@@ -1644,12 +1796,12 @@ function check_asset_panel(pnl::AssetPanel, na::Option{<:Integer}, nobs::Option{
     @argcheck(!isnothing(na),
               IsNothingError("an Asset Panel (pnl) describes a universe, so it needs an asset axis to bind to, but $na_sym is nothing"))
     @argcheck(ax[end] == na,
-              DimensionMismatch("the Panel Fields of an Asset Panel are indexed by asset, so their asset axis must be the carrier's, got $(ax[end]) and $na_sym = $na"))
+              DimensionMismatch("the Panel Fields of an Asset Panel are indexed by asset, so their asset axis must be the asset axis of the input data, got $(ax[end]) and $na_sym = $na"))
     if length(ax) == 2
         @argcheck(!isnothing(nobs),
                   IsNothingError("a time-varying Asset Panel (pnl) has an observation axis to bind to; provide the asset data its observations are parallel to, or pass a static Asset Panel instead"))
         @argcheck(ax[1] == nobs,
-                  DimensionMismatch("a time-varying Asset Panel is observations × assets, so its leading axis must be the carrier's observations, got $(ax[1]) and $nobs observations"))
+                  DimensionMismatch("a time-varying Asset Panel is observations × assets, so its leading axis must be the observation axis of the input data, got $(ax[1]) and $nobs observations"))
     end
     return nothing
 end

@@ -35,11 +35,12 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, StatsBase, Statistic
 # the result's `X`; every other prior wraps an inner prior estimator and synthesises its `X`,
 # so the fill is paid once, at the `EmpiricalPrior` at the bottom of the chain.
 #
-# The reference implementation gives no oracle for the share: it zero-fills its portfolio
-# return series at one line and announces nothing, so it has no fill limit and no denominator
-# to read off. The reference's own denominator -- filled entries over the entries of the whole
-# returns matrix -- is what ADR 0118 replaced, and it is pinned below as the context the
-# message reports rather than as the number that trips.
+# The oracle fills the same scenario cells with zero and warns once for each asset whose own
+# filled share is above a fixed `0.05`; it never refuses, so `fill_limit = 0.05` gives its
+# decision to warn or stay silent (#1416). It is silent only on its portfolio return series,
+# which it fills at one line. The matrix-wide share -- filled entries over the entries of the
+# whole returns matrix -- is pinned below as the context the message reports rather than as
+# the number that trips.
 
 const PO = PortfolioOptimisers
 
@@ -75,7 +76,7 @@ pnl_mix = make_panel(amsk_mix)
 pnl_full = make_panel(trues(T, N))
 
 me = ExpWeightedExpectedReturns(; decay = 0.9, min_obs = 2)
-ce = ExpWeightedCovariance(; decay = 0.9, min_obs = 2, centred = true)
+ce = ExpWeightedCovariance(; decay = 0.9, min_obs = 2, centring = PreCentred())
 # The estimator that accepts the whole matrix in silence, and the one that accepts none.
 pe = EmpiricalPrior(; me = me, ce = ce, fill_limit = 1)
 pe0 = EmpiricalPrior(; me = me, ce = ce)
@@ -326,12 +327,12 @@ end
 @testset "The dilution identity a scenario measure reads" begin
     # THE COST OF THE FILL IS EXACT, and the invented zeros are not the reason a reader might
     # expect: they do not enter the tail, they inflate the denominator. For an admitted column
-    # of coverage `c` whose asset carries at least `ceil(alpha * T)` losses, the measure at
+    # of coverage `c` whose asset carries at least `floor(alpha * T) + 1` losses, the measure at
     # level `alpha` over the FILLED column equals the measure at level `alpha / c` over that
     # column's OBSERVED rows -- to the last bit, because `alpha * T` and `(alpha / c) * (c * T)`
     # are the same count, the same order statistic and the same denominator.
     #
-    # The shares are exact binary fractions so that the two `ceil(Int, alpha * T)` agree
+    # The shares are exact binary fractions so that the two `floor(Int, alpha * T)` agree
     # without a rounding argument. ADR 0118's own illustration is the same statement at
     # `c = 0.3`, where a 5% CVaR is a 16.7% CVaR.
     rngd = StableRNG(13579)
@@ -352,8 +353,9 @@ end
     @test isnothing(PO.investable_mask(prd))
     @test all(iszero, view(prd.X, 1:32, 2))
     observed = Xd[33:Td, 2]
-    # The column carries more than the four losses the identity needs.
-    @test count(<(0), observed) >= ceil(Int, alpha * Td)
+    # The column carries more than the five losses the identity needs: the four of the tail
+    # and the boundary loss, which the tail takes at zero weight.
+    @test count(<(0), observed) >= floor(Int, alpha * Td) + 1
 
     filled_col = reshape(prd.X[:, 2], :, 1)
     obs_col = reshape(observed, :, 1)

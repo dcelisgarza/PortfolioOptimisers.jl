@@ -13,13 +13,16 @@ The measure is also called Expected Shortfall. It is a coherent risk measure, an
 \\end{align}
 ```
 
-The minimum has a closed form on the sorted returns. The tail holds the ``k^{\\star} - 1`` smallest returns in full and the boundary return in part, so that its weight is ``\\alpha W_{T}`` exactly:
+The minimum has a closed form on the sorted returns. The tail holds the ``k^{\\star} - 1`` smallest returns in full and the boundary return in part, so that its weight is ``\\alpha W_{T}`` exactly. The part is zero when ``W_{k^{\\star} - 1} = \\alpha W_{T}``:
 
 ```math
 \\begin{align}
-\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) &= -\\frac{1}{\\alpha W_{T}} \\left( \\sum_{k=1}^{k^{\\star} - 1} w_{(k)} x_{(k)} + \\left(\\alpha W_{T} - W_{k^{\\star} - 1}\\right) x_{(k^{\\star})} \\right)\\,.
+\\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) &= -\\frac{1}{\\alpha W_{T}} \\left( \\sum_{k=1}^{k^{\\star} - 1} w_{(k)} x_{(k)} + \\left(\\alpha W_{T} - W_{k^{\\star} - 1}\\right) x_{(k^{\\star})} \\right)\\\\
+&= \\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}) + \\frac{1}{\\alpha W_{T}} \\sum_{t=1}^{T} w_{t} \\max\\left(-x_{t} - \\mathrm{VaR}_{\\alpha}(\\boldsymbol{x}),\\, 0\\right)\\,.
 \\end{align}
 ```
+
+The second line holds because ``\\nu = x_{(k^{\\star})} = -\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` is a minimiser. ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})`` is the [`ValueatRisk`](@ref) at the same level, the smallest loss of the minimisers, as Rockafellar and Uryasev define it. The functor reads ``k^{\\star}`` off the computed ``\\alpha W_{T}``, so where a rounding error puts that product under a cumulative weight, it reads the position before the one of [`ValueatRisk`](@ref), whose slack absorbs the error. That position is the other end of the minimisers, so the value does not change.
 
 Where:
 
@@ -27,11 +30,12 @@ Where:
   - $(math_dict[:xret])
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
-  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when no observation weights are set, and then ``W_{T} = T`` and ``k^{\\star} = \\lceil \\alpha T \\rceil``.
+  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when no observation weights are set, and then ``W_{T} = T`` and ``k^{\\star} = \\lfloor \\alpha T \\rfloor + 1``.
   - $(math_dict[:nu_ru])
   - $(math_dict[:x_k_sorted])
   - $(math_dict[:W_k_cum])
   - $(math_dict[:k_star_tail])
+  - ``\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})``: Value-at-Risk at level ``\\alpha``, ``-x_{(k^{\\star})}``.
 
 For a continuous distribution the measure equals ``-\\mathbb{E}[x \\mid x \\leq -\\mathrm{VaR}_{\\alpha}(\\boldsymbol{x})]``. On a sample that conditional mean can hold more or less than ``\\alpha W_{T}`` of the weight, and the part taken of the boundary return is what corrects it.
 
@@ -42,7 +46,7 @@ The functor has one method for each kind of `w`.
 Without observation weights:
 
  1. Copy `x`, so that the caller's vector keeps its order.
- 2. Compute `aT`, which is ``\\alpha T``, and `idx`, which is ``k^{\\star} = \\lceil \\alpha T \\rceil``.
+ 2. Compute `aT`, which is ``\\alpha T``, and `idx`, which is ``k^{\\star} = \\lfloor \\alpha T \\rfloor + 1``, capped at ``T``.
  3. Partially sort the copy, so that its `idx` smallest entries come first, in ascending order.
  4. Set `var` to minus the entry at `idx`, the Value-at-Risk.
  5. Sum `x[i] + var` over the `idx - 1` entries before it, giving `sum_var`.
@@ -52,7 +56,7 @@ With observation weights:
 
  1. Read the weights `w` with [`get_observation_weights`](@ref), and their sum `sw`, which is ``W_{T}``.
  2. Sort `x` with `sortperm`, giving `order`, and accumulate the sorted weights, giving `cum_w`.
- 3. Set `alpha` to `sw * r.alpha`, and find `idx`, the first position at which `cum_w` reaches `alpha`. A rounding error in `cum_w` can put `idx` one past the end, and then `idx` moves back to the last position.
+ 3. Set `alpha` to `sw * r.alpha`, and find `idx`, the first position at which `cum_w` exceeds `alpha`. A rounding error in `cum_w` can put `idx` one past the end, and then `idx` moves back to the last position.
  4. If `idx` is one, return minus the smallest return.
  5. Otherwise, return minus the weighted sum of the `idx - 1` smallest returns plus the boundary return times `alpha - cum_w[idx - 1]`, divided by `alpha`.
 
@@ -72,8 +76,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `alpha` is a number: `0 < alpha < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:alpha_tail0])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -127,8 +131,8 @@ ConditionalValueatRisk
     @pprop w
     function ConditionalValueatRisk(settings::RiskMeasureSettings, alpha::Num_SigCal,
                                     w::Option{<:ObsWeights})
-        assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_half_open_unit_interval(alpha, :alpha)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
@@ -144,7 +148,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures the worst-case mean-CVaR loss of a portfolio over a Wasserstein ball of distributions around the sample.
 
-It is the distributionally robust mean-CVaR problem of Mohajerin Esfahani and Kuhn [drcvar](@cite). It is a measure of a portfolio, defined on the weights and the scenario matrix, so a realised return series does not carry enough to evaluate it.
+It is the distributionally robust mean-CVaR problem of [drcvar](@citet). It is a measure of a portfolio, defined on the weights and the scenario matrix, so a realised return series does not carry enough to evaluate it.
 
 # Mathematical definition
 
@@ -168,7 +172,7 @@ The loss is the larger of two affine pieces ``b_{i} \\tau + a_{i} \\boldsymbol{w
 \\end{align}
 ```
 
-This is Equation 27 of the paper, which Corollary 5.1 gives for the support ``C \\boldsymbol{\\xi} \\leq \\boldsymbol{d}`` with ``C = -I`` and ``\\boldsymbol{d} = \\boldsymbol{1}``. The infinity norm is the dual of the 1-norm of the transport cost.
+This is Equation 27 of [drcvar](@cite). Corollary 5.1 of [drcvar](@cite) gives it for the support ``C \\boldsymbol{\\xi} \\leq \\boldsymbol{d}`` with ``C = -I`` and ``\\boldsymbol{d} = \\boldsymbol{1}``. The infinity norm is the dual of the 1-norm of the transport cost.
 
 Where:
 
@@ -191,7 +195,7 @@ Three consequences follow. The first two contradict a reading of the measure as 
 
   - The robustness premium ``r \\lambda`` is not a constant. ``\\lambda`` depends on ``\\boldsymbol{w}``, so ``r`` cannot be factored out of the optimisation.
   - The loss carries a mean term that ``l`` does not scale. As ``r \\to 0`` the ball collapses to ``\\hat{\\mathbb{P}}``, and the measure goes to ``-\\mathbb{E}_{\\hat{\\mathbb{P}}}[\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}] + l \\, \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi})``, not to ``\\mathrm{CVaR}_{\\alpha}`` alone.
-  - As ``r`` grows, the long-only portfolio of minimum measure goes to the equally weighted portfolio. This is Proposition 7.2 of the paper, for this support.
+  - As ``r`` grows, the long-only portfolio of minimum measure goes to the equally weighted portfolio. This is Proposition 7.2 of [drcvar](@cite), for this support.
 
 # Fields
 
@@ -214,7 +218,7 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `l` is a number: `l > 0` and finite.
   - If `r` is a number: `r > 0` and finite.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -285,7 +289,7 @@ DistributionallyRobustConditionalValueatRisk
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_gt0_finite_val(l, :l)
         assert_nonempty_gt0_finite_val(r, :r)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(l), typeof(r), typeof(w)}(settings,
                                                                                      alpha,
                                                                                      l, r,
@@ -363,9 +367,12 @@ const RMCVaR{T} = Union{<:ConditionalValueatRisk{<:Any, <:Any, T},
                         <:DistributionallyRobustConditionalValueatRisk{<:Any, <:Any, <:Any,
                                                                        <:Any, T}}
 function (r::RMCVaR{Nothing})(x::VecNum)
+    if iszero(r.alpha)
+        return worst_positive_weight_loss(x, nothing)
+    end
     x = copy(x)
     aT = r.alpha * length(x)
-    idx = ceil(Int, aT)
+    idx = min(floor(Int, aT) + 1, length(x))
     partialsort!(x, 1:idx)
     var = -x[idx]
     sum_var = zero(eltype(x))
@@ -375,14 +382,17 @@ function (r::RMCVaR{Nothing})(x::VecNum)
     return var - sum_var / aT
 end
 function (r::RMCVaR{<:ObsWeights})(x::VecNum)
-    w = get_observation_weights(r.w, x)
+    w = checked_observation_weights(r.w, x)
+    if iszero(r.alpha)
+        return worst_positive_weight_loss(x, w)
+    end
     sw = sum(w)
     order = sortperm(x)
     sorted_x = view(x, order)
     sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     alpha = sw * r.alpha
-    idx = searchsortedfirst(cum_w, alpha)
+    idx = searchsortedlast(cum_w, alpha) + 1
     return if idx == 1
         -sorted_x[1]
     else
@@ -453,7 +463,7 @@ Keywords correspond to the struct's fields.
 
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `beta` is a number: `0 < beta < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -513,7 +523,7 @@ ConditionalValueatRiskRange
                                          beta::Num_SigCal, w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w)}(settings,
                                                                              alpha, beta, w)
     end
@@ -538,7 +548,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures the spread between the two robust tails of a portfolio, a worst-case mean-CVaR loss on each side.
 
-Each tail is the program of [`DistributionallyRobustConditionalValueatRisk`](@ref) with its own significance level, tail weight and radius. The paper that states that program treats one tail only, so this measure is the library's generalisation of it to two tails.
+Each tail is the program of [`DistributionallyRobustConditionalValueatRisk`](@ref) with its own significance level, tail weight and radius. That program is Equation 27 of [drcvar](@cite), and it treats one tail only. This measure is the library's generalisation of it to two tails.
 
 # Mathematical definition
 
@@ -583,7 +593,7 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `beta` is a number: `0 < beta < 1`.
   - Each of `l_a`, `r_a`, `l_b` and `r_b` that is a number: `> 0` and finite.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -675,7 +685,7 @@ DistributionallyRobustConditionalValueatRiskRange
         assert_nonempty_gt0_finite_val(r_a, :r_a)
         assert_nonempty_gt0_finite_val(l_b, :l_b)
         assert_nonempty_gt0_finite_val(r_b, :r_b)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(l_a), typeof(r_a), typeof(beta),
                    typeof(l_b), typeof(r_b), typeof(w)}(settings, alpha, l_a, r_a, beta,
                                                         l_b, r_b, w)
@@ -783,7 +793,7 @@ function (r::RMCVaRRg{Nothing})(x::VecNum)
     x = copy(x)
     alpha = r.alpha
     aT = alpha * length(x)
-    idx1 = ceil(Int, aT)
+    idx1 = min(floor(Int, aT) + 1, length(x))
     partialsort!(x, 1:idx1)
     var1 = -x[idx1]
     sum_var1 = zero(eltype(x))
@@ -794,7 +804,7 @@ function (r::RMCVaRRg{Nothing})(x::VecNum)
 
     beta = r.beta
     bT = beta * length(x)
-    idx2 = ceil(Int, bT)
+    idx2 = min(floor(Int, bT) + 1, length(x))
     # Negate the copy and sort it ascending, rather than sort it with `rev = true`. The two
     # orders give the same values bit for bit, because negation is exact and `var2 - x[i]` is
     # `var2 + (-x[i])`. The reverse ordering leads JET, over an abstract `x`, into a `StepRange`
@@ -810,14 +820,14 @@ function (r::RMCVaRRg{Nothing})(x::VecNum)
     return loss - gain
 end
 function (r::RMCVaRRg{<:ObsWeights})(x::VecNum)
-    w = get_observation_weights(r.w, x)
+    w = checked_observation_weights(r.w, x)
     sw = sum(w)
     order = sortperm(x)
     sorted_x = view(x, order)
     sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     alpha = sw * r.alpha
-    idx = searchsortedfirst(cum_w, alpha)
+    idx = searchsortedlast(cum_w, alpha) + 1
     loss = if idx == 1
         -sorted_x[1]
     else
@@ -838,7 +848,7 @@ function (r::RMCVaRRg{<:ObsWeights})(x::VecNum)
     sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     beta = sw * r.beta
-    idx = searchsortedfirst(cum_w, beta)
+    idx = searchsortedlast(cum_w, beta) + 1
     gain = if idx == 1
         -sorted_x[1]
     else
@@ -903,8 +913,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `alpha` is a number: `0 < alpha < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:alpha_tail0])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -958,8 +968,8 @@ ConditionalDrawdownatRisk
     @pprop w
     function ConditionalDrawdownatRisk(settings::RiskMeasureSettings, alpha::Num_SigCal,
                                        w::Option{<:ObsWeights})
-        assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_half_open_unit_interval(alpha, :alpha)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
@@ -975,7 +985,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures the worst-case mean-CDaR loss of a portfolio over a Wasserstein ball of drawdown scenarios around the sample.
 
-It is the library's generalisation of the program of [`DistributionallyRobustConditionalValueatRisk`](@ref) to drawdowns. The paper that states that program treats returns only.
+It uses the program of [`DistributionallyRobustConditionalValueatRisk`](@ref), which is Equation 27 of [drcvar](@cite) and treats returns only. This measure is the library's generalisation of that program to drawdowns.
 
 # Mathematical definition
 
@@ -1031,7 +1041,7 @@ Keywords correspond to the struct's fields.
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `l` is a number: `l > 0` and finite.
   - If `r` is a number: `r > 0` and finite.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -1104,7 +1114,7 @@ DistributionallyRobustConditionalDrawdownatRisk
         assert_unit_interval(alpha, :alpha)
         assert_nonempty_gt0_finite_val(l, :l)
         assert_nonempty_gt0_finite_val(r, :r)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(l), typeof(r), typeof(w)}(settings,
                                                                                      alpha,
                                                                                      l, r,
@@ -1206,7 +1216,7 @@ Where:
   - ``\\boldsymbol{d}``: Drawdown series ``T \\times 1``, each entry ``\\leq 0``.
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
-  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when `w` is `nothing`, and then ``W_{T} = T`` and ``k^{\\star} = \\lceil \\alpha T \\rceil``.
+  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when `w` is `nothing`, and then ``W_{T} = T`` and ``k^{\\star} = \\lfloor \\alpha T \\rfloor + 1``.
   - $(math_dict[:x_k_sorted]) Here the series is ``\\boldsymbol{d}``, so the entry is ``d_{(k)}``.
   - $(math_dict[:W_k_cum])
   - $(math_dict[:k_star_tail])
@@ -1219,16 +1229,16 @@ The third argument selects the method.
 
 `nothing`:
 
- 1. Compute `aT`, which is ``\\alpha T``, and `idx`, which is ``\\lceil \\alpha T \\rceil``.
+ 1. Compute `aT`, which is ``\\alpha T``, and `idx`, which is ``\\lfloor \\alpha T \\rfloor + 1``, capped at ``T``.
  2. Partially sort `dd` in place, so that its `idx` smallest entries come first, in ascending order.
- 3. Set `var` to minus the entry at `idx`.
+ 3. Set `var` to minus the entry at `idx`, the Drawdown-at-Risk.
  4. Sum `dd[i] + var` over the `idx - 1` entries before it, giving `sum_var`.
  5. Return `var - sum_var / aT`.
 
 A weights vector `w`:
 
  1. Sort `dd` with `sortperm`, giving `order`, and accumulate the sorted weights, giving `cum_w`.
- 2. Set `alpha` to `sum(w) * alpha`, and find `idx`, the first position at which `cum_w` reaches it. A rounding error in `cum_w` can put `idx` one past the end, and then `idx` moves back to the last position.
+ 2. Set `alpha` to `sum(w) * alpha`, and find `idx`, the first position at which `cum_w` exceeds it. A rounding error in `cum_w` can put `idx` one past the end, and then `idx` moves back to the last position.
  3. If `idx` is one, return minus the smallest drawdown.
  4. Otherwise, return minus the weighted sum of the `idx - 1` smallest drawdowns plus the boundary drawdown times `alpha - cum_w[idx - 1]`, divided by `alpha`.
 
@@ -1252,8 +1262,11 @@ A weights vector `w`:
   - [`empirical_value_at_risk`](@ref)
 """
 function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing)
+    if iszero(alpha)
+        return worst_positive_weight_loss(dd, nothing)
+    end
     aT = alpha * length(dd)
-    idx = ceil(Int, aT)
+    idx = min(floor(Int, aT) + 1, length(dd))
     partialsort!(dd, 1:idx)
     var = -dd[idx]
     sum_var = zero(eltype(dd))
@@ -1263,13 +1276,16 @@ function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, ::Nothing)
     return var - sum_var / aT
 end
 function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum)
+    if iszero(alpha)
+        return worst_positive_weight_loss(dd, w)
+    end
     sw = sum(w)
     order = sortperm(dd)
     sorted_dd = view(dd, order)
     sorted_w = view(w, order)
     cum_w = cumsum(sorted_w)
     alpha = sw * alpha
-    idx = searchsortedfirst(cum_w, alpha)
+    idx = searchsortedlast(cum_w, alpha) + 1
     return if idx == 1
         -sorted_dd[1]
     else
@@ -1282,7 +1298,7 @@ function conditional_drawdown_at_risk(dd::VecNum, alpha::Real, w::VecNum)
 end
 function (r::RMCDaR)(x::VecNum)
     return conditional_drawdown_at_risk(absolute_drawdown_vec(x), r.alpha,
-                                        get_observation_weights(r.w, x))
+                                        checked_observation_weights(r.w, x))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1337,8 +1353,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `alpha` is a number: `0 < alpha < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:alpha_tail0])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -1389,8 +1405,8 @@ RelativeConditionalDrawdownatRisk
     @pprop w
     function RelativeConditionalDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                                alpha::Num_SigCal, w::Option{<:ObsWeights})
-        assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_half_open_unit_interval(alpha, :alpha)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
@@ -1404,7 +1420,7 @@ end
 calibration_slots(x::RelativeConditionalDrawdownatRisk) = (; alpha = x.alpha)
 function (r::RelativeConditionalDrawdownatRisk)(x::VecNum)
     return conditional_drawdown_at_risk(relative_drawdown_vec(x), r.alpha,
-                                        get_observation_weights(r.w, x))
+                                        checked_observation_weights(r.w, x))
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

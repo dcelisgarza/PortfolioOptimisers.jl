@@ -30,6 +30,117 @@ function fit_predict(opt::OptE_Opt, rd::ReturnsResult)
     res = optimise(opt, rd)
     return StatsAPI.predict(res, rd)
 end
+"""
+    predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)
+    predict(res, rd, test_idx, cols = :)
+    predict(res, rd, test_idxs::VecVecInt, cols = :)
+
+Apply an optimisation result `res` to returns data `rd` to produce a
+[`PredictionResult`](@ref) or a vector of prediction results.
+
+When `test_idx` is given, only the rows of `rd` that `test_idx` indexes, and the columns that
+`cols` selects, are used for the prediction.
+
+The fee holds no horizon. `charge_fees` receives the length of the series it charges, so a fold
+spreads a one-off cost over its own observations and the whole-sample method spreads it over the
+whole sample. `fees.fa` names the clock alone: a `nothing` or `FirstObservationFees` charges the
+two fixed terms on the first observation of the series, and an `AmortisedFees` spreads them
+evenly over it. The `fa` keyword **overrides** that clock for the series this method builds, and
+changes nothing that the result holds. A report can then charge a fixed fee as a fund saw it, while
+the optimiser prices the same fee as its own objective needs.
+
+A test window over a point-in-time universe holds two kinds of gap. The column of a
+non-investable asset has weight `0`, and the view at the Investable Mask removes it before
+anything reads it. A **Held Gap** is an `(observation, asset)` pair at which the weight is not
+zero and the return is missing, which an asset that delists **inside** the test window makes. The
+mask comes from the fit and cannot see it. Nothing is renormalised, so the missing weight is held
+in cash on that observation. Without a drift, the series of the fold is
+
+```text
+returns[t] == sum_i w_i * (isfinite(X[t, i]) ? X[t, i] : 0) - fee
+```
+
+with the fee taken over the whole weight vector. Under a drift, `w_i` is the weight of asset `i`
+on the weight path at observation `t`.
+
+A failed fold carries `NaN` weights, so its series is `NaN` and `res.w` and `rd.X` show the
+failure to a scorer. Under a drift the fold still held a book. [`held_start_weights`](@ref)
+starts the drift from the previous weights `w_prev`, member by member under a population, so the
+next fold reads that book. With no `w_prev`, which is fold 1 or a scheme whose folds are not a
+timeline, the record is `NaN` and nothing throws.
+
+# Algorithm
+
+ 1. For the index methods, view the rows `test_idx` and the columns `cols` of `rd` with [`port_opt_view`](@ref).
+ 2. View the weights and the window at the Investable Mask of `res` with [`investable_fold_view`](@ref). The fee of the result is on the investable universe already, and is not viewed.
+ 3. Override the clock of the fee with `fa` through [`override_fee_amortisation`](@ref).
+ 4. Set every non-finite entry of the window to zero with [`filter_held_gaps`](@ref), giving `Xf`. A Held Gap warns, or raises an `ArgumentError` under `strict`, through [`strict_diagnostic`](@ref).
+ 5. Compute the net return series from the weights, `Xf`, the fee and `wd` with [`calc_net_returns`](@ref).
+ 6. Choose the weights the drift starts from with [`held_start_weights`](@ref), from the return code, the weights and `w_prev` viewed at the mask.
+ 7. Drift them over `Xf` under `hwd` with [`held_weights_result`](@ref), giving the record and the ruined members.
+ 8. Warn about the ruined members with [`warn_ruined_members`](@ref), and mark them failed with [`mark_ruined_members`](@ref).
+ 9. Collapse the data aligned to the series with [`reconstruct_rd`](@ref).
+10. Expand the record to the caller's universe with [`expand_held_weights`](@ref), because the turnover of the next fold reads it, and build the [`PredictionResult`](@ref). The index methods record `test_idx` in its `idx`, and the whole-sample method records `nothing`, because it cannot know which rows of a larger returns data `rd` holds.
+
+The method over `test_idxs` runs the method over one `test_idx` for each fold.
+
+# Arguments
+
+  - `res::NonFiniteAllocationOptimisationResult`: Fitted optimisation result.
+  - `rd::ReturnsResult`: Returns data for the prediction period.
+  - `test_idx`: Observation index or vector of observation indices for the test fold.
+  - `cols`: Column selector. Defaults to `:` (all assets).
+
+# Keyword Arguments
+
+  - `wd::Option{<:AbstractWeightDrift} = nothing`: The Weight Drift of the series, or `nothing` for a series formed from the target weights.
+  - `hwd::Option{<:AbstractWeightDrift} = wd`: The drift of the Held Weights record, or `nothing` for no record. The schemes pass [`held_weights_drift`](@ref)`(wd, pws)`, so a Previous-Weights Source records the held weights of a series that is not drifted.
+  - `fa::Option{<:AbstractFeeAmortisation} = nothing`: The clock the series charges the two fixed fee terms on, or `nothing` to inherit the clock the fee itself states.
+  - `store_weight_path::Bool = false`: Whether the record stores the weight path, in place of rebuilding it on demand.
+  - `strict::Bool = false`: Whether a Held Gap raises an `ArgumentError` rather than warning.
+  - `w_prev::Option{<:VecNum_VecVecNum} = nothing`: The previous weights the fold was handed, which a failed fold holds under a drift, or `nothing`.
+
+# Returns
+
+  - [`PredictionResult`](@ref) or vector of [`PredictionResult`](@ref).
+
+# Related
+
+  - [`fit_predict`](@ref)
+  - [`fit_and_predict`](@ref)
+  - [`PredictionResult`](@ref)
+  - [`MultiPeriodPredictionResult`](@ref)
+  - [`extract_fees`](@ref)
+  - [`override_fee_amortisation`](@ref)
+  - [`held_start_weights`](@ref)
+"""
+function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult;
+                          wd::Option{<:AbstractWeightDrift} = nothing,
+                          hwd::Option{<:AbstractWeightDrift} = wd,
+                          fa::Option{<:AbstractFeeAmortisation} = nothing,
+                          store_weight_path::Bool = false, strict::Bool = false,
+                          w_prev::Option{<:VecNum_VecVecNum} = nothing)
+    # The window is viewed at the Investable Mask first, so the column of an asset the fit
+    # found non-investable is never read, and the Held Gaps of the reduced window are
+    # zeroed once, before the series is formed and before a drift compounds on it. The
+    # fees are already on that universe, because the result carries what it solved on. The
+    # record expands back to the caller's universe on the way out, because the next fold's
+    # turnover reads its held weights.
+    imsk = result_investable_mask(res)
+    w, rdv, fees = investable_fold_view(imsk, res.w, rd, extract_fees(res, nothing))
+    # The clock the series is charged on is the caller's, not the fit's: `fa` overrides
+    # `fees.fa` here and reaches nothing the result carries, so `res.fees` still states
+    # what the optimiser priced. A `nothing` `fa` inherits and rebuilds no fee.
+    fees = override_fee_amortisation(fees, fa)
+    Xf = filter_held_gaps(w, rdv.X, strict; nx = rdv.nx)
+    X = calc_net_returns(w, Xf, fees, wd, rdv.ts)
+    w0 = held_start_weights(res.retcode, w, investable_weights_view(imsk, w_prev))
+    (hw, ruined) = held_weights_result(hwd, w0, Xf, store_weight_path, rdv.ts)
+    warn_ruined_members(wd, ruined, length(res.w))
+    res = mark_ruined_members(res, ruined)
+    rdv = reconstruct_rd(res, rdv, X, hw, w)
+    return PredictionResult(; res = res, rd = rdv, hw = expand_held_weights(imsk, hw))
+end
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                           test_idx::VecInt, cols = :;
                           wd::Option{<:AbstractWeightDrift} = nothing,
@@ -51,7 +162,8 @@ function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::Return
     warn_ruined_members(wd, ruined, length(res.w))
     res = mark_ruined_members(res, ruined)
     rdi = reconstruct_rd(res, rdi, X, hw, w)
-    return PredictionResult(; res = res, rd = rdi, hw = expand_held_weights(imsk, hw))
+    return PredictionResult(; res = res, rd = rdi, hw = expand_held_weights(imsk, hw),
+                            idx = test_idx)
 end
 function StatsAPI.predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                           test_idxs::VecVecInt, cols = :; kwargs...)
@@ -62,6 +174,8 @@ end
     fit_and_predict(opt, rd::ReturnsResult, cv::CombCVER; cols, ex) -> PopulationPredictionResult
     fit_and_predict(opt, rd::ReturnsResult; train_idx = nothing, test_idx, cols) -> PredictionResult
     fit_and_predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult; test_idx, cols) -> PredictionResult
+    fit_and_predict(pipe::Pipeline, data::Prices_RR; train_idx = nothing, test_idx, cols) -> PredictionResult
+    fit_and_predict(res::PipelineResult, data::Prices_RR; test_idx, cols) -> PredictionResult
 
 Fit an optimisation estimator on training data and predict on test data using cross-validation.
 
@@ -72,6 +186,8 @@ A combinatorial `cv` takes its own method, because its folds recombine into seve
 The estimator form reads `train_idx = nothing` as *the estimator holds its window*. It reads the estimator out through `optimise(opt)` in place of a fit over `port_opt_view(rd, train_idx, cols)`, and predicts over `test_idx` as before. The online arm of [`fold_loop`](@ref) reads a fold out this way. It is also the public entry for an estimator stepped by hand, warmed up with [`update_online_estimator`](@ref) and folded with [`partial_fit!`](@ref). `fit_and_predict(opt, rd; test_idx)` on a stepped estimator equals `fit_and_predict(opt, rd; train_idx, test_idx)` on the cold one over the same rows. The two arms belong to [`fit_fold_result`](@ref), and the method is defined beside them.
 
 The result form is fitted already, so it ignores `train_idx` and every keyword that [`predict`](@ref) does not take. The fold loop passes the same keywords to an estimator and to a result.
+
+The two [`Pipeline`](@ref) methods take price data or returns data. The `Pipeline` method fits the pipeline over the rows `train_idx` and the columns `cols` with [`pipeline_fold_fit`](@ref), or reads a stepped pipeline out when `train_idx` is `nothing`. It then predicts over `test_idx` with [`predict(res::PipelineResult, data::AbstractPricesResult, window)`](@ref). The [`PipelineResult`](@ref) method is fitted already, and predicts over `test_idx`.
 
 # Algorithm
 
@@ -359,35 +475,35 @@ $(DocStringExtensions.FIELDS)
   - [`TimeDependentContext`](@ref)
   - [`fit_and_predict`](@ref)
 """
-struct Fold{T1, T2, T3, T4, T5, T6, T7}
+@concrete struct Fold
     """
     Index of the fold within the scheme's `split` enumeration (1-based).
     """
-    i::T1
+    i
     """
     Number of folds in the enumeration.
     """
-    n::T2
+    n
     """
     The fold's resolved estimator: asset-viewed, schedule-swapped, weights-threaded.
     """
-    est::T3
+    est
     """
     The fold's (possibly asset-viewed) input data.
     """
-    rd::T4
+    rd
     """
     The fold's training indices, or `nothing` when the estimator holds its window.
     """
-    train::T5
+    train
     """
     The fold's test indices.
     """
-    test::T6
+    test
     """
     The previous weights threaded into `est`, or `nothing` when there are none.
     """
-    w_prev::T7
+    w_prev
 end
 """
     folds_are_time_ordered(cv)
@@ -489,9 +605,8 @@ parallel, because such a fold does not depend on the other folds.
 The loop reads the three predicates of `cv` by type, so inference folds the choice and removes
 the arms that cannot run. A `Bool` keyword cannot do this: its value survives only by constant
 propagation, which one call can lose, and the sequential arm is then inferred where it can never
-run. Of the two path-level sites, the optimiser passes the [`MultipleRandomised`](@ref) it runs,
-which answers for the walk-forward it wraps, and the Pipeline omits `cv`, for which
-`folds_are_time_ordered(nothing)` answers `true`.
+run. The two path-level sites, of the optimiser and of the Pipeline, pass the
+[`MultipleRandomised`](@ref) that they run, which answers for the walk-forward that it wraps.
 
 `ElT` is the element type of the result of one fold: a single [`PredictionResult`](@ref) for a
 time-ordered scheme, and a `Vector{PredictionResult}` for the multi-path combinatorial scheme.
@@ -589,6 +704,60 @@ function fit_and_predict(opt::OptE_Opt_TD, rd::ReturnsResult, cv::NonSeqCVER; co
                                strict = strict, w_prev = fold.w_prev)
     end
     return MultiPeriodPredictionResult(; pred = predictions, id = id)
+end
+"""
+    assert_prediction_series(names::Option{<:VecStr}, A::Option{<:MatNum},
+                             X::Option{<:VecNum_VecVecNum}, ts::Option{<:VecDate},
+                             nsym::Symbol, sym::Symbol) -> nothing
+
+Check one named matrix of a [`PredictionReturnsResult`](@ref), the factor returns or the Exogenous Series, against the portfolio series and the timestamps.
+
+The matrix rides beside the portfolio series `X` on the observation axis, so it holds one row per observation of each series of `X`, and one per timestamp.
+
+# Arguments
+
+  - `names`: The column names, or `nothing`.
+  - `A`: The matrix, `observations × columns`, or `nothing`.
+  - `X`: The portfolio series, one vector or one vector per member of a population, or `nothing`.
+  - `ts`: The timestamps, or `nothing`.
+  - `nsym`: The name of the names field, which the messages print.
+  - `sym`: The name of the matrix field, which the messages print.
+
+# Validation
+
+  - The rules of [`check_names_and_returns_matrix`](@ref).
+  - When `A` and `X` are given, every series of `X` has `size(A, 1)` entries. Raises a `DimensionMismatch`.
+  - When `A` and `ts` are given, `length(ts) == size(A, 1)`. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`PredictionReturnsResult`](@ref)
+  - [`check_names_and_returns_matrix`](@ref)
+"""
+function assert_prediction_series(names::Option{<:VecStr}, A::Option{<:MatNum},
+                                  X::Option{<:VecNum_VecVecNum}, ts::Option{<:VecDate},
+                                  nsym::Symbol, sym::Symbol)::Nothing
+    check_names_and_returns_matrix(names, A, nsym, sym)
+    if isnothing(A)
+        return nothing
+    end
+    n = size(A, 1)
+    if isa(X, VecNum)
+        @argcheck(length(X) == n,
+                  DimensionMismatch("X must have one entry per row of $sym, got length(X) = $(length(X)) and size($sym, 1) = $n"))
+    elseif isa(X, VecVecNum)
+        @argcheck(all(x -> length(x) == n, X),
+                  DimensionMismatch("each element of X must have the same length as the number of rows in $sym"))
+    end
+    if !isnothing(ts)
+        @argcheck(length(ts) == n,
+                  DimensionMismatch("ts must have one entry per row of $sym, got length(ts) = $(length(ts)) and size($sym, 1) = $n"))
+    end
+    return nothing
 end
 
 export fit, fit_predict

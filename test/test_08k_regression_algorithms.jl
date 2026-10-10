@@ -47,6 +47,37 @@ const PO = PortfolioOptimisers
 const StatsAPI = PortfolioOptimisers.StatsAPI
 const MVS = PortfolioOptimisers.MultivariateStats
 
+#=
+A caller's own regression target under the time-series estimators (#1441). `CallerTestTarget`
+fits through `GLM.LinearModel`, as the library's `LinearModel` does, but it is a separate type
+with no `kwargs` field. Every verb an estimator reads therefore reaches it through the methods
+the `# Interfaces` section of `AbstractRegressionTarget` names, never through a field that only
+the library's targets carry, and its results must equal the library's.
+=#
+struct CallerTestTarget{W} <: PortfolioOptimisers.AbstractRegressionTarget
+    w::W
+end
+CallerTestTarget() = CallerTestTarget(nothing)
+function PortfolioOptimisers.factory(::CallerTestTarget, w::StatsBase.AbstractWeights)
+    return CallerTestTarget(w)
+end
+function PortfolioOptimisers.StatsAPI.fit(tgt::CallerTestTarget, A::AbstractMatrix,
+                                          y::AbstractVector)
+    if isnothing(tgt.w)
+        return StatsAPI.fit(PO.GLM.LinearModel, A, y)
+    end
+    return StatsAPI.fit(PO.GLM.LinearModel, A, y; weights = tgt.w)
+end
+function PortfolioOptimisers.regression_target_weights(tgt::CallerTestTarget)
+    return tgt.w
+end
+# A target that states its fit and no other method.
+struct BareTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+function PortfolioOptimisers.StatsAPI.fit(::BareTestTarget, A::AbstractMatrix,
+                                          y::AbstractVector)
+    return StatsAPI.fit(PO.GLM.LinearModel, A, y)
+end
+
 # Reference forward search that scans the EXCLUDED set only, never the whole `value` vector.
 function ref_forward_selection(crit, tgt, y, F; ismin::Bool)
     T, N = size(F)
@@ -477,6 +508,10 @@ end
         end
         @test roundtrip(DimensionReductionRegression()) < 1e-14
         @test roundtrip(factory(DimensionReductionRegression(), w)) < 1e-14
+        # A probabilistic PCA predicts its posterior mean, `C⁻¹ Wᵀ x`, not the projection on
+        # the left singular vectors of `W`. The recovery mapped back through those vectors,
+        # and on this sample its prediction missed the reduced-space fit by 4.5 (#1472).
+        @test roundtrip(DimensionReductionRegression(; drtgt = PPCA())) < 1e-14
 
         # Standardise unweighted and fit weighted -- issue #398's shape -- and the two paths
         # part. The scale is what binds them, not the fit.
@@ -547,5 +582,73 @@ end
         @test re.drtgt === PCA()
         @test re.ve.w === w
         @test re.retgt.kwargs.weights === w
+    end
+end
+
+@testset "A caller's own regression target under the time-series estimators" begin
+    using Test, PortfolioOptimisers, StableRNGs, StatsBase, LinearAlgebra, Statistics
+
+    rng = StableRNG(1441)
+    T, N = 120, 4
+    F = randn(rng, T, N)
+    X = hcat(0.7 .* F[:, 1] .- 0.4 .* F[:, 2] .+ 0.2 .* randn(rng, T),
+             0.5 .* F[:, 3] .+ 0.2 .* randn(rng, T))
+    w = pweights(range(0.5, 1.5; length = T))
+    same(r1, r2) = r1.b == r2.b && r1.M == r2.M
+
+    @testset "The library targets state their weights" begin
+        for tgt in (LinearModel(), GeneralisedLinearModel())
+            @test isnothing(PO.regression_target_weights(tgt))
+            @test PO.regression_target_weights(factory(tgt, w)) === w
+        end
+    end
+
+    @testset "StepwiseRegression" begin
+        # Before #1441 the constructor read `tgt.kwargs`, a field only the library's targets
+        # carry, and threw a `FieldError` on a caller's target.
+        @test isa(StepwiseRegression(; tgt = BareTestTarget()), StepwiseRegression)
+
+        # `PValue` reads `StatsAPI.coeftable`, and each other criterion reads its score verb.
+        # `:r2` and `:adjr2` had no method for a caller's target before #1441.
+        for crit in (PValue(), :aic, :aicc, :bic, :r2, :adjr2),
+            alg in (ForwardSelection(), BackwardElimination())
+
+            lib = StepwiseRegression(; crit = crit, alg = alg)
+            for tgt in (CallerTestTarget(), BareTestTarget())
+                @test same(regression(StepwiseRegression(; crit = crit, alg = alg,
+                                                         tgt = tgt), X, F),
+                           regression(lib, X, F))
+            end
+            # The weights reach the caller's fit through its own `factory` method.
+            @test same(regression(factory(StepwiseRegression(; crit = crit, alg = alg,
+                                                             tgt = CallerTestTarget()), w),
+                                  X, F), regression(factory(lib, w), X, F))
+        end
+    end
+
+    @testset "DimensionReductionRegression" begin
+        lib = DimensionReductionRegression()
+        re = DimensionReductionRegression(; retgt = CallerTestTarget())
+        @test same(regression(re, X, F), regression(lib, X, F))
+        # The weighted mean of the response reads the caller's weights, so the weighted
+        # intercepts equal the library's too.
+        @test same(regression(factory(re, w), X, F), regression(factory(lib, w), X, F))
+
+        # A target that does not state its weights is refused at construction, because the
+        # intercept would ignore the weights `factory` stored in it.
+        @test_throws ArgumentError DimensionReductionRegression(; retgt = BareTestTarget())
+        msg = sprint(showerror,
+                     try
+                         DimensionReductionRegression(; retgt = BareTestTarget())
+                     catch e
+                         e
+                     end)
+        @test occursin("regression_target_weights(::BareTestTarget)", msg)
+
+        # The weights a caller's target states are checked like the library's.
+        @test_throws ArgumentError DimensionReductionRegression(;
+                                                                retgt = CallerTestTarget(1.0))
+        @test_throws PO.IsEmptyError DimensionReductionRegression(;
+                                                                  retgt = CallerTestTarget(pweights(Float64[])))
     end
 end

@@ -8,3 +8,10 @@ Description = "Graph Traversal, private API of PortfolioOptimisers.jl: distance_
 distance_wei
 breadth
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

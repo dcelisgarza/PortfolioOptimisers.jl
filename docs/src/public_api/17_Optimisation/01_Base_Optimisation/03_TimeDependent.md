@@ -1,8 +1,8 @@
 ```@meta
-Description = "Time-dependent estimators, public API of PortfolioOptimisers.jl: TimeDependent, TimeDependentContext, PreviousWeightsFunction, NoDefault, …"
+Description = "Time-dependent, public API of PortfolioOptimisers.jl: TimeDependent, TimeDependentContext, PreviousWeightsFunction, NoDefault, TimeDependentDefaultError, …"
 ```
 
-# Time-dependent estimators
+# Time-dependent
 
 ```@docs
 TimeDependent

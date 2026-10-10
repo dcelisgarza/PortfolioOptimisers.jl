@@ -1,6 +1,6 @@
 #=
 Check `src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl` against the mathematics its docstrings
-state, and against the reference implementation the map of issue #643 ports. Issue #679.
+state, and against the stored oracle of map #643. Issue #679.
 
 THREE FACTS SHAPE THE PROBES.
 
@@ -77,6 +77,17 @@ function cross_sectional_panel(; T = 6, N = 25, K = 4, seed = 987)
     X[1, 2] = NaN
     return Z, X, W, beta
 end
+
+# A regression target the library does not know, for `cross_sectional_least_squares`.
+struct LeverageTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+
+# A cross-sectional estimator the library does not know, which answers the public verb alone.
+struct BlockTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressionEstimator end
+function PortfolioOptimisers.cross_sectional_regression(::BlockTestRegression, Z, X, W)
+    return cross_sectional_regression(CrossSectionalLinearRegression(), Z, X, W)
+end
+# A cross-sectional estimator the library does not know, which answers no verb.
+struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressionEstimator end
 
 @testset "Cross-sectional regression" begin
     Z, X, W, beta = cross_sectional_panel()
@@ -237,6 +248,91 @@ end
         @test occursin("observation 1", msg)
         @test occursin("rank $(size(Zd, 3) - 1)", msg)
         @test occursin("$(size(Zd, 2)) eligible assets", msg)
+        # A target refuses before it fits, with the message of the linear member.
+        tmsg = try
+            cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                      alg = RankDeficiencyRefusal()),
+                                       Zd, Xc, Wc)
+            ""
+        catch e
+            sprint(showerror, e)
+        end
+        @test tmsg == msg
+        # A member means the same thing under both estimators, so a least-squares target
+        # gives the factor returns of the linear member under each (#1625). Under the default
+        # `PseudoInverseFallback()` the target fits the columns that the rank test keeps, and
+        # the projection onto the row space gives the answer of least norm.
+        # `DependentColumnDrop()` gives the dropped column zero: the pivot keeps the doubled
+        # column, whose norm is larger (#1620). Every member gives the fitted values of the
+        # linear member, and its intercept. `UncheckedSolve()` hands the full design to `GLM`,
+        # whose own pivot drops a column.
+        for intercept in (false, true)
+            linear = cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                               intercept = intercept),
+                                                Zd, Xc, Wc)
+            for alg in (PseudoInverseFallback(), DependentColumnDrop(), UncheckedSolve())
+                target = cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                                   alg = alg,
+                                                                                   intercept = intercept),
+                                                    Zd, Xc, Wc)
+                @test target.eps ≈ linear.eps
+                @test intercept ? target.b ≈ linear.b : isnothing(target.b)
+                if !isa(alg, UncheckedSolve)
+                    own = cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                                    alg = alg,
+                                                                                    intercept = intercept),
+                                                     Zd, Xc, Wc)
+                    @test target.f ≈ own.f
+                end
+            end
+            drop = cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                             alg = DependentColumnDrop(),
+                                                                             intercept = intercept),
+                                              Zd, Xc, Wc)
+            @test all(iszero, drop.f[:, 1])
+            @test all(!iszero, drop.f[:, 2])
+            @test drop.f[:, 3:end] ≈ linear.f[:, 3:end]
+            @test !isapprox(drop.f, linear.f)
+            @test drop.eps ≈ linear.eps
+        end
+        # A design of rank zero leaves nothing to fit, so every factor returns zero.
+        for cre in (CrossSectionalTargetRegression(),
+                    CrossSectionalTargetRegression(; alg = DependentColumnDrop()),
+                    CrossSectionalLinearRegression(; alg = DependentColumnDrop()))
+            zero_design = cross_sectional_regression(cre, zero(Zc), Xc, Wc)
+            @test all(iszero, zero_design.f)
+            @test zero_design.eps == Xc
+        end
+        # The projection on its own keeps the linear predictor, and lands on the answer of
+        # the pseudo-inverse. At rank zero it returns its argument.
+        D = Zd[1, :, :] .* sqrt.(Wc[1, :])
+        r = PortfolioOptimisers.cross_sectional_rank(D)
+        f = randn(StableRNG(1625), size(D, 2))
+        p = PortfolioOptimisers.cross_sectional_row_space(f, D, r)
+        @test D * p ≈ D * f
+        @test p ≈ LinearAlgebra.pinv(D) * (D * f)
+        @test norm(p) < norm(f)
+        @test PortfolioOptimisers.cross_sectional_row_space(f, D, 0) === f
+    end
+
+    @testset "The solve algorithm of a target (#1625)" begin
+        # A target has no pseudo-inverse, so `MinimumNormSolve()` is refused, on both doors.
+        @test_throws "MinimumNormSolve() has no meaning" CrossSectionalTargetRegression(;
+                                                                                        alg = MinimumNormSolve())
+        @test_throws ArgumentError CrossSectionalTargetRegression(LinearModel(),
+                                                                  MinimumNormSolve(), false,
+                                                                  PortfolioOptimisers.FLoops.SequentialEx())
+        # The projection keeps the answer of a target only when the target reads the design
+        # through the linear predictor alone, which `is_basis_invariant` states. A target
+        # that keeps its default answer is refused under the default, and named.
+        @test !PortfolioOptimisers.is_basis_invariant(LeverageTestTarget())
+        @test_throws "fit of LeverageTestTarget" CrossSectionalTargetRegression(;
+                                                                                tgt = LeverageTestTarget())
+        for alg in (UncheckedSolve(), DependentColumnDrop(), RankDeficiencyRefusal())
+            cre = CrossSectionalTargetRegression(; tgt = LeverageTestTarget(), alg = alg)
+            @test cre.alg === alg
+        end
+        @test CrossSectionalTargetRegression().alg === PseudoInverseFallback()
     end
 
     @testset "The two members agree" begin
@@ -294,6 +390,51 @@ end
                                                               Z, X, We)
     end
 
+    @testset "A block names its observations after the fitted ones (#1629)" begin
+        PO = PortfolioOptimisers
+        function message(f)
+            try
+                f()
+                return ""
+            catch e
+                return sprint(showerror, e)
+            end
+        end
+        Zd = copy(Zc)
+        Zd[:, :, 2] = 2 .* Zd[:, :, 1]
+        We = copy(W)
+        We[2, :] .= 0.0
+        for cre in (CrossSectionalLinearRegression(; alg = RankDeficiencyRefusal()),
+                    CrossSectionalTargetRegression(; alg = RankDeficiencyRefusal()))
+            m0 = message(() -> cross_sectional_regression(cre, Zd, Xc, Wc))
+            @test message(() -> PO.cross_sectional_block_regression(cre, Zd, Xc, Wc, 0)) ==
+                  m0
+            m7 = message(() -> PO.cross_sectional_block_regression(cre, Zd, Xc, Wc, 7))
+            @test m7 == replace(m0, "observation 1 " => "observation 8 ")
+            lv = trues(size(Zd, 3))
+            @test message(() -> PO.cross_sectional_live_regression(cre, Zd, Xc, Wc, lv, 7)) ==
+                  m7
+            # The offset changes the name in a refusal alone, never the fit.
+            fit = PO.cross_sectional_block_regression(CrossSectionalLinearRegression(), Zc,
+                                                      Xc, Wc, 7)
+            @test fit.f ==
+                  cross_sectional_regression(CrossSectionalLinearRegression(), Zc, Xc, Wc).f
+        end
+        # The refusal of an empty cross-section under a target names the same observation.
+        cre = CrossSectionalTargetRegression()
+        @test occursin("observation 12 has no asset",
+                       message(() -> PO.cross_sectional_block_regression(cre, Z, X, We, 10)))
+        # An estimator the library does not know answers the public verb, and numbers the
+        # observations of the block itself. One that answers no verb is refused by name.
+        csr = PO.cross_sectional_block_regression(BlockTestRegression(), Zc, Xc, Wc, 7)
+        @test csr.f ==
+              cross_sectional_regression(CrossSectionalLinearRegression(), Zc, Xc, Wc).f
+        @test PO.cross_sectional_live_regression(BlockTestRegression(), Zc, Xc, Wc,
+                                                 trues(size(Zc, 3)), 7).csr.f == csr.f
+        @test_throws MethodError PO.cross_sectional_block_regression(BareTestRegression(),
+                                                                     Zc, Xc, Wc, 7)
+    end
+
     @testset "The coefficient of determination" begin
         csr = cross_sectional_regression(CrossSectionalLinearRegression(), Z, X, W)
         r2 = cross_sectional_r2(csr, Z, X, W)
@@ -342,9 +483,75 @@ end
         @test v.f === csr.f
         @test v.n === csr.n
         @test v.b === csr.b
+        @test v.h1 == csr.h1[:, [1, 3, 5]]
         # The passthrough returns the result it was handed.
         @test cross_sectional_regression(csr, Zc, Xc, Wc) === csr
         @test cross_sectional_regression(csr) === csr
+    end
+
+    @testset "A pair of leverage one has a zero residual and a mark (#1423)" begin
+        # Asset 4 is the only member of the second level, so the design gives it a direction
+        # of its own: the fit reproduces its return, whatever the return is. Its residual is
+        # zero in exact arithmetic, and the subtraction would leave only round-off.
+        T, N = 3, 5
+        Zh = zeros(T, N, 2)
+        Zh[:, :, 1] .= 1.0
+        Zh[:, 4, 2] .= 1.0
+        Xh = [0.1 0.7 0.3 0.123456789 -0.2; 0.3 -0.1 0.25 0.987654321 0.4;
+              -0.3 0.2 0.1 0.333333333 0.05]
+        Wh = [1.0 2.0 1.0 3.0 1.0; 1.0 1.0 1.0 1.0 1.0; 1.0 1.0 1.0 0.0 1.0]
+        mark = falses(T, N)
+        mark[1:2, 4] .= true
+        for cre in (CrossSectionalLinearRegression(), CrossSectionalTargetRegression(),
+                    CrossSectionalTargetRegression(; tgt = GeneralisedLinearModel()),
+                    CrossSectionalLinearRegression(; alg = MinimumNormSolve()))
+            csr = cross_sectional_regression(cre, Zh, Xh, Wh)
+            # The pair of zero weight at observation 3 left the fit, so it has no mark.
+            @test csr.h1 == mark
+            @test all(iszero, csr.eps[mark])
+            @test all(!iszero, csr.eps[.!mark])
+            # The mark reads the design alone, so the scale of the returns does not move it.
+            @test cross_sectional_regression(cre, Zh, 1e-9 .* Xh, Wh).h1 == mark
+        end
+        # With an intercept, the level's own column still gives asset 4 its direction.
+        Zi = Zh[:, :, 2:2]
+        csr = cross_sectional_regression(CrossSectionalLinearRegression(; intercept = true),
+                                         Zi, Xh, Wh)
+        @test csr.h1 == mark
+        @test all(iszero, csr.eps[mark])
+        # Under a log link the fit reproduces the pair on the scale of the link, so the
+        # residual on the scale of the returns keeps its value, and only the mark is set.
+        ls = PortfolioOptimisers.cross_sectional_least_squares
+        glmp = PortfolioOptimisers.GLM
+        nrm = PortfolioOptimisers.Distributions.Normal()
+        glm = GeneralisedLinearModel(; args = (nrm, glmp.LogLink()))
+        @test !ls(CrossSectionalTargetRegression(; tgt = glm))
+        @test ls(GeneralisedLinearModel(; args = (nrm, glmp.IdentityLink())))
+        @test !ls(LeverageTestTarget())
+        # The mask on its own: no row or no column marks nothing, a zero design has rank zero
+        # and marks nothing, and a design with fewer rows than columns fits every row.
+        lo = PortfolioOptimisers.cross_sectional_leverage_one
+        @test lo(zeros(0, 2), Float64[], false) == falses(0)
+        @test lo(zeros(3, 0), ones(3), false) == falses(3)
+        @test lo(zeros(3, 2), ones(3), false) == falses(3)
+        @test lo([1.0 2.0 3.0; 4.0 5.0 7.0], [1.0, 2.0], false) == trues(2)
+        @test lo([1.0 0.0; 1.0 0.0; 1.0 1.0], [1.0, 3.0, 0.5], false) ==
+              BitVector([false, false, true])
+        # With the intercept column, the constant minus the level's column is the other
+        # level's own direction, so a lone member of either level is marked, and a level of
+        # two members on each side marks nothing.
+        @test lo([0.0; 0.0; 1.0;;], [1.0, 1.0, 1.0], true) ==
+              BitVector([false, false, true])
+        @test lo([0.0; 1.0; 1.0;;], [1.0, 1.0, 1.0], true) ==
+              BitVector([true, false, false])
+        @test lo([0.0; 0.0; 1.0; 1.0;;], [1.0, 2.0, 1.0, 3.0], true) == falses(4)
+        # A result a caller builds by hand states no mark, and the constructor checks one.
+        f = [1.0 2.0; 3.0 4.0]
+        e = [0.1 0.2 0.3; 0.4 0.5 0.6]
+        @test isnothing(CrossSectionalRegression(; f = f, eps = e, n = [3, 3]).h1)
+        @test_throws DimensionMismatch CrossSectionalRegression(; f = f, eps = e,
+                                                                n = [3, 3],
+                                                                h1 = falses(2, 2))
     end
 
     @testset "The result refuses a malformed construction" begin

@@ -1,8 +1,8 @@
 ```@meta
-Description = "Simple variance and standard deviation, private API of PortfolioOptimisers.jl: show_fields, simple_variance_kernel, simple_variance_count, …"
+Description = "Simple variance, private API of PortfolioOptimisers.jl: show_fields, simple_variance_kernel, simple_variance_count, SimpleVarianceState, …"
 ```
 
-# Simple variance and standard deviation: private API
+# Simple variance: private API
 
 The library uses the variance of each asset in several places, such as some estimators of the expected returns and of the covariance, performance analysis, and the constraints it generates. [`SimpleVariance`](@ref) computes the sample variance, and the standard deviation as its square root.
 

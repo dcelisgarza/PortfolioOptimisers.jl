@@ -43,7 +43,7 @@ layers still met a changing universe with no rule, and ticket
   dead assets reduces at the head, so `subset_size` becomes a ceiling, and a subset with no live
   asset throws `IsEmptyError` from `investable_mask` and stops the run.
 
-The reference implementation zero-fills the whole test window at one line, at every weight, so a
+The oracle zero-fills the whole test window at one line, at every weight, so a
 caller cannot tell a dead asset at weight zero from a delisting at a live weight. Its naive family
 reads the width of the returns matrix and derives no mask, so an equal-weighted benchmark over a
 panel with a `NaN` column cannot run. Its default completeness selector reads the two endpoints of
@@ -84,7 +84,7 @@ names. Every selector ranks among live assets alone, a score or a redundancy is 
 columns only, and a new selector cannot forget the rule. `CompleteAssetSelector` becomes the
 identity on the Coverage Universe, so it reads the panel's active mask through the funnel, and it
 stays as the explicit step that drops dead assets and nothing else. No selector is a default
-anywhere, because every head reduces itself. The reference's endpoint mode is not added: an
+anywhere, because every head reduces itself. The oracle's endpoint mode is not added: an
 interior gap puts an asset outside the Coverage Universe at every head already, so a selector that
 keeps it gains nothing.
 
@@ -114,7 +114,7 @@ different indices from the released one.
 
 A walk-forward over a changing universe is one series. The strategy traded a different universe in
 each fold because the universe changed, and that is its history, not an artefact. The per-fold
-mask on each fold's result is the record, and nothing is normalised across folds. The reference's
+mask on each fold's result is the record, and nothing is normalised across folds. The oracle's
 calibration ratio belongs to its covariance forecast evaluation, which the library does not have.
 
 Under the whole-window rule of ADR 0117 and the rolling window that `IndexWalkForward` defaults
@@ -125,12 +125,12 @@ Under an expanding window it never joins, unless a mask-aware estimator carries 
 
 | Question | Refused | Why |
 | --- | --- | --- |
-| The test window | Full universe, and the fold zero-fills every gap with no mask view, the reference's shape and the first text of ADR 0118. | The filter scans a dead column the fit already excluded, and the fold and the value-level door reduce by two different rules. |
+| The test window | Full universe, and the fold zero-fills every gap with no mask view, the oracle's shape and the first text of ADR 0118. | The filter scans a dead column the fit already excluded, and the fold and the value-level door reduce by two different rules. |
 | The test window | Full universe, and the fold refuses any gap. | A dead asset always has a gap in the test window, so every point-in-time backtest refuses and the map's closing test cannot pass. |
 | The prior-free heads | Nothing reduces; the heads refuse a non-finite column, and the caller precedes them with `CompleteAssetSelector` in a Pipeline. | Two results with no mask, so a reader has two idioms, and a bare equal-weighted benchmark over a point-in-time panel refuses. |
 | The prior-free heads | The Fold Loop reduces every head's data to the Coverage Universe of the training window. | The Fold Loop gains a universe policy that ADR 0115 gave to the optimiser, a prior-fitting head reduces twice, and a bare call outside a fold is not covered. |
-| Pre-selection | Each value-reading selector refuses a non-finite column, the precedent of `asset_scores`. | Three sites to guard, the CVaR hole of `asset_scores` stays, and the order in a pipeline becomes load-bearing, which is the reference's hazard. |
-| Pre-selection | The reference's endpoint mode beside the strict one, and a default selector in the fold. | An interior gap is outside the Coverage Universe at every head already, and every head reduces itself. |
+| Pre-selection | Each value-reading selector refuses a non-finite column, the precedent of `asset_scores`. | Three sites to guard, the CVaR hole of `asset_scores` stays, and the order in a pipeline becomes load-bearing, which is the oracle's hazard. |
+| Pre-selection | The oracle's endpoint mode beside the strict one, and a default selector in the fold. | An interior gap is outside the Coverage Universe at every head already, and every head reduces itself. |
 | The search | A non-finite column is handed to the scorer as `-Inf`. | Safe for the orientation the search fixes, and for a scorer that reads order alone, but a scorer that reads a spread computes `NaN` from a column that holds `-Inf`, and the `NaN` wins again. |
 | The search | The search refuses any non-finite fold score. | A wide grid with one infeasible corner never finishes, and the caller must prune the grid by hand. |
 | The subsets | Draw over the full universe, as released. | `subset_size` is a ceiling, and a dead-only subset refuses the whole run. |
@@ -147,7 +147,7 @@ Under an expanding window it never joins, unless a mask-aware estimator carries 
   [#856](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/856).
 - ADR 0115's last section and ADR 0118's first section are rewritten in place, because neither
   reached `main`.
-- `CONTEXT.md` gains the three doors on the **Coverage Universe** entry, and the **Investable
+- `GLOSSARY.md` gains the three doors on the **Coverage Universe** entry, and the **Investable
   Mask** and **Held Gap** entries state the fold's view.
 - A seeded `MultipleRandomised` split gives different indices from the released one.
 - The two prior-free heads read the panel's active mask, so a stale finite price during an

@@ -1,7 +1,9 @@
 ```@meta
-Description = "Ulcer Index has no private API in PortfolioOptimisers.jl; its names are in the public API."
+Description = "Ulcer Index, private API of PortfolioOptimisers.jl: ulcer_index."
 ```
 
 # Ulcer Index: private API
 
-Every name of this topic is public. The [public page](@ref api-ulcer-index) documents them.
+```@docs
+ulcer_index
+```

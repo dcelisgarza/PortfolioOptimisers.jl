@@ -1,14 +1,14 @@
 ```@meta
-Description = "Pipeline cross-validation, private API of PortfolioOptimisers.jl: Pipeline_OnlPipe, pipeline_cross_val_predict, pipeline_path_fit_and_predict, …"
+Description = "Prediction CV, private API of PortfolioOptimisers.jl: Pipeline_OnlPipe, pipeline_cross_val_predict, pipeline_path_fit_and_predict, …"
 ```
 
-# Pipeline cross-validation: private API
+# Prediction CV: private API
 
 ## The pipeline fold loop
 
 `cross_val_predict` over a `Pipeline` fits the whole pipeline on each training window and predicts on each test window. It also replaces each [`TimeDependent`](@ref) schedule of the pipeline with its value for the fold, before `fit` runs. So no value that the pipeline passes to the optimiser is a schedule, and neither `fit` nor [`run_step`](@ref) reads the fold.
 
-A scheme built by [`OnlineIndexWalkForward`](@ref) or [`OnlineDateWalkForward`](@ref) is an online scheme. With one, the loop fits the pipeline once on the first training window, adds the rows of each later fold with [`partial_fit!`](@ref), and gets the fitted result from `fit(pipe)` with no data. `Online(pipe)` goes through the same `cross_val_predict` methods, and refits the whole pipeline at each fold on a buffer of the rows so far. The [online pipeline](@ref private-api-the-pipelines-online-step) page documents both.
+A scheme built by [`OnlineIndexWalkForward`](@ref) or [`OnlineDateWalkForward`](@ref) is an online scheme. With one, the loop fits the pipeline once on the first training window, adds the rows of each later fold with [`partial_fit!`](@ref), and gets the fitted result from `fit(pipe)` with no data. `Online(pipe)` goes through the same `cross_val_predict` methods, and refits the whole pipeline at each fold on a buffer of the rows so far. The [online pipeline](@ref private-api-online-pipeline) page documents both.
 
 ```@docs
 PortfolioOptimisers.Pipeline_OnlPipe
@@ -36,4 +36,14 @@ update_time_dependent_estimator(p::Pipeline, ctx::TimeDependentContext, all_bind
 PortfolioOptimisers.reset_time_dependent_step
 reset_time_dependent_estimator(p::Pipeline)
 PortfolioOptimisers.pipeline_step_factory
+```
+
+## The rows of a pipeline fold
+
+A fold of returns data records its rows on its [`PredictionResult`](@ref) when every fitted step of the pipeline keeps the observations of the window. A realised [`factor_attribution`](@ref) of the cross-validation reads those rows to find the block rows of each fold. A preprocessing step states whether it keeps them with [`keeps_observations`](@ref).
+
+```@docs
+PortfolioOptimisers.fitted_step_keeps_observations
+PortfolioOptimisers.apply_fitted_steps_keeping
+PortfolioOptimisers.pipeline_fold_prediction
 ```

@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the rules that build a covariance shrinkage target from the matrix being shrunk.
 
-Each rule builds a target from the table of Schäfer and Strimmer. The target is positive definite when the matrix being shrunk is, so a geodesic reaches it. The target of the table with perfect positive correlation has rank one, so no rule builds it. [`DiagonalTarget`](@ref) builds the diagonal target of the same table. It is a [`RegimeAdjustedTarget`](@ref), so it joins the rules through [`GeodesicShrinkageTarget`](@ref) and not through this type.
+Each rule builds one of the targets of Table 2 of [schaferstrimmer2005](@cite). The target is positive definite when the matrix being shrunk is, so a geodesic reaches it. Target E of that table has perfect positive correlation and rank one, so no rule builds it. [`DiagonalTarget`](@ref) builds target D of the same table. It is a [`RegimeAdjustedTarget`](@ref), so it joins the rules through [`GeodesicShrinkageTarget`](@ref) and not through this type.
 
 # Interfaces
 
@@ -858,7 +858,7 @@ end
 
 Folds observations into a [`GeodesicShrinkageCovariance`](@ref) by forwarding them to `ce.ce`.
 
-The shrinkage reads the matrix that `ce.ce` returns and no observation. So the estimator keeps no state of its own, and it folds when `ce.ce` folds. The read-out applies the shrinkage to the folded matrix.
+The shrinkage reads the matrix that `ce.ce` returns and no observation. So the estimator keeps no state of its own, and it folds when `ce.ce` folds. `cov(ce)` with no data applies the shrinkage to the folded matrix.
 
 # Algorithm
 
@@ -909,7 +909,7 @@ Reads the shrunk covariance, or its correlation, of a folded [`GeodesicShrinkage
 
 # Validation
 
-  - `ce.ce` carries a partial-fit state. The read-out of `ce.ce` throws an `ArgumentError` otherwise.
+  - `ce.ce` carries a partial-fit state. `cov(ce.ce)` with no data throws an `ArgumentError` otherwise.
 
 # Returns
 

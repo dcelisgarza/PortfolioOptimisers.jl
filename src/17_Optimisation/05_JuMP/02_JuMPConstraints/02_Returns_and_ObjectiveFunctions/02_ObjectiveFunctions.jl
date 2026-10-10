@@ -17,8 +17,8 @@ Where:
   - $(math_dict[:R_w])
 
 The objective reads no return expression, so it admits a [`NoReturn`](@ref) term and a zero
-`:ret`. It also states no floor on the return, so a term's `settings.lb` is the only thing
-that keeps the solution off a portfolio whose expected return is negative.
+`:ret`. It sets no floor on the return, so without a `settings.lb` on a term the solution can
+have a negative expected return.
 
 # Related
 
@@ -43,21 +43,19 @@ Objective function that maximises risk-adjusted utility.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\max}\\; \\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - l\\, R(\\boldsymbol{w})\\,.
+\\underset{\\boldsymbol{w}}{\\max}\\; \\mathrm{ret} - l\\, R(\\boldsymbol{w})\\,.
 \\end{align}
 ```
 
 Where:
 
-  - $(math_dict[:mu_er])
+  - $(math_dict[:ret_model]) With one [`ArithmeticReturn`](@ref) term it is ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``.
   - $(math_dict[:w_port])
-  - ``l``: Risk-aversion coefficient.
+  - $(math_dict[:l_utility])
   - $(math_dict[:R_w])
 
-The risk carries the coefficient **whole**: the model builds `ret - l * risk`, with no factor
-of one half. A caller porting a ``\\tfrac{\\lambda}{2}`` convention halves its own ``\\lambda``. At
-`l = 3.0` on a five-asset sample the model's own objective is **0.0015922030484060072**, which
-is `ret - 3.0 * risk` exactly; the halved form would give **0.0018692372364207165**.
+The coefficient multiplies the whole risk, with no factor of one half. A caller who ports a
+``\\tfrac{\\lambda}{2}`` convention halves their own ``\\lambda``.
 
 # Fields
 
@@ -103,96 +101,79 @@ $(DocStringExtensions.TYPEDEF)
 
 Objective function that maximises the risk-adjusted Sharpe-type ratio.
 
+The ratio reads the aggregate return. Its numerator is the model's one return expression,
+whatever number of terms built it, so `rf` is one rate on that expression. A term that is not
+in return units leaves the numerator through `settings.rte = false`, not through a rate of its
+own.
+
+The model solves the ratio in homogenised weights, and [`set_max_ratio_return_constraints!`](@ref)
+picks one of two normalisations for it. In the risk form, every row of the model holds at
+``\\boldsymbol{y} = \\boldsymbol{0}``, ``k = 0``, so [`set_maximum_ratio_scale_floor!`](@ref)
+bounds ``k`` below by ``k_{\\min}``. The floor binds only when no feasible portfolio's return
+expression is more than ``r_f``. A mean uncertainty set of a large radius can cause this, and
+so can a fee or a market impact cost that is more than every expected return. A term that
+deducts a worst-case penalty or a charge forces the risk form, because the return form has no
+solution in these cases. Thus a ``k`` equal to its floor shows that the objective never went
+above zero. The weights then maximise the return expression at that scale, not the ratio. The
+field `kmin` lets a caller read and set the floor, and a `kmin` that the caller names applies
+to both forms.
+
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\max}\\; \\frac{\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f}{R(\\boldsymbol{w})}\\,.
+\\underset{\\boldsymbol{w}}{\\max}\\; \\frac{\\mathrm{ret} - r_f}{R(\\boldsymbol{w})}\\,.
 \\end{align}
 ```
 
-Where:
-
-  - $(math_dict[:mu_er])
-  - $(math_dict[:w_port])
-  - ``r_f``: Risk-free rate.
-  - $(math_dict[:R_w])
-
-The quotient is not convex, so the model solves the equivalent fractional programme instead.
-It homogenises the whole feasible set by a scalar ``k \\geq 0``, optimises in
-``\\boldsymbol{y} = k \\boldsymbol{w}``, and de-homogenises with
-``\\boldsymbol{w} = \\boldsymbol{y} / k``. One of two normalisations pins ``k``:
-
-  - **Return form.** ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{y} - r_f k = \\mathrm{ohf}``, and the model minimises the risk. This is the branch [`set_max_ratio_return_constraints!`](@ref) registers as `sr_ret`.
-  - **Risk form.** ``R(\\boldsymbol{y}) \\leq \\mathrm{ohf}``, and the model maximises ``\\mathrm{ret} - r_f k``. This is the branch registered as `sr_risk`.
-
-The return form fails whenever the portfolio's expected return cannot exceed ``r_f``, so the
-risk form takes over there, and wherever a term raises a cone the return form cannot carry.
-[`set_max_ratio_return_constraints!`](@ref) states the exact test.
-
-## The scale floor
-
-Homogenisation carries a degenerate ray. Every constraint the model writes in ``\\boldsymbol{y}``
-is homogeneous — ``\\mathbf{A}\\boldsymbol{y} - k \\boldsymbol{b} \\leq \\boldsymbol{0}``, the
-budget, the weight bounds — so all of them hold at ``\\boldsymbol{y} = \\boldsymbol{0}``,
-``k = 0``, and only the normalisation keeps the solver off that point. The return form's
-normalisation is an equality on a non-zero right-hand side, so it excludes the ray outright.
-The risk form's is an inequality, and it does not: when no feasible portfolio's return
-expression can beat ``r_f`` — which a mean uncertainty set of a large enough radius
-guarantees — the objective ``\\mathrm{ret} - r_f k`` is non-positive along every ray, its
-supremum is zero at the origin, and the solver answers with ``k`` at the size of its own
-feasibility tolerance. Each constraint then holds to about that tolerance rather than on its
-own terms, and the recovered ``\\boldsymbol{w} = \\boldsymbol{y} / k`` can break the bound the
-caller wrote while the result still reports success.
-
-``k \\geq k_{\\min}`` closes the ray, and [`set_maximum_ratio_scale_floor!`](@ref) writes it
-on the risk form — the branch that needs it. The floor binds **only** on a model that has no
-tangency portfolio to find, because a feasible ray with a positive ratio is scaled by the
-normalisation alone; so a `k` that comes back at the floor is the signal that the objective
-never rose above zero, and the weights beside it maximise the return expression at that
-scale rather than the ratio. `kmin` is caller-visible for that reason, and a `kmin` the
-caller names is written on either branch.
-
-The ratio is taken at the **aggregate** level: its numerator is the model's single `ret`
-expression, whatever number of terms built it. `rf` is therefore a single rate on that
-aggregate, and a term that is not in return units belongs out of the numerator through
-`settings.rte = false`, not through a per-term rate.
-
-## The degree of the risk
-
-The quotient above holds for a risk expression of degree one in ``(\\boldsymbol{y}, k)``. The
-model builds the risk on ``\\boldsymbol{y}``, so a risk expression of degree ``d`` equals
-``k^{d} R(\\boldsymbol{w})``, and both normalisations reach the maximiser of
+The quotient is not concave, so the model solves an equivalent programme in
+``\\boldsymbol{y} = k \\boldsymbol{w}``, with ``k \\geq 0``, and recovers
+``\\boldsymbol{w} = \\boldsymbol{y} / k``. Every constraint of the model is homogeneous in
+``(\\boldsymbol{y}, k)``, and one of two normalisations fixes the scale:
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\max}\\; \\frac{\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f}{R(\\boldsymbol{w})^{1/d}}\\,.
+\\text{return form:} &\\quad \\underset{\\boldsymbol{y},\\, k}{\\min}\\; R(\\boldsymbol{y}) \\quad \\text{s.t.} \\quad \\mathrm{ret}(\\boldsymbol{y}) - r_f k = \\mathrm{ohf}\\,, \\\\
+\\text{risk form:} &\\quad \\underset{\\boldsymbol{y},\\, k}{\\max}\\; \\mathrm{ret}(\\boldsymbol{y}) - r_f k \\quad \\text{s.t.} \\quad R(\\boldsymbol{y}) \\leq \\mathrm{ohf}\\,.
 \\end{align}
 ```
 
+The model builds the risk on ``\\boldsymbol{y}``, so a risk expression of degree ``d`` in
+``(\\boldsymbol{y}, k)`` equals ``k^{d} R(\\boldsymbol{w})``. The return form then fixes
+``k = \\mathrm{ohf} / (\\mathrm{ret} - r_f)`` and minimises
+``\\mathrm{ohf}^{d} R(\\boldsymbol{w}) / (\\mathrm{ret} - r_f)^{d}``. The risk form meets its
+bound at ``k = (\\mathrm{ohf} / R(\\boldsymbol{w}))^{1/d}`` and maximises
+``k (\\mathrm{ret} - r_f)``. Both forms reach the maximiser of
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\max}\\; \\frac{\\mathrm{ret} - r_f}{R(\\boldsymbol{w})^{1/d}}\\,,
+\\end{align}
+```
+
+and neither maximiser depends on ``\\mathrm{ohf}``.
+
 Where:
 
-  - $(math_dict[:mu_er])
+  - $(math_dict[:ret_model]) With one [`ArithmeticReturn`](@ref) term it is ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``.
   - $(math_dict[:w_port])
-  - ``\\boldsymbol{y}``: The homogenised weights, ``\\boldsymbol{y} = k \\boldsymbol{w}``.
+  - $(math_dict[:y_homog])
   - $(math_dict[:k_budget])
-  - ``r_f``: Risk-free rate.
+  - $(math_dict[:r_f_ratio])
   - $(math_dict[:R_w])
+  - $(math_dict[:ohf_ratio])
   - $(math_dict[:d_homog]) Here it is the degree of the expression that the model builds.
+  - $(math_dict[:k_min_ratio])
   - ``\\mathbf{\\Sigma}``: The covariance matrix of the variance.
   - ``\\sigma(\\boldsymbol{w})``: The portfolio's standard deviation, ``\\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}``.
-  - ``\\mathbf{W}``: The symmetric lifted matrix of [`set_sdp_constraints!`](@ref).
+  - $(math_dict[:W_lift])
 
-The return form fixes ``k = \\mathrm{ohf} / (\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f)``
-and minimises ``\\mathrm{ohf}^{d} R(\\boldsymbol{w}) / (\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f)^{d}``.
-The risk form meets its bound at ``k = (\\mathrm{ohf} / R(\\boldsymbol{w}))^{1/d}`` and maximises
-``k (\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f)``. Neither maximiser depends on `ohf`.
+The degree belongs to the formulation, not to the measure, and [`Variance`](@ref) has two
+formulations of different degree:
 
-The degree belongs to the formulation, not to the measure, and [`Variance`](@ref) has two:
-
-  - A measure of degree one, such as [`StandardDeviation`](@ref) or [`ConditionalValueatRisk`](@ref), gives the quotient of the first equation.
-  - [`Variance`](@ref) in the [`SquaredSOCRiskExpr`](@ref) or [`QuadRiskExpr`](@ref) formulation builds ``\\boldsymbol{y}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{y} = k^{2} \\sigma^{2}(\\boldsymbol{w})``, of degree two. The model maximises ``(\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f) / \\sigma(\\boldsymbol{w})``, the Sharpe ratio.
-  - [`Variance`](@ref) in the semidefinite formulation builds ``\\mathrm{tr}(\\mathbf{\\Sigma} \\mathbf{W})`` with ``\\mathbf{W} \\succeq \\boldsymbol{y}\\boldsymbol{y}^\\intercal / k``. The trace is at least ``k \\sigma^{2}(\\boldsymbol{w})``, with equality at ``\\mathbf{W} = \\boldsymbol{y}\\boldsymbol{y}^\\intercal / k``, so it has degree one. The model maximises ``(\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - r_f) / \\sigma^{2}(\\boldsymbol{w})``, the excess return per unit of variance. A variance takes this formulation when it holds risk-contribution rows `rc`, when the constraints hold a [`SemiDefinitePhylogeny`](@ref), and always under [`FactorRiskContribution`](@ref).
+  - A measure of degree one, such as [`StandardDeviation`](@ref) or [`ConditionalValueatRisk`](@ref), gives the first quotient.
+  - [`Variance`](@ref) in the [`SquaredSOCRiskExpr`](@ref) or [`QuadRiskExpr`](@ref) formulation builds ``\\boldsymbol{y}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{y} = k^{2} \\sigma^{2}(\\boldsymbol{w})``, of degree two. The model maximises ``(\\mathrm{ret} - r_f) / \\sigma(\\boldsymbol{w})``, the Sharpe ratio.
+  - [`Variance`](@ref) in the semidefinite formulation builds ``\\mathrm{tr}(\\mathbf{\\Sigma} \\mathbf{W})`` with ``\\mathbf{W} \\succeq \\boldsymbol{y}\\boldsymbol{y}^\\intercal / k``. The trace is at least ``k \\sigma^{2}(\\boldsymbol{w})``, with equality at ``\\mathbf{W} = \\boldsymbol{y}\\boldsymbol{y}^\\intercal / k``, so it has degree one. The model maximises ``(\\mathrm{ret} - r_f) / \\sigma^{2}(\\boldsymbol{w})``, the excess return per unit of variance. A variance takes this formulation when it holds risk-contribution rows `rc`, when the constraints hold a [`SemiDefinitePhylogeny`](@ref), and always under [`FactorRiskContribution`](@ref).
 
 # Fields
 
@@ -263,19 +244,20 @@ Objective function that maximises the model's return expression.
 
 ```math
 \\begin{align}
-\\underset{\\boldsymbol{w}}{\\max}\\; \\mathrm{ret}(\\boldsymbol{w})\\,.
+\\underset{\\boldsymbol{w}}{\\max}\\; \\mathrm{ret}\\,.
 \\end{align}
 ```
 
 Where:
 
   - $(math_dict[:w_port])
-  - ``\\mathrm{ret}(\\boldsymbol{w})``: The model's single scalar return expression, the weighted sum over the return terms.
+  - $(math_dict[:ret_model])
 
-The objective reads the aggregate expression, not ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``:
-a [`LogarithmicReturn`](@ref) term contributes a mean logarithmic return, and several terms
-contribute their weighted sum. It states no ceiling on the risk, so a risk measure's
-`settings.ub` is the only thing that keeps the solution off the single highest-return asset.
+The objective reads the aggregate expression, not ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w}``.
+A [`LogarithmicReturn`](@ref) term contributes a mean logarithmic return, and several terms
+contribute their weighted sum. The objective sets no ceiling on the risk. Without a
+`settings.ub` on a risk measure, the solution puts the most weight that the other
+constraints let it put on the assets of the highest return.
 
 # Related
 
@@ -294,14 +276,26 @@ struct MaximumReturn <: ObjectiveFunction end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Internal objective that maximises the expression of **one** return term.
+Internal objective that maximises the expression of one return term.
 
-Used only by the return-frontier corner solves. With *k* terms the span of term *i* has to be
-read off a portfolio that maximised term *i* alone: reading it off the aggregate
-maximum-return corner makes it an artefact of the other terms' `scale`, and can leave
-`rt_min > rt_max`, so the sweep range descends.
+Only the corner solves of the return frontier use it, and it is not part of the public API.
+With several terms, the span of term ``i`` comes from a portfolio that maximised term ``i``
+alone. The corner that maximises the aggregate return gives a span that changes with the
+`scale` of the other terms. That span can have `rt_min > rt_max`, which makes the sweep range
+descend.
 
-Not part of the user-facing API.
+# Mathematical definition
+
+```math
+\\begin{align}
+\\underset{\\boldsymbol{w}}{\\max}\\; \\mathrm{ret}_i\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:ret_i_term])
 
 # Fields
 
@@ -312,13 +306,13 @@ $(DocStringExtensions.FIELDS)
     MaximumElementReturn(i::Integer) -> MaximumElementReturn
 
 The argument corresponds to the struct's field. The type takes a positional argument alone,
-because it carries one field and no caller outside the frontier builds it.
+because it has one field and no caller outside the frontier builds it.
 
 ## Validation
 
-  - `i > 0`. The other half of the domain, `i <= length(ret)`, is checked at model build by
-    [`assert_no_return_objective_compatibility`](@ref), which is the first site that sees the
-    return terms.
+  - `i > 0`. [`assert_no_return_objective_compatibility`](@ref) checks the other half of the
+    domain, `i <= length(ret)`, when the model is built, because it is the first function
+    that sees the return terms.
 
 # Related
 
@@ -341,24 +335,39 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` when the model's `:ret` expression is identically zero.
 
-The degeneracy guard tests the **state** of the expression, not the **type** of the term.
-Two routes reach that state — a [`NoReturn`](@ref) term, and a term taken out of the
-sum by `settings.rte = false` — and this predicate is one **fused** test over both.
+The guard tests the state of the expression, not the type of the term. A term is out of
+`:ret` when it is a [`NoReturn`](@ref), or when its `settings.rte` is `false`. The predicate
+tests the two conditions in one quantifier.
 
-The fusion is load-bearing. `:ret` is the weighted sum of the terms, so it is zero exactly
-when *every* term is out of it, by either route. Testing the routes separately and composing
-them is wrong:
+`:ret` is the weighted sum of the terms, so it is zero exactly when every term is out of it.
+Each term can be out for either of the two conditions. Two separate tests joined with `||`
+miss a vector that mixes the conditions:
 
 ```julia
 r = [NoReturn(), ArithmeticReturn(; settings = JuMPReturnsSettings(; rte = false))]
 ```
 
 Every term here is out of `:ret`, yet `all(isa NoReturn) || all(!rte)` returns `false`. Only
-`all(isa NoReturn || !rte)` sees it. The risk axis composes instead, because its two halves
-carry different quantifiers; see [`zero_risk_expression_flag`](@ref).
+`all(isa NoReturn || !rte)` returns `true`. The risk side composes two tests instead, because
+its two halves carry different quantifiers, see [`zero_risk_expression_flag`](@ref).
 
-One real term beside a `NoReturn` leaves `:ret` non-zero, so `[ArithmeticReturn(), NoReturn()]` solves correctly under every objective and is not refused. An empty vector is
-refused separately by [`set_return_constraints!`](@ref).
+One real term beside a `NoReturn` leaves `:ret` non-zero, so `[ArithmeticReturn(), NoReturn()]`
+solves under every objective, and no guard refuses it. [`set_return_constraints!`](@ref)
+refuses an empty vector on its own.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{flag} &= \\bigwedge_{i=1}^{n} \\left(\\mathrm{none}_i \\lor \\lnot\\, \\mathrm{rte}_i\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``n``: Number of return terms, one for a single term. An empty vector gives `false`.
+  - ``\\mathrm{none}_i``: Whether term ``i`` is a [`NoReturn`](@ref).
+  - ``\\mathrm{rte}_i``: The `settings.rte` flag of term ``i``.
 
 # Related
 
@@ -379,9 +388,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Assert that an objective which reads the return expression is given a non-zero one.
 
-Dispatches on the objective. Three of them read `:ret` and are refused when it is degenerate;
-every other objective takes the no-op fallback, because a zero `:ret` is legitimate under
-[`MinimumRisk`](@ref) and [`MaximumUtility`](@ref).
+The function dispatches on the objective. Three objectives read `:ret`, and the function
+refuses them when `:ret` is zero. Every other objective takes the fallback, which does
+nothing, because [`MinimumRisk`](@ref) and [`MaximumUtility`](@ref) accept a zero `:ret`.
 
 | Objective                      | Refused when                     |
 |:------------------------------ |:-------------------------------- |
@@ -389,28 +398,32 @@ every other objective takes the no-op fallback, because a zero `:ret` is legitim
 | [`MaximumRatio`](@ref)         | every term is out of `:ret`      |
 | [`MaximumElementReturn`](@ref) | term `i` is a [`NoReturn`](@ref) |
 
-The first two use [`zero_return_expression_flag`](@ref), so both routes to a zero expression
-are covered. [`MaximumElementReturn`](@ref) is **per index** and ignores
-`settings.rte` entirely: it maximises `ret_i` directly, which the builder registers whatever
-the flag says, so a `false` flag removes that term from the *sum* without touching the
-objective. Only the sentinel type makes `ret_i` itself zero.
+The first two read [`zero_return_expression_flag`](@ref), so they see both ways in which a
+term leaves the expression. [`MaximumElementReturn`](@ref) reads one index and ignores
+`settings.rte`. It maximises `ret_i`, which the builder registers for each value of the flag.
+Thus a `false` flag takes the term out of the sum and does not change the objective. Only a
+`NoReturn` makes `ret_i` itself zero.
 
-[`MaximumElementReturn`](@ref)'s method **range-checks `i` first**, because the `NoReturn`
-test indexes `ret[i]`. The refusal is a `DomainError`, matching the constructor's own
-`i > zero(i)` guard: the two halves of one domain, spelled alike. The constructor cannot
-check the upper half, because it never sees `ret`. A [`TimeDependent`](@ref) schedule is
-checked **per fold**, by construction — a callable schedule has no value until its fold
-exists, so an eager scan could cover vector schedules only.
+[`set_return_constraints!`](@ref) calls this function when the model is built, not a
+constructor. Each optimiser with an objective calls that function. These optimisers are
+[`MeanRisk`](@ref), [`FactorRiskContribution`](@ref) and [`NearOptimalCentering`](@ref). The
+cost is that a refusal comes when `optimise` runs, not at construction. A
+[`TimeDependent`](@ref) schedule is resolved by then, so the function checks each fold on its
+own. A callable schedule has no value until its fold exists. A check at construction can thus
+reach only the vector schedules.
 
-Called from [`set_return_constraints!`](@ref), the shared model-build hook every JuMP
-optimiser reaches, **not** from a constructor. The hook is the only site that sees all three
-objective-carrying optimisers: [`MeanRisk`](@ref), [`FactorRiskContribution`](@ref) — which
-carries its own `obj` and had no return-side guard at all — and
-[`NearOptimalCentering`](@ref). The cost is that a refusal now arrives at `optimise` time
-rather than at construction time.
+# Algorithm
 
-The seam is also where a [`TimeDependent`](@ref) schedule is already resolved, so neither side
-needs a schedule skip here.
+ 1. Under [`MaximumReturn`](@ref) or [`MaximumRatio`](@ref), refuse when [`zero_return_expression_flag`](@ref) is `true`.
+ 2. Under [`MaximumElementReturn`](@ref), check that `i` is at most the number of terms, before the next step indexes the terms.
+ 3. Under [`MaximumElementReturn`](@ref), refuse when term `i` is a [`NoReturn`](@ref).
+ 4. Under any other objective, do nothing.
+
+# Validation
+
+  - Under [`MaximumReturn`](@ref) or [`MaximumRatio`](@ref): `!zero_return_expression_flag(ret)`. Otherwise the function raises an `ArgumentError`.
+  - Under [`MaximumElementReturn`](@ref): `i <= length(ret)`. Otherwise the function raises a `DomainError`, as the constructor does for `i > 0`, because the two checks bound one domain.
+  - Under [`MaximumElementReturn`](@ref): `!isa(ret[i], NoReturn)`. Otherwise the function raises an `ArgumentError`.
 
 # Related
 
@@ -449,21 +462,24 @@ Assert that `ret` gives a non-zero return expression, for optimisers built aroun
 
 A zero `:ret` is coherent in the three optimisers that never read it, and in
 [`MeanRisk`](@ref) under an objective that never reads it. [`NearOptimalCentering`](@ref) is
-the one optimiser that neither describes: its logarithmic barrier constrains
-`exp(log_ret) <= ret - rt`, so with a zero return expression the model is **infeasible**
-rather than degenerate, and without this check the failure arrives as a solver
-`OptimisationFailure` naming nothing.
+neither. Its logarithmic barrier constrains `exp(log_ret) <= ret - rt`, so with a zero return
+expression the model is infeasible rather than degenerate. Without this check, the failure
+arrives as a solver `OptimisationFailure` that names no cause.
 
-The criterion is [`zero_return_expression_flag`](@ref), so both routes to a zero expression
-are covered. This guard stays at the **constructor**, unlike the objective-level
-[`assert_no_return_objective_compatibility`](@ref), and the split is principled: this one asks
-whether the *formulation* needs a return term, which is knowable from the estimator alone,
-while the other asks whether the *objective* does, and objective and term first meet at model
-build.
+The test is [`zero_return_expression_flag`](@ref), so it sees both ways in which a term
+leaves the expression. This guard runs in the constructor, and
+[`assert_no_return_objective_compatibility`](@ref) runs when the model is built. This guard
+asks whether the formulation needs a return term, which the estimator alone answers. The other
+asks whether the objective needs one, and the objective and the terms first meet when the
+model is built.
 
-`T` names the calling optimiser, for the error message. [`TimeDependent`](@ref) schedules are
-skipped here and reached instead through [`assert_time_dependent_substitution`](@ref), which
-re-runs the host's own constructor on each resolved entry.
+`T` names the optimiser that calls the function, for the error message. The function skips a
+[`TimeDependent`](@ref) schedule, and [`assert_time_dependent_substitution`](@ref) reaches it
+instead, because it runs the optimiser's own constructor again on each resolved entry.
+
+# Validation
+
+  - `isa(ret, TimeDependent) || !zero_return_expression_flag(ret)`. Otherwise the function raises an `ArgumentError`.
 
 # Related
 
@@ -483,21 +499,33 @@ end
 
 Register the homogenisation variable `k` for the maximum ratio objective.
 
-This is the head-level producer of `k`. Every head that shapes `w` from an objective calls
-it exactly once, so the two spellings of `k` live here rather than at each head: `k >= 0`
-under [`MaximumRatio`](@ref), and the literal `1` under every other objective. The heads
-whose formulation is fixed pass their own fixed objective ([`MinimumRisk`](@ref)) and take
-the second branch. [`RiskBudgeting`](@ref) is the one head that does not come through here
-— see [`get_k`](@ref).
+Each optimiser head that shapes `w` from an objective calls this function one time. Thus the
+two forms of `k` are here, and not at each head. A head whose formulation is fixed
+passes its own objective, [`MinimumRisk`](@ref), and takes the second method.
+[`RiskBudgeting`](@ref) is the one head that does not call it, see [`get_k`](@ref).
 
-This runs **before** the model is assembled, because [`set_weight_constraints!`](@ref) reads
-`k` immediately afterwards. The other half of the old bundle — the normalisation factor `ohf`
-— is sized from the *resolved* return characteristic, which does not exist until the return
-builders have run, so [`set_maximum_ratio_normalisation!`](@ref) registers it later.
+The function runs before the rest of the model, because [`set_weight_constraints!`](@ref)
+reads `k` next. The normalisation factor `ohf` depends on the resolved return characteristic,
+which exists only after the return builders run, so [`set_maximum_ratio_normalisation!`](@ref)
+registers it later.
 
-The second method takes exactly one objective, not `args...`. A variadic fallback used to
-absorb a wrong-arity call silently and register `k = 1` under a `MaximumRatio` objective, so
-the ratio branch went untested while the call still looked correct.
+The second method takes exactly one objective, not `args...`, so a call with the wrong number
+of arguments fails. A variadic method accepts such a call and registers `k = 1` under a
+[`MaximumRatio`](@ref) objective, which is wrong.
+
+# JuMP formulation
+
+## Variables
+
+  - `k`: ``k \\geq 0``, created under [`MaximumRatio`](@ref).
+
+## Expressions
+
+  - `k`: the constant ``1``, registered under every other objective.
+
+Where:
+
+  - $(math_dict[:k_budget])
 
 # Arguments
 
@@ -528,11 +556,38 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Register the ratio problem's normalisation factor `ohf`.
 
-Sized from the resolved aggregate characteristic ``\\sum_{i:\\,\\mathrm{rte}} s_i \\boldsymbol{\\mu}_i`` when there is one, and from the prior's own vector when no term carries
-a per-asset quantity. Reading it off the resolved aggregate corrects a pre-existing mismatch:
-the factor used to come from `pr.mu` alone, so it ignored a term's own `mu` and a set's
-carried centre. The change is numerical, not semantic — any `ohf > 0` recovers the same
-`w / k`.
+The function sizes the factor from the resolved aggregate characteristic when it exists. When
+no term carries a per-asset quantity, it uses the prior's own vector. Thus the factor follows
+a term's own `mu` and the centre that a set carries. The size is a matter of
+numerics alone, because every ``\\mathrm{ohf} > 0`` gives the same weights.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{ohf} &= \\min\\left(10^{3},\\, \\max\\left(10^{-3},\\, \\frac{1}{N} \\sum_{j=1}^{N} \\lvert \\bar{\\mu}_j \\rvert\\right)\\right)\\,, \\\\
+\\bar{\\boldsymbol{\\mu}} &= \\sum_{i \\,:\\, \\mathrm{rte}_i} s_i\\, \\boldsymbol{\\mu}_i\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:ohf_ratio]) A stated `obj.ohf` replaces the formula.
+  - ``\\bar{\\boldsymbol{\\mu}}``: Aggregate characteristic, the expected returns of the prior when no term in the expression carries one.
+  - ``\\boldsymbol{\\mu}_i``: Resolved characteristic of return term ``i``.
+  - $(math_dict[:s_i_ret])
+  - ``\\mathrm{rte}_i``: The `rte` flag of term ``i``.
+  - $(math_dict[:N])
+
+# JuMP formulation
+
+## Expressions
+
+  - `ohf`: ``\\mathrm{ohf}``.
+
+Where:
+
+  - $(math_dict[:ohf_ratio])
 
 # Arguments
 
@@ -540,6 +595,10 @@ carried centre. The change is numerical, not semantic — any `ohf > 0` recovers
   - `obj::MaximumRatio`: The ratio objective.
   - `mu`: The resolved aggregate characteristic, or `nothing`.
   - `pr`: Prior result, the fallback when `mu` is `nothing`.
+
+# Validation
+
+  - If `obj.ohf` is provided: `obj.ohf > 0`. Otherwise the function raises a `DomainError`.
 
 # Returns
 
@@ -566,49 +625,68 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Close the ratio problem's degenerate ray by tightening `k`'s own lower bound to ``k_{\\min}``.
+Raise `k`'s own lower bound to ``k_{\\min}``, which closes the degenerate ray of the ratio problem.
 
-Every constraint the homogenised model writes is homogeneous in ``(\\boldsymbol{y}, k)``, so
-each of them holds at the origin. [`MaximumRatio`](@ref) states what that costs. This closes
-that ray.
+Every row of the homogenised model other than the normalisation is homogeneous in
+``(\\boldsymbol{y}, k)``, so it holds at the origin. The risk form's normalisation holds there
+too, and [`MaximumRatio`](@ref) states the cost of that. The floor closes the ray to the
+origin.
 
-The floor is written as a **variable bound** — [`set_maximum_ratio_factor_variables!`](@ref)
-already declares `k >= 0`, and this tightens that same bound rather than adding a row. A row
-would carry a dual and change the interior point the solver lands on even where it cannot
-bind, and a `MaximumRatio` answer feeds allocators and stacked optimisers that are pinned far
-tighter than that perturbation.
+The floor is a variable bound, not a row. [`set_maximum_ratio_factor_variables!`](@ref)
+declares `k >= 0`, and this function raises that bound. A row carries a dual, and it moves the
+interior point where the solver stops, also where the row cannot bind. Allocators and stacked
+optimisers read a `MaximumRatio` answer to a tolerance that is much smaller than that move.
 
-**Only the risk form gets the derived floor**, for the same reason. The return form's
-normalisation is an equality on a non-zero right-hand side, so under finite weight bounds it
-excludes the ray already and a floor there is inert by construction — and inert is not free.
-A `kmin` the caller names is written on either branch, because a caller who asks for a floor
-is asking for this bound.
+The derived floor applies to the risk form alone, for the same reason. The return form's
+normalisation is an equality with a non-zero right-hand side. Under finite weight bounds, it
+excludes the ray already. A floor there cannot bind, but it still moves the answer. A `kmin`
+that the caller names applies to both forms, because the caller asks for this bound.
 
-Sized from the resolved aggregate characteristic when `obj.kmin` is `nothing`:
+``\\mathrm{ohf} / (\\max_i \\bar{\\mu}_i - r_f)`` is the return form's own floor. No long-only
+fully invested portfolio earns more than its best asset, so no such model can fix ``k`` below
+it. The risk form's scale is ``\\mathrm{ohf}^{1/d} / R(\\boldsymbol{w})`` for a risk measure of
+degree ``d``, and that expression does not bound it.
+
+The factor ``10^{-4}`` is a margin with three limits. It must be below the smallest scale that
+a well-posed model fixes, which is the scale of `MaximumDrawdown`. It must be above the
+feasibility tolerance at which the solver stops on the ray. If not, the recovered weights
+``\\boldsymbol{w} = \\boldsymbol{y} / k`` keep a residual of that size. It must be below the
+point where a slack bound makes the condition number of the widest model too large. That
+model is `ExactOrderedWeightsArray` under a [`LogarithmicReturn`](@ref). With the floor, the
+recovered weights meet a bound to about ``10^{-5}``. Without it, the ray can return weights
+that break the bound and still report success.
+
+# Mathematical definition
 
 ```math
-k_{\\min} = \\frac{10^{-4}\\,\\mathrm{ohf}}{\\max\\left(\\mathrm{ohf},\\, \\max_i \\mu_i - r_f\\right)}\\,.
+\\begin{align}
+k_{\\min} &= \\frac{10^{-4}\\,\\mathrm{ohf}}{\\max\\left(\\mathrm{ohf},\\, \\max_i \\bar{\\mu}_i - r_f\\right)}\\,.
+\\end{align}
 ```
 
-``\\mathrm{ohf} / (\\max_i \\mu_i - r_f)`` is the return form's own floor: no long-only fully
-invested portfolio earns more than its best asset, so no such model can pin `k` below it. The
-risk form's scale is ``\\mathrm{ohf}^{1/d} / R(\\boldsymbol{w})`` for a risk measure
-homogeneous of degree ``d``, which that expression does not bound — measured over the risk
-measures the library ships, it lands between one eighth and seventeen times it.
+Where:
 
-The ``10^{-4}`` is the margin, and three measurements fix it. It has to sit **below** the
-smallest scale a well-posed model pins, which is `MaximumDrawdown`'s; **above** the
-feasibility tolerance the collapsed ray answers on, or the recovered
-``\\boldsymbol{w} = \\boldsymbol{y} / k`` still carries a useless residual; and below the
-point where a slack bound spoils the conditioning of the widest model that reaches here —
-`ExactOrderedWeightsArray` under a [`LogarithmicReturn`](@ref) stops converging at
-``10^{-3}`` though its own scale is three orders above the bound. ``10^{-4}`` is the value
-that clears all three. It buys the middle one the least: the recovered weights meet a bound
-to about ``10^{-5}`` rather than to ``10^{-7}``, against the breach of the bound outright
-that the collapsed ray returned.
+  - $(math_dict[:k_min_ratio]) A stated `obj.kmin` replaces the formula.
+  - $(math_dict[:ohf_ratio])
+  - ``\\bar{\\mu}_i``: Entry ``i`` of the aggregate characteristic, the expected returns of the prior when no term in the expression carries one.
+  - $(math_dict[:r_f_ratio])
+  - $(math_dict[:R_w])
+  - $(math_dict[:d_homog])
 
-The denominator's ``\\max`` keeps a universe whose characteristic is smaller than `ohf` from
-lifting the floor above ``10^{-4}``.
+The outer ``\\max`` in the denominator is at least ``\\mathrm{ohf}``, so
+``k_{\\min} \\leq 10^{-4}``. A universe whose characteristic is smaller than ``\\mathrm{ohf}``
+thus cannot raise the floor above ``10^{-4}``.
+
+# JuMP formulation
+
+## Variables
+
+  - `k`: read from the model. Its lower bound becomes ``k_{\\min}``.
+
+Where:
+
+  - $(math_dict[:k_budget])
+  - $(math_dict[:k_min_ratio])
 
 # Arguments
 
@@ -650,12 +728,34 @@ end
 
 Accumulate an expression into the objective penalty term `op` in the JuMP model.
 
-Creates the `op` expression if it does not yet exist, then adds `expr` to it.
+The regularisation, soft-constraint and custom-term builders call it, and
+[`add_penalty_to_objective!`](@ref) adds the sum to the objective.
+
+# Algorithm
+
+ 1. When the model holds no `op`, register `op` as a zero. Its type is the type of `expr`, a `JuMP.AffExpr` or a `JuMP.QuadExpr`.
+ 2. When `expr` is quadratic and `op` is affine, register `op` again as a `JuMP.QuadExpr` with the same value.
+ 3. Add `expr` to `op` in place.
+
+# JuMP formulation
+
+## Expressions
+
+  - `op`: ``\\mathrm{op} + e``.
+
+Where:
+
+  - $(math_dict[:op_penalty])
+  - ``e``: The expression `expr`.
 
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.
   - `expr`: JuMP expression to add to the penalty.
+
+# Validation
+
+  - When the model holds no `op`: `expr` is a `JuMP.AffExpr` or a `JuMP.QuadExpr`. Otherwise the function raises an `ArgumentError`.
 
 # Returns
 
@@ -688,9 +788,25 @@ end
 
 Add the accumulated objective penalty to the main objective expression.
 
-If an `op` penalty term exists in the model, adds `factor * op` to `expr`. Returns `expr` unchanged if no penalty term has been registered.
+An affine expression cannot hold a quadratic penalty in place, so an affine `expr` becomes a `JuMP.QuadExpr` when `op` is quadratic. That makes a new expression, so the caller must use the returned value and not the one it passed in.
 
-A quadratic penalty cannot be accumulated into an affine objective in-place, so an affine `expr` is promoted to a `JuMP.QuadExpr` when `op` is quadratic. Promotion allocates a new expression, which is why the caller must use the returned value rather than the one it passed in.
+# Algorithm
+
+ 1. When the model holds no `op`, return `expr` unchanged.
+ 2. When `op` is quadratic and `expr` is not, register `obj_expr` again as a `JuMP.QuadExpr` that holds `expr`.
+ 3. Add `factor * op` to `expr` in place, and return it.
+
+# JuMP formulation
+
+## Expressions
+
+  - `obj_expr`: ``e + f\\, \\mathrm{op}``, registered again only in step 2.
+
+Where:
+
+  - ``e``: The objective expression `expr`.
+  - ``f``: The sign `factor`.
+  - $(math_dict[:op_penalty])
 
 # Arguments
 
@@ -724,17 +840,54 @@ end
 
 Set the portfolio objective function in the JuMP model.
 
-Dispatches on the objective function type to build the appropriate JuMP objective expression, then folds in the [Objective Penalty](@ref add_to_objective_penalty!) accumulated by the regularisation, soft-constraint, and custom-term builders.
+The function dispatches on the objective, builds its expression, and adds the [Objective Penalty](@ref add_to_objective_penalty!) that the regularisation, soft-constraint and custom-term builders accumulated.
 
-Custom objective terms are applied *before* the penalty is folded in, because they contribute to the same accumulator: `add_penalty_to_objective!` applies the sign factor matching this method's optimisation sense, so a contribution always worsens the objective regardless of which objective is being built.
+The custom objective terms go in before the penalty, because they add to the same accumulator. [`add_penalty_to_objective!`](@ref) applies the sign that matches the sense of the objective, so a contribution always worsens the objective, whichever objective the method builds.
 
-The return term is **not** a parameter of this function. It used to be passed positionally so that a [`LogarithmicReturn`](@ref) ratio problem could dispatch to its own method, because the logarithmic builder registered `sr_elog_ret_risk` where every other branch registered `sr_risk`. The hoisted ratio constraint registers one name for every term shape, so the two methods collapse into one keyed on the presence of `:sr_risk`, and the positional lost its only dispatch reason.
+The return term is not an argument. Under [`MaximumRatio`](@ref) the method reads the form from the model instead. A registered `:sr_risk` means the risk form, and no `:sr_risk` means the return form.
+
+# Algorithm
+
+ 1. Read the objective scale `so`, and the entries that the objective reads.
+ 2. Register `obj_expr`, the expression of the objective.
+ 3. Add the custom objective terms of `optimiser.opt.cobj` to the penalty, with [`add_custom_objective_term!`](@ref).
+ 4. Add the penalty to `obj_expr` with [`add_penalty_to_objective!`](@ref). Use the sign `1` for a minimised objective and `-1` for a maximised one.
+ 5. Set the objective to `so * obj_expr` in the sense of the objective.
+
+# JuMP formulation
+
+## Expressions
+
+  - `obj_expr`: the expression of the objective, before step 4 adds the penalty to it.
+
+      + ``R(\\boldsymbol{w})`` under [`MinimumRisk`](@ref), and under the return form of [`MaximumRatio`](@ref).
+      + ``\\mathrm{ret} - l\\, R(\\boldsymbol{w})`` under [`MaximumUtility`](@ref).
+      + ``\\mathrm{ret} - r_f k`` under the risk form of [`MaximumRatio`](@ref).
+      + ``\\mathrm{ret}`` under [`MaximumReturn`](@ref).
+      + ``\\mathrm{ret}_i`` under [`MaximumElementReturn`](@ref).
+
+## Objective
+
+  - `Min`: ``s_o \\left(R(\\boldsymbol{w}) + \\mathrm{op}\\right)`` under [`MinimumRisk`](@ref) and under the return form of [`MaximumRatio`](@ref).
+  - `Max`: ``s_o \\left(\\mathrm{obj\\_expr} - \\mathrm{op}\\right)`` under every other objective.
+
+Where:
+
+  - $(math_dict[:R_w]) It is the model's `:risk`.
+  - $(math_dict[:ret_model])
+  - $(math_dict[:ret_i_term])
+  - $(math_dict[:l_utility])
+  - $(math_dict[:r_f_ratio])
+  - $(math_dict[:k_budget])
+  - $(math_dict[:so_scale])
+  - $(math_dict[:op_penalty])
+  - ``\\mathrm{obj\\_expr}``: The expression `obj_expr` before step 4.
 
 # Arguments
 
   - `model::JuMP.Model`: JuMP optimisation model.
-  - `obj::ObjectiveFunction`: Portfolio objective (e.g. [`MinimumRisk`](@ref), [`MaximumUtility`](@ref)). This is the objective *being built*, which during a [`Frontier`](@ref) sweep differs from the one the user declared.
-  - `optimiser::JuMPOptimisationEstimator`: The outer optimisation estimator (e.g. the [`MeanRisk`](@ref) itself). Supplies the custom objective terms as `optimiser.opt.cobj`.
+  - `obj::ObjectiveFunction`: Portfolio objective, such as [`MinimumRisk`](@ref) or [`MaximumUtility`](@ref). It is the objective that the method builds, which in a [`Frontier`](@ref) sweep is not the one the user declared.
+  - `optimiser::JuMPOptimisationEstimator`: The outer optimisation estimator, such as the [`MeanRisk`](@ref) itself. Its `optimiser.opt.cobj` holds the custom objective terms.
   - `attrs::ProcessedJuMPOptimiserAttributes`: Pre-computed constraint and prior bundle.
 
 # Returns

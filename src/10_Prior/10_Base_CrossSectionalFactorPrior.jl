@@ -42,9 +42,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the carrier the Exposure Estimators of a Cross-Sectional Factor Prior are fitted on.
+Return the returns data that the Exposure Estimators of a Cross-Sectional Factor Prior are fitted on.
 
-An Exposure Estimator weights its cross-sectional transforms by a benchmark-weight Panel Field that it names. The prior computes those weights from the market capitalisation, and writes them onto a copy of the Asset Panel before it builds any Factor Exposure. The copy replaces a field of that name, so every member reads the weights of the prior.
+An Exposure Estimator weights its cross-sectional transforms by a benchmark-weight Panel Field that it names. The prior computes those weights from the market capitalisation, and writes them onto a copy of the Asset Panel before it builds any Factor Exposure. A panel that already holds a field of that name is refused rather than overwritten, so a field the caller built is never lost and every member reads the weights of the prior.
 
 # Arguments
 
@@ -55,11 +55,12 @@ An Exposure Estimator weights its cross-sectional transforms by a benchmark-weig
 # Validation
 
   - `rd.pnl` is an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
+  - `rd.pnl` holds no Panel Field named `name`. Raises an `ArgumentError`.
   - The rules of [`NumericPanelField`](@ref) and of [`AssetPanel`](@ref).
 
 # Returns
 
-  - `rd::ReturnsResult`: The carrier, with the benchmark weights on its Asset Panel.
+  - `rd::ReturnsResult`: The returns data, with the benchmark weights on its Asset Panel.
 
 # Related
 
@@ -67,30 +68,80 @@ An Exposure Estimator weights its cross-sectional transforms by a benchmark-weig
   - [`exposure_benchmark_weights`](@ref)
   - [`cross_sectional_cap_weights`](@ref)
 """
-function cross_sectional_benchmark_carrier(rd::ReturnsResult, name::AbstractString,
+function cross_sectional_benchmark_returns(rd::ReturnsResult, name::AbstractString,
                                            W::MatNum)::ReturnsResult
     pnl = rd.pnl
     @argcheck(!isnothing(pnl),
-              IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the carrier with the `pnl` that asset_panel returns."))
-    pf = Any[f for f in pnl.pf if f.name != name]
-    push!(pf, NumericPanelField(; name = name, vals = W))
+              IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
+    @argcheck(all(f -> f.name != name, pnl.pf),
+              ArgumentError("a Cross-Sectional Factor Prior writes its benchmark weights onto the Panel Field \"$name\", and the Asset Panel already holds a field of that name. Rename the field of the panel, or set the bw of the prior to a name the panel does not use."))
+    pf = push!(Any[pnl.pf...], NumericPanelField(; name = name, vals = W))
     return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = rd.B,
-                         ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
+                         ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
                          pnl = AssetPanel(; pf = identity.(pf), amsk = pnl.amsk,
                                           emsk = pnl.emsk))
 end
 """
+    assert_cross_sectional_benchmark_field(key::AbstractString,
+                                           xe::AbstractExposureEstimator,
+                                           bw::AbstractString) -> nothing
+    assert_cross_sectional_benchmark_field(key::AbstractString,
+                                           xe::Union{<:CompositeExposure, <:DerivedExposure},
+                                           bw::AbstractString) -> nothing
+
+Refuse a factor whose Exposure Estimator reads its benchmark weights from a Panel Field the prior does not write.
+
+A Cross-Sectional Factor Prior writes its benchmark weights onto the Panel Field `bw`, and [`CompositeExposure`](@ref) and [`DerivedExposure`](@ref) each read them from the field their own `bw` names. When the two names differ, the member reads another field, or fails because the panel has none, so the prior refuses the pair when it is built. A member that reads no benchmark weight passes. An [`ObservedExposure`](@ref) is checked through the member it wraps.
+
+# Arguments
+
+  - `key`: The factor name, for the message.
+  - `xe`: The Exposure Estimator of the factor.
+  - `bw`: Name of the benchmark-weight Panel Field of the prior.
+
+# Validation
+
+  - `xe.bw == bw` when `xe` reads benchmark weights. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`cross_sectional_benchmark_returns`](@ref)
+  - [`exposure_benchmark_weights`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function assert_cross_sectional_benchmark_field(::AbstractString,
+                                                ::AbstractExposureEstimator,
+                                                ::AbstractString)::Nothing
+    return nothing
+end
+function assert_cross_sectional_benchmark_field(key::AbstractString, xe::ObservedExposure,
+                                                bw::AbstractString)::Nothing
+    return assert_cross_sectional_benchmark_field(key, xe.xe, bw)
+end
+function assert_cross_sectional_benchmark_field(key::AbstractString,
+                                                xe::Union{<:CompositeExposure,
+                                                          <:DerivedExposure},
+                                                bw::AbstractString)::Nothing
+    @argcheck(xe.bw == bw,
+              ArgumentError("factor \"$key\" reads its benchmark weights from the Panel Field \"$(xe.bw)\", and the prior writes them onto \"$bw\". Give the Exposure Estimator bw = \"$bw\", or give the prior bw = \"$(xe.bw)\"."))
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the order in which a factor list is computed, and the source index of each factor.
+Return the dependency layers in which a factor list is computed, and the source index of each factor.
 
-A [`DerivedExposure`](@ref) is computed from the Factor Exposure of another factor of the same list, so the list is not always computed in the order it was written. The order this returns puts every source before the factor derived from it.
+A [`DerivedExposure`](@ref) is computed from the Factor Exposure of another factor of the same list, so the list is not always computed in the order it was written. The layers this returns put every source in a layer before the factor derived from it. No factor of a layer reads another factor of the same layer, so the members of one layer can be computed in parallel.
 
 # Algorithm
 
  1. Resolve the source name of every [`DerivedExposure`](@ref) to a position in the list, giving `src`.
- 2. Pass over the list, and append to `ord` every factor that has no source or whose source is already in `ord`. Repeat until `ord` holds every factor.
- 3. Refuse a pass that appends nothing, because the factors left over depend on each other.
+ 2. Pass over the list, and collect into a new layer every factor that is in no layer yet and that has no source or whose source is in an earlier layer. Repeat until the layers hold every factor.
+ 3. Refuse a pass that collects nothing, because the factors left over depend on each other.
 
 # Arguments
 
@@ -103,7 +154,7 @@ A [`DerivedExposure`](@ref) is computed from the Factor Exposure of another fact
 
 # Returns
 
-  - `ord::Vector{Int}`: The positions of `factors`, in the order they are computed.
+  - `lay::Vector{Vector{Int}}`: The positions of `factors`, one vector per layer, in the order the layers are computed.
   - `src::Vector{Int}`: The position of each factor's source, and `0` when it has none.
 
 # Related
@@ -126,22 +177,23 @@ function cross_sectional_exposure_order(factors::AbstractVector{<:Pair})
             src[i] = j
         end
     end
-    ord = Int[]
-    done = falses(n)
-    while length(ord) < n
+    # `lvl[i]` is the layer of factor `i`, and zero while it has none. A factor joins layer `k`
+    # when its source joined an earlier layer, so no member of a layer reads another member.
+    lvl = zeros(Int, n)
+    k = 0
+    while any(iszero, lvl)
+        k += 1
         moved = false
         for i in 1:n
-            if done[i] || (src[i] > 0 && !done[src[i]])
-                continue
+            if iszero(lvl[i]) && (iszero(src[i]) || 0 < lvl[src[i]] < k)
+                lvl[i] = k
+                moved = true
             end
-            push!(ord, i)
-            done[i] = true
-            moved = true
         end
         @argcheck(moved,
-                  ArgumentError("the factors $(nm[.!done]) are derived Factor Exposures that depend on each other, so no order computes a source before the factor derived from it"))
+                  ArgumentError("the factors $(nm[iszero.(lvl)]) are derived Factor Exposures that depend on each other, so no order computes a source before the factor derived from it"))
     end
-    return ord, src
+    return [findall(==(j), lvl) for j in 1:k], src
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -225,19 +277,50 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Return the rows of the returns data that one member of a factor list reads to give its Factor Exposures at the last `m` rows.
+
+The exposure of a row reads the last [`lookback`](@ref) rows of the panel, so the last `m` rows read the last `lookback(xe) + m - 1` of them. A member whose look-back is `nothing` reads every row.
+
+# Arguments
+
+  - `xe`: Exposure Estimator.
+  - $(arg_dict[:rd]) It carries the Asset Panel the member reads.
+  - `m`: Number of last rows whose exposures the member gives.
+
+# Returns
+
+  - `rdi::ReturnsResult`: `rd` when the member reads every row, or a view of its last `k` rows.
+  - `k::Int`: Number of rows of `rdi`.
+
+# Related
+
+  - [`lookback`](@ref)
+  - [`cross_sectional_exposure_history`](@ref)
+"""
+function cross_sectional_exposure_rows(xe, rd::ReturnsResult, m::Integer)
+    T = size(rd.X, 1)
+    k = min(T, something(lookback(xe), T) + m - 1)
+    return (; rdi = k == T ? rd : port_opt_view(rd, (T - k + 1):T, :), k = k)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Build the exposure history of a factor list, and the factor axis it is written on.
 
 # Algorithm
 
  1. Read the factor axis with [`cross_sectional_factor_axis`](@ref), and the column count of each factor with [`cross_sectional_exposure_widths`](@ref).
- 2. Take the computation order with [`cross_sectional_exposure_order`](@ref).
- 3. Compute each member in that order. Give a [`DerivedExposure`](@ref) the exposure of its source, which the order has already written.
- 4. Write each Factor Exposure into `Ms` with [`cross_sectional_exposure_write!`](@ref). `Ms` takes the element type `float_if_integer(real(eltype(X)))`, so integer returns give a float history that can hold a fractional exposure and the `NaN` of an inactive cell.
+ 2. Take the dependency layers with [`cross_sectional_exposure_order`](@ref).
+ 3. Compute the layers in order, and the members of one layer under `ex` through [`cross_sectional_foreach`](@ref). Give a [`DerivedExposure`](@ref) the exposure of its source, which an earlier layer has already written. Each member writes its own columns of `Ms`, so every executor gives the same history.
+ 4. When `n` is an integer, give each member the rows of `rd` that [`cross_sectional_exposure_rows`](@ref) names, and keep the last `n` rows of its exposure. Those rows equal the rows of the exposure over every row of `rd`. A [`DerivedExposure`](@ref) has a look-back of one, so it reads the `n` rows of its source that `Ms` holds.
+ 5. Write each Factor Exposure into `Ms` with [`cross_sectional_exposure_write!`](@ref). `Ms` takes the element type `float_if_integer(real(eltype(X)))`, so integer returns give a float history that can hold a fractional exposure and the `NaN` of an inactive cell.
 
 # Arguments
 
   - `factors`: Pairs of `factor name => Exposure Estimator`.
   - $(arg_dict[:rd]) It carries the Asset Panel every member reads.
+  - $(arg_dict[:ex]) It computes the members of one dependency layer.
+  - `n`: Number of last rows of `rd` to compute, or `nothing` for every row. The carry fold of a [`CrossSectionalFactorPrior`](@ref) gives the number of rows of a step.
 
 # Validation
 
@@ -246,7 +329,7 @@ Build the exposure history of a factor list, and the factor axis it is written o
 
 # Returns
 
-  - `Ms::Array{<:Real, 3}`: The exposure history, `observations × assets × factors`.
+  - `Ms::Array{<:Real, 3}`: The exposure history, `observations × assets × factors`, of the last `n` rows of `rd`, or of every row.
   - `nf::Vector{String}`: Name of each factor.
   - `fam::Vector{String}`: Family label of each factor.
 
@@ -254,110 +337,43 @@ Build the exposure history of a factor list, and the factor axis it is written o
 
   - [`factor_exposure`](@ref)
   - [`cross_sectional_factor_axis`](@ref)
+  - [`cross_sectional_exposure_rows`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
 function cross_sectional_exposure_history(factors::AbstractVector{<:Pair},
-                                          rd::ReturnsResult)
+                                          rd::ReturnsResult,
+                                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx();
+                                          n::Option{<:Integer} = nothing)
     (; nf, fam) = cross_sectional_factor_axis(factors, rd)
     wid = cross_sectional_exposure_widths(factors, rd)
-    ord, src = cross_sectional_exposure_order(factors)
+    lay, src = cross_sectional_exposure_order(factors)
     col = cumsum(vcat(1, @view(wid[1:(end - 1)])))
-    X = rd.X
-    Tf = float_if_integer(real(eltype(X)))
-    Ms = Array{Tf, 3}(undef, size(X, 1), size(X, 2), length(nf))
-    for i in ord
-        nm = String(first(factors[i]))
-        xe = last(factors[i])
+    for i in eachindex(factors)
         if src[i] > 0
             @argcheck(isone(wid[src[i]]),
-                      ArgumentError("the derived Factor Exposure $nm reads one Factor Exposure, and its source \"$(nf[col[src[i]]])\" contributes $(wid[src[i]]) of them"))
-            A = factor_exposure(xe, rd, Ms[:, :, col[src[i]]])
-            cross_sectional_exposure_write!(Ms, A, col[i], wid[i], nm)
-        else
-            cross_sectional_exposure_write!(Ms, factor_exposure(xe, rd), col[i], wid[i], nm)
+                      ArgumentError("the derived Factor Exposure $(first(factors[i])) reads one Factor Exposure, and its source \"$(nf[col[src[i]]])\" contributes $(wid[src[i]]) of them"))
+        end
+    end
+    X = rd.X
+    m = something(n, size(X, 1))
+    Tf = float_if_integer(real(eltype(X)))
+    Ms = Array{Tf, 3}(undef, m, size(X, 2), length(nf))
+    for cur in lay
+        cross_sectional_foreach(ex, cur) do i
+            nm = String(first(factors[i]))
+            xe = last(factors[i])
+            (; rdi, k) = cross_sectional_exposure_rows(xe, rd, m)
+            # A derived member reads a copy of its source, which an earlier layer wrote.
+            A = if src[i] > 0
+                factor_exposure(xe, rdi, Ms[:, :, col[src[i]]])
+            else
+                factor_exposure(xe, rdi)
+            end
+            return cross_sectional_exposure_write!(Ms, selectdim(A, 1, (k - m + 1):k),
+                                                   col[i], wid[i], nm)
         end
     end
     return (; Ms = Ms, nf = nf, fam = fam)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return whether one asset carries a finite Factor Exposure to every factor at one observation.
-
-# Arguments
-
-  - `Ms`: The exposure history, `observations × assets × factors`.
-  - `t`: The observation.
-  - `i`: The asset.
-
-# Returns
-
-  - `ans::Bool`: Whether every exposure of the pair is finite.
-
-# Related
-
-  - [`cross_sectional_warmup`](@ref)
-  - [`cross_sectional_eligible`](@ref)
-"""
-function cross_sectional_exposures_finite(Ms::Arr3Num, t::Integer, i::Integer)::Bool
-    for k in axes(Ms, 3)
-        if !isfinite(Ms[t, i, k])
-            return false
-        end
-    end
-    return true
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the number of leading observations a Cross-Sectional Factor Prior discards.
-
-A Descriptor warms up, so the first observations of an exposure history carry no usable asset. An observation is cold when no asset of the estimation universe carries both a finite return and a finite Factor Exposure to every factor. The prior fits from the first observation that is not cold.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-n &= \\min\\left\\{t : \\exists\\, i,\\ e_{ti} = 1,\\ x_{t,\\,i} \\in \\mathbb{R},\\ B_{tik} \\in \\mathbb{R} \\ \\forall k \\in \\{1, \\ldots, K\\}\\right\\} - 1\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``n``: Count of the leading cold observations.
-  - $(math_dict[:e_ti_pnl])
-  - $(math_dict[:x_ti_ret])
-  - $(math_dict[:B_tik_cs])
-  - $(math_dict[:K])
-
-# Arguments
-
-  - `X`: Asset returns, `observations × assets`.
-  - `Ms`: The exposure history, `observations × assets × factors`.
-  - `emsk`: The estimation mask, `observations × assets`.
-
-# Validation
-
-  - At least one observation is not cold. Raises an `ArgumentError`.
-
-# Returns
-
-  - `n::Int`: The count of leading cold observations.
-
-# Related
-
-  - [`cross_sectional_exposure_history`](@ref)
-  - [`CrossSectionalFactorPrior`](@ref)
-"""
-function cross_sectional_warmup(X::MatNum, Ms::Arr3Num, emsk::AbstractMatrix{Bool})::Int
-    for t in axes(Ms, 1)
-        for i in axes(Ms, 2)
-            if emsk[t, i] && isfinite(X[t, i]) && cross_sectional_exposures_finite(Ms, t, i)
-                return t - 1
-            end
-        end
-    end
-    return throw(ArgumentError("no observation of this Asset Panel carries an asset of the estimation universe with both a finite return and a finite Factor Exposure to every factor, so the whole history is Descriptor warm-up. Give more observations, or shorten the warm-up of the Descriptors."))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -427,6 +443,7 @@ A cross-sectional fit of `K` factors needs more assets than factors, and a fit w
 
   - `msk`: The eligibility mask, `observations × assets`.
   - `minra`: The smallest eligible asset count an observation may carry.
+  - `cb`: The observed factors of the fitted observations, from [`cross_sectional_observed_block`](@ref), or `nothing`. An observed return that is `NaN` makes the net return of every asset that holds the factor `NaN`, so the message names the observed factors that have no return at the observation it names, with [`cross_sectional_observed_gap`](@ref).
 
 # Validation
 
@@ -441,29 +458,126 @@ A cross-sectional fit of `K` factors needs more assets than factors, and a fit w
   - [`cross_sectional_eligible`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-function assert_cross_sectional_coverage(msk::AbstractMatrix{Bool}, minra::Integer)::Nothing
+function assert_cross_sectional_coverage(msk::AbstractMatrix{Bool}, minra::Integer,
+                                         cb::Option{<:NamedTuple} = nothing)::Nothing
     n = vec(sum(msk; dims = 2))
     bad = findall(x -> x < minra, n)
     @argcheck(isempty(bad),
-              ArgumentError("$(length(bad)) observation(s) carry fewer than minra = $minra eligible assets, the fewest being $(minimum(view(n, bad))) at observation $(bad[argmin(view(n, bad))]). Widen the coverage of the Descriptors, lower the min_coverage of the Factor Exposures, or lower minra."))
+              ArgumentError("$(length(bad)) observation(s) carry fewer than minra = $minra eligible assets, the fewest being $(minimum(view(n, bad))) at observation $(bad[argmin(view(n, bad))]). Widen the coverage of the Descriptors, lower the min_coverage of the Factor Exposures, or lower minra.$(cross_sectional_observed_gap(cb, bad[argmin(view(n, bad))]))"))
     return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuse a fit whose factor prior states a non-finite factor moment.
+Return the factors whose moments the factor prior of a Cross-Sectional Factor Prior states.
 
-The warm-up of the Descriptors and the warm-up of the factor prior add up. The Descriptors fix the first observation of the factor-return history, and the factor prior then warms up over that history. A window that covers the first warm-up can be too short for the second. A factor prior that gives a `NaN` and does not raise then makes the whole prior non-finite, and a later factorisation fails with no name. So the fit checks the moments that the factor prior gives, and refuses a non-finite one with a message that names the cause.
+A factor is ready when its mean and its variance are finite, which is the rule of the Investable Mask of a [`LowOrderPrior`](@ref) read over the factors. A factor prior with a warm-up can state `NaN` for one factor and finite moments for the others, so the prior reads the moments of the ready factors alone. The covariance of two ready factors must then be finite, or the block of the ready factors states no covariance matrix. A factor prior that is a [`LowOrderPrior`](@ref) already keeps that rule, so the check fails only on moments that a processing step or a direct call gives.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{R} &= \\left\\{k : \\hat{\\mu}_{f,k} \\in \\mathbb{R},\\ \\hat{\\Sigma}_{f,kk} \\in \\mathbb{R}\\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{R}``: The ready factors.
+  - ``\\hat{\\mu}_{f,k}``: Entry ``k`` of the factor mean that the factor prior states.
+  - ``\\hat{\\Sigma}_{f,kl}``: Entry ``(k, l)`` of the factor covariance that the factor prior states.
+
+# Arguments
+
+  - `mu`: The factor means the factor prior stated.
+  - `sigma`: The factor covariance the factor prior stated.
+
+# Validation
+
+  - `mu` and `sigma` agree on the factor axis. Raises a `DimensionMismatch`.
+  - Every entry of `sigma` between two ready factors is finite. Raises an [`IsNonFiniteError`](@ref) that names the first such pair.
+
+# Returns
+
+  - `rdy::BitVector`: `true` at each ready factor.
+
+# Related
+
+  - [`cross_sectional_determined`](@ref)
+  - [`cross_sectional_factor_moments`](@ref)
+  - [`cross_sectional_lift`](@ref)
+"""
+function cross_sectional_ready_factors(mu::VecNum, sigma::MatNum)::BitVector
+    @argcheck(length(mu) == size(sigma, 1) == size(sigma, 2),
+              DimensionMismatch("mu ($(length(mu))) and sigma ($(size(sigma))) must agree on the factor axis"))
+    rdy = BitVector(map(k -> isfinite(mu[k]) && isfinite(sigma[k, k]), eachindex(mu)))
+    c = findfirst(.!isfinite.(sigma) .& rdy .& transpose(rdy))
+    @argcheck(isnothing(c),
+              IsNonFiniteError("the factor prior states a finite mean and a finite variance for factors $(c[1]) and $(c[2]), and a covariance between them of $(sigma[c]), so the block of the factors whose moments it states is not a covariance matrix. Give pe a factor prior whose covariance is finite wherever both factors have a finite mean and a finite variance."))
+    return rdy
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the assets whose factor moments a Cross-Sectional Factor Prior determines.
+
+The mean of an asset reads the factor means only on the support of its loadings, the factors where its loading is not zero. Its covariance with another asset reads the factor covariance only on the two supports. So an asset is determined when its loadings are finite and its support holds only ready factors. A factor that is not ready changes no moment of an asset with a zero loading on it.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{D} &= \\left\\{i : B_{Tik} \\in \\mathbb{R} \\ \\forall k,\\ k \\in \\mathcal{R} \\ \\forall k : B_{Tik} \\neq 0\\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{D}``: The determined assets.
+  - ``\\mathcal{R}``: The ready factors, from [`cross_sectional_ready_factors`](@ref).
+  - $(math_dict[:B_T_cs])
+
+# Arguments
+
+  - `L`: The reduced loadings of the latest observation, `assets × factors`.
+  - `rdy`: `true` at each ready factor.
+
+# Validation
+
+  - `L` and `rdy` agree on the factor axis. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `det::BitVector`: `true` at each determined asset.
+
+# Related
+
+  - [`cross_sectional_ready_factors`](@ref)
+  - [`cross_sectional_investable`](@ref)
+  - [`assert_cross_sectional_factor_moments`](@ref)
+"""
+function cross_sectional_determined(L::MatNum, rdy::AbstractVector{Bool})::BitVector
+    @argcheck(size(L, 2) == length(rdy),
+              DimensionMismatch("L ($(size(L, 2)) columns) and rdy ($(length(rdy))) must agree on the factor axis"))
+    return vec(all(isfinite.(L) .& (transpose(rdy) .| iszero.(L)); dims = 2))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuse a fit whose factor prior determines the moments of no asset.
+
+The warm-up of the Descriptors and the warm-up of the factor prior add up. The Descriptors fix the first observation of the factor-return history, and the factor prior then warms up over that history. A window that covers the first warm-up can be too short for the second, and a factor prior then gives `NaN` and does not raise. An asset whose loadings read only finite factor moments keeps its moments, and every other asset is `NaN` and leaves through the Investable Mask. When no asset is determined, the prior states no moment at all, so the fit refuses with a message that names the cause.
 
 # Arguments
 
   - `mu`: The factor means the factor prior stated.
   - `sigma`: The factor covariance the factor prior stated.
   - `n`: The count of fitted observations the factor prior read.
+  - `det`: `true` at each determined asset, from [`cross_sectional_determined`](@ref).
 
 # Validation
 
-  - Every factor mean and every entry of the factor covariance is finite. Raises an [`IsNonFiniteError`](@ref).
+  - At least one asset is determined. Raises an [`IsNonFiniteError`](@ref) that counts the non-finite factor means and covariance entries.
 
 # Returns
 
@@ -471,16 +585,160 @@ The warm-up of the Descriptors and the warm-up of the factor prior add up. The D
 
 # Related
 
+  - [`cross_sectional_determined`](@ref)
   - [`cross_sectional_warmup`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-function assert_cross_sectional_factor_moments(mu::VecNum, sigma::MatNum,
-                                               n::Integer)::Nothing
-    nfm = count(!isfinite, mu)
-    nfs = count(!isfinite, sigma)
-    @argcheck(iszero(nfm) && iszero(nfs),
-              IsNonFiniteError("the factor prior read the $n observation(s) left after the Descriptor warm-up and the exposure lag, and stated $nfm non-finite factor mean(s) and $nfs non-finite factor covariance entr(ies). A Descriptor's warm-up and the factor prior's own warm-up are cumulative, so a window must cover both. Give more observations, shorten the warm-up of the Descriptors, or give pe a factor prior that estimates from fewer observations."))
+function assert_cross_sectional_factor_moments(mu::VecNum, sigma::MatNum, n::Integer,
+                                               det::AbstractVector{Bool})::Nothing
+    @argcheck(any(det),
+              IsNonFiniteError("the factor prior read the $n observation(s) left after the Descriptor warm-up and the exposure lag, and stated $(count(!isfinite, mu)) non-finite factor mean(s) and $(count(!isfinite, sigma)) non-finite factor covariance entr(ies), so the moments of no asset are determined. A Descriptor's warm-up and the factor prior's own warm-up are cumulative, so a window must cover both. Give more observations, shorten the warm-up of the Descriptors, or give pe a factor prior that estimates from fewer observations."))
     return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Fit the factor prior of a Cross-Sectional Factor Prior on the factors that are not empty, and give every Empty Factor no mean and no variance.
+
+An Empty Factor has a return of zero at every fitted observation, from [`cross_sectional_live_regression`](@ref). A covariance estimator that turns the covariance into a correlation divides by the zero volatility of such a factor, and gives `NaN`. So the function fits `pe` and processes the covariance with `f_mp` on the other factors only. It then puts the answer on the whole factor axis, with a zero return in every scenario, a zero mean, and a zero row and column of the covariance at each Empty Factor. When no factor is empty, the moments are those that `pe` states over `f`.
+
+The method over `pr` takes the factor prior already fitted on the factors that are not empty. The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads its folded factor prior out and gives the result to it, so both routes process and expand the moments with one code.
+
+# Algorithm
+
+ 1. Take the columns of `f` at `lv`, giving `fl`. When every factor is in `lv`, `fl` is `f`.
+ 2. Fit `pe` on `fl`, giving `pr`. The method over `pr` starts at step 3.
+ 3. Process the covariance of `pr` in place with `f_mp`, over `fl`, with [`matrix_processing_block!`](@ref). A factor prior with a warm-up can state `NaN` for one factor and finite moments for the others, so the processing reads the block of the finite variances, and every entry outside it keeps its `NaN`. A covariance with no finite variance has no block, and is not processed.
+ 4. When every factor is in `lv`, return the scenarios, the mean and the covariance of `pr`. Otherwise, write them into the columns at `lv` of a zero scenario matrix `X`, the entries at `lv` of a zero mean `mu`, and the block at `lv` of a zero covariance `sigma`.
+ 5. Divide the scenario weights of `pr` by their sum with [`cross_sectional_scenario_weights`](@ref).
+
+# Arguments
+
+  - `pe`: The factor prior estimator.
+  - `pr`: The factor prior that `pe` states over the columns of `f` at `lv`.
+  - `f_mp`: Matrix processing estimator of the factor covariance.
+  - `f`: The factor returns, `observations × factors`.
+  - `lv`: `true` at each factor that is not empty.
+  - $(arg_dict[:strict]) It is forwarded to `pe`.
+  - `kwargs...`: Additional keyword arguments passed to `matrix_processing!`.
+
+# Validation
+
+  - `lv` has one entry per column of `f`. Raises a `DimensionMismatch`.
+  - The covariance of `pr` is a new matrix, because step 3 processes it in place.
+  - The rules of [`matrix_processing_block!`](@ref) and [`cross_sectional_scenario_weights`](@ref).
+
+# Returns
+
+  - `X::MatNum`: The factor return scenarios of `pr` on the whole factor axis.
+  - `mu::VecNum`: The expected factor returns on the whole factor axis. A mean that `pr` does not state is `NaN`.
+  - `sigma::MatNum`: The processed factor covariance on the whole factor axis. The row and the column of a factor that the factor prior states no variance for are `NaN`.
+  - `w`: The scenario weights of `pr` divided by their sum, or `nothing`.
+  - `ens`, `kld`, `ow`: The effective number of scenarios, the Kullback-Leibler divergence and the original weights of `pr`.
+
+# Related
+
+  - [`cross_sectional_live_regression`](@ref)
+  - [`cross_sectional_lift`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function cross_sectional_factor_moments(pe::AbstractLowOrderPriorEstimator_A_AF,
+                                        f_mp::AbstractMatrixProcessingEstimator, f::MatNum,
+                                        lv::AbstractVector{Bool}; strict::Bool = false,
+                                        kwargs...)
+    @argcheck(length(lv) == size(f, 2),
+              DimensionMismatch("lv ($(length(lv))) must have one entry per column of f ($(size(f, 2)))"))
+    return cross_sectional_factor_moments(prior(pe, all(lv) ? f : f[:, lv];
+                                                strict = strict), f_mp, f, lv; kwargs...)
+end
+function cross_sectional_factor_moments(pr::LowOrderPrior,
+                                        f_mp::AbstractMatrixProcessingEstimator, f::MatNum,
+                                        lv::AbstractVector{Bool}; kwargs...)
+    @argcheck(length(lv) == size(f, 2),
+              DimensionMismatch("lv ($(length(lv))) must have one entry per column of f ($(size(f, 2)))"))
+    live = all(lv)
+    fl = live ? f : f[:, lv]
+    # A factor with no variance has no row to process, so the processing reads the block of
+    # the finite variances, and the `NaN` frame around it stays as it is. With no finite
+    # variance there is no block, and the assembly refuses the fit by name (#1510).
+    if any(isfinite, LinearAlgebra.diag(pr.sigma))
+        matrix_processing_block!(f_mp, pr.sigma, fl; kwargs...)
+    end
+    if live
+        X, mu, sigma = pr.X, pr.mu, pr.sigma
+    else
+        K = length(lv)
+        X = zeros(eltype(pr.X), size(pr.X, 1), K)
+        X[:, lv] = pr.X
+        mu = zeros(eltype(pr.mu), K)
+        mu[lv] = pr.mu
+        sigma = zeros(eltype(pr.sigma), K, K)
+        sigma[lv, lv] = pr.sigma
+    end
+    return (; X = X, mu = mu, sigma = sigma, w = cross_sectional_scenario_weights(pr.w),
+            ens = pr.ens, kld = pr.kld, ow = pr.ow)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Divide the scenario weights of the factor prior of a Cross-Sectional Factor Prior by their sum.
+
+A scenario weight vector states a probability measure over the scenarios only when it sums to one. A ratio estimator, such as the weighted mean ``\\sum_t w_t x_t / \\sum_t w_t``, gives the same answer at every scale of ``w``. A consumer that reads the weights as probabilities, such as a scenario risk measure that forms ``\\sum_t w_t L_t`` and divides by nothing, gives a wrong answer at every other scale. So the prior stores the weights divided by their sum, which every consumer reads correctly. A sum that is zero states no measure, so the function refuses it.
+
+The function keeps the kind of `StatsBase.Weights`, `AnalyticWeights` and `ProbabilityWeights`, as [`nothing_scalar_array_getindex`](@ref) does. The corrected variance of each of these kinds is the same at every scale of the weights. `FrequencyWeights` are counts, so their corrected variance divides by ``\\sum_t w_t - 1``, which is zero after the division. So `FrequencyWeights`, and a kind the function cannot rebuild such as `StatsBase.UnitWeights`, become `StatsBase.ProbabilityWeights`, as the prior probabilities of [`EntropyPoolingPrior`](@ref) do.
+
+# Mathematical definition
+
+```math
+\\begin{aligned}
+p_t &= \\frac{w_t}{\\sum_{s = 1}^{T} w_s}\\,.
+\\end{aligned}
+```
+
+Where:
+
+  - ``p_t``: The scenario weight that the prior stores for scenario ``t``.
+  - ``w_t``: The scenario weight of the factor prior for scenario ``t``.
+  - $(math_dict[:T])
+
+# Algorithm
+
+ 1. `w` is `nothing`: return `nothing`, because no weights means unweighted.
+ 2. `w` is a `StatsBase.Weights`, `AnalyticWeights` or `ProbabilityWeights`: refuse a sum that is not positive, and return weights of the same kind over `w.values` divided by the sum.
+ 3. `w` is any other `StatsBase.AbstractWeights`, `FrequencyWeights` among them: wrap its values in `StatsBase.ProbabilityWeights`, and apply step 2.
+
+# Arguments
+
+  - `w`: The scenario weights of the factor prior, or `nothing`.
+
+# Validation
+
+  - The sum of `w` is positive. Raises a `DomainError` that holds the sum. StatsBase refuses a weight vector whose sum is not finite when it builds the vector, so a sum that reaches this function is finite.
+
+# Returns
+
+  - `p::Option{<:StatsBase.AbstractWeights}`: The weights `w` divided by their sum, or `nothing`.
+
+# Related
+
+  - [`cross_sectional_factor_moments`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function cross_sectional_scenario_weights(::Nothing)
+    return nothing
+end
+function cross_sectional_scenario_weights(w::Union{<:StatsBase.Weights,
+                                                   <:StatsBase.AnalyticWeights,
+                                                   <:StatsBase.ProbabilityWeights})
+    s = sum(w)
+    @argcheck(s > zero(s),
+              DomainError(s,
+                          "the scenario weights of the factor prior sum to $s, so they state no probability measure over the scenarios. A Cross-Sectional Factor Prior divides its scenario weights by their sum, which must be positive. Give pe a factor prior whose weights are not all zero."))
+    return Base.typename(typeof(w)).wrapper(w.values / s)
+end
+function cross_sectional_scenario_weights(w::StatsBase.AbstractWeights)
+    return cross_sectional_scenario_weights(StatsBase.pweights(collect(w)))
 end
 """
     cross_sectional_variance_counts(cnt::Nothing, csr::CrossSectionalRegression)
@@ -555,32 +813,28 @@ D_{ij} &= \\sqrt{v_{Ti} \\, v_{Tj}} \\, \\tilde{\\rho}_{ij}\\,.
 
 Where:
 
-  - ``C_{ij}``: Entry of the covariance that `ce` estimates from the filled standardised idiosyncratic returns ``\\tilde{z}_{ti}``.
+  - ``C_{ij}``: Entry of the covariance that `ce` estimates from the standardised idiosyncratic returns ``z_{ti}``, with no fill. A cell with no finite value stays a gap for `ce`, because a value written into it is not an observation of the pair: the mean of the other assets of its observation, which the scenarios take, would correlate the asset with each of them.
   - ``\\rho_{ij}``, ``\\tilde{\\rho}_{ij}``: Correlation of assets ``i`` and ``j``, before and after the threshold. The indicator is ``0`` when ``\\rho_{ij}`` is not finite.
   - ``\\tau``: The correlation threshold. At ``\\tau = 0`` the answer is the vector of the latest variances ``v_{Ti}``, which is the diagonal of ``\\mathbf{D}``.
   - ``D_{ij}``: Entry of ``\\mathbf{D}``.
   - $(math_dict[:D_orth])
-  - $(math_dict[:ztilde_ti_idio])
+  - $(math_dict[:z_ti_idio])
   - $(math_dict[:v_ti_idio])
   - $(math_dict[:T])
 
 # Algorithm
 
  1. If `th` is zero, return `ev`, the latest idiosyncratic variances. The block then carries a vector, and the asset covariance takes a diagonal.
- 2. Otherwise, get `fv` from `ce` with [`gap_fill_value`](@ref). `fv` is the value that `ce` gives a gapped cell of `S`. A cell of `S` is non-finite only where the asset is inactive.
- 3. If `fv` is finite, write it over every non-finite cell of a copy of `S`, and estimate the covariance `C` of that copy with `ce`. The fallback `fv` is zero, which is the mean of a standardised series.
- 4. If `fv` is not finite, estimate `C` from `S` as it stands, with `amsk` as the `active_mask`. A gap-aware `ce` then freezes the block of an inactive asset and does not decay it.
- 5. Convert `C` to the correlation `R`.
- 6. Set to zero every entry of `R` off the diagonal whose magnitude does not exceed `th`, and set the diagonal to one. This step also sets a non-finite correlation to zero.
- 7. Rescale `R` by the latest idiosyncratic volatilities, giving `D`.
- 8. Make the block of `D` over the assets with a finite variance positive definite with [`posdef!`](@ref).
+ 2. If `S` is `nothing`, the carry fold folded `ce` over the rows, so read `C` from the state of `ce` with the call of `Statistics.cov` with no data.
+ 3. Otherwise, take the rows and the keyword arguments of `ce` with [`cross_sectional_correlation_rows`](@ref), and estimate the covariance `C` of the rows with `ce`.
+ 4. Threshold, rescale and repair `C` with [`cross_sectional_thresholded_covariance`](@ref).
 
 # Arguments
 
   - `th`: The correlation threshold.
-  - `ce`: Covariance estimator of the standardised idiosyncratic returns.
+  - `ce`: Covariance estimator of the standardised idiosyncratic returns. When `S` is `nothing`, it is the estimator that the carry fold folded over them.
   - `pdm`: Positive definite matrix estimator, or `nothing`.
-  - `S`: Standardised idiosyncratic returns, `observations × assets`.
+  - `S`: Standardised idiosyncratic returns with no fill, `observations × assets`, from [`cross_sectional_standardised_residuals`](@ref) with `filled = false`, or `nothing` when `ce` carries their fold.
   - `ev`: The latest idiosyncratic variances, one per asset.
   - `amsk`: The active mask, `observations × assets`. Only a `ce` with a non-finite [`gap_fill_value`](@ref) reads it.
 
@@ -592,6 +846,8 @@ Where:
 # Related
 
   - [`cross_sectional_standardised_residuals`](@ref)
+  - [`cross_sectional_correlation_rows`](@ref)
+  - [`cross_sectional_thresholded_covariance`](@ref)
   - [`gap_fill_value`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
@@ -605,37 +861,20 @@ function cross_sectional_idiosyncratic_covariance(th::Real,
     if iszero(th)
         return ev
     end
-    fv = gap_fill_value(ce)
-    C = if isfinite(fv)
-        Z = Matrix{real(eltype(S))}(S)
-        for k in CartesianIndices(Z)
-            if !isfinite(Z[k])
-                Z[k] = fv
-            end
-        end
-        Statistics.cov(ce, Z; dims = 1)
+    (; X, kw) = cross_sectional_correlation_rows(ce, S, amsk)
+    return cross_sectional_thresholded_covariance(th, pdm,
+                                                  Statistics.cov(ce, X; dims = 1, kw...),
+                                                  ev)
+end
+function cross_sectional_idiosyncratic_covariance(th::Real,
+                                                  ce::StatsBase.CovarianceEstimator,
+                                                  pdm::Option{<:AbstractPosdefEstimator},
+                                                  ::Nothing, ev::VecNum, ::Any)
+    return if iszero(th)
+        ev
     else
-        Statistics.cov(ce, S; dims = 1, active_mask = amsk)
+        cross_sectional_thresholded_covariance(th, pdm, Statistics.cov(ce), ev)
     end
-    s = sqrt.(LinearAlgebra.diag(C))
-    R = StatsBase.cov2cor(Matrix(C), s)
-    for k in CartesianIndices(R)
-        if k[1] != k[2] && !(abs(R[k]) > th)
-            R[k] = zero(eltype(R))
-        end
-    end
-    for i in axes(R, 1)
-        R[i, i] = one(eltype(R))
-    end
-    se = sqrt.(ev)
-    D = R .* se .* transpose(se)
-    idx = findall(isfinite, ev)
-    if !isempty(idx)
-        B = D[idx, idx]
-        posdef!(pdm, B)
-        D[idx, idx] = B
-    end
-    return D
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -693,6 +932,8 @@ Return the standardised idiosyncratic returns a scenario set is rebuilt from.
 
 The function divides each idiosyncratic return by the idiosyncratic volatility of the same observation, so the whole history is on one scale and the latest volatilities can rescale it. An active pair whose standardised return is not finite takes the average standardised return of its own observation, so a sparse history does not shorten the scenario set. An inactive pair stays `NaN`.
 
+Under `filled = false` the function returns ``z_{ti}`` with `NaN` at every cell that is not finite, and writes no average. The estimate of the idiosyncratic correlation reads that form, see [`cross_sectional_idiosyncratic_covariance`](@ref): the average of the other assets of an observation is not an observation of the pair, and it would correlate the asset with each of them.
+
 # Mathematical definition
 
 ```math
@@ -725,23 +966,30 @@ A zero variance gives ``0 / 0`` or ``\\pm\\infty``, and a variance still in warm
   - `eps`: Idiosyncratic returns, `observations × assets`.
   - `vs`: Idiosyncratic variance history, `observations × assets`.
   - `amsk`: The active mask, `observations × assets`.
+  - `filled`: When `true`, an active cell that is not finite takes ``\\bar{z}_{t}``. When `false`, it is `NaN`.
 
 # Returns
 
-  - `S::Matrix{<:Real}`: The standardised idiosyncratic returns, `observations × assets`.
+  - `S::Matrix{<:Real}`: The standardised idiosyncratic returns, `observations × assets`: ``\\tilde{z}_{ti}`` under `filled = true`, and ``z_{ti}`` with `NaN` at each cell that is not finite under `filled = false`.
 
 # Related
 
   - [`cross_sectional_finite_mean`](@ref)
   - [`cross_sectional_scenarios`](@ref)
+  - [`cross_sectional_idiosyncratic_covariance`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
 function cross_sectional_standardised_residuals(eps::MatNum, vs::MatNum,
-                                                amsk::AbstractMatrix{Bool})
+                                                amsk::AbstractMatrix{Bool};
+                                                filled::Bool = true)
     Tf = promote_type(real(eltype(eps)), real(eltype(vs)))
     S = Matrix{Tf}(undef, size(eps))
     for k in CartesianIndices(S)
-        S[k] = amsk[k] ? Tf(eps[k]) / sqrt(Tf(vs[k])) : Tf(NaN)
+        z = amsk[k] ? Tf(eps[k]) / sqrt(Tf(vs[k])) : Tf(NaN)
+        S[k] = filled || isfinite(z) ? z : Tf(NaN)
+    end
+    if !filled
+        return S
     end
     for t in axes(S, 1)
         avg = cross_sectional_finite_mean(S, t)
@@ -818,13 +1066,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the assets a Cross-Sectional Factor Prior can state a finite moment for.
 
-The prior fits on the coverage universe and answers on it, so an asset that it cannot state a moment for stays in the result and carries `NaN`. An asset is investable when the Asset Panel activates it at the latest observation, its latest idiosyncratic variance is finite, and its latest loadings are finite.
+The prior fits on the coverage universe and answers on it, so an asset that it cannot state a moment for stays in the result and carries `NaN`. An asset is investable when the Asset Panel activates it at the latest observation, its latest idiosyncratic variance is finite, and the factor prior determines its factor moments.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathcal{I} &= \\left\\{i : a_{Ti} = 1,\\ v_{Ti} \\in \\mathbb{R},\\ B_{Tik} \\in \\mathbb{R} \\ \\forall k \\in \\{1, \\ldots, K\\}\\right\\}\\,.
+\\mathcal{I} &= \\left\\{i : a_{Ti} = 1,\\ v_{Ti} \\in \\mathbb{R},\\ i \\in \\mathcal{D}\\right\\}\\,.
 \\end{align}
 ```
 
@@ -833,15 +1081,14 @@ Where:
   - $(math_dict[:I_inv])
   - $(math_dict[:a_ti_pnl])
   - $(math_dict[:v_ti_idio])
-  - $(math_dict[:B_T_cs])
+  - ``\\mathcal{D}``: The determined assets, from [`cross_sectional_determined`](@ref).
   - $(math_dict[:T])
-  - $(math_dict[:K])
 
 # Arguments
 
   - `amsk`: The active mask of the latest observation, one entry per asset.
-  - `L`: The reduced loadings of the latest observation, `assets × factors`.
   - `ev`: The latest idiosyncratic variances, one per asset.
+  - `det`: `true` at each determined asset.
 
 # Returns
 
@@ -850,27 +1097,12 @@ Where:
 # Related
 
   - [`investable_mask`](@ref)
+  - [`cross_sectional_determined`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
 """
-function cross_sectional_investable(amsk::AbstractVector{Bool}, L::MatNum,
-                                    ev::VecNum)::Vector{Int}
-    idx = Int[]
-    for i in eachindex(amsk)
-        if !(amsk[i] && isfinite(ev[i]))
-            continue
-        end
-        ok = true
-        for k in axes(L, 2)
-            if !isfinite(L[i, k])
-                ok = false
-                break
-            end
-        end
-        if ok
-            push!(idx, i)
-        end
-    end
-    return idx
+function cross_sectional_investable(amsk::AbstractVector{Bool}, ev::VecNum,
+                                    det::AbstractVector{Bool})::Vector{Int}
+    return findall(i -> amsk[i] && isfinite(ev[i]) && det[i], eachindex(amsk))
 end
 """
     cross_sectional_panel_masks(pnl::AssetPanel{<:Any, Nothing, Nothing}) -> Union{}
@@ -1138,15 +1370,16 @@ function cross_sectional_basis_now(fcb::FactorFamilyBasis, r)
     return factor_basis_slice(fcb, r)
 end
 """
-    cross_sectional_expand(fcb::Nothing, r, lag::Integer, f, mu, sigma) -> NamedTuple
-    cross_sectional_expand(fcb::FactorFamilyBasis, r, lag::Integer, f, mu, sigma)
-        -> NamedTuple
+    cross_sectional_expand(fcb::Nothing, r, lag::Integer, f) -> Nothing
+    cross_sectional_expand(fcb::FactorFamilyBasis, r, lag::Integer, f) -> MatNum
+    cross_sectional_expand(fcb::Nothing, r, mu, sigma) -> NamedTuple
+    cross_sectional_expand(fcb::FactorFamilyBasis, r, mu, sigma) -> NamedTuple
 
-Expand a factor distribution from the reduced axis onto the raw one.
+Expand the realised factor returns, or the factor moments, from the reduced axis onto the raw one.
 
-The nested factor prior of a [`LowOrderPrior`](@ref) is on the raw axis, so a constraint written in the name of a dropped factor still resolves. A prior that constrains no Factor Family already fits on the raw axis, and the `nothing` method takes that case.
+The nested factor prior of a [`LowOrderPrior`](@ref) is on the raw axis, so a constraint written in the name of a dropped factor still resolves. A prior that constrains no Factor Family already fits on the raw axis, and the `nothing` methods take that case: the moments pass through, and the returns give `nothing`, because a block with no re-basis carries no second copy of its factor returns.
 
-The fit of observation `t` regresses the returns of `t` on the exposures of `t - lag`, so its coefficients are coordinates in the basis of `t - lag`. So the realised factor returns expand with the lagged ratios. The moments describe the next observation, so they expand with the current ratios. The function takes the whole basis and slices it twice. Two slice arguments could hold one basis and one `nothing`, and no method takes that pair.
+The fit of observation `t` regresses the returns of `t` on the exposures of `t - lag`, so its coefficients are coordinates in the basis of `t - lag`. So the realised factor returns expand with the lagged ratios, and the prior stores the answer on the block as `fr` before the moments exist. The block's own `fcb` covers its rows alone, so it cannot expand the first `lag` rows, and this is the one place where their basis still exists. The moments describe the next observation, so they expand with the ratios of the last fitted observation. Each method takes the whole basis and slices it. Two slice arguments could hold one basis and one `nothing`, and no method takes that pair.
 
 # Arguments
 
@@ -1163,7 +1396,7 @@ The fit of observation `t` regresses the returns of `t` on the exposures of `t -
 
 # Returns
 
-  - `f::MatNum`: The realised factor returns on the raw axis.
+  - `fr::Option{<:MatNum}`: The realised factor returns on the raw axis, or `nothing` with no re-basis.
   - `mu::VecNum`: The expected factor returns on the raw axis.
   - `sigma::MatNum`: The factor covariance on the raw axis.
 
@@ -1173,20 +1406,24 @@ The fit of observation `t` regresses the returns of `t` on the exposures of `t -
   - [`expand_factor_returns`](@ref)
   - [`expand_factor_mu`](@ref)
   - [`expand_factor_covariance`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
 """
-function cross_sectional_expand(::Nothing, r, ::Integer, f::MatNum, mu::VecNum,
-                                sigma::MatNum)
-    return (; f = f, mu = mu, sigma = sigma)
+function cross_sectional_expand(::Nothing, r, ::Integer, ::MatNum)
+    return nothing
 end
-function cross_sectional_expand(fcb::FactorFamilyBasis, r, lag::Integer, f::MatNum,
-                                mu::VecNum, sigma::MatNum)
+function cross_sectional_expand(fcb::FactorFamilyBasis, r, lag::Integer, f::MatNum)
+    return expand_factor_returns(factor_basis_slice(fcb, r .- lag), f)
+end
+function cross_sectional_expand(::Nothing, r, mu::VecNum, sigma::MatNum)
+    return (; mu = mu, sigma = sigma)
+end
+function cross_sectional_expand(fcb::FactorFamilyBasis, r, mu::VecNum, sigma::MatNum)
     now = factor_basis_slice(fcb, r)
-    return (; f = expand_factor_returns(factor_basis_slice(fcb, r .- lag), f),
-            mu = expand_factor_mu(now, mu), sigma = expand_factor_covariance(now, sigma))
+    return (; mu = expand_factor_mu(now, mu), sigma = expand_factor_covariance(now, sigma))
 end
 """
-    cross_sectional_residual_block(esigma::VecNum, idx) -> NamedTuple
-    cross_sectional_residual_block(esigma::MatNum, idx) -> NamedTuple
+    cross_sectional_residual_block(esigma::VecNum, idx, mtx_sqrt = EigenFallbackSquareRoot()) -> NamedTuple
+    cross_sectional_residual_block(esigma::MatNum, idx, mtx_sqrt = EigenFallbackSquareRoot()) -> NamedTuple
 
 Return the idiosyncratic block of the asset covariance and a square root of it.
 
@@ -1198,14 +1435,14 @@ The idiosyncratic covariance is a vector of variances or a full matrix, and each
 \\begin{align}
 \\mathbf{R} &= \\begin{cases}
     \\operatorname{diag}\\left(\\sqrt{v_{Ti}}\\right)_{i \\in \\mathcal{I}} & \\mathbf{D} \\text{ diagonal}\\,, \\\\
-    \\operatorname{chol}\\left(\\mathbf{D}_{\\mathcal{I}\\mathcal{I}}\\right) & \\text{otherwise}\\,.
+    \\operatorname{sqrt}\\left(\\mathbf{D}_{\\mathcal{I}\\mathcal{I}}\\right) & \\text{otherwise}\\,.
 \\end{cases}
 \\end{align}
 ```
 
 Where:
 
-  - ``\\operatorname{chol}``: Lower Cholesky factor.
+  - ``\\operatorname{sqrt}``: The square root that [`matrix_square_root`](@ref) takes under `mtx_sqrt`. By default it is the lower Cholesky factor of a positive definite matrix, and the eigen square root of a singular one.
   - $(math_dict[:R_idio])
   - $(math_dict[:D_orth])
   - $(math_dict[:I_inv])
@@ -1216,10 +1453,11 @@ Where:
 
   - `esigma`: The idiosyncratic variances, or the idiosyncratic covariance.
   - `idx`: The investable assets.
+  - $(arg_dict[:mtx_sqrt]) The vector method reads no square-root algorithm.
 
 # Validation
 
-  - A full block restricted to `idx` factorises. Raises a `PosDefException`.
+  - A full block restricted to `idx` has a square root under `mtx_sqrt`. Raises a `LinearAlgebra.PosDefException`.
 
 # Returns
 
@@ -1231,38 +1469,101 @@ Where:
   - [`cross_sectional_lift`](@ref)
   - [`cross_sectional_idiosyncratic_covariance`](@ref)
 """
-function cross_sectional_residual_block(esigma::VecNum, idx::AbstractVector{<:Integer})
+function cross_sectional_residual_block(esigma::VecNum, idx::AbstractVector{<:Integer},
+                                        ::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
     d = esigma[idx]
     return (; D = LinearAlgebra.diagm(d), R = LinearAlgebra.diagm(sqrt.(d)))
 end
-function cross_sectional_residual_block(esigma::MatNum, idx::AbstractVector{<:Integer})
+function cross_sectional_residual_block(esigma::MatNum, idx::AbstractVector{<:Integer},
+                                        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     D = esigma[idx, idx]
-    return (; D = D, R = Matrix(LinearAlgebra.cholesky(D).L))
+    return (; D = D, R = Matrix(matrix_square_root(mtx_sqrt, D)))
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the Systematic Repair rule of a [`CrossSectionalFactorPrior`](@ref), the rule that says whether the lift repairs the systematic block before it adds the idiosyncratic block.
+
+[`cross_sectional_lift`](@ref) projects the factor covariance onto the investable assets. The result is the systematic block, whose rank is at most the number of factors. So the block is not positive definite when the investable assets outnumber the factors, and a repair under `mp.pdm` moves it by round-off alone. The lift then adds the idiosyncratic block and repairs the sum under `mp.pdm`, under every rule. The rule decides only which steps of `mp` run on the systematic block before the sum.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractSystematicRepair` and implement the following method:
+
+## `systematic_processing!`
+
+  - `systematic_processing!(srep::MySystematicRepair, mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum; kwargs...) -> MatNum`: Processes the systematic block `sigma` in place under `mp`, and returns it.
+
+### Arguments
+
+  - `srep`: The member of the family.
+  - `mp`: The matrix processing estimator of the prior.
+  - `sigma`: The systematic block, `investable assets × investable assets`.
+  - `X`: The asset return scenarios of the investable assets, `scenarios × investable assets`.
+  - `kwargs...`: Additional keyword arguments passed to the steps of `mp`.
+
+### Returns
+
+  - `sigma::MatNum`: The systematic block, modified in place.
+
+# Related
+
+  - [`SystematicRepair`](@ref)
+  - [`NoSystematicRepair`](@ref)
+  - [`systematic_processing!`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`cross_sectional_lift`](@ref)
+"""
+abstract type AbstractSystematicRepair <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the Carry Rule of a [`CrossSectionalFactorPrior`](@ref), the rule that says whether the carry fold accepts a part whose step cost grows with the stream.
+
+The carry fold folds each part that has a fold of its own. It fits every other part again at each step, over every row that the part reads. That refit is exact, but its cost grows with the number of folded observations. Five kinds of part do that, as [`carry_growing_parts`](@ref) states: a factor with no finite look-back, a Return Forecast with no bounded fold, a `ve` that does not fold, a factor prior `pe` that does not fold, and the idiosyncratic correlation under `th > 0` with a `ce` that does not fold. Every test reads the configuration alone, so the constructor of the prior applies the rule. A batch fit and the refit under [`Online`](@ref) ignore it.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. The constructor of [`CrossSectionalFactorPrior`](@ref) passes the rule and the configuration to [`assert_carry_rule`](@ref), which dispatches on the type of the rule. A new rule needs its own method of that check. The carry fold runs the same step under every rule, so a rule that changes the step needs its own method of the step too.
+
+# Related
+
+  - [`FoldOrRefit`](@ref)
+  - [`FoldOnly`](@ref)
+  - [`assert_carry_rule`](@ref)
+  - [`carry_growing_parts`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`CrossSectionalCarryState`](@ref)
+"""
+abstract type AbstractCarryRule <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Lift a factor distribution onto the assets of a Cross-Sectional Factor Prior.
 
-The square root `chol` factorises the factor model before `mp` processes it, as in [`factor_lift`](@ref). So `chol' * chol` equals `sigma` only when the processing leaves the matrix unchanged, which the default `mp` does to a positive definite matrix. A detoning `mp` moves `sigma` and leaves `chol` where it was.
+The square root `chol` factorises the factor model before `mp` processes it, as in [`factor_lift`](@ref). [`matrix_square_root`](@ref) takes the square root of each block under `mtx_sqrt`. So `chol' * chol` equals `sigma` only when the processing leaves the matrix unchanged, which the default `mp` does to a positive definite matrix. A detoning `mp` moves `sigma` and leaves `chol` where it was.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\boldsymbol{\\mu}_{\\mathcal{I}} &= \\mathbf{B}_{T,\\,\\mathcal{I}} \\, \\boldsymbol{\\mu}_{f}\\,, \\\\
-\\mathbf{\\Sigma}_{\\mathcal{I}\\mathcal{I}} &= \\mathbf{B}_{T,\\,\\mathcal{I}} \\, \\mathbf{F} \\, \\mathbf{B}_{T,\\,\\mathcal{I}}^{\\intercal} + \\mathbf{D}_{\\mathcal{I}\\mathcal{I}}\\,, \\\\
-\\mathbf{C} &= \\begin{bmatrix} \\mathbf{B}_{T,\\,\\mathcal{I}} \\, \\operatorname{chol}(\\mathbf{F}) & \\mathbf{R} \\end{bmatrix}^{\\intercal}\\,.
+\\mathcal{S} &= \\left\\{i : B_{Tik} \\in \\mathbb{R} \\ \\forall k \\in \\{1, \\ldots, K\\}\\right\\}\\,, \\\\
+\\boldsymbol{\\mu}_{\\mathcal{S}} &= \\mathbf{B}_{T,\\,\\mathcal{S}} \\odot \\boldsymbol{\\mu}_{f}\\,, \\\\
+\\mathbf{\\Sigma}_{\\mathcal{S}\\mathcal{S}} &= \\mathbf{B}_{T,\\,\\mathcal{S}} \\odot \\mathbf{F} \\odot \\mathbf{B}_{T,\\,\\mathcal{S}}^{\\intercal} + \\mathbf{D}_{\\mathcal{S}\\mathcal{S}}\\,, \\\\
+\\mathbf{C}_{\\cdot\\mathcal{I}} &= \\begin{bmatrix} \\mathbf{B}_{T,\\,\\mathcal{I}} \\, \\operatorname{chol}(\\mathbf{F}_{\\mathcal{R}\\mathcal{R}}) & \\mathbf{R} \\end{bmatrix}^{\\intercal}\\,.
 \\end{align}
 ```
 
 Where:
 
+  - ``\\mathcal{S}``: Assets with finite latest loadings, the assets whose systematic part the model states. It holds ``\\mathcal{I}``. The contract of [`factor_exposure`](@ref) writes `NaN` at every inactive cell, so an asset of ``\\mathcal{S}`` is active at the latest observation.
   - ``\\boldsymbol{\\mu}``: Expected asset returns.
   - ``\\mathbf{\\Sigma}``: Asset covariance.
   - ``\\mathbf{C}``: Low-rank square root of the asset covariance, ``(K + \\lvert \\mathcal{I} \\rvert) \\times N`` over the full asset universe.
-  - ``\\mathbf{B}_{T,\\,\\mathcal{I}}``: The rows of ``\\mathbf{B}_{T}`` at the investable assets.
-  - ``\\operatorname{chol}``: Lower Cholesky factor.
+  - ``\\mathbf{B}_{T,\\,\\mathcal{S}}``, ``\\mathbf{B}_{T,\\,\\mathcal{I}}``: The rows of ``\\mathbf{B}_{T}`` at the assets of ``\\mathcal{S}`` and of ``\\mathcal{I}``.
+  - ``\\odot``: The product over the support of each row of loadings, from [`support_product`](@ref). It reads a factor moment only where the loading is not zero, so a factor moment that is `NaN` reaches only the entries of the assets that load on it.
+  - ``\\operatorname{chol}``: The square root that [`matrix_square_root`](@ref) takes under `mtx_sqrt`. By default it is the lower Cholesky factor of a positive definite matrix, and the eigen square root of a singular one. Of a factor covariance with a zero row and column, which an Empty Factor carries, it is the square root of the block of the other factors, with a zero row and column at the Empty Factor. It is written on the factor axis, with a zero row and column at each factor outside ``\\mathcal{R}``.
+  - ``\\mathcal{R}``: The ready factors, from [`cross_sectional_ready_factors`](@ref).
   - $(math_dict[:B_T_cs])
   - $(math_dict[:mu_f_patt])
   - $(math_dict[:F_patt])
@@ -1270,19 +1571,24 @@ Where:
   - $(math_dict[:R_idio])
   - $(math_dict[:I_inv])
 
-A consequence of the definition: ``\\mathbf{C}_{\\cdot\\mathcal{I}}^{\\intercal} \\mathbf{C}_{\\cdot\\mathcal{I}} = \\mathbf{\\Sigma}_{\\mathcal{I}\\mathcal{I}}``. Every entry of ``\\boldsymbol{\\mu}``, ``\\mathbf{\\Sigma}`` and ``\\mathbf{C}`` outside the investable set is `NaN`.
+A consequence of the definition: ``\\mathbf{C}_{\\cdot\\mathcal{I}}^{\\intercal} \\mathbf{C}_{\\cdot\\mathcal{I}} = \\mathbf{\\Sigma}_{\\mathcal{I}\\mathcal{I}}``.
+
+The answer states an entry exactly when the model determines it. An asset of ``\\mathcal{S}`` outside ``\\mathcal{I}`` has no idiosyncratic variance, as in the warm-up of its variance. Its entry of ``\\boldsymbol{\\mu}`` is finite, and so is its covariance with each other asset of ``\\mathcal{S}`` when ``\\mathbf{D}`` is diagonal, because the model sets the idiosyncratic covariance of two assets to zero. Its variance is `NaN`, and so is each covariance that reads its variance through an idiosyncratic correlation. The first ``K`` entries of its column of ``\\mathbf{C}``, its systematic root, are finite, and the rest are `NaN`. Every entry outside ``\\mathcal{S}`` is `NaN`. An asset of ``\\mathcal{S}`` whose loadings read a factor that the factor prior states no moment for is outside ``\\mathcal{I}`` too. Its entries are `NaN` exactly where the product reads a `NaN` factor moment, and its systematic root is `NaN`, because a root of its factor covariance does not exist. The Investable Mask needs a finite mean and a finite variance, so it still leaves out every asset outside ``\\mathcal{I}``. `mp` processes the block over ``\\mathcal{I}`` alone, so an entry outside that block is the one the model states before any processing.
 
 # Algorithm
 
  1. Take `Li`, the rows of `L` at the investable assets. Get `D` and `R` from [`cross_sectional_residual_block`](@ref).
- 2. Project the factor mean through `Li`, giving `mui`, and the factor covariance, giving `si`.
- 3. Process `si` with `mp`, as [`factor_lift`](@ref) does.
+ 2. Project the factor mean through `Li`, giving `mui`, and the factor covariance, giving `si`, each with [`support_product`](@ref).
+ 3. Process `si` under `srep` with [`systematic_processing!`](@ref). [`SystematicRepair`](@ref) runs every step of `mp`, as [`factor_lift`](@ref) does, and [`NoSystematicRepair`](@ref) runs every step except the `:pdm` step.
  4. Add `D` to `si`, and make the sum positive definite with `mp.pdm`.
- 5. Build `ci`, the low-rank square root `[Li * chol(f_sigma).L  R]`.
- 6. Scatter `mui`, `si` and `ci` into the full asset universe, giving `mu`, `sigma` and `chol`, with `NaN` at every asset outside `idx`.
+ 5. Take the ready factors of `f_mu` and `f_sigma` with [`cross_sectional_ready_factors`](@ref), and `lf`, the ready factors whose column of `f_sigma` over the ready factors is not zero. Take the square root `Lf` of the block of `f_sigma` at `lf` under `mtx_sqrt`, and write it into the block at `lf` of a zero matrix `Cf`.
+ 6. Build `ci`, the low-rank square root `[Li * Cf  R]`.
+ 7. Take `sdx`, the assets whose row of `L` is finite, and `Ls`, their rows. Project the factor covariance through `Ls` with [`support_product`](@ref), and add the block of `esigma` at `sdx`, giving `ss`. A `NaN` variance in `esigma` makes `NaN` the entries that read it. Take `cdx`, the assets of `sdx` whose loadings are zero at every factor that is not ready.
+ 8. Write the product of `Ls` and `f_mu` with [`support_product`](@ref) and `ss` at `sdx`, and the systematic root `L * Cf` at `cdx`, into the full asset universe, over `NaN`. Then write `mui`, `si` and `ci` at `idx` over them, giving `mu`, `sigma` and `chol`. Write `NaN` on the diagonal of `sigma` at every asset of `sdx` outside `idx`, so the Investable Mask of the answer is never wider than `idx`.
 
 # Arguments
 
+  - $(arg_dict[:srep])
   - `mp`: Matrix processing estimator.
   - `L`: The reduced loadings of the latest observation, `assets × factors`.
   - `f_mu`: Expected factor returns on the reduced axis.
@@ -1290,43 +1596,81 @@ A consequence of the definition: ``\\mathbf{C}_{\\cdot\\mathcal{I}}^{\\intercal}
   - `esigma`: The idiosyncratic variances, or the idiosyncratic covariance.
   - `idx`: The investable assets.
   - `Xs`: The asset return scenarios, `scenarios × assets`, which the processing reads.
+  - $(arg_dict[:mtx_sqrt])
 
 # Validation
 
   - `L`, `f_mu` and `f_sigma` agree on the factor axis. Raises a `DimensionMismatch`.
+  - The rules of [`cross_sectional_ready_factors`](@ref) on `f_mu` and `f_sigma`.
+  - The block of `f_sigma` at `lf` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`.
+  - Each asset of `idx` reads finite factor moments alone, as [`cross_sectional_determined`](@ref) states. The function does not check it.
 
 # Returns
 
-  - `mu::Vector{<:Real}`: Expected asset returns, `NaN` at a non-investable asset.
-  - `sigma::Matrix{<:Real}`: Asset covariance, `NaN` in the row and the column of a non-investable asset.
-  - `chol::Matrix{<:Real}`: The low-rank square root, `NaN` in the column of a non-investable asset.
+  - `mu::Vector{<:Real}`: Expected asset returns, `NaN` at an asset outside ``\\mathcal{S}`` and at an asset whose loadings read a `NaN` factor mean.
+  - `sigma::Matrix{<:Real}`: Asset covariance, `NaN` at every entry the model does not determine.
+  - `chol::Matrix{<:Real}`: The low-rank square root, `NaN` in the column of an asset outside ``\\mathcal{S}`` or of an asset whose loadings read a factor that is not ready, and below the first ``K`` rows of an asset outside ``\\mathcal{I}``.
 
 # Related
 
   - [`factor_lift`](@ref)
   - [`cross_sectional_residual_block`](@ref)
+  - [`cross_sectional_ready_factors`](@ref)
+  - [`support_product`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
+  - [`AbstractSystematicRepair`](@ref)
+  - [`systematic_processing!`](@ref)
 """
-function cross_sectional_lift(mp::AbstractMatrixProcessingEstimator, L::MatNum,
+function cross_sectional_lift(srep::AbstractSystematicRepair,
+                              mp::AbstractMatrixProcessingEstimator, L::MatNum,
                               f_mu::VecNum, f_sigma::MatNum, esigma::VecNum_MatNum,
-                              idx::AbstractVector{<:Integer}, Xs::MatNum; kwargs...)
+                              idx::AbstractVector{<:Integer}, Xs::MatNum;
+                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
+                              kwargs...)
     @argcheck(size(L, 2) == length(f_mu) == size(f_sigma, 1),
               DimensionMismatch("L ($(size(L, 2)) columns), f_mu ($(length(f_mu))) and f_sigma ($(size(f_sigma, 1)) rows) must agree on the factor axis"))
     Li = L[idx, :]
-    (; D, R) = cross_sectional_residual_block(esigma, idx)
-    mui = Li * f_mu
-    si = Li * f_sigma * transpose(Li)
-    matrix_processing!(mp, si, Xs[:, idx]; kwargs...)
+    (; D, R) = cross_sectional_residual_block(esigma, idx, mtx_sqrt)
+    # A factor that the factor prior states no moment for is `NaN`, and `0 * NaN` is `NaN`,
+    # so each product reads the factor moments on the support of the loadings alone (#1510).
+    mui = support_product(Li, f_mu)
+    si = support_product(Li, f_sigma, Li)
+    systematic_processing!(srep, mp, si, view(Xs, :, idx); kwargs...)
     si .+= D
     posdef!(mp.pdm, si)
-    ci = hcat(Li * Matrix(LinearAlgebra.cholesky(f_sigma).L), R)
+    rdy = cross_sectional_ready_factors(f_mu, f_sigma)
+    lf = findall(k -> rdy[k] && !all(iszero, view(f_sigma, rdy, k)), axes(f_sigma, 2))
+    Lf = matrix_square_root(mtx_sqrt, f_sigma[lf, lf])
+    Cf = zeros(eltype(Lf), size(f_sigma))
+    Cf[lf, lf] = Lf
+    ci = hcat(Li * Cf, R)
+    # An asset with finite loadings and no idiosyncratic variance, one in the warm-up of its
+    # variance, still has a mean and, under a diagonal block, a covariance with every other
+    # asset that the model states. Only the entries that read its variance are `NaN`, and
+    # the idiosyncratic block writes them (#1384).
+    sdx = findall(i -> all(isfinite, view(L, i, :)), axes(L, 1))
+    Ls = L[sdx, :]
+    # The product is symmetric only to rounding, and a covariance is exactly symmetric.
+    ss = Matrix(LinearAlgebra.Symmetric(support_product(Ls, f_sigma, Ls)))
+    ss .+= esigma isa AbstractVector ? LinearAlgebra.diagm(esigma[sdx]) : esigma[sdx, sdx]
+    # The systematic root of an asset is a root of its factor covariance, so it exists only
+    # when its support lies in the ready factors.
+    cdx = filter(i -> all(k -> rdy[k] || iszero(L[i, k]), axes(L, 2)), sdx)
     N = size(L, 1)
-    Tf = real(eltype(si))
+    Tf = promote_type(real(eltype(si)), real(eltype(ss)))
     mu = fill(Tf(NaN), N)
     sigma = fill(Tf(NaN), N, N)
     chol = fill(Tf(NaN), size(ci, 2), N)
+    mu[sdx] = support_product(Ls, f_mu)
     mu[idx] = mui
+    sigma[sdx, sdx] = ss
+    # The prior states no variance for an asset outside the investable set, so the Investable
+    # Mask, which reads the diagonal, never holds an asset that `idx` leaves out.
+    for i in setdiff(sdx, idx)
+        sigma[i, i] = Tf(NaN)
+    end
     sigma[idx, idx] = si
+    chol[axes(Cf, 2), cdx] = transpose(L[cdx, :] * Cf)
     chol[:, idx] = transpose(ci)
     return (; mu = mu, sigma = sigma, chol = chol)
 end
@@ -1359,7 +1703,7 @@ Where:
   - $(math_dict[:B_T_cs])
   - $(math_dict[:K])
 
-The orthogonal part is ``\\boldsymbol{\\alpha} - \\mathbf{B}_{T} \\boldsymbol{g}`` and not the residual of the regression, so the intercept stays in it: the weighted mean of ``\\alpha^{\\perp}_{i}`` over ``\\mathcal{V}`` is ``c``. The split then adds up. The prior's expected return is ``\\mathbf{B}_{T} (\\lambda \\boldsymbol{\\mu}_{f} + (1 - \\lambda) \\boldsymbol{g}) + c_{\\alpha} \\boldsymbol{\\alpha}^{\\perp}``, which is ``\\boldsymbol{\\alpha}`` at ``\\lambda = 0`` and ``c_{\\alpha} = 1``, whatever the intercept. Without an intercept, ``\\mathbf{B}_{T,\\,\\mathcal{V}}^{\\intercal} \\mathbf{U} \\boldsymbol{\\alpha}^{\\perp}_{\\mathcal{V}} = \\boldsymbol{0}``, with ``\\mathbf{U}`` the diagonal matrix of the weights ``u_{i}``. The symbols ``\\lambda``, ``c_{\\alpha}`` and ``\\boldsymbol{\\mu}_{f}`` are the shrinkage, the confidence and the factor mean of [`CrossSectionalFactorPrior`](@ref).
+The orthogonal part is ``\\boldsymbol{\\alpha} - \\mathbf{B}_{T} \\boldsymbol{g}`` and not the residual of the regression, so the intercept stays in it: the weighted mean of ``\\alpha^{\\perp}_{i}`` over ``\\mathcal{V}`` is ``c``. The split then adds up. The prior's expected return is ``\\mathbf{B}_{T} (\\lambda \\boldsymbol{\\mu}_{f} + (1 - \\lambda) \\boldsymbol{g}) + c_{\\alpha} \\boldsymbol{\\alpha}^{\\perp}``, which is ``\\boldsymbol{\\alpha}`` at ``\\lambda = 0`` and ``c_{\\alpha} = 1``, whatever the intercept. Without an intercept, ``\\mathbf{B}_{T,\\,\\mathcal{V}}^{\\intercal} \\mathbf{U} \\boldsymbol{\\alpha}^{\\perp}_{\\mathcal{V}} = \\boldsymbol{0}``, with ``\\mathbf{U}`` the diagonal matrix of the weights ``u_{i}``. The symbols ``\\lambda``, ``c_{\\alpha}`` and ``\\boldsymbol{\\mu}_{f}`` are the Spanned Shrinkage, the Orthogonal Forecast Scale and the factor mean of [`CrossSectionalFactorPrior`](@ref).
 
 # Algorithm
 
@@ -1414,83 +1758,84 @@ function cross_sectional_alpha_split(cre::AbstractCrossSectionalRegressionEstima
     return (; g = g, ap = mu - L * g)
 end
 """
-    cross_sectional_return_forecast(rfe::Nothing, rd::ReturnsResult,
+    cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit, rfe::Nothing,
+                                    rd::ReturnsResult, csfm::CrossSectionalFactorModel,
+                                    cre::AbstractCrossSectionalRegressionEstimator,
+                                    reads::Bool, H::Option{<:MatNum},
+                                    rf0::Nothing = nothing) -> NamedTuple
+    cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit,
+                                    rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
                                     csfm::CrossSectionalFactorModel,
                                     cre::AbstractCrossSectionalRegressionEstimator,
-                                    c::Real) -> NamedTuple
-    cross_sectional_return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
-                                    csfm::CrossSectionalFactorModel,
-                                    cre::AbstractCrossSectionalRegressionEstimator,
-                                    c::Real) -> NamedTuple
+                                    reads::Bool, H::Option{<:MatNum},
+                                    rf0::Option{<:AbstractReturnForecastResult} = nothing) -> NamedTuple
 
-Fit the Return Forecast of a [`CrossSectionalFactorPrior`](@ref), and write its split onto the factor-model block.
+Fit the Return Forecast of a [`CrossSectionalFactorPrior`](@ref) under its Orthogonal Forecast Fit, and split it against the latest Factor Exposures.
 
-A prior that states no Return Forecast Estimator takes the method over `Nothing`. That method returns the block with the zero `b` that it carries, and a `g` of `nothing`, so the factor mean does not change.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\boldsymbol{b} &= c_{\\alpha} \\, \\boldsymbol{\\alpha}^{\\perp}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\boldsymbol{b}``: Intercept of the block, one entry per asset.
-  - ``c_{\\alpha}``: Confidence in the orthogonal part of the forecast.
-  - $(math_dict[:alpha_perp]) [`cross_sectional_alpha_split`](@ref) states it.
+The split is unscaled by `c`. The Orthogonal Forecast Scale `c` can be a rule that reads the orthogonal part, so [`cross_sectional_calibration`](@ref) resolves `c` after this function, and [`cross_sectional_forecast_block`](@ref) then scales the part. A prior that states no Return Forecast Estimator takes the method over `Nothing`, which returns `nothing` in each entry, so the factor mean and the zero `b` do not change. The batch fit, the online refit and the carry fold all reach the forecast through this function, so the Orthogonal Forecast Fit holds on each of them.
 
 # Algorithm
 
- 1. Fit `rfe` on the coverage universe through [`return_forecast`](@ref), giving `rf`. The carrier is the whole one, so the Descriptors of the forecast warm up over every observation of the panel. [`return_forecast_rows`](@ref) finds the block as a suffix of that carrier by its size.
- 2. Split `rf.mu` against the latest exposures with [`cross_sectional_alpha_split`](@ref), giving `g` and `ap`.
- 3. Rebuild the block with `b = c * ap` and with `rf` in its field `rf`. Read `L` with `getfield`. The property `L` of [`CrossSectionalFactorModel`](@ref) gives `M` when `L` is unset, and the rebuilt block would then hold `M` as a set `L`.
+ 1. Take the member that the prior fits with [`orthogonal_forecast_member`](@ref), giving `rfo`. Under [`ScoreNeutralisation`](@ref) a fitted member neutralises its scores against the estimated factors of `csfm`.
+ 2. Take `rf0` as `rf` when the carry fold gives it. Otherwise fit `rfo` on the coverage universe with [`orthogonal_forecast_result`](@ref), giving `rf`. `rd` holds every observation, so the Descriptors of the forecast warm up over every observation of the panel. [`return_forecast_rows`](@ref) finds the block as a suffix of `rd` by its size.
+ 3. Split `rf.mu` against the latest exposures of the estimated factors with [`cross_sectional_alpha_split`](@ref), giving `g` and `ap`. The observed factors are the trailing columns of `L`, and the split leaves them out, so `g` has one entry per column of `csr.f`. Scale `ap` with [`orthogonal_forecast_rescale`](@ref), which changes it under [`OrthogonalPartCalibration`](@ref) alone.
+ 4. When `reads` is `true`, take the Return Forecast history of `rfo` once with [`cross_sectional_forecast_history`](@ref) from `rf`, giving `hist`. Otherwise `hist` is `nothing`.
 
 # Arguments
 
+  - `ofit`: The Orthogonal Forecast Fit of the prior.
   - `rfe`: Return Forecast Estimator, or `nothing`.
-  - $(arg_dict[:rd]) It is the whole carrier the prior was fitted on, and the block is a suffix of it.
+  - $(arg_dict[:rd]) It is the full returns data that the estimated members of the prior read, and the block is a suffix of it. Under observed factors its `X` holds the returns net of them.
   - `csfm`: The factor-model block, built with a zero `b` and no Return Forecast.
   - `cre`: Cross-Sectional Regression Estimator of the split.
-  - `c`: Confidence in the orthogonal part of the forecast.
+  - `reads`: Whether a slot of the prior reads the Return Forecast history, as [`reads_forecast_history`](@ref) answers.
+  - `H`: The rows of the Return Forecast history that the carry fold carries, or `nothing` when the history is made here.
+  - `rf0`: The Return Forecast Result that the carry fold of a forecast that folds carries, as [`folds_forecast_rows`](@ref) answers, or `nothing` to fit the member here.
 
 # Validation
 
-  - The rules of [`return_forecast`](@ref) and of [`cross_sectional_alpha_split`](@ref).
+  - The rules of [`return_forecast`](@ref), of [`cross_sectional_alpha_split`](@ref) and, when `reads` is `true`, of [`cross_sectional_forecast_history`](@ref).
+  - The rules of [`DescriptorScores`](@ref) on the rebuilt scores under [`ScoreNeutralisation`](@ref).
 
 # Returns
 
-  - `rr::CrossSectionalFactorModel`: The block, with `b` and `rf` set.
-  - `g::Option{<:VecNum}`: The spanned coefficients, or `nothing` when the prior states no estimator.
+  - `rf::Option{<:AbstractReturnForecastResult}`: The Return Forecast Result, or `nothing`.
+  - `g::Option{<:VecNum}`: The spanned coefficients, or `nothing`.
+  - `ap::Option{<:VecNum}`: The orthogonal part before the Orthogonal Forecast Scale, one entry per asset, or `nothing`.
+  - `hist::Option{<:MatNum}`: The Return Forecast history, `observations × assets`, or `nothing`.
 
 # Related
 
   - [`CrossSectionalFactorPrior`](@ref)
   - [`cross_sectional_alpha_split`](@ref)
+  - [`cross_sectional_calibration`](@ref)
+  - [`cross_sectional_forecast_block`](@ref)
   - [`cross_sectional_forecast_mu`](@ref)
   - [`return_forecast`](@ref)
+  - [`AbstractOrthogonalForecastFit`](@ref)
 """
-function cross_sectional_return_forecast(::Nothing, ::ReturnsResult,
-                                         csfm::CrossSectionalFactorModel,
+function cross_sectional_return_forecast(::AbstractOrthogonalForecastFit, ::Nothing,
+                                         ::ReturnsResult, ::CrossSectionalFactorModel,
                                          ::AbstractCrossSectionalRegressionEstimator,
-                                         ::Real)
-    return (; rr = csfm, g = nothing)
+                                         ::Bool, ::Option{<:MatNum}, ::Nothing = nothing)
+    return (; rf = nothing, g = nothing, ap = nothing, hist = nothing)
 end
-function cross_sectional_return_forecast(rfe::AbstractReturnForecastEstimator,
+function cross_sectional_return_forecast(ofit::AbstractOrthogonalForecastFit,
+                                         rfe::AbstractReturnForecastEstimator,
                                          rd::ReturnsResult, csfm::CrossSectionalFactorModel,
                                          cre::AbstractCrossSectionalRegressionEstimator,
-                                         c::Real)
-    rf = return_forecast(rfe, rd, csfm)
+                                         reads::Bool, H::Option{<:MatNum},
+                                         rf0::Option{<:AbstractReturnForecastResult} = nothing)
+    rfo = orthogonal_forecast_member(ofit, rfe, csfm)
+    rf = isnothing(rf0) ? orthogonal_forecast_result(ofit, rfo, rd, csfm, cre) : rf0
     rw = csfm.rw
-    (; g, ap) = cross_sectional_alpha_split(cre, rf.mu, csfm.L, @view(rw[size(rw, 1), :]))
-    return (;
-            rr = CrossSectionalFactorModel(; M = csfm.M, L = getfield(csfm, :L), b = c * ap,
-                                           csr = csfm.csr, Ms = csfm.Ms, vs = csfm.vs,
-                                           esigma = csfm.esigma, edof = csfm.edof,
-                                           ediv = csfm.ediv, rw = rw, bw = csfm.bw,
-                                           nf = csfm.nf, fam = csfm.fam, fcb = csfm.fcb,
-                                           lag = csfm.lag, rf = rf), g = g)
+    #! The observed factors are the trailing columns of `L`, and the fit observes their
+    #! returns, so the forecast splits against the loadings the regression estimated.
+    L = view(csfm.L, :, 1:size(csfm.csr.f, 2))
+    (; g, ap) = cross_sectional_alpha_split(cre, rf.mu, L, @view(rw[size(rw, 1), :]))
+    (; g, ap) = orthogonal_forecast_rescale(ofit, rf, g, ap)
+    hist = reads ? cross_sectional_forecast_history(rf, rfo, rd, csfm, H) : nothing
+    return (; rf = rf, g = g, ap = ap, hist = hist)
 end
 """
     cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::Nothing) -> VecNum
@@ -1498,7 +1843,7 @@ end
 
 Blend the expected factor returns with the spanned part of a Return Forecast.
 
-A prior that states no Return Forecast Estimator has a spanned part of zero, and the method over `Nothing` takes it. There `lambda` shrinks the factor mean towards zero, and `lambda = 0` gives an expected return of zero.
+A prior that states no Return Forecast Estimator has a spanned part of zero, and the method over `Nothing` takes it. There `lambda` shrinks the factor mean towards zero, and `lambda = 0` gives an expected return of zero. At `lambda = 0` the blend reads no factor mean, so a factor mean that the factor prior does not state gives a finite blend there, and `NaN` at every other `lambda`.
 
 # Mathematical definition
 
@@ -1532,8 +1877,8 @@ Where:
   - [`cross_sectional_alpha_split`](@ref)
 """
 function cross_sectional_forecast_mu(lambda::Real, mu::VecNum, ::Nothing)
-    return lambda * mu
+    return lambda * (iszero(lambda) ? zero(mu) : mu)
 end
 function cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::VecNum)
-    return lambda * mu + (one(lambda) - lambda) * g
+    return lambda * (iszero(lambda) ? zero(mu) : mu) + (one(lambda) - lambda) * g
 end

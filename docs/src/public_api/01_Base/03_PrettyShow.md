@@ -1,7 +1,7 @@
 ```@meta
-Description = "Pretty printing has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Pretty show has no public API in PortfolioOptimisers.jl; its names are in the private API."
 ```
 
-# Pretty printing
+# Pretty show
 
-Every name of this topic is private. The [private page](@ref private-api-pretty-printing) documents them.
+Every name of this topic is private. The [private page](@ref private-api-pretty-show) documents them.

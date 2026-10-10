@@ -563,13 +563,17 @@ end
             @test eltype(res.w) == Rational{Int}
         end
     end
-    @testset "The relative formulations write eps into a zero weight" begin
+    @testset "The relative formulations divide by eps in a copy of a zero weight" begin
+        # The formulation writes `eps` into a copy, so the caller's weights stay as they
+        # are (#785), and the zero weights still reach the bounds.
         wz = [0.6, 0.4, 0.0, 0.0]
         wzc = copy(wz)
-        PortfolioOptimisers.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv),
-                                              WeightBounds(; lb = fill(0.05, 4),
-                                                           ub = fill(0.5, 4)), wzc)
-        @test wzc[3:4] == fill(eps(eltype(wz)), 2)
+        w = PortfolioOptimisers.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv),
+                                                  WeightBounds(; lb = fill(0.05, 4),
+                                                               ub = fill(0.5, 4)), wzc)
+        @test wzc == wz
+        @test all(x -> 0.05 - 1e-8 <= x <= 0.5 + 1e-8, w)
+        @test isapprox(sum(w), 1; rtol = 1e-8)
     end
 end
 @testset "assert_special_nco_requirements over a vector" begin

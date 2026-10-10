@@ -24,6 +24,13 @@ applyTo: "test/test_*.jl"
 
 - **Import rare packages**: write `using` at the top of the file for a package that `init_code` does not load.
 - **Nested test sets**: Use `@testset` for grouping related tests within a top-level `@testset`.
+- **A case named for a route asserts that the route ran**: When a testset or a comment names a branch — a choice that moves, a fallback, a refusal, a factor that comes alive — assert a value that only that branch produces, before the values the branch shares with the others. The outputs of two branches can agree on the data the case uses, and then every check passes on the branch the case does not name. A case that names a choice that moves opens with the choice at each step:
+
+    ```julia
+    @test [dropped(x.pr) for x in sb] == [["style1"], ["style2"], ["style2"]]
+    ```
+
+    This is a judgement for review, not a mechanical rule, so no census gates it.
 
 ## Validation Testing
 

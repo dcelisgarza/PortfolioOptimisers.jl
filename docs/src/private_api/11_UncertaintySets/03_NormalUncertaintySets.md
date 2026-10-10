@@ -11,6 +11,7 @@ normal_mu_error_sample
 normal_sigma_error_sample
 mu_asymptotic_cov
 sigma_asymptotic_cov
+normal_sigma_shape
 mu_normal_box_set
 sigma_normal_box_set
 normal_box_preamble

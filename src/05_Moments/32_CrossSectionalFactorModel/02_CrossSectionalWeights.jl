@@ -411,8 +411,7 @@ Row `t` reads the variance series at row `t - 1`, so an entry never carries the 
 # Algorithm
 
  1. Take the variance series of `eps` through [`variance_series`](@ref).
- 2. Fill the result with `NaN`, which is what row `1` and every pair outside `mask` keep. Both blend components then normalise over the same universe.
- 3. Write the reciprocal of row `t - 1` of the series into every eligible pair of row `t`, for every later observation.
+ 2. Lag and invert the series through [`cross_sectional_lagged_inverse`](@ref).
 
 # Arguments
 
@@ -455,10 +454,45 @@ function cross_sectional_lagged_inverse_variance(ve::AbstractCovarianceEstimator
     @argcheck(!isempty(eps), IsEmptyError("eps cannot be empty"))
     @argcheck(size(eps) == size(mask),
               DimensionMismatch("eps ($(size(eps, 1))×$(size(eps, 2))) must match mask ($(size(mask, 1))×$(size(mask, 2)))"))
-    V = variance_series(ve, eps; dims = 1, kwargs...)
+    return cross_sectional_lagged_inverse(variance_series(ve, eps; dims = 1, kwargs...),
+                                          mask)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the lagged inverse of a variance series.
+
+Row `t` reads row `t - 1` of the series. Row `1` is `NaN`, because no variance precedes it. [`cross_sectional_lagged_inverse_variance`](@ref) reads the series of a residual matrix through it. The carry fold of a [`CrossSectionalFactorPrior`](@ref) reads the series of its folded variance through it, with the last row of the previous step as row `1`.
+
+# Algorithm
+
+ 1. Fill the result with `NaN`, which is what row `1` and every pair outside `mask` keep. Both blend components then normalise over the same universe.
+ 2. Write the reciprocal of row `t - 1` of the series into every eligible pair of row `t`, for every later observation.
+
+# Arguments
+
+  - `V::MatNum`: Variance series `observations × assets`.
+  - `mask::AbstractMatrix{Bool}`: Eligibility mask `observations × assets`.
+
+# Validation
+
+  - `size(V) == size(mask)`.
+
+# Returns
+
+  - `IV::Matrix{<:Number}`: Inverse variances `observations × assets`, `NaN` in row `1` and outside `mask`.
+
+# Related
+
+  - [`cross_sectional_lagged_inverse_variance`](@ref)
+  - [`cs_weights_blend`](@ref)
+"""
+function cross_sectional_lagged_inverse(V::MatNum, mask::AbstractMatrix{Bool})::MatNum
+    @argcheck(size(V) == size(mask),
+              DimensionMismatch("V ($(size(V, 1))×$(size(V, 2))) must match mask ($(size(mask, 1))×$(size(mask, 2)))"))
     Tf = real(eltype(V))
-    IV = fill(Tf(NaN), size(eps))
-    for t in 2:size(eps, 1), i in axes(eps, 2)
+    IV = fill(Tf(NaN), size(V))
+    for t in 2:size(V, 1), i in axes(V, 2)
         if mask[t, i]
             IV[t, i] = inv(V[t - 1, i])
         end
@@ -472,11 +506,14 @@ Clamp the inverse variance weights of each observation to two cross-sectional qu
 
 The clamp protects the blend from an asset whose estimated variance is very small, which would otherwise carry almost the whole cross-section. The quantiles come from the estimation universe, which is the set of pairs with a positive first-pass weight, and the clamp reaches the whole row, so a pair outside that universe still leaves inside the same bounds.
 
+An entry is infinite where its variance is exactly zero. When every entry of the set is infinite, both quantiles are infinite, and the clamp lifts every entry of the row that is not `NaN` to infinity. That is the limit of the clamp as the variances of the set go to zero together, so [`cross_sectional_median_cap!`](@ref) then gives those entries equal shares.
+
 # Algorithm
 
  1. For each observation, gather the entries in the estimation universe that are not `NaN`.
- 2. Take the quantiles `wins` of that set, and clamp the whole row between them.
- 3. Write an all-`NaN` row where the set carries no finite entry, because no bound exists there.
+ 2. Where the set carries a finite entry, take the quantiles `wins` of that set, and clamp the whole row between them.
+ 3. Where every entry of the set is infinite, write an infinity into every entry of the row that is not `NaN`.
+ 4. Write an all-`NaN` row where the set is empty, because no bound exists there.
 
 # Arguments
 
@@ -524,8 +561,11 @@ function cross_sectional_winsorise!(IV::Matrix{<:Number}, W0::MatNum,
         if any(isfinite, u)
             row .= clamp.(row, Statistics.quantile(u, wins[1]),
                           Statistics.quantile(u, wins[2]))
-        else
+        elseif isempty(u)
             row .= Tf(NaN)
+        else
+            # Every variance of the set is zero, so both bounds are infinite.
+            row .= ifelse.(isnan.(row), row, Tf(Inf))
         end
     end
     return nothing
@@ -537,11 +577,14 @@ Cap the inverse variance weights of each observation at a multiple of their medi
 
 The cap is the second of the two bounds, and it is what answers an asset whose estimated variance is exactly zero: its entry is infinite, and it leaves at `ratio` times the median, so the observation still returns a weight. The normalisation puts the row on the same scale as the capitalisation component, so the blend of the two realises the shrinkage the caller wrote.
 
+When half or more of the entries are infinite, the median is infinite and the cap does not bind. The row then takes the limit of the normalised row as those variances go to zero together: each infinite entry gets an equal share, and each finite entry gets zero. A row whose entries are all infinite gets equal shares the same way.
+
 # Algorithm
 
- 1. For each observation, record whether the row carries a finite entry.
+ 1. For each observation, record whether the row carries an entry that is not `NaN`.
  2. Take the median of the entries that are not `NaN`, and cap the row at `ratio` times it.
- 3. Divide the row by the sum of its entries that are not `NaN`.
+ 3. Where no entry is infinite after the cap, divide the row by the sum of its entries that are not `NaN`.
+ 4. Where ``n`` entries are still infinite, write ``1 / n`` into each of them and zero into every finite entry.
 
 # Arguments
 
@@ -550,7 +593,7 @@ The cap is the second of the two bounds, and it is what answers an asset whose e
 
 # Returns
 
-  - `ready::BitVector`: One entry per observation, `true` where the row carries a usable inverse variance estimate. A row that answers `false` is untouched.
+  - `ready::BitVector`: One entry per observation, `true` where the row carries an inverse variance estimate that is not `NaN`. A row that answers `false` is untouched.
 
 # Examples
 
@@ -574,16 +617,23 @@ julia> IV
 """
 function cross_sectional_median_cap!(IV::Matrix{<:Number}, ratio::Real)::BitVector
     ready = falses(size(IV, 1))
-    u = eltype(IV)[]
+    Tf = eltype(IV)
+    u = Tf[]
     for t in axes(IV, 1)
         row = view(IV, t, :)
-        ready[t] = any(isfinite, row)
+        ready[t] = any(!isnan, row)
         if !ready[t]
             continue
         end
         append!(empty!(u), Iterators.filter(!isnan, row))
         row .= min.(row, Statistics.median!(u) * ratio)
-        row ./= sum(append!(empty!(u), Iterators.filter(!isnan, row)))
+        n = count(isinf, row)
+        if iszero(n)
+            row ./= sum(append!(empty!(u), Iterators.filter(!isnan, row)))
+        else
+            # The limit as the zero variances go to zero together: equal shares for them.
+            row .= ifelse.(isnan.(row), row, ifelse.(isinf.(row), one(Tf) / n, zero(Tf)))
+        end
     end
     return ready
 end
@@ -599,12 +649,7 @@ The verb takes the first-pass weights and residuals as arguments rather than rea
 # Algorithm
 
  1. Take the lagged inverse variances through [`cross_sectional_lagged_inverse_variance`](@ref).
- 2. Clamp them to the cross-sectional quantiles through [`cross_sectional_winsorise!`](@ref).
- 3. Cap and normalise them through [`cross_sectional_median_cap!`](@ref), which also names the observations that carry an estimate.
- 4. Normalise the first-pass weights over the same universe.
- 5. Write zero over every entry that is still `NaN`, so a missing entry does not contribute.
- 6. Write the normalised first-pass weights into every observation that carries no estimate.
- 7. Blend the two components by `alg.lambda`, and write zero outside `mask`.
+ 2. Blend them with the first-pass weights through [`cs_weights_blend`](@ref).
 
 # Arguments
 
@@ -658,7 +703,50 @@ function cs_weights_refine(alg::BlendedInverseVarianceWeights, W0::MatNum, eps::
               DimensionMismatch("W0 ($(size(W0, 1))×$(size(W0, 2))) must match eps ($(size(eps, 1))×$(size(eps, 2)))"))
     @argcheck(all(isfinite, W0), IsNonFiniteError("all entries of W0 must be finite"))
     @argcheck(all(x -> x >= zero(x), W0), DomainError(W0, "all entries of W0 must be >= 0"))
-    IV = cross_sectional_lagged_inverse_variance(ve, eps, mask; kwargs...)
+    return cs_weights_blend(alg, W0,
+                            cross_sectional_lagged_inverse_variance(ve, eps, mask;
+                                                                    kwargs...), mask)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Blend the first-pass weights with lagged inverse variances into the second-pass weights.
+
+[`cs_weights_refine`](@ref) runs it on the inverse variances of its residuals. The carry fold of a [`CrossSectionalFactorPrior`](@ref) runs it on the inverse variances of the new observations, which it reads from its folded variance. Each observation is blended on its own row, so the two calls give the same row.
+
+# Algorithm
+
+ 1. Clamp `IV` to the cross-sectional quantiles through [`cross_sectional_winsorise!`](@ref).
+ 2. Cap and normalise it through [`cross_sectional_median_cap!`](@ref), which also names the observations that carry an estimate.
+ 3. Normalise the first-pass weights over the same universe.
+ 4. Write zero over every entry that is still `NaN`, so a missing entry does not contribute.
+ 5. Write the normalised first-pass weights into every observation that carries no estimate.
+ 6. Blend the two components by `alg.lambda`, and write zero outside `mask`.
+
+# Arguments
+
+  - `alg`: Cross-sectional weight policy.
+  - `W0::MatNum`: First-pass weights `observations × assets`.
+  - `IV::Matrix{<:Number}`: Lagged inverse variances `observations × assets`, changed in place.
+  - `mask::AbstractMatrix{Bool}`: Eligibility mask `observations × assets`.
+
+# Validation
+
+  - `size(W0) == size(IV)`.
+
+# Returns
+
+  - `W1::Matrix{<:Number}`: Second-pass weights `observations × assets`, zero outside `mask`.
+
+# Related
+
+  - [`cs_weights_refine`](@ref)
+  - [`cross_sectional_lagged_inverse`](@ref)
+"""
+function cs_weights_blend(alg::BlendedInverseVarianceWeights, W0::MatNum,
+                          IV::Matrix{<:Number}, mask::AbstractMatrix{Bool})::MatNum
+    @argcheck(size(W0) == size(IV),
+              DimensionMismatch("W0 ($(size(W0, 1))×$(size(W0, 2))) must match IV ($(size(IV, 1))×$(size(IV, 2)))"))
     cross_sectional_winsorise!(IV, W0, alg.wins)
     ready = cross_sectional_median_cap!(IV, alg.ratio)
     Tf = promote_type(eltype(IV), real(eltype(W0)), typeof(alg.lambda))

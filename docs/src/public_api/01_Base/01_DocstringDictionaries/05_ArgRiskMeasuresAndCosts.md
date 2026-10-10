@@ -1,7 +1,7 @@
 ```@meta
-Description = "Risk measure and cost arguments has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Arg risk measures and costs has no public API in PortfolioOptimisers.jl; its names are in the private API."
 ```
 
-# Risk measure and cost arguments
+# Arg risk measures and costs
 
-This file defines no name. The [private page](@ref private-api-risk-measure-and-cost-arguments) says which table it fills.
+This file defines no name. The [private page](@ref private-api-arg-risk-measures-and-costs) says which table it fills.

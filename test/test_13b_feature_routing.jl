@@ -321,14 +321,15 @@ const PO = PortfolioOptimisers
         D_cut = distance(fde, Zd[:, 1:2]; dims = 1)
         # A panel carrying one of each kind, so every entry form has something to resolve
         # against. `mcap` blanks and `sector` does not, which is what separates the two
-        # observed-mask cases.
+        # observed-mask cases. Each blank holds a placeholder (#1631).
         gnum = NumericPanelField(; name = "mcap", vals = [1.0, 2.0, 3.0],
-                                 omsk = [true, false, true])
+                                 omsk = [true, false, true], pmsk = [false, true, false])
         gcat = CategoricalPanelField(; name = "sector", levels = ["T", "E"],
                                      codes = [1, 2, 1])
         gten = TensorPanelField(; name = "beta", axis = "factor", labels = ["mkt", "smb"],
                                 vals = [1.0 2.0; 3.0 4.0; 5.0 6.0],
-                                omsk = [true true; true false; true true])
+                                omsk = [true true; true false; true true],
+                                pmsk = [false false; false true; false false])
         gpnl = AssetPanel(; pf = [gnum, gcat, gten])
 
         @testset "construction refuses what cannot be read" begin
@@ -373,17 +374,19 @@ const PO = PortfolioOptimisers
             sel = ["beta" => "smb", "mcap", "sector" => ["E"], "mcap" => :observed]
             @test feature_labels(gpnl, sel) ==
                   ["beta" => "smb", "mcap", "sector" => "E", "mcap" => :observed]
-            @test feature_matrix(gpnl, sel) ==
-                  [2.0 1.0 0.0 1.0; 4.0 2.0 1.0 0.0; 6.0 3.0 0.0 1.0]
-            @test feature_matrix(gpnl, reverse(sel)) ==
-                  feature_matrix(gpnl, sel)[:, [4, 3, 2, 1]]
+            # `mcap` and `beta` hold a placeholder at row 2, so their value columns hold `NaN`
+            # there (#1508), and the mask column shows the blank.
+            @test isequal(feature_matrix(gpnl, sel),
+                          [2.0 1.0 0.0 1.0; NaN NaN 1.0 0.0; 6.0 3.0 0.0 1.0])
+            @test isequal(feature_matrix(gpnl, reverse(sel)),
+                          feature_matrix(gpnl, sel)[:, [4, 3, 2, 1]])
         end
 
         @testset "a label vector is a selector that rebuilds the same matrix" begin
             for sel in (nothing, ["mcap"], ["sector"], ["beta" => ["smb", "mkt"]],
                         ["mcap" => :observed, "beta" => :observed, "sector"])
                 lab = feature_labels(gpnl, sel)
-                @test feature_matrix(gpnl, lab) == feature_matrix(gpnl, sel)
+                @test isequal(feature_matrix(gpnl, lab), feature_matrix(gpnl, sel))
                 @test feature_labels(gpnl, lab) == lab
             end
         end
@@ -425,11 +428,12 @@ const PO = PortfolioOptimisers
             # cut to `rows` at least once.
             Tt, Nt = 7, 3
             rng = StableRNG(1064)
+            ov = rand(rng, Bool, Tt, Nt)
             tv = NumericPanelField(; name = "mcap", vals = abs.(randn(rng, Tt, Nt)) .+ 1,
-                                   omsk = rand(rng, Bool, Tt, Nt))
+                                   omsk = ov, pmsk = .!ov)
+            ot = rand(rng, Bool, Tt, Nt, 2)
             tt = TensorPanelField(; name = "beta", axis = "factor", labels = ["mkt", "smb"],
-                                  vals = randn(rng, Tt, Nt, 2),
-                                  omsk = rand(rng, Bool, Tt, Nt, 2))
+                                  vals = randn(rng, Tt, Nt, 2), omsk = ot, pmsk = .!ot)
             tc = PortfolioOptimisers.panel_field_lift(gcat, Tt)
             tpnl = AssetPanel(; pf = [tv, tt, tc], amsk = trues(Tt, Nt),
                               emsk = trues(Tt, Nt))
@@ -439,9 +443,9 @@ const PO = PortfolioOptimisers
             @test size(Zt) == (Tt, Nt, 7)
             # `rows` cuts the observation axis alone, keeps it, and every writer agrees
             # with the full stack row for row.
-            @test feature_matrix(tpnl, sel; rows = Tt:Tt) == Zt[Tt:Tt, :, :]
-            @test feature_matrix(tpnl, sel; rows = [2, 5]) == Zt[[2, 5], :, :]
-            @test feature_matrix(tpnl, sel; rows = 3:5) == Zt[3:5, :, :]
+            @test isequal(feature_matrix(tpnl, sel; rows = Tt:Tt), Zt[Tt:Tt, :, :])
+            @test isequal(feature_matrix(tpnl, sel; rows = [2, 5]), Zt[[2, 5], :, :])
+            @test isequal(feature_matrix(tpnl, sel; rows = 3:5), Zt[3:5, :, :])
             @test eltype(feature_matrix(tpnl, sel; rows = Tt:Tt)) == eltype(Zt)
             # The rows must lie on the observation axis, and a static panel has none.
             @test_throws ArgumentError feature_matrix(tpnl, sel; rows = [0, 2])
@@ -450,11 +454,11 @@ const PO = PortfolioOptimisers
             # `true` at, as `selectdim` reads it. Its length is the observation count and
             # not the stack's, which threw a DimensionMismatch before #845.
             bmsk = [false, true, false, false, true, false, false]
-            @test feature_matrix(tpnl, sel; rows = bmsk) == Zt[[2, 5], :, :]
+            @test isequal(feature_matrix(tpnl, sel; rows = bmsk), Zt[[2, 5], :, :])
             @test PortfolioOptimisers.stacked_axes((Tt, Nt), bmsk) == (2, Nt)
             @test_throws ArgumentError feature_matrix(tpnl, sel; rows = [true, false])
             @test_throws ArgumentError feature_matrix(gpnl; rows = 1:1)
-            @test feature_matrix(gpnl; rows = Colon()) == feature_matrix(gpnl)
+            @test isequal(feature_matrix(gpnl; rows = Colon()), feature_matrix(gpnl))
             @test PortfolioOptimisers.stacked_axes((Tt, Nt), Colon()) == (Tt, Nt)
             @test PortfolioOptimisers.stacked_axes((Nt,), Colon()) == (Nt,)
             @test PortfolioOptimisers.stacked_axes((Tt, Nt), 2:3) == (2, Nt)
@@ -464,23 +468,39 @@ const PO = PortfolioOptimisers
             for alg in (AggregateFeatures(), AggregateDistances(), StackObservations())
                 @test PortfolioOptimisers.collapse_rows(alg, tpnl) === Colon()
             end
-            # The routed entry stacks what its collapse reads, and the distance it
-            # measures is the one the full stack gives.
+            # The routed entry stacks what its collapse reads, with a zero at a placeholder,
+            # and the distance it measures is the one the full stack gives on the cells it
+            # can read: active, and holding data in each value column (#1508, #1631). With
+            # half of the cells blank, a collapse can refuse, and the refusal is the same.
             trd = ReturnsResult(; nx = ["a", "b", "c"], X = randn(rng, Tt, Nt), pnl = tpnl)
-            for alg in (LastObservation(), AggregateFeatures(), AggregateDistances(),
-                        StackObservations())
+            Z0 = feature_matrix(tpnl, sel; placeholder = 0)
+            R = PortfolioOptimisers.feature_data_cells(tpnl,
+                                                       PortfolioOptimisers.select_fields(tpnl,
+                                                                                         sel,
+                                                                                         false))
+            res(f) =
+                try
+                    f()
+                catch e
+                    sprint(showerror, e)
+                end
+            for alg in (LastObservation(), LastObservation(; alg = LastActiveRow()),
+                        AggregateFeatures(), AggregateDistances(), StackObservations())
                 de_r = FeatureDistance(; sel = sel, alg = alg)
                 Zr = feature_matrix(de_r, nothing, trd, trd.X)
-                @test size(Zr, 1) == (alg isa LastObservation ? 1 : Tt)
-                @test Zr == Zt[(alg isa LastObservation ? (Tt:Tt) : (1:Tt)), :, :]
-                @test distance(de_r, nothing, trd.X; rd = trd) == distance(de_r, Zt)
+                rr = PortfolioOptimisers.readable_window_rows(alg, tpnl, R)
+                @test size(Zr, 1) == length((1:Tt)[rr])
+                @test isequal(Zr, Z0[rr, :, :])
+                @test isequal(res(() -> distance(de_r, nothing, trd.X; rd = trd)),
+                              res(() -> distance(de_r, Z0; amsk = R, nx = trd.nx)))
             end
             # The labels are untouched by the rows: the rebuild is the measurement
             # column for column.
             de_l = FeatureDistance(; sel = sel)
             @test feature_labels(de_l, nothing, trd, trd.X) == feature_labels(tpnl, sel)
-            @test feature_matrix(tpnl, feature_labels(tpnl, sel); rows = Tt:Tt) ==
-                  feature_matrix(de_l, nothing, trd, trd.X)
+            @test isequal(feature_matrix(tpnl, feature_labels(tpnl, sel); rows = Tt:Tt,
+                                         placeholder = 0),
+                          feature_matrix(de_l, nothing, trd, trd.X))
         end
 
         @testset "an unresolvable field, level or label warns and drops, or throws" begin
@@ -598,6 +618,72 @@ const PO = PortfolioOptimisers
             @test occursin("numeric Panel Field", err.value.msg)
             @test occursin(":observed", err.value.msg)
             @test !occursin("0 label", err.value.msg)
+        end
+
+        @testset "a LabelGroup entry selects the labels of one group (#1402)" begin
+            # Groups interleave with the labels, so the selection must follow the label
+            # order and not gather the group's labels from one block.
+            tg = TensorPanelField(; name = "expo", axis = "factor",
+                                  labels = ["mom12", "val", "mom6", "size"],
+                                  groups = ["momentum", "value", "momentum", "size"],
+                                  vals = [1.0 2.0 3.0 4.0; 5.0 6.0 7.0 8.0;
+                                          9.0 10.0 11.0 12.0])
+            tpnl = AssetPanel(; pf = [gnum, gcat, gten, tg])
+            mom = ["expo" => LabelGroup("momentum")]
+            @test feature_labels(tpnl, mom) == ["expo" => "mom12", "expo" => "mom6"]
+            @test feature_matrix(tpnl, mom) ==
+                  feature_matrix(tpnl, ["expo" => ["mom12", "mom6"]])
+            @test feature_matrix(tpnl, mom) == tg.vals[:, tg.groups .== "momentum"]
+            # The labels are a selector that rebuilds the matrix.
+            @test feature_matrix(tpnl, feature_labels(tpnl, mom)) ==
+                  feature_matrix(tpnl, mom)
+            # Two groups take two entries, in the order sel writes them, beside other forms.
+            sel = ["expo" => LabelGroup("size"), "mcap", "expo" => LabelGroup("momentum")]
+            @test feature_labels(tpnl, sel) ==
+                  ["expo" => "size", "mcap", "expo" => "mom12", "expo" => "mom6"]
+            # `mcap` holds a placeholder at row 2, so it holds `NaN` there (#1508).
+            @test isequal(feature_matrix(tpnl, sel),
+                          [4.0 1.0 1.0 3.0; 8.0 NaN 5.0 7.0; 12.0 3.0 9.0 11.0])
+            # The time-varying shape selects the same labels on every observation, and the
+            # documented slice of the values by group is the same array.
+            tv = TensorPanelField(; name = "expo", axis = "factor", labels = tg.labels,
+                                  groups = tg.groups,
+                                  vals = reshape(collect(1.0:24.0), 2, 3, 4))
+            tvp = AssetPanel(; pf = [tv], amsk = trues(2, 3), emsk = trues(2, 3))
+            @test feature_matrix(tvp, mom) == tv.vals[:, :, tv.groups .== "momentum"]
+            @test feature_matrix(tvp, mom; rows = [2]) ==
+                  tv.vals[2:2, :, tv.groups .== "momentum"]
+            # The routed distance reads the same columns as the label list.
+            @test FeatureDistance(; sel = mom).sel == mom
+
+            # Construction refuses an empty group, and the entry check refuses a group the
+            # generated constructor let through without its check.
+            @test_throws IsEmptyError LabelGroup("")
+            @test LabelGroup(; group = "momentum") == LabelGroup("momentum")
+            @test_throws ArgumentError FeatureDistance(; sel = ["expo" => LabelGroup(1)])
+            # A group and a label entry that hold one label double its column.
+            @test_throws ArgumentError feature_matrix(tpnl, [mom; "expo" => "mom6"])
+            @test_throws ArgumentError feature_matrix(tpnl, ["expo"; mom])
+
+            # A group the field does not hold warns and drops, or throws under strict, with
+            # the nearest group as a suggestion.
+            @test (@test_logs (:warn,) feature_labels(tpnl,
+                                                      ["expo" => LabelGroup("zzz"), "mcap"])) ==
+                  ["mcap"]
+            err = @test_throws ArgumentError feature_matrix(tpnl,
+                                                            ["expo" =>
+                                                                 LabelGroup("momentm")];
+                                                            strict = true)
+            @test occursin("did you mean `momentum`", err.value.msg)
+            # A field with no groups resolves no group: a numeric field, a categorical field,
+            # and a tensor field built without groups.
+            for name in ("mcap", "sector", "beta")
+                err = @test_throws ArgumentError feature_matrix(tpnl,
+                                                                [name =>
+                                                                     LabelGroup("momentum")];
+                                                                strict = true)
+                @test occursin("carries no groups", err.value.msg)
+            end
         end
     end
 end

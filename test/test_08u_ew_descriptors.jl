@@ -1,7 +1,7 @@
 #=
 Check `src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl` and
 `05_EWVolatilityDescriptors.jl` against the contract their docstrings state, and against the
-reference implementation. Issue #718, map #643.
+oracle. Issue #718, map #643.
 
 FOUR CONVENTIONS SHAPE THE PROBES, and the first three are `test_08s_descriptors.jl`'s.
 
@@ -19,7 +19,7 @@ FOUR CONVENTIONS SHAPE THE PROBES, and the first three are `test_08s_descriptors
 
 The two recursions the census pins are written out as literals: `EWMomentum(half_life = 5,
 skip = 0)` and `EWVolatility(half_life = 5)`. The last testset diffs two cases against numbers
-the reference implementation printed on the synthetic panel of `test06c_setup.jl`.
+the oracle printed on the synthetic panel of `test06c_setup.jl`.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
 
@@ -138,7 +138,7 @@ end
         @test isa(vol, EWVolatility)
         @test vol.ce.decay ≈ exp2(-inv(40.0))
         @test vol.ce.min_obs == 40
-        @test vol.ce.centred
+        @test isa(vol.ce.centring, PreCentred)
         @test isnothing(vol.ce.regime_method)
         @test isa(vol.alg, FullMoment)
         @test iszero(vol.mar)
@@ -262,6 +262,36 @@ end
         R = [nvol[k] > 0 ? zvol[k] / nvol[k] : NaN for k in CartesianIndices(zvol)]
         @test ew_same(D, ew_hand_mean(R, lam, 1))
         @test D[3, 2] == D[2, 2]
+    end
+    @testset "A preset refuses a share count or a price at or below zero, not a zero volume" begin
+        # A share count and a price are positive by construction, so the `gt0` guard of the
+        # presets refuses a value at or below zero (#1379, ADR 0108). A volume is zero on a
+        # day with no trade, so it is not guarded, and its ratio is NaN.
+        @test EWShareTurnover().gt0 == ["adj_shares_outstanding"]
+        @test EWAmihudIlliquidity().gt0 == ["adj_close"]
+        @test EWAmihudIlliquidity(; den = ["p", "v"]).gt0 == ["p"]
+        @test isnothing(EWVolumeRatio(; num = "a", den = "b", decay = lam, min_obs = 1).gt0)
+        @test_throws ArgumentError EWShareTurnover(; gt0 = ["adj_close"])
+        fields(; v = vol, s = shr, p = px) = ["adj_volume" => copy(v),
+                                              "adj_shares_outstanding" => copy(s),
+                                              "adj_close" => copy(p),
+                                              "short_interest" => copy(si)]
+        zshr = copy(shr)
+        zshr[3, 2] = 0.0
+        rdz = ew_hand_panel(fields(; s = zshr), X)
+        @test_throws DomainError descriptor(EWShareTurnover(; half_life = 2), rdz)
+        # With the guard off, the zero share count gives no ratio and holds the state.
+        D = descriptor(EWShareTurnover(; half_life = 2, min_obs = 1, gt0 = nothing), rdz)
+        @test D[3, 2] == D[2, 2]
+        npx = copy(px)
+        npx[2, 1] = -1.0
+        rdn = ew_hand_panel(fields(; p = npx), X)
+        @test_throws DomainError descriptor(EWAmihudIlliquidity(; half_life = 2), rdn)
+        zvol = copy(vol)
+        zvol[2, 1] = 0.0
+        rdv = ew_hand_panel(fields(; v = zvol), X)
+        @test size(descriptor(EWShareTurnover(; half_life = 2), rdv)) == size(X)
+        @test size(descriptor(EWAmihudIlliquidity(; half_life = 2), rdv)) == size(X)
     end
     @testset "DaysToCover smooths the denominator alone, and only a positive value advances" begin
         zvol = copy(vol)
@@ -443,17 +473,17 @@ end
         end
     end
     #=
-    The reference implementation was run on this exact panel, all thirteen cases of the two
+    The oracle was run on this exact panel, all thirteen cases of the two
     files. Every one agreed: no cell differed in whether it is `NaN`, and the largest relative
     difference over the finite cells was 4.3e-15, which is floating point noise. Four cases
     agreed to the last bit.
 
     Two rows of two cases are stored here as literals, so a regression is caught without the
-    reference. Each carries the skip, the exponentiate flag and a non-zero minimum acceptable
+    oracle. Each carries the skip, the exponentiate flag and a non-zero minimum acceptable
     return, which the hand recursions above exercise least. Asset two is delisted before the
     last observation, so its literal is `NaN`.
     =#
-    @testset "Two cases against numbers the reference implementation printed" begin
+    @testset "Two cases against numbers the oracle printed" begin
         mom_250 = [-0.0062617311055179368, -0.0017340648519905755, -0.0014142152400465399,
                    -0.0066824380942661545, -0.003862538174442892, -0.0059118968616883802,
                    -0.0011177723894685181, -0.0030445356884902497, -0.0018186579722233619,
@@ -532,13 +562,13 @@ end
 end
 
 #=
-The reference implementation ran the four named Descriptors on this panel at `half_life = 3`,
+The oracle ran the four named Descriptors on this panel at `half_life = 3`,
 and every cell agreed to the last bit, `NaN` pattern included. The panel carries what the
 synthetic panel above carries least: a gap in every Panel Field, a zero volume, a missing share
 count, a missing short interest, and an asset that is inactive for two rows. The literals below
-are what the reference printed.
+are what the oracle printed.
 =#
-@testset "The four named Descriptors agree with the reference implementation on a panel with gaps" begin
+@testset "The four named Descriptors agree with the oracle on a panel with gaps" begin
     X = [0.01 0.02 -0.01; -0.02 NaN 0.03; 0.03 0.01 NaN; NaN -0.01 NaN; 0.00 0.02 0.01;
          0.01 -0.03 0.02; -0.01 0.01 -0.02; 0.02 NaN 0.01]
     vol = [10.0 20.0 30.0; 12.0 22.0 31.0; 14.0 0.0 NaN; 16.0 26.0 NaN; 0.0 28.0 34.0;

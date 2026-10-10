@@ -3,13 +3,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the raw factor names and the Factor Family label of one Factor Exposure.
 
-A [`OneHotExposure`](@ref) expands to one `"<field>=<level>"` name per level of the Panel Field it reads, so the name that the caller pairs with it names the block and not a column. Every other Exposure Estimator produces one factor, and that factor takes the name of the caller.
+A [`OneHotExposure`](@ref) expands to one `"<field>=<level>"` name per level of the Panel Field it reads, so the name that the caller pairs with it names the block and not a column. A [`CurrencyExposure`](@ref) expands the same way, less its base currency. Any other member of [`AbstractObservedExposureEstimator`](@ref) takes the name the caller pairs with it when it gives one factor, as an [`ObservedExposure`](@ref) does, and names each factor by its series of the Exogenous Series when it gives several, under its own family label. Every other Exposure Estimator produces one factor, and that factor takes the name of the caller.
 
 # Arguments
 
-  - `nm::AbstractString`: The name that the caller pairs with the estimator. The one-hot method ignores it.
+  - `nm::AbstractString`: The name that the caller pairs with the estimator. The one-hot and the currency methods ignore it.
   - `xe`: An Exposure Estimator.
-  - `rd`: Returns data that carries the Asset Panel. The one-hot method reads the levels of its Panel Field, and every other method ignores it.
+  - `rd`: Returns data that carries the Asset Panel. The one-hot and the currency methods read the levels of their Panel Field, and every other method ignores it.
 
 # Returns
 
@@ -20,6 +20,8 @@ A [`OneHotExposure`](@ref) expands to one `"<field>=<level>"` name per level of 
 
   - [`cross_sectional_factor_axis`](@ref)
   - [`OneHotExposure`](@ref)
+  - [`CurrencyExposure`](@ref)
+  - [`ObservedExposure`](@ref)
   - [`one_hot_exposure_names`](@ref)
 """
 function exposure_axis_names(nm::AbstractString, xe::AbstractExposureEstimator,
@@ -28,6 +30,10 @@ function exposure_axis_names(nm::AbstractString, xe::AbstractExposureEstimator,
 end
 function exposure_axis_names(::AbstractString, xe::OneHotExposure, rd::ReturnsResult)
     nf = one_hot_exposure_names(xe, rd)
+    return nf, fill(String(xe.family), length(nf))
+end
+function exposure_axis_names(::AbstractString, xe::CurrencyExposure, rd::ReturnsResult)
+    nf = panel_field_labels(one_hot_field(rd, xe.field))[currency_level_columns(xe, rd)]
     return nf, fill(String(xe.family), length(nf))
 end
 """

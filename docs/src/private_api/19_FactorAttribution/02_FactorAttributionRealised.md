@@ -1,16 +1,16 @@
 ```@meta
-Description = "Realised factor attribution, private API of PortfolioOptimisers.jl: ATTRIBUTION_CURRENCY_FAMILY, attribution_slice, attribution_weights, attribution_cov, …"
+Description = "Factor attribution realised, private API of PortfolioOptimisers.jl: attribution_slice, attribution_weights, attribution_cov, attribution_align, …"
 ```
 
-# [Realised factor attribution: private API](@id private-api-realised-factor-attribution)
+# [Factor attribution realised: private API](@id private-api-factor-attribution-realised)
 
 ```@docs
-ATTRIBUTION_CURRENCY_FAMILY
 attribution_slice
 attribution_weights
 attribution_cov
 attribution_align
 attribution_trim_exposures
+attribution_zero_inactive
 attribution_trim_rows
 attribution_trim_basis
 attribution_finite_rows
@@ -19,28 +19,26 @@ attribution_window_exposures
 attribution_window_basis
 attribution_window_weights
 attribution_weight_moments
+assert_attribution_ddof
 realised_attribution
+attribution_remainder
 attribution_series_component
 attribution_family_spread
 attribution_no_errors
 attribution_standard_errors
-attribution_currency_mask
+attribution_observed_indices
 attribution_reduce_for_errors
-attribution_reduce_families
-attribution_currency_flags
+attribution_observed_flags
 attribution_broadcast_exposures
 attribution_sandwich
+attribution_changed_covariance
 attribution_expand_errors
 attribution_scatter
 attribution_family_errors
 realised_attribution_assets
 realised_attribution_asset_factor
 attribution_rolling
-attribution_net_returns
 attribution_finite_series
 attribution_realised_entry
 attribution_rolling_entry
-attribution_prediction_history
-attribution_fold_weights
-attribution_fold_returns
 ```

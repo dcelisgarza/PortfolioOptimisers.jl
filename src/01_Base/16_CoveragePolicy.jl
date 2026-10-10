@@ -25,7 +25,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## admits
 
-  - `admits(alg::AbstractCoverageAlgorithm, share::Real, active::Bool, stale::Integer, min_coverage::Real) -> Bool`: The read-out predicate, called once per asset.
+  - `admits(alg::AbstractCoverageAlgorithm, share::Real, active::Bool, stale::Integer, min_coverage::Real) -> Bool`: The predicate that the estimate from the state calls once per asset.
 
 ### Arguments
 
@@ -65,7 +65,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Keeps a delisted asset's history, and drops the asset from the frame the moment it goes inactive.
 
-This is the default rule. It does nothing at fold time, and it does not read the staleness at read-out. A relisting resumes the history. An asset that lists, delists and lists again folds into the counts and accumulators that it left behind, and does not start from zero. [`ExpireCoverage`](@ref) keeps the history in the same way, and it differs only in how long a delisted asset stays in the frame.
+This is the default rule. It does nothing at fold time, and it does not read the staleness when the estimate is made from the state. A relisting resumes the history. An asset that lists, delists and lists again folds into the counts and accumulators that it left behind, and does not start from zero. [`ExpireCoverage`](@ref) keeps the history in the same way, and it differs only in how long a delisted asset stays in the frame.
 
 # Related
 
@@ -147,6 +147,461 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype of the rules that choose which assets an available-case covariance peels away.
+
+An available-case covariance divides each pair by the observations that the pair shares. Two admitted assets can each have a variance and share too few observations for a covariance, so their cell is `NaN` inside the finite block. Such a pair is **undetermined**. The undetermined pairs make a graph, with one vertex per admitted asset that has a variance and one edge per undetermined pair. A set of assets removes every undetermined pair exactly when it is a vertex cover of this graph. A member of the family goes in the `peel` field of a [`CoveragePolicy`](@ref) and chooses the cover. The peel runs at admission, so a peeled asset is `NaN` across its row and column and leaves the Investable Mask.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractPeel` and implement the following method:
+
+## peel_assets
+
+  - `peel_assets(peel::AbstractPeel, U::AbstractMatrix{Bool}) -> Vector{Int}`: The vertices to remove from the graph of undetermined pairs.
+
+### Arguments
+
+  - `peel`: The concrete subtype instance.
+  - `U`: The adjacency matrix of the graph. It is symmetric, `true` at each undetermined pair, and `false` on the diagonal.
+
+### Returns
+
+  - `idx::Vector{Int}`: The vertices to remove, sorted. A set that does not cover every edge leaves a `NaN` inside the block, and the matrix repair refuses it with an `IsNonFiniteError`.
+
+### Examples
+
+```jldoctest
+julia> struct PeelEveryEnd <: PortfolioOptimisers.AbstractPeel end
+
+julia> PortfolioOptimisers.peel_assets(::PeelEveryEnd, U) = findall(vec(any(U; dims = 2)));
+
+julia> PortfolioOptimisers.peel_assets(PeelEveryEnd(), Bool[0 1 0; 1 0 0; 0 0 0])
+2-element Vector{Int64}:
+ 1
+ 2
+```
+
+# Related
+
+  - [`MinimalPeel`](@ref)
+  - [`GreedyPeel`](@ref)
+  - [`NoPeel`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`peel_assets`](@ref)
+"""
+abstract type AbstractPeel <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Peels the fewest assets that remove every undetermined pair, and keeps the greedy peel whenever it is one of them.
+
+This is the default rule. It solves the minimum vertex cover of the graph of undetermined pairs exactly, so it keeps the most assets that a peel can keep. When the cover of [`GreedyPeel`](@ref) has the minimum size, the rule returns it, so it gives the greedy answer on every graph where the greedy answer is optimal. Otherwise it returns the minimum cover whose sorted index vector is lexicographically smallest.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{P} &= \\underset{\\substack{\\mathcal{C} \\subseteq \\mathcal{V} \\\\ \\forall (i, j) \\in \\mathcal{E},\\ i \\in \\mathcal{C} \\lor j \\in \\mathcal{C}}}{\\operatorname{arg\\,min}} \\left\\lvert \\mathcal{C} \\right\\rvert\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{P}``: The assets the rule peels.
+  - $(math_dict[:V_peel])
+  - $(math_dict[:E_peel])
+  - ``\\mathcal{C}``: A candidate set of assets to remove.
+
+# Algorithm
+
+ 1. Take the greedy cover `g` with [`GreedyPeel`](@ref).
+ 2. Find the minimum cover size `k` with [`peel_cover_within`](@ref). Start at `length(g)` and lower the size while a smaller cover exists, so that only the size below the minimum needs a full search. Return `g` when no smaller cover exists.
+ 3. Otherwise build the lexicographically smallest cover of size `k` with [`peel_lexicographic`](@ref).
+
+The search is exact. Minimum vertex cover is NP-hard in general, but the search is exponential in the cover size alone, of order ``1.47^{k}`` with ``O(N^{2})`` work at each step. A tree, a path and a cycle need no branch at all. The graph holds only the pairs of admitted assets that share too few observations, so `k` is small in practice.
+
+# Related
+
+  - [`AbstractPeel`](@ref)
+  - [`GreedyPeel`](@ref)
+  - [`NoPeel`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`peel_assets`](@ref)
+"""
+struct MinimalPeel <: AbstractPeel end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Peels assets greedily, the asset with the most undetermined pairs first.
+
+It is the oracle's rule. It removes the asset with the most undetermined pairs to the assets that are still in the graph, the smallest index on a tie, and repeats until no undetermined pair is left. The greedy cover can be larger than the minimum. On a star whose three leaves each carry one more pendant edge it removes four assets, where three suffice. [`MinimalPeel`](@ref) returns the minimum.
+
+# Algorithm
+
+ 1. Find the asset of the largest degree among the assets still in the graph, the smallest index on a tie, with [`peel_max_degree`](@ref).
+ 2. Stop when that degree is zero. Otherwise remove the asset and go to step 1.
+
+# Related
+
+  - [`AbstractPeel`](@ref)
+  - [`MinimalPeel`](@ref)
+  - [`NoPeel`](@ref)
+  - [`peel_assets`](@ref)
+"""
+struct GreedyPeel <: AbstractPeel end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Peels no asset, so an undetermined pair stays `NaN` in the covariance.
+
+The matrix repair then refuses the `NaN` inside the finite block with an `IsNonFiniteError` that names the cell. Use it to see the undetermined pairs, or to keep a covariance whose gaps a later step fills.
+
+# Related
+
+  - [`AbstractPeel`](@ref)
+  - [`MinimalPeel`](@ref)
+  - [`GreedyPeel`](@ref)
+  - [`matrix_processing_block!`](@ref)
+"""
+struct NoPeel <: AbstractPeel end
+"""
+    peel_assets(peel, U)
+
+Returns the assets to remove from a graph of undetermined pairs.
+
+It is the verb of the [`AbstractPeel`](@ref) interface. [`coverage_peel`](@ref) calls it once per available-case covariance, on the graph of the admitted assets that have a variance.
+
+# Arguments
+
+  - `peel`: The peel rule.
+  - `U`: The adjacency matrix of the graph. It is symmetric, `true` at each undetermined pair, and `false` on the diagonal.
+
+# Returns
+
+  - `idx::Vector{Int}`: The vertices to remove, sorted.
+
+# Examples
+
+```jldoctest
+julia> U = falses(7, 7);
+
+julia> for (i, j) in ((1, 2), (1, 3), (1, 4), (2, 5), (3, 6), (4, 7))
+           U[i, j] = U[j, i] = true
+       end
+
+julia> PortfolioOptimisers.peel_assets(GreedyPeel(), U)
+4-element Vector{Int64}:
+ 1
+ 2
+ 3
+ 4
+
+julia> PortfolioOptimisers.peel_assets(MinimalPeel(), U)
+3-element Vector{Int64}:
+ 2
+ 3
+ 4
+
+julia> PortfolioOptimisers.peel_assets(NoPeel(), U)
+Int64[]
+```
+
+# Related
+
+  - [`AbstractPeel`](@ref)
+  - [`MinimalPeel`](@ref)
+  - [`GreedyPeel`](@ref)
+  - [`NoPeel`](@ref)
+  - [`coverage_peel`](@ref)
+"""
+function peel_assets end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`NoPeel`](@ref) method of [`peel_assets`](@ref). It removes no vertex.
+
+# Related
+
+  - [`peel_assets`](@ref)
+  - [`NoPeel`](@ref)
+"""
+function peel_assets(::NoPeel, ::AbstractMatrix{Bool})
+    return Int[]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`GreedyPeel`](@ref) method of [`peel_assets`](@ref). It removes the vertex of the largest degree, the smallest index on a tie, until no edge is left.
+
+# Related
+
+  - [`peel_assets`](@ref)
+  - [`GreedyPeel`](@ref)
+  - [`peel_max_degree`](@ref)
+"""
+function peel_assets(::GreedyPeel, U::AbstractMatrix{Bool})
+    alive = trues(size(U, 1))
+    idx = Int[]
+    while true
+        v, d = peel_max_degree(U, alive)
+        if iszero(d)
+            break
+        end
+        alive[v] = false
+        push!(idx, v)
+    end
+    return sort!(idx)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+[`MinimalPeel`](@ref) method of [`peel_assets`](@ref). It returns the greedy cover when that cover has the minimum size, and the lexicographically smallest minimum cover otherwise.
+
+# Related
+
+  - [`peel_assets`](@ref)
+  - [`MinimalPeel`](@ref)
+  - [`peel_cover_within`](@ref)
+"""
+function peel_assets(::MinimalPeel, U::AbstractMatrix{Bool})
+    g = peel_assets(GreedyPeel(), U)
+    alive = trues(size(U, 1))
+    # A search at or above the minimum stops at the first cover it finds, so the size falls
+    # from the greedy size, and only the size below the minimum is searched in full.
+    budget = length(g)
+    while budget > 0 && peel_cover_within(U, alive, budget - 1)
+        budget -= 1
+    end
+    return budget == length(g) ? g : peel_lexicographic(U, budget)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Builds the lexicographically smallest vertex cover of a given size, when a cover of that size exists.
+
+It is step 3 of [`MinimalPeel`](@ref). It visits the vertices in index order, and removes each vertex for which a cover of the remaining size still exists. A smaller index taken first gives the smaller sorted index vector, so the cover that the visit completes is the lexicographically smallest one.
+
+# Algorithm
+
+ 1. Skip a vertex that is no longer in the graph, or that has no edge left.
+ 2. Remove the vertex when [`peel_cover_within`](@ref) finds a cover of the remaining size without it, and lower the size by one.
+ 3. Otherwise keep it. Every cover of the size that keeps it removes each of its neighbours, so remove them and lower the size by their number.
+
+# Arguments
+
+  - `U`: The adjacency matrix of the graph.
+  - `budget`: The size of the cover. A cover of this size exists.
+
+# Returns
+
+  - `idx::Vector{Int}`: The vertices of the cover, sorted.
+
+# Related
+
+  - [`MinimalPeel`](@ref)
+  - [`peel_cover_within`](@ref)
+"""
+function peel_lexicographic(U::AbstractMatrix{Bool}, budget::Integer)
+    alive = trues(size(U, 1))
+    idx = Int[]
+    for i in axes(U, 1)
+        if !alive[i] || !any(j -> alive[j] && U[i, j], axes(U, 2))
+            continue
+        end
+        alive[i] = false
+        if peel_cover_within(U, alive, budget - 1)
+            push!(idx, i)
+            budget -= 1
+            continue
+        end
+        # No cover of the budget removes `i`, so every cover that keeps it removes each of
+        # its neighbours.
+        alive[i] = true
+        for j in axes(U, 2)
+            if alive[j] && U[i, j]
+                alive[j] = false
+                push!(idx, j)
+                budget -= 1
+            end
+        end
+    end
+    return sort!(idx)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Finds the vertex of the largest degree among the vertices still in a graph, the smallest index on a tie.
+
+# Arguments
+
+  - `U`: The adjacency matrix of the graph.
+  - `alive`: One entry per vertex, `true` where the vertex is still in the graph.
+
+# Returns
+
+  - `(v, d)::Tuple{Int, Int}`: The vertex and its degree over the vertices still in the graph. `v` is `0` and `d` is `0` when no edge is left.
+
+# Related
+
+  - [`GreedyPeel`](@ref)
+  - [`peel_cover_within`](@ref)
+"""
+function peel_max_degree(U::AbstractMatrix{Bool}, alive::AbstractVector{Bool})
+    v, d = 0, 0
+    for i in axes(U, 1)
+        if !alive[i]
+            continue
+        end
+        di = count(j -> alive[j] && U[i, j], axes(U, 2))
+        if di > d
+            v, d = i, di
+        end
+    end
+    return v, d
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Decides whether the vertices still in a graph have a vertex cover of at most `k` vertices.
+
+It is the exact search of [`MinimalPeel`](@ref), a bounded search tree on the vertex of the largest degree.
+
+# Algorithm
+
+ 1. Return `false` when `k` is negative.
+ 2. While a vertex has degree one, put its neighbour in the cover and lower `k` by one, with [`peel_pendants!`](@ref).
+ 3. Take the vertex `v` of the largest degree `d` with [`peel_max_degree`](@ref). Return `true` when `d` is zero.
+ 4. Return `false` when the graph has more than `k d` edges, because each vertex of a cover covers at most `d` edges.
+ 5. When `d` is two, every vertex left with an edge has degree two, so each component is a cycle. Compare `k` with the size of the cover of the cycles, from [`peel_cycle_cover`](@ref).
+ 6. A cover either holds `v`, or holds every neighbour of `v`. Search the graph without `v` at the size `k - 1`, then the graph without `v` and its neighbours at the size `k - d`.
+
+The branch of step 6 has `d >= 3`, so the tree has at most ``1.47^{k}`` leaves.
+
+# Arguments
+
+  - `U`: The adjacency matrix of the graph.
+  - `alive`: One entry per vertex, `true` where the vertex is still in the graph. It is not mutated.
+  - `k`: The largest size of the cover.
+
+# Returns
+
+  - `found::Bool`: Whether a vertex cover of at most `k` vertices exists.
+
+# Related
+
+  - [`MinimalPeel`](@ref)
+  - [`peel_max_degree`](@ref)
+  - [`peel_cycle_cover`](@ref)
+"""
+function peel_cover_within(U::AbstractMatrix{Bool}, alive::AbstractVector{Bool},
+                           k::Integer)::Bool
+    a = copy(alive)
+    k = peel_pendants!(U, a, k)
+    # The second branch spends `d` at once, and the pendant rule spends one per edge, so
+    # either can overdraw the size.
+    if k < 0
+        return false
+    end
+    v, d = peel_max_degree(U, a)
+    if iszero(d)
+        return true
+    end
+    m = count(a[i] && a[j] && U[i, j] for i in axes(U, 1) for j in axes(U, 2) if i < j)
+    if m > k * d
+        return false
+    end
+    if d == 2
+        return peel_cycle_cover(U, a) <= k
+    end
+    a[v] = false
+    if peel_cover_within(U, a, k - 1)
+        return true
+    end
+    for j in axes(U, 2)
+        a[j] &= !U[v, j]
+    end
+    return peel_cover_within(U, a, k - d)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Puts the neighbour of each vertex of degree one into the cover, until no such vertex is left or the size is spent.
+
+It is step 2 of [`peel_cover_within`](@ref). Some minimum cover holds the neighbour, because the edge needs one of its two ends and the neighbour covers at least as many edges. Each removal can leave a new vertex of degree one, so the rule repeats.
+
+# Arguments
+
+  - `U`: The adjacency matrix of the graph.
+  - `alive`: One entry per vertex, `true` where the vertex is still in the graph, mutated in place.
+  - `k`: The largest size of the cover.
+
+# Returns
+
+  - `k::Integer`: The size left, which is negative when the rule spent more than `k`.
+
+# Related
+
+  - [`peel_cover_within`](@ref)
+"""
+function peel_pendants!(U::AbstractMatrix{Bool}, alive::AbstractVector{Bool}, k::Integer)
+    while k >= 0
+        p = findfirst(i -> alive[i] && isone(count(j -> alive[j] && U[i, j], axes(U, 2))),
+                      axes(U, 1))
+        if isnothing(p)
+            break
+        end
+        alive[findfirst(j -> alive[j] && U[p, j], axes(U, 2))] = false
+        k -= 1
+    end
+    return k
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the size of the minimum vertex cover of a graph whose components are cycles.
+
+[`peel_cover_within`](@ref) calls it when every vertex left with an edge has degree two. A cycle of `c` vertices needs `cld(c, 2)` of them, and the cycles share no vertex, so the sizes add.
+
+# Arguments
+
+  - `U`: The adjacency matrix of the graph.
+  - `alive`: One entry per vertex, `true` where the vertex is still in the graph. Every vertex still in the graph has degree zero or two.
+
+# Returns
+
+  - `k::Int`: The size of the minimum vertex cover.
+
+# Related
+
+  - [`peel_cover_within`](@ref)
+"""
+function peel_cycle_cover(U::AbstractMatrix{Bool}, alive::AbstractVector{Bool})
+    seen = .!alive
+    k = 0
+    for s in axes(U, 1)
+        if seen[s] || !any(j -> alive[j] && U[s, j], axes(U, 2))
+            continue
+        end
+        c = 0
+        stack = [s]
+        seen[s] = true
+        while !isempty(stack)
+            i = pop!(stack)
+            c += 1
+            for j in axes(U, 2)
+                if !seen[j] && U[i, j]
+                    seen[j] = true
+                    push!(stack, j)
+                end
+            end
+        end
+        k += cld(c, 2)
+    end
+    return k
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Fits each cell of a moment on the observations that cell has, instead of on the Coverage Universe.
 
 A policy replaces the all-or-nothing Coverage Universe with available-case estimation. It goes in the `cvg` field of a moment estimator, where the default is `nothing`. With `nothing` the estimator takes the reduce-and-expand path by dispatch, and the policy costs nothing. With a policy set, the estimator fits every cell of the answer on the observations at which every asset of that cell is finite and active, and each cell carries its own denominator. An asset reaches the answer only where [`admits`](@ref) lets it in.
@@ -154,6 +609,8 @@ A policy replaces the all-or-nothing Coverage Universe with available-case estim
 **`min_coverage` is also the share that a [`scenario_fill`](@ref) passes in silence.** [`admits`](@ref) reads the coverage share of an asset as its own observation count over the number of observations folded. The fill counts the non-finite entries of the column over the same denominator. So a column that [`DecayCoverage`](@ref), [`ResetCoverage`](@ref) or [`ExpireCoverage`](@ref) admits is at most a `1 - min_coverage` share non-finite. Where the `fill_limit` of a prior is `nothing`, [`resolve_fill_limit`](@ref) derives `1 - min_coverage`, and no admitted column goes past it. A policy therefore turns on no warning, and an available-case walk-forward gives no warning for the gaps that it was set up to fill.
 
 The default `min_coverage = 0` admits every column, and a prior fills in silence every column that has a variance. Under the default Bessel correction that is a column with two or more observations. A column with one observation has a `NaN` variance, so the Investable Mask drops the asset and nothing is filled. To admit broadly and still get the warning, set the `fill_limit` of the prior explicitly, tighter than `1 - min_coverage`.
+
+**A covariance peels the assets of an undetermined pair at admission.** Two admitted assets can each have a variance and share too few observations for a covariance. The `peel` rule then removes a set of assets that leaves no such pair, and [`coverage_peel`](@ref) reports it through [`strict_diagnostic`](@ref): a warning names the peeled assets, and `strict = true` refuses. A peeled asset is `NaN` across its row and column, so it leaves the Investable Mask, and the matrix repair meets no `NaN` inside the finite block. The default [`MinimalPeel`](@ref) keeps the most assets. [`GreedyPeel`](@ref) is the oracle's rule, and [`NoPeel`](@ref) keeps the `NaN` for the matrix repair to refuse. A mean and a variance have no pairs, so the rule binds on a covariance and a correlation alone.
 
 # Fields
 
@@ -163,7 +620,8 @@ $(DocStringExtensions.FIELDS)
 
     CoveragePolicy(;
         min_coverage::Real = 0.0,
-        alg::AbstractCoverageAlgorithm = DecayCoverage()
+        alg::AbstractCoverageAlgorithm = DecayCoverage(),
+        peel::AbstractPeel = MinimalPeel()
     ) -> CoveragePolicy
 
 Keywords correspond to the struct's fields.
@@ -178,7 +636,8 @@ Keywords correspond to the struct's fields.
 julia> CoveragePolicy(; min_coverage = 0.25)
 CoveragePolicy
   min_coverage ┼ Float64: 0.25
-           alg ┴ DecayCoverage()
+           alg ┼ DecayCoverage()
+          peel ┴ MinimalPeel()
 ```
 
 # Related
@@ -189,6 +648,8 @@ CoveragePolicy
   - [`ExpireCoverage`](@ref)
   - [`admits`](@ref)
   - [`CoverageCounts`](@ref)
+  - [`AbstractPeel`](@ref)
+  - [`coverage_peel`](@ref)
 """
 @concrete struct CoveragePolicy <: AbstractEstimator
     """
@@ -199,16 +660,22 @@ CoveragePolicy
     `alg`: Coverage algorithm, the rule that decides what happens to a delisted asset.
     """
     alg
-    function CoveragePolicy(min_coverage::Real, alg::AbstractCoverageAlgorithm)
+    """
+    `peel`: Peel rule, which chooses the assets an available-case covariance removes so that no pair of admitted assets with a variance is left without a covariance.
+    """
+    peel
+    function CoveragePolicy(min_coverage::Real, alg::AbstractCoverageAlgorithm,
+                            peel::AbstractPeel)
         @argcheck(zero(min_coverage) <= min_coverage <= one(min_coverage),
                   DomainError(min_coverage,
                               "`min_coverage` is a share of the observations folded, so it must lie in [0, 1]."))
-        return new{typeof(min_coverage), typeof(alg)}(min_coverage, alg)
+        return new{typeof(min_coverage), typeof(alg), typeof(peel)}(min_coverage, alg, peel)
     end
 end
 function CoveragePolicy(; min_coverage::Real = 0.0,
-                        alg::AbstractCoverageAlgorithm = DecayCoverage())::CoveragePolicy
-    return CoveragePolicy(min_coverage, alg)
+                        alg::AbstractCoverageAlgorithm = DecayCoverage(),
+                        peel::AbstractPeel = MinimalPeel())::CoveragePolicy
+    return CoveragePolicy(min_coverage, alg, peel)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -217,7 +684,7 @@ Carries the per-cell denominators and the per-asset bookkeeping of an available-
 
 A partial-fit state holds it in its `cvg` field. On the plain path that field is `nothing`, so the plain state costs nothing. `nu` has the shape of the accumulator it serves, because the observation count of a covariance cell is a count per pair and not a count per asset. `centre` has that shape too wherever the centre of a cell differs from the per-asset mean of the state.
 
-This type is an implementation detail and is not intended for direct use. [`partial_fit!`](@ref) writes it, the read-out verbs divide by it, and [`merge_states`](@ref) folds two of them.
+This type is an implementation detail and is not intended for direct use. [`partial_fit!`](@ref) writes it, the batch verbs called with no data divide by it, and [`merge_states`](@ref) folds two of them.
 
 # Fields
 
@@ -667,7 +1134,7 @@ end
 
 Decides whether an asset reaches the answer of an available-case fit.
 
-It is the second of the two verbs of the [`AbstractCoverageAlgorithm`](@ref) interface. It runs once per asset at read-out, and the read-out writes `NaN` across every asset that it refuses.
+It is the second of the two verbs of the [`AbstractCoverageAlgorithm`](@ref) interface. It runs once per asset when the estimate is made from the state, and the estimate holds `NaN` across every asset that `admits` refuses.
 
 # Arguments
 
@@ -755,7 +1222,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the universe of an available-case fit out of its per-cell counts.
 
-It makes the mask of the read-out, and it is the one place that calls [`admits`](@ref). It collapses onto the `nothing` sentinel exactly as [`coverage_sentinel`](@ref) does, so an answer that admits every asset allocates no mask. Unlike [`coverage_sentinel`](@ref) it refuses no sample. An available-case fit whose window admits nothing answers all `NaN` and does not raise, because the fit is opt-in and its caller asked for the gaps.
+It makes the mask of the estimate from the state, and it is the one place that calls [`admits`](@ref). It collapses onto the `nothing` sentinel exactly as [`coverage_sentinel`](@ref) does, so an answer that admits every asset allocates no mask. Unlike [`coverage_sentinel`](@ref) it refuses no sample. An available-case fit whose window admits nothing answers all `NaN` and does not raise, because the fit is opt-in and its caller asked for the gaps.
 
 # Mathematical definition
 
@@ -808,9 +1275,108 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Peels the assets of the undetermined pairs out of the universe of an available-case covariance.
+
+It is the pairwise half of admission, and it runs after [`coverage_admission`](@ref) in every available-case covariance. A pair is **undetermined** when both of its assets are admitted and have a variance, and the pair shares too few observations for a covariance. [`coverage_divide`](@ref) would write `NaN` at such a cell inside the finite block, and the matrix repair would refuse it. The `peel` rule of the policy chooses the assets to remove, and they leave the mask, so every consumer of the result reads one universe.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{V} &= \\left\\{ i \\in \\mathcal{A} : \\nu_{ii} - \\delta \\geq 1 \\right\\}\\,, \\\\
+\\mathcal{E} &= \\left\\{ (i, j) \\in \\mathcal{V}^{2} : i \\neq j,\\ \\nu_{ij} - \\delta < 1 \\right\\}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:V_peel])
+  - $(math_dict[:E_peel])
+  - $(math_dict[:A_adm_cvg])
+  - ``\\nu_{ij}``: Number of observations at which assets ``i`` and ``j`` are both valid.
+  - ``\\delta``: The Bessel correction, ``1`` when `corrected` is `true` and ``0`` otherwise.
+
+# Algorithm
+
+ 1. Take the vertices `V`, the admitted assets whose variance has a denominator of at least one.
+ 2. Take the adjacency matrix `U` of the undetermined pairs among them. Return `cmsk` when it holds no edge.
+ 3. Take the assets to remove with [`peel_assets`](@ref). Return `cmsk` when the rule removes none, as [`NoPeel`](@ref) does.
+ 4. Report the peel through [`strict_diagnostic`](@ref), which warns, or refuses under `strict`.
+ 5. Remove the peeled assets from the mask.
+
+# Arguments
+
+  - `cvg`: The policy the estimator carries.
+  - `cmsk`: The admitted assets from [`coverage_admission`](@ref), or `nothing` when every asset is admitted.
+  - `nu`: The per-pair observation count, `assets × assets`.
+  - `corrected`: The Bessel correction of the covariance.
+  - `strict`: Whether a peel refuses rather than warns.
+
+# Validation
+
+  - Under `strict`, the rule peels no asset. An `ArgumentError` that names the assets is thrown otherwise.
+
+# Returns
+
+  - `cmsk::Option{BitVector}`: The admitted assets after the peel, or `nothing` when every asset is admitted.
+
+# Related
+
+  - [`coverage_admission`](@ref)
+  - [`AbstractPeel`](@ref)
+  - [`peel_assets`](@ref)
+  - [`strict_diagnostic`](@ref)
+  - [`coverage_divide`](@ref)
+"""
+function coverage_peel(cvg::CoveragePolicy, cmsk::Option{BitVector},
+                       nu::AbstractMatrix{<:Integer}, corrected::Bool, strict::Bool)
+    V = [i
+         for i in axes(nu, 1) if (isnothing(cmsk) || cmsk[i]) && nu[i, i] - corrected >= 1]
+    U = BitMatrix(undef, length(V), length(V))
+    for b in eachindex(V), a in eachindex(V)
+        U[a, b] = a != b && nu[V[a], V[b]] - corrected < 1
+    end
+    if !any(U)
+        return cmsk
+    end
+    idx = V[peel_assets(cvg.peel, U)]
+    if isempty(idx)
+        return cmsk
+    end
+    strict_diagnostic(peel_msg(idx, count(U) ÷ 2, cvg.peel), strict)
+    out = isnothing(cmsk) ? trues(size(nu, 1)) : copy(cmsk)
+    out[idx] .= false
+    return out
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Builds the text of the report of [`coverage_peel`](@ref).
+
+# Arguments
+
+  - `idx`: The peeled assets, as indices of the universe of the fit.
+  - `m`: The number of undetermined pairs before the peel.
+  - `peel`: The peel rule that chose the assets.
+
+# Returns
+
+  - `msg::String`: The message, which names the assets, the count of pairs and the rule.
+
+# Related
+
+  - [`coverage_peel`](@ref)
+  - [`strict_diagnostic`](@ref)
+"""
+function peel_msg(idx::AbstractVector{<:Integer}, m::Integer, peel::AbstractPeel)
+    return "an available-case covariance peeled the assets at indices $(idx) of its universe, to remove $(m) undetermined pair(s): pairs of admitted assets that each have a variance but share too few observations for a covariance. $(peel) chose them. A peeled asset is `NaN` across its row and column, so it leaves the Investable Mask. Pass `strict = true` to refuse instead, set `peel = NoPeel()` on the `CoveragePolicy` to keep the `NaN` cells, raise `min_coverage`, or fit over a window that the pairs share."
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Divides an available-case accumulator by its per-cell denominator, and frames the assets the policy refuses.
 
-Every available-case read-out ends with it. A cell whose denominator has not reached one is `NaN`, which is the per-cell half of the rule. An asset that [`coverage_admission`](@ref) refuses is `NaN` across its whole row and column, which is the per-asset half.
+Every available-case estimate from a state ends with it. A cell whose denominator has not reached one is `NaN`, which is the per-cell half of the rule. An asset that [`coverage_admission`](@ref) refuses is `NaN` across its whole row and column, which is the per-asset half.
 
 The element type of the answer is the type of the division itself, so a `Float32` accumulator reads out as `Float32`, and the sentinel does not widen it. An element type that cannot hold `NaN` cannot hold the answer either. An exact accumulator, a `Rational` among them, raises an `InexactError` at the first cell that the policy refuses, and does not read out as `Float64`. A window with no refused cell is unaffected.
 
@@ -924,7 +1490,7 @@ end
 
 Writes `NaN` into every entry of an answer that touches an asset the policy refuses.
 
-It is the per-asset half of the read-out rule, and [`coverage_divide`](@ref) and [`coverage_frame`](@ref) share it. A `nothing` mask is the sentinel of [`coverage_admission`](@ref). It means that every asset is admitted, so the method writes nothing.
+It is the per-asset half of the rule that an available-case estimate applies, and [`coverage_divide`](@ref) and [`coverage_frame`](@ref) share it. A `nothing` mask is the sentinel of [`coverage_admission`](@ref). It means that every asset is admitted, so the method writes nothing.
 
 # Arguments
 
@@ -1000,5 +1566,6 @@ function coverage_refuse_comoment!(val::AbstractMatrix, cmsk::BitVector,
     val[:, pout] .= nan
     return nothing
 end
-export CoveragePolicy, DecayCoverage, ResetCoverage, ExpireCoverage
-public AbstractCoverageAlgorithm, fold_inactive!, admits
+export CoveragePolicy, DecayCoverage, ResetCoverage, ExpireCoverage, MinimalPeel,
+       GreedyPeel, NoPeel
+public AbstractCoverageAlgorithm, fold_inactive!, admits, AbstractPeel, peel_assets

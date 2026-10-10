@@ -12,6 +12,12 @@ target_forecast_alignment
 target_forecast_samples
 target_forecast_fit
 target_forecast_uncalibrated
+target_forecast_insample
+target_forecast_prequential
+target_forecast_observations
+target_forecast_row
+normal_equations_coef
+normal_equations_add!
 target_forecast_scatter
 target_forecast_calibration_design
 target_forecast_calibration
@@ -19,4 +25,6 @@ target_forecast_latest
 target_forecast_latest_variances
 target_forecast_multiplier
 target_forecast_coefficient
+target_forecast_orthogonal_coefficient
+target_forecast_orthogonal_rows
 ```

@@ -14,7 +14,7 @@ Compute the expected portfolio return using the specified return estimator.
 
 ## The prior route reduces to the Investable Mask
 
-A prior result lives on the **full** asset universe, and an asset it could not estimate carries `NaN` in `mu` and down its column of `pr.X`. So `dot(w, mu)` and `X * w` are `NaN` at **any** weight, the optimiser's own zero included. Each method therefore reduces the prior, the weights and the fees once at its entry, through [`investable_reduction`](@ref) — the rule for an optimiser, taken at the value-level door. A held non-investable asset warns and its weight is dropped, or raises under `strict`. [`NoReturn`](@ref) answers zero at every weight, so it reads nothing and reduces nothing.
+A prior result lives on the **full** asset universe, and an asset it could not estimate carries `NaN` in `mu` and down its column of `pr.X`. So `dot(w, mu)` and `X * w` are `NaN` at **any** weight, the optimiser's own zero included. Each method therefore reduces the prior, the weights and the fees once at its entry, through [`investable_reduction`](@ref) — the rule for an optimiser, applied at the entry of each value-level verb. A held non-investable asset warns and its weight is dropped, or raises under `strict`. [`NoReturn`](@ref) answers zero at every weight, so it reads nothing and reduces nothing.
 
 The reduction is a **no-op on a prior that is already reduced**, because a reduced prior's moments are finite everywhere and [`investable_mask`](@ref) then answers `nothing`. That is what keeps a vector of terms, a population, and a composite such as [`expected_ratio`](@ref) to exactly one diagnostic.
 
@@ -78,9 +78,10 @@ Where:
 """
 function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
-    # The value-level door. A non-investable asset carries `NaN` in `mu`, so `dot(w, mu)` is
-    # `NaN` at any weight, the optimiser's own zero included. The reduction is a no-op on a
-    # prior that is already reduced, which is what keeps a composite to one diagnostic.
+    # Reduce to the Investable Mask. A non-investable asset carries `NaN` in `mu`, so
+    # `dot(w, mu)` is `NaN` at any weight, the optimiser's own zero included. The reduction
+    # is a no-op on a prior that is already reduced, which is what keeps a composite to one
+    # diagnostic.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     # The scalar twin of the `ret` expression `set_return_constraints!` builds, so it uses
     # the same ladder. The prior is in hand, so a Deferred Quantity resolves here too.
@@ -90,7 +91,7 @@ function expected_return(r::ArithmeticReturn, w::VecNum, pr::AbstractPriorResult
 end
 function expected_return(ret::LogarithmicReturn, w::VecNum, pr::AbstractPriorResult,
                          fees::Option{<:Fees} = nothing; strict::Bool = false, kwargs...)
-    # The value-level door — see the note on the arithmetic twin above.
+    # Reduce to the Investable Mask — see the note on the arithmetic twin above.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     rw = ret.w
     X = pr.X
@@ -290,7 +291,7 @@ function expected_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                         pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                         rf::Number = 0, sca::Scalariser = SumScalariser(),
                         strict::Bool = false, kwargs...)
-    # The value-level door reduces here, at the outermost entry the caller reached, so a
+    # Reduce to the Investable Mask here, at the outermost entry the caller reached, so a
     # held non-investable asset is named once. Both children reduce again on the reduced
     # prior, where every moment is finite and the mask is `nothing`, so neither repeats it.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
@@ -383,7 +384,7 @@ function expected_risk_ret_ratio(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum
                                  pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                                  rf::Number = 0, sca::Scalariser = SumScalariser(),
                                  strict::Bool = false, kwargs...)
-    # The value-level door reduces once here — see the note in `expected_ratio`.
+    # Reduce to the Investable Mask once here — see the note in `expected_ratio`.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     # The prior, not `pr.X` — see the note in `expected_ratio`.
     rk = expected_risk(r, w, pr, fees; sca = sca, kwargs...)
@@ -493,8 +494,8 @@ function expected_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                        pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                        rf::Number = 0, sca::Scalariser = SumScalariser(),
                        strict::Bool = false, kwargs...)
-    # The value-level door reduces once here, so the penalty's asset count is the count of
-    # assets the prior could estimate — see the note in `expected_ratio`.
+    # Reduce to the Investable Mask once here, so the penalty's asset count is the count
+    # of assets the prior could estimate — see the note in `expected_ratio`.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     sr = expected_ratio(r, ret, w, pr, fees; rf = rf, sca = sca, kwargs...)
     return sr - sric_penalty(sr, pr)
@@ -560,7 +561,7 @@ function expected_risk_ret_sric(r::BaseRM_VecBaseRM, ret::JRE_VecJRE, w::VecNum,
                                 pr::AbstractPriorResult, fees::Option{<:Fees} = nothing;
                                 rf::Number = 0, sca::Scalariser = SumScalariser(),
                                 strict::Bool = false, kwargs...)
-    # The value-level door reduces once here — see the note in `expected_sric`.
+    # Reduce to the Investable Mask once here — see the note in `expected_sric`.
     _, pr, w, fees = investable_reduction(pr, w, fees, strict)
     rk, rt, sr = expected_risk_ret_ratio(r, ret, w, pr, fees; rf = rf, sca = sca, kwargs...)
     return rk, rt, sr - sric_penalty(sr, pr)
@@ -632,7 +633,8 @@ ExpectedReturn
            │            │     fee ┼ Bool: true
            │            │     mic ┴ Bool: true
            │        ucs ┼ nothing
-           │         mu ┴ nothing
+           │         mu ┼ nothing
+           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
 ```
 
 # Related
@@ -774,7 +776,8 @@ ExpectedReturnRiskRatio
            │            │     fee ┼ Bool: true
            │            │     mic ┴ Bool: true
            │        ucs ┼ nothing
-           │         mu ┴ nothing
+           │         mu ┼ nothing
+           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
         rk ┼ Variance
            │   settings ┼ RiskMeasureSettings
            │            │   scale ┼ Float64: 1.0
@@ -783,7 +786,8 @@ ExpectedReturnRiskRatio
            │      sigma ┼ nothing
            │       chol ┼ nothing
            │         rc ┼ nothing
-           │        alg ┴ SquaredSOCRiskExpr()
+           │        alg ┼ SquaredSOCRiskExpr()
+           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
        sca ┼ SumScalariser()
         rf ┴ Float64: 0.0
 ```
@@ -1233,7 +1237,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PerformanceSummaryResult(
-        n_periods, periods_per_year, alpha, compound,
+        n_periods, ppy, alpha, compound,
         ann_return, ann_volatility, sharpe, sharpe_stderr,
         sortino, calmar, max_drawdown, cvar,
         excess_ret, tracking_error, information_ratio, turnover
@@ -1258,7 +1262,7 @@ the arguments that produced the statistics after them.
     """
     $(field_dict[:ps_ppy])
     """
-    periods_per_year
+    ppy
     """
     $(field_dict[:ps_alpha])
     """
@@ -1317,11 +1321,11 @@ the arguments that produced the statistics after them.
     turnover
 end
 """
-    performance_summary(ret::VecNum; periods_per_year::Number = 252, alpha::Number = 0.05,
+    performance_summary(ret::VecNum; ppy::Number = 1, alpha::Number = 0.05,
                         compound::Bool = false,
                         benchmark::Option{<:VecNum} = nothing) -> PerformanceSummaryResult
     performance_summary(w::ArrNum, X::MatNum, fees::Option{<:Fees} = nothing;
-                        periods_per_year, alpha, compound, benchmark) -> PerformanceSummaryResult
+                        ppy, alpha, compound, benchmark) -> PerformanceSummaryResult
     performance_summary(w::ArrNum, rd::ReturnsResult, fees::Option{<:Fees} = nothing;
                         kwargs...) -> PerformanceSummaryResult
     performance_summary(res::OptimisationResult, rd::ReturnsResult;
@@ -1334,7 +1338,7 @@ The weight-and-returns methods net the returns through [`calc_net_returns`](@ref
 
 Every method takes a `benchmark`, a second return series over the same periods, and answers the three excess statistics against it. Without one the three are `NaN`. The prediction-result method also answers the **turnover** of the held path, the mean trade at a rebalance of a multi-period result; at `test_size = 1` a rebalance is a period. A bare series, a single fold and a one-fold result record no rebalance, so their turnover is `NaN`.
 
-**The Precomputed-returns contract: the series `ret` must be finite.** No method takes a finiteness check, because every internal caller hands one a finite series: the prediction methods read the fold's own funnel output, and a scan on a long series would be paid by all of them. One non-finite entry makes the mean, the volatility and every ratio non-finite, and the tail figure answers a **finite wrong number** rather than a `NaN`, because `partialsort` orders a `NaN` after every real. A caller who holds a gapped series drops the gaps first with `x[isfinite.(x)]`, and a caller who holds a gapped panel scores it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead, which filters the Held Gaps once.
+**The Precomputed-returns contract: the series `ret` must be finite.** No method takes a finiteness check, because every internal caller hands one a finite series: the prediction methods read the fold's own output of [`calc_net_returns`](@ref), and a scan on a long series would be paid by all of them. One non-finite entry makes the mean, the volatility and every ratio non-finite, and the tail figure answers a **finite wrong number** rather than a `NaN`, because `partialsort` orders a `NaN` after every real. A caller who holds a gapped series drops the gaps first with `x[isfinite.(x)]`, and a caller who holds a gapped panel scores it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead, which filters the Held Gaps once.
 
 The standard error of the Sharpe ratio reads every observation as independent, so it understates the true standard error on a series scored under a Weight Drift, as the `# Mathematical definition` states. The rigorous alternative is a long-run variance estimator, which needs a bandwidth the library would have to defend on every sample. The library does not build one, and it applies no guard and no threshold: the figure is reported as it stands.
 
@@ -1376,7 +1380,7 @@ Where:
   - $(math_dict[:xret])
   - $(math_dict[:b_norm_err])
   - $(math_dict[:T])
-  - ``p``: Number of periods per year, `periods_per_year`.
+  - ``p``: Number of periods per year, `ppy`.
   - ``m``, ``s``: Sample mean and corrected sample standard deviation of ``\\boldsymbol{x}``.
   - ``\\boldsymbol{d}``: Drawdown path of the cumulative wealth of ``\\boldsymbol{x}``, compounded or not as `compound` states, with ``d_{t} \\leq 0``.
   - ``m_e``, ``s_e``: Sample mean and corrected sample standard deviation of the excess series ``\\boldsymbol{e} = \\boldsymbol{x} - \\boldsymbol{b}``.
@@ -1399,7 +1403,7 @@ The expression corrects for the third and fourth moments and **not** for serial 
 
 Every method reduces to [`summarise_returns`](@ref), which runs the steps. A method that takes weights nets the returns through [`calc_net_returns`](@ref) first, and the method that takes a prediction result takes the first series when it carries several, and reads the turnover of its held path.
 
- 1. Check `alpha` and `periods_per_year`, as `# Validation` states.
+ 1. Check `alpha` and `ppy`, as `# Validation` states.
  2. Take `T`, the number of periods, and `m` and `s`, the sample mean and the corrected sample standard deviation of `ret` about `m`. Clamp the mean to the least and the greatest entry of `ret`. The clamp moves nothing in exact arithmetic. The rounded mean of a constant `ret` can differ from its common value, and the clamp makes `m` equal that value, so `s` is exactly zero.
  3. Annualise the two, giving `ann_ret` and `ann_vol`.
  4. Divide, giving `sharpe`. A non-positive `ann_vol` gives a `NaN` in its place.
@@ -1419,7 +1423,7 @@ Every method reduces to [`summarise_returns`](@ref), which runs the steps. A met
   - `fees`: Optional transaction fees.
   - `rd`: [`ReturnsResult`](@ref) carrying the asset returns.
   - `res`: An [`OptimisationResult`](@ref), whose weights and fees meet the caller's `rd` on the result's investable universe through [`result_investable_view`](@ref).
-  - $(arg_dict[:ps_ppy])
+  - $(arg_dict[:ps_ppy]) It defaults to `1`, which reports the statistics per period at any frequency of the data.
   - $(arg_dict[:ps_alpha])
   - $(arg_dict[:ps_compound])
   - `benchmark`: Benchmark return series over the same periods as `ret`, or `nothing` for no excess statistics.
@@ -1427,7 +1431,7 @@ Every method reduces to [`summarise_returns`](@ref), which runs the steps. A met
 # Validation
 
   - `0 < alpha < 1`.
-  - `periods_per_year > 0`.
+  - `ppy > 0`.
   - `length(benchmark) == length(ret)` when a benchmark is given. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
@@ -1545,7 +1549,7 @@ function held_path_turnover(pred::MultiPeriodPredictionResult)
     return sum(sum(abs, view(W0, f, :) - view(W1, f - 1, :)) for f in 2:F) / (F - 1)
 end
 """
-    summarise_returns(ret::VecNum, turnover::Option{<:Number}; periods_per_year::Number = 252,
+    summarise_returns(ret::VecNum, turnover::Option{<:Number}; ppy::Number = 1,
                       alpha::Number = 0.05, compound::Bool = false,
                       benchmark::Option{<:VecNum} = nothing) -> PerformanceSummaryResult
 
@@ -1557,11 +1561,11 @@ Every `performance_summary` method reduces to this function. The bare-series met
 
   - `ret`: Periodic portfolio returns.
   - `turnover`: Mean turnover per rebalance, or `nothing` when the caller holds no weight path.
-  - `periods_per_year`, `alpha`, `compound`, `benchmark`: As [`performance_summary`](@ref) states them.
+  - `ppy`, `alpha`, `compound`, `benchmark`: As [`performance_summary`](@ref) states them.
 
 # Validation
 
-  - `0 < alpha < 1` and `periods_per_year > 0`. A `DomainError` is thrown otherwise.
+  - `0 < alpha < 1` and `ppy > 0`. A `DomainError` is thrown otherwise.
   - `length(benchmark) == length(ret)` when a benchmark is given, checked by [`excess_statistics`](@ref). A `DimensionMismatch` is thrown otherwise.
 
 # Returns
@@ -1574,15 +1578,13 @@ Every `performance_summary` method reduces to this function. The bare-series met
   - [`excess_statistics`](@ref)
   - [`held_path_turnover`](@ref)
 """
-function summarise_returns(ret::VecNum, turnover::Option{<:Number};
-                           periods_per_year::Number = 252, alpha::Number = 0.05,
-                           compound::Bool = false,
+function summarise_returns(ret::VecNum, turnover::Option{<:Number}; ppy::Number = 1,
+                           alpha::Number = 0.05, compound::Bool = false,
                            benchmark::Option{<:VecNum} = nothing)::PerformanceSummaryResult
     assert_unit_interval(alpha, :alpha)
-    @argcheck(periods_per_year > zero(periods_per_year),
-              DomainError(periods_per_year, "periods_per_year must be positive"))
+    @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
     T = length(ret)
-    ann = periods_per_year
+    ann = ppy
     # The clamp moves nothing in exact arithmetic. On a constant series it makes the mean the
     # common value, so `s` is exactly zero and every guard below fires.
     m = clamp(mean(ret), extrema(ret)...)

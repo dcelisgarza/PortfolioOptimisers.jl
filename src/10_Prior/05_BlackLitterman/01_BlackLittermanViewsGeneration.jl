@@ -118,7 +118,7 @@ Convert parsed Black-Litterman view equations into a `BlackLittermanViews` objec
 
 A view that is dropped is **dropped, not refused**. Its index joins `excl`, the remaining rows keep their order, and [`remove_excl_views`](@ref) drops the matching entry of a per-view confidence vector. When every view is dropped there is no row left and the return is `nothing`; [`bl_preroll`](@ref) is the caller that decides what that means.
 
-**A row is the unit of a drop.** A view is a joint statement over several names with one right-hand side, so a name this function cannot resolve takes the whole row with it rather than only its own term: `a + c == 0.05` assembled without `c` would fit `a == 0.05`, a different and stronger claim than the caller wrote, and one the update would blend the prior against. What the name's failure was decides only whether the drop is *reported*. A name on the **counterpart axis** — read with [`counterpart_axis_names`](@ref), and in practice the Non-Investable Axis a door minted with [`investable_views`](@ref) — is dropped in silence under both settings of `strict`, because it was a correct name over the universe the caller was handed and the data moved it; the departure is announced once, by the door, through [`announce_non_investable`](@ref). A name on neither axis is a typo, and is reported exactly as before.
+**A row is the unit of a drop.** A view is a joint statement over several names with one right-hand side, so a name this function cannot resolve takes the whole row with it rather than only its own term: `a + c == 0.05` assembled without `c` would fit `a == 0.05`, a different and stronger claim than the caller wrote, and one the update would blend the prior against. What the name's failure was decides only whether the drop is *reported*. A name on the **counterpart axis** — read with [`counterpart_axis_names`](@ref), and in practice the Non-Investable Axis that the caller which derived the Investable Mask minted with [`investable_views`](@ref) — is dropped in silence under both settings of `strict`, because it was a correct name over the universe the caller was handed and the data moved it; the departure is announced once, by the caller that derived the Investable Mask, through [`announce_non_investable`](@ref). A name on neither axis is a typo, and is reported exactly as before.
 
 # Algorithm
 
@@ -138,7 +138,7 @@ A view that is dropped is **dropped, not refused**. Its index joins `excl`, the 
   - $(arg_dict[:ekey])
   - `datatype`: Numeric type for coefficients and expected returns.
   - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning.
-  - `ledger`: The door's ledger of departure casualties, or `nothing` when nobody is collecting. A row dropped for a name on the counterpart axis is recorded into it through [`record_non_investable_drop!`](@ref).
+  - `ledger`: The Departure Ledger of the caller that derived the Investable Mask, or `nothing` when nobody is collecting. A row dropped for a name on the counterpart axis is recorded into it through [`record_non_investable_drop!`](@ref).
 
 # Validation
 
@@ -285,7 +285,7 @@ The two routes agree. A [`LinearConstraintEstimator`](@ref) assembled here and t
 
   - `strict`: If `true`, throws an error if a variable or group is not found in `sets`; if `false`, issues a warning.
 
-  - `ledger`: The door's ledger of departure casualties, or `nothing` when nobody is collecting. It is threaded into both [`replace_group_by_assets`](@ref) and [`get_black_litterman_views`](@ref), so a shed group and a dropped row are both recorded.
+  - `ledger`: The Departure Ledger of the caller that derived the Investable Mask, or `nothing` when nobody is collecting. It is threaded into both [`replace_group_by_assets`](@ref) and [`get_black_litterman_views`](@ref), so a shed group and a dropped row are both recorded.
 
 # Returns
 

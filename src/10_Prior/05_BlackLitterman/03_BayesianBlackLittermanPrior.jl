@@ -37,7 +37,7 @@ The views are applied to the **factors** and reach the assets through the regres
   - The factor block `fpr` carries the **posterior** factor moments — `mu_hat` and the inverse of the posterior precision — processed by `f_mp`. Its `chol` is dropped for the same reason; its `w` and that weighting's diagnostics forward untouched, because the views do not touch the observation axis.
   - Everything else forwards: `X` is the wrapped prior's unchanged, so `w`, `ens`, `kld`, `ow` and `Z` all still describe the axis they were computed over, and `rr` is a regression over data the views do not modify.
 
-Because both blocks are posterior, the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b + rf` holds, and at the default `rf = 0.0` that is the plain identity. [`FactorBlackLittermanPrior`](@ref) satisfies it too, for the same reason. The other two members do not — see the warnings on [`BlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref).
+Because both blocks are posterior, the returned prior result is **internally consistent**: `mu == rr.M * fpr.mu + rr.b + rf` holds, and at the default `rf = 0.0` that is the plain identity. [`FactorBlackLittermanPrior`](@ref) satisfies it too, for the same reason. The other two members do not — see the warnings on [`BlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref).
 
 !!! warning
 
@@ -45,11 +45,11 @@ Because both blocks are posterior, the returned carrier is **internally consiste
 
 ## What this estimator refuses
 
-The update inverts the wrapped prior's factor covariance twice, so it needs a factor axis of full rank. A factor model that states a re-based Factor Family through [`has_family_rebasis`](@ref) carries `fpr` on the **raw** axis, which a re-basis makes a linear image of a smaller one, so that covariance is singular by construction. Such a carrier is refused with an `ArgumentError` naming the wrapped estimator.
+The update inverts the wrapped prior's factor covariance twice, so it needs a factor axis of full rank. A factor model that states a re-based Factor Family through [`has_family_rebasis`](@ref) carries `fpr` on the **raw** axis, which a re-basis makes a linear image of a smaller one, so that covariance is singular by construction. Such a prior result is refused with an `ArgumentError` naming the wrapped estimator.
 
 The refusal is not decoration over a failure that would otherwise be visible. The inversion **raises nothing** on such a matrix: it returns entries of order `1e18`, and the update carries on to a posterior whose scale looks like the prior's, so a caller reading the result sees no sign that it is meaningless. That is why the refusal reads what the result *states* rather than testing its rank, and why it is a refusal rather than a warning.
 
-[`HighOrderFactorPriorEstimator`](@ref) accepts the same carrier, because it only projects through `rr.M` and never inverts the factor covariance.
+[`HighOrderFactorPriorEstimator`](@ref) accepts the same prior result, because it only projects through `rr.M` and never inverts the factor covariance.
 
 ## The views are written on the factor axis
 
@@ -88,66 +88,69 @@ julia> BayesianBlackLittermanPrior(;
                                                                             \"F2 == 0.04\"]))
 BayesianBlackLittermanPrior
           pe ┼ FactorPrior
-             │    pe ┼ EmpiricalPrior
-             │       │           ce ┼ PortfolioOptimisersCovariance
-             │       │              │   ce ┼ Covariance
-             │       │              │      │    me ┼ SimpleExpectedReturns
-             │       │              │      │       │   w ┴ nothing
-             │       │              │      │    ce ┼ GeneralCovariance
-             │       │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │       │              │      │       │    w ┴ nothing
-             │       │              │      │   alg ┼ FullMoment()
-             │       │              │      │     w ┴ nothing
-             │       │              │   mp ┼ MatrixProcessing
-             │       │              │      │     pdm ┼ Posdef
-             │       │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │       │              │      │      dn ┼ nothing
-             │       │              │      │      dt ┼ nothing
-             │       │              │      │     alg ┼ nothing
-             │       │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-             │       │           me ┼ EquilibriumExpectedReturns
-             │       │              │   ce ┼ PortfolioOptimisersCovariance
-             │       │              │      │   ce ┼ Covariance
-             │       │              │      │      │    me ┼ SimpleExpectedReturns
-             │       │              │      │      │       │   w ┴ nothing
-             │       │              │      │      │    ce ┼ GeneralCovariance
-             │       │              │      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │       │              │      │      │       │    w ┴ nothing
-             │       │              │      │      │   alg ┼ FullMoment()
-             │       │              │      │      │     w ┴ nothing
-             │       │              │      │   mp ┼ MatrixProcessing
-             │       │              │      │      │     pdm ┼ Posdef
-             │       │              │      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │              │      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │       │              │      │      │      dn ┼ nothing
-             │       │              │      │      │      dt ┼ nothing
-             │       │              │      │      │     alg ┼ nothing
-             │       │              │      │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-             │       │              │    w ┼ nothing
-             │       │              │    l ┴ Int64: 1
-             │       │      horizon ┼ nothing
-             │       │   fill_limit ┴ nothing
-             │    mp ┼ MatrixProcessing
-             │       │     pdm ┼ Posdef
-             │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │       │      dn ┼ nothing
-             │       │      dt ┼ nothing
-             │       │     alg ┼ nothing
-             │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-             │    re ┼ StepwiseRegression
-             │       │   crit ┼ PValue
-             │       │        │   t ┴ Float64: 0.05
-             │       │    alg ┼ ForwardSelection()
-             │       │    tgt ┼ LinearModel
-             │       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │    ve ┼ SimpleVariance
-             │       │          me ┼ SimpleExpectedReturns
-             │       │             │   w ┴ nothing
-             │       │           w ┼ nothing
-             │       │   corrected ┴ Bool: true
-             │   rsd ┴ Bool: true
+             │         pe ┼ EmpiricalPrior
+             │            │           ce ┼ PortfolioOptimisersCovariance
+             │            │              │   ce ┼ Covariance
+             │            │              │      │    me ┼ SimpleExpectedReturns
+             │            │              │      │       │   w ┴ nothing
+             │            │              │      │    ce ┼ GeneralCovariance
+             │            │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │            │              │      │       │    w ┴ nothing
+             │            │              │      │   alg ┼ FullMoment()
+             │            │              │      │     w ┴ nothing
+             │            │              │   mp ┼ MatrixProcessing
+             │            │              │      │     pdm ┼ Posdef
+             │            │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │            │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │            │              │      │      dn ┼ nothing
+             │            │              │      │      dt ┼ nothing
+             │            │              │      │     alg ┼ nothing
+             │            │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+             │            │           me ┼ EquilibriumExpectedReturns
+             │            │              │   ce ┼ PortfolioOptimisersCovariance
+             │            │              │      │   ce ┼ Covariance
+             │            │              │      │      │    me ┼ SimpleExpectedReturns
+             │            │              │      │      │       │   w ┴ nothing
+             │            │              │      │      │    ce ┼ GeneralCovariance
+             │            │              │      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │            │              │      │      │       │    w ┴ nothing
+             │            │              │      │      │   alg ┼ FullMoment()
+             │            │              │      │      │     w ┴ nothing
+             │            │              │      │   mp ┼ MatrixProcessing
+             │            │              │      │      │     pdm ┼ Posdef
+             │            │              │      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │            │              │      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │            │              │      │      │      dn ┼ nothing
+             │            │              │      │      │      dt ┼ nothing
+             │            │              │      │      │     alg ┼ nothing
+             │            │              │      │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+             │            │              │    w ┼ nothing
+             │            │              │    l ┴ Int64: 1
+             │            │      horizon ┼ nothing
+             │            │   fill_limit ┴ nothing
+             │         mp ┼ MatrixProcessing
+             │            │     pdm ┼ Posdef
+             │            │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │            │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │            │      dn ┼ nothing
+             │            │      dt ┼ nothing
+             │            │     alg ┼ nothing
+             │            │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+             │         re ┼ StepwiseRegression
+             │            │       crit ┼ PValue
+             │            │            │   t ┴ Float64: 0.05
+             │            │        alg ┼ ForwardSelection()
+             │            │        tgt ┼ LinearModel
+             │            │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │            │     choice ┼ BatchChoice()
+             │            │   included ┴ nothing
+             │         ve ┼ SimpleVariance
+             │            │          me ┼ SimpleExpectedReturns
+             │            │             │   w ┴ nothing
+             │            │           w ┼ nothing
+             │            │   corrected ┴ Bool: true
+             │        rsd ┼ Bool: true
+             │   mtx_sqrt ┴ EigenFallbackSquareRoot()
         f_mp ┼ MatrixProcessing
              │     pdm ┼ Posdef
              │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -449,7 +452,7 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
     # image of a smaller one, so a covariance on that axis is singular by construction.
     #
     # The inversion RAISES NOTHING on such a matrix. Measured on the fixture of
-    # `test/test_12i_cross_sectional_factor_carrier.jl`: the solve returns entries of order
+    # `test/test_12i_cross_sectional_factor_rr_slot.jl`: the solve returns entries of order
     # `1e18` and the update carries on to a posterior whose scale looks like the prior's, so
     # a caller reading the result sees no sign that it is meaningless. That is what the
     # refusal is for, and it is why the refusal reads the result's own statement rather than
@@ -488,9 +491,10 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
     posterior_mu = apply_rf(pe.rf, posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b)
     # The views land on the *factors*, so `mu_hat` and `sigma_hat` are the posterior factor
     # moments — `sigma_hat` is a precision (`inv(f_sigma) + P'Ω⁻¹P`), so the covariance is its
-    # inverse. Reporting them rather than the prior ones is what makes this carrier internally
-    # consistent: `mu == rr.M * fpr.mu + rr.b` holds exactly afterwards, where forwarding the
-    # prior block left the asset and factor halves describing different distributions.
+    # inverse. Reporting them rather than the prior ones is what makes this prior result
+    # internally consistent: `mu == rr.M * fpr.mu + rr.b` holds exactly afterwards, where
+    # forwarding the prior block left the asset and factor halves describing different
+    # distributions.
     # `pe.f_mp` processes the factor block for the same reason `pe.mp` processes the asset one,
     # and is separate for the same reason `FactorBlackLittermanPrior` keeps the two apart.
     f_posterior_sigma = sigma_hat \ LinearAlgebra.I

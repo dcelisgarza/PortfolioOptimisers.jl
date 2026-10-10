@@ -161,6 +161,50 @@ end
         # whole-data prediction with the default window
         pred_all = PortfolioOptimisers.predict(res, rd)
         @test size(pred_all.rd.X, 1) == 100
+
+        # A vector of windows predicts each window as one call does.
+        preds = PortfolioOptimisers.predict(res, rd, [61:80, 81:100])
+        @test length(preds) == 2
+        @test preds[1].rd.X ≈ rd.X[61:80, :] * res.w
+        @test preds[2].rd.X ≈ rd.X[81:100, :] * res.w
+        # The result form of fit_and_predict predicts as predict does.
+        fap = PortfolioOptimisers.fit_and_predict(res, rd; test_idx = collect(61:100))
+        @test fap.rd.X ≈ pred.rd.X
+        fapv = PortfolioOptimisers.fit_and_predict(res, rd;
+                                                   test_idx = [collect(61:80),
+                                                               collect(81:100)])
+        @test fapv[2].rd.X ≈ preds[2].rd.X
+    end
+
+    @testset "predict at price level, on several windows and from a result" begin
+        X = make_prices(; T = 60)
+        pr = PricesResult(; X = X)
+        res = fit(Pipeline(;
+                           steps = (PricesToReturns(), EmpiricalPrior(), EqualWeighted())),
+                  PortfolioOptimisers.port_opt_view(pr, 1:30))
+        P = values(X)
+        R = P[2:end, :] ./ P[1:(end - 1), :] .- 1
+        preds = PortfolioOptimisers.predict(res, pr, [31:45, 46:60])
+        @test length(preds) == 2
+        @test preds[2].rd.X ≈ R[46:59, :] * res.w
+        # The result form took returns data only, and a price window was a MethodError.
+        fap = PortfolioOptimisers.fit_and_predict(res, pr; test_idx = collect(46:60))
+        @test fap.rd.X ≈ preds[2].rd.X
+        # A returns window after a price fit: the fitted PricesToReturns passes it unchanged.
+        rw = ReturnsResult(; nx = string.("A", 1:5), X = R, ts = timestamp(X)[2:end])
+        @test PortfolioOptimisers.apply_fitted_step(PricesToReturns(), rw) === rw
+        mdf = PortfolioOptimisers.fit_preprocessing(MissingDataFilter(), pr)
+        @test PortfolioOptimisers.apply_fitted_step(mdf, rw) === rw
+        # A fitted context with no returns slot has no asset axis to check.
+        res_p = fit(Pipeline(; steps = (MissingDataFilter(),)), pr)
+        @test isnothing(res_p.ctx.returns)
+        @test isnothing(PortfolioOptimisers.assert_universe_aligned(res_p, rw))
+        @test PortfolioOptimisers.predict(res, rw, 46:59).rd.X ≈ preds[2].rd.X
+        # A pipeline with no optimisation result has nothing to predict with.
+        res0 = fit(Pipeline(; steps = (PricesToReturns(), EmpiricalPrior())), pr)
+        @test_throws PortfolioOptimisers.IsNothingError PortfolioOptimisers.fit_and_predict(res0,
+                                                                                            pr;
+                                                                                            test_idx = collect(46:60))
     end
 
     @testset "predict guards" begin
@@ -400,6 +444,65 @@ end
             pd = Pipeline(; steps = (prep..., TimeDependent([ew, iv]; default = iv)))
             res = fit(pd, pr)
             @test isapprox(res.w, fit(static_pipe(iv), pr).w)
+            # A wrapped callable schedule resets to its `default` the same way.
+            ps = PipelineStep(; est = TimeDependent(ctx -> ew; default = iv), writes = :opt)
+            @test isapprox(fit(Pipeline(; steps = (prep..., ps)), pr).w, res.w)
+            ps0 = PipelineStep(; est = TimeDependent(ctx -> ew), writes = :opt)
+            @test_throws PortfolioOptimisers.TimeDependentDefaultError fit(Pipeline(;
+                                                                                    steps = (prep...,
+                                                                                             ps0)),
+                                                                           pr)
+        end
+
+        @testset "a PipelineStep answers for its estimator on every schedule route" begin
+            # Each route of the file reaches the estimator inside a `PipelineStep`: the
+            # fold-less reset, the swap of a fold, and the weights of the previous fold. A
+            # wrapped callable passes through the three routes unchanged.
+            using Clarabel
+            slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                         settings = Dict("verbose" => false))
+            fstep = PipelineStep(; est = ctx -> ctx.prior, reads = (:prior,),
+                                 writes = :prior)
+            # A scheduled field: the bound is 0.3 at fold 1, 0.25 at fold 2 and 0.22
+            # outside a fold.
+            wbs = TimeDependent([WeightBounds(; lb = 0.0, ub = 0.3),
+                                 WeightBounds(; lb = 0.0, ub = 0.25)];
+                                default = WeightBounds(; lb = 0.0, ub = 0.22))
+            mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv, wb = wbs))
+            bare = Pipeline(; steps = (prep..., mr))
+            wrapped = Pipeline(;
+                               steps = (prep..., fstep,
+                                        PipelineStep(; est = mr, writes = :opt)))
+            @test PortfolioOptimisers.is_time_dependent(wrapped)
+            rf = fit(bare, pr)
+            @test maximum(rf.w) <= 0.22 + 1e-6
+            @test isapprox(fit(wrapped, pr).w, rf.w)
+            pb = cross_val_predict(bare, pr, cvw; ex = FLoops.SequentialEx())
+            pw = cross_val_predict(wrapped, pr, cvw; ex = FLoops.SequentialEx())
+            @test maximum(pb.pred[1].res.w) <= 0.3 + 1e-6
+            @test maximum(pb.pred[2].res.w) <= 0.25 + 1e-6
+            @test all(isapprox(a.res.w, b.res.w) for (a, b) in zip(pb.pred, pw.pred))
+            # The turnover of fold 2 anchors on the weights of fold 1, not on `w0`.
+            w0 = [0.6, 0.1, 0.1, 0.1, 0.1]
+            mrt = MeanRisk(;
+                           opt = JuMPOptimiser(; slv = slv,
+                                               tn = Turnover(; w = w0, val = 0.1)))
+            tref = cross_val_predict(Pipeline(; steps = (prep..., mrt)), pr, cvw;
+                                     ex = FLoops.SequentialEx())
+            w1, w2 = tref.pred[1].res.w, tref.pred[2].res.w
+            @test maximum(abs, w2 - w1) <= 0.1 + 1e-6
+            @test maximum(abs, w2 - w0) > 0.1 + 1e-3
+            # A nested pipeline inside a `PipelineStep` lost the weights of the previous
+            # fold, so its turnover anchored on `w0` at every fold (issue #795).
+            inner = Pipeline(; steps = (EmpiricalPrior(), mrt))
+            rets = (MissingDataFilter(), PriceGapFill(), PricesToReturns())
+            for steps in ((prep..., fstep, PipelineStep(; est = mrt, writes = :opt)),
+                          (rets..., inner), (rets..., PipelineStep(; est = inner, writes = :opt)))
+                pipe = Pipeline(; steps = steps)
+                @test PortfolioOptimisers.needs_previous_weights(pipe)
+                p = cross_val_predict(pipe, pr, cvw; ex = FLoops.SequentialEx())
+                @test all(isapprox(a.res.w, b.res.w) for (a, b) in zip(tref.pred, p.pred))
+            end
         end
 
         @testset "construction and scheme guards" begin

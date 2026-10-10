@@ -25,15 +25,15 @@ asserted at machine precision, because each is a construction rather than an est
     idiosyncratic variance is zero, and the factor rows then agree with `factor_risk_contribution`
     exactly, because the leakage term the docstring names is `pinv(M) * D * w` and `D` is zero.
 
-THE ORACLE IS THE REFERENCE IMPLEMENTATION'S OWN ATTRIBUTION MODULE, whose four test files this one
-mirrors. Two departures are deliberate and are recorded in the resolution comment of #708 and in the
-docstring of `factor_attribution`:
+THE ORACLE IS AN EXTERNAL ATTRIBUTION MODULE, whose four test files this one mirrors. Two
+departures are deliberate and are recorded in the resolution comment of #708 and in the docstring
+of `factor_attribution`:
 
-  - The predicted side carries an unattributed remainder, which the reference's own predicted
+  - The predicted side carries an unattributed remainder, which the oracle's own predicted
     attribution cannot express. Under decision 5 of #708 the predicted totals anchor on `pr.mu` and
     `pr.sigma`, which is what the optimiser saw, so a wrapping prior's gap lands in the remainder.
   - The spread of the weight history uses the corrected denominator, as the spread of the exposure
-    history beside it does. The reference uses the uncorrected one for the weights alone.
+    history beside it does. The oracle uses the uncorrected one for the weights alone.
 =#
 using Statistics, Distributions, Dates, Random
 include(joinpath(@__DIR__, "test06c_setup.jl"))
@@ -48,11 +48,16 @@ function fa_factors()
             "value" => CompositeExposure(; descriptors = [BookToPrice()], family = "style")]
 end
 
+# An idiosyncratic variance estimate with no warm-up, so the standard errors read a stated variance
+# at every pair of the regression.
+const FA_VE1 = RegimeAdjustedExpWeightedVariance(; centring = PreCentred(), min_obs = 1)
+
 function fa_prior(; n_assets::Integer = 20, n_observations::Integer = 60,
                   n_industries::Integer = 3, seed::Integer = 782_001, kwargs...)
     rd = synthetic_asset_panel(; n_assets = n_assets, n_observations = n_observations,
                                n_industries = n_industries, rng = StableRNG(seed)).rd
-    pe = CrossSectionalFactorPrior(; factors = fa_factors(), minra = 5, kwargs...)
+    pe = CrossSectionalFactorPrior(; lambda = 1, factors = fa_factors(), minra = 5,
+                                   kwargs...)
     return prior(pe, rd), rd
 end
 
@@ -344,9 +349,9 @@ end
         @test isa(fa.fmbd.exposure_std, AbstractVector)
         @test length(fa.fmbd.exposure_std) == length(fa.fmbd.labels)
     end
-    @testset "A constant weight carries no spread of its own" begin
+    @testset "A constant weight carries a spread of exactly zero (#1515)" begin
         @test fa.abd.weight == w
-        @test isnothing(fa.abd.weight_std)
+        @test fa.abd.weight_std == zero(w)
     end
     @testset "The three entry points that form the same series agree" begin
         @test factor_attribution(w, pr, ReturnsResult(; nx = rd.nx, X = rd.X)).sys.vol_contrib ≈
@@ -386,9 +391,13 @@ end
     lag, Tb = rr.lag, size(rr.csr.f, 1)
     n = Tb - lag
     rows = [Tx - Tb + lag + j for j in 1:n]
-    B = [fin.(rr.Ms[j, :, :]) for j in 1:n]
+    # A pair with no idiosyncratic return or no exposure adds nothing to the net series, so it
+    # is zero in both the exposure and the idiosyncratic return (#1388).
+    act = [all(isfinite, rr.Ms[j, i, :]) && isfinite(rr.csr.eps[j + lag, i])
+           for j in 1:n, i in 1:N]
+    B = [act[j, :] .* fin.(rr.Ms[j, :, :]) for j in 1:n]
     F = fin.(rr.csr.f[(1:n) .+ lag, :])
-    E = fin.(rr.csr.eps[(1:n) .+ lag, :])
+    E = act .* fin.(rr.csr.eps[(1:n) .+ lag, :])
     W = Wh[rows, :]
     r = ret[rows]
     sig = std(r)
@@ -435,20 +444,32 @@ end
         A = S .+ E
         @test fa.abd.weight ≈ vec(mean(W; dims = 1))
         @test fa.abd.weight_std ≈ vec(std(W; dims = 1))
+        # `ddof` sets the divisor of the weight spread alone (#1515).
+        fa0 = factor_attribution(Wh, pr, ret; assets = true, ppy = ppy, ddof = 0)
+        @test fa0.abd.weight_std ≈ vec(std(W; dims = 1, corrected = false))
+        @test fa0.abd.weight_std ≈ fa.abd.weight_std .* sqrt((n - 1) / n)
+        @test fa0.fbd.exposure_std == fa.fbd.exposure_std
+        @test fa0.sys.vol_contrib == fa.sys.vol_contrib
+        @test fa0.abd.vol_contrib == fa.abd.vol_contrib
+        @test_throws DomainError factor_attribution(Wh, pr, ret; ddof = -1)
+        @test_throws DomainError factor_attribution(Wh, pr, ret; ddof = n)
+        @test_throws DomainError factor_attribution(Wh, pr, ret, n; ddof = n)
         @test fa.abd.sys_vol_contrib ≈
               [cv(W[:, i] .* S[:, i]) / sig for i in 1:N] .* sqrt(ppy)
         @test fa.abd.sys_mu_contrib ≈ vec(mean(W .* S; dims = 1)) .* ppy
         @test fa.abd.idio_vol_contrib ≈
               [cv(W[:, i] .* E[:, i]) / sig for i in 1:N] .* sqrt(ppy)
         @test fa.abd.idio_mu_contrib ≈ vec(mean(W .* E; dims = 1)) .* ppy
-        @test fa.abd.vol ≈ vec(std(A; dims = 1)) .* sqrt(ppy)
-        # An asset the prior could not estimate has a model return of zero, so no correlation.
-        @test isapprox(fa.abd.corr,
-                       [std(A[:, i]) > 0 ? cv(A[:, i]) / (std(A[:, i]) * sig) : NaN
-                        for i in 1:N]; nans = true)
+        # The standalone numbers read the active pairs of the asset alone. An asset with fewer
+        # than two has no volatility and no correlation, and one with none has no mean.
+        a(i) = A[act[:, i], i]
+        ra(i) = r[act[:, i]]
+        @test isapprox(fa.abd.vol, [std(a(i)) for i in 1:N] .* sqrt(ppy); nans = true)
+        @test isapprox(fa.abd.corr, [std(a(i)) > 0 ? cor(a(i), ra(i)) : NaN for i in 1:N];
+                       nans = true)
         @test fa.abd.vol_contrib ≈ [cv(W[:, i] .* A[:, i]) / sig for i in 1:N] .* sqrt(ppy)
         @test fa.abd.pct_var ≈ [cv(W[:, i] .* A[:, i]) / sig^2 for i in 1:N]
-        @test fa.abd.mu ≈ vec(mean(A; dims = 1)) .* ppy
+        @test isapprox(fa.abd.mu, [mean(a(i)) for i in 1:N] .* ppy; nans = true)
         @test fa.abd.mu_contrib ≈ vec(mean(W .* A; dims = 1)) .* ppy
     end
     @testset "Each asset-by-factor entry is one term of the systematic return" begin
@@ -480,14 +501,12 @@ end
     eps = Float32[0.001 -0.002 0.0015; -0.0005 0.001 -0.0008]
     rw = Float32[0.4 0.35 0.25; 0.3 0.45 0.25]
     vs = Float32[1.0e-4 2.0e-4 1.5e-4; 1.2e-4 1.8e-4 1.6e-4]
-    csr = CrossSectionalRegression(; f = f, eps = eps, n = [3, 3])
+    csr = CrossSectionalRegression(; f = f[:, 1:1], eps = eps, n = [3, 3])
     rr = CrossSectionalFactorModel(; M = Ms[2, :, :], b = Float32[0.001, 0.0005, 0.0012],
                                    csr = csr, Ms = Ms, vs = vs,
                                    esigma = Float32[1.2e-4, 1.8e-4, 1.6e-4], rw = rw,
                                    bw = rw, nf = ["market", "usd"],
-                                   fam = ["market",
-                                          PortfolioOptimisers.ATTRIBUTION_CURRENCY_FAMILY],
-                                   lag = 0)
+                                   fam = ["market", "currency"], lag = 0, fx = f[:, 2:2])
     X = Float32[0.011 0.003 0.02; 0.004 0.012 0.009]
     fpr = LowOrderPrior(; X = f, mu = vec(mean(f; dims = 1)), sigma = cov(f))
     p32 = LowOrderPrior(; X = X, mu = rr.M * fpr.mu .+ rr.b,
@@ -513,7 +532,12 @@ end
     # observation is rank-deficient and the sandwich falls back to the pseudo-inverse. The answer is
     # the minimum-norm one, so it is finite; a plain solve would return an arbitrarily large number.
     PO = PortfolioOptimisers
-    pr, rd = fa_prior()
+    # The sandwich reads the idiosyncratic variance of every pair of the regression, so a history
+    # inside the warm-up of the default variance estimate has no standard error (#1388). An
+    # estimate with no warm-up states every variance.
+    pr0, rd = fa_prior()
+    @test isnan(factor_attribution(fa_weights(pr0), pr0, rd.X; se = true).sys.mu_se)
+    pr, rd = fa_prior(; ve = FA_VE1)
     w = fa_weights(pr)
     al = PO.attribution_align(pr.rr, pr, size(rd.X, 1))
     G = transpose(view(al.B, 1, :, :)) * Diagonal(view(al.rw, 1, :)) * view(al.B, 1, :, :)
@@ -652,13 +676,16 @@ end
         @test b.sys.mu_se ≈ 12 * fa.sys.mu_se
         @test b.fbd.mu_se ≈ 12 * fa.fbd.mu_se
     end
-    @testset "A currency family carries no estimation uncertainty" begin
-        cur = CrossSectionalFactorModel(; M = rr.M, b = rr.b, csr = csr, Ms = Ms, vs = vs,
-                                        esigma = rr.esigma, rw = rw, bw = rw,
+    @testset "An observed factor carries no estimation uncertainty" begin
+        # The block states the observed factor through `fx`, whatever its family label.
+        cur = CrossSectionalFactorModel(; M = rr.M, b = rr.b,
+                                        csr = CrossSectionalRegression(; f = csr.f[:, 1:1],
+                                                                       eps = csr.eps,
+                                                                       n = csr.n), Ms = Ms,
+                                        vs = vs, esigma = rr.esigma, rw = rw, bw = rw,
                                         nf = ["market", "usd"],
-                                        fam = ["market",
-                                               PortfolioOptimisers.ATTRIBUTION_CURRENCY_FAMILY],
-                                        lag = 0)
+                                        fam = ["market", "currency"], lag = 0,
+                                        fx = csr.f[:, 2:2])
         prc = LowOrderPrior(; X = X, mu = mu, sigma = sigma, rr = cur, fpr = fpr)
         fc = factor_attribution(w, prc, X; se = true)
         @test isnan(fc.fbd.mu_se[2])
@@ -886,29 +913,206 @@ end
         @test length(factor_attribution(mpred, pr, 30)) ==
               length(factor_attribution(w, pr, rd.X, 30))
     end
+    @testset "A cross-validation's folds are matched to the block by their row key (#1493)" begin
+        ret = fa_net_returns(w, pr, rd)
+        T = length(ret)
+        # The fit drops the first observation for the lag, and records the rows it covers.
+        @test pr.rr.idx == 2:T
+        @test pr.rr.ts == rd.ts[2:T]
+        function fold(r; idx = r, ts = rd.ts[r])
+            return PredictionResult(; res = res,
+                                    rd = PredictionReturnsResult(; nx = rd.nx,
+                                                                 X = collect(view(ret, r)),
+                                                                 ts = ts), idx = idx)
+        end
+        folds(rs; kw...) = MultiPeriodPredictionResult(;
+                                                       pred = [fold(r; kw...) for r in rs])
+        # Data row `t` is block row `t - 1`, and its exposures are those of the row before.
+        blk = PO.attribution_block_arrays(pr.rr, pr)
+        function bare(rows, args...)
+            br = rows .- 1
+            return factor_attribution(repeat(transpose(w), length(rows)),
+                                      blk.B[br .- blk.lag, :, :], blk.f[br, :],
+                                      blk.eps[br, :], ret[rows], args...; lag = 0,
+                                      fam = blk.fam)
+        end
+        gap(a, b) = maximum(abs,
+                            [a.total.vol - b.total.vol;
+                             a.sys.vol_contrib - b.sys.vol_contrib;
+                             a.idio.vol_contrib - b.idio.vol_contrib;
+                             a.sys.mu_contrib - b.sys.mu_contrib;
+                             a.fbd.vol_contrib - b.fbd.vol_contrib])
+        # Two folds that end ten rows before the block, which the tail rule refused. Each key
+        # finds the same rows: both keys, the positions alone, the timestamps alone.
+        rs = (21:40, 41:50)
+        ref = bare(21:50)
+        for m in (folds(rs), folds(rs; ts = nothing), folds(rs; idx = nothing))
+            @test gap(factor_attribution(m, pr), ref) <= 1e-15
+        end
+        @test length(factor_attribution(folds(rs), pr, 10)) == length(bare(21:50, 10))
+        # A series that names no row keeps the tail rule.
+        @test_throws DimensionMismatch factor_attribution(folds(rs; idx = nothing,
+                                                                ts = nothing), pr)
+        # Data rows 1 and 2 have no exposures in the block, so a fold that starts there
+        # leaves them out, and the attribution starts at row 3.
+        fa1 = factor_attribution(folds((1:20, 21:40)), pr)
+        @test gap(fa1, bare(3:40)) <= 1e-15
+        @test fa1.total.vol ≈ std(ret[3:40]) rtol = 1e-14
+        @test PO.attribution_series_key(folds(rs)).idx == 21:50
+        @test PO.attribution_series_key(folds(rs)).ts == rd.ts[21:50]
+        @test isnothing(PO.attribution_series_key(folds(rs; idx = nothing)).idx)
+        # A whole-sample prediction names no fold, so it records no position.
+        @test isnothing(predict(res, rd).idx)
+    end
+    @testset "The row match leaves out the edges and refuses a gap, a repeat and no overlap (#1493)" begin
+        # Under a lag of one the first key has no exposures, so the aligned keys are 2, 3, 5, 6.
+        bk = [1, 2, 3, 5, 6]
+        m = PO.attribution_match_rows(bk, [1, 2, 3], 1)
+        @test m.rows == 2:3 && m.arows == [1, 2]
+        m = PO.attribution_match_rows(bk, [5, 6, 7], 1)
+        @test m.rows == 1:2 && m.arows == [3, 4]
+        d = rd.ts[bk]
+        @test PO.attribution_match_rows(d, d[[3, 4]], 1).arows == [2, 3]
+        @test_throws DimensionMismatch PO.attribution_match_rows(bk, [7, 8], 1)
+        # Key 4 lies between two rows of the block, which holds no row for it.
+        @test_throws ArgumentError PO.attribution_match_rows(bk, [3, 4, 5], 1)
+        @test_throws ArgumentError PO.attribution_match_rows(bk, [3, 3], 1)
+        @test_throws ArgumentError PO.attribution_match_rows(bk, [5, 3], 1)
+        # The timestamps come first, the positions next, and no shared key gives nothing.
+        t = rd.ts[1:3]
+        @test PO.attribution_key_pair((; idx = 1:3, ts = t), (; idx = 4:6, ts = t)).block ==
+              t
+        @test PO.attribution_key_pair((; idx = 1:3, ts = nothing), (; idx = 4:6, ts = t)).block ==
+              1:3
+        @test isnothing(PO.attribution_key_pair((; idx = nothing, ts = nothing),
+                                                (; idx = 4:6, ts = t)))
+        blk = PO.attribution_block_arrays(pr.rr, pr)
+        @test_throws DimensionMismatch PO.attribution_key_align(blk, 5,
+                                                                (; idx = 1:4, ts = nothing))
+        # A FactorPrior block records the positions of its observations (#1495), and a block
+        # built by hand records no key.
+        tsr = first(fa_ts_prior()).rr
+        @test PO.attribution_row_key(tsr) == (; idx = 1:90, ts = nothing)
+        @test PO.attribution_row_key(Regression(; M = tsr.M)) ==
+              (; idx = nothing, ts = nothing)
+    end
 end
 
-@testset "The investable zeroing helpers of the predicted side" begin
+@testset "Every cross-validation scheme matches its folds to the block by their row key" begin
     PO = PortfolioOptimisers
-    imsk = BitVector([true, false, true])
-    A = ones(3, 2)
-    v = ones(3)
-    E = ones(3, 3)
-    @test PO.attribution_investable_rows(A, nothing) === A
-    @test PO.attribution_investable_rows(A, imsk) == [1 1; 0 0; 1 1]
-    @test PO.attribution_investable_rows(v, imsk) == [1, 0, 1]
-    @test PO.attribution_investable_block(E, nothing) === E
-    @test PO.attribution_investable_block(v, imsk) == [1, 0, 1]
-    @test PO.attribution_investable_block(E, imsk) == [1 0 1; 0 0 0; 1 0 1]
+    pr, rd = fa_prior()
+    # The same panel with no timestamps, so the folds match the block by position alone.
+    rdn = ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, pnl = rd.pnl)
+    # A path that holds a Leverage-One Pair has a `NaN` split on both routes (#1579), and two
+    # `NaN` are no gap.
+    d(x, y) = isequal(x, y) ? zero(x) : x - y
+    gap(a, b) = maximum(abs,
+                        [d(a.total.vol, b.total.vol);
+                         d(a.sys.vol_contrib, b.sys.vol_contrib);
+                         d(a.idio.vol_contrib, b.idio.vol_contrib);
+                         d(a.sys.mu_contrib, b.sys.mu_contrib);
+                         d.(a.fbd.vol_contrib, b.fbd.vol_contrib)])
+    # The one call on a path against the bare-array route over the data rows its folds name.
+    # Data row `t` is block row `t - 1`, its exposures are those of the row before, and rows 1
+    # and 2 have none, so the bare route starts at row 3.
+    function path_gap(mp, prr)
+        blk = PO.attribution_block_arrays(prr.rr, prr)
+        W, ret = PO.attribution_prediction_history(mp)
+        rows = reduce(vcat, p.idx for p in mp.pred)
+        k = findall(>=(3), rows)
+        br = rows[k] .- 1
+        ref = factor_attribution(W[k, :], blk.B[br .- blk.lag, :, :], blk.f[br, :],
+                                 blk.eps[br, :], ret[k]; lag = 0, fam = blk.fam,
+                                 h1 = blk.h1[br, :])
+        return gap(factor_attribution(mp, prr), ref)
+    end
+    opt = EqualWeighted()
+    mr = MultipleRandomised(IndexWalkForward(15, 10); n_subsets = 2, subset_size = 8,
+                            window_size = 50, seed = 1)
+    cvs = (KFold(; n = 3), IndexWalkForward(20, 10), HindsightSplit())
+    @testset "A single path, $(nameof(typeof(cv))), timestamps $(!isnothing(data.ts))" for cv in
+                                                                                           cvs,
+                                                                                           data in
+                                                                                           (rd,
+                                                                                            rdn)
+
+        mp = cross_val_predict(opt, data, cv)
+        # Measured: a difference of exactly zero.
+        @test path_gap(mp, pr) == 0
+    end
+    @testset "Each combinatorial path, timestamps $(!isnothing(data.ts))" for data in
+                                                                              (rd, rdn)
+        pop = cross_val_predict(opt, data,
+                                CombinatorialCrossValidation(; n_folds = 4,
+                                                             n_test_folds = 2))
+        @test all(p -> path_gap(p, pr) == 0, pop.pred)
+        # The population method attributes each path, one entry per path.
+        fas = factor_attribution(pop, pr)
+        @test length(fas) == length(pop.pred)
+        @test [f.total.vol for f in fas] ==
+              [factor_attribution(p, pr).total.vol for p in pop.pred]
+        @test length.(factor_attribution(pop, pr, 10)) ==
+              [length(factor_attribution(p, pr, 10)) for p in pop.pred]
+    end
+    @testset "Each randomised path against a prior on its own assets, timestamps $(!isnothing(data.ts))" for data in
+                                                                                                             (rd,
+                                                                                                              rdn)
+        pop = cross_val_predict(opt, data, mr)
+        pe = CrossSectionalFactorPrior(; lambda = 1, factors = fa_factors(), minra = 5)
+        for p in pop.pred
+            c = [findfirst(==(n), data.nx) for n in p.pred[1].rd.nx]
+            prs = prior(pe, PO.port_opt_view(data, :, c))
+            # The subset prior covers every row of the data, so the folds match it by row.
+            @test prs.rr.idx == 2:size(data.X, 1)
+            @test path_gap(p, prs) == 0
+        end
+        # A path holds 8 of the 20 assets, so the prior of the whole universe refuses it.
+        @test_throws DimensionMismatch factor_attribution(pop, pr)
+    end
+end
+
+@testset "The rule for an unknown entry, helper by helper (#1515)" begin
+    PO = PortfolioOptimisers
+    w = [0.5, 0.0, 0.5]
+    # A held asset keeps its unknown entries under the entry rule, and no asset keeps them
+    # when they read as zero.
+    @test PO.attribution_unknown_keep(EntrywiseUnknown(), w) == [true, false, true]
+    @test PO.attribution_unknown_keep(ZeroUnknown(), w) == falses(3)
+    keep = BitVector([true, false, false])
+    A = [NaN 1.0; NaN 2.0; 3.0 NaN]
+    @test isequal(PO.attribution_unknown_rows(A, keep), [NaN 1.0; 0.0 2.0; 3.0 0.0])
+    v = [NaN, NaN, 1.0]
+    @test isequal(PO.attribution_unknown_rows(v, keep), [NaN, 0.0, 1.0])
+    @test isequal(PO.attribution_unknown_block(v, keep), [NaN, 0.0, 1.0])
+    # A full block keeps an unknown entry only between two kept assets.
+    E = fill(NaN, 3, 3)
+    E[3, 3] = 2.0
+    keep2 = BitVector([true, true, false])
+    @test isequal(PO.attribution_unknown_block(E, keep2),
+                  [NaN NaN 0.0; NaN NaN 0.0; 0.0 0.0 2.0])
+    @test PO.attribution_standalone(EntrywiseUnknown(), A) === A
+    @test isequal(PO.attribution_standalone(ZeroUnknown(), A), [0.0 1.0; 0.0 2.0; 3.0 0.0])
+    # A contribution of an asset with no weight is zero, and the sign of a finite zero stays.
+    C = [NaN -0.0; NaN NaN; 1.0 2.0]
+    H = PO.attribution_held_entries(C, w)
+    @test isequal(H, [NaN -0.0; 0.0 0.0; 1.0 2.0])
+    @test occursin("`NaN`", PO.attribution_unknown_note(EntrywiseUnknown()))
+    @test occursin("reads as zero", PO.attribution_unknown_note(ZeroUnknown()))
+    # The realised standalone moments read the active pairs, or every observation.
+    act = [true, false, true]
+    @test PO.attribution_standalone_pairs(EntrywiseUnknown(), act) === act
+    @test PO.attribution_standalone_pairs(ZeroUnknown(), act) == trues(3)
+    # The active mask of the returns data.
+    @test isnothing(PO.attribution_active_mask(nothing))
 end
 @testset "The refusals" begin
     PO = PortfolioOptimisers
     pr, rd = fa_prior()
     w = fa_weights(pr)
     # Issue #844: a holding in a non-investable asset takes the library's strictness policy.
-    # The default warns, names the assets and zeroes their contributions, which is what the
-    # reference implementation does and what a walk-forward over a panel with a delisting
-    # needs; `strict = true` keeps the refusal.
+    # The default warns and names the assets, which is what a walk-forward over a panel with a
+    # delisting needs; `strict = true` keeps the refusal. Issue #1515: the rule `unknown` sets
+    # the numbers, entry by entry, or with every unknown entry read as zero.
     @testset "A holding the prior could not estimate is warned about, and refused under strict" begin
         imsk = PO.investable_mask(pr)
         @test !isnothing(imsk)
@@ -920,16 +1124,26 @@ end
         holds(l) = occursin("Assets [$(j)] are not investable", l.message)
         logs, fa = Test.collect_test_logs(() -> factor_attribution(bad, pr; assets = true))
         @test count(holds, logs) == 1
-        @test isfinite(fa.total.vol_contrib)
-        @test fa.sys.vol_contrib + fa.idio.vol_contrib + fa.unattr.vol_contrib ≈
-              fa.total.vol_contrib
+        @test any(l -> occursin("is `NaN`", l.message), logs)
+        # The variance of the held asset is unknown, so the total is unknown, and an asset the
+        # portfolio does not hold still contributes zero.
+        @test isnan(PO.attribution_idiosyncratic_covariance(pr.rr)[j])
+        @test isnan(fa.total.vol_contrib) && isnan(fa.idio.vol_contrib)
         @test fa.abd.weight[j] == 0.1
-        @test iszero(fa.abd.sys_vol_contrib[j])
-        @test iszero(fa.abd.idio_vol_contrib[j])
-        @test iszero(fa.abd.mu_contrib[j])
-        # The held asset contributes nothing, so the decomposition is the one of the
-        # portfolio without it.
-        @test fa.sys.vol_contrib ≈ factor_attribution(w, pr).sys.vol_contrib
+        z = iszero.(bad)
+        @test all(iszero, fa.abd.sys_vol_contrib[z]) && all(iszero, fa.abd.pct_var[z])
+        # `ZeroUnknown()` reads the unknown entries as zero, so the numbers are finite and the
+        # four components sum to the total.
+        logs, fz = Test.collect_test_logs(() -> factor_attribution(bad, pr; assets = true,
+                                                                   unknown = ZeroUnknown()))
+        @test count(holds, logs) == 1
+        @test any(l -> occursin("reads as zero", l.message), logs)
+        @test isfinite(fz.total.vol_contrib)
+        @test fz.sys.vol_contrib + fz.idio.vol_contrib + fz.unattr.vol_contrib ≈
+              fz.total.vol_contrib
+        fin(x) = isfinite(x) ? x : zero(x)
+        @test fz.fbd.exposure ≈ transpose(fin.(pr.rr.M)) * bad
+        @test fz.abd.weight[j] == 0.1
         logs, far = Test.collect_test_logs(() -> factor_attribution(bad, pr, rd.X))
         @test count(holds, logs) == 1
         @test isfinite(far.total.vol_contrib)
@@ -941,6 +1155,22 @@ end
         @test_throws ArgumentError factor_attribution(bad, pr, rd.X; strict = true)
         @test_throws ArgumentError factor_attribution(W, pr, ret; strict = true)
         @test_throws ArgumentError factor_attribution(W, pr, ret, 30; strict = true)
+    end
+    @testset "Weights over another universe are refused before any read of them" begin
+        # Eight weights against a prior of twenty assets: each prior route refuses with the
+        # two counts, rather than failing on an index of the mask or of the returns.
+        w8 = fill(1 / 8, 8)
+        T = size(rd.X, 1)
+        W8 = repeat(transpose(w8), T)
+        ret = randn(StableRNG(782_010), T) ./ 100
+        for f in (() -> factor_attribution(w8, pr), () -> factor_attribution(w8, pr, rd.X),
+                  () -> factor_attribution(w8, pr, rd.X, 10),
+                  () -> factor_attribution(W8, pr, ret),
+                  () -> factor_attribution(W8, pr, ret, 10))
+            @test_throws "the weights hold 8 assets, and the factor model describes 20" f()
+        end
+        @test_throws DimensionMismatch PO.assert_attribution_assets(W8, 20)
+        @test isnothing(PO.assert_attribution_assets(w, length(w)))
     end
     @testset "A held observation with no return is zeroed with a warning, and refused under strict" begin
         t = 7
@@ -1034,7 +1264,7 @@ end
 # fixture above leaves `families` unset, where the two axes happen to agree.
 @testset "A constrained Factor Family leaves the realised decomposition on the raw axis" begin
     PO = PortfolioOptimisers
-    pr, rd = fa_prior(; families = ["industry" => nothing])
+    pr, rd = fa_prior(; families = ["industry" => nothing], ve = FA_VE1)
     rr = pr.rr
     w = fa_weights(pr)
     @testset "The read answers the raw factor axis, not the basis the fit solved in" begin
@@ -1042,7 +1272,16 @@ end
         @test size(rr.csr.f, 2) < size(rr.Ms, 3)
         f = PO.attribution_factor_returns(rr, pr)
         @test size(f, 2) == size(rr.Ms, 3) == length(rr.nf)
-        @test f === pr.fpr.X
+        # The block carries the raw-axis history itself. With no Scenario Cap to trim the
+        # nested factor prior, that prior holds the same rows (#1422).
+        @test f === rr.fr
+        @test f == pr.fpr.X
+        # A re-based block that carries no raw-axis history has nothing to multiply the
+        # exposures by, so the read refuses it.
+        nofr = CrossSectionalFactorModel(;
+                                         (k => getfield(rr, k)
+                                          for k in fieldnames(typeof(rr)) if k != :fr)...)
+        @test_throws PO.IsNothingError PO.attribution_factor_returns(nofr, pr)
     end
     @testset "The realised decomposition runs, and its identities close" begin
         fa = factor_attribution(w, pr, rd.X; assets = true)
@@ -1065,17 +1304,15 @@ end
         al = PO.attribution_align(rr, pr, length(ret))
         T = size(al.f, 1)
         g = reduce(vcat, [transpose(transpose(al.B[t, :, :]) * w) for t in 1:T])
-        red = PO.attribution_reduce_for_errors(al.fcb, al.B, g, rr.fam, T)
+        red = PO.attribution_reduce_for_errors(al.fcb, al.unseen, al.B, al.rw, g, al.no, T)
         @test red.nr < size(g, 2)
-        keep = findall(!, red.currency)
-        Vf = [PO.attribution_expand_errors(al.fcb,
-                                           PO.attribution_sandwich(view(red.B, t, :, :),
-                                                                   view(al.rw, t, :),
-                                                                   view(al.vs, t, :), keep),
-                                           keep, red.nr, t) for t in 1:T]
-        @test fa.sys.mu_se ≈ sqrt(sum(dot(g[t, :], Vf[t], g[t, :]) for t in 1:T)) / T
+        keep = findall(!, red.observed)
+        V = [PO.attribution_sandwich(view(red.B, t, :, :), view(al.rw, t, :),
+                                     view(al.vs, t, :), keep) for t in 1:T]
+        Vf = PO.attribution_expand_errors(al.fcb, PO.attribution_scatter(V, keep, red.nr))
+        @test fa.sys.mu_se ≈ sqrt(sum(dot(g[t, :], Vf[t, :, :], g[t, :]) for t in 1:T)) / T
         @test fa.fbd.mu_se ≈
-              [sqrt(sum(g[t, k]^2 * Vf[t][k, k] for t in 1:T)) / T for k in axes(g, 2)]
+              [sqrt(sum(g[t, k]^2 * Vf[t, k, k] for t in 1:T)) / T for k in axes(g, 2)]
         @test all(isfinite, fa.fmbd.mu_se)
     end
     @testset "The predicted decomposition answers the same axis" begin

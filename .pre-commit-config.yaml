@@ -1,3 +1,8 @@
+# Every hook runs at commit time unless it names its stages. The pre-push type is installed for the
+# gate-stamps guard alone, and without this line every hook below would run again on each push. A
+# hook whose own manifest names its stages ignores this line, so such a hook names them here too.
+default_stages: [pre-commit]
+default_install_hook_types: [pre-commit, pre-push]
 repos:
   - repo: local
     hooks:
@@ -7,6 +12,15 @@ repos:
         entry: found Copier update rejection files; review them and remove them
         language: fail
         files: "\\.rej$"
+      # Refuse a push to dev when dev moved under a gate after it measured the tree. It acts only
+      # in a worktree under .claude/worktrees/. See code_health/gate_stamp.sh.
+      - id: gate-stamps
+        name: gate stamps are current against the push target
+        entry: bash code_health/gate_stamp.sh check
+        language: system
+        stages: [pre-push]
+        pass_filenames: false
+        always_run: true
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -22,8 +36,12 @@ repos:
       - id: pretty-format-json
         args: [--autofix, --indent=2]
         exclude: ^docs/paper/main-jlyfish\.json$
+      # These two name their own stages, pre-push among them, and a hook's own stages override
+      # default_stages. A fix at push time would fail the push, so they run at commit time alone.
       - id: trailing-whitespace
+        stages: [pre-commit]
       - id: end-of-file-fixer
+        stages: [pre-commit]
         exclude: ^docs/paper/main-jlyfish\.json$
       - id: check-merge-conflict
         args: [--assume-in-merge]

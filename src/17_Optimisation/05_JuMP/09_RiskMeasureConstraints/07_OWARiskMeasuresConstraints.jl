@@ -227,9 +227,10 @@ the length of `r.alg.p`.
 
 Every permutation of the weight vector satisfies those properties, so the feasible set is a
 superset of the exact one and the risk is an upper bound on the exact OWA risk. The gap
-closes as the weight vector approaches a line, which is the case the source paper studies: it
-reports the same objective value as the exact formulation, to its printed precision, for the
-Gini mean difference and the tail Gini over samples of 500 to 10,000 observations.
+closes as the weight vector approaches a line. [owa3](@citet) studies that linear case. For
+the Gini mean difference and the tail Gini over samples of 500 to 10,000 observations,
+[owa3](@cite) reports the same objective value as the exact formulation, to the printed
+precision.
 
 The gap was measured here against the functor at `T = 100`, `N = 8` with the default `p`. The
 Gini mean difference is 0.06 % high, the tail Gini is 1.7e-5 % high, and the tail Gini range
@@ -281,8 +282,8 @@ Where:
 # Keyword arguments
 
   - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns;
-    if `false`, to their negation. This is the seam [`set_range_risk_constraints!`](@ref)
-    builds the gain tail of [`OrderedWeightsArrayRange`](@ref) through.
+    if `false`, to their negation. [`set_range_risk_constraints!`](@ref) sets it to `false`
+    to build the gain tail of [`OrderedWeightsArrayRange`](@ref).
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
@@ -295,6 +296,10 @@ Where:
   - [`ApproxOrderedWeightsArray`](@ref)
   - [`ExactOrderedWeightsArray`](@ref)
   - [`set_risk_constraints!`](@ref)
+
+# References
+
+  - $(ref_dict[:owa3])
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,

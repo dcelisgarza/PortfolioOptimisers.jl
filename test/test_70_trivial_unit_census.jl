@@ -286,19 +286,10 @@ end
     kept = Dict{Symbol, String}(#
                                 # Public descriptor factories: one keyword call each, the
                                 # user's door to a named exposure (ADR 0135).
-                                :ReturnOnAssets => "public descriptor factory",
                                 :ReturnOnEquity => "public descriptor factory",
-                                :AssetTurnover => "public descriptor factory",
-                                :CashFlowToAssets => "public descriptor factory",
                                 :SalesToEnterpriseValue => "public descriptor factory",
                                 :LogMarketCap => "public descriptor factory",
-                                :BookToPrice => "public descriptor factory",
-                                :CashFlowToPrice => "public descriptor factory",
-                                :SalesToPrice => "public descriptor factory",
-                                :EarningsToPrice => "public descriptor factory",
-                                :ForwardEarningsToPrice => "public descriptor factory",
                                 :EbitdaToEnterpriseValue => "public descriptor factory",
-                                :DebtToAssets => "public descriptor factory",
                                 :AssetsGrowthRate => "public descriptor factory",
                                 :SalesGrowthRate => "public descriptor factory",
                                 :IssuanceGrowthRate => "public descriptor factory",

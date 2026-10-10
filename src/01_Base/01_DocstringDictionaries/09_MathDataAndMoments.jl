@@ -37,6 +37,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :S_t_realised => "``\\mathbf{S}_t``: Realised covariance of step ``t``, formed from the centred returns that follow it.",#
                  :h_step => "``h``: Horizon of a step, the number of observations the forecast is judged on.",#
                  :M_steps => "``M``: Steps of the walk-forward, the number of forecasts a run scores.",#
+                 :z_band => "``z_{\\alpha/2}``: Upper ``\\alpha / 2`` quantile of the standard normal distribution.",#
                  :c_weight_bias => "``c``: Bias correction of the weighted denominator. It is fixed by the **type** of the weights, never by the estimator: `corrected = false` gives ``c = 0`` for every type, and `corrected = true` gives ``c = 1`` for `StatsBase.FrequencyWeights`, ``c = \\sum_t w_t^2 / \\sum_t w_t`` for `StatsBase.AnalyticWeights` and ``c = \\sum_t w_t / T`` for `StatsBase.ProbabilityWeights`.",#
                  # Shrinkage of the sample expected returns.
                  :mu_hat_shrink => "``\\hat{\\boldsymbol{\\mu}}``: ``N \\times 1`` vector of sample expected returns, whose ``i``-th entry is ``\\hat{\\mu}_i``.",#
@@ -145,7 +146,7 @@ unique_key_dict!(math_dict, :math_dict,
                  # The idiosyncratic diagnostics of a cross-sectional fit. Each symbol is
                  # stated by two or more Units of that file.
                  :eps_ti_idio => "``\\varepsilon_{ti}``: Idiosyncratic return of asset ``i`` at observation ``t``.",#
-                 :v_ti_idio => "``v_{ti}``: Idiosyncratic variance the fit predicted for asset ``i`` at observation ``t``.",#
+                 :v_ti_idio => "``v_{ti}``: Idiosyncratic variance of asset ``i`` that the fit estimated from the observations up to ``t``, so it is the forecast for observation ``t + 1``.",#
                  :sigma_ti_idio => "``\\hat{\\sigma}_{ti} = \\sqrt{\\max(v_{ti}, 0)}``: Predicted idiosyncratic volatility of asset ``i`` at observation ``t``. A negative variance counts as zero.",#
                  :z_ti_idio => "``z_{ti}``: Standardised idiosyncratic return of asset ``i`` at observation ``t``.",#
                  :F_t_idio => "``\\mathcal{F}_{t}``: Finite cross-section of observation ``t``, the assets whose standardised return ``z_{ti}`` is finite.",#
@@ -186,6 +187,8 @@ unique_key_dict!(math_dict, :math_dict,
                  :nu_k_cvg => "``\\nu_{k}``: Observation count of cell ``k``, the number of observations at which every asset of the cell is finite and active.",#
                  :v_k_cvg => "``v_{k}``: Entry ``k`` of the answer of an available-case fit.",#
                  :A_adm_cvg => "``\\mathcal{A}``: Admitted assets, those that [`admits`](@ref) lets into the answer. A cell is admitted when every asset of the cell is in ``\\mathcal{A}``.",#
+                 :V_peel => "``\\mathcal{V}``: Vertices of the graph of undetermined pairs, the admitted assets that have a variance.",#
+                 :E_peel => "``\\mathcal{E}``: Edges of the graph of undetermined pairs, the pairs of vertices that share too few observations for a covariance.",#
                  # The Coverage Universe of `05_Moments/33_CoverageUniverse.jl`. The
                  # symbol is stated by two or more Units of that file.
                  :C_cvg_univ => "``\\mathcal{C}``: Coverage Universe of the fit, the assets whose returns are finite, and whose active mask entries are ``1``, at every observation of the window.",#

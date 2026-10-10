@@ -1,4 +1,5 @@
 using JuMP: JuMP
+include(joinpath(@__DIR__, "parity_harness.jl"))
 @testset "Fees" begin
     using PortfolioOptimisers, Test, DataFrames, TimeSeries, CSV, Clarabel, HiGHS
     X = TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz")); timestamp = :Date)[(end - 252):end]
@@ -727,7 +728,7 @@ end
     wd = SelfFinancingDrift()
 
     # Fixture 1 of research #749: three assets, three observations. Every number below
-    # is a printed output of the reference implementation.
+    # is a printed output of the oracle.
     R1 = [0.10 -0.04 0.02
           -0.03 0.08 0.01
           0.05 -0.02 -0.01]
@@ -739,89 +740,95 @@ end
           0.005 0.028 -0.003 0.018
           0.024 -0.011 0.015 -0.006]
 
-    @testset "the drift reproduces the reference implementation" begin
-        # Grilling #758 fixed the tolerance at `rtol = atol = 1e-14`, the reference's
+    @testset "the drift reproduces the stored oracle" begin
+        # Grilling #758 fixed the tolerance at `rtol = atol = 1e-14`, the oracle's
         # own, at any panel size. It absorbs the summation-order drift a wide panel
-        # carries, which a bare equality bound to a small fixture would not.
+        # carries, which a bare equality bound to a small fixture would not. Cell by cell,
+        # 12 of the 14 comparisons below are exact, and the worst is maxrel 2.2e-16 (the
+        # charged period), so the tolerance stays far above the measure by that decision.
         rtol = atol = 1e-14
 
         # Long only.
         w = [0.5, 0.3, 0.2]
-        @test isapprox(calc_net_returns(w, R1, nothing, wd),
-                       [0.04200000000000004, 0.008234165067178445, 0.01750823354718345];
-                       rtol = rtol, atol = atol)
-        @test isapprox(PO.weight_path(wd, w, R1),
-                       [0.5 0.3 0.2
-                        0.527831094049904 0.27639155470249516 0.19577735124760076
-                        0.5078147309105446 0.2960650307449218 0.1961202383445335];
-                       rtol = rtol, atol = atol)
-        @test isapprox(PO.held_weights(wd, w, R1),
-                       [0.5240306170272836, 0.285151235699135, 0.19081814727358146];
-                       rtol = rtol, atol = atol)
+        @test parity_compare(calc_net_returns(w, R1, nothing, wd),
+                             [0.04200000000000004, 0.008234165067178445,
+                              0.01750823354718345]; rtol, atol, name = "drift 1").ok
+        @test parity_compare(PO.weight_path(wd, w, R1),
+                             [0.5 0.3 0.2
+                              0.527831094049904 0.27639155470249516 0.19577735124760076
+                              0.5078147309105446 0.2960650307449218 0.1961202383445335];
+                             rtol, atol, name = "drift 2").ok
+        @test parity_compare(PO.held_weights(wd, w, R1),
+                             [0.5240306170272836, 0.285151235699135, 0.19081814727358146];
+                             rtol, atol, name = "drift 3").ok
 
         # Long short.
         w = [1.1, -0.4, 0.3]
-        @test isapprox(calc_net_returns(w, R1, nothing, wd),
-                       [0.13200000000000012, -0.05650176678445251, 0.05981873338077248];
-                       rtol = rtol, atol = atol)
-        @test isapprox(PO.weight_path(wd, w, R1),
-                       [1.1 -0.4 0.3
-                        1.068904593639576 -0.33922261484098937 0.2703180212014134
-                        1.0989288790681997 -0.38830006366802744 0.28937118459982775];
-                       rtol = rtol, atol = atol)
-        @test isapprox(PO.held_weights(wd, w, R1),
-                       [1.088747808166026, -0.35905579926935327, 0.2703079911033273];
-                       rtol = rtol, atol = atol)
+        @test parity_compare(calc_net_returns(w, R1, nothing, wd),
+                             [0.13200000000000012, -0.05650176678445251,
+                              0.05981873338077248]; rtol, atol, name = "drift 4").ok
+        @test parity_compare(PO.weight_path(wd, w, R1),
+                             [1.1 -0.4 0.3
+                              1.068904593639576 -0.33922261484098937 0.2703180212014134
+                              1.0989288790681997 -0.38830006366802744 0.28937118459982775];
+                             rtol, atol, name = "drift 5").ok
+        @test parity_compare(PO.held_weights(wd, w, R1),
+                             [1.088747808166026, -0.35905579926935327, 0.2703079911033273];
+                             rtol, atol, name = "drift 6").ok
 
         # Partly invested. The cash position earns zero and the recursion still holds.
         w = [0.4, 0.2, 0.1]
-        @test isapprox(calc_net_returns(w, R1, nothing, wd),
-                       [0.03400000000000003, 0.003075435203094834, 0.015583216028075997];
-                       rtol = rtol, atol = atol)
-        @test isapprox(PO.weight_path(wd, w, R1),
-                       [0.4 0.2 0.1
-                        0.4255319148936171 0.18568665377176016 0.09864603481624759
-                        0.4115004145857036 0.19992672438728087 0.09932702134634297];
-                       rtol = rtol, atol = atol)
-        @test isapprox(PO.held_weights(wd, w, R1),
-                       [0.4254456242441918, 0.19292184707995289, 0.09682490767960966];
-                       rtol = rtol, atol = atol)
+        @test parity_compare(calc_net_returns(w, R1, nothing, wd),
+                             [0.03400000000000003, 0.003075435203094834,
+                              0.015583216028075997]; rtol, atol, name = "drift 7").ok
+        @test parity_compare(PO.weight_path(wd, w, R1),
+                             [0.4 0.2 0.1
+                              0.4255319148936171 0.18568665377176016 0.09864603481624759
+                              0.4115004145857036 0.19992672438728087 0.09932702134634297];
+                             rtol, atol, name = "drift 8").ok
+        @test parity_compare(PO.held_weights(wd, w, R1),
+                             [0.4254456242441918, 0.19292184707995289, 0.09682490767960966];
+                             rtol, atol, name = "drift 9").ok
 
-        # The charged period. The reference charges the whole cost and the whole fee on
+        # The charged period. The oracle charges the whole cost and the whole fee on
         # every observation, so `fa` stays `nothing` here.
         w = [0.5, 0.3, 0.2]
         fees = Fees(; l = 0.001, tn = Turnover(; w = [0.4, 0.4, 0.2], val = 0.002))
         @test sum(PO.calc_fees(w, size(R1, 1), fees)) == 0.0014
-        @test isapprox(calc_net_returns(w, R1, fees, wd),
-                       [0.04060000000000004, 0.006834165067178446, 0.016108233547183447];
-                       rtol = rtol, atol = atol)
+        @test parity_compare(calc_net_returns(w, R1, fees, wd),
+                             [0.04060000000000004, 0.006834165067178446,
+                              0.016108233547183447]; rtol, atol, name = "drift 10").ok
 
         # The four-asset fixture, one period over the whole panel.
         w = [0.55, -0.25, 0.40, 0.15]
-        @test isapprox(calc_net_returns(w, R2, nothing, wd),
-                       [0.019099999999999895, -0.01632862329506435, 0.019844904856505252,
-                        0.0025246633703204235, -0.0024704157155172046,
-                        0.020955902076400745]; rtol = rtol, atol = atol)
-        @test isapprox(PO.weight_path(wd, w, R2),
-                       [0.55 -0.25 0.4 0.15
-                        0.5461681876165245 -0.23770974389166913 0.394073201844765 0.1502796585222255
-                        0.5507925257828371 -0.245763793948783 0.3918011650345975 0.15353812298651465
-                        0.5578972610680699 -0.2414635013265368 0.388403154208739 0.14844275687782565
-                        0.5459189515276911 -0.23916943450665185 0.39749808735724307 0.1494015530612434
-                        0.550007292945471 -0.24647507457054046 0.3972870572850599 0.15246743897369103];
-                       rtol = rtol, atol = atol)
-        @test isapprox(PO.held_weights(wd, w, R2),
-                       [0.5516472032050764, -0.23876040899954856, 0.3949694226011338,
-                        0.1484419004108052]; rtol = rtol, atol = atol)
-        @test isapprox(calc_net_returns(w, R2, nothing, nothing),
-                       [0.0191, -0.0167, 0.019950000000000002, 0.0030499999999999985,
-                        -0.00275, 0.021050000000000003]; rtol = rtol, atol = atol)
+        @test parity_compare(calc_net_returns(w, R2, nothing, wd),
+                             [0.019099999999999895, -0.01632862329506435,
+                              0.019844904856505252, 0.0025246633703204235,
+                              -0.0024704157155172046, 0.020955902076400745]; rtol, atol,
+                             name = "drift 11").ok
+        @test parity_compare(PO.weight_path(wd, w, R2),
+                             [0.55 -0.25 0.4 0.15
+                              0.5461681876165245 -0.23770974389166913 0.394073201844765 0.1502796585222255
+                              0.5507925257828371 -0.245763793948783 0.3918011650345975 0.15353812298651465
+                              0.5578972610680699 -0.2414635013265368 0.388403154208739 0.14844275687782565
+                              0.5459189515276911 -0.23916943450665185 0.39749808735724307 0.1494015530612434
+                              0.550007292945471 -0.24647507457054046 0.3972870572850599 0.15246743897369103];
+                             rtol, atol, name = "drift 12").ok
+        @test parity_compare(PO.held_weights(wd, w, R2),
+                             [0.5516472032050764, -0.23876040899954856, 0.3949694226011338,
+                              0.1484419004108052]; rtol, atol, name = "drift 13").ok
+        @test parity_compare(calc_net_returns(w, R2, nothing, nothing),
+                             [0.0191, -0.0167, 0.019950000000000002, 0.0030499999999999985,
+                              -0.00275, 0.021050000000000003]; rtol, atol,
+                             name = "drift 14").ok
     end
 
     @testset "the held weights are what a chain carries forward" begin
         # Fixture 3 of research #749, the executed-turnover oracle. The threading itself
         # is the fold loop's, so this reproduces each period's arithmetic by hand: the
-        # previous weights of a period are the held weights of the period before it.
+        # previous weights of a period are the held weights of the period before it. The
+        # tolerance is the one of #758 above. Measured cell by cell: maxrel 1.1e-16 on the
+        # first chain, and every other comparison exact.
         rtol = atol = 1e-14
         targets = [[0.55, -0.25, 0.40, 0.15], [0.30, 0.30, 0.20, 0.20],
                    [0.60, -0.10, 0.35, 0.00]]
@@ -837,21 +844,22 @@ end
             prev = PO.held_weights(wd, t, R2[rg, :])
             push!(endings, collect(prev))
         end
-        @test isapprox(chain,
-                       [0.017749999999999894, -0.01767862329506435, 0.008865180638220317,
-                        -0.001985705588138785, -0.0018861255335676944,
-                        0.019818651026508604]; rtol = rtol, atol = atol)
-        @test isapprox(turnovers, [1.35, 1.0348193617797028, 1.036125533567566];
-                       rtol = rtol, atol = atol)
-        @test isapprox(endings[1],
-                       [0.5507925257828371, -0.245763793948783, 0.3918011650345975,
-                        0.15353812298651465]; rtol = rtol, atol = atol)
-        @test isapprox(endings[2],
-                       [0.30131820563706624, 0.29585098098528584, 0.20561902757915068,
-                        0.19721178579849719]; rtol = rtol, atol = atol)
-        @test isapprox(endings[3],
-                       [0.6053723917377186, -0.09967695178090742, 0.3472438694197147, 0.0];
-                       rtol = rtol, atol = atol)
+        @test parity_compare(chain,
+                             [0.017749999999999894, -0.01767862329506435,
+                              0.008865180638220317, -0.001985705588138785,
+                              -0.0018861255335676944, 0.019818651026508604]; rtol, atol,
+                             name = "chain 1").ok
+        @test parity_compare(turnovers, [1.35, 1.0348193617797028, 1.036125533567566]; rtol,
+                             atol, name = "chain 2").ok
+        @test parity_compare(endings[1],
+                             [0.5507925257828371, -0.245763793948783, 0.3918011650345975,
+                              0.15353812298651465]; rtol, atol, name = "chain 3").ok
+        @test parity_compare(endings[2],
+                             [0.30131820563706624, 0.29585098098528584, 0.20561902757915068,
+                              0.19721178579849719]; rtol, atol, name = "chain 4").ok
+        @test parity_compare(endings[3],
+                             [0.6053723917377186, -0.09967695178090742, 0.3472438694197147,
+                              0.0]; rtol, atol, name = "chain 5").ok
 
         # With both switches off the chain keeps the numbers it has today.
         prev = zeros(4)
@@ -863,9 +871,10 @@ end
             push!(turnovers, sum(abs, t - prev))
             prev = t
         end
-        @test isapprox(chain,
-                       [0.017750000000000002, -0.01805, 0.00885, -0.0018500000000000005,
-                        -0.0019000000000000002, 0.0197]; rtol = rtol, atol = atol)
+        @test parity_compare(chain,
+                             [0.017750000000000002, -0.01805, 0.00885,
+                              -0.0018500000000000005, -0.0019000000000000002, 0.0197]; rtol,
+                             atol, name = "chain 6").ok
         @test isapprox(turnovers, [1.35, 1.05, 1.0499999999999998]; rtol = rtol,
                        atol = atol)
     end
@@ -892,23 +901,26 @@ end
         @test calc_net_returns(w, one_obs, nothing, wd)[1] == 0.04200000000000004
 
         # A one-observation window has a path of exactly one row, the target weights,
-        # and its held weights are the reference's own one-observation ending weights.
+        # and its held weights are the oracle's own one-observation ending weights.
+        # Both comparisons of the oracle's outputs here measure exact, at the tolerance
+        # of #758.
         @test PO.weight_path(wd, w, one_obs) == transpose(w)
-        @test isapprox(PO.held_weights(wd, w, one_obs),
-                       [0.527831094049904, 0.27639155470249516, 0.19577735124760076];
-                       rtol = 1e-14, atol = 1e-14)
+        @test parity_compare(PO.held_weights(wd, w, one_obs),
+                             [0.527831094049904, 0.27639155470249516, 0.19577735124760076];
+                             rtol = 1e-14, atol = 1e-14, name = "window 1").ok
 
         single = R1[:, 1:1]
         @test calc_net_returns([1.0], single, nothing, wd) != vec(single)
         @test isapprox(calc_net_returns([1.0], single, nothing, wd), vec(single);
                        atol = 1e-14)
-        @test isapprox(calc_net_returns([1.0], single, nothing, wd),
-                       [0.10000000000000009, -0.030000000000000138, 0.050000000000000044];
-                       rtol = 1e-14, atol = 1e-14)
+        @test parity_compare(calc_net_returns([1.0], single, nothing, wd),
+                             [0.10000000000000009, -0.030000000000000138,
+                              0.050000000000000044]; rtol = 1e-14, atol = 1e-14,
+                             name = "window 2").ok
     end
 
     @testset "the weight path and the held weights sum to one with the cash" begin
-        # The identity the reference's own oracle test asserts. The deflated cash is what
+        # The identity the oracle's own test asserts. The deflated cash is what
         # the weights leave uninvested, and it earns zero.
         w = [0.4, 0.2, 0.1]
         cash = 1 - sum(w)

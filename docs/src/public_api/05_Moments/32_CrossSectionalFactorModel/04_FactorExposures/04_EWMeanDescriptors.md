@@ -1,8 +1,8 @@
 ```@meta
-Description = "Exponentially Weighted Mean Descriptors, public API of PortfolioOptimisers.jl: EWMean, EWVolumeRatio, DaysToCover, descriptor, EWMomentum, EWShareTurnover, …"
+Description = "EW mean descriptors, public API of PortfolioOptimisers.jl: EWMean, EWVolumeRatio, DaysToCover, descriptor, partial_fit!, merge_states, EWMomentum, …"
 ```
 
-# [Exponentially Weighted Mean Descriptors](@id api-ew-mean-descriptors)
+# [EW mean descriptors](@id api-ew-mean-descriptors)
 
 ## Types
 
@@ -16,6 +16,8 @@ DaysToCover
 
 ```@docs
 descriptor(de::EWMean, rd::ReturnsResult)
+PortfolioOptimisers.partial_fit!(de::Union{EWMean, EWVolumeRatio, DaysToCover}, rd::ReturnsResult)
+merge_states(::PortfolioOptimisers.EWMeanState, ::PortfolioOptimisers.EWMeanState)
 EWMomentum
 EWShareTurnover
 EWAmihudIlliquidity

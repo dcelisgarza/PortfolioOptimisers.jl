@@ -177,7 +177,8 @@ HierarchicalEqualRiskContribution
        │      sigma ┼ nothing
        │       chol ┼ nothing
        │         rc ┼ nothing
-       │        alg ┴ SquaredSOCRiskExpr()
+       │        alg ┼ SquaredSOCRiskExpr()
+       │   mtx_sqrt ┴ EigenFallbackSquareRoot()
     ro ┼ Variance
        │   settings ┼ RiskMeasureSettings
        │            │   scale ┼ Float64: 1.0
@@ -186,7 +187,8 @@ HierarchicalEqualRiskContribution
        │      sigma ┼ nothing
        │       chol ┼ nothing
        │         rc ┼ nothing
-       │        alg ┴ SquaredSOCRiskExpr()
+       │        alg ┼ SquaredSOCRiskExpr()
+       │   mtx_sqrt ┴ EigenFallbackSquareRoot()
   scai ┼ SumScalariser()
   scao ┼ SumScalariser()
     ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
@@ -524,7 +526,7 @@ Compute the shares inside each cluster and the risk of each cluster that HERC al
   - `hec`: The optimiser. It gives the measures, the scalarisers `scai` and `scao`, and the executor `ex`.
   - `pr`: Prior result. Its `X` is the return matrix, and its moments resolve the measures.
   - `cls`: Asset indices of each cluster, one entry per cluster.
-  - `fees`: Resolved fees, or `nothing`. The caller resolves them on its own universe and strips both liquidation carriers first, because a cluster-level risk prices no forced exit. The exiting asset is in no cluster, because its column is `NaN`.
+  - `fees`: Resolved fees, or `nothing`. The caller resolves them on its own universe and strips both liquidation charges, `lq` and `flq`, first, because a cluster-level risk prices no forced exit. The exiting asset is in no cluster, because its column is `NaN`.
 
 # Returns
 
@@ -568,7 +570,7 @@ Run the Hierarchical Equal Risk Contribution optimisation.
  2. Pick the returns `rd` that `opt.brt` selects, with [`returns_result_picker`](@ref).
  3. Fit the prior `pr` with `opt.pe`.
  4. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk`.
- 5. Remove the liquidation carriers from `fees`, giving `cfees`, the fees that the risks read.
+ 5. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the risks read.
  6. Reduce `pr`, `hec` and `rd` to the assets of `imsk`, with [`investable_reduction`](@ref). `X` is the returns matrix of the reduced `pr`, and `N` its number of assets.
  7. Cluster the assets with `opt.cle`, giving `clr`, and cut its dendrogram into `clr.k` clusters, giving `cls`, the asset indices of each cluster.
  8. Compute the shares `w` and the cluster risks `rkcl` with [`herc_risk`](@ref).
@@ -590,22 +592,24 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     hec = reset_time_dependent_estimator(hec)
     rd = returns_result_picker(rd, hec.opt.brt)
     pr = prior(hec.opt.pe, rd)
-    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
-    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
-    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
+    # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
     # A weight is a quotient of two risks, so an integer sample takes a float weight type,
     # and every other sample keeps its own type.
     T = float_if_integer(eltype(pr.X))
-    imsk = investable_mask(pr)
+    # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    imsk = feature_readable_mask(hec.opt.cle, investable_mask(pr), rd)
     fees = investable_fees_view(fees_constraints(hec.opt.fees, hec.opt.sets;
                                                  strict = hec.opt.strict, datatype = T),
                                 imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
-    # rebuilds, so it rides on the result alone. No sub-problem below holds that vector —
+    # rebuilds, so only the result charges it. No sub-problem below holds that vector —
     # the exiting asset is in no cluster, its column being `NaN` — so none prices an exit.
-    cfees = strip_liquidation_carriers(fees, nothing)
+    cfees = strip_liquidation_charges(fees, nothing)
     # The prior fits on the coverage universe and returns a result on the full asset
     # universe, where an asset it could not estimate carries `NaN`. Reduce once, here:
     # the distance the clustering is built from never sees a `NaN`, and the cluster count

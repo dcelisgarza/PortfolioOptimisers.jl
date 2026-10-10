@@ -1,8 +1,8 @@
 ```@meta
-Description = "Online selection rules: the second set, private API of PortfolioOptimisers.jl: nonneg_quadratic_root, ConfidenceWeightedMeanReversionState, …"
+Description = "Second set rules, private API of PortfolioOptimisers.jl: nonneg_quadratic_root, ConfidenceWeightedMeanReversionState, lagged_window_correlation, …"
 ```
 
-# Online selection rules: the second set: private API
+# Second set rules: private API
 
 ```@docs
 PortfolioOptimisers.nonneg_quadratic_root

@@ -1,8 +1,8 @@
 ```@meta
-Description = "MIP Constraints, private API of PortfolioOptimisers.jl: AbstractMIPSpace, AbstractMIPIndicators, AssetMIPSpace, SubsetMIPSpace, HeldIndicators, …"
+Description = "MIP indicators, private API of PortfolioOptimisers.jl: AbstractMIPSpace, AbstractMIPIndicators, AssetMIPSpace, SubsetMIPSpace, HeldIndicators, …"
 ```
 
-# [MIP Constraints: private API](@id private-api-mip-constraints)
+# [MIP indicators: private API](@id private-api-mip-indicators)
 
 ```@docs
 AbstractMIPSpace

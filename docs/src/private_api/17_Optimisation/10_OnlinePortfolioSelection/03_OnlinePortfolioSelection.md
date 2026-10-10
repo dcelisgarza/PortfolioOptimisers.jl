@@ -1,8 +1,8 @@
 ```@meta
-Description = "The online portfolio selection head, private API of PortfolioOptimisers.jl: online_selection_seed, fold_online_selection, online_selection_pin, …"
+Description = "Online Portfolio Selection, private API of PortfolioOptimisers.jl: online_selection_seed, fold_online_selection, online_selection_pin, …"
 ```
 
-# The online portfolio selection head: private API
+# Online Portfolio Selection: private API
 
 ```@docs
 PortfolioOptimisers.online_selection_seed
@@ -12,10 +12,10 @@ PortfolioOptimisers.online_selection_row!
 PortfolioOptimisers.row_timestamp
 PortfolioOptimisers.report_held_steps
 PortfolioOptimisers.report_row_gaps
-PortfolioOptimisers.rows_carrier
+PortfolioOptimisers.buffer_returns_result
 PortfolioOptimisers.buffer_panel
-PortfolioOptimisers.online_selection_readout
-PortfolioOptimisers.online_readout(::OnlinePortfolioSelection)
+PortfolioOptimisers.online_selection_result
+PortfolioOptimisers.batch_from_state(::OnlinePortfolioSelection)
 PortfolioOptimisers.held_timestamps(opt::OnlinePortfolioSelection)
 PortfolioOptimisers.fees_carry_turnover
 PortfolioOptimisers.assert_online_fee_source(opt::OnlinePortfolioSelection, pws)

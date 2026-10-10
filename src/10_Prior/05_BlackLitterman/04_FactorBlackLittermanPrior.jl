@@ -32,10 +32,10 @@ Keywords correspond to the struct's fields.
 
 ## Composition: what this estimator forwards
 
-This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its carrier directly rather than forwarding one along its own axis; each field still follows the pattern of a posterior field replacing its prior counterpart while a structural field forwards whole. It is the member of the Black-Litterman family whose factor block is *modified* rather than passed through — the views land on the factor distribution, and the assets are its projection.
+This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its prior result directly rather than forwarding one along its own axis; each field still follows the pattern of a posterior field replacing its prior counterpart while a structural field forwards whole. It is the member of the Black-Litterman family whose factor block is *modified* rather than passed through — the views land on the factor distribution, and the assets are its projection.
 
   - The factor block `fpr` is the **posterior** factor distribution, processed by `f_mp`, with `chol` dropped because the posterior covariance supersedes the one it factorises. Its `w` and that weighting's diagnostics forward untouched.
-  - `mu` and `sigma` are that block projected through the loadings, so the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction, whatever `rf` is, because the rate is inside `fpr.mu` where it is present at all. `sigma` optionally gains a residual correction when `rsd` is `true`.
+  - `mu` and `sigma` are that block projected through the loadings, so the returned prior result is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction, whatever `rf` is, because the rate is inside `fpr.mu` where it is present at all. `sigma` optionally gains a residual correction when `rsd` is `true`.
   - `w` is the factor prior's, and is over the right axis: this estimator wraps only a factor prior, and `posterior_X` has exactly `F`'s rows, so it is the only weighting in existence.
 
 Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the identity exactly, while [`BlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) do not — see their warnings.
@@ -121,11 +121,13 @@ FactorBlackLittermanPrior
              │     alg ┼ nothing
              │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
           re ┼ StepwiseRegression
-             │   crit ┼ PValue
-             │        │   t ┴ Float64: 0.05
-             │    alg ┼ ForwardSelection()
-             │    tgt ┼ LinearModel
-             │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │       crit ┼ PValue
+             │            │   t ┴ Float64: 0.05
+             │        alg ┼ ForwardSelection()
+             │        tgt ┼ LinearModel
+             │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │     choice ┼ BatchChoice()
+             │   included ┴ nothing
           ve ┼ SimpleVariance
              │          me ┼ SimpleExpectedReturns
              │             │   w ┴ nothing
@@ -354,7 +356,7 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
  2. When `pe.views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so step 6 checks its width instead.
  3. Reduce `X` to the assets it can be fitted over with [`coverage_reduction`](@ref), under `pnl`, giving the mask and `Xi`. This member wraps a *factor* prior, so there is no asset-side prior result to read an Investable Mask off and the gap is read out of the returns themselves.
  4. Fit the wrapped prior `pe.pe` on `F` alone, giving `f_prior`, and read `prior_mu` and `prior_sigma` off it. The wrapped estimator is bounded over the asset axis, but the matrix it is handed here is the factor one.
- 5. Regress `Xi` on `F` with [`factor_reconstruction`](@ref) under `pe.re`, giving the regression result `rr` and the reconstructed returns `posterior_X`.
+ 5. Regress `Xi` on `F` with [`factor_reconstruction`](@ref) under `pe.re` viewed to `imsk` with [`coverage_regression`](@ref), giving the regression result `rr` and the reconstructed returns `posterior_X`.
  6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over `prior_sigma` and `size(Xi, 1)` observations, giving `blp`. The axis is `:tfkey`, so no view row is ever dropped for a departed asset and no ledger is kept.
  7. Put the prior mean on the total-return scale the views are written on, giving `prior_total_mu`. When `pe.l` is set this is the equilibrium mean of [`equilibrium_mu`](@ref), a risk premium, plus `pe.rf` by [`apply_rf`](@ref), over `pe.w` sliced to the reduced axis by [`investable_weights_view`](@ref); otherwise it is `prior_mu`, which is on that scale already.
  8. Run the master equations with [`bl_posteriors`](@ref), giving the posterior factor pair. When no view row survived it hands back `prior_total_mu` and the factor prior covariance instead, and step 10 lifts those exactly as it lifts a posterior pair.
@@ -364,7 +366,7 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
 12. Forward the factor block with [`forward_prior`](@ref), replacing `mu` and `sigma` by the posterior factor pair and dropping `chol`. It is not expanded: the reduction never touched the factor axis.
 13. Announce the departures once with [`announce_bl_departures`](@ref), naming them with [`investable_universe_names`](@ref).
 14. Write every asset-axis block back onto the full universe: the moment pair with [`expand_moment`](@ref), the reconstruction with [`expand_columns`](@ref) and the regression with [`expand_regression`](@ref). `chol` is dropped instead of expanded, because a `NaN` frame has no factorisation.
-15. Build the carrier directly, taking `w` and its diagnostics from `f_prior` and carrying no `Z`.
+15. Build the prior result directly, taking `w` and its diagnostics from `f_prior` and carrying no `Z`.
 
 # Arguments
 
@@ -428,7 +430,7 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     f_prior = prior(pe.pe, F; strict = strict)
     prior_mu, prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors.
-    rr, posterior_X = factor_reconstruction(pe.re, Xi, F)
+    rr, posterior_X = factor_reconstruction(coverage_regression(pe.re, imsk), Xi, F)
     M = rr.M
     # `pe.sets` goes through unreduced and unminted, and with no ledger, for the reason
     # [`BayesianBlackLittermanPrior`](@ref) gives: the views resolve against `tfkey`, so

@@ -2,34 +2,34 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the callable structs used as time-dependent values.
+Abstract supertype for the callable structs that compute the value of a schedule at each fold.
 
-A subtype is a data-carrying alternative to a bare function inside a [`TimeDependent`](@ref): it must implement a functor `(x::MySubtype)(ctx::TimeDependentContext)` returning the fold's field value. Because it is a struct, it participates in a trait a bare function cannot: define `needs_previous_weights(::MySubtype) = true` to declare a previous-weights requirement directly (the default is `false`), instead of wrapping in [`PreviousWeightsFunction`](@ref).
+A subtype takes the place of a bare function in a [`TimeDependent`](@ref), and holds its parameters as data. Because it is a type, it can declare that it reads the previous weights with a method of `needs_previous_weights`. A bare function needs the wrapper [`PreviousWeightsFunction`](@ref) for that.
 
-Being a struct also makes it the natural home for **recording what a callable schedule chose**: a bare `ctx -> …` selects nothing by index, so its per-fold decision is not otherwise recoverable (see the provenance note on [`TimeDependent`](@ref)). A functor can carry a mutable field — e.g. a vector it writes at `ctx.i` — and log the fold's resolved value as a side effect of computing it.
+A subtype can also record what it computed. A bare function `ctx -> …` selects no entry by index, so a later reader cannot recover its value at a fold. A functor can hold a mutable field, for example a vector, and write the value of fold `ctx.i` into it.
 
-The family classifies by what the functor returns, and a subtype declares that kind in its type. Subtype [`TimeDependentConstraintCallable`](@ref) when the per-fold value is a constraint value, and [`TimeDependentOptimiserCallable`](@ref) when it is an optimiser. Only the second is statically admissible in an optimiser-valued field (see [`TD_OptE_Opt`](@ref)), so the classification is what that admissibility is read off. Do not subtype this root directly.
+The family is divided by what the functor returns, and a subtype states that kind by its supertype. Subtype [`TimeDependentConstraintCallable`](@ref) when the value is a constraint value, and [`TimeDependentOptimiserCallable`](@ref) when the value is an optimiser. Only the second is admitted in a field that holds an optimiser before any fold runs, see [`TD_OptE_Opt`](@ref). Do not subtype this root directly.
 
 # Interfaces
 
-Subtype one of the two children, not this root, and implement the following:
+Subtype one of the two children, not this root, and implement the methods below.
 
 ## The functor
 
-  - `(x::MySubtype)(ctx::TimeDependentContext)`: Returns the field value for the fold that `ctx` describes.
+  - `(x::MySubtype)(ctx::TimeDependentContext)`: Returns the value of the field at the fold that `ctx` describes.
 
 ### Arguments
 
   - `x`: The concrete subtype instance.
-  - `ctx`: The fold's context, which carries the fold index, the fold loop's data and, when the loop runs sequentially, the previous fold's weights.
+  - `ctx`: The context of the fold. It holds the index of the fold, the data of the fold loop, and the weights of the previous fold when the loop runs its folds in sequence.
 
 ### Returns
 
-  - The complete field value for that fold. Its kind is the one the subtype's supertype declares.
+  - The complete value of the field at that fold, of the kind that the supertype of the subtype states.
 
 ## `needs_previous_weights`
 
-  - `needs_previous_weights(::MySubtype) -> Bool`: Declares whether the functor reads `ctx.w_prev`. The default is `false`. Define it as `true` to force sequential fold execution, which is what [`PreviousWeightsFunction`](@ref) does for a bare function.
+  - `needs_previous_weights(::MySubtype) -> Bool`: States whether the functor reads `ctx.w_prev`. The fallback returns `false`. Return `true` to make the fold loop run its folds in sequence, as [`PreviousWeightsFunction`](@ref) does for a bare function.
 
 # Related
 
@@ -47,15 +47,15 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for callable structs whose per-fold value is a *constraint value*.
+Abstract supertype for the callable structs whose value at a fold is a constraint value.
 
-A subtype implements a functor `(x::MySubtype)(ctx::TimeDependentContext)` returning the fold's value for a constraint-position field — a budget, a set of weight bounds, a fee structure, a turnover limit, anything a [`TimeDependent`](@ref) may carry other than an optimiser. The value is checked when the fold loop swaps it into the field, by the host's own keyword constructor.
+A constraint value is any value of a [`TimeDependent`](@ref) that is not an optimiser, for example a budget, a set of weight bounds, a fee structure or a turnover limit. When the fold loop puts the value into its field, the keyword constructor of the optimiser that holds the field checks it.
 
-This is the kind to subtype for a functor whose output is *not* an optimiser. A functor returning an optimiser declares [`TimeDependentOptimiserCallable`](@ref) instead, which is what makes an optimiser-position schedule statically admissible (see [`TD_OptE_Opt`](@ref)).
+A functor that returns an optimiser subtypes [`TimeDependentOptimiserCallable`](@ref) instead.
 
 # Interfaces
 
-The methods are those of [`TimeDependentCallable`](@ref): the functor `(x::MySubtype)(ctx::TimeDependentContext)`, and the optional `needs_previous_weights`. This child adds no method. It states what the functor returns — a constraint value — and the host's own keyword constructor checks that value when the fold loop swaps it in.
+The methods are those of [`TimeDependentCallable`](@ref): the functor `(x::MySubtype)(ctx::TimeDependentContext)`, and the optional `needs_previous_weights`. This child adds no method. It states that the functor returns a constraint value.
 
 # Related
 
@@ -69,13 +69,13 @@ abstract type TimeDependentConstraintCallable <: TimeDependentCallable end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for callable structs whose per-fold value is an *optimiser*.
+Abstract supertype for the callable structs whose value at a fold is an optimiser.
 
-A subtype implements a functor `(x::MySubtype)(ctx::TimeDependentContext)` returning the fold's optimiser (an [`OptE_Opt`](@ref)), so a [`TimeDependent`](@ref) holding it is admissible wherever an optimiser-valued field accepts a schedule (see [`TD_OptE_Opt`](@ref)). Declaring the functor's output kind in the type is what makes the schedule *statically* admissible: a bare `ctx -> optimiser` is admitted as a `Base.Callable` and checked only when the fold loop swaps its value in.
+The functor returns an [`OptE_Opt`](@ref), so a [`TimeDependent`](@ref) that holds it is admitted in every field that holds an optimiser, see [`TD_OptE_Opt`](@ref). The type states the kind of the value before any fold runs. A bare function `ctx -> optimiser` is admitted as a `Base.Callable`, and its value is checked only when the fold loop puts it into the field.
 
 # Interfaces
 
-The methods are those of [`TimeDependentCallable`](@ref): the functor `(x::MySubtype)(ctx::TimeDependentContext)`, and the optional `needs_previous_weights`. This child adds no method. It states that the functor returns an [`OptE_Opt`](@ref), and [`assert_time_dependent_optimiser`](@ref) checks that promise when the fold loop swaps the value in.
+The methods are those of [`TimeDependentCallable`](@ref): the functor `(x::MySubtype)(ctx::TimeDependentContext)`, and the optional `needs_previous_weights`. This child adds no method. It states that the functor returns an [`OptE_Opt`](@ref), and [`assert_time_dependent_optimiser`](@ref) checks the value when the fold loop puts it into the field.
 
 # Related
 
@@ -89,9 +89,9 @@ abstract type TimeDependentOptimiserCallable <: TimeDependentCallable end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Declares that a callable time-dependent entry requires the previous optimisation's weights.
+States that a function in a schedule reads the weights of the previous fold.
 
-A bare callable inside a [`TimeDependent`](@ref) cannot be inspected for previous-weight requirements, so it contributes `false` to [`needs_previous_weights`](@ref) and its context's `w_prev` is only populated when something else makes the fold loop sequential. Wrapping the callable in `PreviousWeightsFunction` declares the requirement as data: it contributes `true` to [`needs_previous_weights`](@ref), forcing sequential fold execution and a populated `w_prev` in the [`TimeDependentContext`](@ref).
+No code can find out whether a bare function in a [`TimeDependent`](@ref) reads the previous weights. So a bare function gives `false` to [`needs_previous_weights`](@ref), and its context holds `w_prev` only when another input makes the fold loop run in sequence. A function in a `PreviousWeightsFunction` gives `true`. Then the fold loop runs its folds in sequence, and the [`TimeDependentContext`](@ref) of each fold after the first holds `w_prev`.
 
 # Fields
 
@@ -117,14 +117,11 @@ PreviousWeightsFunction
   - [`TimeDependentContext`](@ref)
   - [`needs_previous_weights`](@ref)
 """
-struct PreviousWeightsFunction{T} <: AbstractAlgorithm
+@concrete struct PreviousWeightsFunction <: AbstractAlgorithm
     """
-    Callable evaluated per fold as `f(ctx::TimeDependentContext)`, returning the fold's field value.
+    Function that the fold loop calls at each fold as `f(ctx::TimeDependentContext)`. It returns the value of the field at that fold.
     """
-    f::T
-    function PreviousWeightsFunction(f)
-        return new{typeof(f)}(f)
-    end
+    f
 end
 function PreviousWeightsFunction(; f)::PreviousWeightsFunction
     return PreviousWeightsFunction(f)
@@ -135,10 +132,12 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-States that no fold-less value exists. It stands in the two places such a value may be missing.
+States that no value exists for a field outside every fold loop.
 
-  - As a [`TimeDependent`](@ref)'s `default`: the schedule states no fold-less value of its own, so a fold-less solve falls back to the field's static default (see [`time_dependent_field_defaults`](@ref)).
-  - As an entry of a host's [`time_dependent_field_defaults`](@ref): the field is *required* and has no static default (the optimiser-valued fields), so a schedule there must carry its own `default`. A fold-less solve of a host whose required field holds a defaultless schedule throws a [`TimeDependentDefaultError`](@ref).
+It has two uses.
+
+  - As the `default` of a [`TimeDependent`](@ref), it states that the schedule gives no value outside every fold loop. A solve with no fold then uses the static default of the field, see [`time_dependent_field_defaults`](@ref).
+  - As an entry of the [`time_dependent_field_defaults`](@ref) of an optimiser, it states that the field is required and has no static default. The fields that hold an optimiser are such fields. A schedule in one of them must carry its own `default`, else a solve with no fold throws a [`TimeDependentDefaultError`](@ref).
 
 # Constructors
 
@@ -162,9 +161,9 @@ struct NoDefault <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Exception thrown when a fold-less solve reaches a [`TimeDependent`](@ref) schedule that has no value to fall back to: the field has no static default and the schedule supplies no `default`.
+Exception for a solve with no fold that reaches a schedule with no value outside every fold loop.
 
-A schedule is defined *only* over the folds of a cross-validation scheme. Fields with a static default reset to it silently; a required field (the optimiser-valued ones) has nothing to reset to, so the schedule must state the value a fold-less solve should use, via `TimeDependent(val; default = x)`.
+A [`TimeDependent`](@ref) is defined only over the folds of a cross-validation scheme. A field with a static default takes that default outside every fold loop, and no message is given. A required field, such as a field that holds an optimiser, has no static default. So its schedule must state the value outside every fold loop, as `TimeDependent(val; default = x)`.
 
 # Fields
 
@@ -190,27 +189,29 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Varies one optimiser input across the folds of a cross-validation scheme.
+Changes one optimiser input from fold to fold of a cross-validation scheme.
 
-A `TimeDependent` is stored *directly in the optimiser field it varies* — e.g. `JuMPOptimiser(; lt = TimeDependent([...]))` — so the field's position names the target and a field holds either a static value or a per-fold schedule, never both. It is recognised at top-level optimiser fields only, never nested inside another input (e.g. inside a [`Fees`](@ref) or a risk measure).
+A `TimeDependent` goes directly into the optimiser field that it changes, for example `JuMPOptimiser(; lt = TimeDependent([...]))`. So the field names the target, and a field holds a static value or a schedule, never both. The fold loop finds a schedule only in a field of an optimiser. It does not find one inside another input, for example inside a [`Fees`](@ref) or a risk measure.
 
-`val` is either a vector of per-fold values — entry `i` is the complete field value for fold `i` of the consuming scheme's `split` enumeration — or a callable evaluated per fold: a bare function `f(ctx::TimeDependentContext)` (optionally wrapped in [`PreviousWeightsFunction`](@ref)) or a [`TimeDependentCallable`](@ref) functor struct.
+The field `val` is a vector or a function. Entry `i` of a vector is the complete value of the field at fold `i`. A function is called at each fold with the [`TimeDependentContext`](@ref) of the fold. It is a bare function, a bare function in a [`PreviousWeightsFunction`](@ref), or a [`TimeDependentCallable`](@ref).
 
-For a field that itself accepts a *vector of constraints* statically, a per-fold entry is that whole vector, so a schedule of per-fold constraint vectors is a vector of vectors — `TimeDependent([[c₁ᵃ, c₁ᵇ], [c₂ᵃ, c₂ᵇ], …])`, entry `i` being fold `i`'s complete constraint vector. There is no separate "vector of `TimeDependent`" facility and none is needed: `TimeDependent` is recognised only at a top-level field, so to vary individual constraints within a vector, build the fold's vector in a callable — `TimeDependent(ctx -> [dynamic(ctx), static])` — which keeps the shared static parts in one place.
+A field that takes a vector of constraints takes the whole vector at each fold. So a schedule of constraint vectors is a vector of vectors, `TimeDependent([[c₁ᵃ, c₁ᵇ], [c₂ᵃ, c₂ᵇ], …])`. To change one constraint of a vector and keep the others, make the vector in a function, `TimeDependent(ctx -> [dynamic(ctx), static])`.
 
-The machinery imposes no ordering of its own: fold `i` is whatever `split(cv, rd)` enumerates `i`-th, which is chronological for walk-forward and (unshuffled) KFold schemes. For schemes whose enumeration is not a timeline (combinatorial splits, randomised paths) it is the user's responsibility to key entries off the fold's indices — a callable sees its own fold's windows via `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` and may derive any ordering from them.
+Fold `i` is fold `i` of the enumeration of `split(cv, rd)`, and the schedule sets no other order. That order is the order of time for a walk-forward scheme and for a `KFold` with no shuffle. For a scheme whose enumeration is not an order of time, such as a combinatorial or a randomised scheme, a function can read the windows of its fold, `ctx.train_idx[ctx.i]` and `ctx.test_idx[ctx.i]`.
 
-A time-dependent constraint participates only where folds exist and is inert everywhere else — a fold-less `optimise` replaces it with the field's fold-less value (see [`reset_time_dependent_estimator`](@ref)). Vector entries must have length equal to the number of folds of the consuming cross-validation scheme, validated at `split` time. Entries may be `nothing`, giving the field `nothing` for that fold.
+A schedule has an effect only at a fold. An `optimise` with no fold replaces it with the value of the field outside every fold loop, see [`reset_time_dependent_estimator`](@ref). That value is the static default of the field, or `default` when the schedule sets one. A required field, such as a field that holds an optimiser, has no static default. So a schedule in such a field must set `default`, else a solve with no fold throws a [`TimeDependentDefaultError`](@ref).
 
-The fold-less value is the field's static default, unless `default` overrides it. A field with *no* static default — the required, optimiser-valued fields — has nothing to reset to, so a schedule there **must** supply `default`; a fold-less solve of one that does not throws a [`TimeDependentDefaultError`](@ref).
+A vector must have one entry for each fold of the scheme, and the fold loop checks the length after `split`. An entry can be `nothing`, which gives the field the value `nothing` at that fold.
 
-A vector whose entries are all optimisers or precomputed results ([`OptE_Opt`](@ref)) is stored as a `Vector{OptE_Opt}`, so a *mixed* schedule — fold `i` optimising or predicting depending on what entry `i` is — is admissible in an optimiser-valued field on its element type alone (see [`TD_OptE_Opt`](@ref)) rather than falling out to a `Vector{Any}` the field cannot accept.
+The constructor stores a vector whose entries are all optimisers or precomputed results, [`OptE_Opt`](@ref), as a `Vector{OptE_Opt}`. So a mixed schedule, which optimises at some folds and predicts at others, is admitted in a field that holds an optimiser by its element type, see [`TD_OptE_Opt`](@ref). Else the vector is a `Vector{Any}`, which the field does not take.
 
-A schedule and an [`Online`](@ref) do not wrap each other, and the reason is when each resolves: a wrapper resolves **once**, at warm-up, because the sample buffer it seeds is threaded from step to step, while a schedule resolves **per fold**, because its value is that fold's. So neither `val`, nor a vector entry of `val`, nor `default` may be an `Online` — a wrapper reached through one of them would be resolved at no fold at all, or re-seeded at every fold, throwing the buffer away. They do compose the other way round: an estimator an `Online` wraps may hold schedules of its own, which resolve per fold after the seeding, and one host may hold a wrapper in one field and a schedule in another.
+A schedule and an [`Online`](@ref) do not wrap each other, because they resolve at different times. An `Online` resolves once, at the warm-up, because the step passes its sample buffer on to the next step. A schedule resolves at each fold. So `val`, an entry of `val` and `default` must not be an `Online`. The other order works: an estimator in an `Online` can hold schedules, which resolve at each fold after the warm-up.
 
-Schedules do not nest: neither `val`, nor a vector entry of `val`, nor `default` may be a `TimeDependent`. Entry `i` is fold `i`'s *complete* field value, and the fold-less value is by definition outside every fold loop, so nesting has no meaning. An estimator swapped in by a schedule may itself carry schedules — those resolve against the same fold context after the swap — but they live in *its* fields, not inside this wrapper.
+Schedules do not nest. So `val`, an entry of `val` and `default` must not be a `TimeDependent`. An estimator that a schedule puts into a field can hold schedules in its own fields. Those resolve against the same fold after the swap.
 
-**Recovering which entry a fold ran** needs no stored provenance, because a vector schedule is keyed by the fold index and nothing else. Entry `i` runs at fold `i` of the consuming scheme's `split` enumeration ([`time_dependent_value`](@ref) indexes `val[ctx.i]`), so `val[i]` *is* fold `i`'s value — the same index you keyed the schedule by. Under the time-ordered schemes (walk-forward, unshuffled [`KFold`](@ref), [`Pipeline`](@ref)) fold `i` is also the `i`-th entry of the returned [`MultiPeriodPredictionResult`](@ref); under schemes that regroup for reporting ([`MultipleRandomised`](@ref) sorts by test index, combinatorial recombines each split's test groups into paths) the prediction order no longer tracks the fold order, so re-run `split(cv, rd)` and read the fold→path map off its `path_ids` — it is keyed by the very enumeration index the schedule was, so entry `k` still governs enumeration fold `k`. A **callable** schedule computes its value rather than selecting an entry, so there is no index to recover: what it returned is knowable only by re-running it on the fold's [`TimeDependentContext`](@ref), or by having it record its own choice. Recording is a logging concern the caller owns, and the [`TimeDependentCallable`](@ref) struct interface is its natural home — a functor can stash the regime it picked per fold in a field of its own.
+To find the entry that ran at a fold, read the index of the fold. [`time_dependent_value`](@ref) reads `val[ctx.i]`, so `val[i]` is the value at fold `i`. For a walk-forward scheme, a `KFold` with no shuffle and a [`Pipeline`](@ref), fold `i` is also entry `i` of the [`MultiPeriodPredictionResult`](@ref). [`MultipleRandomised`](@ref) and the combinatorial schemes put their predictions in a different order. For them, run `split(cv, rd)` again, and read the map from fold to path in its `path_ids`.
+
+A function computes its value and selects no entry, so no index records its value. To get the value again, call the function with the context of the fold, or let a [`TimeDependentCallable`](@ref) write its value into one of its fields.
 
 # Fields
 
@@ -227,7 +228,7 @@ $(DocStringExtensions.FIELDS)
 ## Validation
 
   - If `val` is a vector: `!isempty(val)`, and no entry is a `TimeDependent` or an [`Online`](@ref).
-  - `val` is not a `TimeDependent` or an [`Online`](@ref).
+  - `val` is not a `TimeDependent`, else an `ArgumentError` is thrown. The constructor has no method for a `val` that is not a vector, a function, a [`PreviousWeightsFunction`](@ref) or a [`TimeDependentCallable`](@ref), such as an `Online`.
   - `default` is not a `TimeDependent` or an [`Online`](@ref).
   - `bind in (:outermost, :nearest)`.
 
@@ -254,22 +255,25 @@ TimeDependent
   - [`update_time_dependent_estimator`](@ref)
   - [`reset_time_dependent_estimator`](@ref)
 """
-struct TimeDependent{T1, T2} <: AbstractEstimator
+@concrete struct TimeDependent <: AbstractEstimator
     """
-    Vector of per-fold values (in the consuming scheme's `split` enumeration order), or a callable of the fold's [`TimeDependentContext`](@ref): a bare function (optionally wrapped in [`PreviousWeightsFunction`](@ref)) or a [`TimeDependentCallable`](@ref) functor struct.
+    Vector with one value for each fold, in the order of `split`, or a function of the [`TimeDependentContext`](@ref) of the fold. The function is a bare function, a bare function in a [`PreviousWeightsFunction`](@ref), or a [`TimeDependentCallable`](@ref).
     """
-    val::T1
+    val
     """
-    Which fold loop consumes the schedule: `:outermost` (default) binds it to the outermost fold loop processing the estimator tree; `:nearest` binds it to the nearest enclosing fold loop — inside a meta-optimiser's inner estimators that is the meta's own cross-validation leg, which then consumes the schedule even when the meta is backtested under an outer fold loop.
+    Fold loop that resolves the schedule. `:outermost`, the default, selects the outermost fold loop over the estimator. `:nearest` selects the nearest fold loop around the field. In an inner estimator of a meta-optimiser, that is the cross-validation of the meta-optimiser, also when an outer fold loop runs the meta-optimiser.
     """
     bind::Symbol
     """
-    Value the field takes outside every fold loop, overriding the host's static default (see [`time_dependent_field_defaults`](@ref)). [`NoDefault`](@ref) (the default) defers to the host's static default; a field that has none requires this to be set.
+    Value of the field outside every fold loop. It replaces the static default that [`time_dependent_field_defaults`](@ref) gives for the field. [`NoDefault`](@ref), the default, keeps the static default. A field with no static default needs this value.
     """
-    default::T2
+    default
     function TimeDependent(val::Union{<:AbstractVector, <:Base.Callable,
-                                      <:PreviousWeightsFunction, <:TimeDependentCallable},
-                           bind::Symbol = :outermost; default = NoDefault())
+                                      <:PreviousWeightsFunction, <:TimeDependentCallable,
+                                      <:TimeDependent}, bind::Symbol = :outermost;
+                           default = NoDefault())
+        @argcheck(!isa(val, TimeDependent),
+                  ArgumentError("val cannot be a TimeDependent: schedules do not nest. An estimator swapped in by a schedule may carry schedules of its own — they resolve against the same fold context after the swap — but they belong in its fields, not inside this wrapper."))
         if isa(val, AbstractVector)
             @argcheck(!isempty(val), IsEmptyError("val cannot be empty"))
             @argcheck(!any(x -> isa(x, TimeDependent), val),
@@ -289,11 +293,8 @@ struct TimeDependent{T1, T2} <: AbstractEstimator
         return new{typeof(val), typeof(default)}(val, bind, default)
     end
 end
-function TimeDependent(::TimeDependent, args...; kwargs...)
-    return throw(ArgumentError("val cannot be a TimeDependent: schedules do not nest. An estimator swapped in by a schedule may carry schedules of its own — they resolve against the same fold context after the swap — but they belong in its fields, not inside this wrapper."))
-end
 function Online(::TimeDependent, args...; kwargs...)
-    return throw(ArgumentError("est cannot be a TimeDependent: a schedule is not one estimator, so there is nothing for a buffer to belong to. The two wrappers resolve at different times and neither wraps the other — an `Online` resolves once at warm-up, because the buffer it seeds is threaded from step to step, and a schedule resolves once per fold, because its value is the fold's. They compose in the other order: an estimator an `Online` wraps may hold schedules of its own, which resolve per fold after the seeding, and one host may hold a wrapper in one field and a schedule in another."))
+    return throw(ArgumentError("est cannot be a TimeDependent: a schedule is not one estimator, so there is nothing for a buffer to belong to. The two wrappers resolve at different times and neither wraps the other — an `Online` resolves once at warm-up, because the buffer it seeds is threaded from step to step, and a schedule resolves once per fold, because its value is the fold's. They compose in the other order: an estimator an `Online` wraps may hold schedules of its own, which resolve per fold after the seeding, and one estimator may hold a wrapper in one field and a schedule in another."))
 end
 function TimeDependent(;
                        val::Union{<:AbstractVector, <:Base.Callable,
@@ -305,9 +306,9 @@ end
 """
     const TD_Option{X} = Union{Nothing, <:TimeDependent, X}
 
-Alias for an optimiser field that accepts `nothing`, a static value of type `X`, or a per-fold [`TimeDependent`](@ref) schedule.
+Alias for an optimiser field that takes `nothing`, a static value of type `X`, or a [`TimeDependent`](@ref) schedule.
 
-The set of fields whose constructor signatures use this alias is the single source of truth for which optimiser inputs may vary over folds.
+The fields whose constructor signatures use this alias, or [`TD`](@ref), are the optimiser inputs that can change from fold to fold. No other list of them exists.
 
 # Related
 
@@ -318,9 +319,9 @@ const TD_Option{X} = Union{Nothing, <:TimeDependent, X}
 """
     const TD{X} = Union{<:TimeDependent, X}
 
-Alias for a *required* optimiser field that accepts a static value of type `X` or a per-fold [`TimeDependent`](@ref) schedule, but not `nothing`.
+Alias for a required optimiser field that takes a static value of type `X` or a [`TimeDependent`](@ref) schedule, but not `nothing`.
 
-The problem-definition fields that always carry a value — the prior estimator, the returns model, the scalariser, the clustering estimator, the weight finaliser — are time-dependent through this alias rather than [`TD_Option`](@ref), so `nothing` stays inadmissible where it was never a legal static value. Such a field still has a *static default*, so a schedule in one resets to that default on a fold-less solve, unlike the optimiser-valued fields (see [`TD_OptE_Opt`](@ref)).
+The prior estimator, the returns model, the scalariser, the clustering estimator and the weight finaliser always hold a value. They use this alias and not [`TD_Option`](@ref), so they do not take `nothing`. Such a field has a static default, so a solve with no fold resets a schedule in it to that default. A field that holds an optimiser has no static default, see [`TD_OptE_Opt`](@ref).
 
 # Related
 
@@ -335,11 +336,13 @@ const TD{X} = Union{<:TimeDependent, X}
                               TimeDependent{<:PreviousWeightsFunction},
                               TimeDependent{<:Base.Callable}}
 
-The [`TimeDependent`](@ref) forms admissible in an *optimiser-valued* field — where the scheduled thing is the optimiser itself, not one of its inputs.
+Alias for the [`TimeDependent`](@ref) forms that a field which holds an optimiser takes, where the schedule changes the optimiser itself.
 
-Two of the four are statically checked: a vector schedule whose entries are all [`OptE_Opt`](@ref) (an optimiser or a precomputed result — a mixed schedule is allowed, fold `i` optimising or predicting depending on what entry `i` is), and a [`TimeDependentOptimiserCallable`](@ref), which declares its output kind in its type. The other two — a bare `ctx -> optimiser` and a [`PreviousWeightsFunction`](@ref) wrapping one — cannot be checked before they run, so their output is checked when the fold loop swaps it into the field, by the host's own keyword constructor.
+The type of two forms states their value before any fold runs. The first is a vector whose entries are all [`OptE_Opt`](@ref). An entry is an optimiser or a precomputed result, so a mixed schedule optimises at some folds and predicts at others. The second is a [`TimeDependentOptimiserCallable`](@ref).
 
-Because an optimiser-valued field is *required*, a schedule in one has no static default to reset to on a fold-less solve and must supply `default` (see [`NoDefault`](@ref), [`TimeDependentDefaultError`](@ref)).
+The other two forms are a bare function `ctx -> optimiser` and a [`PreviousWeightsFunction`](@ref) that holds one. Their value is not known before they run, so it is checked when the fold loop puts it into place. In a field of an estimator, the keyword constructor of the estimator checks it. When the schedule is the optimiser itself, [`assert_time_dependent_optimiser`](@ref) checks it.
+
+A field that holds an optimiser is required, and it has no static default. So a schedule in it must set `default`, see [`NoDefault`](@ref) and [`TimeDependentDefaultError`](@ref).
 
 # Related
 
@@ -357,9 +360,9 @@ const TD_OptE_Opt = Union{TimeDependent{<:AbstractVector{<:OptE_Opt}},
     const TDO_OptE_Opt = Union{<:TD_OptE_Opt,
                                <:TimeDependent{<:AbstractVector{<:Option{<:OptE_Opt}}}}
 
-The [`TimeDependent`](@ref) forms admissible in an *optional* optimiser-valued field (a fallback): every [`TD_OptE_Opt`](@ref) form, plus a vector schedule whose entries may be `nothing`.
+Alias for the [`TimeDependent`](@ref) forms that an optional field which holds an optimiser takes, such as a fallback.
 
-`nothing` was always a legal static value of an optional field, and the [`TimeDependent`](@ref) contract says a vector entry may be `nothing`, giving the field `nothing` for that fold — so an optional optimiser field admits `TimeDependent([mr, nothing])`, a fallback switched off on some folds. A *required* optimiser position (the optimiser itself) never admits `nothing`, statically or per fold, so it stays on the strict [`TD_OptE_Opt`](@ref) bound.
+It holds every form of [`TD_OptE_Opt`](@ref), and a vector whose entries can be `nothing`. An optional field takes `nothing` as a static value, and an entry `nothing` gives the field `nothing` at that fold. So an optional field takes `TimeDependent([mr, nothing])`, a fallback that is off at some folds. A required field that holds an optimiser never takes `nothing`, so it keeps the bound [`TD_OptE_Opt`](@ref).
 
 # Related
 
@@ -372,9 +375,9 @@ const TDO_OptE_Opt = Union{<:TD_OptE_Opt,
 """
     const TDO_Option{X} = Union{Nothing, <:TDO_OptE_Opt, X}
 
-Alias for an *optional* optimiser-valued field (e.g. a fallback) that accepts `nothing`, a static value of type `X`, or a per-fold schedule of optimisers whose entries may be `nothing` (see [`TDO_OptE_Opt`](@ref)).
+Alias for an optional field that holds an optimiser, such as a fallback.
 
-A required optimiser-valued field spells its union out — `Union{<:X, <:TD_OptE_Opt}` — since `nothing` is not one of its values.
+The field takes `nothing`, a static value of type `X`, or a schedule of optimisers whose entries can be `nothing`, see [`TDO_OptE_Opt`](@ref). A required field that holds an optimiser does not take `nothing`, so its signature writes `Union{<:X, <:TD_OptE_Opt}`.
 
 # Related
 
@@ -387,9 +390,9 @@ const TDO_Option{X} = Union{Nothing, <:TDO_OptE_Opt, X}
 """
     const OptE_TD = Union{<:NonFiniteAllocationOptimisationEstimator, <:TD_OptE_Opt}
 
-Alias for an optimisation estimator, or a [`TimeDependent`](@ref) schedule standing in its place.
+Alias for an optimisation estimator, or a [`TimeDependent`](@ref) schedule in the place of one.
 
-This is the entry-point type of the cross-validation fold loops that *fit*: a schedule handed straight to [`cross_val_predict`](@ref) is the optimiser, and fold `i` runs entry `i`. Precomputed results are excluded because a bare result takes the predict-only path, which has no fold loop to resolve a schedule against — but a schedule *whose entries* are results is admissible here, and each such entry takes the predict-only path per fold (see [`OptE_Opt_TD`](@ref)).
+The cross-validation fold loops that fit take this type. A schedule given directly to [`cross_val_predict`](@ref) is the optimiser, and fold `i` runs entry `i`. A bare precomputed result is not a member, because it takes the path that only predicts, which has no fold loop to resolve a schedule against. A schedule whose entries are results is a member, and each such entry predicts at its fold, see [`OptE_Opt_TD`](@ref).
 
 # Related
 
@@ -401,9 +404,9 @@ const OptE_TD = Union{<:NonFiniteAllocationOptimisationEstimator, <:TD_OptE_Opt}
 """
     const OptE_Opt_TD = Union{<:OptE_Opt, <:TD_OptE_Opt}
 
-Alias for an optimisation estimator or a precomputed result, or a [`TimeDependent`](@ref) schedule standing in their place.
+Alias for an optimisation estimator, a precomputed result, or a [`TimeDependent`](@ref) schedule in the place of one.
 
-The entry-point type of the fold loops that accept a precomputed result as well as an estimator. A schedule's entries are [`OptE_Opt`](@ref), so a *mixed* schedule is admissible: fold `i` optimises when entry `i` is an estimator and predicts when it is a result, which the single-fold [`fit_and_predict`](@ref) methods already distinguish by dispatch.
+The fold loops that take a precomputed result as well as an estimator take this type. The entries of a schedule are [`OptE_Opt`](@ref), so a mixed schedule is a member. Fold `i` optimises when entry `i` is an estimator, and predicts when entry `i` is a result. The methods of [`fit_and_predict`](@ref) select the path by dispatch.
 
 # Related
 
@@ -415,9 +418,9 @@ const OptE_Opt_TD = Union{<:OptE_Opt, <:TD_OptE_Opt}
 """
     const VecOptE_Opt_TD = AbstractVector{<:OptE_Opt_TD}
 
-Alias for a vector of optimisation estimators or results in which individual *elements* may be [`TimeDependent`](@ref) schedules.
+Alias for a vector of optimisation estimators or results in which an entry can be a [`TimeDependent`](@ref) schedule.
 
-This is the element-level admission of schedules, needed where a vector-valued field's elements are themselves optimiser positions consumed by a fold loop one at a time — `Stacking.opti`, whose inner cross-validation is entered per candidate. It is a superset of [`VecOptE_Opt`](@ref), so every method taking it continues to accept plain vectors.
+A field needs it when a fold loop reads each entry of the vector as an optimiser, one entry at a time. `Stacking.opti` is such a field, because its inner cross-validation runs once for each candidate. The alias contains [`VecOptE_Opt`](@ref), so each method that takes it also takes a vector with no schedule.
 
 # Related
 
@@ -431,9 +434,9 @@ const VecOptE_Opt_TD = AbstractVector{<:OptE_Opt_TD}
                                  TimeDependent{<:PreviousWeightsFunction},
                                  TimeDependent{<:Base.Callable}}
 
-The [`TimeDependent`](@ref) forms admissible in a *vector-of-optimisers* field (`Stacking.opti`): a vector schedule whose entries are per-fold optimiser vectors, or a callable returning the fold's vector.
+Alias for the [`TimeDependent`](@ref) forms that a field which holds a vector of optimisers takes, such as `Stacking.opti`.
 
-Entry `i` is fold `i`'s complete vector of candidates, so a field-level schedule varies the whole candidate set per fold; an entry's own elements may in turn be schedules (a [`VecOptE_Opt_TD`](@ref)), which the consuming host's inner fold loop resolves as usual. Only `bind = :outermost` is admissible at the field level — see the host's constructor for why.
+A vector schedule holds one vector of optimisers for each fold, and a function returns the vector of its fold. Entry `i` is the complete vector of candidates at fold `i`, so the schedule changes the whole set of candidates from fold to fold. An element of an entry can also be a schedule, a [`VecOptE_Opt_TD`](@ref), which the inner fold loop of the optimiser resolves. A schedule of the whole field takes only `bind = :outermost`. The constructor of the optimiser states the reason.
 
 # Related
 
@@ -447,9 +450,13 @@ const TD_VecOptE_Opt = Union{TimeDependent{<:AbstractVector{<:VecOptE_Opt_TD}},
 """
 $(DocStringExtensions.TYPEDEF)
 
-Describes one fold to the time-dependent constraints that resolve against it.
+Describes one fold to the schedules that resolve against it.
 
-Carries the fold's position in the consuming scheme's `split` enumeration and the data needed for a callable entry to compute its value. `i` indexes `train_idx`/`test_idx`, so `ctx.train_idx[ctx.i]`/`ctx.test_idx[ctx.i]` are always the fold's own windows; no ordering beyond the scheme's enumeration is implied. `rd` is the fold loop's (possibly asset-viewed) input data, so callables see the current universe and timestamps: the returns-level data at the optimiser fold loops, or the raw, pre-preprocessing price- or returns-level input at the [`Pipeline`](@ref) fold loop — a pipeline-level callable sees the fold's data *before* any pipeline step has transformed it. `w_prev` is populated only when the fold loop runs sequentially and a previous fold exists; `path_id` only under multi-path schemes.
+It holds the position of the fold in the enumeration of `split`, and the data that a function in a schedule reads to compute its value. The field `i` indexes `train_idx` and `test_idx`, so `ctx.train_idx[ctx.i]` and `ctx.test_idx[ctx.i]` are the windows of the fold. The context sets no order other than the enumeration of the scheme.
+
+The field `rd` is the input data of the fold loop, which can be a view of a subset of the assets. So a function reads the current universe and timestamps. An optimiser fold loop gives returns. The [`Pipeline`](@ref) fold loop gives the prices or returns that it received, before any step of the pipeline changes them.
+
+The field `w_prev` holds weights only when the fold loop runs in sequence and a previous fold exists. The field `path_id` holds a value only under a scheme with many paths.
 
 # Fields
 
@@ -473,35 +480,35 @@ Keywords correspond to the struct's fields.
   - [`TimeDependent`](@ref)
   - [`update_time_dependent_estimator`](@ref)
 """
-struct TimeDependentContext{T1, T2, T3, T4, T5, T6, T7} <: AbstractResult
+@concrete struct TimeDependentContext <: AbstractResult
     """
-    Index of the fold within the scheme's `split` enumeration (1-based); indexes `train_idx`/`test_idx`.
+    Index of the fold in the enumeration of `split`, from one. It indexes `train_idx` and `test_idx`.
     """
-    i::T1
+    i
     """
-    Number of folds within the path.
+    Number of folds in the path.
     """
-    n::T2
+    n
     """
-    The fold loop's (possibly asset-viewed) returns data.
+    Input data of the fold loop, which can be a view of a subset of the assets.
     """
-    rd::T3
+    rd
     """
-    Per-path training index vectors.
+    Training index vectors of the path, one for each fold.
     """
-    train_idx::T4
+    train_idx
     """
-    Per-path test index vectors.
+    Test index vectors of the path, one for each fold.
     """
-    test_idx::T5
+    test_idx
     """
-    Previous fold's portfolio weights, when threaded; `nothing` otherwise.
+    Portfolio weights of the previous fold when the fold loop runs in sequence, else `nothing`.
     """
-    w_prev::T6
+    w_prev
     """
-    Path identifier under multi-path schemes; `nothing` otherwise.
+    Identifier of the path under a scheme with many paths, else `nothing`.
     """
-    path_id::T7
+    path_id
     function TimeDependentContext(i::Integer, n::Integer, rd::Prices_RR, train_idx,
                                   test_idx, w_prev::Option{<:VecNum},
                                   path_id::Option{<:Integer})
@@ -519,9 +526,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve a time-dependent constraint to its value for the fold described by `ctx`.
+Resolves a schedule to its value at the fold that `ctx` describes.
 
-Vector values index entry `ctx.i`; callables are invoked with `ctx`.
+# Algorithm
+
+ 1. When `td.val` is a vector, return its entry `ctx.i`.
+ 2. When `td.val` is a [`PreviousWeightsFunction`](@ref), return `td.val.f(ctx)`.
+ 3. Else return `td.val(ctx)`.
 
 # Related
 
@@ -540,9 +551,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if a time-dependent constraint requires the previous optimisation's weights.
+Returns `true` if a schedule reads the weights of the previous fold.
 
-`true` for a [`PreviousWeightsFunction`](@ref) value; for vector values, delegates to [`needs_previous_weights`](@ref) on entries that support it (turnover, fees, tracking), descending into per-fold vector entries. Bare callables contribute `false` — their output cannot be inspected.
+A bare function gives `false`, because no code can find out what it reads.
+
+# Algorithm
+
+ 1. When `td.val` is a [`PreviousWeightsFunction`](@ref), return `true`.
+ 2. When `td.val` is a [`TimeDependentCallable`](@ref), return its own `needs_previous_weights`.
+ 3. When `td.val` is a vector, return `true` if any entry needs the previous weights, by [`time_dependent_entry_needs_previous_weights`](@ref).
+ 4. Else return `false`.
 
 # Related
 
@@ -563,9 +581,9 @@ end
 """
     time_dependent_entry_needs_previous_weights(x)
 
-Return `true` if a per-fold entry value of a [`TimeDependent`](@ref) requires the previous optimisation's weights.
+Returns `true` if an entry of a [`TimeDependent`](@ref) vector reads the weights of the previous fold.
 
-Delegates to [`needs_previous_weights`](@ref) for the value types that support the trait (turnover, fees, tracking); every other value contributes `false`.
+A turnover, a fee, a tracking input, a risk measure, an optimisation estimator or result, and a nested schedule each give their own [`needs_previous_weights`](@ref). A vector entry gives `true` if any of its elements does. Every other value gives `false`.
 
 # Related
 
@@ -599,9 +617,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Slice a [`TimeDependent`](@ref) schedule of scalar-or-array field values (warm starts, initial weights) to asset indices `i`.
+Slices a [`TimeDependent`](@ref) schedule of scalar or array values, such as warm starts or initial weights, to the asset indices `i`.
 
-Vector schedules slice each per-fold entry, and the `default` when one is set; callable schedules pass through — they see the sliced universe via their fold context's `rd`.
+A function schedule is not sliced, because it reads the sliced universe from the field `rd` of its context.
+
+# Algorithm
+
+ 1. When `td.val` is a vector, slice each entry with `nothing_scalar_array_view`.
+ 2. When `td.default` is not [`NoDefault`](@ref), slice it too.
+ 3. Return a new schedule with the sliced values and the same `bind`.
 
 # Related
 
@@ -622,9 +646,11 @@ end
 """
     inner_fold_fields(opt)
 
-Field names of `opt` that the host hands across a fold loop it opens *itself*, so the loop that merely reaches the host is never the nearest one for them.
+Returns the names of the fields of `opt` that the optimiser gives to a fold loop of its own.
 
-The default is the empty tuple: an ordinary host opens no inner fold loop, so the loop reaching it is both outermost and nearest for every field. A meta-optimiser whose inner cross-validation consumes a field directly declares that field here (e.g. `NestedClustered`'s `opti`, entered per cluster as `cross_val_predict(opti, …; cols = cl)`), and every generic pass — [`time_dependent_fields`](@ref), and through it update, reset and the fold-count assertion — then leaves a `bind = :nearest` schedule in that field for the host's own inner loop. Without the reset leg of this rule, the fold-less reset at the top of `_optimise` would replace a `:nearest` optimiser schedule with its `default` before the inner cross-validation ever saw it.
+For such a field, the fold loop that reaches the optimiser is not the nearest fold loop. The fallback returns an empty tuple, because an ordinary optimiser opens no inner fold loop. Then the loop that reaches it is the outermost and the nearest loop for every field.
+
+A meta-optimiser whose inner cross-validation reads a field directly names that field here. For example, `NestedClustered` names `opti`, which it runs once for each cluster as `cross_val_predict(opti, …; cols = cl)`. Then [`time_dependent_fields`](@ref) leaves a schedule with `bind = :nearest` in that field for the inner loop, and so do the update, the reset and the check of the fold count. Without this rule, the reset at the start of `_optimise` replaces such a schedule with its `default` before the inner cross-validation reads it.
 
 # Related
 
@@ -638,11 +664,11 @@ end
 """
     time_dependent_candidate_fields(opt)
 
-Field names of `opt` whose *type* admits a [`TimeDependent`](@ref) value — the candidate set [`time_dependent_fields`](@ref) narrows by value.
+Returns the names of the fields of `opt` whose type can hold a [`TimeDependent`](@ref).
 
-Whether a field can hold a schedule is decidable from `fieldtype` alone: a host built through the widened constructor signatures (see [`TD_Option`](@ref)) records a schedule in the field's type parameter, so a field that holds no schedule cannot have a type intersecting [`TimeDependent`](@ref). The tuple is therefore computed once per host type by a generated function, and a fold-invariant scan over a wide static host such as `JuMPOptimiser`, whose fields number in the dozens, folds to an empty tuple at compile time rather than walking every field dynamically on every `split` and `_optimise`.
+[`time_dependent_fields`](@ref) reads the values of these fields only. The type of a field decides whether it can hold a schedule. A constructor that takes a schedule, see [`TD_Option`](@ref), records it in a type parameter. So a field that holds no schedule has a type whose intersection with `TimeDependent` is empty.
 
-This stays derived from the field types — no hand-maintained list — so the constructor signatures remain the single source of truth for which fields may vary over folds.
+A generated function computes the tuple once for each type of optimiser. For a `JuMPOptimiser` that holds no schedule, the tuple is empty at compile time, so `split` and `_optimise` read none of its fields. The tuple comes from the field types, and no list of fields is written by hand.
 
 # Related
 
@@ -659,9 +685,9 @@ end
 """
     entitled(opt, f::Symbol, all_binds::Bool)
 
-Return `true` when the recursion position described by `all_binds` may consume a `bind = :nearest` schedule in field `f` of `opt`.
+Returns `true` when the current fold loop can resolve a schedule with `bind = :nearest` in the field `f` of `opt`.
 
-Entitlement is per-field, not per-host: a loop scanning with `all_binds = true` takes `:nearest` schedules everywhere *except* in the fields the host hands across its own inner fold loop (see [`inner_fold_fields`](@ref)) — for those, the host's inner loop is the nearest one, whatever loop is doing the scanning. A field is taken by a pass iff `entitled(opt, f, all_binds) || bind === :outermost`.
+The answer is for each field, not for each optimiser. A loop with `all_binds = true` resolves such schedules in every field except the fields that the optimiser gives to its own inner fold loop, see [`inner_fold_fields`](@ref). For those fields, the inner loop is the nearest loop. A pass resolves a field when `entitled(opt, f, all_binds) || bind === :outermost` is `true`.
 
 # Related
 
@@ -674,19 +700,24 @@ end
 """
     time_dependent_fields(opt, all_binds::Bool = true)
 
-Return the tuple of field names of `opt` whose values are [`TimeDependent`](@ref).
+Returns the names of the fields of `opt` that hold a [`TimeDependent`](@ref) which the current fold loop resolves.
 
-The scan is generic over the host's fields, so the widened constructor signatures (see [`TD_Option`](@ref)) remain the single source of truth for which fields may vary over folds — there is no hand-maintained list. Only the fields whose type admits a schedule are visited (see [`time_dependent_candidate_fields`](@ref)); the rest are ruled out at compile time, so a static host returns an empty tuple without touching its fields.
+The function reads only the fields whose type can hold a schedule, see [`time_dependent_candidate_fields`](@ref). So an optimiser that holds no schedule returns an empty tuple, and the function reads none of its fields.
 
-# The `all_binds` argument
+The argument `all_binds` states a fact about the position of the fold loop, and the field `bind` of a schedule cannot state it. Take an outer fold loop that runs a meta-optimiser, whose inner cross-validation runs an estimator with a schedule that has `bind = :nearest`. Both loops reach that field. The outer loop must pass through the meta-optimiser, because that is how it resolves the schedules with `bind = :outermost` of the inner estimator. It must leave the schedule with `:nearest`, because it is not the nearest loop. The inner loop reaches the same estimator directly, and it must resolve that schedule.
 
-`all_binds` encodes something the schedule's own `bind` field cannot: it is a property of the *recursion position*, not of the schedule. A [`TimeDependent`](@ref)'s `bind` (`:outermost` / `:nearest`) says *which* fold loop the schedule wants; `all_binds` says whether the loop currently recursing is *entitled* to consume nearest-bound schedules at this depth. The second fact is not on the schedule.
+So every ordinary fold loop passes `all_binds = true`. Such a loop is the outermost and the nearest loop, so it resolves every schedule that remains. A meta-optimiser passes `false` when it recurses into the estimators of its own inner cross-validation.
 
-Why position matters: under `outer CV loop → meta → (meta's inner CV loop) → inner estimator with a :nearest field`, the same `:nearest` field is visited by two loops. The outer loop recurses through the meta (mandatory — that recursion is how an inner estimator's `:outermost` field is resolved against the outer folds) and must *skip* the `:nearest` field, because it is not the nearest enclosing loop. The meta's inner CV loop drives the same estimator directly and must *consume* it, because it is. Same field, same `bind`, opposite actions — the difference is whether a nearer fold-loop boundary was crossed to reach it, which is exactly what `all_binds` carries.
+[`inner_fold_fields`](@ref) refines the rule for each field. With `all_binds = true`, a schedule with `:nearest` in a field that the optimiser gives to its own inner fold loop stays in place, see [`entitled`](@ref).
 
-So `all_binds` is `true` at every ordinary (outermost/standalone) fold loop — which is both outermost and nearest, and therefore takes everything remaining, including `:nearest`. It is forced to `false` only where a meta-optimiser recurses into the estimators its own inner CV owns, leaving their `:nearest` schedules for that inner loop. With `all_binds = false`, only fields with `bind === :outermost` are returned.
+# Arguments
 
-Entitlement is refined **per field** by [`inner_fold_fields`](@ref): even at `all_binds = true`, a `:nearest` schedule in a field the host hands across its *own* inner fold loop is left alone — the host's inner loop, not the scanning one, is nearest for that field (see [`entitled`](@ref)).
+  - `opt`: The optimiser.
+  - `all_binds::Bool = true`: When `true`, return each field that holds a schedule, except the schedules with `:nearest` in the fields of [`inner_fold_fields`](@ref). When `false`, return only the fields whose schedule has `bind === :outermost`.
+
+# Returns
+
+  - `fns::Tuple`: The names of the fields.
 
 # Related
 
@@ -710,11 +741,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Test-substitute every vector entry of the [`TimeDependent`](@ref)-valued fields in `args` through the keyword constructor of `T`.
+Checks each entry of the schedules in `args` with the keyword constructor of `T`.
 
-`args` holds the host constructor's arguments; `defaults` the static defaults of the fields that may be time-dependent (see [`time_dependent_field_defaults`](@ref)). Each per-fold entry, and an explicit `default`, is substituted into its field — with every other time-dependent field standing at a value of its own (see [`time_dependent_stand_in`](@ref)) — and the constructor re-run, surfacing type and cross-field errors at construction time instead of mid-backtest. Substituted calls contain no `TimeDependent` values, so the recursion terminates.
+The constructor of an optimiser calls this function, so a type error or an error between two fields shows at construction and not in the middle of a backtest. The argument `args` holds the arguments of the constructor, and `defaults` holds the static defaults that [`time_dependent_field_defaults`](@ref) gives. A call that the check makes holds no schedule, so the recursion stops.
 
-Validation is skipped when a time-dependent field has no stand-in at all — a callable schedule in a required field, whose value only exists once a fold context does.
+# Algorithm
+
+ 1. Collect the names `tdfs` of the arguments that hold a [`TimeDependent`](@ref). Return when there is none.
+ 2. Find a static value for each of them with [`time_dependent_stand_in`](@ref). Return with no check when one of them has none. That is a function schedule in a required field, whose value exists only at a fold.
+ 3. Replace each schedule in `args` with its static value, giving `base`.
+ 4. For each name in `tdfs`, call the keyword constructor of `T` with `base`, once for each entry of the schedule and once for its explicit `default`, see [`substitute_time_dependent_entries`](@ref).
 
 # Related
 
@@ -742,9 +778,9 @@ end
     substitute_time_dependent_entries(::Type{T}, base::NamedTuple, f::Symbol, td::TimeDependent) where {T}
     substitute_time_dependent_entries(::Type, ::NamedTuple, ::Symbol, ::Any)
 
-Re-run the keyword constructor of `T` with every vector entry of the schedule `td`, and its explicit `default`, substituted into the field `f` of `base`; a field that holds no schedule substitutes nothing.
+Calls the keyword constructor of `T` with each vector entry of the schedule `td`, and with its explicit `default`, in the field `f` of `base`.
 
-The filter of [`assert_time_dependent_substitution`](@ref) keeps the schedules alone, and the dispatch says so to a static analyser at a call whose arguments hold no schedule at all, where an assertion would read as a certain failure.
+The second method takes a value that is not a schedule, and calls nothing. [`assert_time_dependent_substitution`](@ref) passes only schedules. The second method states this fact to a static analyser, which cannot read the filter at a call whose arguments hold no schedule.
 
 # Related
 
@@ -771,11 +807,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a valid static value for a [`TimeDependent`](@ref)-valued field, wrapped in `Some`, or `nothing` if none exists.
+Returns a valid static value for a field that holds a [`TimeDependent`](@ref), in a `Some`, or `nothing` when none exists.
 
-Used by [`assert_time_dependent_substitution`](@ref) to stand the *other* time-dependent fields at a valid value while it test-substitutes one of them: the schedule's `default`, else the field's static default, else the schedule's first entry. A callable schedule in a field with no default of either kind has no stand-in — its value exists only inside a fold — so it returns `nothing` and validation is skipped.
+[`assert_time_dependent_substitution`](@ref) gives the other scheduled fields these values while it checks one of them. This function never throws, unlike [`time_dependent_reset_value`](@ref). A schedule with no value outside every fold loop is valid at construction, and fails only when it reaches a solve with no fold.
 
-Unlike [`time_dependent_reset_value`](@ref) this never throws: a schedule without a fold-less value is legitimate at construction time and only fails if it reaches a fold-less solve.
+# Algorithm
+
+ 1. When `td.default` is not [`NoDefault`](@ref), return it.
+ 2. Read the static default of `field` from `defaults`, which is `nothing` for a field that `defaults` does not list. Return it when it is not `NoDefault`.
+ 3. When `td.val` is a vector, return its first entry.
+ 4. Else return `nothing`. A function schedule in a required field has a value only at a fold.
 
 # Related
 
@@ -798,9 +839,13 @@ end
 """
     assert_time_dependent_fold_count(opt, n::Integer, all_binds::Bool = true)
 
-Assert that every vector-valued time-dependent constraint in `opt` has exactly `n` entries.
+Checks that each vector schedule in `opt` has exactly `n` entries.
 
-Called by the cross-validation fold loops immediately after `split`, before any fold runs. The default is a no-op; hosts scan their [`time_dependent_fields`](@ref) and wrapper optimisers recurse. When `all_binds` is `false`, `bind === :nearest` schedules are skipped — they are validated by the nearest enclosing fold loop against its own fold count instead (see [`TimeDependent`](@ref)).
+The cross-validation fold loops call it directly after `split`, before any fold runs. The fallback checks nothing. An optimiser with scheduled fields checks the fields that [`time_dependent_fields`](@ref) returns, and an optimiser that wraps others recurses. When `all_binds` is `false`, the check leaves out the schedules with `bind === :nearest`. The nearest fold loop checks them against its own fold count.
+
+# Validation
+
+  - Each vector schedule that the check reads has `n` entries, else a `DimensionMismatch` is thrown.
 
 # Related
 
@@ -826,7 +871,11 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert the fold count of every [`TimeDependent`](@ref)-valued field of a host optimiser.
+Checks the fold count of each field of an optimiser that holds a [`TimeDependent`](@ref) which the current fold loop resolves.
+
+# Validation
+
+  - Each vector schedule has `n` entries, else a `DimensionMismatch` that names the field is thrown.
 
 # Related
 
@@ -843,7 +892,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if the base optimiser configuration carries time-dependent constraints.
+Returns `true` if an optimiser configuration holds a schedule in one of its fields.
 
 # Related
 
@@ -862,9 +911,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve the time-dependent constraints of a base optimiser configuration for the fold described by `ctx`.
+Resolves the schedules of an optimiser configuration at the fold that `ctx` describes.
 
-Rebuilds the configuration through its validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, so the result is an ordinary static configuration. When `all_binds` is `false`, `bind === :nearest` fields are left in place for the nearest enclosing fold loop to consume.
+The function rebuilds the configuration with its keyword constructor, which checks the values, and puts the value at the fold into each scheduled field. So the answer is an ordinary static configuration. When `all_binds` is `false`, the schedules with `bind === :nearest` stay in place for the nearest fold loop.
 
 # Related
 
@@ -879,7 +928,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Replace the time-dependent constraints of a base optimiser configuration with their static defaults (see [`time_dependent_field_defaults`](@ref)).
+Replaces the schedules of an optimiser configuration with their values outside every fold loop, see [`time_dependent_reset_value`](@ref).
 
 # Related
 
@@ -893,9 +942,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Rebuild an estimator through its keyword constructor with the fields in `repl` replaced.
+Rebuilds an estimator with its keyword constructor, with the fields in `repl` replaced.
 
-All remaining fields are carried through unchanged. Because the rebuild goes through the validated keyword constructor, every construction invariant re-runs.
+The other fields keep their values. The keyword constructor checks every rule of construction again.
+
+# Algorithm
+
+ 1. Read every field of `x` into a `NamedTuple` keyed by the field names.
+ 2. Merge `repl` into it, so a name in `repl` replaces the value of that field.
+ 3. Call the keyword constructor of the type of `x` with the merged tuple.
 
 # Related
 
@@ -910,17 +965,17 @@ end
 """
     is_time_dependent(opt)
 
-Return `true` if the optimiser carries time-dependent constraints.
+Returns `true` if the optimiser holds a schedule.
 
-The default returns `false`. Hosts return `true` when any of their fields holds a [`TimeDependent`](@ref) (see [`time_dependent_fields`](@ref)); wrapper optimisers recurse into their inner optimiser and fallback.
+The fallback returns `false`. An optimiser returns `true` when one of its fields holds a [`TimeDependent`](@ref), see [`time_dependent_fields`](@ref). An optimiser that wraps others recurses into its inner optimiser and its fallback.
 
 # Arguments
 
-  - `opt`: Optimisation estimator, result, or vector thereof.
+  - `opt`: An optimisation estimator or result, or a vector of them.
 
 # Returns
 
-  - `Bool`: `true` if the estimator is time-dependent.
+  - `flag::Bool`: `true` if the optimiser holds a schedule.
 
 # Related
 
@@ -937,19 +992,19 @@ end
 """
     update_time_dependent_estimator(opt, ctx::TimeDependentContext, all_binds::Bool = true)
 
-Resolve the time-dependent constraints of `opt` for the fold described by `ctx`.
+Resolves the schedules of `opt` at the fold that `ctx` describes.
 
-The default returns the estimator unchanged. Hosts rebuild themselves through their validated keyword constructor with each [`TimeDependent`](@ref)-valued field replaced by its resolved per-fold value, so the result is an ordinary static estimator; wrapper optimisers recurse.
+The fallback returns the estimator unchanged. An optimiser with scheduled fields rebuilds itself with its keyword constructor, which checks the values, and puts the value at the fold into each scheduled field. So the answer is an ordinary static estimator. An optimiser that wraps others recurses.
 
 # Arguments
 
-  - `opt`: Optimisation estimator or result.
-  - `ctx::TimeDependentContext`: The fold's context.
-  - `all_binds::Bool`: When `false`, `bind === :nearest` schedules are skipped, leaving them for the nearest enclosing fold loop to consume. Meta-optimisers pass `false` when recursing into the estimators their internal fold loop processes; fold loops call with the default `true`.
+  - `opt`: An optimisation estimator or result.
+  - `ctx::TimeDependentContext`: The context of the fold.
+  - `all_binds::Bool = true`: When `false`, the schedules with `bind === :nearest` stay in place for the nearest fold loop. A meta-optimiser passes `false` when it recurses into the estimators of its own inner fold loop. A fold loop passes `true`.
 
 # Returns
 
-  - Updated estimator.
+  - `opt`: The estimator with its schedules resolved.
 
 # Related
 
@@ -967,9 +1022,15 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Rebuild a host optimiser with each [`TimeDependent`](@ref)-valued field replaced by its per-fold value for `ctx`.
+Rebuilds an optimiser with the value at the fold `ctx` in each field that holds a [`TimeDependent`](@ref).
 
-Shared implementation behind the hosts' [`update_time_dependent_estimator`](@ref) methods. Returns `opt` unchanged when no field is time-dependent.
+The methods of [`update_time_dependent_estimator`](@ref) for the optimisers call this function.
+
+# Algorithm
+
+ 1. Collect the names `tdfs` of the fields that the current fold loop resolves, with [`time_dependent_fields`](@ref). Return `opt` unchanged when there is none.
+ 2. Resolve each of them with [`time_dependent_value`](@ref), giving `repl`.
+ 3. Rebuild `opt` with [`rebuild_estimator`](@ref).
 
 # Related
 
@@ -989,9 +1050,9 @@ end
 """
     time_dependent_field_defaults(opt)
 
-Return a `NamedTuple` of the static defaults of the optimiser fields that may hold a [`TimeDependent`](@ref), for those whose default is not `nothing`.
+Returns a `NamedTuple` of the static defaults of the optimiser fields that can hold a [`TimeDependent`](@ref), for the fields whose default is not `nothing`.
 
-Used by [`reset_time_dependent_estimator`](@ref) to replace per-fold schedules with their static defaults on fold-less solves; fields absent from the tuple default to `nothing`. A *required* field — one with no static default at all, i.e. the optimiser-valued fields — is listed with [`NoDefault`](@ref), which is not a value it can take but a declaration that a schedule there must carry its own `default`. The fallback method returns an empty tuple.
+[`reset_time_dependent_estimator`](@ref) reads it to replace the schedules in a solve with no fold. A field that the tuple does not list has the default `nothing`. A required field has no static default, and the fields that hold an optimiser are such fields. The tuple lists a required field with [`NoDefault`](@ref). That is not a value of the field. It states that a schedule in the field must carry its own `default`. The fallback method returns an empty tuple.
 
 # Related
 
@@ -1006,9 +1067,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the value a [`TimeDependent`](@ref)-valued field takes outside every fold loop.
+Returns the value of a field that holds a [`TimeDependent`](@ref), outside every fold loop.
 
-The schedule's own `default` wins; absent one ([`NoDefault`](@ref)), the host's static default for `field` is used ([`time_dependent_field_defaults`](@ref), `nothing` for fields it omits). Throws a [`TimeDependentDefaultError`](@ref) when neither exists — a schedule in a required field that never said what a fold-less solve should do.
+# Algorithm
+
+ 1. When `td.default` is not [`NoDefault`](@ref), return it.
+ 2. Read the static default of `field` from `defaults`, see [`time_dependent_field_defaults`](@ref). It is `nothing` for a field that `defaults` does not list.
+ 3. When the static default is `NoDefault`, throw. Else return it.
+
+# Validation
+
+  - The schedule or the field has a value outside every fold loop, else a [`TimeDependentDefaultError`](@ref) that names the field and the type of `opt` is thrown.
 
 # Related
 
@@ -1031,9 +1100,11 @@ end
 """
     reset_time_dependent_estimator(opt)
 
-Replace every [`TimeDependent`](@ref)-valued field of `opt` with its static default, recursing through wrapper optimisers.
+Replaces each [`TimeDependent`](@ref) field of `opt` with its value outside every fold loop, and recurses into the optimisers that `opt` wraps.
 
-A time-dependent constraint is defined only over the folds of a cross-validation scheme, so a fold-less solve runs with the affected fields at their static defaults (see [`time_dependent_field_defaults`](@ref)). Called at the top of the `_optimise` methods; per-fold estimators produced by [`update_time_dependent_estimator`](@ref) contain no `TimeDependent` values, so they pass through unchanged. The default returns the estimator unchanged; hosts rebuild themselves, wrapper optimisers recurse.
+A schedule is defined only over the folds of a cross-validation scheme. So a solve with no fold runs with each scheduled field at its value outside every fold loop, which [`time_dependent_reset_value`](@ref) gives. The `_optimise` methods call this function first. An estimator that [`update_time_dependent_estimator`](@ref) resolved holds no schedule, so this function returns it unchanged.
+
+This fallback serves every optimisation estimator and every optimisation result, and returns `opt` unchanged. An optimiser that can hold a schedule adds a method that rebuilds it, and an optimiser that wraps others adds a method that recurses.
 
 # Related
 
@@ -1041,7 +1112,8 @@ A time-dependent constraint is defined only over the folds of a cross-validation
   - [`update_time_dependent_estimator`](@ref)
   - [`is_time_dependent`](@ref)
 """
-function reset_time_dependent_estimator(opt::OptE_Opt)
+function reset_time_dependent_estimator(opt::Union{<:OptimisationEstimator,
+                                                   <:OptimisationResult})
     return opt
 end
 function reset_time_dependent_estimator(::Nothing)
@@ -1050,9 +1122,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Rebuild a host optimiser with each [`TimeDependent`](@ref)-valued field replaced by its fold-less value (see [`time_dependent_reset_value`](@ref)).
+Rebuilds an optimiser with the value outside every fold loop in each field that holds a [`TimeDependent`](@ref).
 
-Shared implementation behind the hosts' [`reset_time_dependent_estimator`](@ref) methods. Returns `opt` unchanged when no field is time-dependent.
+The methods of [`reset_time_dependent_estimator`](@ref) for the optimisers call this function.
+
+# Algorithm
+
+ 1. Collect the names `tdfs` of the scheduled fields with [`time_dependent_fields`](@ref), which leaves out the schedules with `:nearest` in the fields of [`inner_fold_fields`](@ref). Return `opt` unchanged when there is none.
+ 2. Read the static defaults of `opt` with [`time_dependent_field_defaults`](@ref).
+ 3. Find the value of each field in `tdfs` with [`time_dependent_reset_value`](@ref), giving `repl`.
+ 4. Rebuild `opt` with [`rebuild_estimator`](@ref).
 
 # Related
 
@@ -1076,7 +1155,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-A [`TimeDependent`](@ref) schedule is time-dependent by construction.
+Returns `true`, because a [`TimeDependent`](@ref) is a schedule.
 
 # Related
 
@@ -1088,9 +1167,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that a [`TimeDependent`](@ref) schedule in an optimiser position resolved to something that can be optimised or predicted.
+Checks that a [`TimeDependent`](@ref) in the place of an optimiser resolved to a value that can optimise or predict.
 
-The vector and [`TimeDependentOptimiserCallable`](@ref) forms of a schedule declare their output kind in their type and are checked statically (see [`TD_OptE_Opt`](@ref)). The two callable forms — a bare `ctx -> optimiser` and a [`PreviousWeightsFunction`](@ref) wrapping one — cannot be, so their output is checked here, when the fold loop swaps it in.
+The type of a vector schedule and of a [`TimeDependentOptimiserCallable`](@ref) states the kind of their value before any fold runs, see [`TD_OptE_Opt`](@ref). A bare function `ctx -> optimiser` and a [`PreviousWeightsFunction`](@ref) that holds one do not. So this function checks their value when the fold loop puts it into place.
+
+# Validation
+
+  - `opt` is an [`OptE_Opt`](@ref), else an `ArgumentError` that names the type of `opt` is thrown.
 
 # Related
 
@@ -1106,11 +1189,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Resolve a [`TimeDependent`](@ref) schedule standing in for an optimiser to the optimiser of fold `ctx.i`.
+Resolves a [`TimeDependent`](@ref) in the place of an optimiser to the optimiser of fold `ctx.i`.
 
-Entry `i` may be an estimator or a precomputed result, so a *mixed* schedule optimises on some folds and predicts on others. After the swap the resolved estimator is recursed into with the **same** context, so its own `:outermost` schedules bind to this fold loop rather than going unresolved.
+Entry `i` can be an estimator or a precomputed result, so a mixed schedule optimises at some folds and predicts at others. The resolved optimiser can hold schedules of its own. The function resolves them with the same context, so its schedules with `:outermost` resolve against this fold loop.
 
-Returns the schedule unchanged when `all_binds` is `false` and it is not `:outermost`-bound — a `:nearest` schedule in an optimiser position is consumed by a fold loop the host itself opens, not by the loop that reached the host.
+# Algorithm
+
+ 1. When `all_binds` is `false` and `td.bind` is not `:outermost`, return `td` unchanged. The fold loop that the optimiser opens resolves such a schedule, not the loop that reached the optimiser.
+ 2. Resolve `td` at the fold with [`time_dependent_value`](@ref), giving `opt`.
+ 3. Check `opt` with [`assert_time_dependent_optimiser`](@ref).
+ 4. Return `update_time_dependent_estimator(opt, ctx, all_binds)`.
 
 # Related
 
@@ -1130,11 +1218,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert that a [`TimeDependent`](@ref) schedule standing in for an optimiser has one entry per fold, and that the schedules *within* each entry are sized to the same fold loop.
+Checks that a [`TimeDependent`](@ref) in the place of an optimiser has one entry for each fold, and that the schedules in each entry have the same fold count.
 
-Entry `i` runs at fold `i` of this loop, so its own `:outermost` schedules bind here too (see [`update_time_dependent_estimator`](@ref)) and are validated against this loop's fold count. The `default` is not — it runs only outside a fold loop, where its schedules reset instead.
+Entry `i` runs at fold `i` of this loop, so its own schedules with `:outermost` resolve against this loop too, see [`update_time_dependent_estimator`](@ref). The check does not read `default`, which runs only outside every fold loop, where its schedules reset.
 
-Skipped when `all_binds` is `false` and the schedule is not `:outermost`-bound — the fold loop the host opens validates it against its own fold count instead.
+When `all_binds` is `false` and `td.bind` is not `:outermost`, the function checks nothing. The fold loop that the optimiser opens checks the schedule against its own fold count.
+
+# Validation
+
+  - A vector schedule has `n` entries, else a `DimensionMismatch` is thrown.
+  - Each entry passes [`assert_time_dependent_fold_count`](@ref) with the same `n`.
 
 # Related
 
@@ -1159,9 +1252,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the optimiser a [`TimeDependent`](@ref) schedule takes outside every fold loop.
+Returns the optimiser that a [`TimeDependent`](@ref) in the place of an optimiser gives outside every fold loop.
 
-An optimiser position is *required* — there is no static default to fall back to — so the schedule must supply its own `default`, and one that does not throws a [`TimeDependentDefaultError`](@ref). The fold-less optimiser is itself reset, so its own schedules resolve to their defaults too.
+The place of an optimiser is required and has no static default. So the schedule must carry its own `default`. The function resets that optimiser too, so its own schedules take their values outside every fold loop.
+
+# Validation
+
+  - `td.default` is not [`NoDefault`](@ref), else a [`TimeDependentDefaultError`](@ref) is thrown.
 
 # Related
 
@@ -1179,7 +1276,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the statically inspectable entries of a [`TimeDependent`](@ref) schedule: the per-fold values of a vector schedule, plus its `default` when it has one. A callable schedule contributes nothing — its per-fold values cannot be inspected before it runs.
+Returns the values of a [`TimeDependent`](@ref) that are known before any fold runs.
+
+They are the entries of a vector schedule, and `default` when it is set. A function schedule gives no entry, because its values do not exist before it runs.
 
 # Related
 
@@ -1212,19 +1311,23 @@ function assert_special_nco_requirements(td::Union{<:TD_OptE_Opt, <:TD_VecOptE_O
     return nothing
 end
 """
-    assert_no_nearest_bind_optimiser_schedule(x, field::Symbol, host::Symbol)
+    assert_no_nearest_bind_optimiser_schedule(x, field::Symbol, opt_name::Symbol)
 
-Reject a `bind = :nearest` [`TimeDependent`](@ref) schedule in an optimiser-valued position no inner fold loop consumes.
+Refuses a [`TimeDependent`](@ref) with `bind = :nearest` in a field that holds an optimiser and that no inner fold loop reads.
 
-`bind` picks *which fold loop supplies the schedule's index*. `:nearest` therefore says something different from `:outermost` only where the host opens a fold loop of its **own** and hands the field across it — `NestedClustered.opti` (its inner cross-validation is entered per cluster) and `Stacking.opti[k]` (entered per candidate), the positions declared by [`inner_fold_fields`](@ref). Everywhere else the loop that reaches the host *is* the nearest one, and the two binds would name the same loop.
+The field `bind` selects the fold loop whose index the schedule reads. So `:nearest` differs from `:outermost` only where the optimiser opens its own fold loop and gives the field to it. [`inner_fold_fields`](@ref) names those fields: `NestedClustered.opti`, which runs once for each cluster, and `Stacking.opti[k]`, which runs once for each candidate. In every other field, the loop that reaches the optimiser is the nearest loop, and the two values of `bind` select the same loop.
 
-The positions this guards have no such inner loop:
+This function guards the fields that have no inner fold loop:
 
-  - **A fallback (`fb`), on every host.** The fallback walk is a retry chain *within a single fold's solve* — it has no fold indices of its own — so `:nearest` there is either redundant with `:outermost` or, behind a meta's inner cross-validation, silently wrong: it would resolve against the inner loop's fold numbers (tuning folds) instead of the backtest's periods, changing meaning with nesting depth. A per-fold fallback is fully expressible with `:outermost`, including `nothing` entries to switch it off on some folds (see [`TDO_OptE_Opt`](@ref)).
-  - **The outer optimisers (`opto`).** They consume the *combined* inner output, once per solve.
-  - **`SubsetResampling.opt`.** Its internal loop is over randomly drawn asset subsets, not time folds.
+  - The fallback `fb` of every optimiser. The fallback chain runs inside the solve of one fold, and it has no fold index of its own. So `:nearest` there selects the same loop as `:outermost`, or it is wrong behind the inner cross-validation of a meta-optimiser. There it reads the index of a tuning fold and not the period of the backtest. A schedule with `:outermost` states every fallback that changes by fold, and an entry `nothing` turns the fallback off at a fold, see [`TDO_OptE_Opt`](@ref).
+  - The outer optimiser `opto`, which reads the combined inner output once for each solve.
+  - `SubsetResampling.opt`, whose inner loop runs over random subsets of the assets, not over folds of time.
 
-So a `:nearest` schedule in any of them has no nearest fold loop to bind to, and is rejected at construction rather than resolving against a loop the caller did not mean. No-op for anything that is not a [`TimeDependent`](@ref).
+So a schedule with `:nearest` in one of these fields has no nearest fold loop, and the constructor refuses it. The function checks nothing when `x` is not a `TimeDependent`.
+
+# Validation
+
+  - `x.bind !== :nearest` when `x` is a `TimeDependent`, else an `ArgumentError` that names the field and the optimiser is thrown.
 
 # Related
 
@@ -1232,24 +1335,27 @@ So a `:nearest` schedule in any of them has no nearest fold loop to bind to, and
   - [`inner_fold_fields`](@ref)
   - [`TDO_OptE_Opt`](@ref)
 """
-function assert_no_nearest_bind_optimiser_schedule(x, field::Symbol, host::Symbol)::Nothing
+function assert_no_nearest_bind_optimiser_schedule(x, field::Symbol,
+                                                   opt_name::Symbol)::Nothing
     if isa(x, TimeDependent)
         @argcheck(x.bind !== :nearest,
-                  ArgumentError("field `$field` of $host holds a `bind = :nearest` TimeDependent schedule, but no inner fold loop of $host consumes `$field`, so there is no nearest fold loop for it to bind to. Use `bind = :outermost`: the fold loop that reaches the $host resolves the schedule."))
+                  ArgumentError("field `$field` of $opt_name holds a `bind = :nearest` TimeDependent schedule, but no inner fold loop of $opt_name consumes `$field`, so there is no nearest fold loop for it to bind to. Use `bind = :outermost`: the fold loop that reaches the $opt_name resolves the schedule."))
     end
     return nothing
 end
 """
-    assert_nearest_optimiser_schedule(x, field::Symbol, cv, host::Symbol)
+    assert_nearest_optimiser_schedule(x, field::Symbol, cv, opt_name::Symbol)
 
-Validate a `bind = :nearest` [`TimeDependent`](@ref) schedule in an optimiser-valued position that a host's inner cross-validation *does* consume.
+Checks a [`TimeDependent`](@ref) with `bind = :nearest` in a field that holds an optimiser and that the inner cross-validation of the optimiser reads.
 
-Two construction-time requirements, both consequences of the position's double consumer: the inner cross-validation leg resolves the schedule per fold, while the full-sample leg (the meta's `wi` fit, or the per-cluster optimise) always resolves it fold-lessly to its `default`.
+Two parts of the optimiser read such a field. The inner cross-validation resolves the schedule at each fold. The solve on the full sample, which is the fit of `wi` of a meta-optimiser or the optimisation of each cluster, always resolves it to its `default`. So the constructor needs two conditions, which the validation below states. The first condition applies to this field only. Elsewhere a schedule with no `default` is valid at construction.
 
-  - An explicit `default` is required — without one, every solve would throw a [`TimeDependentDefaultError`](@ref) when the full-sample leg reaches the schedule, so the error is moved to construction. This deliberately departs from the rule that a defaultless schedule is legal at construction, for this position only.
-  - `cv !== nothing` is required — without an inner cross-validation there is no inner fold loop, so the schedule could only ever be its `default`: silently inert.
+The function checks nothing when `x` is not a `TimeDependent` with `bind = :nearest`.
 
-No-op for anything that is not a `bind = :nearest` [`TimeDependent`](@ref).
+# Validation
+
+  - `x.default` is not [`NoDefault`](@ref), else a [`TimeDependentDefaultError`](@ref) is thrown. With no `default`, every solve throws when the solve on the full sample reads the schedule.
+  - `cv !== nothing`, else an `ArgumentError` is thrown. With no inner cross-validation, the schedule always takes its `default`, and it has no effect.
 
 # Related
 
@@ -1257,12 +1363,12 @@ No-op for anything that is not a `bind = :nearest` [`TimeDependent`](@ref).
   - [`inner_fold_fields`](@ref)
   - [`TimeDependentDefaultError`](@ref)
 """
-function assert_nearest_optimiser_schedule(x, field::Symbol, cv, host::Symbol)::Nothing
+function assert_nearest_optimiser_schedule(x, field::Symbol, cv, opt_name::Symbol)::Nothing
     if isa(x, TimeDependent) && x.bind === :nearest
         @argcheck(!isa(x.default, NoDefault),
-                  TimeDependentDefaultError("a `bind = :nearest` schedule in `$field` of $host must supply a `default`: besides the inner cross-validation fold loop, `$field` also has a fold-less full-sample consumer that always resolves the schedule to its `default`, so a defaultless one would throw on every solve. Give it a fold-less optimiser: TimeDependent(val, :nearest; default = opt)."))
+                  TimeDependentDefaultError("a `bind = :nearest` schedule in `$field` of $opt_name must supply a `default`: besides the inner cross-validation fold loop, `$field` also has a fold-less full-sample consumer that always resolves the schedule to its `default`, so a defaultless one would throw on every solve. Give it a fold-less optimiser: TimeDependent(val, :nearest; default = opt)."))
         @argcheck(!isnothing(cv),
-                  ArgumentError("a `bind = :nearest` schedule in `$field` of $host requires `cv`: without an inner cross-validation there is no inner fold loop, so the schedule could only ever resolve to its `default` — silently inert. Provide `cv`, or use `bind = :outermost` so the fold loop that reaches the $host consumes it."))
+                  ArgumentError("a `bind = :nearest` schedule in `$field` of $opt_name requires `cv`: without an inner cross-validation there is no inner fold loop, so the schedule could only ever resolve to its `default` — silently inert. Provide `cv`, or use `bind = :outermost` so the fold loop that reaches the $opt_name consumes it."))
     end
     return nothing
 end
@@ -1270,9 +1376,9 @@ end
 """
     const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 
-Alias for a vector of optimisation estimators or results.
+Alias for a vector of continuous optimisation estimators or results.
 
-Represents a collection of [`OptE_Opt`](@ref) objects for batch processing.
+A method that reads many optimisers, such as the candidates of a meta-optimiser, dispatches on it.
 
 # Related
 
@@ -1282,9 +1388,15 @@ const VecOptE_Opt = AbstractVector{<:OptE_Opt}
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply [`factory`](@ref) through a [`TimeDependent`](@ref) schedule: to each vector entry and to the `default`, rebuilding the schedule.
+Applies [`factory`](@ref) to each entry of a [`TimeDependent`](@ref) and to its `default`, and rebuilds the schedule.
 
-A schedule can survive a fold loop's resolution pass (a `bind = :nearest` element left for a meta's inner cross-validation), so the factory pass that follows resolution must see through it. Callable forms pass through unchanged — their per-fold values do not exist yet, and a callable receives the fold's context (including `w_prev`) when it runs.
+A schedule can stay in place after the fold loop resolves the others, for example an element with `bind = :nearest` that the inner cross-validation of a meta-optimiser resolves. So the `factory` pass after the resolution must reach into it. A function schedule does not change, because its values do not exist yet. At its fold, it receives the context, which holds `w_prev`.
+
+# Algorithm
+
+ 1. When `td.val` is a vector, apply `factory(x, args...)` to each entry `x`.
+ 2. When `td.default` is not [`NoDefault`](@ref), apply `factory` to it too.
+ 3. Return a new schedule with the new values and the same `bind`.
 
 # Related
 
@@ -1305,7 +1417,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Assert special NCO requirements for each element of a vector of optimisation estimators or results.
+Checks the requirements of an inner optimiser of [`NestedClustered`](@ref) for each element of a vector of optimisers.
 
 # Related
 
@@ -1321,7 +1433,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if any element of the vector of optimisation estimators or results requires previous portfolio weights.
+Returns `true` if one element of a vector of optimisers needs the weights of the previous fold.
 
 # Related
 
@@ -1334,7 +1446,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` if any element of the vector of optimisation estimators or results is time-dependent.
+Returns `true` if one element of a vector of optimisers holds a schedule, or is one.
 
 # Related
 
@@ -1347,7 +1459,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply [`update_time_dependent_estimator`](@ref) element-wise to a vector of optimisation estimators or results.
+Applies [`update_time_dependent_estimator`](@ref) to each element of a vector of optimisers, and returns a new vector.
 
 # Related
 
@@ -1361,7 +1473,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply [`assert_time_dependent_fold_count`](@ref) element-wise to a vector of optimisation estimators or results.
+Applies [`assert_time_dependent_fold_count`](@ref) to each element of a vector of optimisers.
 
 # Related
 

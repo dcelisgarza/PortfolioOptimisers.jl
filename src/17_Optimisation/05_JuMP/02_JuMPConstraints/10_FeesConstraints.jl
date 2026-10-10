@@ -240,7 +240,7 @@ Where:
 # Arguments
 
   - $(arg_dict[:model])
-  - `lq`: The proportional liquidation carrier, or `nothing`.
+  - `lq`: The proportional liquidation rate, or `nothing`.
 
 # Returns
 
@@ -314,7 +314,7 @@ Where:
 # Arguments
 
   - $(arg_dict[:model])
-  - `flq`: The fixed liquidation carrier, or `nothing`.
+  - `flq`: The fixed liquidation charge, or `nothing`.
   - `kwargs`: Forwarded to `isapprox`, to decide how near zero a weight counts as zero.
 
 # Returns
@@ -350,12 +350,11 @@ These are the proportional fees `l` and `s`, the turnover fee `tn`, and the two 
 
 # Algorithm
 
- 1. Charge `fees.l` through [`set_long_non_fixed_fees!`](@ref).
- 2. Charge `fees.s` through [`set_short_non_fixed_fees!`](@ref).
- 3. Charge `fees.tn` through [`set_turnover_fees!`](@ref).
- 4. Charge `fees.lq` through [`set_liquidation_fees!`](@ref).
- 5. Charge `fees.flq` through [`set_fixed_liquidation_fees!`](@ref), with `fees.kwargs`.
- 6. When the model holds no `:fee_fa`, register `fees.fa` under it. [`set_net_portfolio_returns!`](@ref) reads it as the clock of the one-off fee.
+ 1. Charge `fees.l` and `fees.s` through [`set_proportional_fees!`](@ref). It charges the parts of the weights, or the weights themselves when `fees.s` is a credit on a model with a short part.
+ 2. Charge `fees.tn` through [`set_turnover_fees!`](@ref).
+ 3. Charge `fees.lq` through [`set_liquidation_fees!`](@ref).
+ 4. Charge `fees.flq` through [`set_fixed_liquidation_fees!`](@ref), with `fees.kwargs`.
+ 5. When the model holds no `:fee_fa`, register `fees.fa` under it. [`set_net_portfolio_returns!`](@ref) reads it as the clock of the one-off fee.
 
 # Arguments
 
@@ -371,6 +370,7 @@ These are the proportional fees `l` and `s`, the turnover fee `tn`, and the two 
   - [`add_to_fees!`](@ref)
   - [`set_long_non_fixed_fees!`](@ref)
   - [`set_short_non_fixed_fees!`](@ref)
+  - [`set_proportional_fees!`](@ref)
   - [`set_turnover_fees!`](@ref)
   - [`set_liquidation_fees!`](@ref)
   - [`set_fixed_liquidation_fees!`](@ref)
@@ -491,6 +491,7 @@ $(val_dict[:relax])
 
   - Under a [`PartsBoundWeights`](@ref) head, `sw` lies at or above the short part of `w`, so `fs` lies at or above ``F_s``.
   - The bound is tight under the conditions that [`set_long_non_fixed_fees!`](@ref) states. Without the pin, a model that holds no short position still pays the fee on the whole short budget.
+  - The bound is safe only for a non-negative `fs`, because a slack `sw` then only overpays. A negative `fs` is a credit, and a slack `sw` would earn it on an exposure the model does not hold. So [`set_proportional_fees!`](@ref) never calls this builder with a negative entry on a model that registers `sw`: it charges the whole proportional fee against the weights instead, which is exact.
 
 # Arguments
 
@@ -506,6 +507,7 @@ $(val_dict[:relax])
   - [`add_to_fees!`](@ref)
   - [`set_long_non_fixed_fees!`](@ref)
   - [`set_non_fixed_fees!`](@ref)
+  - [`set_proportional_fees!`](@ref)
   - [`Fees`](@ref)
 """
 function set_short_non_fixed_fees!(args...)
@@ -526,9 +528,118 @@ function set_short_non_fixed_fees!(model::JuMP.Model, fs::Num_VecNum)
     add_to_fees!(model, fs)
     return nothing
 end
+"""
+    set_proportional_fees!(model::JuMP.Model, fl::Option{<:Num_VecNum}, fs::Option{<:Num_VecNum})
+    set_proportional_fees!(model::JuMP.Model, fl::Num_VecNum, fs::Num_VecNum)
+
+Add the long and the short proportional fees to the per period fee of the JuMP model.
+
+A non-negative short rate goes to the two part builders, [`set_long_non_fixed_fees!`](@ref) and [`set_short_non_fixed_fees!`](@ref), which charge the parts `lw` and `sw`. A negative short rate is a credit. Under a [`PartsBoundWeights`](@ref) head `sw` only bounds the short part of the weights. With a non-negative rate a slack `sw` only overpays, but with a credit it earns on an exposure the model does not hold. So when `fs` holds a negative entry and the model registers `sw`, this builder charges the whole proportional fee against `w` and no part, and the charge is exact whether or not the decomposition is pinned.
+
+# Algorithm
+
+ 1. With a `nothing` rate on either side, charge `fl` and `fs` through the two part builders. A `nothing` `l` keeps `s` non-negative, so no credit reaches this method.
+ 2. With no negative entry in `fs`, or no `sw` in the model, charge them through the two part builders. A long-only model holds no `sw` and no short position.
+ 3. Otherwise write the epigraph below.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+F_p &= \\sum_{i = 1}^{N} \\left(f_{l,i} \\max\\left(w_i, 0\\right) - f_{s,i} \\min\\left(w_i, 0\\right)\\right) = \\sum_{i = 1}^{N} \\max\\left(f_{l,i} w_i,\\, -f_{s,i} w_i\\right)\\,.
+\\end{align}
+```
+
+The second form holds because [`Fees`](@ref) keeps ``f_{s,i} \\geq -f_{l,i}``: for ``w_i > 0`` the long slope is the larger, and for ``w_i < 0`` the short one is.
+
+Where:
+
+  - ``F_p``: Proportional fee, long and short.
+  - ``f_{l,i}``: Long fee rate of asset ``i``, `fl`. A scalar applies to every asset.
+  - ``f_{s,i}``: Short fee rate of asset ``i``, `fs`. A scalar applies to every asset.
+  - $(math_dict[:w_i_asset])
+  - $(math_dict[:N])
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: read from the model.
+  - `t_fp`: created when the epigraph is written, one entry for each asset.
+
+## Expressions
+
+  - `fp`: ``\\sum_i t_i``, when the epigraph is written. [`add_to_fees!`](@ref) adds it to ``f_r``.
+
+## Constraints
+
+  - `cfp_l`: ``s_c \\left(\\boldsymbol{f}_l \\odot \\boldsymbol{w} - \\boldsymbol{t}\\right) \\leq 0``.
+  - `cfp_s`: ``s_c \\left(\\boldsymbol{f}_s \\odot \\boldsymbol{w} + \\boldsymbol{t}\\right) \\geq 0``, which is ``t_i \\geq -f_{s,i} w_i``.
+
+Where:
+
+  - ``\\boldsymbol{t}``: The epigraph variable `t_fp`.
+  - ``\\boldsymbol{f}_l,\\, \\boldsymbol{f}_s``: Fee rate vectors, `fl` and `fs`.
+  - ``\\odot``: Elementwise (Hadamard) product.
+  - $(math_dict[:f_r_fee])
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:w_port])
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - The rows give ``t_i \\geq \\max(f_{l,i} w_i, -f_{s,i} w_i)``, so `fp` lies at or above ``F_p``.
+  - The bound is tight when the model pulls `:fees` down, under the conditions that [`set_turnover_fees!`](@ref) states. It does not depend on a pinned decomposition.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `fl::Num_VecNum`: Long fee rate of each asset, or one rate for every asset.
+  - `fs::Num_VecNum`: Short fee rate of each asset, or one rate for every asset.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`add_to_fees!`](@ref)
+  - [`set_non_fixed_fees!`](@ref)
+  - [`set_long_non_fixed_fees!`](@ref)
+  - [`set_short_non_fixed_fees!`](@ref)
+  - [`assert_short_fee_convex`](@ref)
+  - [`Fees`](@ref)
+"""
+function set_proportional_fees!(model::JuMP.Model, fl::Option{<:Num_VecNum},
+                                fs::Option{<:Num_VecNum})
+    set_long_non_fixed_fees!(model, fl)
+    set_short_non_fixed_fees!(model, fs)
+    return nothing
+end
+function set_proportional_fees!(model::JuMP.Model, fl::Num_VecNum, fs::Num_VecNum)
+    # A credit on a short position cannot be charged on the short part `sw`: a slack part
+    # would earn it on an exposure the model does not hold. A long-only model holds no `sw`
+    # and no short position, so its part builders stay exact.
+    if !(any(<(0), fs) && shared_has(model, :sw))
+        set_long_non_fixed_fees!(model, fl)
+        set_short_non_fixed_fees!(model, fs)
+        return nothing
+    end
+    w = get_w(model)
+    sc = get_constraint_scale(model)
+    N = length(w)
+    JuMP.@variable(model, t_fp[1:N])
+    JuMP.@constraints(model, begin
+                          cfp_l, sc * (fl ⊙ w - t_fp) <= 0
+                          cfp_s, sc * (fs ⊙ w + t_fp) >= 0
+                      end)
+    JuMP.@expression(model, fp, sum(t_fp))
+    add_to_fees!(model, fp)
+    return nothing
+end
 function set_non_fixed_fees!(model::JuMP.Model, fees::Fees)
-    set_long_non_fixed_fees!(model, fees.l)
-    set_short_non_fixed_fees!(model, fees.s)
+    set_proportional_fees!(model, fees.l, fees.s)
     set_turnover_fees!(model, fees.tn)
     set_liquidation_fees!(model, fees.lq)
     set_fixed_liquidation_fees!(model, fees.flq, fees.kwargs)

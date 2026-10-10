@@ -1,8 +1,8 @@
 ```@meta
-Description = "Simple variance and standard deviation, public API of PortfolioOptimisers.jl: SimpleVariance, std, var, partial_fit!, port_opt_view, merge_states, …"
+Description = "Simple variance, public API of PortfolioOptimisers.jl: SimpleVariance, std, var, partial_fit!, port_opt_view, merge_states, fold_inactive!."
 ```
 
-# Simple variance and standard deviation
+# Simple variance
 
 The library uses the variance of each asset in several places: in some expected returns estimators, in covariance estimation, in performance analysis and in constraint generation. The estimators below compute the variance, and the standard deviation, which is its square root.
 

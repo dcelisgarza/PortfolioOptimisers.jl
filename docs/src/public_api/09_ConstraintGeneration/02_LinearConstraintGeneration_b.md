@@ -1,8 +1,8 @@
 ```@meta
-Description = "Linear Constraints (b), public API of PortfolioOptimisers.jl: LinearConstraintEstimator, replace_group_by_assets, parse_equation, linear_constraints, …"
+Description = "Linear constraint generation (b), public API of PortfolioOptimisers.jl: LinearConstraintEstimator, replace_group_by_assets, parse_equation, …"
 ```
 
-# Linear Constraints (b)
+# Linear constraint generation (b)
 
 ```@docs
 LinearConstraintEstimator

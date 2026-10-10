@@ -38,7 +38,7 @@ packages' sources during the ticket:
   `inverse_rosenblatt` and `simulate_qmc` run on any vine built from `RVineCopula(structure,
   edges)`. A truncated general R-vine samples through the package's execution-plan method, which
   bypasses a guard that says it cannot.
-- **The reference implementation** owns its structure selection (a maximum spanning tree per tree
+- **The oracle** owns its structure selection (a maximum spanning tree per tree
   on `|τ| + 1e-5` with a central-asset boost) and its pair estimation (tau inversion by default,
   maximum likelihood on request, an independence gate on the Kendall-tau p-value), and uses its
   copula families only for densities and h-functions.
@@ -96,7 +96,7 @@ itself.
   a surface only the vine prior reads.
 - **Delegate the whole fit** to `fit(RVineCopula, U; structure = …)`. Rejected: maximum likelihood
   only, so 30–37 minutes at d = 20 with the Student-t family, no weights, no parity with the
-  reference implementation's tau-inversion fixtures, no per-edge hooks for truncation selection.
+  oracle's tau-inversion fixtures, no per-edge hooks for truncation selection.
 - **Define the estimator inside the extension.** Exact foreign bounds, but no binding, no API page
   and no export until the package is loaded. Rejected.
 - **Core estimator with `Any`-bounded slots** holding the packages' family types and structures.

@@ -1,8 +1,8 @@
 ```@meta
-Description = "The risk ceiling of a programme Allocation Set, public API of PortfolioOptimisers.jl: risk_constraint_solver."
+Description = "Allocation risk ceiling, public API of PortfolioOptimisers.jl: risk_constraint_solver."
 ```
 
-# The risk ceiling of a programme Allocation Set
+# Allocation risk ceiling
 
 ```@docs
 PortfolioOptimisers.risk_constraint_solver(set::ProgrammeAllocationSet)

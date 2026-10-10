@@ -59,7 +59,7 @@ slv = [Solver(; name = :clarabel1, solver = Clarabel.Optimizer,
 # A value at risk view binds the posterior mass of the tail at its target to `alpha`, and an
 # entropy pooling solve meets that constraint to about `1e-8`. The posterior value at risk is a
 # sample order statistic: `ValueatRisk` reads the first observation whose cumulative weight
-# reaches `alpha`, so a mass short of `alpha` by that much reads the next observation down the
+# exceeds `alpha`, so a mass of `alpha`, or short of it, reads the next observation down the
 # tail. `var_view_floor` returns that observation, which is the largest loss the target excludes.
 # A posterior at or above it meets the view to the resolution the sample has, and an assertion
 # written against it does not turn on the sign of a solver residual. See issues #573 and #695.

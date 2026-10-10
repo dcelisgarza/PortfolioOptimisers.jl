@@ -18,7 +18,7 @@ estimator builds, and `0` leaves the nominal variance untouched.
 [#928](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/928) asked for a rule, or for
 evidence that no rule of the ADR 0095 kind can exist. It was the *Selecting a radius* patch that
 kept map [#643](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/643) open. The
-reference implementation states the radius as `radius : float, default=1.0` with no calibration and
+oracle states the radius as `radius : float, default=1.0` with no calibration and
 no selection procedure, so anything found here is beyond parity, which was the intent.
 
 Two rules exist. The exploration also found that neither can be a **Calibration Rule**.
@@ -317,3 +317,12 @@ stated level with no way out except a smaller `q` chosen by hand.
   sample.
 - `Regression` gains two type parameters and `CrossSectionalFactorModel` two, so every printed
   block shows two more fields.
+
+## Amendment (2026-09-29)
+
+The paragraph on `orthonormalise_basis` describes a view that no longer exists. ADR 0189 (#1424)
+makes the view of a compact set the projection of the set: it keeps the sliced rows of the basis,
+adds the factor `R` of the rows it drops, and pays the principal block of the full penalty
+exactly. The rank does not fall, `orthonormalise_basis` is deleted, and the radius that crosses
+the view unchanged is now the exact radius of the projected set, not a stale one. A caller who
+wants a radius sized on the cluster alone still fits the set on a reduced prior.

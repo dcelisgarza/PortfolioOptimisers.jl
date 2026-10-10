@@ -1,8 +1,8 @@
 ```@meta
-Description = "Online selection rules: mirror descent, its schedules and its gradient transforms, private API of PortfolioOptimisers.jl: MirrorDescentState, …"
+Description = "Mirror descent, private API of PortfolioOptimisers.jl: MirrorDescentState, doubling_stage, WindowedBestRateState, ring_row, copy_gradient_state, …"
 ```
 
-# Online selection rules: mirror descent, its schedules and its gradient transforms: private API
+# Mirror descent: private API
 
 ```@docs
 PortfolioOptimisers.MirrorDescentState
@@ -14,4 +14,11 @@ PortfolioOptimisers.played_allocation
 PortfolioOptimisers.mixed_relatives
 PortfolioOptimisers.reprojection
 PortfolioOptimisers.investable_risk_gradient
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
 ```

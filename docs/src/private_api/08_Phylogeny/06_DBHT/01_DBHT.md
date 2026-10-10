@@ -1,8 +1,8 @@
 ```@meta
-Description = "Direct Bubble Hierarchical Tree, private API of PortfolioOptimisers.jl: DBHTRootMethod."
+Description = "DBHT, private API of PortfolioOptimisers.jl: DBHTRootMethod."
 ```
 
-# Direct Bubble Hierarchical Tree: private API
+# DBHT: private API
 
 ```@docs
 DBHTRootMethod

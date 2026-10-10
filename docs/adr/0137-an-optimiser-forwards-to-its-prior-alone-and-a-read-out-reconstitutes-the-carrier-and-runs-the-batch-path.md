@@ -28,7 +28,7 @@ resolves **by asset name**, which lives in `rd.nx`; a `LowOrderPrior` carries `X
 read-out that handed the batch path a bare matrix would hand its inner optimisers an empty panel
 and its constraint estimators no names.
 
-### What the reference does
+### What the oracle does
 
 Its optimiser's `partial_fit` folds *and* solves in one call — its own docstring says the problem
 is solved fresh on each call — so a warm-up of `T` observations costs it `T` solves, and a failed
@@ -79,14 +79,14 @@ read-out `prior(pe)` — a Prior Result, which the batch path does not refit, so
 prior's exact fold and the step stays quadratic in the assets — drops the state, and calls
 `optimise(opt′, rd′)`. The clustering estimator, the constraint estimators, all `N + M` uncertainty
 sets and a meta-optimiser's inner optimisers are therefore identical to batch **by construction**,
-from one carrier and with no state of their own. No uncertainty set gains a method; the reference
+from one carrier and with no state of their own. No uncertainty set gains a method; the oracle
 reaches the same place by recomputing its one online set from the prior result on every call.
 
 The read-out is **pure**. The state moves at `partial_fit!` and nothing else writes it, so
 `optimise(opt)` is callable any number of times for the same answer, and a failed solve leaves the
 state where the last fold put it. The ordinary fallback chain therefore walks unchanged: each
 fallback is handed the reconstituted carrier and fits from it as it would from the caller's, and
-`factory(res, fb)` records the chain. The reference's refusal of an estimator chain rests on a
+`factory(res, fb)` records the chain. The oracle's refusal of an estimator chain rests on a
 premise — a state advanced past the last answer it can give — that splitting the verbs removed.
 
 The fold-less entry `optimise(opt)` is now one method on the root, chosen by dispatch on the
@@ -154,7 +154,7 @@ Six refusals, each an `ArgumentError` naming the field or the type.
 so far, which is meaningful; what has no meaning is turnover *across* those frontiers, and that is
 [#1004](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1004)'s, in batch and online
 alike. **No previous-weights threading.** The loop threads them and the step does not, which is the
-reference line for line and correct today for every non-frontier optimiser.
+oracle line for line and correct today for every non-frontier optimiser.
 
 ## Considered options
 
@@ -166,8 +166,8 @@ reference line for line and correct today for every non-frontier optimiser.
    would have to move.
 2. **Hand the batch path a bare matrix at read-out.** Rejected by the two facts in the context:
    the meta-optimisers view the caller's carrier and the constraints resolve by name.
-3. **Fold and solve in one verb, as the reference does.** Rejected: a warm-up of `T` observations
-   is `T` solves, and a failed solve strands the state, which forces the reference's refusal of
+3. **Fold and solve in one verb, as the oracle does.** Rejected: a warm-up of `T` observations
+   is `T` solves, and a failed solve strands the state, which forces the oracle's refusal of
    an estimator chain.
 4. **The context on the head rather than on the bundle** — `MeanRisk.cache` rather than
    `JuMPOptimiser.cache`. Rejected: fourteen hosts instead of eight, and the bundle is what holds
@@ -223,6 +223,6 @@ An optimiser's read-out is therefore one of two kinds, and which one is the fami
 The rule that an optimiser forwards the observation to its prior and to nothing else is unchanged
 where a prior is held: a recursive head that reads a forecast off a prior forwards the observation
 to that prior *and* folds its own recursion, and everything else it holds still takes its
-ordinary batch treatment at read-out. The sentence in `CONTEXT.md`'s *Fold Context* entry that
+ordinary batch treatment at read-out. The sentence in `GLOSSARY.md`'s *Fold Context* entry that
 nothing above the prior takes a step of its own now names the recursion as the one thing that
 does.

@@ -44,7 +44,7 @@ Partial-fit state of a [`Cokurtosis`](@ref) estimator under [`FullMoment`](@ref)
 
 The state carries the running count, the running mean and the running second, third and fourth central co-moment accumulators. The fourth accumulator is the answer the estimator reports. The second and the third are there because the update of the fourth reads both: a new observation moves the centre, and every past fourth co-moment is corrected by terms in the third and in the second.
 
-`M4` is `assets² × assets²`, so the state is the largest object in the incremental seam. At 100 assets it holds 10⁸ entries, which is 800 MB in double precision. The seam trades that memory for the recomputation it removes, and a caller who cannot pay it runs the batch verb instead.
+`M4` is `assets² × assets²`, so the state is the largest object of the incremental fit. At 100 assets it holds 10⁸ entries, which is 800 MB in double precision. The incremental fit trades that memory for the recomputation it removes, and a caller who cannot pay it runs the batch verb instead.
 
 This type is an implementation detail and is not intended for direct use. [`partial_fit!`](@ref) writes it, [`cokurtosis`](@ref) reads it, and [`merge_states`](@ref) folds two of them.
 
@@ -78,7 +78,7 @@ $(DocStringExtensions.FIELDS)
     """
     M3
     """
-    `M4`: Running fourth central co-moment accumulator, `assets² × assets²`. It is the sum over the observations and not the cokurtosis, so a read-out divides it by `n`.
+    `M4`: Running fourth central co-moment accumulator, `assets² × assets²`. It is the sum over the observations and not the cokurtosis, so `cokurtosis(kte)` with no data divides it by `n`.
     """
     M4
 end
@@ -332,7 +332,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies a [`CoskewnessPartialFitState`](@ref), so the copy shares no array with the original.
 
-The `copy` method of the [`AbstractPartialFitState`](@ref) interface. The count is a scalar and passes through, and the running mean and the two accumulators are copied. This family overrides [`partial_fit`](@ref), so the seam's own value form never calls this method on it, and a caller who copies a state by hand still gets one.
+The `copy` method of the [`AbstractPartialFitState`](@ref) interface. The count is a scalar and passes through, and the running mean and the two accumulators are copied. This family overrides [`partial_fit`](@ref), so the value form of that interface never calls this method on it, and a caller who copies a state by hand still gets one.
 
 # Arguments
 
@@ -430,7 +430,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies a [`CokurtosisPartialFitState`](@ref), so the copy shares no array with the original.
 
-The `copy` method of the [`AbstractPartialFitState`](@ref) interface. The count is a scalar and passes through, and the running mean and the three accumulators are copied. `M4` is `assets² × assets²`, so this method is the expensive one of the seam, and it is why the family overrides [`partial_fit`](@ref) rather than paying the copy on every fold.
+The `copy` method of the [`AbstractPartialFitState`](@ref) interface. The count is a scalar and passes through, and the running mean and the three accumulators are copied. `M4` is `assets² × assets²`, so this method is the expensive one of that interface, and it is why the family overrides [`partial_fit`](@ref) rather than paying the copy on every fold.
 
 # Arguments
 
@@ -501,7 +501,7 @@ The method builds a new state rather than writing into the arrays of the old one
   - `ske`: Coskewness estimator with a [`FullMoment`](@ref) moment algorithm.
   - `X`: Block of observations (observations × assets).
   - $(arg_dict[:dims])
-  - `active_mask`: The active mask of the Asset Panel, of the shape of `X`, or `nothing`. Accepted and ignored, on the rule the plain first order states: a plain state carries no per-cell count for the mask to gate, and its universe is the Coverage Universe the read-out already reduces to. A fold loop passes it to every member a host folds, so refusing the keyword would refuse the host.
+  - `active_mask`: The active mask of the Asset Panel, of the shape of `X`, or `nothing`. Accepted and ignored, on the rule the plain first order states: a plain state carries no per-cell count for the mask to gate, and its universe is the Coverage Universe that `coskewness(ske)` with no data already reduces to. A fold loop passes it to every member that the outer estimator folds, so refusing the keyword would refuse the outer estimator.
 
 # Validation
 
@@ -650,7 +650,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds a block of observations into the partial-fit state of a [`Cokurtosis`](@ref) estimator under [`FullMoment`](@ref).
 
-The companion of the [`Coskewness`](@ref) method, carried one order further. The state it writes is `assets² × assets²` in its largest field, so the memory the seam trades for the recomputation it removes is stated on [`CokurtosisPartialFitState`](@ref). It builds a new state rather than writing into the arrays of the old one, for the reason the [`Coskewness`](@ref) method states, and it overrides [`partial_fit`](@ref) for that reason too.
+The companion of the [`Coskewness`](@ref) method, carried one order further. The state it writes is `assets² × assets²` in its largest field, so the memory the incremental fit trades for the recomputation it removes is stated on [`CokurtosisPartialFitState`](@ref). It builds a new state rather than writing into the arrays of the old one, for the reason the [`Coskewness`](@ref) method states, and it overrides [`partial_fit`](@ref) for that reason too.
 
 # Algorithm
 
@@ -665,7 +665,7 @@ The companion of the [`Coskewness`](@ref) method, carried one order further. The
   - `kte`: Cokurtosis estimator with a [`FullMoment`](@ref) moment algorithm.
   - `X`: Block of observations (observations × assets).
   - $(arg_dict[:dims])
-  - `active_mask`: The active mask of the Asset Panel, of the shape of `X`, or `nothing`. Accepted and ignored, on the rule the plain first order states: a plain state carries no per-cell count for the mask to gate, and its universe is the Coverage Universe the read-out already reduces to. A fold loop passes it to every member a host folds, so refusing the keyword would refuse the host.
+  - `active_mask`: The active mask of the Asset Panel, of the shape of `X`, or `nothing`. Accepted and ignored, on the rule the plain first order states: a plain state carries no per-cell count for the mask to gate, and its universe is the Coverage Universe that `cokurtosis(kte)` with no data already reduces to. A fold loop passes it to every member that the outer estimator folds, so refusing the keyword would refuse the outer estimator.
 
 # Validation
 
@@ -812,7 +812,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the coskewness tensor and its negative spectral skewness matrix out of a partial-fit state.
 
-The state read-out of [`coskewness`](@ref). It returns the pair the batch method returns, to machine precision, for the sample the state was fitted on.
+The method of [`coskewness`](@ref) that makes the estimate from a Partial Fit State. It returns the pair the batch method returns, to machine precision, for the sample the state was fitted on.
 
 Only the shape of that sample survives a partial fit, so the matrix processing estimator is handed a matrix of the right shape whose entries are zero. Of the shipped steps only `:dn` reads it, and it reads only `size(X)`, so the two routes agree. A custom `:alg` step that reads the values of the sample must be run from the batch verb.
 
@@ -855,9 +855,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a coskewness out of a sample buffer, by refitting the batch verb over the observations the buffer holds.
 
-The buffer read-out of [`coskewness`](@ref), and the whole of the online form at this order. Neither the third nor the fourth co-moment folds exactly under a [`CoveragePolicy`](@ref) — an exact per-cell recursion needs the pairwise second co-moments over each triple's own observation set — so an [`Online`](@ref) wrapper seeds a [`SampleBufferState`](@ref) and the read-out refits from it. The answer is therefore bit-exact with the batch arm over the same rows, by construction rather than by arithmetic coincidence.
+The method of [`coskewness`](@ref) that makes the estimate from a Sample Buffer, and the whole of the online form at this order. Neither the third nor the fourth co-moment folds exactly under a [`CoveragePolicy`](@ref) — an exact per-cell recursion needs the pairwise second co-moments over each triple's own observation set — so an [`Online`](@ref) wrapper seeds a [`SampleBufferState`](@ref) and `coskewness(ske)` with no data refits from it. The answer is therefore bit-exact with the batch arm over the same rows, by construction rather than by arithmetic coincidence.
 
-The buffer holds the observations verbatim, `NaN` included, so the available-case arm reads the same gaps from it that it would read from the caller's own matrix, and it holds the active mask that explains them beside them. With no active mask a gap is a holiday rather than a delisting, which is what [`coverage_valid_block`](@ref) states; with one, the read-out reads the delisting the fold was told about.
+The buffer holds the observations verbatim, `NaN` included, so the available-case arm reads the same gaps from it that it would read from the caller's own matrix, and it holds the active mask that explains them beside them. With no active mask a gap is a holiday rather than a delisting, which is what [`coverage_valid_block`](@ref) states; with one, this method reads the delisting the fold was told about.
 
 # Arguments
 
@@ -919,7 +919,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the square cokurtosis matrix out of a partial-fit state.
 
-The state read-out of [`cokurtosis`](@ref). It returns the matrix the batch method returns, to machine precision, for the sample the state was fitted on.
+The method of [`cokurtosis`](@ref) that makes the estimate from a Partial Fit State. It returns the matrix the batch method returns, to machine precision, for the sample the state was fitted on.
 
 Only the shape of that sample survives a partial fit, so the matrix processing estimator is handed a matrix of the right shape whose entries are zero. Of the shipped steps only `:dn` reads it, and it reads only `size(X)`, so the two routes agree. A custom `:alg` step that reads the values of the sample must be run from the batch verb.
 
@@ -927,7 +927,7 @@ Only the shape of that sample survives a partial fit, so the matrix processing e
 
  1. Refuse a configuration the state no longer matches, with [`assert_partial_fittable`](@ref). [`factory`](@ref) carries the state and replaces `w`, so an estimator that says weighted may hold a state fitted unweighted. The state stays on the estimator, so a caller who restores `w = nothing` reads it again.
  2. Divide the fourth accumulator by the observation count, giving the cokurtosis matrix.
- 3. Process it in place through [`matrix_processing_block!`](@ref), under `kte.mp` and the shape of the fitted sample. It is the block arm rather than the plain one for the reason the low order's read-out takes it: a plain fold over a changing universe answers `NaN` for an asset outside the Coverage Universe at every pair naming it, and a positive-definite repair over that frame meets a LAPACK refusal rather than a named error. The block arm repairs the finite block and leaves the frame for [`investable_mask`](@ref) to read, which is what the batch verb's reduce-and-expand leaves it too; a complete matrix runs the plain arm over the whole of it.
+ 3. Process it in place through [`matrix_processing_block!`](@ref), under `kte.mp` and the shape of the fitted sample. It is the block arm rather than the plain one for the reason the low order's `cov(ce)` with no data takes it: a plain fold over a changing universe answers `NaN` for an asset outside the Coverage Universe at every pair naming it, and a positive-definite repair over that frame meets a LAPACK refusal rather than a named error. The block arm repairs the finite block and leaves the frame for [`investable_mask`](@ref) to read, which is what the batch verb's reduce-and-expand leaves it too; a complete matrix runs the plain arm over the whole of it.
 
 # Arguments
 
@@ -962,7 +962,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a cokurtosis out of a sample buffer, by refitting the batch verb over the observations the buffer holds.
 
-The buffer read-out of [`cokurtosis`](@ref), and the whole of the online form at this order. The [`Coskewness`](@ref) method states the rule; carried one order further, an exact per-cell recursion would need the second and third co-moments over each quadruple's own observation set. The masks the buffer holds are handed to the batch verb on the same terms.
+The method of [`cokurtosis`](@ref) that makes the estimate from a Sample Buffer, and the whole of the online form at this order. The [`Coskewness`](@ref) method states the rule; carried one order further, an exact per-cell recursion would need the second and third co-moments over each quadruple's own observation set. The masks the buffer holds are handed to the batch verb on the same terms.
 
 # Arguments
 
@@ -1022,7 +1022,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a coskewness tensor out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `coskewness`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+The method of `coskewness` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 
@@ -1048,7 +1048,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a cokurtosis matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The buffer read-out arm of `cokurtosis`. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+The method of `cokurtosis` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
 
 # Arguments
 

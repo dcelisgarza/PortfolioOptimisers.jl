@@ -411,13 +411,15 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
         @test copy(cold).me === cold.me
         # A view forwards to the prior's own view.
         @test isa(po.port_opt_view(pa, [1, 2]), PriorExpectedReturns)
-        # A constant column: the default prior's positive-definite repair throws although
-        # `mu` is defined, and a covariance without the repair answers the sample mean.
+        # A constant column: the default prior's positive-definite repair keeps its zero row
+        # and column (#1429), so the adapter answers the sample mean, as a covariance
+        # without the repair does.
         Rc = copy(R)
         Rc[:, 2] .= 0
         rdc = ReturnsResult(; nx = nx, X = Rc, ts = ts)
-        @test_throws ArgumentError mean(pa, Rc)
-        @test_throws ArgumentError optimise(OPS(; alg = ForecastReversion(; me = pa)), rdc)
+        @test vec(mean(pa, Rc)) ≈ vec(mean(Rc; dims = 1))
+        resc = optimise(OPS(; alg = ForecastReversion(; me = pa)), rdc)
+        @test sum(resc.w) ≈ 1 && all(isfinite, resc.w)
         norep = PriorExpectedReturns(;
                                      pe = EmpiricalPrior(;
                                                          ce = PortfolioOptimisersCovariance(;

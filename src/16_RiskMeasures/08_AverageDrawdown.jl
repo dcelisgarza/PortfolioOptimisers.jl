@@ -53,7 +53,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - $(val_dict[:oow])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -101,7 +101,7 @@ AverageDrawdown
     """
     @pprop w
     function AverageDrawdown(settings::RiskMeasureSettings, w::Option{<:ObsWeights})
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(w)}(settings, w)
     end
 end
@@ -145,7 +145,7 @@ function average_drawdown(dd::VecNum, w::VecNum)
     return -Statistics.mean(dd, w)
 end
 function (r::AverageDrawdown)(x::VecNum)
-    return average_drawdown(absolute_drawdown_vec(x), get_observation_weights(r.w, x))
+    return average_drawdown(absolute_drawdown_vec(x), checked_observation_weights(r.w, x))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -202,7 +202,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - $(val_dict[:oow])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -247,7 +247,7 @@ RelativeAverageDrawdown
     @pprop w
     function RelativeAverageDrawdown(settings::HierarchicalRiskMeasureSettings,
                                      w::Option{<:ObsWeights})
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(w)}(settings, w)
     end
 end
@@ -257,7 +257,7 @@ function RelativeAverageDrawdown(;
     return RelativeAverageDrawdown(settings, w)
 end
 function (r::RelativeAverageDrawdown)(x::VecNum)
-    return average_drawdown(relative_drawdown_vec(x), get_observation_weights(r.w, x))
+    return average_drawdown(relative_drawdown_vec(x), checked_observation_weights(r.w, x))
 end
 
 # Expected-risk input kind — see `risk_input_kind`.

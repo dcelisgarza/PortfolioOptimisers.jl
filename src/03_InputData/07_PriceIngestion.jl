@@ -41,7 +41,7 @@ Derive the type the ingestion layer carries a series of value type `T` in.
 
 The layer spells an absent price `NaN`, so the carried type must be able to hold one. The layer reads that type off the data and does not name it: the type is [`float_if_integer`](@ref) of `T`. A floating-point type gives itself, so a `Float32` panel stays `Float32`. An integer type gives its floating-point type, `Float64` for `Int` and `BigFloat` for `BigInt`. A `Rational` and a number type the library does not know give themselves.
 
-This function does not decide whether the type can hold an absence, because a series with no gap and no padding never spells one. [`absent_value`](@ref) refuses a type by name when the layer writes an absence in it.
+This function does not decide whether the type can hold an absence, because a series with no gap and no padding never spells one. [`absent_value`](@ref) throws an error that names the type when the layer writes an absence in it.
 
 # Algorithm
 
@@ -79,7 +79,7 @@ end
 """
     absent_value(::Type{T}) -> T
 
-Return the one spelling of an absent value in type `T`, and refuse by name a type that cannot hold one.
+Return the one spelling of an absent value in type `T`, and throw an error that names a type that cannot hold one.
 
 The layer spells an absence one way, `NaN`, so a type that cannot represent `NaN` cannot state a gap. This function refuses such a type, for example a `Rational` panel that holds a gap or that a join must pad. Without it, a conversion raises an `InexactError` that names nothing. The refusal names the type and what the caller can do. An integer panel never reaches the refusal, because [`absence_type`](@ref) widens it to a floating-point type first.
 
@@ -175,11 +175,11 @@ Spell every absent price of one series the one way the ingestion layer carries, 
 
 A source spells an absent price one of two ways. An outer join of ragged per-asset histories pads with `NaN`, and a wide table built from a tidy one leaves `missing`. The layer unifies both as `NaN`, which no deletion step reads. This defines a gap for every later piece, so it runs before the Span Rule and before the join.
 
-The caller does not name the target type. The one-argument form derives it from the series alone with [`absence_type`](@ref), and the conversion uses this form for a carrier built by hand. [`price_ingestion`](@ref) first promotes the asset, factor and benchmark series to one type, because the join lays them in one table, and passes that type to the two-argument form.
+The caller does not name the target type. The one-argument form derives it from the series alone with [`absence_type`](@ref), and the conversion uses this form for a `PricesResult` built by hand. [`price_ingestion`](@ref) first promotes the asset, factor and benchmark series to one type, because the join lays them in one table, and passes that type to the two-argument form.
 
 # Algorithm
 
- 1. Refuse an infinite value by name with [`assert_no_infinite_price`](@ref). The **Span Rule** reads a non-finite cell as unpriced and the conversion reads it as a price, so the two would disagree about the cell.
+ 1. Refuse an infinite value with [`assert_no_infinite_price`](@ref), which throws an error that names it. The **Span Rule** reads a non-finite cell as unpriced and the conversion reads it as a price, so the two would disagree about the cell.
  2. The values are already of type `T`, so their gaps are already `NaN`: return `A` untouched.
  3. At least one value is `missing`: rebuild the values. Map each `missing` to [`absent_value`](@ref)`(T)` and convert every other entry to `T`. This is the one place where a `missing` becomes an absence, so the refusal of a type that cannot hold one happens here, by name.
  4. Otherwise convert every entry to `T`. Nothing is absent, so the function spells nothing and does not ask whether `T` can spell an absence. This includes an element type that admits `missing` when no value is `missing`.
@@ -229,14 +229,14 @@ end
 """
     assert_pad_spellable(::Type{T}, method::Symbol) -> nothing
 
-Refuse by name, before a join that can pad, a value type that cannot spell the pad.
+Before a join that can pad, throw an error that names a value type that cannot spell the pad.
 
 `TimeSeries.merge` pads with `NaN` converted to the table's value type, which has the same bits as [`absent_value`](@ref)`(T)`. For a type that cannot hold an absence, `merge` raises an `InexactError` that names nothing. This function asks first, so the refusal names the type. It asks before every join that can pad, whether or not the join then pads a row. An inner join drops an observation and does not pad it, so it asks for nothing.
 
 # Algorithm
 
  1. `method` is `:inner`: return.
- 2. Otherwise ask [`absent_value`](@ref)`(T)`, which refuses by name.
+ 2. Otherwise ask [`absent_value`](@ref)`(T)`, which throws an error that names the type.
 
 # Arguments
 
@@ -422,13 +422,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimator that assembles raw price series into the price carrier and its Listing Span, which the conversion then reads.
+Estimator that assembles raw price series into a [`PricesResult`](@ref) and its Listing Span, which the conversion then reads.
 
-`PriceIngestion` runs once on the whole panel, and it is not a [`Pipeline`](@ref) step. The observation clock decides this. The factor and benchmark join can add or drop observations, and the frequency collapse renumbers them. Cross-validation cuts its folds once on the carrier's clock. A hyperparameter that moves the clock changes the test set, and a score on one test set cannot be compared with a score on another. A step that changes only values leaves the clock alone, so it stays inside the `Pipeline`.
+`PriceIngestion` runs once on the whole panel, and it is not a [`Pipeline`](@ref) step. The observation clock decides this. The factor and benchmark join can add or drop observations, and the frequency collapse renumbers them. Cross-validation cuts its folds once on the clock of the `PricesResult`. A hyperparameter that moves the clock changes the test set, and a score on one test set cannot be compared with a score on another. A step that changes only values leaves the clock alone, so it stays inside the `Pipeline`.
 
 Because it runs outside the `Pipeline`, the **Span Rule** can read the whole panel. A step sees only a window, and a span derived from a window reads a delisting that straddles the window end as an asset that was never listed. A split forbids work on the data before it, but a listing calendar is a fact about the instruments and not an estimate from returns, so the panel-wide read is valid.
 
-The carrier holds the derived **Listing Span** in its `span` field. The conversion projects it onto the returns clock and gives the returns carrier an [`AssetPanel`](@ref) that states the universe. A caller who holds a listing calendar passes it as `span`, and it replaces the Span Rule's answer.
+The `PricesResult` holds the derived **Listing Span** in its `span` field. The conversion projects it onto the returns clock and gives the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) that states the universe. A caller who holds a listing calendar passes it as `span`, and it replaces the Span Rule's answer.
 
 **The asset table states the clock.** It states the universe, so it also states the clock. Under the default `join_method = :left`, the layer aligns the factor, benchmark and implied-volatility series to that clock and pads them where they are silent. The layer names what it padded: the table, the number of observations and the columns. It warns by default and refuses under `strict`, because a carried absence raises no error and those axes state no universe that would name it later.
 
@@ -514,28 +514,29 @@ end
     price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
                     F::Option{<:TimeSeries.TimeArray} = nothing,
                     B::Option{<:TimeSeries.TimeArray} = nothing,
+                    E::Option{<:TimeSeries.TimeArray} = nothing,
                     iv::Option{<:TimeSeries.TimeArray} = nothing,
                     ivpa::Option{<:Num_VecNum} = nothing,
                     pnl::Option{<:AssetPanel} = nothing) -> PricesResult
     price_ingestion(est::PriceIngestion, pr::PricesResult) -> PricesResult
 
-Assemble raw price series into the price carrier and its Listing Span.
+Assemble raw price series into a [`PricesResult`](@ref) and its Listing Span.
 
 The three steps that move the clock run here and not in a [`Pipeline`](@ref), and the **Span Rule** reads the whole panel after them. The result is an ordinary [`PricesResult`](@ref). Its `span` field states which assets are listed at each observation, and [`PricesToReturns`](@ref) projects it onto the returns clock.
 
 The layer spells an absent price `NaN`, the library's one spelling for absence. The conversion carries it into the returns and does not delete the observation or the asset that holds it. Every axis the layer touches carries its absences. If a factor, benchmark or implied-volatility series is silent at an observation of the emitted clock, the layer pads it there and names the padding. It warns by default and refuses under `strict`, because those axes state no universe that would name the padding later.
 
-The caller does not name the value type of the carrier. The layer promotes the asset, factor and benchmark types to one type, because the join lays them in one table. It then widens that type only as the return arithmetic would widen it. A `Float32` panel stays `Float32`, `Float32` beside `Float64` joins in `Float64`, and an integer panel takes the floating-point type that represents it. The layer refuses by name a type that cannot spell an absence wherever it might have to spell one: at a `missing` value, before a join that can pad, and when it aligns the implied volatilities. The join and the alignment ask before they know whether they pad a row.
+The caller does not name the value type of the `PricesResult`. The layer promotes the asset, factor and benchmark types to one type, because the join lays them in one table. It then widens that type only as the return arithmetic would widen it. A `Float32` panel stays `Float32`, `Float32` beside `Float64` joins in `Float64`, and an integer panel takes the floating-point type that represents it. The layer throws an error that names a type that cannot spell an absence wherever it might have to spell one: at a `missing` value, before a join that can pad, and when it aligns the implied volatilities. The join and the alignment ask before they know whether they pad a row.
 
 # Algorithm
 
- 1. Check with [`assert_distinct_series_names`](@ref) that the asset, factor and benchmark series keep their names through the join. The join renames a name that two tables share, and a block would then take another block's column.
+ 1. Check with [`assert_distinct_series_names`](@ref) that the asset, factor and benchmark series keep their names through the join, and that no Exogenous Series takes the name of one of them. The join renames a name that two tables share, and a block would then take another block's column.
  2. Promote the value types that the three price tables contribute through [`series_value_type`](@ref), and widen the result with [`absence_type`](@ref), giving the target type. Unify the absent-price spelling of the three tables in that type with [`unify_gaps`](@ref), so a gap means one thing from here on.
- 3. Join the factor and the benchmark series onto the asset clock under `join_method`. A left join keeps the asset clock and pads the others where they are silent. An outer join adds the rows that one series has and another does not, and can pad every table. An inner join keeps the rows that every table has. Before a join that can pad, ask [`assert_pad_spellable`](@ref), which refuses by name a type that cannot spell the pad.
+ 3. Join the factor and the benchmark series onto the asset clock under `join_method`. A left join keeps the asset clock and pads the others where they are silent. An outer join adds the rows that one series has and another does not, and can pad every table. An inner join keeps the rows that every table has. Before a join that can pad, ask [`assert_pad_spellable`](@ref), which throws an error that names a type that cannot spell the pad.
  4. Write the padding report lines of the asset, factor and benchmark tables against the joined clock with [`padding_report_line`](@ref), before the collapse renumbers it.
  5. Collapse the joined series to a lower frequency when `collapse_args` is not empty. This renumbers every observation.
  6. Split the joined series back into the asset, factor and benchmark blocks, all on one clock.
- 7. Align the implied volatilities to that clock with [`align_series`](@ref), in the type that [`absence_type`](@ref) derives from their own type, and pad the observations where they are silent. Write their report line, and carry `ivpa` through. An implied volatility is a volatility and not a price, so the layer carries it and never converts it to a return.
+ 7. Align the implied volatilities to that clock with [`align_series`](@ref), in the type that [`absence_type`](@ref) derives from their own type, and pad the observations where they are silent. Write their report line, and carry `ivpa` through. An implied volatility is a volatility and not a price, so the layer carries it and never converts it to a return. Align the Exogenous Series `E` to the same clock in the same way, and write its report line. `E` is aligned and never joined, so it adds and drops no observation of the assets: a series one consumer reads must not change the universe of every asset. It is a level series, so [`prices_to_returns`](@ref) converts it.
  8. Name what the layer padded with [`assert_join_padding`](@ref), which warns, or refuses under `strict`.
  9. Put a caller's [`AssetPanel`](@ref) on the emitted clock with [`project_panel_clock`](@ref). A caller states a Panel Field on the clock of the table they hold, and the join and the collapse move that clock, so the projection happens here. Each period of a collapse takes the Panel Field values of the last row of its group, as [`LastObservation`](@ref) does. The timestamp function of `collapse_args` does not change this row, so under `(Dates.week, first, last)` the prices and the Panel Field values of a week come from one day. A static panel has no observation axis, and the layer carries it through unchanged.
 10. Read the **Listing Span** off the asset block with [`listing_span`](@ref), unless the caller declared one. A declared span replaces the answer of the Span Rule.
@@ -549,10 +550,11 @@ Under the default join the emitted clock is the asset table's, so `timestamp(pr.
   - `X`: Asset prices, `observations × assets`.
   - `F`: Optional factor prices.
   - `B`: Optional benchmark prices, one column or one per asset.
+  - `E`: Optional Exogenous Series, level series on any clock, such as a Currency Excess Index. The layer aligns it to the emitted clock and pads `NaN` where it is silent.
   - `iv`: Optional implied volatilities, one column per asset, on any clock. The layer aligns them to the emitted clock and pads `NaN` where they are silent.
   - `ivpa`: Optional implied volatility adjustment.
   - `pnl`: Optional [`AssetPanel`](@ref) of Panel Fields the caller already holds. The layer keeps its Panel Fields and does not read its masks. A time-varying panel carries an `amsk` by construction, so that field cannot carry a declaration. A listing statement goes in `span`.
-  - `pr`: A [`PricesResult`](@ref), for the second form. The layer ingests its series again. It keeps a span the carrier states unless `est.span` overrides it, and the Span Rule runs only where neither states one.
+  - `pr`: A [`PricesResult`](@ref), for the second form. The layer ingests its series again. It keeps a span that `pr` states unless `est.span` overrides it, and the Span Rule runs only where neither states one.
 
 # Validation
 
@@ -567,7 +569,7 @@ Under the default join the emitted clock is the asset table's, so `timestamp(pr.
 
 # Returns
 
-  - `pr::PricesResult`: The price carrier, holding the Listing Span in its `span` field.
+  - `pr::PricesResult`: The price data, holding the Listing Span in its `span` field.
 
 # Examples
 
@@ -609,12 +611,13 @@ julia> Matrix(pr.span)
 function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
                          F::Option{<:TimeSeries.TimeArray} = nothing,
                          B::Option{<:TimeSeries.TimeArray} = nothing,
+                         E::Option{<:TimeSeries.TimeArray} = nothing,
                          iv::Option{<:TimeSeries.TimeArray} = nothing,
                          ivpa::Option{<:Num_VecNum} = nothing,
                          pnl::Option{<:AssetPanel} = nothing)::PricesResult
     @argcheck(!isempty(X),
               IsEmptyError("`X` cannot be empty: the ingestion layer states a universe from a price panel"))
-    assert_distinct_series_names(X, F, B)
+    assert_distinct_series_names(X, F, B, E)
     nx = TimeSeries.colnames(X)
     #! The three price tables are laid in one table by the join, so they take one value
     #! type, and it is the one the return arithmetic would widen them to: derived from the
@@ -650,26 +653,33 @@ function price_ingestion(est::PriceIngestion, X::TimeSeries.TimeArray;
         push!(lines, padding_report_line("iv", iv, ts))
         align_series(unify_gaps(iv, absence_type(series_value_type(iv))), ts)
     end
+    Ea = if isnothing(E)
+        nothing
+    else
+        push!(lines, padding_report_line("E", E, ts))
+        align_series(unify_gaps(E, absence_type(series_value_type(E))), ts)
+    end
     assert_join_padding(lines, est.strict)
     #! The collapse is the one step here that renumbers an observation, and a Panel Field is
     #! stated on the clock of the table the caller holds, so the projection is owed here
-    #! rather than by the conversion: after the door, the carrier states one clock and
-    #! everything it carries is on it.
+    #! rather than by the conversion: after `price_ingestion`, the PricesResult states one
+    #! clock and everything it holds is on it.
     pnl = project_panel_clock(pnl, tsj, X, est.collapse_args)
     span = isnothing(est.span) ? listing_span(values(Xa)) : est.span
-    return PricesResult(; X = Xa, F = Fa, B = Ba, iv = iva, ivpa = ivpa, pnl = pnl,
+    return PricesResult(; X = Xa, F = Fa, B = Ba, E = Ea, iv = iva, ivpa = ivpa, pnl = pnl,
                         span = span)
 end
 function price_ingestion(est::PriceIngestion, pr::PricesResult)::PricesResult
-    #! A carrier's span is a declaration already made, and a declaration is never
+    #! The span of `pr` is a declaration already made, and a declaration is never
     #! second-guessed: the estimator's own `span` overrides it, and the Span Rule runs
     #! only where neither states one. A declared span is on the clock the caller handed
-    #! in, so a collapse that moves the clock refuses it by shape at the carrier.
+    #! in, so after a collapse that moves the clock, the PricesResult constructor refuses
+    #! it by its shape.
     span = isnothing(est.span) ? pr.span : est.span
     est = PriceIngestion(; join_method = est.join_method, collapse_args = est.collapse_args,
                          span = span, strict = est.strict)
-    return price_ingestion(est, pr.X; F = pr.F, B = pr.B, iv = pr.iv, ivpa = pr.ivpa,
-                           pnl = pr.pnl)
+    return price_ingestion(est, pr.X; F = pr.F, B = pr.B, E = pr.E, iv = pr.iv,
+                           ivpa = pr.ivpa, pnl = pr.pnl)
 end
 """
     project_panel_clock(pnl::Nothing, tsj, X::TimeSeries.TimeArray, ca::Tuple) -> nothing
@@ -677,7 +687,7 @@ end
 
 Put a caller's [`AssetPanel`](@ref) on the clock the ingestion emits.
 
-A caller states a Panel Field on the clock of the table they hold. The join and the collapse of [`price_ingestion`](@ref) move that clock, so the projection happens at the door of the layer. After it, the carrier states one clock and everything it holds is on that clock. A static panel has no observation axis, so [`feature_row_indices`](@ref) returns `Colon()` for it and the panel passes through unchanged.
+A caller states a Panel Field on the clock of the table they hold. The join and the collapse of [`price_ingestion`](@ref) move that clock, so [`price_ingestion`](@ref) makes the projection. After it, the `PricesResult` states one clock and everything it holds is on that clock. A static panel has no observation axis, so [`feature_row_indices`](@ref) returns `Colon()` for it and the panel passes through unchanged.
 
 A collapse puts many rows into one period. Each period takes the Panel Field values of the last row of its group, as [`LastObservation`](@ref) does. The timestamp function of `ca` does not change this row. So under `(Dates.week, first, last)` a week pairs the prices of its last day with the Panel Field values of the same day.
 
@@ -733,11 +743,11 @@ function project_panel_clock(pnl::AssetPanel, tsj, X::TimeSeries.TimeArray,
                          collect(eachindex(nx)), nx)
 end
 """
-    span_carrier_view(span::Nothing, ts_new, ts_old, j) -> nothing
-    span_carrier_view(span::AbstractMatrix{Bool}, ts_new, ts_old, j) -> SubArray
-    span_carrier_view(span::ListingSpan, ts_new, ts_old, j) -> Union{ListingSpan, SubArray}
+    listing_span_view(span::Nothing, ts_new, ts_old, j) -> nothing
+    listing_span_view(span::AbstractMatrix{Bool}, ts_new, ts_old, j) -> SubArray
+    listing_span_view(span::ListingSpan, ts_new, ts_old, j) -> Union{ListingSpan, SubArray}
 
-View a price carrier's Listing Span over the surviving timestamps and the assets `j`, or return `nothing` when the carrier holds none.
+View the Listing Span of a `PricesResult` over the surviving timestamps and the assets `j`, or return `nothing` when the `PricesResult` holds none.
 
 The span states a fact about the instruments, so the span of a window is a view of the panel-wide span, never a span derived again from the window. A span derived from a window reads a delisting that straddles the window end as an asset that was never listed. A view is exact, and over a [`PortfolioOptimisers.ListingSpan`](@ref) it stores no boolean cell.
 
@@ -770,13 +780,13 @@ The method that Julia selects is the algorithm.
   - [`matched_row_indices`](@ref)
   - [`port_opt_view`](@ref)
 """
-function span_carrier_view(::Nothing, ::Any, ::Any, ::Any)
+function listing_span_view(::Nothing, ::Any, ::Any, ::Any)
     return nothing
 end
-function span_carrier_view(span::AbstractMatrix{Bool}, ts_new, ts_old, j)
+function listing_span_view(span::AbstractMatrix{Bool}, ts_new, ts_old, j)
     return view(span, matched_row_indices(ts_new, ts_old), j)
 end
-function span_carrier_view(span::ListingSpan, ts_new, ts_old, j)
+function listing_span_view(span::ListingSpan, ts_new, ts_old, j)
     i = matched_row_indices(ts_new, ts_old)
     #! A contiguous row window in clock order cuts every interval to an interval, so the
     #! two integers per asset survive the cut: the bounds shift by the rows the window
@@ -797,13 +807,13 @@ end
 
 Check that a Listing Span has the shape of the price panel it describes.
 
-A span states which assets are listed at each observation of the price clock, so it has the shape of the asset prices. A carrier that holds no span states no universe, and there is nothing to check.
+A span states which assets are listed at each observation of the price clock, so it has the shape of the asset prices. A `PricesResult` that holds no span states no universe, and there is nothing to check.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `span` is `nothing`: the carrier states no universe, so there is nothing to check.
+ 1. `span` is `nothing`: the `PricesResult` states no universe, so there is nothing to check.
  2. Otherwise check the span's shape against the price panel's.
 
 # Arguments
@@ -903,7 +913,7 @@ function assert_disjoint_series_names(a::AbstractVector{Symbol}, b::AbstractVect
                                       na::String, nb::String)::Nothing
     shared = intersect(a, b)
     @argcheck(isempty(shared),
-              ConflictingArgumentError("the asset, factor and benchmark series are joined onto one clock and a column name is what says which series a column came from, so `$na` and `$nb` cannot share one; both carry $(shared). Rename the colliding columns before the call."))
+              ConflictingArgumentError("a column name is what says which series a column came from, and the asset, factor and benchmark series are joined onto one clock, so `$na` and `$nb` cannot share one; both carry $(shared). Rename the colliding columns before the call."))
     return nothing
 end
 """
@@ -938,30 +948,33 @@ function assert_unreserved_series_names(n::AbstractVector{Symbol}, nn::String)::
     return nothing
 end
 """
-    assert_distinct_series_names(X::TimeSeries.TimeArray, F::Option{<:TimeSeries.TimeArray} = nothing, B::Option{<:TimeSeries.TimeArray} = nothing) -> nothing
+    assert_distinct_series_names(X::TimeSeries.TimeArray, F::Option{<:TimeSeries.TimeArray} = nothing, B::Option{<:TimeSeries.TimeArray} = nothing, E::Option{<:TimeSeries.TimeArray} = nothing) -> nothing
 
 Check that every price series reaching the layer can still be named after the join.
 
-Both doors of the layer run this check before they merge, [`price_ingestion`](@ref) and [`prices_to_returns`](@ref). After it, every later piece can split the merged table by name. Each name belongs to exactly one of the asset, factor and benchmark blocks, and no name is the clock's.
+Both entry points of the layer run this check before they merge, [`price_ingestion`](@ref) and [`prices_to_returns`](@ref). After it, every later piece can split the merged table by name. Each name belongs to exactly one of the asset, factor and benchmark blocks, and no name is the clock's.
+
+The Exogenous Series `E` is converted beside the three blocks, and a consumer selects its columns by name. So its names are also disjoint from the three blocks, and no name is the clock's.
 
 This function cannot check two series of one table. The `TimeSeries.TimeArray` constructor runs `TimeSeries.replace_dupes!` over its column names, so it renames the duplicates of a table before the table exists, and no duplicate reaches this function.
 
 # Algorithm
 
- 1. Read the three name lists, an absent table naming none, with [`series_names`](@ref).
- 2. Refuse a name shared by two of them with [`assert_disjoint_series_names`](@ref), over all three pairs.
- 3. Refuse the clock's own name in any of them with [`assert_unreserved_series_names`](@ref).
+ 1. Read the four name lists, an absent table naming none, with [`series_names`](@ref).
+ 2. Refuse a name shared by two of them with [`assert_disjoint_series_names`](@ref), over all six pairs.
+ 3. Refuse the clock's own name in any of the four with [`assert_unreserved_series_names`](@ref).
 
 # Arguments
 
   - `X`: Asset prices, `observations × assets`.
   - `F`: Optional factor prices.
   - `B`: Optional benchmark prices.
+  - `E`: Optional Exogenous Series.
 
 # Validation
 
-  - The asset, factor and benchmark names are pairwise disjoint. Raises a [`ConflictingArgumentError`](@ref) naming the shared columns.
-  - None of them is `timestamp`. Raises a [`ConflictingArgumentError`](@ref).
+  - The asset, factor, benchmark and Exogenous Series names are pairwise disjoint. Raises a [`ConflictingArgumentError`](@ref) naming the shared columns.
+  - None of the four is `timestamp`. Raises a [`ConflictingArgumentError`](@ref).
 
 # Returns
 
@@ -978,16 +991,22 @@ This function cannot check two series of one table. The `TimeSeries.TimeArray` c
 """
 function assert_distinct_series_names(X::TimeSeries.TimeArray,
                                       F::Option{<:TimeSeries.TimeArray} = nothing,
-                                      B::Option{<:TimeSeries.TimeArray} = nothing)::Nothing
+                                      B::Option{<:TimeSeries.TimeArray} = nothing,
+                                      E::Option{<:TimeSeries.TimeArray} = nothing)::Nothing
     nx = TimeSeries.colnames(X)
     nf = series_names(F)
     nb = series_names(B)
+    ne = series_names(E)
     assert_disjoint_series_names(nx, nf, "X", "F")
     assert_disjoint_series_names(nx, nb, "X", "B")
     assert_disjoint_series_names(nf, nb, "F", "B")
+    assert_disjoint_series_names(nx, ne, "X", "E")
+    assert_disjoint_series_names(nf, ne, "F", "E")
+    assert_disjoint_series_names(nb, ne, "B", "E")
     assert_unreserved_series_names(nx, "X")
     assert_unreserved_series_names(nf, "F")
     assert_unreserved_series_names(nb, "B")
+    assert_unreserved_series_names(ne, "E")
     return nothing
 end
 """
@@ -1029,9 +1048,9 @@ end
     returns_universe_masks(span::Nothing, R::AbstractMatrix)
     returns_universe_masks(span::AbstractMatrix{Bool}, R::AbstractMatrix)
 
-Derive the two universe masks the returns carrier's [`AssetPanel`](@ref) states.
+Derive the two universe masks that the [`AssetPanel`](@ref) of the `ReturnsResult` states.
 
-A carrier from the layer arrives with a **Listing Span**. This function projects the span onto the returns clock and intersects it with finiteness. A carrier built outside the layer arrives without a span and states **no universe**, whether or not its prices hold a gap. The function does not derive a span for it, because a derivation from one window reads a delisting that straddles the window end as an asset that was never listed. The library still handles the gaps of such a carrier, because with no panel the Coverage Universe reads finiteness alone. So `pnl === nothing` means only that the layer did not build the carrier.
+A `PricesResult` from the layer arrives with a **Listing Span**. This function projects the span onto the returns clock and intersects it with finiteness. A `PricesResult` built outside the layer arrives without a span and states **no universe**, whether or not its prices hold a gap. The function does not derive a span for it, because a derivation from one window reads a delisting that straddles the window end as an asset that was never listed. The library still handles the gaps of such a `PricesResult`, because with no panel the Coverage Universe reads finiteness alone. So `pnl === nothing` means only that the layer did not build the `PricesResult`.
 
 # Algorithm
 
@@ -1047,7 +1066,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `(amsk, emsk)`: The two masks, or `nothing, nothing` when the carrier states no universe.
+  - `(amsk, emsk)`: The two masks, or `nothing, nothing` when the `PricesResult` states no universe.
 
 # Related
 
@@ -1067,35 +1086,35 @@ end
     attach_universe_masks(pnl::Nothing, amsk::AbstractMatrix{Bool}, emsk::AbstractMatrix{Bool}) -> AssetPanel
     attach_universe_masks(pnl::AssetPanel, amsk::AbstractMatrix{Bool}, emsk::AbstractMatrix{Bool}) -> AssetPanel
 
-Put the two universe masks onto the [`AssetPanel`](@ref) the returns carrier holds.
+Put the two universe masks onto the [`AssetPanel`](@ref) that the `ReturnsResult` holds.
 
-The layer emits one carrier, and the masks go on it. A [`Pipeline`](@ref) step has one output, and [`PricesToReturns`](@ref) cannot emit the masks by another route without putting them on the price clock, where the masks are not stated. Because the carrier holds the masks, [`port_opt_view`](@ref) slices the universe together with the returns and needs no extra code.
+The layer emits one `ReturnsResult`, and the masks go on it. A [`Pipeline`](@ref) step has one output, and [`PricesToReturns`](@ref) cannot emit the masks by another route without putting them on the price clock, where the masks are not stated. Because the `ReturnsResult` holds the masks, [`port_opt_view`](@ref) slices the universe together with the returns and needs no extra code.
 
-The function keeps a caller's Panel Fields and replaces both masks with the layer's. The active mask cannot be a declaration that a panel brings to the door. A time-varying panel holds an `amsk` by construction, and [`asset_panel`](@ref) writes an all-true one when the caller states none. So an all-true `amsk` beside a time-varying Panel Field looks the same as a declared calendar in which every asset is listed. The one door for a listing statement is `span` on [`PriceIngestion`](@ref). The estimation mask states a fact about the data and not about the instruments, so the conversion derives it again in every case with [`universe_masks`](@ref), and `emsk ⊆ amsk` holds by construction.
+The function keeps a caller's Panel Fields and replaces both masks with the layer's. The active mask cannot be a declaration that a panel brings into the layer. A time-varying panel holds an `amsk` by construction, and [`asset_panel`](@ref) writes an all-true one when the caller states none. So an all-true `amsk` beside a time-varying Panel Field looks the same as a declared calendar in which every asset is listed. The only way to state a listing is `span` on [`PriceIngestion`](@ref). The estimation mask states a fact about the data and not about the instruments, so the conversion derives it again in every case with [`universe_masks`](@ref), and `emsk ⊆ amsk` holds by construction.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. No masks: return the panel unchanged. The carrier states no universe, so `pnl === nothing` means only that the layer did not build the carrier.
+ 1. No masks: return the panel unchanged. The `PricesResult` states no universe, so `pnl === nothing` means only that the layer did not build the `PricesResult`.
  2. Masks and no panel: return an [`AssetPanel`](@ref) of the two masks and no Panel Field. This is the layer's common case: a caller holding only prices has no feature data.
  3. Masks and a panel: keep its Panel Fields and replace both its masks. A static panel's fields carry no observation axis, so the function first lifts them onto the clock of the masks with [`panel_field_lift`](@ref).
 
 # Arguments
 
-  - `pnl`: The Asset Panel the price carrier held, or `nothing`.
+  - `pnl`: The Asset Panel that the `PricesResult` held, or `nothing`.
   - `amsk`: The active mask, or `nothing`.
   - `emsk`: The estimation mask, or `nothing`.
 
 # Returns
 
-  - `pnl′::Option{<:AssetPanel}`: The panel the returns carrier holds.
+  - `pnl′::Option{<:AssetPanel}`: The panel that the `ReturnsResult` holds.
 
 # Related
 
   - [`AssetPanel`](@ref)
   - [`asset_panel`](@ref): writes the all-true `amsk` a time-varying build carries when the caller states none.
-  - [`PriceIngestion`](@ref): its `span` is the door for a listing statement.
+  - [`PriceIngestion`](@ref): its `span` is the only way to state a listing.
   - [`returns_universe_masks`](@ref)
   - [`panel_field_lift`](@ref)
   - [`prices_to_returns`](@ref)

@@ -7,7 +7,7 @@ This function computes the distance matrix containing the lengths of the shortes
 
 !!! note
 
-    Based on a Matlab implementation by Mika Rubinov, Rick Betzel, and Andrea Avena.
+    It ports the function `distance_wei` of the Brain Connectivity Toolbox of [rubinovsporns2010](@citet).
 
 # Mathematical definition
 
@@ -59,6 +59,10 @@ A pair that no path joins keeps ``D_{u,\\,v} = \\infty``, because the minimum ov
   - [`PMFG_T2s`](@ref)
   - [`CliqHierarchyTree2s`](@ref)
   - [`DBHT`](@ref)
+
+# References
+
+  - $(ref_dict[:rubinovsporns2010])
 """
 function distance_wei(L::MatNum)
     N = size(L, 1)
@@ -111,7 +115,7 @@ This function performs a breadth-first search (BFS) on a binary (directed or und
 
 !!! note
 
-    Original implementation by Olaf Sporns, Indiana University, 2002/2007/2008.
+    It ports the function `breadth` of the Brain Connectivity Toolbox of [rubinovsporns2010](@citet).
 
 # Algorithm
 
@@ -140,6 +144,10 @@ This function performs a breadth-first search (BFS) on a binary (directed or und
 
   - [`FindDisjoint`](@ref)
   - [`CliqHierarchyTree2s`](@ref)
+
+# References
+
+  - $(ref_dict[:rubinovsporns2010])
 """
 function breadth(CIJ::MatNum, source::Integer)
     N = size(CIJ, 1)

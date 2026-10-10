@@ -585,13 +585,13 @@ end
     # The model and the functor must report the same number.
     @test isapprox(JuMP.value(res.model[:var_range_risk_1]), r(x))
 
-    # Both legs flag `floor((alpha - s) * T) = 3` exceedances. A gain leg that flags none
+    # Both legs flag `floor((alpha + s) * T) = 4` exceedances. A gain leg that flags none
     # is the defect above.
-    @test sum(round.(Int, JuMP.value.(res.model[:z_var_gain_1]))) == 3
-    @test sum(round.(Int, JuMP.value.(res.model[:z_var_loss_1]))) == 3
+    @test sum(round.(Int, JuMP.value.(res.model[:z_var_gain_1]))) == 4
+    @test sum(round.(Int, JuMP.value.(res.model[:z_var_loss_1]))) == 4
 
     # The two legs are the two empirical quantiles, in the negated upper tail convention.
     xs = sort(x)
-    @test isapprox(JuMP.value(res.model[:var_risk_loss_1]), -xs[4])
-    @test isapprox(JuMP.value(res.model[:var_risk_gain_1]), xs[end - 3])
+    @test isapprox(JuMP.value(res.model[:var_risk_loss_1]), -xs[5])
+    @test isapprox(JuMP.value(res.model[:var_risk_gain_1]), xs[end - 4])
 end

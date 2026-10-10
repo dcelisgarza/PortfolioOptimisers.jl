@@ -65,12 +65,17 @@ rdk = ReturnsResult(; nx = nx[keep], X = X[:, keep], nf = nf, F = F)
     @test PortfolioOptimisers.investable_mask(LowOrderPrior(; X = pr.X, mu = pr.mu,
                                                             sigma = sigma)) ==
           BitVector([1, 1, 1, 0, 1])
-    # An off-diagonal `NaN` is not read: the diagonal alone decides.
+    # The diagonal alone decides the mask. An off-diagonal `NaN` between two investable
+    # assets is refused, and one that touches an excluded asset is not read.
     sigma = collect(pr.sigma)
     sigma[1, 2] = NaN
-    @test isnothing(PortfolioOptimisers.investable_mask(LowOrderPrior(; X = pr.X,
-                                                                      mu = pr.mu,
-                                                                      sigma = sigma)))
+    @test_throws PortfolioOptimisers.IsNonFiniteError LowOrderPrior(; X = pr.X, mu = pr.mu,
+                                                                    sigma = sigma)
+    sigma = collect(pr.sigma)
+    sigma[4, 4] = sigma[1, 4] = sigma[4, 1] = NaN
+    @test PortfolioOptimisers.investable_mask(LowOrderPrior(; X = pr.X, mu = pr.mu,
+                                                            sigma = sigma)) ==
+          BitVector([1, 1, 1, 0, 1])
     # An empty investable set has no optimisation to state, so it throws where it is derived
     # rather than passing a zero-asset problem downstream.
     @test_throws PortfolioOptimisers.IsEmptyError PortfolioOptimisers.investable_mask(LowOrderPrior(;

@@ -36,6 +36,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :f_views_conf => "`f_views_conf`: Factor views confidence estimator or result.",#
                  :rsd => "`rsd`: Whether to include residual variance in the posterior covariance.",#
                  :f_mp => "`f_mp`: Factor matrix processing estimator.",#
+                 :mtx_sqrt => "`mtx_sqrt`: Square-root algorithm of the factor covariance, and of a full idiosyncratic covariance, whose square roots make up `chol`. The default [`EigenFallbackSquareRoot`](@ref) takes the Cholesky factor where it exists, and the eigen square root of a singular positive semidefinite matrix otherwise. [`RidgeCholeskySquareRoot`](@ref) takes the Cholesky factor of the matrix with a small ridge added, and `nothing` takes the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. [`matrix_square_root`](@ref) states each algorithm.",#
+                 :srep => "`srep`: Systematic Repair rule of the lift, a member of [`AbstractSystematicRepair`](@ref). [`NoSystematicRepair`](@ref) runs every step of `mp` on the systematic block except the `:pdm` step, and [`SystematicRepair`](@ref) runs every step. Under each rule the lift then adds the idiosyncratic block and repairs the sum under `mp.pdm`.",#
+                 :carry => "`carry`: Carry Rule of the carry fold, a member of [`AbstractCarryRule`](@ref). [`FoldOrRefit`](@ref), the default, folds each part that has a fold and fits every other part again at each step, so the carry fold equals the batch fit at a cost that can grow with the stream. [`FoldOnly`](@ref) makes the constructor refuse a part whose step cost grows, as [`carry_growing_parts`](@ref) lists it. A batch fit and the refit under [`Online`](@ref) ignore the rule.",#
                  :re => "`re`: Regression estimator.",#
                  :pes => "`pes`: Vector of prior estimators.",#
                  :pe1 => "`pe1`: Pre-processing prior estimator.",#
@@ -114,6 +117,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :val_ucs => "`val`: Quantity the set is a neighbourhood of — a characteristic vector on the mean axis, a covariance matrix on the covariance axis. `nothing` defers to the consumer's own quantity. When it is set, it takes precedence over the returns estimator's field and over the prior.",#
                  :method_ucs => "`method`: Ellipsoidal uncertainty set estimation method.",#
                  :diagonal => "`diagonal`: Whether to use only the diagonal of the covariance matrix.",#
+                 :dc_ucs => "`dc`: Construction of the diagonal covariance shape. It is read only when `alg` is an [`EllipsoidalUncertaintySetAlgorithm`](@ref) or a [`NormBallUncertaintySetAlgorithm`](@ref) with `diagonal = true`. [`DiagonalOfShape`](@ref) takes the diagonal of the full shape, and [`ShapeOfDiagonal`](@ref) builds the shape from the variances alone.",#
                  :eps_ucs => "`eps`: Radius of the ``\\ell_1`` uncertainty set on the characteristic vector. Larger values admit more estimation error, and therefore activate more assets.",#
                  :ep_ucs => "`ep`: Radius of the positive-error side of the signed ``\\ell_1`` uncertainty set.",#
                  :en_ucs => "`en`: Radius of the negative-error side of the signed ``\\ell_1`` uncertainty set.",#

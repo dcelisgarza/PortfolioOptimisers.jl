@@ -270,7 +270,7 @@ Convert a Matlab-style linkage matrix to a format compatible with [`Clustering.H
 
 This function transforms a linkage matrix produced by DBHT or similar hierarchical clustering routines into the format required by [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust), including proper indexing and cluster size tracking.
 
-**This is the seam to [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust), so the convention below is the one every consumer downstream reads.** [`DBHTs`](@ref) loads the first two columns into `mleft` and `mright` and the third into `heights`, and [`Clusters`](@ref) and everything that cuts a dendrogram reads them back on that convention.
+**This is the point where the result passes to [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust), so the convention below is the one every consumer downstream reads.** [`DBHTs`](@ref) loads the first two columns into `mleft` and `mright` and the third into `heights`, and [`Clusters`](@ref) and everything that cuts a dendrogram reads them back on that convention.
 
 Both conventions number one merge per row, and they differ in how a row names its two sides.
 

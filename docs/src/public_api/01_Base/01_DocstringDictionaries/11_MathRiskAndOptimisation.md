@@ -1,7 +1,7 @@
 ```@meta
-Description = "Risk and optimisation notation has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Math risk and optimisation has no public API in PortfolioOptimisers.jl; its names are in the private API."
 ```
 
-# Risk and optimisation notation
+# Math risk and optimisation
 
-This file defines no name. The [private page](@ref private-api-risk-and-optimisation-notation) says which table it fills.
+This file defines no name. The [private page](@ref private-api-math-risk-and-optimisation) says which table it fills.

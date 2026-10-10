@@ -5,15 +5,15 @@ Abstract supertype for the statistics of a window of price levels that [`PriceLe
 
 Every statistic reads the reconstructed price path. The level of the last observation is one in every asset, and the returns of the window give the earlier levels. The statistic is a vector over the assets, and the expected return is the statistic divided by the last level, minus one.
 
-A statistic that reads each asset's levels alone is homogeneous of degree one in them, so it has the same value on the path as on the prices. The moving averages, the peak, the lagged price, the reweighted relative and the trend switches are of this kind. A statistic that couples the assets changes when each asset is scaled by its own last price. The spatial median couples them through its Euclidean distances, and the kernel trend pattern through its regression. On the path, each of them is the paper's statistic of prices normalised to one at the current period, and its docstring states the difference.
+A statistic that reads each asset's levels alone is homogeneous of degree one in them, so it has the same value on the path as on the prices. The moving averages, the peak, the lagged price, the reweighted relative and the trend switches are of this kind. A statistic that couples the assets changes when each asset is scaled by its own last price. The spatial median couples them through its Euclidean distances, and the kernel trend pattern through its regression. On the path, each of them is the published statistic of prices normalised to one at the current period, and its docstring states the difference.
 
 A statistic is **windowed** when it reads a fixed number of levels. [`MovingAverage`](@ref), [`SpatialMedian`](@ref), [`WindowPeak`](@ref) and [`LaggedPrice`](@ref) are windowed. A statistic is **folding** when it is an exact recursion over the price relatives, as [`ExponentialMovingAverage`](@ref) and [`ReweightedPriceRelative`](@ref) are. A folding statistic carries one vector on a Partial Fit State and reads no rows. Its batch form over a matrix of returns runs the same recursion from the first level, so a fold and a batch over the same rows agree exactly.
 
-A folding statistic can also carry a memory on the same state, the last [`memory_rows`](@ref) relatives, as [`KernelTrendPattern`](@ref) does. Its recursion reads the carried vector and the memory together, so a host holds no rows for it. Its batch form fills the memory as it runs from the first row.
+A folding statistic can also carry a memory on the same state, the last [`memory_rows`](@ref) relatives, as [`KernelTrendPattern`](@ref) does. Its recursion reads the carried vector and the memory together, so the estimator that holds it keeps no rows for it. Its batch form fills the memory as it runs from the first row.
 
-Over the first rows a windowed statistic reads the levels it has. With `window = 5` and two returns folded, it reads three levels. This truncation is the library's choice. Over their first `window` rows, the authors' code for the moving-average, median and peak price papers forecasts the last price relative instead. A folding statistic starts from its seed at the first row, and a composite statistic truncates every window it holds.
+Over the first rows a windowed statistic reads the levels it has. With `window = 5` and two returns folded, it reads three levels. This truncation is the library's choice. Over their first `window` rows, the code that accompanies [lihoi2012](@cite), [huang2016](@cite) and [lai2018ppt](@cite) forecasts the last price relative instead. A folding statistic starts from its seed at the first row, and a composite statistic truncates every window it holds.
 
-A folding statistic reads the active mask. [`partial_fit!`](@ref) folds the active assets of the row alone, and it resets an inactive asset to [`cold_statistic`](@ref), so a relisted asset starts cold. The read-out is `NaN` at an asset that has folded no level since its last reset. The caller reduces the assets, so a statistic that couples them reads the active assets alone and needs no mask of its own.
+A folding statistic reads the active mask. [`partial_fit!`](@ref) folds the active assets of the row alone, and it resets an inactive asset to [`cold_statistic`](@ref), so a relisted asset starts cold. `mean(me)` with no data answers `NaN` at an asset that has folded no level since its last reset. The caller reduces the assets, so a statistic that couples them reads the active assets alone and needs no mask of its own.
 
 # Interfaces
 
@@ -55,14 +55,20 @@ To implement a new price-level statistic, subtype `AbstractPriceLevelStatistic` 
   - [`fold_statistic`](@ref)
   - [`memory_rows`](@ref)
   - [`rows_needed`](@ref)
+
+# References
+
+  - $(ref_dict[:lihoi2012])
+  - $(ref_dict[:huang2016])
+  - $(ref_dict[:lai2018ppt])
 """
 abstract type AbstractPriceLevelStatistic <: AbstractExpectedReturnsAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Averages the last `window` price levels, which is the forecast of the moving-average reversion of Li and Hoi (2012).
+Averages the last `window` price levels, which is the forecast of the on-line moving average reversion, OLMAR.
 
-The journal version of the paper, Li, Hoi, Sahoo and Liu (2015), allows `window >= 2` and runs its experiments at `window = 5`, the default.
+The forecast is that of [lihoi2012](@citet). The journal version of [lihoi2012](@cite) is [li2015olmar](@cite). It allows `window >= 2` and runs its experiments at `window = 5`, the default.
 
 # Mathematical definition
 
@@ -111,11 +117,11 @@ MovingAverage
   - $(ref_dict[:lihoi2012])
   - $(ref_dict[:li2015olmar]) Equation (1).
 """
-struct MovingAverage{T1 <: Integer} <: AbstractPriceLevelStatistic
+@concrete struct MovingAverage <: AbstractPriceLevelStatistic
     """
     $(field_dict[:price_window])
     """
-    window::T1
+    window
     function MovingAverage(window::Integer)
         assert_price_window(window)
         return new{typeof(window)}(window)
@@ -127,9 +133,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Averages the price levels with weights that fall exponentially with age, which is the forecast of the second form of the moving-average reversion of Li, Hoi, Sahoo and Liu (2015).
+Averages the price levels with weights that fall exponentially with age, which is the forecast of the second form of the on-line moving average reversion, OLMAR-2.
 
-It is a folding statistic. The recursion is exact in relative terms, so the statistic reads no rows and carries one vector. The paper admits ``\\alpha \\in (0, 1)`` and states no default. Its sensitivity study finds high wealth over a wide range of ``\\alpha`` and poor wealth at the two endpoints. The default `alpha = 0.5` is the value of the authors' toolbox example. The library also admits `alpha = 1`, where the forecast is one in every asset.
+The forecast is Equation (2) of [li2015olmar](@cite). It is a folding statistic. The recursion is exact in relative terms, so the statistic reads no rows and carries one vector. [li2015olmar](@citet) admit ``\\alpha \\in (0, 1)`` and state no default. The sensitivity study of [li2015olmar](@cite) finds high wealth over a wide range of ``\\alpha`` and poor wealth at the two endpoints. The default `alpha = 0.5` is the value of the example in the toolbox of [li2016olps](@cite). The library also admits `alpha = 1`, where the forecast is one in every asset.
 
 # Mathematical definition
 
@@ -148,7 +154,7 @@ Where:
   - $(math_dict[:alpha_ema])
   - $(math_dict[:xhat_fc])
 
-The paper writes the first price as ``\\boldsymbol{p}_{1}`` and seeds the average there. The seed above is the same seed with the first level indexed zero, so the forecast after one level is one.
+[li2015olmar](@citet) write the first price as ``\\boldsymbol{p}_{1}`` and seed the average there. The seed above is the same seed with the first level indexed zero, so the forecast after one level is one.
 
 # Fields
 
@@ -182,12 +188,13 @@ ExponentialMovingAverage
 # References
 
   - $(ref_dict[:li2015olmar]) Equation (2).
+  - $(ref_dict[:li2016olps])
 """
-struct ExponentialMovingAverage{T1 <: Real} <: AbstractPriceLevelStatistic
+@concrete struct ExponentialMovingAverage <: AbstractPriceLevelStatistic
     """
     The smoothing weight on the current level, `0 < alpha <= 1`. A smaller weight gives a longer memory.
     """
-    alpha::T1
+    alpha
     function ExponentialMovingAverage(alpha::Real)
         @argcheck(zero(alpha) < alpha <= one(alpha),
                   DomainError(alpha, "alpha must be in (0, 1]"))
@@ -200,13 +207,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Takes the spatial (``L_1``) median of the last `window` price levels, which is the forecast of the robust median reversion of Huang, Zhou, Li, Hoi and Zhou (2016).
+Takes the spatial (``L_1``) median of the last `window` price levels, which is the forecast of the robust median reversion, RMR.
 
-[`spatial_median`](@ref) finds the median with the modified Weiszfeld iteration of Vardi and Zhang (2000), after it tests each level as the median.
+It is the forecast of [huang2016](@citet). [`spatial_median`](@ref) finds the median with the modified Weiszfeld iteration of [vardizhang2000](@citet), after it tests each level as the median.
 
-The distances couple the assets, so the median changes when each asset is scaled by its own price. The library reads it on the reconstructed path, with every asset's last level at one. The paper takes the median of the raw prices, and the authors' code takes it of prices rebased to one on the first day of the series. On the test fixture, the library's forecast differs from the rebased one by up to 0.003. It differs from the raw one by up to 0.08 when one asset trades at a hundred times the price of the others. The normalised median is scale-free, so no asset dominates the distances through its quotation.
+The distances couple the assets, so the median changes when each asset is scaled by its own price. The library reads it on the reconstructed path, with every asset's last level at one. [huang2016](@citet) take the median of the raw prices. The code that accompanies [huang2016](@cite) takes it of prices rebased to one on the first day of the series. On the test fixture, the library's forecast differs from the rebased one by up to 0.003. It differs from the raw one by up to 0.08 when one asset trades at a hundred times the price of the others. The normalised median is scale-free, so no asset dominates the distances through its quotation.
 
-The paper stops its iteration when ``\\lVert \\boldsymbol{\\mu}_{i-1} - \\boldsymbol{\\mu}_{i} \\rVert_1 \\leq \\tau \\lVert \\boldsymbol{\\mu}_{i} \\rVert_1``, and it gives no value for its maximum number of iterations. The authors' code stops at ``\\tau = 10^{-9}`` or after 200 iterations. The library stops when the Euclidean change of the iterate is below `tol`, or after `iters` iterations. On the test fixture the defaults leave the forecast within ``3 \\times 10^{-8}`` of the minimiser, as close as the authors' code.
+Algorithm 1 of [huang2016](@cite) stops its iteration when ``\\lVert \\boldsymbol{\\mu}_{i-1} - \\boldsymbol{\\mu}_{i} \\rVert_1 \\leq \\tau \\lVert \\boldsymbol{\\mu}_{i} \\rVert_1``, and it gives no value for its maximum number of iterations. The code that accompanies [huang2016](@cite) stops at ``\\tau = 10^{-9}`` or after 200 iterations. The library stops when the Euclidean change of the iterate is below `tol`, or after `iters` iterations. On the test fixture the defaults leave the forecast within ``3 \\times 10^{-8}`` of the minimiser, as close as that code.
 
 When the median lies very near a level but not on it, the Weiszfeld iteration converges slowly. The cap of `iters` can then stop it with the forecast about ``10^{-4}`` from the minimiser, while the sum of distances is within ``10^{-6}`` of its minimum. The steps are then small, so `tol` stops it early too. Raise `iters` and lower `tol` together where that difference matters.
 
@@ -264,20 +271,19 @@ SpatialMedian
   - $(ref_dict[:huang2016]) Equations (2) and (5), Algorithm 1.
   - $(ref_dict[:vardizhang2000])
 """
-struct SpatialMedian{T1 <: Integer, T2 <: Integer, T3 <: Real} <:
-       AbstractPriceLevelStatistic
+@concrete struct SpatialMedian <: AbstractPriceLevelStatistic
     """
     $(field_dict[:price_window])
     """
-    window::T1
+    window
     """
     Maximum number of Weiszfeld iterations.
     """
-    iters::T2
+    iters
     """
     Convergence tolerance on the Euclidean distance between two successive iterates.
     """
-    tol::T3
+    tol
     function SpatialMedian(window::Integer, iters::Integer, tol::Real)
         assert_price_window(window)
         @argcheck(iters >= 1, DomainError(iters, "iters must be at least 1"))
@@ -292,9 +298,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Takes the highest of the last `window` price levels, which is the forecast of the peak price tracking of Lai, Dai, Ren and Huang (2018).
+Takes the highest of the last `window` price levels, which is the forecast of the peak price tracking, PPT.
 
-The peak price tracking paper is not open access. Li, Luo and Xu (2023, eq. 5) restate its peak, and the short-term sparse portfolio of Lai, Yang, Fang and Wu (2018, eq. 10) uses the same peak. That portfolio does not read the ratio itself. It reads ``1.1 \\log \\hat{x}_{t+1, i} + 1`` (eq. 11), a transform that [`ShortTermSparsePortfolio`](@ref) applies.
+It is the forecast of [lai2018ppt](@citet), which is not open access. Equation (5) of [liluoxu2023](@cite) restates the peak, and Equation (10) of the short-term sparse portfolio of [lai2018sspo](@citet) uses the same peak. That portfolio does not read the ratio itself. It reads ``1.1 \\log \\hat{x}_{t+1, i} + 1`` (eq. 11), a transform that [`ShortTermSparsePortfolio`](@ref) applies.
 
 # Mathematical definition
 
@@ -347,11 +353,11 @@ WindowPeak
   - $(ref_dict[:lai2018sspo]) Equations (10) and (11).
   - $(ref_dict[:liluoxu2023]) Equation (5).
 """
-struct WindowPeak{T1 <: Integer} <: AbstractPriceLevelStatistic
+@concrete struct WindowPeak <: AbstractPriceLevelStatistic
     """
     $(field_dict[:price_window])
     """
-    window::T1
+    window
     function WindowPeak(window::Integer)
         assert_price_window(window)
         return new{typeof(window)}(window)
@@ -363,9 +369,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Takes the price level `lag` observations ago, which is the forecast of the first form of the transaction-cost optimisation of Li, Wang, Huang and Hoi (2018).
+Takes the price level `lag` observations ago, which is the forecast of the first form of the transaction-cost optimisation, TCO.
 
-The forecast bets that the moves of the last `lag` periods revert. The paper's first form reads `lag = 1` (Algorithm 2). At `lag = 0` the forecast is one in every asset, which is the hold branch of a switched statistic. Over fewer than `lag` rows the statistic reads the first level it has.
+It is the forecast of [li2018tco](@citet). The forecast bets that the moves of the last `lag` periods revert. The first form, Algorithm 2 of [li2018tco](@cite), reads `lag = 1`. At `lag = 0` the forecast is one in every asset, which is the hold branch of a switched statistic. Over fewer than `lag` rows the statistic reads the first level it has.
 
 # Mathematical definition
 
@@ -415,11 +421,11 @@ LaggedPrice
 
   - $(ref_dict[:li2018tco]) Algorithm 2.
 """
-struct LaggedPrice{T1 <: Integer} <: AbstractPriceLevelStatistic
+@concrete struct LaggedPrice <: AbstractPriceLevelStatistic
     """
     The number of observations between the forecast level and the current one, `0` for the current level.
     """
-    lag::T1
+    lag
     function LaggedPrice(lag::Integer)
         @argcheck(lag >= 0, DomainError(lag, "lag must be non-negative"))
         return new{typeof(lag)}(lag)
@@ -431,9 +437,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Averages the price levels with a weight per asset that depends on the data, which is the reweighted price relative of Lai, Yang, Fang and Wu (2020).
+Averages the price levels with a weight per asset that depends on the data, which is the forecast of the reweighted price relative tracking, RPRT.
 
-It is a folding statistic. The paper is not open access. Li, Luo and Xu (2023, eqs. 8 and 11) restate the recursion, and the MATLAB code that the authors publish runs the same recursion. The seed ``\\hat{\\boldsymbol{\\varphi}}_{1} = \\boldsymbol{x}_{1}`` is that of the restatement, so the forecast after the first row is one. The authors' code seeds the forecast at one instead. On the test fixture at `theta = 0.8`, the two forecasts differ by 0.024 after the first row and by less than ``10^{-4}`` after ten rows. The default `theta = 0.8` is the value of the authors' code. The restating paper sets 0.7 for its own rule.
+It is the forecast of [lai2018rprt](@citet), which is not open access. It is a folding statistic. Equations (8) and (11) of [liluoxu2023](@cite) restate the recursion, and the MATLAB code that accompanies [lai2018rprt](@cite) runs the same recursion. The seed ``\\hat{\\boldsymbol{\\varphi}}_{1} = \\boldsymbol{x}_{1}`` is that of the restatement, so the forecast after the first row is one. The MATLAB code seeds the forecast at one instead. On the test fixture at `theta = 0.8`, the two forecasts differ by 0.024 after the first row and by less than ``10^{-4}`` after ten rows. The default `theta = 0.8` is the value of the MATLAB code. [liluoxu2023](@citet) set 0.7 for their own rule.
 
 # Mathematical definition
 
@@ -450,7 +456,7 @@ Where:
   - $(math_dict[:x_t_rel])
   - ``\\boldsymbol{\\gamma}_{t+1}``: The weight of each asset on its current relative.
   - ``\\theta``: The reweighting strength. A larger value puts more weight on the current relative.
-  - ``\\hat{\\boldsymbol{\\varphi}}_{t+1}``: The Price Relative Forecast for period ``t + 1``, in the symbol of the restating paper.
+  - ``\\hat{\\boldsymbol{\\varphi}}_{t+1}``: The Price Relative Forecast for period ``t + 1``, in the symbol of [liluoxu2023](@cite).
 
 [`ExponentialMovingAverage`](@ref) is the case of a constant weight ``\\boldsymbol{\\gamma}_{t+1} = \\alpha \\boldsymbol{1}``.
 
@@ -489,11 +495,11 @@ ReweightedPriceRelative
   - $(ref_dict[:lai2018rprt])
   - $(ref_dict[:liluoxu2023]) Equations (8) and (11).
 """
-struct ReweightedPriceRelative{T1 <: Real} <: AbstractPriceLevelStatistic
+@concrete struct ReweightedPriceRelative <: AbstractPriceLevelStatistic
     """
     The reweighting strength `theta > 0` on the current price relative.
     """
-    theta::T1
+    theta
     function ReweightedPriceRelative(theta::Real)
         @argcheck(theta > zero(theta), DomainError(theta, "theta must be positive"))
         return new{typeof(theta)}(theta)
@@ -549,7 +555,7 @@ $(DocStringExtensions.FIELDS)
     """
     n
     """
-    The number of levels each asset has folded since its last reset, `assets × 1`. An asset at zero carries the cold seed, and the read-out answers `NaN` for it.
+    The number of levels each asset has folded since its last reset, `assets × 1`. An asset at zero carries the cold seed, and `mean(me)` with no data answers `NaN` for it.
     """
     nu
     """
@@ -577,9 +583,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Forecasts the next return of each asset as the move from the last price level to a statistic of a window of price levels.
 
-The forecast is the Price Relative Forecast of the online portfolio selection family, as an expected-returns estimator that any `me` field can hold. It is a forecast of the next period's return under the reversion or trend hypothesis of the paper that defines the statistic, not an average of past returns. The estimator reads every statistic on the reconstructed path, so the forecast is a function of the returns alone. [`AbstractPriceLevelStatistic`](@ref) states where this path changes the paper's statistic.
+The forecast is the Price Relative Forecast of the online portfolio selection family, as an expected-returns estimator that any `me` field can hold. It is a forecast of the next period's return under the reversion or trend hypothesis of the statistic, not an average of past returns. The estimator reads every statistic on the reconstructed path, so the forecast is a function of the returns alone. [`AbstractPriceLevelStatistic`](@ref) states where this path changes the published statistic.
 
-A windowed statistic reads its last `window - 1` returns, and over the first rows it reads the levels it has. A folding statistic, such as [`ExponentialMovingAverage`](@ref) or [`ReweightedPriceRelative`](@ref), is an exact recursion over the price relatives. [`partial_fit!`](@ref) folds one row into the state that the `cache` field carries, and `mean(me)` reads it, so an online host carries one vector for it and no rows. Its batch form over a matrix runs the same recursion from the first level, and the two agree exactly over the same rows.
+A windowed statistic reads its last `window - 1` returns, and over the first rows it reads the levels it has. A folding statistic, such as [`ExponentialMovingAverage`](@ref) or [`ReweightedPriceRelative`](@ref), is an exact recursion over the price relatives. [`partial_fit!`](@ref) folds one row into the state that the `cache` field carries, and `mean(me)` reads it, so an online estimator that holds it carries one vector for it and no rows. Its batch form over a matrix runs the same recursion from the first level, and the two agree exactly over the same rows.
 
 # Mathematical definition
 
@@ -641,17 +647,15 @@ PriceLevelExpectedReturns
   - [`rows_needed`](@ref)
   - [`partial_fit!`](@ref)
 """
-struct PriceLevelExpectedReturns{T1 <: AbstractPriceLevelStatistic,
-                                 T2 <: Option{<:PriceLevelForecastState}} <:
-       AbstractExpectedReturnsEstimator
+@concrete struct PriceLevelExpectedReturns <: AbstractExpectedReturnsEstimator
     """
     The price-level statistic the forecast reads.
     """
-    alg::T1
+    alg
     """
     $(field_dict[:pfcache])
     """
-    cache::T2
+    cache
     function PriceLevelExpectedReturns(alg::AbstractPriceLevelStatistic,
                                        cache::Option{<:PriceLevelForecastState})
         return new{typeof(alg), typeof(cache)}(alg, cache)
@@ -792,7 +796,7 @@ end
 
 Returns the number of return rows an expected-returns estimator reads at a step of the online portfolio selection family, `1` for one that folds, or `nothing` when it reads every row folded so far.
 
-A windowed price-level statistic over `window` levels reads `window - 1` returns. A folding statistic reads the current row alone, because its state is one vector. The head gives it that row as it stands, with its gaps and its active mask, as a one-row carrier, and not the finite price relative of the step. An estimator for which [`supports_partial_fit`](@ref) returns `true` has an exact fold of its own, and it reads the current row on the same terms. A [`WindowedExpectedReturns`](@ref) reads its window.
+A windowed price-level statistic over `window` levels reads `window - 1` returns. A folding statistic reads the current row alone, because its state is one vector. The head gives it that row as it stands, with its gaps and its active mask, as a one-row [`ReturnsResult`](@ref), and not the finite price relative of the step. An estimator for which [`supports_partial_fit`](@ref) returns `true` has an exact fold of its own, and it reads the current row on the same terms. A [`WindowedExpectedReturns`](@ref) reads its window.
 
 Every other expected-returns estimator returns `nothing`, which is unbounded. The head keeps every row for it, and it refits on the whole prefix at every step, at a cost of `O(tN)` a step after `t` rows. [`ForecastReversion`](@ref) forwards to its fields, and the head takes the maximum over its rule tree.
 
@@ -1187,9 +1191,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-The spatial median of the rows of `P`, by the modified Weiszfeld iteration of Vardi and Zhang (2000).
+The spatial median of the rows of `P`, by the modified Weiszfeld iteration.
 
-The plain Weiszfeld iteration converges slowly when the median is one of the points, and it cannot step from an iterate that equals a point. The function first tests every point with the optimality condition of Vardi and Zhang, so a median that is one of the points is found exactly. The iteration then uses the modified map, which stays defined on a point.
+The iteration is that of [vardizhang2000](@citet). The plain Weiszfeld iteration converges slowly when the median is one of the points, and it cannot step from an iterate that equals a point. The function first tests every point with the optimality condition of [vardizhang2000](@cite), so a median that is one of the points is found exactly. The iteration then uses the modified map, which stays defined on a point.
 
 # Mathematical definition
 
@@ -1313,7 +1317,7 @@ function Statistics.mean(me::PriceLevelExpectedReturns, X::MatNum; dims::Int = 1
                                          dims = 1, active_mask = amsk)))
     else
         @argcheck(isnothing(amsk),
-                  ArgumentError("`$(typeof(me.alg).name.name)` is a windowed statistic with no recursion to reset, so it reads no active mask: the Asset Panel seam reduces it to the Coverage Universe of its window."))
+                  ArgumentError("`$(typeof(me.alg).name.name)` is a windowed statistic with no recursion to reset, so it reads no active mask: `mean(me, X, pnl)` reduces it to the Coverage Universe of its window."))
         need = window_rows(me.alg)
         k = isnothing(need) ? size(X, 1) : min(size(X, 1), need)
         P = price_levels(view(X, (size(X, 1) - k + 1):size(X, 1), :))
@@ -1368,7 +1372,7 @@ end
 
 Reads the expected return from the state that a folding statistic carries, as the folded statistic minus one.
 
-An asset that has folded no level since its last reset carries its cold seed, not a forecast. So the read-out is `NaN` for it, as [`ExpWeightedExpectedReturns`](@ref) is below its `min_obs`. One folded level is enough for a forecast, so a `NaN` marks an asset that the mask turned off, or one that has no return yet.
+An asset that has folded no level since its last reset carries its cold seed, not a forecast. So `mean(me)` with no data answers `NaN` for it, as [`ExpWeightedExpectedReturns`](@ref) is below its `min_obs`. One folded level is enough for a forecast, so a `NaN` marks an asset that the mask turned off, or one that has no return yet.
 
 # Validation
 
@@ -1406,7 +1410,7 @@ Refuses a fold of a statistic that has no exact recursion, by name.
 """
 function assert_folding_statistic(alg::AbstractPriceLevelStatistic)::Nothing
     @argcheck(folds(alg),
-              ArgumentError("`$(typeof(alg).name.name)` is a windowed statistic with no exact recursion over price relatives, so `partial_fit!` cannot fold it: a host that carries the rows refits it with `mean(me, X)`, and the online portfolio selection head holds `window - 1` rows for it."))
+              ArgumentError("`$(typeof(alg).name.name)` is a windowed statistic with no exact recursion over price relatives, so `partial_fit!` cannot fold it: an estimator that holds it and carries the rows refits it with `mean(me, X)`, and the online portfolio selection head holds `window - 1` rows for it."))
     return nothing
 end
 """

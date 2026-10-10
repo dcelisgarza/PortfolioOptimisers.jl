@@ -890,8 +890,10 @@ end
             @test all(x -> x > 0.15 + 1e-6, w2[1:2])
         end
         @testset "Per-fold clustering estimator" begin
+            # Under the exact leaf order every linkage gives the same order on fold 1, so the
+            # two estimators are told apart on fold 2, where `:single` and Ward differ by 0.029.
             single = ClustersEstimator(; alg = HClustAlgorithm(; linkage = :single))
-            tdcle = TimeDependent([single, ClustersEstimator()])
+            tdcle = TimeDependent([ClustersEstimator(), single])
             p = cross_val_predict(HierarchicalRiskParity(;
                                                          opt = HierarchicalOptimiser(;
                                                                                      slv = slv,
@@ -906,9 +908,9 @@ end
                                                                                       slv = slv,
                                                                                       cle = single)),
                                    rd, cvw)
-            @test isapprox(p.pred[1].res.w, p1.pred[1].res.w)
-            @test isapprox(p.pred[2].res.w, p0.pred[2].res.w)
-            @test !isapprox(p0.pred[1].res.w, p1.pred[1].res.w)
+            @test isapprox(p.pred[1].res.w, p0.pred[1].res.w)
+            @test isapprox(p.pred[2].res.w, p1.pred[2].res.w)
+            @test !isapprox(p0.pred[2].res.w, p1.pred[2].res.w)
         end
     end
     @testset "Problem-definition fields of the concrete estimators" begin

@@ -1,8 +1,8 @@
 ```@meta
-Description = "Dimensional Reduction Regression, public API of PortfolioOptimisers.jl: PCA, PPCA, DimensionReductionRegression, fit, regression, factory."
+Description = "Dimension reduction regression, public API of PortfolioOptimisers.jl: PCA, PPCA, DimensionReductionRegression, fit, regression, factory."
 ```
 
-# Dimensional Reduction Regression
+# Dimension reduction regression
 
 ```@docs
 PCA

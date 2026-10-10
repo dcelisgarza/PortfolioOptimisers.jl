@@ -3,11 +3,11 @@ $(DocStringExtensions.TYPEDEF)
 
 The Fold Context of an optimiser: the columns of a [`ReturnsResult`](@ref) that the prior beneath the optimiser does not keep, and the context that the first step pins.
 
-An optimiser's online step sends each observation to its prior and to nothing else. Its read-out rebuilds a `ReturnsResult` from the prior's buffer and from this state, and runs the batch path over it. The batch path needs the whole carrier and not a bare matrix, because a meta-optimiser hands its inner optimisers a view of the carrier, and a [`UniverseSets`](@ref) constraint finds its assets by name.
+An optimiser's online step sends each observation to its prior and to nothing else. The call `optimise(opt)` with no data rebuilds a `ReturnsResult` from the prior's buffer and from this state, and runs the batch path over it. The batch path needs the whole `ReturnsResult` and not a bare matrix, because a meta-optimiser hands its inner optimisers a view of the `ReturnsResult`, and a [`UniverseSets`](@ref) constraint finds its assets by name.
 
-Each column has one owner. The prior at the bottom of the chain keeps the returns in its own state. This state keeps them only for a head that holds no prior, which is [`EqualWeighted`](@ref), [`RandomWeighted`](@ref) or [`BestConstantRebalancedPortfolio`](@ref). The prior's buffer keeps the factor column when the prior's estimator tree reads it, and this state keeps it when [`needs_factor_returns`](@ref) answers `false` or when there is no prior. This state always keeps the benchmark column and the timestamps.
+Each column has one owner. The prior at the bottom of the chain keeps the returns in its own state. This state keeps them only for a head that holds no prior, which is [`EqualWeighted`](@ref), [`RandomWeighted`](@ref) or [`BestConstantRebalancedPortfolio`](@ref). The prior's buffer keeps the factor column when the prior's estimator tree reads it, and this state keeps it when [`needs_factor_returns`](@ref) answers `false` or when there is no prior. This state always keeps the benchmark column, the Exogenous Series and the timestamps.
 
-The first step pins the asset, factor and benchmark names and a static [`AssetPanel`](@ref), and every later step must carry the same values. A time-varying panel is not pinned. Its active mask goes into the returns buffer with the rows it describes, and the read-out rebuilds the panel from it.
+The first step pins the asset, factor, benchmark and Exogenous Series names and a static [`AssetPanel`](@ref), and every later step must carry the same values. A time-varying panel is not pinned. Its active mask goes into the returns buffer with the rows it describes, and `optimise(opt)` with no data rebuilds the panel from it.
 
 Each matrix column is a [`SampleBufferState`](@ref), so each column takes its orientation, cap, merge, copy and asset slice from that type, and `max_history` caps every column at once. The timestamps and a single-column benchmark are plain vectors, because no asset indexes them.
 
@@ -24,6 +24,8 @@ $(DocStringExtensions.FIELDS)
         F::Option{<:SampleBufferState} = nothing,
         nb::Option{<:VecStr} = nothing,
         B::Option{<:Union{<:SampleBufferState, <:AbstractVector}} = nothing,
+        ne::Option{<:VecStr} = nothing,
+        E::Option{<:SampleBufferState} = nothing,
         ts::Option{<:AbstractVector} = nothing,
         pnl::Option{<:AssetPanel} = nothing,
         max_history::Option{<:Integer} = nothing
@@ -42,7 +44,7 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
 
   - `nx`, `X`, `pnl`: Sliced to the selected assets.
   - `nb`, `B`: Sliced when the benchmark is a matrix over the assets, and copied unchanged when it is a single column.
-  - `nf`, `F`, `ts`: Copied unchanged, because no asset indexes them.
+  - `nf`, `F`, `ne`, `E`, `ts`: Copied unchanged, because no asset indexes them.
 
 # Related
 
@@ -58,7 +60,7 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
     """
     nx
     """
-    Buffer of the asset returns, `observations × assets`. It is `nothing` when a prior beneath the optimiser keeps the rows, which is every host except a head that holds no prior.
+    Buffer of the asset returns, `observations × assets`. It is `nothing` when a prior beneath the optimiser keeps the rows, which is every optimiser except a head that holds no prior.
     """
     X
     """
@@ -66,7 +68,7 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
     """
     nf
     """
-    Buffer of the factor returns, `observations × factors`. It is `nothing` when the carrier holds none, and when the prior beneath the optimiser keeps them in its own buffer, which it does whenever its tree reads them.
+    Buffer of the factor returns, `observations × factors`. It is `nothing` when the returns data holds none, and when the prior beneath the optimiser keeps them in its own buffer, which it does whenever its tree reads them.
     """
     F
     """
@@ -74,11 +76,19 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
     """
     nb
     """
-    Buffer of the benchmark. It is a [`SampleBufferState`](@ref) of `observations × assets` for a matrix benchmark, a plain vector for a single column, and `nothing` when the carrier holds none.
+    Buffer of the benchmark. It is a [`SampleBufferState`](@ref) of `observations × assets` for a matrix benchmark, a plain vector for a single column, and `nothing` when the returns data holds none.
     """
     B
     """
-    Timestamps of the folded observations, in order, or `nothing` when the carrier holds none.
+    Names of the Exogenous Series, which the first step pins.
+    """
+    ne
+    """
+    Buffer of the Exogenous Series, `observations × series`, or `nothing` when the returns data holds none. No prior keeps it, so this state always does.
+    """
+    E
+    """
+    Timestamps of the folded observations, in order, or `nothing` when the returns data holds none.
     """
     ts
     """
@@ -96,6 +106,8 @@ function ReturnsBufferState(; nx::Option{<:VecStr} = nothing,
                             F::Option{<:SampleBufferState} = nothing,
                             nb::Option{<:VecStr} = nothing,
                             B::Option{<:Union{<:SampleBufferState, <:AbstractVector}} = nothing,
+                            ne::Option{<:VecStr} = nothing,
+                            E::Option{<:SampleBufferState} = nothing,
                             ts::Option{<:AbstractVector} = nothing,
                             pnl::Option{<:AssetPanel} = nothing,
                             max_history::Option{<:Integer} = nothing)::ReturnsBufferState
@@ -106,14 +118,14 @@ function ReturnsBufferState(; nx::Option{<:VecStr} = nothing,
     end
     if !isnothing(pnl)
         @argcheck(panel_is_static(pnl),
-                  ArgumentError("a ReturnsBufferState pins a static Asset Panel and never a time-varying one: the masks of a time-varying panel are per-observation, so they travel into the returns buffer beside the rows they explain and the read-out rebuilds the panel from them."))
+                  ArgumentError("a ReturnsBufferState pins a static Asset Panel and never a time-varying one: the masks of a time-varying panel are per-observation, so they travel into the returns buffer beside the rows they explain and optimise(opt) with no data rebuilds the panel from them."))
     end
-    return ReturnsBufferState(nx, X, nf, F, nb, B, ts, pnl, max_history)
+    return ReturnsBufferState(nx, X, nf, F, nb, B, ne, E, ts, pnl, max_history)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses a step whose carrier disagrees with the context that the first step pinned.
+Refuses a step whose returns data disagrees with the context that the first step pinned.
 
 The names and the static panel are context and not sample. The first step fixes them, and every later step must carry the same values, because a state that took a new asset axis would fold the next observation onto the wrong column. [`merge_states`](@ref) applies the same check to two states. Two values agree when [`pinned_agree`](@ref) answers `true`, and two `nothing` values agree.
 
@@ -147,7 +159,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Answers whether two pinned values are the same value, by content.
 
-`isequal` is not enough for pinned context. An [`AssetPanel`](@ref) is an immutable struct that holds arrays, and a struct with no equality method of its own compares its array fields by identity. Two panels of one universe that come from two views of one carrier then compare unequal, and every step of a walk-forward hands over such a view.
+`isequal` is not enough for pinned context. An [`AssetPanel`](@ref) is an immutable struct that holds arrays, and a struct with no equality method of its own compares its array fields by identity. Two panels of one universe that come from two views of one `ReturnsResult` then compare unequal, and every step of a walk-forward hands over such a view.
 
 # Algorithm
 
@@ -216,7 +228,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses a step or a merge that adds a column the first step did not carry, or drops a column it did carry.
 
-The first step fixes whether the carrier holds a factor matrix, a benchmark or timestamps, as a [`SampleBufferState`](@ref) fixes whether it records a mask. A column that is present for some observations and absent for others cannot be rebuilt into a matrix. The caller runs this check on every step after the first, also when the state keeps no column at all, and [`merge_states`](@ref) runs it on the columns of two states.
+The first step fixes whether the returns data holds a factor matrix, a benchmark, an Exogenous Series or timestamps, as a [`SampleBufferState`](@ref) fixes whether it records a mask. A column that is present for some observations and absent for others cannot be rebuilt into a matrix. The caller runs this check on every step after the first, also when the state keeps no column at all, and [`merge_states`](@ref) runs it on the columns of two states.
 
 # Arguments
 
@@ -240,7 +252,7 @@ The first step fixes whether the carrier holds a factor matrix, a benchmark or t
 """
 function assert_column_presence(buffer, column, name::Symbol)::Nothing
     @argcheck(isnothing(buffer) == isnothing(column),
-              ArgumentError("the online step fixes at its first observation whether the carrier holds `$name`, and every later step and every merged state must agree: the state $(isnothing(buffer) ? "holds no" : "holds a") `$name` and the step or state it meets $(isnothing(column) ? "carries none" : "carries one"). A column is present at every observation or at none, because a matrix cannot be rebuilt from rows that sometimes have it."))
+              ArgumentError("the online step fixes at its first observation whether the returns data holds `$name`, and every later step and every merged state must agree: the state $(isnothing(buffer) ? "holds no" : "holds a") `$name` and the step or state it meets $(isnothing(column) ? "carries none" : "carries one"). A column is present at every observation or at none, because a matrix cannot be rebuilt from rows that sometimes have it."))
     return nothing
 end
 """
@@ -248,7 +260,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Number of observations a [`ReturnsBufferState`](@ref) holds.
 
-Every column takes the same appends and the same cap, so every column holds the same number of rows, and the count comes from the first column the state keeps. A state that keeps no column answers zero. This is the state of a carrier with returns and names alone, beside a prior that keeps the rows. [`returns_result`](@ref) checks the count against the buffer of the rows.
+Every column takes the same appends and the same cap, so every column holds the same number of rows, and the count comes from the first column the state keeps. A state that keeps no column answers zero. This is the state for a `ReturnsResult` that holds returns and names alone, beside a prior that keeps the rows. [`returns_result`](@ref) checks the count against the buffer of the rows.
 
 # Arguments
 
@@ -266,7 +278,7 @@ Every column takes the same appends and the same cap, so every column holds the 
 """
 function context_count(state::ReturnsBufferState)
     return something(column_count(state.X), column_count(state.F), column_count(state.B),
-                     column_count(state.ts), Some(0))
+                     column_count(state.E), column_count(state.ts), Some(0))
 end
 """
     column_count(buffer::Nothing)
@@ -307,7 +319,7 @@ The vector arm writes into `buffer` and returns it.
 
 # Algorithm
 
- 1. When the carrier does not hold the column, return `nothing`.
+ 1. When the returns data does not hold the column, return `nothing`.
  2. For a matrix column, seed a [`SampleBufferState`](@ref) with the cap when `buffer` is `nothing`, and append `column` to it with [`partial_fit!`](@ref).
  3. For a vector column, seed an empty vector with the element type of `column` when `buffer` is `nothing`, and append `column` to it.
  4. When the vector is longer than `max_history`, delete its first entries, so it keeps the last `max_history`, as a capped buffer drops its oldest rows.
@@ -354,26 +366,27 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds the observations of a [`ReturnsResult`](@ref) into a [`ReturnsBufferState`](@ref).
 
-The step of the state itself. The host decides once which columns the state owns. `own_returns` is `true` only for a head that holds no prior, and a state whose prior keeps the rows appends no `X` and no mask. `own_factors` is `false` when the prior's tree reads `F`. The prior's buffer then records the factor column, and its own first-append rule refuses a column that comes and goes, so this state does not keep `F` and does not check its presence.
+The step of the state itself. The optimiser decides once which columns the state owns. `own_returns` is `true` only for a head that holds no prior, and a state whose prior keeps the rows appends no `X` and no mask. `own_factors` is `false` when the prior's tree reads `F`. The prior's buffer then records the factor column, and its own first-append rule refuses a column that comes and goes, so this state does not keep `F` and does not check its presence. `own_exogenous` is `false` when the prior's tree reads the Exogenous Series. The prior's buffer then records every column of the series and its names, so this state keeps neither `E` nor `ne`, and the buffer pins the names.
 
-A head that holds no prior keeps the active mask of a time-varying panel and nothing else of that panel. The estimation mask, the Panel Fields and the implied volatility do not reach the state, and no such head reads them. A host with a prior refuses a carrier that holds any of them, in [`fold_prior`](@ref).
+A head that holds no prior keeps the active mask of a time-varying panel and nothing else of that panel. The estimation mask, the Panel Fields and the implied volatility do not reach the state, and no such head reads them. An optimiser with a prior refuses returns data that holds any of them, in [`fold_prior`](@ref).
 
 # Algorithm
 
- 1. Refuse a carrier with no returns.
+ 1. Refuse an `rd` with no returns.
  2. Read `n`, the number of observations the state holds, and `pnl`, which is the panel when it is static and `nothing` when it is time-varying.
- 3. On the first step, when `n` is zero and no names are pinned, pin `nx`, `nf`, `nb` and `pnl`.
- 4. On every later step, refuse a carrier whose names or static panel differ from the pinned ones, and a carrier that adds or drops a column the state owns.
+ 3. On the first step, when `n` is zero and no names are pinned, pin `nx`, `nf`, `nb` and `pnl`, and pin `ne` when the state owns the series.
+ 4. On every later step, refuse an `rd` whose names or static panel differ from the pinned ones, and an `rd` that adds or drops a column the state owns.
  5. When the state owns the rows, append `X` with [`fold_column_masked`](@ref), with the active mask of a time-varying panel.
- 6. When the state owns the factor column, append `F` with [`fold_column`](@ref).
+ 6. When the state owns the factor column, append `F` with [`fold_column`](@ref). When it owns the series, append `E` with [`fold_column`](@ref).
  7. Append `B` and `ts` with [`fold_column`](@ref), and return the new state.
 
 # Arguments
 
   - `state`: The state to fold into.
-  - `rd`: The carrier of one or more observations, `observations × assets`.
+  - `rd`: The returns data of one or more observations, `observations × assets`.
   - `own_returns`: Whether the state keeps the returns. It is `true` for a head that holds no prior, and `false` otherwise.
-  - `own_factors`: Whether the state keeps the factor column. It is `true` for a head that holds no prior and for a host whose prior's tree never reads `F`, and `false` otherwise.
+  - `own_factors`: Whether the state keeps the factor column. It is `true` for a head that holds no prior and for an optimiser whose prior's tree never reads `F`, and `false` otherwise.
+  - `own_exogenous`: Whether the state keeps the Exogenous Series and its names. It is `true` for a head that holds no prior and for an optimiser whose prior's tree never reads the series, and `false` otherwise.
 
 # Validation
 
@@ -395,14 +408,17 @@ A head that holds no prior keeps the active mask of a time-varying panel and not
   - [`fold_prior`](@ref)
 """
 function partial_fit!(state::ReturnsBufferState, rd::ReturnsResult;
-                      own_returns::Bool = false, own_factors::Bool = true)
+                      own_returns::Bool = false, own_factors::Bool = true,
+                      own_exogenous::Bool = true)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     n = context_count(state)
     static = isnothing(rd.pnl) || panel_is_static(rd.pnl)
     pnl = static ? rd.pnl : nothing
     if iszero(n) && isnothing(state.nx)
         state = ReturnsBufferState(; nx = rd.nx, X = state.X, nf = rd.nf, F = state.F,
-                                   nb = rd.nb, B = state.B, ts = state.ts, pnl = pnl,
+                                   nb = rd.nb, B = state.B,
+                                   ne = own_exogenous ? rd.ne : nothing, E = state.E,
+                                   ts = state.ts, pnl = pnl,
                                    max_history = state.max_history)
     else
         assert_pinned_context(state.nx, rd.nx, :nx)
@@ -411,6 +427,10 @@ function partial_fit!(state::ReturnsBufferState, rd::ReturnsResult;
         assert_pinned_context(state.pnl, pnl, :pnl)
         if own_factors
             assert_column_presence(state.F, rd.F, :F)
+        end
+        if own_exogenous
+            assert_pinned_context(state.ne, rd.ne, :ne)
+            assert_column_presence(state.E, rd.E, :E)
         end
         assert_column_presence(state.B, rd.B, :B)
         assert_column_presence(state.ts, rd.ts, :ts)
@@ -422,8 +442,10 @@ function partial_fit!(state::ReturnsBufferState, rd::ReturnsResult;
         state.X
     end
     F = own_factors ? fold_column(state.F, rd.F, state.max_history) : state.F
+    E = own_exogenous ? fold_column(state.E, rd.E, state.max_history) : state.E
     return ReturnsBufferState(; nx = state.nx, X = X, nf = state.nf, F = F, nb = state.nb,
                               B = fold_column(state.B, rd.B, state.max_history),
+                              ne = state.ne, E = E,
                               ts = fold_column(state.ts, rd.ts, state.max_history),
                               pnl = state.pnl, max_history = state.max_history)
 end
@@ -432,7 +454,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Appends a block of returns to the buffer that a head with no prior owns, with the active mask of its panel.
 
-The form of [`fold_column`](@ref) for the one column that carries a mask. The buffer records the active mask of a time-varying panel with the rows, so the read-out can rebuild the panel from it. A static panel gives no mask.
+The form of [`fold_column`](@ref) for the one column that carries a mask. The buffer records the active mask of a time-varying panel with the rows, so `optimise(opt)` with no data can rebuild the panel from it. A static panel gives no mask.
 
 # Algorithm
 
@@ -466,15 +488,15 @@ end
 
 Rebuilds the [`ReturnsResult`](@ref) that the observations folded so far describe.
 
-The reconstitution verb of an optimiser's read-out. `rows` is the buffer that holds the returns, which is the prior's buffer, or the state's own `X` when the head holds no prior. The state holds every other column and the pinned context. The one exception is the factor column of a prior whose tree reads it, which `rows` holds. Every array of the result is a new copy and not a view, because the next fold writes into the buffers and can reallocate them, and a carrier that held a view would then change in the hands of its caller.
+The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer that holds the returns, which is the prior's buffer, or the state's own `X` when the head holds no prior. The state holds every other column and the pinned context. The two exceptions are the factor column of a prior whose tree reads it, and the Exogenous Series with its names of a prior whose tree reads it, which `rows` holds. Every array of the result is a new copy and not a view, because the next fold writes into the buffers and can reallocate them, and a `ReturnsResult` that held a view would then change in the hands of its caller. The Panel Fields are the one exception. Nothing writes into the arrays of a panel, and a fold makes new arrays when it appends, so the result shares them with `rows`.
 
 # Algorithm
 
  1. Read `n` with [`context_count`](@ref), and refuse a state whose count differs from the count of `rows`.
  2. Copy the valid rows of `rows` into `X`.
- 3. When `rows` records an active mask, rebuild a time-varying [`AssetPanel`](@ref) from it. Its estimation mask is the one that `rows` records or, when `rows` records none, a copy of the active mask. The online step records no estimation mask, so the second case is the usual one. When `rows` records no active mask, take the static panel that the state pinned, or `nothing`.
- 4. Take `F` from the state when the state keeps the factor column, and from [`factor_buffer`](@ref) of `rows` otherwise.
- 5. Copy `B` and `ts` from the state, and build the carrier.
+ 3. When `rows` records an active mask, rebuild a time-varying [`AssetPanel`](@ref) from it. Its estimation mask is the one that `rows` records or, when `rows` records none, a copy of the active mask. The step of a refit prior records both masks, and the carry of [`EmpiricalPrior`](@ref) and a head with no prior record the active mask alone. Its Panel Fields are the ones that `rows` records, which it records for a prior that reads them, and none otherwise. When `rows` records no active mask, take the static panel that the state pinned, or `nothing`.
+ 4. Take `F` from the state when the state keeps the factor column, and from [`factor_buffer`](@ref) of `rows` otherwise. Take `ne` and `E` from the state when the state keeps the series, and from [`exogenous_buffer_kwargs`](@ref) of `rows` otherwise.
+ 5. Copy `B` and `ts` from the state, and build the `ReturnsResult`.
 
 # Arguments
 
@@ -487,7 +509,7 @@ The reconstitution verb of an optimiser's read-out. `rows` is the buffer that ho
 
 # Returns
 
-  - `rd::ReturnsResult`: The carrier. Field by field, it is equal to the carrier that a batch fit over the same observations reads, with two exceptions. A time-varying panel comes back with an estimation mask equal to its active mask and with no Panel Field, and `iv` and `ivpa` come back as `nothing`. A host with a prior refuses a step that carries any of these, and a head with no prior reads none of them.
+  - `rd::ReturnsResult`: The rebuilt returns data. Field by field, it is equal to the `ReturnsResult` that a batch fit over the same observations reads, with two exceptions. A time-varying panel comes back with the parts that the route of the prior recorded: both masks and the Panel Fields for a refit prior that reads them, and the active mask alone on the carry or with no prior. `iv` and `ivpa` come back as `nothing`. An optimiser with a prior refuses a step that carries a part its route cannot record, and a head with no prior reads none of them.
 
 # Related
 
@@ -497,6 +519,7 @@ The reconstitution verb of an optimiser's read-out. `rows` is the buffer that ho
   - [`sample_buffer`](@ref)
   - [`sample_buffer_kwargs`](@ref)
   - [`factor_buffer`](@ref)
+  - [`exogenous_buffer_kwargs`](@ref)
 """
 function returns_result(state::ReturnsBufferState, rows::SampleBufferState)
     n = context_count(state)
@@ -507,14 +530,16 @@ function returns_result(state::ReturnsBufferState, rows::SampleBufferState)
     pnl = if haskey(msk, :active_mask)
         amsk = Matrix(msk.active_mask)
         emsk = haskey(msk, :estimation_mask) ? Matrix(msk.estimation_mask) : copy(amsk)
-        AssetPanel(; amsk = amsk, emsk = emsk)
+        AssetPanel(; pf = something(rows.P, AbstractPanelField[]), amsk = amsk, emsk = emsk)
     else
         state.pnl
     end
     F = isnothing(state.F) ? column_matrix(factor_buffer(rows)) : column_matrix(state.F)
+    ex = isnothing(state.E) ? exogenous_buffer_kwargs(rows) : (; ne = state.ne, E = state.E)
     return ReturnsResult(; nx = state.nx, X = X, nf = state.nf, F = F, nb = state.nb,
-                         B = column_matrix(state.B), ts = column_matrix(state.ts),
-                         pnl = pnl)
+                         B = column_matrix(state.B), ne = get(ex, :ne, nothing),
+                         E = column_matrix(get(ex, :E, nothing)),
+                         ts = column_matrix(state.ts), pnl = pnl)
 end
 """
     column_matrix(buffer::Nothing)
@@ -522,7 +547,7 @@ end
     column_matrix(buffer::AbstractMatrix)
     column_matrix(buffer::AbstractVector)
 
-Copies one column of a [`ReturnsBufferState`](@ref), or the factor rows of a prior's buffer, into a new array for the carrier that a read-out rebuilds. A buffer gives a matrix of its valid rows, a matrix or a vector gives a copy of itself, and `nothing` gives `nothing`.
+Copies one column of a [`ReturnsBufferState`](@ref), or the factor rows of a prior's buffer, into a new array for the `ReturnsResult` that `optimise(opt)` with no data rebuilds. A buffer gives a matrix of its valid rows, a matrix or a vector gives a copy of itself, and `nothing` gives `nothing`.
 
 # Arguments
 
@@ -590,6 +615,7 @@ function merge_states(a::ReturnsBufferState, b::ReturnsBufferState)
     assert_pinned_context(a.nx, b.nx, :nx)
     assert_pinned_context(a.nf, b.nf, :nf)
     assert_pinned_context(a.nb, b.nb, :nb)
+    assert_pinned_context(a.ne, b.ne, :ne)
     assert_pinned_context(a.pnl, b.pnl, :pnl)
     w = a.max_history
     @argcheck(w == b.max_history,
@@ -597,10 +623,12 @@ function merge_states(a::ReturnsBufferState, b::ReturnsBufferState)
     assert_column_presence(a.X, b.X, :X)
     assert_column_presence(a.F, b.F, :F)
     assert_column_presence(a.B, b.B, :B)
+    assert_column_presence(a.E, b.E, :E)
     assert_column_presence(a.ts, b.ts, :ts)
     return ReturnsBufferState(; nx = a.nx, X = merge_column(a.X, b.X, w), nf = a.nf,
                               F = merge_column(a.F, b.F, w), nb = a.nb,
-                              B = merge_column(a.B, b.B, w),
+                              B = merge_column(a.B, b.B, w), ne = a.ne,
+                              E = merge_column(a.E, b.E, w),
                               ts = merge_column(a.ts, b.ts, w), pnl = a.pnl,
                               max_history = w)
 end
@@ -661,6 +689,7 @@ function Base.copy(x::ReturnsBufferState)
     return ReturnsBufferState(; nx = copy_column(x.nx), X = copy_column(x.X),
                               nf = copy_column(x.nf), F = copy_column(x.F),
                               nb = copy_column(x.nb), B = copy_column(x.B),
+                              ne = copy_column(x.ne), E = copy_column(x.E),
                               ts = copy_column(x.ts), pnl = x.pnl,
                               max_history = x.max_history)
 end
@@ -693,13 +722,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Slices a [`ReturnsBufferState`](@ref) to the selected assets.
 
-The asset axis runs through `nx`, `X`, a matrix benchmark with its names, and the panel. The factors, the timestamps and a single-column benchmark have no asset axis, so the slice copies them unchanged. A later fold on the sliced state appends to these vectors in place, and a shared vector would change the state that the slice came from, as [`port_opt_view`](@ref) on a [`SampleBufferState`](@ref) explains for its factor rows. The names and the panel come back as views, because no step writes into pinned context.
+The asset axis runs through `nx`, `X`, a matrix benchmark with its names, and the panel. The factors, the Exogenous Series, the timestamps and a single-column benchmark have no asset axis, so the slice copies them unchanged. A later fold on the sliced state appends to these vectors in place, and a shared vector would change the state that the slice came from, as [`port_opt_view`](@ref) on a [`SampleBufferState`](@ref) explains for its factor rows. The names and the panel come back as views, because no step writes into pinned context.
 
 # Algorithm
 
  1. Slice `nx` and the panel to `i` as views, and slice `X` with [`port_opt_view`](@ref) on its buffer.
  2. When `B` is a [`SampleBufferState`](@ref), slice `nb` and `B` to `i`. Otherwise, copy both.
- 3. Copy `nf`, `F` and `ts`, and return the new state.
+ 3. Copy `nf`, `F`, `ne`, `E` and `ts`, and return the new state.
 
 # Arguments
 
@@ -729,7 +758,8 @@ function port_opt_view(x::ReturnsBufferState, i, args...)
                                   port_opt_view(x.B, i)
                               else
                                   copy_column(x.B)
-                              end, ts = copy_column(x.ts),
+                              end, ne = copy_column(x.ne), E = copy_column(x.E),
+                              ts = copy_column(x.ts),
                               pnl = isnothing(x.pnl) ? nothing : port_opt_view(x.pnl, i),
                               max_history = x.max_history)
 end

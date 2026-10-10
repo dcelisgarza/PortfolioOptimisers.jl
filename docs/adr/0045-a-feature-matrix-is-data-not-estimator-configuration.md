@@ -55,7 +55,7 @@ Seven decisions follow from that one, in the order they constrain each other.
 
 ### 1. Vocabulary: **feature**, and the symbol is `Z`
 
-The noun is **feature**. *Characteristic* was the first candidate and is unavailable: `CONTEXT.md`
+The noun is **feature**. *Characteristic* was the first candidate and is unavailable: `GLOSSARY.md`
 already pins **Characteristic Vector** as the per-asset quantity an ℓ1 uncertainty set is built
 around, with `CharacteristicUncertaintySet` naming it in code (ADR
 [0032](0032-quintile-portfolios-are-an-uncertainty-set.md)). *Attribute* was rejected as vaguer than
@@ -314,7 +314,7 @@ all-zero distance matrix for three unrelated assets inside a cluster.
   in `ple`, which no type bound can take over because `ple` legitimately accepts a result outside a
   meta-optimiser. That guard also had a latent bug: `||` binds looser than `&&`, so its vector branch
   was unreachable and a result inside a vector passed in exactly the case the branch was written for.
-  This generalises beyond phylogeny and is recorded as a library-wide rule in `CONTEXT.md` §1: **an
+  This generalises beyond phylogeny and is recorded as a library-wide rule in `GLOSSARY.md` §1: **an
   Estimator never holds a Result.** One consequence is worth stating precisely — with
   `PhylogenyFeatures` narrowed, every square-producing *producer* now refits from the returns, so the
   **prior** carrier has no exogenous route to square structure. The **data** carrier still does, and
@@ -873,7 +873,7 @@ prior with one method. This closes the `Z` bridge question map #643 handed to ma
 
 The name set follows the library's rule that a type is named for what it makes and a field for
 the type it holds: `AbstractAssetPanelEstimator`, `ape`, `asset_panel`, `RegressionPanel`,
-`PhylogenyPanel`. `CONTEXT.md` §2 replaces **Feature Matrix Estimator** with **Asset Panel
+`PhylogenyPanel`. `GLOSSARY.md` §2 replaces **Feature Matrix Estimator** with **Asset Panel
 Estimator**, and §3.8 re-cuts **Phylogeny Features**. The build is
 [#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810).
 
@@ -945,7 +945,7 @@ string convention, `"industry=Tech"` and `"mcap::observed"`, is the pair of conv
 removed from the panel.
 
 The verbs derive from the panel and live beside it in `03_InputData`. `feature_matrix` and
-`feature_labels` are exported. `CONTEXT.md` §2 gains **Feature Selector**, and §3.7 re-cuts
+`feature_labels` are exported. `GLOSSARY.md` §2 gains **Feature Selector**, and §3.7 re-cuts
 **Feature Distance**. The build is
 [#811](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/811).
 
@@ -998,7 +998,7 @@ The one-hot exposure reads a categorical field's codes and levels, and a lifted 
 consumer that reads the masks dispatches on the mask type, so a static panel is refused there by
 dispatch, and the refusal names the masks as the lift.
 
-The fourth amendment above is released history and stands as written. `CONTEXT.md` §2 loses
+The fourth amendment above is released history and stands as written. `GLOSSARY.md` §2 loses
 **Feature Program**, §4.4's **Universe Sets** loses the feature axis, and **Asset Panel** states
 the bridge and the lift. The lift, the bridge and the deletions
 are all built by [#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810).
@@ -1009,7 +1009,7 @@ Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802)'s f
 [#807](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/807), decides what the Asset
 Panel does at the four places a feature matrix was sliced or aggregated: an asset view, a
 cross-validation fold, a meta-optimiser collapse and preselection. Every option was judged from
-zero, on architecture, maintainability, ergonomics and performance. The reference implementation
+zero, on architecture, maintainability, ergonomics and performance. The oracle
 slices its panel by observation as a view and by asset as a copy, never slices a third axis by
 asset, and has no collapse onto a synthetic universe, so every decision here adds capability.
 
@@ -1080,7 +1080,7 @@ timestamps). The fourth was deleted by the tenth.
 `feature_matrix_panel` loses its last reader, because the collapse returns a panel and a producer
 builds its tensor field directly, and it is deleted with its export, its API entry and its
 catalogue entry. A caller with a bare matrix builds one `TensorPanelField`, or one
-`NumericPanelField` per column. `CONTEXT.md` §2's **Panel Field** states the view and the
+`NumericPanelField` per column. `GLOSSARY.md` §2's **Panel Field** states the view and the
 collapse. The build is
 [#810](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/810).
 
@@ -1089,8 +1089,7 @@ collapse. The build is
 Map [#802](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/802)'s sixth decision,
 [#816](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/816), closes the question the first text left
 open: whether a `Clusters` result should record which matrix produced it. Every option was judged
-from zero, on architecture, maintainability, ergonomics and performance. The reference
-implementation's clustering estimator records the asset names it was fit on, for its dendrogram
+from zero, on architecture, maintainability, ergonomics and performance. The oracle's clustering estimator records the asset names it was fit on, for its dendrogram
 plot, and its distance estimators record the codependence and the distance. Neither records a
 feature name, because neither reads a panel, so both decisions here add capability.
 
@@ -1200,3 +1199,15 @@ graded program.
 - `test/test_18k_constraints.jl` called `factor_universe` with four arguments where it takes
     five, so three `@test_throws` assertions were catching a `MethodError` instead of the
     exceptions they name.
+
+## Amendment (2026-10-06): a fold stores its positions as well
+
+The Decision above recovers a fold's rows from its timestamps and adds no fold provenance to
+`PredictionResult`. That still holds for the Feature Matrix. A realised `factor_attribution` of a
+cross-validation needs the rows of each fold too, and on returns data with no timestamps it has
+nothing to recover them from.
+[ADR 0195](0195-a-realised-attribution-of-a-cross-validation-matches-each-fold-to-the-block-by-a-row-key.md)
+therefore adds `idx`, the `test_idx` of the fold, to `PredictionResult`. The indexed `predict`
+records it, and the whole-sample `predict` records `nothing`. The timestamps stay the first key:
+the attribution matches by timestamp whenever both sides carry them, and by position otherwise.
+`fold_row_indices` is unchanged and still reads the timestamps.

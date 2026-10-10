@@ -4,15 +4,18 @@ The Factor Family Basis, its transforms and the Neutralisation verb (issue #724,
 Issue #651 decided that `fcb` is a `FactorFamilyBasis` carrying the time axis, that
 Neutralisation is a field of the prior applied to the exposure history, and that the automatic
 drop is the member with the largest time-average absolute benchmark-weighted exposure. This file
-holds the port of the reference implementation's basis tests and its Neutralisation validation
-tests, and it pins two parity cases measured against the reference on the synthetic Asset Panel
-of `test06c_setup.jl`.
+holds the ported basis tests and the Neutralisation validation tests, and it pins two parity
+cases measured against the oracle of map #1375 on the synthetic Asset Panel of `test06c_setup.jl`.
 
-The parity cases are literals rather than a live comparison: the reference is not a dependency
-of this package, so the numbers it produced are stored here and the test re-derives them.
+The parity cases are literals rather than a live comparison: the oracle is not a dependency of
+this package, so the numbers it produced are stored here and the test re-derives them. The basis
+inside a fitted prior, and each of its transforms, is measured in
+`test_12x_parity_prior_config_grid.jl` (#1385). The stacked forms of the transforms, one slice per
+observation (#1406), are pinned against the stored oracle `Parity_FactorFamilyBasis_Stack_*`.
 =#
 using Statistics, Distributions, Dates, Random
 include(joinpath(@__DIR__, "test06c_setup.jl"))
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 @testset "FactorFamilyBasis construction and structure" begin
     PO = PortfolioOptimisers
@@ -75,9 +78,18 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
                                                      ratios = [0.5 0.25], K = 5)
         # The dropped position indexes its own family.
         @test_throws DomainError FactorFamilyBasis(; ok..., di = [3])
-        # `K` exceeds the number of families, so the reduced axis is not empty.
+        # The reduced axis is never empty: each family holds at least two members, the families
+        # are disjoint, and every member lies in `1:K`, so `K` is at least twice the number of
+        # families. A basis with `K` at most the number of families breaks one of those rules,
+        # and that rule refuses it (#1385).
         @test_throws ArgumentError FactorFamilyBasis(; fnm = ["a"], fi = [[1]], di = [1],
                                                      ratios = reshape([0.5], 1, 1), K = 1)
+        @test_throws ArgumentError FactorFamilyBasis(; fnm = ["a", "b"],
+                                                     fi = [[1, 2], [2, 1]], di = [1, 1],
+                                                     ratios = [0.5 0.25], K = 2)
+        @test_throws DomainError FactorFamilyBasis(; fnm = ["a", "b"],
+                                                   fi = [[1, 2], [3, 4]], di = [1, 1],
+                                                   ratios = [0.5 0.25], K = 2)
         # One column per retained member of a constrained family.
         @test_throws DimensionMismatch FactorFamilyBasis(; ok..., ratios = [0.5 0.25])
         # A non-finite ratio is refused, which is how a zero benchmark-weighted exposure on
@@ -207,6 +219,28 @@ end
               dense_basis(fcb, 3) * S * transpose(dense_basis(fcb, 3))
     end
 
+    @testset "A factor with no covariance reaches only the raw factors that read it" begin
+        # A raw factor reads the reduced factors of its own family alone, so a `NaN` row of
+        # one reduced factor must not reach a dropped factor of another family through a
+        # zero weight (#1510).
+        A = randn(rng, Kr, Kr)
+        S = A * transpose(A)
+        k = Kr
+        Sn = copy(S)
+        Sn[k, :] .= NaN
+        Sn[:, k] .= NaN
+        B = dense_basis(fcb, T)
+        reads = .!iszero.(B[:, k])
+        raw = PO.expand_factor_covariance(fcb, Sn)
+        @test isnan.(raw) == (reads .| transpose(reads))
+        @test 0 < count(reads) < K
+        S0 = copy(S)
+        S0[k, :] .= 0
+        S0[:, k] .= 0
+        ok = .!isnan.(raw)
+        @test raw[ok] ≈ (B * S0 * transpose(B))[ok]
+    end
+
     @testset "Projecting coordinates is not a column selection" begin
         x = randn(rng, T, K)
         y = PO.project_factor_coordinates(fcb, x)
@@ -226,6 +260,51 @@ end
         @test size(W) == (1, Kr)
         mu = randn(rng, Kr)
         @test (W * mu)[1] ≈ PO.expand_factor_mu(fcb, mu)[fcb.fi[1][fcb.di[1]]]
+    end
+
+    @testset "A stack is the loop of the single form over the observations" begin
+        # Each transform whose single form reads the ratios of one observation takes a stack,
+        # one slice per observation, and applies the ratios of each slice's own observation.
+        A = randn(rng, T, Kr, Kr)
+        V = similar(A)
+        for t in 1:T
+            V[t, :, :] = A[t, :, :] * transpose(A[t, :, :])
+        end
+        S = PO.expand_factor_covariance(fcb, V)
+        @test size(S) == (T, K, K)
+        for t in 1:T
+            @test S[t, :, :] == PO.expand_factor_covariance(fcb, V[t, :, :], t)
+        end
+        @test PO.reduce_factor_covariance(fcb, S) == V
+        for t in 1:T
+            @test PO.reduce_factor_covariance(fcb, S)[t, :, :] ==
+                  PO.reduce_factor_covariance(fcb, S[t, :, :])
+        end
+        W = PO.dropped_factor_weights(fcb)
+        @test size(W) == (T, 1, Kr)
+        for t in 1:T
+            @test W[t, :, :] == PO.dropped_factor_weights(fcb, t)
+        end
+        mu = randn(rng, T, Kr)
+        raw = PO.expand_factor_mu(fcb, mu)
+        @test size(raw) == (T, K)
+        for t in 1:T
+            @test raw[t, :] == PO.expand_factor_mu(fcb, mu[t, :], t)
+        end
+        L = PO.reduce_loadings(fcb, Ms)
+        @test L == PO.reduce_exposures(fcb, Ms)
+        for t in 1:T
+            @test L[t, :, :] == PO.reduce_loadings(fcb, Ms[t, :, :], t)
+        end
+        # A stack whose observation axis is not the basis's is refused, as a history is.
+        @test_throws DimensionMismatch PO.expand_factor_covariance(fcb, V[1:(T - 1), :, :])
+        @test_throws DimensionMismatch PO.expand_factor_mu(fcb, mu[1:(T - 1), :])
+        @test_throws DimensionMismatch PO.reduce_loadings(fcb, Ms[1:(T - 1), :, :])
+        @test_throws DimensionMismatch PO.expand_factor_covariance(fcb,
+                                                                   randn(rng, T, Kr + 1,
+                                                                         Kr + 1))
+        @test_throws DimensionMismatch PO.reduce_factor_covariance(fcb,
+                                                                   randn(rng, T, K + 1, K))
     end
 
     @testset "A transform refuses a wrong axis" begin
@@ -261,6 +340,47 @@ end
         end
         @test occursin("g carries a factor axis", msg)
     end
+end
+
+@testset "The stacked transforms equal the stored oracle" begin
+    #=
+    Two constrained families with a free factor between them and a factor after them: `ind`
+    (factors 2 to 4) drops its last member and `cty` (factors 6 to 8) its first, so the reduced
+    axis interleaves retained members of both. Six observations, each with its own ratios and
+    its own reduced covariance. The oracle expanded the whole stack at once, reduced its answer,
+    built the weights of the dropped factors for every observation, and expanded one mean per
+    row. Each output is a vertical stack, row `(t - 1) n + a` holding entry `(t, a, :)`.
+    Measured on 2026-09-30 and again on 2026-10-07: every cell of the four outputs is bit-equal
+    (maxrel 0). The tolerance is `1e-14`, not zero, because the products go through BLAS, which
+    can round them differently on another host.
+    =#
+    PO = PortfolioOptimisers
+    rng = StableRNG(1406)
+    T, K = 6, 9
+    ratios = hcat(0.2 .+ rand(rng, T, 2), -0.5 .+ 3 .* rand(rng, T, 2))
+    fcb = FactorFamilyBasis(; fnm = ["ind", "cty"], fi = [[2, 3, 4], [6, 7, 8]],
+                            di = [3, 1], ratios = ratios, K = K)
+    Kr = PO.reduced_factor_count(fcb)
+    V = zeros(T, Kr, Kr)
+    for t in 1:T
+        A = randn(rng, Kr, Kr + 2)
+        V[t, :, :] = A * transpose(A) ./ (Kr + 2)
+    end
+    M = randn(rng, T, Kr)
+    unstack(S, n) = [S[(t - 1) * n + a, b] for t in 1:T, a in 1:n, b in axes(S, 2)]
+    oracle(o, n) = unstack(parity_load("FactorFamilyBasis", "Stack", o), n)
+    E = PO.expand_factor_covariance(fcb, V)
+    # A covariance compares against its largest entry: an off-diagonal cell can be a
+    # cancellation, so a sum that BLAS orders differently moves it by more than its own ulps.
+    @test parity_compare(E, oracle("Expanded", K); rtol = 1e-14, scale = :array,
+                         name = "stack expanded").ok
+    @test parity_compare(PO.reduce_factor_covariance(fcb, E), oracle("Reduced", Kr);
+                         rtol = 1e-14, scale = :array, name = "stack reduced").ok
+    @test parity_compare(PO.dropped_factor_weights(fcb), oracle("Weights", 2); rtol = 1e-14,
+                         name = "stack weights").ok
+    @test parity_compare(PO.expand_factor_mu(fcb, M),
+                         parity_load("FactorFamilyBasis", "Stack", "Mu"); rtol = 1e-14,
+                         name = "stack mu").ok
 end
 
 @testset "FactorFamilyBasis transforms agree with their closed forms in exact arithmetic" begin
@@ -407,6 +527,9 @@ end
                                                  Matrix{Float32}(LinearAlgebra.I, Kr, Kr))) ==
               Float32
         @test eltype(PO.dropped_factor_weights(f32, 1)) == Float32
+        @test eltype(PO.dropped_factor_weights(f32)) == Float32
+        @test eltype(PO.expand_factor_covariance(f32, ones(Float32, T, Kr, Kr))) == Float32
+        @test eltype(PO.reduce_factor_covariance(f32, ones(Float32, T, K, K))) == Float32
         @test eltype(PO.project_factor_coordinates(f32, ones(Float32, T, K))) == Float32
         @test eltype(PO.project_factor_coordinates(f32, ones(Float32, K))) == Float32
     end
@@ -857,14 +980,16 @@ end
     end
 end
 
-@testset "Parity with the reference implementation" begin
+@testset "Parity with the oracle" begin
     PO = PortfolioOptimisers
     #=
-    The reference implementation's basis builder and its Neutralisation verb were run on the
-    Factor Exposures built from the synthetic Asset Panel below. The two cases pinned here are
-    the constraint ratios of the automatic drop and of a stated drop. The reference's answers
-    are bit-identical to the ones this file recomputes, and the neutralised exposures agreed to
-    6e-15, which is the difference between two orders of the same weighted least squares.
+    The oracle's basis builder and its Neutralisation verb were run on the Factor Exposures
+    built from the synthetic Asset Panel below. The two cases pinned here are the constraint
+    ratios of the automatic drop and of a stated drop. The literals are the oracle's printed
+    values, and ours differ from them by 3.0e-16 at most, one or two units in the last place of
+    a sum taken in another order (#1385). The neutralised exposures agree to maxabs 1.1e-16 (a
+    relative 1.1e-14 on a cell near zero), which is the difference between two orders of the
+    same weighted least squares.
     =#
     res = synthetic_asset_panel(; n_assets = 12, n_observations = 40, n_industries = 3,
                                 rng = StableRNG(987))
@@ -890,43 +1015,350 @@ end
                     "industry=Banks"]
     @test ax.fam == ["market", "style", "style", "industry", "industry", "industry"]
 
-    @testset "Case one: the automatic drop matches the reference" begin
+    @testset "Case one: the automatic drop matches the oracle" begin
         fcb = factor_family_basis(["industry" => nothing], Ms, bw, ax.nf, ax.fam)
         @test PO.dropped_factor_names(fcb, ax.nf) == ["industry=Software"]
         @test size(fcb.ratios) == (40, 2)
-        # The reference's own numbers, to the last bit it printed.
-        @test fcb.ratios[1, :] ≈ [0.45312850847114156, 0.5134232034472233]
-        @test fcb.ratios[2, :] ≈ [0.4499883905713916, 0.5141858044142668]
-        @test fcb.ratios[end, :] ≈ [0.4003878534447987, 0.4488185225503101]
-        @test vec(sum(fcb.ratios; dims = 1)) ≈ [17.16704789180863, 19.62192609499553]
+        # The oracle's own numbers, to the last bit it printed, cell by cell. Measured on
+        # 2026-10-07: maxrel 0.0, 0.0, 1.4e-16 and 1.8e-16, one ulp of a sum taken in another
+        # order.
+        @test parity_compare(fcb.ratios[1, :], [0.45312850847114156, 0.5134232034472233];
+                             rtol = 1e-15, name = "ratios 1").ok
+        @test parity_compare(fcb.ratios[2, :], [0.4499883905713916, 0.5141858044142668];
+                             rtol = 1e-15, name = "ratios 2").ok
+        @test parity_compare(fcb.ratios[end, :], [0.4003878534447987, 0.4488185225503101];
+                             rtol = 1e-15, name = "ratios 3").ok
+        @test parity_compare(vec(sum(fcb.ratios; dims = 1)),
+                             [17.16704789180863, 19.62192609499553]; rtol = 1e-15,
+                             name = "ratios 4").ok
     end
 
-    @testset "Case two: a stated drop matches the reference" begin
+    @testset "Case two: a stated drop matches the oracle" begin
         fcb = factor_family_basis(["industry" => "industry=Real Estate"], Ms, bw, ax.nf,
                                   ax.fam)
         @test fcb.di == [1]
         @test PO.dropped_factor_names(fcb, ax.nf) == ["industry=Real Estate"]
-        @test fcb.ratios[1, :] ≈ [2.2068794642252954, 1.1330631241444427]
-        @test fcb.ratios[end, :] ≈ [2.4975782641664717, 1.1209593864769638]
-        @test vec(sum(fcb.ratios; dims = 1)) ≈ [93.32153055932386, 45.704976978893356]
+        # Measured on 2026-10-07, cell by cell: maxrel 0.0, 2.0e-16 and 3.0e-16.
+        @test parity_compare(fcb.ratios[1, :], [2.2068794642252954, 1.1330631241444427];
+                             rtol = 1e-15, name = "ratios 5").ok
+        @test parity_compare(fcb.ratios[end, :], [2.4975782641664717, 1.1209593864769638];
+                             rtol = 1e-15, name = "ratios 6").ok
+        @test parity_compare(vec(sum(fcb.ratios; dims = 1)),
+                             [93.32153055932386, 45.704976978893356]; rtol = 1e-15,
+                             name = "ratios 7").ok
     end
 
-    @testset "The Neutralisation matches the reference" begin
+    @testset "The Neutralisation matches the oracle" begin
         Y = copy(Ms)
         PO.neutralise_exposures!(Y, ["vol" => ["size"]], CrossSectionalLinearRegression(),
                                  bw, ax.nf, ax.fam)
         v = Y[:, :, 3]
         fin = isfinite.(v)
         @test count(!, fin) == 7
-        # The two orders of the same weighted least squares differ in the last bits, so the
-        # tolerance is loose where the ratios above are exact.
-        @test v[1, :][fin[1, :]] ≈
-              [0.799889405563868, -0.004743865235128638, 0.2239307925031833,
-               0.7848793720945417, 0.6921418278212657, 0.8139226090427376,
-               0.6331743087329431, 0.5729801019175156, 1.277378472749908,
-               0.7383912304326324, -0.08625133637864447, -2.3746306903228844][fin[1, :]] rtol=1e-12
-        @test sum(v[fin]) ≈ 120.8785614679006 rtol=1e-12
-        # The re-standardisation makes the weighted sum of squares the eligible count.
-        @test sum(abs2, v[fin]) ≈ 433.0 rtol=1e-12
+        # The two orders of the same weighted least squares differ in the last bits. Measured on
+        # 2026-10-07: maxrel 1.1e-14 and maxabs 1.1e-16. The worst relative cell is
+        # -0.0047, a residual near zero, so its error is an ulp of the unit-scale exposures
+        # and the comparison takes an absolute tolerance of a few of those ulps.
+        @test parity_compare(v[1, :][fin[1, :]],
+                             [0.799889405563868, -0.004743865235128638, 0.2239307925031833,
+                              0.7848793720945417, 0.6921418278212657, 0.8139226090427376,
+                              0.6331743087329431, 0.5729801019175156, 1.277378472749908,
+                              0.7383912304326324, -0.08625133637864447,
+                              -2.3746306903228844][fin[1, :]]; rtol = 1e-14, atol = 1e-15,
+                             name = "neutralised row 1").ok
+        # The sum of the eligible cells, and the weighted sum of squares, which the
+        # re-standardisation makes the eligible count. Measured on 2026-10-07: maxrel 2.4e-16.
+        @test parity_compare([sum(v[fin]), sum(abs2, v[fin])], [120.8785614679006, 433.0];
+                             rtol = 1e-14, name = "neutralised sums").ok
     end
+end
+
+@testset "A pass-through arm appends factors the basis never re-bases (#1367)" begin
+    PO = PortfolioOptimisers
+    fcb = FactorFamilyBasis(; fnm = ["industry"], fi = [[2, 3]], di = [2],
+                            ratios = reshape([0.5, 0.4], 2, 1), K = 4)
+    nf = ["mkt", "ind0", "ind1", "style"]
+    fcb2 = PO.append_passthrough_factors(fcb, 2)
+    @test fcb2.K == 6
+    @test fcb2.fnm == fcb.fnm && fcb2.fi == fcb.fi && fcb2.di == fcb.di
+    @test fcb2.ratios == fcb.ratios
+    # The appended factors keep their order after every retained factor.
+    @test PO.reduce_factor_names(fcb2, [nf; "USD"; "EUR"]) ==
+          [PO.reduce_factor_names(fcb, nf); "USD"; "EUR"]
+    @test PO.retained_factor_indices(fcb2) == [1, 2, 4, 5, 6]
+    # Their row of the change of basis is an identity row: expanded returns, means and
+    # covariances carry them unchanged.
+    f = randn(StableRNG(1_367), 2, 5)
+    ef = PO.expand_factor_returns(fcb2, f)
+    @test ef[:, 5:6] == f[:, 4:5]
+    @test ef[:, 1:4] ≈ PO.expand_factor_returns(fcb, f[:, 1:3])
+    S = let A = randn(StableRNG(1), 5, 5)
+        A * A'
+    end
+    eS = PO.expand_factor_covariance(PO.factor_basis_slice(fcb2, 2:2), S)
+    @test eS[5:6, 5:6] ≈ S[4:5, 4:5]
+    # A zero count leaves the basis itself, and no basis stays no basis.
+    @test PO.append_passthrough_factors(fcb, 0) === fcb
+    @test isnothing(PO.append_passthrough_factors(nothing, 3))
+    @test_throws DomainError PO.append_passthrough_factors(fcb, -1)
+    @test_throws DomainError PO.append_passthrough_factors(nothing, -1)
+    @test_throws MethodError PO.append_passthrough_factors(fcb, 1.5)
+end
+
+@testset "A member that no asset loads on leaves the zero-sum condition of its observation (#1606)" begin
+    PO = PortfolioOptimisers
+    cre = CrossSectionalLinearRegression()
+    rng = StableRNG(1_606)
+    # Raw axis: market, then the family a, b, c. Assets 5, 6 and 11 are the only assets in c,
+    # and they have no weight at observation 2, so the sample of observation 2 sees no asset
+    # in c.
+    ind = [2, 2, 3, 3, 4, 4, 2, 3, 3, 2, 4, 3]
+    N = length(ind)
+    B = zeros(2, N, 4)
+    for t in 1:2, i in 1:N
+        B[t, i, 1] = 1.0
+        B[t, i, ind[i]] = 1.0
+    end
+    X = randn(rng, 2, N) .* 0.01
+    W = ones(2, N)
+    W[2, findall(==(4), ind)] .= 0.0
+    # The benchmark-weighted exposures of the lagged observation, which still weight c.
+    cw = [3.0 4.0 2.0; 3.0 4.0 2.0]
+    basis(d) = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [d],
+                                 ratios = cw[:, setdiff(1:3, d)] ./ cw[:, d], K = 4)
+    function fit(d)
+        fcb = basis(d)
+        Zl = PO.reduce_exposures(fcb, B)
+        ud = PO.unseen_member_design(ZeroUnseenMember(), fcb, B, Zl, W)
+        csr = PO.unseen_member_returns(PO.cross_sectional_live_regression(cre, ud.Z, X, W).csr,
+                                       ud.P)
+        return (; Zl = Zl, ud = ud, csr = csr, f = PO.expand_factor_returns(fcb, csr.f))
+    end
+    A = fit(1)
+    Bf = fit(2)
+    C = fit(3)
+    @testset "Only the observation that sees no asset in c changes" begin
+        @test first.(A.ud.P) == [2]
+        @test A.ud.Z[1, :, :] == A.Zl[1, :, :]
+    end
+    @testset "c has a return of zero, and the condition holds over a and b" begin
+        for r in (A, Bf, C)
+            @test r.f[2, 4] == 0
+            @test abs(cw[2, 1] * r.f[2, 2] + cw[2, 2] * r.f[2, 3]) < 1e-15
+            @test abs(sum(cw[1, :] .* r.f[1, 2:4])) < 1e-15
+        end
+    end
+    @testset "The factor returns do not depend on the dropped member" begin
+        @test A.f≈Bf.f atol=1e-14
+        @test A.f≈C.f atol=1e-14
+    end
+    @testset "The answer is the regression under the condition over a and b" begin
+        act = findall(>(0), W[2, :])
+        # f_b = -c_a / c_b f_a and f_c = 0, so the design is [1, x_a - (c_a / c_b) x_b].
+        Zr = hcat(B[2, act, 1], B[2, act, 2] .- cw[2, 1] / cw[2, 2] .* B[2, act, 3])
+        h = Zr \ X[2, act]
+        @test A.f[2, 1:2]≈h atol=1e-14
+        @test A.f[2, 3]≈-cw[2, 1] / cw[2, 2] * h[2] atol=1e-14
+    end
+    @testset "The residuals of the sample are those of the solved rule" begin
+        # The solved rule keeps c in the condition, and the solve algorithm takes the
+        # minimum-norm answer of the rank-deficient row. Its residuals agree on the pairs of
+        # positive weight. An asset outside the sample reads the return of c, which the solved
+        # rule leaves to the solve.
+        old = PO.cross_sectional_live_regression(cre, A.Zl, X, W).csr
+        m = isfinite.(old.eps) .& (W .> 0)
+        @test isequal(isfinite.(A.csr.eps), isfinite.(old.eps))
+        @test maximum(abs, A.csr.eps[m] .- old.eps[m]) < 1e-15
+        # Outside the sample the residuals still agree across the dropped members.
+        for r in (Bf, C)
+            @test isequal(isfinite.(A.csr.eps), isfinite.(r.csr.eps))
+            @test maximum(abs, filter(isfinite, A.csr.eps .- r.csr.eps)) < 1e-15
+        end
+    end
+    @testset "A dropped member that the sample does not see moves the condition" begin
+        # Drop c: the condition moves onto b, the retained member with the larger ratio, so
+        # the column of b in the changed design is zero.
+        @test first.(C.ud.P) == [2]
+        @test all(iszero, last(only(C.ud.P))[:, 3])
+        @test all(iszero, C.ud.Z[2, :, 3])
+        # When the sample sees no member at all, every member has a return of zero.
+        fcb = basis(3)
+        W0 = copy(W)
+        W0[2, :] .= 0.0
+        Pt = last(only(PO.unseen_member_design(ZeroUnseenMember(), fcb, B,
+                                               PO.reduce_exposures(fcb, B), W0).P))
+        @test all(iszero, Pt[:, 2:3]) && Pt[1, 1] == 1
+        # When each member the sample sees has no benchmark weight, the dropped member is
+        # alone in the condition, so its zero return leaves the others free.
+        fz = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [3],
+                               ratios = [1.5 2.0; 0.0 0.0], K = 4)
+        Pt = last(only(PO.unseen_member_design(ZeroUnseenMember(), fz, B,
+                                               PO.reduce_exposures(fz, B), W).P))
+        @test Pt == LinearAlgebra.I
+    end
+    @testset "No basis, the solved rule and no unseen member change nothing" begin
+        for rule in (ZeroUnseenMember(), SolvedUnseenMember())
+            ud = PO.unseen_member_design(rule, nothing, B, B, W)
+            @test ud.Z === B && ud.P == ()
+        end
+        fcb = basis(1)
+        Zl = PO.reduce_exposures(fcb, B)
+        ud = PO.unseen_member_design(SolvedUnseenMember(), fcb, B, Zl, W)
+        @test ud.Z === Zl && ud.P == ()
+        ud = PO.unseen_member_design(ZeroUnseenMember(), fcb, B, Zl, ones(2, N))
+        @test ud.Z === Zl && isempty(ud.P)
+        csr = PO.cross_sectional_live_regression(cre, Zl, X, ones(2, N)).csr
+        @test PO.unseen_member_returns(csr, ud.P) === csr
+        # A member with no benchmark weight is out of the condition already.
+        fz = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [1],
+                               ratios = [4/3 2/3; 4/3 0.0], K = 4)
+        @test isempty(PO.unseen_member_design(ZeroUnseenMember(), fz, B,
+                                              PO.reduce_exposures(fz, B), W).P)
+    end
+    @testset "The number type of the ratios is kept" begin
+        fq = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [3],
+                               ratios = [3//2 2//1; 3//2 2//1], K = 4)
+        Bq = Rational{Int}.(B)
+        P = PO.unseen_member_design(ZeroUnseenMember(), fq, Bq, PO.reduce_exposures(fq, Bq),
+                                    W).P
+        @test eltype(last(only(P))) == Rational{Int}
+        @test last(only(P))[3, 2] == -3//4
+        fi = FactorFamilyBasis(; fnm = ["ind"], fi = [[2, 3, 4]], di = [3],
+                               ratios = [1 2; 1 2], K = 4)
+        P = PO.unseen_member_design(ZeroUnseenMember(), fi, B, PO.reduce_exposures(fi, B),
+                                    W).P
+        @test eltype(last(only(P))) == Float64
+    end
+    @testset "The fitted prior of the delisting panel does not depend on the dropped member" begin
+        fx = parity_panel(; T = 300, N = 60, seed = 1601)
+        factors = ["market" => ConstantExposure(),
+                   "industry" => OneHotExposure(; field = "industry", family = "industry"),
+                   "size" => CompositeExposure(; descriptors = [LogMarketCap()],
+                                               family = "style"),
+                   "style1" =>
+                       CompositeExposure(; descriptors = [Passthrough(; field = "style1")],
+                                         family = "style")]
+        mk(fam; kw...) = CrossSectionalFactorPrior(; factors = factors, families = fam,
+                                                   minra = 5, kw...)
+        pa = prior(mk(["industry" => nothing]), fx.rd)
+        pb = prior(mk(["industry" => "industry=Energy"]), fx.rd)
+        a = pa.rr
+        b = pb.rr
+        # Asset 3 is the only asset in Utilities, and it delists after data row 225. The
+        # condition of row 226 reads the benchmark weights of row 225, which still weight it.
+        t = findfirst(==(226), a.idx)
+        u = findfirst(==("industry=Utilities"), a.nf)
+        @test a.fr≈b.fr atol=1e-15
+        @test a.fr[t, u] == 0 && b.fr[t, u] == 0
+        @test all(x -> abs(x) < 1e-15, a.fr[(t + 1):end, u])
+        m = isfinite.(a.csr.eps)
+        @test isequal(m, isfinite.(b.csr.eps))
+        @test maximum(abs, a.csr.eps[m] .- b.csr.eps[m]) < 1e-15
+        # The solved rule differs from the default at row 226 alone, and there its answer
+        # depends on the dropped member: measured 7.6e-4 on Utilities.
+        sa = prior(mk(["industry" => nothing]; unseen = SolvedUnseenMember()), fx.rd).rr
+        sb = prior(mk(["industry" => "industry=Energy"]; unseen = SolvedUnseenMember()),
+                   fx.rd).rr
+        others = setdiff(axes(a.fr, 1), t)
+        @test maximum(abs, a.fr[others, :] .- sa.fr[others, :]) < 1e-15
+        @test maximum(abs, sa.fr[t, :] .- sb.fr[t, :]) > 1e-4
+        @test maximum(abs, sa.fr[others, :] .- sb.fr[others, :]) < 1e-15
+        @test sa.fr[t, u] != 0
+        @testset "The diagnostics and the attribution read the design of the fit (#1609)" begin
+            @test a.unseen === ZeroUnseenMember() && sa.unseen === SolvedUnseenMember()
+            same(x, y) = all(map((p, q) -> isequal(p, q) ||
+                                           isapprox(p, q; rtol = 1e-10, atol = 1e-12), x,
+                                 y))
+            # The diagnostics drop the first `lag` rows of the fit.
+            td = t - a.lag
+            @test first.(PO.cs_regression_data(a).P) == [td]
+            @test PO.cs_regression_data(sa).P == ()
+            ta = cs_regression_t_stats(a)
+            tb = cs_regression_t_stats(b)
+            com = intersect(ta.nf, tb.nf)
+            ia = indexin(com, ta.nf)
+            ib = indexin(com, tb.nf)
+            cu = findfirst(==("industry=Utilities"), com)
+            seen = setdiff(eachindex(com), cu)
+            # The old design gave no t-statistic to the market, Banks and Utilities at this
+            # row. Utilities is unseen, so the rule states its return and it has none still.
+            @test isnan(ta.X[td, ia[cu]]) && isnan(tb.X[td, ib[cu]])
+            @test all(isfinite, ta.X[td, ia[seen]])
+            @test same(ta.X[:, ia], tb.X[:, ib])
+            tsa = cs_regression_t_stats(sa)
+            od = setdiff(axes(ta.X, 1), td)
+            @test same(ta.X[od, :], tsa.X[od, :])
+            @test count(isnan, tsa.X[td, :]) == 4
+            # The VIF reads the changed design, whose column of Utilities is zero. The old
+            # design was rank-deficient, so every member and the market had an infinite VIF.
+            va = exposure_vif(a).X
+            ua = findfirst(==("industry=Utilities"), ta.nf)
+            @test isnan(va[td, ua]) && all(isfinite, va[td, setdiff(axes(va, 2), ua)])
+            @test count(isinf, exposure_vif(sa).X[td, :]) == 4
+            @test same(va[od, :], exposure_vif(sa).X[od, :])
+            # The standard errors of the row do not depend on the dropped member: before
+            # #1609 they differed by 1.6e-6 on the industry family.
+            function row_errors(pr)
+                al = PO.attribution_window(PO.attribution_align(pr.rr, pr,
+                                                                size(fx.rd.X, 1)), td:td)
+                g = dropdims(sum(al.B; dims = 2); dims = 2) ./ size(al.B, 2)
+                return PO.attribution_standard_errors(g, al, PO.attribution_families(pr.rr),
+                                                      1.0, 1, ZeroUnknown())
+            end
+            ea = row_errors(pa)
+            eb = row_errors(pb)
+            @test ea.sys≈eb.sys rtol=1e-12
+            @test ea.factor≈eb.factor rtol=1e-12
+            @test ea.family≈eb.family rtol=1e-12
+            @test ea.factor[u] == 0
+        end
+    end
+end
+
+@testset "The consumers of a block map the change of an Unseen Member (#1609)" begin
+    PO = PortfolioOptimisers
+    Zl = randn(StableRNG(1_609), 8, 3)
+    # The dropped member is unseen, so the condition moves onto member 3: its column is zero,
+    # and its row holds the condition over member 2.
+    P = [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 -0.5 0.0]
+    G = (Zl * P)' * (Zl * P)
+    D = zeros(1, 3)
+    @test PO.cs_inverse_diagonal!(D, G, 1, P) == 2
+    @test D[1, :]≈LinearAlgebra.diag(P * LinearAlgebra.pinv(G) * P') atol=1e-12
+    @test all(x -> 0 < x < Inf, D)
+    # A zero row of the change is an Unseen Member, whose return the rule states.
+    P0 = [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 0.0]
+    PO.cs_inverse_diagonal!(D, (Zl * P0)' * (Zl * P0), 1, P0)
+    @test D[1, 3] == 0 && all(isfinite, D)
+    # Without a change the slice keeps its own answer.
+    PO.cs_inverse_diagonal!(D, Zl' * Zl, 1)
+    @test D[1, :] ≈ LinearAlgebra.diag(inv(Zl' * Zl))
+    # A coefficient that the change keeps in the null space stays unidentified.
+    Zc = copy(Zl)
+    Zc[:, 1] .= 0
+    PO.cs_inverse_diagonal!(D, Zc' * Zc, 1, Matrix(1.0LinearAlgebra.I, 3, 3))
+    @test isinf(D[1, 1]) && isfinite(D[1, 2])
+    @test isnothing(PO.unseen_member_change_at((), 1))
+    @test PO.unseen_member_change_at([2 => P], 2) === P
+    @test isnothing(PO.unseen_member_change_at([2 => P], 1))
+    V = [2.0 0.5 0.1; 0.5 1.0 0.2; 0.1 0.2 3.0]
+    @test PO.attribution_changed_covariance(nothing, V, 1:3) === V
+    @test PO.attribution_changed_covariance(P, V, 1:3) ≈ P * V * P'
+    # An observed factor is not in a family, so the change is the block on `keep`.
+    Pf = [P zeros(3); zeros(1, 3) 1.0]
+    @test PO.attribution_changed_covariance(Pf, V, 1:3) ≈ P * V * P'
+    # A block that a caller builds without a rule reads its own design.
+    blk = CrossSectionalFactorModel(; M = [1.0 2.0; 3.0 4.0], b = [0.1, 0.2])
+    @test blk.unseen === SolvedUnseenMember()
+    @test PO.attribution_unseen_rule(blk) === SolvedUnseenMember()
+    @test PO.attribution_unseen_rule(Regression(; M = [1.0 2.0; 3.0 4.0], b = [0.1, 0.2])) ===
+          SolvedUnseenMember()
+    zb = CrossSectionalFactorModel(; M = [1.0 2.0; 3.0 4.0], b = [0.1, 0.2],
+                                   unseen = ZeroUnseenMember())
+    @test PO.port_opt_view(zb, [1]).unseen === ZeroUnseenMember()
+    kw = PO.attribution_array_keywords(pairs((; unseen = ZeroUnseenMember(), se = true)))
+    @test kw.blk.unseen === ZeroUnseenMember() && keys(kw.entry) == (:se,)
+    @test PO.attribution_array_block(ones(2, 2), ones(3, 2), ones(3, 2);
+                                     unseen = ZeroUnseenMember()).unseen ===
+          ZeroUnseenMember()
 end

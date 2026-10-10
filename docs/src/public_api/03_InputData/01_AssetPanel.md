@@ -1,8 +1,8 @@
 ```@meta
-Description = "The Asset Panel, public API of PortfolioOptimisers.jl: AbstractPanelField, AssetPanel, NumericPanelField, CategoricalPanelField, TensorPanelField, …"
+Description = "Asset Panel, public API of PortfolioOptimisers.jl: AbstractPanelField, AssetPanel, NumericPanelField, CategoricalPanelField, TensorPanelField, panel_field, …"
 ```
 
-# The Asset Panel
+# Asset Panel
 
 ## The asset panel
 

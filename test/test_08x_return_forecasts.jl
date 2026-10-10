@@ -1,7 +1,7 @@
 #=
 Check `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/01_Base_ReturnForecast.jl`, `02_DescriptorScores.jl`,
 `03_CustomValueReturnForecast.jl` and `04_FixedWeightedReturnForecast.jl` against the contract
-their docstrings state, and against the reference implementation the map of issue #643 ports.
+their docstrings state, and against the stored oracle of map #643.
 Issue #737.
 
 FOUR CONVENTIONS SHAPE THE PROBES.
@@ -19,9 +19,9 @@ FOUR CONVENTIONS SHAPE THE PROBES.
    the conversion is a method on the tag: the Sharpe unit multiplies the whole history by the
    idiosyncratic volatility of the same observation, so its last row is what `mu` reads.
 
-4. THE STORED CASES ARE THE REFERENCE IMPLEMENTATION'S OWN OUTPUT.
+4. THE STORED CASES ARE THE ORACLE'S OWN OUTPUT.
    `assets/FixedWeightedReturnForecast1.csv.gz` and `assets/FixedWeightedReturnForecast2.csv.gz`
-   were produced by the reference implementation's fixed-weighted alpha estimator, driven on
+   were produced by the oracle's fixed-weighted alpha estimator, driven on
    the synthetic panel the last testset rebuilds, with the same two raw Descriptors, the same
    weights, the same coverage threshold, the same two transforms, the same grouping and, for
    the second case, the same Neutralisation and the same Forecast Unit. The factor-model block
@@ -29,6 +29,7 @@ FOUR CONVENTIONS SHAPE THE PROBES.
    #725 has not landed.
 =#
 include(joinpath(@__DIR__, "test06c_setup.jl"))
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 # A small hand panel. Every numeric field takes a forward fill, so each earns an observed-mask
 # column and a raw `NaN` reads back as `NaN` rather than as the fill value.
@@ -176,8 +177,8 @@ end
     end
 
     @testset "A Neutralisation against a factor leaves the residual of that fit" begin
-        # The one target is the score itself, and the fit carries no intercept, so every
-        # residual is zero.
+        # The one target is the score itself, so every residual is zero, with or without an
+        # intercept.
         Ms = reshape(Float64.(a), 2, 2, 1)
         blk = forecast_hand_block(2; Ms = Ms, nf = ["style"], fam = ["style"])
         dsn = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
@@ -186,7 +187,7 @@ end
         @test all(abs.(Sn) .< 1e-10)
     end
 
-    @testset "`cre` decides whether the residual is merely orthogonal or uncorrelated (#950)" begin
+    @testset "`cre` decides whether the residual is merely orthogonal or uncorrelated (#950, #1521)" begin
         # A target exposure with a non-zero cross-sectional mean under equal weights, and a
         # score that is not a multiple of it, so the two fits disagree.
         x = reshape([1.0, 2.0, 6.0], 1, 3, 1)
@@ -194,14 +195,25 @@ end
         rd3 = forecast_hand_panel(["a" => y])
         blk3 = forecast_hand_block(3; Ms = x, nf = ["style"], fam = ["style"])
         xv = vec(x)
+        ds3(; kw...) = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
+                                        outlier = nothing, scoring = nothing, kw...)
+        no_intercept = CrossSectionalLinearRegression(; intercept = false)
 
-        @testset "The default carries no intercept, and the residual stays correlated" begin
-            ds0 = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
-                                   neutralise = ["style"], outlier = nothing,
-                                   scoring = nothing)
-            @test isa(ds0.cre, CrossSectionalLinearRegression)
-            @test !ds0.cre.intercept
-            eps0 = vec(descriptor_scores(ds0, rd3, blk3).S)
+        @testset "The default fits an intercept, and the residual decorrelates" begin
+            dsi = ds3(; neutralise = ["style"])
+            @test isa(dsi.cre, CrossSectionalLinearRegression)
+            @test dsi.cre.intercept
+            epsi = vec(descriptor_scores(dsi, rd3, blk3).S)
+            # The normal equations of the intercept and of the slope: the residual is
+            # orthogonal to the constant and to `x`, so it is uncorrelated with `x`.
+            @test sum(epsi) ≈ 0 atol = 1e-10
+            @test dot(xv, epsi) ≈ 0 atol = 1e-10
+            @test dot(xv .- mean(xv), epsi) ≈ 0 atol = 1e-10
+        end
+
+        @testset "`intercept = false` keeps the oracle's rule, and the residual stays correlated" begin
+            eps0 = vec(descriptor_scores(ds3(; neutralise = ["style"], cre = no_intercept),
+                                         rd3, blk3).S)
             # Orthogonal to the raw exposure...
             @test dot(xv, eps0) ≈ 0 atol = 1e-10
             # ...but not to its cross-sectional deviation from the mean, so a Pearson
@@ -209,13 +221,20 @@ end
             @test dot(xv .- mean(xv), eps0) ≈ -225 / 41 atol = 1e-8
         end
 
-        @testset "`intercept = true` removes the centred projection, and the residual decorrelates" begin
-            dsi = DescriptorScores(; descriptors = [Passthrough(; field = "a")],
-                                   neutralise = ["style"],
-                                   cre = CrossSectionalLinearRegression(; intercept = true),
-                                   outlier = nothing, scoring = nothing)
-            epsi = vec(descriptor_scores(dsi, rd3, blk3).S)
-            @test dot(xv .- mean(xv), epsi) ≈ 0 atol = 1e-10
+        @testset "Targets that span the constant give one residual under both rules" begin
+            # A market column of ones beside `x`. The column space already holds the
+            # constant, so the intercept adds nothing, and the residual is the one of the
+            # fit of `y` on `[1 x]`: slope `Sxy / Sxx = 1 / 14` through `(x̄, ȳ) = (3, 2)`.
+            Mm = cat(ones(1, 3, 1), x; dims = 3)
+            blkm = CrossSectionalFactorModel(; M = Mm[end, :, :], b = zeros(3), Ms = Mm,
+                                             nf = ["market", "style"],
+                                             fam = ["market", "style"])
+            nm = ["market", "style"]
+            epsi = vec(descriptor_scores(ds3(; neutralise = nm), rd3, blkm).S)
+            eps0 = vec(descriptor_scores(ds3(; neutralise = nm, cre = no_intercept), rd3,
+                                         blkm).S)
+            @test epsi ≈ [-6 / 7, 15 / 14, -3 / 14] atol = 1e-12
+            @test eps0 ≈ epsi atol = 1e-12
         end
     end
 
@@ -335,9 +354,12 @@ end
                                neutralise = "s", outlier = nothing, scoring = nothing)
         Sn = descriptor_scores(dsn, rdn, blkn).S
         @test eltype(Sn) === BigFloat
+        # The default fit has an intercept, so it runs through the centroid of the equal
+        # weights of the estimation mask.
         for t in 1:3
-            y = big.(a3[t, :])
-            @test Sn[t, :, 1] ≈ y - x[t, :] * (dot(x[t, :], y) / dot(x[t, :], x[t, :])) rtol = 1e-60
+            yc = big.(a3[t, :]) .- mean(big.(a3[t, :]))
+            xc = x[t, :] .- mean(x[t, :])
+            @test Sn[t, :, 1] ≈ yc - xc * (dot(xc, yc) / dot(xc, xc)) rtol = 1e-60
         end
         # A score type without `NaN` cannot mark the rows before a block that starts late.
         ar = Rational{Int}.(round.(Int, a3))
@@ -620,7 +642,7 @@ end
     end
 end
 
-@testset "The member reproduces the reference implementation" begin
+@testset "The member reproduces the stored oracle" begin
     sp = synthetic_asset_panel(; n_assets = 20, n_observations = 60, n_industries = 4,
                                late_listing_proba = 0.3, delisting_proba = 0.3,
                                missing_ratio = 0.08, rng = StableRNG(987654321))
@@ -661,7 +683,8 @@ end
                             DataFrame))
         @test size(H) == size(E)
         @test isequal(isnan.(H), isnan.(E))
-        @test H[isfinite.(E)] ≈ E[isfinite.(E)]
+        # Measured maxrel 5.4e-14, cell by cell (#1386).
+        @test all(isapprox.(H[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
     end
 
     @testset "The neutralised Sharpe case matches the stored case cell by cell" begin
@@ -675,7 +698,11 @@ end
                             DataFrame))
         @test size(rf.hist) == size(E)
         @test isequal(isnan.(rf.hist), isnan.(E))
-        @test rf.hist[isfinite.(E)] ≈ E[isfinite.(E)]
+        # A score neutralised against the one-hot industry family is a residual, and a
+        # residual near zero comes from a cancellation, so the case compares against its
+        # largest entry. Measured 2.0e-16 there, and 1.7 relative on a cell near zero (#1386).
+        @test parity_compare(rf.hist[isfinite.(E)], E[isfinite.(E)]; scale = :array,
+                             name = "FixedWeightedReturnForecast2").ok
         @test isequal(rf.mu, rf.hist[end, :])
     end
 end
@@ -695,15 +722,19 @@ FOUR MORE CONVENTIONS SHAPE THESE PROBES.
    and the weights are the inverse idiosyncratic variance. In the Sharpe unit the target
    carries the division and the weights are the estimation mask alone.
 
-7. THE STORED CASES ARE THE REFERENCE IMPLEMENTATION'S OWN OUTPUT, on the same synthetic
+7. THE STORED CASES ARE THE ORACLE'S OWN OUTPUT, on the same synthetic
    panel the file already rebuilds, with the idiosyncratic returns and variances drawn from
    the two closed forms the last testset writes and exported to both sides.
 
-8. TWO DELIBERATE DEPARTURES FROM THE REFERENCE, both settled by issue #655.
-   - `cv = nothing` calibrates IN SAMPLE. The reference's own `cv=None` still splits into
-     five folds, and `cv = KFold(; n = 5)` reproduces that to a relative 4.8e-13.
-   - `min_obs` gates the publication of a coefficient. The reference publishes from the
-     first fitted observation, which is `min_obs = 1`, and every stored case sets it.
+8. THE DEFAULTS CALIBRATE OUT OF FOLD AND PUBLISH FROM THE FIRST OBSERVATION.
+   - The default `cv = KFold()` calibrates on the out-of-fold predictions of five
+     unshuffled folds (#1418). An in-sample prediction was fitted to the target the
+     calibration regresses on it, so its slope is biased. `cv = nothing` calibrates in
+     sample, and a hand block with fewer than ten valid samples states it.
+   - The default `min_obs = 1` publishes from the first observation that advances the state
+     (#1386). The coefficients after `n` observations are the weighted least squares of those
+     observations, so a warm-up guards no bias. A stored case that sets `min_obs = 1` states
+     the default it was made under.
 =#
 
 function forecast_fit_panel(a::AbstractMatrix, b::AbstractMatrix, eps::AbstractMatrix,
@@ -758,6 +789,29 @@ end
         blk3 = CrossSectionalFactorModel(; M = reshape([1.0, 1.0], 2, 1), b = zeros(2),
                                          csr = csr, vs = [0.1 0.2; 0.3 NaN])
         @test isequal(PO.forecast_idiosyncratic_variances(blk3), [0.1 0.2; 0.3 NaN])
+        # A pair of leverage one is not an observation of the idiosyncratic return, so both
+        # reads give it `NaN`, and its zero variance is no error (#1571). A zero at a pair
+        # that `h1` does not mark is still a data error. The block does not change.
+        h1 = BitMatrix([0 0; 0 1])
+        csr1 = CrossSectionalRegression(; f = zeros(2, 1), eps = [0.1 0.2; 0.3 0.0],
+                                        n = [2, 2], h1 = h1)
+        blk4 = CrossSectionalFactorModel(; M = reshape([1.0, 1.0], 2, 1), b = zeros(2),
+                                         csr = csr1, vs = [0.1 0.2; 0.3 0.0])
+        @test isequal(PO.forecast_idiosyncratic_returns(blk4), [0.1 0.2; 0.3 NaN])
+        @test isequal(PO.forecast_idiosyncratic_variances(blk4), [0.1 0.2; 0.3 NaN])
+        @test blk4.csr.eps == [0.1 0.2; 0.3 0.0]
+        @test blk4.vs == [0.1 0.2; 0.3 0.0]
+        blk5 = CrossSectionalFactorModel(; M = reshape([1.0, 1.0], 2, 1), b = zeros(2),
+                                         csr = csr1, vs = [0.0 0.2; 0.3 0.0])
+        @test_throws DomainError PO.forecast_idiosyncratic_variances(blk5)
+        # A mask that marks no pair gives the history back as it is.
+        csr0 = CrossSectionalRegression(; f = zeros(2, 1), eps = [0.1 0.2; 0.3 0.4],
+                                        n = [2, 2], h1 = falses(2, 2))
+        blk0 = CrossSectionalFactorModel(; M = reshape([1.0, 1.0], 2, 1), b = zeros(2),
+                                         csr = csr0)
+        @test PO.forecast_idiosyncratic_returns(blk0) === csr0.eps
+        @test_throws DimensionMismatch PO.leverage_one_nan(h1, ones(3, 2))
+        @test PO.leverage_one_nan(nothing, csr0.eps) === csr0.eps
     end
 end
 
@@ -989,6 +1043,13 @@ end
         @test PO.ew_forecast_valid(S, [0.1 0.2], [0.3 0.4], [0.0 1.0]) == [false false]
         @test PO.ew_forecast_valid(S, [NaN 0.2], [0.3 0.4], [1.0 1.0]) == [false false]
         @test PO.ew_forecast_valid(S, [0.1 0.2], [NaN 0.4], [1.0 1.0]) == [false false]
+        # A zero variance would take an infinite weight. It is the variance of a pair that its
+        # own level fits exactly, so the pair leaves the fit (#1423).
+        @test PO.ew_forecast_valid(S, [0.1 0.2], [0.0 0.4], [1.0 1.0]) == [false false]
+        a, y, wv = PO.target_forecast_calibration_design([1.0 2.0 3.0], [0.1 0.2 0.3],
+                                                         [0.5 0.0 0.25], [1.0 1.0 1.0], 1)
+        @test a == [1.0, 3.0]
+        @test wv == [2.0, 4.0]
         @test PO.ew_forecast_solve([1.0 1.0; 1.0 1.0], [2.0, 2.0], 0.0, 1) ≈ [1.0, 1.0]
         @test PO.ew_forecast_solve([2.0 0.0; 0.0 4.0], [2.0, 4.0], 0.0, 1) ≈ [1.0, 1.0]
         @test PO.ew_forecast_solve([2.0 0.0; 0.0 2.0], [2.0, 2.0], 1.0, 1) ≈ [0.5, 0.5]
@@ -1014,7 +1075,9 @@ end
                                                            scale = 0.0)
         @test ExpWeightedReturnForecast(; scores = ds, half_life = 2).decay ≈
               PO.half_life_decay(2)
-        @test ExpWeightedReturnForecast(; scores = ds, half_life = 2).min_obs == 2
+        # The half-life sets the decay alone. The coefficients after one observation are the
+        # weighted least squares of that observation, so the default publishes them (#1386).
+        @test ExpWeightedReturnForecast(; scores = ds, half_life = 2).min_obs == 1
 
         @test_throws PO.IsEmptyError ExpWeightedReturnForecastResult(; mu = Float64[],
                                                                      hist = [1.0 2.0],
@@ -1220,7 +1283,8 @@ end
                                                   calibrate = false, scale = 3.0), rd, csfm)
         @test rf.mu ≈ 3 .* rf1.mu
         rfc = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
-                                                   decay = 0.5, min_obs = 1), rd, csfm)
+                                                   decay = 0.5, min_obs = 1, cv = nothing),
+                              rd, csfm)
         @test isfinite(rfc.calib)
         @test rfc.mu ≈ rfc.calib .* rf1.mu
         rfw = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
@@ -1239,17 +1303,209 @@ end
         @test rf.mu ≈ ([a[4, :] b[4, :]] * (Sf \ yf)) .* sqrt.(vs[4, :])
     end
 
-    @testset "An out of fold calibration needs two samples per fold" begin
-        rf = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
-                                                  decay = 0.5, min_obs = 1,
-                                                  cv = KFold(; n = 3)), rd, csfm)
+    @testset "An out of fold calibration below two samples per fold is in its warm-up" begin
+        # `KFold()` calibrates out of fold on five folds (#1418), and nine valid samples are
+        # fewer than ten, so no prediction is out of fold. The default is prequential since
+        # #1575, and a testset below covers it.
+        kw = (; scores = ds, target_outlier = nothing, decay = 0.5, min_obs = 1)
+        rf = return_forecast(TargetReturnForecast(; kw..., cv = KFold(; n = 3)), rd, csfm)
         @test isfinite(rf.calib)
-        @test_throws ArgumentError return_forecast(TargetReturnForecast(; scores = ds,
-                                                                        target_outlier = nothing,
-                                                                        decay = 0.5,
-                                                                        min_obs = 1,
-                                                                        cv = KFold(; n = 7)),
-                                                   rd, csfm)
+        for cv in (KFold(; n = 7), KFold())
+            rf = return_forecast(TargetReturnForecast(; kw..., cv = cv), rd, csfm)
+            @test isnan(rf.calib)
+            @test all(isnan, rf.mu)
+        end
+        Sf, yf, ok = PO.target_forecast_samples(cat(a[1:3, :], b[1:3, :]; dims = 3),
+                                                eps[2:4, :], ones(3, 3), 3)
+        p = PO.target_forecast_uncalibrated(KFold(; n = 7), TargetReturnForecast(; kw...),
+                                            nothing, Sf, yf, ok, 3)
+        @test length(p) == 9
+        @test all(isnan, p)
+        # The in-sample calibration stays one keyword away.
+        @test isfinite(return_forecast(TargetReturnForecast(; kw..., cv = nothing), rd,
+                                       csfm).calib)
+    end
+
+    @testset "InSampleWarmup reaches the oracle's in-sample fallback below the threshold" begin
+        # R53 of #1416, built by #1512. Nine valid samples are fewer than the ten that five
+        # folds need, so no prediction is out of fold. The oracle then calibrates on the
+        # in-sample predictions of the fitted model. The stored oracle is its latest forecast
+        # and its coefficient on this fixture, measured 1.0e-15 and 2.2e-16 relative. Under an
+        # explicit splitter the oracle refuses the same fit; that refuses valid input, so no
+        # keyword reproduces it, and ours does not refuse. The oracle calibrates out of fold in
+        # its batch fit, so the case states `KFold()`, the default before #1575.
+        kw = (; scores = ds, target_outlier = nothing, half_life = 10.0, cv = KFold())
+        @test TargetReturnForecast(; scores = ds).warmup === NaNWarmup()
+        nan = return_forecast(TargetReturnForecast(; kw...), rd, csfm)
+        @test isnan(nan.calib) && all(isnan, nan.mu)
+        ins = return_forecast(TargetReturnForecast(; kw..., warmup = InSampleWarmup()), rd,
+                              csfm)
+        @test isapprox(ins.calib, 1.9589560993595951; rtol = 1e-12)
+        @test parity_compare(ins.mu,
+                             [0.0084208520108218, 0.00886405474823346, 0.00443202737411673];
+                             name = "InSampleWarmup mu").ok
+        # The fallback is the calibration of `cv = nothing`, and an explicit splitter takes it.
+        cvn = return_forecast(TargetReturnForecast(; kw..., cv = nothing), rd, csfm)
+        xcv = return_forecast(TargetReturnForecast(; kw..., cv = KFold(; n = 5),
+                                                   warmup = InSampleWarmup()), rd, csfm)
+        @test ins.calib == cvn.calib == xcv.calib
+        @test isequal(ins.mu, cvn.mu) && isequal(xcv.mu, cvn.mu)
+        # Above the threshold the warm-up does not act.
+        k3 = (; kw..., cv = KFold(; n = 3))
+        @test return_forecast(TargetReturnForecast(; k3..., warmup = InSampleWarmup()), rd,
+                              csfm).calib ==
+              return_forecast(TargetReturnForecast(; k3...), rd, csfm).calib
+        # Each method of the verb, on the flattened samples.
+        Sf, yf, ok = PO.target_forecast_samples(cat(a[1:3, :], b[1:3, :]; dims = 3),
+                                                eps[2:4, :], ones(3, 3), 3)
+        rfe = TargetReturnForecast(; kw...)
+        model = PO.target_forecast_fit(rfe, Sf, yf, ok)
+        @test all(isnan, PO.target_forecast_warmup(NaNWarmup(), rfe, model, Sf, yf, ok))
+        @test PO.target_forecast_warmup(InSampleWarmup(), rfe, model, Sf, yf, ok) ≈
+              Sf * (Sf \ yf)
+    end
+
+    @testset "The prequential calibration reads the forecast published at each observation (#1575)" begin
+        @test TargetReturnForecast(; scores = ds).cv === PrequentialCalibration()
+        # The panel: 4 observations, 3 assets, 2 Descriptors, and the target of each
+        # observation matures one row later, so 3 observations matured. Observation 1 has no
+        # matured row before it. Observation 2 reads the fit on observation 1, and
+        # observation 3 the fit on observations 1 and 2.
+        A = [vec(transpose(a[1:3, :])) vec(transpose(b[1:3, :]))]
+        y = vec(transpose(eps[2:4, :]))
+        Sf, yf, ok = PO.target_forecast_samples(cat(a[1:3, :], b[1:3, :]; dims = 3),
+                                                eps[2:4, :], ones(3, 3), 3)
+        rfe = TargetReturnForecast(; scores = ds, target_outlier = nothing, decay = 0.5,
+                                   min_obs = 1)
+        p = PO.target_forecast_uncalibrated(rfe.cv, rfe, nothing, Sf, yf, ok, 3)
+        @test all(isnan, p[1:3])
+        # One observation of 3 samples fits 2 coefficients.
+        @test p[4:6] ≈ A[4:6, :] * (A[1:3, :] \ y[1:3])
+        @test p[7:9] ≈ A[7:9, :] * (A[1:6, :] \ y[1:6])
+        # The calibration regresses on those predictions, and the forecast reads the model
+        # fitted on every matured sample.
+        rf = return_forecast(rfe, rd, csfm)
+        P = permutedims(reshape(p, 3, 3))
+        @test rf.calib ≈
+              PO.target_forecast_calibration(P, PO.forward_mean_returns(eps, 1, 1), vs,
+                                             ones(4, 3), 0.5, 1)
+        @test isfinite(rf.calib)
+        @test isa(rf.model, NormalEquationsFit)
+        @test rf.mu ≈ rf.calib .* ([a[4, :] b[4, :]] * (A \ y))
+    end
+
+    @testset "A prequential prediction reads no later observation, and the fold equals the refit (#1575)" begin
+        rng = StableRNG(1575)
+        T, N, K = 40, 12, 3
+        Sf = randn(rng, T * N, K)
+        yf = Sf * [0.3, -0.2, 0.1] .+ randn(rng, T * N)
+        ok = rand(rng, T * N) .> 0.1
+        @testset "g = $(g)" for g in (1, 3)
+            p = PO.target_forecast_prequential(LinearModel(), g, Sf, yf, ok, N)
+            # Each observation t reads the least squares fit on the observations up to t - g.
+            for t in (g + 1, 20, T)
+                idx = findall(ok[1:((t - g) * N)])
+                js = filter(j -> ok[j], PO.target_forecast_row(t, N))
+                @test p[js] ≈ Sf[js, :] * (Sf[idx, :] \ yf[idx])
+            end
+            @test all(isnan, p[1:(g * N)])
+            @test all(isnan, p[.!ok])
+            @test all(isfinite, p[((g * N) + 1):end][ok[((g * N) + 1):end]])
+            # A new observation leaves every earlier prediction as it stands, to the last bit.
+            n = 25 * N
+            @test isequal(PO.target_forecast_prequential(LinearModel(), g, Sf[1:n, :],
+                                                         yf[1:n], ok[1:n], N), p[1:n])
+            # The target of observation 30 matures at 30 + g, so a change of it moves no
+            # prediction before 30 + g, and moves the prediction at 30 + g.
+            y2 = copy(yf)
+            y2[PO.target_forecast_row(30, N)] .+= 10
+            p2 = PO.target_forecast_prequential(LinearModel(), g, Sf, y2, ok, N)
+            m = (29 + g) * N
+            @test isequal(p2[1:m], p[1:m])
+            @test !isequal(p2[(m + 1):end], p[(m + 1):end])
+            # Another regression target fits again at each observation, and agrees with the
+            # fold.
+            q = PO.target_forecast_prequential(LinearModel(;
+                                                           kwargs = (;
+                                                                     dropcollinear = true)),
+                                               g, Sf, yf, ok, N)
+            @test isequal(isnan.(q), isnan.(p))
+            f = isfinite.(p)
+            @test isapprox(q[f], p[f]; rtol = 1e-13, norm = x -> maximum(abs, x))
+        end
+        @testset "The model of the latest observation is the end of the fold" begin
+            # The normal equations of every valid sample, added one sample at a time.
+            function normal(S, y)
+                XtX, Xty = zeros(size(S, 2), size(S, 2)), zeros(size(S, 2))
+                n = PO.normal_equations_add!(XtX, Xty, S, y, ok, eachindex(ok))
+                return NormalEquationsFit(XtX, Xty, n)
+            end
+            m = normal(Sf, yf)
+            idx = findall(ok)
+            @test m.n == length(idx)
+            @test PO.StatsAPI.coef(m) ≈ Sf[idx, :] \ yf[idx]
+            # One more observation, a copy of the first, reads the model of the whole fold.
+            pe = PO.target_forecast_prequential(LinearModel(), 1, [Sf; Sf[1:N, :]],
+                                                [yf; yf[1:N]], [ok; ok[1:N]], N)
+            js = findall(ok[1:N])
+            @test pe[T * N .+ js] ≈ PO.StatsAPI.predict(m, Sf[js, :])
+            # A collinear column takes a zero coefficient, as GLM gives it.
+            Sc = [Sf[:, 1:2] Sf[:, 1]]
+            mc = normal(Sc, yf)
+            gc = PO.StatsAPI.fit(LinearModel(), Sc[idx, :], yf[idx])
+            @test PO.StatsAPI.coef(mc) ≈ PO.StatsAPI.coef(gc)
+            @test iszero(PO.StatsAPI.coef(mc)[3])
+            # The prequential rule with a LinearModel of no keyword argument folds its fit
+            # (#1581). A target with keyword arguments, and another rule, fit through GLM.
+            gk = LinearModel(; kwargs = (; dropcollinear = true))
+            @test PO.target_forecast_folds(PrequentialCalibration(), LinearModel())
+            @test !PO.target_forecast_folds(PrequentialCalibration(), gk)
+            @test !PO.target_forecast_folds(KFold(), LinearModel())
+        end
+        @testset "The number type comes from the data" begin
+            # The fold adds BigFloat samples to BigFloat sums (#1581).
+            n = 5 * N
+            XtX, Xty = zeros(BigFloat, K, K), zeros(BigFloat, K)
+            m = PO.normal_equations_add!(XtX, Xty, big.(Sf[1:n, :]), big.(yf[1:n]), ok[1:n],
+                                         1:n)
+            @test eltype(PO.StatsAPI.coef(NormalEquationsFit(XtX, Xty, m))) == BigFloat
+            mb = NormalEquationsFit(big.([2.0 0.0; 0.0 4.0]), big.([2.0, 2.0]), 3)
+            @test eltype(PO.StatsAPI.coef(mb)) == BigFloat
+        end
+        @testset "The normal equations refuse a wrong shape and a negative count" begin
+            @test_throws DimensionMismatch NormalEquationsFit(zeros(2, 3), zeros(2), 1)
+            @test_throws DimensionMismatch NormalEquationsFit(zeros(2, 2), zeros(3), 1)
+            @test_throws DomainError NormalEquationsFit(zeros(2, 2), zeros(2), -1)
+            # No sample gives a zero rank and zero coefficients.
+            @test iszero(PO.StatsAPI.coef(NormalEquationsFit(zeros(2, 2), zeros(2), 0)))
+            @test PO.target_forecast_observations(trues(6), 0) == 0
+        end
+    end
+
+    @testset "The intercept appends a column of ones to every design" begin
+        # #1419: the fit, the out-of-fold fits and the latest prediction all read the constant.
+        rf = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
+                                                  calibrate = false, intercept = true), rd,
+                             csfm)
+        Sf = [vec(transpose(a[1:3, :])) vec(transpose(b[1:3, :])) ones(9)]
+        yf = vec(transpose(eps[2:4, :]))
+        coef = Sf \ yf
+        @test PortfolioOptimisers.StatsAPI.coef(rf.model) ≈ coef
+        @test rf.mu ≈ [a[4, :] b[4, :] ones(3)] * coef
+        @test !TargetReturnForecast(; scores = ds).intercept
+        rfc = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
+                                                   decay = 0.5, min_obs = 1,
+                                                   cv = KFold(; n = 3), intercept = true),
+                              rd, csfm)
+        # The out-of-fold predictions of the first fold come from a model fitted on the other
+        # two, and they read the constant too.
+        p = PO.target_forecast_uncalibrated(KFold(; n = 3),
+                                            TargetReturnForecast(; scores = ds,
+                                                                 intercept = true), nothing,
+                                            Sf, yf, trues(9), 3)
+        @test p[1:3] ≈ Sf[1:3, :] * (Sf[4:9, :] \ yf[4:9])
+        @test isfinite(rfc.calib)
+        @test rfc.mu ≈ rfc.calib .* rf.mu
     end
 
     @testset "A sample set with no valid pair fits nothing" begin
@@ -1286,7 +1542,9 @@ end
         @test_throws DomainError TargetReturnForecast(; scores = ds, scale = 0.0)
         @test_throws DomainError TargetReturnForecast(; scores = ds, decay = 1.0)
         @test_throws DomainError TargetReturnForecast(; scores = ds, min_obs = 0)
-        @test TargetReturnForecast(; scores = ds, half_life = 2).min_obs == 2
+        # The half-life sets the decay alone, and the default calibrates from the first
+        # observation that states a slope (#1386).
+        @test TargetReturnForecast(; scores = ds, half_life = 2).min_obs == 1
         @test isa(TargetReturnForecast(; scores = ds).target_outlier,
                   CrossSectionalWinsoriser)
         @test isnothing(TargetReturnForecast(; scores = ds).target_scoring)
@@ -1298,7 +1556,154 @@ end
     end
 end
 
-@testset "The two fitted members reproduce the reference implementation" begin
+#=
+A caller's own regression target (#1397). A Huber M-estimator fitted by iteratively reweighted
+least squares, written on top of `StatsAPI` as the `# Interfaces` section of
+`AbstractRegressionTarget` states: `factory` carries the observation weights, `fit` returns a
+model, and `coef` and `predict` read it. The threshold `delta` is in the units of the response,
+so the fit needs no scale estimate. The library ships no such target.
+=#
+struct HuberTestTarget{T, W} <: PortfolioOptimisers.AbstractRegressionTarget
+    delta::T
+    w::W
+end
+HuberTestTarget(delta) = HuberTestTarget(delta, nothing)
+struct HuberTestFit{V}
+    coef::V
+end
+function PortfolioOptimisers.factory(tgt::HuberTestTarget, w::StatsBase.AbstractWeights)
+    return HuberTestTarget(tgt.delta, w)
+end
+# The derivative of the Huber loss: the residual inside the threshold, clamped outside it.
+huber_test_psi(r, delta) = clamp(r, -delta, delta)
+function PortfolioOptimisers.StatsAPI.fit(tgt::HuberTestTarget, A::AbstractMatrix,
+                                          y::AbstractVector)
+    w = isnothing(tgt.w) ? ones(length(y)) : collect(tgt.w)
+    sw = sqrt.(w)
+    b = (sw .* A) \ (sw .* y)
+    for _ in 1:1000
+        r = y - A * b
+        # The IRLS weight of a residual is psi(r) / r: one inside the threshold.
+        u = [abs(ri) <= tgt.delta ? 1.0 : tgt.delta / abs(ri) for ri in r]
+        su = sqrt.(w .* u)
+        bn = (su .* A) \ (su .* y)
+        done = maximum(abs, bn - b) <= 1e-15 * (1 + maximum(abs, b))
+        b = bn
+        done && break
+    end
+    return HuberTestFit(b)
+end
+PortfolioOptimisers.StatsAPI.coef(m::HuberTestFit) = m.coef
+PortfolioOptimisers.StatsAPI.predict(m::HuberTestFit, A::AbstractMatrix) = A * m.coef
+# A least-squares target that states no weight method.
+struct UnweightedTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+function PortfolioOptimisers.StatsAPI.fit(::UnweightedTestTarget, A::AbstractMatrix,
+                                          y::AbstractVector)
+    return HuberTestFit(A \ y)
+end
+# Both fits read the design through its residuals alone, so both are invariant to the basis,
+# and `CrossSectionalTargetRegression` takes them under its default `PseudoInverseFallback()`
+# (#1625).
+function PortfolioOptimisers.is_basis_invariant(::Union{HuberTestTarget,
+                                                        UnweightedTestTarget})
+    return true
+end
+
+@testset "A caller's own regression target runs through both cross-sectional consumers" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1397)
+    T, N, K = 3, 15, 2
+    Z = randn(rng, T, N, K)
+    beta = randn(rng, T, K)
+    X = permutedims(reduce(hcat, Z[t, :, :] * beta[t, :] for t in 1:T)) .+
+        0.01 * randn(rng, T, N)
+    # One gross outlier per observation, so the Huber threshold binds.
+    X[:, 1] .+= 1.0
+    W = 1.0 .+ rand(rng, T, N)
+
+    @testset "The regression fits the target under the cross-sectional weights" begin
+        # An infinite threshold makes the Huber fit a weighted least squares, so it equals the
+        # closed form of the library, and differs from the unweighted fit. A target whose
+        # weights were dropped would give the unweighted fit.
+        f_inf = cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                          tgt = HuberTestTarget(Inf)),
+                                           Z, X, W).f
+        f_wls = cross_sectional_regression(CrossSectionalLinearRegression(), Z, X, W).f
+        f_ols = cross_sectional_regression(CrossSectionalLinearRegression(), Z, X,
+                                           ones(T, N)).f
+        # Measured: the two agree exactly, and the weights move the fit by 6.6%.
+        @test f_inf ≈ f_wls rtol = 1e-12
+        @test !isapprox(f_wls, f_ols; rtol = 1e-3)
+        # A finite threshold: the residuals solve the weighted Huber score equation of each
+        # observation, sum_i w_ti psi(eps_ti) z_ti = 0, and not the unweighted one.
+        delta = 0.02
+        csr = cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                        tgt = HuberTestTarget(delta)),
+                                         Z, X, W)
+        @test isa(csr, CrossSectionalRegression)
+        for t in 1:T
+            psi = huber_test_psi.(csr.eps[t, :], delta)
+            A = Z[t, :, :]
+            scale = sum(W[t, :] .* abs.(psi) .* sum(abs, A; dims = 2))
+            # Measured: at most 1.3e-14 of the scale weighted, and at least 1.8e-2 unweighted.
+            @test maximum(abs, A' * (W[t, :] .* psi)) <= 1e-12 * scale
+            @test maximum(abs, A' * psi) > 1e-3 * scale
+            # The outlier sits outside the threshold, so the fit clamps it.
+            @test abs(csr.eps[t, 1]) > delta
+        end
+        # The robust fit sits nearer the factor returns the panel was built from.
+        @test norm(csr.f - beta) < norm(f_wls - beta)
+    end
+
+    @testset "A target with no weight method is refused where weights reach it" begin
+        cre = CrossSectionalTargetRegression(; tgt = UnweightedTestTarget())
+        @test_throws ArgumentError cross_sectional_regression(cre, Z, X, W)
+        # The message names the method the target lacks.
+        missing_method = "factory(::UnweightedTestTarget, ::AnalyticWeights)"
+        @test_throws missing_method cross_sectional_regression(cre, Z, X, W)
+        @test_throws ArgumentError factory(UnweightedTestTarget(),
+                                           StatsBase.aweights(ones(3)))
+        # A call with no weights reaches the generic factory, which returns the target.
+        @test factory(UnweightedTestTarget()) === UnweightedTestTarget()
+        # A target that states the method keeps it.
+        w = StatsBase.aweights([1.0, 2.0])
+        @test factory(HuberTestTarget(0.5), w).w === w
+    end
+
+    @testset "The forecast fits the target without weights, and reads its predict" begin
+        a = [1.0 2.0 3.0; 2.0 1.0 4.0; 3.0 2.0 1.0; 1.0 4.0 2.0]
+        b = [4.0 1.0 2.0; 1.0 3.0 2.0; 2.0 1.0 3.0; 3.0 2.0 1.0]
+        eps = [0.01 -0.02 0.03; -0.01 0.02 0.01; 0.02 0.01 -0.03; 0.00 0.03 0.02]
+        vs = [0.04 0.09 0.01; 0.02 0.05 0.03; 0.06 0.01 0.02; 0.03 0.04 0.05]
+        rd, csfm, ds = forecast_fit_panel(a, b, eps, vs)
+        kw = (; scores = ds, target_outlier = nothing, calibrate = false)
+        mu_ols = return_forecast(TargetReturnForecast(; kw...), rd, csfm).mu
+        # The forecast needs no weight method: the unweighted target runs, and so does the
+        # Huber target at an infinite threshold, and both equal least squares.
+        for tgt in (UnweightedTestTarget(), HuberTestTarget(Inf))
+            rf = return_forecast(TargetReturnForecast(; kw..., tgt = tgt), rd, csfm)
+            @test isa(rf.model, HuberTestFit)
+            # Measured: 4.0e-16.
+            @test rf.mu ≈ mu_ols rtol = 1e-12
+        end
+        # A finite threshold: the coefficients solve the unweighted Huber score equation of
+        # the pooled samples, and the forecast is the target's own predict on the latest row.
+        delta = 0.015
+        rf = return_forecast(TargetReturnForecast(; kw..., tgt = HuberTestTarget(delta)),
+                             rd, csfm)
+        Sf = [vec(transpose(a[1:3, :])) vec(transpose(b[1:3, :]))]
+        yf = vec(transpose(eps[2:4, :]))
+        coef = PO.StatsAPI.coef(rf.model)
+        psi = huber_test_psi.(yf - Sf * coef, delta)
+        # Measured: 5.6e-15 of the scale, with three of the nine samples clamped.
+        @test maximum(abs, Sf' * psi) <= 1e-12 * sum(abs.(psi) .* sum(abs, Sf; dims = 2))
+        @test any(>(delta), abs.(yf - Sf * coef))
+        @test !isapprox(rf.mu, mu_ols; rtol = 1e-3)
+        @test rf.mu ≈ [a[4, :] b[4, :]] * coef rtol = 1e-12
+    end
+end
+
+@testset "The two fitted members reproduce the stored oracle" begin
     sp = synthetic_asset_panel(; n_assets = 20, n_observations = 60, n_industries = 4,
                                late_listing_proba = 0.3, delisting_proba = 0.3,
                                missing_ratio = 0.08, rng = StableRNG(987654321))
@@ -1345,7 +1750,8 @@ end
         E = stored("ExpWeightedReturnForecast1")
         @test size(rf.hist) == size(E)
         @test isequal(isnan.(rf.hist), isnan.(E))
-        @test rf.hist[isfinite.(E)] ≈ E[isfinite.(E)]
+        # Measured maxrel 2.6e-13, cell by cell (#1386).
+        @test all(isapprox.(rf.hist[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
         @test isequal(rf.mu, rf.hist[end, :])
     end
 
@@ -1359,8 +1765,11 @@ end
         E = stored("ExpWeightedReturnForecast2")
         @test size(rf.hist) == size(E)
         @test isequal(isnan.(rf.hist), isnan.(E))
-        m = isfinite.(E) .& (abs.(E) .> 1e-9)
-        @test rf.hist[m] ≈ E[m]
+        # A neutralised score is a residual, so a cell near zero comes from a cancellation,
+        # and the case compares against its largest entry. Measured 9.9e-16 there (#1386).
+        m = isfinite.(E)
+        @test parity_compare(rf.hist[m], E[m]; scale = :array,
+                             name = "ExpWeightedReturnForecast2").ok
     end
 
     @testset "The uncalibrated target forecast matches the stored case" begin
@@ -1368,7 +1777,8 @@ end
                                                   calibrate = false), rd, csfm)
         E = vec(stored("TargetReturnForecast1"))
         @test isequal(isnan.(rf.mu), isnan.(E))
-        @test rf.mu[isfinite.(E)] ≈ E[isfinite.(E)]
+        # Measured maxrel 1.8e-13 at most over the four stored cases, cell by cell (#1386).
+        @test all(isapprox.(rf.mu[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
     end
 
     @testset "The out of fold calibrated forecast matches the stored case" begin
@@ -1377,7 +1787,8 @@ end
                                                   cv = KFold(; n = 3)), rd, csfm)
         E = vec(stored("TargetReturnForecast2"))
         @test isequal(isnan.(rf.mu), isnan.(E))
-        @test rf.mu[isfinite.(E)] ≈ E[isfinite.(E)]
+        # Measured maxrel 1.8e-13 at most over the four stored cases, cell by cell (#1386).
+        @test all(isapprox.(rf.mu[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
     end
 end
 
@@ -1391,7 +1802,8 @@ end
         emsk = [true false false; true true true; true true true; true true true]
         rd, csfm, ds = forecast_fit_panel(a, b, eps, vs; emsk = emsk)
         rf = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
-                                                  decay = 0.5, min_obs = 1), rd, csfm)
+                                                  decay = 0.5, min_obs = 1, cv = nothing),
+                             rd, csfm)
         # The first observation carries one asset, so it advances no accumulator; the rest do.
         @test isfinite(rf.calib)
     end
@@ -1459,8 +1871,8 @@ end
     for (unit, sharpe) in
         ((IdiosyncraticReturnUnit(), false), (IdiosyncraticSharpeUnit(), true))
         rf = return_forecast(TargetReturnForecast(; scores = ds, target_outlier = nothing,
-                                                  decay = lambda, min_obs = 1, unit = unit),
-                             rd, csfm)
+                                                  decay = lambda, min_obs = 1, unit = unit,
+                                                  cv = nothing), rd, csfm)
         kappa, calendar, alpha = closed_form(sharpe)
         @test rf.calib ≈ kappa rtol = 1e-12
         @test rf.mu ≈ alpha rtol = 1e-12
@@ -1472,7 +1884,7 @@ end
         c = PO.target_forecast_coefficient(rfe, nothing, zeros(Float32, 2, 2),
                                            zeros(Float32, 2), trues(2),
                                            zeros(Float32, 2, 2), nothing,
-                                           ones(Float32, 2, 2), 1)
+                                           ones(Float32, 2, 2), 1).calib
         @test isa(c, Float32)
         @test isnan(c)
         @test isa(PO.target_forecast_multiplier(false, c), Float32)
@@ -1493,19 +1905,19 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
 
 10. THE DESCRIPTORS OF THE FORECAST WARM UP OVER THE WHOLE CARRIER. A Descriptor with a
     warm-up would otherwise warm up a second time inside the block's window, which is the
-    one design the reference implementation cannot express. Every member then cuts to the
+    one design the oracle cannot express. Every member then cuts to the
     block's rows, so `hist` still lines up with `vs`, with `csr.eps` and with `pr.o_X`.
 
 11. THE TARGET MEMBER KEEPS THE BOUNDARY BAND. Under `whole_history = true` the block's
     idiosyncratic returns are placed into the rows they were fitted on, so a signal row
     before the block whose forward window reaches into the block is a training row. There
     are exactly `lag + horizon - 1` such rows. Under `false` the fit trains on the block's
-    rows alone, and the reference implementation has no such mode.
+    rows alone, and the oracle has no such mode.
 
     `assets/FixedWeightedReturnForecast3.csv.gz`, `assets/TargetReturnForecast3.csv.gz` and
-    `assets/TargetReturnForecast4.csv.gz` are the reference implementation's own output on
+    `assets/TargetReturnForecast4.csv.gz` are the oracle's own output on
     the panel this testset rebuilds, with the block padded back onto the whole observation
-    axis as the reference's own prior pads it. Its momentum Descriptor carries a warm-up,
+    axis as the oracle's own prior pads it. Its momentum Descriptor carries a warm-up,
     which is what the earlier stored cases cannot see. The forecast agrees to a relative
     1.3e-14 and the calibration coefficient BIT FOR BIT.
 =#
@@ -1591,7 +2003,8 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
         @test size(rf.hist) == (Tb, N)
         B = E[rows, :]
         @test isequal(isnan.(rf.hist), isnan.(B))
-        @test rf.hist[isfinite.(B)] ≈ B[isfinite.(B)]
+        # Measured maxrel 1.2e-14, cell by cell (#1386).
+        @test all(isapprox.(rf.hist[isfinite.(B)], B[isfinite.(B)]; rtol = 1e-12))
         @test isequal(rf.mu, rf.hist[end, :])
     end
 
@@ -1620,7 +2033,8 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
         E = vec(Matrix(CSV.read(joinpath(@__DIR__, "assets/TargetReturnForecast3.csv.gz"),
                                 DataFrame)))
         @test isequal(isnan.(rf.mu), isnan.(E))
-        @test rf.mu[isfinite.(E)] ≈ E[isfinite.(E)]
+        # Measured maxrel 1.8e-13 at most over the four stored cases, cell by cell (#1386).
+        @test all(isapprox.(rf.mu[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
         # The block's rows alone lose the boundary band, so the fit is a different one.
         rb = return_forecast(TargetReturnForecast(; scores = ds, horizon = 2, lag = 1,
                                                   calibrate = false, whole_history = false),
@@ -1636,9 +2050,11 @@ THREE MORE CONVENTIONS SHAPE THESE PROBES.
                              csfm)
         E = vec(Matrix(CSV.read(joinpath(@__DIR__, "assets/TargetReturnForecast4.csv.gz"),
                                 DataFrame)))
-        # The reference implementation's own coefficient, which the padded rows never enter.
-        @test rf.calib ≈ -0.7730488894268933
-        @test rf.mu[isfinite.(E)] ≈ E[isfinite.(E)]
+        # The oracle's own coefficient, which the padded rows never enter.
+        # Bit-equal when measured (#1386).
+        @test isapprox(rf.calib, -0.7730488894268933; rtol = 1e-14)
+        # Measured maxrel 1.8e-13 at most over the four stored cases, cell by cell (#1386).
+        @test all(isapprox.(rf.mu[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12))
     end
 
     @testset "In the Sharpe unit a row before the block trains nothing" begin

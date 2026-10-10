@@ -55,15 +55,23 @@ const MOMENT_SURFACES = (PortfolioOptimisers.AbstractExpectedReturnsEstimator,
                          PortfolioOptimisers.AbstractCovarianceEstimator,
                          PortfolioOptimisers.AbstractVarianceEstimator)
 
+# The instance a leaf's default constructor gives. A leaf whose constructor requires a keyword
+# takes it from `LEAF_KWARGS`: `ImpliedVolatility` states its annualisation `ppy`, which has no
+# default.
+const LEAF_KWARGS = Dict{Symbol, NamedTuple}(:ImpliedVolatility => (; ppy = 252))
+function default_instance(S::Type)
+    return S(; get(LEAF_KWARGS, nameof(S), (;))...)
+end
+
 # The method a call on `T` dispatches to, or `nothing` when there is none.
 #
 # The leaf types come from `subtypes`, so a parametric leaf arrives as a `UnionAll` and
 # dispatch on it answers the wrong method: `which(cov, Tuple{Covariance, Matrix{Float64}})`
 # reads the surface's fallback, because no single method covers every `Covariance{T1, T2, T3}`.
-# The caller holds an INSTANCE, so the census asks about `typeof(S())`.
+# The caller holds an INSTANCE, so the census asks about `typeof(default_instance(S))`.
 function dispatched_method(verb::Function, S::Type)
     return try
-        which(verb, Tuple{typeof(S()), Matrix{Float64}})
+        which(verb, Tuple{typeof(default_instance(S)), Matrix{Float64}})
     catch
         nothing
     end
@@ -95,7 +103,7 @@ function takes_correlation_rescale(S::Type)
     end
     return m.module === PortfolioOptimisers &&
            m.sig.parameters[2] === PortfolioOptimisers.AbstractCovarianceEstimator &&
-           hasfield(typeof(S()), :ve)
+           hasfield(typeof(default_instance(S)), :ve)
 end
 
 # What each family's membership promises, and what answers it.

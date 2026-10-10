@@ -1240,7 +1240,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the read-out arm of [`coverage_variance`](@ref). Every asset shares one count, so the whole answer is `NaN` until the count passes the Bessel correction.
+`Nothing` method of [`coverage_variance`](@ref) for a state, which `var(ve)` with no data calls. Every asset shares one count, so the whole answer is `NaN` until the count passes the Bessel correction.
 
 # Related
 
@@ -1254,7 +1254,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of the read-out arm of [`coverage_variance`](@ref). Each asset's accumulator is divided by that asset's own count less the Bessel correction, and an asset the policy refuses is `NaN`.
+[`CoveragePolicy`](@ref) method of [`coverage_variance`](@ref) for a state, which `var(ve)` with no data calls. Each asset's accumulator is divided by that asset's own count less the Bessel correction, and an asset the policy refuses is `NaN`.
 
 # Related
 

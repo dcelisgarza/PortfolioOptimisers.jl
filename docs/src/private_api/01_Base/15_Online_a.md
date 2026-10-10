@@ -1,0 +1,47 @@
+```@meta
+Description = "Online (a), private API of PortfolioOptimisers.jl: Online_Option, Onl, CVE_Onl, SampleBufferState, assert_sample_buffer_state, assert_buffer_mask_shape, …"
+```
+
+# Online (a): private API
+
+```@docs
+PortfolioOptimisers.Online_Option
+PortfolioOptimisers.Onl
+PortfolioOptimisers.CVE_Onl
+PortfolioOptimisers.SampleBufferState
+PortfolioOptimisers.assert_sample_buffer_state
+PortfolioOptimisers.assert_buffer_mask_shape
+PortfolioOptimisers.assert_buffer_factor_shape
+PortfolioOptimisers.assert_buffer_series_shape
+PortfolioOptimisers.buffer_rows_view
+PortfolioOptimisers.sample_buffer
+PortfolioOptimisers.sample_buffer_kwargs
+PortfolioOptimisers.factor_buffer
+PortfolioOptimisers.exogenous_buffer_kwargs
+PortfolioOptimisers.assert_sample_buffer(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator})
+PortfolioOptimisers.assert_sample_buffer(::PortfolioOptimisers.Online)
+PortfolioOptimisers.sample_buffer_seed
+PortfolioOptimisers.fold_buffer
+PortfolioOptimisers.assert_buffer_factor_width
+PortfolioOptimisers.assert_buffer_series_names
+PortfolioOptimisers.assert_buffer_presence_agreement
+PortfolioOptimisers.seed_sample_buffer
+PortfolioOptimisers.seed_buffer_array
+PortfolioOptimisers.copy_buffer_rows!
+PortfolioOptimisers.reserve_sample_buffer
+PortfolioOptimisers.compact_buffer_array
+PortfolioOptimisers.observation_row
+PortfolioOptimisers.merge_buffer_array
+PortfolioOptimisers.trim_merged_array
+Base.copy(x::PortfolioOptimisers.SampleBufferState)
+PortfolioOptimisers.copy_buffer_array
+PortfolioOptimisers.slice_buffer_mask
+PortfolioOptimisers.online_candidate_fields
+PortfolioOptimisers.online_fields
+PortfolioOptimisers.update_online_estimator
+PortfolioOptimisers.estimator_fields
+PortfolioOptimisers.online_entry_state
+PortfolioOptimisers.online_wrapper_path
+PortfolioOptimisers.seed_window_path
+PortfolioOptimisers.assert_batch_entry
+```

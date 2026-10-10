@@ -76,7 +76,7 @@ const PATTERNS = Dict("emdash" => r"—", "endash" => r"–", "curly" => r"[“�
                           r"\b(?:utilis(?:e|es|ed|ing)|utiliz(?:e|es|ed|ing)|facilitat(?:e|es|ed|ing)|numerous|in the event that)\b"i,
                       "bold_label" => r"\*\*[^*\n]{1,80}:\*\*|\*\*[^*\n]{1,80}\*\*\s*:",
                       "mechanism" =>
-                          r"\bseams?\b|\bcarriers?\b|\bread-?outs?\b|\bhosts?\b|\brefused? by name\b|§"i,
+                          r"\bseams?\b|\bcarriers?\b|\bread-?outs?\b|\bhosts?\b|\bdoors?\b|\brefused? by name\b|§"i,
                       # "the identity matrix" is the matrix, not the verdict, and a page that
                       # shrinks a covariance towards it says so in those words.
                       "verdict" =>
@@ -581,18 +581,18 @@ function emoji_count(line::AbstractString)
     return n
 end
 
-# --- the glossary of CONTEXT.md --------------------------------------------
+# --- the glossary of GLOSSARY.md --------------------------------------------
 
 """
     glossary_terms(; root = REPO_ROOT) -> Vector{String}
 
-The multi-word bold terms of `CONTEXT.md` in their capitalised form, longest first. The census
+The multi-word bold terms of `GLOSSARY.md` in their capitalised form, longest first. The census
 reads them off that file rather than holding a copy, so the list never goes stale. A term counts
 only when every word of it starts with a capital: `Coverage Universe` is the glossary's name for
 the concept, and `Black-Litterman family` is a proper noun with an ordinary word after it.
 """
 function glossary_terms(; root::AbstractString = REPO_ROOT)
-    path = joinpath(root, "CONTEXT.md")
+    path = joinpath(root, "GLOSSARY.md")
     if !(isfile(path))
         return String[]
     end

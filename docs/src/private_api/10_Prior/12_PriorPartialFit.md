@@ -1,8 +1,8 @@
 ```@meta
-Description = "The prior family on the partial-fit seam, private API of PortfolioOptimisers.jl: PriorCarryState, sample_buffer, returns_buffer, prior_returns_buffer, …"
+Description = "Prior partial fit, private API of PortfolioOptimisers.jl: PriorCarryState, sample_buffer, returns_buffer, prior_returns_buffer, fold_carry, Base.copy, …"
 ```
 
-# The prior family on the partial-fit seam: private API
+# Prior partial fit: private API
 
 ```@docs
 PortfolioOptimisers.PriorCarryState
@@ -11,11 +11,25 @@ PortfolioOptimisers.returns_buffer
 PortfolioOptimisers.prior_returns_buffer
 PortfolioOptimisers.fold_carry
 Base.copy(x::PortfolioOptimisers.PriorCarryState)
+PortfolioOptimisers.buffer_prior
+PortfolioOptimisers.buffer_row_key
+PortfolioOptimisers.forget_row_positions
 PortfolioOptimisers.needs_factor_returns
 PortfolioOptimisers.combine_factor_answers
+PortfolioOptimisers.reads_panel_fields
+PortfolioOptimisers.reads_exogenous_series
 PortfolioOptimisers.assert_factor_returns
+PortfolioOptimisers.assert_prior_fold_returns
+PortfolioOptimisers.refit_prior_step
+PortfolioOptimisers.refit_prior_fold
+PortfolioOptimisers.pin_prior_choice
+PortfolioOptimisers.refit_step_kwargs
+PortfolioOptimisers.exogenous_step_kwargs
+PortfolioOptimisers.step_panel_fields
 PortfolioOptimisers.fold_factor_argument
 PortfolioOptimisers.fold_member
 PortfolioOptimisers.read_member
+PortfolioOptimisers.assert_carry_step_panel
+PortfolioOptimisers.step_active_kwargs
 PortfolioOptimisers.update_online_estimator(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})
 ```

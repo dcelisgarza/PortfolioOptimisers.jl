@@ -18,7 +18,6 @@ robust_cor
 compat_cov
 compat_cor
 moment_window_and_weights
-windowed_preamble
 weighted_centre
 demean_returns
 ```
@@ -40,6 +39,7 @@ windowed_estimator_suggest
 windowed_estimator_error
 windowed_type_doc
 windowed_method_ref
+windowed_method_sig
 windowed_method_doc
 windowed_method_def
 ```

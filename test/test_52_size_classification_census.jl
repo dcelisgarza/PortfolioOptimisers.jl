@@ -29,7 +29,7 @@ branch value is such a string:
 hand count of its source gives 17. The second rule is gone, and `a value string in a branch is
 code` below is the regression test for it.
 
-This file is the fixture adapter for the gate, in the sense `test_51_code_health_root_seam.jl`
+This file is the fixture adapter for the gate, in the sense `test_51_code_health_root.jl`
 gives: a gate exercised only by CI running the real script against the real repository is a
 counting defect found months late. It writes small trees in a temporary directory, labels every
 line of them by hand, and asks the classifier to agree.

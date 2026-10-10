@@ -1,8 +1,8 @@
 ```@meta
-Description = "Multiple Randomised Cross Validation, public API of PortfolioOptimisers.jl: MultipleRandomised, MultipleRandomisedResult, Base.split."
+Description = "Multiple randomised, public API of PortfolioOptimisers.jl: MultipleRandomised, MultipleRandomisedResult, Base.split."
 ```
 
-# Multiple Randomised Cross Validation
+# Multiple randomised
 
 ```@docs
 MultipleRandomised

@@ -1,26 +1,31 @@
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Retrieve or compute and cache the Cholesky factor of the co-kurtosis matrix.
+Retrieve or compute and cache the factor of the co-kurtosis matrix.
 
-If `model` does not yet contain `Gkt`, computes the upper Cholesky factor of
-`pr.S2 * pr.kt * pr.S2'` and stores it as the `:Gkt` Model State entry.
+If `model` does not yet contain `Gkt`, computes the transpose of the square root of
+`pr.S2 * pr.kt * pr.S2'` under `mtx_sqrt` with [`matrix_square_root`](@ref), and stores it as
+the `:Gkt` Model State entry. Every measure of the model that reads the prior's matrix reads
+this one factor, so the first measure sets the algorithm. On a positive definite matrix every
+algorithm gives the Cholesky factor.
 
 # Arguments
 
   - $(arg_dict[:model])
   - `pr::HighOrderPrior`: High-order prior containing `kt` and `S2`.
+  - `mtx_sqrt`: Square-root algorithm, or `nothing` for the plain Cholesky factor.
 
 # Returns
 
-  - `Gkt::Matrix`: Upper Cholesky factor of the co-kurtosis projected matrix.
+  - `Gkt::Matrix`: Factor of the co-kurtosis projected matrix, with `Gkt' * Gkt == pr.S2 * pr.kt * pr.S2'`.
 
 # Related
 
   - [`get_kt_Akt_pm`](@ref)
   - [`set_risk_constraints!`](@ref)
 """
-function get_chol_or_Gkt_pm(model::JuMP.Model, pr::HighOrderPrior)
+function get_chol_or_Gkt_pm(model::JuMP.Model, pr::HighOrderPrior,
+                            mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     if !shared_has(model, :Gkt)
         #=
         #! figure out how to add chol
@@ -32,7 +37,7 @@ function get_chol_or_Gkt_pm(model::JuMP.Model, pr::HighOrderPrior)
                  view(pr.chol_kt, (N2 + 1):N1, :) * transpose(pr.S2))
         end
         =#
-        G = LinearAlgebra.cholesky(pr.S2 * pr.kt * transpose(pr.S2)).U
+        G = transpose(matrix_square_root(mtx_sqrt, pr.S2 * pr.kt * transpose(pr.S2)))
         JuMP.@expression(model, Gkt, G)
     end
     return shared_get(model, :Gkt)
@@ -163,7 +168,7 @@ Add kurtosis risk constraints to `model`.
 
 The `Integer N` overload uses an approximate spectral decomposition of the co-kurtosis tensor
 to build `N` eigen-directions and encodes kurtosis via SOC and equality constraints. The
-`Nothing N` overload uses the full Cholesky-based formulation with the duplication matrix.
+`Nothing N` overload uses the full factor-based formulation with the duplication matrix.
 
 Both accept any prior result. The cokurtosis matrix must resolve on one side or the other,
 and [`assert_high_order_quantity`](@ref) refuses the measure when it resolves on neither.
@@ -173,14 +178,14 @@ and [`assert_high_order_quantity`](@ref) refuses the measure when it resolves on
 ```math
 \\begin{align}
 \\sqrt{\\mathrm{Kurt}(\\boldsymbol{w})} &= \\lVert \\mathbf{G}_{kt}(\\boldsymbol{w} \\otimes \\boldsymbol{w}) \\rVert_2\\,, \\\\
-\\mathbf{G}_{kt} &= \\mathrm{chol}(\\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal)\\,.
+\\mathbf{G}_{kt}^\\intercal \\mathbf{G}_{kt} &= \\mathbf{S}_2 \\mathbf{K} \\mathbf{S}_2^\\intercal\\,.
 \\end{align}
 ```
 
 Where:
 
   - ``\\mathrm{Kurt}(\\boldsymbol{w})``: Portfolio kurtosis risk measure.
-  - ``\\mathbf{G}_{kt}``: Cholesky factor of the projected co-kurtosis matrix.
+  - ``\\mathbf{G}_{kt}``: Transpose of the square root of the projected co-kurtosis matrix that [`matrix_square_root`](@ref) takes under the `mtx_sqrt` of the measure.
   - ``\\mathbf{K}``: Co-kurtosis matrix.
   - ``\\mathbf{S}_2``: Duplication matrix.
   - $(math_dict[:w_port])
@@ -259,7 +264,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Add JuMP risk constraints for `Kurtosis` with a continuous `Nothing` truncation parameter
 to `model`.
 
-Uses the full Cholesky-based SDP formulation to compute the portfolio kurtosis risk as a
+Uses the full factor-based SDP formulation to compute the portfolio kurtosis risk as a
 second-order cone constraint over the vectorised weight matrix `W`. This overload applies
 when the kurtosis truncation rank is `Nothing` (no truncation).
 
@@ -299,9 +304,9 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     W = set_sdp_constraints!(model; prefix = prefix)
     L2, S2 = dup_elim_sum_selector(pr, size(W, 1))[2:3]
     G = if isnothing(r.kt)
-        get_chol_or_Gkt_pm(model, pr)
+        get_chol_or_Gkt_pm(model, pr, r.mtx_sqrt)
     else
-        LinearAlgebra.cholesky(S2 * r.kt * transpose(S2)).U
+        transpose(matrix_square_root(r.mtx_sqrt, S2 * r.kt * transpose(S2)))
     end
     sqrt_kurtosis_risk = state_set!(model, prefix, :kurtosis_risk_, i,
                                     JuMP.@variable(model))

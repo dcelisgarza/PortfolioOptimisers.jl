@@ -116,7 +116,7 @@ end
     # Every row is the same classification, stored once.
     @test all(t -> f.codes[t, :] == f.codes[1, :], 1:T)
     @test isa(f.codes, PortfolioOptimisers.RepeatedLeading)
-    # A lifted field carries no observed mask, because every cell was observed.
+    # The input cannot blank, so the lifted field carries no observed mask (#1631).
     @test isnothing(f.omsk)
     # The masks are the second lift signal.
     lifted = asset_panel([panel_input(TAXS, "nx_sector")]; amsk = trues(T, 4),

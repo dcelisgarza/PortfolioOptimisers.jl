@@ -29,7 +29,7 @@ Six facts shaped the decision.
    ticket named it as "the slot a non-optimisation evaluation fits". Its one member is
    `MultipleRandomised`, a resampling *split*. A scheme says how folds are cut; an evaluation
    consumes a scheme, as `fit_and_predict(opt, rd, cv)` does.
-3. **The reference has this feature, and #864 did not read it.** Its batch and online verbs each
+3. **The oracle has this feature, and #864 did not read it.** Its batch and online verbs each
    hand-roll a walk-forward and share one per-step kernel; its Result stores per-step scalars
    only — the squared Mahalanobis distance, its ratio, the diagonal ratio averaged over assets,
    the standardised portfolio return and the portfolio QLIKE per test portfolio, the active count
@@ -53,7 +53,7 @@ Six facts shaped the decision.
    `mu`. So `E[(z − c)(z − c)'] = Σ̂` has a definite `c` for every family that fits a second moment,
    and the raw proxy `zz'` estimates `Σ + (μ − c)(μ − c)'` instead. The bias is `c'Σ̂⁻¹c / N`:
    0.16 % on daily data, 3.2 % on monthly data or for the horizon return at `h = 20`.
-6. **Under a Coverage Policy a forecast is a `NaN` frame** (ADR 0117), which is the reference's
+6. **Under a Coverage Policy a forecast is a `NaN` frame** (ADR 0117), which is the oracle's
    own convention for an inactive asset: "NaN diagonal entries mark inactive assets".
 
 ## Decision
@@ -70,7 +70,7 @@ batch expanding, batch rolling, online expanding and online rolling forms are th
 compositions the walk-forward and the `Online` wrapper already express, and the verb reads none
 of them. An `Online` at the root under a scheme with no Fold Fit is refused by name, because a
 batch fold would never seed its buffer. The verb and the kernel live in
-`src/20_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl`, after the loop it
+`src/17_Optimisation/02_CrossValidation/13_CovarianceForecastEvaluation.jl`, after the loop it
 runs through, and the three verbs above the Result in `14_CovarianceForecastSummary.jl`. It owes
 the loop four small methods: `partial_fit!(pe::AbstractPriorEstimator, rd)`, which is
 `fold_prior`; `partial_fit!(ce::AbstractCovarianceEstimator, rd)`; `is_time_dependent` and
@@ -79,12 +79,12 @@ the loop four small methods: `partial_fit!(pe::AbstractPriorEstimator, rd)`, whi
 
 **The realised quantity is a typed family, `AbstractRealisedTarget`.** `RealisedCovariance()`,
 the default, compares `S_t = Σ_s (z_s − c)(z_s − c)'` against `h Σ̂_t` — a per-row statistic whose
-ratio has per-step variance `2 / (N h)` under a Gaussian null. `HorizonReturn()`, the reference's
+ratio has per-step variance `2 / (N h)` under a Gaussian null. `HorizonReturn()`, the oracle's
 member, compares `R R'` with `R = Σ_s (z_s − c)` against the same target — the `h`-day holder's
-question, rank one, per-step variance `2 / N`. The two coincide at `h = 1`, so the reference is
-an oracle at `h = 1` for both and at any `h` for `HorizonReturn()`. A gap in the test window
+question, rank one, per-step variance `2 / N`. The two coincide at `h = 1`, so the oracle
+checks both at `h = 1` and at any `h` for `HorizonReturn()`. A gap in the test window
 contributes to neither `S` nor its count, so the target of cell `ij` is `H_ij Σ̂_ij` with `H` the
-pairwise count of finite rows — the reference's convention, and the per-cell denominator ADR 0117
+pairwise count of finite rows — the oracle's convention, and the per-cell denominator ADR 0117
 made the moment layer's own.
 
 **The realised return is centred on the location the forecast is about, always.** One verb,
@@ -103,10 +103,10 @@ no `demean` flag: the location is the estimator's, not the caller's, and an esti
 a zero mean is evaluated at zero. An asset whose location is not finite is not active at the step,
 beside one whose forecast variance is not: a return that cannot be centred cannot be scored.
 
-**The diagnostics are the reference's five and three more.** Per step and free of `w`: the
-Mahalanobis ratio `tr((H ⊙ Σ̂)⁻¹S) / N` — `tr(Σ̂⁻¹S) / (N h)` with no gap, and the reference's
+**The diagnostics are the oracle's five and three more.** Per step and free of `w`: the
+Mahalanobis ratio `tr((H ⊙ Σ̂)⁻¹S) / N` — `tr(Σ̂⁻¹S) / (N h)` with no gap, and the oracle's
 `R'(H ⊙ Σ̂)⁻¹R / N` under its target — the diagonal ratio per asset `S_ii / (H_ii Σ̂_ii)` — kept
-as `M × N`, where the reference keeps the mean over assets — the whole-matrix QLIKE, coded through
+as `M × N`, where the oracle keeps the mean over assets — the whole-matrix QLIKE, coded through
 the identity `h log|Σ̂| + N h m_t` so that it is `h log|Σ̂| + tr(Σ̂⁻¹S)` with no gap and stays
 finite under one, and the Frobenius loss `Σ_{H_ij > 0} (S_ij / H_ij − Σ̂_ij)²`, the per-cell form
 of `‖S/h − Σ̂‖²_F`; the two losses #864 proved robust to the proxy. Per step and per test
@@ -115,7 +115,7 @@ reads the per-row portfolio returns whichever target formed `S`. Over the run: t
 and quantiles of each ratio, where the mean is the ratio of sums #864 §4.1 states — the per-step
 ratios weighted by their degrees of freedom, `N_t h_t` under the realised covariance and `N_t`
 under the horizon return, which is the plain mean at a fixed universe and horizon and is what the
-reference reports — the Gaussian band `1 ± z_{α/2} √(2 / Σ_t dof_t)` on the mean ratio and
+oracle reports — the Gaussian band `1 ± z_{α/2} √(2 / Σ_t dof_t)` on the mean ratio and
 `√(2 / Σ_t dof'_t)` on one asset's or one portfolio's ratio, the bias statistic `B = std(b_t)` per
 portfolio with its cross-portfolio quantiles at `(5, 25, 75, 95)`, the mean losses, and the
 exceedance rate of `dof_t m_t` against `χ²_{dof_t}` at each of `levels`, `(0.95, 0.99)` by
@@ -126,7 +126,7 @@ not computed.
 
 **The test portfolio.** `w = nothing` is inverse volatility recomputed every step from `Σ̂_t`;
 a vector is one static portfolio; a vector of vectors is `P` portfolios. Each is renormalised
-over the step's active assets, as the reference does. A portfolio *solved* per step by an optimiser
+over the step's active assets, as the oracle does. A portfolio *solved* per step by an optimiser
 on the forecast — Engle and Colacito's minimum-variance test — is not built here; it needs the
 optimiser's read-out under the online arm, and is fog on the map.
 
@@ -141,7 +141,7 @@ nature, and a horizon per step is the `h_t` #864 §4.1 already wrote, so nothing
 summary weights each step by its own length. The step row type is a `NamedTuple`, because the
 kernel's numeric types are known only after the first fit, as the optimiser entry's
 `PredictionResult` is a `UnionAll`. This is the opposite of map #931's lazy ruling, for
-the reason fact 4 gives, and the shape of the reference, so its numbers are an oracle. The
+the reason fact 4 gives, and it is the oracle's shape, so the oracle's numbers check it. The
 per-step kernel is exported as the level-1 verb `covariance_forecast_step(Σ̂, Z, c, w, target)`
 on bare arrays, so a caller holding forecasts of their own builds the same Result by hand.
 
@@ -163,7 +163,7 @@ build ticket #1023 over eight assets with a listing and a delisting: **exact, to
 merge the decision assumed, so their identity is at the rounding of that recursion and not at the
 bit. The rolling identity is `Online(est; max_history = w)` against `expand_train = false`, as ADR
 0140 states it, and it is exact for every family measured, because the capped buffer's read-out
-is the batch verb over the rolling window's rows. The reference is the oracle for
+is the batch verb over the rolling window's rows. The oracle checks
 `HorizonReturn()` on a fixture whose location is zero: its per-step kernel agrees to `1e-15` on
 all five numbers, with and without a missing cell, and its three summaries to the six digits it
 prints. The centring term is asserted as the difference: with `R` the raw column sums,
@@ -176,8 +176,8 @@ On the loop:
 
 1. **One verb through `fold_loop`, the scheme is the walk-forward** — chosen. One body, the
    identity by construction, `DateWalkForward`, purging and the rolling window for free, and
-   the reference's two verbs collapse to one call.
-2. **The reference's shape: two verbs, each with a private loop** — rejected. A ninth fold loop,
+   the oracle's two verbs collapse to one call.
+2. **The oracle's shape: two verbs, each with a private loop** — rejected. A ninth fold loop,
    the shape ADR 0141 removed; no date form; the identity by arithmetic coincidence.
 3. **Map #931's shape: a fixed grid of refits on `1:t`, no scheme** — rejected. No rolling
    window, no purge, no online form without a second loop. #931 chose it because it had no
@@ -189,10 +189,10 @@ On the Result:
    `O(N² M)` when the caller asks for it, and the re-projection verb is what the request buys.
 2. **Lean: store every `Σ̂_t`, every diagnostic a verb** — rejected on fact 4. The rule that fits
    a `T × N` pairing does not fit an `N² × M` one.
-3. **Per-step diagnostics only, no forecasts ever** — the reference. Rejected because a caller
+3. **Per-step diagnostics only, no forecasts ever** — the oracle. Rejected because a caller
    who can pay for the forecasts loses a re-projection they would otherwise rerun the loop for.
 
-On the diagnostics: **the reference's five alone** was rejected because a loss projected on one
+On the diagnostics: **the oracle's five alone** was rejected because a loss projected on one
 portfolio is blind to a correlation error the portfolio does not touch, and a summary without a
 band or a test prints numbers a reader cannot judge; **the five plus the whole-matrix losses and
 the band, without the comparison** was the recommended middle and was passed over for the test,
@@ -200,10 +200,10 @@ because two mean losses side by side invite exactly the reading the test exists 
 
 On the realised quantity: **the horizon return as the default** was rejected because it is the
 noisier statistic when the better one costs nothing; **the realised covariance alone** was
-rejected because it makes the `h`-day holder's question inexpressible, a capability the reference
+rejected because it makes the `h`-day holder's question inexpressible, a capability the oracle
 has.
 
-On centring: **no centring** (the reference) and **a `demean` flag reading the prior's `mu`**
+On centring: **no centring** (the oracle) and **a `demean` flag reading the prior's `mu`**
 were both drafted and both rejected when the location turned out to be a field or a state
 component of every family that fits a second moment. A flag would have let a caller evaluate a
 forecast against a proxy for a moment the forecast does not estimate.
@@ -219,10 +219,74 @@ forecast against a proxy for a moment the forecast does not estimate.
   alongside `AbstractForecastTarget`'s three members; the abstract root is not exported.
 - `forecast_location` is a new verb with a method per family that carries a location and a
   fallback that reads the window; a caller's `AbstractCovarianceEstimator` gets the fallback.
-- `CONTEXT.md` gains **Covariance Forecast Evaluation** and **Realised Target**, and the *Avoid*
+- `GLOSSARY.md` gains **Covariance Forecast Evaluation** and **Realised Target**, and the *Avoid*
   line of **Forecast Calibration** names the covariance case.
-- The reference's raw ratios differ from the library's by the centring term; a parity test
+- The oracle's raw ratios differ from the library's by the centring term; a parity test
   states it.
 - The build was [#1023](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1023) on
   map #861; the plots, the optimiser-solved test portfolio, a `Pipeline` in the estimator slot,
   and the covariance metrics as search scorers are fog there.
+
+## Amendment (2026-09-29)
+
+**A step with no active asset is unscored, not refused.** `covariance_forecast_step` refused a
+step at which no asset had both a finite forecast variance and a finite test return, and the fold
+loop passed the refusal on, so one such step stopped the whole evaluation. That is valid input: a
+one-row test window on a market holiday, or a forecast still in its warm-up. The parity measure of
+[#1389](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1389) found that the oracle
+drops the step with no message.
+
+The kernel now returns the step unscored: `n_valid = 0`, and every diagnostic `NaN`. The step is
+kept, not dropped, so each step of `CovarianceForecastEvaluationResult` stays the step of its fold,
+as `test_idx` and `dates` state, and two evaluations over one walk-forward still share their
+steps when a forecast of one of them is in its warm-up. `covariance_forecast_summary` reads the
+scored steps only, and its `n_steps` counts them; it refuses an evaluation that scored no step.
+`covariance_forecast_compare` takes the loss difference over the steps that both evaluations
+scored. With a holiday inside the sample, every summary then equals the oracle's, and
+`test_24e_parity_covariance_forecast_evaluation.jl` pins the steps and the summaries in batch and
+online form.
+
+The same measure fixes the window convention of a parity run: the oracle's `train` rows before a
+purge of `purged` rows are `IndexWalkForward(train + purged, test; purged_size = purged)` here,
+because the training span of the library counts the purge.
+
+## Amendment (2026-10-07)
+
+**Three rules of the summary and its figures stay the defaults, and each gains the oracle's rule
+as a keyword.** The last verdicts of
+[#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416) (rows R56, R88 and
+R91), built by [#1513](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1513).
+
+- **The weight of a step (R56).** Under a calibrated Gaussian forecast the ratio of step `t` is
+  `chi2(nu_t) / nu_t`, with mean one and variance `2 / nu_t`. Every mean with fixed weights is
+  unbiased. The mean weighted by `nu_t` has the least variance, and it is itself
+  `chi2(sum nu) / sum nu`. The oracle takes the plain mean, which is a convention and not an error,
+  and the two agree when every step has the same horizon and active count.
+  `covariance_forecast_summary` and `plot_covariance_calibration` take
+  `step_weighting::AbstractStepWeighting`: `DofStepWeighting()`, the default and the rule above,
+  or `EqualStepWeighting()`, the plain mean. The public verb `covariance_step_weights` gives the
+  weights, and the Gaussian band of every rule reads the variance of its own mean,
+  `2 sum(omega_t^2 / nu_t) / (sum omega_t)^2`, which is `2 / sum nu_t` to the last bit under the
+  default. The rule weights the diagonal ratio too, on its own degrees of freedom. The Result
+  records the rule in the field `step_weighting`.
+- **A window over a step with nothing scored (R88).** The default window of a figure spans the
+  last `window` steps, a fixed stretch of the walk-forward, so two evaluations stay paired step by
+  step, and an unscored step adds nothing. `scored_steps = true` makes the window hold the last
+  `window` scored steps, the oracle's rule, and an unscored step draws no point. Both are valid
+  moving averages.
+- **The first `window - 1` points (R91).** The default series covers every step, and a point with
+  no whole window is blank, so figures at different windows line up. `whole_windows = true` starts
+  each series at its first whole window, the oracle's layout.
+
+With all three keywords set, the rolling series equal the oracle's point for point, and the
+summary under `EqualStepWeighting()` equals the oracle's summary.
+`test_25b_parity_covariance_forecast_plots.jl` pins both.
+
+**An exponentially weighted estimator names its centring with a type, not a flag.** Fact 5 and
+the decision above name a Bool `centred` on `ExpWeightedCovariance` and
+`RegimeAdjustedExpWeightedCovariance`.
+[#1507](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1507) replaced it with the
+field `centring`, which takes a singleton type of `AbstractCentring`. `forecast_location` reads the
+location through `centring_report_location`: zero for every asset under `PreCentred()`, and
+`state.location` under `EstimatedCentring()`, the default, or under `ZeroStartCentring()`. So the
+rule of this ADR holds, and `PreCentred()` is the case that `centred = true` named.

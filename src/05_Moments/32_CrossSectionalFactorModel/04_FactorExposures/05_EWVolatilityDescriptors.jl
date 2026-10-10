@@ -4,7 +4,7 @@
 
 Build the exponentially weighted variance estimator an [`EWVolatility`](@ref) reads by default.
 
-The estimator is the plain recursion. It is uncentred, it divides by `1 - λ^n` to correct the bias, it restarts an asset that turns inactive, and it applies **no regime adjustment**. `centred = true` gives the uncentred form, because the flag declares the returns already centred, so the estimator tracks no location. `regime_method = nothing` turns off the regime multiplier of [`RegimeAdjustedExpWeightedVariance`](@ref), because a volatility Descriptor is not scaled by a regime.
+The estimator is the plain recursion. It is uncentred, it divides by `1 - λ^n` to correct the bias, it restarts an asset that turns inactive, and it applies **no regime adjustment**. `centring = PreCentred()` gives the uncentred form, because it declares the returns already centred, so the estimator tracks no location. `regime_method = nothing` turns off the regime multiplier of [`RegimeAdjustedExpWeightedVariance`](@ref), because a volatility Descriptor is not scaled by a regime.
 
 # Mathematical definition
 
@@ -49,8 +49,9 @@ Where:
 ```jldoctest
 julia> ce = PortfolioOptimisers.ew_variance_estimator(5.0);
 
-julia> (ce.decay ≈ exp2(-inv(5.0)), ce.min_obs, ce.centred, ce.regime_method)
-(true, 5, true, nothing)
+julia> (ce.decay ≈ exp2(-inv(5.0)), ce.min_obs, ce.centring, ce.regime_method)
+(true, 5, PreCentred()
+, nothing)
 
 julia> PortfolioOptimisers.ew_variance_estimator(5.0, 8.0).min_obs
 8
@@ -66,7 +67,8 @@ function ew_variance_estimator(half_life::Real,
                                warm_up::Real = half_life)::RegimeAdjustedExpWeightedVariance
     return RegimeAdjustedExpWeightedVariance(; decay = half_life_decay(half_life),
                                              min_obs = half_life_min_obs(warm_up, :warm_up),
-                                             centred = true, regime_method = nothing)
+                                             centring = PreCentred(),
+                                             regime_method = nothing)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -101,9 +103,10 @@ $(DocStringExtensions.FIELDS)
     EWVolatility(; half_life::Real = 40.0,
                  ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life),
                  alg::AbstractMomentAlgorithm = FullMoment(),
-                 mar::Real = 0.0) -> EWVolatility
+                 mar::Real = 0.0,
+                 cache::Option{<:AbstractPartialFitState} = nothing) -> EWVolatility
 
-`ce`, `alg` and `mar` correspond to the struct's fields. `half_life` is not a field. It fixes the default of `ce` through [`ew_variance_estimator`](@ref), and the constructor keeps a `ce` that the caller passes as it is. The default half-life of `40` weights about as far back as a window of two months of daily observations.
+`ce`, `alg`, `mar` and `cache` correspond to the struct's fields. `half_life` is not a field. It fixes the default of `ce` through [`ew_variance_estimator`](@ref), and the constructor keeps a `ce` that the caller passes as it is. The default half-life of `40` weights about as far back as a window of two months of daily observations.
 
 ## Validation
 
@@ -141,17 +144,21 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), isa(de.alg, FullMoment), de.mar)
     Minimum acceptable return that the downside form measures the returns against. The Descriptor reads it only where `alg` is a [`SemiMoment`](@ref), which clips every excess above it to zero.
     """
     mar
+    """
+    $(field_dict[:ew_vol_desc_cache])
+    """
+    cache
     function EWVolatility(ce::AbstractCovarianceEstimator, alg::AbstractMomentAlgorithm,
-                          mar::Real)
+                          mar::Real, cache::Option{<:AbstractPartialFitState})
         assert_finite(mar, :mar)
-        return new{typeof(ce), typeof(alg), typeof(mar)}(ce, alg, mar)
+        return new{typeof(ce), typeof(alg), typeof(mar), typeof(cache)}(ce, alg, mar, cache)
     end
 end
 function EWVolatility(; half_life::Real = 40.0,
                       ce::AbstractCovarianceEstimator = ew_variance_estimator(half_life),
-                      alg::AbstractMomentAlgorithm = FullMoment(),
-                      mar::Real = 0.0)::EWVolatility
-    return EWVolatility(ce, alg, mar)
+                      alg::AbstractMomentAlgorithm = FullMoment(), mar::Real = 0.0,
+                      cache::Option{<:AbstractPartialFitState} = nothing)::EWVolatility
+    return EWVolatility(ce, alg, mar, cache)
 end
 """
     ew_volatility_input(alg::FullMoment, X::AbstractMatrix{<:Number},
@@ -198,7 +205,7 @@ end
 """
     descriptor(de::EWVolatility, rd::ReturnsResult) -> Matrix{<:Real}
 
-Compute an exponentially weighted volatility Descriptor from a carrier.
+Compute an exponentially weighted volatility Descriptor from a [`ReturnsResult`](@ref).
 
 # Algorithm
 
@@ -206,7 +213,7 @@ Compute an exponentially weighted volatility Descriptor from a carrier.
  2. Take the point-in-time variance series `V` of `Y` through [`variance_series`](@ref). It reads the active mask of the Asset Panel, so an asset that turns inactive restarts its recursion.
  3. Take the square root `D`, and write `NaN` into the inactive cells through [`descriptor_active_fill!`](@ref).
 
-The variance estimator owns the warm-up and the bias correction, so a cell where it returns `NaN` is `NaN` in the Descriptor.
+The variance estimator owns the warm-up and the bias correction, so a cell where it returns `NaN` is `NaN` in the Descriptor. The call is [`ew_volatility_fold`](@ref) from no state, so a step of the carry fold runs the same arithmetic.
 
 # Arguments
 
@@ -246,12 +253,7 @@ julia> descriptor(EWVolatility(; half_life = 1), rd)
   - [`descriptor_active_fill!`](@ref)
 """
 function descriptor(de::EWVolatility, rd::ReturnsResult)::Matrix{<:Real}
-    pnl = descriptor_asset_panel(rd)
-    Y = ew_volatility_input(de.alg, rd.X, de.mar)
-    V = variance_series(de.ce, Y, pnl; dims = 1)
-    D = sqrt.(V)
-    descriptor_active_fill!(D, pnl)
-    return D
+    return ew_volatility_fold(de, rd, nothing).D
 end
 """
     EWDownsideVolatility(; half_life::Real = 40.0, mar::Real = 0.0,
@@ -344,7 +346,8 @@ $(DocStringExtensions.FIELDS)
                                                                                  max(half_life,
                                                                                      beta_half_life)),
                          alg::AbstractMomentAlgorithm = FullMoment(), mar::Real = 0.0,
-                         min_val::Real = 1e-12) -> EWResidualVolatility
+                         min_val::Real = 1e-12,
+                         cache::Option{<:AbstractPartialFitState} = nothing) -> EWResidualVolatility
 
 Keywords correspond to the struct's fields, except `half_life` and `beta_half_life`, which are not fields. `half_life` fixes the decay of `ce`, `beta_half_life` fixes `beta_decay`, and the **longer** of the two fixes the warm-up of `ce`, because a residual is no better estimated than the beta that formed it. The constructor keeps a `ce` or a `beta_decay` that the caller passes as it is. The default half-lives of `40` and `60` weight about as far back as two months and one quarter of daily observations.
 
@@ -401,15 +404,20 @@ julia> (de.ce.decay ≈ exp2(-inv(5.0)), de.ce.min_obs, de.beta_decay ≈ exp2(-
     $(field_dict[:min_val])
     """
     min_val
+    """
+    $(field_dict[:ew_vol_desc_cache])
+    """
+    cache
     function EWResidualVolatility(mcap::AbstractString, ce::AbstractCovarianceEstimator,
                                   beta_decay::Real, alg::AbstractMomentAlgorithm, mar::Real,
-                                  min_val::Real)
+                                  min_val::Real, cache::Option{<:AbstractPartialFitState})
         assert_panel_terms(mcap, :mcap)
         assert_ew_decay(beta_decay)
         assert_finite(mar, :mar)
         assert_nonempty_gt0_finite_val(min_val, :min_val)
         return new{typeof(mcap), typeof(ce), typeof(beta_decay), typeof(alg), typeof(mar),
-                   typeof(min_val)}(mcap, ce, beta_decay, alg, mar, min_val)
+                   typeof(min_val), typeof(cache)}(mcap, ce, beta_decay, alg, mar, min_val,
+                                                   cache)
     end
 end
 function EWResidualVolatility(; mcap::AbstractString = "market_cap", half_life::Real = 40.0,
@@ -420,8 +428,9 @@ function EWResidualVolatility(; mcap::AbstractString = "market_cap", half_life::
                                                                                       max(half_life,
                                                                                           beta_half_life)),
                               alg::AbstractMomentAlgorithm = FullMoment(), mar::Real = 0.0,
-                              min_val::Real = 1e-12)::EWResidualVolatility
-    return EWResidualVolatility(mcap, ce, beta_decay, alg, mar, min_val)
+                              min_val::Real = 1e-12,
+                              cache::Option{<:AbstractPartialFitState} = nothing)::EWResidualVolatility
+    return EWResidualVolatility(mcap, ce, beta_decay, alg, mar, min_val, cache)
 end
 """
     ew_residual_returns(X::AbstractMatrix{<:Real}, rm::AbstractVector{<:Real},
@@ -490,7 +499,7 @@ end
 """
     descriptor(de::EWResidualVolatility, rd::ReturnsResult) -> Matrix{<:Real}
 
-Compute an exponentially weighted residual volatility Descriptor from a carrier.
+Compute an exponentially weighted residual volatility Descriptor from a [`ReturnsResult`](@ref).
 
 # Algorithm
 
@@ -501,7 +510,7 @@ Compute an exponentially weighted residual volatility Descriptor from a carrier.
  5. Take the point-in-time variance series `V` of `Y` through [`variance_series`](@ref), and take its square root `D`.
  6. Write `NaN` into the inactive cells through [`descriptor_active_fill!`](@ref).
 
-The variance estimator owns the warm-up and the bias correction, so a cell where it returns `NaN` is `NaN` in the Descriptor.
+The variance estimator owns the warm-up and the bias correction, so a cell where it returns `NaN` is `NaN` in the Descriptor. The call is [`ew_volatility_fold`](@ref) from no state, so a step of the carry fold runs the same arithmetic.
 
 # Arguments
 
@@ -543,17 +552,7 @@ julia> descriptor(EWResidualVolatility(; half_life = 1, beta_half_life = 1), rd)
   - [`variance_series`](@ref)
 """
 function descriptor(de::EWResidualVolatility, rd::ReturnsResult)::Matrix{<:Real}
-    pnl = descriptor_asset_panel(rd)
-    rm = market_return_series(rd, de.mcap)
-    X = rd.X
-    amsk = pnl.amsk
-    B, _ = ew_beta_series(X, rm, de.beta_decay, 1, de.min_val, amsk)
-    E = ew_residual_returns(X, rm, B, amsk)
-    Y = ew_volatility_input(de.alg, E, de.mar)
-    V = variance_series(de.ce, Y, pnl; dims = 1)
-    D = sqrt.(V)
-    descriptor_active_fill!(D, pnl)
-    return D
+    return ew_volatility_fold(de, rd, nothing).D
 end
 """
     EWResidualDownsideVolatility(; mcap::AbstractString = "market_cap",
@@ -616,6 +615,347 @@ function EWResidualDownsideVolatility(; mcap::AbstractString = "market_cap",
                                       min_val::Real = 1e-12)::EWResidualVolatility
     return EWResidualVolatility(; mcap = mcap, ce = ce, beta_decay = beta_decay,
                                 alg = SemiMoment(), mar = mar, min_val = min_val)
+end
+
+"""
+$(DocStringExtensions.TYPEDEF)
+
+The carried state of an [`EWVolatility`](@ref) or of an [`EWResidualVolatility`](@ref), after the observations that it folded.
+
+The state holds the partial-fit state of the variance estimator `ce`, and for an [`EWResidualVolatility`](@ref) the state of its beta recursion too. A step of the carry fold runs the two recursions from it with the arithmetic of the batch call, as [`ew_volatility_fold`](@ref) states.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    EWVolatilityState(; ve::AbstractPartialFitState,
+                      beta::Option{<:EWBetaState} = nothing) -> EWVolatilityState
+
+Keywords correspond to the struct's fields.
+
+# Related
+
+  - [`EWVolatility`](@ref)
+  - [`EWResidualVolatility`](@ref)
+  - [`ew_volatility_fold`](@ref)
+  - [`descriptor_step`](@ref)
+"""
+@concrete struct EWVolatilityState <: AbstractPartialFitState
+    """
+    The partial-fit state of the variance estimator `ce`, a [`RegimeAdjustedVarianceState`](@ref).
+    """
+    ve
+    """
+    The state of the beta recursion of an [`EWResidualVolatility`](@ref), an [`EWBetaState`](@ref), or `nothing` for an [`EWVolatility`](@ref).
+    """
+    beta
+    function EWVolatilityState(ve::AbstractPartialFitState, beta::Option{<:EWBetaState})
+        return new{typeof(ve), typeof(beta)}(ve, beta)
+    end
+end
+function EWVolatilityState(; ve::AbstractPartialFitState,
+                           beta::Option{<:EWBetaState} = nothing)::EWVolatilityState
+    return EWVolatilityState(ve, beta)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses to merge two [`EWVolatilityState`](@ref): the recursion of the second block starts from the state after the first one, so two states fitted on disjoint blocks do not give the state of their union to the last bit.
+
+# Validation
+
+  - Always throws an `ArgumentError`.
+
+# Related
+
+  - [`EWVolatilityState`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function merge_states(::EWVolatilityState, ::EWVolatilityState)
+    return throw(ArgumentError("an EWVolatilityState cannot merge two states fitted on disjoint blocks: the recursion of the second block starts from the state after the first one. Fold the second block into the state of the first with partial_fit!."))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Copies an [`EWVolatilityState`](@ref), so that the copy shares no vector with the original.
+
+# Arguments
+
+  - `x`: The state to copy.
+
+# Returns
+
+  - `state::EWVolatilityState`: A new state, equal to `x`.
+
+# Related
+
+  - [`EWVolatilityState`](@ref)
+"""
+function Base.copy(x::EWVolatilityState)
+    return EWVolatilityState(copy(x.ve), isnothing(x.beta) ? nothing : copy(x.beta))
+end
+"""
+    ew_volatility_parts(::Nothing)
+    ew_volatility_parts(st::EWVolatilityState)
+
+Returns the two parts of the carried state of a volatility Descriptor, as the fields `ve` and `beta`: both `nothing` for no state, or the state itself.
+
+# Arguments
+
+  - `st`: The carried state, or `nothing`.
+
+# Returns
+
+  - `parts`: An object with the fields `ve` and `beta`.
+
+# Related
+
+  - [`EWVolatilityState`](@ref)
+  - [`ew_volatility_fold`](@ref)
+"""
+function ew_volatility_parts(::Nothing)
+    return (; ve = nothing, beta = nothing)
+end
+function ew_volatility_parts(st::EWVolatilityState)::EWVolatilityState
+    return st
+end
+"""
+    ew_volatility_state(::Nothing, ::Option{<:EWBetaState})
+    ew_volatility_state(ve::AbstractPartialFitState, beta::Option{<:EWBetaState})
+
+Returns the state of a volatility Descriptor after a fold: `nothing` where the variance estimator `ce` has no state, because it does not fold, or the [`EWVolatilityState`](@ref) of the two parts.
+
+# Arguments
+
+  - `ve`: The state of `ce` after the fold, or `nothing`.
+  - `beta`: The state of the beta recursion after the fold, or `nothing`.
+
+# Returns
+
+  - `st::Option{<:EWVolatilityState}`: The state, or `nothing`.
+
+# Related
+
+  - [`EWVolatilityState`](@ref)
+  - [`ew_volatility_fold`](@ref)
+"""
+function ew_volatility_state(::Nothing, ::Option{<:EWBetaState})::Nothing
+    return nothing
+end
+function ew_volatility_state(ve::AbstractPartialFitState,
+                             beta::Option{<:EWBetaState})::EWVolatilityState
+    return EWVolatilityState(ve, beta)
+end
+"""
+    ew_volatility_variance(ce::RegimeAdjustedExpWeightedVariance, Y::AbstractMatrix{<:Real},
+                           pnl::AssetPanel, st::Option{<:RegimeAdjustedVarianceState})
+    ew_volatility_variance(ce::AbstractCovarianceEstimator, Y::AbstractMatrix{<:Real},
+                           pnl::AssetPanel, ::Any)
+
+Returns the point-in-time variance series of the input of a volatility Descriptor, and the state of the variance estimator after it.
+
+A [`RegimeAdjustedExpWeightedVariance`](@ref) runs the forward pass of its [`variance_series`](@ref) with [`regime_adjusted_variance_pass!`](@ref), from a copy of the carried state or from the cold state, and reads the variance of each observation with [`regime_adjusted_variance`](@ref). The batch call and the step thus run one pass, and a folded row equals the batch call to the last bit. The copy leaves the carried state as it was. Every other estimator takes its [`variance_series`](@ref) over the whole input, and has no state. It never makes a state, so it only gets `nothing`.
+
+# Arguments
+
+  - `ce`: The variance estimator.
+  - `Y`: The input of the variance, `observations × assets`.
+  - `pnl`: The Asset Panel of the observations. Its two masks reset and gate the recursion.
+  - `st`: The carried state of `ce`, or `nothing`.
+
+# Validation
+
+  - A carried state holds the assets of `Y`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `fold::NamedTuple`: `V`, the variance of each observation, `observations × assets`, and `st`, the state of `ce` after the observations, or `nothing` for an estimator that does not fold.
+
+# Related
+
+  - [`ew_volatility_fold`](@ref)
+  - [`variance_series`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
+"""
+function ew_volatility_variance(ce::RegimeAdjustedExpWeightedVariance,
+                                Y::AbstractMatrix{<:Real}, pnl::AssetPanel,
+                                st::Option{<:RegimeAdjustedVarianceState})
+    amsk, emsk = panel_moment_masks(pnl)
+    V = Matrix{float_if_integer(eltype(Y))}(undef, size(Y))
+    vs = regime_adjusted_variance_pass!(ce, Y, 1, emsk, amsk,
+                                        isnothing(st) ? nothing : copy(st)) do i, cache
+        V[i, :] = regime_adjusted_variance(cache, ce)
+        return nothing
+    end
+    return (; V = V, st = vs)
+end
+function ew_volatility_variance(ce::AbstractCovarianceEstimator, Y::AbstractMatrix{<:Real},
+                                pnl::AssetPanel, ::Any)
+    return (; V = variance_series(ce, Y, pnl; dims = 1), st = nothing)
+end
+"""
+    ew_volatility_fold(de::EWVolatility, rd::ReturnsResult,
+                       cache::Option{<:EWVolatilityState})
+    ew_volatility_fold(de::EWResidualVolatility, rd::ReturnsResult,
+                       cache::Option{<:EWVolatilityState})
+
+Folds the observations of a [`ReturnsResult`](@ref) into the recursions of a volatility Descriptor from a state, and returns the state after them and the Descriptor of each observation.
+
+The batch call [`descriptor`](@ref) is this function from no state, so a step equals the batch call by construction. Every input of the recursions reads one row: the transformed return, the market return of [`market_return_series`](@ref) and the residual of [`ew_residual_returns`](@ref). So the step needs no row before its own.
+
+# Algorithm
+
+ 1. For an [`EWResidualVolatility`](@ref), build the market return, and run the beta recursion with [`ew_beta_series!`](@ref) from the beta state, or from zero. Remove the market from every return.
+ 2. Transform the returns, or the residuals, through [`ew_volatility_input`](@ref).
+ 3. Take the variance of each observation and the state of `ce` after them with [`ew_volatility_variance`](@ref), and take the square root.
+ 4. Write `NaN` into the inactive cells through [`descriptor_active_fill!`](@ref).
+
+# Arguments
+
+  - `de`: Descriptor Estimator.
+  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+  - `cache`: The carried state, or `nothing` for the first observation.
+
+# Validation
+
+  - The rules of [`descriptor`](@ref), of [`ew_beta_state`](@ref) and of [`ew_volatility_variance`](@ref).
+  - The state of an [`EWResidualVolatility`](@ref) holds a beta state, and the state of an [`EWVolatility`](@ref) holds none. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `fold::NamedTuple`: `st`, the state after the observations, or `nothing` where `ce` does not fold, and `D`, the Descriptor of each observation, `observations × assets`.
+
+# Related
+
+  - [`descriptor_step`](@ref)
+  - [`EWVolatilityState`](@ref)
+"""
+function ew_volatility_fold(de::EWVolatility, rd::ReturnsResult,
+                            cache::Option{<:EWVolatilityState})
+    c = ew_volatility_parts(cache)
+    @argcheck(isnothing(c.beta),
+              ArgumentError("the state of this EWVolatility holds a beta state, so it is the state of an EWResidualVolatility. An EWVolatility folds from its own state, or from no state."))
+    pnl = descriptor_asset_panel(rd)
+    Y = ew_volatility_input(de.alg, rd.X, de.mar)
+    vf = ew_volatility_variance(de.ce, Y, pnl, c.ve)
+    D = sqrt.(vf.V)
+    descriptor_active_fill!(D, pnl)
+    return (; st = ew_volatility_state(vf.st, nothing), D = D)
+end
+function ew_volatility_fold(de::EWResidualVolatility, rd::ReturnsResult,
+                            cache::Option{<:EWVolatilityState})
+    c = ew_volatility_parts(cache)
+    @argcheck(isnothing(cache) == isnothing(c.beta),
+              ArgumentError("the state of this EWResidualVolatility holds no beta state, so it is the state of an EWVolatility. An EWResidualVolatility folds from its own state, or from no state."))
+    pnl = descriptor_asset_panel(rd)
+    rm = market_return_series(rd, de.mcap)
+    X = rd.X
+    amsk = pnl.amsk
+    bs = ew_beta_state(c.beta, X, rm, de.beta_decay)
+    bf = ew_beta_series!(bs, X, rm, de.beta_decay, 1, de.min_val, amsk)
+    E = ew_residual_returns(X, rm, bf.B, amsk)
+    Y = ew_volatility_input(de.alg, E, de.mar)
+    vf = ew_volatility_variance(de.ce, Y, pnl, c.ve)
+    D = sqrt.(vf.V)
+    descriptor_active_fill!(D, pnl)
+    return (; st = ew_volatility_state(vf.st, bf.st), D = D)
+end
+"""
+    descriptor_step(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance},
+                              EWResidualVolatility{<:Any,
+                                                   <:RegimeAdjustedExpWeightedVariance}},
+                    rd::ReturnsResult)
+
+Folds the observations of a [`ReturnsResult`](@ref) into the carried state of a volatility Descriptor whose `ce` is a [`RegimeAdjustedExpWeightedVariance`](@ref), and returns the Descriptor of each one.
+
+The Descriptor of an observation equals the one of the batch call [`descriptor`](@ref) over every observation that the state folded and the observations before it, to the last bit, because the state runs the recursions with the same arithmetic from the same first observation, as [`ew_volatility_fold`](@ref) states. The step copies the state, so the estimator it gets keeps its state.
+
+A volatility Descriptor with any other `ce` has no state to carry, so it takes the fallback of [`descriptor_step`](@ref), which answers `nothing`. The carry fold of a [`CrossSectionalFactorPrior`](@ref) then keeps every row for it, or refuses it under the strict carry rule.
+
+# Arguments
+
+  - `de`: The estimator, with or without a state.
+  - $(arg_dict[:rd]) It holds the new observations alone.
+
+# Validation
+
+  - The rules of [`ew_volatility_fold`](@ref).
+
+# Returns
+
+  - `step::NamedTuple`: `de`, the estimator with the state after the observations in `cache`, and `D`, the Descriptor of each observation, `observations × assets`.
+
+# Related
+
+  - [`EWVolatilityState`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`descriptor_carry`](@ref)
+"""
+function descriptor_step(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance},
+                                   EWResidualVolatility{<:Any,
+                                                        <:RegimeAdjustedExpWeightedVariance}},
+                         rd::ReturnsResult)
+    (; st, D) = ew_volatility_fold(de, rd, de.cache)
+    return (; de = Accessors.@set(de.cache = st), D = D)
+end
+"""
+    partial_fit!(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance},
+                           EWResidualVolatility{<:Any,
+                                                <:RegimeAdjustedExpWeightedVariance}},
+                 rd::ReturnsResult)
+
+Folds the observations of a [`ReturnsResult`](@ref) into the carried state of a volatility Descriptor, and returns the estimator with the state after them in `cache`. [`descriptor_step`](@ref) states the fold, and also returns the Descriptor of each observation.
+
+# Arguments
+
+  - `de`: The estimator, with no state or with its state.
+  - $(arg_dict[:rd]) It holds the new observations alone.
+
+# Validation
+
+  - The rules of [`descriptor_step`](@ref).
+
+# Returns
+
+  - `de::Union{EWVolatility, EWResidualVolatility}`: The estimator, with its `cache` field set to the state after the observations.
+
+# Related
+
+  - [`descriptor_step`](@ref)
+  - [`EWVolatilityState`](@ref)
+"""
+function partial_fit!(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance},
+                                EWResidualVolatility{<:Any,
+                                                     <:RegimeAdjustedExpWeightedVariance}},
+                      rd::ReturnsResult)
+    return descriptor_step(de, rd).de
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of an [`EWVolatility`](@ref) or of an [`EWResidualVolatility`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one, such as a [`CompositeExposure`](@ref). Set `set_show_nothing_fields!(:EWVolatility, true)` to render it.
+
+# Arguments
+
+  - `de`: The estimator.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, every field name but `:cache`.
+
+# Related
+
+  - [`EWVolatility`](@ref)
+  - [`EWResidualVolatility`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+function show_fields(de::Union{EWVolatility, EWResidualVolatility})
+    return filter(!=(:cache), fieldnames(typeof(de)))
 end
 
 export EWVolatility, EWDownsideVolatility, EWResidualVolatility,

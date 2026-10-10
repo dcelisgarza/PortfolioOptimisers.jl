@@ -379,6 +379,95 @@ end
     @test_throws ArgumentError PortfolioOptimisers.panel_fill(NoPanelFill(), v, "f")
     @test PortfolioOptimisers.panel_fill(NoPanelFill(), [1.0, 2.0], "f") == [1.0, 2.0]
 end
+# A test-local input and a test-local policy that define only the methods an extension written
+# before #1413 defines: the builder reaches them through the fallbacks that drop the active mask.
+struct Test06bPanelInput <: PortfolioOptimisers.AbstractPanelFieldInput
+    name::String
+    vals::Matrix{Float64}
+    alg::Any
+end
+function test06b_numeric(inp::Test06bPanelInput)
+    return NumericPanelInput(; name = inp.name, vals = inp.vals, alg = inp.alg)
+end
+PortfolioOptimisers.panel_input_is_static(::Test06bPanelInput) = false
+function PortfolioOptimisers.panel_resolve(inp::Test06bPanelInput)
+    return PortfolioOptimisers.panel_resolve(test06b_numeric(inp))
+end
+function PortfolioOptimisers.panel_input_field(inp::Test06bPanelInput, vals, obs)
+    return PortfolioOptimisers.panel_input_field(test06b_numeric(inp), vals, obs)
+end
+struct Test06bPanelFill <: PortfolioOptimisers.AbstractPanelFillAlgorithm end
+function PortfolioOptimisers.panel_fill(::Test06bPanelFill, v::AbstractVector,
+                                        ::AbstractString)
+    return PortfolioOptimisers.panel_fill(ForwardPanelFill(), v, "f")
+end
+@testset "A directional fill stops at the edge of an inactive stretch (#1413)" begin
+    # Asset 1 delists after observation 4 and lists again at 8, whose first cell is blank.
+    amsk = trues(12, 2)
+    amsk[5:7, 1] .= false
+    x = [collect(1.0:12.0) collect(21.0:32.0)]
+    x[5:8, 1] .= NaN
+    build(alg; m = amsk) = panel_field(asset_panel([NumericPanelInput(; name = "x",
+                                                                      vals = x, alg = alg)];
+                                                   amsk = m, emsk = m), "x")
+    f = build(ForwardPanelFill(; val = -1.0))
+    # Nothing crosses the stretch: cell 8 has nothing to carry on its own side of it, and the
+    # inactive cells 5:7 have nothing either.
+    @test f.vals[:, 1] ==
+          [1.0, 2.0, 3.0, 4.0, -1.0, -1.0, -1.0, -1.0, 9.0, 10.0, 11.0, 12.0]
+    @test f.vals[:, 2] == x[:, 2]
+    @test f.omsk == .!isnan.(x)
+    # The run toward the limit restarts in each stretch, so no limit reaches back over it.
+    for lim in 1:5
+        @test build(ForwardPanelFill(; val = -1.0, lim = lim)).vals[8, 1] == -1.0
+    end
+    # Without a mask the column is one stretch, and the fill carries as before.
+    @test build(ForwardPanelFill(; val = -1.0); m = nothing).vals[5:8, 1] == fill(4.0, 4)
+    @test build(ForwardPanelFill(; val = -1.0, lim = 3); m = nothing).vals[5:8, 1] ==
+          [4.0, 4.0, 4.0, -1.0]
+    # The backward fill is the mirror image: the last cell of the first listing is blank.
+    y = copy(x)
+    y[4:7, 1] .= NaN
+    y[5:7, 1] .= [50.0, 60.0, 70.0]
+    b = panel_field(asset_panel([NumericPanelInput(; name = "y", vals = y,
+                                                   alg = BackwardPanelFill(; val = -1.0))];
+                                amsk = amsk, emsk = amsk), "y")
+    # An observed inactive cell carries within its own stretch, and never into the active one.
+    @test b.vals[4:8, 1] == [-1.0, 50.0, 60.0, 70.0, 9.0]
+    # A tensor Panel Field reads the active mask of its asset, the second axis, in every slice.
+    t = cat(x, x .+ 100; dims = 3)
+    tf = panel_field(asset_panel([TensorPanelInput(; name = "t", vals = t, axis = "f",
+                                                   labels = ["a", "b"],
+                                                   alg = ForwardPanelFill(; val = -1.0))];
+                                 amsk = amsk, emsk = amsk), "t")
+    @test tf.vals[5:8, 1, 1] == fill(-1.0, 4)
+    @test tf.vals[5:8, 1, 2] == fill(-1.0, 4)
+    @test tf.vals[:, 2, :] == t[:, 2, :]
+    # The one-argument resolution reads no mask, so the column is one stretch.
+    inp = NumericPanelInput(; name = "x", vals = x, alg = ForwardPanelFill(; val = -1.0))
+    @test PortfolioOptimisers.panel_resolve(inp)[1][8, 1] == 4.0
+    @test PortfolioOptimisers.panel_resolve(inp, amsk)[1][8, 1] == -1.0
+    # A mask of the wrong shape is refused before the fill reads it.
+    @test_throws DimensionMismatch PortfolioOptimisers.panel_resolve(inp, trues(11, 2))
+    @test_throws DimensionMismatch asset_panel([inp]; amsk = trues(12, 3),
+                                               emsk = trues(12, 3))
+    # An extension's input and policy that know no mask keep working through the fallbacks.
+    ext = Test06bPanelInput("x", x, ForwardPanelFill(; val = -1.0))
+    @test panel_field(asset_panel([ext]; amsk = amsk, emsk = amsk), "x").vals[8, 1] == 4.0
+    own = NumericPanelInput(; name = "x", vals = x, alg = Test06bPanelFill())
+    @test PortfolioOptimisers.panel_resolve(own, amsk)[1][8, 1] == 4.0
+    # A cell-wise policy reads no mask, and NoPanelFill names the position in the whole column.
+    c = panel_field(asset_panel([NumericPanelInput(; name = "x", vals = x,
+                                                   alg = ConstantPanelFill(; val = -1.0))];
+                                amsk = amsk, emsk = amsk), "x")
+    @test c.vals[5:8, 1] == fill(-1.0, 4)
+    err = try
+        asset_panel([NumericPanelInput(; name = "x", vals = x)]; amsk = amsk, emsk = amsk)
+    catch e
+        e
+    end
+    @test occursin("position 5", err.msg)
+end
 @testset "Panel Field inputs and their resolution" begin
     @test_throws IsEmptyError NumericPanelInput(; name = "", vals = ones(2, 2))
     @test_throws IsEmptyError NumericPanelInput(; name = "a", vals = zeros(0, 0))
@@ -491,8 +580,8 @@ end
     #=
     Masks beside static inputs alone are a *request* for observations, not a contradiction:
     the panel couples the masks to the shape, so the build lifts each static input onto the
-    masks' observation count. The lift is lazy, and a lifted Panel Field carries no observed
-    mask, because every cell of a static input was observed.
+    masks' observation count. The lift is lazy, and it lifts the masks of the Panel Field too.
+    This input cannot blank, so it carries no observed mask before or after the lift (#1631).
     =#
     lifted = asset_panel([NumericPanelInput(; name = "a", vals = [1.0, 2.0])];
                          amsk = trues(3, 2), emsk = trues(3, 2))
@@ -649,6 +738,93 @@ end
     @test panel_feature_matrix(PortfolioOptimisers.port_opt_view(prs, ts[2:3], [1, 3]).pnl)[2] ==
           [1.0 2.0; 5.0 6.0]
     @test isnothing(prices_to_returns(PricesToReturns(), prs).pnl.amsk)
+end
+@testset "A view selects observations by timestamp and assets and factors by name (#1402)" begin
+    ts = [Dates.Date(2024, 1, 2), Dates.Date(2024, 1, 3), Dates.Date(2024, 1, 5),
+          Dates.Date(2024, 1, 8)]
+    nx = ["AAPL", "MSFT", "XOM"]
+    pnl = asset_panel([NumericPanelInput(; name = "mcap", vals = reshape(1.0:12.0, 4, 3))];
+                      amsk = trues(4, 3),
+                      emsk = [true false true; true true true;
+                              false true true; true true false])
+    rd = ReturnsResult(; nx = nx, X = reshape(0.01:0.01:0.12, 4, 3), nf = ["mkt", "smb"],
+                       F = reshape(0.1:0.1:0.8, 4, 2), B = reshape(0.5:0.5:6.0, 4, 3),
+                       nb = nx, ts = ts, pnl = pnl)
+    # A name or a timestamp is a spelling of a position, so every such view equals the view
+    # by position, field for field and in the order the caller gives.
+    function same_view(a, b)
+        return a.nx == b.nx &&
+               a.X == b.X &&
+               a.nf == b.nf &&
+               a.F == b.F &&
+               a.B == b.B &&
+               a.nb == b.nb &&
+               a.ts == b.ts &&
+               a.pnl.amsk == b.pnl.amsk &&
+               a.pnl.emsk == b.pnl.emsk &&
+               PortfolioOptimisers.panel_field(a.pnl, "mcap").vals ==
+               PortfolioOptimisers.panel_field(b.pnl, "mcap").vals
+    end
+    PV = PortfolioOptimisers.port_opt_view
+    @test same_view(PV(rd, ["XOM", "AAPL"]), PV(rd, [3, 1]))
+    @test same_view(PV(rd, ts[[2, 4]], ["MSFT"]), PV(rd, [2, 4], [2]))
+    @test same_view(PV(rd, :, ["MSFT", "XOM"], ["smb"]), PV(rd, :, [2, 3], [2]))
+    # A calendar range selects the observations the returns hold, in clock order, as the
+    # timestamp view of a PricesResult does; order and repeats of the timestamps do not
+    # matter, and a timestamp off the clock selects no row.
+    @test same_view(PV(rd, Dates.Date(2024, 1, 3):Dates.Day(1):Dates.Date(2024, 1, 7), :),
+                    PV(rd, [2, 3], :))
+    @test same_view(PV(rd, [ts[4], Dates.Date(2023, 12, 31), ts[1], ts[4]], :),
+                    PV(rd, [1, 4], :))
+    # A DateTime selects the Date at the same instant, because the two compare equal.
+    @test same_view(PV(rd, [Dates.DateTime(2024, 1, 5)], :), PV(rd, [3], :))
+    # Positions, ranges and colons pass through unchanged.
+    @test same_view(PV(rd, 2:3, 1:2, :), PV(rd, [2, 3], [1, 2]))
+
+    # A name that selects nothing is refused rather than dropped: a dropped ticker would
+    # shrink the universe with no error.
+    err = @test_throws ArgumentError PV(rd, ["AAPL", "APPL"])
+    @test occursin("APPL", err.value.msg) && occursin("did you mean `AAPL`", err.value.msg)
+    @test_throws ArgumentError PV(rd, :, ["MSFT", "IBM"])
+    @test_throws ArgumentError PV(rd, :, :, ["hml"])
+    # A timestamp window that holds no observation is empty, which the carrier refuses.
+    @test_throws IsEmptyError PV(rd, [Dates.Date(2023, 1, 1)], :)
+    # Each index keeps its axis: a timestamp never selects an asset, and a name never selects
+    # an observation, so the reversed index order of the two methods cannot pass silently.
+    err = @test_throws ArgumentError PV(rd, ts[1:2])
+    @test occursin("observation index", err.value.msg)
+    err = @test_throws ArgumentError PV(rd, ["AAPL"], :)
+    @test occursin("second index", err.value.msg)
+    # A carrier with no names or no timestamps has nothing to match. Asset returns always
+    # carry their names, so only a carrier of factor returns alone has no asset names.
+    fonly = ReturnsResult(; nf = ["mkt", "smb"], F = rd.F)
+    err = @test_throws ArgumentError PV(fonly, :, ["AAPL"])
+    @test occursin("no asset names", err.value.msg)
+    bare = ReturnsResult(; nx = nx, X = rd.X)
+    err = @test_throws ArgumentError PV(bare, ts[1:2], :)
+    @test occursin("no timestamps", err.value.msg)
+    @test_throws ArgumentError PV(bare, :, :, ["mkt"])
+
+    P = TimeSeries.TimeArray(ts, reshape(100.0:111.0, 4, 3), Symbol.(nx))
+    ppnl = asset_panel([NumericPanelInput(; name = "mcap", vals = reshape(1.0:12.0, 4, 3))];
+                       amsk = trues(4, 3), emsk = trues(4, 3))
+    pr = PricesResult(; X = P,
+                      B = TimeSeries.TimeArray(ts, reshape(1.0:12.0, 4, 3), Symbol.(nx)),
+                      pnl = ppnl)
+    function same_prices(a, b)
+        return values(a.X) == values(b.X) &&
+               TimeSeries.colnames(a.X) == TimeSeries.colnames(b.X) &&
+               TimeSeries.timestamp(a.X) == TimeSeries.timestamp(b.X) &&
+               values(a.B) == values(b.B) &&
+               PortfolioOptimisers.panel_field(a.pnl, "mcap").vals ==
+               PortfolioOptimisers.panel_field(b.pnl, "mcap").vals
+    end
+    @test same_prices(PV(pr, ts[2:3], ["XOM", "AAPL"]), PV(pr, ts[2:3], [3, 1]))
+    @test same_prices(PV(pr, 2:3, ["MSFT"]), PV(pr, 2:3, [2]))
+    @test same_prices(PV(pr, :, ["MSFT"]), PV(pr, :, [2]))
+    err = @test_throws ArgumentError PV(pr, :, ["MSFT", "MSTF"])
+    @test occursin("MSTF", err.value.msg)
+    @test_throws ArgumentError PV(pr, ts[2:3], ts[2:3])
 end
 @testset "The panel's numeric type comes from its values (#910)" begin
     # A field resolves in the type its own cells carry, so a Float32 panel stays Float32

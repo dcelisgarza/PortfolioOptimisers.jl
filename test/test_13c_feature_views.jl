@@ -142,13 +142,13 @@ end
         and a strongly blocked feature matrix can survive the wrong slice with its ordering
         intact. That is exactly why the recorded matrices above, and not the weight vector,
         are this file's primary evidence -- a weight-only test would pass on the bug for
-        half the fixtures one might pick.
+        half the fixtures one might pick. This fixture is one of them: under the exact
+        optimal leaf order (#1494) the two runs give equal weights, although the trees differ.
         =#
         @test all(PO.distance(FeatureDistance(), ri_sq.seen[i]) !=
                   PO.distance(FeatureDistance(), ri_re.seen[i]) for i in eachindex(cls))
         @test any(res_sq.resi[i].clr.res.merges != res_re.resi[i].clr.res.merges
                   for i in eachindex(cls))
-        @test !isapprox(res_sq.w, res_re.w)
         @test isapprox(sum(res_sq.w), 1)
         @test isapprox(sum(res_re.w), 1)
 

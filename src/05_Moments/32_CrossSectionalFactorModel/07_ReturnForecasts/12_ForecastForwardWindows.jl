@@ -232,7 +232,7 @@ end
 """
     forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Option{<:MatNum},
                           grid::AbstractVector{<:Tuple{Integer, Integer}},
-                          min_count::Integer) -> NamedTuple
+                          min_count::Integer, ppy::Number) -> NamedTuple
 
 Score one Return Forecast against a grid of forward windows, on one common date set.
 
@@ -243,19 +243,21 @@ Score one Return Forecast against a grid of forward windows, on one common date 
  1. Check `w` against the shape of `fe.alpha`, so a wrong weight history raises at every depth, also when no date stays.
  2. Build the forward target of each window from `X` with [`forward_mean_returns`](@ref).
  3. Intersect the dates of the base evaluation across the whole grid with [`forecast_common_dates`](@ref).
- 4. For each window, build a [`ForecastEvaluationResult`](@ref) that carries `fe.alpha` and `fe.umsk`, the window's target, the common dates, the window's own `horizon` and `lag`, and `min_count`, and read its row with [`forecast_window_row`](@ref).
+ 4. For each window, build a [`ForecastEvaluationResult`](@ref) that carries `fe.alpha` and `fe.umsk`, the window's target, the common dates, the window's own `horizon` and `lag`, `min_count` and `ppy`, and read its row with [`forecast_window_row`](@ref).
  5. Transpose the rows into columns, one entry per period.
 
 # Arguments
 
-  - `fe`: The base evaluation, from [`forecast_evaluation`](@ref). Its `alpha`, `umsk`, `target`, `step` and `ppy` go into every window, and its `dates` are the dates the common set is taken from.
+  - `fe`: The base evaluation, from [`forecast_evaluation`](@ref). Its `alpha`, `umsk`, `target`, `step` and `ties` go into every window, and its `dates` are the dates the common set is taken from.
   - `X`: The target history `observations × assets` the forward windows are taken over, on the axis of `fe.alpha`. It is what [`forecast_target_history`](@ref) gives for `fe.target`.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights.
   - `grid`: One `(horizon, lag)` pair per period, from [`forecast_window_grid`](@ref).
   - `min_count`: Least number of assets a cross-section needs, for the date rule and for the statistics alike.
+  - `ppy`: Periods per year of the annualised columns, which every window carries.
 
 # Validation
 
+  - `ppy > 0`. Raises a `DomainError`.
   - `size(X) == size(fe.alpha)`. Raises a `DimensionMismatch`.
   - `!isempty(grid)`. Raises an [`IsEmptyError`](@ref).
   - `size(w) == size(fe.alpha)`, when `w` is not `nothing`. Raises a `DimensionMismatch`.
@@ -276,7 +278,8 @@ Score one Return Forecast against a grid of forward windows, on one common date 
 """
 function forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Option{<:MatNum},
                                grid::AbstractVector{<:Tuple{Integer, Integer}},
-                               min_count::Integer)
+                               min_count::Integer, ppy::Number)
+    @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
     alpha::MatNum = fe.alpha
     @argcheck(size(X, 1) == size(alpha, 1) && size(X, 2) == size(alpha, 2),
               DimensionMismatch("the target history ($(size(X, 1))×$(size(X, 2))) must match the Return Forecast history ($(size(alpha, 1))×$(size(alpha, 2)))"))
@@ -286,9 +289,8 @@ function forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Optio
     common = forecast_common_dates(alpha, ys, fe.dates, min_count)
     rows = [forecast_window_row(ForecastEvaluationResult(alpha, ys[p], fe.umsk, common,
                                                          fe.target, grid[p][1], grid[p][2],
-                                                         fe.step, min_count, fe.ties,
-                                                         fe.ppy), w, min_count)
-            for p in eachindex(grid)]
+                                                         fe.step, min_count, fe.ties, ppy),
+                                w, min_count) for p in eachindex(grid)]
     return (; period = collect(eachindex(grid)), horizon = [g[1] for g in grid],
             lag = [g[2] for g in grid], dates = common,
             spearman_mean_ic = [r.spearman_mean_ic for r in rows],
@@ -306,12 +308,13 @@ end
 """
     forecast_holding_period(fe::ForecastEvaluationResult, X::MatNum,
                             w::Option{<:MatNum} = nothing; n::Integer = 10,
-                            min_count::Integer = fe.min_count) -> NamedTuple
+                            min_count::Integer = fe.min_count,
+                            ppy::Number = fe.ppy) -> NamedTuple
     forecast_holding_period(fe::ForecastEvaluationResult, rd::ReturnsResult,
                             csfm::CrossSectionalFactorModel;
                             weighting::AbstractOrthogonalityMetric = IdentityMetric(),
-                            n::Integer = 10,
-                            min_count::Integer = fe.min_count) -> NamedTuple
+                            n::Integer = 10, min_count::Integer = fe.min_count,
+                            ppy::Number = fe.ppy) -> NamedTuple
 
 Score a Return Forecast against cumulative forward windows, one row per holding period.
 
@@ -323,7 +326,7 @@ A deeper window matures later, so it scores fewer dates at the end of the sample
 
 The set shrinks as `n` grows. The rows of one table are comparable with each other, but a table at one depth is not comparable with a table at another depth. To compare two depths, read the deeper table and truncate it.
 
-`n` is a keyword and not a field of the evaluation, so a caller reads the table at a second depth without a second pairing to build `fe`, which can cost a rolling refit.
+`n` is a keyword and not a field of the evaluation, so a caller reads the table at a second depth without a second pairing to build `fe`, which can cost a rolling refit. `ppy` is a keyword for the same reason: annualisation is a linear rescale, the mean times `ppy` and the ratio times its square root, so `ppy = 1` gives the per-period table of an evaluation whose summary is annualised.
 
 # The t-statistic of a deeper row corrects for the overlap
 
@@ -336,7 +339,7 @@ The stride between two dates is the base evaluation's, and it does not grow with
 
 # Arguments
 
-  - `fe`: The base evaluation, from [`forecast_evaluation`](@ref). Its `horizon` and `lag` set the grid, its `alpha`, `umsk`, `target`, `step` and `ppy` go into every window, and its `dates` are the dates the common set is taken from.
+  - `fe`: The base evaluation, from [`forecast_evaluation`](@ref). Its `horizon` and `lag` set the grid, its `alpha`, `umsk`, `target`, `step` and `ties` go into every window, and its `dates` are the dates the common set is taken from.
   - `X`: The target history `observations × assets` the forward windows are taken over, on the axis of `fe.alpha`. The block method builds it from `fe.target` with [`forecast_target_history`](@ref). The bare method takes it, so a caller can score a history that the library did not build.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights. Only the Pearson coefficient and the coverage read it.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
@@ -344,6 +347,7 @@ The stride between two dates is the base evaluation's, and it does not grow with
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), resolved by [`cs_diagnostic_weights`](@ref).
   - `n`: Number of forward periods, the depth of the table.
   - `min_count`: Least number of assets a cross-section needs. It defaults to the threshold the evaluation carries, and it applies to the common dates and to the statistics alike.
+  - $(arg_dict[:fe_table_ppy])
 
 # Validation
 
@@ -359,7 +363,7 @@ The stride between two dates is the base evaluation's, and it does not grow with
       + `dates::Vector{Int}`: The common evaluation dates every row was computed on.
       + `spearman_mean_ic`, `spearman_ic_ir`, `spearman_t_stat`: The Spearman coefficient's summary, from [`forecast_ic_summary`](@ref), with the t-statistic at the row's own [`forecast_ic_lags`](@ref).
       + `pearson_mean_ic`, `pearson_ic_ir`, `pearson_t_stat`: The Pearson coefficient's summary.
-      + `rank_ann_return`, `rank_sharpe`: The annualised return and the ratio of the `:rank` book, from [`forecast_portfolio`](@ref).
+      + `rank_ann_return`, `rank_sharpe`: The annualised return and the ratio of the `:rank` book, from [`forecast_portfolio`](@ref), at `ppy` periods per year.
       + `zscore_ann_return`, `zscore_sharpe`: The same two figures of the `:zscore` book.
       + `mean_coverage`: The mean of the finite entries of [`forecast_coverage`](@ref).
 
@@ -395,27 +399,29 @@ julia> t.dates
 """
 function forecast_holding_period(fe::ForecastEvaluationResult, X::MatNum,
                                  w::Option{<:MatNum} = nothing; n::Integer = 10,
-                                 min_count::Integer = fe.min_count)
+                                 min_count::Integer = fe.min_count, ppy::Number = fe.ppy)
     return forecast_window_table(fe, X, w,
                                  forecast_window_grid(fe.horizon, fe.lag, n, :cumulative),
-                                 min_count)
+                                 min_count, ppy)
 end
 function forecast_holding_period(fe::ForecastEvaluationResult, rd::ReturnsResult,
                                  csfm::CrossSectionalFactorModel;
                                  weighting::AbstractOrthogonalityMetric = IdentityMetric(),
-                                 n::Integer = 10, min_count::Integer = fe.min_count)
+                                 n::Integer = 10, min_count::Integer = fe.min_count,
+                                 ppy::Number = fe.ppy)
     return forecast_holding_period(fe, forecast_target_history(fe.target, rd, csfm),
                                    cs_diagnostic_weights(weighting, csfm); n = n,
-                                   min_count = min_count)
+                                   min_count = min_count, ppy = ppy)
 end
 """
     forecast_decay(fe::ForecastEvaluationResult, X::MatNum,
                    w::Option{<:MatNum} = nothing; n::Integer = 10,
-                   min_count::Integer = fe.min_count) -> NamedTuple
+                   min_count::Integer = fe.min_count, ppy::Number = fe.ppy) -> NamedTuple
     forecast_decay(fe::ForecastEvaluationResult, rd::ReturnsResult,
                    csfm::CrossSectionalFactorModel;
                    weighting::AbstractOrthogonalityMetric = IdentityMetric(),
-                   n::Integer = 10, min_count::Integer = fe.min_count) -> NamedTuple
+                   n::Integer = 10, min_count::Integer = fe.min_count,
+                   ppy::Number = fe.ppy) -> NamedTuple
 
 Score a Return Forecast against disjoint forward windows, one row per period out.
 
@@ -438,6 +444,7 @@ The two tables agree at `p = 1`, which is the base evaluation's own window, and 
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), resolved by [`cs_diagnostic_weights`](@ref).
   - `n`: Number of forward periods, the depth of the table.
   - `min_count`: Least number of assets a cross-section needs. It applies to the common dates and to the statistics alike.
+  - $(arg_dict[:fe_table_ppy])
 
 # Validation
 
@@ -478,18 +485,19 @@ and the second scores what is left of it one horizon later.
 """
 function forecast_decay(fe::ForecastEvaluationResult, X::MatNum,
                         w::Option{<:MatNum} = nothing; n::Integer = 10,
-                        min_count::Integer = fe.min_count)
+                        min_count::Integer = fe.min_count, ppy::Number = fe.ppy)
     return forecast_window_table(fe, X, w,
                                  forecast_window_grid(fe.horizon, fe.lag, n, :disjoint),
-                                 min_count)
+                                 min_count, ppy)
 end
 function forecast_decay(fe::ForecastEvaluationResult, rd::ReturnsResult,
                         csfm::CrossSectionalFactorModel;
                         weighting::AbstractOrthogonalityMetric = IdentityMetric(),
-                        n::Integer = 10, min_count::Integer = fe.min_count)
+                        n::Integer = 10, min_count::Integer = fe.min_count,
+                        ppy::Number = fe.ppy)
     return forecast_decay(fe, forecast_target_history(fe.target, rd, csfm),
                           cs_diagnostic_weights(weighting, csfm); n = n,
-                          min_count = min_count)
+                          min_count = min_count, ppy = ppy)
 end
 
 export forecast_holding_period, forecast_decay

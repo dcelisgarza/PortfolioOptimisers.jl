@@ -37,6 +37,7 @@ These three abstract hierarchies form the backbone of the library. Understanding
 - **Struct types**:
 
   - Use `@concrete` from `ConcreteStructs.jl` — it auto-generates type parameters so `struct MyType{T1, T2}` boilerplate is not needed.
+  - Do not bound a type parameter in the header, neither as `struct MyType{T1 <: Real}` nor as a `@concrete` field `x <: Real`. Bound the argument of the inner constructor instead (see *Constructor Pattern*). A bound in the header is one that every signature naming the type must meet, and inference can fail or take very long on it. A struct that `@concrete` cannot write, because its parameters reach a parametric supertype or two fields share one, declares its parameters by hand with no bound. `test/test_75_concrete_struct_census.jl` gates the rule and holds each exception with its reason.
   - Use `DocStringExtensions.TYPEDEF` in the docstring header for struct types.
   - All fields must be documented using inline `"$(field_dict[:key])"` strings and reflected in the `# Fields` section via `$(DocStringExtensions.FIELDS)`.
   - Call `@define_pretty_show(TypeName)` immediately after any new struct that should display nicely in the REPL (all estimators, algorithms, and results).
@@ -169,6 +170,32 @@ method converts internally. An index is the usual case.
 `<:Number` over a narrower bound, so a caller may bring a number type from another package. Narrow
 to `<:Real` only where the body needs an order, and to a concrete type only where the body needs
 that exact representation.
+
+## A divisor's correction is named by who makes it
+
+The divisor of a spread is the number of observations, less a correction. Two keywords name that
+correction, and each one names who makes it.
+
+- **`ddof::Integer` where the library makes the correction itself.** The code subtracts the integer
+  from the number of observations, `T - ddof`, and refuses a negative one. The members of
+  `NormError` and `EvenMoment` take it.
+- **`corrected::Bool` where `Statistics` or `StatsBase` makes it.** The code passes the flag on, to
+  `Statistics.std`, `Statistics.var`, `StatsBase.SimpleCovariance` or `StatsBase.varcorrection`.
+  `SimpleVariance`, `StdValue` and `VarValue` take it. Under observation weights the flag selects a
+  divisor for each weight type, and no integer states that divisor.
+
+One definition never names both, and a definition that names `ddof` never calls an upstream
+spread. Such a site states an integer and applies a flag, so `ddof = 2` either raises or silently
+means `ddof = 1`. To offer an integer, subtract it yourself. To delegate, take `corrected` and pass
+it on.
+
+A partial fit that reproduces a correction `StatsBase` makes on the batch path subtracts the flag
+itself, as `n - corrected`. It keeps the name `corrected`, because it reads the field of an
+estimator whose batch path delegates. One field cannot carry two names.
+
+The default of each keyword is written at its site and is the site's own decision.
+[ADR 0087](../../docs/adr/0087-one-written-bias-correction-default-not-the-upstream-one.md) fixes
+`corrected = true`.
 
 ## Union Type Aliases and Dispatch Groups
 

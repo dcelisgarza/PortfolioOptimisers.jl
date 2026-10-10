@@ -1,7 +1,11 @@
 ```@meta
-Description = "Realised factor attribution has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Factor attribution realised, public API of PortfolioOptimisers.jl: attribution_standalone_pairs."
 ```
 
-# Realised factor attribution
+# [Factor attribution realised](@id api-factor-attribution-realised)
 
-Every name of this topic is private. The [private page](@ref private-api-realised-factor-attribution) documents them.
+The verb of this page is a method that a new [`AbstractUnknownEntryRule`](@ref) implements. The [private page](@ref private-api-factor-attribution-realised) documents the other names of this topic.
+
+```@docs
+PortfolioOptimisers.attribution_standalone_pairs
+```

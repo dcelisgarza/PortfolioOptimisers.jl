@@ -138,7 +138,7 @@ numbers, so it is a sentence in the docstring and not a second name.
 
 - New `src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl`; new
   `test/test_69_second_set.jl`; every rule joins the batch–online identity loop of `test_67`.
-- `CONTEXT.md`'s roster gains `WeakAggregatingAlgorithm` · WAA and the constructor
+- `GLOSSARY.md`'s roster gains `WeakAggregatingAlgorithm` · WAA and the constructor
   `AggregatingExponentialGradient` · WAEG, CAEG.
 - The Learning-Rate Schedule build of ADR 0165 landed second and wired the slot: the bound, the
   carrier's `s` field and the restart; nothing else in the rule moved.

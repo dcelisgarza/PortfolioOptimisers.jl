@@ -24,9 +24,12 @@ Solves a convex optimisation problem to compute the ERM at confidence level `alp
 """
 function ERM(x::VecNum, slv::Slv_VecSlv, alpha::Number = 0.05,
              w::Option{<:ObsWeights} = nothing)
-    w = get_observation_weights(w, x)
+    w = checked_observation_weights(w, x)
     if isa(slv, VecSlv)
         @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
+    end
+    if iszero(alpha)
+        return worst_positive_weight_loss(x, w)
     end
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, false)
@@ -130,9 +133,9 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `alpha` is a number: `0 < alpha < 1`.
+  - $(val_dict[:alpha_tail0])
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -192,8 +195,8 @@ EntropicValueatRisk
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_half_open_unit_interval(alpha, :alpha)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
                                                                             alpha, w)
     end
@@ -254,7 +257,7 @@ Keywords correspond to the struct's fields.
 
   - If `alpha` is a number: `0 < alpha < 1`. If `beta` is a number: `0 < beta < 1`.
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 # Related
 
@@ -295,7 +298,7 @@ Keywords correspond to the struct's fields.
         end
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(beta), typeof(w)}(settings,
                                                                                           slv,
                                                                                           alpha,
@@ -381,9 +384,9 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `alpha` is a number: `0 < alpha < 1`.
+  - $(val_dict[:alpha_tail0])
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -445,8 +448,8 @@ EntropicDrawdownatRisk
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_half_open_unit_interval(alpha, :alpha)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
                                                                             alpha, w)
     end
@@ -520,9 +523,9 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `alpha` is a number: `0 < alpha < 1`.
+  - $(val_dict[:alpha_tail0])
   - If `slv` is a `VecSlv`: `!isempty(slv)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -581,8 +584,8 @@ RelativeEntropicDrawdownatRisk
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
-        assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_half_open_unit_interval(alpha, :alpha)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(slv), typeof(alpha), typeof(w)}(settings, slv,
                                                                             alpha, w)
     end

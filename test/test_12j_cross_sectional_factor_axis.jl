@@ -15,10 +15,11 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
     res = synthetic_asset_panel(; n_assets = 10, n_observations = 30, n_industries = 3,
                                 rng = StableRNG(724_101))
     rd = res.rd
+    # The size member keeps the default benchmark-weight field, because the last testset builds
+    # a prior from these Pairs, and the prior refuses a member that reads another field.
     factors = ["market" => ConstantExposure(),
                "size" =>
-                   CompositeExposure(; descriptors = [Passthrough(; field = "market_cap")],
-                                     bw = "market_cap"),
+                   CompositeExposure(; descriptors = [Passthrough(; field = "market_cap")]),
                "industry" => OneHotExposure(; field = "industry", family = "industry")]
 
     @testset "A one-hot member expands to one name per level" begin
@@ -69,7 +70,7 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
 
     @testset "A family label that names a factor is allowed only when it is that factor" begin
         # `market` is both the name of the single factor and the label of its family, which
-        # is the case the reference implementation permits.
+        # is the case the oracle permits.
         sets = PO.cross_sectional_factor_sets(factors, rd)
         @test sets.dict["market"] == ["market"]
         # A label shared with a factor of another family would answer two different lists.
@@ -138,7 +139,7 @@ include(joinpath(@__DIR__, "test06c_setup.jl"))
     @testset "Both verbs read the axis off the estimator, and both are exported" begin
         # Issue #1059: a caller who writes a factor mandate in a pipeline step holds the
         # estimator, not its Pairs, so the estimator method forwards `pe.factors`.
-        pe = CrossSectionalFactorPrior(; factors = factors)
+        pe = CrossSectionalFactorPrior(; lambda = 1, factors = factors)
         # The names resolve unqualified, so the pipeline example can call them.
         @test :cross_sectional_factor_axis in names(PortfolioOptimisers)
         @test :cross_sectional_factor_sets in names(PortfolioOptimisers)

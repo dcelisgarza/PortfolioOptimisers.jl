@@ -2,7 +2,7 @@
     return_forecast(rfe::AbstractReturnForecastEstimator, rd::ReturnsResult,
                     csfm::CrossSectionalFactorModel) -> AbstractReturnForecastResult
 
-Compute the Return Forecast of a carrier and a fitted factor-model block.
+Compute the Return Forecast of the returns data `rd` and a fitted factor-model block.
 
 This is the verb every Return Forecast Estimator answers. The block carries the exposure history, the idiosyncratic variance history and the factor axis the members read, so a caller fits a forecast on a stored prior result without refitting the prior.
 
@@ -179,8 +179,8 @@ function return_forecast_weights(rd::ReturnsResult)::MatNum
     emsk = pnl.emsk
     @argcheck(!isnothing(emsk),
               IsNothingError("a Return Forecast scores its Descriptors over the estimation universe of each observation, and this Asset Panel is static, so it carries no estimation mask"))
-    # The mask is read in the number type of the returns it weighs, so a `Float32` carrier
-    # is not widened by its own weights.
+    # The mask is read in the number type of the returns it weighs, so `Float32` returns
+    # data is not widened by its own weights.
     T = real(eltype(rd.X))
     return T.(emsk)
 end
@@ -241,12 +241,13 @@ function return_forecast_block_observations(csfm::CrossSectionalFactorModel)::Op
 end
 """
     return_forecast_rows(rd::ReturnsResult, csfm::CrossSectionalFactorModel) -> AbstractUnitRange
+    return_forecast_rows(Tc::Integer, csfm::CrossSectionalFactorModel) -> AbstractUnitRange
 
-Return the rows of the carrier the histories of a factor-model block live on.
+Return the rows of the returns data the histories of a factor-model block live on.
 
-A [`CrossSectionalFactorPrior`](@ref) drops the leading observations that its Descriptors warm up over, and fits on the observations that remain. So the block is always a suffix of the carrier. The function finds the suffix by size, not by a stored offset. A stored offset must survive every view of the block, and the size arithmetic holds on every view.
+A [`CrossSectionalFactorPrior`](@ref) drops the leading observations that its Descriptors warm up over, and fits on the observations that remain. So the block is always a suffix of the returns data. The function finds the suffix by size, not by a stored offset. A stored offset must survive every view of the block, and the size arithmetic holds on every view.
 
-A Return Forecast Estimator scores its own Descriptors over the whole carrier, so they warm up on every observation of the panel. Each member then cuts the scores to these rows. A carrier of the same length as the block gives the whole range. A caller who hands the carrier that is already narrowed gets this answer.
+A Return Forecast Estimator scores its own Descriptors over all the returns data, so they warm up on every observation of the panel. Each member then cuts the scores to these rows. Returns data of the same length as the block gives the whole range. A caller who hands in returns data that is already narrowed gets this answer.
 
 # Mathematical definition
 
@@ -258,23 +259,24 @@ A Return Forecast Estimator scores its own Descriptors over the whole carrier, s
 
 Where:
 
-  - ``\\mathcal{R}``: The rows of the carrier that the block lives on.
-  - ``T_{c}``: Number of observations of the carrier.
+  - ``\\mathcal{R}``: The rows of the returns data that the block lives on.
+  - ``T_{c}``: Number of observations of the returns data.
   - ``T_{b}``: Number of observations of the block. A block that carries no history states no window, and then ``T_{b} = T_{c}``.
 
 # Arguments
 
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+  - `Tc`: Number of observations of the returns data, in place of `rd`. [`return_forecast_step`](@ref) reads it off the scores it gets.
   - `csfm`: The fitted factor-model block.
 
 # Validation
 
   - The rules of [`descriptor_asset_panel`](@ref).
-  - The carrier is at least as long as the block. Raises a `DimensionMismatch`.
+  - The returns data is at least as long as the block. Raises a `DimensionMismatch`.
 
 # Returns
 
-  - `rows::AbstractUnitRange`: The rows of the carrier the block lives on.
+  - `rows::AbstractUnitRange`: The rows of the returns data the block lives on.
 
 # Related
 
@@ -285,13 +287,16 @@ Where:
 """
 function return_forecast_rows(rd::ReturnsResult,
                               csfm::CrossSectionalFactorModel)::AbstractUnitRange
-    Tc = size(descriptor_asset_panel(rd).amsk, 1)
+    return return_forecast_rows(size(descriptor_asset_panel(rd).amsk, 1), csfm)
+end
+function return_forecast_rows(Tc::Integer,
+                              csfm::CrossSectionalFactorModel)::AbstractUnitRange
     Tb = return_forecast_block_observations(csfm)
     if isnothing(Tb)
         return 1:Tc
     end
     @argcheck(Tb <= Tc,
-              DimensionMismatch("the factor model block is fitted on a suffix of the carrier, so the carrier ($Tc observations) cannot be shorter than the block ($Tb observations). Hand the carrier the prior was fitted on."))
+              DimensionMismatch("the factor model block is fitted on a suffix of the returns data, so the returns data ($Tc observations) cannot be shorter than the block ($Tb observations). Hand in the returns data that the prior was fitted on."))
     return (Tc - Tb + 1):Tc
 end
 """
@@ -299,14 +304,14 @@ end
     return_forecast_cut(A::MatNum, rows::AbstractUnitRange) -> MatNum
     return_forecast_cut(A::Arr3Num, rows::AbstractUnitRange) -> Arr3Num
 
-Cut a history that lives on the carrier's observation axis down to the block's rows.
+Cut a history that lives on the observation axis of the returns data down to the block's rows.
 
-The Return Forecast family computes its Descriptor scores over the whole carrier and answers on the block's rows. So this verb cuts each whole-axis history that the family carries beside the scores, once. The cut is a copy and not a view, because a view of an array whose element type is open names no numeric array.
+The Return Forecast family computes its Descriptor scores over all the returns data and answers on the block's rows. So this verb cuts each whole-axis history that the family carries beside the scores, once. The cut is a copy and not a view, because a view of an array whose element type is open names no numeric array.
 
 # Arguments
 
-  - `A`: A history on the carrier's observation axis, or `nothing`.
-  - `rows`: The rows of the carrier the block lives on.
+  - `A`: A history on the observation axis of the returns data, or `nothing`.
+  - `rows`: The rows of the returns data the block lives on.
 
 # Returns
 
@@ -331,15 +336,15 @@ end
     return_forecast_pad(A::Nothing, rows::AbstractUnitRange, T::Integer) -> Nothing
     return_forecast_pad(A::MatNum, rows::AbstractUnitRange, T::Integer) -> MatNum
 
-Place a history of a factor-model block into the rows of the carrier it was fitted on.
+Place a history of a factor-model block into the rows of the returns data it was fitted on.
 
-The rows before the block carry no information of the factor model, so they are `NaN`. A member that fits over the whole carrier reads them as it reads any missing cell. Where the history that a pair needs is not finite, the pair drops out of the fit.
+The rows before the block carry no information of the factor model, so they are `NaN`. A member that fits over all the returns data reads them as it reads any missing cell. Where the history that a pair needs is not finite, the pair drops out of the fit.
 
 # Arguments
 
   - `A`: A history on the block's observation axis, or `nothing`.
-  - `rows`: The rows of the carrier the block lives on.
-  - `T`: Number of observations the carrier has.
+  - `rows`: The rows of the returns data the block lives on.
+  - `T`: Number of observations of the returns data.
 
 # Validation
 
@@ -347,7 +352,7 @@ The rows before the block carry no information of the factor model, so they are 
 
 # Returns
 
-  - `A`: The same history on the carrier's axis, `NaN` before the block, or `nothing`. Its element type is [`float_if_integer`](@ref) of the element type of `A`, so an integer history becomes a floating-point history.
+  - `A`: The same history on the axis of the returns data, `NaN` before the block, or `nothing`. Its element type is [`float_if_integer`](@ref) of the element type of `A`, so an integer history becomes a floating-point history.
 
 # Related
 
@@ -443,6 +448,8 @@ Return the idiosyncratic return history a fitted Return Forecast builds its targ
 
 The history lives on the cross-sectional fit the block nests, which is optional, so this is the one place that states the refusal.
 
+A pair whose leverage is one, which the `h1` field of the fit marks, reads `NaN` through [`leverage_one_nan`](@ref). Its residual is zero by construction, so it is not an observation of the idiosyncratic return, and a forward target that reads it skips it. The block does not change.
+
 # Arguments
 
   - `csfm`: The fitted factor-model block.
@@ -453,26 +460,31 @@ The history lives on the cross-sectional fit the block nests, which is optional,
 
 # Returns
 
-  - `eps::MatNum`: Idiosyncratic returns, `observations × assets`.
+  - `eps::MatNum`: Idiosyncratic returns, `observations × assets`, `NaN` at a pair that `h1` marks.
 
 # Related
 
   - [`CrossSectionalFactorModel`](@ref)
   - [`CrossSectionalRegression`](@ref)
+  - [`leverage_one_nan`](@ref)
   - [`forward_mean_returns`](@ref)
 """
 function forecast_idiosyncratic_returns(csfm::CrossSectionalFactorModel)::MatNum
     csr = csfm.csr
     @argcheck(!isnothing(csr),
               IsNothingError("a fitted Return Forecast regresses its Descriptor scores on the forward idiosyncratic return, and the factor model block carries no cross-sectional fit in csr"))
-    return csr.eps
+    return leverage_one_nan(csr.h1, csr.eps)
 end
 """
     forecast_idiosyncratic_variances(csfm::CrossSectionalFactorModel) -> MatNum
 
 Return the idiosyncratic variance history a fitted Return Forecast weighs its fit by.
 
-A fitted member reads the variances whatever its Forecast Unit. In the return unit they are the regression weights, and in the Sharpe unit they scale the target and the forecast. The function refuses a finite variance that is not strictly positive. Such a variance is a weight of infinity in the return unit and a division by zero in the Sharpe unit.
+A fitted member reads the variances whatever its Forecast Unit. In the return unit they are the regression weights, and in the Sharpe unit they scale the target and the fit. The forecast of the latest row reads `csfm.vs` itself, so it does not pass through this function.
+
+A pair whose leverage is one, which the `h1` field of the cross-sectional fit marks, reads `NaN` through [`leverage_one_nan`](@ref), so the fit leaves it out. Its variance reads only residuals that are zero by construction, so it is zero, or a rounding of zero. The test is the mask and not the value, because a rounding passes a test of the value. The block does not change.
+
+The function refuses a finite variance that is not strictly positive at every other pair. Such a variance is a weight of infinity in the return unit and a division by zero in the Sharpe unit, so it is a data error.
 
 # Arguments
 
@@ -481,27 +493,29 @@ A fitted member reads the variances whatever its Forecast Unit. In the return un
 # Validation
 
   - `csfm.vs` is given. Raises an [`IsNothingError`](@ref).
-  - Every finite entry of `csfm.vs` is strictly positive. Raises a `DomainError`.
+  - Every finite entry of `csfm.vs` at a pair that `h1` does not mark is strictly positive. Raises a `DomainError`.
+  - The rules of [`leverage_one_nan`](@ref).
 
 # Returns
 
-  - `vs::MatNum`: Idiosyncratic variances, `observations × assets`.
+  - `vs::MatNum`: Idiosyncratic variances, `observations × assets`, `NaN` at a pair that `h1` marks.
 
 # Related
 
   - [`CrossSectionalFactorModel`](@ref)
+  - [`leverage_one_nan`](@ref)
   - [`forecast_unit_target`](@ref)
   - [`forecast_return_units`](@ref)
 """
 function forecast_idiosyncratic_variances(csfm::CrossSectionalFactorModel)::MatNum
-    vs = csfm.vs
-    @argcheck(!isnothing(vs),
+    @argcheck(!isnothing(csfm.vs),
               IsNothingError("a fitted Return Forecast weighs its fit by the idiosyncratic variance, and the factor model block carries no variance history in vs"))
+    vs = leverage_one_nan(isnothing(csfm.csr) ? nothing : csfm.csr.h1, csfm.vs)
     for idx in CartesianIndices(vs)
         v = vs[idx]
         @argcheck(!isfinite(v) || v > zero(v),
                   DomainError(v,
-                              "every finite idiosyncratic variance weighs a fit, so it must be strictly positive, got vs[$(idx[1]), $(idx[2])] = $v"))
+                              "every finite idiosyncratic variance of a pair whose leverage is not one weighs a fit, so it must be strictly positive, got vs[$(idx[1]), $(idx[2])] = $v"))
     end
     return vs
 end
@@ -592,5 +606,396 @@ function forward_mean_returns(X::MatNum, horizon::Integer, lag::Integer)::Matrix
     end
     return Y
 end
+"""
+    fits_idiosyncratic_target(rfe) -> Bool
+    fits_idiosyncratic_target(rfe::ExpWeightedReturnForecast) -> Bool
+    fits_idiosyncratic_target(rfe::TargetReturnForecast) -> Bool
 
-export return_forecast, IdiosyncraticReturnUnit, IdiosyncraticSharpeUnit
+Answer whether a Return Forecast Estimator fits its forecast on the forward idiosyncratic return.
+
+Such a member regresses the forward idiosyncratic return of the block on its scores. The cross-sectional fit of the block makes that return orthogonal to the Factor Exposures under its regression weights. By the Frisch–Waugh theorem, the only slope that the member can estimate is the slope on the part of its scores that the exposures do not span. Its slope on the whole score is attenuated by the share of the variance of that part, so the part of its forecast that the exposures do not span is under-scaled, and the part that they span has no evidence from the fit. [`ScoreNeutralisation`](@ref), the default Orthogonal Forecast Fit of a [`CrossSectionalFactorPrior`](@ref), neutralises the scores of a member that answers `true`.
+
+The fallback answers `false`, so the prior keeps the forecast of a member whose weights and scale the caller states, such as [`FixedWeightedReturnForecast`](@ref) and [`CustomValueReturnForecast`](@ref): a spanned part can be the view of a factor that the caller intends. [`TargetReturnForecast`](@ref) and [`ExpWeightedReturnForecast`](@ref) answer `true`. A caller's own fitted member opts in with a method that answers `true`, and it must then hold its [`DescriptorScores`](@ref) in a field named `scores`.
+
+# Arguments
+
+  - `rfe`: Return Forecast Estimator.
+
+# Returns
+
+  - `flag::Bool`: Whether the member fits its forecast on the forward idiosyncratic return.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.fits_idiosyncratic_target(CustomValueReturnForecast(; mu = [0.1]))
+false
+```
+
+# Related
+
+  - [`AbstractOrthogonalForecastFit`](@ref)
+  - [`ScoreNeutralisation`](@ref)
+  - [`calibrates_orthogonal_part`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function fits_idiosyncratic_target(::Any)::Bool
+    return false
+end
+"""
+    calibrates_orthogonal_part(rfe) -> Bool
+    calibrates_orthogonal_part(rfe::TargetReturnForecast) -> Bool
+
+Answer whether a Return Forecast Estimator can fit its calibration slope on the orthogonal part of its prediction.
+
+[`OrthogonalPartCalibration`](@ref) asks the member for that slope, `κ⊥`, beside the slope `κ` of its whole prediction. Only a member whose forecast is a calibrated prediction has a slope to fit, so the fallback answers `false`, and the constructor of [`CrossSectionalFactorPrior`](@ref) refuses the rule with such a member. [`TargetReturnForecast`](@ref) answers its own `calibrate`. A caller's own member that answers `true` must state the four-argument method of [`return_forecast`](@ref), whose Result carries `κ` in `calib` and `κ⊥` in `ocalib`.
+
+# Arguments
+
+  - `rfe`: Return Forecast Estimator, or `nothing`.
+
+# Returns
+
+  - `flag::Bool`: Whether the member can fit `κ⊥`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.calibrates_orthogonal_part(nothing)
+false
+```
+
+# Related
+
+  - [`OrthogonalPartCalibration`](@ref)
+  - [`fits_idiosyncratic_target`](@ref)
+  - [`TargetReturnForecast`](@ref)
+"""
+function calibrates_orthogonal_part(::Any)::Bool
+    return false
+end
+"""
+    folds_forecast_rows(rfe) -> Bool
+    folds_forecast_rows(rfe::FixedWeightedReturnForecast) -> Bool
+    folds_forecast_rows(rfe::ExpWeightedReturnForecast) -> Bool
+
+Answer whether a Return Forecast Estimator computes the rows of its history one observation at a time.
+
+The carry fold of a [`CrossSectionalFactorPrior`](@ref) asks the member. A member that answers `true` computes the rows of its new observations from a fold state and from the scores of its [`DescriptorScores`](@ref) and the block on those observations and on the [`forecast_target_gap`](@ref) observations before them. So the carry keeps the scores of every fitted observation, the rows of the history and the fold state, and keeps only the panel rows that a new observation reads. The fallback answers `false`, and the carry then keeps every panel row and fits the member again at each call with no data. [`FixedWeightedReturnForecast`](@ref) and [`ExpWeightedReturnForecast`](@ref) answer `true`.
+
+A member that answers `true` holds its [`DescriptorScores`](@ref) in a field named `scores`, and states [`return_forecast_step`](@ref) and [`return_forecast_result`](@ref).
+
+# Arguments
+
+  - `rfe`: Return Forecast Estimator, or `nothing`.
+
+# Returns
+
+  - `flag::Bool`: Whether the member computes its history one observation at a time.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.folds_forecast_rows(CustomValueReturnForecast(; mu = [0.1]))
+false
+```
+
+# Related
+
+  - [`return_forecast_step`](@ref)
+  - [`return_forecast_result`](@ref)
+  - [`forecast_target_gap`](@ref)
+  - [`CrossSectionalCarryState`](@ref)
+"""
+function folds_forecast_rows(::Any)::Bool
+    return false
+end
+"""
+    forecast_target_gap(rfe) -> Integer
+    forecast_target_gap(rfe::ExpWeightedReturnForecast) -> Integer
+
+Return the number of observations that a target of a Return Forecast Estimator takes to mature.
+
+A fitted member regresses the scores of an observation on the forward mean return that [`forward_mean_returns`](@ref) takes over the observations `lag` to `lag + horizon - 1` after it. So the target of an observation matures `lag + horizon - 1` observations later. A step of the carry fold of a [`CrossSectionalFactorPrior`](@ref) gives a member that folds, as [`folds_forecast_rows`](@ref) answers, its new observations and this number of observations before them, because the targets of those observations mature at the step. The fallback answers `0`, for a member whose row reads its own observation alone. [`ExpWeightedReturnForecast`](@ref) answers `lag + horizon - 1`.
+
+# Arguments
+
+  - `rfe`: Return Forecast Estimator.
+
+# Returns
+
+  - `gap::Integer`: The number of observations that a target takes to mature.
+
+# Examples
+
+```jldoctest
+julia> ds = DescriptorScores(; descriptors = [Passthrough(; field = \"a\")]);
+
+julia> PortfolioOptimisers.forecast_target_gap(ExpWeightedReturnForecast(; scores = ds,
+                                                                         horizon = 3, lag = 2))
+4
+
+julia> PortfolioOptimisers.forecast_target_gap(FixedWeightedReturnForecast(; scores = ds,
+                                                                           scale = 1.0))
+0
+```
+
+# Related
+
+  - [`folds_forecast_rows`](@ref)
+  - [`return_forecast_step`](@ref)
+  - [`forward_mean_returns`](@ref)
+"""
+function forecast_target_gap(::Any)::Integer
+    return 0
+end
+"""
+    estimated_factor_columns(csfm::CrossSectionalFactorModel) -> AbstractUnitRange
+
+Return the columns of the raw factor axis of a block that hold the estimated factors.
+
+The observed factors are the trailing columns of the raw axis, one per column of `csfm.fx`, and the fit does not estimate them. The idiosyncratic return of the fit is therefore orthogonal to the exposures of the estimated factors alone, and the split of a Return Forecast reads those columns alone.
+
+# Arguments
+
+  - `csfm`: The fitted factor-model block.
+
+# Returns
+
+  - `idx::AbstractUnitRange`: The columns of the estimated factors on the raw factor axis.
+
+# Related
+
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`ScoreNeutralisation`](@ref)
+  - [`OrthogonalPartCalibration`](@ref)
+"""
+function estimated_factor_columns(csfm::CrossSectionalFactorModel)::AbstractUnitRange
+    fx = csfm.fx
+    return 1:(size(csfm.M, 2) - (isnothing(fx) ? 0 : size(fx, 2)))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the Orthogonal Forecast Fit rules of a [`CrossSectionalFactorPrior`](@ref).
+
+The prior splits its Return Forecast into the part `L g` that the latest Factor Exposures span and the orthogonal part `α⊥`. A fitted member, one that answers `true` to [`fits_idiosyncratic_target`](@ref), regresses the forward idiosyncratic return, which is orthogonal to the exposures. So the scale of its whole forecast is the scale of `α⊥` attenuated by `var(α⊥) / var(α)`, and its `g` has no evidence from the fit. A rule of this family states how the prior makes `α⊥` carry the scale of the fit. The prior applies it inside [`cross_sectional_return_forecast`](@ref), so the batch fit, the Return Forecast history, the online refit and the carry fold all read it.
+
+The Orthogonal Forecast Fit is not the Orthogonal Forecast Scale `c`. The fit repairs the scale that the member fits, before the split is scaled, and `c` then multiplies the repaired part.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. The prior holds it in its `ofit` field, and three steps of [`cross_sectional_return_forecast`](@ref) dispatch on it: [`orthogonal_forecast_member`](@ref) gives the member that the prior fits, [`orthogonal_forecast_result`](@ref) fits it, and [`orthogonal_forecast_rescale`](@ref) scales the orthogonal part of the split. Each step has a method for this abstract type that leaves the forecast as it stands, so a new rule adds a method only for the step that it changes.
+
+# Related
+
+  - [`ScoreNeutralisation`](@ref)
+  - [`OrthogonalPartCalibration`](@ref)
+  - [`UnadjustedForecast`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`AbstractAlgorithm`](@ref)
+"""
+abstract type AbstractOrthogonalForecastFit <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Neutralise the scores of a fitted member against every estimated factor of the block, before the fit.
+
+This is the default Orthogonal Forecast Fit of a [`CrossSectionalFactorPrior`](@ref). When the member answers `true` to [`fits_idiosyncratic_target`](@ref), the prior adds the name of every estimated factor of the block to the Neutralisation names of its [`DescriptorScores`](@ref), and sets the weights of the Neutralisation to [`BlockRegressionWeights`](@ref). The score of each observation is then orthogonal to the exposures under the inner product of the cross-sectional fit, which is the one that the split reads. By the Frisch–Waugh theorem the member then fits the slope on the orthogonal part of its score, so `α⊥` carries the scale of the fit and `g` is about zero. The observed factors are not neutralised: the regression does not estimate them, so the idiosyncratic return is not orthogonal to their exposures, and the split leaves them out.
+
+A member that answers `false` keeps its forecast. A neutralised score is `NaN` before the block, so under `whole_history = true` a [`TargetReturnForecast`](@ref) trains only on the last `lag + horizon - 1` rows before the block, which are the rows whose forward window reaches into the block.
+
+# Related
+
+  - [`AbstractOrthogonalForecastFit`](@ref)
+  - [`OrthogonalPartCalibration`](@ref)
+  - [`UnadjustedForecast`](@ref)
+  - [`BlockRegressionWeights`](@ref)
+  - [`fits_idiosyncratic_target`](@ref)
+"""
+struct ScoreNeutralisation <: AbstractOrthogonalForecastFit end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Fit the calibration slope of a [`TargetReturnForecast`](@ref) on the orthogonal part of its prediction too, and scale `α⊥` by it.
+
+The prior asks the member for `κ⊥` through the four-argument method of [`return_forecast`](@ref). The calibration splits each row of the prediction that `κ` reads against the exposures of the estimated factors of that row, under the regression weights of that row and the Cross-Sectional Regression Estimator of the prior, and runs the regression of `κ` on the orthogonal parts. The member still publishes `α = κ p`. The prior keeps `g` from `α`, and scales `α⊥` by `κ⊥ / κ` before the Orthogonal Forecast Scale `c`. A ratio that is not finite, in the warm-up of either slope, gives the zero split of a forecast that is not finite.
+
+The constructor of [`CrossSectionalFactorPrior`](@ref) refuses the rule with a member that answers `false` to [`calibrates_orthogonal_part`](@ref). The rule repairs `α⊥` alone and leaves the scores as they are, so only the member that asks for it pays for it.
+
+# Related
+
+  - [`AbstractOrthogonalForecastFit`](@ref)
+  - [`ScoreNeutralisation`](@ref)
+  - [`UnadjustedForecast`](@ref)
+  - [`calibrates_orthogonal_part`](@ref)
+  - [`TargetReturnForecastResult`](@ref)
+"""
+struct OrthogonalPartCalibration <: AbstractOrthogonalForecastFit end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Read the Return Forecast as the member states it.
+
+The prior splits the forecast of the member as it stands, so a fitted member keeps the under-scale of `α⊥`. This is the form of the independent implementation that the library is measured against. It stays one keyword away, and the parity cases of the prior state it.
+
+# Related
+
+  - [`AbstractOrthogonalForecastFit`](@ref)
+  - [`ScoreNeutralisation`](@ref)
+  - [`OrthogonalPartCalibration`](@ref)
+"""
+struct UnadjustedForecast <: AbstractOrthogonalForecastFit end
+"""
+    orthogonal_forecast_member(ofit::AbstractOrthogonalForecastFit, rfe,
+                               csfm::CrossSectionalFactorModel)
+    orthogonal_forecast_member(ofit::ScoreNeutralisation, rfe,
+                               csfm::CrossSectionalFactorModel)
+
+Return the Return Forecast Estimator that a [`CrossSectionalFactorPrior`](@ref) fits under its Orthogonal Forecast Fit.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. [`ScoreNeutralisation`](@ref): when `rfe` answers `true` to [`fits_idiosyncratic_target`](@ref), rebuild its `scores` with the Neutralisation names of the caller followed by the names of the estimated factors of `csfm`, and with [`BlockRegressionWeights`](@ref). A name that the caller also gave keeps its first place. Otherwise return `rfe`.
+ 2. Any other rule: return `rfe`.
+
+# Arguments
+
+  - `ofit`: The Orthogonal Forecast Fit of the prior.
+  - `rfe`: Return Forecast Estimator.
+  - `csfm`: The factor-model block, whose names and observed factors state the estimated factors.
+
+# Returns
+
+  - `rfe`: The member that the prior fits.
+
+# Related
+
+  - [`AbstractOrthogonalForecastFit`](@ref)
+  - [`cross_sectional_return_forecast`](@ref)
+  - [`estimated_factor_columns`](@ref)
+"""
+function orthogonal_forecast_member(::AbstractOrthogonalForecastFit, rfe,
+                                    ::CrossSectionalFactorModel)
+    return rfe
+end
+function orthogonal_forecast_member(::ScoreNeutralisation, rfe,
+                                    csfm::CrossSectionalFactorModel)
+    if !fits_idiosyncratic_target(rfe)
+        return rfe
+    end
+    ds = rfe.scores
+    nms = unique(vcat(if isnothing(ds.neutralise)
+                          String[]
+                      else
+                          neutralisation_names(ds.neutralise)
+                      end, csfm.nf[estimated_factor_columns(csfm)]))
+    return rebuild_with_slots(rfe,
+                              (;
+                               scores = rebuild_with_slots(ds,
+                                                           (; neutralise = nms,
+                                                            nw = BlockRegressionWeights()))))
+end
+"""
+    orthogonal_forecast_result(ofit::AbstractOrthogonalForecastFit, rfe, rd::ReturnsResult,
+                               csfm::CrossSectionalFactorModel,
+                               cre::AbstractCrossSectionalRegressionEstimator)
+    orthogonal_forecast_result(ofit::OrthogonalPartCalibration, rfe, rd::ReturnsResult,
+                               csfm::CrossSectionalFactorModel,
+                               cre::AbstractCrossSectionalRegressionEstimator)
+
+Fit the Return Forecast of a [`CrossSectionalFactorPrior`](@ref) under its Orthogonal Forecast Fit.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. [`OrthogonalPartCalibration`](@ref): call the four-argument method of [`return_forecast`](@ref) with `cre`, so the Result also carries `κ⊥` in `ocalib`.
+ 2. Any other rule: call the three-argument method.
+
+# Arguments
+
+  - `ofit`: The Orthogonal Forecast Fit of the prior.
+  - `rfe`: Return Forecast Estimator, as [`orthogonal_forecast_member`](@ref) returns it.
+  - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
+  - `csfm`: The fitted factor-model block.
+  - `cre`: Cross-Sectional Regression Estimator of the prior, which splits each row.
+
+# Returns
+
+  - `rf::AbstractReturnForecastResult`: The Result of the member.
+
+# Related
+
+  - [`AbstractOrthogonalForecastFit`](@ref)
+  - [`cross_sectional_return_forecast`](@ref)
+"""
+function orthogonal_forecast_result(::AbstractOrthogonalForecastFit, rfe, rd::ReturnsResult,
+                                    csfm::CrossSectionalFactorModel,
+                                    ::AbstractCrossSectionalRegressionEstimator)
+    return return_forecast(rfe, rd, csfm)
+end
+function orthogonal_forecast_result(::OrthogonalPartCalibration, rfe, rd::ReturnsResult,
+                                    csfm::CrossSectionalFactorModel,
+                                    cre::AbstractCrossSectionalRegressionEstimator)
+    return return_forecast(rfe, rd, csfm, cre)
+end
+"""
+    orthogonal_forecast_rescale(ofit::AbstractOrthogonalForecastFit,
+                                rf::AbstractReturnForecastResult, g::VecNum, ap::VecNum)
+    orthogonal_forecast_rescale(ofit::OrthogonalPartCalibration,
+                                rf::TargetReturnForecastResult, g::VecNum, ap::VecNum)
+
+Scale the orthogonal part of the split of a Return Forecast under the Orthogonal Forecast Fit.
+
+# Mathematical definition
+
+Under [`OrthogonalPartCalibration`](@ref):
+
+```math
+\\begin{align}
+\\boldsymbol{\\alpha}^{\\perp}_{\\kappa} &= \\frac{\\kappa_{\\perp}}{\\kappa} \\, \\boldsymbol{\\alpha}^{\\perp}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{\\alpha}^{\\perp}_{\\kappa}``: The orthogonal part that the prior scales by `c`.
+  - ``\\kappa``, ``\\kappa_{\\perp}``: The calibration slopes of the whole prediction and of its orthogonal part, `rf.calib` and `rf.ocalib`.
+  - $(math_dict[:alpha_perp])
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Any rule but [`OrthogonalPartCalibration`](@ref), or a Result that carries no `κ⊥`: return `g` and `ap` unchanged. The prior refuses [`OrthogonalPartCalibration`](@ref) with a member other than a [`TargetReturnForecast`](@ref), so the second case does not happen.
+ 2. [`OrthogonalPartCalibration`](@ref) with a [`TargetReturnForecastResult`](@ref): return the zero split unchanged. Otherwise return a zero `g` and a zero `ap` when `κ⊥ / κ` is not finite, which is the warm-up of either slope, and `g` with `ap` times the ratio when it is finite.
+
+# Arguments
+
+  - `ofit`: The Orthogonal Forecast Fit of the prior.
+  - `rf`: The Result of the member. A [`TargetReturnForecastResult`](@ref) carries `calib` and `ocalib`.
+  - `g`: The spanned coefficients of the split.
+  - `ap`: The unscaled orthogonal part of the split.
+
+# Returns
+
+  - `g::VecNum`: The spanned coefficients.
+  - `ap::VecNum`: The orthogonal part that the Orthogonal Forecast Scale multiplies.
+
+# Related
+
+  - [`OrthogonalPartCalibration`](@ref)
+  - [`cross_sectional_return_forecast`](@ref)
+  - [`cross_sectional_alpha_split`](@ref)
+"""
+function orthogonal_forecast_rescale(::AbstractOrthogonalForecastFit,
+                                     ::AbstractReturnForecastResult, g::VecNum, ap::VecNum)
+    return (; g = g, ap = ap)
+end
+
+export return_forecast, IdiosyncraticReturnUnit, IdiosyncraticSharpeUnit,
+       ScoreNeutralisation, OrthogonalPartCalibration, UnadjustedForecast
+public AbstractOrthogonalForecastFit

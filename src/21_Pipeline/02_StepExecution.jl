@@ -144,7 +144,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Read the slot an uncertainty-set step fits from, as the arguments its verb takes.
 
-An estimator that reads a prior result — [`reads_prior_result`](@ref) answers `true` — is fitted from the `prior` slot, and never touches the returns; every other estimator is fitted from the `returns` slot, whose `X` and `F` its verb takes. The required slot is checked here, so a missing one is refused by name before any fit. The predicate reads the type, so the branch folds.
+An estimator that reads a prior result — [`reads_prior_result`](@ref) answers `true` — is fitted from the `prior` slot, and never touches the returns; every other estimator is fitted from the `returns` slot, whose `X` and `F` its verb takes. The required slot is checked here, so a missing one is refused with an error that names it before any fit. The predicate reads the type, so the branch folds.
 
 # Arguments
 
@@ -210,7 +210,7 @@ Which slot the step reads is decided by [`reads_prior_result`](@ref). An estimat
 """
 function run_uncertainty_step(ue::AbstractUncertaintySetEstimator, target::Option{Symbol},
                               ctx::PipelineContext)
-    @argcheck(target in PIPELINE_STEP_TARGETS,
+    @argcheck(target in (:mu, :sigma, :both),
               ArgumentError("the PipelineStep target of a $(typeof(ue)) step must be :mu, :sigma, or :both, got $(repr(target))"))
     src = uncertainty_step_source(ue, ctx)
     cur = ctx.uncertainty

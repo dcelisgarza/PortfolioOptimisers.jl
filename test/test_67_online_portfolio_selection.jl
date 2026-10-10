@@ -290,12 +290,12 @@ end
         @test isnan(po.sample_buffer(B)[1, 4]) && !B.A[B.off + 1, 4]
         @test all(isfinite, po.sample_buffer(B)[2:3, :]) &&
               all(B.A[(B.off + 2):(B.off + 3), :])
-        crd = po.rows_carrier(B, ob.cache.nx)
+        crd = po.buffer_returns_result(B, ob.cache.nx)
         @test isa(crd, ReturnsResult) && crd.nx == nx && size(crd.X) == (3, 4)
         @test crd.pnl.amsk == amsk[10:12, :] && crd.pnl.emsk == amsk[10:12, :]
-        @test isnothing(po.rows_carrier(nothing, nx)) &&
-              isnothing(po.rows_carrier(nothing, nothing))
-        @test_throws po.IsNothingError po.rows_carrier(B, nothing)
+        @test isnothing(po.buffer_returns_result(nothing, nx)) &&
+              isnothing(po.buffer_returns_result(nothing, nothing))
+        @test_throws po.IsNothingError po.buffer_returns_result(B, nothing)
         # The fold arm reads the current row under the last mask row of the carrier.
         @test po.last_active_mask(crd.pnl) == amsk[12, :]
         @test isnothing(po.last_active_mask(nothing))
@@ -316,13 +316,13 @@ end
         os = po.partial_fit!(OPS(; alg = MovingAverageReversion(; window = 4)),
                              rows(rd, 1:4))
         @test isnothing(os.cache.X.A) && isnothing(po.buffer_panel(os.cache.X))
-        @test isnothing(po.rows_carrier(os.cache.X, nx).pnl)
+        @test isnothing(po.buffer_returns_result(os.cache.X, nx).pnl)
         # A windowed statistic over a relisted asset reads the rows it has, not filled
         # zeros: at row 15 a plain moving average over D is undefined, so the step holds
         # that leg, and the answer is finite.
         mar = MovingAverageReversion(; window = 15)
         om = po.partial_fit!(OPS(; alg = mar), rows(rdg, 1:15))
-        crd15 = po.rows_carrier(om.cache.X, nx)
+        crd15 = po.buffer_returns_result(om.cache.X, nx)
         muD = vec(mean(PriceLevelExpectedReturns(; alg = MovingAverage(; window = 15)),
                        crd15.X, crd15.pnl; dims = 1))
         @test isnan(muD[4]) && all(isfinite, muD[1:3])
@@ -426,7 +426,7 @@ end
                                                                  X = R[10:10, :]))
         # The refusals of the online seams.
         @test_throws ArgumentError optimise(opt)
-        @test_throws ArgumentError po.online_readout(o)
+        @test_throws ArgumentError po.batch_from_state(o)
         @test_throws ArgumentError po.update_online_estimator(Online(opt; max_history = 5))
         cv = OnlineIndexWalkForward(5, 1)
         @test_throws ArgumentError cross_val_predict(o, rd, cv)

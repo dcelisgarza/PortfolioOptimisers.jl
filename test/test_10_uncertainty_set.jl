@@ -465,13 +465,16 @@ end
         cov = [2.0 0.5; 0.5 3.0]
         Xs = randn(StableRNG(1), 50, 2)
         # Number method returns k == the number verbatim; cov passed through untouched.
-        s = PortfolioOptimisers.ellipsoidal_set(false, 5, q, nothing, cov,
-                                                MuUncertaintySetClass())
+        s = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(5,
+                                                                                   false),
+                                                q, nothing, cov, MuUncertaintySetClass())
         @test s.k == 5
         @test s.sigma == cov
         @test s.class isa MuUncertaintySetClass
         # diagonal = true restricts cov to its diagonal before fitting k.
-        sd = PortfolioOptimisers.ellipsoidal_set(true, 5, q, nothing, cov,
+        sd = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(5,
+                                                                                    true),
+                                                 q, nothing, cov,
                                                  SigmaUncertaintySetClass())
         @test sd.sigma == LinearAlgebra.Diagonal(cov)
         @test sd.class isa SigmaUncertaintySetClass
@@ -479,7 +482,9 @@ end
         for (method, samp) in ((GeneralKUncertaintyAlgorithm(), nothing),
                                (ChiSqKUncertaintyAlgorithm(), nothing), (NormalKUncertaintyAlgorithm(), Xs))
             for diag in (false, true)
-                e = PortfolioOptimisers.ellipsoidal_set(diag, method, q, samp, cov,
+                e = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(method,
+                                                                                           diag),
+                                                        q, samp, cov,
                                                         MuUncertaintySetClass())
                 cov_ref = diag ? LinearAlgebra.Diagonal(cov) : cov
                 @test e.sigma == cov_ref
@@ -735,22 +740,103 @@ end
                                             randn(StableRNG(3), 10, 4),
                                             LinearAlgebra.Diagonal(ones(4)))
         end
-        @testset "The chi-squared radius reads size(sigma_X, 1)" begin
-            # The degrees of freedom is the first dimension of the shape matrix, so the
-            # same algorithm gives N on the mean axis and N^2 on the covariance axis.
+        @testset "The chi-squared radius reads the dimension of the set (#1425)" begin
+            # Without `df`, `k_ucs` reads the side of the shape, which is the dimension of a
+            # shape of full rank: N on the mean axis, N^2 on a diagonal covariance shape.
             for p in (4, 16)
                 k = PortfolioOptimisers.k_ucs(ChiSqKUncertaintyAlgorithm(), 0.05, nothing,
                                               LinearAlgebra.Diagonal(ones(p)))
                 @test k ≈ sqrt(quantile(Distributions.Chisq(p), 0.95))
             end
-            # A symmetric N x N matrix carries N(N+1)/2 free entries, so the N^2 the
-            # covariance axis passes overstates the dimension of the ellipsoid, and the
-            # radius is the conservative one.
+            # A symmetric N x N matrix has N(N+1)/2 free entries, so a full covariance
+            # shape reads that many degrees of freedom. A diagonal shape keeps N^2, the
+            # expected value of its statistic, and the mean axis reads N either way.
             N = 4
-            k_sq = PortfolioOptimisers.k_ucs(ChiSqKUncertaintyAlgorithm(), 0.05, nothing,
-                                             LinearAlgebra.Diagonal(ones(N^2)))
+            ud = PortfolioOptimisers.ucs_dimension
+            @test ud(MuUncertaintySetClass(), false, N) == N
+            @test ud(MuUncertaintySetClass(), true, N) == N
+            @test ud(SigmaUncertaintySetClass(), true, N^2) == N^2
+            @test ud(SigmaUncertaintySetClass(), false, N^2) == N * (N + 1) ÷ 2
+            # A full shape that is the sample covariance of M errors has rank at most
+            # M - 1, so the dimension is capped there. A diagonal shape takes no cap.
+            @test ud(SigmaUncertaintySetClass(), false, N^2, 5) == 4
+            @test ud(SigmaUncertaintySetClass(), false, N^2, 100) == N * (N + 1) ÷ 2
+            @test ud(SigmaUncertaintySetClass(), true, N^2, 5) == N^2
+            @test ud(MuUncertaintySetClass(), false, N, 3) == 2
+            @test ud(MuUncertaintySetClass(), false, N, 100) == N
+            @test ud(MuUncertaintySetClass(), true, N, 3) == N
             k_free = sqrt(quantile(Distributions.Chisq(N * (N + 1) ÷ 2), 0.95))
-            @test k_sq > k_free
+            k_amb = sqrt(quantile(Distributions.Chisq(N^2), 0.95))
+            S = Matrix{Float64}(LinearAlgebra.I, N^2, N^2)
+            # `ambient = true` reads the side of the shape, N^2, on every route.
+            for (km, want) in ((ChiSqKUncertaintyAlgorithm(), k_free),
+                               (ChiSqKUncertaintyAlgorithm(; ambient = true), k_amb))
+                e = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                           false),
+                                                        0.05, nothing, S,
+                                                        SigmaUncertaintySetClass())
+                @test e.k ≈ want
+                ed = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                            true),
+                                                         0.05, nothing, S,
+                                                         SigmaUncertaintySetClass())
+                @test ed.k ≈ k_amb
+                for d in (false, true)
+                    alg = NormBallUncertaintySetAlgorithm(; method = km, diagonal = d)
+                    nb = PortfolioOptimisers.norm_ball_set(alg, 0.05, nothing, S,
+                                                           SigmaUncertaintySetClass())
+                    @test nb.kappa ≈ (d ? k_amb : want)
+                end
+                @test PortfolioOptimisers.k_ucs(km, 0.05, nothing, S, 3) ≈
+                      (km.ambient ? k_amb : sqrt(quantile(Distributions.Chisq(3), 0.95)))
+            end
+            # The empirical radius absorbs `df`, because its distances carry the dimension.
+            Xs = randn(StableRNG(1425), 50, 3)
+            C3 = Statistics.cov(Xs)
+            @test PortfolioOptimisers.k_ucs(NormalKUncertaintyAlgorithm(), 0.05, Xs, C3,
+                                            1) ==
+                  PortfolioOptimisers.k_ucs(NormalKUncertaintyAlgorithm(), 0.05, Xs, C3)
+        end
+        @testset "The full Normal covariance set holds its stated level (#1425)" begin
+            # The error of a sample covariance is symmetric, so the Normal shape
+            # (I + K)(Σ ⊗ Σ) / T has rank N(N+1)/2 = 15 of 25, and its squared Mahalanobis
+            # distance is chi-squared with 15 degrees of freedom. The chi-squared radius at
+            # 15 and the empirical radius of the sampled errors therefore agree, and the
+            # radius at N^2 = 25 covers almost every error.
+            rng = StableRNG(1425)
+            N, T = 5, 120
+            A = randn(rng, N, N) * 0.01
+            X = randn(rng, T, N) * transpose(A)
+            ell(km) = EllipsoidalUncertaintySetAlgorithm(; method = km, diagonal = false)
+            sc = sigma_ucs(NormalUncertaintySet(; alg = ell(ChiSqKUncertaintyAlgorithm())),
+                           X)
+            sa = sigma_ucs(NormalUncertaintySet(;
+                                                alg = ell(ChiSqKUncertaintyAlgorithm(;
+                                                                                     ambient = true))),
+                           X)
+            sn = sigma_ucs(NormalUncertaintySet(; alg = ell(NormalKUncertaintyAlgorithm()),
+                                                n_sim = 20_000, rng = StableRNG(7)), X)
+            @test sc.sigma == sa.sigma == sn.sigma
+            @test sc.k ≈ sqrt(quantile(Distributions.Chisq(15), 0.95))
+            @test sa.k ≈ sqrt(quantile(Distributions.Chisq(25), 0.95))
+            # Measured: 5.000 (chi-squared), 5.027 (empirical), 6.136 (ambient).
+            @test isapprox(sn.k, sc.k; rtol = 0.02)
+            @test sa.k / sn.k > 1.15
+            # The coverage of each radius on errors drawn from the fitted covariance, one
+            # sample covariance of T normal returns at a time.
+            Σ = sc.val
+            L = LinearAlgebra.cholesky(LinearAlgebra.Symmetric(Σ)).L
+            d2 = map(1:20_000) do _
+                E = Statistics.cov(randn(rng, T, N) * transpose(L)) - Σ
+                e = vec((E + transpose(E)) / 2)
+                return LinearAlgebra.dot(e, sc.sigma \ e)
+            end
+            # Measured: mean distance 15.13, the rank and not N^2 = 25. The radius at 15
+            # covers 0.939, short of 0.95 because a sample covariance of 120 returns is not
+            # exactly normal, and the radius at 25 covers 0.997.
+            @test isapprox(Statistics.mean(d2), 15; rtol = 0.02)
+            @test isapprox(Statistics.mean(d2 .<= sc.k^2), 0.95; atol = 0.02)
+            @test Statistics.mean(d2 .<= sa.k^2) > 0.99
         end
         @testset "The empirical radius measures against the shape it is given" begin
             # `ellipsoidal_set` takes the diagonal BEFORE it fits k, so on the default the
@@ -759,9 +845,13 @@ end
             Xd = randn(rng, 252, 5) * 0.01
             cv = Statistics.cov(Xd)
             km = NormalKUncertaintyAlgorithm()
-            e_full = PortfolioOptimisers.ellipsoidal_set(false, km, 0.05, Xd, cv,
+            e_full = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                            false),
+                                                         0.05, Xd, cv,
                                                          MuUncertaintySetClass())
-            e_diag = PortfolioOptimisers.ellipsoidal_set(true, km, 0.05, Xd, cv,
+            e_diag = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                            true),
+                                                         0.05, Xd, cv,
                                                          MuUncertaintySetClass())
             d2_diag = [LinearAlgebra.dot(Xd[t, :], LinearAlgebra.Diagonal(cv) \ Xd[t, :])
                        for t in axes(Xd, 1)]
@@ -781,9 +871,13 @@ end
             n_diag_larger = count(1:60) do s
                 Xs = randn(StableRNG(s), 252, 5) * 0.01
                 cvs = Statistics.cov(Xs)
-                kf = PortfolioOptimisers.ellipsoidal_set(false, km, 0.05, Xs, cvs,
+                kf = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                            false),
+                                                         0.05, Xs, cvs,
                                                          MuUncertaintySetClass()).k
-                kd = PortfolioOptimisers.ellipsoidal_set(true, km, 0.05, Xs, cvs,
+                kd = PortfolioOptimisers.ellipsoidal_set(EllipsoidalUncertaintySetAlgorithm(km,
+                                                                                            true),
+                                                         0.05, Xs, cvs,
                                                          MuUncertaintySetClass()).k
                 return kd > kf
             end
@@ -1296,6 +1390,17 @@ end
                                                                            C = [1.0, 1.0],
                                                                            Q = zeros(2, 1),
                                                                            val = ones(2, 3))
+            # A fitted set has no row in `R`, and `R` must be finite with one column per
+            # column of `Q`.
+            @test size(ucsc.R) == (0, Kc)
+            @test_throws Exception CompactCovarianceUncertaintySet(; kappa = 1.0,
+                                                                   C = [1.0, 1.0],
+                                                                   Q = zeros(2, 1),
+                                                                   R = fill(NaN, 1, 1))
+            @test_throws DimensionMismatch CompactCovarianceUncertaintySet(; kappa = 1.0,
+                                                                           C = [1.0, 1.0],
+                                                                           Q = zeros(2, 1),
+                                                                           R = zeros(1, 2))
             # A rank of zero is admitted, and so is a radius of zero.
             @test size(CompactCovarianceUncertaintySet(; kappa = 0.0, C = Cc,
                                                        Q = zeros(Nc, 0)).Q, 2) == 0
@@ -1330,26 +1435,64 @@ end
             @test_throws ArgumentError mu_ucs(ucsc)
             @test sigma_ucs(ucsc) === ucsc
         end
-        @testset "A view re-orthonormalises the basis it slices" begin
+        @testset "A view is the projection of the set (ADR 0189)" begin
             iv = [1, 2, 3, 4, 5]
             vc = PortfolioOptimisers.port_opt_view(ucsc, iv)
             @test vc.kappa == ucsc.kappa
             @test vc.C == Cc[iv]
-            # The slice is not orthonormal, and the view is.
+            # The view keeps the sliced rows, which are not orthonormal, and `R` completes
+            # them: the stacked columns are orthonormal.
+            @test vc.Q == Qc[iv, :]
             @test !isapprox(transpose(Qc[iv, :]) * Qc[iv, :], I(Kc); atol = 1e-8)
-            @test isapprox(transpose(vc.Q) * vc.Q, I(size(vc.Q, 2)); atol = 1e-12)
-            # The span survives the slice, so the view projects onto the same subspace.
-            @test isapprox(vc.Q * transpose(vc.Q) * Qc[iv, :], Qc[iv, :]; atol = 1e-10)
-            # A view equals a fit on the cluster's rows: the projector of the view and the
-            # projector of a fresh orthonormalisation of the same rows agree.
+            @test isapprox(transpose(vcat(vc.Q, vc.R)) * vcat(vc.Q, vc.R), I(Kc);
+                           atol = 1e-14)
+            # The penalty of the view is the principal block of the penalty of the full set,
+            # so a cluster portfolio pays what it pays as a portfolio of the full universe.
+            # Measured maxscaled 4e-16 against `BigFloat` on the design simulation.
+            M = Diagonal(Cc) * (I - Qc * transpose(Qc)) * Diagonal(Cc)
+            z5 = zeros(length(iv), length(iv))
+            rngv = StableRNG(1424)
+            for _ in 1:20
+                wv = randn(rngv, length(iv))
+                wf = zeros(Nc)
+                wf[iv] = wv
+                @test isapprox(PortfolioOptimisers.ucs_variance(vc, z5, wv),
+                               PortfolioOptimisers.ucs_variance(ucsc, zeros(Nc, Nc), wf);
+                               rtol = 1e-12)
+                @test isapprox(PortfolioOptimisers.ucs_variance(vc, z5, wv),
+                               ucsc.kappa * dot(wv, M[iv, iv], wv); rtol = 1e-12)
+            end
+            # A refit on the rows of the view spares the span of the sliced rows, and the
+            # full set does not spare it: the projection still charges that portfolio.
+            wsp = (Qc[iv, :] * [1.0, -0.5, 0.3]) ./ Cc[iv]
             Qfit = Matrix(qr(Qc[iv, :]).Q)[:, 1:Kc]
-            @test isapprox(vc.Q * transpose(vc.Q), Qfit * transpose(Qfit); atol = 1e-10)
-            # Slicing the projector instead is wrong: it is not even a projector.
-            Psliced = (I - Qc * transpose(Qc))[iv, iv]
-            @test !isapprox(Psliced * Psliced, Psliced; atol = 1e-8)
-            # The rank falls when the sliced columns become dependent.
-            @test size(PortfolioOptimisers.port_opt_view(ucsc, [1]).Q, 2) == 1
-            @test size(PortfolioOptimisers.orthonormalise_basis(zeros(Nc, 0)), 2) == 0
+            refit = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc[iv], Q = Qfit)
+            @test PortfolioOptimisers.ucs_variance(refit, z5, wsp) < 1e-20
+            @test PortfolioOptimisers.ucs_variance(vc, z5, wsp) > 1e-3
+            @test isapprox(PortfolioOptimisers.ucs_variance(vc, z5, wsp),
+                           ucsc.kappa * dot(wsp, M[iv, iv], wsp); rtol = 1e-12)
+            # A view of a view is the view of the composed index.
+            jv = [1, 3, 4]
+            vv = PortfolioOptimisers.port_opt_view(vc, jv)
+            vd = PortfolioOptimisers.port_opt_view(ucsc, iv[jv])
+            @test isapprox(transpose(vv.R) * vv.R, transpose(vd.R) * vd.R; atol = 1e-14)
+            wj = randn(rngv, length(jv))
+            @test isapprox(PortfolioOptimisers.ucs_variance(vv, zeros(3, 3), wj),
+                           ucsc.kappa * dot(wj, M[iv[jv], iv[jv]], wj); rtol = 1e-12)
+            # A single asset keeps every column, and `R` has one row per column.
+            v1 = PortfolioOptimisers.port_opt_view(ucsc, [1])
+            @test size(v1.Q) == (1, Kc) && size(v1.R) == (Kc, Kc)
+            @test isapprox(PortfolioOptimisers.ucs_variance(v1, zeros(1, 1), [1.0]),
+                           ucsc.kappa * M[1, 1]; rtol = 1e-12)
+            # A view that drops nothing keeps the set's own `R`, and so does a view that drops
+            # only zero rows. A rank-zero set drops no row into `R`.
+            @test size(PortfolioOptimisers.port_opt_view(ucsc, 1:Nc).R, 1) == 0
+            Qz = vcat(Qc, zeros(2, Kc))
+            ucsz = CompactCovarianceUncertaintySet(; kappa = 2.0, C = vcat(Cc, zeros(2)),
+                                                   Q = Qz)
+            @test size(PortfolioOptimisers.port_opt_view(ucsz, 1:Nc).R, 1) == 0
+            ucs0 = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc, Q = zeros(Nc, 0))
+            @test size(PortfolioOptimisers.port_opt_view(ucs0, iv).R) == (0, 0)
             # `val` is a covariance, so it is sliced on both axes.
             ucsv = CompactCovarianceUncertaintySet(; kappa = 2.0, C = Cc, Q = Qc,
                                                    val = sigmac)
@@ -1365,6 +1508,22 @@ end
             @test isapprox(PortfolioOptimisers.JuMP.value(resc.model[keyc]),
                            PortfolioOptimisers.ucs_variance(ucsc, sigmac, resc.w);
                            rtol = 1e-6)
+            # A view states `R` in the model: at the optimum on the view's assets, the model's
+            # expression is the worst case of the padded portfolio under the full set.
+            iv = [1, 2, 3, 4, 5]
+            vc = PortfolioOptimisers.port_opt_view(ucsc, iv)
+            rdv = ReturnsResult(; X = Xc[:, iv], nx = string.("A", iv))
+            resv = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = vc),
+                                     obj = MinimumRisk(), opt = optc), rdv)
+            @test isa(resv.retcode, PortfolioOptimisers.OptimisationSuccess)
+            wpad = zeros(Nc)
+            wpad[iv] = resv.w
+            @test isapprox(PortfolioOptimisers.JuMP.value(resv.model[keyc]),
+                           PortfolioOptimisers.ucs_variance(ucsc, sigmac, wpad);
+                           rtol = 1e-6)
+            @test isapprox(PortfolioOptimisers.ucs_variance(vc, sigmac[iv, iv], resv.w),
+                           PortfolioOptimisers.ucs_variance(ucsc, sigmac, wpad);
+                           rtol = 1e-12)
             # No lifted matrix on this route, and one on the ellipsoidal route.
             @test !haskey(resc.model, :W)
             rese = optimise(MeanRisk(;
@@ -1438,6 +1597,8 @@ end
         sg_tag = SigmaUncertaintySetClass()
         ret_key = PortfolioOptimisers.state_key(Symbol(""), :ret_, 1)
         skey(name) = PortfolioOptimisers.state_key(Symbol(""), name, 1)
+        # The mean builder tags its index, so its names differ from the covariance builder's.
+        wkey(name) = PortfolioOptimisers.state_key(Symbol(""), name, :w_1)
         dualq = PortfolioOptimisers.dual_norm_order
         # A maximum-utility objective pulls on the return term, so the epigraph is tight at
         # the optimum and the model's own expression is the worst case.
@@ -1524,11 +1685,11 @@ end
                 want = dot(mun, res.w) - ucs.kappa * norm(transpose(Ln) * res.w, dualq(p))
                 @test isapprox(PortfolioOptimisers.JuMP.value(res.model[ret_key]), want;
                                rtol = 1e-6)
-                @test haskey(res.model, skey(:t_nbucs_))
-                @test haskey(res.model, skey(:nbucs_cone_))
+                @test haskey(res.model, wkey(:t_nbucs_))
+                @test haskey(res.model, wkey(:nbucs_cone_))
                 # Only the power-cone route carries the per-entry auxiliaries.
-                @test haskey(res.model, skey(:r_nbucs_)) == (p == 3)
-                @test haskey(res.model, skey(:nbucs_cone_sum_)) == (p == 3)
+                @test haskey(res.model, wkey(:r_nbucs_)) == (p == 3)
+                @test haskey(res.model, wkey(:nbucs_cone_sum_)) == (p == 3)
             end
             # The penalty is linear in the radius and vanishes at zero, where the weights
             # are the nominal ones.
@@ -1651,7 +1812,7 @@ end
                                                     class = mu_tag))
             @test isa(res0.retcode, PortfolioOptimisers.OptimisationSuccess)
             @test isapprox(res0.w, resn.w; rtol = 1e-5, atol = 1e-6)
-            @test !haskey(res0.model, skey(:t_nbucs_))
+            @test !haskey(res0.model, wkey(:t_nbucs_))
             @test !haskey(res0.model, skey(:x_nbucs_w_))
             resv = optimise(MeanRisk(; r = Variance(), obj = MinimumRisk(), opt = optn),
                             rdn)
@@ -1668,6 +1829,24 @@ end
             u0s = NormBallUncertaintySet(; kappa = 1.0, L = zeros(Nn^2, 0), class = sg_tag)
             @test isapprox(PortfolioOptimisers.ucs_variance(u0s, sigman, wn),
                            dot(wn, sigman, wn))
+        end
+        @testset "A set on each axis builds one model (#1390)" begin
+            # Both builders register their epigraph under one prefix, and the mean builder
+            # tags its index. With one index, the second registration refused the model.
+            Lb = randn(rngn, Nn^2, 4) * 1e-4
+            um = NormBallUncertaintySet(; kappa = 1.0, L = Ln, class = mu_tag)
+            us = NormBallUncertaintySet(; kappa = 1.0, L = Lb, class = sg_tag)
+            res = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = us),
+                                    obj = MaximumUtility(; l = 2),
+                                    opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slvn,
+                                                        ret = ArithmeticReturn(; ucs = um))),
+                           rdn)
+            @test isa(res.retcode, PortfolioOptimisers.OptimisationSuccess)
+            @test haskey(res.model, wkey(:t_nbucs_))
+            @test haskey(res.model, skey(:t_nbucs_))
+            want = dot(mun, res.w) - norm(transpose(Ln) * res.w, 2)
+            @test isapprox(PortfolioOptimisers.JuMP.value(res.model[ret_key]), want;
+                           rtol = 1e-6)
         end
         @testset "The carried centre wins over the fallback (ADR 0050)" begin
             nbv = NormBallUncertaintySet(; kappa = 1.0, L = Ln, class = mu_tag,
@@ -1758,6 +1937,46 @@ end
             @test isapprox(diag(PortfolioOptimisers.norm_ball_deviation_factor(true, E730)),
                            sqrt.(vec(var(E730; dims = 1))))
         end
+        @testset "The normal radius applies the pseudo-inverse, and cuts only a singular square map" begin
+            # #1526: a square map went to an LU factorisation, which refuses a singular
+            # map. Every map that solved before still takes `L \ X'`, bit for bit.
+            S730 = cov(X730)
+            E730 = randn(StableRNG(5), 500, N730) * 1e-2
+            coords = PortfolioOptimisers.norm_ball_coordinates
+            for L in
+                (cholesky(S730).L, matrix_square_root(RidgeCholeskySquareRoot(), S730),
+                 PortfolioOptimisers.norm_ball_deviation_factor(false, E730),
+                 PortfolioOptimisers.norm_ball_deviation_factor(true, E730))
+                @test coords(L, E730) == L \ transpose(E730)
+            end
+            # A zero entry of a diagonal map gives a zero coordinate.
+            @test coords(Diagonal([0.5, 0.0, 0.25]), [1.0 2.0 3.0; 4.0 5.0 6.0]) ==
+                  [2.0 8.0; 0.0 0.0; 12.0 24.0]
+            # The eigen square root of a singular shape: the squared distances are the
+            # pseudo-inverse Mahalanobis distances under the cut `m eps` on the eigenvalues.
+            B = randn(StableRNG(6), N730, 3)
+            Ss = B * transpose(B)
+            Ls = matrix_square_root(EigenFallbackSquareRoot(), Ss)
+            @test !isa(Ls, LowerTriangular)
+            @test rank(Ls) == 3
+            Es = transpose(Ls * randn(StableRNG(7), N730, 200))
+            Zs = coords(Ls, Es)
+            @test size(Zs) == (3, 200)
+            Pinv = pinv(Ss; rtol = N730 * eps())
+            @test isapprox(vec(sum(abs2, Zs; dims = 1)),
+                           [dot(x, Pinv, x) for x in eachrow(Es)]; rtol = 1e-10)
+            km = NormalKUncertaintyAlgorithm()
+            @test isapprox(PortfolioOptimisers.k_norm_ball(km, 0.05, Es, Ls, 3),
+                           sqrt(quantile([dot(x, Pinv, x) for x in eachrow(Es)], 0.95));
+                           rtol = 1e-10)
+            # A deviation map with as many simulations as entries is square, and its rank
+            # is one less than its size.
+            Eq = randn(StableRNG(8), N730, N730)
+            Lq = PortfolioOptimisers.norm_ball_deviation_factor(false, Eq)
+            @test size(coords(Lq, Eq), 1) == N730 - 1
+            # A zero map keeps no direction, so every distance is zero.
+            @test PortfolioOptimisers.k_norm_ball(km, 0.05, Es, zeros(N730, N730), 0) == 0
+        end
         @testset "The Normal estimator emits the ellipsoid it would have built, factorised" begin
             for diagonal in (true, false),
                 method in (ChiSqKUncertaintyAlgorithm(), NormalKUncertaintyAlgorithm(),
@@ -1827,10 +2046,13 @@ end
         @testset "The bootstrap covariance axis is exact, low rank, and repairs nothing" begin
             # A vectorised symmetric matrix spans N(N+1)/2 coordinates, so the sample
             # covariance of the deviations is rank deficient at every sample size. The
-            # ellipsoid's shape is therefore the repaired one and its radius reads N^2
-            # degrees of freedom; the map carries the sample second moment exactly and its
-            # radius reads the rank the sample has.
-            for n_sim in (30, 12)
+            # ellipsoid's shape is therefore the repaired one, and its radius reads the
+            # N(N+1)/2 dimensions of the symmetric matrices (#1425, ADR 0188), capped at
+            # the rank n_sim - 1 of the sample, or N^2 under `ambient = true`. The map
+            # carries the sample second moment exactly and its radius reads the rank the
+            # sample has, so the two routes give one radius. At n_sim = 8 the cap binds:
+            # 7 < N(N+1)/2 = 10.
+            for n_sim in (30, 12, 8)
                 ub = ARCHUncertaintySet(;
                                         alg = NormBallUncertaintySetAlgorithm(;
                                                                               diagonal = false),
@@ -1853,13 +2075,45 @@ end
                       1e-12 * maximum(abs, cov(Xd))
                 @test rank(sb.L) == min(n_sim - 1, div(N730 * (N730 + 1), 2))
                 @test sb.kappa == sqrt(cquantile(Chisq(rank(sb.L)), ub.q))
-                @test se.k == sqrt(cquantile(Chisq(N730^2), ueb.q))
+                @test se.k ==
+                      sqrt(cquantile(Chisq(min(n_sim - 1, div(N730 * (N730 + 1), 2))),
+                                     ueb.q))
+                @test se.k == sb.kappa
+                uea = ARCHUncertaintySet(;
+                                         alg = EllipsoidalUncertaintySetAlgorithm(;
+                                                                                  method = ChiSqKUncertaintyAlgorithm(;
+                                                                                                                      ambient = true),
+                                                                                  diagonal = false),
+                                         n_sim = n_sim, seed = 7)
+                sea = sigma_ucs(uea, X730)
+                @test sea.sigma == se.sigma
+                @test sea.k == sqrt(cquantile(Chisq(N730^2), ueb.q))
                 # The ellipsoid's shape is not the sample's own second moment, because the
                 # sample is rank deficient and the default matrix processing repairs it.
                 @test !isposdef(cov(Xd))
                 @test isposdef(Matrix(se.sigma))
                 @test maximum(abs, Matrix(se.sigma) - cov(Xd)) > 0
             end
+        end
+        @testset "An ellipsoid or a norm ball needs two resamples, a box needs one" begin
+            # Both shapes read the covariance of the resampled errors, and one resample has
+            # none: the constructor refuses it and names the remedy. The box reads
+            # quantiles, so one resample is valid, and two resamples give finite radii.
+            for alg in (EllipsoidalUncertaintySetAlgorithm(; diagonal = false),
+                        EllipsoidalUncertaintySetAlgorithm(),
+                        NormBallUncertaintySetAlgorithm(; diagonal = false),
+                        NormBallUncertaintySetAlgorithm())
+                msg = "one resample has no covariance"
+                @test_throws msg ARCHUncertaintySet(; alg = alg, n_sim = 1)
+                @test_throws DomainError ARCHUncertaintySet(; alg = alg, n_sim = 1)
+                ms, ss = ucs(ARCHUncertaintySet(; alg = alg, n_sim = 2, seed = 7), X730)
+                for s in (ms, ss)
+                    @test isfinite(hasproperty(s, :k) ? s.k : s.kappa)
+                end
+            end
+            mb, sb = ucs(ARCHUncertaintySet(; n_sim = 1, seed = 7), X730)
+            @test isa(mb, BoxUncertaintySet)
+            @test all(isfinite, sb.lb) && all(isfinite, sb.ub)
         end
         @testset "The bootstrap pair and the two single-axis verbs agree under a seed" begin
             ub = ARCHUncertaintySet(; alg = NormBallUncertaintySetAlgorithm(), n_sim = 20,

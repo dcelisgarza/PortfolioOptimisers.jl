@@ -26,8 +26,8 @@ end
 function PortfolioOptimisers.plot_network(pl::NwE_ClE_Cl, res::OptimisationResult;
                                           rd::Option{<:Pr_RR} = nothing,
                                           nx::AbstractVector = 1:length(res.w), kwargs...)
-    # The prior arity's own door sees a viewed prior, whose mask is already `nothing`, so
-    # the pairing of the result's two universes happens here.
+    # The method of the prior arity receives a viewed prior, whose mask is already
+    # `nothing`, so the pairing of the result's two universes happens here.
     _, w, pr, _, nx = result_investable_view(res, rd, nothing, nx)
     return PortfolioOptimisers.plot_network(pl, pr, w; nx = nx, kwargs...)
 end

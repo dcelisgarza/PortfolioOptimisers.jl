@@ -365,7 +365,7 @@ end
 
 The names that the catalogue must list, before the removal of the names in `NOT_A_CHOICE`.
 
-This function is the Choice Surface of `CONTEXT.md` § 1 in code, and the one statement of the
+This function is the Choice Surface of `GLOSSARY.md` § 1 in code, and the one statement of the
 coverage rule. `test/test_26_docs.jl` calls it too. A type that `PortfolioOptimisers` declares,
 and that is not abstract, is on the surface when one of these rules holds:
 

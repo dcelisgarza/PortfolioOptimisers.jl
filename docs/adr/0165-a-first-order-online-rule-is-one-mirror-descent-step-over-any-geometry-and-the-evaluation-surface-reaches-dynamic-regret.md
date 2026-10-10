@@ -423,7 +423,7 @@ uniform start holds for one period only under equal price relatives.
   the two new geometries. ADR 0161's Result gains `path_length` and `cumulative`, and its
   comparator section names the splitter. ADR 0163's constructor line becomes
   `ExpertMixture(; experts, alg, eset, proj, grad, p0)`.
-- `CONTEXT.md` gains *Mirror Descent*, *Learning-Rate Schedule*, *Gradient Predictor*, *Gradient
+- `GLOSSARY.md` gains *Mirror Descent*, *Learning-Rate Schedule*, *Gradient Predictor*, *Gradient
   Point*, *Risk Loss*, *Hindsight Split*; *Projection Geometry* gains the three maps; *Expert
   Mixture* the two slots; *Online Selection Rule* the fourth set; the roster line moves the names.
 - Five build tickets graduate: `MirrorDescent` with its geometries and schedules, blocked by the
@@ -431,7 +431,7 @@ uniform start holds for one period only under equal price relatives.
   mixture's slots with `Ader`, `Sword` and the switching weighting; the evaluation surface. One
   task ticket asks the maintainer for the closed papers. The forecast-arm, second-set and third-set
   builds each gain a scope comment; the docs build waits on all five.
-- No reference implementation is named here, on the tickets, or in any docstring the builds write;
+- No implementation in another library is named here, on the tickets, or in any docstring the builds write;
   papers are cited by author and year.
 - Issues [#1170](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1170) and
   [#1169](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1169).

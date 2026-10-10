@@ -1,8 +1,8 @@
 ```@meta
-Description = "The Listing Span, private API of PortfolioOptimisers.jl: ListingSpan, project_span."
+Description = "Listing Span, private API of PortfolioOptimisers.jl: ListingSpan, project_span."
 ```
 
-# The Listing Span: private API
+# Listing Span: private API
 
 ## Types
 

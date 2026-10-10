@@ -9,7 +9,7 @@ Follow these steps to add a new estimator to PortfolioOptimisers.jl. Read the re
 
 This prompt carries the **order of the work**, and no rule of its own. Every rule it needs lives in a standards file, and each step links to the section that owns it. Read these first:
 
-- [`STANDARDS.md`](../../STANDARDS.md) — which file owns which rule, and which check holds it.
+- [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md) — which file owns which rule, and which check holds it.
 - [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) — type roles, constructors, validation, dispatch, exports.
 - [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) — the Authority for every docstring section named below.
 - [`.github/instructions/julia-return-types.instructions.md`](../instructions/julia-return-types.instructions.md) — when to annotate a return type.

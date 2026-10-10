@@ -1,9 +1,31 @@
 ```@meta
-Description = "Cross-Sectional Factor Prior, private API of PortfolioOptimisers.jl: cross_sectional_prior_option."
+Description = "Cross-Sectional Factor Prior, private API of PortfolioOptimisers.jl: Num_SpanShrinkCal, Num_OrthFcScaleCal, assert_forecast_history_rule, …"
 ```
 
 # Cross-Sectional Factor Prior: private API
 
 ```@docs
+PortfolioOptimisers.Num_SpanShrinkCal
+PortfolioOptimisers.Num_OrthFcScaleCal
+PortfolioOptimisers.assert_forecast_history_rule
+PortfolioOptimisers.assert_spanned_shrinkage
+PortfolioOptimisers.assert_orthogonal_forecast_scale
+PortfolioOptimisers.assert_orthogonal_forecast_fit
 PortfolioOptimisers.cross_sectional_prior_option
+PortfolioOptimisers.cross_sectional_assemble
+PortfolioOptimisers.cross_sectional_calibration
+PortfolioOptimisers.cross_sectional_forecast_block
+PortfolioOptimisers.cross_sectional_exposures_finite
+PortfolioOptimisers.cross_sectional_warmup
+PortfolioOptimisers.cross_sectional_exposure_stage
+PortfolioOptimisers.cross_sectional_exposure_series
+PortfolioOptimisers.cross_sectional_benchmark_stage
+PortfolioOptimisers.cross_sectional_minra
+PortfolioOptimisers.cross_sectional_live_regression
+PortfolioOptimisers.cross_sectional_live_factors
+PortfolioOptimisers.cross_sectional_pin_choice
+PortfolioOptimisers.cross_sectional_pinned_families
+PortfolioOptimisers.cross_sectional_axis_pairs
+PortfolioOptimisers.cross_sectional_lookback
+PortfolioOptimisers.show_fields(::CrossSectionalFactorPrior)
 ```

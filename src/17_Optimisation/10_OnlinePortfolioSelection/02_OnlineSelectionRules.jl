@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Lets the allocation drift with the market and never trades it, the buy-and-hold benchmark of the online selection papers (BAH).
+Lets the allocation drift with the market and never trades it, the buy-and-hold benchmark (BAH).
 
-From the uniform Start Allocation it is the uniform buy-and-hold portfolio, which the papers use as the market index. The rule keeps no state and reads no rows.
+It is the benchmark of the online selection survey [lihoi2014](@cite). From the uniform Start Allocation it is the uniform buy-and-hold portfolio, which [lihoi2014](@citet) use as the market index. The rule keeps no state and reads no rows.
 
 # Mathematical definition
 
@@ -27,12 +27,12 @@ Where:
 
 The entries of ``\\hat{\\boldsymbol{w}}_t`` are non-negative and sum to one. So on the simplex the projection returns ``\\hat{\\boldsymbol{w}}_t`` unchanged, and the rule never trades. The weight of asset ``i`` after period ``t`` is then ``w_{1,i} \\prod_{s \\leq t} x_{s,i}``, divided by the sum of that product over the assets.
 
-As the weighting of an [`ExpertMixture`](@ref), the rule reads the expert-return vector ``\\boldsymbol{r}_t`` in place of ``\\boldsymbol{x}_t``. Its step is then ``\\boldsymbol{p}_{t+1} \\propto \\boldsymbol{p}_t \\odot \\boldsymbol{r}_t``, the wealth-weighted mixture that the papers write as `BAH_W`. It is the default weighting of the mixture.
+As the weighting of an [`ExpertMixture`](@ref), the rule reads the expert-return vector ``\\boldsymbol{r}_t`` in place of ``\\boldsymbol{x}_t``. Its step is then ``\\boldsymbol{p}_{t+1} \\propto \\boldsymbol{p}_t \\odot \\boldsymbol{r}_t``, the wealth-weighted mixture. It is a buy and hold over the experts, the combination that Section 3.5.2 of [lihoi2014](@cite) describes. It is the default weighting of the mixture.
 
 # Algorithm
 
  1. Compute `wh`, the Price-Adjusted Allocation of `w` over `x`.
- 2. Project `wh` onto the Allocation Set `set` with `alg.proj`, from `wh`. Return the carrier `st` unchanged, and the projection.
+ 2. Project `wh` onto the Allocation Set `set` with `alg.proj`, from `wh`. Return `st` unchanged, and the projection. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
 
 # Fields
 
@@ -63,11 +63,11 @@ BuyAndHold
 
   - $(ref_dict[:lihoi2014])
 """
-struct BuyAndHold{T1 <: EuclideanProjection} <: AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct BuyAndHold <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     $(field_dict[:proj])
     """
-    proj::T1
+    proj
     function BuyAndHold(proj::EuclideanProjection)
         return new{typeof(proj)}(proj)
     end
@@ -110,7 +110,7 @@ On the simplex the projection returns ``\\boldsymbol{b}``, so the rule holds ``\
 # Algorithm
 
  1. Set `q` to `alg.w`, or to the uniform allocation over the assets of `w` when `alg.w` is `nothing`.
- 2. Project `q` onto `set` with `alg.proj`, from the Price-Adjusted Allocation of `w` over `x`. Return the carrier `st` unchanged, and the projection.
+ 2. Project `q` onto `set` with `alg.proj`, from the Price-Adjusted Allocation of `w` over `x`. Return `st` unchanged, and the projection. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
 
 # Fields
 
@@ -160,17 +160,15 @@ ConstantRebalancedPortfolio
 
   - $(ref_dict[:cover1991])
 """
-struct ConstantRebalancedPortfolio{T1 <: Option{<:AbstractVector},
-                                   T2 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct ConstantRebalancedPortfolio <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The target ``\\boldsymbol{b}``, the allocation that the rule rebalances to every period, over the pinned universe. A `nothing` value is the uniform allocation.
     """
-    w::T1
+    w
     """
     $(field_dict[:proj])
     """
-    proj::T2
+    proj
     function ConstantRebalancedPortfolio(w::Option{<:AbstractVector},
                                          proj::EuclideanProjection)
         if !isnothing(w)
@@ -226,7 +224,7 @@ $(DocStringExtensions.FIELDS)
     b
 end
 function merge_states(::NewtonStepState, ::NewtonStepState)
-    return throw(ArgumentError("a `NewtonStepState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the carrier follows it."))
+    return throw(ArgumentError("a `NewtonStepState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the state of the rule follows it."))
 end
 function Base.copy(x::NewtonStepState)
     return NewtonStepState(x.n, copy(x.A), copy(x.b))
@@ -237,9 +235,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Steps to the Newton point of the log wealth of the past periods, the online Newton step (ONS) of Agarwal, Hazan, Kale and Schapire (2006).
+Steps to the Newton point of the log wealth of the past periods, the online Newton step (ONS).
 
-The rule is a second-order method on the exp-concave log-wealth objective. Each step solves one dense ``N \\times N`` linear system, and the carrier holds an ``N \\times N`` matrix. Under a [`GramProjection`](@ref) each step also solves a programme. The head projects the Start Allocation before the first gradient, where ``A_0 = I`` and the Gram norm is the Euclidean norm, so it projects the start in the Euclidean geometry. As the weighting of an [`ExpertMixture`](@ref), the rule steps on the expert-return vector, and its Gram matrix is ``K \\times K`` for ``K`` experts.
+It is the rule of [agarwal2006](@citet). The rule is a second-order method on the exp-concave log-wealth objective. Each step solves one dense ``N \\times N`` linear system. `st` is the state of the rule: what the rule keeps from one update to the next, here a [`NewtonStepState`](@ref) that holds an ``N \\times N`` Gram matrix. Under a [`GramProjection`](@ref) each step also solves a programme. The head projects the Start Allocation before the first gradient, where ``A_0 = I`` and the Gram norm is the Euclidean norm, so it projects the start in the Euclidean geometry. As the weighting of an [`ExpertMixture`](@ref), the rule steps on the expert-return vector, and its Gram matrix is ``K \\times K`` for ``K`` experts.
 
 # Mathematical definition
 
@@ -272,9 +270,9 @@ Where:
   - $(math_dict[:T_regret])
   - ``\\alpha``: Market variability, the smallest entry of any price relative after each price relative is scaled so that its largest entry is one.
 
-At ``M = A_t`` and ``\\eta = 0`` this is the update of the paper's Figure 1. The paper mixes the uniform allocation into the projected point, ``(1 - \\eta) \\boldsymbol{p}_t + \\eta \\boldsymbol{1} / N``. The rule mixes before the projection instead, so the answer stays in an Allocation Set whose bounds the uniform allocation breaks. On the simplex at ``\\eta = 0`` the two norms give one answer whenever ``\\delta A_t^{-1} \\boldsymbol{b}_t`` lies in the simplex.
+At ``M = A_t`` and ``\\eta = 0`` this is the update of Figure 1 of [agarwal2006](@cite). [agarwal2006](@citet) mix the uniform allocation into the projected point, ``(1 - \\eta) \\boldsymbol{p}_t + \\eta \\boldsymbol{1} / N``. The rule mixes before the projection instead, so the answer stays in an Allocation Set whose bounds the uniform allocation breaks. On the simplex at ``\\eta = 0`` the two norms give one answer whenever ``\\delta A_t^{-1} \\boldsymbol{b}_t`` lies in the simplex.
 
-The paper's Theorem 1 bounds the regret against the best constant rebalanced portfolio in hindsight. If the market variability is ``\\alpha > 0``, then ``\\eta = 0``, ``\\beta = \\alpha / (8 \\sqrt{N})`` and ``\\delta = 1`` give a regret of at most ``(10 N^{1.5} / \\alpha) \\log(N T / \\alpha^2)``. The rule at these values under the Gram norm is the paper's algorithm, so the bound holds for it. With no assumption on the market, the paper chooses ``\\eta`` and ``\\beta`` from ``T`` and bounds the regret by ``22 N^{1.25} \\sqrt{T \\log(N T)}``. That bound needs the paper's mix after the projection, so the rule does not carry it. The package claims neither bound under the Euclidean default.
+Theorem 1 of [agarwal2006](@cite) bounds the regret against the best constant rebalanced portfolio in hindsight. If the market variability is ``\\alpha > 0``, then ``\\eta = 0``, ``\\beta = \\alpha / (8 \\sqrt{N})`` and ``\\delta = 1`` give a regret of at most ``(10 N^{1.5} / \\alpha) \\log(N T / \\alpha^2)``. The rule at these values under the Gram norm is the algorithm of [agarwal2006](@cite), so the bound holds for it. With no assumption on the market, [agarwal2006](@citet) choose ``\\eta`` and ``\\beta`` from ``T`` and bound the regret by ``22 N^{1.25} \\sqrt{T \\log(N T)}``. That bound needs the mix after the projection of [agarwal2006](@cite), so the rule does not carry it. The package claims neither bound under the Euclidean default.
 
 # Algorithm
 
@@ -284,7 +282,7 @@ The paper's Theorem 1 bounds the regret against the best constant rebalanced por
  4. Solve the symmetric system `st.A \\ st.b`, and scale the solution by `delta`, giving `q`.
  5. When `eta` is not zero, shrink `q` towards the uniform allocation in place.
  6. Bind `st.A` onto `alg.proj` with [`gram_geometry`](@ref). Project `q` onto `set` in that geometry, from the Price-Adjusted Allocation of `w` over `x`, giving `wn`.
- 7. Return a carrier with the count raised by one, which holds the same `A` and `b`, and `wn`.
+ 7. Return a new state of the rule with the count raised by one, which holds the same `A` and `b`, and `wn`.
 
 # Fields
 
@@ -299,7 +297,7 @@ $(DocStringExtensions.FIELDS)
         proj::Union{<:EuclideanProjection, <:GramProjection} = EuclideanProjection()
     ) -> NewtonStep
 
-Keywords correspond to the struct's fields. The defaults `beta = 1`, `delta = 1/8` and `eta = 0` are the values of the paper's experiments. The `proj` slot takes the Gram geometry of the paper's theorem or the Euclidean geometry.
+Keywords correspond to the struct's fields. The defaults `beta = 1`, `delta = 1/8` and `eta = 0` are the values of the experiments of [agarwal2006](@cite). The `proj` slot takes the Gram geometry of Theorem 1 of [agarwal2006](@cite), or the Euclidean geometry.
 
 ## Validation
 
@@ -322,32 +320,30 @@ NewtonStep
   - [`AbstractOnlinePortfolioSelectionAlgorithm`](@ref)
   - [`OnlinePortfolioSelection`](@ref)
   - [`NewtonStepState`](@ref)
-  - [`GramProjection`](@ref): the geometry of the paper's projection.
-  - [`UniversalPortfolio`](@ref): the paper reports that the Newton step runs much faster than the sampled universal portfolio.
+  - [`GramProjection`](@ref): the geometry of the projection of [agarwal2006](@cite).
+  - [`UniversalPortfolio`](@ref): [agarwal2006](@citet) report that the Newton step runs much faster than the sampled universal portfolio.
 
 # References
 
   - $(ref_dict[:agarwal2006])
 """
-struct NewtonStep{T1 <: Real, T2 <: Real, T3 <: Real,
-                  T4 <: Union{<:EuclideanProjection, <:GramProjection}} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct NewtonStep <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The trade-off parameter ``\\beta``, which scales the gradient sum.
     """
-    beta::T1
+    beta
     """
     The scale ``\\delta`` of the Newton direction.
     """
-    delta::T2
+    delta
     """
-    The shrinkage ``\\eta`` of the Newton point towards the uniform allocation before the projection, in `[0, 1)`. At `0` the rule is the paper's algorithm.
+    The shrinkage ``\\eta`` of the Newton point towards the uniform allocation before the projection, in `[0, 1)`. At `0` the rule is the algorithm of [agarwal2006](@cite).
     """
-    eta::T3
+    eta
     """
     $(field_dict[:proj])
     """
-    proj::T4
+    proj
     function NewtonStep(beta::T1, delta::T2, eta::T3,
                         proj::T4) where {T1 <: Real, T2 <: Real, T3 <: Real,
                                          T4 <:
@@ -387,7 +383,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the step-length rules of the passive aggressive mean reversion rule.
 
-The paper's three variants, [`NoSlack`](@ref), [`LinearSlack`](@ref) and [`QuadraticSlack`](@ref), differ in one formula for the step length ``\\tau_t``. [`PassiveAggressiveMeanReversion`](@ref) holds one of them in its `slack` field.
+The three variants of [li2012pamr](@cite), [`NoSlack`](@ref), [`LinearSlack`](@ref) and [`QuadraticSlack`](@ref), differ in one formula for the step length ``\\tau_t``. [`PassiveAggressiveMeanReversion`](@ref) holds one of them in its `slack` field.
 
 # Interfaces
 
@@ -432,6 +428,10 @@ HalfSlack()
   - [`QuadraticSlack`](@ref)
   - [`PassiveAggressiveMeanReversion`](@ref)
   - [`passive_aggressive_step`](@ref)
+
+# References
+
+  - $(ref_dict[:li2012pamr])
 """
 abstract type AbstractPassiveAggressiveSlack <: AbstractAlgorithm end
 """
@@ -500,7 +500,7 @@ Where:
   - $(math_dict[:eps_cw])
   - $(math_dict[:t_period])
 
-The paper derives this step from a linear penalty ``C \\xi`` on a slack ``\\xi \\geq 0`` of the loss constraint, without the non-negativity constraint on the allocation.
+[li2012pamr](@citet) derive this step from a linear penalty ``C \\xi`` on a slack ``\\xi \\geq 0`` of the loss constraint, without the non-negativity constraint on the allocation.
 
 # Fields
 
@@ -510,7 +510,7 @@ $(DocStringExtensions.FIELDS)
 
     LinearSlack(; C::Real = 500) -> LinearSlack
 
-Keywords correspond to the struct's fields. The default is the value of the paper's experiments.
+Keywords correspond to the struct's fields. The default is the value of the experiments of [li2012pamr](@cite).
 
 ## Validation
 
@@ -534,11 +534,11 @@ LinearSlack
 
   - $(ref_dict[:li2012pamr])
 """
-struct LinearSlack{T1 <: Real} <: AbstractPassiveAggressiveSlack
+@concrete struct LinearSlack <: AbstractPassiveAggressiveSlack
     """
     The aggressiveness ``C``, the cap on the step.
     """
-    C::T1
+    C
     function LinearSlack(C::Real)
         @argcheck(C > zero(C), DomainError(C, "C must be positive"))
         return new{typeof(C)}(C)
@@ -571,7 +571,7 @@ Where:
   - $(math_dict[:eps_cw])
   - $(math_dict[:t_period])
 
-The paper derives this step from a quadratic penalty ``C \\xi^2`` on a slack ``\\xi`` of the loss constraint, without the non-negativity constraint on the allocation.
+[li2012pamr](@citet) derive this step from a quadratic penalty ``C \\xi^2`` on a slack ``\\xi`` of the loss constraint, without the non-negativity constraint on the allocation.
 
 # Fields
 
@@ -581,7 +581,7 @@ $(DocStringExtensions.FIELDS)
 
     QuadraticSlack(; C::Real = 500) -> QuadraticSlack
 
-Keywords correspond to the struct's fields. The default is the value of the paper's experiments.
+Keywords correspond to the struct's fields. The default is the value of the experiments of [li2012pamr](@cite).
 
 ## Validation
 
@@ -605,11 +605,11 @@ QuadraticSlack
 
   - $(ref_dict[:li2012pamr])
 """
-struct QuadraticSlack{T1 <: Real} <: AbstractPassiveAggressiveSlack
+@concrete struct QuadraticSlack <: AbstractPassiveAggressiveSlack
     """
     The aggressiveness ``C``, which softens the denominator.
     """
-    C::T1
+    C
     function QuadraticSlack(C::Real)
         @argcheck(C > zero(C), DomainError(C, "C must be positive"))
         return new{typeof(C)}(C)
@@ -677,9 +677,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Moves the allocation the least distance that brings the last period's gross return down to `eps`, the passive aggressive mean reversion (PAMR) of Li, Zhao, Hoi and Gopalkrishnan (2012).
+Moves the allocation the least distance that brings the last period's gross return down to `eps`, the passive aggressive mean reversion (PAMR).
 
-The rule sells what rose in the last period, a bet on mean reversion over one period. Its threshold bounds the return on the realised price relative from above. The threshold of [`ForecastReversion`](@ref) bounds the return on a forecast from below. The rule keeps no state and reads no rows.
+It is the rule of [li2012pamr](@citet). The rule sells what rose in the last period, a bet on mean reversion over one period. Its threshold bounds the return on the realised price relative from above. The threshold of [`ForecastReversion`](@ref) bounds the return on a forecast from below. The rule keeps no state and reads no rows.
 
 # Mathematical definition
 
@@ -705,11 +705,11 @@ Where:
   - $(math_dict[:N])
   - $(math_dict[:t_period])
 
-The step length ``\\tau_t`` is the step of the step-length rule. It is zero when every entry of ``\\boldsymbol{x}_t`` is equal, because then ``\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert = 0``. The paper sets it to zero in that case too.
+The step length ``\\tau_t`` is the step of the step-length rule. It is zero when every entry of ``\\boldsymbol{x}_t`` is equal, because then ``\\lVert \\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1} \\rVert = 0``. [li2012pamr](@citet) set it to zero in that case too.
 
-The entries of ``\\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1}`` sum to zero, so ``\\boldsymbol{q}`` keeps the budget of one. Under [`NoSlack`](@ref) with ``\\ell_t > 0``, the gross return of ``\\boldsymbol{q}`` over period ``t`` is exactly ``\\epsilon``. So, by the paper's Proposition 1, ``\\boldsymbol{q}`` solves the paper's first problem without the non-negativity constraint. The projection onto the simplex is the normalisation step of the paper's Algorithm 1.
+The entries of ``\\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1}`` sum to zero, so ``\\boldsymbol{q}`` keeps the budget of one. Under [`NoSlack`](@ref) with ``\\ell_t > 0``, the gross return of ``\\boldsymbol{q}`` over period ``t`` is exactly ``\\epsilon``. So, by Proposition 1 of [li2012pamr](@cite), ``\\boldsymbol{q}`` solves the first problem of [li2012pamr](@cite) without the non-negativity constraint. The projection onto the simplex is the normalisation step of Algorithm 1 of [li2012pamr](@cite).
 
-The paper takes ``\\epsilon \\geq 0``, and its experiments choose ``\\epsilon \\leq 1`` because the gross return of a period is near one. With a threshold above one, the rule moves only after a period whose gross return is above the threshold.
+[li2012pamr](@citet) take ``\\epsilon \\geq 0``. The experiments of [li2012pamr](@cite) choose ``\\epsilon \\leq 1`` because the gross return of a period is near one. With a threshold above one, the rule moves only after a period whose gross return is above the threshold.
 
 # Algorithm
 
@@ -718,7 +718,7 @@ The paper takes ``\\epsilon \\geq 0``, and its experiments choose ``\\epsilon \\
  3. Compute `loss`, the hinge loss `max(0, dot(w, x) - eps)`.
  4. Set `tau` to zero when `denom` is zero. Otherwise, set `tau` to the step of `alg.slack` from `loss` and `denom`.
  5. Compute `q = w .- tau .* dev`.
- 6. Project `q` onto `set` with `alg.proj`, from the Price-Adjusted Allocation of `w` over `x`. Return the carrier `st` unchanged, and the projection.
+ 6. Project `q` onto `set` with `alg.proj`, from the Price-Adjusted Allocation of `w` over `x`. Return `st` unchanged, and the projection. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
 
 # Fields
 
@@ -732,11 +732,11 @@ $(DocStringExtensions.FIELDS)
         proj::EuclideanProjection = EuclideanProjection()
     ) -> PassiveAggressiveMeanReversion
 
-Keywords correspond to the struct's fields. `NoSlack()`, `LinearSlack(; C)` and `QuadraticSlack(; C)` are the paper's PAMR, PAMR-1 and PAMR-2. The default `eps = 0.5` is the value of the paper's experiments.
+Keywords correspond to the struct's fields. `NoSlack()`, `LinearSlack(; C)` and `QuadraticSlack(; C)` are PAMR, PAMR-1 and PAMR-2 of [li2012pamr](@cite). The default `eps = 0.5` is the value of the experiments of [li2012pamr](@cite).
 
 ## Validation
 
-  - `eps >= 0`, the range that the paper states. A `DomainError` is thrown otherwise.
+  - `eps >= 0`, the range of [li2012pamr](@cite). A `DomainError` is thrown otherwise.
 
 # Examples
 
@@ -760,21 +760,19 @@ PassiveAggressiveMeanReversion
 
   - $(ref_dict[:li2012pamr])
 """
-struct PassiveAggressiveMeanReversion{T1 <: Real, T2 <: AbstractPassiveAggressiveSlack,
-                                      T3 <: EuclideanProjection} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct PassiveAggressiveMeanReversion <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The reversion threshold ``\\epsilon``. The rule moves only when the gross return of the last period is above it.
     """
-    eps::T1
+    eps
     """
-    The step-length rule, one of the paper's three variants.
+    The step-length rule. It is one of the three variants of [li2012pamr](@cite).
     """
-    slack::T2
+    slack
     """
     $(field_dict[:proj])
     """
-    proj::T3
+    proj
     function PassiveAggressiveMeanReversion(eps::Real,
                                             slack::AbstractPassiveAggressiveSlack,
                                             proj::EuclideanProjection)
@@ -801,7 +799,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the Rule State and the allocation of every expert, and the Rule State and the weights of the weighting, for an expert mixture.
 
-[`ExpertMixture`](@ref) seeds it and replaces every entry once per period. A view slices the carrier and the allocation of every expert to the selected assets, and carries the weighting's carrier and the weights unchanged, because they are stated over the experts.
+[`ExpertMixture`](@ref) seeds it and replaces every entry once per period. A view slices the state and the allocation of every expert to the selected assets. It keeps the state of the weighting and the weights unchanged, because they are stated over the experts.
 
 # Fields
 
@@ -818,7 +816,7 @@ $(DocStringExtensions.FIELDS)
     """
     n
     """
-    The carrier of each expert, one entry per expert, `nothing` where the expert carries nothing.
+    The state of the rule of each expert, one entry per expert, `nothing` where the expert keeps nothing.
     """
     st
     """
@@ -826,7 +824,7 @@ $(DocStringExtensions.FIELDS)
     """
     h
     """
-    The carrier of the weighting, or `nothing`.
+    The state of the weighting rule, or `nothing`.
     """
     pst
     """
@@ -835,7 +833,7 @@ $(DocStringExtensions.FIELDS)
     p
 end
 function merge_states(::ExpertMixtureState, ::ExpertMixtureState)
-    return throw(ArgumentError("an `ExpertMixtureState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the carrier follows it."))
+    return throw(ArgumentError("an `ExpertMixtureState` is not merged on its own: it sits beside an allocation that is order-dependent, so the head's state refuses the merge, and the state of the rule follows it."))
 end
 function Base.copy(x::ExpertMixtureState)
     return ExpertMixtureState(x.n, copy_column.(x.st), copy.(x.h), copy_column(x.pst),
@@ -886,7 +884,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Makes every first-order expert of a mixture read its gradient at the blend that the mixture played, while it steps from its own iterate.
 
-This is the shared gradient of Zhang, Lu and Zhou (2018, Algorithm 4) and of Zhao, Zhang, Zhang and Zhou (2020, Algorithm 2). The papers state their dynamic-regret bounds on it, and [`Ader`](@ref) and [`Sword`](@ref) build the mixture on it. The mixture passes the blend through the seven-argument [`online_update!`](@ref). [`MirrorDescent`](@ref), [`OptimisticStep`](@ref) and [`AdaptiveSubgradient`](@ref) read it, and the hint of `OptimisticStep` stays the hint of its predictor. A rule with no gradient takes its six-argument update and ignores the point.
+This is the shared gradient of Algorithm 4 of [zhang2018ader](@cite) and of Algorithm 2 of [zhao2020sword](@cite). [zhang2018ader](@citet) and [zhao2020sword](@citet) state their dynamic-regret bounds on it. [`Ader`](@ref) and [`Sword`](@ref) build the mixture on it. The mixture passes the blend through the seven-argument [`online_update!`](@ref). [`MirrorDescent`](@ref), [`OptimisticStep`](@ref) and [`AdaptiveSubgradient`](@ref) read it, and the hint of `OptimisticStep` stays the hint of its predictor. A rule with no gradient takes its six-argument update and ignores the point.
 
 # Mathematical definition
 
@@ -930,13 +928,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Mixes the allocations of several expert rules, with weights that a second rule moves on the experts' returns.
 
-Every expert takes its own Online Update. The weighting is itself an Online Selection Rule, and it reads the expert-return vector in place of the price relative. Under [`BuyAndHold`](@ref), the default, the mixture is the wealth-weighted mixture that the papers write as `BAH_W`. Over sampled constant rebalanced portfolios it is Cover's universal portfolio, [`UniversalPortfolio`](@ref).
+Every expert takes its own Online Update. The weighting is itself an Online Selection Rule, and it reads the expert-return vector in place of the price relative. Under [`BuyAndHold`](@ref), the default, the mixture is the wealth-weighted mixture, a buy and hold over the experts, as in Section 3.5.2 of [lihoi2014](@cite). Over sampled constant rebalanced portfolios it is the universal portfolio of [cover1991](@citet), [`UniversalPortfolio`](@ref).
 
 The weighting projects its step onto the Expert Set `eset`, in the weighting's own Projection Geometry. A `nothing` set is the bare simplex over the experts. A given [`BoundedAllocationSet`](@ref) broadcasts a scalar bound over the experts and reads one entry per expert from a vector bound, so a cap on `eset` caps the weight of any one expert.
 
 The mixture then projects the blend onto the head's Allocation Set once more, in its own Euclidean geometry `proj`, from its Price-Adjusted Allocation. On a [`BoundedAllocationSet`](@ref) a blend of feasible allocations is feasible, so [`blend_projection`](@ref) skips the projection and the default configuration solves nothing. On a [`ProgrammeAllocationSet`](@ref) the projection is the repair that a MIP kind needs, or a turnover ceiling under a weighting other than buy-and-hold. Then the mixture solves ``K + 1`` programmes a period, one for each expert and one of its own. A Newton weighting holds a ``K \\times K`` Gram matrix, so two thousand experts cost a ``2000 \\times 2000`` solve a period.
 
-The mixture reads nothing of a given Start Allocation. The head holds it for the first period, and the experts' mix replaces it. Each expert starts where its rule starts. A constant rebalanced portfolio starts at its own `w`, and any other rule starts at the Start Allocation. The seed projects each start onto the head's Allocation Set in the expert's geometry, as [`project_start`](@ref) projects the head's `w0`. So a sampled expert's wealth is Cover's ``S_t(\\boldsymbol{b})`` of its feasible allocation from the first period. The weights start at `p0`, uniform by default, and the seed projects them onto the Expert Set in the weighting's geometry. The seed makes a start outside a set feasible, and never refuses it.
+The mixture reads nothing of a given Start Allocation. The head holds it for the first period, and the experts' mix replaces it. Each expert starts where its rule starts. A constant rebalanced portfolio starts at its own `w`, and any other rule starts at the Start Allocation. The seed projects each start onto the head's Allocation Set in the expert's geometry, as [`project_start`](@ref) projects the head's `w0`. So the wealth of a sampled expert is ``S_t(\\boldsymbol{b})`` of [cover1991](@cite) for its feasible allocation from the first period. The weights start at `p0`, uniform by default, and the seed projects them onto the Expert Set in the weighting's geometry. The seed makes a start outside a set feasible, and never refuses it.
 
 `grad` is the Gradient Point. Under [`OwnPoint`](@ref), the default, every expert reads its gradient at its own iterate. Under [`BlendPoint`](@ref), every first-order expert reads its gradient at the blend ``\\boldsymbol{w}_t`` that the mixture played, and steps from its own iterate.
 
@@ -970,19 +968,19 @@ Where:
   - $(math_dict[:T_regret])
   - $(math_dict[:ell_t_surr])
 
-Under [`BuyAndHold`](@ref) on the bare Expert Set, ``\\boldsymbol{p}_{t+1} \\propto \\boldsymbol{p}_t \\odot \\boldsymbol{r}_t``. Wherever the projection onto ``\\mathcal{W}`` returns the blend, the wealth of the mixture is then the ``\\boldsymbol{p}_1``-weighted average of the experts' wealths. So for every sequence of price relatives, ``\\max_k \\log S_{T,k} - \\log \\hat{S}_T \\leq -\\log p_{1,k^\\star}``, with ``k^\\star`` the best expert. At the uniform start the bound is ``\\log K``, the bound of Cover and Ordentlich (1996) for an equal split over expert strategies. The package does not claim the bound where the Expert Set binds or the second projection changes the blend.
+Under [`BuyAndHold`](@ref) on the bare Expert Set, ``\\boldsymbol{p}_{t+1} \\propto \\boldsymbol{p}_t \\odot \\boldsymbol{r}_t``. Wherever the projection onto ``\\mathcal{W}`` returns the blend, the wealth of the mixture is then the ``\\boldsymbol{p}_1``-weighted average of the experts' wealths. So for every sequence of price relatives, ``\\max_k \\log S_{T,k} - \\log \\hat{S}_T \\leq -\\log p_{1,k^\\star}``, with ``k^\\star`` the best expert. At the uniform start the bound is ``\\log K``, the bound of [coverordentlich1996](@citet) for an equal split over expert strategies. The package does not claim the bound where the Expert Set binds or the second projection changes the blend.
 
 Under [`BlendPoint`](@ref) with [`ExponentiatedGradient`](@ref) as the weighting, ``\\langle \\boldsymbol{p}_t, \\boldsymbol{r}_t \\rangle = \\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle`` wherever the projection onto ``\\mathcal{W}`` returns the blend. The weight update is then exactly the exponentially weighted forecaster on the surrogate losses ``\\ell_t(\\boldsymbol{h}_k(t))``. [`Ader`](@ref) and [`Sword`](@ref) build that mixture over a geometric grid of first-order experts.
 
 # Algorithm
 
- 1. Compute `r`, the expert-return vector, from the held allocations `st.h`.
+ 1. Compute `r`, the expert-return vector, from the held allocations `st.h`. `st` is the state of the rule: what the rule keeps from one update to the next, here an [`ExpertMixtureState`](@ref).
  2. Compute `point`, the Gradient Point, with [`gradient_point`](@ref).
- 3. Take the Online Update of every expert from its own carrier and allocation, with `point`. Store the new carrier and allocation in `st.st` and `st.h`.
+ 3. Take the Online Update of every expert from its own state and allocation, with `point`. Store the new state and allocation in `st.st` and `st.h`.
  4. Resolve the Expert Set with [`expert_allocation_set`](@ref). Take the Online Update of the weighting from `st.pst` and `st.p`, on `r`, over that set, giving `pst` and `p`.
  5. Compute the blend `q`, the sum of `p[k] .* h` over the experts.
  6. Project `q` onto `set` with [`blend_projection`](@ref) in `alg.proj`, from the Price-Adjusted Allocation of `w` over `x`, giving `wn`.
- 7. Return a carrier with the count raised by one, which holds the new `pst` and `p`, and `wn`.
+ 7. Return a new state of the rule with the count raised by one, which holds the new `pst` and `p`, and `wn`.
 
 # Fields
 
@@ -1050,39 +1048,36 @@ ExpertMixture
 # References
 
   - $(ref_dict[:lihoi2014])
+  - $(ref_dict[:cover1991])
   - $(ref_dict[:coverordentlich1996])
   - $(ref_dict[:zhang2018ader])
   - $(ref_dict[:zhao2020sword])
 """
-struct ExpertMixture{T1 <: AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm},
-                     T2 <: AbstractOnlinePortfolioSelectionAlgorithm,
-                     T3 <: Option{<:BoundedAllocationSet}, T4 <: EuclideanProjection,
-                     T5 <: Union{OwnPoint, BlendPoint}, T6 <: Option{<:AbstractVector}} <:
-       AbstractOnlinePortfolioSelectionAlgorithm
+@concrete struct ExpertMixture <: AbstractOnlinePortfolioSelectionAlgorithm
     """
     The expert rules, one Rule State each.
     """
-    experts::T1
+    experts
     """
     The weighting, a rule of the family that reads the expert-return vector in place of the price relative.
     """
-    alg::T2
+    alg
     """
     The Expert Set that the weighting projects onto, over the experts, or `nothing` for the bare simplex over them.
     """
-    eset::T3
+    eset
     """
     The geometry of the second projection, which projects the blend onto the head's Allocation Set.
     """
-    proj::T4
+    proj
     """
     The Gradient Point, where every first-order expert reads its gradient.
     """
-    grad::T5
+    grad
     """
     The Start Allocation over the experts, projected onto the Expert Set at the seed, or `nothing` for the uniform one.
     """
-    p0::T6
+    p0
     function ExpertMixture(experts::AbstractVector{<:AbstractOnlinePortfolioSelectionAlgorithm},
                            alg::AbstractOnlinePortfolioSelectionAlgorithm,
                            eset::Option{<:BoundedAllocationSet}, proj::EuclideanProjection,
@@ -1186,7 +1181,7 @@ end
 
 Returns the allocation that an expert of an [`ExpertMixture`](@ref) holds during the first period.
 
-A rule that reads `w` holds the Start Allocation. A constant rebalanced portfolio holds its own target, or the uniform allocation when its `w` is `nothing`, so a sampled expert's wealth is Cover's ``S_t(\\boldsymbol{b})`` from the first period. The head itself holds the Start Allocation for that period in both cases. The seed of the mixture then projects the answer onto the head's Allocation Set in the expert's geometry, through [`project_start`](@ref). So the expert never holds a target that a bound of the set excludes, such as a one-hot allocation under a cap. The target comes back in the numeric type that the head's allocation and the target promote to. So an integer target, such as a one-hot expert of a switching portfolio, seeds a carrier that can hold the projected allocation.
+A rule that reads `w` holds the Start Allocation. A constant rebalanced portfolio holds its own target, or the uniform allocation when its `w` is `nothing`, so the wealth of a sampled expert is the wealth ``S_t(\\boldsymbol{b})`` of its constant rebalanced portfolio from the first period. The head itself holds the Start Allocation for that period in both cases. The seed of the mixture then projects the answer onto the head's Allocation Set in the expert's geometry, through [`project_start`](@ref). So the expert never holds a target that a bound of the set excludes, such as a one-hot allocation under a cap. The target comes back in the numeric type that the head's allocation and the target promote to. So an integer target, such as a one-hot expert of a switching portfolio, gives a vector that can hold the projected allocation.
 
 # Arguments
 
@@ -1211,8 +1206,9 @@ function expert_start_allocation(alg::ConstantRebalancedPortfolio, w::AbstractVe
     if isnothing(alg.w)
         return fill(one(eltype(w)) / length(w), length(w))
     end
-    # The carrier's numeric type is the head's, so a target given as integers, as the
-    # one-hot experts of a switching portfolio are, holds the projected allocation.
+    # The copy promotes to the numeric type of `w`, the head's, so a target given as
+    # integers, as the one-hot experts of a switching portfolio are, holds the projected
+    # allocation.
     return promote_type(eltype(w), eltype(alg.w)).(alg.w)
 end
 function online_update!(alg::ExpertMixture, st::ExpertMixtureState, w::AbstractVector,
@@ -1303,11 +1299,11 @@ end
         proj::EuclideanProjection = EuclideanProjection()
     ) -> ExpertMixture
 
-Builds Cover's (1991) universal portfolio as an expert mixture over `n_experts` constant rebalanced portfolios sampled from a Dirichlet prior on the simplex (UP).
+Builds the universal portfolio as an expert mixture over `n_experts` constant rebalanced portfolios sampled from a Dirichlet prior on the simplex (UP).
 
-Cover defines the portfolio as the wealth-weighted average of every constant rebalanced portfolio. The integral has no closed form beyond a few assets, so the mixture replaces it with an average over `n_experts` draws. `alpha = 1` is Cover's uniform prior, and `alpha = 1/2` is the Dirichlet(½) prior of Cover and Ordentlich (1996).
+[cover1991](@citet) defines the portfolio as the wealth-weighted average of every constant rebalanced portfolio. The integral has no closed form beyond a few assets, so the mixture replaces it with an average over `n_experts` draws. `alpha = 1` is the uniform prior of [cover1991](@cite), and `alpha = 1/2` is the Dirichlet(½) prior of [coverordentlich1996](@cite).
 
-Each period costs ``O(K N)``, and the carrier holds ``K`` allocations of ``N`` entries. The gap between the best sampled expert and the best constant rebalanced portfolio is sampling error. It shrinks as `n_experts` grows, it has no closed form, and it needs more draws as ``N`` grows.
+Each period costs ``O(K N)``, and the state of the mixture holds ``K`` allocations of ``N`` entries. The gap between the best sampled expert and the best constant rebalanced portfolio is sampling error. It shrinks as `n_experts` grows, it has no closed form, and it needs more draws as ``N`` grows.
 
 # Mathematical definition
 
@@ -1337,7 +1333,7 @@ Where:
 
 Under the default weighting on the bare Expert Set, the mixture's allocation is the sampled ratio on the right, with no error beyond the sampling. Two bounds hold for every sequence of price relatives.
 
-  - The exact integral, Theorems 1 and 2 of Cover and Ordentlich (1996). Under the uniform prior, ``\\log S^\\star_T - \\log \\hat{S}_T \\leq (N - 1) \\log(T + 1)``. Under the Dirichlet(½) prior, the bound is ``\\log 2 + \\frac{N - 1}{2} \\log(T + 1)``. Neither bound needs an assumption on the price relatives. Cover (1991) proves that the growth rates of the two portfolios agree as ``T \\to \\infty``, for every bounded sequence.
+  - The exact integral, Theorems 1 and 2 of [coverordentlich1996](@cite). Under the uniform prior, ``\\log S^\\star_T - \\log \\hat{S}_T \\leq (N - 1) \\log(T + 1)``. Under the Dirichlet(½) prior, the bound is ``\\log 2 + \\frac{N - 1}{2} \\log(T + 1)``. Neither bound needs an assumption on the price relatives. [cover1991](@citet) proves that the growth rates of the two portfolios agree as ``T \\to \\infty``, for every bounded sequence.
   - The sampled mixture, exact for the object that the package builds. The best sampled expert beats the mixture by at most ``\\log K`` in log wealth, because the wealth of the mixture is the average of the experts' wealths, and an average is at least ``1 / K`` of its largest term.
 
 # Algorithm
@@ -1380,13 +1376,14 @@ julia> length(up.experts)
   - [`ExpertMixture`](@ref)
   - [`ConstantRebalancedPortfolio`](@ref)
   - [`BuyAndHold`](@ref): the default weighting.
-  - [`NewtonStep`](@ref): its paper reports that it runs much faster than the sampled universal portfolio.
+  - [`NewtonStep`](@ref): [agarwal2006](@citet) report that it runs much faster than the sampled universal portfolio.
   - [`RandomWeighted`](@ref)
 
 # References
 
   - $(ref_dict[:cover1991])
   - $(ref_dict[:coverordentlich1996])
+  - $(ref_dict[:agarwal2006])
 """
 function UniversalPortfolio(; N::Integer, n_experts::Integer = 2000, alpha::Num_VecNum = 1,
                             rng::Random.AbstractRNG = Random.default_rng(),

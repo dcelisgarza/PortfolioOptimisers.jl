@@ -18,6 +18,7 @@
     - `fold_weight_matrix` puts zeros outside each cluster of a `ClusterUniverse`.
     - A fold count or a clock that disagrees raises `DimensionMismatch`, and a
       time-varying panel without a clock raises `IsNothingError`.
+    - Integer returns give the weights of the same returns as `Float64` (#1363).
     =#
 
     PO = PortfolioOptimisers
@@ -47,7 +48,7 @@
     @testset "prepare_outer_rd collapses B, iv and ivpa" begin
         W = randn(StableRNG(3), N, 3)
         W[:, 3] .= 0
-        nb, B, ivo, ivpao, pnl, Xb = PO.prepare_outer_rd(rd, W)
+        nb, B, ivo, ivpao, pnl, Xb = PO.prepare_outer_rd(rd, W, RenormaliseActive())
         @test nb == ["_b1", "_b2", "_b3"]
         @test B ≈ Bm * W
         @test ivo ≈ iv * wtilde(W)
@@ -63,7 +64,7 @@
         # A scalar adjustment and a benchmark that is not a matrix are kept as they are.
         rds = ReturnsResult(; nx = string.(1:N), X = X, ts = ts, iv = iv, ivpa = 0.7,
                             B = Bm[:, 1])
-        nbs, Bs, _, ivpas = PO.prepare_outer_rd(rds, W)
+        nbs, Bs, _, ivpas = PO.prepare_outer_rd(rds, W, RenormaliseActive())
         @test ivpas == 0.7
         @test Bs === rds.B
         @test isnothing(nbs)
@@ -133,14 +134,15 @@
         preds = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, opti,
                                              PO.FullUniverse(), rd, cv.cv, st.ex)
         heights = [length(p.mrd.X) for p in preds]
-        ro = PO.rebuild_returns_result(rd, preds, PO.FullUniverse())
+        ro = PO.rebuild_returns_result(rd, preds, PO.FullUniverse(), RenormaliseActive())
         @test ro.X == hcat([p.mrd.X for p in preds]...)
         @test ro.iv == hcat([p.mrd.iv for p in preds]...)
         @test ro.ivpa == [p.mrd.ivpa for p in preds]
         @test ro.nb == ["_b1", "_b2", "_b3"]
         @test size(ro.B) == (T, 3)
         # The method does not change the predictions, so a second call agrees.
-        @test PO.rebuild_returns_result(rd, preds, PO.FullUniverse()).X == ro.X
+        @test PO.rebuild_returns_result(rd, preds, PO.FullUniverse(),
+                                        RenormaliseActive()).X == ro.X
         @test [length(p.mrd.X) for p in preds] == heights
 
         # The rows of fold 2 carry the normalised weights of fold 2, and `ivpa` the
@@ -232,13 +234,56 @@
         st = Stacking(; opti = opti, opto = InverseVolatility(), cv = cv)
         preds = PO.sub_portfolio_predictions(PO.MultiPeriodPredictionResult, opti,
                                              PO.FullUniverse(), rdc, cv.cv, st.ex)
-        ro = PO.rebuild_returns_result(rdc, preds, PO.FullUniverse())
+        ro = PO.rebuild_returns_result(rdc, preds, PO.FullUniverse(), RenormaliseActive())
         f = PO.panel_field(ro.pnl, "sector")
         @test f isa TensorPanelField
         @test size(f.vals) == (T, 3, 2)
         @test all(sum(f.vals; dims = 3) .≈ 1)
         # Neither removed method exists: no path gives either of them an argument.
         @test !hasmethod(PO.panel_field_stack, Tuple{Vector{PO.CategoricalPanelField}})
-        @test !hasmethod(PO.fold_asset_panel, Tuple{Nothing, Any, Matrix{Float64}, Any})
+        @test !hasmethod(PO.fold_asset_panel,
+                         Tuple{Nothing, Any, Matrix{Float64}, Any, Any})
+    end
+
+    @testset "integer returns give the weights of the same returns as Float64" begin
+        #=
+        #1363: a weight, a fee and a net return are fractions, so a meta-optimiser that took
+        its matrix of inner weights, its weight bounds, its fees or its buffer of outer
+        returns from the element type of integer returns threw `InexactError`. Each path
+        below threw before the fix.
+        =#
+        Xi = rand(StableRNG(2), -3:3, 120, 6)
+        nx = string.("A", 1:6)
+        rdi = ReturnsResult(; nx = nx, X = Xi)
+        rdf = ReturnsResult(; nx = nx, X = Matrix{Float64}(Xi))
+        sets = UniverseSets(; dict = Dict("nx" => nx))
+        fees = FeesEstimator(; l = ["A1" => 0.001], dl = 0.0005)
+        kcv = OptimisationCrossValidation(; cv = KFold(; n = 3))
+        ew = EqualWeighted()
+        sti = [EqualWeighted(), InverseVolatility()]
+        opts = [NestedClustered(; opti = ew, opto = ew),
+                NestedClustered(; opti = ew, opto = ew, cv = kcv),
+                NestedClustered(; opti = ew, opto = ew, fees = fees, sets = sets),
+                Stacking(; opti = sti, opto = ew),
+                Stacking(; opti = sti, opto = ew, cv = kcv),
+                Stacking(; opti = sti, opto = ew, fees = fees, sets = sets),
+                SubsetResampling(; opt = ew, subset_size = 3, n_subsets = 4, seed = 7),
+                SubsetResampling(; opt = ew, subset_size = 3, n_subsets = 4, seed = 7,
+                                 fees = fees, sets = sets)]
+        for opt in opts
+            wi = optimise(opt, rdi).w
+            wf = optimise(opt, rdf).w
+            @test eltype(wi) == Float64
+            @test isapprox(wi, wf; rtol = 0, atol = eps(Float64))
+        end
+        # The buffer of outer returns holds a net return, a fraction, for integer inputs.
+        _, _, _, _, _, Xo = PO.prepare_outer_rd(rdi, [1 0; 0 1; 1 0; 0 1; 1 0; 0 1],
+                                                RenormaliseActive())
+        @test eltype(Xo) == Float64
+        # A type that is not an integer is kept.
+        rdr = ReturnsResult(; nx = nx, X = Rational{Int}.(Xi))
+        _, _, _, _, _, Xr = PO.prepare_outer_rd(rdr, Rational{Int}.(ones(Int, 6, 2)),
+                                                RenormaliseActive())
+        @test eltype(Xr) == Rational{Int}
     end
 end

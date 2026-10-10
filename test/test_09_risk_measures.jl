@@ -163,7 +163,11 @@
                 5e-2
             elseif i in (20, 23, 24, 54)
                 0.25
-            elseif i in (33, 55)
+            elseif i == 33
+                # The two entropic solves of EDaR at alpha = 1 - 1e-6 differ by 5.5e-5 on some
+                # hosts.
+                1e-4
+            elseif i == 55
                 5e-5
             elseif i == 60
                 5e-4
@@ -556,7 +560,7 @@
 
         # The empirical branch is untouched, and the two are different numbers.
         emp = expected_risk(ValueatRisk(; alpha = 0.05), w, pr)
-        @test isapprox(emp, -partialsort(rd.X * w, ceil(Int, 0.05 * size(rd.X, 1))))
+        @test isapprox(emp, -partialsort(rd.X * w, floor(Int, 0.05 * size(rd.X, 1)) + 1))
         @test !isapprox(emp, expected_risk(r, w, pr))
 
         # The range's two legs share one mean term, which cancels in their difference.

@@ -1,8 +1,8 @@
 ```@meta
-Description = "Variance from covariance, public API of PortfolioOptimisers.jl: var, std, cov, cor."
+Description = "Abstract covariance variance, public API of PortfolioOptimisers.jl: var, std, cov, cor."
 ```
 
-# Variance from covariance
+# Abstract covariance variance
 
 ```@docs
 var(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)

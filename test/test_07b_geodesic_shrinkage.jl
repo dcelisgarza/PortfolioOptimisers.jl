@@ -2,6 +2,7 @@ using PortfolioOptimisers, Test, LinearAlgebra, Statistics, StatsBase, StableRNG
 using CovarianceEstimation: CovarianceEstimation
 
 const PO = PortfolioOptimisers
+include(joinpath(@__DIR__, "parity_harness.jl"))
 
 # The geodesic from its first form, S^(1/2) (S^(-1/2) T S^(-1/2))^a S^(1/2). The library
 # computes the second form, from the target end, so this derivation shares no step with it.
@@ -15,8 +16,8 @@ end
 # The affine-invariant distance, from the generalised eigenvalues of the pair.
 airm(A, B) = sqrt(sum(abs2, log.(eigvals(Symmetric(A), Symmetric(B)))))
 
-# A fixed start and a fixed target. The answers below were produced by the reference
-# implementation's own interpolation on these two matrices, printed to 17 digits.
+# A fixed start and a fixed target. The answers below were produced by the oracle's own
+# interpolation on these two matrices, printed to 17 digits.
 const S3 = [4.0 1.2 -0.6; 1.2 2.0 0.3; -0.6 0.3 1.0]
 const T3 = [2.0 0.5 0.0; 0.5 1.5 0.2; 0.0 0.2 1.0]
 const REF3 = Dict((0.25, :scaled) =>
@@ -47,7 +48,7 @@ const TARGETS3 = Dict(:identity => IdentityTarget(), :scaled => ScaledIdentityTa
                       :common => CommonCovarianceTarget(),
                       :constcor => ConstantCorrelationTarget(),
                       :diagonal => DiagonalTarget(), :custom => T3)
-# A small returns matrix, and the reference estimator's answer on it at intensity 0.4, with
+# A small returns matrix, and the oracle estimator's answer on it at intensity 0.4, with
 # its default sample covariance and its default positive definite repair.
 const X10 = [1.2e-05 0.002992 -0.001246; -0.008906 -0.008109 -0.01308;
              0.000601 0.013643 0.001839; -0.006205 0.002417 0.005398;
@@ -96,10 +97,11 @@ const REFX10 = Dict(:scaled =>
         @test PO.shrinkage_target(ConstantCorrelationTarget(), fill(2.0, 1, 1)) ==
               fill(2.0, 1, 1)
     end
-    @testset "parity with the reference interpolation" begin
+    @testset "parity with the oracle interpolation" begin
+        # Measured maxrel 5.1e-15 cell by cell.
         for a in (0.25, 0.75), key in (:scaled, :diagonal, :custom)
             got = PO.geodesic_point(TARGETS3[key], S3, a)
-            @test isapprox(got, REF3[(a, key)]; rtol = 1e-12)
+            @test parity_compare(got, REF3[(a, key)]; name = "geodesic $(a) $(key)").ok
         end
         for a in (0.25, 0.75), (key, tgt) in TARGETS3
             T = PO.shrinkage_target(tgt, S3)
@@ -107,11 +109,13 @@ const REFX10 = Dict(:scaled =>
                            rtol = 1e-12)
         end
     end
-    @testset "parity with the reference estimator" begin
+    @testset "parity with the oracle estimator" begin
         for key in (:scaled, :diagonal)
             ce = GeodesicShrinkageCovariance(; tgt = TARGETS3[key], alpha = 0.4)
-            @test isapprox(cov(ce, X10), REFX10[key]; rtol = 1e-12)
-            @test isapprox(cov(ce, permutedims(X10); dims = 2), REFX10[key]; rtol = 1e-12)
+            # Measured maxrel 3.1e-15 cell by cell, in both orientations.
+            @test parity_compare(cov(ce, X10), REFX10[key]; name = "geodesic X10 $(key)").ok
+            @test parity_compare(cov(ce, permutedims(X10); dims = 2), REFX10[key];
+                                 name = "geodesic X10' $(key)").ok
         end
     end
     @testset "end points" begin

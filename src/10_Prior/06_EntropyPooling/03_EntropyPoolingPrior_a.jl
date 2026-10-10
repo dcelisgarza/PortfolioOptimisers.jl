@@ -924,7 +924,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the grid of dual variables that an upper-bound or equality entropic value-at-risk view selects one point of.
 
-A lower-bound grid view is a set of rows on the posterior probabilities alone, so it goes into the constraint dictionary and never reaches this carrier. An equality view emits both: the rows go into the dictionary and the selector block comes here.
+A lower-bound grid view is a set of rows on the posterior probabilities alone, so it goes into the constraint dictionary and never reaches this tail view constraint. An equality view emits both: the rows go into the dictionary and the selector block comes here.
 
 # Fields
 
@@ -1023,7 +1023,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the grid of primal points that an upper-bound or equality relativistic value-at-risk view selects one point of.
 
-A lower-bound grid view is a set of rows on the posterior probabilities alone, so it goes into the constraint dictionary and never reaches this carrier. An equality view emits both: the rows go into the dictionary and the selector block comes here.
+A lower-bound grid view is a set of rows on the posterior probabilities alone, so it goes into the constraint dictionary and never reaches this tail view constraint. An equality view emits both: the rows go into the dictionary and the selector block comes here.
 
 # Fields
 
@@ -1078,9 +1078,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the carriers of the sequential convex tail view formulations.
+Abstract supertype for the tail view constraints of the sequential convex formulations.
 
-A sequential carrier splits the assets of an oriented lower-bound view into a **dual side**, whose measures are concave in the posterior probabilities and take their exact dual blocks, and a **primal side**, whose measures enter with a negative coefficient and take a linear upper bound read at a fixed posterior. The three subtypes differ in the measure alone, and the two verbs that read a carrier, [`add_ep_tail_view!`](@ref) and [`ep_refine_tail_view`](@ref), have one method for the whole family. Each subtype supplies [`ep_tail_dual_block!`](@ref) and [`ep_tail_surrogate_row`](@ref) for its measure.
+A sequential tail view constraint splits the assets of an oriented lower-bound view into a **dual side**, whose measures are concave in the posterior probabilities and take their exact dual blocks, and a **primal side**, whose measures enter with a negative coefficient and take a linear upper bound read at a fixed posterior. The three subtypes differ in the measure alone, and the two verbs that read one, [`add_ep_tail_view!`](@ref) and [`ep_refine_tail_view`](@ref), have one method for the whole family. Each subtype supplies [`ep_tail_dual_block!`](@ref) and [`ep_tail_surrogate_row`](@ref) for its measure.
 
 # Related
 
@@ -1342,7 +1342,7 @@ end
 
 Add the dual block of one asset's risk measure to an entropy pooling JuMP model, and return the expression that attains the measure.
 
-The dual representation of each measure is a maximum of ``\\boldsymbol{\\nu}^{\\intercal} \\boldsymbol{x}`` over a set of weights that depends on the posterior probabilities. `ep_tail_dual_block!` registers that set, and hands the linear expression back so the caller can bound it, on its own or in a coefficient-weighted sum over several assets. The carrier `tv` names the measure and carries its level, and the method is shared by the fixed carrier of the measure and its sequential one.
+The dual representation of each measure is a maximum of ``\\boldsymbol{\\nu}^{\\intercal} \\boldsymbol{x}`` over a set of weights that depends on the posterior probabilities. `ep_tail_dual_block!` registers that set, and hands the linear expression back so the caller can bound it, on its own or in a coefficient-weighted sum over several assets. The tail view constraint `tv` names the measure and carries its level, and the method is shared by the fixed tail view constraint of the measure and its sequential one.
 
 # JuMP formulation
 
@@ -1629,7 +1629,7 @@ Re-read the surrogate row of a sequential tail view at a posterior, and say whet
  2. Clamp `w` below at zero and normalise it to sum to one. A conic solver returns a posterior whose smallest entries sit a rounding error below zero, and the searches behind the rows refuse a negative probability.
  3. For each asset of the primal side, read its bound at `w` with [`ep_tail_surrogate_row`](@ref), and accumulate the coefficient-weighted sum of the bounds into a new row `c`, `b`. The value of the new row at `w` is the coefficient-weighted sum of the measures there.
  4. Read the gap between the row `tv` held and the new one at `w`. The old row bounds the same sum from the same side, so the gap is the slack the last solve left.
- 5. Return the carrier with the new row, and whether the gap is within `tol` of the larger of the target and the largest loss the primal side names.
+ 5. Return `tv` with the new row, and whether the gap is within `tol` of the larger of the target and the largest loss the primal side names.
 
 # Arguments
 
@@ -1638,7 +1638,7 @@ Re-read the surrogate row of a sequential tail view at a posterior, and say whet
 
 # Returns
 
-  - `tv::AbstractSequentialTailViewConstraint`: The carrier with its row re-read at `w`.
+  - `tv::AbstractSequentialTailViewConstraint`: The tail view constraint with its row re-read at `w`.
   - `tight::Bool`: Whether the row `tv` held before the call was tight at `w`.
 
 # Related
@@ -1680,10 +1680,10 @@ A linear upper bound is tight where it is read, but it can fall only as far as i
 
 # Algorithm
 
- 1. Normalise `w` to sum to one, and read the row at it with [`ep_refine_tail_view`](@ref). Return the carrier where its primal side is empty, because the view is then convex and the row is empty.
+ 1. Normalise `w` to sum to one, and read the row at it with [`ep_refine_tail_view`](@ref). Return `tv` where its primal side is empty, because the view is then convex and the row is empty.
  2. Read `need`, the value the row must reach: the target, less the row's constant, less the coefficient-weighted sum of the measures of the dual side under the current probabilities, each read through [`ep_tail_surrogate_row`](@ref).
- 3. Return the carrier where the largest coefficient of the row is at least `need`. A probability vector then meets the row, and the solve can start.
- 4. Otherwise tilt the probabilities with [`ep_row_tilt`](@ref) so the row reaches nine tenths of the way from its current value to its largest coefficient, re-read the row there, and return to step 2. Take at most `iters` steps, and return the last carrier where the tilt does not exist.
+ 3. Return `tv` where the largest coefficient of the row is at least `need`. A probability vector then meets the row, and the solve can start.
+ 4. Otherwise tilt the probabilities with [`ep_row_tilt`](@ref) so the row reaches nine tenths of the way from its current value to its largest coefficient, re-read the row there, and return to step 2. Take at most `iters` steps, and return `tv` with its last row where the tilt does not exist.
 
 # Arguments
 
@@ -1692,7 +1692,7 @@ A linear upper bound is tight where it is read, but it can fall only as far as i
 
 # Returns
 
-  - `tv::AbstractSequentialTailViewConstraint`: The carrier with its first row.
+  - `tv::AbstractSequentialTailViewConstraint`: The tail view constraint with its first row.
 
 # Related
 
@@ -1737,7 +1737,7 @@ end
 
 Add the variables and constraints of one tail view to an entropy pooling JuMP model.
 
-`add_ep_tail_view!` is the one seam through which a conditional, entropic or relativistic value-at-risk view reaches the model. Each formulation has its own method, dispatched on the constraint carrier the view parser produced. The three dual carriers share one method, and the three sequential carriers share another: both write one dual block per asset with [`ep_tail_dual_block!`](@ref), and differ in the row that bounds the sum.
+`add_ep_tail_view!` is the one function through which a conditional, entropic or relativistic value-at-risk view reaches the model. Each formulation has its own method, dispatched on the tail view constraint the view parser produced. The three dual tail view constraints share one method, and the three sequential tail view constraints share another: both write one dual block per asset with [`ep_tail_dual_block!`](@ref), and differ in the row that bounds the sum.
 
 # JuMP formulation
 
@@ -1746,21 +1746,21 @@ The section covers the five methods, and every entry each of them registers. Eac
 ## Variables
 
   - `pw`: $(math_dict[:ep_post_probs]) It is read from the caller, and every entry below is registered against it.
-  - `nu`, `tau`, `varsigma`: created once per asset of the view by [`ep_tail_dual_block!`](@ref), for the dual carriers and for the dual side of the sequential ones. Its `# JuMP formulation` names them.
+  - `nu`, `tau`, `varsigma`: created once per asset of the view by [`ep_tail_dual_block!`](@ref), for the dual tail view constraints and for the dual side of the sequential ones. Its `# JuMP formulation` names them.
   - `y`, `q`: ``\\boldsymbol{y}`` and ``\\boldsymbol{q}``, ``\\bar{s} \\times 1`` each, created once per asset by the [`IntegerConditionalValueatRiskViewConstraint`](@ref) method. `y` is binary, and `q` is bounded below by zero.
   - `y`: ``\\boldsymbol{y}``, ``K \\times 1`` and binary, created by the [`GridEntropicValueatRiskViewConstraint`](@ref) and [`GridRelativisticValueatRiskViewConstraint`](@ref) methods. It selects the grid point the view is met at.
 
 ## Expressions
 
-  - ``\\varepsilon``: Left hand side of the view, built once per method and registered under no name. It is the coefficient-weighted sum of the per-asset expressions [`ep_tail_dual_block!`](@ref) returns for the dual carriers, of the per-asset tail sums for the integer carrier, and of the dual-side expressions plus the surrogate row ``b + \\boldsymbol{c}^{\\intercal} \\boldsymbol{p}`` for the sequential carriers.
+  - ``\\varepsilon``: Left hand side of the view, built once per method and registered under no name. It is the coefficient-weighted sum of the per-asset expressions [`ep_tail_dual_block!`](@ref) returns for the dual tail view constraints, of the per-asset tail sums for the integer tail view constraint, and of the dual-side expressions plus the surrogate row ``b + \\boldsymbol{c}^{\\intercal} \\boldsymbol{p}`` for the sequential tail view constraints.
 
 ## Constraints
 
-The method of the three dual carriers, [`LinearConditionalValueatRiskViewConstraint`](@ref), [`ConicEntropicValueatRiskViewConstraint`](@ref) and [`ConicRelativisticValueatRiskViewConstraint`](@ref), registers one block of [`ep_tail_dual_block!`](@ref) per asset the view names, and one row:
+The method of the three dual tail view constraints, [`LinearConditionalValueatRiskViewConstraint`](@ref), [`ConicEntropicValueatRiskViewConstraint`](@ref) and [`ConicRelativisticValueatRiskViewConstraint`](@ref), registers one block of [`ep_tail_dual_block!`](@ref) per asset the view names, and one row:
 
   - ``s_{c1} \\left(\\bar{c} - \\sum_{i} \\gamma_{i} \\sum_{j=1}^{T} \\nu_{i,\\,j} x_{i,\\,j}\\right) \\leq 0``.
 
-The method of the three sequential carriers, [`SequentialConditionalValueatRiskViewConstraint`](@ref), [`SequentialEntropicValueatRiskViewConstraint`](@ref) and [`SequentialRelativisticValueatRiskViewConstraint`](@ref), registers one block of [`ep_tail_dual_block!`](@ref) per asset of the dual side, and one row over both sides, divided by the largest coefficient of the surrogate row where that exceeds one, so the row's coefficients sit in ``[-1, 1]`` however small the dual variable of a relativistic measure is:
+The method of the three sequential tail view constraints, [`SequentialConditionalValueatRiskViewConstraint`](@ref), [`SequentialEntropicValueatRiskViewConstraint`](@ref) and [`SequentialRelativisticValueatRiskViewConstraint`](@ref), registers one block of [`ep_tail_dual_block!`](@ref) per asset of the dual side, and one row over both sides, divided by the largest coefficient of the surrogate row where that exceeds one, so the row's coefficients sit in ``[-1, 1]`` however small the dual variable of a relativistic measure is:
 
   - ``s_{c1} \\left(\\bar{c} - \\sum_{i \\in \\mathcal{P}} \\gamma_{i} \\sum_{j=1}^{T} \\nu_{i,\\,j} x_{i,\\,j} - b - \\sum_{j=1}^{T} c_{j} p_{j}\\right) \\Big/ \\max\\left(1, \\lVert \\boldsymbol{c} \\rVert_{\\infty}\\right) \\leq 0``.
 
@@ -1792,20 +1792,20 @@ Where:
   - $(math_dict[:cvar_target])
   - ``x_{i,\\,j}``: Loss of asset ``i`` at observation ``j``, the negated return.
   - ``\\boldsymbol{\\nu}_{i}``: ``T \\times 1`` vector of weights that attains the measure of asset ``i``, from its block of [`ep_tail_dual_block!`](@ref).
-  - ``\\bar{c}``: Target of the view, whichever measure it is stated on. A sequential carrier holds the view oriented as a lower bound, so its target carries the sign of that orientation.
+  - ``\\bar{c}``: Target of the view, whichever measure it is stated on. A sequential tail view constraint holds the view oriented as a lower bound, so its target carries the sign of that orientation.
   - ``\\bar{s}``: Length of one asset's window of largest losses, from [`ep_sbar`](@ref).
   - ``x_{[j]}``, ``p_{[j]}``: Loss and posterior probability of the observation in position ``j`` of that window, which is sorted ascending.
   - ``\\gamma_{i}``: Coefficient the view gives asset ``i``.
-  - ``\\mathcal{P}``: Assets on the dual side of a sequential carrier.
-  - ``b``, ``\\boldsymbol{c}``: Surrogate row a sequential carrier holds, from [`ep_tail_surrogate_row`](@ref).
+  - ``\\mathcal{P}``: Assets on the dual side of a sequential tail view constraint.
+  - ``b``, ``\\boldsymbol{c}``: Surrogate row a sequential tail view constraint holds, from [`ep_tail_surrogate_row`](@ref).
   - ``\\boldsymbol{y}``: Binary vector. It marks the tail of one asset's window in the integer conditional value-at-risk method, and selects one grid point in the two grid methods.
   - ``\\boldsymbol{q}``: ``\\bar{s} \\times 1`` vector that carries the tail mass of each observation of the window: ``p_{[j]}`` above the lowest marked observation, a part of ``p_{[j]}`` at it, and zero below it.
   - ``\\varepsilon``: Left hand side of an integer conditional value-at-risk view, the coefficient-weighted sum of the per-asset posterior CVaRs.
-  - ``K``: Number of grid points the carrier holds.
+  - ``K``: Number of grid points the tail view constraint holds.
   - ``c_{k,\\,j}``: Scaled coefficient of observation ``j`` at grid point ``k``, from [`ep_evar_grid_row`](@ref) or [`ep_rlvar_grid_row`](@ref).
   - ``b_{k}``: Scaled bound of grid point ``k``, from those same two functions. It is ``\\alpha`` times the reciprocal that [`ep_evar_grid_row`](@ref) returns, and the target that [`ep_rlvar_grid_row`](@ref) returns.
   - ``M_{k}``: Smallest big-M constant that releases the row of grid point ``k``.
-  - ``M``: Big-M multiplier the grid carrier holds.
+  - ``M``: Big-M multiplier the grid tail view constraint holds.
 
 ## Relaxation
 
@@ -1819,7 +1819,7 @@ The sequential method is a **restriction** of the view, tightened by re-solves.
 
  2. **Quantity.** The coefficient-weighted sum of the posterior measures the view names, a statistic of `pw`.
 
- 3. **Tightness.** The row is tight at the posterior it was read at. [`entropy_pooling`](@ref) re-reads it at each posterior with [`ep_refine_tail_view`](@ref) and solves again, until the slack is within the carrier's `tol` or its `iters` re-solves are spent, so the view is met to that tolerance at the fixed point and over-met before it.
+ 3. **Tightness.** The row is tight at the posterior it was read at. [`entropy_pooling`](@ref) re-reads it at each posterior with [`ep_refine_tail_view`](@ref) and solves again, until the slack is within the `tol` of the tail view constraint or its `iters` re-solves are spent, so the view is met to that tolerance at the fixed point and over-met before it.
 
  4. **Direction.** Every grid point is a feasible point of the primal programme of the statistic, so its row bounds the statistic from above. The block asks one grid point to hold, so the posterior statistic lies at or below the target. The encoding is a **restriction**: it can only be tighter than the view asks, and the view is never violated.
 

@@ -202,7 +202,8 @@ MeanRisk
       │           │            │     fee ┼ Bool: true
       │           │            │     mic ┴ Bool: true
       │           │        ucs ┼ nothing
-      │           │         mu ┴ nothing
+      │           │         mu ┼ nothing
+      │           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
       │       sca ┼ SumScalariser()
       │      ccnt ┼ nothing
       │      cobj ┼ nothing
@@ -229,7 +230,8 @@ MeanRisk
       │      sigma ┼ nothing
       │       chol ┼ nothing
       │         rc ┼ nothing
-      │        alg ┴ SquaredSOCRiskExpr()
+      │        alg ┼ SquaredSOCRiskExpr()
+      │   mtx_sqrt ┴ EigenFallbackSquareRoot()
   obj ┼ MinimumRisk()
    wi ┼ nothing
    fb ┴ nothing
