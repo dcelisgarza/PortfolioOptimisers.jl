@@ -249,7 +249,7 @@ using Dates, StatsPlots, GraphRecipes, Statistics
                                          name = "$(case) $(fig) Mahalanobis").ok
                 else
                     # A listing moves the degrees of freedom, and the weights move the mean.
-                    @test !parity_compare(ours[:, j], oracle[:, j]).ok
+                    @test !parity_compare(ours[:, j], oracle[:, j]; quiet = true).ok
                     nu = PO.target_dof.(Ref(ev.target), ev.n_valid, ev.horizon)
                     @test ours[:, j] ≈
                           [sum(nu[s] * ev.mahalanobis_ratio[s] for s in (t - W + 1):t) /
@@ -277,7 +277,7 @@ using Dates, StatsPlots, GraphRecipes, Statistics
                                  [os[1, 1], os[1, 2], os[1, 4], os[1, 5], os[2, 1],
                                   os[2, 2], os[2, 4], os[2, 5]];
                                  name = "Portfolios summary").ok
-            @test !parity_compare([sd.mahalanobis_mean[1]], [os[1, 1]]).ok
+            @test !parity_compare([sd.mahalanobis_mean[1]], [os[1, 1]]; quiet = true).ok
         end
         firsts = first.(a.test_idx)
         for (fig, p, n) in

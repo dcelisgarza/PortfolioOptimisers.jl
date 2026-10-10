@@ -18,7 +18,9 @@ A group of outputs is stored side by side in one file:
 
   - `Regression`: the t-statistics, the variance inflation factors, the condition number and the
     four scores `r2`, `adjusted_r2`, `aic`, `bic`. `TRate`: the exceedance rate at the thresholds
-    `2` and `1.5`. `Gram`: the Gram of `DiagSmallBase`, one row per observation.
+    `2` and `1.5`, for the cases without a constrained family. In a family case a singular row
+    changes the rate (#1421), and the factor model summary below checks that difference.
+    `Gram`: the Gram of `DiagSmallBase`, one row per observation.
   - `Correlation`, `Stability`, `Dispersion`: the benchmark, identity and regression weightings.
     `Stability5`: the stability at a step of five.
   - `IC1`, `IC3`: the rank and the linear coefficient at the horizons one and three. `ICSummary`:

@@ -21,8 +21,10 @@ one row of the case tables below:
     coefficient.
 
 The `Default` cases state no keyword but the Descriptors, the scale and the half-life, so they pin
-our defaults against the oracle's: an out-of-fold calibration on five folds, and a forecast from
-the first observation that advances the state (#1386). The oracle's integer `cv = 3` gives the
+our defaults against the oracle's, and a forecast starts from the first observation that advances
+the state (#1386). The calibration is the one exception: the target `Default` case states
+`cv = KFold()`, the out-of-fold calibration on five folds of the oracle's batch fit, because the
+default of the library is prequential since #1575. The oracle's integer `cv = 3` gives the
 stored `Hz3` output bit for bit, so `KFold(; n = 3)` is the route of the integer short form, as
 the `cv` docstring of `TargetReturnForecast` states (#1408).
 
@@ -121,6 +123,8 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
               "TgtScore" => TargetReturnForecast(; scores = ds(), target_outlier = nothing,
                                                  target_scoring = CrossSectionalStandardiser(),
                                                  cv = KFold())]
+    # ADR 0186: no field takes an integer as the short form of `KFold(; n)`.
+    @test_throws TypeError TargetReturnForecast(; scores = ds(), cv = 3)
     # A matrix or a forecast compares against its largest entry, a coefficient cell by cell.
     same(a, b, n) = parity_compare(a, b; scale = :array, name = n).ok
     cell(a, b, n) = parity_compare(a, b; name = n).ok

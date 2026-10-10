@@ -89,23 +89,38 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
         r = parity_compare(a, a .* (1 + 1e-13); name = "1e-13")
         @test r.ok
         @test r.maxrel ≈ 1e-13 rtol = 1e-3
-        r = parity_compare(a, a .* (1 + 1e-11); name = "1e-11")
+        r = parity_compare(a, a .* (1 + 1e-11); quiet = true)
         @test !r.ok && r.pattern
         @test parity_compare(a, a .* (1 + 1e-11); rtol = 1e-10).ok
         # A zero against a tiny value is a relative difference of one, which only `atol` passes.
         b = [1.0 NaN; -2.0 1e-18]
-        @test !parity_compare(a, b).ok
+        @test !parity_compare(a, b; quiet = true).ok
         @test parity_compare(a, b; atol = 1e-16).ok
         # Under `scale = :array` a cell is measured against the largest entry, 2 here.
         r = parity_compare(a, b; scale = :array)
         @test r.ok && r.maxrel == 1 && r.maxscaled == 5e-19
-        @test !parity_compare(a, [1.0 NaN; -2.0 3e-12]; scale = :array).ok
+        @test !parity_compare(a, [1.0 NaN; -2.0 3e-12]; scale = :array, quiet = true).ok
         # The non-finite cells must agree exactly.
-        r = parity_compare(a, [1.0 2.0; -2.0 0.0])
+        r = parity_compare(a, [1.0 2.0; -2.0 0.0]; quiet = true)
         @test !r.ok && !r.pattern
-        @test !parity_compare([Inf], [-Inf]).ok && parity_compare([Inf], [Inf]).ok
-        @test parity_compare(a, a[:, 1]) ==
+        @test !parity_compare([Inf], [-Inf]; quiet = true).ok &&
+              parity_compare([Inf], [Inf]).ok
+        @test parity_compare(a, a[:, 1]; quiet = true) ==
               (; ok = false, pattern = false, maxrel = Inf, maxscaled = Inf, maxabs = Inf)
+        # A check that fails prints one line under its name, and `quiet = true` prints none,
+        # so a negative check that passes adds no output.
+        out = mktemp() do path, io
+            redirect_stdout(io) do
+                parity_compare([1.0], [2.0]; name = "loud")
+                parity_compare([1.0], [2.0]; name = "hush", quiet = true)
+                parity_compare([1.0], [1.0]; name = "pass")
+                parity_compare(a, a[:, 1]; name = "shape", quiet = true)
+                return nothing
+            end
+            close(io)
+            return read(path, String)
+        end
+        @test startswith(out, "parity loud: maxrel = 0.5") && count('\n', out) == 1
     end
 
     @testset "The storage round-trips a stored output exactly" begin

@@ -177,10 +177,12 @@ end
             fs = PO.factor_basis_slice(fcb, 1:(T - 1))
             g = PO.reduce_factor_returns(fs, pr.fpr.X[2:T, :])
             @test PO.expand_factor_returns(fs, g) == pr.fpr.X[2:T, :]
-            has("BasisRatios") || continue
             # The same dropped member, automatic or stated, and the same ratios. Measured
             # maxrel 5.5e-16.
-            @test PO.dropped_factor_indices(fcb) == Int.(vec(load("BasisDropped"))) .+ 1
+            if has("BasisDropped")
+                @test PO.dropped_factor_indices(fcb) == Int.(vec(load("BasisDropped"))) .+ 1
+            end
+            has("BasisRatios") || continue
             @test parity_compare(fcb.ratios, load("BasisRatios"); name = "$(c) ratios").ok
             has("BasisReducedLoadings") || continue
             # Every transform on the fitted outputs. The expansions read the ratios of the

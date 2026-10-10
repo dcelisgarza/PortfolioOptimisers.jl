@@ -383,7 +383,9 @@ end
             a = return_forecast(rfe, pp, blk)
             b = return_forecast(rfe, pp, blk2)
             @test isequal(a.calib, b.calib)
-            @test isapprox(a.calib, calibs[uname]; rtol = 1e-10)
+            # Measured maxrel 1.3e-15 (return) and 1.7e-14 (Sharpe).
+            @test parity_compare([a.calib], [calibs[uname]]; rtol = 1e-13,
+                                 name = "calib $(uname)").ok
             @test same(a.mu, b.mu)
             rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, unit = unit)
             a = return_forecast(rfe, pp, blk)

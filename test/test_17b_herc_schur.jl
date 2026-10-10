@@ -271,7 +271,11 @@ end
                                                                                                        items,
                                                                                                        wb,
                                                                                                        p)
-        @test isapprox(gamma, gtp; atol = 1e-12)
+        # A search returns a point of its scan or its bisection, and another branch moves it
+        # by a step of the search, far above the bound. So the bound asks for the same point.
+        # Measured 0.0 on every case.
+        @test parity_compare([gamma], [gtp]; rtol = 0.0, atol = 1e-12,
+                             name = "Schur gamma $(seed) $(g)").ok
         @test w == nm_weights(pr, gamma)
     end
 
@@ -305,7 +309,9 @@ end
                                                                                                    wb,
                                                                                                    p)
     @test 8 / 9 < gamma < 1
-    @test isapprox(gamma, 0.9555121527777777; atol = 1e-12)
+    # The same point of the search as above. Measured 0.0.
+    @test parity_compare([gamma], [0.9555121527777777]; rtol = 0.0, atol = 1e-12,
+                         name = "Schur gamma interpolated").ok
     @test w == nm_weights(pr, gamma)
     # A maximum gamma of zero runs the allocation at zero.
     w, gamma, _ = PortfolioOptimisers.schur_complement_weights(pr, items, wb,
@@ -361,7 +367,9 @@ end
     wb = WeightBounds(; lb = zeros(9), ub = ones(9))
     p = SchurComplementParams(; gamma = 0.5, alg = MonotonicSchurComplement(; N = 6))
     w, gamma, _ = PO.schur_complement_weights(pr, items, wb, p)
-    @test isapprox(gamma, 0.262744140625; atol = 1e-12)
+    # The same point of the bisection. Measured 0.0.
+    @test parity_compare([gamma], [0.262744140625]; rtol = 0.0, atol = 1e-12,
+                         name = "Schur gamma nine").ok
     pn = SchurComplementParams(; gamma = 0.5, alg = NonMonotonicSchurComplement(),
                                flag = false)
     @test w == PO.schur_complement_weights(pr, items, wb, pn, gamma)[1]
@@ -460,7 +468,9 @@ end
         p = SchurComplementParams(; gamma = g, alg = NonMonotonicSchurComplement(),
                                   flag = false)
         w, gamma, r = PO.schur_complement_weights(prs, [order], wb6, p)
-        # Measured maxabs 1.1e-16, and 0 on the monotonic search below.
+        # Measured maxabs 1.1e-16 (maxrel 5.8e-16), and 0 on the monotonic search below. The
+        # weights sum to one, so an absolute bound reads each one on the scale of the whole
+        # portfolio.
         @test parity_compare(w, wref[g]; rtol = 0.0, atol = 1e-15,
                              name = "Schur nonmonotonic w $(g)").ok
         # The weights of the recursion sum to one before any finaliser.
@@ -473,6 +483,7 @@ end
     p = SchurComplementParams(; gamma = 1.0, alg = MonotonicSchurComplement(; N = 11))
     w, gamma, _ = PO.schur_complement_weights(prs, [order], wb6, p)
     @test gamma == 1.0
+    # Measured maxabs 0, under the bound of the weights above.
     @test parity_compare(w, wmono; rtol = 0.0, atol = 1e-15, name = "Schur monotonic w").ok
 
     # symmetric_step_up_matrix: the identity, the average of the insertions, and the

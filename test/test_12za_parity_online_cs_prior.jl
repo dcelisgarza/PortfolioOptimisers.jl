@@ -315,6 +315,7 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         # 2.8e-13.
         check(sb, "Style", "Prefix")
         @test !parity_compare(sb[2].pr.sigma, load("Style", "FoldSigma")[(N + 1):(2N), :];
-                              scale = :array, name = "Style batch vs fold sigma 2").ok
+                              scale = :array, name = "Style batch vs fold sigma 2",
+                              quiet = true).ok
     end
 end

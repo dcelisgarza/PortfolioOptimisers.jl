@@ -227,9 +227,9 @@ end
                                      name = "$(case) disjoint t").ok
             end
             # The coverage summary counts a silenced date; on the scored dates it is the
-            # oracle's.
-            cov = stored[:, end]
-            nsc = stored[:, end - 1]
+            # oracle's. The library's own coverage on the oracle's dates gives it.
+            cov = ours[:, end]
+            nsc = ours[:, end - 1]
             @test parity_compare([sum(cov) / length(cov), minimum(cov),
                                   sum(nsc) / length(nsc), minimum(nsc)], ss[29:32]).ok
             if case == "Gap"

@@ -218,7 +218,8 @@ p1383_col(A, k, n = 1) = A[:, ((k - 1) * n + 1):(k * n)]
                 @test parity_compare(st.covariance[f, f], (Ok .* (w * transpose(w)))[f, f];
                                      rtol = 1e-14, name = "$case $name raw").ok
                 S = cov(make(), Xc; active_mask = am)
-                @test !parity_compare(S[f, f], Ok[f, f]; rtol = 1e-4, scale = :array).ok
+                @test !parity_compare(S[f, f], Ok[f, f]; rtol = 1e-4, scale = :array,
+                                      quiet = true).ok
                 @test minimum(LinearAlgebra.eigvals(LinearAlgebra.Symmetric(S[f, f]))) >=
                       -1e-15 * maximum(abs, S[f, f])
             end

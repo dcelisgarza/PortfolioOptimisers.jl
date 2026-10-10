@@ -337,7 +337,8 @@ end
         orc = load(c, "Families")
         cols = c in se_better ? (1:5) : (1:6)
         sc = maximum(abs, our[:, 1])
-        # Measured maxabs 1.1e-16 at most.
+        # Measured maxabs 1.1e-16 at most. The spread is round-off on our side and zero on the
+        # oracle's, as on the factor axis, so the bound is absolute.
         @test cmp(our[:, 2], orc[:, 2], "$(c) family spread"; atol = 1e-14 * sc)
         @test cmp(our[:, setdiff(cols, 2)], orc[:, setdiff(cols, 2)], "$(c) families")
     end
@@ -518,9 +519,9 @@ end
                                                     unknown = ZeroUnknown())))
         orc = load("PredHeld", "Components")
         sc = maximum(abs, filter(isfinite, zu["Components"][[4], 1:4]))
-        # Measured maxabs 2.2e-16.
+        # Measured maxrel 4.4e-16 cell by cell.
         @test cmp(zu["Components"][[1, 2, 4], 1:5], orc[[1, 2, 4], 1:5],
-                  "PredHeld components"; atol = 1e-14 * sc)
+                  "PredHeld components")
         @test all(iszero, zu["Components"][3, 2:4])
         for out in ("Factors", "Assets", "AssetFactorVol", "AssetFactorMu")
             @test cmp(zu[out], load("PredHeld", out), "PredHeld $(out)")

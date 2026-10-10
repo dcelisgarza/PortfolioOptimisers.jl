@@ -136,7 +136,13 @@ using Dates
         ours = steps(r, st[:, 1])
         @test ours[:, 2] == st[:, 2]
         @test parity_compare(ours[:, 5], st[:, 5]; name = "CovPortfolios diagonal").ok
-        @test !parity_compare(ours[:, 4], st[:, 4]).ok
+        @test !parity_compare(ours[:, 4], st[:, 4]; quiet = true).ok
+        # So the diagonal rows of the summary are the oracle's too.
+        s = covariance_forecast_summary(r)
+        os = vec(load("CovPortfolios", "Summary"))
+        @test parity_compare([s.diagonal_mean[1], s.diagonal_median[1], s.diagonal_p5[1],
+                              s.diagonal_p95[1]], os[[6, 7, 9, 10]];
+                             name = "CovPortfolios diagonal summary").ok
     end
 
     @testset "The comparison pairs the steps both evaluations scored" begin

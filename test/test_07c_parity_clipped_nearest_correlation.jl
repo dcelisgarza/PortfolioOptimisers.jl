@@ -108,7 +108,8 @@ const P1412_CASES = [("Indefinite", false), ("IndefiniteHigham", true),
         E = parity_load("CrossSectionalFactorPrior", "PitLargeOverlayRaw", "IdioCov")
         mp = MatrixProcessing(; pdm = p1412_pdm())
         PortfolioOptimisers.matrix_processing_block!(mp, E, zeros(1, size(E, 2)))
-        # Measured maxscaled 1.6e-15.
+        # Measured maxscaled 1.6e-15. A covariance compares against its largest entry, the
+        # harness rule that THE MEASURE above states.
         @test parity_compare(E, p1412_out("OverlayLarge"); scale = :array,
                              name = "OverlayLarge").ok
     end
@@ -154,6 +155,13 @@ end
     @test PortfolioOptimisers.posdef_accepts(Posdef().alg, X) == isposdef(X)
     @test PortfolioOptimisers.posdef_accepts(Posdef().alg, p1412_in("Borderline"))
     @test !PortfolioOptimisers.posdef_accepts(pdm.alg, p1412_in("Borderline"))
+    # ADR 0186: Newton stays the default repair, also in `f_mp` and `mp` of the cross-sectional
+    # prior. Only the prior's idiosyncratic block takes the clip by default, in `pdm` (#1603).
+    newton = PortfolioOptimisers.NearestCorrelationMatrix.Newton
+    csp = CrossSectionalFactorPrior(; factors = ["market" => ConstantExposure()])
+    @test Posdef().alg === newton
+    @test csp.f_mp.pdm.alg === newton && csp.mp.pdm.alg === newton
+    @test csp.pdm.alg isa ClippedNearestCorrelation
     # A zero variance is left to the zero-row rule of `posdef!`.
     @test !PortfolioOptimisers.posdef_accepts(pdm.alg, p1412_in("ZeroVariance"))
     # An eigenvalue floor this far below the round-off of an 80 x 80 rebuild cannot hold, so

@@ -149,18 +149,27 @@ end
     ut = 5
 
     @testset "ZeroUnknown() is the oracle's attribution" begin
+        # The oracle's shares are a printout of four digits, so each bound is half a unit of
+        # the last digit. Measured maxabs 3.5e-5 at most, and 2.1e-7 on the idiosyncratic
+        # share of the equal weights.
         zp = factor_attribution(w3, pr; unknown = ZeroUnknown())
         @test zp.sys.pct_var ≈ 1.0 rtol = 1e-12
-        @test zp.fbd.pct_var[ut] ≈ 0.8604 atol = 5e-5
+        @test parity_compare([zp.fbd.pct_var[ut]], [0.8604]; rtol = 0.0, atol = 5e-5,
+                             name = "zp.fbd.pct_var[ut]").ok
         zr = quiet(() -> factor_attribution(w3, pr, rd; unknown = ZeroUnknown()))
         @test zr.sys.pct_var ≈ 1.0 rtol = 1e-12
-        @test zr.fbd.pct_var[ut] ≈ 0.8265 atol = 5e-5
+        @test parity_compare([zr.fbd.pct_var[ut]], [0.8265]; rtol = 0.0, atol = 5e-5,
+                             name = "zr.fbd.pct_var[ut]").ok
         z5 = factor_attribution(w5, pr, rd; unknown = ZeroUnknown())
-        @test z5.sys.pct_var ≈ 0.6436 atol = 5e-5
-        @test z5.idio.pct_var ≈ 0.3564 atol = 5e-5
+        @test parity_compare([z5.sys.pct_var], [0.6436]; rtol = 0.0, atol = 5e-5,
+                             name = "z5.sys.pct_var").ok
+        @test parity_compare([z5.idio.pct_var], [0.3564]; rtol = 0.0, atol = 5e-5,
+                             name = "z5.idio.pct_var").ok
         zq = quiet(() -> factor_attribution(weq, pr, rd; unknown = ZeroUnknown()))
-        @test zq.sys.pct_var ≈ 0.9775 atol = 5e-5
-        @test zq.idio.pct_var ≈ -0.00211 atol = 5e-6
+        @test parity_compare([zq.sys.pct_var], [0.9775]; rtol = 0.0, atol = 5e-5,
+                             name = "zq.sys.pct_var").ok
+        @test parity_compare([zq.idio.pct_var], [-0.00211]; rtol = 0.0, atol = 5e-6,
+                             name = "zq.idio.pct_var").ok
         # The preset and the rule per kind agree when the unstated kind reads nothing.
         kq = quiet(() -> factor_attribution(weq, pr, rd;
                                             unknown = KindwiseUnknown(;

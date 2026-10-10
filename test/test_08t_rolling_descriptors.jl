@@ -480,7 +480,8 @@ end
     @test isequal(isnan.(rev), isnan.(oracle_reversal_21))
     @test isequal(isnan.(mx), isnan.(oracle_max_return_21))
     ok = .!isnan.(oracle_reversal_21)
-    # Measured maxabs 8.3e-17.
+    # Measured maxabs 8.3e-17. A reversal is a sum of returns, so a cell near zero carries a
+    # large relative round-off, and the pin is absolute: one ulp of the largest entry, 0.05.
     @test parity_compare(rev[ok], oracle_reversal_21[ok]; rtol = 0.0, atol = 1e-16,
                          name = "Reversal 21").ok
     okm = .!isnan.(oracle_max_return_21)

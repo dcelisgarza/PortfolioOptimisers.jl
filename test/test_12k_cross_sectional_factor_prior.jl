@@ -883,7 +883,8 @@ end
         # The two libraries solve the same weighted least squares by different routes: this
         # one factorises the weighted design, and the oracle solves the
         # normal equations. The absolute agreement is therefore machine precision, and a
-        # near-zero factor return makes the relative figure larger than that.
+        # near-zero factor return makes the relative figure larger than that. Measured maxabs
+        # 1.2e-16 against a largest entry of 0.029.
         @test maximum(abs, pr.fpr.X - E) < 1e-14
         # The stored factor returns pin the residuals too, because the reconciliation is
         # exact: `Ms[t - 1] f_t + eps_t == X_t`.
@@ -1001,6 +1002,8 @@ end
         @test all(isfinite, E)
         # The oracle's own expected returns, over the same universe. The
         # split is the last step of the fit, so the stored vector pins the whole chain.
+        # Measured maxabs 2.1e-17 against a largest entry of 0.048. A cell near zero carries
+        # the round-off of the split, so the bound is absolute.
         @test maximum(abs, pr.mu - E) < 1e-14
         # The forecast the split consumed travels on the block, and its `mu` is the last
         # observation of its own history.

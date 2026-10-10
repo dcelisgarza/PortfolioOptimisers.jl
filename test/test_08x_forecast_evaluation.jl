@@ -2282,6 +2282,7 @@ end
             @test forecast_calibration(forecast_evaluation(k * IC_ALPHA, y)).slope ≈
                   forecast_calibration(fe).slope / k
         end
+        # Measured maxrel 0.0: the negation is exact.
         @test parity_compare([forecast_calibration(forecast_evaluation(-IC_ALPHA, y)).slope],
                              [-CAL_REF_SLOPE]; rtol = 1e-14, name = "negated slope").ok
     end

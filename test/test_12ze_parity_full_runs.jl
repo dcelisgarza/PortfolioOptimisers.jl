@@ -295,10 +295,10 @@ end
         for (k, w) in enumerate((res.w, (p.res.w for p in hcv.pred)...))
             @test parity_compare(w, Wou[:, k]; rtol = 1e-12, name = "hrp $(k)").ok
         end
-        # The tree is the oracle's: the same merge heights (measured 4.4e-16) and the same
-        # clusters. The oracle sorts its merges by height.
+        # The tree is the oracle's: the same merge heights (measured maxrel 9.8e-16) and the
+        # same clusters. The oracle sorts its merges by height.
         L = load("Hrp", "Linkage")
-        @test maxabs(sort(res.clr.res.heights), sort(L[:, 3])) <= 1e-14
+        @test parity_compare(sort(res.clr.res.heights), sort(L[:, 3]); name = "heights").ok
         # Better (#1494): the library's order is the exact optimal leaf ordering, 15.888. The
         # oracle's "optimal" order of the same tree sums to 16.065, so the orders differ, and
         # so do the weights. The library's heuristic order summed to 15.921 before.
@@ -308,6 +308,8 @@ end
         @test res.clr.res.order != lo
         @test adj(res.clr.res.order) < adj(lo) - 0.1
         @test maxabs(res.w, loadv("Hrp", "W")) > 1e-3
+        Wof = load("Hrp", "FoldW")
+        @test all(maxabs(p.res.w, Wof[:, k]) > 1e-3 for (k, p) in enumerate(hcv.pred))
     end
 
     @testset "Observed factors through a walk-forward and the meta-optimisers" begin

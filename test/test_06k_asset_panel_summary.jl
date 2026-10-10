@@ -258,16 +258,18 @@ end
         @test res.pnl.emsk ==
               (parity_load("AssetPanelSummary", "Align$case", "EstimationMask") .== 1) .&
               res.pnl.amsk
+        first = parity_load("AssetPanelSummary", "Align$case", "ActiveMask") .== 1
         if case == "SalesBook"
             # Better: the oracle's first call walks the fields in turn, so it stops at
             # observation 5 on asset 7, where `sales_ttm` is not observed, and its second
             # call moves on to observation 10. The rule of the library is its fixed point.
-            first = parity_load("AssetPanelSummary", "Align$case", "ActiveMask") .== 1
             @test findfirst(first[:, 7]) == 5
             @test findfirst(res.pnl.amsk[:, 7]) == 10
             @test n[2] > 0
         else
+            # The oracle's second call aligns nothing more, so its first call is the result.
             @test n[2] == 0
+            @test first == res.pnl.amsk
         end
     end
     # Better: the oracle refuses a tensor field; the library aligns asset 3 past the three

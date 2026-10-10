@@ -37,11 +37,12 @@ repository.
 
 **The comparison.** `parity_compare` is the one comparison of every parity ticket. It needs the
 same shape and the same pattern of non-finite values, and every finite pair within
-`atol + rtol * max(|a|, |b|)`, `rtol = 1e-12` by default. It prints the largest relative and
-absolute difference, so a test states the measured value next to its tolerance. A small entry
-formed by a cancellation, such as an off-diagonal covariance of two unrelated assets, carries a
-relative round-off far above that of the matrix: `scale = :array` measures each cell against the
-largest entry instead, and a test that uses it says why.
+`atol + rtol * max(|a|, |b|)`, `rtol = 1e-12` by default. It returns the largest relative and
+absolute difference, so a test states the measured value next to its tolerance, and it prints
+them only when the check fails. A small entry formed by a cancellation, such as an off-diagonal
+covariance of two unrelated assets, carries a relative round-off far above that of the matrix:
+`scale = :array` measures each cell against the largest entry instead, and a test that uses it
+says why.
 
 **The storage.** A stored oracle output is `test/assets/Parity_<Unit>_<Case>_<Output>.csv.gz`, with
 a header row `x1, x2, …`. `Unit` is the Julia name of the unit under test, `Case` names the
@@ -287,7 +288,8 @@ function parity_read(path::AbstractString; header::Bool = false)
 end
 
 """
-    parity_compare(a, b; rtol = 1e-12, atol = 0.0, scale = :cell, name = "") -> NamedTuple
+    parity_compare(a, b; rtol = 1e-12, atol = 0.0, scale = :cell, name = "", quiet = false)
+        -> NamedTuple
 
 Compare `a` with `b` cell by cell. `ok` is true when the shapes agree, the non-finite cells agree
 exactly, and every finite pair lies within `atol + rtol * m`. Under `scale = :cell`, `m` is
@@ -298,13 +300,18 @@ off-diagonal covariance.
 `pattern` reports the non-finite cells alone. `maxrel` is the largest difference of a finite pair
 over its own size, `maxscaled` the largest difference over the largest entry, and `maxabs` the
 largest difference. A check that fails prints one line with all three, under `name`. A check
-that passes prints nothing, so the output of a parity file shows its failures alone.
+that passes prints nothing, so the output of a parity file shows its failures alone. A negative
+check, `@test !parity_compare(...).ok`, passes when the comparison fails, so it states
+`quiet = true` and prints nothing either.
 """
 function parity_compare(a::AbstractArray, b::AbstractArray; rtol::Real = 1e-12,
-                        atol::Real = 0.0, scale::Symbol = :cell, name::AbstractString = "")
+                        atol::Real = 0.0, scale::Symbol = :cell, name::AbstractString = "",
+                        quiet::Bool = false)
     @assert scale in (:cell, :array)
     if size(a) != size(b)
-        println("parity $(name): size $(size(a)) against $(size(b))")
+        if !quiet
+            println("parity $(name): size $(size(a)) against $(size(b))")
+        end
         return (; ok = false, pattern = false, maxrel = Inf, maxscaled = Inf, maxabs = Inf)
     end
     big = 0.0
@@ -328,7 +335,7 @@ function parity_compare(a::AbstractArray, b::AbstractArray; rtol::Real = 1e-12,
     end
     maxscaled = iszero(maxabs) ? 0.0 : maxabs / big
     ok = pattern && within
-    if !ok
+    if !(ok || quiet)
         println("parity $(name): maxrel = $(maxrel), maxscaled = $(maxscaled), maxabs = $(maxabs), pattern = $(pattern)")
     end
     return (; ok, pattern, maxrel, maxscaled, maxabs)

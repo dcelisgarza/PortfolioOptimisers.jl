@@ -701,8 +701,8 @@ end
         # A score neutralised against the one-hot industry family is a residual, and a
         # residual near zero comes from a cancellation, so the case compares against its
         # largest entry. Measured 2.0e-16 there, and 1.7 relative on a cell near zero (#1386).
-        @test isapprox(rf.hist[isfinite.(E)], E[isfinite.(E)]; rtol = 1e-12,
-                       norm = x -> maximum(abs, x))
+        @test parity_compare(rf.hist[isfinite.(E)], E[isfinite.(E)]; scale = :array,
+                             name = "FixedWeightedReturnForecast2").ok
         @test isequal(rf.mu, rf.hist[end, :])
     end
 end
@@ -1768,7 +1768,8 @@ end
         # A neutralised score is a residual, so a cell near zero comes from a cancellation,
         # and the case compares against its largest entry. Measured 9.9e-16 there (#1386).
         m = isfinite.(E)
-        @test isapprox(rf.hist[m], E[m]; rtol = 1e-12, norm = x -> maximum(abs, x))
+        @test parity_compare(rf.hist[m], E[m]; scale = :array,
+                             name = "ExpWeightedReturnForecast2").ok
     end
 
     @testset "The uncalibrated target forecast matches the stored case" begin

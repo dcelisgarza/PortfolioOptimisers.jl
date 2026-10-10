@@ -54,36 +54,40 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         # The oracle centres nothing, so its numbers are ours at a zero location under
         # its own target, the horizon return.
         k(Z, wt) = covariance_forecast_step(sig, Z, zeros(4), wt, HorizonReturn())
-        # Measured maxabs 2.2e-16 on the standardised returns, and 1.8e-15 on a QLIKE near -7.
+        # Measured maxrel 2.4e-16 at most, on every statistic of the four steps below.
         s = k(Zr, nothing)
         @test s.n_valid == 4
-        @test isapprox(s.mahalanobis_ratio, 0.978852966148661; atol = 1e-14)
-        @test isapprox(mean(s.diagonal_ratio), 1.1925335096638512; atol = 1e-14)
-        @test parity_compare(s.standardised_return, [1.9211917469757487]; rtol = 0.0,
-                             atol = 1e-14, name = "stdret Zr").ok
-        @test parity_compare(s.portfolio_qlike, [-6.949593962426171]; rtol = 0.0,
-                             atol = 1e-13, name = "pqlike Zr").ok
+        @test parity_compare([s.mahalanobis_ratio], [0.978852966148661]; rtol = 1e-14,
+                             name = "mahalanobis Zr").ok
+        @test parity_compare([mean(s.diagonal_ratio)], [1.1925335096638512]; rtol = 1e-14,
+                             name = "diagonal mean Zr").ok
+        @test parity_compare(s.standardised_return, [1.9211917469757487]; rtol = 1e-14,
+                             name = "stdret Zr").ok
+        @test parity_compare(s.portfolio_qlike, [-6.949593962426171]; rtol = 1e-14,
+                             name = "pqlike Zr").ok
         s = k(Zr, W)
         @test parity_compare(s.standardised_return, [1.894133508777383, 1.6253620587183681];
-                             rtol = 0.0, atol = 1e-14, name = "stdret Zr W").ok
+                             rtol = 1e-14, name = "stdret Zr W").ok
         @test parity_compare(s.portfolio_qlike, [-6.961786146396911, -7.110698408378284];
-                             rtol = 0.0, atol = 1e-13, name = "pqlike Zr W").ok
+                             rtol = 1e-14, name = "pqlike Zr W").ok
         # One missing cell: the pairwise count scales the forecast, `H ⊙ Σ̂`, and the
         # oracle's numbers move with it.
         s = k(Zn, nothing)
         @test s.n_valid == 4
-        @test isapprox(s.mahalanobis_ratio, 0.9039713006494878; atol = 1e-14)
-        @test isapprox(mean(s.diagonal_ratio), 1.0830084753657339; atol = 1e-14)
-        @test parity_compare(s.standardised_return, [1.850608226250147]; rtol = 0.0,
-                             atol = 1e-14, name = "stdret Zn").ok
-        @test parity_compare(s.portfolio_qlike, [-7.149655216935746]; rtol = 0.0,
-                             atol = 1e-13, name = "pqlike Zn").ok
+        @test parity_compare([s.mahalanobis_ratio], [0.9039713006494878]; rtol = 1e-14,
+                             name = "mahalanobis Zn").ok
+        @test parity_compare([mean(s.diagonal_ratio)], [1.0830084753657339]; rtol = 1e-14,
+                             name = "diagonal mean Zn").ok
+        @test parity_compare(s.standardised_return, [1.850608226250147]; rtol = 1e-14,
+                             name = "stdret Zn").ok
+        @test parity_compare(s.portfolio_qlike, [-7.149655216935746]; rtol = 1e-14,
+                             name = "pqlike Zn").ok
         s = k(Zn, W)
         @test parity_compare(s.standardised_return,
-                             [1.8276572778164961, 1.5382386137061885]; rtol = 0.0,
-                             atol = 1e-14, name = "stdret Zn W").ok
+                             [1.8276572778164961, 1.5382386137061885]; rtol = 1e-14,
+                             name = "stdret Zn W").ok
         @test parity_compare(s.portfolio_qlike, [-7.156129366719016, -7.322586405112045];
-                             rtol = 0.0, atol = 1e-13, name = "pqlike Zn W").ok
+                             rtol = 1e-14, name = "pqlike Zn W").ok
         # An independent re-derivation of the missing-cell case in plain Julia, so the
         # literals above are not the only oracle: with `H` the pairwise finite count,
         # `m = R' (H ⊙ Σ̂)⁻¹ R / N`, `d_i = R_i² / (H_ii Σ̂_ii)`, `b = w'R / √(w'(H ⊙ Σ̂)w)`.
@@ -381,7 +385,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test parity_compare(cfer.mahalanobis_ratio,
                              [0.978852966148661, 0.4653960403261437, 0.011680925757934219,
                               0.315530814251327, 0.34876711552388395, 0.15922909197779334,
-                              0.2726172060164678]; rtol = 0.0, atol = 1e-14,
+                              0.2726172060164678]; rtol = 1e-14,
                              name = "cfer mahalanobis ratio").ok
         s = covariance_forecast_summary(cfer)
         @test s.names == ["forecast_1"]
