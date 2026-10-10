@@ -297,7 +297,8 @@ off-diagonal covariance.
 
 `pattern` reports the non-finite cells alone. `maxrel` is the largest difference of a finite pair
 over its own size, `maxscaled` the largest difference over the largest entry, and `maxabs` the
-largest difference. Print one line with all three, under `name`.
+largest difference. A check that fails prints one line with all three, under `name`. A check
+that passes prints nothing, so the output of a parity file shows its failures alone.
 """
 function parity_compare(a::AbstractArray, b::AbstractArray; rtol::Real = 1e-12,
                         atol::Real = 0.0, scale::Symbol = :cell, name::AbstractString = "")
@@ -326,8 +327,11 @@ function parity_compare(a::AbstractArray, b::AbstractArray; rtol::Real = 1e-12,
         end
     end
     maxscaled = iszero(maxabs) ? 0.0 : maxabs / big
-    println("parity $(name): maxrel = $(maxrel), maxscaled = $(maxscaled), maxabs = $(maxabs), pattern = $(pattern)")
-    return (; ok = pattern && within, pattern, maxrel, maxscaled, maxabs)
+    ok = pattern && within
+    if !ok
+        println("parity $(name): maxrel = $(maxrel), maxscaled = $(maxscaled), maxabs = $(maxabs), pattern = $(pattern)")
+    end
+    return (; ok, pattern, maxrel, maxscaled, maxabs)
 end
 
 """
