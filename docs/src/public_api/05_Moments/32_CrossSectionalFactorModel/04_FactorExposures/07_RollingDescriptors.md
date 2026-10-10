@@ -19,6 +19,7 @@ PortfolioOptimisers.partial_fit!(de::RollingLogReturn{<:Any, <:Any, <:Any, <:Any
 merge_states(::PortfolioOptimisers.RollingLogReturnState, ::PortfolioOptimisers.RollingLogReturnState)
 PortfolioOptimisers.descriptor_step
 PortfolioOptimisers.carry_lookback
+descriptor(de::PortfolioOptimisers.CarriedDescriptor, rd::ReturnsResult)
 RollingMomentum
 Reversal
 MaxReturn

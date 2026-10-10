@@ -1,5 +1,5 @@
 ```@meta
-Description = "PortfolioOptimisersCovariance, private API of PortfolioOptimisers.jl: find_uncorrelated_indices, gap_fill_value, show_fields, supports_partial_fit."
+Description = "PortfolioOptimisersCovariance, private API of PortfolioOptimisers.jl: find_uncorrelated_indices, gap_fill_value, show_fields."
 ```
 
 # PortfolioOptimisersCovariance: private API
@@ -8,5 +8,4 @@ Description = "PortfolioOptimisersCovariance, private API of PortfolioOptimisers
 PortfolioOptimisers.find_uncorrelated_indices
 gap_fill_value(::PortfolioOptimisersCovariance)
 PortfolioOptimisers.show_fields(::PortfolioOptimisersCovariance)
-PortfolioOptimisers.supports_partial_fit(ce::PortfolioOptimisersCovariance)
 ```

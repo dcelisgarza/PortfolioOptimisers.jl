@@ -24,7 +24,6 @@ rolling_state_seed
 rolling_state_fold!
 rolling_state_value!
 rolling_state_push!
-descriptor(de::PortfolioOptimisers.CarriedDescriptor, rd::ReturnsResult)
 descriptor_carry
 descriptor_carried
 ```

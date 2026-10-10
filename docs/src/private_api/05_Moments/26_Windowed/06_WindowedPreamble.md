@@ -15,6 +15,5 @@ windowed_series_rows
 windowed_series_row
 windowed_variance_series
 SeedWindowed
-supports_partial_fit(::SeedWindowed)
 seed_window_path(::SeedWindowed)
 ```
