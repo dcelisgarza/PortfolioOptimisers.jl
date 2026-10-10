@@ -803,6 +803,96 @@ The rule applies on the predicted side to every number, and on both sides to the
 
 A Leverage-One Pair is a second kind of unknown entry. The fit reproduced the return of the pair, so its total is exact and the split between its systematic and its idiosyncratic part is unknown. This is the opposite of an asset in the warm-up of its variance, whose split is exact up to its unknown idiosyncratic part. The rule applies to this kind on both sides, through [`attribution_leverage_split`](@ref).
 
+# Interfaces
+
+In order to implement a new rule for an unknown entry which will work seamlessly with the library, subtype `AbstractUnknownEntryRule` and implement the following six methods. The first four apply the rule to an entry the factor model does not state, and the last two apply it to the variance split of a Leverage-One Pair. A rule that implements all six applies to every kind, and it can also be a field of [`KindwiseUnknown`](@ref).
+
+## The held assets that keep their unknown entries
+
+  - `attribution_unknown_keep(rule::MyRule, w::VecNum) -> BitVector`: Returns the assets whose unknown entries stay unknown in a predicted attribution.
+
+### Arguments
+
+  - `rule`: The rule.
+  - `w`: Portfolio weights.
+
+### Returns
+
+  - `keep::BitVector`: `true` at every asset whose unknown entries stay `NaN`. An asset with a weight of zero adds nothing to a sum, so the attribution reads its unknown entries as zero whatever the rule returns.
+
+## The standalone moments of the predicted asset axis
+
+  - `attribution_standalone(rule::MyRule, A::AbstractArray) -> AbstractArray`: Returns the entries of a block that the standalone volatility and mean of each asset read.
+
+### Arguments
+
+  - `rule`: The rule.
+  - `A`: The loadings, the factor-orthogonal mean or the idiosyncratic block.
+
+### Returns
+
+  - `A::AbstractArray`: The entries the standalone moments read, the shape of `A`.
+
+## The observations of the realised standalone moments
+
+  - `attribution_standalone_pairs(rule::MyRule, act::AbstractVector{Bool}) -> AbstractVector{Bool}`: Returns the observations that the realised standalone moments of one asset read.
+
+### Arguments
+
+  - `rule`: The rule.
+  - `act`: Whether each aligned pair of the asset is active.
+
+### Returns
+
+  - `a::AbstractVector{Bool}`: The observations the moments read, the length of `act`.
+
+## The note of the report
+
+  - `attribution_unknown_note(rule::MyRule) -> String`: Returns the sentence that a predicted attribution adds to the report of a held asset that is not investable.
+
+### Arguments
+
+  - `rule`: The rule.
+
+### Returns
+
+  - `note::String`: The sentence. It states what the rule does with the unknown entries, so that the reader knows which numbers to trust.
+
+## The marks of a Leverage-One Pair
+
+  - `attribution_leverage_split(rule::MyRule, lev::Option{<:AbstractVector{Bool}}, w::VecNum, M::MatNum) -> Option{<:NamedTuple}`: Returns the marks of a predicted attribution.
+  - `attribution_leverage_split(rule::MyRule, h1::Option{<:AbstractMatrix{Bool}}, W::VecNum_MatNum, B::MatNum_Arr3Num) -> Option{<:NamedTuple}`: Returns the marks of a realised attribution.
+
+### Arguments
+
+  - `rule`: The rule.
+  - `lev`: Assets the leverage-one mask marks at one row or more, or `nothing` when the model marks no pair.
+  - `h1`: The leverage-one mask, `observations × assets`, or `nothing` when the model marks no pair.
+  - `w`: Portfolio weights.
+  - `W`: Portfolio weights, or the weight history, `observations × assets`.
+  - `M`: Loadings, `assets × factors`.
+  - `B`: Loadings, or the exposure history, `observations × assets × factors`.
+
+### Returns
+
+  - `lv::Option{<:NamedTuple}`: `nothing` when the rule marks nothing. Otherwise the asset mask `assets` and the factor mask `factors`. [`attribution_leverage_nan`](@ref) puts `NaN` in every variance number that the marks read.
+
+## The standard errors of a Leverage-One Pair
+
+  - `attribution_leverage_errors(rule::MyRule, h1::Option{<:AbstractMatrix{Bool}}, reg::AbstractMatrix{Bool}, ses::NamedTuple, pass) -> NamedTuple`: Returns the standard errors of the mean return contributions after the rule.
+
+### Arguments
+
+  - `rule`: The rule.
+  - `h1`: The leverage-one mask, `observations × assets`, or `nothing` when the model marks no pair.
+  - `reg`: Whether each pair is in the regression, `observations × assets`.
+  - `ses`: The standard errors, with the fields `sys`, `factor` and `family`.
+  - `pass`: The reduction of [`attribution_error_pass`](@ref), a function of a matrix of variances, `observations × assets`.
+
+### Returns
+
+  - `ses::NamedTuple`: The standard errors, with the fields of `ses`.
+
 # Related
 
   - [`EntrywiseUnknown`](@ref)
@@ -879,20 +969,21 @@ Keywords correspond to the struct's fields.
   - [`ZeroUnknown`](@ref)
   - [`factor_attribution`](@ref)
 """
-struct KindwiseUnknown{T1, T2} <: AbstractUnknownEntryRule
+@concrete struct KindwiseUnknown <: AbstractUnknownEntryRule
     """
     Rule for an entry the factor model does not state.
     """
-    unstated::T1
+    unstated
     """
     Rule for the variance split of a Leverage-One Pair.
     """
-    leverage::T2
-    function KindwiseUnknown(unstated::AbstractUnknownEntryRule,
-                             leverage::AbstractUnknownEntryRule)
+    leverage
+    function KindwiseUnknown(unstated::T1,
+                             leverage::T2) where {T1 <: AbstractUnknownEntryRule,
+                                                  T2 <: AbstractUnknownEntryRule}
         @argcheck(!isa(unstated, KindwiseUnknown) && !isa(leverage, KindwiseUnknown),
                   ArgumentError("each field of `KindwiseUnknown` is the rule of one kind of unknown entry, so it cannot be a `KindwiseUnknown`"))
-        return new{typeof(unstated), typeof(leverage)}(unstated, leverage)
+        return new{T1, T2}(unstated, leverage)
     end
 end
 function KindwiseUnknown(; unstated::AbstractUnknownEntryRule = EntrywiseUnknown(),

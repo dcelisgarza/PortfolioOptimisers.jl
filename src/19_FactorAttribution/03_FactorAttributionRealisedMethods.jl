@@ -936,3 +936,6 @@ end
 function attribution_unknown_note(::ZeroUnknown)
     return "Every entry the prior does not state for them reads as zero, so the idiosyncratic part and the total understate the variance of the portfolio"
 end
+
+public attribution_unknown_keep, attribution_standalone, attribution_standalone_pairs,
+       attribution_unknown_note, attribution_leverage_split, attribution_leverage_errors
