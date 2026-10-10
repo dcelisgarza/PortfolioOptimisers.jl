@@ -614,14 +614,15 @@ function asset_panel(ape::RegressionPanel, pr, rd, ::Any)
     L = prr.rr.L
     nnf = count(i -> !all(isfinite, view(L, i, :)), axes(L, 1))
     @argcheck(iszero(nnf),
-              IsNonFiniteError("`RegressionPanel` reads the factor loadings `pr.rr.L` as a Panel Field, and $(nnf) of the $(size(L, 1)) assets inside the prior's Investable Mask carry a loading that is not finite, so the field cannot be built over them. An asset outside the mask is written as a zero row with a false observed mask and never reaches this check, so every asset it counts has a finite moment and a loadings row that is not: a defect of the regression, not of the universe.\nGot\npr => $(nameof(typeof(pr)))\nrr => $(nameof(typeof(pr.rr)))\nassets with a non-finite loading => $(nnf)"))
+              IsNonFiniteError("`RegressionPanel` reads the factor loadings `pr.rr.L` as a Panel Field, and $(nnf) of the $(size(L, 1)) assets inside the prior's Investable Mask carry a loading that is not finite, so the field cannot be built over them. An asset outside the mask is written as a zero placeholder row and never reaches this check, so every asset it counts has a finite moment and a loadings row that is not: a defect of the regression, not of the universe.\nGot\npr => $(nameof(typeof(pr)))\nrr => $(nameof(typeof(pr.rr)))\nassets with a non-finite loading => $(nnf)"))
     vals, omsk = expand_investable_loadings(L, imsk)
     return AssetPanel(;
                       pf = [TensorPanelField(; name = "loadings", axis = "factor",
                                              labels = panel_axis_labels(regression_factor_names(prr.rr,
                                                                                                 rd),
                                                                         size(L, 2)),
-                                             vals = vals, omsk = omsk)])
+                                             vals = vals, omsk = omsk,
+                                             pmsk = isnothing(omsk) ? nothing : .!omsk)])
 end
 """
     expand_investable_loadings(L::MatNum, imsk::Nothing) -> (L, nothing)
@@ -629,9 +630,9 @@ end
 
 Write the loadings that a [`RegressionPanel`](@ref) read on the Investable Mask back onto the full asset universe.
 
-A prior fitted on a point-in-time Asset Panel writes `NaN` into the loadings of every asset outside its Investable Mask, and a Panel Field admits no `NaN`. So the producer reads the loadings on the mask, and this function expands them. Each asset outside the mask gets a zero row and a false observed mask. Every uncertainty set that a caller fits on its own on such a prior follows the same rule, and a Panel Field already has that shape for a cell that a fill policy wrote.
+A prior fitted on a point-in-time Asset Panel writes `NaN` into the loadings of every asset outside its Investable Mask, and a Panel Field admits no `NaN`. So the producer reads the loadings on the mask, and this function expands them. Each asset outside the mask gets a zero row and a false observed mask. Every uncertainty set that a caller fits on its own on such a prior follows the same rule. The producer marks the row as a placeholder too: its placeholder mask is the negation of the observed mask, because no loading exists there.
 
-A zero row is a placeholder, not a zero feature vector, because its observed mask is false. A [`FeatureDistance`](@ref) reads no unobserved cell: a direct call refuses such an asset by name. An optimiser hands the producer the prior reduced to the mask, so a fit meets no such row. The selector `"loadings" => :observed` reads the mask as a column.
+A zero row is a placeholder, not a zero feature vector. A [`FeatureDistance`](@ref) reads no placeholder: a direct call refuses such an asset by name. An optimiser hands the producer the prior reduced to the mask, so a fit meets no such row. The selector `"loadings" => :observed` reads the mask as a column.
 
 # Mathematical definition
 

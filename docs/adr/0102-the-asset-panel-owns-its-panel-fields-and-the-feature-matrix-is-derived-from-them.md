@@ -440,35 +440,75 @@ refuse valid input. Every consumer keeps such a row unscored. The oracle's check
 
 An unfilled blank keeps the policy's `val` with `omsk = false`. #1416 found that two readers used
 that `val` as data: `feature_matrix` (and through it `FeatureDistance`) and the panel collapse of a
-meta-optimiser. A child task of map #1375 makes them read observed cells only, and adds a census
-that poisons the active unobserved cells, as `test_06j` poisons the inactive ones.
+meta-optimiser. A child task of map #1375 makes them skip that `val`, and adds a census that
+poisons it in the active cells, as `test_06j` poisons the inactive ones. The next amendment states
+the rule.
 
 ## Amendment (2026-10-06, #1508)
 
 ([#1508](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1508), a build task
-of #1416.) **A reader reads the active observed cells alone, and `val` is a placeholder that no
-reader reads.** A placeholder is a storage convention, not an observation. A reader that uses it
-adds a fabricated value to its sample, and its answer then changes with `val`. A correct reader
-gives the same answer for every `val`.
+of #1416, and [#1631](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1631), which
+corrected it.) **A reader reads the active cells that hold data, and a placeholder is a value that
+no reader reads.** A placeholder is the `val` that a fill policy writes into a blank only because
+it has nothing to carry there. It is a storage convention, not an observation. A reader that uses
+it adds a fabricated value to its sample, and its answer then changes with `val`. A correct reader
+gives the same answer for every placeholder.
 
-- `feature_matrix` holds `unobserved` at a cell of a value column whose observed mask is `false`,
-  `NaN` by default, as `panel_field_values` does. `unobserved = nothing` keeps the placeholder. An
-  observed-mask column is data in every cell, so it is unchanged.
-- `FeatureDistance` reads an asset at a cell only where it is active and every value column of its
-  selector was observed. The rules of #1454 for an inactive cell apply to an unobserved one: each
-  asset and each pair at its own readable rows, `LastActiveRow` at the last readable row, and the
-  entry of a fit drops an asset with no readable row. A static panel has one row, so an asset with
-  an unobserved selected cell is unreadable there.
+**A filled cell holds data.** The observed mask cannot tell a placeholder from a filled cell: both
+are `false`. The first build of #1508 read `omsk = false` as a placeholder, so the readers skipped
+every value that a fill policy wrote. That broke the purpose of `ConstantPanelFill`, whose value is
+what the absence means, and of a carried value. #1631 found it: a static panel filled under
+`ConstantPanelFill` made `FeatureDistance` refuse every asset with a filled cell, and a fit dropped
+such an asset in silence. So each Panel Field carries a second mask beside `omsk`.
+
+- **`pmsk` is the placeholder mask**: `true` where a cell holds a placeholder, of the size of the
+  values, or `nothing` when no cell holds one. An observed cell is never a placeholder, and a field
+  with no observed mask holds none: the constructor refuses both. `omsk` keeps its meaning,
+  observed by the raw input. So a cell is observed, filled (`omsk` and `pmsk` both `false`) or a
+  placeholder. A second `Bool` mask was chosen over one array of three states, an enumeration or
+  a `UInt8`: every reader of `omsk`, the lazy `AllTrueMask` and the `nothing` form keep working,
+  and a reader that skips placeholders reads one mask.
+- **The fill policy states its placeholders** through the optional verb `panel_placeholder`,
+  which `panel_fill` has beside it. `ForwardPanelFill` and `BackwardPanelFill` mark a blank that
+  no carried value reaches: before the first observed cell of a stretch, or past the run of `lim`.
+  `ConstantPanelFill` marks none. A policy that defines no method marks none, so its values are
+  data, as they were before #1508. An input type states them through the optional verb
+  `panel_input_placeholder`, whose fallback marks none.
+- **`RegressionPanel`** marks its zero rows outside the Investable Mask as placeholders, because
+  no loading exists there.
+- **A lift keeps both masks.** The lift above drops the observed mask of a static input, because
+  every cell of a static input was observed. That is not so for a static input whose blanks
+  `ConstantPanelFill` filled, and a collapsed static panel that a meta-optimiser lifts can hold a
+  placeholder. So the lift wraps `omsk` and `pmsk` in a `RepeatedLeading`, as it wraps the values.
+  A view, a concatenation, a fold stack and the round trip of the panel keep `pmsk` too; the
+  manifest records it in a `placeholder` column, and the table in `"<column>::placeholder"`
+  columns.
+
+The readers:
+
+- `feature_matrix` holds `placeholder` at a placeholder of a value column, `NaN` by default.
+  `placeholder = nothing` keeps the stored value. A filled cell keeps its value. An observed-mask
+  column is data in every cell, so it is unchanged. The keyword is `placeholder`, not
+  `unobserved`, because `panel_field_values` reads `unobserved` at every unobserved cell, filled or
+  not, and one name must not mean two cell sets.
+- `FeatureDistance` reads an asset at a cell only where it is active and no value column of its
+  selector holds a placeholder. The rules of #1454 for an inactive cell apply to a placeholder:
+  each asset and each pair at its own readable rows, `LastActiveRow` at the last readable row, and
+  the entry of a fit drops an asset with no readable row. A static panel has one row, so an asset
+  with a selected placeholder is unreadable there.
 - The panel collapse of a meta-optimiser reads, for each Panel Field, the members that are active
-  and observed, and the rule of #1456 divides by their weight. A tensor field reads the observed
-  mask of each label. A square field reads a pair of members with the weight `W[i, k] W[j, l]` and
-  divides by the weight of the read pairs, so a symmetric field stays symmetric. A collapsed cell
-  with no active observed member is unobserved. Where every active cell is observed, the collapse
-  is the one that reads the active members, bit for bit.
+  and hold data, and the rule of #1456 divides by their weight. A tensor field reads the mask of
+  each label. A square field reads a pair of members with the weight `W[i, k] W[j, l]` and divides
+  by the weight of the read pairs, so a symmetric field stays symmetric. A collapsed cell holds a
+  placeholder where no active member with weight holds data, and it is observed where an active
+  member with weight was observed. Where no active cell holds a placeholder, the collapse is the
+  one that reads the active members, bit for bit.
+- `panel_field_values`, the descriptors, the exposures and `describe` read `omsk` as before: a
+  filled cell is not an observation there.
 
-`test_06m` gates the rule. It blanks about one active cell in twenty of every Panel Field, poisons
-`val` there, and needs every consumer of an Asset Panel to give the same answer on the clean and on
-the poisoned copy.
+`test_06m` gates the rule. It marks about one active cell in twenty of every Panel Field as a
+placeholder, poisons the value there, and needs every consumer of an Asset Panel to give the same
+answer on the clean and on the poisoned copy. Its last test set checks that a filled cell is read.
 
 ## Amendment (2026-10-07)
 

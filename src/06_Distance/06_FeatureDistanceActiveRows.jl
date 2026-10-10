@@ -145,10 +145,10 @@ State why a collapse has no value to read for an asset, and the remedy, for the 
   - [`feature_readable`](@ref)
 """
 function unreadable_message(::AbstractFeatureCollapseAlgorithm)
-    return "each has no readable row in the window: no row at which it is active and every value column of `sel` was observed. Inside a fit, the entry of the optimiser drops such an asset as a non-investable asset. A direct call has no entry of a fit. Pass a view of the returns data at the assets to cluster, `port_opt_view(rd, i)`."
+    return "each has no readable row in the window: no row at which it is active and every value column of `sel` holds data, observed or filled. Inside a fit, the entry of the optimiser drops such an asset as a non-investable asset. A direct call has no entry of a fit. Pass a view of the returns data at the assets to cluster, `port_opt_view(rd, i)`."
 end
 function unreadable_message(::LastObservation{<:LastRow})
-    return "each is inactive at the last row of the window, or a value column of `sel` was not observed there. Inside a fit, the entry of the optimiser drops such an asset as a non-investable asset. A direct call has no entry of a fit. Pass a view of the returns data at the assets to cluster, `port_opt_view(rd, i)`, or read each asset at its last readable row, `LastObservation(; alg = LastActiveRow())`."
+    return "each is inactive at the last row of the window, or a value column of `sel` holds a placeholder there. Inside a fit, the entry of the optimiser drops such an asset as a non-investable asset. A direct call has no entry of a fit. Pass a view of the returns data at the assets to cluster, `port_opt_view(rd, i)`, or read each asset at its last readable row, `LastObservation(; alg = LastActiveRow())`."
 end
 """
     asset_major(Z::Arr3Num, dims::Integer)
@@ -566,9 +566,9 @@ end
 
 Compose the Investable Mask of a prior with the assets that each [`FeatureDistance`](@ref) inside `x` can read, at the entry of a fit.
 
-A fit reduces its prior, its optimiser and its returns data to the Investable Mask once, at its entry, with [`investable_reduction`](@ref). An asset that the prior admits can still have no value that a [`FeatureDistance`](@ref) of the fit can read in the window of its Asset Panel. A cell is readable where the asset is active and every value column of the Feature Selector was observed. [`LastRow`](@ref) reads nothing for an asset whose last cell is not readable, and every collapse reads nothing for an asset with no readable row. A static panel has one row, so an asset with an unobserved cell has none. This function drops such an asset from the mask before the reduction. The asset then departs as a non-investable asset: the reduction announces it, the fit gives it a zero weight, and it is listed on the Non-Investable Axis. Under [`DropFewerRows`](@ref) it also drops, from each pair with no shared active row, the asset with fewer active rows, until no pair is empty.
+A fit reduces its prior, its optimiser and its returns data to the Investable Mask once, at its entry, with [`investable_reduction`](@ref). An asset that the prior admits can still have no value that a [`FeatureDistance`](@ref) of the fit can read in the window of its Asset Panel. A cell is readable where the asset is active and every value column of the Feature Selector holds data, observed or filled. [`LastRow`](@ref) reads nothing for an asset whose last cell is not readable, and every collapse reads nothing for an asset with no readable row. A static panel has one row, so an asset with a placeholder has none. This function drops such an asset from the mask before the reduction. The asset then departs as a non-investable asset: the reduction announces it, the fit gives it a zero weight, and it is listed on the Non-Investable Axis. Under [`DropFewerRows`](@ref) it also drops, from each pair with no shared active row, the asset with fewer active rows, until no pair is empty.
 
-A default prior drops every asset that is not active over its whole window, so under it this function drops only an asset with an unobserved cell.
+A default prior drops every asset that is not active over its whole window, so under it this function drops only an asset with a placeholder.
 
 Every fit that clusters or builds a phylogeny calls it: [`HierarchicalRiskParity`](@ref), [`HierarchicalEqualRiskContribution`](@ref), [`SchurComplementHierarchicalRiskParity`](@ref), [`NestedClustered`](@ref), and a [`JuMPOptimiser`](@ref) through its phylogeny and centrality estimators. [`Stacking`](@ref) and [`SubsetResampling`](@ref) cluster only inside their inner optimisers, and each of those calls it at its own entry.
 
@@ -640,7 +640,7 @@ function compose_readable_mask(alg::AbstractFeatureCollapseAlgorithm,
     end
     drop_empty_pairs!(keep, empty_pair_rule(alg), A)
     @argcheck(any(keep),
-              IsEmptyError("FeatureDistance reads each asset at its readable rows, where it is active and every value column of `sel` was observed, and no asset of the investable universe has a value to read in the window of the Asset Panel, so the fit has no asset left."))
+              IsEmptyError("FeatureDistance reads each asset at its readable rows, where it is active and every value column of `sel` holds data, and no asset of the investable universe has a value to read in the window of the Asset Panel, so the fit has no asset left."))
     return isnothing(imsk) && all(keep) ? nothing : keep
 end
 """
@@ -664,7 +664,7 @@ end
 
 Name the rows that a collapse reads, and cut the mask of the cells it can read to them.
 
-A cell is readable where the asset is active and every value column of `cols` was observed: [`readable_cells`](@ref) joins the active mask of the panel with [`feature_observed_cells`](@ref). An unobserved cell holds the placeholder of a blank, not data. So a collapse reads it as it reads an inactive cell: each asset and each pair at its own readable rows. [`readable_window_rows`](@ref) names the rows on this mask, so [`LastActiveRow`](@ref) reads the last readable row of each asset. [`window_activity`](@ref) cuts the mask to the rows.
+A cell is readable where the asset is active and every value column of `cols` holds data: [`readable_cells`](@ref) joins the active mask of the panel with [`feature_data_cells`](@ref). A cell that holds the placeholder of a blank that no fill reached holds no data. So a collapse reads it as it reads an inactive cell: each asset and each pair at its own readable rows. [`readable_window_rows`](@ref) names the rows on this mask, so [`LastActiveRow`](@ref) reads the last readable row of each asset. [`window_activity`](@ref) cuts the mask to the rows.
 
 # Arguments
 
@@ -686,19 +686,19 @@ A cell is readable where the asset is active and every value column of `cols` wa
 """
 function feature_window_mask(alg::AbstractFeatureCollapseAlgorithm, pnl::AssetPanel,
                              cols::AbstractVector{Tuple{Int, Int, Symbol}})
-    R = readable_cells(pnl.amsk, feature_observed_cells(pnl, cols))
+    R = readable_cells(pnl.amsk, feature_data_cells(pnl, cols))
     rows = readable_window_rows(alg, pnl, R)
     return rows, window_activity(R, rows)
 end
 """
     readable_cells(amsk, o)
 
-Join the active mask `amsk` of a panel with the mask `o` of its observed cells: a cell is readable where both are `true`. Either mask can be `nothing`, which marks every cell `true`.
+Join the active mask `amsk` of a panel with the mask `o` of its cells that hold data: a cell is readable where both are `true`. Either mask can be `nothing`, which marks every cell `true`.
 
 # Related
 
   - [`feature_window_mask`](@ref)
-  - [`feature_observed_cells`](@ref)
+  - [`feature_data_cells`](@ref)
 """
 function readable_cells(amsk, ::Nothing)
     return amsk
@@ -712,7 +712,7 @@ end
 """
     readable_window_rows(alg, pnl::AssetPanel, R)
 
-Name the rows that a collapse reads on the mask `R` of readable cells. [`LastObservation`](@ref) forwards to its rule. [`LastActiveRow`](@ref) on a time-varying panel names them with [`last_active_rows`](@ref) on `R`, so an asset whose last active cell is unobserved is read at its last readable row. Every other case is [`collapse_rows`](@ref).
+Name the rows that a collapse reads on the mask `R` of readable cells. [`LastObservation`](@ref) forwards to its rule. [`LastActiveRow`](@ref) on a time-varying panel names them with [`last_active_rows`](@ref) on `R`, so an asset whose last active cell holds a placeholder is read at its last readable row. Every other case is [`collapse_rows`](@ref).
 
 # Related
 

@@ -333,7 +333,7 @@ end
         f = rv.pnl.pf[k]
         @test f.levels[end] == fxs.at.empty_level[1] && maximum(f.codes) < length(f.levels)
         f3 = CategoricalPanelField(; name = f.name, levels = f.levels[1:(end - 1)],
-                                   codes = Matrix(f.codes), omsk = f.omsk)
+                                   codes = Matrix(f.codes), omsk = f.omsk, pmsk = f.pmsk)
         pf = [j == k ? f3 : x for (j, x) in enumerate(rv.pnl.pf)]
         rv3 = ReturnsResult(; nx = rv.nx, X = rv.X, ne = rv.ne, E = rv.E,
                             pnl = AssetPanel(pf, rv.pnl.amsk, rv.pnl.emsk))

@@ -230,7 +230,7 @@ To add a rule, subtype `AbstractLastObservationAlgorithm` and implement the two 
 ### Arguments
 
   - `alg`: The concrete subtype instance.
-  - `A`: The mask of readable cells of the window, `observations × assets`: the asset is active, and every value column that the Feature Selector names was observed.
+  - `A`: The mask of readable cells of the window, `observations × assets`: the asset is active, and every value column that the Feature Selector names holds data, observed or filled.
 
 ### Returns
 
@@ -1306,7 +1306,7 @@ end
 
 Compute the distance matrix from a feature matrix.
 
-The 2-D method collapses nothing: a static feature matrix has no observation axis, so the collapse algorithm reads its one row. Its `amsk` is `1 × assets` and marks the assets whose every value column was observed, and the method refuses an asset that it marks `false`. The 3-D method dispatches on it. Assets whose feature vector is entirely zero are given the convention documented in [`patch_zero_feature_vectors!`](@ref).
+The 2-D method collapses nothing: a static feature matrix has no observation axis, so the collapse algorithm reads its one row. Its `amsk` is `1 × assets` and marks the assets whose every value column holds data, and the method refuses an asset that it marks `false`. The 3-D method dispatches on it. Assets whose feature vector is entirely zero are given the convention documented in [`patch_zero_feature_vectors!`](@ref).
 
 The 3-D method reads the active mask `amsk` of the window. A collapse then reads each asset, or each pair of assets, at its own active rows, as each member of [`AbstractFeatureCollapseAlgorithm`](@ref) states. A window with no inactive cell gives the result that it gives with no mask.
 
@@ -1533,15 +1533,15 @@ end
 
 Stack the Feature Matrix a [`FeatureDistance`](@ref) measures, beside the mask of the cells it can read in the rows it stacks.
 
-It is [`feature_matrix`](@ref) with the mask added. A cell is readable where the asset is active and every value column of `de.sel` was observed. The mask is cut to the rows that the collapse reads, so it has one row per observation of the stack. A static panel has one row, the cells of the assets. Its mask is `nothing` when every cell is observed, and a `1 × assets` matrix otherwise. A time-varying panel whose every cell is readable gives the active mask, which the kernel drops when it is all `true`.
+It is [`feature_matrix`](@ref) with the mask added. A cell is readable where the asset is active and every value column of `de.sel` holds data: a value that the raw input carried, or that a fill policy wrote. The mask is cut to the rows that the collapse reads, so it has one row per observation of the stack. A static panel has one row, the cells of the assets. Its mask is `nothing` when every cell holds data, and a `1 × assets` matrix otherwise. A time-varying panel whose every cell is readable gives the active mask, which the kernel drops when it is all `true`.
 
-The stack holds a zero at an unobserved cell, never the placeholder that the panel stores. The mask leaves that cell out, so the zero is never read, and the stack is the same for every placeholder.
+The stack holds a zero at a cell that holds a placeholder, never the placeholder that the panel stores. The mask leaves that cell out, so the zero is never read, and the stack is the same for every placeholder.
 
 # Algorithm
 
  1. Resolve the panel with [`asset_panel`](@ref), and resolve `de.sel` against it with [`select_fields`](@ref).
  2. Name the rows the collapse reads, and cut the mask of readable cells to them, with [`feature_window_mask`](@ref).
- 3. Stack the panel over those rows with [`feature_stack`](@ref), with a zero at each unobserved cell.
+ 3. Stack the panel over those rows with [`feature_stack`](@ref), with a zero at each cell that holds a placeholder.
 
 # Arguments
 
@@ -1553,7 +1553,7 @@ The stack holds a zero at an unobserved cell, never the placeholder that the pan
 # Returns
 
   - `Z::Array`: The Feature Matrix, as [`feature_matrix`](@ref) returns it.
-  - `A::Option{<:AbstractMatrix{Bool}}`: The mask of readable cells of the stacked rows, `observations × assets`, or `1 × assets` for a static panel with an unobserved cell, or `nothing`.
+  - `A::Option{<:AbstractMatrix{Bool}}`: The mask of readable cells of the stacked rows, `observations × assets`, or `1 × assets` for a static panel with a placeholder, or `nothing`.
 
 # Related
 
@@ -1566,9 +1566,9 @@ function feature_window(de::FeatureDistance, pr, rd, X)
     pnl = asset_panel(de.ape, pr, rd, X)
     cols = select_fields(pnl, de.sel, de.strict)
     rows, A = feature_window_mask(de.alg, pnl, cols)
-    #! The mask leaves out every unobserved cell, so the zero written there is never read. It
+    #! The mask leaves out every placeholder, so the zero written there is never read. It
     #! keeps the stack finite for the checks of the kernel, whatever the placeholder holds.
-    return feature_stack(pnl, cols; rows = rows, unobserved = 0), A
+    return feature_stack(pnl, cols; rows = rows, placeholder = 0), A
 end
 """
     window_activity(amsk, rows)

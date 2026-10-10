@@ -23,9 +23,9 @@ message that names no asset, so a `NaN` for a missing value is no remedy.
 ## Decision
 
 **A `FeatureDistance` reads each asset, or each pair of assets, only at its own readable rows.**
-A row is readable for an asset where the asset is active and every value column of the Feature
-Selector was observed (#1508), because the panel stores a placeholder in an unobserved cell, not
-data. This is available-case estimation, as a Coverage Policy fits a covariance cell on the rows
+A row is readable for an asset where the asset is active and no value column of the Feature
+Selector holds a placeholder (#1508, #1631), because a placeholder is not data. A cell that a fill
+policy wrote holds data, and the distance reads it. This is available-case estimation, as a Coverage Policy fits a covariance cell on the rows
 at which both of its assets are active. The maintainer decided each part in a grilling session on
 issue #1450, and #1454 built it.
 

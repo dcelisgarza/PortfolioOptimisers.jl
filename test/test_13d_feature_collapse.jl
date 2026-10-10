@@ -617,7 +617,8 @@ end
         codes = [1 2 2; 1 1 2; 2 1 2]
         S = reshape(Float64.(1:27), 3, 3, 3)
         pnl = AssetPanel(;
-                         pf = [NumericPanelField(; name = "a", vals = a, omsk = o),
+                         pf = [NumericPanelField(; name = "a", vals = a, omsk = o,
+                                                 pmsk = .!o),
                                NumericPanelField(; name = "lift",
                                                  vals = PO.RepeatedLeading([10.0, 20.0,
                                                                             30.0], 3)),
@@ -632,8 +633,9 @@ end
         cr = PO.collapse_asset_panel(pnl, Wi, nx3, RenormaliseActive())
         cc = PO.collapse_asset_panel(pnl, Wi, nx3, InactiveAsCash())
         # A numeric field: row 1 has every member active and keeps the plain collapse. Row 2
-        # reads asset 3 alone, because asset 1 is unobserved there (#1508): 6 under the
-        # default, and 0.25 × 6 under the cash rule. Row 3 has no active observed member.
+        # reads asset 3 alone, because asset 1 holds a placeholder there (#1508, #1631): 6
+        # under the default, and 0.25 × 6 under the cash rule. Row 3 has no active member that
+        # holds data.
         @test vals(cr, "a") ≈ [1.75 2.0; 6.0 0.0; 0.0 0.0]
         @test vals(cc, "a") ≈ [1.75 2.0; 1.5 0.0; 0.0 0.0]
         # A static input lifted over the observations collapses row by row, so it varies.

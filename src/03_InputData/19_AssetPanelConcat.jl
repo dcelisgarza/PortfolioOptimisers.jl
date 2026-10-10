@@ -205,7 +205,7 @@ Concatenates the parts of one time-varying Panel Field along the observation axi
 
 # Algorithm
 
-The method that Julia selects is the algorithm. Each kind concatenates the value arrays of its parts with [`panel_values_vcat`](@ref), and their observed masks with [`panel_omsk_vcat`](@ref).
+The method that Julia selects is the algorithm. Each kind concatenates the value arrays of its parts with [`panel_values_vcat`](@ref), their observed masks with [`panel_omsk_vcat`](@ref), and their placeholder masks with [`panel_pmsk_vcat`](@ref).
 
 # Arguments
 
@@ -221,23 +221,27 @@ The method that Julia selects is the algorithm. Each kind concatenates the value
   - [`Base.vcat(a::AssetPanel, bs::AssetPanel...)`](@ref)
   - [`panel_values_vcat`](@ref)
   - [`panel_omsk_vcat`](@ref)
+  - [`panel_pmsk_vcat`](@ref)
 """
 function panel_field_vcat(f::NumericPanelField, fs::AbstractVector)
     vals = [g.vals for g in fs]
     return NumericPanelField(; name = f.name, vals = panel_values_vcat(vals),
-                             omsk = panel_omsk_vcat([g.omsk for g in fs], vals))
+                             omsk = panel_omsk_vcat([g.omsk for g in fs], vals),
+                             pmsk = panel_pmsk_vcat([g.pmsk for g in fs], vals))
 end
 function panel_field_vcat(f::CategoricalPanelField, fs::AbstractVector)
     codes = [g.codes for g in fs]
     return CategoricalPanelField(; name = f.name, levels = f.levels,
                                  codes = panel_values_vcat(codes),
-                                 omsk = panel_omsk_vcat([g.omsk for g in fs], codes))
+                                 omsk = panel_omsk_vcat([g.omsk for g in fs], codes),
+                                 pmsk = panel_pmsk_vcat([g.pmsk for g in fs], codes))
 end
 function panel_field_vcat(f::TensorPanelField, fs::AbstractVector)
     vals = [g.vals for g in fs]
     return TensorPanelField(; name = f.name, axis = f.axis, labels = f.labels,
                             groups = f.groups, vals = panel_values_vcat(vals),
-                            omsk = panel_omsk_vcat([g.omsk for g in fs], vals))
+                            omsk = panel_omsk_vcat([g.omsk for g in fs], vals),
+                            pmsk = panel_pmsk_vcat([g.pmsk for g in fs], vals))
 end
 """
     panel_values_vcat(vs::AbstractVector{<:RepeatedLeading}) -> AbstractArray
@@ -310,6 +314,42 @@ function panel_omsk_vcat(::AbstractVector{Nothing}, ::AbstractVector)
 end
 function panel_omsk_vcat(ms::AbstractVector, vals::AbstractVector)
     return reduce(vcat, [isnothing(m) ? trues(size(v)) : m for (m, v) in zip(ms, vals)])
+end
+"""
+    panel_pmsk_vcat(ms::AbstractVector{Nothing}, vals::AbstractVector) -> Nothing
+    panel_pmsk_vcat(ms::AbstractVector, vals::AbstractVector) -> AbstractArray{Bool}
+
+Concatenates the placeholder masks of the parts of one Panel Field along the observation axis.
+
+A part with no placeholder mask holds no placeholder, so each of its cells holds data.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No part has a placeholder mask: return `nothing`.
+ 2. Otherwise: write an array of `false` values of the size of its values for each part with no mask, and concatenate the masks with `vcat`.
+
+# Arguments
+
+  - `ms`: The placeholder mask of each part, or `nothing`, in the order of the observations.
+  - `vals`: The value array of each part, which gives the size of a missing mask.
+
+# Returns
+
+  - `pmsk::Option{<:AbstractArray{Bool}}`: The placeholder mask over the observations of every part, or `nothing`.
+
+# Related
+
+  - [`panel_field_vcat`](@ref)
+  - [`panel_omsk_vcat`](@ref)
+  - [`Option`](@ref)
+"""
+function panel_pmsk_vcat(::AbstractVector{Nothing}, ::AbstractVector)
+    return nothing
+end
+function panel_pmsk_vcat(ms::AbstractVector, vals::AbstractVector)
+    return reduce(vcat, [isnothing(m) ? falses(size(v)) : m for (m, v) in zip(ms, vals)])
 end
 """
     panel_mask_vcat(ms::AbstractVector{<:AllTrueMask}) -> AllTrueMask

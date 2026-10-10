@@ -580,8 +580,8 @@ end
     #=
     Masks beside static inputs alone are a *request* for observations, not a contradiction:
     the panel couples the masks to the shape, so the build lifts each static input onto the
-    masks' observation count. The lift is lazy, and a lifted Panel Field carries no observed
-    mask, because every cell of a static input was observed.
+    masks' observation count. The lift is lazy, and it lifts the masks of the Panel Field too.
+    This input cannot blank, so it carries no observed mask before or after the lift (#1631).
     =#
     lifted = asset_panel([NumericPanelInput(; name = "a", vals = [1.0, 2.0])];
                          amsk = trues(3, 2), emsk = trues(3, 2))

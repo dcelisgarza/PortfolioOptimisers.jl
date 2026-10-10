@@ -29,7 +29,7 @@ by up to 24 % under a standardisation of the columns or under `Euclidean`, and o
 
 ## Decision
 
-**At each observation, the collapse weighs only the members that are active and observed
+**At each observation, the collapse weighs only the members that are active and hold data
 there.** A field
 `pcol` on `NestedClustered` and on `Stacking` holds the rule, an `AbstractPanelCollapseAlgorithm`,
 which stays unexported. The two rules are exported.
@@ -39,10 +39,10 @@ which stays unexported. The two rules are exported.
 | `RenormaliseActive()`, the default | `a°_tk = Σ_i W̃_ik r_ti a_ti / Σ_i W̃_ik r_ti` |
 | `InactiveAsCash()` | `a°_tk = Σ_i W̃_ik r_ti a_ti` |
 
-`r = m .& o` marks the cells that the collapse reads: `m` is the active mask of the panel, and `o`
-is the observed mask of the field (#1508). A member is read where it is active and its cell was
-observed, because the panel stores a placeholder in an unobserved cell, not data. A field with no
-observed mask reads `r = m`. **The default renormalises** because the collapse already
+`r = m .& u` marks the cells that the collapse reads: `m` is the active mask of the panel, and `u`
+is the data mask of the field, `.!pmsk` (#1508, #1631). A member is read where it is active and its
+cell holds data: a value that the raw input carried, or that a fill policy wrote. A placeholder is
+not data, and the collapse skips it. A field with no placeholder mask reads `r = m`. **The default renormalises** because the collapse already
 divides out the gross exposure: leverage, short positions and the cash that a budget leaves. The
 cash of an inactive member is one more part of the portfolio outside the universe, and the
 default divides it out in the same way, so each value stays a convex combination, as the
@@ -51,11 +51,12 @@ matches the outer returns for an additive feature, such as a loading.
 
 | Part | Rule |
 | --- | --- |
-| Every kind of field | A numeric field, the one-hot block of a categorical field and a rectangular tensor field take the restricted weights `D_t` of each row, `D_t,ik = W̃_ik r_ti / d_tk`. A tensor field reads the observed mask of each label. A square tensor field reads a pair of members with the weight `W̃_ik W̃_jl` where both are active and the cell is observed, and divides by the weight of the read pairs, so it stays symmetric. Where the read pairs are separable, this is `S°_t = D_tᵀ S_t D_t`. |
+| Every kind of field | A numeric field, the one-hot block of a categorical field and a rectangular tensor field take the restricted weights `D_t` of each row, `D_t,ik = W̃_ik r_ti / d_tk`. A tensor field reads the data mask of each label. A square tensor field reads a pair of members with the weight `W̃_ik W̃_jl` where both are active and the cell holds data, and divides by the weight of the read pairs, so it stays symmetric. Where the read pairs are separable, this is `S°_t = D_tᵀ S_t D_t`. |
 | A lifted field | A static input that a time-varying panel holds as a `RepeatedLeading` takes the rule of each row, so its collapse varies over time. |
 | A static panel | It has no mask and no inactive member, and it does not change under either rule. |
 | The divisor | `d_tk` is the weight of the read members under the default, and one under the cash rule. It is also one where a sub-portfolio has no read member, whose values are then the zero of its empty column, and where every member with weight is read. |
 | The observed mask | A collapsed cell is observed where a member that is active and observed has weight: the collapse reads `m .& omsk`, not `omsk`. A field with no observed mask keeps none. |
+| The placeholder mask | A collapsed cell holds a placeholder where no member that is active and holds data has weight: `pmsk° = .!(collapse of m .& u)`. A field with no placeholder mask keeps none. An observed collapsed cell is never a placeholder. |
 | The universe masks | They keep their rule: a sub-portfolio is active where one member with weight is, and so for the estimation mask. |
 | The cross-validated path | `rebuild_asset_panel` stacks the collapsed active and estimation masks of each fold, in place of all-`true` masks, so a sub-portfolio is inactive on the same rows on both paths. A static panel keeps all-`true` masks. |
 | `iv` | `prepare_outer_rd` collapses it with the same rule, row by row, through `collapse_rate`. |

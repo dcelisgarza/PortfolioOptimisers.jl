@@ -20,22 +20,28 @@ function census_poison_cells!(V::AbstractArray, amsk::AbstractMatrix{Bool}, f)
 end
 census_poison_mask(::Nothing, ::Any) = nothing
 census_poison_mask(m, amsk) = census_poison_cells!(Array(m), amsk, Returns(true))
+# An inactive cell that reads as observed holds no placeholder (#1631).
+census_poison_placeholder(::Nothing, ::Any) = nothing
+census_poison_placeholder(p, amsk) = census_poison_cells!(Array(p), amsk, Returns(false))
 function census_poison_field(f::NumericPanelField, amsk)
     return NumericPanelField(f.name,
                              census_poison_cells!(Array(f.vals), amsk, Returns(1e6)),
-                             census_poison_mask(f.omsk, amsk))
+                             census_poison_mask(f.omsk, amsk),
+                             census_poison_placeholder(f.pmsk, amsk))
 end
 function census_poison_field(f::CategoricalPanelField, amsk)
     nl = length(f.levels)
     return CategoricalPanelField(f.name, f.levels,
                                  census_poison_cells!(Array(f.codes), amsk,
                                                       c -> mod1(c + 1, nl)),
-                                 census_poison_mask(f.omsk, amsk))
+                                 census_poison_mask(f.omsk, amsk),
+                                 census_poison_placeholder(f.pmsk, amsk))
 end
 function census_poison_field(f::TensorPanelField, amsk)
     return TensorPanelField(f.name, f.axis, f.labels, f.groups,
                             census_poison_cells!(Array(f.vals), amsk, Returns(1e6)),
-                            census_poison_mask(f.omsk, amsk))
+                            census_poison_mask(f.omsk, amsk),
+                            census_poison_placeholder(f.pmsk, amsk))
 end
 census_poison_rates(::Nothing, ::Any) = nothing
 function census_poison_rates(iv::AbstractMatrix, amsk)
@@ -195,7 +201,7 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :feature_stack => "a step of feature_matrix",
                                            :feature_stack_eltype => "reads the types and the masks, and no cell value",
                                            # The mask of the cells FeatureDistance reads: the masks alone, and no cell value.
-                                           :feature_observed_cells => "reads the observed masks",
+                                           :feature_data_cells => "reads the placeholder masks",
                                            :feature_window_mask => "a step of FeatureDistance, whose cases are below",
                                            :readable_window_rows => "reads the axes and the masks")
 
@@ -212,7 +218,7 @@ function census_fixture(poison = census_poison, blank = identity)
     pf = CENSUS_PO.AbstractPanelField[]
     for f in pnl.pf
         if f.name in ("adj_volume", "short_interest")
-            push!(pf, NumericPanelField(f.name, abs.(f.vals), f.omsk))
+            push!(pf, NumericPanelField(f.name, abs.(f.vals), f.omsk, f.pmsk))
         else
             push!(pf, f)
         end

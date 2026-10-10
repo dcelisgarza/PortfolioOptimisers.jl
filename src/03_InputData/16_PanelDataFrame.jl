@@ -5,7 +5,7 @@
 
 Return the table columns one Panel Field contributes to a [`panel_dataframe`](@ref), in column order.
 
-A column is the triple `(name, vals, omsk)`. `name` is the column name, `vals` is the slab of values over the axes of the panel, and `omsk` is the slab of the observed mask, or `nothing` when the Panel Field carries no observed mask. Every slab is `assets` on a static panel and `observations × assets` on a time-varying one, so [`panel_array_view`](@ref) slices each of them by asset.
+A column is the tuple `(name, vals, omsk, pmsk)`. `name` is the column name, `vals` is the slab of values over the axes of the panel, `omsk` is the slab of the observed mask, or `nothing` when the Panel Field carries no observed mask, and `pmsk` is the slab of the placeholder mask, or `nothing` when the Panel Field holds no placeholder. Every slab is `assets` on a static panel and `observations × assets` on a time-varying one, so [`panel_array_view`](@ref) slices each of them by asset.
 
 A table and a Feature Matrix give a categorical Panel Field a different number of columns. A Feature Matrix holds numbers, so it gives the Panel Field one indicator column per level. A table column can hold a string, so it gives the Panel Field one column that holds the level. A tensor Panel Field gets the same columns in both, one column per trailing-axis label under the `"<field>=<label>"` name that [`panel_field_labels`](@ref) gives it. A table has two axes, and the labels are a third axis, so each label becomes a column.
 
@@ -24,7 +24,7 @@ The method that Julia selects is the algorithm.
 
 # Returns
 
-  - `cols::Vector{Tuple{String, Any, Any}}`: One `(name, vals, omsk)` triple per column, in column order. The value slab of a numeric or a tensor Panel Field is the array of the Panel Field or a view of it, not a copy.
+  - `cols::Vector{Tuple{String, Any, Any, Any}}`: One `(name, vals, omsk, pmsk)` tuple per column, in column order. The value slab of a numeric or a tensor Panel Field is the array of the Panel Field or a view of it, not a copy.
 
 # Related
 
@@ -34,18 +34,20 @@ The method that Julia selects is the algorithm.
   - [`panel_array_view`](@ref)
 """
 function panel_frame_columns(f::NumericPanelField, ::Bool)
-    return Tuple{String, Any, Any}[(String(f.name), f.vals, f.omsk)]
+    return Tuple{String, Any, Any, Any}[(String(f.name), f.vals, f.omsk, f.pmsk)]
 end
 function panel_frame_columns(f::CategoricalPanelField, decode::Bool)
     vals = decode ? [f.levels[c] for c in f.codes] : f.codes
-    return Tuple{String, Any, Any}[(String(f.name), vals, f.omsk)]
+    return Tuple{String, Any, Any, Any}[(String(f.name), vals, f.omsk, f.pmsk)]
 end
 function panel_frame_columns(f::TensorPanelField, ::Bool)
     d = ndims(f.vals)
-    omsk = f.omsk
-    return Tuple{String, Any, Any}[("$(f.name)=$(f.labels[l])", selectdim(f.vals, d, l),
-                                    isnothing(omsk) ? nothing : selectdim(omsk, d, l))
-                                   for l in eachindex(f.labels)]
+    omsk, pmsk = f.omsk, f.pmsk
+    return Tuple{String, Any, Any, Any}[("$(f.name)=$(f.labels[l])",
+                                         selectdim(f.vals, d, l),
+                                         isnothing(omsk) ? nothing : selectdim(omsk, d, l),
+                                         isnothing(pmsk) ? nothing : selectdim(pmsk, d, l))
+                                        for l in eachindex(f.labels)]
 end
 """
     panel_frame_fields(pnl::AssetPanel, fields::Nothing)
@@ -295,6 +297,55 @@ function panel_frame_field(::AssetPanel, f::TensorPanelField, ::VecInt, ::VecStr
     return throw(ArgumentError("the tensor Panel Field \"$(f.name)\" carries a $(f.axis) axis of $(length(f.labels)) label(s) beside its assets, so it has no observations × assets table of its own. Ask for a layout instead, which spreads the $(f.axis) axis into one column per label: `panel_dataframe(pnl; fields = [\"$(f.name)\"])`."))
 end
 """
+    panel_frame_mask!(df::DataFrames.DataFrame, m::Nothing, name::AbstractString, j::VecInt, args...) -> nothing
+    panel_frame_mask!(df::DataFrames.DataFrame, m::AbstractArray{Bool}, name::AbstractString, j::VecInt) -> nothing
+    panel_frame_mask!(df::DataFrames.DataFrame, m::AbstractArray{Bool}, name::AbstractString, j::VecInt, nxj::VecStr, cols::Vector{String}) -> nothing
+
+Add the slab of one mask of a Panel Field column to a [`panel_dataframe`](@ref) table, the observed mask or the placeholder mask. A Panel Field that carries no such mask adds nothing.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `m` is `nothing`: add nothing.
+ 2. The long layout: add one column `name`, through [`panel_frame_column!`](@ref), as [`panel_frame_long`](@ref) adds a value column.
+ 3. The wide layout: add one column `"<name>@<asset>"` per selected asset, through [`panel_frame_block!`](@ref), as [`panel_frame_wide`](@ref) adds a value column.
+
+# Arguments
+
+  - `df`: The table. This function adds the columns to it.
+  - `m`: The slab of the mask, or `nothing`.
+  - `name`: The column name, `"<column>::observed"` or `"<column>::placeholder"`.
+  - `j`: The selected positions on the asset axis. See [`VecInt`](@ref).
+  - `nxj`: The name of each selected asset, in the order of `j`. The wide layout alone reads it. See [`VecStr`](@ref).
+  - `cols`: A buffer of one column name per asset, which the wide layout writes.
+
+# Returns
+
+  - `nothing`. `df` holds the new columns.
+
+# Related
+
+  - [`panel_frame_long`](@ref)
+  - [`panel_frame_wide`](@ref)
+  - [`panel_frame_columns`](@ref)
+"""
+function panel_frame_mask!(::DataFrames.DataFrame, ::Nothing, ::AbstractString, ::VecInt,
+                           ::Any...)::Nothing
+    return nothing
+end
+function panel_frame_mask!(df::DataFrames.DataFrame, m::AbstractArray{Bool},
+                           name::AbstractString, j::VecInt)::Nothing
+    panel_frame_column!(df, name, vec(permutedims(panel_array_view(m, :, j))))
+    return nothing
+end
+function panel_frame_mask!(df::DataFrames.DataFrame, m::AbstractArray{Bool},
+                           name::AbstractString, j::VecInt, nxj::VecStr,
+                           cols::Vector{String})::Nothing
+    panel_frame_block!(df, panel_array_view(m, :, j), map!(a -> "$name@$a", cols, nxj))
+    return nothing
+end
+"""
     panel_frame_long(pnl::AssetPanel, fs, j::VecInt, nxj::VecStr, ts, decode::Bool) -> DataFrames.DataFrame
 
 Write the selected Panel Fields in the long layout, with one row per pair of observation and asset and one column per Panel Field column.
@@ -345,12 +396,10 @@ function panel_frame_long(pnl::AssetPanel, fs, j::VecInt, nxj::VecStr, ts, decod
         panel_frame_column!(df, "asset", repeat(collect(nxj); outer = length(ts)))
     end
     for f in fs
-        for (name, vals, omsk) in panel_frame_columns(f, decode)
+        for (name, vals, omsk, pmsk) in panel_frame_columns(f, decode)
             panel_frame_column!(df, name, vec(permutedims(panel_array_view(vals, :, j))))
-            if !isnothing(omsk)
-                panel_frame_column!(df, "$name::observed",
-                                    vec(permutedims(panel_array_view(omsk, :, j))))
-            end
+            panel_frame_mask!(df, omsk, "$name::observed", j)
+            panel_frame_mask!(df, pmsk, "$name::placeholder", j)
         end
     end
     if static
@@ -371,7 +420,7 @@ To get the Panel Field column and the asset of a cell, read the long layout, whi
 # Algorithm
 
  1. Add the `"observation"` column, unless the panel is static. A static panel has one row.
- 2. For each Panel Field in order, and each of its columns from [`panel_frame_columns`](@ref), add one column per selected asset through [`panel_frame_block!`](@ref). When the Panel Field carries an observed mask, add the mask of that column next, one column per asset.
+ 2. For each Panel Field in order, and each of its columns from [`panel_frame_columns`](@ref), add one column per selected asset through [`panel_frame_block!`](@ref). When the Panel Field carries an observed mask, add the mask of that column next, one column per asset, and then its placeholder mask in the same way when it holds a placeholder.
  3. On a time-varying panel, add the active mask and then the estimation mask, one column per asset each.
 
 # Arguments
@@ -409,13 +458,11 @@ function panel_frame_wide(pnl::AssetPanel, fs, j::VecInt, nxj::VecStr, ts, decod
     end
     cols = Vector{String}(undef, length(nxj))
     for f in fs
-        for (name, vals, omsk) in panel_frame_columns(f, decode)
+        for (name, vals, omsk, pmsk) in panel_frame_columns(f, decode)
             panel_frame_block!(df, panel_array_view(vals, :, j),
                                map!(a -> "$name@$a", cols, nxj))
-            if !isnothing(omsk)
-                panel_frame_block!(df, panel_array_view(omsk, :, j),
-                                   map!(a -> "$name::observed@$a", cols, nxj))
-            end
+            panel_frame_mask!(df, omsk, "$name::observed", j, nxj, cols)
+            panel_frame_mask!(df, pmsk, "$name::placeholder", j, nxj, cols)
         end
     end
     if static

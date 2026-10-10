@@ -51,7 +51,8 @@ function panel_frame_axes(pnl::AssetPanel, nx::Option{<:VecStr},
 end
 """
     panel_manifest_row!(mf::DataFrames.DataFrame, kind::AbstractString, field, label;
-                        group = missing, observed = missing, grouped = missing) -> nothing
+                        group = missing, observed = missing, placeholder = missing,
+                        grouped = missing) -> nothing
 
 Add one row to a manifest that [`panel_manifest`](@ref) writes.
 
@@ -65,6 +66,7 @@ A cell that the kind of the row does not use holds `missing`. A text reader writ
   - `label`: The label of the row, or `missing`.
   - `group`: The group of a trailing-axis label, or `missing`.
   - `observed`: Whether the Panel Field carries an observed mask, or `missing`.
+  - `placeholder`: Whether the Panel Field carries a placeholder mask, or `missing`.
   - `grouped`: Whether a tensor Panel Field carries groups, or `missing`.
 
 # Returns
@@ -77,9 +79,9 @@ A cell that the kind of the row does not use holds `missing`. A text reader writ
   - [`panel_manifest_rows!`](@ref)
 """
 function panel_manifest_row!(mf::DataFrames.DataFrame, kind::AbstractString, field, label;
-                             group = missing, observed = missing,
+                             group = missing, observed = missing, placeholder = missing,
                              grouped = missing)::Nothing
-    push!(mf, (kind, field, label, group, observed, grouped))
+    push!(mf, (kind, field, label, group, observed, placeholder, grouped))
     return nothing
 end
 """
@@ -89,7 +91,7 @@ end
 
 Add the rows that describe one Panel Field to a manifest that [`panel_manifest`](@ref) writes.
 
-The table that [`panel_dataframe`](@ref) writes gives the values of a Panel Field. These rows give the parts of the Panel Field that a table column cannot hold: its kind, whether it carries an observed mask, the order of the levels of a categorical Panel Field, and the axis name, the labels and the groups of a tensor Panel Field.
+The table that [`panel_dataframe`](@ref) writes gives the values of a Panel Field. These rows give the parts of the Panel Field that a table column cannot hold: its kind, whether it carries an observed mask and a placeholder mask, the order of the levels of a categorical Panel Field, and the axis name, the labels and the groups of a tensor Panel Field.
 
 # Algorithm
 
@@ -99,7 +101,7 @@ The method that Julia selects is the algorithm.
  2. [`CategoricalPanelField`](@ref): one `"categorical"` row, then one `"level"` row per level, in the order of the codes. A level that no cell holds keeps its row.
  3. [`TensorPanelField`](@ref): one `"tensor"` row with the axis name as its label, then one `"label"` row per trailing-axis label with its group.
 
-The first row of each Panel Field records in `observed` whether it carries an observed mask. The `"tensor"` row records in `grouped` whether the Panel Field carries groups, because an empty group and no group are both an empty cell in a text file.
+The first row of each Panel Field records in `observed` whether it carries an observed mask, and in `placeholder` whether it carries a placeholder mask. The `"tensor"` row records in `grouped` whether the Panel Field carries groups, because an empty group and no group are both an empty cell in a text file.
 
 # Arguments
 
@@ -117,11 +119,13 @@ The first row of each Panel Field records in `observed` whether it carries an ob
   - [`AbstractPanelField`](@ref)
 """
 function panel_manifest_rows!(mf::DataFrames.DataFrame, f::NumericPanelField)::Nothing
-    panel_manifest_row!(mf, "numeric", f.name, missing; observed = !isnothing(f.omsk))
+    panel_manifest_row!(mf, "numeric", f.name, missing; observed = !isnothing(f.omsk),
+                        placeholder = !isnothing(f.pmsk))
     return nothing
 end
 function panel_manifest_rows!(mf::DataFrames.DataFrame, f::CategoricalPanelField)::Nothing
-    panel_manifest_row!(mf, "categorical", f.name, missing; observed = !isnothing(f.omsk))
+    panel_manifest_row!(mf, "categorical", f.name, missing; observed = !isnothing(f.omsk),
+                        placeholder = !isnothing(f.pmsk))
     for level in f.levels
         panel_manifest_row!(mf, "level", f.name, level)
     end
@@ -130,7 +134,7 @@ end
 function panel_manifest_rows!(mf::DataFrames.DataFrame, f::TensorPanelField)::Nothing
     grouped = !isnothing(f.groups)
     panel_manifest_row!(mf, "tensor", f.name, f.axis; observed = !isnothing(f.omsk),
-                        grouped = grouped)
+                        placeholder = !isnothing(f.pmsk), grouped = grouped)
     for (l, label) in pairs(f.labels)
         panel_manifest_row!(mf, "label", f.name, label;
                             group = grouped ? f.groups[l] : missing)
@@ -148,7 +152,7 @@ The table of [`panel_dataframe`](@ref) holds the values and the masks. It cannot
 
 Call this function with the `nx`, `ts`, `fields` and `assets` of the [`panel_dataframe`](@ref) call, so that the two tables describe the same panel.
 
-The manifest has six columns: `kind`, `field`, `label`, `group`, `observed` and `grouped`. Its rows are, in order:
+The manifest has seven columns: `kind`, `field`, `label`, `group`, `observed`, `placeholder` and `grouped`. Its rows are, in order:
 
   - One `"panel"` row. Its label is `"static"` or `"time-varying"`.
   - One `"observation"` row per observation of a time-varying panel. Its label is the observation label as text.
@@ -188,18 +192,18 @@ julia> pnl = AssetPanel(;
                                                     codes = [1, 2, 1])]);
 
 julia> panel_manifest(pnl; nx = [\"A\", \"B\", \"C\"])
-8×6 DataFrame
- Row │ kind         field    label    group    observed  grouped
-     │ String       String?  String?  String?  Bool?     Bool?
-─────┼───────────────────────────────────────────────────────────
-   1 │ panel        missing  static   missing   missing  missing
-   2 │ asset        missing  A        missing   missing  missing
-   3 │ asset        missing  B        missing   missing  missing
-   4 │ asset        missing  C        missing   missing  missing
-   5 │ categorical  sector   missing  missing     false  missing
-   6 │ level        sector   Tech     missing   missing  missing
-   7 │ level        sector   Energy   missing   missing  missing
-   8 │ level        sector   Retail   missing   missing  missing
+8×7 DataFrame
+ Row │ kind         field    label    group    observed  placeholder  grouped
+     │ String       String?  String?  String?  Bool?     Bool?        Bool?
+─────┼────────────────────────────────────────────────────────────────────────
+   1 │ panel        missing  static   missing   missing      missing  missing
+   2 │ asset        missing  A        missing   missing      missing  missing
+   3 │ asset        missing  B        missing   missing      missing  missing
+   4 │ asset        missing  C        missing   missing      missing  missing
+   5 │ categorical  sector   missing  missing     false        false  missing
+   6 │ level        sector   Tech     missing   missing      missing  missing
+   7 │ level        sector   Energy   missing   missing      missing  missing
+   8 │ level        sector   Retail   missing   missing      missing  missing
 ```
 
 # Related
@@ -220,6 +224,7 @@ function panel_manifest(pnl::AssetPanel; nx::Option{<:VecStr} = nothing,
                               label = Union{Missing, String}[],
                               group = Union{Missing, String}[],
                               observed = Union{Missing, Bool}[],
+                              placeholder = Union{Missing, Bool}[],
                               grouped = Union{Missing, Bool}[])
     static = panel_is_static(pnl)
     panel_manifest_row!(mf, "panel", missing, static ? "static" : "time-varying")
@@ -449,14 +454,14 @@ end
 
 Read one Panel Field from a table, as its manifest entry `s` describes it.
 
-A cell that a long table does not hold is outside the universe, and no consumer reads it. It gets the value zero, the first level of a categorical Panel Field, and `false` in the observed mask.
+A cell that a long table does not hold is outside the universe, and no consumer reads it. It gets the value zero, the first level of a categorical Panel Field, and `false` in the observed mask and in the placeholder mask.
 
 # Algorithm
 
  1. `"numeric"`: read the column named after the Panel Field into an array of the element type of the column, through [`panel_table_read!`](@ref).
  2. `"categorical"`: read the same column. With `decode`, find the code of the level in each cell. Without it, each cell holds the code.
  3. `"tensor"`: read the column `"<field>=<label>"` of each label into its slice of the trailing axis.
- 4. Read the observed mask from the columns named `"<column>::observed"` when the manifest records one.
+ 4. Read the observed mask from the columns named `"<column>::observed"` when the manifest records one, and the placeholder mask from the columns named `"<column>::placeholder"` in the same way.
 
 # Arguments
 
@@ -482,31 +487,77 @@ A cell that a long table does not hold is outside the universe, and no consumer 
   - [`panel_table_read!`](@ref)
   - [`panel_table_eltype`](@ref)
   - [`panel_table_mask`](@ref)
+  - [`panel_field_table_mask`](@ref)
 """
 function panel_read_field(s::NamedTuple, lin, tab::NamedTuple, sz::Tuple, decode::Bool)
     if s.kind == "numeric"
         vals = fill(zero(panel_table_eltype(lin, tab, [s.name])), sz)
         panel_table_read!(vals, lin, tab, s.name, identity)
-        omsk = s.observed ? panel_table_mask(lin, tab, "$(s.name)::observed", sz) : nothing
-        return NumericPanelField(s.name, vals, omsk)
+        return NumericPanelField(s.name, vals,
+                                 panel_field_table_mask(s.observed, lin, tab,
+                                                        "$(s.name)::observed", sz),
+                                 panel_field_table_mask(s.placeholder, lin, tab,
+                                                        "$(s.name)::placeholder", sz))
     elseif s.kind == "categorical"
         codes = ones(Int, sz)
         panel_table_read!(codes, lin, tab, s.name, panel_code_reader(s, decode))
-        omsk = s.observed ? panel_table_mask(lin, tab, "$(s.name)::observed", sz) : nothing
-        return CategoricalPanelField(s.name, s.labels, codes, omsk)
+        return CategoricalPanelField(s.name, s.labels, codes,
+                                     panel_field_table_mask(s.observed, lin, tab,
+                                                            "$(s.name)::observed", sz),
+                                     panel_field_table_mask(s.placeholder, lin, tab,
+                                                            "$(s.name)::placeholder", sz))
     end
     cols = ["$(s.name)=$l" for l in s.labels]
     vals = fill(zero(panel_table_eltype(lin, tab, cols)), sz..., length(cols))
-    omsk = s.observed ? falses(sz..., length(cols)) : nothing
     for (l, c) in pairs(cols)
         panel_table_read!(selectdim(vals, ndims(vals), l), lin, tab, c, identity)
-        if s.observed
-            panel_table_read!(selectdim(omsk, ndims(omsk), l), lin, tab, "$c::observed",
-                              identity)
-        end
     end
     return TensorPanelField(s.name, s.axis, s.labels, s.grouped ? s.groups : nothing, vals,
-                            omsk)
+                            panel_field_table_mask(s.observed, lin, tab,
+                                                   ["$c::observed" for c in cols], sz),
+                            panel_field_table_mask(s.placeholder, lin, tab,
+                                                   ["$c::placeholder" for c in cols], sz))
+end
+"""
+    panel_field_table_mask(on::Bool, lin, tab::NamedTuple, name::AbstractString, sz::Tuple) -> Option{BitArray}
+    panel_field_table_mask(on::Bool, lin, tab::NamedTuple, cols::VecStr, sz::Tuple) -> Option{BitArray}
+
+Read one mask of a Panel Field from a table, the observed mask or the placeholder mask, when its manifest entry records one.
+
+The mask of the column `"<column>"` is the column `"<column>::observed"` or `"<column>::placeholder"`. A numeric or a categorical Panel Field has one mask column, and its mask has the shape `sz`. A tensor Panel Field has one mask column per label, and its mask has a trailing label axis.
+
+# Arguments
+
+  - `on`: Whether the manifest records the mask. With `false`, the answer is `nothing`.
+  - `lin`: The linear indices of a long table, or `nothing` for a wide table. See [`panel_table_read!`](@ref).
+  - `tab`: The named tuple `(; df, nx)` of the table and the asset names of the manifest.
+  - `name`, `cols`: The mask column of the Panel Field, or the mask column of each label.
+  - `sz`: The shape of one column of the panel.
+
+# Returns
+
+  - `M::Option{BitArray}`: The mask, or `nothing`.
+
+# Related
+
+  - [`panel_read_field`](@ref)
+  - [`panel_table_mask`](@ref)
+  - [`Option`](@ref)
+  - [`VecStr`](@ref)
+"""
+function panel_field_table_mask(on::Bool, lin, tab::NamedTuple, name::AbstractString,
+                                sz::Tuple)
+    return on ? panel_table_mask(lin, tab, name, sz) : nothing
+end
+function panel_field_table_mask(on::Bool, lin, tab::NamedTuple, cols::VecStr, sz::Tuple)
+    if !on
+        return nothing
+    end
+    M = falses(sz..., length(cols))
+    for (l, c) in pairs(cols)
+        panel_table_read!(selectdim(M, ndims(M), l), lin, tab, c, identity)
+    end
+    return M
 end
 """
     panel_code_reader(s::NamedTuple, decode::Bool)
@@ -605,7 +656,7 @@ end
 
 Read the entry of each Panel Field from a manifest that [`panel_manifest`](@ref) wrote.
 
-An entry is the named tuple `(; kind, name, observed, grouped, axis, labels, groups)`. `labels` holds the levels of a categorical Panel Field and the trailing-axis labels of a tensor Panel Field. `axis`, `grouped` and `groups` belong to a tensor Panel Field, and are `""`, `false` and empty for the other kinds.
+An entry is the named tuple `(; kind, name, observed, placeholder, grouped, axis, labels, groups)`. `labels` holds the levels of a categorical Panel Field and the trailing-axis labels of a tensor Panel Field. `axis`, `grouped` and `groups` belong to a tensor Panel Field, and are `""`, `false` and empty for the other kinds.
 
 # Algorithm
 
@@ -619,7 +670,7 @@ An entry is the named tuple `(; kind, name, observed, grouped, axis, labels, gro
 
 # Validation
 
-  - `mf` holds the six columns of a manifest. Raises a `KeyError`.
+  - `mf` holds the seven columns of a manifest. Raises a `KeyError`.
   - A `"level"` row follows the `"categorical"` row of its Panel Field, and a `"label"` row follows the `"tensor"` row of its Panel Field. Raises an `ArgumentError`.
   - Each row has a kind that a manifest holds. Raises an `ArgumentError`.
 
@@ -638,16 +689,19 @@ An entry is the named tuple `(; kind, name, observed, grouped, axis, labels, gro
 function panel_manifest_fields(mf::DataFrames.DataFrame)
     text = c -> panel_text.(panel_table_column(mf, c))
     kind, field, label, group = text("kind"), text("field"), text("label"), text("group")
-    observed, grouped = text("observed"), text("grouped")
-    specs = @NamedTuple{kind::String, name::String, observed::Bool, grouped::Bool,
-                        axis::String, labels::Vector{String}, groups::Vector{String}}[]
+    observed, placeholder = text("observed"), text("placeholder")
+    grouped = text("grouped")
+    specs = @NamedTuple{kind::String, name::String, observed::Bool, placeholder::Bool,
+                        grouped::Bool, axis::String, labels::Vector{String},
+                        groups::Vector{String}}[]
     for r in eachindex(kind)
         k = kind[r]
         if k in ("numeric", "categorical", "tensor")
             push!(specs,
                   (; kind = k, name = field[r], observed = observed[r] == "true",
-                   grouped = grouped[r] == "true", axis = k == "tensor" ? label[r] : "",
-                   labels = String[], groups = String[]))
+                   placeholder = placeholder[r] == "true", grouped = grouped[r] == "true",
+                   axis = k == "tensor" ? label[r] : "", labels = String[],
+                   groups = String[]))
         elseif !(k in ("panel", "observation", "asset"))
             panel_manifest_attach!(specs, r, k, field[r], label[r], group[r])
         end

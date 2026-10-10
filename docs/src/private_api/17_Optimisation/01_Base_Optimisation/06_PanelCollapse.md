@@ -19,4 +19,6 @@ PortfolioOptimisers.collapse_panel_numeric
 PortfolioOptimisers.collapse_panel_tensor
 PortfolioOptimisers.collapse_panel_mask
 PortfolioOptimisers.collapse_categorical_mask
+PortfolioOptimisers.collapse_tensor_mask
+PortfolioOptimisers.collapse_placeholder_mask
 ```

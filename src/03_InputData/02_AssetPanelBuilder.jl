@@ -5,7 +5,7 @@ Supertype of the policies that resolve a blank cell of a raw Panel Field.
 
 All concrete types stating what a Panel Field's blank cell becomes should subtype `AbstractPanelFillAlgorithm`.
 
-A blank never reaches a `PricesResult` or a `ReturnsResult`. [`asset_panel`](@ref) resolves every one of them, so every Panel Field comes out finite. The policy says what the resolved value is; the observed mask the Panel Field also carries says which cells the resolution touched.
+A blank never reaches a `PricesResult` or a `ReturnsResult`. [`asset_panel`](@ref) resolves every one of them, so every Panel Field comes out finite. The policy says what the resolved value is; the observed mask the Panel Field also carries says which cells the resolution touched. A value that the policy writes is data, and every reader reads it. The one exception is a placeholder: a value that the policy writes only because it has nothing to carry into the cell. The placeholder mask of the Panel Field marks it, and no reader reads it.
 
 # Interfaces
 
@@ -27,12 +27,28 @@ In order to implement a new concrete type that works seamlessly with the library
 
 [`asset_panel`](@ref) calls `panel_fill(alg, v, act, name)`, where `act` is the asset's column of the active mask, or `nothing` for a static Panel Field. A policy that defines only the three-argument method reads no mask: the four-argument fallback drops `act`. [`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref) define the four-argument method, so that no value crosses an inactive stretch.
 
+## `panel_placeholder` (optional)
+
+  - `panel_placeholder(alg::AbstractPanelFillAlgorithm, v::AbstractVector) -> AbstractVector{Bool}`: Which blanks of one asset's column the policy resolves to a placeholder, a value that holds no data.
+
+### Arguments
+
+  - `alg`: The concrete subtype instance.
+  - `v`: One asset's raw values along the observation axis, blanks included.
+
+### Returns
+
+  - `plc::AbstractVector{Bool}`: The same length as `v`, `true` at a blank that the policy resolves to a placeholder.
+
+The fallback marks no cell, so every value that a policy writes is data unless the policy defines this method. [`asset_panel`](@ref) calls `panel_placeholder(alg, v, act)`, and the three-argument fallback drops `act`, as the one of `panel_fill` does. [`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref) define both methods: their `val` is a placeholder.
+
 # Related
 
   - [`NoPanelFill`](@ref)
   - [`ConstantPanelFill`](@ref)
   - [`ForwardPanelFill`](@ref)
   - [`BackwardPanelFill`](@ref)
+  - [`panel_placeholder`](@ref)
   - [`asset_panel`](@ref)
 """
 abstract type AbstractPanelFillAlgorithm <: AbstractAlgorithm end
@@ -68,7 +84,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Resolves every blank cell to one constant.
 
-This is the policy for a quantity whose absence *means* a value: a zero dividend before the first payment, or a residual category before a classification exists.
+This is the policy for a quantity whose absence *means* a value: a zero dividend before the first payment, or a residual category before a classification exists. So the value it writes is data: the observed mask marks the cell `false`, and every reader reads the value.
 
 # Fields
 
@@ -124,7 +140,7 @@ Resolves a blank cell to the nearest earlier observed value of the same asset.
 
 This is the safe fill over a cross-validation fold. It looks **backward** along the observation axis, so a fold that starts later reads only rows that fold already holds, and the value a fold computes does not depend on rows outside it.
 
-A leading blank has no earlier value to take, so it falls through to `val`.
+A leading blank has no earlier value to take, so it falls through to `val`, and so does a blank past the run of `lim`. That `val` is a placeholder, not data: the placeholder mask marks the cell, and no reader reads it. A cell that the fill carries a value into holds data. See [`panel_placeholder`](@ref).
 
 The fill runs within each stretch of constant activity of the asset's active mask. No value crosses an inactive stretch, so an asset that delists and lists again does not carry the last value of its first listing into its second, and the run of blanks that `lim` counts restarts in each stretch.
 
@@ -192,7 +208,7 @@ Resolves a blank cell to the nearest later observed value of the same asset.
 
     The policy is offered rather than refused because a Panel Field may be built outside any fold, where nothing looks forward into anything.
 
-A trailing blank has no later value to take, so it falls through to `val`.
+A trailing blank has no later value to take, so it falls through to `val`, and so does a blank past the run of `lim`. That `val` is a placeholder, not data: the placeholder mask marks the cell, and no reader reads it. A cell that the fill carries a value into holds data. See [`panel_placeholder`](@ref).
 
 The fill runs within each stretch of constant activity of the asset's active mask. No value crosses an inactive stretch, so an asset that delists and lists again does not carry the first value of its second listing back into its first, and the run of blanks that `lim` counts restarts in each stretch.
 
@@ -461,22 +477,139 @@ The one body behind [`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref): 
   - [`panel_value_eltype`](@ref)
 """
 function panel_directional_fill(v::AbstractVector, val, lim::Option{<:Integer}, order)
+    src = panel_directional_source(v, lim, order)
     out = Vector{Union{eltype(v), typeof(val)}}(undef, length(v))
-    carry = nothing
-    run = 0
-    for i in order
-        x = v[i]
-        if !is_panel_blank(x)
-            carry = x
-            run = 0
-            out[i] = x
-        else
-            run += 1
-            ok = !isnothing(carry) && (isnothing(lim) || run <= lim)
-            out[i] = ok ? carry : val
-        end
+    for i in eachindex(v)
+        out[i] = iszero(src[i]) ? val : v[src[i]]
     end
     return out
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Find, for each cell of one asset's column, the observed cell whose value a directional fill writes there.
+
+The one walk behind [`panel_directional_fill`](@ref) and [`panel_directional_placeholder`](@ref), so the values and the placeholders cannot disagree.
+
+# Algorithm
+
+ 1. Start with no carried cell and a run length of zero.
+ 2. Walk `order`. On an observed cell, take it as the carried cell, reset the run to zero, and record the cell itself.
+ 3. On a blank cell, raise the run by one. Record the carried cell when one exists and the run is within `lim`, and `0` otherwise.
+
+# Arguments
+
+  - `v`: One asset's raw values along the observation axis, blanks included, with one-based indices.
+  - `lim`: Longest run of consecutive blanks a value is carried across, or `nothing` for no limit.
+  - `order`: The traversal order of the observation axis.
+
+# Returns
+
+  - `src::Vector{Int}`: The same length as `v`. Entry `i` is the index of the observed cell that cell `i` takes its value from, and `0` where nothing reaches it, so the cell takes the placeholder `val`.
+
+# Related
+
+  - [`panel_directional_fill`](@ref)
+  - [`panel_directional_placeholder`](@ref)
+"""
+function panel_directional_source(v::AbstractVector, lim::Option{<:Integer}, order)
+    Base.require_one_based_indexing(v)
+    src = zeros(Int, length(v))
+    carry = 0
+    run = 0
+    for i in order
+        if !is_panel_blank(v[i])
+            carry = i
+            run = 0
+            src[i] = i
+        else
+            run += 1
+            ok = !iszero(carry) && (isnothing(lim) || run <= lim)
+            src[i] = ok ? carry : 0
+        end
+    end
+    return src
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Mark the cells of one asset's column that a directional fill resolves to its placeholder `val`: a blank that no carried value reaches, before the first observed cell of the walk or past the run of `lim`.
+
+# Arguments
+
+  - `v`: One asset's raw values along the observation axis, blanks included.
+  - `lim`: Longest run of consecutive blanks a value is carried across, or `nothing` for no limit.
+  - `order`: The traversal order of the observation axis.
+
+# Returns
+
+  - `plc::BitVector`: The same length as `v`, `true` at a placeholder.
+
+# Related
+
+  - [`panel_directional_source`](@ref)
+  - [`panel_placeholder`](@ref)
+"""
+function panel_directional_placeholder(v::AbstractVector, lim::Option{<:Integer}, order)
+    return BitVector(iszero.(panel_directional_source(v, lim, order)))
+end
+"""
+    panel_placeholder(alg::AbstractPanelFillAlgorithm, v::AbstractVector) -> AbstractVector{Bool}
+    panel_placeholder(alg::ForwardPanelFill, v::AbstractVector) -> BitVector
+    panel_placeholder(alg::BackwardPanelFill, v::AbstractVector) -> BitVector
+    panel_placeholder(alg::AbstractPanelFillAlgorithm, v::AbstractVector, act::Option{<:AbstractVector{Bool}}) -> AbstractVector{Bool}
+    panel_placeholder(alg::Union{<:ForwardPanelFill, <:BackwardPanelFill}, v::AbstractVector, act::AbstractVector{Bool}) -> BitVector
+
+Mark the blanks of one asset's column that a fill policy resolves to a placeholder, a value that holds no data.
+
+A value that a fill policy writes is data, and every reader reads it: [`ConstantPanelFill`](@ref) writes the value that the absence means, and a directional fill carries an observed value. A directional fill that has nothing to carry into a cell writes its `val` there only because a Panel Field holds no blank. That `val` is a placeholder. The placeholder mask of the Panel Field records it, and no reader reads it.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A policy that defines no method marks no cell, so every value that it writes is data. [`NoPanelFill`](@ref) writes no value, and [`ConstantPanelFill`](@ref) writes data.
+ 2. [`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref) mark the cells that [`panel_directional_placeholder`](@ref) marks, in their own order.
+ 3. With `act`, a directional policy marks each stretch of constant activity on its own, as [`panel_fill`](@ref) fills it. Every other policy, and a directional one given `act = nothing`, drops `act`.
+
+# Arguments
+
+  - `alg`: The fill policy.
+  - `v`: One asset's raw values along the observation axis, blanks included.
+  - `act`: The asset's column of the active mask, the same length as `v`, or `nothing` for no mask.
+
+# Returns
+
+  - `plc::AbstractVector{Bool}`: The same length as `v`, `true` at a placeholder.
+
+# Related
+
+  - [`AbstractPanelFillAlgorithm`](@ref)
+  - [`panel_fill`](@ref)
+  - [`panel_directional_placeholder`](@ref)
+  - [`panel_activity_stretches`](@ref)
+  - [`Option`](@ref)
+"""
+function panel_placeholder(::AbstractPanelFillAlgorithm, v::AbstractVector)
+    return falses(length(v))
+end
+function panel_placeholder(alg::ForwardPanelFill, v::AbstractVector)
+    return panel_directional_placeholder(v, alg.lim, eachindex(v))
+end
+function panel_placeholder(alg::BackwardPanelFill, v::AbstractVector)
+    return panel_directional_placeholder(v, alg.lim, reverse(eachindex(v)))
+end
+function panel_placeholder(alg::AbstractPanelFillAlgorithm, v::AbstractVector,
+                           ::Option{<:AbstractVector{Bool}})
+    return panel_placeholder(alg, v)
+end
+function panel_placeholder(alg::Union{<:ForwardPanelFill, <:BackwardPanelFill},
+                           v::AbstractVector, act::AbstractVector{Bool})
+    plc = falses(length(v))
+    for r in panel_activity_stretches(act)
+        plc[r] = panel_placeholder(alg, view(v, r))
+    end
+    return plc
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -531,6 +664,21 @@ In order to implement a new concrete type that works seamlessly with the library
 ### Returns
 
   - `f::AbstractPanelField`: The Panel Field.
+
+## `panel_input_placeholder` (optional)
+
+  - `panel_input_placeholder(inp::AbstractPanelFieldInput, amsk::Option{<:AbstractMatrix{Bool}}) -> Option{AbstractArray{Bool}}`: The placeholder mask of the Panel Field, `true` at a cell whose resolved value holds no data, or `nothing`.
+
+### Arguments
+
+  - `inp`: The concrete subtype instance.
+  - `amsk`: The active mask (observations × assets), or `nothing`.
+
+### Returns
+
+  - `pmsk::Option{AbstractArray{Bool}}`: The placeholder mask, the same size as the resolved values, or `nothing`.
+
+The fallback returns `nothing`, so every value that the input's fill writes is data. [`asset_panel`](@ref) gives the mask to the Panel Field with [`panel_field_placeholder`](@ref).
 
 # Related
 
@@ -1172,6 +1320,173 @@ function panel_input_field(inp::TensorPanelInput, vals::AbstractArray{<:Real},
                             omsk = isa(inp.alg, NoPanelFill) ? nothing : obs)
 end
 """
+    panel_placeholder_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm, amsk::Option{<:AbstractMatrix{Bool}}) -> BitArray
+
+Mark the placeholders of one raw Panel Field, the cells that [`panel_fill_array`](@ref) resolves to a value that holds no data.
+
+The walk is the one of [`panel_fill_array`](@ref): a time-varying raw Panel Field marks each column with the active mask of its asset, and a static one marks the whole array as one flat run.
+
+# Arguments
+
+  - `vals`: The raw values, blanks included.
+  - `alg`: The fill policy.
+  - `amsk`: The active mask (observations × assets) of a time-varying raw Panel Field, as [`panel_input_mask`](@ref) returns it, or `nothing` for a static one.
+
+# Returns
+
+  - `plc::BitArray`: The same size as `vals`, `true` at a placeholder. See [`panel_placeholder`](@ref).
+
+# Related
+
+  - [`panel_placeholder`](@ref)
+  - [`panel_fill_array`](@ref)
+  - [`panel_input_placeholder`](@ref)
+  - [`Option`](@ref)
+"""
+function panel_placeholder_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm,
+                                 ::Nothing)
+    return reshape(BitVector(panel_placeholder(alg, vec(vals), nothing)), size(vals))
+end
+function panel_placeholder_array(vals::AbstractArray, alg::AbstractPanelFillAlgorithm,
+                                 amsk::AbstractMatrix{Bool})
+    plc = falses(size(vals))
+    for col in CartesianIndices(size(vals)[2:end])
+        plc[:, col] = panel_placeholder(alg, view(vals, :, col), view(amsk, :, col[1]))
+    end
+    return plc
+end
+"""
+    panel_input_placeholder(inp::NumericPanelInput, amsk::Option{<:AbstractMatrix{Bool}}) -> Option{BitArray}
+    panel_input_placeholder(inp::CategoricalPanelInput, amsk::Option{<:AbstractMatrix{Bool}}) -> Option{BitArray}
+    panel_input_placeholder(inp::TensorPanelInput, amsk::Option{<:AbstractMatrix{Bool}}) -> Option{BitArray}
+    panel_input_placeholder(inp::AbstractPanelFieldInput, amsk::Option{<:AbstractMatrix{Bool}}) -> nothing
+
+Return the placeholder mask of the Panel Field that one raw Panel Field builds, or `nothing` when its fill writes no placeholder.
+
+[`asset_panel`](@ref) gives the mask to the Panel Field with [`panel_field_placeholder`](@ref). The last method is the fallback for an input type that defines none: its fill writes no placeholder, so every value that it writes is data.
+
+# Algorithm
+
+ 1. Mark the placeholders with [`panel_placeholder_array`](@ref), over the mask that [`panel_input_mask`](@ref) returns.
+ 2. Return `nothing` when no cell is a placeholder.
+
+# Arguments
+
+  - `inp`: The raw Panel Field.
+  - `amsk`: The active mask (observations × assets), or `nothing` for all-`true`.
+
+# Returns
+
+  - `pmsk::Option{BitArray}`: The placeholder mask, the same size as the raw values, or `nothing`.
+
+# Related
+
+  - [`AbstractPanelFieldInput`](@ref)
+  - [`panel_placeholder_array`](@ref)
+  - [`panel_field_placeholder`](@ref)
+  - [`asset_panel`](@ref)
+  - [`Option`](@ref)
+"""
+function panel_input_placeholder(::AbstractPanelFieldInput,
+                                 ::Option{<:AbstractMatrix{Bool}})
+    return nothing
+end
+function panel_input_placeholder(inp::Union{<:NumericPanelInput, <:CategoricalPanelInput,
+                                            <:TensorPanelInput},
+                                 amsk::Option{<:AbstractMatrix{Bool}})
+    plc = panel_placeholder_array(inp.vals, inp.alg, panel_input_mask(inp, amsk))
+    return any(plc) ? plc : nothing
+end
+"""
+    panel_field_placeholder(f::AbstractPanelField, pmsk::Nothing) -> AbstractPanelField
+    panel_field_placeholder(f::NumericPanelField, pmsk::AbstractArray{Bool}) -> NumericPanelField
+    panel_field_placeholder(f::CategoricalPanelField, pmsk::AbstractArray{Bool}) -> CategoricalPanelField
+    panel_field_placeholder(f::TensorPanelField, pmsk::AbstractArray{Bool}) -> TensorPanelField
+
+Give a Panel Field the placeholder mask that [`panel_input_placeholder`](@ref) returns. `nothing` returns the Panel Field unchanged. Otherwise the Panel Field is built again with its positional constructor, which checks the mask.
+
+# Related
+
+  - [`panel_input_placeholder`](@ref)
+  - [`asset_panel`](@ref)
+  - [`AbstractPanelField`](@ref)
+"""
+function panel_field_placeholder(f::AbstractPanelField, ::Nothing)
+    return f
+end
+function panel_field_placeholder(f::NumericPanelField, pmsk::AbstractArray{Bool})
+    return NumericPanelField(f.name, f.vals, f.omsk, pmsk)
+end
+function panel_field_placeholder(f::CategoricalPanelField, pmsk::AbstractArray{Bool})
+    return CategoricalPanelField(f.name, f.levels, f.codes, f.omsk, pmsk)
+end
+function panel_field_placeholder(f::TensorPanelField, pmsk::AbstractArray{Bool})
+    return TensorPanelField(f.name, f.axis, f.labels, f.groups, f.vals, f.omsk, pmsk)
+end
+"""
+    panel_field_lift(f::NumericPanelField, n::Integer) -> NumericPanelField
+    panel_field_lift(f::CategoricalPanelField, n::Integer) -> CategoricalPanelField
+    panel_field_lift(f::TensorPanelField, n::Integer) -> TensorPanelField
+
+Lift a static Panel Field onto `n` observations, lazily.
+
+A static input that meets a time-varying one, or that meets the two universe masks, joins the panel at the panel's observation count. The values are wrapped in a [`RepeatedLeading`](@ref), which stores them once. The observed mask and the placeholder mask are wrapped in the same way, so a cell that a fill policy wrote, or that holds a placeholder, keeps that state at every observation.
+
+# Algorithm
+
+The method that Julia selects is the algorithm. Each kind rebuilds itself with its value array and its two masks wrapped in a [`RepeatedLeading`](@ref), through [`panel_mask_lift`](@ref).
+
+# Arguments
+
+  - `f`: The static Panel Field.
+  - `n`: Length of the observation axis to lift onto.
+
+# Returns
+
+  - A Panel Field of the same kind, over `n` observations.
+
+# Related
+
+  - [`RepeatedLeading`](@ref)
+  - [`panel_mask_lift`](@ref)
+  - [`asset_panel`](@ref)
+  - [`AbstractPanelField`](@ref)
+"""
+function panel_field_lift(f::NumericPanelField, n::Integer)
+    return NumericPanelField(; name = f.name, vals = RepeatedLeading(f.vals, n),
+                             omsk = panel_mask_lift(f.omsk, n),
+                             pmsk = panel_mask_lift(f.pmsk, n))
+end
+function panel_field_lift(f::CategoricalPanelField, n::Integer)
+    return CategoricalPanelField(; name = f.name, levels = f.levels,
+                                 codes = RepeatedLeading(f.codes, n),
+                                 omsk = panel_mask_lift(f.omsk, n),
+                                 pmsk = panel_mask_lift(f.pmsk, n))
+end
+function panel_field_lift(f::TensorPanelField, n::Integer)
+    return TensorPanelField(; name = f.name, axis = f.axis, labels = f.labels,
+                            groups = f.groups, vals = RepeatedLeading(f.vals, n),
+                            omsk = panel_mask_lift(f.omsk, n),
+                            pmsk = panel_mask_lift(f.pmsk, n))
+end
+"""
+    panel_mask_lift(m::Nothing, n::Integer) -> nothing
+    panel_mask_lift(m::AbstractArray{Bool}, n::Integer) -> RepeatedLeading
+
+Lift one mask of a static Panel Field onto `n` observations, as [`panel_field_lift`](@ref) lifts its values. `nothing` stays `nothing`.
+
+# Related
+
+  - [`panel_field_lift`](@ref)
+  - [`RepeatedLeading`](@ref)
+"""
+function panel_mask_lift(::Nothing, ::Integer)
+    return nothing
+end
+function panel_mask_lift(m::AbstractArray{Bool}, n::Integer)
+    return RepeatedLeading(m, n)
+end
+"""
     panel_build_observations(inputs::AbstractVector{<:AbstractPanelFieldInput},
                              amsk::Option{<:AbstractMatrix{Bool}},
                              emsk::Option{<:AbstractMatrix{Bool}}) -> Option{Int}
@@ -1236,14 +1551,14 @@ The result goes straight into the `pnl` keyword that `PricesResult` and `Returns
 
 The **static entry** is the rank of the raw values. An input whose values carry no observation axis is a static input: a fundamentals table or a sector classification with no history is that shape. There [`ForwardPanelFill`](@ref) and [`BackwardPanelFill`](@ref) are refused, because there is no observation axis to carry a value along.
 
-An input set that is static throughout, with no mask, builds a **static panel**. A static input that meets a time-varying input, or that meets a mask, is **lifted**: [`panel_build_observations`](@ref) reads the observation count the build takes, and [`panel_field_lift`](@ref) wraps the static values in a [`RepeatedLeading`](@ref), which stores them once and indexes a leading observation axis. A lifted Panel Field carries no observed mask, because every cell of a static input was observed.
+An input set that is static throughout, with no mask, builds a **static panel**. A static input that meets a time-varying input, or that meets a mask, is **lifted**: [`panel_build_observations`](@ref) reads the observation count the build takes, and [`panel_field_lift`](@ref) wraps the static values in a [`RepeatedLeading`](@ref), which stores them once and indexes a leading observation axis. A lifted Panel Field keeps its observed mask, lifted in the same way.
 
 # Algorithm
 
  1. Check that `inputs` is not empty and that the Panel Field names are unique.
  2. Check each input's fill policy against its shape, with [`assert_panel_input_fill`](@ref).
  3. Read the observation count the build takes, with [`panel_build_observations`](@ref).
- 4. Resolve every input with [`panel_resolve`](@ref), which fills its blanks within each stretch of constant activity of `amsk` and records the observed cells, and build its Panel Field with [`panel_input_field`](@ref). Lift a static Panel Field of a time-varying build with [`panel_field_lift`](@ref).
+ 4. Resolve every input with [`panel_resolve`](@ref), which fills its blanks within each stretch of constant activity of `amsk` and records the observed cells, and build its Panel Field with [`panel_input_field`](@ref). Give it the placeholder mask of [`panel_input_placeholder`](@ref) with [`panel_field_placeholder`](@ref). Lift a static Panel Field of a time-varying build with [`panel_field_lift`](@ref).
  5. Return the panel with no mask when the build is static.
  6. Otherwise fill in the masks that were not given, and return the panel. A missing active mask is all-`true`. A missing estimation mask is the active mask, because the estimation mask is a subset of the active mask and the only subset that needs no further information is the whole of it; an all-`true` default would break the subset rule at the first inactive cell. The [`AssetPanel`](@ref) constructor checks that every Panel Field shares one shape.
 
@@ -1282,6 +1597,7 @@ julia> panel_feature_matrix(pnl)[1]
   - [`AbstractPanelFieldInput`](@ref)
   - [`AbstractPanelFillAlgorithm`](@ref)
   - [`panel_input_field`](@ref)
+  - [`panel_input_placeholder`](@ref)
   - [`panel_build_observations`](@ref)
   - [`panel_field_lift`](@ref)
   - [`RepeatedLeading`](@ref)
@@ -1301,7 +1617,8 @@ function asset_panel(inputs::AbstractVector{<:AbstractPanelFieldInput};
     for inp in inputs
         assert_panel_input_fill(inp)
         v, o = panel_resolve(inp, amsk)
-        f = panel_input_field(inp, v, o)
+        f = panel_field_placeholder(panel_input_field(inp, v, o),
+                                    panel_input_placeholder(inp, amsk))
         push!(pf, isnothing(T) || !panel_input_is_static(inp) ? f : panel_field_lift(f, T))
     end
     if isnothing(T)
@@ -1335,5 +1652,5 @@ abstract type AbstractAssetPanelEstimator <: AbstractEstimator end
 
 export asset_panel, NumericPanelInput, CategoricalPanelInput, TensorPanelInput, NoPanelFill,
        ConstantPanelFill, ForwardPanelFill, BackwardPanelFill
-public AbstractPanelFillAlgorithm, panel_fill, AbstractPanelFieldInput,
-       panel_input_is_static, panel_resolve, panel_input_field
+public AbstractPanelFillAlgorithm, panel_fill, panel_placeholder, AbstractPanelFieldInput,
+       panel_input_is_static, panel_resolve, panel_input_field, panel_input_placeholder

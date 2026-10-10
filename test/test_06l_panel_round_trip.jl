@@ -32,13 +32,14 @@ function panel_1399_trip(pnl; nx = nothing, ts = nothing, layout = :wide, decode
 end
 # Every part of a Panel Field but the values, which a long table keeps on the active cells only.
 function panel_1399_schema(f::NumericPanelField)
-    return (NumericPanelField, f.name, isnothing(f.omsk))
+    return (NumericPanelField, f.name, isnothing(f.omsk), isnothing(f.pmsk))
 end
 function panel_1399_schema(f::CategoricalPanelField)
-    return (CategoricalPanelField, f.name, isnothing(f.omsk), f.levels)
+    return (CategoricalPanelField, f.name, isnothing(f.omsk), isnothing(f.pmsk), f.levels)
 end
 function panel_1399_schema(f::TensorPanelField)
-    return (TensorPanelField, f.name, isnothing(f.omsk), f.axis, f.labels, f.groups)
+    return (TensorPanelField, f.name, isnothing(f.omsk), isnothing(f.pmsk), f.axis,
+            f.labels, f.groups)
 end
 panel_1399_values(f::CategoricalPanelField) = f.codes
 panel_1399_values(f::PortfolioOptimisers.AbstractPanelField) = f.vals
@@ -52,7 +53,8 @@ function panel_1399_equal(p1::AssetPanel, p2::AssetPanel; active_only::Bool = fa
     for (f1, f2) in zip(p1.pf, p2.pf)
         ok &= panel_1399_schema(f1) == panel_1399_schema(f2)
         for (a1, a2) in
-            ((panel_1399_values(f1), panel_1399_values(f2)), (f1.omsk, f2.omsk))
+            ((panel_1399_values(f1), panel_1399_values(f2)), (f1.omsk, f2.omsk),
+             (f1.pmsk, f2.pmsk))
             if isnothing(a1)
                 continue
             end
@@ -112,7 +114,8 @@ end
 @testset "panel_manifest" begin
     pnl = panel_1399_timevarying()
     mf = panel_manifest(pnl; nx = ["A", "B", "C"], ts = TS_1399)
-    @test names(mf) == ["kind", "field", "label", "group", "observed", "grouped"]
+    @test names(mf) ==
+          ["kind", "field", "label", "group", "observed", "placeholder", "grouped"]
     @test mf.kind[1:8] ==
           ["panel", "observation", "observation", "observation", "observation", "asset",
            "asset", "asset"]
@@ -303,5 +306,32 @@ end
                                                               types = Dict("asset" =>
                                                                                String))),
                                            mf2); active_only = true)
+    end
+end
+
+# #1631: a placeholder mask comes back from both layouts, and its manifest row records it.
+@testset "asset_panel(df, mf): a placeholder mask survives the round trip (#1631)" begin
+    amsk = Bool[1 1; 1 1; 0 1]
+    pnl = asset_panel([NumericPanelInput(; name = "mcap",
+                                         vals = [NaN 1.0; 2.0 NaN; 3.0 NaN],
+                                         alg = ForwardPanelFill()),
+                       CategoricalPanelInput(; name = "sector",
+                                             vals = [missing "a"; "b" "a"; "b" missing],
+                                             alg = ForwardPanelFill(; val = "z")),
+                       TensorPanelInput(; name = "beta", axis = "factor",
+                                        labels = ["u", "v"],
+                                        vals = cat([NaN 1.0; 2.0 3.0; 4.0 5.0],
+                                                   [1.0 NaN; 2.0 3.0; 4.0 5.0]; dims = 3),
+                                        alg = ForwardPanelFill())]; amsk = amsk)
+    @test panel_field(pnl, "mcap").pmsk == Bool[1 0; 0 0; 0 0]
+    @test panel_field(pnl, "sector").pmsk == Bool[1 0; 0 0; 0 0]
+    mf = panel_manifest(pnl; nx = ["A", "B"])
+    @test isequal(mf.placeholder[mf.kind .∈ Ref(["numeric", "categorical", "tensor"])],
+                  [true, true, true])
+    for decode in (true, false)
+        w = panel_1399_trip(pnl; nx = ["A", "B"], layout = :wide, decode)
+        @test panel_1399_equal(pnl, w)
+        l = panel_1399_trip(pnl; nx = ["A", "B"], layout = :long, decode)
+        @test panel_1399_equal(pnl, l; active_only = true)
     end
 end

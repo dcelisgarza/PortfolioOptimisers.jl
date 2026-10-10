@@ -321,14 +321,15 @@ const PO = PortfolioOptimisers
         D_cut = distance(fde, Zd[:, 1:2]; dims = 1)
         # A panel carrying one of each kind, so every entry form has something to resolve
         # against. `mcap` blanks and `sector` does not, which is what separates the two
-        # observed-mask cases.
+        # observed-mask cases. Each blank holds a placeholder (#1631).
         gnum = NumericPanelField(; name = "mcap", vals = [1.0, 2.0, 3.0],
-                                 omsk = [true, false, true])
+                                 omsk = [true, false, true], pmsk = [false, true, false])
         gcat = CategoricalPanelField(; name = "sector", levels = ["T", "E"],
                                      codes = [1, 2, 1])
         gten = TensorPanelField(; name = "beta", axis = "factor", labels = ["mkt", "smb"],
                                 vals = [1.0 2.0; 3.0 4.0; 5.0 6.0],
-                                omsk = [true true; true false; true true])
+                                omsk = [true true; true false; true true],
+                                pmsk = [false false; false true; false false])
         gpnl = AssetPanel(; pf = [gnum, gcat, gten])
 
         @testset "construction refuses what cannot be read" begin
@@ -373,7 +374,7 @@ const PO = PortfolioOptimisers
             sel = ["beta" => "smb", "mcap", "sector" => ["E"], "mcap" => :observed]
             @test feature_labels(gpnl, sel) ==
                   ["beta" => "smb", "mcap", "sector" => "E", "mcap" => :observed]
-            # `mcap` and `beta` are unobserved at row 2, so their value columns hold `NaN`
+            # `mcap` and `beta` hold a placeholder at row 2, so their value columns hold `NaN`
             # there (#1508), and the mask column shows the blank.
             @test isequal(feature_matrix(gpnl, sel),
                           [2.0 1.0 0.0 1.0; NaN NaN 1.0 0.0; 6.0 3.0 0.0 1.0])
@@ -427,11 +428,12 @@ const PO = PortfolioOptimisers
             # cut to `rows` at least once.
             Tt, Nt = 7, 3
             rng = StableRNG(1064)
+            ov = rand(rng, Bool, Tt, Nt)
             tv = NumericPanelField(; name = "mcap", vals = abs.(randn(rng, Tt, Nt)) .+ 1,
-                                   omsk = rand(rng, Bool, Tt, Nt))
+                                   omsk = ov, pmsk = .!ov)
+            ot = rand(rng, Bool, Tt, Nt, 2)
             tt = TensorPanelField(; name = "beta", axis = "factor", labels = ["mkt", "smb"],
-                                  vals = randn(rng, Tt, Nt, 2),
-                                  omsk = rand(rng, Bool, Tt, Nt, 2))
+                                  vals = randn(rng, Tt, Nt, 2), omsk = ot, pmsk = .!ot)
             tc = PortfolioOptimisers.panel_field_lift(gcat, Tt)
             tpnl = AssetPanel(; pf = [tv, tt, tc], amsk = trues(Tt, Nt),
                               emsk = trues(Tt, Nt))
@@ -466,16 +468,16 @@ const PO = PortfolioOptimisers
             for alg in (AggregateFeatures(), AggregateDistances(), StackObservations())
                 @test PortfolioOptimisers.collapse_rows(alg, tpnl) === Colon()
             end
-            # The routed entry stacks what its collapse reads, with a zero at an unobserved
-            # cell, and the distance it measures is the one the full stack gives on the
-            # cells it can read: active, and observed in each value column (#1508). With
+            # The routed entry stacks what its collapse reads, with a zero at a placeholder,
+            # and the distance it measures is the one the full stack gives on the cells it
+            # can read: active, and holding data in each value column (#1508, #1631). With
             # half of the cells blank, a collapse can refuse, and the refusal is the same.
             trd = ReturnsResult(; nx = ["a", "b", "c"], X = randn(rng, Tt, Nt), pnl = tpnl)
-            Z0 = feature_matrix(tpnl, sel; unobserved = 0)
-            R = PortfolioOptimisers.feature_observed_cells(tpnl,
-                                                           PortfolioOptimisers.select_fields(tpnl,
-                                                                                             sel,
-                                                                                             false))
+            Z0 = feature_matrix(tpnl, sel; placeholder = 0)
+            R = PortfolioOptimisers.feature_data_cells(tpnl,
+                                                       PortfolioOptimisers.select_fields(tpnl,
+                                                                                         sel,
+                                                                                         false))
             res(f) =
                 try
                     f()
@@ -497,7 +499,7 @@ const PO = PortfolioOptimisers
             de_l = FeatureDistance(; sel = sel)
             @test feature_labels(de_l, nothing, trd, trd.X) == feature_labels(tpnl, sel)
             @test isequal(feature_matrix(tpnl, feature_labels(tpnl, sel); rows = Tt:Tt,
-                                         unobserved = 0),
+                                         placeholder = 0),
                           feature_matrix(de_l, nothing, trd, trd.X))
         end
 
@@ -639,7 +641,7 @@ const PO = PortfolioOptimisers
             sel = ["expo" => LabelGroup("size"), "mcap", "expo" => LabelGroup("momentum")]
             @test feature_labels(tpnl, sel) ==
                   ["expo" => "size", "mcap", "expo" => "mom12", "expo" => "mom6"]
-            # `mcap` is unobserved at row 2, so it holds `NaN` there (#1508).
+            # `mcap` holds a placeholder at row 2, so it holds `NaN` there (#1508).
             @test isequal(feature_matrix(tpnl, sel),
                           [4.0 1.0 1.0 3.0; 8.0 NaN 5.0 7.0; 12.0 3.0 9.0 11.0])
             # The time-varying shape selects the same labels on every observation, and the

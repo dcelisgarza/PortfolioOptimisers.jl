@@ -41,7 +41,7 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
     @testset "LastObservation" begin
         @test LastObservation().alg === LastRow()
         # LastRow reads the last row, where `b` is inactive: a direct call refuses it by name.
-        msg = "FeatureDistance has no value to read for the assets [\"b\"]: each is inactive at the last row of the window, or a value column of `sel` was not observed there."
+        msg = "FeatureDistance has no value to read for the assets [\"b\"]: each is inactive at the last row of the window, or a value column of `sel` holds a placeholder there."
         @test_throws msg hand_distance(fdist(LastObservation()), rd)
         # On a view without `b`, the last row is 4 against 7.
         D = hand_distance(fdist(LastObservation()), PO.port_opt_view(rd, [1, 3]))
@@ -165,7 +165,7 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         # An asset with no active row has no value under any collapse.
         B = copy(A)
         B[:, 2] .= false
-        msg = "no value to read for the assets at the positions [2]: each has no readable row in the window: no row at which it is active and every value column of `sel` was observed. Inside a fit"
+        msg = "no value to read for the assets at the positions [2]: each has no readable row in the window: no row at which it is active and every value column of `sel` holds data, observed or filled. Inside a fit"
         @test_throws msg distance(fdist(AggregateFeatures()), Z; amsk = B)
         # A mask whose last row is complete reads the last row under either rule.
         C = copy(A)

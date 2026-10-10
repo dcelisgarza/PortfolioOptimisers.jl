@@ -197,6 +197,60 @@ function assert_panel_field_mask(vals::AbstractArray, omsk::AbstractArray{Bool},
     return nothing
 end
 """
+    assert_panel_field_placeholder(omsk, pmsk::Nothing, name::AbstractString) -> nothing
+    assert_panel_field_placeholder(omsk, pmsk::AbstractArray{Bool}, name::AbstractString) -> nothing
+
+Check that a Panel Field's placeholder mask marks only cells that the raw source did not observe.
+
+A placeholder is the value that the builder stores in a blank that no fill reaches. Only a blank holds one, so an observed cell is never a placeholder, and a Panel Field that cannot blank holds none.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `pmsk` is `nothing`: no cell holds a placeholder, so there is nothing to check.
+ 2. `pmsk` is an array: check that the Panel Field carries an observed mask of the same size, and that no cell is `true` in both masks.
+
+# Arguments
+
+  - `omsk`: The observed mask, or `nothing`.
+  - `pmsk`: The placeholder mask, or `nothing`.
+  - `name`: The Panel Field's name, displayed in the error message.
+
+# Validation
+
+  - `omsk` is not `nothing`. Raises an `ArgumentError`.
+  - `size(pmsk) == size(omsk)`. Raises a `DimensionMismatch`.
+  - `!any(omsk .& pmsk)`. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_panel_field_mask`](@ref)
+  - [`NumericPanelField`](@ref)
+  - [`CategoricalPanelField`](@ref)
+  - [`TensorPanelField`](@ref)
+"""
+function assert_panel_field_placeholder(::Option{<:AbstractArray{Bool}}, ::Nothing,
+                                        ::AbstractString)::Nothing
+    return nothing
+end
+function assert_panel_field_placeholder(omsk::Option{<:AbstractArray{Bool}},
+                                        pmsk::AbstractArray{Bool},
+                                        name::AbstractString)::Nothing
+    @argcheck(!isnothing(omsk),
+              ArgumentError("the Panel Field \"$name\" carries a placeholder mask (pmsk) and no observed mask (omsk). A placeholder fills a blank, and a Panel Field with no observed mask cannot blank, so give the observed mask, or pass pmsk = nothing."))
+    @argcheck(size(pmsk) == size(omsk),
+              DimensionMismatch("the placeholder mask (pmsk) of the Panel Field \"$name\" marks one cell of its values, so it is the same size as its observed mask (omsk), got size(pmsk) = $(size(pmsk)) and size(omsk) = $(size(omsk))"))
+    i = findfirst(k -> omsk[k] && pmsk[k], CartesianIndices(pmsk))
+    @argcheck(isnothing(i),
+              ArgumentError("the Panel Field \"$name\" marks the cell $(isnothing(i) ? "" : string(Tuple(i))) as observed (omsk) and as a placeholder (pmsk). A placeholder fills a blank, and an observed cell is not blank."))
+    return nothing
+end
+"""
     assert_panel_finite(vals::AbstractArray{<:Real}, name::AbstractString) -> nothing
 
 Check that a resolved Panel Field carries no non-finite value.
@@ -247,7 +301,8 @@ $(DocStringExtensions.FIELDS)
 # Constructor
 
     NumericPanelField(name::AbstractString, vals::AbstractArray{<:Real},
-                      omsk::Option{<:AbstractArray{Bool}} = nothing)
+                      omsk::Option{<:AbstractArray{Bool}} = nothing,
+                      pmsk::Option{<:AbstractArray{Bool}} = nothing)
 
 # Validation
 
@@ -255,6 +310,7 @@ $(DocStringExtensions.FIELDS)
   - `!isempty(vals)`. Raises an [`IsEmptyError`](@ref).
   - `ndims(vals) in (1, 2)`. Raises a `DimensionMismatch`.
   - `size(omsk) == size(vals)` when `omsk` is given. Raises a `DimensionMismatch`.
+  - `pmsk` marks only unobserved cells. See [`assert_panel_field_placeholder`](@ref).
 
 # Related
 
@@ -274,21 +330,33 @@ $(DocStringExtensions.FIELDS)
     """
     vals
     """
-    Observed mask, the same size as the values, or `nothing` when the Panel Field cannot blank.
+    Observed mask, the same size as the values, or `nothing` when the Panel Field cannot blank. A cell is `true` where the raw input carried a value, and `false` where a fill policy wrote one.
     """
     omsk
+    """
+    Placeholder mask, the same size as the values, or `nothing` when no cell holds a placeholder. A cell is `true` where it holds the placeholder of a blank that no fill reached. No reader reads such a cell.
+    """
+    pmsk
     function NumericPanelField(name::AbstractString, vals::AbstractArray{<:Real},
-                               omsk::Option{<:AbstractArray{Bool}})
+                               omsk::Option{<:AbstractArray{Bool}},
+                               pmsk::Option{<:AbstractArray{Bool}})
         assert_panel_field_name(name)
         assert_panel_field_shape(vals, name, 1, 2)
         assert_panel_finite(vals, name)
         assert_panel_field_mask(vals, omsk, name)
-        return new{typeof(name), typeof(vals), typeof(omsk)}(name, vals, omsk)
+        assert_panel_field_placeholder(omsk, pmsk, name)
+        return new{typeof(name), typeof(vals), typeof(omsk), typeof(pmsk)}(name, vals, omsk,
+                                                                           pmsk)
     end
 end
+function NumericPanelField(name::AbstractString, vals::AbstractArray{<:Real},
+                           omsk::Option{<:AbstractArray{Bool}})::NumericPanelField
+    return NumericPanelField(name, vals, omsk, nothing)
+end
 function NumericPanelField(; name::AbstractString, vals::AbstractArray{<:Real},
-                           omsk::Option{<:AbstractArray{Bool}} = nothing)::NumericPanelField
-    return NumericPanelField(name, vals, omsk)
+                           omsk::Option{<:AbstractArray{Bool}} = nothing,
+                           pmsk::Option{<:AbstractArray{Bool}} = nothing)::NumericPanelField
+    return NumericPanelField(name, vals, omsk, pmsk)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -305,7 +373,8 @@ $(DocStringExtensions.FIELDS)
 
     CategoricalPanelField(name::AbstractString, levels::VecStr,
                           codes::AbstractArray{<:Integer},
-                          omsk::Option{<:AbstractArray{Bool}} = nothing)
+                          omsk::Option{<:AbstractArray{Bool}} = nothing,
+                          pmsk::Option{<:AbstractArray{Bool}} = nothing)
 
 # Validation
 
@@ -315,6 +384,7 @@ $(DocStringExtensions.FIELDS)
   - `ndims(codes) in (1, 2)`. Raises a `DimensionMismatch`.
   - Every code lies in `1:length(levels)`. Raises a `DomainError`.
   - `size(omsk) == size(codes)` when `omsk` is given. Raises a `DimensionMismatch`.
+  - `pmsk` marks only unobserved cells. See [`assert_panel_field_placeholder`](@ref).
 
 # Related
 
@@ -340,12 +410,17 @@ $(DocStringExtensions.FIELDS)
     """
     codes
     """
-    Observed mask, the same size as the codes, or `nothing` when the Panel Field cannot blank.
+    Observed mask, the same size as the codes, or `nothing` when the Panel Field cannot blank. A cell is `true` where the raw input carried a label, and `false` where a fill policy wrote one.
     """
     omsk
+    """
+    Placeholder mask, the same size as the codes, or `nothing` when no cell holds a placeholder. A cell is `true` where it holds the placeholder of a blank that no fill reached. No reader reads such a cell.
+    """
+    pmsk
     function CategoricalPanelField(name::AbstractString, levels::VecStr,
                                    codes::AbstractArray{<:Integer},
-                                   omsk::Option{<:AbstractArray{Bool}})
+                                   omsk::Option{<:AbstractArray{Bool}},
+                                   pmsk::Option{<:AbstractArray{Bool}})
         assert_panel_field_name(name)
         assert_panel_labels(levels, :levels)
         assert_panel_field_shape(codes, name, 1, 2)
@@ -355,14 +430,24 @@ $(DocStringExtensions.FIELDS)
                   DomainError(nl,
                               "the codes of the categorical Panel Field \"$name\" index its $nl level(s), so every code lies in 1:$nl; the first offending code is at $(isnothing(i) ? "" : string(Tuple(i)))"))
         assert_panel_field_mask(codes, omsk, name)
-        return new{typeof(name), typeof(levels), typeof(codes), typeof(omsk)}(name, levels,
-                                                                              codes, omsk)
+        assert_panel_field_placeholder(omsk, pmsk, name)
+        return new{typeof(name), typeof(levels), typeof(codes), typeof(omsk), typeof(pmsk)}(name,
+                                                                                            levels,
+                                                                                            codes,
+                                                                                            omsk,
+                                                                                            pmsk)
     end
+end
+function CategoricalPanelField(name::AbstractString, levels::VecStr,
+                               codes::AbstractArray{<:Integer},
+                               omsk::Option{<:AbstractArray{Bool}})::CategoricalPanelField
+    return CategoricalPanelField(name, levels, codes, omsk, nothing)
 end
 function CategoricalPanelField(; name::AbstractString, levels::VecStr,
                                codes::AbstractArray{<:Integer},
-                               omsk::Option{<:AbstractArray{Bool}} = nothing)::CategoricalPanelField
-    return CategoricalPanelField(name, levels, codes, omsk)
+                               omsk::Option{<:AbstractArray{Bool}} = nothing,
+                               pmsk::Option{<:AbstractArray{Bool}} = nothing)::CategoricalPanelField
+    return CategoricalPanelField(name, levels, codes, omsk, pmsk)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -381,7 +466,8 @@ $(DocStringExtensions.FIELDS)
 
     TensorPanelField(name::AbstractString, axis::AbstractString, labels::VecStr,
                      groups::Option{<:VecStr}, vals::AbstractArray{<:Real},
-                     omsk::Option{<:AbstractArray{Bool}} = nothing)
+                     omsk::Option{<:AbstractArray{Bool}} = nothing,
+                     pmsk::Option{<:AbstractArray{Bool}} = nothing)
 
 # Validation
 
@@ -393,6 +479,7 @@ $(DocStringExtensions.FIELDS)
   - `ndims(vals) in (2, 3)`. Raises a `DimensionMismatch`.
   - `size(vals, ndims(vals)) == length(labels)`. Raises a `DimensionMismatch`.
   - `size(omsk) == size(vals)` when `omsk` is given. Raises a `DimensionMismatch`.
+  - `pmsk` marks only unobserved cells. See [`assert_panel_field_placeholder`](@ref).
 
 # Examples
 
@@ -446,12 +533,17 @@ julia> f.vals[:, :, f.groups .== \"momentum\"]
     """
     vals
     """
-    Observed mask, the same size as the values, or `nothing` when the Panel Field cannot blank.
+    Observed mask, the same size as the values, or `nothing` when the Panel Field cannot blank. A cell is `true` where the raw input carried a value, and `false` where a fill policy wrote one.
     """
     omsk
+    """
+    Placeholder mask, the same size as the values, or `nothing` when no cell holds a placeholder. A cell is `true` where it holds the placeholder of a blank that no fill reached. No reader reads such a cell.
+    """
+    pmsk
     function TensorPanelField(name::AbstractString, axis::AbstractString, labels::VecStr,
                               groups::Option{<:VecStr}, vals::AbstractArray{<:Real},
-                              omsk::Option{<:AbstractArray{Bool}})
+                              omsk::Option{<:AbstractArray{Bool}},
+                              pmsk::Option{<:AbstractArray{Bool}})
         assert_panel_field_name(name)
         @argcheck(!isempty(axis),
                   IsEmptyError("the trailing-axis name (axis) of the tensor Panel Field \"$name\" cannot be empty: it names what the axis represents, such as \"factor\""))
@@ -465,14 +557,21 @@ julia> f.vals[:, :, f.groups .== \"momentum\"]
         @argcheck(size(vals, ndims(vals)) == length(labels),
                   DimensionMismatch("the tensor Panel Field \"$name\" needs one label per trailing-axis entry of vals, got $(size(vals, ndims(vals))) trailing entries and length(labels) = $(length(labels))"))
         assert_panel_field_mask(vals, omsk, name)
+        assert_panel_field_placeholder(omsk, pmsk, name)
         return new{typeof(name), typeof(axis), typeof(labels), typeof(groups), typeof(vals),
-                   typeof(omsk)}(name, axis, labels, groups, vals, omsk)
+                   typeof(omsk), typeof(pmsk)}(name, axis, labels, groups, vals, omsk, pmsk)
     end
+end
+function TensorPanelField(name::AbstractString, axis::AbstractString, labels::VecStr,
+                          groups::Option{<:VecStr}, vals::AbstractArray{<:Real},
+                          omsk::Option{<:AbstractArray{Bool}})::TensorPanelField
+    return TensorPanelField(name, axis, labels, groups, vals, omsk, nothing)
 end
 function TensorPanelField(; name::AbstractString, axis::AbstractString, labels::VecStr,
                           groups::Option{<:VecStr} = nothing, vals::AbstractArray{<:Real},
-                          omsk::Option{<:AbstractArray{Bool}} = nothing)::TensorPanelField
-    return TensorPanelField(name, axis, labels, groups, vals, omsk)
+                          omsk::Option{<:AbstractArray{Bool}} = nothing,
+                          pmsk::Option{<:AbstractArray{Bool}} = nothing)::TensorPanelField
+    return TensorPanelField(name, axis, labels, groups, vals, omsk, pmsk)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -604,45 +703,6 @@ function Base.show(io::IO, msk::AllTrueMask)
 end
 function Base.show(io::IO, ::MIME"text/plain", msk::AllTrueMask)
     return show(io, msk)
-end
-"""
-    panel_field_lift(f::NumericPanelField, n::Integer) -> NumericPanelField
-    panel_field_lift(f::CategoricalPanelField, n::Integer) -> CategoricalPanelField
-    panel_field_lift(f::TensorPanelField, n::Integer) -> TensorPanelField
-
-Lift a static Panel Field onto `n` observations, lazily.
-
-A static input that meets a time-varying one, or that meets the two universe masks, joins the panel at the panel's observation count. The values are wrapped in a [`RepeatedLeading`](@ref), which stores them once, and the observed mask is dropped: every cell of a static input was observed, so `nothing` is the mask that says so.
-
-# Algorithm
-
-The method that Julia selects is the algorithm. Each kind rebuilds itself with its value array wrapped in a [`RepeatedLeading`](@ref) and its observed mask set to `nothing`.
-
-# Arguments
-
-  - `f`: The static Panel Field.
-  - `n`: Length of the observation axis to lift onto.
-
-# Returns
-
-  - A Panel Field of the same kind, over `n` observations.
-
-# Related
-
-  - [`RepeatedLeading`](@ref)
-  - [`asset_panel`](@ref)
-  - [`AbstractPanelField`](@ref)
-"""
-function panel_field_lift(f::NumericPanelField, n::Integer)
-    return NumericPanelField(; name = f.name, vals = RepeatedLeading(f.vals, n))
-end
-function panel_field_lift(f::CategoricalPanelField, n::Integer)
-    return CategoricalPanelField(; name = f.name, levels = f.levels,
-                                 codes = RepeatedLeading(f.codes, n))
-end
-function panel_field_lift(f::TensorPanelField, n::Integer)
-    return TensorPanelField(; name = f.name, axis = f.axis, labels = f.labels,
-                            groups = f.groups, vals = RepeatedLeading(f.vals, n))
 end
 """
     panel_field_axes(f::NumericPanelField) -> Tuple{Vararg{Int}}
@@ -1109,12 +1169,14 @@ The method that Julia selects is the algorithm, and each kind views its own valu
 """
 function panel_field_view(f::NumericPanelField, i, j, ::Any)
     return NumericPanelField(; name = f.name, vals = panel_array_view(f.vals, i, j),
-                             omsk = panel_array_view(f.omsk, i, j))
+                             omsk = panel_array_view(f.omsk, i, j),
+                             pmsk = panel_array_view(f.pmsk, i, j))
 end
 function panel_field_view(f::CategoricalPanelField, i, j, ::Any)
     return CategoricalPanelField(; name = f.name, levels = f.levels,
                                  codes = panel_array_view(f.codes, i, j),
-                                 omsk = panel_array_view(f.omsk, i, j))
+                                 omsk = panel_array_view(f.omsk, i, j),
+                                 pmsk = panel_array_view(f.pmsk, i, j))
 end
 function panel_field_view(f::TensorPanelField, i, j, nx::Option{<:VecStr})
     sq = features_are_assets(f, nx)
@@ -1123,7 +1185,8 @@ function panel_field_view(f::TensorPanelField, i, j, nx::Option{<:VecStr})
                             labels = sq ? f.labels[j] : f.labels,
                             groups = panel_groups_view(f.groups, j, sq),
                             vals = panel_tensor_view(f.vals, i, j, k),
-                            omsk = panel_tensor_view(f.omsk, i, j, k))
+                            omsk = panel_tensor_view(f.omsk, i, j, k),
+                            pmsk = panel_tensor_view(f.pmsk, i, j, k))
 end
 """
     panel_groups_view(::Nothing, j, sq::Bool) -> nothing

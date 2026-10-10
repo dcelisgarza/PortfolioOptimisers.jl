@@ -693,19 +693,45 @@ function panel_field_observed_column!(zc::AbstractArray, f::TensorPanelField, ro
     return nothing
 end
 """
+    panel_data_mask(f::AbstractPanelField) -> Option{AbstractArray{Bool}}
+
+Return the mask of the cells of a Panel Field that hold data, or `nothing` when every cell holds data.
+
+A cell holds data where the raw input carried a value, or where a fill policy wrote one. It holds no data where it holds the placeholder of a blank that no fill reached. So the mask is the negation of the placeholder mask `pmsk`. A reader that must not take a placeholder as data, such as [`FeatureDistance`](@ref) and the panel collapse of a meta-optimiser, reads a cell only where this mask is `true`.
+
+# Arguments
+
+  - `f`: The Panel Field.
+
+# Returns
+
+  - `d::Option{AbstractArray{Bool}}`: `.!f.pmsk`, the same size as the values, or `nothing` when `f.pmsk` is `nothing`.
+
+# Related
+
+  - [`NumericPanelField`](@ref)
+  - [`CategoricalPanelField`](@ref)
+  - [`TensorPanelField`](@ref)
+  - [`panel_field_column_mask`](@ref)
+"""
+function panel_data_mask(f::AbstractPanelField)
+    pmsk = f.pmsk
+    return isnothing(pmsk) ? nothing : .!pmsk
+end
+"""
     panel_field_column_mask(f::NumericPanelField, l::Integer, rows = Colon()) -> Option{AbstractArray{Bool}}
     panel_field_column_mask(f::CategoricalPanelField, l::Integer, rows = Colon()) -> Option{AbstractArray{Bool}}
     panel_field_column_mask(f::TensorPanelField, l::Integer, rows = Colon()) -> Option{AbstractArray{Bool}}
 
-Return the observed mask of one value column of a Panel Field, or `nothing` when the Panel Field cannot blank.
+Return the mask of the cells of one value column of a Panel Field that hold data, or `nothing` when every cell holds data.
 
-A cell of a value column holds data only where this mask is `true`. Elsewhere it holds the placeholder that the builder stores, and a reader must not take that placeholder as data. A numeric Panel Field has one value column, and a categorical Panel Field is observed or not for the whole cell, never for one level, so both give their whole mask. A tensor Panel Field gives the mask of the label that the column reads. The method cuts the mask to `rows` along its leading axis, as [`panel_field_value_column!`](@ref) cuts a value column.
+A cell holds data where the raw input carried a value or a fill policy wrote one. Elsewhere it holds the placeholder of a blank that no fill reached, and a reader must not take that placeholder as data. The mask is [`panel_data_mask`](@ref), the negation of the placeholder mask. A numeric Panel Field has one value column, and a categorical Panel Field holds a placeholder or not for the whole cell, never for one level, so both give their whole mask. A tensor Panel Field gives the mask of the label that the column reads. The method cuts the mask to `rows` along its leading axis, as [`panel_field_value_column!`](@ref) cuts a value column.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. A Panel Field that carries no mask gives `nothing`.
+ 1. A Panel Field that holds no placeholder gives `nothing`.
  2. A numeric or a categorical Panel Field gives its mask, cut to `rows`.
  3. A tensor Panel Field gives the slice of its mask at label `l`, cut to `rows`.
 
@@ -722,24 +748,25 @@ The method that Julia selects is the algorithm.
 # Related
 
   - [`feature_matrix`](@ref)
-  - [`feature_observed_cells`](@ref)
+  - [`feature_data_cells`](@ref)
+  - [`panel_data_mask`](@ref)
   - [`panel_field_value_column!`](@ref)
 """
 function panel_field_column_mask(f::Union{<:NumericPanelField, <:CategoricalPanelField},
                                  ::Integer, rows = Colon())
-    omsk = f.omsk
-    return isnothing(omsk) ? nothing : selectdim(omsk, 1, rows)
+    d = panel_data_mask(f)
+    return isnothing(d) ? nothing : selectdim(d, 1, rows)
 end
 function panel_field_column_mask(f::TensorPanelField, l::Integer, rows = Colon())
-    omsk = f.omsk
-    return isnothing(omsk) ? nothing : selectdim(selectdim(omsk, ndims(omsk), l), 1, rows)
+    d = panel_data_mask(f)
+    return isnothing(d) ? nothing : selectdim(selectdim(d, ndims(d), l), 1, rows)
 end
 """
-    feature_observed_cells(pnl::AssetPanel, cols::AbstractVector{Tuple{Int, Int, Symbol}}) -> Option{AbstractArray{Bool}}
+    feature_data_cells(pnl::AssetPanel, cols::AbstractVector{Tuple{Int, Int, Symbol}}) -> Option{AbstractArray{Bool}}
 
-Mark the cells of an Asset Panel at which every resolved value column was observed.
+Mark the cells of an Asset Panel at which every resolved value column holds data.
 
-A cell is one asset of a static panel, or one observation and one asset of a time-varying one. It is `true` where each value column of `cols` holds data, and `false` where one of them holds the placeholder of a blank. An observed-mask column holds data in every cell, so it adds nothing. The answer is `nothing` when no value column of `cols` can blank. A [`FeatureDistance`](@ref) reads an asset at a cell only where this mask and the active mask are both `true`.
+A cell is one asset of a static panel, or one observation and one asset of a time-varying one. It is `true` where each value column of `cols` holds data, observed or filled, and `false` where one of them holds the placeholder of a blank that no fill reached. An observed-mask column holds data in every cell, so it adds nothing. The answer is `nothing` when no value column of `cols` holds a placeholder. A [`FeatureDistance`](@ref) reads an asset at a cell only where this mask and the active mask are both `true`.
 
 # Algorithm
 
@@ -752,7 +779,7 @@ Take the conjunction of the masks that [`panel_field_column_mask`](@ref) gives f
 
 # Returns
 
-  - `o::Option{AbstractArray{Bool}}`: The mask, with the shape of the panel's axes, or `nothing`.
+  - `d::Option{AbstractArray{Bool}}`: The mask, with the shape of the panel's axes, or `nothing`.
 
 # Related
 
@@ -761,16 +788,15 @@ Take the conjunction of the masks that [`panel_field_column_mask`](@ref) gives f
   - [`select_fields`](@ref)
   - [`FeatureDistance`](@ref)
 """
-function feature_observed_cells(pnl::AssetPanel,
-                                cols::AbstractVector{Tuple{Int, Int, Symbol}})
-    o = nothing
+function feature_data_cells(pnl::AssetPanel, cols::AbstractVector{Tuple{Int, Int, Symbol}})
+    d = nothing
     for (k, l, part) in cols
         m = part === :observed ? nothing : panel_field_column_mask(pnl.pf[k], l)
         if !isnothing(m)
-            o = isnothing(o) ? BitArray(m) : (o .&= m)
+            d = isnothing(d) ? BitArray(m) : (d .&= m)
         end
     end
-    return o
+    return d
 end
 """
     stacked_axes(ax::Tuple, rows) -> Tuple
@@ -818,7 +844,7 @@ function stacked_axes(ax::Tuple, rows::AbstractVector{<:Integer})::Tuple
 end
 """
     feature_matrix(pnl::AssetPanel, sel = nothing; strict::Bool = false, rows = Colon(),
-                   unobserved::Option{<:Real} = NaN) -> Array
+                   placeholder::Option{<:Real} = NaN) -> Array
 
 Stack the Panel Fields a Feature Selector names into the Feature Matrix a distance measures.
 
@@ -828,14 +854,14 @@ A static panel gives an `assets × features` matrix, and a time-varying one an `
 
 A time-varying panel stacks every observation unless `rows` names the rows to stack. Then it stacks those rows alone, one row of the stack for each row that `rows` names. A consumer that reads one row stacks one row this way. A [`FeatureDistance`](@ref) under [`LastObservation`](@ref) passes the last row through [`collapse_rows`](@ref), so it reads a lifted static Panel Field, whose values are a [`RepeatedLeading`](@ref), once and does not copy it once per observation. The stack keeps its observation axis whatever `rows` holds. A one-row stack is therefore a window of one observation, and every collapse algorithm agrees on it. A static panel has no observation axis, so it takes `Colon()` alone.
 
-A cell of a value column whose observed mask is `false` holds no data. The panel stores a placeholder there, and the Feature Matrix holds `unobserved` in its place, `NaN` by default. So the answer does not change with the placeholder. `unobserved = nothing` keeps the placeholder, and an observed-mask column still shows where the data held a blank.
+A cell of a value column holds data where the raw input carried a value or a fill policy wrote one, and the Feature Matrix holds that value. A cell that holds the placeholder of a blank that no fill reached holds no data. The Feature Matrix holds `placeholder` in its place, `NaN` by default, so the answer does not change with the placeholder. `placeholder = nothing` keeps the stored placeholder. An observed-mask column shows where the raw input held a blank, filled or not.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
 Z_{s,\\,i,\\,c} &= \\begin{cases}
-u & c \\text{ is a value column of a Panel Field that can blank, and } m^{(k,l)}_{r_{s},\\,i} = 0 \\\\
+u & c \\text{ is a value column of a Panel Field that holds a placeholder, and } d^{(k,l)}_{r_{s},\\,i} = 0 \\\\
 v^{(k)}_{r_{s},\\,i} & c \\text{ is the value column of a numeric Panel Field} \\\\
 \\mathbf{1}\\left[g^{(k)}_{r_{s},\\,i} = l\\right] & c \\text{ is level } l \\text{ of a categorical Panel Field} \\\\
 V^{(k)}_{r_{s},\\,i,\\,l} & c \\text{ is label } l \\text{ of a tensor Panel Field} \\\\
@@ -859,8 +885,8 @@ Where:
   - ``g^{(k)}_{t,\\,i}``: Level position of a categorical Panel Field at observation ``t`` and asset ``i``.
   - ``V^{(k)}_{t,\\,i,\\,l}``: Value of a tensor Panel Field at observation ``t``, asset ``i`` and label ``l``.
   - ``m^{(k)}_{t,\\,i}``, ``m^{(k)}_{t,\\,i,\\,j}``: Observed mask of a Panel Field, ``1`` where the cell was observed. A tensor Panel Field's mask carries the label index ``j``.
-  - ``m^{(k,l)}_{t,\\,i}``: Observed mask of the value column that ``c`` reads: ``m^{(k)}_{t,\\,i}`` for a numeric or a categorical Panel Field, and ``m^{(k)}_{t,\\,i,\\,l}`` for a tensor Panel Field. The first case applies first, and it does not apply to a Panel Field that cannot blank.
-  - ``u``: The value of `unobserved`. With `unobserved = nothing`, the first case does not apply.
+  - ``d^{(k,l)}_{t,\\,i}``: Data mask of the value column that ``c`` reads, ``0`` where the cell holds a placeholder, see [`panel_field_column_mask`](@ref). The first case applies first, and it does not apply to a Panel Field that holds no placeholder.
+  - ``u``: The value of `placeholder`. With `placeholder = nothing`, the first case does not apply.
   - ``\\mathbf{1}[\\cdot]``: Indicator function, ``1`` when its condition holds and ``0`` otherwise.
   - ``C``: Number of columns the Feature Selector resolves to.
   - $(math_dict[:N])
@@ -869,9 +895,9 @@ Where:
 
  1. Resolve `sel` against the panel with [`select_fields`](@ref).
  2. Derive the element type as the promotion over the Panel Fields whose **value** columns `sel` resolves to. An observed-mask column is a `0`/`1` column that every type holds, so it contributes nothing, and an indicator contributes nothing either. A selection of mask and indicator columns alone stacks in the panel's own type, the promotion over the values of every Panel Field. So the one-hot block of a `Float32` panel is `Float32`. A panel with no numeric or tensor Panel Field stacks in `Float64`. See [`panel_value_eltype`](@ref).
- 3. When a value column reads a Panel Field that can blank, widen the type to hold `unobserved` through [`panel_read_eltype`](@ref). An integer panel with the default `NaN` stacks in a floating-point type.
+ 3. When a value column reads a Panel Field that holds a placeholder, widen the type to hold `placeholder` through [`panel_read_eltype`](@ref). An integer panel with the default `NaN` stacks in a floating-point type.
  4. Allocate the matrix as zeros, over the observation rows that `rows` names, the asset axis of the panel and the resolved column count. See [`stacked_axes`](@ref).
- 5. Write each column, cut to `rows`, with [`panel_field_value_column!`](@ref) or [`panel_field_observed_column!`](@ref). Then write `unobserved` into each cell of a value column whose mask from [`panel_field_column_mask`](@ref) is `false`, through [`panel_read_write!`](@ref).
+ 5. Write each column, cut to `rows`, with [`panel_field_value_column!`](@ref) or [`panel_field_observed_column!`](@ref). Then write `placeholder` into each cell of a value column whose mask from [`panel_field_column_mask`](@ref) is `false`, through [`panel_read_write!`](@ref).
 
 # Arguments
 
@@ -879,12 +905,12 @@ Where:
   - $(field_dict[:fdsel])
   - $(field_dict[:fdstrict])
   - $(field_dict[:fdrows])
-  - $(arg_dict[:fdunobs])
+  - $(arg_dict[:fdplc])
 
 # Validation
 
   - The panel holds a Panel Field, and `sel` resolves to at least one column. See [`select_fields`](@ref).
-  - `unobserved` converts to the element type of the matrix. A `Rational` panel with an unobserved cell refuses `NaN` with an `InexactError`.
+  - `placeholder` converts to the element type of the matrix. A `Rational` panel that holds a placeholder refuses `NaN` with an `InexactError`.
   - `rows` is `Colon()` on a static panel, and indexes the observation axis of a time-varying one. See [`stacked_axes`](@ref).
 
 # Returns
@@ -905,22 +931,22 @@ Where:
 """
 function feature_matrix(pnl::AssetPanel, sel = nothing; strict::Bool = false,
                         rows::Union{Colon, AbstractVector{<:Integer}} = Colon(),
-                        unobserved::Option{<:Real} = NaN)
+                        placeholder::Option{<:Real} = NaN)
     return feature_stack(pnl, select_fields(pnl, sel, strict); rows = rows,
-                         unobserved = unobserved)
+                         placeholder = placeholder)
 end
 """
     feature_stack(pnl::AssetPanel, cols::AbstractVector{Tuple{Int, Int, Symbol}}; rows = Colon(),
-                  unobserved::Option{<:Real} = NaN) -> Array
+                  placeholder::Option{<:Real} = NaN) -> Array
 
-Stack the resolved columns `cols` of an Asset Panel into a Feature Matrix. It is steps 2 to 5 of [`feature_matrix`](@ref), which states them, for a caller that resolved the Feature Selector already. [`FeatureDistance`](@ref) resolves it once and reads the same columns for its mask of observed cells.
+Stack the resolved columns `cols` of an Asset Panel into a Feature Matrix. It is steps 2 to 5 of [`feature_matrix`](@ref), which states them, for a caller that resolved the Feature Selector already. [`FeatureDistance`](@ref) resolves it once and reads the same columns for its mask of the cells that hold data.
 
 # Arguments
 
   - `pnl`: The Asset Panel.
   - `cols`: The resolved columns, from [`select_fields`](@ref).
   - $(arg_dict[:fdrows])
-  - $(arg_dict[:fdunobs])
+  - $(arg_dict[:fdplc])
 
 # Returns
 
@@ -929,12 +955,12 @@ Stack the resolved columns `cols` of an Asset Panel into a Feature Matrix. It is
 # Related
 
   - [`feature_matrix`](@ref)
-  - [`feature_observed_cells`](@ref)
+  - [`feature_data_cells`](@ref)
 """
 function feature_stack(pnl::AssetPanel, cols::AbstractVector{Tuple{Int, Int, Symbol}};
                        rows::Union{Colon, AbstractVector{<:Integer}} = Colon(),
-                       unobserved::Option{<:Real} = NaN)
-    Z = zeros(feature_stack_eltype(pnl, cols, unobserved),
+                       placeholder::Option{<:Real} = NaN)
+    Z = zeros(feature_stack_eltype(pnl, cols, placeholder),
               stacked_axes(panel_axes(pnl), rows)..., length(cols))
     for (c, col) in pairs(cols)
         k, l, part = col
@@ -943,13 +969,13 @@ function feature_stack(pnl::AssetPanel, cols::AbstractVector{Tuple{Int, Int, Sym
             panel_field_observed_column!(zc, pnl.pf[k], rows)
         else
             panel_field_value_column!(zc, pnl.pf[k], l, rows)
-            panel_read_write!(zc, panel_field_column_mask(pnl.pf[k], l, rows), unobserved)
+            panel_read_write!(zc, panel_field_column_mask(pnl.pf[k], l, rows), placeholder)
         end
     end
     return Z
 end
 """
-    feature_stack_eltype(pnl::AssetPanel, cols::AbstractVector{Tuple{Int, Int, Symbol}}, unobserved::Option{<:Real}) -> Type
+    feature_stack_eltype(pnl::AssetPanel, cols::AbstractVector{Tuple{Int, Int, Symbol}}, placeholder::Option{<:Real}) -> Type
 
 Derive the element type of the Feature Matrix that [`feature_stack`](@ref) stacks from the resolved columns `cols`. It is steps 2 and 3 of [`feature_matrix`](@ref), which states the rule.
 
@@ -957,13 +983,13 @@ Derive the element type of the Feature Matrix that [`feature_stack`](@ref) stack
 
  1. Promote over the Panel Fields whose value columns `cols` holds. An observed-mask column and an indicator contribute nothing, see [`panel_value_eltype`](@ref).
  2. With nothing to promote, take the promotion over every Panel Field of the panel.
- 3. When a value column reads a Panel Field that can blank, widen the type to hold `unobserved` through [`panel_read_eltype`](@ref).
+ 3. When a value column reads a Panel Field that holds a placeholder, widen the type to hold `placeholder` through [`panel_read_eltype`](@ref).
 
 # Arguments
 
   - `pnl`: The Asset Panel.
   - `cols`: The resolved columns, from [`select_fields`](@ref).
-  - $(arg_dict[:fdunobs])
+  - $(arg_dict[:fdplc])
 
 # Returns
 
@@ -977,13 +1003,13 @@ Derive the element type of the Feature Matrix that [`feature_stack`](@ref) stack
 """
 function feature_stack_eltype(pnl::AssetPanel,
                               cols::AbstractVector{Tuple{Int, Int, Symbol}},
-                              unobserved::Option{<:Real})
+                              placeholder::Option{<:Real})
     vcols = filter(col -> col[3] !== :observed, cols)
     T = mapreduce(col -> panel_value_eltype(pnl.pf[col[1]]), promote_type, vcols;
                   init = Union{})
     T = T === Union{} ? panel_value_eltype(pnl.pf) : T
-    blank = any(col -> !isnothing(pnl.pf[col[1]].omsk), vcols)
-    return panel_read_eltype(T, blank ? unobserved : nothing)
+    blank = any(col -> !isnothing(pnl.pf[col[1]].pmsk), vcols)
+    return panel_read_eltype(T, blank ? placeholder : nothing)
 end
 """
     feature_labels(pnl::AssetPanel, sel = nothing; strict::Bool = false) -> Vector

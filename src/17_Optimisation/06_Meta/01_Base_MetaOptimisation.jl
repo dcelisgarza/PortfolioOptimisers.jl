@@ -752,7 +752,7 @@ Every fold collapses the same source field onto the same synthetic assets, so th
 # Algorithm
 
  1. Concatenate the values of every fold along the observation axis.
- 2. Concatenate the observed masks in the same way, or keep `nothing` when the field carries none.
+ 2. Concatenate the observed masks in the same way, or keep `nothing` when the field carries none. Concatenate the placeholder masks with [`panel_pmsk_vcat`](@ref).
  3. Build the field again with its keyword constructor, which runs every check again.
 
 # Arguments
@@ -775,7 +775,9 @@ function panel_field_stack(fs::AbstractVector{<:NumericPanelField})
                                  nothing
                              else
                                  vcat((f.omsk for f in fs)...)
-                             end)
+                             end,
+                             pmsk = panel_pmsk_vcat([f.pmsk for f in fs],
+                                                    [f.vals for f in fs]))
 end
 function panel_field_stack(fs::AbstractVector{<:TensorPanelField})
     return TensorPanelField(; name = fs[1].name, axis = fs[1].axis, labels = fs[1].labels,
@@ -785,7 +787,9 @@ function panel_field_stack(fs::AbstractVector{<:TensorPanelField})
                                 nothing
                             else
                                 cat((f.omsk for f in fs)...; dims = 1)
-                            end)
+                            end,
+                            pmsk = panel_pmsk_vcat([f.pmsk for f in fs],
+                                                   [f.vals for f in fs]))
 end
 """
     fold_feature_anchors(rd, pred)
