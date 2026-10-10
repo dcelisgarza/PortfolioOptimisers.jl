@@ -794,9 +794,9 @@ end
             @test near(batch(pes[2], k, dl, de), batch(pes[1], k, dl, de))
         end
         # `RankDeficiencyRefusal()` refuses in the stream at the step whose batch fit refuses,
-        # with the same rank: under `SolvedUnseenMember()`, the step that fits row 226, whose
-        # Unseen Member makes it rank-deficient. The stream names the position of the
-        # observation within the step, and the batch fit its position in the panel (#1629).
+        # with the same message: under `SolvedUnseenMember()`, the step that fits row 226,
+        # whose Unseen Member makes it rank-deficient. Both name the position of the
+        # observation among the fitted observations, not its position within the step (#1629).
         dr = de[1:5]
         for cre in (CrossSectionalLinearRegression(; alg = RankDeficiencyRefusal()),
                     CrossSectionalTargetRegression(; alg = RankDeficiencyRefusal()))
@@ -816,9 +816,9 @@ end
             end
             mb = [message(() -> batch(pe, k, dl, dr)) for k in eachindex(ms)]
             @test isempty.(ms) == isempty.(mb) == [true, true, true, false]
-            rank = "has rank 4 over 5 factors and 59 eligible assets"
-            @test occursin(rank, ms[end]) && occursin(rank, mb[end])
-            @test occursin("observation 225", mb[end])
+            @test occursin("observation 225 has rank 4 over 5 factors and 59 eligible assets",
+                           mb[end])
+            @test ms[end] == mb[end]
         end
         # A new dropped member with a zero benchmark-weighted exposure at an observation has
         # no finite ratio, so the rebase answers `nothing`, and the fit of every observation

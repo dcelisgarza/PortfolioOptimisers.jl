@@ -14,6 +14,7 @@ AbstractCrossSectionalSolveAlgorithm
 
 ```@docs
 cross_sectional_design_mask
+cross_sectional_block_regression
 cross_sectional_coefficients
 cross_sectional_leverage_one
 leverage_one_nan

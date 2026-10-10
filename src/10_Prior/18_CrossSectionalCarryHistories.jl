@@ -559,7 +559,7 @@ A column that is zero at an observation is an Unseen Member under [`ZeroUnseenMe
 
  1. Build the design of each fitted observation `s` in `mv.fcb` with [`unseen_member_design`](@ref), on the factors that `mv.lv` marks, and scale its rows of positive weight in `st.W[s, :]` by the square root of the weight.
  2. Keep the factor returns of the observation when [`cross_sectional_rank`](@ref) of the columns of that design that are not zero equals their number.
- 3. Otherwise, regress the returns of the observation with [`cross_sectional_live_regression`](@ref), under the policy of `pe.cre`, and map the answer with [`unseen_member_returns`](@ref). Write the factor returns into the row `s` of `mv.f`.
+ 3. Otherwise, regress the returns of the observation with [`cross_sectional_live_regression`](@ref), under the policy of `pe.cre`, after `s - 1` fitted observations, so a refusal names the observation `s`, as the batch fit does. Map the answer with [`unseen_member_returns`](@ref). Write the factor returns into the row `s` of `mv.f`.
 
 # Arguments
 
@@ -592,7 +592,8 @@ function cross_sectional_move_solve(pe::CrossSectionalFactorPrior,
         nz = map(c -> any(!iszero, c), eachcol(A))
         if cross_sectional_rank(view(A, :, nz)) < count(nz)
             t = s + pe.lag
-            csr = cross_sectional_live_regression(pe.cre, ud.Z, view(Xs, t:t, :), W, lv).csr
+            csr = cross_sectional_live_regression(pe.cre, ud.Z, view(Xs, t:t, :), W, lv,
+                                                  s - 1).csr
             f[s, :] = view(unseen_member_returns(csr, ud.P).f, 1, :)
         end
     end

@@ -1195,7 +1195,8 @@ function cross_sectional_foreach(f, ::FLoops.SequentialEx, idx::AbstractVector):
     return nothing
 end
 """
-    cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimator, Z::Arr3Num,
+    cross_sectional_regression(cre::Union{CrossSectionalLinearRegression,
+                                          CrossSectionalTargetRegression}, Z::Arr3Num,
                                X::MatNum, W::MatNum) -> CrossSectionalRegression
     cross_sectional_regression(csr::CrossSectionalRegression, args...) -> CrossSectionalRegression
 
@@ -1204,6 +1205,8 @@ Fit one regression per observation across the assets, or return a fitted result 
 The verb is its own rather than a fourth argument of [`regression`](@ref), because `regression(re::Regression, args...)` is a greedy passthrough that returns its first argument for any trailing arguments, so a time-series result handed to a cross-sectional call would return silently instead of raising.
 
 The weight matrix `W` is an argument rather than a field, because a two-pass weighting scheme calls the estimator **twice** on one design with two different weight matrices, and a policy stored on the estimator would force a second estimator object or a mutation.
+
+A refusal names an observation by its row of `X`. The verb fits [`cross_sectional_block_regression`](@ref) with no observation before `X`.
 
 # Algorithm
 
@@ -1255,11 +1258,64 @@ CrossSectionalRegression
   - [`cross_sectional_design_mask`](@ref)
   - [`cross_sectional_coefficients`](@ref)
   - [`cross_sectional_systematic`](@ref)
+  - [`cross_sectional_block_regression`](@ref)
   - [`regression`](@ref)
 """
-function cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimator,
-                                    Z::Arr3Num, X::MatNum,
-                                    W::MatNum)::CrossSectionalRegression
+function cross_sectional_regression(cre::Union{CrossSectionalLinearRegression,
+                                               CrossSectionalTargetRegression}, Z::Arr3Num,
+                                    X::MatNum, W::MatNum)::CrossSectionalRegression
+    return cross_sectional_block_regression(cre, Z, X, W, 0)
+end
+function cross_sectional_regression(csr::CrossSectionalRegression, args...)
+    return csr
+end
+"""
+    cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegression,
+                                                CrossSectionalTargetRegression},
+                                     Z::Arr3Num, X::MatNum, W::MatNum,
+                                     t0::Integer) -> CrossSectionalRegression
+    cross_sectional_block_regression(cre::AbstractCrossSectionalRegressionEstimator,
+                                     Z::Arr3Num, X::MatNum, W::MatNum,
+                                     t0::Integer) -> CrossSectionalRegression
+
+Fit one regression per observation of a block that follows `t0` fitted observations, as [`cross_sectional_regression`](@ref) fits it.
+
+A refusal names the observation at the row `t` of `X` as observation `t0 + t`. So the carry fold of a [`CrossSectionalFactorPrior`](@ref), which fits the new observations of a step alone, names the observation that the batch fit names. The method for an estimator that the library does not know calls [`cross_sectional_regression`](@ref) on the block, and the estimator numbers the observations of the block itself.
+
+# Algorithm
+
+The algorithm of [`cross_sectional_regression`](@ref), with `t0 + t` as the index of the observation that [`cross_sectional_coefficients`](@ref) receives.
+
+# Arguments
+
+  - `cre`: Cross-sectional regression estimator.
+  - `Z::Arr3Num`: Exposure tensor `observations × assets × factors`.
+  - `X::MatNum`: Asset returns matrix `observations × assets`.
+  - `W::MatNum`: Cross-sectional weights matrix `observations × assets`.
+  - `t0::Integer`: Number of fitted observations before the block.
+
+# Validation
+
+  - The rules of [`cross_sectional_regression`](@ref).
+
+# Returns
+
+  - `csr::CrossSectionalRegression`: The fit of the block.
+
+# Related
+
+  - [`cross_sectional_regression`](@ref)
+  - [`cross_sectional_coefficients`](@ref)
+  - [`cross_sectional_live_regression`](@ref)
+"""
+function cross_sectional_block_regression(cre::AbstractCrossSectionalRegressionEstimator,
+                                          Z::Arr3Num, X::MatNum, W::MatNum, ::Integer)
+    return cross_sectional_regression(cre, Z, X, W)
+end
+function cross_sectional_block_regression(cre::Union{CrossSectionalLinearRegression,
+                                                     CrossSectionalTargetRegression},
+                                          Z::Arr3Num, X::MatNum, W::MatNum,
+                                          t0::Integer)::CrossSectionalRegression
     act = cross_sectional_design_mask(Z, X, W)
     # The coefficients answer a weighted least squares, so the working type is the inputs'
     # own promotion, widened to a float only when it is an integer: an integer panel
@@ -1294,7 +1350,7 @@ function cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimat
             y = y .- ybar
             A = A .- transpose(xbar)
         end
-        fi = cross_sectional_coefficients(cre, A, y, w, t)
+        fi = cross_sectional_coefficients(cre, A, y, w, t0 + t)
         f[t, :] = fi
         if cre.intercept
             b[t] = ybar - LinearAlgebra.dot(fi, xbar)
@@ -1304,9 +1360,6 @@ function cross_sectional_regression(cre::AbstractCrossSectionalRegressionEstimat
     # A fit that is not least squares keeps the residual of a marked pair, and only marks it.
     eps[h1 .& cross_sectional_least_squares(cre)] .= zero(eltype(eps))
     return CrossSectionalRegression(; f = f, eps = eps, n = n, b = b, h1 = BitMatrix(h1))
-end
-function cross_sectional_regression(csr::CrossSectionalRegression, args...)
-    return csr
 end
 """
     cross_sectional_systematic(f::MatNum, b::Option{<:VecNum}, Z::Arr3Num) -> MatNum

@@ -1728,12 +1728,12 @@ A zero column of the design adds nothing to the fit, so the returns of the other
 
 # Algorithm
 
-The method with `lv` regresses on the factors that a caller marks. The carry fold of a [`CrossSectionalFactorPrior`](@ref) calls it on its new observations, with the mark of every observation it fitted, so a factor that is empty at the new observations alone keeps its column, as it does in the batch fit.
+The method with `lv` regresses on the factors that a caller marks. The carry fold of a [`CrossSectionalFactorPrior`](@ref) calls it on its new observations, with the mark of every observation it fitted, so a factor that is empty at the new observations alone keeps its column, as it does in the batch fit. The fold also gives the number `t0` of observations it fitted before them, so a refusal names the observation that the batch fit names.
 
 # Algorithm
 
  1. Without `lv`, mark the factors that are not empty with [`cross_sectional_live_factors`](@ref), giving `lv`.
- 2. If every factor is in `lv`, regress on `Z` with [`cross_sectional_regression`](@ref) and return.
+ 2. If every factor is in `lv`, regress on `Z` with [`cross_sectional_block_regression`](@ref) after `t0` observations, and return.
  3. Otherwise, regress on the columns of `Z` at `lv`, giving `csl`. Write its factor returns into the columns at `lv` of a zero matrix `f`, and keep its residuals, its counts and its intercept.
 
 # Arguments
@@ -1743,6 +1743,7 @@ The method with `lv` regresses on the factors that a caller marks. The carry fol
   - `X`: Asset returns matrix `observations × assets`.
   - `W`: Cross-sectional weights matrix `observations × assets`.
   - `lv`: `true` at each factor to regress on.
+  - `t0`: Number of fitted observations before the first row of `X`, which a refusal adds to the row it names.
 
 # Validation
 
@@ -1769,11 +1770,11 @@ function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEs
 end
 function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEstimator,
                                          Z::Arr3Num, X::MatNum, W::MatNum,
-                                         lv::AbstractVector{Bool})
+                                         lv::AbstractVector{Bool}, t0::Integer = 0)
     if all(lv)
-        return (; csr = cross_sectional_regression(cre, Z, X, W), lv = lv)
+        return (; csr = cross_sectional_block_regression(cre, Z, X, W, t0), lv = lv)
     end
-    csl = cross_sectional_regression(cre, Z[:, :, lv], X, W)
+    csl = cross_sectional_block_regression(cre, Z[:, :, lv], X, W, t0)
     f = zeros(eltype(csl.f), size(csl.f, 1), size(Z, 3))
     f[:, lv] = csl.f
     return (;

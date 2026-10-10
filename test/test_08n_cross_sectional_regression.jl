@@ -81,6 +81,14 @@ end
 # A regression target the library does not know, for `cross_sectional_least_squares`.
 struct LeverageTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
 
+# A cross-sectional estimator the library does not know, which answers the public verb alone.
+struct BlockTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressionEstimator end
+function PortfolioOptimisers.cross_sectional_regression(::BlockTestRegression, Z, X, W)
+    return cross_sectional_regression(CrossSectionalLinearRegression(), Z, X, W)
+end
+# A cross-sectional estimator the library does not know, which answers no verb.
+struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressionEstimator end
+
 @testset "Cross-sectional regression" begin
     Z, X, W, beta = cross_sectional_panel()
     # Rows 2 onwards carry no missing entry, so a probe that needs a clean panel takes them.
@@ -380,6 +388,51 @@ struct LeverageTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
         @test_throws ArgumentError cross_sectional_regression(CrossSectionalLinearRegression(;
                                                                                              alg = RankDeficiencyRefusal()),
                                                               Z, X, We)
+    end
+
+    @testset "A block names its observations after the fitted ones (#1629)" begin
+        PO = PortfolioOptimisers
+        function message(f)
+            try
+                f()
+                return ""
+            catch e
+                return sprint(showerror, e)
+            end
+        end
+        Zd = copy(Zc)
+        Zd[:, :, 2] = 2 .* Zd[:, :, 1]
+        We = copy(W)
+        We[2, :] .= 0.0
+        for cre in (CrossSectionalLinearRegression(; alg = RankDeficiencyRefusal()),
+                    CrossSectionalTargetRegression(; alg = RankDeficiencyRefusal()))
+            m0 = message(() -> cross_sectional_regression(cre, Zd, Xc, Wc))
+            @test message(() -> PO.cross_sectional_block_regression(cre, Zd, Xc, Wc, 0)) ==
+                  m0
+            m7 = message(() -> PO.cross_sectional_block_regression(cre, Zd, Xc, Wc, 7))
+            @test m7 == replace(m0, "observation 1 " => "observation 8 ")
+            lv = trues(size(Zd, 3))
+            @test message(() -> PO.cross_sectional_live_regression(cre, Zd, Xc, Wc, lv, 7)) ==
+                  m7
+            # The offset changes the name in a refusal alone, never the fit.
+            fit = PO.cross_sectional_block_regression(CrossSectionalLinearRegression(), Zc,
+                                                      Xc, Wc, 7)
+            @test fit.f ==
+                  cross_sectional_regression(CrossSectionalLinearRegression(), Zc, Xc, Wc).f
+        end
+        # The refusal of an empty cross-section under a target names the same observation.
+        cre = CrossSectionalTargetRegression()
+        @test occursin("observation 12 has no asset",
+                       message(() -> PO.cross_sectional_block_regression(cre, Z, X, We, 10)))
+        # An estimator the library does not know answers the public verb, and numbers the
+        # observations of the block itself. One that answers no verb is refused by name.
+        csr = PO.cross_sectional_block_regression(BlockTestRegression(), Zc, Xc, Wc, 7)
+        @test csr.f ==
+              cross_sectional_regression(CrossSectionalLinearRegression(), Zc, Xc, Wc).f
+        @test PO.cross_sectional_live_regression(BlockTestRegression(), Zc, Xc, Wc,
+                                                 trues(size(Zc, 3)), 7).csr.f == csr.f
+        @test_throws MethodError PO.cross_sectional_block_regression(BareTestRegression(),
+                                                                     Zc, Xc, Wc, 7)
     end
 
     @testset "The coefficient of determination" begin
