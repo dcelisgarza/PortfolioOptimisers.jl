@@ -233,9 +233,9 @@ end
     target_forecast_latest_row(vs::Nothing, t::Integer, N::Integer) -> Nothing
     target_forecast_latest_row(vs::MatNum, t::Integer, N::Integer) -> MatNum
 
-Return the idiosyncratic variances that the read-out of a [`TargetReturnForecast`](@ref) at block row `t` converts with, as a one-row matrix.
+Return the idiosyncratic variances that a [`TargetReturnForecast`](@ref) converts its forecast with at block row `t`, as a one-row matrix.
 
-The read-out of a block reads the last row of the variances of that block, as [`target_forecast_latest_variances`](@ref) states. A row before the block has no variance, so it reads `NaN`.
+The forecast of a block reads the last row of the variances of that block, as [`target_forecast_latest_variances`](@ref) states. A row before the block has no variance, so it reads `NaN`.
 
 # Arguments
 

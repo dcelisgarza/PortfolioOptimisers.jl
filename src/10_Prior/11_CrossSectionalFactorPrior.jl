@@ -477,7 +477,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     @fprop mp
     """
-    $(field_dict[:srep]) The default is [`NoSystematicRepair`](@ref). The batch fit and the read-out of the carry fold run the same lift, so the carry fold equals the batch fit under each rule.
+    $(field_dict[:srep]) The default is [`NoSystematicRepair`](@ref). The batch fit and the carry fold run the same lift when they read the prior, so the carry fold equals the batch fit under each rule.
     """
     srep
     """

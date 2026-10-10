@@ -480,7 +480,7 @@ end
 
 Return the idiosyncratic variance history a fitted Return Forecast weighs its fit by.
 
-A fitted member reads the variances whatever its Forecast Unit. In the return unit they are the regression weights, and in the Sharpe unit they scale the target and the fit. The read-out of the latest row reads `csfm.vs` itself, so it does not pass through this function.
+A fitted member reads the variances whatever its Forecast Unit. In the return unit they are the regression weights, and in the Sharpe unit they scale the target and the fit. The forecast of the latest row reads `csfm.vs` itself, so it does not pass through this function.
 
 A pair whose leverage is one, which the `h1` field of the cross-sectional fit marks, reads `NaN` through [`leverage_one_nan`](@ref), so the fit leaves it out. Its variance reads only residuals that are zero by construction, so it is zero, or a rounding of zero. The test is the mask and not the value, because a rounding passes a test of the value. The block does not change.
 

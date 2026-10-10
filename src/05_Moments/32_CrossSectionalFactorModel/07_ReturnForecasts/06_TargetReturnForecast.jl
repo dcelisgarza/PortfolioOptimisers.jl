@@ -1245,7 +1245,7 @@ function return_forecast(rfe::TargetReturnForecast, rd::ReturnsResult,
     cf = target_forecast_coefficient(rfe, model, Sf, yf, ok, d.fwd, d.vs, d.w, nt)
     ocalib = target_forecast_orthogonal_coefficient(cre, cf.P, d.fwd, d.vs, d.w, rfe, csfm,
                                                     d.off)
-    # The fit reads `NaN` at a pair of leverage one, and the read-out converts with the
+    # The fit reads `NaN` at a pair of leverage one, and the forecast converts with the
     # variance the block holds there. The last row of the block is the last row of `vs`.
     P = forecast_return_units(rfe.unit, target_forecast_latest(model, d.Sa),
                               target_forecast_latest_variances(csfm.vs))

@@ -630,7 +630,7 @@ function return_forecast_step(rfe::ExpWeightedReturnForecast, P::NamedTuple,
             coefs[t, :] = coef
         end
     end
-    # The fit reads `NaN` at a pair of leverage one, and the read-out converts with the
+    # The fit reads `NaN` at a pair of leverage one, and the forecast converts with the
     # variance the block holds there.
     hist = forecast_return_units(rfe.unit, rfe.scale .* ew_forecast_history(Sb, coefs, gap),
                                  csfm.vs)
