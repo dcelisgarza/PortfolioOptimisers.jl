@@ -349,7 +349,7 @@ a late observed series.
 Every `Posdef` repair now ends with `assert_posdef_repair`, which raises a `PosdefRepairError`
 when the result is not finite or its smallest eigenvalue is below the tolerance of the eigen square
 root. A result that passes returns with no message, singular or not, so the zero rows of a zero
-variance still pass. [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-five-differences-are-deliberate.md)
+variance still pass. [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-seven-differences-are-deliberate.md)
 states the rule.
 
 ## Amendment (2026-10-07, #1511)

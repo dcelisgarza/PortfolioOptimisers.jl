@@ -6,7 +6,7 @@ status: accepted
 
 ## Context
 
-[ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-five-differences-are-deliberate.md)
+[ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-seven-differences-are-deliberate.md)
 put the online update of the Cross-Sectional Factor Prior in scope of map
 [#1375](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1375) (mode 16a), and
 [#1409](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1409) decided the route. The

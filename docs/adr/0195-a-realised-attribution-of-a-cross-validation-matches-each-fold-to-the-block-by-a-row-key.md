@@ -97,7 +97,7 @@ missing `ts` only where it is load-bearing.
 
 - **Timestamps only, as ADR 0045 decided for the Feature Matrix.** The attribution of a
   walk-forward over data with no timestamps would stay refused, and the oracle answers that case.
-  [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-five-differences-are-deliberate.md)
+  [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-seven-differences-are-deliberate.md)
   builds a mode of the oracle that a caller cannot reach.
 - **A `rows` keyword on `factor_attribution`.** The caller would split the cross-validation again
   to pass it, and a wrong range gives wrong numbers with no error.

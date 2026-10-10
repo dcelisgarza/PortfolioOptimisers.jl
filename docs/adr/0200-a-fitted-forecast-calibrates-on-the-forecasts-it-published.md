@@ -101,7 +101,7 @@ values.
 - The forecast that the member publishes at an observation is the forecast of a fit through that
   observation. So the carry gives a slot that reads the Return Forecast history the rows of the
   fold, and fits no member again for it.
-- [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-five-differences-are-deliberate.md)
+- [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-seven-differences-are-deliberate.md)
   states the warm-up under a cross-validation estimator, and
   [ADR 0194](0194-a-fitted-return-forecast-neutralises-its-scores-so-its-orthogonal-part-carries-the-scale-of-its-fit.md)
   reads `κ⊥` off the same predictions as `κ`, prequential by default.
