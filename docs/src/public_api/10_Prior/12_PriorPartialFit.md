@@ -24,8 +24,6 @@ PortfolioOptimisers.partial_fit!(pe::PortfolioOptimisers.AbstractPriorEstimator,
 PortfolioOptimisers.partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any, <:Option{<:PortfolioOptimisers.PriorCarryState}}, x::PortfolioOptimisers.VecNum, ::PortfolioOptimisers.Option{<:PortfolioOptimisers.VecNum_MatNum} = nothing; kwargs...)
 PortfolioOptimisers.partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Option{<:PortfolioOptimisers.PriorCarryState}}, rd::ReturnsResult)
 prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any, <:Option{<:PortfolioOptimisers.PriorCarryState}}; strict::Bool = false, kwargs...)
-PortfolioOptimisers.partial_fit!(pe::HighOrderPriorEstimator, X::PortfolioOptimisers.VecNum_MatNum, F::PortfolioOptimisers.Option{<:PortfolioOptimisers.VecNum_MatNum} = nothing; kwargs...)
-prior(pe::HighOrderPriorEstimator; kwargs...)
 PortfolioOptimisers.partial_fit!(pe::BlackLittermanPrior, X::PortfolioOptimisers.VecNum_MatNum, F::PortfolioOptimisers.Option{<:PortfolioOptimisers.VecNum_MatNum} = nothing; kwargs...)
 PortfolioOptimisers.partial_fit!(pe::HighOrderPriorEstimator, rd::ReturnsResult)
 prior(pe::BlackLittermanPrior; strict::Bool = false, kwargs...)

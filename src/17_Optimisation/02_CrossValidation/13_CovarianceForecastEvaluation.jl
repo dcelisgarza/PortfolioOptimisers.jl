@@ -257,7 +257,7 @@ A second moment is always taken about some centre, ``\\mathbb{E}[(\\boldsymbol{z
 
 Each family has two arities. The data form answers for a batch fit over `X`. The data-less form answers for the state that the estimator carries after [`partial_fit!`](@ref), so a refit fold and a stepped fold centre on the same quantity. For a family state, the data-less form returns the vector of the state itself, which the next fold writes in place.
 
-  - [`Covariance`](@ref) answers the centre that [`weighted_centre`](@ref) resolves from `ce.me` and `ce.w`, or `state.mu`. Under a [`CoveragePolicy`](@ref) the batch fit and the fold are one computation, so the data form folds the window and reads the same `state.mu`. That vector is the diagonal of the per-pair centre, the available-case mean of each asset. The forecast centres each off-diagonal product on the mean of the observations that the pair shares, and one vector cannot carry that centre. The per-asset ratios read the diagonal only.
+  - [`Covariance`](@ref) answers the centre that [`weighted_centre`](@ref) resolves from `ce.me` and `ce.w`, or `state.mu`. Under a [`CoveragePolicy`](@ref) the batch fit and the fold are one computation, so the data form folds the window and reads the same `state.mu`. That fold runs under [`FullMoment`](@ref) whatever `ce.alg` is, because the centre does not depend on the moment algorithm, and the fold refuses every other algorithm. That vector is the diagonal of the per-pair centre, the available-case mean of each asset. The forecast centres each off-diagonal product on the mean of the observations that the pair shares, and one vector cannot carry that centre. The per-asset ratios read the diagonal only.
   - [`GeneralCovariance`](@ref) answers the sample mean, weighted by `ce.w` when it carries observation weights, or `state.mu`.
   - [`ExpWeightedCovariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref) answer `state.location` under [`EstimatedCentring`](@ref), or zero for every asset under [`PreCentred`](@ref), because the estimator then assumes a zero mean. The data form runs over the window the same pass that the batch fit runs, and reads the location at the end of the pass.
   - [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref) answer what the estimator that they hold answers, because a matrix transform moves no centre. A `StatsBase.CovarianceEstimator` that they hold is read as a [`GeneralCovariance`](@ref), as `cov` reads it.
@@ -308,7 +308,9 @@ end
 function forecast_location(ce::Covariance, cvg::CoveragePolicy, X::MatNum; dims::Int = 1,
                            active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                            estimation_mask = nothing, kwargs...)
-    ce = partial_fit!(Covariance(; me = ce.me, ce = ce.ce, alg = ce.alg, w = ce.w,
+    # The centre does not depend on the moment algorithm, and the fold refuses every algorithm
+    # but `FullMoment`, so the location of a `SemiMoment` estimator is read from a full one.
+    ce = partial_fit!(Covariance(; me = ce.me, ce = ce.ce, alg = FullMoment(), w = ce.w,
                                  cvg = cvg), X; dims = dims, active_mask = active_mask)
     return forecast_location(ce)
 end
@@ -509,24 +511,27 @@ function prior_state_location(pe::AbstractPriorEstimator, pr::AbstractPriorResul
 end
 function prior_state_location(pe::EmpiricalPrior{<:Any, <:Any, Nothing},
                               ::AbstractPriorResult, state::PriorCarryState; kwargs...)
-    return carried_location(pe.ce, sample_buffer(state); kwargs...)
+    return carried_location(pe.ce, sample_buffer(state), buffer_asset_panel(state.buf);
+                            implied_volatility_buffer_kwargs(state.buf)..., kwargs...)
 end
 function prior_state_location(pe::EmpiricalPrior{<:Any, <:Any, <:Number},
                               pr::AbstractPriorResult, state::PriorCarryState; kwargs...)
-    c = carried_location(pe.ce, log1p.(sample_buffer(state)); kwargs...)
+    c = carried_location(pe.ce, log1p.(sample_buffer(state)), buffer_asset_panel(state.buf);
+                         implied_volatility_buffer_kwargs(state.buf)..., kwargs...)
     return horizon_location(c, pr, pe.horizon)
 end
 """
-    carried_location(ce, X::MatNum; kwargs...)
+    carried_location(ce, X::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
 
 Read the location of a covariance estimator that a fold-and-carry prior holds, out of its state or over the rows that the prior carries.
 
-This is [`read_member`](@ref) for [`forecast_location`](@ref). A `StatsBase.CovarianceEstimator` does not fold, and it is read as a [`GeneralCovariance`](@ref) over the rows, as `cov` reads it.
+This is [`read_member`](@ref) for [`forecast_location`](@ref). A `StatsBase.CovarianceEstimator` does not fold, and it is read as a [`GeneralCovariance`](@ref) over the rows, as `cov` reads it. The refit calls the panel form over `pnl`, as the data form of [`prior_forecast_location`](@ref) does over `rd.pnl`, so it answers a gapped sample and reads the active mask that the carried buffer records.
 
 # Arguments
 
   - $(arg_dict[:ce])
   - `X`: The rows that the prior carries, `observations × assets`.
+  - `pnl`: The Asset Panel that [`buffer_asset_panel`](@ref) rebuilds from the carried buffer, or `nothing`.
   - `kwargs...`: Additional keyword arguments, passed to the refit alone.
 
 # Returns
@@ -538,11 +543,11 @@ This is [`read_member`](@ref) for [`forecast_location`](@ref). A `StatsBase.Cova
   - [`read_member`](@ref)
   - [`prior_state_location`](@ref)
 """
-function carried_location(ce, X::MatNum; kwargs...)
+function carried_location(ce, X::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
     return if supports_partial_fit(ce)
         forecast_location(ce)
     else
-        forecast_location(library_covariance_estimator(ce), X; dims = 1, kwargs...)
+        forecast_location(library_covariance_estimator(ce), X, pnl; dims = 1, kwargs...)
     end
 end
 """

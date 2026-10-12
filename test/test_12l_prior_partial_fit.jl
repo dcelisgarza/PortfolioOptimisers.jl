@@ -863,13 +863,15 @@ end
             @test isapprox(prior(all_steps(EmpiricalPrior(; ce = ce), r)).sigma, pb.sigma;
                            rtol = 1e-12)
             # A gap in the surface drops the asset from the Coverage Universe of the batch
-            # fit. The refit reads the same panel method. The carry refits through the
-            # plain method, which refuses the gap by name.
+            # fit. The refit and the carry read the same panel method (#1639).
             pg = prior(EmpiricalPrior(; ce = ce), rg)
             @test all(isnan, view(pg.sigma, 2, :))
             @test isapprox(prior(all_steps(online(EmpiricalPrior(; ce = ce)), rg)).sigma,
                            pg.sigma; rtol = 1e-12, nans = true)
-            m = message(() -> prior(all_steps(EmpiricalPrior(; ce = ce), rg)))
+            @test isapprox(prior(all_steps(EmpiricalPrior(; ce = ce), rg)).sigma, pg.sigma;
+                           rtol = 1e-12, nans = true)
+            # The plain method refuses the gap by name.
+            m = message(() -> cov(ce, Xc; dims = 1, iv = ivg, ivpa = 1.1))
             @test occursin("all(isfinite, iv) must hold", m)
         end
         # The carry fold of a Cross-Sectional Factor Prior has no slot for the surface.
@@ -878,6 +880,62 @@ end
         m = message(() -> partial_fit!(cs, rd(full; iv = fill(0.2, T, N), ivpa = 1.0)))
         @test occursin("the carry fold of a Cross-Sectional Factor Prior takes no implied volatilities",
                        m)
+    end
+    @testset "The carry refits a member that does not fold over the panel of its buffer (#1639)" begin
+        r0 = rd(nothing)
+        # Asset 3 is inactive where its returns are finite, so a refit that drops the
+        # panel reads rows that the batch fit does not read.
+        A = copy(M)
+        A[1:12, 3] .= false
+        tv = AssetPanel(; amsk = A, emsk = copy(A))
+        # The buffer gives the panel that it records, or nothing.
+        @test isnothing(po.buffer_asset_panel(steps(EmpiricalPrior(), r0).cache.buf))
+        p = po.buffer_asset_panel(steps(EmpiricalPrior(), rd(tv)).cache.buf)
+        @test p.amsk == A && p.emsk == A && isempty(p.pf)
+        # A gapped sample: the plain method refuses it, the batch fit and the carry answer.
+        for ce in (Covariance(; alg = SemiMoment()), StatsBase.SimpleCovariance()),
+            horizon in (nothing, 5)
+
+            est = EmpiricalPrior(; ce = ce, horizon = horizon)
+            b = prior(est, r0)
+            c = prior(steps(est, r0))
+            @test isapprox(c.sigma, b.sigma; rtol = 1e-12, nans = true)
+            @test isapprox(c.mu, b.mu; rtol = 1e-12, nans = true)
+            @test isequal(c.X, b.X)
+            @test isapprox(po.forecast_location(steps(est, r0)),
+                           po.forecast_location(est, r0); rtol = 1e-12, nans = true)
+        end
+        h = HighOrderPriorEstimator(; kte = Cokurtosis(; alg = SemiMoment()),
+                                    ske = Coskewness(; alg = SemiMoment()))
+        hb = prior(h, r0)
+        hc = prior(steps(h, r0))
+        @test any(isnan, hb.kt)
+        @test isapprox(hc.kt, hb.kt; rtol = 1e-12, nans = true)
+        @test isapprox(hc.sk, hb.sk; rtol = 1e-12, nans = true)
+        @test isapprox(hc.V, hb.V; rtol = 1e-12, nans = true)
+        # A time-varying active mask: the refit reads it, as the batch fit does. The members
+        # that fold read it under a Coverage Policy.
+        cvg = CoveragePolicy(; min_coverage = 0.2)
+        for ce in
+            (Covariance(; alg = SemiMoment(), cvg = cvg), Covariance(; alg = SemiMoment()),
+             StatsBase.SimpleCovariance())
+            est = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg), ce = ce)
+            b = prior(est, rd(tv))
+            c = prior(steps(est, rd(tv)))
+            @test isapprox(c.sigma, b.sigma; rtol = 1e-12, nans = true)
+            @test isapprox(c.mu, b.mu; rtol = 1e-12, nans = true)
+            @test !isapprox(prior(est, r0).sigma, b.sigma; nans = true)
+        end
+        est = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg),
+                             ce = Covariance(; alg = SemiMoment(), cvg = cvg))
+        c = po.forecast_location(steps(est, rd(tv)))
+        @test isequal(c, po.forecast_location(est, rd(tv)))
+        @test !isequal(c, po.forecast_location(est, r0))
+        # The location does not depend on the moment algorithm.
+        @test isequal(c,
+                      po.forecast_location(EmpiricalPrior(; me = est.me,
+                                                          ce = Covariance(; cvg = cvg)),
+                                           rd(tv)))
     end
     @testset "The fold refuses what no state records" begin
         @test_throws IsNothingError partial_fit!(online(EmpiricalPrior()),

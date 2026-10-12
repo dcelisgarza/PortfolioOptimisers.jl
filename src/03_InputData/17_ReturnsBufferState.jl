@@ -494,7 +494,7 @@ The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer th
 
  1. Read `n` with [`context_count`](@ref), and refuse a state whose count differs from the count of `rows`.
  2. Copy the valid rows of `rows` into `X`.
- 3. When `rows` records an active mask, rebuild a time-varying [`AssetPanel`](@ref) from it. Its estimation mask is the one that `rows` records or, when `rows` records none, a copy of the active mask. The step of a refit prior records both masks, and the carry of [`EmpiricalPrior`](@ref) and a head with no prior record the active mask alone. Its Panel Fields are the ones that `rows` records, which it records for a prior that reads them, and none otherwise. When `rows` records no active mask, take the static panel that the state pinned, or `nothing`.
+ 3. When `rows` records an active mask, rebuild a time-varying [`AssetPanel`](@ref) from it with [`buffer_asset_panel`](@ref). Its estimation mask is the one that `rows` records or, when `rows` records none, a copy of the active mask. The step of a refit prior records both masks, and the carry of [`EmpiricalPrior`](@ref) and a head with no prior record the active mask alone. Its Panel Fields are the ones that `rows` records, which it records for a prior that reads them, and none otherwise. When `rows` records no active mask, take the static panel that the state pinned, or `nothing`.
  4. Take `F` from the state when the state keeps the factor column, and from [`factor_buffer`](@ref) of `rows` otherwise. Take `ne` and `E` from the state when the state keeps the series, and from [`exogenous_buffer_kwargs`](@ref) of `rows` otherwise.
  5. Take `iv` and `ivpa` from [`implied_volatility_buffer_kwargs`](@ref) of `rows`, which records them beside the returns.
  6. Copy `B` and `ts` from the state, and build the `ReturnsResult`.
@@ -522,20 +522,14 @@ The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer th
   - [`factor_buffer`](@ref)
   - [`exogenous_buffer_kwargs`](@ref)
   - [`implied_volatility_buffer_kwargs`](@ref)
+  - [`buffer_asset_panel`](@ref)
 """
 function returns_result(state::ReturnsBufferState, rows::SampleBufferState)
     n = context_count(state)
     @argcheck(iszero(n) || n == rows.n,
               DimensionMismatch("the fold context and the returns buffer are appended to together, so they hold one number of observations, but the context holds $n and the returns buffer holds $(rows.n)."))
     X = Matrix(sample_buffer(rows))
-    msk = sample_buffer_kwargs(rows)
-    pnl = if haskey(msk, :active_mask)
-        amsk = Matrix(msk.active_mask)
-        emsk = haskey(msk, :estimation_mask) ? Matrix(msk.estimation_mask) : copy(amsk)
-        AssetPanel(; pf = something(rows.P, AbstractPanelField[]), amsk = amsk, emsk = emsk)
-    else
-        state.pnl
-    end
+    pnl = something(buffer_asset_panel(rows), Some(state.pnl))
     F = isnothing(state.F) ? column_matrix(factor_buffer(rows)) : column_matrix(state.F)
     ex = isnothing(state.E) ? exogenous_buffer_kwargs(rows) : (; ne = state.ne, E = state.E)
     vols = implied_volatility_buffer_kwargs(rows)

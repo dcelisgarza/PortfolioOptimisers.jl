@@ -982,5 +982,115 @@ function factor_residual_config(pe::HighOrderPriorEstimator)
     # [`factor_residual_config`](@ref)).
     return factor_residual_config(pe.pe)
 end
+"""
+    partial_fit!(pe::HighOrderPriorEstimator, X, F = nothing; kwargs...)
+
+Folds observations into a [`HighOrderPriorEstimator`](@ref) by forwarding them to its members.
+
+The estimator keeps no buffer. It builds `HighOrderPrior(; pr = pr, ...)` around the result of its embedded prior, so the rows it needs in `prior(pe)` with no data are the rows that prior carries. A buffer here would be a second copy of the sample.
+
+The estimator forwards the fold to `pe.pe` in every case, because that member carries the rows. An embedded prior that cannot fold refuses here, and names the wrapper that gives it a buffer. The refusal is correct, because the estimator has no rows of its own to give it. The factor observations go with the rows, as the batch verb passes `F` to the embedded prior, and the tree of the embedded prior decides what happens to them. `pe.kte` and `pe.ske` go through [`fold_member`](@ref) instead, because the estimator has rows for them in `prior(pe)` with no data, and that call refits a co-moment that cannot fold. So `HighOrderPriorEstimator(; ske = Coskewness(; alg = SemiMoment()))` needs no wrapper and keeps one copy of the sample.
+
+# Algorithm
+
+ 1. Fold `pe.pe` with the observations and `F` through [`partial_fit!`](@ref).
+ 2. Fold `pe.kte` and `pe.ske` with the observations through [`fold_member`](@ref).
+ 3. Rebuild the estimator with the three folded members with `Accessors.setproperties`, and return it.
+
+# Arguments
+
+  - `pe`: High order prior estimator.
+  - `X`: Observations to fold, a matrix of rows or one observation.
+  - `F`: The factor observations beside `X`, or `nothing`. The method forwards them to the embedded prior.
+  - `kwargs...`: Additional keyword arguments, forwarded to the members.
+
+# Validation
+
+  - `pe.pe` folds. The embedded prior refuses the fold otherwise, with an error that names the wrapper that gives it a buffer.
+
+# Returns
+
+  - `pe`: The estimator, with its members folded.
+
+# Related
+
+  - [`HighOrderPriorEstimator`](@ref)
+  - [`prior`](@ref)
+  - [`fold_member`](@ref)
+  - [`supports_partial_fit`](@ref)
+"""
+function partial_fit!(pe::HighOrderPriorEstimator, X::VecNum_MatNum,
+                      F::Option{<:VecNum_MatNum} = nothing; kwargs...)
+    return Accessors.setproperties(pe,
+                                   (; pe = partial_fit!(pe.pe, X, F; kwargs...),
+                                    kte = fold_member(pe.kte, X; kwargs...),
+                                    ske = fold_member(pe.ske, X; kwargs...)))
+end
+"""
+    prior(pe::HighOrderPriorEstimator; kwargs...)
+
+Reads a [`HighOrderPriorEstimator`](@ref) out of its fold, with no data matrix.
+
+The embedded prior answers first. A co-moment that folded answers from its state. The method refits a co-moment that did not fold over the rows that the embedded prior folded, which [`prior_returns_buffer`](@ref) reads. [`assemble_high_order_prior`](@ref) then builds the result as the batch method does.
+
+The refit reads the folded rows and not `pr.X`, because `pr.X` holds the scenarios of the embedded prior's result, and these are not always the folded rows. A Scenario Cap on the embedded prior keeps only the last rows, and the scenario fill writes zeros into the early rows of an asset that lists late. The batch method fits both co-moments over every row that the caller passes, `NaN` entries included, so a refit over `pr.X` differs from it in both cases. Under an [`Online`](@ref) window the buffer holds the last `max_history` rows, which is the window that the batch equal of that route fits over. The estimator keeps no copy of the rows, because the embedded prior already holds them.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{P}_T &= \\mathcal{P}(\\mathbf{X})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:P_fold_prior])
+  - $(math_dict[:P_batch_prior])
+  - $(math_dict[:X_returns])
+
+The equality holds for the embedded result and for every co-moment, the ones that fold and the ones that the method refits. In floating point, each co-moment differs from the batch co-moment by rounding.
+
+# Algorithm
+
+ 1. Read the embedded result `pr` out of `pe.pe` with [`prior`](@ref).
+ 2. Read the rows that the embedded prior folded with [`prior_returns_buffer`](@ref) and [`sample_buffer`](@ref), giving `X`.
+ 3. Rebuild the Asset Panel of the rows from the same buffer with [`buffer_asset_panel`](@ref), giving `pnl`, as the batch method gives `rd.pnl` to both co-moments.
+ 4. Read `kt` out of `pe.kte` through [`read_member`](@ref), which refits it over `X` and `pnl` where it did not fold.
+ 5. Read `sk` and `V` out of `pe.ske` through [`read_member`](@ref), on the same terms.
+ 6. Build the result with [`assemble_high_order_prior`](@ref), and return it.
+
+# Arguments
+
+  - `pe`: High order prior estimator whose members carry states.
+  - `kwargs...`: Additional keyword arguments, forwarded to the members.
+
+# Validation
+
+  - Every condition that `prior(pe.pe)` with no data checks.
+  - Everything [`prior_returns_buffer`](@ref) refuses.
+
+# Returns
+
+  - `hop::HighOrderPrior`: Result object carrying the low order result and the co-moments.
+
+# Related
+
+  - [`HighOrderPriorEstimator`](@ref)
+  - [`assemble_high_order_prior`](@ref)
+  - [`read_member`](@ref)
+  - [`prior_returns_buffer`](@ref)
+  - [`buffer_asset_panel`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function prior(pe::HighOrderPriorEstimator; kwargs...)
+    pr = prior(pe.pe; kwargs...)
+    buf = prior_returns_buffer(pe.pe)
+    X = sample_buffer(buf)
+    pnl = buffer_asset_panel(buf)
+    kt = read_member(cokurtosis, pe.kte, X, pnl; kwargs...)
+    sk, V = read_member(coskewness, pe.ske, X, pnl; kwargs...)
+    return assemble_high_order_prior(pe, pr, kt, sk, V)
+end
 
 export HighOrderPriorEstimator

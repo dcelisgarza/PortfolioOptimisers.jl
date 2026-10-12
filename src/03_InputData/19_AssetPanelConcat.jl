@@ -648,3 +648,49 @@ function sample_buffer_panel(P::AbstractVector{<:AbstractPanelField},
                       amsk = Matrix{Bool}(view(state.A::AbstractMatrix{Bool}, rows, :)),
                       emsk = Matrix{Bool}(view(state.M::AbstractMatrix{Bool}, rows, :)))
 end
+"""
+    buffer_asset_panel(state::SampleBufferState) -> Option{<:AssetPanel}
+
+Rebuilds the Asset Panel of the observations a sample buffer holds, from every part of a panel that the buffer records, or gives `nothing` when the buffer records no active mask.
+
+A buffer that records Panel Fields gives the panel of [`sample_buffer_panel`](@ref). A buffer that records an active mask and no Panel Field gives a panel with no Panel Field. Its estimation mask is the one that the buffer records or, when the buffer records none, a copy of the active mask. The carry of [`EmpiricalPrior`](@ref) records the active mask alone, so its call with no data gives a member that it refits this panel, as the batch fit gives the member `rd.pnl`. [`returns_result`](@ref) rebuilds the panel of a `ReturnsResult` with it. The masks are copies of the valid region, because a later fold writes into the backing masks.
+
+# Algorithm
+
+ 1. Return [`sample_buffer_panel`](@ref) of `state` when `state.P` is not `nothing`.
+ 2. Read the masks with [`sample_buffer_kwargs`](@ref), and return `nothing` when they hold no active mask.
+ 3. Copy the active mask, and the estimation mask or a second copy of the active mask, into two matrices.
+ 4. Make the `AssetPanel` of no Panel Field and the two masks.
+
+# Arguments
+
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `pnl::Option{<:AssetPanel}`: The panel of the rows of the buffer, or `nothing`.
+
+# Related
+
+  - [`sample_buffer_panel`](@ref)
+  - [`sample_buffer_kwargs`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`returns_result`](@ref)
+  - [`read_member`](@ref)
+"""
+function buffer_asset_panel(state::SampleBufferState)
+    return buffer_asset_panel(state.P, state)
+end
+function buffer_asset_panel(P::AbstractVector{<:AbstractPanelField},
+                            state::SampleBufferState)
+    return sample_buffer_panel(P, state)
+end
+function buffer_asset_panel(::Nothing, state::SampleBufferState)
+    msk = sample_buffer_kwargs(state)
+    if !haskey(msk, :active_mask)
+        return nothing
+    end
+    amsk = Matrix(msk.active_mask)
+    emsk = haskey(msk, :estimation_mask) ? Matrix(msk.estimation_mask) : copy(amsk)
+    return AssetPanel(; pf = AbstractPanelField[], amsk = amsk, emsk = emsk)
+end

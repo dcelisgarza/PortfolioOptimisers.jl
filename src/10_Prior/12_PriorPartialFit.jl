@@ -1369,13 +1369,17 @@ Reads the estimate of a member out of its fold, or refits the member over the ro
 
 This half of the rule for an outer estimator with mixed members reads the estimate, and [`fold_member`](@ref) is the fold half. A member that the outer estimator folded answers from its state. A member that the outer estimator did not fold answers from the matrix that the outer estimator passes. `f` is the batch verb of the member, for example `Statistics.mean`, `Statistics.cov`, [`coskewness`](@ref) or [`cokurtosis`](@ref). The one-argument method of the same verb reads the estimate from the state, and every family that folds follows this convention.
 
-No [`AssetPanel`](@ref) reaches this verb. A panel describes the fold and is not a sample, and a buffer holds no activity mask, so the verb refits a member over the rows alone.
+The refit calls the panel form of the verb, `f(est, X, pnl)`, as the batch fit of the outer estimator does. `pnl` is the panel that [`buffer_asset_panel`](@ref) rebuilds from the buffer of the outer estimator, or `nothing`. The panel form reduces the rows to the Coverage Universe and expands the estimate, so a refit answers a gapped sample as the batch fit answers it, and reads the active mask that the buffer records. The plain form `f(est, X)` refuses a gapped sample.
+
+The decision to fold or to refit reads `est`, and the refit calls the verb on `batch`. These differ for a raw `StatsBase.CovarianceEstimator`, which has no panel form. Its prior passes the [`GeneralCovariance`](@ref) of [`library_covariance_estimator`](@ref) as `batch`, as the batch fit does. The decision must stay on the raw member, because [`supports_partial_fit`](@ref) answers `true` for the wrapper, and the wrapper folded nothing.
 
 # Arguments
 
   - `f`: The batch verb of the member.
   - `est`: The member, or `nothing`.
   - `X`: The rows that the outer estimator carries, which are the rows the member was folded on.
+  - `pnl`: The Asset Panel of the rows, or `nothing`.
+  - `batch`: The estimator that the refit gives to the verb. It is `est` by default.
   - `shared`: Keyword arguments that reach the verb whether the member folds or not. A prior passes `strict` to its covariance here, so that a peel of a [`CoveragePolicy`](@ref) refuses under `strict` in both arms.
   - `kwargs...`: Additional keyword arguments, forwarded to the batch verb alone. A folded member is read with no other keyword argument, because its state is already the estimate.
 
@@ -1387,13 +1391,15 @@ No [`AssetPanel`](@ref) reaches this verb. A panel describes the fold and is not
 
   - [`fold_member`](@ref)
   - [`supports_partial_fit`](@ref)
+  - [`buffer_asset_panel`](@ref)
   - [`EmpiricalPrior`](@ref)
 """
-function read_member(f::F, est, X::MatNum; shared::NamedTuple = (;), kwargs...) where {F}
+function read_member(f::F, est, X::MatNum, pnl::Option{<:AssetPanel}; batch = est,
+                     shared::NamedTuple = (;), kwargs...) where {F}
     return if supports_partial_fit(est)
         f(est; shared...)
     else
-        f(est, X; dims = 1, shared..., kwargs...)
+        f(batch, X, pnl; dims = 1, shared..., kwargs...)
     end
 end
 """
@@ -1628,7 +1634,7 @@ Reads an [`EmpiricalPrior`](@ref) out of its fold, with no data matrix.
 
 `pe.max_scenarios` cuts the rows that the result carries, as it does in batch, and the fill runs over the rows that remain. When the cap cuts, `ens` holds the number of observations folded, through [`scenario_ens`](@ref), so a consumer that prices a sample size reads ``T`` and not the number of rows carried. The named-asset set of the carry state limits the notice of the fill, so a walk-forward names an asset at the first step whose fill reaches it, and at no later step.
 
-No [`AssetPanel`](@ref) is read. A panel describes the fold and is not a sample. The Coverage Universe of this method equals the Coverage Universe of a batch fit, because [`coverage_mask`](@ref) is a function of the rows alone, and the carry state holds the rows that a batch fit reads.
+A member that the method refits takes the [`AssetPanel`](@ref) that [`buffer_asset_panel`](@ref) rebuilds from the carried buffer, as the batch fit gives it `rd.pnl`. The buffer records the active mask of each step. So a member that the method refits answers on the Coverage Universe of a batch fit, on a gapped sample and under a time-varying panel. A member that folds read the active mask at each step of its fold, as the keyword form of its verb reads it.
 
 # Mathematical definition
 
@@ -1654,7 +1660,7 @@ The equality holds for `mu`, `sigma`, `X` and `ens`, with and without a horizon,
  1. Read the carry state with [`partial_fit_cache`](@ref), giving `state`.
  2. Resolve the fill limit against the coverage floor of the members with [`resolve_fill_limit`](@ref), as the batch method does, giving `fill_limit`.
  3. Read the carried rows with [`sample_buffer`](@ref), giving `X`. Under the horizon method, take `log1p` of the rows, giving `Xl`.
- 4. Read `mu` and `sigma` through [`read_member`](@ref), which refits a member that did not fold over `X`, or over `Xl` under the horizon method. A member that it refits also takes the implied volatilities and `ivpa` that [`implied_volatility_buffer_kwargs`](@ref) reads from the carried buffer, as the batch verb gives `rd.iv` and `rd.ivpa` to both members. An [`ImpliedVolatility`](@ref) has no fold, so it is such a member.
+ 4. Read `mu` and `sigma` through [`read_member`](@ref), which refits a member that did not fold over `X`, or over `Xl` under the horizon method. A member that it refits also takes the panel of [`buffer_asset_panel`](@ref), and the implied volatilities and `ivpa` that [`implied_volatility_buffer_kwargs`](@ref) reads from the carried buffer, as the batch verb gives `rd.pnl`, `rd.iv` and `rd.ivpa` to both members. A covariance that it refits is the [`library_covariance_estimator`](@ref) of `pe.ce`, as in the batch verb. An [`ImpliedVolatility`](@ref) has no fold, so it is such a member.
  5. Under the horizon method, convert `mu` and `sigma` with [`horizon_moments!`](@ref).
  6. Cut the carried rows to `pe.max_scenarios` with [`scenario_window`](@ref), and copy them into a new matrix `Xs`, because the next fold writes into the storage of the buffer.
  7. Fill `Xs` with [`scenario_fill`](@ref), and return a [`LowOrderPrior`](@ref) whose `ens` [`scenario_ens`](@ref) reads from the rows before the cut.
@@ -1682,6 +1688,7 @@ The equality holds for `mu`, `sigma`, `X` and `ens`, with and without a horizon,
   - [`scenario_window`](@ref)
   - [`scenario_fill`](@ref)
   - [`horizon_moments!`](@ref)
+  - [`buffer_asset_panel`](@ref)
 """
 function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                                   <:Option{<:PriorCarryState}}; strict::Bool = false,
@@ -1689,12 +1696,15 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
     state = partial_fit_cache(pe)
     fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
     X = sample_buffer(state)
-    vols = implied_volatility_buffer_kwargs(returns_buffer(state))
-    mu = vec(read_member(Statistics.mean, pe.me, X; vols..., kwargs...))
+    pnl = buffer_asset_panel(state.buf)
+    vols = implied_volatility_buffer_kwargs(state.buf)
+    mu = vec(read_member(Statistics.mean, pe.me, X, pnl; vols..., kwargs...))
     # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
     # `strict`.
     shared = isa(pe.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
-    sigma = read_member(Statistics.cov, pe.ce, X; shared = shared, vols..., kwargs...)
+    sigma = read_member(Statistics.cov, pe.ce, X, pnl;
+                        batch = library_covariance_estimator(pe.ce), shared = shared,
+                        vols..., kwargs...)
     # Materialised, not viewed: the buffer's backing matrix is written and reallocated by the
     # next fold, and a Result holding a view of it would change under its holder.
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
@@ -1711,123 +1721,20 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
     # The arms were folded on the log-returns, so a member that did not fold is refitted on
     # them too. The carried rows are the arithmetic ones the caller handed in.
     Xl = log1p.(X)
-    vols = implied_volatility_buffer_kwargs(returns_buffer(state))
-    mu = vec(read_member(Statistics.mean, pe.me, Xl; vols..., kwargs...))
+    pnl = buffer_asset_panel(state.buf)
+    vols = implied_volatility_buffer_kwargs(state.buf)
+    mu = vec(read_member(Statistics.mean, pe.me, Xl, pnl; vols..., kwargs...))
     # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
     # `strict`.
     shared = isa(pe.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
-    sigma = read_member(Statistics.cov, pe.ce, Xl; shared = shared, vols..., kwargs...)
+    sigma = read_member(Statistics.cov, pe.ce, Xl, pnl;
+                        batch = library_covariance_estimator(pe.ce), shared = shared,
+                        vols..., kwargs...)
     horizon_moments!(mu, sigma, pe.horizon)
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
     return LowOrderPrior(;
                          X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
                          mu = mu, sigma = sigma, ens = scenario_ens(pe.max_scenarios, X))
-end
-"""
-    partial_fit!(pe::HighOrderPriorEstimator, X, F = nothing; kwargs...)
-
-Folds observations into a [`HighOrderPriorEstimator`](@ref) by forwarding them to its members.
-
-The estimator keeps no buffer. It builds `HighOrderPrior(; pr = pr, ...)` around the result of its embedded prior, so the rows it needs in `prior(pe)` with no data are the rows that prior carries. A buffer here would be a second copy of the sample.
-
-The estimator forwards the fold to `pe.pe` in every case, because that member carries the rows. An embedded prior that cannot fold refuses here, and names the wrapper that gives it a buffer. The refusal is correct, because the estimator has no rows of its own to give it. The factor observations go with the rows, as the batch verb passes `F` to the embedded prior, and the tree of the embedded prior decides what happens to them. `pe.kte` and `pe.ske` go through [`fold_member`](@ref) instead, because the estimator has rows for them in `prior(pe)` with no data, and that call refits a co-moment that cannot fold. So `HighOrderPriorEstimator(; ske = Coskewness(; alg = SemiMoment()))` needs no wrapper and keeps one copy of the sample.
-
-# Algorithm
-
- 1. Fold `pe.pe` with the observations and `F` through [`partial_fit!`](@ref).
- 2. Fold `pe.kte` and `pe.ske` with the observations through [`fold_member`](@ref).
- 3. Rebuild the estimator with the three folded members with `Accessors.setproperties`, and return it.
-
-# Arguments
-
-  - `pe`: High order prior estimator.
-  - `X`: Observations to fold, a matrix of rows or one observation.
-  - `F`: The factor observations beside `X`, or `nothing`. The method forwards them to the embedded prior.
-  - `kwargs...`: Additional keyword arguments, forwarded to the members.
-
-# Validation
-
-  - `pe.pe` folds. The embedded prior refuses the fold otherwise, with an error that names the wrapper that gives it a buffer.
-
-# Returns
-
-  - `pe`: The estimator, with its members folded.
-
-# Related
-
-  - [`HighOrderPriorEstimator`](@ref)
-  - [`prior`](@ref)
-  - [`fold_member`](@ref)
-  - [`supports_partial_fit`](@ref)
-"""
-function partial_fit!(pe::HighOrderPriorEstimator, X::VecNum_MatNum,
-                      F::Option{<:VecNum_MatNum} = nothing; kwargs...)
-    return Accessors.setproperties(pe,
-                                   (; pe = partial_fit!(pe.pe, X, F; kwargs...),
-                                    kte = fold_member(pe.kte, X; kwargs...),
-                                    ske = fold_member(pe.ske, X; kwargs...)))
-end
-"""
-    prior(pe::HighOrderPriorEstimator; kwargs...)
-
-Reads a [`HighOrderPriorEstimator`](@ref) out of its fold, with no data matrix.
-
-The embedded prior answers first. A co-moment that folded answers from its state. The method refits a co-moment that did not fold over the rows that the embedded prior folded, which [`prior_returns_buffer`](@ref) reads. [`assemble_high_order_prior`](@ref) then builds the result as the batch method does.
-
-The refit reads the folded rows and not `pr.X`, because `pr.X` holds the scenarios of the embedded prior's result, and these are not always the folded rows. A Scenario Cap on the embedded prior keeps only the last rows, and the scenario fill writes zeros into the early rows of an asset that lists late. The batch method fits both co-moments over every row that the caller passes, `NaN` entries included, so a refit over `pr.X` differs from it in both cases. Under an [`Online`](@ref) window the buffer holds the last `max_history` rows, which is the window that the batch equal of that route fits over. The estimator keeps no copy of the rows, because the embedded prior already holds them.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathcal{P}_T &= \\mathcal{P}(\\mathbf{X})\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:P_fold_prior])
-  - $(math_dict[:P_batch_prior])
-  - $(math_dict[:X_returns])
-
-The equality holds for the embedded result and for every co-moment, the ones that fold and the ones that the method refits. In floating point, each co-moment differs from the batch co-moment by rounding.
-
-# Algorithm
-
- 1. Read the embedded result `pr` out of `pe.pe` with [`prior`](@ref).
- 2. Read the rows that the embedded prior folded with [`prior_returns_buffer`](@ref) and [`sample_buffer`](@ref), giving `X`.
- 3. Read `kt` out of `pe.kte` through [`read_member`](@ref), which refits it over `X` where it did not fold.
- 4. Read `sk` and `V` out of `pe.ske` through [`read_member`](@ref), on the same terms.
- 5. Build the result with [`assemble_high_order_prior`](@ref), and return it.
-
-# Arguments
-
-  - `pe`: High order prior estimator whose members carry states.
-  - `kwargs...`: Additional keyword arguments, forwarded to the members.
-
-# Validation
-
-  - Every condition that `prior(pe.pe)` with no data checks.
-  - Everything [`prior_returns_buffer`](@ref) refuses.
-
-# Returns
-
-  - `hop::HighOrderPrior`: Result object carrying the low order result and the co-moments.
-
-# Related
-
-  - [`HighOrderPriorEstimator`](@ref)
-  - [`assemble_high_order_prior`](@ref)
-  - [`read_member`](@ref)
-  - [`prior_returns_buffer`](@ref)
-  - [`partial_fit!`](@ref)
-"""
-function prior(pe::HighOrderPriorEstimator; kwargs...)
-    pr = prior(pe.pe; kwargs...)
-    X = sample_buffer(prior_returns_buffer(pe.pe))
-    kt = read_member(cokurtosis, pe.kte, X; kwargs...)
-    sk, V = read_member(coskewness, pe.ske, X; kwargs...)
-    return assemble_high_order_prior(pe, pr, kt, sk, V)
 end
 """
     partial_fit!(pe::BlackLittermanPrior, X, F = nothing; kwargs...)

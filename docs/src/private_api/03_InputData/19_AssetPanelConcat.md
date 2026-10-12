@@ -20,4 +20,5 @@ PortfolioOptimisers.assert_buffer_panel_block
 PortfolioOptimisers.panel_fields_view
 PortfolioOptimisers.panel_fields_append
 PortfolioOptimisers.sample_buffer_panel
+PortfolioOptimisers.buffer_asset_panel
 ```
