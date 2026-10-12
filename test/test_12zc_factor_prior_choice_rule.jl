@@ -258,5 +258,44 @@ set over every observation.
         @test po.pin_prior_choice(ho, X, nothing) === ho
         op = OpinionPoolingPrior(; pes = [EntropyPoolingPrior()])
         @test po.pin_prior_choice(op, X, F) === op
+        @test !po.pending_choice(op)
+    end
+
+    @testset "An opinion pool pins pe1 over the buffer and pe2 under the pooled weights (#1637)" begin
+        # The view moves the pooled weights away from uniform, and a weighted reduction then
+        # chooses other components than an unweighted one over the same rows.
+        sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+        ep = EntropyPoolingPrior(; sets = sets,
+                                 mu_views = LinearConstraintEstimator(;
+                                                                      val = "A1 == 0.004"))
+        fp = FactorPrior(; re = StepwiseRegression(; sw..., choice = PinnedChoice()))
+        dr(; kw...) = FactorPrior(; re = DimensionReductionRegression(; pca..., kw...))
+        first_sets = [po._regression(fp.re, X[rows(1), i], F[rows(1), :]) for i in 1:N]
+
+        e = online(OpinionPoolingPrior(; pes = [ep], pe1 = fp))
+        e = partial_fit!(e, X[rows(1), :], F[rows(1), :])
+        @test e.pe1.re.included == first_sets
+        e = partial_fit!(e, X[61:200, :], F[61:200, :])
+        @test e.pe1.re.included == first_sets
+
+        pool(pe2) = OpinionPoolingPrior(; pes = [ep], pe2 = pe2)
+        e = online(pool(dr(; choice = PinnedChoice())))
+        @test po.pending_choice(e)
+        e = partial_fit!(e, X[rows(1), :], F[rows(1), :])
+        proj = e.pe2.re.proj
+        @test !po.pending_choice(e)
+        b = prior(pool(dr()), X[rows(1), :], F[rows(1), :])
+        @test same(prior(e), b)
+        unweighted = po.pin_regression_choice(DimensionReductionRegression(; pca...,
+                                                                           choice = PinnedChoice()),
+                                              X[rows(1), :], F[rows(1), :]).proj
+        @test !isapprox(proj, unweighted; rtol = 1e-3)
+        e = partial_fit!(e, X[61:120, :], F[61:120, :])
+        @test e.pe2.re.proj === proj
+        @test same(prior(e), prior(pool(dr(; proj = proj)), X[rows(2), :], F[rows(2), :]))
+
+        # One row fits nothing, so it pins nothing.
+        e = online(pool(dr(; choice = PinnedChoice())))
+        @test isnothing(partial_fit!(e, X[1, :], F[1, :]).pe2.re.proj)
     end
 end

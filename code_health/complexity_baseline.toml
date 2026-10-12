@@ -5,7 +5,7 @@
 julia = "1.13.1"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "4f8c891ebb"
+commit = "93df99ae16"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -246,7 +246,7 @@ commit = "4f8c891ebb"
 "src/10_Prior/09_AssetPanelEstimators.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 26, cog_sum = 11, arg_sum = 27, macros = ["@propagatable"] }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { cyc = 10, cog = 16, arg = 10, cyc_sum = 111, cog_sum = 85, arg_sum = 132, macros = [] }
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { cyc = 6, cog = 7, arg = 29, cyc_sum = 76, cog_sum = 60, arg_sum = 131, macros = ["@propagatable"] }
-"src/10_Prior/12_PriorPartialFit.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 111, cog_sum = 63, arg_sum = 186, macros = [] }
+"src/10_Prior/12_PriorPartialFit.jl" = { cyc = 9, cog = 12, arg = 7, cyc_sum = 129, cog_sum = 79, arg_sum = 198, macros = [] }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 10, cog_sum = 8, arg_sum = 19, macros = [] }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 11, cog_sum = 5, arg_sum = 17, macros = [] }
 "src/10_Prior/15_CrossSectionalPriorFold.jl" = { cyc = 8, cog = 13, arg = 5, cyc_sum = 89, cog_sum = 70, arg_sum = 115, macros = [] }

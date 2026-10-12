@@ -8,6 +8,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ow => "`w`: Observation weights vector `observations × 1`.",#
                  :oow => "`w`: Optional observation weights vector `observations × 1`, or a concrete subtype of [`DynamicAbstractWeights`](@ref). If `nothing`, the computation is unweighted.",#
                  :eqw => "`w`: Optional equilibrium weights vector `assets × 1`. If `nothing`, equal weights are used.",#
+                 :w_pin => "`w`: The observation weights under which the batch fit makes the choice that the method pins, or `nothing` when that fit is unweighted.",#
                  # Matrix processing.
                  :pdm => "`pdm`: Positive definite matrix estimator.",
                  :opdm => "`pdm`: Optional positive definite matrix estimator.",

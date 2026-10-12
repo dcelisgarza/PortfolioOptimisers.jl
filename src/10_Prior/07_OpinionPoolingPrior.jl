@@ -497,13 +497,9 @@ No field of `pe` is modified, so calling `prior` twice on one estimator gives th
 
  1. Orient `X` and `F` by `dims`.
  2. When `pe.pe1` is not `nothing`, replace `X` with the returns of that estimator's prior.
- 3. Read the opinion probabilities `ow`, from `pe.w` when it is set and from a uniform `range` over `length(pe.pes)` when it is `nothing`.
- 4. Take the remainder `rw` of `ow` against one. When `rw` exceeds `eps`, append it to `ow` and give `pw` a last column of `1/T`, the uniform prior over the observations.
- 5. Fit every estimator of `pe.pes` over the executor `pe.ex`. Check that each answered on the pool's own observation axis, and write its weights into a column of `pw`.
- 6. Penalise `ow` through [`robust_probabilities`](@ref), which is the identity when `pe.p` is `nothing`.
- 7. Pool the columns of `pw` under `pe.alg` through [`compute_pooling`](@ref), giving the consensus weights `w`.
- 8. Refit `pe.pe2` under `w` through [`factory`](@ref), giving the moments of the result.
- 9. Read `ens` as `exp` of the entropy of `w`, and `kld` as the divergence from `w` to each column of `pw`.
+ 3. Pool the opinions of `pe.pes` over `X` with [`opinion_pooling_weights`](@ref), giving the consensus weights `w`, the penalised opinion probabilities `ow` and the weights `pw` of each opinion.
+ 4. Refit `pe.pe2` under `w` through [`factory`](@ref), giving the moments of the result.
+ 5. Read `ens` as `exp` of the entropy of `w`, and `kld` as the divergence from `w` to each column of `pw`.
 
 # Arguments
 
@@ -518,7 +514,7 @@ No field of `pe` is modified, so calling `prior` twice on one estimator gives th
 # Validation
 
   - `dims in (1, 2)`.
-  - Every opinion answers on the pool's observation axis, which is `pe.pe1`'s result when `pe.pe1` is set and `X` when it is `nothing`. An opinion whose own wrapped estimator drops rows answers on a shorter axis, and its probabilities are then over other scenarios. That raises a `DimensionMismatch` naming the opinion, both counts, and the fix: move the estimator that drops rows into `pe1`.
+  - Every opinion answers on the pool's observation axis, which is `pe.pe1`'s result when `pe.pe1` is set and `X` when it is `nothing`. An opinion whose own wrapped estimator drops rows answers on a shorter axis, and its probabilities are then over other scenarios. [`opinion_pooling_weights`](@ref) then raises a `DimensionMismatch` naming the opinion, both counts, and the fix: move the estimator that drops rows into `pe1`.
 
 # Returns
 
@@ -541,6 +537,62 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
                kwargs...)
     X, F = dims_oriented(dims, X, F)
     X = !isnothing(pe.pe1) ? prior(pe.pe1, X, F, pnl; strict = strict, kwargs...).X : X
+    w, ow, pw = opinion_pooling_weights(pe, X, F, pnl; strict = strict, kwargs...)
+    pe2 = factory(pe.pe2, w)
+    # Opinion pooling reweights observations without touching either axis of `Z`, so the
+    # pooled prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
+    # The factor block is the refit prior's, forwarded whole rather than stamped with the
+    # pooled weights — see the note at the same step in `03_EntropyPoolingPrior_c.jl`.
+    (; X, o_X, mu, sigma, chol, rr, fpr) = prior(pe2, X, F, pnl; strict = strict, kwargs...)
+    ens = exp(StatsBase.entropy(w))
+    kld = [StatsBase.kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
+    return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w,
+                         ens = ens, kld = kld, ow = ow, rr = rr, fpr = fpr)
+end
+"""
+    opinion_pooling_weights(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum},
+                            pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
+
+Pools the opinions of an [`OpinionPoolingPrior`](@ref) into the consensus weights of the observations.
+
+[`prior`](@ref) refits `pe.pe2` under these weights. The online step of the refit route reads them too, because [`pin_prior_choice`](@ref) pins the regression of `pe.pe2` under the weights of its first fit.
+
+# Algorithm
+
+ 1. Read the opinion probabilities `ow`, from `pe.w` when it is set and from a uniform `range` over `length(pe.pes)` when it is `nothing`.
+ 2. Take the remainder `rw` of `ow` against one. When `rw` exceeds `eps`, append it to `ow` and give `pw` a last column of `1/T`, the uniform prior over the observations.
+ 3. Fit every estimator of `pe.pes` over the executor `pe.ex`. Check that each answered on the pool's own observation axis, and write its weights into a column of `pw`.
+ 4. Penalise `ow` through [`robust_probabilities`](@ref), which is the identity when `pe.p` is `nothing`.
+ 5. Pool the columns of `pw` under `pe.alg` through [`compute_pooling`](@ref), giving the consensus weights `w`.
+
+# Arguments
+
+  - `pe`: Opinion pooling prior estimator.
+  - `X`: The returns that the opinions read, `observations × assets`. These are the returns of `pe.pe1` when it is set.
+  - `F`: Optional factor matrix.
+  - $(arg_dict[:pnl_prior])
+  - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings. Default is `false`.
+  - `kwargs...`: Additional keyword arguments passed to the opinions.
+
+# Validation
+
+  - Every opinion answers on the observation axis of `X`. A `DimensionMismatch` that names the opinion is thrown otherwise.
+
+# Returns
+
+  - `w::StatsBase.ProbabilityWeights`: The consensus weights of the observations.
+  - `ow::VecNum`: The penalised opinion probabilities, one entry per column of `pw`.
+  - `pw::MatNum`: The weights of each opinion, one column per opinion.
+
+# Related
+
+  - [`OpinionPoolingPrior`](@ref)
+  - [`compute_pooling`](@ref)
+  - [`robust_probabilities`](@ref)
+  - [`pin_prior_choice`](@ref)
+"""
+function opinion_pooling_weights(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum},
+                                 pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
     T = size(X, 1)
     M = length(pe.pes)
     ow = isnothing(pe.w) ? range(inv(M), inv(M); length = M) : pe.w
@@ -570,16 +622,7 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     end
     ow = robust_probabilities(ow, pw, pe.p)
     w = compute_pooling(pe.alg, ow, pw)
-    pe2 = factory(pe.pe2, w)
-    # Opinion pooling reweights observations without touching either axis of `Z`, so the
-    # pooled prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
-    # The factor block is the refit prior's, forwarded whole rather than stamped with the
-    # pooled weights — see the note at the same step in `03_EntropyPoolingPrior_c.jl`.
-    (; X, o_X, mu, sigma, chol, rr, fpr) = prior(pe2, X, F, pnl; strict = strict, kwargs...)
-    ens = exp(StatsBase.entropy(w))
-    kld = [StatsBase.kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
-    return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w,
-                         ens = ens, kld = kld, ow = ow, rr = rr, fpr = fpr)
+    return w, ow, pw
 end
 
 function factor_residual_config(pe::OpinionPoolingPrior)

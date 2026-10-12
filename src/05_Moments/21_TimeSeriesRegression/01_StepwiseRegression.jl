@@ -791,17 +791,17 @@ function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
 end
 """
     pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice},
-                          X::MatNum, F::MatNum)
+                          X::MatNum, F::MatNum, w::Option{<:ObsWeights} = nothing)
 
 Writes the factor set of the first fit of each asset into `included` of a stepwise regression under a [`PinnedChoice`](@ref).
 
-The online step of a prior calls it after the fold, over the rows of the buffer of the prior. The search of one asset reads only the column of that asset and `F`, so the factor set that it writes is the set that the fit over the same rows takes, whatever other assets the prior gives to that fit. An asset whose column holds a value that is not finite is not covered by the fit, so it keeps `nothing`, and a later step writes its set at the first fit that covers it. Under [`BatchChoice`](@ref) the generic method returns `re` unchanged.
+The online step of a prior calls it after the fold, over the rows of the buffer of the prior. The search of one asset reads only the column of that asset and `F`, so the factor set that it writes is the set that the fit over the same rows takes, whatever other assets the prior gives to that fit. A prior that refits the regression under observation weights, as [`OpinionPoolingPrior`](@ref) refits `pe2`, gives those weights as `w`, and the search reads them as that fit does. An asset whose column holds a value that is not finite is not covered by the fit, so it keeps `nothing`, and a later step writes its set at the first fit that covers it. Under [`BatchChoice`](@ref) the generic method returns `re` unchanged.
 
 # Algorithm
 
  1. Return `re` when `F` holds fewer than two rows. The regression refuses one row, so no fit is made yet.
  2. Check `re.included` with [`assert_stepwise_included`](@ref). Copy it into a vector of one entry per column of `X`, giving `included`. A field of `nothing` gives a vector of `nothing`.
- 3. For each asset `j` whose entry is `nothing` and whose column of `X` is finite, run the stepwise search of `re` on that column, and write the result into entry `j`.
+ 3. For each asset `j` whose entry is `nothing` and whose column of `X` is finite, run the stepwise search of `re` on that column, and write the result into entry `j`. When `w` is not `nothing`, the search is that of `factory(re, w)`.
  4. Return `re` rebuilt with `included`.
 
 # Arguments
@@ -809,6 +809,7 @@ The online step of a prior calls it after the fold, over the rows of the buffer 
   - `re`: Stepwise regression estimator under a [`PinnedChoice`](@ref).
   - $(arg_dict[:X])
   - $(arg_dict[:F])
+  - $(arg_dict[:w_pin])
 
 # Validation
 
@@ -825,11 +826,12 @@ The online step of a prior calls it after the fold, over the rows of the buffer 
   - [`pin_prior_choice`](@ref)
 """
 function pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice},
-                               X::MatNum, F::MatNum)
+                               X::MatNum, F::MatNum, w::Option{<:ObsWeights} = nothing)
     if size(F, 1) < 2
         return re
     end
     assert_stepwise_included(re.included, X, F)
+    rw = isnothing(w) ? re : factory(re, w)
     included = Vector{Union{Nothing, Vector{Int}}}(nothing, size(X, 2))
     if !isnothing(re.included)
         included .= re.included
@@ -837,7 +839,7 @@ function pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:Pin
     for j in axes(X, 2)
         x = view(X, :, j)
         if isnothing(included[j]) && all(isfinite, x)
-            included[j] = _regression(re, x, F)
+            included[j] = _regression(rw, x, F)
         end
     end
     return rebuild_estimator(re, (; included = included))

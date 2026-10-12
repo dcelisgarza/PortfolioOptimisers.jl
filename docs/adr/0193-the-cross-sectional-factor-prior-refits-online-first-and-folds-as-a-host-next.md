@@ -274,6 +274,13 @@ about 0.03 s for the step of the oracle. The carry equals the batch fit to 5.7e-
   `FactorBlackLittermanPrior` and `AugmentedBlackLittermanPrior`, and it reaches a factor prior
   inside a prior that embeds it, because that prior refits from its own buffer and never steps the
   embedded one.
+- The hook gives each embedded prior the rows and the weights that the batch fit of its host gives
+  it, so the choice it pins is the choice of that batch fit (#1637). `OpinionPoolingPrior` is the
+  host whose priors read different rows: `pe1` reads the buffer, each prior of `pes` reads the
+  returns of `pe1`, and `pe2` reads those returns under the pooled weights. The hook runs `pe1` and
+  the pool over the buffer to pin `pe2`, and it runs them only while a choice is still to pin.
+  `EntropyPoolingPrior` and `MeucciEntropyPoolingPrior` refit `pe` under their own weights, and
+  the hook does not give `pe` those weights yet (#1641).
 
 ### The carry fold carries only the rows that the Descriptors read
 

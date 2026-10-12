@@ -628,16 +628,16 @@ end
 """
     pin_regression_choice(re::DimensionReductionRegression{<:Any, <:Any, <:Any,
                                                            <:PinnedChoice, Nothing},
-                          X::MatNum, F::MatNum)
+                          X::MatNum, F::MatNum, w::Option{<:ObsWeights} = nothing)
 
 Writes the components of the first fit into `proj` of a dimension reduction regression under a [`PinnedChoice`](@ref).
 
-The online step of a prior calls it after the fold, over the rows of the buffer of the prior. The reduction reads `F` alone, so the components that it writes are the components that the fit over the same rows uses. The method writes them in the units of the original factors: the matrix of the projection divided, row by row, by the scale that standardised each factor. A later fit centres the factors at their mean over its own rows and multiplies them by `proj`. So the components keep the weights of the first fit, and the intercept of each asset is still its mean less the part that the factors explain. A regression whose `proj` is a matrix, and a regression under [`BatchChoice`](@ref), get the generic method, which returns `re` unchanged.
+The online step of a prior calls it after the fold, over the rows of the buffer of the prior. The reduction reads `F` alone, so the components that it writes are the components that the fit over the same rows uses. A prior that refits the regression under observation weights, as [`OpinionPoolingPrior`](@ref) refits `pe2`, gives those weights as `w`, and the reduction reads them as that fit does. The method writes them in the units of the original factors: the matrix of the projection divided, row by row, by the scale that standardised each factor. A later fit centres the factors at their mean over its own rows and multiplies them by `proj`. So the components keep the weights of the first fit, and the intercept of each asset is still its mean less the part that the factors explain. A regression whose `proj` is a matrix, and a regression under [`BatchChoice`](@ref), get the generic method, which returns `re` unchanged.
 
 # Algorithm
 
  1. Return `re` when `F` holds fewer than two rows. The regression refuses one row, so no fit is made yet.
- 2. Reduce `F` with [`prep_dim_red_reg`](@ref), giving `Vp` and `sigma`.
+ 2. Reduce `F` with [`prep_dim_red_reg`](@ref), giving `Vp` and `sigma`. When `w` is not `nothing`, the reduction is that of `factory(re, w)`.
  3. Return `re` rebuilt with `proj = Vp ./ sigma`.
 
 # Arguments
@@ -645,6 +645,7 @@ The online step of a prior calls it after the fold, over the rows of the buffer 
   - `re`: Dimension reduction regression under a [`PinnedChoice`](@ref), whose `proj` is `nothing`.
   - $(arg_dict[:X])
   - $(arg_dict[:F])
+  - $(arg_dict[:w_pin])
 
 # Validation
 
@@ -662,11 +663,11 @@ The online step of a prior calls it after the fold, over the rows of the buffer 
 """
 function pin_regression_choice(re::DimensionReductionRegression{<:Any, <:Any, <:Any,
                                                                 <:PinnedChoice, Nothing},
-                               ::MatNum, F::MatNum)
+                               ::MatNum, F::MatNum, w::Option{<:ObsWeights} = nothing)
     if size(F, 1) < 2
         return re
     end
-    _, Vp, _, sigma = prep_dim_red_reg(re, F)
+    _, Vp, _, sigma = prep_dim_red_reg(isnothing(w) ? re : factory(re, w), F)
     return rebuild_estimator(re, (; proj = Vp ./ sigma))
 end
 

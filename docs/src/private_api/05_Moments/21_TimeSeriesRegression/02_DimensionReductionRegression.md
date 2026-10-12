@@ -9,7 +9,7 @@ DimensionReductionTarget
 _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum, x1::MatNum, Vp::MatNum)
 prep_dim_red_reg
 dimension_reduction_map
-pin_regression_choice(re::DimensionReductionRegression{<:Any, <:Any, <:Any, <:PinnedChoice, Nothing}, ::MatNum, F::MatNum)
+pin_regression_choice(re::DimensionReductionRegression{<:Any, <:Any, <:Any, <:PinnedChoice, Nothing}, ::MatNum, F::MatNum, w::Option{<:ObsWeights} = nothing)
 ```
 
 ## References

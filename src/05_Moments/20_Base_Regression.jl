@@ -1735,7 +1735,8 @@ function regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult
     return regression(re, rd.X, rd.F)
 end
 """
-    pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, X::MatNum, F::MatNum)
+    pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, X::MatNum, F::MatNum,
+                          w::Option{<:ObsWeights} = nothing)
 
 Returns a regression estimator unchanged, because it has no choice to pin.
 
@@ -1746,6 +1747,7 @@ The online step of a prior that fits a regression calls [`pin_regression_choice`
   - `re`: Regression estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:F])
+  - $(arg_dict[:w_pin])
 
 # Returns
 
@@ -1759,7 +1761,7 @@ The online step of a prior that fits a regression calls [`pin_regression_choice`
   - [`pin_prior_choice`](@ref)
 """
 function pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, ::MatNum,
-                               ::MatNum)
+                               ::MatNum, ::Option{<:ObsWeights} = nothing)
     return re
 end
 

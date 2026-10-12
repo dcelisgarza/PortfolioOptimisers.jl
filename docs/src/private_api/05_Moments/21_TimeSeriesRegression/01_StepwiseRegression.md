@@ -14,5 +14,5 @@ get_forward_reg_incl_excl!
 get_backward_reg_incl!
 assert_stepwise_included
 stepwise_factor_set
-pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice}, X::MatNum, F::MatNum)
+pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice}, X::MatNum, F::MatNum, w::Option{<:ObsWeights} = nothing)
 ```

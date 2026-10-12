@@ -940,36 +940,50 @@ function refit_prior_step(pe::AbstractPriorEstimator, rd::ReturnsResult)
     return pin_prior_choice(pe, sample_buffer(state), factor_buffer(state))
 end
 """
-    pin_prior_choice(pe::AbstractPriorEstimator, X, F)
+    pin_prior_choice(pe::Union{Nothing, <:AbstractPriorEstimator}, X, F, w = nothing)
     pin_prior_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                               <:AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum)
+                               <:AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum,
+                     w::Option{<:ObsWeights} = nothing)
     pin_prior_choice(pe::Union{<:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator,
                                <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
-                               <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, X, F)
-    pin_prior_choice(pe::OpinionPoolingPrior, X, F)
+                               <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, X, F,
+                     w = nothing)
+    pin_prior_choice(pe::OpinionPoolingPrior, X::MatNum, F::MatNum,
+                     w::Option{<:ObsWeights} = nothing)
 
 Applies the Choice Rule of each regression that a prior fits, after an online step of the refit route.
 
 A [`StepwiseRegression`](@ref) or a [`DimensionReductionRegression`](@ref) under a [`PinnedChoice`](@ref) keeps the choice of its first fit. The step holds no state for it: it writes the choice into the configuration of the regression, with [`pin_regression_choice`](@ref), over the rows of the buffer. A prior that embeds another prior fits the embedded prior on the same returns and factor returns, so the method passes the same rows to it. A prior with no regression in its tree returns unchanged.
 
+An [`OpinionPoolingPrior`](@ref) does not give each prior the same rows. Its batch fit gives `pe1` the returns of the buffer, gives each prior of `pes` the returns of `pe1`, and refits `pe2` on those returns under the pooled weights. The method gives each prior the rows and the weights that the batch fit gives it, so the choice that it pins is the choice of the batch fit over the same rows. It runs `pe1` and the pool only when a prior of `pes` or `pe2` has a choice to pin, which [`pending_choice`](@ref) answers.
+
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. Any other prior, or `F` that is `nothing`: return `pe`.
- 2. A prior that fits `pe.re` on the returns: apply [`pin_regression_choice`](@ref) to `pe.re`, and rebuild `pe` with the answer when it differs.
- 3. A prior that embeds a prior in `pe.pe`: apply this function to `pe.pe`, and rebuild `pe` with the answer when it differs.
- 4. An [`OpinionPoolingPrior`](@ref): apply this function to each prior of `pe.pes`, and rebuild `pe` with the answers when one differs.
+ 1. Any other prior, `nothing`, or `F` that is `nothing`: return `pe`.
+ 2. A prior that fits `pe.re` on the returns: apply [`pin_regression_choice`](@ref) to `pe.re` under `w`, and rebuild `pe` with the answer when it differs.
+ 3. A prior that embeds a prior in `pe.pe`: apply this function to `pe.pe` under `w`, and rebuild `pe` with the answer when it differs.
+ 4. An [`OpinionPoolingPrior`](@ref):
+     1. Return `pe` when `F` holds fewer than two rows, or when [`pending_choice`](@ref) of `pe` is `false`.
+     2. Apply this function to `pe.pe1` over `X` under `w`.
+     3. When a prior of `pe.pes` or `pe.pe2` has a choice to pin, read the returns `X1` of `pe.pe1` over `X`, or take `X` when `pe.pe1` is `nothing`. Apply this function to each prior of `pe.pes` over `X1` under `w`.
+     4. When `pe.pe2` has a choice to pin, pool the opinions over `X1` with [`opinion_pooling_weights`](@ref), giving the pooled weights, and apply this function to `pe.pe2` over `X1` under them.
+     5. Rebuild `pe` with the answers.
+
+When `w` is not `nothing`, the method reads `factory(pe.pe1, w)` and `factory(pe, w)`, as a batch fit of `factory(pe, w)` does.
 
 # Arguments
 
   - `pe`: The prior after the fold of the step.
   - `X`: The returns of the rows of the buffer, `observations × assets`.
   - `F`: The factor returns of the rows of the buffer, `observations × factors`, or `nothing`.
+  - $(arg_dict[:w_pin])
 
 # Validation
 
   - The rules of [`pin_regression_choice`](@ref).
+  - The rules of the batch verb of `pe.pe1` and of each prior of `pe.pes`, and of [`opinion_pooling_weights`](@ref), when the method runs them.
 
 # Returns
 
@@ -978,28 +992,110 @@ The method that Julia selects is the algorithm.
 # Related
 
   - [`pin_regression_choice`](@ref)
+  - [`pending_choice`](@ref)
   - [`refit_prior_step`](@ref)
   - [`PinnedChoice`](@ref)
   - [`partial_fit!`](@ref)
 """
-function pin_prior_choice(pe::AbstractPriorEstimator, ::Any, ::Any)
+function pin_prior_choice(pe::Union{Nothing, <:AbstractPriorEstimator}, ::Any, ::Any,
+                          ::Any = nothing)
     return pe
 end
 function pin_prior_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                    <:AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum)
-    re = pin_regression_choice(pe.re, X, F)
+                                    <:AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum,
+                          w::Option{<:ObsWeights} = nothing)
+    re = pin_regression_choice(pe.re, X, F, w)
     return re === pe.re ? pe : rebuild_estimator(pe, (; re = re))
 end
 function pin_prior_choice(pe::Union{<:HighOrderPriorEstimator,
                                     <:HighOrderFactorPriorEstimator, <:BlackLittermanPrior,
                                     <:BayesianBlackLittermanPrior, <:EntropyPoolingPrior,
-                                    <:MeucciEntropyPoolingPrior}, X, F)
-    inner = pin_prior_choice(pe.pe, X, F)
+                                    <:MeucciEntropyPoolingPrior}, X, F, w = nothing)
+    inner = pin_prior_choice(pe.pe, X, F, w)
     return inner === pe.pe ? pe : rebuild_estimator(pe, (; pe = inner))
 end
-function pin_prior_choice(pe::OpinionPoolingPrior, X, F)
-    pes = [pin_prior_choice(p, X, F) for p in pe.pes]
-    return all(splat(===), zip(pes, pe.pes)) ? pe : rebuild_estimator(pe, (; pes = pes))
+function pin_prior_choice(pe::OpinionPoolingPrior, X::MatNum, F::MatNum,
+                          w::Option{<:ObsWeights} = nothing)
+    if size(F, 1) < 2 || !pending_choice(pe)
+        return pe
+    end
+    pe = rebuild_estimator(pe, (; pe1 = pin_prior_choice(pe.pe1, X, F, w)))
+    if !any(pending_choice, pe.pes) && !pending_choice(pe.pe2)
+        return pe
+    end
+    pool = isnothing(w) ? pe : factory(pe, w)
+    X1 = isnothing(pool.pe1) ? X : prior(pool.pe1, X, F).X
+    pe = rebuild_estimator(pe, (; pes = [pin_prior_choice(p, X1, F, w) for p in pe.pes]))
+    if !pending_choice(pe.pe2)
+        return pe
+    end
+    pool = isnothing(w) ? pe : factory(pe, w)
+    wp = first(opinion_pooling_weights(pool, X1, F, nothing))
+    return rebuild_estimator(pe, (; pe2 = pin_prior_choice(pe.pe2, X1, F, wp)))
+end
+"""
+    pending_choice(est::Union{Nothing, <:AbstractEstimator})
+    pending_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice})
+    pending_choice(re::DimensionReductionRegression{<:Any, <:Any, <:Any, <:PinnedChoice,
+                                                    Nothing})
+    pending_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
+                             <:AugmentedBlackLittermanPrior})
+    pending_choice(pe::Union{<:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator,
+                             <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
+                             <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior})
+    pending_choice(pe::OpinionPoolingPrior)
+
+Answers whether a regression, or a regression in the tree of a prior, holds a choice under a [`PinnedChoice`](@ref) that no fit has pinned yet.
+
+[`pin_prior_choice`](@ref) reads it before it runs the opinions of an [`OpinionPoolingPrior`](@ref) over the rows of the buffer. That run is a batch fit of the opinions, so the step makes it only while a choice is still to pin.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Any other estimator, or `nothing`: `false`.
+ 2. A [`StepwiseRegression`](@ref) under a [`PinnedChoice`](@ref): `true` when `re.included` is `nothing`, or when one of its entries is `nothing`.
+ 3. A [`DimensionReductionRegression`](@ref) under a [`PinnedChoice`](@ref) whose `proj` is `nothing`: `true`.
+ 4. A prior that fits `pe.re` on the returns: the answer for `pe.re`.
+ 5. A prior that embeds a prior in `pe.pe`: the answer for `pe.pe`.
+ 6. An [`OpinionPoolingPrior`](@ref): `true` when the answer for `pe.pe1`, for a prior of `pe.pes`, or for `pe.pe2` is `true`.
+
+# Arguments
+
+  - `est`, `re`, `pe`: The estimator to read.
+
+# Returns
+
+  - `flag::Bool`: `true` when a choice is still to pin.
+
+# Related
+
+  - [`pin_prior_choice`](@ref)
+  - [`pin_regression_choice`](@ref)
+  - [`PinnedChoice`](@ref)
+"""
+function pending_choice(::Union{Nothing, <:AbstractEstimator})
+    return false
+end
+function pending_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice})
+    return isnothing(re.included) || any(isnothing, re.included)
+end
+function pending_choice(::DimensionReductionRegression{<:Any, <:Any, <:Any, <:PinnedChoice,
+                                                       Nothing})
+    return true
+end
+function pending_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
+                                  <:AugmentedBlackLittermanPrior})
+    return pending_choice(pe.re)
+end
+function pending_choice(pe::Union{<:HighOrderPriorEstimator,
+                                  <:HighOrderFactorPriorEstimator, <:BlackLittermanPrior,
+                                  <:BayesianBlackLittermanPrior, <:EntropyPoolingPrior,
+                                  <:MeucciEntropyPoolingPrior})
+    return pending_choice(pe.pe)
+end
+function pending_choice(pe::OpinionPoolingPrior)
+    return pending_choice(pe.pe1) || any(pending_choice, pe.pes) || pending_choice(pe.pe2)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
