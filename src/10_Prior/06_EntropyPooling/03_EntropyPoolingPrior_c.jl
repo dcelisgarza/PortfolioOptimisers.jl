@@ -702,7 +702,7 @@ end
 
 Return the observation weights of the fit of `pe.pe`, the prior that `pe` embeds, so that [`pin_prior_choice`](@ref) pins the choice of that fit.
 
-A prior that embeds a prior fits it under the weights `w` that its own host gives it. An entropy pooling prior fits it under its prior probabilities `w0`, builds its views on that fit, and refits under the posterior weights. Each refit reads the choice of the `w0` fit. [`factory`](@ref) writes the weights of the host into `pe.w`, so `w0` is `w` when `w` is set, and `pe.w` otherwise. When both are `nothing`, the fit is unweighted.
+A prior that embeds a prior fits it under the weights `w` that the prior around it gives it. An entropy pooling prior fits it under its prior probabilities `w0`, builds its views on that fit, and refits under the posterior weights. Each refit reads the choice of the `w0` fit. [`factory`](@ref) writes the weights of the outer prior into `pe.w`, so `w0` is `w` when `w` is set, and `pe.w` otherwise. When both are `nothing`, the fit is unweighted.
 
 # Algorithm
 

@@ -676,7 +676,7 @@ end
 
 Folds the rows of a Returns Result into the head's recursion as the Block Step, and reads nothing out.
 
-Each row of `rd` is one Online Update, in order, and the state never learns the cadence of the loop. A fold of `k` rows is `k` updates and builds no Recursion Result. After a fold of rows `1:t`, `optimise(opt)` equals `optimise(opt, rd[1:t])` exactly, because both take the same `t` single-row updates. The step also folds `rd` into the fallback through [`step_fallback`](@ref), because the head holds no returns window that the fallback could read at the read-out.
+Each row of `rd` is one Online Update, in order, and the state never learns the cadence of the loop. A fold of `k` rows is `k` updates and builds no Recursion Result. After a fold of rows `1:t`, `optimise(opt)` equals `optimise(opt, rd[1:t])` exactly, because both take the same `t` single-row updates. The step also folds `rd` into the fallback through [`step_fallback`](@ref), because the head holds no returns window that the fallback could read when `optimise(opt)` runs with no data.
 
 # Arguments
 
@@ -713,7 +713,7 @@ end
 
 Folds the rows of an online step into the fallback of an [`OnlinePortfolioSelection`](@ref) head.
 
-The head reads out a Recursion Result and rebuilds no returns data, so its fallback gets no rows at the read-out. A fallback that steps with the head holds its own state, and `optimise(fb)` with no data reads that state out as the online step of any optimiser does. So every fallback that the batch verb admits also answers online. A fallback estimator steps through [`partial_fit!`](@ref). Any other value passes unchanged: `nothing`, a precomputed result, which answers itself, and a [`TimeDependent`](@ref) schedule, whose entries are batch configuration and carry no state.
+The head reads out a Recursion Result and rebuilds no returns data, so its fallback gets no rows when `optimise(opt)` runs with no data. A fallback that steps with the head holds its own state, and `optimise(fb)` with no data reads that state out as the online step of any optimiser does. So every fallback that the batch verb admits also answers online. A fallback estimator steps through [`partial_fit!`](@ref). Any other value passes unchanged: `nothing`, a precomputed result, which answers itself, and a [`TimeDependent`](@ref) schedule, whose entries are batch configuration and carry no state.
 
 # Arguments
 
@@ -923,7 +923,7 @@ The method refuses a head that has taken no step with an `ArgumentError`. The Re
 # Arguments
 
   - `opt`: The stepped head.
-  - `kwargs`: The keyword arguments of the read-out of the fallback, passed on unchanged.
+  - `kwargs`: The keyword arguments of `optimise` with no data on the fallback, passed on unchanged.
 
 # Validation
 
