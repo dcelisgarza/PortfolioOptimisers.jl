@@ -180,7 +180,7 @@ Prior instead of pasted.
     site's order is the only one there is.
 - **A `TD_` wrapper holding a rule is still unspecified.** `l2c` and `linfc` join `l1` and
     `linf` as fields with two deferral channels, and ADR 0030 still considered only one.
-    `test_09i_norm_ceiling_calibration.jl` records what the code does rather than ratifying
+    `test_09f_calibration_slot.jl` records what the code does rather than ratifying
     a design, on the same terms as the radius family's file.
 - **No rule computes a ceiling from anything but the universe size.** A rule that read the
     covariance matrix — a floor on effective *independent* bets rather than on assets — has a

@@ -236,7 +236,7 @@ reading, and it is correct under it. The rule's method **is** a floor on the eff
 assets, the norm ceiling is what that floor converts into, and ADR 0097 is where the two are held
 apart.
 
-`test_09g_calibration_rules.jl` gates the list. A rule whose name ends in the word for a quantity of
+`test_09f_calibration_slot.jl` gates the list. A rule whose name ends in the word for a quantity of
 this channel and stands outside the table reds the census, and so does a name in the table that no
 rule carries.
 

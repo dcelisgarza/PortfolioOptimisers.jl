@@ -45,7 +45,7 @@ the decision.
    the threshold, so a row kept at `t` is dropped at `t + 1` when a column leaves, and the returns
    either side of it move. These are **window-valued**: no state folded at `t` can be corrected,
    so no exact online form exists.
-2. **A populated state is viewable by asset.** `test_08r_partial_fit.jl:240` pins
+2. **A populated state is viewable by asset.** `test_08p_regime_partial_fit.jl:240` pins
    `cov(port_opt_view(cv, i)) == cov(Covariance(), X[:, i])` on a state folded over every column,
    and `ReturnsBufferState`, `PriorCarryState` and `SampleBufferState` each carry
    `port_opt_view`. A state fitted on the full universe, viewed to a column set and read out, is
