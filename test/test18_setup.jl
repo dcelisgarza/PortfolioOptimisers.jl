@@ -685,7 +685,8 @@ function mr_block4()
     end
 end
 
-function mr_block5()
+# `cases` selects the columns of the reference, so two files can share the five solves.
+function mr_block5(cases = 1:6)
     r = VarianceSkewKurtosis(;
                              sk = Skewness(;
                                            settings = MaxRiskMeasureSettings(; scale = 2)),
@@ -694,7 +695,7 @@ function mr_block5()
                   DataFrame)
     i = 1
     for obj in objs, ret in rets
-        if i == 6
+        if i == 6 || !(i in cases)
             i += 1
             continue
         end
