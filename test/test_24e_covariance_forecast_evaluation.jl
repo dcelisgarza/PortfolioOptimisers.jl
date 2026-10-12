@@ -329,6 +329,75 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         end
     end
 
+    @testset "A bare covariance estimator reads the implied volatilities (#1643)" begin
+        # The regression reads windows of 20 rows and needs more than two of them, so the
+        # first training window is longer than the one above.
+        wv = 90
+        cvb = IndexWalkForward(wv, h; purged_size = p, expand_train = true)
+        cvo = OnlineIndexWalkForward(wv, h; purged_size = p)
+        iv = 0.2 .+ abs.(randn(StableRNG(1643), T, N)) ./ 50
+        ivpas = (1.1, collect(range(1.05, 1.2; length = N)))
+        algs = (ImpliedVolatilityRegression(), ImpliedVolatilityPremium())
+        poc(ce) = PortfolioOptimisersCovariance(; ce = ce)
+        for alg in algs, ivpa in ivpas
+            ce = ImpliedVolatility(; alg = alg, ppy = 252)
+            r = ReturnsResult(; nx = nx, X = X, iv = iv, ivpa = ivpa, ts = ts)
+            # Batch: the bare estimator answers what the prior that holds it answers.
+            b = cfe(ce, r, cvb)
+            @test length(b.dates) == 14
+            for est in (EmpiricalPrior(; ce = ce), poc(ce))
+                bb = cfe(est, r, cvb)
+                for f in columns
+                    @test finite_max(getfield(b, f), getfield(bb, f)) == 0
+                end
+            end
+            # Online: the buffer of the composite records the surface beside the rows, so
+            # the stepped run is the batch run.
+            o = cfe(po.Online(poc(ce)), r, cvo)
+            @test b.n_valid == o.n_valid
+            for f in columns
+                @test finite_max(getfield(b, f), getfield(o, f)) == 0
+            end
+        end
+        r = ReturnsResult(; nx = nx, X = X, iv = iv, ivpa = 1.1, ts = ts)
+        ce = ImpliedVolatility(; ppy = 252)
+        # The rolling identity, through a capped buffer.
+        b = cfe(ce, r, IndexWalkForward(wv + p, h; purged_size = p))
+        o = cfe(po.Online(poc(ce); max_history = wv), r,
+                OnlineIndexWalkForward(wv + p, h; purged_size = p))
+        for f in columns
+            @test finite_max(getfield(b, f), getfield(o, f)) == 0
+        end
+        # An estimator that reads no surface ignores it, in batch, in an exact fold and in a
+        # buffer alike.
+        for (est, cv) in
+            ((Covariance(), cvb), (Covariance(), cvo), (po.Online(Covariance()), cvo))
+            a = cfe(est, r, cv)
+            z = cfe(est, rd, cv)
+            for f in columns
+                @test finite_max(getfield(a, f), getfield(z, f)) == 0
+            end
+        end
+        # The buffer pins `ivpa` and the presence of `iv` at its first append.
+        ob = po.partial_fit!(po.update_online_estimator(po.Online(poc(ce))),
+                             po.port_opt_view(r, 1:wv, :))
+        @test ob.cache.iv == iv[1:wv, :] && ob.cache.ivpa == 1.1
+        @test_throws ArgumentError po.partial_fit!(ob, X[(wv + 1):(wv + 2), :];
+                                                   iv = iv[(wv + 1):(wv + 2), :],
+                                                   ivpa = 2.0)
+        @test_throws ArgumentError po.partial_fit!(ob, X[(wv + 1):(wv + 2), :])
+        o1 = po.partial_fit!(ob, X[wv + 1, :]; iv = iv[wv + 1, :], ivpa = 1.1)
+        @test o1.cache.n == wv + 1 && po.sample_buffer(o1.cache) == X[1:(wv + 1), :]
+        # The read-out runs over a view of the buffer, so it differs from a fit over a
+        # contiguous copy by rounding alone.
+        @test isapprox(cov(o1),
+                       cov(poc(ce), X[1:(wv + 1), :]; iv = iv[1:(wv + 1), :], ivpa = 1.1);
+                       rtol = 1e-12)
+        # The estimator itself carries no buffer, and the refusal names the composite.
+        e = @test_throws ArgumentError po.Online(ce)
+        @test occursin("PortfolioOptimisersCovariance", e.value.msg)
+    end
+
     @testset "The date form" begin
         bd = DateWalkForward(w, h; period = Day(1), purged_size = p, expand_train = true)
         od = OnlineDateWalkForward(w, h; period = Day(1), purged_size = p)

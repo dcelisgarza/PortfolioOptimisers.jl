@@ -601,7 +601,7 @@ This is the data-less arm of [`forecast_location`](@ref), with one method per sh
 
   - A [`CovarianceState`](@ref) carries `mu`.
   - The two exponentially weighted states carry `location`.
-  - A [`SampleBufferState`](@ref) carries the rows and the masks that it folded. The method answers the data form of the estimator over them, because a buffer means the batch verb over its rows each time the estimate is made from the state.
+  - A [`SampleBufferState`](@ref) carries the rows, the masks and the implied volatilities that it folded. The method answers the data form of the estimator over them, because a buffer means the batch verb over its rows each time the estimate is made from the state.
   - A [`PortfolioOptimisersCovariance`](@ref) whose own `cache` is `nothing` forwards to the estimator that it holds, which carries the state.
 
 The first two methods return the vector of the state itself, and the next fold writes that vector in place. A caller that keeps the location across a fold must copy it, as [`covariance_forecast_evaluation`](@ref) does when it stores the forecasts.
@@ -625,7 +625,8 @@ function forecast_state_location(::Any,
     return state.location
 end
 function forecast_state_location(ce, state::SampleBufferState)
-    return forecast_location(ce, sample_buffer(state); sample_buffer_kwargs(state)...)
+    return forecast_location(ce, sample_buffer(state); sample_buffer_kwargs(state)...,
+                             implied_volatility_buffer_kwargs(state)...)
 end
 function forecast_state_location(ce::PortfolioOptimisersCovariance, ::Nothing)
     return forecast_location(ce.ce)
@@ -855,11 +856,14 @@ Fold the observations of the returns data `rd` into a covariance estimator.
 
 This is the `ReturnsResult` arity that [`online_folds`](@ref), the online arm of the fold loop, calls for the two kinds of estimator that [`covariance_forecast_evaluation`](@ref) threads through it. A prior has a `ReturnsResult` arity of its own, [`partial_fit!`](@ref) over a `ReturnsResult`, which is the fold of every prior and the forward that the step of an optimiser makes. A covariance estimator folds `rd.X` in its own arity. When the Asset Panel varies in time, the method reads its active mask through [`step_active_mask`](@ref) and passes it as the `active_mask` keyword. That verb also refuses a mask that the step cannot carry.
 
+An estimator that carries a [`SampleBufferState`](@ref) also takes `rd.iv` and `rd.ivpa`, and the buffer records them beside the rows. The call with no data gives them back to the batch verb, so a buffered [`ImpliedVolatility`](@ref) answers what a batch fit over the same rows answers. An exact fold keeps numbers alone, and no exact fold reads an implied volatility, so it does not take them. The batch fit of such an estimator ignores them too.
+
 # Algorithm
 
  1. Check that `rd.X` is not `nothing`.
  2. Read the active mask of the step through [`step_active_mask`](@ref), giving `amsk`.
- 3. Fold `rd.X` into `ce` through `partial_fit!(ce, rd.X)`, with `active_mask = amsk` when `amsk` is not `nothing`.
+ 3. Read the implied-volatility keywords of the state through [`step_implied_volatility_kwargs`](@ref).
+ 4. Fold `rd.X` into `ce` through `partial_fit!(ce, rd.X)`, with `active_mask = amsk` when `amsk` is not `nothing`, and with the keywords of step 3.
 
 # Arguments
 
@@ -870,7 +874,6 @@ This is the `ReturnsResult` arity that [`online_folds`](@ref), the online arm of
 
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
   - Everything [`step_active_mask`](@ref) refuses.
-  - `rd.iv` is `nothing`. An `ArgumentError` is thrown otherwise. The exact fold of a covariance estimator holds numbers alone and keeps no implied volatilities, so a step that carried them would fold an estimate that reads them without them.
 
 # Returns
 
@@ -879,19 +882,51 @@ This is the `ReturnsResult` arity that [`online_folds`](@ref), the online arm of
 # Related
 
   - [`step_active_mask`](@ref)
+  - [`step_implied_volatility_kwargs`](@ref)
   - [`online_folds`](@ref)
   - [`covariance_forecast_evaluation`](@ref)
 """
 function partial_fit!(ce::AbstractCovarianceEstimator, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     amsk = step_active_mask(rd)
-    @argcheck(isnothing(rd.iv),
-              ArgumentError("this online step takes no implied-volatility surface: the exact fold of a covariance estimator keeps numbers alone, so a step carrying `iv` would fold an estimate that reads the surface without it and read out an answer a batch fit would not give. Drop `iv` from `rd`, or fit in batch. An optimiser's prior records `iv` on its own step."))
+    # The first fold meets `nothing`, so the state is read without the refusal of
+    # `partial_fit_cache`.
+    cache = hasfield(typeof(ce), :cache) ? getfield(ce, :cache) : nothing
+    vols = step_implied_volatility_kwargs(cache, rd)
     return if isnothing(amsk)
-        partial_fit!(ce, rd.X)
+        partial_fit!(ce, rd.X; vols...)
     else
-        partial_fit!(ce, rd.X; active_mask = amsk)
+        partial_fit!(ce, rd.X; active_mask = amsk, vols...)
     end
+end
+"""
+    step_implied_volatility_kwargs(state::SampleBufferState, rd::ReturnsResult)
+    step_implied_volatility_kwargs(state, rd::ReturnsResult)
+
+Give the implied volatilities of a step to the state that records them, as keywords of [`partial_fit!`](@ref).
+
+A [`SampleBufferState`](@ref) records `iv` and `ivpa` beside its rows, so it takes `rd.iv` and `rd.ivpa`. Any other state is an exact fold, which keeps numbers alone, and it takes nothing. The type of the state selects the method.
+
+# Arguments
+
+  - `state`: The state that the estimator carries.
+  - `rd`: The returns data of the step.
+
+# Returns
+
+  - `kwargs::NamedTuple`: `iv` and `ivpa` for a buffer, or an empty `NamedTuple`.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`implied_volatility_buffer_kwargs`](@ref)
+  - [`ImpliedVolatility`](@ref)
+"""
+function step_implied_volatility_kwargs(::SampleBufferState, rd::ReturnsResult)
+    return (; iv = rd.iv, ivpa = rd.ivpa)
+end
+function step_implied_volatility_kwargs(::Any, ::ReturnsResult)
+    return (;)
 end
 """
     is_time_dependent(est::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator, <:Online})
@@ -958,7 +993,7 @@ These are the two arms of the callback of [`covariance_forecast_evaluation`](@re
 
 # Algorithm
 
- 1. With a training window, take the view of `rd` on its rows, giving `rdt`. Fit a covariance estimator through the Asset Panel methods of the moment verbs, `cov(ce, rdt.X, rdt.pnl)` and [`forecast_location`](@ref)`(ce, rdt.X, rdt.pnl)`. Fit a prior once over the view, giving `pr`.
+ 1. With a training window, take the view of `rd` on its rows, giving `rdt`. Fit a covariance estimator through the Asset Panel methods of the moment verbs, `cov(ce, rdt.X, rdt.pnl)` and [`forecast_location`](@ref)`(ce, rdt.X, rdt.pnl)`. Both calls take `iv = rdt.iv` and `ivpa = rdt.ivpa`, as [`prior`](@ref) gives them to its members, so an [`ImpliedVolatility`](@ref) reads its surface and every other estimator ignores it. Fit a prior once over the view, giving `pr`.
  2. With `nothing`, read `cov(ce)` and `forecast_location(ce)` out of the state of a covariance estimator, or `pr = prior(pe)` out of the state of a prior.
  3. Return the forecast and the location. For a prior they are `pr.sigma` and [`prior_forecast_location`](@ref) of `pr`, which reads the centre of `pr.sigma` without a second fit.
 
@@ -984,8 +1019,8 @@ These are the two arms of the callback of [`covariance_forecast_evaluation`](@re
 function forecast_moments(ce::AbstractCovarianceEstimator, rd::ReturnsResult,
                           train_idx::VecInt)
     rdt = port_opt_view(rd, train_idx, :)
-    return Statistics.cov(ce, rdt.X, rdt.pnl; dims = 1),
-           forecast_location(ce, rdt.X, rdt.pnl; dims = 1)
+    return Statistics.cov(ce, rdt.X, rdt.pnl; dims = 1, iv = rdt.iv, ivpa = rdt.ivpa),
+           forecast_location(ce, rdt.X, rdt.pnl; dims = 1, iv = rdt.iv, ivpa = rdt.ivpa)
 end
 function forecast_moments(ce::AbstractCovarianceEstimator, ::ReturnsResult, ::Nothing)
     return Statistics.cov(ce), forecast_location(ce)

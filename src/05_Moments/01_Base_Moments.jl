@@ -304,7 +304,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a covariance matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The method of `Statistics.cov` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+The method of `Statistics.cov` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers. It holds the implied volatilities and `ivpa` that it was folded with too, so a wrapped [`ImpliedVolatility`](@ref) reads its surface over the same rows.
 
 # Arguments
 
@@ -326,14 +326,14 @@ The method of `Statistics.cov` that makes the estimate from a Sample Buffer. An 
 function Statistics.cov(ce::AbstractCovarianceEstimator, state::SampleBufferState;
                         kwargs...)
     return Statistics.cov(ce, sample_buffer(state); sample_buffer_kwargs(state)...,
-                          kwargs...)
+                          implied_volatility_buffer_kwargs(state)..., kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads a correlation matrix out of a [`SampleBufferState`](@ref), by running the batch verb over the observations the buffer holds.
 
-The method of `Statistics.cor` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers.
+The method of `Statistics.cor` that makes the estimate from a Sample Buffer. An estimator wrapped in [`Online`](@ref) carries a buffer rather than a family state, so it takes no exact fold, and its estimate is whatever a batch fit over the rows the buffer holds gives — every observation folded so far when the buffer is uncapped, and the last `max_history` of them when it is capped. It runs no [`assert_partial_fittable`](@ref) check of its own: the batch verb answers configurations an incremental fold cannot, and a wrapper is how a caller reaches them. The buffer also holds the per-observation masks it was folded with, so the batch verb is given the mask that explains the rows and a wrapped estimator under a [`CoveragePolicy`](@ref) answers what an unwrapped one answers. It holds the implied volatilities and `ivpa` that it was folded with too, so a wrapped [`ImpliedVolatility`](@ref) reads its surface over the same rows.
 
 # Arguments
 
@@ -355,7 +355,7 @@ The method of `Statistics.cor` that makes the estimate from a Sample Buffer. An 
 function Statistics.cor(ce::AbstractCovarianceEstimator, state::SampleBufferState;
                         kwargs...)
     return Statistics.cor(ce, sample_buffer(state); sample_buffer_kwargs(state)...,
-                          kwargs...)
+                          implied_volatility_buffer_kwargs(state)..., kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

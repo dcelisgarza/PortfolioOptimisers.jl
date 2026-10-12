@@ -355,10 +355,11 @@ end
         @test_throws ArgumentError partial_fit!(o,
                                                 ReturnsResult(; nx = nx, X = r11.X,
                                                               ts = r11.ts))
-        # The exact fold of a covariance estimator keeps numbers alone and takes no
-        # surface. The mask reader itself leaves the surface to its caller.
+        # The mask reader leaves the surface to its caller. The exact fold of a covariance
+        # estimator ignores it, as its batch fit does (#1643).
         @test isnothing(po.step_active_mask(r11))
-        @test_throws ArgumentError partial_fit!(Covariance(), r11)
+        r5 = rows(rdi, 1:5)
+        @test cov(partial_fit!(Covariance(), r5)) == cov(partial_fit!(Covariance(), r5.X))
     end
 
     @testset "What the step refuses, by name" begin

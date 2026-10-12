@@ -1412,12 +1412,12 @@ This is the buffering arm of [`partial_fit!`](@ref). Each estimator that carries
 
 The method covers both arms of the interface. The families that refuse the step also declare one method over both arms, and two narrower methods here would be ambiguous against each of them. So the body selects the arm by the type of `X`, and the compiler resolves that branch at each call site.
 
-A buffer carries the per-observation masks beside the observations. So a [`CoveragePolicy`](@ref) mask goes through the wrapper as it goes through the accumulator of an estimator, and the call with no data gives it back to the batch verb. A wrapped estimator folded under a policy gives the answer of a batch fit over the same window under the same policy.
+A buffer carries the per-observation masks beside the observations. So a [`CoveragePolicy`](@ref) mask goes through the wrapper as it goes through the accumulator of an estimator, and the call with no data gives it back to the batch verb. A wrapped estimator folded under a policy gives the answer of a batch fit over the same window under the same policy. The implied volatilities and `ivpa` go through the wrapper in the same way, so a wrapped estimator that reads them, such as an [`ImpliedVolatility`](@ref) inside a [`PortfolioOptimisersCovariance`](@ref), gives the answer of a batch fit over the same rows.
 
 # Algorithm
 
  1. Read the buffer out of the `cache` field with [`assert_sample_buffer`](@ref), which refuses an estimator that was never wrapped in [`Online`](@ref).
- 2. Fold a matrix and its masks through the block arm of [`partial_fit!`](@ref), and a vector and its masks through the single-observation arm.
+ 2. Fold a matrix, its masks and its implied volatilities through the block arm of [`partial_fit!`](@ref), and a vector, its masks and its implied volatilities through the single-observation arm.
  3. Rebind `est.cache` with `Accessors.@reset`, and return the estimator.
 
 # Arguments
@@ -1427,12 +1427,15 @@ A buffer carries the per-observation masks beside the observations. So a [`Cover
   - $(arg_dict[:dims])
   - `active_mask`: The active mask of the block, of the shape of `X`, or of one entry per asset when `X` is one observation, or `nothing`.
   - `estimation_mask`: The estimation mask, on the same terms as `active_mask`.
+  - `iv`: The implied volatilities, on the same terms as `active_mask`.
+  - `ivpa`: The implied volatility risk premium adjustment, or `nothing`.
 
 # Validation
 
   - `est` carries a [`SampleBufferState`](@ref). An `ArgumentError` is thrown otherwise.
-  - The masks, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
-  - A buffer that holds observations receives the masks that it records. An `ArgumentError` is thrown otherwise.
+  - The masks and `iv`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
+  - A buffer that holds observations receives the masks that it records, and it receives `iv` if and only if it records implied volatilities. An `ArgumentError` is thrown otherwise.
+  - `ivpa` equals the adjustment that the first append pinned. An `ArgumentError` is thrown otherwise.
   - $(val_dict[:dims])
 
 # Returns
@@ -1449,13 +1452,14 @@ A buffer carries the per-observation masks beside the observations. So a [`Cover
 """
 function partial_fit!(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
                       X::VecNum_MatNum; dims::Int = 1, active_mask = nothing,
-                      estimation_mask = nothing)
+                      estimation_mask = nothing, iv = nothing, ivpa = nothing)
     state = assert_sample_buffer(est)
     state = if isa(X, MatNum)
         partial_fit!(state, X; dims = dims, active_mask = active_mask,
-                     estimation_mask = estimation_mask)
+                     estimation_mask = estimation_mask, iv = iv, ivpa = ivpa)
     else
-        partial_fit!(state, X; active_mask = active_mask, estimation_mask = estimation_mask)
+        partial_fit!(state, X; active_mask = active_mask, estimation_mask = estimation_mask,
+                     iv = iv, ivpa = ivpa)
     end
     return Accessors.@set est.cache = state
 end
@@ -1502,7 +1506,7 @@ $(DocStringExtensions.FIELDS)
   - `est` is not an `Online`. An `ArgumentError` is thrown otherwise.
   - `est` is not a cross-validation scheme, because the function constructor of a scheme builds its Online Scheme. An `ArgumentError` naming the constructors is thrown otherwise.
   - `est` is not an [`OnlinePortfolioSelection`](@ref) head, because a refit of a head is a batch walk-forward, and the library runs both settings of the wrapper in other forms. An `ArgumentError` naming those forms is thrown otherwise.
-  - `est` has a `cache` field. An `ArgumentError` is thrown otherwise.
+  - `est` has a `cache` field. An `ArgumentError` is thrown otherwise. A covariance estimator with no such field, such as [`ImpliedVolatility`](@ref), takes the buffer of a [`PortfolioOptimisersCovariance`](@ref) that holds it.
   - No field of the tree of `est` holds a windowed estimator under [`SeedWindow`](@ref), because the wrapper refits the tree at each step, and a refit has no first fit to remember. [`seed_window_path`](@ref) finds the field, and an `ArgumentError` that names it is thrown otherwise.
   - `max_history > 0` when it is not `nothing`. A `DomainError` is thrown otherwise.
 
@@ -1545,7 +1549,7 @@ Online
     function Online(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator};
                     max_history::Option{<:Integer} = nothing)
         @argcheck(hasfield(typeof(est), :cache),
-                  ArgumentError("`$(typeof(est))` has no `cache` field, so it has nowhere to carry a sample buffer and cannot be wrapped in `Online`."))
+                  ArgumentError("`$(typeof(est))` has no `cache` field, so it has nowhere to carry a sample buffer and cannot be wrapped in `Online`. A covariance estimator of this kind takes the buffer of a `PortfolioOptimisersCovariance(; ce = …)`, which carries one for any estimator that it holds, and a prior holds the rows for each of its members."))
         path = seed_window_path(est)
         @argcheck(isnothing(path),
                   ArgumentError("`$(typeof(est).name.name)` holds a `SeedWindow` at `$(path)`, and `Online` refits the estimator over its buffer at each step. A refit has no first fit to remember, so it cannot keep the window of the first fit alone. Fold the estimator without `Online` in a prior that folds, such as `EmpiricalPrior`, or set the rule to `RollingWindow()`."))
