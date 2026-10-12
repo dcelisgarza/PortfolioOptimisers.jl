@@ -258,6 +258,33 @@ end
         @test agrees(prior(e1), p1) && near(prior(e2), batch(pe, 2))
     end
 
+    @testset "A first step refuses a member that holds a state (#1642)" begin
+        # Found by #1638: the carry reads every member as configuration, and keeps each state
+        # it folds in its own state. A state that the caller folded into a member entered the
+        # first step, and the prior differed from the batch fit with no message, or the step
+        # failed with a `DimensionMismatch` that named no field.
+        listed(de) = ["market" => ConstantExposure(),
+                      "mom" => CompositeExposure(; descriptors = [de], family = "style")]
+        de = RollingLogReturn(; window = 10)
+        cs = CrossSectionalFactorPrior(; factors = listed(de), th = 0.5)
+        X = rd.X[1:20, :]
+        for (pe, path) in ((CrossSectionalFactorPrior(;
+                                                      factors = listed(partial_fit!(de, rows(rd, 1:90))),
+                                                      th = 0.5), "factors[2].descriptors[1].cache"),
+                           (CrossSectionalFactorPrior(; factors = listed(de), th = 0.5,
+                                                      pe = partial_fit!(cs.pe, X[:, 1:2])), "pe.cache"),
+                           (CrossSectionalFactorPrior(; factors = listed(de), th = 0.5,
+                                                      ve = partial_fit!(cs.ve, X; dims = 1)), "ve.cache"),
+                           (CrossSectionalFactorPrior(; factors = listed(de), th = 0.5,
+                                                      ce = partial_fit!(cs.ce, X; dims = 1)), "ce.cache"))
+            msg = message(() -> partial_fit!(pe, rows(rd, 91:170)))
+            @test occursin("ArgumentError", msg) && occursin("`$(path)`", msg)
+        end
+        # The cold prior folds, and its own state passes the later steps.
+        e1 = partial_fit!(cs, rows(rd, 1:90))
+        @test isa(partial_fit!(e1, rows(rd, 91:170)).cache, po.CrossSectionalCarryState)
+    end
+
     @testset "A step appends to the histories in place (#1564)" begin
         # A step writes its rows into the spare rows of the backing of each history, and each
         # state keeps the view of its own rows.
