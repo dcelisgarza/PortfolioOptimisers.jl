@@ -5,7 +5,7 @@
 
 Names the first field of an estimator tree that holds an [`Online`](@ref) declaration, or answers `nothing`.
 
-[`assert_batch_entry`](@ref) uses this walk. Only the warm-up of the online arm of the fold loop resolves a wrapper, with [`update_online_estimator`](@ref). Without the check, a batch fit that reaches a wrapper gets a `MethodError` at `prior(pe, X)`, not a refusal. The walk is the walk of [`online_entry_state`](@ref), and the answer is the dotted path from the root. It is `"pe"` for a wrapped prior on a naive optimiser, and `"opt.pe"` for a wrapped prior under a JuMP head. The walk does not enter a field that holds a wrapper, because the warm-up resolves the wrappers below it. A wrapper at the root answers `""`, the empty path. A [`TimeDependent`](@ref) schedule answers `nothing`, because its constructor refuses a wrapper among its entries. A value that is not an estimator also answers `nothing`.
+[`assert_batch_entry`](@ref) uses this walk. Only the warm-up of the online arm of the fold loop resolves a wrapper, with [`update_online_estimator`](@ref). Without the check, a batch fit that reaches a wrapper gets a `MethodError` at `prior(pe, X)`, not a refusal. The walk reads the fields of [`estimator_fields`](@ref), and the answer is the dotted path from the root. It is `"pe"` for a wrapped prior on a naive optimiser, and `"opt.pe"` for a wrapped prior under a JuMP head. The walk does not enter a field that holds a wrapper, because the warm-up resolves the wrappers below it. A wrapper at the root answers `""`, the empty path. A [`TimeDependent`](@ref) schedule answers `nothing`, because its constructor refuses a wrapper among its entries. A value that is not an estimator also answers `nothing`.
 
 # Algorithm
 
@@ -193,38 +193,45 @@ PinnedChoice()
 struct PinnedChoice <: AbstractChoiceRule end
 """
     seed_window_path(est)
+    seed_window_path(v::AbstractVector)
+    seed_window_path(p::Pair)
     seed_window_path(::Any)
 
 Names the first field of an estimator tree that holds a windowed estimator under [`SeedWindow`](@ref), or answers `nothing`.
 
-The constructor of [`Online`](@ref) uses this walk to refuse a seed window, because the wrapper refits its estimator at each step. The walk is the walk of [`online_wrapper_path`](@ref), and the answer is the dotted path from the root to the `rule` field, such as `"ce.rule"` for the covariance member of a prior. A windowed estimator under a seed window answers `"rule"` through its own method. A value that is not an estimator answers `nothing`.
+The constructor of [`Online`](@ref) uses this walk to refuse a seed window, because the wrapper refits its estimator at each step. The answer is the path from the root to the `rule` field, such as `"ce.rule"` for the covariance member of a prior. A windowed estimator under a seed window answers `"rule"` through its own method. A value that is not an estimator answers `nothing`.
+
+The walk reads every field, not only the fields of [`estimator_fields`](@ref). A refit reaches the estimators that a vector holds, such as the factor list of a [`CrossSectionalFactorPrior`](@ref), the Descriptors of a [`DescriptorScores`](@ref) and the priors of an [`OpinionPoolingPrior`](@ref), so the refusal must reach them too (#1638). A vector answers with the index of its element in brackets, and a Pair answers through its value, so a Descriptor in a factor list gives a path such as `"factors[2].descriptors[1].ce.rule"`. [`element_path`](@ref) walks the vector.
 
 # Algorithm
 
- 1. Walk the fields of [`estimator_fields`](@ref) in order, and find the path in each field with this function.
- 2. Answer the first path found, with the field name and a dot before it.
+ 1. Walk every field of `est` in order, and find the path in each field with this function.
+ 2. Answer the first path found, with the field name before it, as [`tree_path`](@ref) joins them.
  3. Answer `nothing` when no field gives a path.
 
 # Arguments
 
   - `est`: The estimator, or any value a field holds.
+  - `v`: A vector that a field holds.
+  - `p`: A Pair that a vector holds, such as a member of a factor list.
 
 # Returns
 
-  - `path::Option{<:String}`: The dotted path of the first seed window found, or `nothing`.
+  - `path::Option{<:String}`: The path of the first seed window found, or `nothing`.
 
 # Related
 
   - [`SeedWindow`](@ref)
   - [`Online`](@ref)
-  - [`online_wrapper_path`](@ref)
+  - [`element_path`](@ref)
+  - [`tree_path`](@ref)
   - [`estimator_fields`](@ref)
 """
 function seed_window_path(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
-    for f in estimator_fields(est)
+    for f in fieldnames(typeof(est))
         path = seed_window_path(getfield(est, f))
         if !isnothing(path)
-            return string(f, ".", path)
+            return tree_path(f, path)
         end
     end
     return nothing
@@ -339,6 +346,69 @@ function update_online_estimator(o::Online)
 end
 function update_online_estimator(::Online{<:CrossValidationEstimator})
     return throw(ArgumentError("`Online` on a scheme is an Online Scheme, and it reached the warm-up in an estimator slot: a scheme seeds no sample buffer, because it is the `cv` argument of `cross_val_predict`, not a field of the estimator that runs through it."))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Joins the name of a field, or the bracketed index of an element, to the path that a walk found below it.
+
+A path that starts with a bracket follows the name with no dot, so a walk names a member of a vector field as `"factors[2]"` and not as `"factors.[2]"`. Every other path follows the name after a dot.
+
+# Arguments
+
+  - `head`: The field name, or the bracketed index of an element, such as `"[2]"`.
+  - `path`: The path below `head`.
+
+# Returns
+
+  - `path::String`: The joined path.
+
+# Related
+
+  - [`seed_window_path`](@ref)
+  - [`online_entry_state`](@ref)
+  - [`element_path`](@ref)
+"""
+function tree_path(head::Union{<:Symbol, <:AbstractString}, path::AbstractString)
+    return startswith(path, '[') ? string(head, path) : string(head, ".", path)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Walks the elements of a vector in order with `walk`, and answers the path of the first element that gives one, or `nothing`.
+
+The walks of an estimator tree that must see the estimators a vector holds call this function: [`seed_window_path`](@ref) and [`online_entry_state`](@ref). The answer starts with the index of the element in brackets, as [`tree_path`](@ref) joins it.
+
+# Arguments
+
+  - `walk`: The walk, a function that answers a path or `nothing` for one element.
+  - `v`: The vector.
+
+# Returns
+
+  - `path::Option{<:String}`: The path of the first element that gives one, or `nothing`.
+
+# Related
+
+  - [`seed_window_path`](@ref)
+  - [`online_entry_state`](@ref)
+  - [`tree_path`](@ref)
+"""
+function element_path(walk, v::AbstractVector)
+    i = findfirst(x -> !isnothing(walk(x)), v)
+    return isnothing(i) ? nothing : tree_path(string("[", i, "]"), walk(v[i]))
+end
+function seed_window_path(v::AbstractVector)
+    return element_path(seed_window_path, v)
+end
+function seed_window_path(p::Pair)
+    return seed_window_path(last(p))
+end
+function online_entry_state(v::AbstractVector)
+    return element_path(online_entry_state, v)
+end
+function online_entry_state(p::Pair)
+    return online_entry_state(last(p))
 end
 
 """

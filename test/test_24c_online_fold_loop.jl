@@ -232,6 +232,27 @@ assets is what keeps the JuMP families cheap.
         @test po.online_entry_state(partial_fit!(mr, rows(rd, 1:5))) == "opt.cache"
         @test isnothing(po.online_entry_state(nothing))
         @test isnothing(po.online_entry_state(TimeDependent([me]; default = me)))
+        # Found by #1638: the walk read the fields of `estimator_fields` alone, which skips a
+        # vector, so a Descriptor that the caller folded in a factor list escaped it, and the
+        # first step of the carry fold read its state.
+        pnl = asset_panel([NumericPanelInput(; name = "market_cap", vals = ones(20, N))])
+        cold = RollingLogReturn(; window = 5)
+        warm = partial_fit!(cold, ReturnsResult(; nx = nx, X = X[1:20, :], pnl = pnl))
+        function listed(de)
+            return CrossSectionalFactorPrior(;
+                                             factors = ["market" => ConstantExposure(),
+                                                        "mom" => CompositeExposure(;
+                                                                                   descriptors = [de],
+                                                                                   family = "style")])
+        end
+        @test po.online_entry_state(listed(warm)) == "factors[2].descriptors[1].cache"
+        @test isnothing(po.online_entry_state(listed(cold)))
+        scored = CrossSectionalFactorPrior(; factors = ["market" => ConstantExposure()],
+                                           rfe = ExpWeightedReturnForecast(;
+                                                                           scores = DescriptorScores(;
+                                                                                                     descriptors = [warm])))
+        @test po.online_entry_state(scored) == "rfe.scores.descriptors[1].cache"
+        @test po.online_entry_state([[nothing], [me]]) == "[2][1].cache"
         # The batch arms read a stepped estimator as configuration, as they always did.
         @test isapprox(weights(cross_val_predict(partial_fit!(mr, rows(rd, 1:5)), rd,
                                                  batch_cv)),

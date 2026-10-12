@@ -355,6 +355,33 @@ end
     @test PortfolioOptimisers.seed_window_path(EmpiricalPrior(; me = me)) == "me.rule"
     @test isnothing(PortfolioOptimisers.seed_window_path(EmpiricalPrior()))
     @test Online(EmpiricalPrior(; ce = WindowedCovariance(; ce = ew))) isa Online
+    # Found by #1638: the walk read the fields of `estimator_fields` alone, which skips a
+    # vector, so a seed window inside a factor list or the scores of a Return Forecast escaped
+    # the refusal, and the refit rolled the window with no message.
+    vol(rule) = EWVolatility(; ce = WindowedVariance(; window = 10, rule = rule))
+    function listed(rule)
+        return CrossSectionalFactorPrior(; lambda = 1,
+                                         factors = ["market" => ConstantExposure(),
+                                                    "vol" => CompositeExposure(;
+                                                                               descriptors = [vol(rule)],
+                                                                               family = "style")])
+    end
+    err = try
+        Online(listed(SeedWindow()))
+    catch e
+        e
+    end
+    @test err isa ArgumentError && occursin("`factors[2].descriptors[1].ce.rule`", err.msg)
+    scored = CrossSectionalFactorPrior(; factors = ["market" => ConstantExposure()],
+                                       rfe = ExpWeightedReturnForecast(;
+                                                                       scores = DescriptorScores(;
+                                                                                                 descriptors = [vol(SeedWindow())])))
+    @test PortfolioOptimisers.seed_window_path(scored) ==
+          "rfe.scores.descriptors[1].ce.rule"
+    @test_throws ArgumentError Online(scored)
+    @test isnothing(PortfolioOptimisers.seed_window_path(listed(RollingWindow())))
+    @test Online(listed(RollingWindow())) isa Online
+    @test PortfolioOptimisers.seed_window_path([[1.0], [seed(ew)]]) == "[2][1].rule"
     # A fold refuses observation weights and an inner estimator that does not fold.
     wtd = WindowedCovariance(; ce = ew, w = StatsBase.eweights(40, 0.1),
                              rule = SeedWindow())

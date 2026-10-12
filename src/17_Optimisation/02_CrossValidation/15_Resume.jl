@@ -4,7 +4,7 @@
 
 Copies every partial-fit state that an estimator tree carries, and returns the tree rebuilt around the copies.
 
-The walk is the one [`online_entry_state`](@ref) takes, with a rebuild where that verb makes a report. An estimator whose subtree holds no state comes back as it is. A [`TimeDependent`](@ref) schedule comes back unchanged, because its entries are batch configuration that the fold loop resolves per fold and threads no state through. Any value that is not an estimator comes back unchanged too.
+The walk reads the fields of [`estimator_fields`](@ref), as [`online_wrapper_path`](@ref) does, with a rebuild where that verb makes a report. It does not enter a vector, because no fold writes a state into one, and [`online_entry_state`](@ref) refuses at the entry a state that a caller put there. An estimator whose subtree holds no state comes back as it is. A [`TimeDependent`](@ref) schedule comes back unchanged, because its entries are batch configuration that the fold loop resolves per fold and threads no state through. Any value that is not an estimator comes back unchanged too.
 
 Two callers use it. [`Resume`](@ref) calls it once at entry, so the Result it holds is never written. That copy is necessary because [`partial_fit!`](@ref) promises nothing about a kept estimator, and a buffer appends into its backing array. The generic method of [`partial_fit`](@ref) calls it before every fold. The value form therefore keeps its promise on an estimator that folds through the states of its members, such as a [`HighOrderPriorEstimator`](@ref) or a hierarchical optimiser, as well as on a leaf that carries its own `cache`. Every state type defines `Base.copy`, so one copy per state is enough.
 

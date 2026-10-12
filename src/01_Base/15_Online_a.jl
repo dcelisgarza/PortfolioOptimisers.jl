@@ -1738,9 +1738,9 @@ end
 """
     estimator_fields(x)
 
-Field names of `x` whose type admits an estimator, the candidate set that [`online_entry_state`](@ref) and [`online_wrapper_path`](@ref) walk.
+Field names of `x` whose type admits an estimator, the candidate set that [`online_wrapper_path`](@ref) and [`copy_states`](@ref) walk.
 
-`fieldtype` alone decides whether a field can hold an estimator, because a `@concrete` estimator records the type of the value in the type parameter of the field. So a generated function computes the tuple once for each estimator type, as for [`online_candidate_fields`](@ref). A field that holds a vector of estimators or a result is not a candidate. A vector is a batch configuration that the step never folds into, and a result carries no state field. A field that holds a [`TimeDependent`](@ref) schedule is a candidate, because a schedule is an estimator. The `TimeDependent` methods of the two walks answer `nothing` for it, because the entries of a schedule resolve at each fold.
+`fieldtype` alone decides whether a field can hold an estimator, because a `@concrete` estimator records the type of the value in the type parameter of the field. So a generated function computes the tuple once for each estimator type, as for [`online_candidate_fields`](@ref). A field that holds a vector of estimators or a result is not a candidate. A vector is a batch configuration that the step never folds into, and a result carries no state field. A walk that must reach the estimators a vector holds reads every field instead, as [`online_entry_state`](@ref) and [`seed_window_path`](@ref) do. A field that holds a [`TimeDependent`](@ref) schedule is a candidate, because a schedule is an estimator. The `TimeDependent` methods of the two walks answer `nothing` for it, because the entries of a schedule resolve at each fold.
 
 # Related
 
@@ -1757,29 +1757,34 @@ Field names of `x` whose type admits an estimator, the candidate set that [`onli
 end
 """
     online_entry_state(est)
+    online_entry_state(v::AbstractVector)
+    online_entry_state(p::Pair)
     online_entry_state(::TimeDependent)
 
 Names the first field of an estimator tree that carries a partial-fit state, or answers `nothing`.
 
-The cold start of the fold loop uses this walk. The online arm of [`fold_loop`](@ref) reads its argument as configuration only, so it refuses by name an estimator that holds a state, and this walk finds the state. The answer is the dotted path from the root, for example `"opt.pe.me.cache"` for the state of a mean estimator under a JuMP head. A [`TimeDependent`](@ref) schedule answers `nothing`, because its entries are batch configuration that resolves at each fold, and the loop passes no state through them. A value that is not an estimator also answers `nothing`.
+The cold start of the fold loop uses this walk. The online arm of [`fold_loop`](@ref) reads its argument as configuration only, so it refuses by name an estimator that holds a state, and this walk finds the state. The answer is the path from the root, for example `"opt.pe.me.cache"` for the state of a mean estimator under a JuMP head. The walk reads every field, not only the fields of [`estimator_fields`](@ref), because a state can stand in an estimator that a vector holds. A Descriptor that the caller folded before the call, in the factor list of a [`CrossSectionalFactorPrior`](@ref), is such an estimator, and the first step of the carry fold reads its state (#1638). A vector answers with the index of its element in brackets, as [`element_path`](@ref) states, and a Pair answers through its value, so the path is `"factors[2].descriptors[1].cache"` for that Descriptor. A [`TimeDependent`](@ref) schedule answers `nothing`, because its entries are batch configuration that resolves at each fold, and the loop passes no state through them. A value that is not an estimator also answers `nothing`.
 
 # Algorithm
 
  1. Answer `"cache"` when `est` has a `cache` field that is not `nothing`.
- 2. Walk the fields of [`estimator_fields`](@ref) in order, and find the path in each field with this function.
- 3. Answer the first path found, with the field name and a dot before it, or `nothing` when no field gives one.
+ 2. Walk every field of `est` in order, and find the path in each field with this function.
+ 3. Answer the first path found, with the field name before it, as [`tree_path`](@ref) joins them, or `nothing` when no field gives one.
 
 # Arguments
 
   - `est`: The estimator, or any value a field holds.
+  - `v`: A vector that a field holds.
+  - `p`: A Pair that a vector holds, such as a member of a factor list.
 
 # Returns
 
-  - `path::Option{<:String}`: The dotted path of the first state found, or `nothing`.
+  - `path::Option{<:String}`: The path of the first state found, or `nothing`.
 
 # Related
 
   - [`estimator_fields`](@ref)
+  - [`element_path`](@ref)
   - [`online_wrapper_path`](@ref)
   - [`update_online_estimator`](@ref)
   - [`partial_fit_cache`](@ref)
@@ -1790,10 +1795,10 @@ function online_entry_state(est::Union{<:AbstractEstimator,
     if hasfield(typeof(est), :cache) && !isnothing(getfield(est, :cache))
         return "cache"
     end
-    for f in estimator_fields(est)
+    for f in fieldnames(typeof(est))
         path = online_entry_state(getfield(est, f))
         if !isnothing(path)
-            return string(f, ".", path)
+            return tree_path(f, path)
         end
     end
     return nothing
