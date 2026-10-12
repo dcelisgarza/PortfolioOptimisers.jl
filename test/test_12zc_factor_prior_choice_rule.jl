@@ -5,7 +5,8 @@ The Choice Rule on the selection regressions of a factor prior (#1472, map #1375
 `DimensionReductionRegression` chooses its components over every observation. On the refit route
 of the online step, `BatchChoice()` chooses again at each call with no data, and
 `PinnedChoice()` writes the choice of the first fit into `included` or `proj` of the regression
-that the step returns. The two agree in a batch fit.
+that the step returns. The two agree in a batch fit, except in an entropy pooling prior, whose
+refits under the posterior weights keep the choice of the fit that its views read (#1641).
 
 The data moves the choice on purpose: asset 1 follows factor 1 over the first 60 observations
 and factor 2 after them, so the stepwise set of asset 1 over the first block differs from the
@@ -297,5 +298,46 @@ set over every observation.
         # One row fits nothing, so it pins nothing.
         e = online(pool(dr(; choice = PinnedChoice())))
         @test isnothing(partial_fit!(e, X[1, :], F[1, :]).pe2.re.proj)
+    end
+
+    @testset "An entropy pooling prior keeps the choice of the fit that its views read (#1641)" begin
+        # The views move the posterior weights away from uniform, and a refit that chose again
+        # under them would read other components than the fit that the views read.
+        sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+        mv = LinearConstraintEstimator(; val = "A1 == 0.004")
+        sv = LinearConstraintEstimator(; val = "A2 == 3.0e-5")
+        dr(; kw...) = FactorPrior(; re = DimensionReductionRegression(; pca..., kw...))
+        pin(w = nothing) = po.pin_regression_choice(DimensionReductionRegression(; pca...,
+                                                                                 choice = PinnedChoice()),
+                                                    X[rows(1), :], F[rows(1), :], w).proj
+        proj0 = pin()
+        hosts = (pe -> EntropyPoolingPrior(; sets = sets, mu_views = mv, pe = pe),
+                 pe -> EntropyPoolingPrior(; sets = sets, mu_views = mv, sigma_views = sv,
+                                           alg = H2_EntropyPooling(), pe = pe),
+                 pe -> MeucciEntropyPoolingPrior(; sets = sets, mu_views = mv, pe = pe))
+        for host in hosts
+            b = prior(host(dr(; choice = PinnedChoice())), X[rows(1), :], F[rows(1), :])
+            @test same(b, prior(host(dr(; proj = proj0)), X[rows(1), :], F[rows(1), :]))
+            @test !same(b, prior(host(dr()), X[rows(1), :], F[rows(1), :]))
+            e = online(host(dr(; choice = PinnedChoice())))
+            e = partial_fit!(e, X[rows(1), :], F[rows(1), :])
+            proj = e.pe.re.proj
+            @test isapprox(proj, proj0; rtol = 1e-12)
+            @test same(prior(e), b)
+            e = partial_fit!(e, X[61:120, :], F[61:120, :])
+            @test e.pe.re.proj === proj
+        end
+
+        # The caller's prior probabilities weight the fit that the views read, so the batch
+        # fit and the step pin the components under them.
+        w = pweights(collect(range(1.0, 2.0; length = edges[2])))
+        projw = pin(w)
+        @test !isapprox(projw, proj0; rtol = 1e-3)
+        ep(pe) = EntropyPoolingPrior(; sets = sets, mu_views = mv, w = w, pe = pe)
+        pe = ep(dr(; choice = PinnedChoice()))
+        @test isapprox(po.pin_prior_choice(pe, X[rows(1), :], F[rows(1), :]).pe.re.proj,
+                       projw; rtol = 1e-12)
+        @test same(prior(pe, X[rows(1), :], F[rows(1), :]),
+                   prior(ep(dr(; proj = projw)), X[rows(1), :], F[rows(1), :]))
     end
 end

@@ -957,13 +957,15 @@ A [`StepwiseRegression`](@ref) or a [`DimensionReductionRegression`](@ref) under
 
 An [`OpinionPoolingPrior`](@ref) does not give each prior the same rows. Its batch fit gives `pe1` the returns of the buffer, gives each prior of `pes` the returns of `pe1`, and refits `pe2` on those returns under the pooled weights. The method gives each prior the rows and the weights that the batch fit gives it, so the choice that it pins is the choice of the batch fit over the same rows. It runs `pe1` and the pool only when a prior of `pes` or `pe2` has a choice to pin, which [`pending_choice`](@ref) answers.
 
+An [`EntropyPoolingPrior`](@ref) or a [`MeucciEntropyPoolingPrior`](@ref) fits `pe.pe` under its prior probabilities `w0`, builds its views on that fit, and refits `pe.pe` under the posterior weights. Its batch fit applies this function to itself at the `w0` fit, so every refit reads the choice that the views read. The method pins `pe.pe` under the weights of that fit, which [`embedded_pin_weights`](@ref) answers, so the batch fit and the step pin the same choice, and the step runs no view and no solve.
+
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. Any other prior, `nothing`, or `F` that is `nothing`: return `pe`.
  2. A prior that fits `pe.re` on the returns: apply [`pin_regression_choice`](@ref) to `pe.re` under `w`, and rebuild `pe` with the answer when it differs.
- 3. A prior that embeds a prior in `pe.pe`: apply this function to `pe.pe` under `w`, and rebuild `pe` with the answer when it differs.
+ 3. A prior that embeds a prior in `pe.pe`: apply this function to `pe.pe` under the weights of [`embedded_pin_weights`](@ref), and rebuild `pe` with the answer when it differs.
  4. An [`OpinionPoolingPrior`](@ref):
      1. Return `pe` when `F` holds fewer than two rows, or when [`pending_choice`](@ref) of `pe` is `false`.
      2. Apply this function to `pe.pe1` over `X` under `w`.
@@ -993,6 +995,7 @@ When `w` is not `nothing`, the method reads `factory(pe.pe1, w)` and `factory(pe
 
   - [`pin_regression_choice`](@ref)
   - [`pending_choice`](@ref)
+  - [`embedded_pin_weights`](@ref)
   - [`refit_prior_step`](@ref)
   - [`PinnedChoice`](@ref)
   - [`partial_fit!`](@ref)
@@ -1011,7 +1014,7 @@ function pin_prior_choice(pe::Union{<:HighOrderPriorEstimator,
                                     <:HighOrderFactorPriorEstimator, <:BlackLittermanPrior,
                                     <:BayesianBlackLittermanPrior, <:EntropyPoolingPrior,
                                     <:MeucciEntropyPoolingPrior}, X, F, w = nothing)
-    inner = pin_prior_choice(pe.pe, X, F, w)
+    inner = pin_prior_choice(pe.pe, X, F, embedded_pin_weights(pe, w))
     return inner === pe.pe ? pe : rebuild_estimator(pe, (; pe = inner))
 end
 function pin_prior_choice(pe::OpinionPoolingPrior, X::MatNum, F::MatNum,

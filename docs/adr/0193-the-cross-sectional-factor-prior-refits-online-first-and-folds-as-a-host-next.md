@@ -279,8 +279,14 @@ about 0.03 s for the step of the oracle. The carry equals the batch fit to 5.7e-
   host whose priors read different rows: `pe1` reads the buffer, each prior of `pes` reads the
   returns of `pe1`, and `pe2` reads those returns under the pooled weights. The hook runs `pe1` and
   the pool over the buffer to pin `pe2`, and it runs them only while a choice is still to pin.
-  `EntropyPoolingPrior` and `MeucciEntropyPoolingPrior` refit `pe` under their own weights, and
-  the hook does not give `pe` those weights yet (#1641).
+- `EntropyPoolingPrior` and `MeucciEntropyPoolingPrior` build their views on the fit of `pe` under
+  the prior probabilities `w0`, and refit `pe` under the posterior weights. The views read the
+  regression of the `w0` fit, so under `PinnedChoice` the batch fit pins the choice at that fit,
+  and every refit reads it. The posterior is then one model under new probabilities, and the hook
+  pins `pe` under `w0` alone, with no view and no solve (#1641). A pin under the weights of the
+  last refit was rejected: the views of the step then read another regression than the views of
+  the batch fit, so the posterior weights differ (3.7 % on the data of the test), and that choice
+  is not a fixed point of its own posterior. Under `BatchChoice` each refit still chooses again.
 
 ### The carry fold carries only the rows that the Descriptors read
 
