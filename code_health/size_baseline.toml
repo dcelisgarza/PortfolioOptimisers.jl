@@ -6,7 +6,7 @@
 [provenance]
 julia = "1.13.1"
 julia_syntax = "1.0.2"
-commit = "2586e269f6"
+commit = "b97cc1980b"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { code = 287, doc = 0, comment = 12, blank = 2, total = 301 }
@@ -59,6 +59,7 @@ commit = "2586e269f6"
 "src/02_Tools/05_Propagatable.jl" = { code = 321, doc = 693, comment = 42, blank = 302, total = 1358 }
 "src/02_Tools/06_ForwardProperties.jl" = { code = 184, doc = 119, comment = 4, blank = 36, total = 343 }
 "src/02_Tools/07_VectorToScalarMeasures.jl" = { code = 147, doc = 469, comment = 0, blank = 211, total = 827 }
+"src/02_Tools/08_MeanTest.jl" = { code = 307, doc = 539, comment = 0, blank = 242, total = 1088 }
 "src/03_InputData/01_AssetPanel.jl" = { code = 451, doc = 874, comment = 7, blank = 416, total = 1748 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { code = 338, doc = 689, comment = 0, blank = 312, total = 1339 }
 "src/03_InputData/03_ListingSpan.jl" = { code = 74, doc = 195, comment = 0, blank = 83, total = 352 }

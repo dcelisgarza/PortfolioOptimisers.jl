@@ -171,7 +171,9 @@
                           :AbstractRegimeDebias, :AbstractHacFloor,
                           :AbstractHacVolatilityTiming, :AbstractCalibrationWarmup,
                           :AbstractStepWeighting, :AbstractSystematicRepair,
-                          :AbstractCarryRule, :AbstractUnseenMemberRule])
+                          :AbstractCarryRule, :AbstractUnseenMemberRule,
+                          :AbstractMeanTestEstimator, :AbstractLongRunKernel,
+                          :AbstractMeanTestSpan])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&

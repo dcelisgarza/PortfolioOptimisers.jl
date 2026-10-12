@@ -173,7 +173,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the summary of an information coefficient series per factor, with the names and the families of the factors.
 
-[`exposure_ic_summary`](@ref) returns it when it reads a [`FactorDiagnosticResult`](@ref) or a block. The method over a bare matrix returns a `NamedTuple` of the same five vectors, and a caller reads a field of either by the same name. [`port_opt_view`](@ref) selects the factors of the summary by position, by name, or by family with a [`LabelGroup`](@ref).
+[`exposure_ic_summary`](@ref) returns it when it reads a [`FactorDiagnosticResult`](@ref) or a block. The method over a bare matrix returns a `NamedTuple` of the same eight vectors, and a caller reads a field of either by the same name. [`port_opt_view`](@ref) selects the factors of the summary by position, by name, or by family with a [`LabelGroup`](@ref).
 
 # Fields
 
@@ -182,7 +182,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     ExposureICSummaryResult(
-        mean_ic, std_ic, ic_ir, t_stat, hit_rate, nf, fam
+        mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower, mean_ci_upper,
+        hit_rate, nf, fam
     ) -> ExposureICSummaryResult
 
 The arguments are the fields, in the order of their declaration. The type is a Result, so [`exposure_ic_summary`](@ref) builds it and a caller reads it. It has no keyword constructor, and it checks none of its values.
@@ -211,6 +212,18 @@ The arguments are the fields, in the order of their declaration. The type is a R
     T-statistic of the mean, with a long-run standard error, one entry per factor.
     """
     t_stat
+    """
+    Two-sided p-value of the null hypothesis that the mean is zero, one entry per factor.
+    """
+    p_value
+    """
+    Lower bound of the confidence interval of the mean at the level of the Mean Test, one entry per factor.
+    """
+    mean_ci_lower
+    """
+    Upper bound of the confidence interval of the mean at the level of the Mean Test, one entry per factor.
+    """
+    mean_ci_upper
     """
     Fraction of the same observations at which the information coefficient is positive, one entry per factor.
     """
@@ -258,18 +271,22 @@ function port_opt_view(s::ExposureICSummaryResult, i, args...)::ExposureICSummar
     return ExposureICSummaryResult(factor_table_fields(s, i)...)
 end
 """
-    exposure_ic_summary(ic::MatNum; lags::Integer = 0) -> NamedTuple
-    exposure_ic_summary(ic::FactorDiagnosticResult; lags::Integer = 0) -> ExposureICSummaryResult
+    exposure_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags + 1,
+                        mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()) -> NamedTuple
+    exposure_ic_summary(ic::FactorDiagnosticResult; lags::Integer = 0,
+                        window::Real = lags + 1,
+                        mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()) -> ExposureICSummaryResult
     exposure_ic_summary(csfm::CrossSectionalFactorModel,
                         rd::Option{<:ReturnsResult} = nothing; horizon::Integer = 1,
                         rank::Bool = true, reduced::Bool = false,
-                        ties::Symbol = :average) -> ExposureICSummaryResult
+                        ties::Symbol = :average,
+                        mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()) -> ExposureICSummaryResult
 
 Return the summary of an information coefficient series, one entry per factor.
 
-The mean states the average score, the standard deviation states how much the score moves, and their ratio states the score per unit of movement. The t-statistic states whether the mean is far enough from zero to believe over the observations that carried a score, and the hit rate states how often the score was positive. All five read the observations that carried a score. An observation whose score is `NaN` is one at which nothing was measured, not a miss, so it is in no denominator here, as it is in none of the library's other summaries. The coverage of the series answers the separate question of how often the series had no score.
+The mean states the average score, the standard deviation states how much the score moves, and their ratio states the score per unit of movement. The t-statistic, the p-value and the confidence interval of the mean state whether the mean is far enough from zero to believe over the observations that carried a score, and the hit rate states how often the score was positive. All eight read the observations that carried a score. An observation whose score is `NaN` is one at which nothing was measured, not a miss, so it is in no denominator here, as it is in none of the library's other summaries. The coverage of the series answers the separate question of how often the series had no score.
 
-The standard error of the t-statistic is the long-run one of [`exposure_ic_factor_summary`](@ref), over `lags` autocovariances. [`exposure_ic`](@ref) scores every observation against a window of `horizon` observations, so each row shares returns with the `horizon - 1` rows on each side of it, and the block method derives `lags` as `horizon - 1`. The bare method takes `lags` from the caller. Its default of `0` is the independent case, which is the case of a series scored at a stride of its window.
+The Mean Test `mt` gives the t-statistic, the p-value and the interval, as [`exposure_ic_factor_summary`](@ref) states. The function resolves the generator of the test once, so a seeded test is reproducible and the factors take different draws. [`exposure_ic`](@ref) scores every observation against a window of `horizon` observations, so each row shares returns with the `horizon - 1` rows on each side of it, and the block method derives `lags` as `horizon - 1`. The bare method takes `lags` from the caller. Its default of `0` is the independent case, which is the case of a series scored at a stride of its window. Only [`OverlapMeanTest`](@ref) reads `lags`.
 
 # Mathematical definition
 
@@ -290,14 +307,16 @@ Where:
   - ``\\overline{\\mathrm{IC}}_{k}``: Its mean over ``\\mathcal{T}_{k}``.
   - ``s_{k}``: Its standard deviation over ``\\mathcal{T}_{k}``.
   - ``\\mathrm{IR}_{k}``: Its information ratio.
-  - ``\\sigma_{k}``: Its long-run standard deviation over ``\\mathcal{T}_{k}``, which [`exposure_ic_factor_summary`](@ref) defines and which is ``s_{k}`` at `lags = 0`.
-  - ``t_{k}``: Its t-statistic.
+  - ``\\sigma_{k}``: Its long-run standard deviation over ``\\mathcal{T}_{k}``, which the Mean Test `mt` defines.
+  - ``t_{k}``: Its t-statistic. The p-value of `mt` reads it.
   - ``\\mathrm{hit}_{k}``: Its hit rate.
 
 # Arguments
 
   - `ic`: Information coefficient series `pairs × factors`, or the [`FactorDiagnosticResult`](@ref) of [`exposure_ic`](@ref), whose labels the answer keeps.
-  - `lags`: Number of autocovariances the t-statistic's standard error reads. It is one less than the number of rows a forward window spans, `horizon - 1` for a series scored at every observation.
+  - `lags`: Number of rows on each side of a given row whose windows overlap it. It is one less than the number of rows a forward window spans, `horizon - 1` for a series scored at every observation.
+  - `window`: Number of rows that one forward window spans, `lags + 1` by default.
+  - `mt`: The Mean Test of the t-statistic, the p-value and the interval.
   - `csfm`: A cross-sectional factor model block.
   - $(arg_dict[:cs_ic_rd]) [`exposure_ic`](@ref) states how each form reads the returns.
   - `horizon`: Forward window, in observations.
@@ -308,13 +327,13 @@ Where:
 # Validation
 
   - `!isempty(ic)`.
-  - `lags >= 0`. Raises a `DomainError`.
+  - The rules of [`resolve_mean_test_window`](@ref).
   - A [`FactorDiagnosticResult`](@ref) is a series `pairs × factors`: `X` is a matrix and `dims == (2,)`. Raises an `ArgumentError`.
 
 # Returns
 
-  - `summary::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, hit_rate)`, each one entry per factor, on the method over a matrix.
-  - `s::ExposureICSummaryResult`: On the other two methods, the same five vectors, with the names and the family labels of the factor axis of the series. The block method returned the `NamedTuple` in earlier releases, and a field of the Result has the name of the field of the `NamedTuple`.
+  - `summary::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower, mean_ci_upper, hit_rate)`, each one entry per factor, on the method over a matrix.
+  - `s::ExposureICSummaryResult`: On the other two methods, the same eight vectors, with the names and the family labels of the factor axis of the series. The block method returned the `NamedTuple` in earlier releases, and a field of the Result has the name of the field of the `NamedTuple`.
 
 # Related
 
@@ -322,10 +341,12 @@ Where:
   - [`exposure_ic_factor_summary`](@ref)
   - [`forecast_factor_correlation`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
+  - [`WildBootstrapMeanTest`](@ref)
 """
-function exposure_ic_summary(ic::MatNum; lags::Integer = 0)
+function exposure_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags + 1,
+                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
     @argcheck(!isempty(ic), IsEmptyError("ic cannot be empty"))
-    @argcheck(lags >= zero(lags), DomainError(lags, "lags must be >= 0"))
+    resolve_mean_test_window(lags, window)
     P, K = size(ic)
     Tm = float_if_integer(real(eltype(ic)))
     Ts = typeof(sqrt(one(Tm)))
@@ -333,82 +354,76 @@ function exposure_ic_summary(ic::MatNum; lags::Integer = 0)
     std_ic = Vector{Ts}(undef, K)
     ic_ir = Vector{Ts}(undef, K)
     t_stat = Vector{Ts}(undef, K)
+    p_value = Vector{Ts}(undef, K)
+    mean_ci_lower = Vector{Ts}(undef, K)
+    mean_ci_upper = Vector{Ts}(undef, K)
     hit_rate = Vector{Tm}(undef, K)
+    rng = mean_test_rng(mt)
     for k in 1:K
-        m = exposure_ic_factor_summary(ic, k; lags = lags)
+        m = exposure_ic_factor_summary(ic, k; lags = lags, window = window, mt = mt,
+                                       rng = rng)
         mean_ic[k] = m.mean_ic
         std_ic[k] = m.std_ic
         ic_ir[k] = m.ic_ir
         t_stat[k] = m.t_stat
+        p_value[k] = m.p_value
+        mean_ci_lower[k] = m.mean_ci_lower
+        mean_ci_upper[k] = m.mean_ci_upper
         hit_rate[k] = m.hit_rate
     end
     return (; mean_ic = mean_ic, std_ic = std_ic, ic_ir = ic_ir, t_stat = t_stat,
+            p_value = p_value, mean_ci_lower = mean_ci_lower, mean_ci_upper = mean_ci_upper,
             hit_rate = hit_rate)
 end
 """
-    exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0)
+    exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0,
+                               window::Real = lags + 1,
+                               mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
+                               rng = mean_test_rng(mt))
 
-Return the five summary numbers of one factor's information coefficient series.
+Return the eight summary numbers of one factor's information coefficient series.
 
-The mean, the standard deviation and the hit rate read the observations at which the coefficient is finite, so an observation with no coefficient is in no denominator and the three agree on their sample. A series with no finite coefficient has no hit rate. The ratio has no answer where either of its two terms has none, and none where the standard deviation is zero. The t-statistic is the mean over the standard error of the mean, so it says whether the mean is far enough from zero to believe over the evidence there was.
+The mean, the standard deviation and the hit rate read the observations at which the coefficient is finite, so an observation with no coefficient is in no denominator and the three agree on their sample. A series with no finite coefficient has no hit rate. The ratio has no answer where either of its two terms has none, and none where the standard deviation is zero. The t-statistic, the p-value and the confidence interval of the mean come from the Mean Test `mt`, and they state whether the mean is far enough from zero to believe over the evidence there was.
 
 [`forecast_ic_summary`](@ref) calls this function too, so a coefficient of a factor exposure and a coefficient of a Return Forecast have the same summary.
 
-# The standard error reads the overlap
+# The test reads the dependence of the rows
 
-A coefficient scored against a forward window that is longer than the stride between two scores reads the same returns at consecutive rows. The rows are then not independent, and the standard error of their mean is not ``s / \\sqrt{n}``. The rows that overlap a given row are the ``L`` on each side of it, where ``L`` is one less than the number of strides a window spans. Under no skill, every autocovariance beyond ``L`` is zero.
+A coefficient scored against a forward window that is longer than the stride between two scores reads the same returns at consecutive rows. The rows that overlap a given row are the ``L`` on each side of it, where ``L`` is one less than the number of strides a window spans. A persistent ranking of the assets correlates the rows across the overlap. A persistent coefficient correlates them past it too, and a change of the volatility over time changes the law of the statistic. A test that treats the rows as independent then overstates the evidence.
 
-The autocovariances up to ``L`` are not zero when the scored quantity keeps its ranking of the assets from one row to the next. An exposure is persistent in this sense, so its series is a moving average of order ``L``. A Return Forecast that draws a new ranking at every row gives autocovariances near zero at every lag, and there the plain statistic ``\\mathrm{IR} \\sqrt{n}`` does not overstate the evidence. The long-run variance then adds sampling noise to the standard error and moves it little.
+The default [`WildBootstrapMeanTest`](@ref) reads the dependence at every lag up to a bandwidth that is a fixed fraction of the series, and reads the p-value off a wild bootstrap of the statistic. It does not read `lags`. [`OverlapMeanTest`](@ref) reads the overlap alone, at the order `lags`, and compares the statistic with the Student law. At `lags = 0` its statistic is ``\\mathrm{IR} \\sqrt{n}``. The history rule of a Mean Test reads `window`.
 
-The standard error therefore reads the long-run variance, the variance plus twice the first ``L`` autocovariances, with no taper. The window and the stride fix the order, so the function does not estimate it from the series. A tapered estimate at the same order under-weights autocovariances that the window and the stride imply, and still overstates the statistic. For a persistent ranking under no skill, the autocovariances fall linearly across the window. The Bartlett taper at that order then keeps two thirds of their sum in the limit of a long window, so the statistic is too large by the root of three halves there, and by less at a short window.
-
-The autocovariances read the rows at their positions in `ic`. A row whose coefficient is `NaN` is in no pair, and the lag between two rows is their distance in the series, not in its finite subsequence. Every autocovariance divides by the same ``n - 1`` as the variance, so at `lags = 0` the standard error is exactly ``s / \\sqrt{n}`` and the statistic is ``\\mathrm{IR} \\sqrt{n}``.
-
-The long-run variance is a sum of signed terms, and a short series can sum it to a number that is not positive. The t-statistic is `NaN` there, as it is where the standard deviation is zero. The function does not clamp it, because a clamped value would report a certainty that the series does not carry.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\gamma_{j} &= \\frac{1}{n - 1} \\sum_{t,\\, t + j \\in \\mathcal{T}} \\left( \\mathrm{IC}_{t} - \\overline{\\mathrm{IC}} \\right) \\left( \\mathrm{IC}_{t + j} - \\overline{\\mathrm{IC}} \\right)\\,, \\\\
-\\sigma^{2} &= \\gamma_{0} + 2 \\sum_{j = 1}^{L} \\gamma_{j}\\,, \\\\
-t &= \\frac{\\overline{\\mathrm{IC}}}{\\sigma} \\sqrt{n}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{IC}_{t}``: Coefficient of factor ``k`` at row ``t``.
-  - ``\\mathcal{T}``: The rows at which it is finite.
-  - ``n``: The number of rows in ``\\mathcal{T}``.
-  - ``\\overline{\\mathrm{IC}}``: Mean of the coefficient over ``\\mathcal{T}``.
-  - ``\\gamma_{j}``: Autocovariance at lag ``j``. ``\\gamma_{0}`` is the variance ``s^{2}``.
-  - ``\\sigma``: Long-run standard deviation.
-  - ``t``: The t-statistic.
-  - ``L``: `lags`.
+The test reads the rows at their positions in `ic`. A row whose coefficient is `NaN` is in no pair, and the lag between two rows is their distance in the series, not in its finite subsequence. A long-run variance that is not positive gives a `NaN` t-statistic and a `NaN` p-value. The function does not clamp it, because a clamped value would report a certainty that the series does not carry.
 
 # Arguments
 
   - `ic`: Information coefficient series `pairs × factors`.
   - `k`: Position of the factor.
-  - `lags`: Number of autocovariances the standard error reads, `0` for independent rows. [`forecast_ic_lags`](@ref) derives it from a window and a stride.
+  - `lags`: Number of rows on each side of a given row whose windows overlap it, `0` for independent rows. [`forecast_ic_lags`](@ref) derives it from a window and a stride.
+  - `window`: Number of rows that one forward window spans, `lags + 1` by default. [`forecast_ic_window`](@ref) derives it exactly from a window and a stride.
+  - `mt`: The Mean Test of the t-statistic, the p-value and the interval.
+  - `rng`: The generator of the test. A caller that summarises many series resolves it once with [`mean_test_rng`](@ref), so a seeded test is reproducible and the series take different draws.
 
 # Validation
 
-  - `lags >= 0`. Raises a `DomainError`.
+  - The rules of [`resolve_mean_test_window`](@ref).
 
 # Returns
 
-  - `m::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, hit_rate)`, five numbers.
+  - `m::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower, mean_ci_upper, hit_rate)`, eight numbers.
 
 # Related
 
   - [`exposure_ic_summary`](@ref)
   - [`forecast_ic_summary`](@ref)
   - [`forecast_ic_lags`](@ref)
+  - [`mean_test`](@ref)
 """
-function exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0)
-    @argcheck(lags >= zero(lags), DomainError(lags, "lags must be >= 0"))
+function exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0,
+                                    window::Real = lags + 1,
+                                    mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
+                                    rng = mean_test_rng(mt))
+    w = resolve_mean_test_window(lags, window)
     P = size(ic, 1)
     Tm = float_if_integer(real(eltype(ic)))
     Ts = typeof(sqrt(one(Tm)))
@@ -434,61 +449,29 @@ function exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0)
     end
     sd = n > 1 ? sqrt(q / (n - 1)) : Ts(NaN)
     ir = isfinite(m) && isfinite(sd) && sd > zero(Ts) ? m / sd : Ts(NaN)
-    return (; mean_ic = m, std_ic = sd, ic_ir = ir,
-            t_stat = exposure_ic_t_stat(view(ic, :, k), m, q, n, lags),
-            hit_rate = n > 0 ? Tm(h) / Tm(n) : Tm(NaN))
+    res = mean_test(mt, view(ic, :, k), w, rng)
+    return (; mean_ic = m, std_ic = sd, ic_ir = ir, t_stat = res.t_stat,
+            p_value = res.p_value, mean_ci_lower = res.mean_ci_lower,
+            mean_ci_upper = res.mean_ci_upper, hit_rate = n > 0 ? Tm(h) / Tm(n) : Tm(NaN))
 end
-"""
-    exposure_ic_t_stat(c::VecNum, m::Real, q::Real, n::Integer, lags::Integer) -> Real
-
-Return the t-statistic of one factor's information coefficient series, over its long-run standard error.
-
-[`exposure_ic_factor_summary`](@ref) gives it the mean, the sum of squared deviations and the count, so the function reads the series once more, for the autocovariances alone. The long-run variance is the sum of squared deviations plus twice the first `lags` autocovariance sums, every one over ``n - 1``. Each pair reads its two positions in the series, so a `NaN` row is in no pair and the lag is a distance in the series. A long-run variance that is not positive, or a count of one, has no statistic.
-
-# Arguments
-
-  - `c`: Information coefficient series of one factor, a column of the `pairs × factors` matrix.
-  - `m`: Mean of the finite entries of `c`.
-  - `q`: Sum of the squared deviations of the finite entries of `c` from `m`.
-  - `n`: Number of finite entries of `c`.
-  - `lags`: Number of autocovariances the standard error reads.
-
-# Returns
-
-  - `t::Real`: `m` over the long-run standard error of the mean, or `NaN`.
-
-# Related
-
-  - [`exposure_ic_factor_summary`](@ref)
-"""
-function exposure_ic_t_stat(c::VecNum, m::Real, q::Real, n::Integer, lags::Integer)
-    Tf = typeof(q)
-    Ts = typeof(sqrt(one(Tf)))
-    P = length(c)
-    lrv = q
-    for j in 1:lags, t in 1:(P - j)
-        v = c[t]
-        u = c[t + j]
-        if isfinite(v) && isfinite(u)
-            lrv += 2 * (Tf(v) - m) * (Tf(u) - m)
-        end
-    end
-    lrsd = n > 1 && lrv > zero(Tf) ? sqrt(lrv / (n - 1)) : Ts(NaN)
-    return isfinite(m) && isfinite(lrsd) ? m / lrsd * sqrt(Ts(n)) : Ts(NaN)
-end
-function exposure_ic_summary(ic::FactorDiagnosticResult; lags::Integer = 0)
+function exposure_ic_summary(ic::FactorDiagnosticResult; lags::Integer = 0,
+                             window::Real = lags + 1,
+                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
     @argcheck(ndims(ic.X) == 2 && ic.dims == (2,),
               ArgumentError("exposure_ic_summary reads a series `pairs × factors`, whose factor axis is its second dimension. Got size(ic.X) => $(size(ic.X)) and ic.dims => $(ic.dims)"))
-    (; mean_ic, std_ic, ic_ir, t_stat, hit_rate) = exposure_ic_summary(ic.X; lags = lags)
-    return ExposureICSummaryResult(mean_ic, std_ic, ic_ir, t_stat, hit_rate, ic.nf, ic.fam)
+    s = exposure_ic_summary(ic.X; lags = lags, window = window, mt = mt)
+    return ExposureICSummaryResult(s.mean_ic, s.std_ic, s.ic_ir, s.t_stat, s.p_value,
+                                   s.mean_ci_lower, s.mean_ci_upper, s.hit_rate, ic.nf,
+                                   ic.fam)
 end
 function exposure_ic_summary(csfm::CrossSectionalFactorModel,
                              rd::Option{<:ReturnsResult} = nothing; horizon::Integer = 1,
                              rank::Bool = true, reduced::Bool = false,
-                             ties::Symbol = :average)
+                             ties::Symbol = :average,
+                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
     return exposure_ic_summary(exposure_ic(csfm, rd; horizon = horizon, rank = rank,
                                            reduced = reduced, ties = ties);
-                               lags = horizon - 1)
+                               lags = horizon - 1, mt = mt)
 end
 """
     exposure_ic_data(csfm::CrossSectionalFactorModel, rd::Nothing, reduced::Bool)

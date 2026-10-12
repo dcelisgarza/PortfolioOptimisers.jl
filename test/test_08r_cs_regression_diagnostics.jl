@@ -725,11 +725,11 @@ using Statistics
         ica2 = exposure_ic(csfm3; horizon = 2).X
         @test all(isnan, ica2[:, 3])
         @test exposure_agrees(ica2[:, 1:2], ref_ic_h2[:, 1:2])
-        @test isequal(exposure_ic_summary(csfm3).mean_ic[1:2],
-                      exposure_ic_summary(csfm3; ties = :ordinal).mean_ic[1:2])
-        @test isnan(exposure_ic_summary(csfm3).mean_ic[3])
+        @test isequal(exposure_ic_summary(csfm3; mt = OverlapMeanTest()).mean_ic[1:2],
+                      exposure_ic_summary(csfm3; ties = :ordinal, mt = OverlapMeanTest()).mean_ic[1:2])
+        @test isnan(exposure_ic_summary(csfm3; mt = OverlapMeanTest()).mean_ic[3])
         # The summary is bit-equal, and the scaled hit rate measures maxrel 1.4e-16.
-        s = exposure_ic_summary(csfm3; ties = :ordinal)
+        s = exposure_ic_summary(csfm3; ties = :ordinal, mt = OverlapMeanTest())
         @test exposure_agrees(s.mean_ic, ref_mean_ic)
         @test exposure_agrees(s.std_ic, ref_std_ic)
         @test exposure_agrees(s.ic_ir, ref_ic_ir)
@@ -763,7 +763,7 @@ using Statistics
         @test size(exposure_stability(csfm; step = 4).X) == (T - 4, K)
         @test size(exposure_dispersion(csfm).X) == (T, K)
         @test length(exposure_coverage(csfm).X) == K
-        s3 = exposure_ic_summary(csfm3)
+        s3 = exposure_ic_summary(csfm3; mt = OverlapMeanTest())
         for v in (s3.mean_ic, s3.std_ic, s3.ic_ir, s3.t_stat, s3.hit_rate)
             @test length(v) == 3
         end
@@ -774,16 +774,17 @@ using Statistics
         # its `h - 1` neighbours and the block method hands `h - 1` lags to the kernel. At
         # the default window there is no overlap and the bare method's default agrees.
         ic2 = exposure_ic(csfm3; horizon = 2).X
-        s2 = exposure_ic_summary(csfm3; horizon = 2)
+        s2 = exposure_ic_summary(csfm3; horizon = 2, mt = OverlapMeanTest())
         # The constant third factor has no rank coefficient, so its column is `NaN`, and
         # the comparisons read `isequal`.
-        @test isequal(s2.t_stat, exposure_ic_summary(ic2; lags = 1).t_stat)
-        @test !isequal(s2.t_stat, exposure_ic_summary(ic2).t_stat)
-        @test isequal(s2.mean_ic, exposure_ic_summary(ic2).mean_ic)
-        @test isequal(s2.ic_ir, exposure_ic_summary(ic2).ic_ir)
-        @test isequal(exposure_ic_summary(csfm3).t_stat,
-                      exposure_ic_summary(exposure_ic(csfm3).X).t_stat)
-        @test_throws DomainError exposure_ic_summary(ic2; lags = -1)
+        @test isequal(s2.t_stat,
+                      exposure_ic_summary(ic2; lags = 1, mt = OverlapMeanTest()).t_stat)
+        @test !isequal(s2.t_stat, exposure_ic_summary(ic2; mt = OverlapMeanTest()).t_stat)
+        @test isequal(s2.mean_ic, exposure_ic_summary(ic2; mt = OverlapMeanTest()).mean_ic)
+        @test isequal(s2.ic_ir, exposure_ic_summary(ic2; mt = OverlapMeanTest()).ic_ir)
+        @test isequal(exposure_ic_summary(csfm3; mt = OverlapMeanTest()).t_stat,
+                      exposure_ic_summary(exposure_ic(csfm3).X; mt = OverlapMeanTest()).t_stat)
+        @test_throws DomainError exposure_ic_summary(ic2; lags = -1, mt = OverlapMeanTest())
     end
 
     @testset "the correlation of a constant exposure and of a sparse one" begin
@@ -933,7 +934,8 @@ using Statistics
         no_fit = CrossSectionalFactorModel(; M = Ms[T, :, :], b = zeros(N), Ms = Ms,
                                            lag = 1)
         @test_throws PortfolioOptimisers.IsNothingError exposure_ic(no_fit)
-        @test_throws PortfolioOptimisers.IsNothingError exposure_ic_summary(no_fit)
+        @test_throws PortfolioOptimisers.IsNothingError exposure_ic_summary(no_fit;
+                                                                            mt = OverlapMeanTest())
         # The exposure history and the fit must carry the same axes.
         short = CrossSectionalRegression(; f = f[1:(T - 1), :], eps = eps[1:(T - 1), :],
                                          n = fill(N, T - 1))
@@ -954,7 +956,8 @@ using Statistics
         @test_throws DomainError exposure_ic(B, randn(StableRNG(6), 3, 4); horizon = 0)
         @test_throws DimensionMismatch exposure_ic(B, randn(StableRNG(6), 3, 4);
                                                    horizon = 3)
-        @test_throws PortfolioOptimisers.IsEmptyError exposure_ic_summary(zeros(0, 0))
+        @test_throws PortfolioOptimisers.IsEmptyError exposure_ic_summary(zeros(0, 0);
+                                                                          mt = OverlapMeanTest())
         # A history of ones is what an absent weight history resolves to.
         @test PortfolioOptimisers.exposure_weights(B, nothing) == ones(3, 4)
         @test PortfolioOptimisers.exposure_weights(B, ones(3, 4)) == ones(3, 4)
@@ -1048,7 +1051,8 @@ using Statistics
         @test size(exposure_ic(blk).X) == (Tr - 1, Kr)
         # `reduced` is the one mode that maps the exposures through the re-basis first.
         @test size(exposure_ic(blk; reduced = true).X) == (Tr - 1, Kred)
-        @test size(exposure_ic_summary(blk; reduced = true).mean_ic) == (Kred,)
+        @test size(exposure_ic_summary(blk; reduced = true, mt = OverlapMeanTest()).mean_ic) ==
+              (Kred,)
         # A block that carries no re-basis has one axis, whatever `reduced` states.
         @test exposure_agrees(exposure_ic(csfm3; reduced = true).X, exposure_ic(csfm3).X)
 
@@ -1078,17 +1082,20 @@ using Statistics
         @test isequal(Ci.X, C.X[1:2, 1:2])
         @test isequal(PO.port_opt_view(C, ["value", "tech"]).X, C.X[[3, 1], [3, 1]])
         # The summary of a view is the view of the summary, and it keeps the labels.
-        s = exposure_ic_summary(blk; reduced = true)
+        s = exposure_ic_summary(blk; reduced = true, mt = OverlapMeanTest())
         @test s isa ExposureICSummaryResult
         @test s.nf == ["tech", "value"] && s.fam == ["industry", "style"]
         sv = PO.port_opt_view(s, LabelGroup("style"))
-        sr = exposure_ic_summary(PO.port_opt_view(red, LabelGroup("style")))
-        for f in (:mean_ic, :std_ic, :ic_ir, :t_stat, :hit_rate, :nf, :fam)
+        sr = exposure_ic_summary(PO.port_opt_view(red, LabelGroup("style"));
+                                 mt = OverlapMeanTest())
+        for f in
+            (:mean_ic, :std_ic, :ic_ir, :t_stat, :p_value, :mean_ci_lower, :mean_ci_upper,
+             :hit_rate, :nf, :fam)
             @test isequal(getfield(sv, f), getfield(s, f)[2:2])
             @test isequal(getfield(sr, f), getfield(s, f)[2:2])
         end
         # The summary reads a series, not a matrix of factor pairs.
-        @test_throws ArgumentError exposure_ic_summary(C)
+        @test_throws ArgumentError exposure_ic_summary(C; mt = OverlapMeanTest())
     end
 
     @testset "a diagnostic answer checks its axis, and a view refuses what it cannot find" begin
@@ -1203,13 +1210,14 @@ using Statistics
         ic = exposure_ic(Bn, Rn, wn; horizon = H)
         # The sums below read every row, which holds because no row of this fixture is `NaN`.
         @test !any(isnan, ic)
-        s2 = exposure_ic_summary(ic; lags = 2)
+        s2 = exposure_ic_summary(ic; lags = 2, mt = OverlapMeanTest())
         for k in 1:Kn
             c = ic[:, k]
             m = mean(c)
             g = sum((c[t] - m) * (c[t + j] - m) for j in 1:2 for t in 1:(length(c) - j))
+            # The divisor `n - 2L - 1` removes the bias of the centring at order `L = 2`.
             @test s2.t_stat[k] ≈
-                  m / sqrt((sum(abs2, c .- m) + 2 * g) / (length(c) - 1)) * sqrt(length(c))
+                  m / sqrt((sum(abs2, c .- m) + 2 * g) / (length(c) - 5)) * sqrt(length(c))
             @test s2.std_ic[k] ≈ std(c)
             @test s2.hit_rate[k] == mean(c .> 0)
         end
@@ -1231,17 +1239,18 @@ using Statistics
         @test PortfolioOptimisers.cs_ranks([3, 1, 1, 2], trues(4), :average) ==
               [4.0, 1.5, 1.5, 3.0]
         ici = rand(rng10, -1:1, 6, 2)
-        @test isequal(exposure_ic_summary(ici; lags = 1),
-                      exposure_ic_summary(float.(ici); lags = 1))
+        @test isequal(exposure_ic_summary(ici; lags = 1, mt = OverlapMeanTest()),
+                      exposure_ic_summary(float.(ici); lags = 1, mt = OverlapMeanTest()))
         # A `Rational` panel keeps its means exact, and a square root answers in `Float64`.
         Rr = Rational{Int}.(Ri)
         @test PortfolioOptimisers.exposure_forward_mean_return(Rr, 2) isa
               Matrix{Rational{Int}}
         @test exposure_coverage(Rational{Int}.(Bi)) isa Vector{Rational{Int}}
-        sr = exposure_ic_summary(Rational{Int}.(ici); lags = 1)
+        sr = exposure_ic_summary(Rational{Int}.(ici); lags = 1, mt = OverlapMeanTest())
         @test sr.mean_ic isa Vector{Rational{Int}}
         @test sr.hit_rate isa Vector{Rational{Int}}
-        @test sr.std_ic ≈ exposure_ic_summary(float.(ici); lags = 1).std_ic
+        @test sr.std_ic ≈
+              exposure_ic_summary(float.(ici); lags = 1, mt = OverlapMeanTest()).std_ic
         @test exposure_correlation(Rational{Int}.(Bi)) ≈ exposure_correlation(Bf)
         # A `Float32` panel stays in `Float32`.
         B32 = Float32.(Bf)
@@ -1249,7 +1258,8 @@ using Statistics
         @test eltype(exposure_correlation(B32)) == Float32
         @test eltype(exposure_ic(B32, R32)) == Float32
         @test eltype(exposure_dispersion(B32)) == Float32
-        @test eltype(exposure_ic_summary(exposure_ic(B32, R32)).t_stat) == Float32
+        @test eltype(exposure_ic_summary(exposure_ic(B32, R32); mt = OverlapMeanTest()).t_stat) ==
+              Float32
     end
 end
 
@@ -1311,8 +1321,8 @@ end
     # On the dense block, the returns the reconstruction gives back score as it does.
     @test isequal(exposure_ic(csfm3, rd3).X, exposure_ic(csfm3).X)
     # The summary derives its lags from the window on both forms.
-    @test isequal(exposure_ic_summary(csfm, rd3; horizon = 2).t_stat[1:3],
-                  exposure_ic_summary(csfm3; horizon = 2).t_stat)
+    @test isequal(exposure_ic_summary(csfm, rd3; horizon = 2, mt = OverlapMeanTest()).t_stat[1:3],
+                  exposure_ic_summary(csfm3; horizon = 2, mt = OverlapMeanTest()).t_stat)
 
     # A block that records the position of each row reads those rows of the returns data.
     pos = CrossSectionalFactorModel(; M = Ms[T, :, 1:3], b = zeros(N), csr = csr3,

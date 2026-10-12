@@ -245,4 +245,6 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :west1996 => "[west1996](@cite) K. D. West. *Asymptotic inference about predictive ability*. Econometrica 64, 1067–1084 (1996).",#
                  :neweywest1987 => "[neweywest1987](@cite) W. K. Newey and K. D. West. *A simple, positive semi-definite, heteroskedasticity and autocorrelation consistent covariance matrix*. Econometrica 55, 703–708 (1987).",#
                  :angchenxing2006 => "[angchenxing2006](@cite) A. Ang, J. Chen and Y. Xing. *Downside risk*. The Review of Financial Studies 19, 1191–1239 (2006).",#
+                 :andrews1991 => "[andrews1991](@cite) D. W. K. Andrews. *Heteroskedasticity and autocorrelation consistent covariance matrix estimation*. Econometrica 59, 817–858 (1991).",#
+                 :demetrescu2026robust => "[demetrescu2026robust](@cite) M. Demetrescu, C. Hanck and R. Kruse-Becher. *Robust fixed-b inference in the presence of time-varying volatility*. Econometrics and Statistics 37, 154–173 (2026).",#
                  :estrada2002 => "[estrada2002](@cite) J. Estrada. *Systematic risk in emerging markets: the D-CAPM*. Emerging Markets Review 3, 365–379 (2002).")

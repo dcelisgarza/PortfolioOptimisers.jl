@@ -162,9 +162,9 @@ function forecast_common_dates(alpha::MatNum, ys::AbstractVector{<:MatNum},
 end
 """
     forecast_window_row(fp::ForecastEvaluationResult, w::Option{<:MatNum},
-                        min_count::Integer) -> NamedTuple
+                        min_count::Integer, mt::AbstractMeanTestEstimator) -> NamedTuple
 
-Return the eleven figures that one forward window adds to a table.
+Return the seventeen figures that one forward window adds to a table.
 
 The row computes no statistic of its own. It reads [`forecast_ic`](@ref) and [`forecast_ic_summary`](@ref) for the two information coefficients, [`forecast_portfolio`](@ref) for each of the two books, and [`forecast_coverage`](@ref) for the share of the universe the window scored. A window whose evaluation carries no date gives `NaN` for every figure and raises nothing, because a table deeper than the sample must still print.
 
@@ -173,7 +173,7 @@ In [`forecast_window_table`](@ref) the portfolio series of a row has no gap. [`f
 # Algorithm
 
  1. If `fp.dates` is empty, give `NaN` for every figure.
- 2. Score the two coefficients with [`forecast_ic`](@ref) at `min_count`, and summarise them with [`forecast_ic_summary`](@ref) at the [`forecast_ic_lags`](@ref) of `fp`.
+ 2. Score the two coefficients with [`forecast_ic`](@ref) at `min_count`, and summarise them with [`forecast_ic_summary`](@ref) at `mt`, at the [`forecast_ic_lags`](@ref) and at the [`forecast_ic_window`](@ref) of `fp`.
  3. Build the `:rank` book and the `:zscore` book with [`forecast_portfolio`](@ref).
  4. Take the mean of the finite entries of [`forecast_coverage`](@ref), or `NaN` when no entry is finite.
  5. Convert every figure to the element type that `fp.alpha` and `fp.y` promote to.
@@ -183,6 +183,7 @@ In [`forecast_window_table`](@ref) the portfolio series of a row has no gap. [`f
   - `fp`: The evaluation of one forward window, on the table's common dates.
   - `w`: Cross-sectional weight history `observations × assets`, on the axis of `fp.alpha`, or `nothing` for equal weights.
   - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported.
+  - `mt`: The Mean Test of the t-statistics, the p-values and the intervals.
 
 # Validation
 
@@ -190,7 +191,7 @@ In [`forecast_window_table`](@ref) the portfolio series of a row has no gap. [`f
 
 # Returns
 
-  - `row::NamedTuple`: `(; spearman_mean_ic, spearman_ic_ir, spearman_t_stat, pearson_mean_ic, pearson_ic_ir, pearson_t_stat, rank_ann_return, rank_sharpe, zscore_ann_return, zscore_sharpe, mean_coverage)`. Every figure has the element type that `fp.alpha` and `fp.y` promote to, whatever the element type of `w`.
+  - `row::NamedTuple`: `(; spearman_mean_ic, spearman_ic_ir, spearman_t_stat, spearman_p_value, spearman_mean_ci_lower, spearman_mean_ci_upper, pearson_mean_ic, pearson_ic_ir, pearson_t_stat, pearson_p_value, pearson_mean_ci_lower, pearson_mean_ci_upper, rank_ann_return, rank_sharpe, zscore_ann_return, zscore_sharpe, mean_coverage)`. Every figure has the element type that `fp.alpha` and `fp.y` promote to, whatever the element type of `w`.
 
 # Related
 
@@ -201,19 +202,22 @@ In [`forecast_window_table`](@ref) the portfolio series of a row has no gap. [`f
   - [`forecast_coverage`](@ref)
 """
 function forecast_window_row(fp::ForecastEvaluationResult, w::Option{<:MatNum},
-                             min_count::Integer)
+                             min_count::Integer, mt::AbstractMeanTestEstimator)
     alpha::MatNum = fp.alpha
     y::MatNum = fp.y
     Tf = promote_type(real(eltype(alpha)), real(eltype(y)))
     if isempty(fp.dates)
         nan = Tf(NaN)
         return (; spearman_mean_ic = nan, spearman_ic_ir = nan, spearman_t_stat = nan,
-                pearson_mean_ic = nan, pearson_ic_ir = nan, pearson_t_stat = nan,
-                rank_ann_return = nan, rank_sharpe = nan, zscore_ann_return = nan,
-                zscore_sharpe = nan, mean_coverage = nan)
+                spearman_p_value = nan, spearman_mean_ci_lower = nan,
+                spearman_mean_ci_upper = nan, pearson_mean_ic = nan, pearson_ic_ir = nan,
+                pearson_t_stat = nan, pearson_p_value = nan, pearson_mean_ci_lower = nan,
+                pearson_mean_ci_upper = nan, rank_ann_return = nan, rank_sharpe = nan,
+                zscore_ann_return = nan, zscore_sharpe = nan, mean_coverage = nan)
     end
     ic = forecast_ic_summary(forecast_ic(fp, w; min_count = min_count);
-                             lags = forecast_ic_lags(fp))
+                             lags = forecast_ic_lags(fp), window = forecast_ic_window(fp),
+                             mt = mt)
     rk = forecast_portfolio(fp; kind = :rank)
     zs = forecast_portfolio(fp; kind = :zscore)
     c = forecast_coverage(fp, w)
@@ -221,8 +225,14 @@ function forecast_window_row(fp::ForecastEvaluationResult, w::Option{<:MatNum},
     return (; spearman_mean_ic = Tf(ic.spearman.mean_ic),
             spearman_ic_ir = Tf(ic.spearman.ic_ir),
             spearman_t_stat = Tf(ic.spearman.t_stat),
+            spearman_p_value = Tf(ic.spearman.p_value),
+            spearman_mean_ci_lower = Tf(ic.spearman.mean_ci_lower),
+            spearman_mean_ci_upper = Tf(ic.spearman.mean_ci_upper),
             pearson_mean_ic = Tf(ic.pearson.mean_ic), pearson_ic_ir = Tf(ic.pearson.ic_ir),
             pearson_t_stat = Tf(ic.pearson.t_stat),
+            pearson_p_value = Tf(ic.pearson.p_value),
+            pearson_mean_ci_lower = Tf(ic.pearson.mean_ci_lower),
+            pearson_mean_ci_upper = Tf(ic.pearson.mean_ci_upper),
             rank_ann_return = Tf(rk.summary.ann_return),
             rank_sharpe = Tf(rk.summary.sharpe),
             zscore_ann_return = Tf(zs.summary.ann_return),
@@ -232,7 +242,8 @@ end
 """
     forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Option{<:MatNum},
                           grid::AbstractVector{<:Tuple{Integer, Integer}},
-                          min_count::Integer, ppy::Number) -> NamedTuple
+                          min_count::Integer, ppy::Number,
+                          mt::AbstractMeanTestEstimator) -> NamedTuple
 
 Score one Return Forecast against a grid of forward windows, on one common date set.
 
@@ -243,7 +254,7 @@ Score one Return Forecast against a grid of forward windows, on one common date 
  1. Check `w` against the shape of `fe.alpha`, so a wrong weight history raises at every depth, also when no date stays.
  2. Build the forward target of each window from `X` with [`forward_mean_returns`](@ref).
  3. Intersect the dates of the base evaluation across the whole grid with [`forecast_common_dates`](@ref).
- 4. For each window, build a [`ForecastEvaluationResult`](@ref) that carries `fe.alpha` and `fe.umsk`, the window's target, the common dates, the window's own `horizon` and `lag`, `min_count` and `ppy`, and read its row with [`forecast_window_row`](@ref).
+ 4. For each window, build a [`ForecastEvaluationResult`](@ref) that carries `fe.alpha` and `fe.umsk`, the window's target, the common dates, the window's own `horizon` and `lag`, `min_count` and `ppy`, and read its row with [`forecast_window_row`](@ref) at `mt`.
  5. Transpose the rows into columns, one entry per period.
 
 # Arguments
@@ -254,6 +265,7 @@ Score one Return Forecast against a grid of forward windows, on one common date 
   - `grid`: One `(horizon, lag)` pair per period, from [`forecast_window_grid`](@ref).
   - `min_count`: Least number of assets a cross-section needs, for the date rule and for the statistics alike.
   - `ppy`: Periods per year of the annualised columns, which every window carries.
+  - `mt`: The Mean Test of the t-statistics, the p-values and the intervals.
 
 # Validation
 
@@ -278,7 +290,8 @@ Score one Return Forecast against a grid of forward windows, on one common date 
 """
 function forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Option{<:MatNum},
                                grid::AbstractVector{<:Tuple{Integer, Integer}},
-                               min_count::Integer, ppy::Number)
+                               min_count::Integer, ppy::Number,
+                               mt::AbstractMeanTestEstimator)
     @argcheck(ppy > zero(ppy), DomainError(ppy, "ppy must be positive"))
     alpha::MatNum = fe.alpha
     @argcheck(size(X, 1) == size(alpha, 1) && size(X, 2) == size(alpha, 2),
@@ -290,15 +303,21 @@ function forecast_window_table(fe::ForecastEvaluationResult, X::MatNum, w::Optio
     rows = [forecast_window_row(ForecastEvaluationResult(alpha, ys[p], fe.umsk, common,
                                                          fe.target, grid[p][1], grid[p][2],
                                                          fe.step, min_count, fe.ties, ppy),
-                                w, min_count) for p in eachindex(grid)]
+                                w, min_count, mt) for p in eachindex(grid)]
     return (; period = collect(eachindex(grid)), horizon = [g[1] for g in grid],
             lag = [g[2] for g in grid], dates = common,
             spearman_mean_ic = [r.spearman_mean_ic for r in rows],
             spearman_ic_ir = [r.spearman_ic_ir for r in rows],
             spearman_t_stat = [r.spearman_t_stat for r in rows],
+            spearman_p_value = [r.spearman_p_value for r in rows],
+            spearman_mean_ci_lower = [r.spearman_mean_ci_lower for r in rows],
+            spearman_mean_ci_upper = [r.spearman_mean_ci_upper for r in rows],
             pearson_mean_ic = [r.pearson_mean_ic for r in rows],
             pearson_ic_ir = [r.pearson_ic_ir for r in rows],
             pearson_t_stat = [r.pearson_t_stat for r in rows],
+            pearson_p_value = [r.pearson_p_value for r in rows],
+            pearson_mean_ci_lower = [r.pearson_mean_ci_lower for r in rows],
+            pearson_mean_ci_upper = [r.pearson_mean_ci_upper for r in rows],
             rank_ann_return = [r.rank_ann_return for r in rows],
             rank_sharpe = [r.rank_sharpe for r in rows],
             zscore_ann_return = [r.zscore_ann_return for r in rows],
@@ -308,12 +327,14 @@ end
 """
     forecast_holding_period(fe::ForecastEvaluationResult, X::MatNum,
                             w::Option{<:MatNum} = nothing; n::Integer = 10,
+                            mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
                             min_count::Integer = fe.min_count,
                             ppy::Number = fe.ppy) -> NamedTuple
     forecast_holding_period(fe::ForecastEvaluationResult, rd::ReturnsResult,
                             csfm::CrossSectionalFactorModel;
                             weighting::AbstractOrthogonalityMetric = IdentityMetric(),
                             n::Integer = 10, min_count::Integer = fe.min_count,
+                            mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
                             ppy::Number = fe.ppy) -> NamedTuple
 
 Score a Return Forecast against cumulative forward windows, one row per holding period.
@@ -328,9 +349,9 @@ The set shrinks as `n` grows. The rows of one table are comparable with each oth
 
 `n` is a keyword and not a field of the evaluation, so a caller reads the table at a second depth without a second pairing to build `fe`, which can cost a rolling refit. `ppy` is a keyword for the same reason: annualisation is a linear rescale, the mean times `ppy` and the ratio times its square root, so `ppy = 1` gives the per-period table of an evaluation whose summary is annualised.
 
-# The t-statistic of a deeper row corrects for the overlap
+# The test of a deeper row reads the overlap
 
-The stride between two dates is the base evaluation's, and it does not grow with the window. From the second row on, consecutive windows therefore share returns. At the default stride, which is `fe.horizon`, the window of row `p` overlaps the windows of its `p - 1` neighbours on each side. When the forecast keeps its ranking from one date to the next, the consecutive coefficients of a deep row are then correlated, and for a forecast with no skill a t-statistic that treated them as independent would spread by about ``\\sqrt{p}`` down the column. A forecast that draws a new ranking at every date gives uncorrelated coefficients at every depth. The `t_stat` columns use the long-run standard error over [`forecast_ic_lags`](@ref) autocovariances at each row, as [`forecast_ic_summary`](@ref) states, so a t-statistic that holds down the column means that the forecast holds. The `ic_ir` columns are the per-date ratio, with no correction.
+The stride between two dates is the base evaluation's, and it does not grow with the window. From the second row on, consecutive windows therefore share returns. At the default stride, which is `fe.horizon`, the window of row `p` overlaps the windows of its `p - 1` neighbours on each side. When the forecast keeps its ranking from one date to the next, the consecutive coefficients of a deep row are then correlated, and for a forecast with no skill a t-statistic that treated them as independent would spread by about ``\\sqrt{p}`` down the column. The Mean Test `mt` reads this dependence at each row, as [`forecast_ic_summary`](@ref) states, so a p-value that holds down the column means that the forecast holds. [`OverlapMeanTest`](@ref) reads the row's own [`forecast_ic_lags`](@ref). Each row resolves the generator of `mt`, so a seeded test draws the same multipliers at every row. The `ic_ir` columns are the per-date ratio, with no correction.
 
 # Algorithm
 
@@ -346,6 +367,7 @@ The stride between two dates is the base evaluation's, and it does not grow with
   - `csfm`: The fitted factor-model block the evaluation was built on.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), resolved by [`cs_diagnostic_weights`](@ref).
   - `n`: Number of forward periods, the depth of the table.
+  - `mt`: The Mean Test of the t-statistics, the p-values and the intervals.
   - `min_count`: Least number of assets a cross-section needs. It defaults to the threshold the evaluation carries, and it applies to the common dates and to the statistics alike.
   - $(arg_dict[:fe_table_ppy])
 
@@ -355,14 +377,14 @@ The stride between two dates is the base evaluation's, and it does not grow with
 
 # Returns
 
-  - `table::NamedTuple`: Fifteen columns. `dates` holds the common dates, and each of the other fourteen holds one entry per period.
+  - `table::NamedTuple`: Twenty-one columns. `dates` holds the common dates, and each of the other twenty holds one entry per period.
 
       + `period::Vector{Int}`: `1` to `n`.
       + `horizon::Vector{Int}`: The window's horizon, `p` times `fe.horizon`.
       + `lag::Vector{Int}`: The window's lag, `fe.lag` at every period.
       + `dates::Vector{Int}`: The common evaluation dates every row was computed on.
-      + `spearman_mean_ic`, `spearman_ic_ir`, `spearman_t_stat`: The Spearman coefficient's summary, from [`forecast_ic_summary`](@ref), with the t-statistic at the row's own [`forecast_ic_lags`](@ref).
-      + `pearson_mean_ic`, `pearson_ic_ir`, `pearson_t_stat`: The Pearson coefficient's summary.
+      + `spearman_mean_ic`, `spearman_ic_ir`, `spearman_t_stat`, `spearman_p_value`, `spearman_mean_ci_lower`, `spearman_mean_ci_upper`: The Spearman coefficient's summary, from [`forecast_ic_summary`](@ref) at `mt`.
+      + `pearson_mean_ic`, `pearson_ic_ir`, `pearson_t_stat`, `pearson_p_value`, `pearson_mean_ci_lower`, `pearson_mean_ci_upper`: The Pearson coefficient's summary.
       + `rank_ann_return`, `rank_sharpe`: The annualised return and the ratio of the `:rank` book, from [`forecast_portfolio`](@ref), at `ppy` periods per year.
       + `zscore_ann_return`, `zscore_sharpe`: The same two figures of the `:zscore` book.
       + `mean_coverage`: The mean of the finite entries of [`forecast_coverage`](@ref).
@@ -399,28 +421,32 @@ julia> t.dates
 """
 function forecast_holding_period(fe::ForecastEvaluationResult, X::MatNum,
                                  w::Option{<:MatNum} = nothing; n::Integer = 10,
+                                 mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
                                  min_count::Integer = fe.min_count, ppy::Number = fe.ppy)
     return forecast_window_table(fe, X, w,
                                  forecast_window_grid(fe.horizon, fe.lag, n, :cumulative),
-                                 min_count, ppy)
+                                 min_count, ppy, mt)
 end
 function forecast_holding_period(fe::ForecastEvaluationResult, rd::ReturnsResult,
                                  csfm::CrossSectionalFactorModel;
                                  weighting::AbstractOrthogonalityMetric = IdentityMetric(),
                                  n::Integer = 10, min_count::Integer = fe.min_count,
-                                 ppy::Number = fe.ppy)
+                                 ppy::Number = fe.ppy,
+                                 mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
     return forecast_holding_period(fe, forecast_target_history(fe.target, rd, csfm),
                                    cs_diagnostic_weights(weighting, csfm); n = n,
-                                   min_count = min_count, ppy = ppy)
+                                   min_count = min_count, ppy = ppy, mt = mt)
 end
 """
     forecast_decay(fe::ForecastEvaluationResult, X::MatNum,
                    w::Option{<:MatNum} = nothing; n::Integer = 10,
+                   mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
                    min_count::Integer = fe.min_count, ppy::Number = fe.ppy) -> NamedTuple
     forecast_decay(fe::ForecastEvaluationResult, rd::ReturnsResult,
                    csfm::CrossSectionalFactorModel;
                    weighting::AbstractOrthogonalityMetric = IdentityMetric(),
                    n::Integer = 10, min_count::Integer = fe.min_count,
+                   mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
                    ppy::Number = fe.ppy) -> NamedTuple
 
 Score a Return Forecast against disjoint forward windows, one row per period out.
@@ -443,6 +469,7 @@ The two tables agree at `p = 1`, which is the base evaluation's own window, and 
   - `csfm`: The fitted factor-model block the evaluation was built on.
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref), resolved by [`cs_diagnostic_weights`](@ref).
   - `n`: Number of forward periods, the depth of the table.
+  - `mt`: The Mean Test of the t-statistics, the p-values and the intervals.
   - `min_count`: Least number of assets a cross-section needs. It applies to the common dates and to the statistics alike.
   - $(arg_dict[:fe_table_ppy])
 
@@ -485,19 +512,21 @@ and the second scores what is left of it one horizon later.
 """
 function forecast_decay(fe::ForecastEvaluationResult, X::MatNum,
                         w::Option{<:MatNum} = nothing; n::Integer = 10,
+                        mt::AbstractMeanTestEstimator = WildBootstrapMeanTest(),
                         min_count::Integer = fe.min_count, ppy::Number = fe.ppy)
     return forecast_window_table(fe, X, w,
                                  forecast_window_grid(fe.horizon, fe.lag, n, :disjoint),
-                                 min_count, ppy)
+                                 min_count, ppy, mt)
 end
 function forecast_decay(fe::ForecastEvaluationResult, rd::ReturnsResult,
                         csfm::CrossSectionalFactorModel;
                         weighting::AbstractOrthogonalityMetric = IdentityMetric(),
                         n::Integer = 10, min_count::Integer = fe.min_count,
-                        ppy::Number = fe.ppy)
+                        ppy::Number = fe.ppy,
+                        mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
     return forecast_decay(fe, forecast_target_history(fe.target, rd, csfm),
                           cs_diagnostic_weights(weighting, csfm); n = n,
-                          min_count = min_count, ppy = ppy)
+                          min_count = min_count, ppy = ppy, mt = mt)
 end
 
 export forecast_holding_period, forecast_decay

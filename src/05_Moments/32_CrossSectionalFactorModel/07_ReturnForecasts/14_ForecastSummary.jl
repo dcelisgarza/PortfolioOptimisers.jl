@@ -397,9 +397,9 @@ end
     forecast_summary_row(fe::ForecastEvaluationResult, w::Option{<:MatNum},
                          bins::Integer) -> NamedTuple
 
-Return the thirty-three figures of one evaluation in a summary.
+Return the thirty-nine figures of one evaluation in a summary.
 
-The row computes no statistic of its own. It reads the ten information-coefficient figures from [`forecast_ic_summary`](@ref), five figures of each of the two books from [`forecast_portfolio`](@ref), six calibration figures from [`forecast_calibration`](@ref), and the seven figures of the sample from [`forecast_summary_coverage`](@ref).
+The row computes no statistic of its own. It reads the sixteen information-coefficient figures from [`forecast_ic_summary`](@ref), five figures of each of the two books from [`forecast_portfolio`](@ref), six calibration figures from [`forecast_calibration`](@ref), and the seven figures of the sample from [`forecast_summary_coverage`](@ref).
 
 Each book reports `ann_return`, `ann_volatility` and `sharpe` from the [`PerformanceSummaryResult`](@ref) it carries, with its hit rate and its mean turnover beside them. None of the three reads the order of the returns. The row leaves out the other figures of that summary, and a caller reads them from `forecast_portfolio(fe; kind = …).summary`. Two of them, `max_drawdown` and `calmar`, read the path, and [`forecast_portfolio`](@ref) summarises the compressed path, which joins the date before a gap to the date after it. When the gaps of two forecasts fall on different dates, their drawdowns are of two different paths.
 
@@ -407,17 +407,18 @@ The threshold is the one that the evaluation carries, and the row takes no keywo
 
 # Algorithm
 
- 1. Summarise the coefficients of [`forecast_ic`](@ref) with [`forecast_ic_summary`](@ref), at the lag that [`forecast_ic_lags`](@ref) derives, giving `ic`.
+ 1. Summarise the coefficients of [`forecast_ic`](@ref) with [`forecast_ic_summary`](@ref), at `mt`, at the lag that [`forecast_ic_lags`](@ref) derives and at the window that [`forecast_ic_window`](@ref) derives, giving `ic`.
  2. Score the rank book and the z-score book with [`forecast_portfolio`](@ref), giving `rk` and `zs`.
  3. Read the calibration at `bins` bins with [`forecast_calibration`](@ref), giving `cb`.
  4. Read the seven coverage figures with [`forecast_summary_coverage`](@ref), giving `cv`.
- 5. Collect the thirty-three figures into one named tuple.
+ 5. Collect the thirty-nine figures into one named tuple.
 
 # Arguments
 
   - `fe`: An evaluation, from [`forecast_evaluation`](@ref).
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights.
   - `bins`: Number of quantile bins the calibration curve cuts.
+  - `mt`: The Mean Test of the two t-statistics, the two p-values and the two intervals.
 
 # Validation
 
@@ -425,7 +426,7 @@ The threshold is the one that the evaluation carries, and the row takes no keywo
 
 # Returns
 
-  - `row::NamedTuple`: The thirty-three columns that [`ForecastSummaryResult`](@ref) documents, as scalars.
+  - `row::NamedTuple`: The thirty-nine columns that [`ForecastSummaryResult`](@ref) documents, as scalars.
 
 # Related
 
@@ -437,18 +438,24 @@ The threshold is the one that the evaluation carries, and the row takes no keywo
   - [`forecast_summary_coverage`](@ref)
 """
 function forecast_summary_row(fe::ForecastEvaluationResult, w::Option{<:MatNum},
-                              bins::Integer)
-    ic = forecast_ic_summary(forecast_ic(fe, w); lags = forecast_ic_lags(fe))
+                              bins::Integer, mt::AbstractMeanTestEstimator)
+    ic = forecast_ic_summary(forecast_ic(fe, w); lags = forecast_ic_lags(fe),
+                             window = forecast_ic_window(fe), mt = mt)
     rk = forecast_portfolio(fe; kind = :rank)
     zs = forecast_portfolio(fe; kind = :zscore)
     cb = forecast_calibration(fe, w; bins = bins)
     cv = forecast_summary_coverage(fe, w)
     return (; spearman_mean_ic = ic.spearman.mean_ic, spearman_std_ic = ic.spearman.std_ic,
             spearman_ic_ir = ic.spearman.ic_ir, spearman_t_stat = ic.spearman.t_stat,
+            spearman_p_value = ic.spearman.p_value,
+            spearman_mean_ci_lower = ic.spearman.mean_ci_lower,
+            spearman_mean_ci_upper = ic.spearman.mean_ci_upper,
             spearman_hit_rate = ic.spearman.hit_rate, pearson_mean_ic = ic.pearson.mean_ic,
             pearson_std_ic = ic.pearson.std_ic, pearson_ic_ir = ic.pearson.ic_ir,
-            pearson_t_stat = ic.pearson.t_stat, pearson_hit_rate = ic.pearson.hit_rate,
-            rank_ann_return = rk.summary.ann_return,
+            pearson_t_stat = ic.pearson.t_stat, pearson_p_value = ic.pearson.p_value,
+            pearson_mean_ci_lower = ic.pearson.mean_ci_lower,
+            pearson_mean_ci_upper = ic.pearson.mean_ci_upper,
+            pearson_hit_rate = ic.pearson.hit_rate, rank_ann_return = rk.summary.ann_return,
             rank_ann_volatility = rk.summary.ann_volatility,
             rank_sharpe = rk.summary.sharpe, rank_hit_rate = rk.hit_rate,
             rank_mean_turnover = rk.mean_turnover,
@@ -538,7 +545,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The headline statistics of one or more Return Forecast evaluations, one entry per forecast.
 
-`ForecastSummaryResult` is what [`forecast_evaluation_summary`](@ref) returns. It is the top of the evaluation hierarchy. It carries thirty-three columns that it reads from the verbs below it, on an axis whose entries are the forecasts, so a caller can tabulate it, plot it, test it, or read it without a plotting package.
+`ForecastSummaryResult` is what [`forecast_evaluation_summary`](@ref) returns. It is the top of the evaluation hierarchy. It carries thirty-nine columns that it reads from the verbs below it, on an axis whose entries are the forecasts, so a caller can tabulate it, plot it, test it, or read it without a plotting package.
 
 # One class, and no comparison class beside it
 
@@ -569,8 +576,10 @@ $(DocStringExtensions.FIELDS)
     ForecastSummaryResult(
         names,
         spearman_mean_ic, spearman_std_ic, spearman_ic_ir, spearman_t_stat,
+        spearman_p_value, spearman_mean_ci_lower, spearman_mean_ci_upper,
         spearman_hit_rate, pearson_mean_ic, pearson_std_ic, pearson_ic_ir,
-        pearson_t_stat, pearson_hit_rate,
+        pearson_t_stat, pearson_p_value, pearson_mean_ci_lower, pearson_mean_ci_upper,
+        pearson_hit_rate,
         rank_ann_return, rank_ann_volatility, rank_sharpe, rank_hit_rate,
         rank_mean_turnover, zscore_ann_return, zscore_ann_volatility, zscore_sharpe,
         zscore_hit_rate, zscore_mean_turnover,
@@ -609,9 +618,21 @@ keyword constructor, and it validates nothing of its own.
     """
     spearman_ic_ir
     """
-    Date-level t-statistic of the mean Spearman information coefficient, one entry per forecast. Its standard error reads the overlap of the forward windows, so it is the familiar ratio only under a stride of the horizon.
+    Date-level t-statistic of the mean Spearman information coefficient, one entry per forecast. The Mean Test of the summary defines it. Under the default [`WildBootstrapMeanTest`](@ref) it is not on the scale of the normal law, so read `spearman_p_value`.
     """
     spearman_t_stat
+    """
+    Two-sided p-value of the null hypothesis that the mean Spearman information coefficient is zero, one entry per forecast.
+    """
+    spearman_p_value
+    """
+    Lower bound of the confidence interval of the mean Spearman information coefficient at the level of the Mean Test, one entry per forecast.
+    """
+    spearman_mean_ci_lower
+    """
+    Upper bound of the confidence interval of the mean Spearman information coefficient at the level of the Mean Test, one entry per forecast.
+    """
+    spearman_mean_ci_upper
     """
     Share of the **scored** dates at which the Spearman information coefficient is positive, one entry per forecast.
     """
@@ -629,9 +650,21 @@ keyword constructor, and it validates nothing of its own.
     """
     pearson_ic_ir
     """
-    Date-level t-statistic of the mean weighted Pearson information coefficient, one entry per forecast. Its standard error reads the overlap of the forward windows, so it is the familiar ratio only under a stride of the horizon.
+    Date-level t-statistic of the mean weighted Pearson information coefficient, one entry per forecast. The Mean Test of the summary defines it. Under the default [`WildBootstrapMeanTest`](@ref) it is not on the scale of the normal law, so read `pearson_p_value`.
     """
     pearson_t_stat
+    """
+    Two-sided p-value of the null hypothesis that the mean weighted Pearson information coefficient is zero, one entry per forecast.
+    """
+    pearson_p_value
+    """
+    Lower bound of the confidence interval of the mean weighted Pearson information coefficient at the level of the Mean Test, one entry per forecast.
+    """
+    pearson_mean_ci_lower
+    """
+    Upper bound of the confidence interval of the mean weighted Pearson information coefficient at the level of the Mean Test, one entry per forecast.
+    """
+    pearson_mean_ci_upper
     """
     Share of the **scored** dates at which the weighted Pearson information coefficient is positive, one entry per forecast.
     """
@@ -757,7 +790,8 @@ end
     forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationResult},
                                 w::Option{<:MatNum} = nothing; align::Bool = false,
                                 paired::Bool = true, names = nothing, bins::Integer = 10,
-                                quantiles = nothing) -> ForecastSummaryResult
+                                quantiles = nothing,
+                                mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()) -> ForecastSummaryResult
     forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationResult},
                                 csfm::CrossSectionalFactorModel;
                                 weighting::AbstractOrthogonalityMetric = IdentityMetric(),
@@ -786,7 +820,7 @@ A weighting reaches the summary in one of two forms, as it reaches every other b
  1. Under `align = true`, put the evaluations on the grid they share with [`forecast_evaluation_align`](@ref).
  2. Under `paired = true`, refuse a set of evaluations that are not comparable, with [`forecast_summary_assert_comparable`](@ref).
  3. Resolve the names axis with [`forecast_summary_names`](@ref).
- 4. Read the thirty-three core figures of each evaluation with [`forecast_summary_row`](@ref).
+ 4. Read the thirty-nine core figures of each evaluation with [`forecast_summary_row`](@ref).
  5. Read the quantile-spread block with [`forecast_summary_spreads`](@ref), which returns `nothing` when the caller asks for no quantile.
  6. Collect the rows into columns and build a [`ForecastSummaryResult`](@ref), with the `ppy` that the evaluations agree on, or the `ppy` of each evaluation under `paired = false`.
 
@@ -801,6 +835,7 @@ A weighting reaches the summary in one of two forms, as it reaches every other b
   - `names`: One name per evaluation, or `nothing` to number them.
   - `bins`: Number of quantile bins the calibration curve cuts.
   - `quantiles`: Tail fractions the quantile spreads are cut at, each in `(0, 0.5]`, as a collection or as one number, or `nothing` for none.
+  - `mt`: The Mean Test of the t-statistics, the p-values and the intervals. Each evaluation resolves its generator, so a seeded test draws the same multipliers for every evaluation.
   - `weighting`: The [`AbstractOrthogonalityMetric`](@ref) whose weight history the weighted statistics read.
 
 # Validation
@@ -828,8 +863,8 @@ A weighting reaches the summary in one of two forms, as it reaches every other b
 function forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationResult},
                                      w::Option{<:MatNum} = nothing; align::Bool = false,
                                      paired::Bool = true, names = nothing,
-                                     bins::Integer = 10,
-                                     quantiles = nothing)::ForecastSummaryResult
+                                     bins::Integer = 10, quantiles = nothing,
+                                     mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())::ForecastSummaryResult
     @argcheck(!isempty(fes), IsEmptyError("fes cannot be empty"))
     @argcheck(paired || !align,
               ConflictingArgumentError("`paired = false` lists the summary of each evaluation on its own grid, and `align = true` puts the evaluations on one grid, so the two cannot be given together"))
@@ -841,18 +876,24 @@ function forecast_evaluation_summary(fes::AbstractVector{<:ForecastEvaluationRes
     # The element is asserted rather than taken from the iterator: `afes` is an
     # `AbstractVector` of an abstract element type, so without the assertion every read
     # inside the row is analysed against an unknown type.
-    rows = [forecast_summary_row(afes[i]::ForecastEvaluationResult, w, bins)
+    rows = [forecast_summary_row(afes[i]::ForecastEvaluationResult, w, bins, mt)
             for i in eachindex(afes)]
     q, sm, sv, si, sh = forecast_summary_spreads(afes, quantiles)
     return ForecastSummaryResult(nm, [r.spearman_mean_ic for r in rows],
                                  [r.spearman_std_ic for r in rows],
                                  [r.spearman_ic_ir for r in rows],
                                  [r.spearman_t_stat for r in rows],
+                                 [r.spearman_p_value for r in rows],
+                                 [r.spearman_mean_ci_lower for r in rows],
+                                 [r.spearman_mean_ci_upper for r in rows],
                                  [r.spearman_hit_rate for r in rows],
                                  [r.pearson_mean_ic for r in rows],
                                  [r.pearson_std_ic for r in rows],
                                  [r.pearson_ic_ir for r in rows],
                                  [r.pearson_t_stat for r in rows],
+                                 [r.pearson_p_value for r in rows],
+                                 [r.pearson_mean_ci_lower for r in rows],
+                                 [r.pearson_mean_ci_upper for r in rows],
                                  [r.pearson_hit_rate for r in rows],
                                  [r.rank_ann_return for r in rows],
                                  [r.rank_ann_volatility for r in rows],

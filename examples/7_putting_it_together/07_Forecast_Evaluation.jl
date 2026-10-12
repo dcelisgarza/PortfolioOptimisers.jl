@@ -234,22 +234,31 @@ values, because the two say different things and you usually want both. Passing 
 block lets the `weighting` keyword take the Pearson weights from the block. The default, used here,
 gives every asset the same weight, and the Spearman column is unweighted.
 
-[`forecast_ic_summary`](@ref) reduces that matrix to five figures per coefficient. `ic_ir` is the
-mean over the standard deviation, the coefficient's own information ratio, and `t_stat` says
-whether the mean is distinguishable from zero at all.
+[`forecast_ic_summary`](@ref) reduces that matrix to six figures per coefficient. `ic_ir` is the
+mean over the standard deviation, the coefficient's own information ratio. `t_stat` and `p_value`
+say whether the mean is distinguishable from zero at all.
+
+The coefficients of consecutive dates can be correlated, so the test of the mean must read that
+dependence. A Mean Test does this. The default, [`WildBootstrapMeanTest`](@ref), reads the
+dependence at every lag up to a fixed fraction of the sample, and takes its p-value from a wild
+bootstrap. Its t-statistic is not on the scale of the normal law, so read the p-value. The bootstrap
+draws random numbers, so this example passes a seeded test to every summary, and the tables are the
+same at every run.
 =#
 
 ic_signal = forecast_ic(fe_signal, csfm)
 ic_trait = forecast_ic(fe_trait, csfm)
 
-s_signal = forecast_ic_summary(ic_signal)
-s_trait = forecast_ic_summary(ic_trait)
+mt = WildBootstrapMeanTest(; seed = 42)
+s_signal = forecast_ic_summary(ic_signal; mt = mt)
+s_trait = forecast_ic_summary(ic_trait; mt = mt)
 
 pretty_table(DataFrame("Forecast" => ["signal composite", "trait regression"],
                        "Mean IC" => [s_signal.spearman.mean_ic, s_trait.spearman.mean_ic],
                        "Std IC" => [s_signal.spearman.std_ic, s_trait.spearman.std_ic],
                        "IC IR" => [s_signal.spearman.ic_ir, s_trait.spearman.ic_ir],
                        "t-stat" => [s_signal.spearman.t_stat, s_trait.spearman.t_stat],
+                       "p-value" => [s_signal.spearman.p_value, s_trait.spearman.p_value],
                        "Hit rate" =>
                            [s_signal.spearman.hit_rate, s_trait.spearman.hit_rate]);
              formatters = [numfmt], title = "Spearman information coefficient")
@@ -417,25 +426,25 @@ says how quickly the information goes stale.
 
 The stride between two dates stays at the base evaluation's, so from the second row of the
 holding-period table on, consecutive windows use the same returns, and their coefficients are not
-independent. The `t_stat` column corrects for that overlap. Its standard error is the long-run one,
-at the order that the window and the stride imply. A t-statistic that stays large down the column
-therefore reflects the forecast, not the overlap. Without it, a forecast with no skill would look
-more significant at every row.
+independent. The Mean Test of the table reads that dependence at each row, as it does in the
+summary above. A p-value that stays small down the column therefore reflects the forecast, not the
+overlap. Without the test, a forecast with no skill would look more significant at every row.
 =#
 
-hp = forecast_holding_period(fe_signal, rd, csfm; n = 4)
-dc = forecast_decay(fe_signal, rd, csfm; n = 4)
+hp = forecast_holding_period(fe_signal, rd, csfm; n = 4, mt = mt)
+dc = forecast_decay(fe_signal, rd, csfm; n = 4, mt = mt)
 
 pretty_table(DataFrame("Period" => hp.period, "Horizon" => hp.horizon, "Lag" => hp.lag,
                        "Mean IC" => hp.spearman_mean_ic, "t-stat" => hp.spearman_t_stat,
+                       "p-value" => hp.spearman_p_value,
                        "Rank ann. return" => hp.rank_ann_return,
                        "Rank Sharpe" => hp.rank_sharpe); formatters = [numfmt],
              title = "Holding period: cumulative forward windows")
 
 pretty_table(DataFrame("Period" => dc.period, "Horizon" => dc.horizon, "Lag" => dc.lag,
                        "Mean IC" => dc.spearman_mean_ic, "t-stat" => dc.spearman_t_stat,
-                       "Rank Sharpe" => dc.rank_sharpe); formatters = [numfmt],
-             title = "Decay: disjoint forward windows")
+                       "p-value" => dc.spearman_p_value, "Rank Sharpe" => dc.rank_sharpe);
+             formatters = [numfmt], title = "Decay: disjoint forward windows")
 
 #=
 The two tables give different answers, and the difference comes from the synthetic panel. The
@@ -512,26 +521,26 @@ Pass `align = true` with the raw evaluations instead, and the summary runs the a
 
 fs = forecast_evaluation_summary([fe_signal, fe_trait], csfm;
                                  names = ["signal composite", "trait regression"],
-                                 quantiles = (0.1, 0.2))
+                                 quantiles = (0.1, 0.2), mt = mt)
 
 pretty_table(DataFrame("Statistic" =>
                            ["Spearman mean IC", "Spearman IC IR", "Spearman t-stat",
-                            "Spearman hit rate", "Rank ann. return", "Rank Sharpe",
-                            "Rank mean turnover", "Z-score Sharpe", "Calibration slope",
-                            "Mean coverage", "Mean assets scored"],
+                            "Spearman p-value", "Spearman hit rate", "Rank ann. return",
+                            "Rank Sharpe", "Rank mean turnover", "Z-score Sharpe",
+                            "Calibration slope", "Mean coverage", "Mean assets scored"],
                        "signal composite" => [fs.spearman_mean_ic[1], fs.spearman_ic_ir[1],
-                                              fs.spearman_t_stat[1], fs.spearman_hit_rate[1],
-                                              fs.rank_ann_return[1], fs.rank_sharpe[1],
-                                              fs.rank_mean_turnover[1], fs.zscore_sharpe[1],
-                                              fs.calibration_slope[1], fs.mean_coverage[1],
-                                              fs.mean_n_scored[1]],
+                                              fs.spearman_t_stat[1], fs.spearman_p_value[1],
+                                              fs.spearman_hit_rate[1], fs.rank_ann_return[1],
+                                              fs.rank_sharpe[1], fs.rank_mean_turnover[1],
+                                              fs.zscore_sharpe[1], fs.calibration_slope[1],
+                                              fs.mean_coverage[1], fs.mean_n_scored[1]],
                        "trait regression" => [fs.spearman_mean_ic[2], fs.spearman_ic_ir[2],
-                                              fs.spearman_t_stat[2], fs.spearman_hit_rate[2],
-                                              fs.rank_ann_return[2], fs.rank_sharpe[2],
-                                              fs.rank_mean_turnover[2], fs.zscore_sharpe[2],
-                                              fs.calibration_slope[2], fs.mean_coverage[2],
-                                              fs.mean_n_scored[2]]); formatters = [numfmt],
-             title = "Eleven of the thirty columns, side by side")
+                                              fs.spearman_t_stat[2], fs.spearman_p_value[2],
+                                              fs.spearman_hit_rate[2], fs.rank_ann_return[2],
+                                              fs.rank_sharpe[2], fs.rank_mean_turnover[2],
+                                              fs.zscore_sharpe[2], fs.calibration_slope[2],
+                                              fs.mean_coverage[2], fs.mean_n_scored[2]]);
+             formatters = [numfmt], title = "Twelve of the columns, side by side")
 
 #=
 The quantile spreads are the only fields of the result with a second axis, and the result fills them

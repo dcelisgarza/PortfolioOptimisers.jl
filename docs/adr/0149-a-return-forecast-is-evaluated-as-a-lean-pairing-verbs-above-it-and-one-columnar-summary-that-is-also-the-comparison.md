@@ -401,3 +401,101 @@ both Neutralisation sites fit with no intercept. The site of `DescriptorScores` 
 then orthogonal to the constant and to each target, so the score is uncorrelated with each target
 under every design. `cre = CrossSectionalLinearRegression(; intercept = false)` gives the oracle's
 rule. The Neutralisation of a Factor Exposure reads the `cre` of the prior, and it does not change.
+
+## Amendment (2026-10-12)
+
+**The test of a mean coefficient is a Mean Test, and the default is a fixed-bandwidth wild
+bootstrap.** The amendment of 2026-09-19 set the order of the long-run variance to the overlap of
+the forward windows. That order reads no dependence past the overlap. A coefficient series that is
+persistent past it, such as a factor-like forecast whose coefficient follows a slow regime, was
+still overstated, and the normal law is a poor reference for a long-run variance in a short series.
+Measured on a no-skill series of 60 dates at the 5% level: an AR(1) series of coefficient 0.5 at a
+stride of the horizon, where the order is zero, was rejected 27.9% of the time, and an MA(4)
+series at its exact overlap order 10.6% of the time, 20.1% at 24 dates. The untapered sum can also
+be negative, and the statistic is then `NaN`.
+
+The decision follows the source `demetrescu2026robust`: a long-run variance at a fixed bandwidth
+`B = b * T`, where `T` is the span of the series, with the p-value read off a Gaussian wild
+bootstrap of the studentised mean. On the same cases with the Bartlett kernel at `b = 0.4` the
+rejection rates are 6.9% and 9.1%, and 5.7% for the AR(1) case at 250 dates, where the overlap rule
+still gives 25.4%. The remaining distortion of the MA(4) case is the one the source reports for
+strong serial correlation in a short series. A block multiplier of the overlap length moved it from
+9.0% to 8.7% and was not adopted.
+
+Every value of the test is a field, and none is fixed in the code:
+`WildBootstrapMeanTest(; kernel = BartlettKernel(), b = 0.4, span = FiniteEntrySpan(), n_sim = 1_999,
+q = 0.05, min_obs = nothing, min_periods = nothing, rng = Random.default_rng(), seed = nothing)`.
+
+- **The defaults are those of the source.** Its simulations recommend a mid bandwidth and find the
+  Bartlett kernel more powerful than the quadratic spectral one, and its application draws 1,999
+  times. A smaller `b` gives more power and a larger distortion: at `b = 0.1` the AR(1) case was
+  rejected 10.1% of the time and the power against a shift of 0.6 standard deviations rose from
+  0.47 to 0.64.
+- **The kernel** is an extension point, `AbstractLongRunKernel` with `long_run_kernel_weight`. The
+  library ships `BartlettKernel` and `QuadraticSpectralKernel`, the kernel of equation 2.7 of
+  `andrews1991`. The Bartlett form reads sums of windows of the series at any real bandwidth, so its
+  cost is linear in the length of the series. Any other kernel reads every pair, and its bootstrap
+  does one matrix product per block of draws. Both paths take the draws in the same order, so they
+  answer the same p-value from the same generator.
+- **The span** that the bandwidth and the history rule read is `FiniteEntrySpan`, the entries from
+  the first finite one to the last, or `FullGridSpan`, every position of the grid. A missing entry
+  inside the span keeps its position under both.
+- **The interval** of the mean is the symmetric percentile-t interval of the bootstrap at the level
+  `1 - q`. Its order statistic is read off the same division that gives the p-value, so it excludes
+  zero exactly when the p-value is at most `q`. A product `q * (M + 1)` can round below an integer,
+  as `0.29 * 100` does, so the order is not read off it.
+- **The minimum-data rules** `min_obs` and `min_periods` answer `NaN` for a series with fewer finite
+  entries, or with a span that holds fewer windows. The test receives the window of the grid,
+  `horizon // step` from `forecast_ic_window`, as an exact ratio, so `T / window` is the count of
+  holding periods the history covers, `T * step / horizon`. A test that received only `lags` would
+  count windows of `cld(horizon, step)` dates, which is fewer periods whenever the stride does not
+  divide the horizon. The summaries keep `lags` and take `window = lags + 1` beside it, and refuse
+  two that state different overlaps.
+- **The scale of the statistic is the source's by default.** Every autocovariance divides by
+  `n - ddof`, with `ddof = 0` the divisor `n` of the source. The divisor scales the observed
+  statistic and every bootstrap statistic by one factor, so it moves the t-statistic alone and no
+  p-value and no interval. `ddof = 1` gives the divisor `n - 1` of the summary's variance. The sample
+  size is the count of finite entries: a missing date keeps its position and is no observation.
+- **The generator** follows the convention of the library, resolved once per summary by
+  `resolve_rng`, so a seeded test is reproducible and the series of one summary take different
+  draws.
+
+The oracle has the same change under review, with the quadratic spectral kernel at a bandwidth of
+`0.1` of the whole grid, 9,999 draws at a fixed seed, a 95% interval, and `NaN` under 20 dates or
+under 10 holding periods. `WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel(), b = 0.1,
+span = FullGridSpan(), n_sim = 9_999, seed = 0, min_obs = 20, min_periods = 10)` states each of
+these. Its divisor is not settled, and `ddof` states either one, so the t-statistic agrees with
+either. The two generators differ, so the p-values and the intervals agree in law and not draw
+for draw. Measured at 60 dates, that configuration rejected 5.7% of independent
+series and 7.2% of the AR(1) series, and its power against the same shift was 0.54.
+
+The rule of 2026-09-19 stays available as `OverlapMeanTest`, with two corrections. The sum of the
+centred products reads deviations from the sample mean, so under the null hypothesis, a moving
+average of order `L`, its expectation is to first order `(n - 2L - 1)` times the long-run
+variance: `tr(W M Σ M)` with `M` the centring matrix and `W` the band of width `2L + 1`. The
+divisor `n - 1` of 2026-09-19 is unbiased at `L = 0` only, so at every positive order it understated
+the variance and overstated the statistic. The test now divides by `n - 2L - 1`, and reads its
+p-value and its interval off the Student law with `n - 2L - 1` degrees of freedom, which is exact at
+`L = 0` under independent Gaussian entries and an approximation above it. At `L = 0` the statistic
+is bit for bit the one it was, so the parity of the plain statistic at a stride of the horizon holds.
+Measured on a no-skill MA(4) series at the 5% level, over 20,000 seeds: the released rule rejected
+19.9% at 24 dates, 10.6% at 60 and 6.0% at 250, and the corrected one 11.2%, 7.9% and 5.5%. At
+`L = 0` it rejected 4.9% at 24 dates, where the normal law gave 6.2%. The exact expectation agrees
+with `n - 2L - 1` to first order: 14.5 against 15 at 24 dates, 49.8 against 51 at 60. A series with
+`n <= 2L + 1` has no statistic. No divisor reads persistence past the overlap, so the bootstrap test
+stays the default.
+
+Every summary of an information coefficient takes the test as the keyword `mt`:
+`exposure_ic_factor_summary`, `exposure_ic_summary`, `forecast_ic_summary`,
+`forecast_holding_period`, `forecast_decay` and `forecast_evaluation_summary`. Each summary gains a
+two-sided p-value and the two bounds of the interval beside its t-statistic: `p_value`,
+`mean_ci_lower` and `mean_ci_upper` in `ExposureICSummaryResult` and in the `NamedTuple` summaries,
+and the same three names behind `spearman_` and `pearson_` in `ForecastSummaryResult` and in the two
+forward-window tables. Under the default the t-statistic is not on the scale of the normal law, so
+the p-value or the interval is the figure to read. `lags` keeps its meaning, and `window` joins it. The mean, the standard
+deviation, the ratio and the hit rate do not change.
+
+The oracle states the plain statistic. The parity fixtures of `test_08x` and `test_08r` that pin a
+t-statistic pass `mt = OverlapMeanTest()`, and new testsets pin the default against a hand
+computation, the bootstrap against a computation draw by draw on both paths, the interval against
+the p-value, and the size against a no-skill series that is persistent past the overlap.
